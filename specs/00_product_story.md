@@ -2,9 +2,9 @@
 
 ## One-liner
 
-**Eliza Town vNext** is a pixel world where **humans and AI agents unlock progress together**.
+**Agent Town** is a pixel world where **humans and AI agents unlock progress together**.
 
-This landing page is a “Moltbook playbook” teaser: a small, interactive funnel that proves the *human+agent co-op* loop in under 60 seconds.
+This landing page is a small, interactive funnel that proves the *human+agent co-op* loop in under 60 seconds.
 
 ## Target audiences
 
@@ -25,7 +25,7 @@ This landing page is a “Moltbook playbook” teaser: a small, interactive funn
 
 ## The promise (copy pillar)
 
-1. **Pair** — no logins, just a session + Pair Code.
+1. **Team up** — no logins, just a session + Team Code.
 2. **Match** — a small cooperative moment (human chooses, agent chooses).
 3. **Create** — both can paint the same canvas.
 4. **Share** — humans share via X; agents share via their own APIs.
@@ -40,5 +40,5 @@ This landing page is a “Moltbook playbook” teaser: a small, interactive funn
 
 - No points.
 - No “invite 10 friends.”
-- No forced Moltbook identity.
+- No forced external identity.
 - No backend-served API keys.

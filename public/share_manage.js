@@ -19,6 +19,19 @@ function el(id) { return document.getElementById(id); }
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
 const shareLink = `${window.location.origin}/s/${shareId}`;
 
+function handleFromUrl(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (!parts.length) return null;
+    const raw = parts[0].startsWith('@') ? parts[0].slice(1) : parts[0];
+    return raw || null;
+  } catch {
+    return null;
+  }
+}
+
 function renderSnapshot(share, palette) {
   const grid = el('snapshot');
   grid.innerHTML = '';
@@ -38,26 +51,47 @@ function renderSnapshot(share, palette) {
   }
 }
 
-function setAgentPostsStatus(share) {
-  const p = share.agentPosts || {};
-  const parts = [];
-  if (p.moltbookUrl) parts.push(`Moltbook: ${p.moltbookUrl}`);
-  if (p.moltXUrl) parts.push(`MoltX: ${p.moltXUrl}`);
-  el('agentPosts').textContent = parts.length ? parts.join(' • ') : 'Waiting for agent post links…';
+function setTeamLine(share) {
+  const handle = share.humanHandle || handleFromUrl(share.xPostUrl);
+  const human = handle ? `@${handle}` : '--';
+  const agent = share.agentName || 'OpenClaw';
+  el('teamLine').textContent = `human: ${human} | agent: ${agent}`;
+}
+
+function setLink(linkId, missingId, url) {
+  const link = el(linkId);
+  const missing = el(missingId);
+  if (url) {
+    link.href = url;
+    link.style.display = 'inline-flex';
+    if (missing) missing.style.display = 'none';
+  } else {
+    link.style.display = 'none';
+    if (missing) missing.style.display = 'inline-flex';
+  }
+}
+
+function setLinks(share) {
+  setLink('xPostLink', 'xPostMissing', share.xPostUrl);
+  const posts = share.agentPosts || {};
+  setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);
+  setLink('moltXLink', 'moltXMissing', posts.moltXUrl);
 }
 
 function setOptInStatus(share) {
   if (share.public) {
-    el('optInStatus').textContent = 'Added to wall ✓';
+    el('optInStatus').textContent = 'Added to wall';
     return;
   }
   const o = share.optIn || {};
   const h = o.human;
   const a = o.agent;
   if (h === true && a === true) {
-    el('optInStatus').textContent = 'Adding…';
+    el('optInStatus').textContent = 'Adding...';
   } else {
-    el('optInStatus').textContent = `Human: ${h === true ? 'yes' : h === false ? 'no' : '…'} • Agent: ${a === true ? 'yes' : a === false ? 'no' : '…'}`;
+    const human = h === true ? 'yes' : h === false ? 'no' : '...';
+    const agent = a === true ? 'yes' : a === false ? 'no' : '...';
+    el('optInStatus').textContent = `Human: ${human} | Agent: ${agent}`;
   }
 }
 
@@ -65,14 +99,10 @@ async function poll() {
   try {
     const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
     renderSnapshot(r.share, r.palette);
-    setAgentPostsStatus(r.share);
+    setTeamLine(r.share);
+    setLinks(r.share);
     setOptInStatus(r.share);
-
-    // Update saved state for X
-    if (r.share.xPostUrl) {
-      el('xUrl').value = r.share.xPostUrl;
-    }
-  } catch (e) {
+  } catch {
     // ignore
   } finally {
     setTimeout(poll, 900);
@@ -83,34 +113,20 @@ async function init() {
   el('shareIdBadge').textContent = shareId;
   el('shareLink').textContent = shareLink;
 
-  const tweetText = 'I paired with my OpenClaw agent and unlocked Eliza Town vNext.';
-  el('xIntent').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareLink)}`;
-
   el('copyLink').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
-      el('copyLink').textContent = 'Copied ✓';
+      el('copyLink').textContent = 'Copied';
       setTimeout(() => (el('copyLink').textContent = 'Copy'), 1200);
     } catch {
       alert(shareLink);
     }
   });
 
-  el('saveX').addEventListener('click', async () => {
-    el('err').textContent = '';
-    try {
-      await api('/api/human/posts', { method: 'POST', body: JSON.stringify({ xPostUrl: el('xUrl').value }) });
-      el('xSaved').style.display = 'block';
-      setTimeout(() => (el('xSaved').style.display = 'none'), 1200);
-    } catch (e) {
-      el('err').textContent = e.message;
-    }
-  });
-
   el('optInYes').addEventListener('click', async () => {
     el('err').textContent = '';
     try {
-      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ appear: true }) });
+      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ shareId, appear: true }) });
     } catch (e) {
       el('err').textContent = e.message;
     }
@@ -119,16 +135,16 @@ async function init() {
   el('optInNo').addEventListener('click', async () => {
     el('err').textContent = '';
     try {
-      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ appear: false }) });
+      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ shareId, appear: false }) });
     } catch (e) {
       el('err').textContent = e.message;
     }
   });
 
-  // Initial load
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
   renderSnapshot(r.share, r.palette);
-  setAgentPostsStatus(r.share);
+  setTeamLine(r.share);
+  setLinks(r.share);
   setOptInStatus(r.share);
 
   poll();

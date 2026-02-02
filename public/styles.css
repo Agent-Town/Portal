@@ -44,16 +44,22 @@ a:hover { text-decoration: underline; }
 
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
 }
 
-.brand .logo {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  background: var(--accent);
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+.brand .logoLink {
+  display: inline-flex;
+  align-items: center;
+}
+
+.brand .logoImg {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--bg);
 }
 
 .badge {
@@ -104,6 +110,10 @@ a:hover { text-decoration: underline; }
   gap: 10px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.kv.stack {
+  margin-top: 8px;
 }
 
 .pill {
@@ -184,6 +194,14 @@ a:hover { text-decoration: underline; }
 
 .sigil .name {
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.sigil .sigilIcon {
+  font-size: 18px;
+  line-height: 1;
 }
 
 .sigil .hint {
@@ -302,6 +320,10 @@ input::placeholder {
   flex-wrap: wrap;
   color: var(--muted);
   font-size: 12px;
+}
+
+.card .kv {
+  margin-top: 10px;
 }
 
 footer {

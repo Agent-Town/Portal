@@ -7,12 +7,12 @@ Each milestone has a measurable “done” state validated by Playwright.
 
 ## M1 — Home basics
 - Home renders.
-- Pair Code appears.
+- Team Code appears.
 - `/skill.md` is reachable.
 
 **Tests**: `e2e/01_home.spec.js`
 
-## M2 — Agent pairing
+## M2 — Agent connect
 - Agent can call `/api/agent/connect`.
 - UI shows “Agent connected”.
 
@@ -35,13 +35,14 @@ Each milestone has a measurable “done” state validated by Playwright.
 
 ## M6 — Share link
 - Human generates share link.
-- Share page loads snapshot and shows share URL.
+- Manage page loads snapshot and shows share URL.
+- Public share page is read-only.
 
 ## M7 — Dual opt-in
 - Human opts in.
 - Agent opts in.
 - Share page shows “Added to wall”.
-- Wall lists the pair.
+- Wall lists the team.
 
 **Tests**: `e2e/03_create_share_wall.spec.js`
 

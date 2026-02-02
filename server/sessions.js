@@ -1,16 +1,16 @@
-const { createPairCode, nowIso, randomHex } = require('./util');
+const { createTeamCode, nowIso, randomHex } = require('./util');
 
 // In-memory sessions (MVP).
 const sessionsById = new Map();
-const sessionIdByPairCode = new Map();
+const sessionIdByTeamCode = new Map();
 
 const ELEMENTS = [
-  { id: 'key', label: 'Key' },
-  { id: 'cookie', label: 'Cookie' },
-  { id: 'booth', label: 'Booth' },
-  { id: 'wolf', label: 'Wolf' },
-  { id: 'map', label: 'Map' },
-  { id: 'spark', label: 'Spark' }
+  { id: 'key', label: 'Key', icon: '🔑' },
+  { id: 'cookie', label: 'Cookie', icon: '🍪' },
+  { id: 'booth', label: 'Booth', icon: '🎪' },
+  { id: 'wolf', label: 'Wolf', icon: '🐺' },
+  { id: 'map', label: 'Map', icon: '🗺️' },
+  { id: 'spark', label: 'Spark', icon: '✨' }
 ];
 
 const CANVAS = { w: 16, h: 16 };
@@ -21,10 +21,10 @@ function emptyCanvas() {
 
 function createSession() {
   const sessionId = randomHex(16);
-  const pairCode = createPairCode();
+  const teamCode = createTeamCode();
   const session = {
     sessionId,
-    pairCode,
+    teamCode,
     createdAt: nowIso(),
     agent: {
       connected: false,
@@ -42,7 +42,8 @@ function createSession() {
       betaPressed: false,
       optIn: null,
       email: null,
-      xPostUrl: null
+      xPostUrl: null,
+      xHandle: null
     },
     match: {
       matched: false,
@@ -65,7 +66,7 @@ function createSession() {
   };
 
   sessionsById.set(sessionId, session);
-  sessionIdByPairCode.set(pairCode, sessionId);
+  sessionIdByTeamCode.set(teamCode, sessionId);
   return session;
 }
 
@@ -74,10 +75,10 @@ function getSessionById(sessionId) {
   return sessionsById.get(sessionId) || null;
 }
 
-function getSessionByPairCode(pairCode) {
-  if (!pairCode || typeof pairCode !== 'string') return null;
-  const code = pairCode.trim();
-  const sessionId = sessionIdByPairCode.get(code);
+function getSessionByTeamCode(teamCode) {
+  if (!teamCode || typeof teamCode !== 'string') return null;
+  const code = teamCode.trim();
+  const sessionId = sessionIdByTeamCode.get(code);
   if (!sessionId) return null;
   return getSessionById(sessionId);
 }
@@ -105,13 +106,13 @@ function evaluateMatch(session) {
 
 function resetAllSessions() {
   sessionsById.clear();
-  sessionIdByPairCode.clear();
+  sessionIdByTeamCode.clear();
 }
 
 module.exports = {
   createSession,
   getSessionById,
-  getSessionByPairCode,
+  getSessionByTeamCode,
   listElements,
   evaluateMatch,
   resetAllSessions,

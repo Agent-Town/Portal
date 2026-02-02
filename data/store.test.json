@@ -1,18 +1,19 @@
 {
   "signups": [
     {
-      "id": "s_1770020381650_78394ab356af8",
-      "createdAt": "2026-02-02T08:19:41.650Z",
+      "id": "s_1770027842905_afdb2fd877ecc",
+      "createdAt": "2026-02-02T10:24:02.905Z",
       "email": "test@example.com",
-      "pairCode": "PAIR-BG4W-FMRU",
+      "teamCode": "TEAM-8F6N-327C",
       "agentName": "ClawTest",
       "matchedElement": "key"
     }
   ],
   "shares": [
     {
-      "id": "sh_1770020383468_a8f23c2c6a983",
-      "createdAt": "2026-02-02T08:19:43.468Z",
+      "id": "sh_1770027844727_9f5e58532d7fa",
+      "createdAt": "2026-02-02T10:24:04.727Z",
+      "teamCode": "TEAM-8F6N-327C",
       "matchedElement": "key",
       "agentName": "ClawTest",
       "pixels": [
@@ -278,9 +279,9 @@
         "h": 16
       },
       "xPostUrl": null,
+      "humanHandle": null,
       "agentPosts": {
-        "moltbookUrl": null,
-        "moltXUrl": null
+        "moltbookUrl": null
       },
       "optIn": {
         "human": true,
@@ -289,18 +290,18 @@
       "public": true
     }
   ],
-  "publicPairs": [
+  "publicTeams": [
     {
-      "id": "p_1770020383506_857536ab7c50f",
-      "createdAt": "2026-02-02T08:19:43.506Z",
-      "shareId": "sh_1770020383468_a8f23c2c6a983",
-      "sharePath": "/s/sh_1770020383468_a8f23c2c6a983",
+      "id": "p_1770027844768_5e3a96dd7ff26",
+      "createdAt": "2026-02-02T10:24:04.768Z",
+      "shareId": "sh_1770027844727_9f5e58532d7fa",
+      "sharePath": "/s/sh_1770027844727_9f5e58532d7fa",
       "matchedElement": "key",
       "agentName": "ClawTest",
       "xPostUrl": null,
+      "humanHandle": null,
       "agentPosts": {
-        "moltbookUrl": null,
-        "moltXUrl": null
+        "moltbookUrl": null
       }
     }
   ]

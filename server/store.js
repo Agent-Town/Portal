@@ -15,10 +15,10 @@ function readStore() {
     return {
       signups: Array.isArray(parsed.signups) ? parsed.signups : [],
       shares: Array.isArray(parsed.shares) ? parsed.shares : [],
-      publicPairs: Array.isArray(parsed.publicPairs) ? parsed.publicPairs : []
+      publicTeams: Array.isArray(parsed.publicTeams) ? parsed.publicTeams : []
     };
   } catch (err) {
-    return { signups: [], shares: [], publicPairs: [] };
+    return { signups: [], shares: [], publicTeams: [] };
   }
 }
 

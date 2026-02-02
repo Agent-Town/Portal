@@ -21,6 +21,7 @@ function el(id) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
+let lastState = null;
 
 function renderPalette() {
   const c = el('palette');
@@ -38,6 +39,25 @@ function renderPalette() {
     });
     c.appendChild(b);
   });
+}
+
+function hasInk() {
+  return pixels.some((p) => p && p !== 0);
+}
+
+function updateLockState() {
+  const hasHuman = !!(lastState && lastState.human && lastState.human.xPostUrl);
+  const hasAgent = !!(lastState && lastState.agent && lastState.agent.posts && lastState.agent.posts.moltbookUrl);
+  const ready = hasHuman && hasAgent && hasInk();
+  el('shareBtn').disabled = !ready;
+}
+
+function setAgentPostsStatus(state) {
+  const p = state && state.agent && state.agent.posts ? state.agent.posts : {};
+  const parts = [];
+  if (p.moltbookUrl) parts.push(`Moltbook: ${p.moltbookUrl}`);
+  if (p.moltXUrl) parts.push(`MoltX: ${p.moltXUrl}`);
+  el('agentPostsCreate').textContent = parts.length ? parts.join(' | ') : 'Waiting for agent post links...';
 }
 
 function renderCanvas(w, h) {
@@ -66,6 +86,7 @@ function renderCanvas(w, h) {
           pixels[idx] = selectedColor;
           b.dataset.color = String(selectedColor);
           b.style.background = palette[selectedColor];
+          updateLockState();
         } catch (e) {
           el('err').textContent = e.message;
         }
@@ -89,6 +110,7 @@ function patchCanvas(w, h, nextPixels) {
       cell.style.background = palette[nextPixels[idx]] || '#000';
     }
   }
+  updateLockState();
 }
 
 async function pollCanvas() {
@@ -103,13 +125,37 @@ async function pollCanvas() {
   }
 }
 
+async function pollState() {
+  try {
+    const state = await api('/api/state');
+    lastState = state;
+    if (state.human?.xPostUrl && !el('xUrlCreate').value) {
+      el('xUrlCreate').value = state.human.xPostUrl;
+    }
+    setAgentPostsStatus(state);
+    updateLockState();
+  } catch (e) {
+    // ignore transient
+  } finally {
+    setTimeout(pollState, 900);
+  }
+}
+
 async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
+  if (st.signup?.complete && st.signup?.createdAt) {
+    try {
+      localStorage.setItem('agentTownSignupCompleteAt', st.signup.createdAt);
+    } catch {
+      // ignore storage failures
+    }
+  }
   if (!st.signup?.complete) {
     window.location.href = '/';
     return;
   }
+  lastState = st;
 
   const state = await api('/api/canvas/state');
   palette = state.palette;
@@ -118,19 +164,46 @@ async function init() {
   renderPalette();
   renderCanvas(state.canvas.w, state.canvas.h);
 
+  if (st.human?.xPostUrl) {
+    el('xUrlCreate').value = st.human.xPostUrl;
+  }
+  setAgentPostsStatus(st);
+  updateLockState();
+
+  el('saveXCreate').addEventListener('click', async () => {
+    el('err').textContent = '';
+    try {
+      await api('/api/human/posts', { method: 'POST', body: JSON.stringify({ xPostUrl: el('xUrlCreate').value }) });
+      el('xSavedCreate').style.display = 'inline-flex';
+      setTimeout(() => (el('xSavedCreate').style.display = 'none'), 1200);
+      const next = await api('/api/state');
+      lastState = next;
+      updateLockState();
+    } catch (e) {
+      el('err').textContent = e.message === 'HANDLE_TAKEN'
+        ? 'That X account has already been used.'
+        : e.message;
+    }
+  });
+
   el('shareBtn').addEventListener('click', async () => {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
     try {
       const r = await api('/api/share/create', { method: 'POST', body: '{}' });
-      window.location.href = r.sharePath;
+      window.location.href = `/share/${r.shareId}`;
     } catch (e) {
-      el('err').textContent = e.message;
+      el('err').textContent = e.message === 'POSTS_REQUIRED'
+        ? 'Add your X link and have your agent save its post link before locking in.'
+        : e.message === 'EMPTY_CANVAS'
+          ? 'Add at least one pixel before locking in.'
+          : e.message;
       el('shareStatus').style.display = 'none';
     }
   });
 
   pollCanvas();
+  pollState();
 }
 
 init().catch((e) => {

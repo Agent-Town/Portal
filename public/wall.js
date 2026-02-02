@@ -14,27 +14,32 @@ async function api(url, opts) {
 
 function el(id) { return document.getElementById(id); }
 
-function render(pairs) {
+function formatHuman(handle) {
+  if (!handle) return '—';
+  return `@${handle}`;
+}
+
+function render(teams) {
   const list = el('list');
   list.innerHTML = '';
 
-  if (!pairs.length) {
+  if (!teams.length) {
     el('empty').style.display = 'block';
     return;
   }
   el('empty').style.display = 'none';
 
-  pairs.forEach((p, idx) => {
+  teams.forEach((p, idx) => {
     const card = document.createElement('div');
     card.className = 'card';
-    card.setAttribute('data-testid', `pair-${idx}`);
+    card.setAttribute('data-testid', `team-${idx}`);
 
     const title = document.createElement('div');
-    title.innerHTML = `<strong>Pair</strong> — agent: ${p.agentName || 'OpenClaw'} • sigil: ${p.matchedElement || '—'}`;
+    title.innerHTML = `<strong>Team</strong> — human: ${formatHuman(p.humanHandle)} • agent: ${p.agentName || 'OpenClaw'}`;
 
     const meta = document.createElement('div');
     meta.className = 'meta';
-    meta.textContent = `Created: ${p.createdAt} • Share: ${p.shareId}`;
+    meta.innerHTML = `Created: ${p.createdAt} • Share: <a href="${p.sharePath}">${p.shareId}</a>`;
 
     const links = document.createElement('div');
     links.className = 'kv';
@@ -87,8 +92,8 @@ async function poll() {
   try {
     const r = await api('/api/wall');
     el('signups').textContent = String(r.signups ?? '—');
-    el('pairs').textContent = String(r.pairs?.length ?? '—');
-    render(r.pairs || []);
+    el('teams').textContent = String(r.teams?.length ?? '—');
+    render(r.teams || []);
   } catch (e) {
     // ignore
   } finally {

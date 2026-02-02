@@ -38,7 +38,8 @@ function renderSigils(state) {
     btn.setAttribute('data-testid', `sigil-${item.id}`);
 
     const left = document.createElement('div');
-    left.innerHTML = `<div class="name">${item.label}</div><div class="hint">click to pick</div>`;
+    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
+    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
 
     const right = document.createElement('div');
     right.style.display = 'grid';
@@ -86,11 +87,12 @@ function updateUI(state) {
   // Counts
   el('signupCount').textContent = String(state.stats?.signups ?? '—');
 
-  // Pair code
-  el('pairCode').textContent = state.pairCode || '…';
+  // Team code (fallback for older servers that still send pairCode)
+  const teamCode = state.teamCode || state.pairCode || '…';
+  el('teamCode').textContent = teamCode;
 
   const origin = window.location.origin;
-  el('pairingSnippet').textContent = `Read ${origin}/skill.md and pair with code: ${state.pairCode || '…'}`;
+  el('teamSnippet').textContent = `Read ${origin}/skill.md and team with code: ${teamCode}`;
 
   // Agent status
   const connected = !!state.agent?.connected;
@@ -123,8 +125,21 @@ function updateUI(state) {
   const waiting = !!state.human?.betaPressed && !complete;
   el('betaWaiting').style.display = waiting ? 'inline-flex' : 'none';
 
-  // Auto-redirect when both have pressed and signup complete.
-  if (complete && !redirecting) {
+  // Auto-redirect only once per completed signup.
+  let freshComplete = false;
+  if (complete && state.signup?.createdAt) {
+    try {
+      const key = 'agentTownSignupCompleteAt';
+      const last = localStorage.getItem(key);
+      if (last !== state.signup.createdAt) {
+        localStorage.setItem(key, state.signup.createdAt);
+        freshComplete = true;
+      }
+    } catch {
+      freshComplete = true;
+    }
+  }
+  if (complete && freshComplete && !redirecting) {
     redirecting = true;
     // small delay for perceived continuity
     setTimeout(() => {
@@ -149,7 +164,7 @@ async function init() {
   elements = session.elements || [];
   // Update UI quickly using /api/state next.
   updateUI({
-    pairCode: session.pairCode,
+    teamCode: session.teamCode,
     elements,
     agent: { connected: false },
     human: {},
@@ -159,12 +174,12 @@ async function init() {
     stats: session.stats
   });
 
-  el('copyPairing').addEventListener('click', async () => {
-    const msg = el('pairingSnippet').textContent;
+  el('copyTeam').addEventListener('click', async () => {
+    const msg = el('teamSnippet').textContent;
     try {
       await navigator.clipboard.writeText(msg);
-      el('copyPairing').textContent = 'Copied ✓';
-      setTimeout(() => (el('copyPairing').textContent = 'Copy pairing message'), 1200);
+      el('copyTeam').textContent = 'Copied ✓';
+      setTimeout(() => (el('copyTeam').textContent = 'Copy team message'), 1200);
     } catch {
       // Fallback
       alert(msg);

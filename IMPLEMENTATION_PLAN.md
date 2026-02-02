@@ -4,9 +4,9 @@ This repo is already implemented, but this plan is structured so **Codex CLI** c
 
 ## Phase 0 — Objective & constraints
 
-- Build a minimal Moltbook-style landing page teaser for Eliza Town vNext.
+- Build a minimal Agent Town landing page teaser.
 - MUST include cooperative **match** mechanic and shared creation.
-- MUST use session cookie + Pair Code (no external identity).
+- MUST use session cookie + Team Code (no external identity).
 - MUST be test-driven: Playwright tests validate each milestone.
 
 ## Phase 1 — Acceptance tests

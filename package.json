@@ -2,7 +2,7 @@
   "name": "moltbook-playbook-coop",
   "private": true,
   "version": "0.1.0",
-  "description": "Minimal Moltbook-style playbook landing page for Eliza Town vNext (human+agent co-op unlock + shared pixel canvas)",
+  "description": "Minimal Agent Town landing page (human+agent co-op unlock + shared pixel canvas)",
   "license": "MIT",
   "scripts": {
     "dev": "node server/index.js",

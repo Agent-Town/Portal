@@ -7,11 +7,11 @@ test.beforeEach(async ({ request }) => {
 test('agent can connect and match the human sigil to unlock', async ({ page, request }) => {
   await page.goto('/');
 
-  const pairCode = (await page.getByTestId('pair-code').innerText()).trim();
+  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
 
   // Agent connects
   const connect = await request.post('/api/agent/connect', {
-    data: { pairCode, agentName: 'ClawTest' }
+    data: { teamCode, agentName: 'ClawTest' }
   });
   expect(connect.ok()).toBeTruthy();
 
@@ -22,7 +22,7 @@ test('agent can connect and match the human sigil to unlock', async ({ page, req
 
   // Agent selects the same sigil
   const sel = await request.post('/api/agent/select', {
-    data: { pairCode, elementId: 'cookie' }
+    data: { teamCode, elementId: 'cookie' }
   });
   expect(sel.ok()).toBeTruthy();
 

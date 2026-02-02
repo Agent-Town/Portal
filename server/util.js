@@ -9,15 +9,15 @@ function randomHex(bytes = 16) {
 }
 
 // Human-copyable, unambiguous alphabet (no 0/O, 1/I).
-const PAIR_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-function createPairCode() {
+const TEAM_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function createTeamCode() {
   const bytes = crypto.randomBytes(8);
   let out = '';
   for (let i = 0; i < bytes.length; i++) {
-    out += PAIR_ALPHABET[bytes[i] % PAIR_ALPHABET.length];
+    out += TEAM_ALPHABET[bytes[i] % TEAM_ALPHABET.length];
   }
-  // Format: PAIR-XXXX-XXXX
-  return `PAIR-${out.slice(0, 4)}-${out.slice(4, 8)}`;
+  // Format: TEAM-XXXX-XXXX
+  return `TEAM-${out.slice(0, 4)}-${out.slice(4, 8)}`;
 }
 
 function parseCookies(headerValue) {
@@ -46,7 +46,7 @@ function isValidEmail(email) {
 module.exports = {
   nowIso,
   randomHex,
-  createPairCode,
+  createTeamCode,
   parseCookies,
   isValidEmail
 };

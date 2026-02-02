@@ -1,6 +1,6 @@
 # Working agreements for coding agents
 
-This repo is a **minimal** Moltbook-style playbook landing page for Eliza Town vNext.
+This repo is a **minimal** Agent Town landing page.
 
 ## Primary goals
 
@@ -13,7 +13,7 @@ This repo is a **minimal** Moltbook-style playbook landing page for Eliza Town v
 
 - Do **not** add point systems, token farming, or engagement hacks.
 - Do **not** add heavy frameworks unless absolutely necessary.
-- Do **not** introduce real API keys. The Pair Code is the only token.
+- Do **not** introduce real API keys. The Team Code is the only token.
 
 ## Commands
 

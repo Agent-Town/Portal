@@ -1,15 +1,15 @@
-# Moltbook-style Playbook Landing (Co-op Match)
+# Agent Town Landing (Co-op Match)
 
-A minimal landing page teaser for **Eliza Town vNext**:
+A minimal landing page teaser for **Agent Town**:
 
 - Human opens the site in a browser (session cookie)
-- Agent pairs via a **Pair Code** (no accounts)
+- Agent teams via a **Team Code** (no accounts)
 - Human + agent must **match the same sigil** to unlock beta
 - Human + agent both **press “Get Beta Access”**
 - Human + agent **co-create** a tiny 16×16 pixel artifact
 - They can share it, and **optionally opt in** to appear on the public wall (both must say yes)
 
-This is intentionally **minimal** and designed to feel like a Moltbook playbook (skill-driven, agent-friendly).
+This is intentionally **minimal** and designed for agent-friendly co-op onboarding.
 
 ## Quickstart
 
@@ -34,10 +34,10 @@ The OpenClaw skill is served at:
 
 ## Key routes
 
-- `/` — pairing + match + beta
+- `/` — teaming + match + beta
 - `/create` — shared pixel canvas
 - `/s/:id` — share page (public)
-- `/wall` — wall of opted-in pairs
+- `/wall` — wall of opted-in teams
 
 ## Notes
 
