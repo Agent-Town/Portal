@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create — Eliza Town vNext</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true"></span>
+        <strong>Create</strong>
+        <span class="badge">human + agent canvas</span>
+      </div>
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/wall">Wall</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h1 style="margin:0 0 8px">Make something together.</h1>
+      <p class="small" style="margin-top:0">
+        Human: click pixels. Agent: paint via the skill API. When it feels done, generate a share link.
+      </p>
+
+      <div class="canvasWrap">
+        <div class="palette" id="palette" data-testid="palette"></div>
+        <div class="canvasGrid" id="canvas" data-testid="canvas"></div>
+        <div class="kv">
+          <button class="btn primary" id="shareBtn" data-testid="share-btn">Generate share link</button>
+          <span class="pill" id="shareStatus" style="display:none">Working…</span>
+        </div>
+      </div>
+      <div class="small" id="err" style="color: var(--bad)"></div>
+    </div>
+
+    <footer>
+      Tip: keep it tiny. A 3–10 pixel signature is enough.
+    </footer>
+  </div>
+
+  <script src="/create.js"></script>
+</body>
+</html>
