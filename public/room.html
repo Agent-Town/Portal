@@ -76,6 +76,27 @@
       <div class="kv" style="margin-top:10px">
         <button class="btn" id="copyErc8004Btn">Copy ERC-8004 statement</button>
       </div>
+
+      <div class="divider" style="margin: 14px 0;"></div>
+      <h3 style="margin:0 0 6px">Mint identity (Phase 3)</h3>
+      <p class="small" style="margin-top:0">Will mint ERC-8004 identity using your EVM wallet (MetaMask). Not wired until contract details are set.</p>
+      <div class="row" style="gap: 10px; align-items: end;">
+        <div>
+          <label class="small" for="erc8004Contract">ERC-8004 contract</label>
+          <input id="erc8004Contract" placeholder="0x…" />
+        </div>
+        <div>
+          <label class="small" for="erc8004Chain">Chain</label>
+          <select id="erc8004Chain">
+            <option value="sepolia">sepolia</option>
+            <option value="mainnet">mainnet</option>
+          </select>
+        </div>
+        <div class="kv">
+          <button class="btn" id="mintErc8004Btn">Mint ERC-8004 identity</button>
+        </div>
+      </div>
+      <div class="small" id="erc8004MintStatus" style="margin-top:8px; color: var(--muted)"></div>
     </div>
 
     <div class="row two" style="margin-top: 14px;">

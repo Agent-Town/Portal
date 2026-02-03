@@ -180,11 +180,31 @@ function buildErc8004Statement(currentRoomId) {
     roomPubKey: currentRoomId,
     // human wallet used for unlock (Solana in Phase 1)
     human: walletAddr || null,
-    // phase 2: fill in agent ERC-8004 id/address once available
+    // phase 2/3: fill in agent + human ERC-8004 identity ids once minted
+    humanErc8004: null,
     agentErc8004: null,
     origin: window.location.origin,
     createdAtMs: Date.now()
   };
+}
+
+async function mintErc8004Identity() {
+  const status = el('erc8004MintStatus');
+  if (status) status.textContent = '';
+
+  if (!window.ethereum) {
+    throw new Error('NO_EVM_WALLET');
+  }
+
+  const contract = el('erc8004Contract')?.value?.trim();
+  const chain = el('erc8004Chain')?.value;
+  if (!contract) throw new Error('MISSING_CONTRACT');
+
+  // Phase 3 TODO: needs real ERC-8004 contract ABI + mint/register function.
+  // We intentionally do not guess calldata.
+  if (status) {
+    status.textContent = `Not wired yet. Need ERC-8004 ABI + mint function signature. (contract=${contract}, chain=${chain})`;
+  }
 }
 
 function renderDescriptorUI(currentRoomId) {
@@ -438,6 +458,15 @@ async function init() {
       setTimeout(() => (el('copyErc8004Btn').textContent = 'Copy ERC-8004 statement'), 1200);
     } catch {
       alert(el('erc8004').value);
+    }
+  });
+
+  el('mintErc8004Btn').addEventListener('click', async () => {
+    setError('');
+    try {
+      await mintErc8004Identity();
+    } catch (e) {
+      setError(e.message);
     }
   });
 

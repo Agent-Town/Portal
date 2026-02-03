@@ -79,4 +79,7 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
   // Phase 2 hook: ERC-8004 statement exists.
   await expect(page.locator('#erc8004')).toBeVisible();
   await expect(page.locator('#erc8004')).toHaveValue(/erc8004\.link_room/);
+
+  // Phase 3 hook: mint UI exists.
+  await expect(page.getByRole('button', { name: 'Mint ERC-8004 identity' })).toBeVisible();
 });
