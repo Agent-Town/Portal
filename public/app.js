@@ -160,6 +160,20 @@ async function poll() {
 }
 
 async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (ref) {
+    try {
+      await api('/api/referral', { method: 'POST', body: JSON.stringify({ shareId: ref }) });
+    } catch {
+      // ignore invalid referral
+    }
+    params.delete('ref');
+    const qs = params.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState({}, '', nextUrl);
+  }
+
   const session = await api('/api/session');
   elements = session.elements || [];
   // Update UI quickly using /api/state next.

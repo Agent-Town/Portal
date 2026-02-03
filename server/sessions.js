@@ -33,8 +33,7 @@ function createSession() {
       betaPressed: false,
       optIn: null,
       posts: {
-        moltbookUrl: null,
-        moltXUrl: null
+        moltbookUrl: null
       }
     },
     human: {
@@ -54,6 +53,9 @@ function createSession() {
       complete: false,
       createdAt: null
     },
+    referral: {
+      shareId: null
+    },
     canvas: {
       w: CANVAS.w,
       h: CANVAS.h,
@@ -61,6 +63,14 @@ function createSession() {
     },
     share: {
       id: null,
+      createdAt: null
+    },
+    roomCeremony: {
+      humanCommit: null,
+      agentCommit: null,
+      humanReveal: null,
+      agentReveal: null,
+      roomId: null,
       createdAt: null
     }
   };

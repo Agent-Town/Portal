@@ -21,7 +21,6 @@ function el(id) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
-let lastState = null;
 
 function renderPalette() {
   const c = el('palette');
@@ -46,18 +45,7 @@ function hasInk() {
 }
 
 function updateLockState() {
-  const hasHuman = !!(lastState && lastState.human && lastState.human.xPostUrl);
-  const hasAgent = !!(lastState && lastState.agent && lastState.agent.posts && lastState.agent.posts.moltbookUrl);
-  const ready = hasHuman && hasAgent && hasInk();
-  el('shareBtn').disabled = !ready;
-}
-
-function setAgentPostsStatus(state) {
-  const p = state && state.agent && state.agent.posts ? state.agent.posts : {};
-  const parts = [];
-  if (p.moltbookUrl) parts.push(`Moltbook: ${p.moltbookUrl}`);
-  if (p.moltXUrl) parts.push(`MoltX: ${p.moltXUrl}`);
-  el('agentPostsCreate').textContent = parts.length ? parts.join(' | ') : 'Waiting for agent post links...';
+  el('shareBtn').disabled = !hasInk();
 }
 
 function renderCanvas(w, h) {
@@ -125,22 +113,6 @@ async function pollCanvas() {
   }
 }
 
-async function pollState() {
-  try {
-    const state = await api('/api/state');
-    lastState = state;
-    if (state.human?.xPostUrl && !el('xUrlCreate').value) {
-      el('xUrlCreate').value = state.human.xPostUrl;
-    }
-    setAgentPostsStatus(state);
-    updateLockState();
-  } catch (e) {
-    // ignore transient
-  } finally {
-    setTimeout(pollState, 900);
-  }
-}
-
 async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
@@ -155,7 +127,6 @@ async function init() {
     window.location.href = '/';
     return;
   }
-  lastState = st;
 
   const state = await api('/api/canvas/state');
   palette = state.palette;
@@ -163,47 +134,148 @@ async function init() {
 
   renderPalette();
   renderCanvas(state.canvas.w, state.canvas.h);
-
-  if (st.human?.xPostUrl) {
-    el('xUrlCreate').value = st.human.xPostUrl;
-  }
-  setAgentPostsStatus(st);
   updateLockState();
 
-  el('saveXCreate').addEventListener('click', async () => {
-    el('err').textContent = '';
-    try {
-      await api('/api/human/posts', { method: 'POST', body: JSON.stringify({ xPostUrl: el('xUrlCreate').value }) });
-      el('xSavedCreate').style.display = 'inline-flex';
-      setTimeout(() => (el('xSavedCreate').style.display = 'none'), 1200);
-      const next = await api('/api/state');
-      lastState = next;
-      updateLockState();
-    } catch (e) {
-      el('err').textContent = e.message === 'HANDLE_TAKEN'
-        ? 'That X account has already been used.'
-        : e.message;
+  async function connectWalletOrThrow() {
+    if (!window.solana) throw new Error('NO_SOLANA_WALLET');
+    const resp = await window.solana.connect();
+    return { wallet: window.solana, address: resp.publicKey.toString() };
+  }
+
+  async function sha256(bytes) {
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return new Uint8Array(digest);
+  }
+
+  async function deriveRhFromCanvas(pxs) {
+    const raw = new TextEncoder().encode(JSON.stringify({ v: 1, pixels: pxs }));
+    return sha256(raw);
+  }
+
+  function b64(bytes) {
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+
+  async function hkdfKeyFromSig(sigBytes) {
+    const salt = new Uint8Array([]);
+    const info = new TextEncoder().encode('elizatown-room-wrap-v1');
+    const ikmHash = await sha256(sigBytes);
+    const baseKey = await crypto.subtle.importKey('raw', ikmHash, 'HKDF', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'HKDF', hash: 'SHA-256', salt, info },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  async function aesGcmEncrypt(key, plaintextBytes, aadBytes) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: aadBytes || new Uint8Array([]) },
+      key,
+      plaintextBytes
+    );
+    return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
+  }
+
+  function base58Encode(bytes) {
+    const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    if (!bytes || bytes.length === 0) return '';
+    const digits = [0];
+    for (let i = 0; i < bytes.length; i++) {
+      let carry = bytes[i];
+      for (let j = 0; j < digits.length; j++) {
+        carry += digits[j] << 8;
+        digits[j] = carry % 58;
+        carry = (carry / 58) | 0;
+      }
+      while (carry) {
+        digits.push(carry % 58);
+        carry = (carry / 58) | 0;
+      }
     }
-  });
+    let out = '';
+    for (let k = 0; k < bytes.length && bytes[k] === 0; k++) out += '1';
+    for (let q = digits.length - 1; q >= 0; q--) out += B58[digits[q]];
+    return out;
+  }
+
+  function buildUnlockMessage({ roomPubKey, nonce, origin }) {
+    return [
+      'ElizaTown Room Unlock',
+      `roomPubKey: ${roomPubKey}`,
+      `origin: ${origin}`,
+      `nonce: ${nonce}`
+    ].join('\n');
+  }
 
   el('shareBtn').addEventListener('click', async () => {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
     try {
-      const r = await api('/api/share/create', { method: 'POST', body: '{}' });
-      window.location.href = `/share/${r.shareId}`;
+      const { wallet, address } = await connectWalletOrThrow();
+
+      // 1) Human computes Rh from canvas and commits+reveals it.
+      const Rh = await deriveRhFromCanvas(pixels);
+      const humanCommit = b64(await sha256(Rh));
+      const humanReveal = b64(Rh);
+      await api('/api/human/room/commit', { method: 'POST', body: JSON.stringify({ commit: humanCommit }) });
+      await api('/api/human/room/reveal', { method: 'POST', body: JSON.stringify({ reveal: humanReveal }) });
+
+      // 2) Wait for agent reveal (agent contributes Ra) via agent endpoints.
+      const mat = await api('/api/human/room/material');
+      if (!mat.agentReveal) {
+        throw new Error('WAITING_AGENT_REVEAL');
+      }
+      const Ra = Uint8Array.from(atob(mat.agentReveal), (c) => c.charCodeAt(0));
+
+      // 3) Derive Kroot = sha256(Rh||Ra) and roomId.
+      const combo = new Uint8Array(Rh.length + Ra.length);
+      combo.set(Rh, 0);
+      combo.set(Ra, Rh.length);
+      const Kroot = await sha256(combo);
+      const roomIdBytes = await sha256(Kroot);
+      const roomPubKey = base58Encode(roomIdBytes);
+
+      // 4) Wrap the room key with wallet-signature-derived Kwrap, store ciphertext only.
+      const n = await api('/api/room/nonce');
+      const nonce = n.nonce;
+
+      const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
+      const sigResp = await wallet.signMessage(new TextEncoder().encode(msg), 'utf8');
+      const sig = sigResp.signature;
+      const Kwrap = await hkdfKeyFromSig(sig);
+
+      const aad = new TextEncoder().encode(`roomPubKey=${roomPubKey}`);
+      const wrapped = await aesGcmEncrypt(Kwrap, Kroot, aad);
+
+      await api('/api/room/init', {
+        method: 'POST',
+        body: JSON.stringify({
+          roomId: roomPubKey,
+          roomPubKey,
+          nonce,
+          wrappedKey: { alg: 'AES-GCM', iv: b64(wrapped.iv), ct: b64(wrapped.ct) },
+          unlock: { kind: 'solana-wallet-signature', address }
+        })
+      });
+
+      window.location.href = `/room?room=${encodeURIComponent(roomPubKey)}`;
     } catch (e) {
-      el('err').textContent = e.message === 'POSTS_REQUIRED'
-        ? 'Add your X link and have your agent save its post link before locking in.'
-        : e.message === 'EMPTY_CANVAS'
-          ? 'Add at least one pixel before locking in.'
+      el('err').textContent = e.message === 'EMPTY_CANVAS'
+        ? 'Add at least one pixel before locking in.'
+        : e.message === 'WAITING_AGENT_REVEAL'
+          ? 'Waiting for agent to contribute to the room ceremony. Ask your agent to call /api/agent/room/commit then /api/agent/room/reveal (see skill.md).'
           : e.message;
       el('shareStatus').style.display = 'none';
     }
   });
 
   pollCanvas();
-  pollState();
 }
 
 init().catch((e) => {

@@ -41,9 +41,9 @@ Each milestone has a measurable “done” state validated by Playwright.
 ## M7 — Dual opt-in
 - Human opts in.
 - Agent opts in.
-- Share page shows “Added to wall”.
-- Wall lists the team.
+- Share page shows “Added to leaderboard”.
+- Leaderboard lists the team.
 
-**Tests**: `e2e/03_create_share_wall.spec.js`
+**Tests**: `e2e/03_create_share_leaderboard.spec.js`
 
 (You can add M8 for post URL capture if desired.)

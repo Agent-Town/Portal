@@ -74,11 +74,14 @@ function setLinks(share) {
   setLink('xPostLink', 'xPostMissing', share.xPostUrl);
   const posts = share.agentPosts || {};
   setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);
-  setLink('moltXLink', 'moltXMissing', posts.moltXUrl);
 }
 
 async function init() {
   el('shareIdBadge').textContent = shareId;
+  const signup = el('signupBtn');
+  if (signup) {
+    signup.href = `/?ref=${encodeURIComponent(shareId)}`;
+  }
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
   renderSnapshot(r.share, r.palette);
   setTeamLine(r.share);

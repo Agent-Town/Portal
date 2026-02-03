@@ -58,29 +58,16 @@ function setTeamLine(share) {
   el('teamLine').textContent = `human: ${human} | agent: ${agent}`;
 }
 
-function setLink(linkId, missingId, url) {
-  const link = el(linkId);
-  const missing = el(missingId);
-  if (url) {
-    link.href = url;
-    link.style.display = 'inline-flex';
-    if (missing) missing.style.display = 'none';
-  } else {
-    link.style.display = 'none';
-    if (missing) missing.style.display = 'inline-flex';
-  }
-}
-
-function setLinks(share) {
-  setLink('xPostLink', 'xPostMissing', share.xPostUrl);
-  const posts = share.agentPosts || {};
-  setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);
-  setLink('moltXLink', 'moltXMissing', posts.moltXUrl);
+function setAgentPostsStatus(share) {
+  const p = share.agentPosts || {};
+  const parts = [];
+  if (p.moltbookUrl) parts.push(`Moltbook: ${p.moltbookUrl}`);
+  el('agentPosts').textContent = parts.length ? parts.join(' | ') : 'Waiting for agent post links...';
 }
 
 function setOptInStatus(share) {
   if (share.public) {
-    el('optInStatus').textContent = 'Added to wall';
+    el('optInStatus').textContent = 'Added to leaderboard';
     return;
   }
   const o = share.optIn || {};
@@ -100,8 +87,11 @@ async function poll() {
     const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
     renderSnapshot(r.share, r.palette);
     setTeamLine(r.share);
-    setLinks(r.share);
+    setAgentPostsStatus(r.share);
     setOptInStatus(r.share);
+    if (r.share.xPostUrl) {
+      el('xUrl').value = r.share.xPostUrl;
+    }
   } catch {
     // ignore
   } finally {
@@ -113,6 +103,9 @@ async function init() {
   el('shareIdBadge').textContent = shareId;
   el('shareLink').textContent = shareLink;
 
+  const tweetText = 'I teamed up with my OpenClaw agent and unlocked Agent Town.';
+  el('xIntent').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareLink)}`;
+
   el('copyLink').addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
@@ -120,6 +113,24 @@ async function init() {
       setTimeout(() => (el('copyLink').textContent = 'Copy'), 1200);
     } catch {
       alert(shareLink);
+    }
+  });
+
+  el('saveX').addEventListener('click', async () => {
+    el('err').textContent = '';
+    el('xErr').textContent = '';
+    try {
+      await api('/api/human/posts', {
+        method: 'POST',
+        body: JSON.stringify({ shareId, xPostUrl: el('xUrl').value })
+      });
+      el('xSaved').style.display = 'block';
+      el('xErr').textContent = '';
+      setTimeout(() => (el('xSaved').style.display = 'none'), 1200);
+    } catch (e) {
+      el('xErr').textContent = e.message === 'HANDLE_TAKEN'
+        ? 'That X account has already been used.'
+        : e.message;
     }
   });
 
@@ -144,8 +155,11 @@ async function init() {
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
   renderSnapshot(r.share, r.palette);
   setTeamLine(r.share);
-  setLinks(r.share);
+  setAgentPostsStatus(r.share);
   setOptInStatus(r.share);
+  if (r.share.xPostUrl) {
+    el('xUrl').value = r.share.xPostUrl;
+  }
 
   poll();
 }

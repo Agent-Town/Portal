@@ -13,6 +13,34 @@ const {
   CANVAS
 } = require('./sessions');
 
+function b64ToBytes(str) {
+  const bin = Buffer.from(str, 'base64');
+  return new Uint8Array(bin);
+}
+
+function bytesToB64(bytes) {
+  return Buffer.from(bytes).toString('base64');
+}
+
+function sha256Bytes(bytes) {
+  const crypto = require('crypto');
+  return new Uint8Array(crypto.createHash('sha256').update(Buffer.from(bytes)).digest());
+}
+
+function base58Encode(bytes) {
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let x = BigInt('0x' + Buffer.from(bytes).toString('hex'));
+  let out = '';
+  while (x > 0n) {
+    const mod = x % 58n;
+    out = alphabet[Number(mod)] + out;
+    x = x / 58n;
+  }
+  // leading zeros
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) out = '1' + out;
+  return out || '1';
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.use(
@@ -168,6 +196,17 @@ app.get('/api/state', (req, res) => {
   });
 });
 
+app.post('/api/referral', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const shareId = typeof req.body?.shareId === 'string' ? req.body.shareId.trim() : '';
+  if (!shareId) return res.status(400).json({ ok: false, error: 'MISSING_SHARE_ID' });
+  const store = readStore();
+  const share = store.shares.find((x) => x.id === shareId);
+  if (!share) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  s.referral.shareId = shareId;
+  res.json({ ok: true });
+});
+
 app.post('/api/human/select', (req, res) => {
   const s = ensureHumanSession(req, res);
   const elementId = typeof req.body?.elementId === 'string' ? req.body.elementId.trim() : '';
@@ -234,14 +273,22 @@ function maybeCompleteSignup(session) {
 
   const store = readStore();
   const signupId = `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const referralShareId = session.referral?.shareId || null;
   const record = {
     id: signupId,
     createdAt: nowIso(),
     email: session.human.email,
     teamCode: session.teamCode,
     agentName: session.agent.name || null,
-    matchedElement: session.match.elementId
+    matchedElement: session.match.elementId,
+    referralShareId
   };
+  if (referralShareId) {
+    const share = store.shares.find((x) => x.id === referralShareId);
+    if (share) {
+      share.referrals = typeof share.referrals === 'number' ? share.referrals + 1 : 1;
+    }
+  }
   store.signups.push(record);
   writeStore(store);
 
@@ -313,15 +360,141 @@ app.post('/api/agent/canvas/paint', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Room ceremony (agent + human) ---
+app.get('/api/agent/room/state', (req, res) => {
+  const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    ceremony: {
+      humanCommit: !!s.roomCeremony?.humanCommit,
+      agentCommit: !!s.roomCeremony?.agentCommit,
+      humanReveal: !!s.roomCeremony?.humanReveal,
+      agentReveal: !!s.roomCeremony?.agentReveal,
+      roomId: s.roomCeremony?.roomId || null
+    }
+  });
+});
+
+app.post('/api/agent/room/commit', (req, res) => {
+  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
+  const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  s.roomCeremony.agentCommit = commit;
+  res.json({ ok: true });
+});
+
+app.post('/api/agent/room/reveal', (req, res) => {
+  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
+  const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  if (!reveal) return res.status(400).json({ ok: false, error: 'MISSING_REVEAL' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+
+  // Verify reveal matches commit if present.
+  const ra = b64ToBytes(reveal);
+  const ch = bytesToB64(sha256Bytes(ra));
+  if (s.roomCeremony.agentCommit && s.roomCeremony.agentCommit !== ch) {
+    return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
+  }
+
+  s.roomCeremony.agentReveal = reveal;
+
+  // If both reveals exist, compute roomId and store it (no secrets persisted).
+  if (s.roomCeremony.humanReveal && s.roomCeremony.agentReveal) {
+    const rh = b64ToBytes(s.roomCeremony.humanReveal);
+    const combo = new Uint8Array(rh.length + ra.length);
+    combo.set(rh, 0);
+    combo.set(ra, rh.length);
+    const kroot = sha256Bytes(combo);
+    const roomIdBytes = sha256Bytes(kroot);
+    s.roomCeremony.roomId = base58Encode(roomIdBytes);
+    s.roomCeremony.createdAt = s.roomCeremony.createdAt || nowIso();
+  }
+
+  res.json({ ok: true, roomId: s.roomCeremony.roomId || null });
+});
+
+app.post('/api/human/room/commit', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
+  if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
+  s.roomCeremony.humanCommit = commit;
+  res.json({ ok: true });
+});
+
+app.post('/api/human/room/reveal', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
+  if (!reveal) return res.status(400).json({ ok: false, error: 'MISSING_REVEAL' });
+
+  const rh = b64ToBytes(reveal);
+  const ch = bytesToB64(sha256Bytes(rh));
+  if (s.roomCeremony.humanCommit && s.roomCeremony.humanCommit !== ch) {
+    return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
+  }
+
+  s.roomCeremony.humanReveal = reveal;
+
+  // If both reveals exist, compute roomId.
+  if (s.roomCeremony.humanReveal && s.roomCeremony.agentReveal) {
+    const ra = b64ToBytes(s.roomCeremony.agentReveal);
+    const combo = new Uint8Array(rh.length + ra.length);
+    combo.set(rh, 0);
+    combo.set(ra, rh.length);
+    const kroot = sha256Bytes(combo);
+    const roomIdBytes = sha256Bytes(kroot);
+    s.roomCeremony.roomId = base58Encode(roomIdBytes);
+    s.roomCeremony.createdAt = s.roomCeremony.createdAt || nowIso();
+  }
+
+  res.json({ ok: true, roomId: s.roomCeremony.roomId || null });
+});
+
+app.get('/api/human/room/state', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  res.json({
+    ok: true,
+    ceremony: {
+      humanCommit: !!s.roomCeremony?.humanCommit,
+      agentCommit: !!s.roomCeremony?.agentCommit,
+      humanReveal: !!s.roomCeremony?.humanReveal,
+      agentReveal: !!s.roomCeremony?.agentReveal,
+      roomId: s.roomCeremony?.roomId || null
+    }
+  });
+});
+
+app.get('/api/human/room/material', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  res.json({
+    ok: true,
+    roomId: s.roomCeremony?.roomId || null,
+    agentReveal: s.roomCeremony?.agentReveal || null
+  });
+});
+
+app.get('/api/agent/room/material', (req, res) => {
+  const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  res.json({ ok: true, roomId: s.roomCeremony?.roomId || null, humanReveal: s.roomCeremony?.humanReveal || null });
+});
+
 // Share creation + retrieval
 app.post('/api/share/create', (req, res) => {
   const s = ensureHumanSession(req, res);
   if (!s.signup.complete) return res.status(403).json({ ok: false, error: 'SIGNUP_REQUIRED' });
   if (!canvasHasInk(s.canvas.pixels)) {
     return res.status(403).json({ ok: false, error: 'EMPTY_CANVAS' });
-  }
-  if (!s.human.xPostUrl || !s.agent.posts?.moltbookUrl) {
-    return res.status(403).json({ ok: false, error: 'POSTS_REQUIRED' });
   }
 
   const store = readStore();
@@ -337,9 +510,9 @@ app.post('/api/share/create', (req, res) => {
     xPostUrl: s.human.xPostUrl,
     humanHandle: s.human.xHandle || null,
     agentPosts: {
-      moltbookUrl: s.agent.posts?.moltbookUrl || null,
-      moltXUrl: s.agent.posts?.moltXUrl || null
+      moltbookUrl: s.agent.posts?.moltbookUrl || null
     },
+    referrals: 0,
     locked: true,
     lockedAt: nowIso(),
     optIn: { human: null, agent: null },
@@ -361,6 +534,9 @@ app.get('/api/share/:id', (req, res) => {
   const rec = store.shares.find((x) => x.id === id);
   if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const { teamCode, ...rest } = rec;
+  if (rest.agentPosts) {
+    rest.agentPosts = { moltbookUrl: rest.agentPosts.moltbookUrl || null };
+  }
   res.json({ ok: true, share: rest, palette: palette() });
 });
 
@@ -420,9 +596,6 @@ app.post('/api/human/posts', (req, res) => {
   }
   const rec = resolved.ok ? (resolved.share || store.shares.find((x) => x.id === resolved.shareId)) : null;
   if (rec) {
-    if (isShareLocked(rec)) {
-      return res.status(403).json({ ok: false, error: 'LOCKED' });
-    }
     rec.xPostUrl = url;
     rec.humanHandle = handle;
     const pub = store.publicTeams.find((p) => p.shareId === s.share.id);
@@ -444,22 +617,17 @@ app.post('/api/agent/posts', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
 
   const moltbookUrl = sanitizeUrl(req.body?.moltbookUrl);
-  const moltXUrl = sanitizeUrl(req.body?.moltXUrl);
 
   s.agent.posts.moltbookUrl = moltbookUrl;
-  s.agent.posts.moltXUrl = moltXUrl;
 
   if (s.share.id) {
     const store = readStore();
     const rec = store.shares.find((x) => x.id === s.share.id);
     if (rec) {
-      if (isShareLocked(rec)) {
-        return res.status(403).json({ ok: false, error: 'LOCKED' });
-      }
-      rec.agentPosts = { moltbookUrl, moltXUrl };
+      rec.agentPosts = { moltbookUrl };
       const pub = store.publicTeams.find((p) => p.shareId === s.share.id);
       if (pub) {
-        pub.agentPosts = { moltbookUrl, moltXUrl };
+        pub.agentPosts = { moltbookUrl };
       }
       writeStore(store);
     }
@@ -468,7 +636,7 @@ app.post('/api/agent/posts', (req, res) => {
 });
 
 // Opt-in gating: only list team if BOTH opted in.
-function maybeAddToWall(session) {
+function maybeAddToLeaderboard(session) {
   if (!session.share.id) return { ok: false, error: 'SHARE_NOT_READY' };
   if (session.human.optIn !== true || session.agent.optIn !== true) return { ok: false, error: 'WAITING' };
 
@@ -518,7 +686,7 @@ app.post('/api/human/optin', (req, res) => {
     writeStore(store);
   }
 
-  const result = maybeAddToWall(s);
+  const result = maybeAddToLeaderboard(s);
   res.json({ ok: true, result });
 });
 
@@ -540,27 +708,127 @@ app.post('/api/agent/optin', (req, res) => {
     writeStore(store);
   }
 
-  const result = maybeAddToWall(s);
+  const result = maybeAddToLeaderboard(s);
   res.json({ ok: true, result });
+});
+
+function buildLeaderboard(store) {
+  const referralsByShare = new Map(
+    store.shares.map((s) => [s.id, typeof s.referrals === 'number' ? s.referrals : 0])
+  );
+  const teams = store.publicTeams.map((p) => ({
+    ...p,
+    humanHandle: p.humanHandle || extractXHandle(p.xPostUrl),
+    referrals: referralsByShare.get(p.shareId) || 0,
+    agentPosts: p.agentPosts ? { moltbookUrl: p.agentPosts.moltbookUrl || null } : null
+  }));
+  teams.sort((a, b) => (b.referrals || 0) - (a.referrals || 0));
+  const referralsTotal = teams.reduce((sum, t) => sum + (t.referrals || 0), 0);
+  return { teams, referralsTotal };
+}
+
+app.get('/api/leaderboard', (_req, res) => {
+  const store = readStore();
+  const { teams, referralsTotal } = buildLeaderboard(store);
+  res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
 app.get('/api/wall', (_req, res) => {
   const store = readStore();
-  const teams = store.publicTeams.map((p) => ({
-    ...p,
-    humanHandle: p.humanHandle || extractXHandle(p.xPostUrl)
-  }));
-  res.json({ ok: true, signups: store.signups.length, teams });
+  const { teams, referralsTotal } = buildLeaderboard(store);
+  res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
   app.post('/__test__/reset', (_req, res) => {
-    writeStore({ signups: [], shares: [], publicTeams: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], rooms: [] });
     resetAllSessions();
     res.json({ ok: true });
   });
 }
+
+// --- Rooms (Phase 1 MVP) ---
+function makeNonce() {
+  return `n_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+app.get('/api/room/nonce', (_req, res) => {
+  res.json({ ok: true, nonce: makeNonce() });
+});
+
+app.post('/api/room/init', (req, res) => {
+  const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
+  const roomPubKey = typeof req.body?.roomPubKey === 'string' ? req.body.roomPubKey.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const wrappedKey = req.body?.wrappedKey;
+  const unlock = req.body?.unlock || null;
+
+  if (!roomId || !roomPubKey) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+  if (roomId !== roomPubKey) return res.status(400).json({ ok: false, error: 'ROOM_ID_MISMATCH' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!wrappedKey || typeof wrappedKey.iv !== 'string' || typeof wrappedKey.ct !== 'string') {
+    return res.status(400).json({ ok: false, error: 'MISSING_WRAPPED_KEY' });
+  }
+
+  const store = readStore();
+  const exists = store.rooms.find((r) => r.id === roomId);
+  if (exists) return res.status(409).json({ ok: false, error: 'ROOM_EXISTS' });
+
+  store.rooms.push({
+    id: roomId,
+    roomPubKey,
+    createdAt: nowIso(),
+    nonce,
+    wrappedKey,
+    unlock,
+    entries: []
+  });
+  writeStore(store);
+
+  res.json({ ok: true, roomId });
+});
+
+app.get('/api/room/:id/meta', (req, res) => {
+  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+  const store = readStore();
+  const room = store.rooms.find((r) => r.id === roomId);
+  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, roomId: room.id, roomPubKey: room.roomPubKey, nonce: room.nonce, wrappedKey: room.wrappedKey });
+});
+
+app.get('/api/room/:id/log', (req, res) => {
+  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+  const store = readStore();
+  const room = store.rooms.find((r) => r.id === roomId);
+  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, entries: Array.isArray(room.entries) ? room.entries : [] });
+});
+
+app.post('/api/room/:id/append', (req, res) => {
+  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+  const ciphertext = req.body?.ciphertext;
+  const author = typeof req.body?.author === 'string' ? req.body.author.trim() : 'unknown';
+  if (!ciphertext || typeof ciphertext.iv !== 'string' || typeof ciphertext.ct !== 'string') {
+    return res.status(400).json({ ok: false, error: 'INVALID_CIPHERTEXT' });
+  }
+
+  const store = readStore();
+  const room = store.rooms.find((r) => r.id === roomId);
+  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  room.entries = Array.isArray(room.entries) ? room.entries : [];
+  room.entries.push({
+    id: `re_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    author,
+    ciphertext
+  });
+  writeStore(store);
+  res.json({ ok: true });
+});
 
 // --- Static + routes ---
 const isProd = process.env.NODE_ENV === 'production';
@@ -577,7 +845,9 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
-app.get('/wall', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'wall.html')));
+app.get('/room', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'room.html')));
+app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
+app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/share/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'share_manage.html')));
 app.get('/s/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'share.html')));
 

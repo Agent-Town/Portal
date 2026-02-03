@@ -22,36 +22,29 @@
       </div>
       <div class="kv">
         <a class="btn" href="/">Home</a>
-        <a class="btn" href="/wall">Wall</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+        <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
 
     <div class="panel">
       <h1 style="margin:0 0 8px">Make something together.</h1>
       <p class="small" style="margin-top:0">
-        Human: click pixels. Agent: paint via the skill API. Add both post links, then lock it in.
+        Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
       </p>
 
       <div class="canvasWrap">
         <div class="palette" id="palette" data-testid="palette"></div>
         <div class="canvasGrid" id="canvas" data-testid="canvas"></div>
-        <div class="row" style="gap:10px; margin-top:12px">
-          <div>
-            <label class="small" for="xUrlCreate">Human X link</label>
-            <input id="xUrlCreate" data-testid="x-url-create" type="url" placeholder="https://x.com/..." />
-          </div>
-          <div class="kv">
-            <button class="btn" id="saveXCreate" data-testid="save-x-create">Save link</button>
-            <span class="pill" id="xSavedCreate" style="display:none">Saved ✓</span>
-          </div>
+        <div class="small" style="margin-top:6px; color: var(--muted)">
+          Join the Leaderboard and gain 1x1 pixel meter extra space in your Agent Town private space.
+        </div>
+        <div class="kv">
+          <button class="btn primary" id="shareBtn" data-testid="share-btn" disabled>Lock in + generate room QR</button>
+          <span class="pill" id="shareStatus" style="display:none">Working…</span>
         </div>
         <div class="small" style="margin-top:6px; color: var(--muted)">
-          Your agent must also save its post link before locking in.
-        </div>
-        <div class="pill small" id="agentPostsCreate" data-testid="agent-posts-create">Waiting for agent post links...</div>
-        <div class="kv">
-          <button class="btn primary" id="shareBtn" data-testid="share-btn" disabled>Lock in + generate share link</button>
-          <span class="pill" id="shareStatus" style="display:none">Working…</span>
+          Next: unlock the room with a Solana wallet signature. Then you and the agent can read/write encrypted entries.
         </div>
       </div>
       <div class="small" id="err" style="color: var(--bad)"></div>
@@ -59,7 +52,7 @@
 
     <footer>
       Tip: keep it tiny. A 3–10 pixel signature is enough.
-      <div>Made by humans &amp; agents for humans &amp; agents. <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a></div>
+      <div>Made by humans &amp; agents for humans &amp; agents. <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
     </footer>
   </div>
 
