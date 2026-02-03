@@ -173,12 +173,30 @@ function buildRoomDescriptor(currentRoomId) {
   };
 }
 
+function buildErc8004Statement(currentRoomId) {
+  return {
+    v: 1,
+    kind: 'erc8004.link_room',
+    roomPubKey: currentRoomId,
+    // human wallet used for unlock (Solana in Phase 1)
+    human: walletAddr || null,
+    // phase 2: fill in agent ERC-8004 id/address once available
+    agentErc8004: null,
+    origin: window.location.origin,
+    createdAtMs: Date.now()
+  };
+}
+
 function renderDescriptorUI(currentRoomId) {
   const descriptor = buildRoomDescriptor(currentRoomId);
   const json = JSON.stringify(descriptor, null, 2);
 
   const d = el('descriptor');
   if (d) d.value = json;
+
+  const stmt = buildErc8004Statement(currentRoomId);
+  const s = el('erc8004');
+  if (s) s.value = JSON.stringify(stmt, null, 2);
 
   const qrEl = el('qr');
   if (qrEl && typeof qrcode === 'function') {
@@ -198,6 +216,8 @@ function clearDescriptorUI() {
   if (qrEl) qrEl.innerHTML = '';
   const d = el('descriptor');
   if (d) d.value = '';
+  const e = el('erc8004');
+  if (e) e.value = '';
 }
 
 function wipeKeys() {
@@ -406,6 +426,18 @@ async function init() {
     } catch {
       // fallback
       alert(el('descriptor').value);
+    }
+  });
+
+  el('copyErc8004Btn').addEventListener('click', async () => {
+    setError('');
+    try {
+      const txt = el('erc8004').value;
+      await navigator.clipboard.writeText(txt);
+      el('copyErc8004Btn').textContent = 'Copied ✓';
+      setTimeout(() => (el('copyErc8004Btn').textContent = 'Copy ERC-8004 statement'), 1200);
+    } catch {
+      alert(el('erc8004').value);
     }
   });
 

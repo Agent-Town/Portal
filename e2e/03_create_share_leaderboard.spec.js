@@ -75,4 +75,8 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
   await expect(page.locator('#descriptor')).toBeVisible();
   await expect(page.locator('#descriptor')).toHaveValue(/"kind":\s*"agent-town-room"/);
   await expect(page.locator('#descriptor')).toHaveValue(/"id":\s*"[A-Za-z0-9]+"/);
+
+  // Phase 2 hook: ERC-8004 statement exists.
+  await expect(page.locator('#erc8004')).toBeVisible();
+  await expect(page.locator('#erc8004')).toHaveValue(/erc8004\.link_room/);
 });
