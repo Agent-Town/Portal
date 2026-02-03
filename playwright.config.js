@@ -44,7 +44,9 @@ module.exports = defineConfig({
     reuseExistingServer: false,
     env: {
       NODE_ENV: 'test',
-      PORT: String(PORT)
+      PORT: String(PORT),
+      // Avoid modifying tracked data/store.test.json during e2e runs.
+      STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.json')
     }
   }
 });

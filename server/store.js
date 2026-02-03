@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 
 function getStorePath() {
+  // Allow tests/e2e to isolate their store file and avoid dirtying tracked fixtures.
+  if (process.env.STORE_PATH) return process.env.STORE_PATH;
+
   const isTest = process.env.NODE_ENV === 'test';
   const filename = isTest ? 'store.test.json' : 'store.json';
   return path.join(process.cwd(), 'data', filename);
