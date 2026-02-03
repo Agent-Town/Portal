@@ -2,17 +2,19 @@
 
 Goal: mint a canonical ERC-8004 identity / profile on Ethereum (or target chain) using the human’s wallet (no server keys).
 
-## Required inputs (need confirmation from Robin)
-- Target chain (Ethereum mainnet / Sepolia / other)
-- ERC-8004 contract address
-- Mint function signature + args (ABI)
-  - e.g. `mint(address owner, bytes ... )` or `register(...)` etc.
-- Any required fees / allowlists
+## What we use
+- **Agent0 TypeScript SDK** on npm: `agent0-sdk`
+- In-browser load via ESM CDN (no build step):
+  - `https://esm.sh/agent0-sdk@1.4.2?bundle`
 
-## Implementation plan
-- Add EVM wallet connect (window.ethereum)
-- Add "Mint ERC-8004 identity" button
-- Build calldata using minimal ABI encoder (or add a small dependency like viem)
-- Send tx via `eth_sendTransaction`
-- Store tx hash in the Room UI + (optional) server store keyed by roomId
-- E2E test: mocked window.ethereum, asserts tx request called, tx hash displayed
+## Current behavior (MVP)
+- Chain selector: **Sepolia** (default) or **mainnet** (confirm dialog)
+- Uses `window.ethereum` (MetaMask or compatible)
+- Calls SDK `createAgent(name, desc)` and then **mints/registers** via:
+  - `agent.registerHTTP('')` (empty URI for now)
+- Waits for confirmation and then populates `humanErc8004` in the Phase 2 statement with the returned `agentId`.
+
+## Follow-ups
+- Host a real ERC-8004 registration JSON (HTTP) or use IPFS via SDK `registerIPFS()` once we add IPFS config.
+- Persist minted `humanErc8004` in server store keyed by `roomId` (optional; note privacy implications).
+- Add richer tx UX (progress, failure modes, explorer links kept in UI).

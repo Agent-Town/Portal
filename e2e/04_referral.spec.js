@@ -13,6 +13,35 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
       connect: async () => ({ publicKey: { toString: () => 'So1anaMock222222222222222222222222222222222' } }),
       signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMock222222222222222222222222222222222' } })
     };
+
+    // Mock EVM wallet + Agent0 SDK for Phase 3 flow
+    window.ethereum = {
+      request: async ({ method, params }) => {
+        if (method === 'eth_requestAccounts') return ['0x1111111111111111111111111111111111111111'];
+        if (method === 'eth_chainId') return '0xaa36a7'; // sepolia
+        if (method === 'wallet_switchEthereumChain') return null;
+        // The SDK uses viem + wallet provider; in our mocked SDK we won't hit other methods.
+        throw new Error(`unmocked ethereum.request: ${method} ${JSON.stringify(params || [])}`);
+      }
+    };
+
+    window.__AG0_SDK_MOCK = {
+      SDK: class SDK {
+        constructor() {}
+        createAgent() {
+          return {
+            setMetadata: () => {},
+            registerHTTP: async () => ({
+              hash: '0xdeadbeef',
+              waitConfirmed: async () => ({
+                receipt: { status: 'success' },
+                result: { agentId: '11155111:123' }
+              })
+            })
+          };
+        }
+      }
+    };
   });
 
   await page.goto('/');
@@ -49,4 +78,9 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
   expect(meta.ok).toBeTruthy();
   expect(meta.nonce).toContain('n_');
   expect(meta.wrappedKey).toBeTruthy();
+
+  // Phase 3: mint identity (mocked SDK) updates UI
+  await page.getByText('Mint ERC-8004 identity').click();
+  await expect(page.locator('#erc8004MintStatus')).toContainText('Minted identity: 11155111:123');
+  await expect(page.locator('#erc8004')).toHaveValue(/11155111:123/);
 });

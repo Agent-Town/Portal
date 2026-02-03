@@ -143,6 +143,10 @@ let room = null; // { roomId, roomPubKey, nonce }
 let KrootBytes = null; // Uint8Array (memory only)
 let Kenc = null; // CryptoKey for room log encryption
 
+// Phase 3: store minted ERC-8004 ids locally (not persisted yet)
+let humanErc8004Id = null;
+let agentErc8004Id = null;
+
 function buildRoomDescriptor(currentRoomId) {
   const origin = window.location.origin;
   return {
@@ -181,8 +185,8 @@ function buildErc8004Statement(currentRoomId) {
     // human wallet used for unlock (Solana in Phase 1)
     human: walletAddr || null,
     // phase 2/3: fill in agent + human ERC-8004 identity ids once minted
-    humanErc8004: null,
-    agentErc8004: null,
+    humanErc8004: humanErc8004Id,
+    agentErc8004: agentErc8004Id,
     origin: window.location.origin,
     createdAtMs: Date.now()
   };
@@ -193,22 +197,25 @@ async function mintErc8004Identity() {
   if (status) status.textContent = '';
 
   if (!window.ethereum) throw new Error('NO_EVM_WALLET');
-  if (!room?.roomId) throw new Error('NO_ROOM_ID');
+  const roomId = room?.roomId || new URLSearchParams(window.location.search).get('room');
+  if (!roomId) throw new Error('NO_ROOM_ID');
 
   const chain = el('erc8004Chain')?.value || 'sepolia';
   const chainId = chain === 'mainnet' ? 1 : 11155111;
 
-  // Use the official Agent0 SDK (ag0) via dynamic import.
-  // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const Sdk = window.__AG0_SDK_MOCK
-    ? window.__AG0_SDK_MOCK
-    : await import('https://esm.sh/@agent0/sdk');
-
-  const SDKClass = Sdk.SDK || Sdk.default || Sdk; // tolerate export shapes
-
-  if (typeof SDKClass !== 'function') {
-    throw new Error('AG0_SDK_LOAD_FAILED');
+  if (chain === 'mainnet') {
+    const ok = confirm('Mint on Ethereum mainnet? This will cost real gas.');
+    if (!ok) return;
   }
+
+  // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
+  // We load it in the browser from esm.sh to avoid introducing a build step.
+  // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
+  const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+  const mod = window.__AG0_SDK_MOCK ? window.__AG0_SDK_MOCK : await import(AGENT0_SDK_ESM_URL);
+
+  const SDKClass = mod.SDK;
+  if (typeof SDKClass !== 'function') throw new Error('AG0_SDK_LOAD_FAILED');
 
   // Ensure wallet is connected
   const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -224,36 +231,61 @@ async function mintErc8004Identity() {
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: `0x${chainId.toString(16)}` }]
       });
-    } catch (e) {
-      // user may reject; proceed will fail later anyway
+    } catch {
       throw new Error('WRONG_CHAIN');
     }
   }
 
-  const rpcUrl = chainId === 1 ? 'https://eth.llamarpc.com' : 'https://rpc.sepolia.org';
+  // Cheap-ish default RPCs (reads only). Writes go via the wallet provider.
+  // If these ever flake, we can swap to Alchemy/Infura env-config later.
+  const rpcUrl = chainId === 1 ? 'https://eth.llamarpc.com' : 'https://rpc.ankr.com/eth_sepolia';
+
   const sdk = new SDKClass({
     chainId,
     rpcUrl,
     walletProvider: window.ethereum
   });
 
-  // Register the room as an ERC-8004 identity (ERC-721 based) using HTTP URI.
-  // This uses the SDK's canonical registry addresses for the chain.
-  const origin = window.location.origin;
-  const descriptorUrl = `${origin}/api/room/${encodeURIComponent(room.roomId)}/descriptor`;
-
-  const agentName = `Agent Town Room ${room.roomId.slice(0, 10)}`;
-  const agentDesc = `E2EE shared room in Agent Town. roomId=${room.roomId}.`;
+  const agentName = `Agent Town Room ${roomId.slice(0, 10)}`;
+  const agentDesc = `E2EE shared room in Agent Town. roomId=${roomId}.`;
 
   const agent = sdk.createAgent(agentName, agentDesc);
 
+  // Attach some metadata to make it discoverable off-chain later.
+  try {
+    agent.setMetadata?.({ roomId, origin: window.location.origin });
+  } catch {
+    // ignore - metadata support may vary by SDK version
+  }
+
   if (status) status.textContent = `Submitting ERC-8004 registration on ${chain}…`;
 
-  const tx = await agent.registerHTTP(descriptorUrl);
+  // NOTE: We register with an empty URI for now (no hosted registration JSON yet).
+  // The SDK will still mint the identity and return the agentId once confirmed.
+  const tx = await agent.registerHTTP('');
 
-  // tx shape depends on SDK; try common patterns.
-  const txHash = tx.hash || tx.txHash || null;
-  if (status) status.textContent = txHash ? `Submitted: ${txHash}` : 'Submitted.';
+  const txHash = tx?.hash;
+  const explorerBase = chainId === 1 ? 'https://etherscan.io/tx/' : 'https://sepolia.etherscan.io/tx/';
+  if (status) {
+    status.innerHTML = txHash
+      ? `Submitted: <a href="${explorerBase}${txHash}" target="_blank" rel="noreferrer">${txHash}</a>`
+      : 'Submitted.';
+  }
+
+  // Wait for confirmation and then update the ERC-8004 statement.
+  if (typeof tx?.waitConfirmed === 'function') {
+    if (status) status.textContent = 'Waiting for confirmation…';
+    const { result } = await tx.waitConfirmed();
+    const agentId = result?.agentId;
+    if (agentId) {
+      humanErc8004Id = agentId;
+      // If we haven't unlocked yet, still re-render the statement using the URL roomId
+      renderDescriptorUI((room && room.roomId) ? room.roomId : roomId);
+      if (status) status.textContent = `Minted identity: ${agentId}`;
+    } else {
+      if (status) status.textContent = 'Confirmed (no agentId returned).';
+    }
+  }
 }
 
 function renderDescriptorUI(currentRoomId) {
