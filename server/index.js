@@ -245,7 +245,8 @@ app.get('/api/agent/state', (req, res) => {
     match: s.match,
     signup: s.signup,
     share: s.share,
-    canvas: { w: s.canvas.w, h: s.canvas.h }
+    canvas: { w: s.canvas.w, h: s.canvas.h },
+    roomId: s.roomCeremony?.roomId || null
   });
 });
 
@@ -477,6 +478,7 @@ app.get('/api/human/room/material', (req, res) => {
   res.json({
     ok: true,
     roomId: s.roomCeremony?.roomId || null,
+    humanReveal: s.roomCeremony?.humanReveal || null,
     agentReveal: s.roomCeremony?.agentReveal || null
   });
 });
@@ -761,14 +763,16 @@ app.post('/api/room/init', (req, res) => {
   const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
   const roomPubKey = typeof req.body?.roomPubKey === 'string' ? req.body.roomPubKey.trim() : '';
   const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
-  const wrappedKey = req.body?.wrappedKey;
+  const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
   const unlock = req.body?.unlock || null;
 
   if (!roomId || !roomPubKey) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
   if (roomId !== roomPubKey) return res.status(400).json({ ok: false, error: 'ROOM_ID_MISMATCH' });
   if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (!wrappedKey || typeof wrappedKey.iv !== 'string' || typeof wrappedKey.ct !== 'string') {
-    return res.status(400).json({ ok: false, error: 'MISSING_WRAPPED_KEY' });
+
+  // Converged for today's publish: ceremony-only rooms.
+  if (keyMode !== 'ceremony') {
+    return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
   }
 
   const store = readStore();
@@ -780,7 +784,7 @@ app.post('/api/room/init', (req, res) => {
     roomPubKey,
     createdAt: nowIso(),
     nonce,
-    wrappedKey,
+    keyMode: 'ceremony',
     unlock,
     entries: []
   });
@@ -795,7 +799,13 @@ app.get('/api/room/:id/meta', (req, res) => {
   const store = readStore();
   const room = store.rooms.find((r) => r.id === roomId);
   if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  res.json({ ok: true, roomId: room.id, roomPubKey: room.roomPubKey, nonce: room.nonce, wrappedKey: room.wrappedKey });
+  res.json({
+    ok: true,
+    roomId: room.id,
+    roomPubKey: room.roomPubKey,
+    nonce: room.nonce,
+    keyMode: 'ceremony'
+  });
 });
 
 app.get('/api/room/:id/descriptor', (req, res) => {

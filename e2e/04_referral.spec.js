@@ -58,7 +58,8 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
   await page.waitForURL('**/create');
 
   // Agent contributes to ceremony (commit+reveal) before human locks in.
-  const ra = Buffer.from(Array.from({ length: 32 }, (_, i) => i));
+  // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
+  const ra = require('crypto').randomBytes(32);
   const raB64 = ra.toString('base64');
   const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
   await request.post('/api/agent/room/commit', { data: { teamCode: teamCodeA, commit: raCommit } });
@@ -71,13 +72,14 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
   const roomId = new URL(page.url()).searchParams.get('room');
   expect(roomId).toBeTruthy();
 
-  // Meta exists and includes nonce + wrappedKey.
+  // Meta exists and includes nonce; ceremony rooms do not include wrappedKey.
   const metaResp = await request.get(`/api/room/${roomId}/meta`);
   expect(metaResp.ok()).toBeTruthy();
   const meta = await metaResp.json();
   expect(meta.ok).toBeTruthy();
   expect(meta.nonce).toContain('n_');
-  expect(meta.wrappedKey).toBeTruthy();
+  expect(meta.keyMode).toBe('ceremony');
+  expect(meta.wrappedKey ?? null).toBeNull();
 
   // Phase 3: mint identity (mocked SDK) updates UI
   await page.getByText('Mint ERC-8004 identity').click();

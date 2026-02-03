@@ -158,29 +158,8 @@ async function init() {
     return btoa(bin);
   }
 
-  async function hkdfKeyFromSig(sigBytes) {
-    const salt = new Uint8Array([]);
-    const info = new TextEncoder().encode('elizatown-room-wrap-v1');
-    const ikmHash = await sha256(sigBytes);
-    const baseKey = await crypto.subtle.importKey('raw', ikmHash, 'HKDF', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
-      { name: 'HKDF', hash: 'SHA-256', salt, info },
-      baseKey,
-      { name: 'AES-GCM', length: 256 },
-      false,
-      ['encrypt', 'decrypt']
-    );
-  }
-
-  async function aesGcmEncrypt(key, plaintextBytes, aadBytes) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv, additionalData: aadBytes || new Uint8Array([]) },
-      key,
-      plaintextBytes
-    );
-    return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
-  }
+  // (Ceremony rooms) We no longer wrap/store K_root on the server.
+  // Wallet signature is used as a UX "unlock" gate on /room, not for persistence.
 
   function base58Encode(bytes) {
     const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -241,17 +220,11 @@ async function init() {
       const roomIdBytes = await sha256(Kroot);
       const roomPubKey = base58Encode(roomIdBytes);
 
-      // 4) Wrap the room key with wallet-signature-derived Kwrap, store ciphertext only.
+      // 4) Create the room container on the server.
+      // Key source of truth is the ceremony (K_root derived from Rh||Ra); we do NOT store K_root (wrapped or otherwise) at rest.
+      // Wallet signature remains the human UX "unlock" gate on the room page.
       const n = await api('/api/room/nonce');
       const nonce = n.nonce;
-
-      const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
-      const sigResp = await wallet.signMessage(new TextEncoder().encode(msg), 'utf8');
-      const sig = sigResp.signature;
-      const Kwrap = await hkdfKeyFromSig(sig);
-
-      const aad = new TextEncoder().encode(`roomPubKey=${roomPubKey}`);
-      const wrapped = await aesGcmEncrypt(Kwrap, Kroot, aad);
 
       await api('/api/room/init', {
         method: 'POST',
@@ -259,7 +232,7 @@ async function init() {
           roomId: roomPubKey,
           roomPubKey,
           nonce,
-          wrappedKey: { alg: 'AES-GCM', iv: b64(wrapped.iv), ct: b64(wrapped.ct) },
+          keyMode: 'ceremony',
           unlock: { kind: 'solana-wallet-signature', address }
         })
       });

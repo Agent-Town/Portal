@@ -72,21 +72,8 @@ async function sha256(bytes) {
   return new Uint8Array(digest);
 }
 
-async function hkdfKeyFromSig(sigBytes) {
-  // Derive a symmetric wrapping key from the wallet signature.
-  const salt = new Uint8Array([]);
-  const info = new TextEncoder().encode('elizatown-room-wrap-v1');
-  const ikmHash = await sha256(sigBytes);
-
-  const baseKey = await crypto.subtle.importKey('raw', ikmHash, 'HKDF', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt, info },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
+// (Publish convergence) Ceremony-only rooms.
+// Wallet signature is a UX gate; we do not derive/store any wrapped room key.
 
 async function aesGcmEncrypt(key, plaintextBytes, aadBytes) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -112,12 +99,19 @@ let wallet = null;
 let walletAddr = null;
 
 async function connectWallet() {
-  if (!window.solana || !window.solana.isPhantom) {
-    throw new Error('NO_SOLANA_WALLET');
-  }
+  // Accept any Solana wallet adapter injected as `window.solana` that supports
+  // `connect()` and `signMessage()` (Phantom, Solflare, Backpack, etc.).
+  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
+  if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
+  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
+
   const resp = await window.solana.connect();
   wallet = window.solana;
-  walletAddr = resp.publicKey.toString();
+
+  const pk = resp?.publicKey || wallet?.publicKey;
+  walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
+  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
+
   el('walletAddr').textContent = walletAddr;
 }
 
@@ -344,50 +338,7 @@ async function deriveRoomEncKey(Kroot) {
   );
 }
 
-async function createRoom() {
-  setError('');
-  setStatus('Creating room…');
-  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
-
-  // Generate high-entropy room root key (Phase 1). Later: derive from ceremony.
-  const Kroot = crypto.getRandomValues(new Uint8Array(32));
-  const roomIdBytes = await sha256(Kroot);
-  const roomPubKey = base58Encode(roomIdBytes); // public identifier
-
-  // Ask server for a fresh nonce to bind the unlock signature.
-  const n = await api('/api/room/nonce');
-  const nonce = n.nonce;
-
-  const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
-  const sig = await signMessage(msg);
-  const Kwrap = await hkdfKeyFromSig(sig);
-
-  // Wrap Kroot for server storage (ciphertext only).
-  const aad = new TextEncoder().encode(`roomPubKey=${roomPubKey}`);
-  const wrapped = await aesGcmEncrypt(Kwrap, Kroot, aad);
-
-  await api('/api/room/init', {
-    method: 'POST',
-    body: JSON.stringify({
-      roomId: roomPubKey,
-      roomPubKey,
-      nonce,
-      wrappedKey: { alg: 'AES-GCM', iv: b64(wrapped.iv), ct: b64(wrapped.ct) },
-      unlock: { kind: 'solana-wallet-signature', address: walletAddr }
-    })
-  });
-
-  // Now unlock locally.
-  room = { roomId: roomPubKey, roomPubKey, nonce };
-  KrootBytes = Kroot;
-  Kenc = await deriveRoomEncKey(KrootBytes);
-  unlocked = true;
-  el('roomId').textContent = room.roomId;
-  setStatus('Room created and unlocked.');
-
-  renderDescriptorUI(room.roomId);
-  await refreshEntries();
-}
+// Ceremony-only publish: room creation happens on /create.
 
 async function unlockExistingRoom(roomId) {
   setError('');
@@ -395,22 +346,31 @@ async function unlockExistingRoom(roomId) {
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
 
   const meta = await api(`/api/room/${encodeURIComponent(roomId)}/meta`);
-  const { roomPubKey, nonce } = meta;
+  const { roomPubKey, nonce, keyMode } = meta;
 
+  if (keyMode && keyMode !== 'ceremony') throw new Error('CEREMONY_ONLY');
+
+  // UX gate: require a wallet signature each session.
   const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
-  const sig = await signMessage(msg);
-  const Kwrap = await hkdfKeyFromSig(sig);
+  await signMessage(msg);
 
-  const wrapped = meta.wrappedKey;
-  const aad = new TextEncoder().encode(`roomPubKey=${roomPubKey}`);
-  const Kroot = await aesGcmDecrypt(Kwrap, unb64(wrapped.iv), unb64(wrapped.ct), aad);
+  // Derive K_root from ceremony material (humanReveal + agentReveal) stored in the session.
+  const mat = await api('/api/human/room/material');
+  if (!mat.humanReveal || !mat.agentReveal) throw new Error('CEREMONY_INCOMPLETE');
+
+  const Rh = unb64(mat.humanReveal);
+  const Ra = unb64(mat.agentReveal);
+  const combo = new Uint8Array(Rh.length + Ra.length);
+  combo.set(Rh, 0);
+  combo.set(Ra, Rh.length);
+  const Kroot = await sha256(combo);
 
   room = { roomId, roomPubKey, nonce };
   KrootBytes = Kroot;
   Kenc = await deriveRoomEncKey(KrootBytes);
   unlocked = true;
   el('roomId').textContent = room.roomId;
-  setStatus('Unlocked.');
+  setStatus('Unlocked (ceremony).');
 
   renderDescriptorUI(room.roomId);
   await refreshEntries();
@@ -490,18 +450,7 @@ async function init() {
     }
   });
 
-  el('createRoomBtn').addEventListener('click', async () => {
-    setError('');
-    try {
-      await createRoom();
-      // Put the room id into the URL for shareable re-open.
-      const params2 = new URLSearchParams(window.location.search);
-      params2.set('room', room.roomId);
-      window.history.replaceState({}, '', `${window.location.pathname}?${params2.toString()}`);
-    } catch (e) {
-      setError(e.message);
-    }
-  });
+  // Ceremony-only publish: no on-page "create room" button.
 
   el('appendBtn').addEventListener('click', async () => {
     setError('');

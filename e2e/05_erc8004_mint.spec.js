@@ -55,7 +55,8 @@ test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, r
   await page.waitForURL('**/create');
 
   // Agent ceremony
-  const ra = Buffer.from(Array.from({ length: 32 }, (_, i) => (i * 7) & 0xff));
+  // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
+  const ra = require('crypto').randomBytes(32);
   const raB64 = ra.toString('base64');
   const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
   await request.post('/api/agent/room/commit', { data: { teamCode, commit: raCommit } });

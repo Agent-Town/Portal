@@ -6,6 +6,8 @@ const fs = require('fs');
 // download its managed browsers. If a system Chromium is available, use it.
 const SYSTEM_CHROMIUM = ['/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => fs.existsSync(p));
 
+const PORT = Number(process.env.PW_PORT || (process.env.CI ? 4173 : 4174));
+
 module.exports = defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -29,19 +31,20 @@ module.exports = defineConfig({
     }
   ],
   use: {
-    baseURL: 'http://localhost:4173',
+    // Use IPv6 loopback explicitly; on this machine, 127.0.0.1 may be proxied.
+    baseURL: `http://[::1]:${PORT}`,
     trace: 'on-first-retry'
   },
   webServer: {
     // Use `exec` so the node process replaces the shell. This helps Playwright
     // reliably terminate the server across environments.
     command: 'exec node server/index.js',
-    url: 'http://localhost:4173/api/health',
+    url: `http://[::1]:${PORT}/api/health`,
     // Always start/stop the server for deterministic local + CI runs.
     reuseExistingServer: false,
     env: {
       NODE_ENV: 'test',
-      PORT: '4173'
+      PORT: String(PORT)
     }
   }
 });

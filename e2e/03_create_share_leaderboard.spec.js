@@ -48,7 +48,8 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
   await expect(page.getByTestId('px-1-0')).toHaveAttribute('data-color', '2');
 
   // Agent contributes to room ceremony (commit+reveal).
-  const ra = Buffer.from(Array.from({ length: 32 }, (_, i) => (i * 7) & 0xff));
+  // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
+  const ra = require('crypto').randomBytes(32);
   const raB64 = ra.toString('base64');
   const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
   await request.post('/api/agent/room/commit', { data: { teamCode, commit: raCommit } });
