@@ -798,6 +798,44 @@ app.get('/api/room/:id/meta', (req, res) => {
   res.json({ ok: true, roomId: room.id, roomPubKey: room.roomPubKey, nonce: room.nonce, wrappedKey: room.wrappedKey });
 });
 
+app.get('/api/room/:id/descriptor', (req, res) => {
+  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+  const store = readStore();
+  const room = store.rooms.find((r) => r.id === roomId);
+  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    ok: true,
+    descriptor: {
+      v: 1,
+      kind: 'agent-town-room',
+      room: {
+        id: room.id,
+        pub: room.roomPubKey,
+        mailboxes: [
+          {
+            chain: 'solana',
+            kind: 'pda',
+            status: 'placeholder',
+            address: 'PDA_TODO',
+            program: 'PROGRAM_TODO'
+          }
+        ]
+      },
+      endpoints: {
+        meta: `${origin}/api/room/${encodeURIComponent(room.id)}/meta`,
+        log: `${origin}/api/room/${encodeURIComponent(room.id)}/log`,
+        append: `${origin}/api/room/${encodeURIComponent(room.id)}/append`
+      },
+      ui: {
+        roomUrl: `${origin}/room?room=${encodeURIComponent(room.id)}`
+      }
+    }
+  });
+});
+
 app.get('/api/room/:id/log', (req, res) => {
   const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
   if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });

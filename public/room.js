@@ -192,19 +192,68 @@ async function mintErc8004Identity() {
   const status = el('erc8004MintStatus');
   if (status) status.textContent = '';
 
-  if (!window.ethereum) {
-    throw new Error('NO_EVM_WALLET');
+  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
+  if (!room?.roomId) throw new Error('NO_ROOM_ID');
+
+  const chain = el('erc8004Chain')?.value || 'sepolia';
+  const chainId = chain === 'mainnet' ? 1 : 11155111;
+
+  // Use the official Agent0 SDK (ag0) via dynamic import.
+  // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
+  const Sdk = window.__AG0_SDK_MOCK
+    ? window.__AG0_SDK_MOCK
+    : await import('https://esm.sh/@agent0/sdk');
+
+  const SDKClass = Sdk.SDK || Sdk.default || Sdk; // tolerate export shapes
+
+  if (typeof SDKClass !== 'function') {
+    throw new Error('AG0_SDK_LOAD_FAILED');
   }
 
-  const contract = el('erc8004Contract')?.value?.trim();
-  const chain = el('erc8004Chain')?.value;
-  if (!contract) throw new Error('MISSING_CONTRACT');
+  // Ensure wallet is connected
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const owner = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  if (!owner) throw new Error('NO_EVM_ACCOUNT');
 
-  // Phase 3 TODO: needs real ERC-8004 contract ABI + mint/register function.
-  // We intentionally do not guess calldata.
-  if (status) {
-    status.textContent = `Not wired yet. Need ERC-8004 ABI + mint function signature. (contract=${contract}, chain=${chain})`;
+  // Best-effort chain switch
+  const currentChainHex = await window.ethereum.request({ method: 'eth_chainId' });
+  const currentChainId = parseInt(currentChainHex, 16);
+  if (currentChainId !== chainId) {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: `0x${chainId.toString(16)}` }]
+      });
+    } catch (e) {
+      // user may reject; proceed will fail later anyway
+      throw new Error('WRONG_CHAIN');
+    }
   }
+
+  const rpcUrl = chainId === 1 ? 'https://eth.llamarpc.com' : 'https://rpc.sepolia.org';
+  const sdk = new SDKClass({
+    chainId,
+    rpcUrl,
+    walletProvider: window.ethereum
+  });
+
+  // Register the room as an ERC-8004 identity (ERC-721 based) using HTTP URI.
+  // This uses the SDK's canonical registry addresses for the chain.
+  const origin = window.location.origin;
+  const descriptorUrl = `${origin}/api/room/${encodeURIComponent(room.roomId)}/descriptor`;
+
+  const agentName = `Agent Town Room ${room.roomId.slice(0, 10)}`;
+  const agentDesc = `E2EE shared room in Agent Town. roomId=${room.roomId}.`;
+
+  const agent = sdk.createAgent(agentName, agentDesc);
+
+  if (status) status.textContent = `Submitting ERC-8004 registration on ${chain}…`;
+
+  const tx = await agent.registerHTTP(descriptorUrl);
+
+  // tx shape depends on SDK; try common patterns.
+  const txHash = tx.hash || tx.txHash || null;
+  if (status) status.textContent = txHash ? `Submitted: ${txHash}` : 'Submitted.';
 }
 
 function renderDescriptorUI(currentRoomId) {
