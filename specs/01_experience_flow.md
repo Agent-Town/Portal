@@ -7,28 +7,28 @@
    - Shows Team Code and “Read the skill” CTA.
    - Shows agent connection status.
    - Step 2: Sigil match (human click, agent API).
-   - Step 3: Beta press (both must press).
+   - Step 3: Open press (both must press).
+   - If a house already exists for the session, replace Steps 1–2 with a **Reconnect to House** panel.
 
 2. **Create** (`/create`)
    - 16×16 pixel canvas.
    - Human paints via click.
    - Agent paints via API.
-   - Human saves X post link; agent saves their post link.
-   - “Lock in + generate share link” creates a permanent `/s/:id` view.
+   - “Lock in + generate house QR” completes the co-op ceremony and creates the house.
 
-3. **Share (public)** (`/s/:id`)
+3. **House** (`/house?house=...`)
+   - Unlock with wallet signature.
+   - Generate a share link for the team.
+   - Optional: upload a public image + prompt (not encrypted) for the leaderboard.
+
+4. **Share (public)** (`/s/:id`)
    - Read-only share page.
-   - Shows snapshot.
    - Shows team names + post links.
+   - Shows public house image + prompt (if uploaded).
 
-4. **Share (manage)** (`/share/:id`)
-   - Shows share URL + copy button.
-   - Shows snapshot and post links (locked).
-   - Opt-in prompt: only lists on wall if both choose yes.
-
-5. **Wall** (`/wall`)
+5. **Leaderboard** (`/leaderboard`)
    - Shows total signups count.
-   - Shows opted-in teams and their post links.
+   - Shows teams with share links and their post links.
 
 ---
 
@@ -41,19 +41,17 @@
 
 ---
 
-## Secondary cooperative mechanic: Co-press beta
+## Secondary cooperative mechanic: Co-press Open
 
-- After unlock, the human enters email and clicks **Get Beta Access**.
-- The agent must also press via `/api/agent/beta/press`.
+- After unlock, the human clicks **Open**.
+- The agent must also press via `/api/agent/open/press`.
 - Only when both have pressed is the signup recorded and `/create` allowed.
 
 ---
 
-## Privacy + wall opt-in
+## Leaderboard visibility
 
-- The wall is opt-in.
-- Only if both human and agent set `appear: true` does the team appear publicly.
-- Otherwise the only “public” thing is the share link itself.
+- Teams appear on the leaderboard after a share link is created.
 
 ---
 
@@ -69,10 +67,10 @@
 
 - Home shows Team Code within 1 second.
 - Home shows agent connection status.
-- Selecting matching sigils unlocks beta state.
-- After both press beta, the browser navigates to `/create`.
+- Selecting matching sigils unlocks the lock.
+- After both press Open, the browser navigates to `/create`.
 - On create page, agent painting is visible to human.
 - Share page displays a stable share URL.
-- If both opt in, wall shows a new entry.
+- Creating a share link adds the team to the leaderboard.
 
 (See Playwright tests in `e2e/`.)

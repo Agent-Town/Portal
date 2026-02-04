@@ -3,6 +3,7 @@ const { createTeamCode, nowIso, randomHex } = require('./util');
 // In-memory sessions (MVP).
 const sessionsById = new Map();
 const sessionIdByTeamCode = new Map();
+const sessionIdByHouseId = new Map();
 
 const ELEMENTS = [
   { id: 'key', label: 'Key', icon: '🔑' },
@@ -30,18 +31,16 @@ function createSession() {
       connected: false,
       name: null,
       selected: null,
-      betaPressed: false,
+      openPressed: false,
       optIn: null,
       posts: {
-        moltbookUrl: null,
-        moltXUrl: null
+        moltbookUrl: null
       }
     },
     human: {
       selected: null,
-      betaPressed: false,
+      openPressed: false,
       optIn: null,
-      email: null,
       xPostUrl: null,
       xHandle: null
     },
@@ -52,7 +51,12 @@ function createSession() {
     },
     signup: {
       complete: false,
-      createdAt: null
+      createdAt: null,
+      mode: null,
+      address: null
+    },
+    referral: {
+      shareId: null
     },
     canvas: {
       w: CANVAS.w,
@@ -61,6 +65,22 @@ function createSession() {
     },
     share: {
       id: null,
+      createdAt: null
+    },
+    shareApproval: {
+      human: false,
+      agent: false
+    },
+    token: {
+      verifiedAt: null,
+      address: null
+    },
+    houseCeremony: {
+      humanCommit: null,
+      agentCommit: null,
+      humanReveal: null,
+      agentReveal: null,
+      houseId: null,
       createdAt: null
     }
   };
@@ -83,6 +103,20 @@ function getSessionByTeamCode(teamCode) {
   return getSessionById(sessionId);
 }
 
+function indexHouseId(session, houseId) {
+  if (!session || !houseId || typeof houseId !== 'string') return;
+  sessionIdByHouseId.set(houseId, session.sessionId);
+}
+
+function getSessionByHouseId(houseId) {
+  if (!houseId || typeof houseId !== 'string') return null;
+  const id = houseId.trim();
+  if (!id) return null;
+  const sessionId = sessionIdByHouseId.get(id);
+  if (!sessionId) return null;
+  return getSessionById(sessionId);
+}
+
 function listElements() {
   return ELEMENTS;
 }
@@ -98,21 +132,24 @@ function evaluateMatch(session) {
     session.match.matched = false;
     session.match.elementId = null;
     session.match.unlockedAt = null;
-    // Reset beta gating if the match breaks.
-    session.human.betaPressed = false;
-    session.agent.betaPressed = false;
+    // Reset open gating if the match breaks.
+    session.human.openPressed = false;
+    session.agent.openPressed = false;
   }
 }
 
 function resetAllSessions() {
   sessionsById.clear();
   sessionIdByTeamCode.clear();
+  sessionIdByHouseId.clear();
 }
 
 module.exports = {
   createSession,
   getSessionById,
   getSessionByTeamCode,
+  getSessionByHouseId,
+  indexHouseId,
   listElements,
   evaluateMatch,
   resetAllSessions,

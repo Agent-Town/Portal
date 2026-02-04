@@ -19,12 +19,12 @@ Each milestone has a measurable “done” state validated by Playwright.
 ## M3 — Match unlock
 - Human selects a sigil.
 - Agent selects same.
-- UI shows UNLOCKED and enables beta button.
+- UI shows UNLOCKED and enables Open button.
 
 **Tests**: `e2e/02_match_unlock.spec.js`
 
-## M4 — Co-press beta
-- Human enters email and presses.
+## M4 — Co-press Open
+- Human presses Open.
 - Agent presses.
 - Browser navigates to `/create`.
 
@@ -35,15 +35,13 @@ Each milestone has a measurable “done” state validated by Playwright.
 
 ## M6 — Share link
 - Human generates share link.
-- Manage page loads snapshot and shows share URL.
+- House page shows share URL.
 - Public share page is read-only.
 
-## M7 — Dual opt-in
-- Human opts in.
-- Agent opts in.
-- Share page shows “Added to wall”.
-- Wall lists the team.
+## M7 — Leaderboard
+- Creating a share link adds the team.
+- Leaderboard lists the team.
 
-**Tests**: `e2e/03_create_share_wall.spec.js`
+**Tests**: `e2e/03_create_share_leaderboard.spec.js`
 
 (You can add M8 for post URL capture if desired.)

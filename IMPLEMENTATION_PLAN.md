@@ -14,7 +14,7 @@ This repo is already implemented, but this plan is structured so **Codex CLI** c
 Write end-to-end tests first:
 - `e2e/01_home.spec.js`
 - `e2e/02_match_unlock.spec.js`
-- `e2e/03_create_share_wall.spec.js`
+- `e2e/03_create_share_leaderboard.spec.js`
 
 ## Phase 2 — Implement in small steps
 

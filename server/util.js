@@ -35,18 +35,9 @@ function parseCookies(headerValue) {
   return out;
 }
 
-function isValidEmail(email) {
-  if (typeof email !== 'string') return false;
-  const e = email.trim();
-  if (!e || e.length > 254) return false;
-  // Minimal, pragmatic validation.
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-}
-
 module.exports = {
   nowIso,
   randomHex,
   createTeamCode,
-  parseCookies,
-  isValidEmail
+  parseCookies
 };
