@@ -1,5 +1,5 @@
 ## Executive summary
-Agent Town Landing is a public, minimal web app with a cookie-based human session, Team Code agent API, and a new “house” flow that aims for E2EE logs with HMAC-authenticated house APIs. The top risks now center on house key material handling (notably the stored `keyWrapSig` + `keyWrap` which makes K_root recoverable from the server store), client-side key compromise, and abuse of bearer-style identifiers (Team Code / houseId). Availability risks also come from store caps and external Solana RPC dependency. Evidence anchors: `server/index.js`, `public/house.js`, `public/create.js`, `specs/02_api_contract.md`.
+Agent Town Landing is a public, minimal web app with a cookie-based human session, Team Code agent API, and a new “house” flow that aims for E2EE logs with HMAC-authenticated house APIs. The top risks now center on house key material handling (key recovery and phishing paths), client-side key compromise, and abuse of bearer-style identifiers (Team Code / houseId). Availability risks also come from store caps and external Solana RPC dependency. Evidence anchors: `server/index.js`, `public/house.js`, `public/create.js`, `specs/02_api_contract.md`.
 
 ## Scope and assumptions
 In-scope paths:
@@ -21,7 +21,7 @@ Assumptions (based on your clarifications and repo evidence):
 - JSON store is used in production (single-node persistence). Evidence: `server/store.js`.
 
 Open questions that could materially change risk ranking:
-- Is it acceptable for the server to store `keyWrapSig` (which enables K_root recovery from `data/store.json`), or should the server be unable to recover K_root?
+- Should any legacy houses with stored `keyWrapSig` be purged or migrated now that recovery re-signs the wrap message?
 - Do you want house availability to survive store caps (`MAX_HOUSES`, `MAX_HOUSE_ENTRIES`), or are these intended as hard ceilings?
 - Is HTTPS always enforced in production (including correct proxy config), or can HTTP be reachable?
 
@@ -69,7 +69,7 @@ Security: none beyond TLS; relies on RPC correctness.
 Evidence: `server/index.js` `postJson`, `hasElizaTownToken`.
 
 - Express API → JSON store (`data/store.json`).
-Data types: signups (wallet addresses), shares, houses, `authKey`, `keyWrap`, `keyWrapSig`, ciphertext logs.
+Data types: signups (wallet addresses), shares, houses, `authKey`, `keyWrap`, ciphertext logs.
 Channel: local file I/O.
 Security: no encryption at rest.
 Evidence: `server/store.js`, `server/index.js` house init.
@@ -99,7 +99,7 @@ flowchart TD
 | Team Code | Agent identity; enables agent actions | C, I |
 | House K_root / K_enc (client-side) | Core E2EE secret; decrypts house logs | C |
 | House K_auth (`authKey`) | Required for HMAC auth to house APIs | C, I |
-| `keyWrap` + `keyWrapSig` | Enables recovery of K_root if combined | C |
+| `keyWrap` | Enables recovery of K_root when combined with a wallet signature | C |
 | House ciphertext logs | Integrity/availability of shared house | I, A |
 | Wallet addresses (token mode) | User privacy + access control | C |
 | Shares and leaderboard data | Reputation and link integrity | I, A |
@@ -137,23 +137,21 @@ flowchart TD
 | `GET /api/token/nonce`, `POST /api/token/verify` | Browser | Internet → Express | Token gate verification | `server/index.js` |
 
 ## Top abuse paths
-1. Recover K_root from server data.
-Steps: attacker gains `data/store.json` → uses `keyWrapSig` + `keyWrap` to decrypt K_root → decrypts house logs. Impact: E2EE confidentiality failure.
-2. Phish wallet signatures to recover house keys.
-Steps: attacker convinces user to sign “House Lookup” and “House Key Wrap” messages → calls `/api/wallet/lookup` → decrypts K_root → reads house logs. Impact: E2EE confidentiality failure.
-3. Leak K_auth or K_root from client runtime.
+1. Phish wallet signature to recover house keys.
+Steps: attacker convinces user to sign the “House Key Wrap” message → calls `/api/wallet/lookup` with that signature → decrypts K_root from `keyWrap` → reads house logs. Impact: E2EE confidentiality failure.
+2. Leak K_auth or K_root from client runtime.
 Steps: XSS or malicious extension reads in-memory keys → forges `x-house-auth` → appends spam or reads ciphertext logs. Impact: house integrity/availability loss.
-4. Team Code compromise.
+3. Team Code compromise.
 Steps: attacker brute-forces or steals Team Code → calls `/api/agent/connect` + `/api/agent/posts` or `/api/agent/open/press` → impersonates agent and posts malicious links. Impact: reputation damage, flow sabotage.
-5. Store exhaustion DoS.
+4. Store exhaustion DoS.
 Steps: attacker spams `/api/house/init` or `/api/house/:id/append` → hits `MAX_HOUSES`/`MAX_HOUSE_ENTRIES` → legitimate users blocked. Impact: availability loss.
-6. TLS/proxy misconfig capture.
+5. TLS/proxy misconfig capture.
 Steps: HTTP allowed or proxy misconfigured → cookies or `x-house-auth` captured → session hijack or house tamper within timestamp window. Impact: integrity loss.
 
 ## Threat model table
 | Threat ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TM-001 | Server/data store attacker | Access to `data/store.json` | Decrypt K_root using `keyWrapSig` + `keyWrap` | E2EE confidentiality break | K_root, house logs | AES-GCM wrap + wallet signatures (`public/create.js`) | Server stores `keyWrapSig`; enables recovery | Do not store `keyWrapSig`; require wallet to re-sign per recovery; consider asymmetric encryption for key wrap | Audit access to store; alert on unexpected reads | Medium | High | High |
+| TM-001 | Remote attacker | User signs House Key Wrap message | Decrypt K_root using `keyWrap` | E2EE confidentiality break | K_root, house logs | Wallet signature gating (`public/house.js`, `server/index.js`) | Phishing remains possible; `keyWrap` stored server-side | Add wallet UX warnings; consider origin-bound or domain-attested messages; optional user pin for recovery | Monitor wallet lookup frequency per address | Medium | High | High |
 | TM-002 | Client-side attacker | XSS, malicious extension, or compromised asset | Read K_root/K_auth from memory and forge house API calls | House integrity/availability loss | K_auth, house logs | CSP + local SDK (`server/index.js`, `public/house.js`) | No runtime isolation; keys in JS memory | Add strict CSP reporting; isolate crypto in secure worker; short-lived keys; consider hardware-backed wallet-based auth | Monitor `HOUSE_AUTH_INVALID` bursts and append rates | Medium | High | High |
 | TM-003 | Remote attacker | Team Code exposure or brute force | Impersonate agent, post malicious links, sabotage flow | Reputation loss, flow integrity | Team Code, shares | Random Team Codes, rate limit `/api/agent` | No rotation/revocation; no agent proof | Allow regenerate Team Code; tie agent connect to short-lived challenge | Alert on repeated `TEAM_NOT_FOUND` and new agent IPs | Low | Medium | Medium |
 | TM-004 | Remote attacker | TLS/proxy misconfig, intercepted headers | Replay or forge `x-house-auth` within skew window | Unauthorized append or read | House integrity | HMAC auth + 5-minute skew window (`server/index.js`) | Relies on correct TLS/proxy setup | Enforce HTTPS at edge; set `Secure` cookie in prod regardless of `req.secure`; reduce skew window | Log non-HTTPS requests and auth failures | Low | Medium | Medium |
@@ -164,7 +162,7 @@ Steps: HTTP allowed or proxy misconfigured → cookies or `x-house-auth` capture
 ## Criticality calibration
 Critical:
 - Any compromise enabling decryption of house logs (K_root exposure).
-- Server compromise that allows K_root recovery at scale (if `keyWrapSig` is stored).
+- Legacy data that still contains `keyWrapSig` (if any) allowing K_root recovery at scale.
 
 High:
 - Client-side key compromise enabling house log tampering or decryption.
@@ -184,7 +182,7 @@ Low:
 | `server/store.js` | At-rest storage of auth/keyWrap material | TM-001, TM-005 |
 | `server/sessions.js` | Team Code and houseId mapping | TM-003, TM-007 |
 | `public/house.js` | K_root/K_auth handling, house auth headers | TM-001, TM-002 |
-| `public/create.js` | House ceremony, key wrap + keyWrapSig | TM-001, TM-002 |
+| `public/create.js` | House ceremony and key wrap | TM-001, TM-002 |
 | `public/app.js` | Token gate flow + wallet signatures | TM-006 |
 | `public/leaderboard.js` | Link rendering and share visibility | TM-003 |
 | `specs/02_api_contract.md` | Intended API behavior vs implementation | TM-001, TM-004 |
@@ -195,6 +193,6 @@ Quality check:
 - Each trust boundary appears in threats.
 - Runtime vs test-only functionality is separated.
 - User clarifications on E2EE and email removal are reflected.
-- Remaining assumptions (TLS enforcement and keyWrapSig policy) are explicit.
+- Remaining assumptions (TLS enforcement and legacy keyWrapSig cleanup) are explicit.
 
 Evidence anchors used throughout include `server/index.js`, `server/sessions.js`, `server/store.js`, `public/house.js`, `public/create.js`, `public/app.js`, and `specs/02_api_contract.md`.

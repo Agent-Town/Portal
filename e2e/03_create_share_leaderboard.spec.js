@@ -100,18 +100,6 @@ test('co-op open -> co-create -> generate house -> unlock with wallet signature'
   // Panels stay closed until toggled.
   await expect(page.locator('#descriptorPanel')).toBeHidden();
   await expect(page.locator('#erc8004Panel')).toBeHidden();
-
-  // House page should render a descriptor textarea after toggle.
-  await page.getByRole('button', { name: 'Show house QR' }).click();
-  await expect(page.locator('#descriptor')).toBeVisible();
-  await expect(page.locator('#descriptor')).toHaveValue(/"kind":\s*"agent-town-house"/);
-  await expect(page.locator('#descriptor')).toHaveValue(/"id":\s*"[A-Za-z0-9]+"/);
-
-  // Phase 2 hook: ERC-8004 statement exists after toggle.
-  await page.getByRole('button', { name: 'Show ERC-8004' }).click();
-  await expect(page.locator('#erc8004')).toBeVisible();
-  await expect(page.locator('#erc8004')).toHaveValue(/erc8004\.link_house/);
-
-  // Phase 3 hook: mint UI exists.
-  await expect(page.getByRole('button', { name: 'Mint ERC-8004 identity' })).toBeVisible();
+  await expect(page.locator('#toggleDescriptorBtn')).toHaveClass(/is-hidden/);
+  await expect(page.locator('#toggleErc8004Btn')).toHaveClass(/is-hidden/);
 });

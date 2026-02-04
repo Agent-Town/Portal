@@ -6,7 +6,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, request }) => {
+test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
   // Mock Solana wallet + EVM wallet + ag0 SDK
   await page.addInitScript(() => {
     // Solana mock
@@ -72,9 +72,6 @@ test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, r
   await page.getByRole('button', { name: 'Connect wallet' }).click();
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
   await expect(page.locator('#erc8004Panel')).toBeHidden();
-  await page.getByRole('button', { name: 'Show ERC-8004' }).click();
-
-  // Mint
-  await page.getByRole('button', { name: 'Mint ERC-8004 identity' }).click();
-  await expect(page.locator('#erc8004MintStatus')).toContainText('0xfeedbeef');
+  await expect(page.locator('#toggleErc8004Btn')).toHaveClass(/is-hidden/);
+  await expect(page.locator('#mintErc8004Btn')).toBeHidden();
 });

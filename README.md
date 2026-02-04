@@ -55,12 +55,13 @@ House entries are end-to-end encrypted. The server only stores ciphertext and ne
 
 What the server stores:
 - Encrypted house log entries (`ciphertext` only).
-- House metadata, including a wallet-wrapped `K_root` (`keyWrap`) and its signature (`keyWrapSig`) for recovery.
+- House metadata, including a wallet-wrapped `K_root` (`keyWrap`) for recovery.
 - `houseAuthKey` (HMAC key) for authenticating `/api/house/:id/*` requests.
 
 What the server does not store:
 - The raw `K_root` or `K_enc` used to decrypt entries.
 - Any unencrypted house content.
+- The `keyWrapSig` (clients re-sign the wrap message during recovery).
 
 Unlocking a house in the UI is gated by a Solana wallet signature. Decryption happens client-side after deriving keys from the ceremony materials.
 

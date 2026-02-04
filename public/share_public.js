@@ -17,6 +17,41 @@ async function api(url, opts = {}) {
 
 function el(id) { return document.getElementById(id); }
 
+function loadHouseIdFromCache() {
+  try {
+    const raw = localStorage.getItem('agentTownWallet');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data && typeof data.houseId === 'string' && data.houseId) {
+      return data.houseId;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function initHouseNavLink() {
+  const link = el('houseNavLink');
+  if (!link) return;
+  let houseId = loadHouseIdFromCache();
+  if (!houseId) {
+    try {
+      const st = await api('/api/state');
+      houseId = st.houseId || null;
+    } catch {
+      houseId = null;
+    }
+  }
+  if (houseId) {
+    link.classList.remove('is-hidden');
+    link.href = `/house?house=${encodeURIComponent(houseId)}`;
+  } else {
+    link.classList.add('is-hidden');
+    link.href = '/house';
+  }
+}
+
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
 
 function handleFromUrl(url) {
@@ -77,6 +112,7 @@ function setPublicMedia(media) {
 
 async function init() {
   el('shareIdBadge').textContent = shareId;
+  initHouseNavLink();
   const signup = el('signupBtn');
   if (signup) {
     signup.href = `/?ref=${encodeURIComponent(shareId)}`;

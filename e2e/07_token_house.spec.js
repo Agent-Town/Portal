@@ -39,6 +39,5 @@ test('token holder can create a house without an agent', async ({ page }) => {
   }
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
   await expect(page.locator('#descriptorPanel')).toBeHidden();
-  await page.getByRole('button', { name: 'Show house QR' }).click();
-  await expect(page.locator('#descriptor')).toBeVisible();
+  await expect(page.locator('#toggleDescriptorBtn')).toHaveClass(/is-hidden/);
 });

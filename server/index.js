@@ -128,11 +128,19 @@ app.use((err, req, res, next) => {
 });
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
+const ASSETS_DIR = path.join(process.cwd(), 'assets');
 const isProd = process.env.NODE_ENV === 'production';
 const ELIZATOWN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const SOLANA_RPC_FALLBACKS = (process.env.SOLANA_RPC_FALLBACKS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const SOLANA_RPC_URLS = [SOLANA_RPC_URL, ...SOLANA_RPC_FALLBACKS].filter(Boolean);
 const TOKEN_CHECK_TIMEOUT_MS = 5_000;
 const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
+const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
+const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
 
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -233,6 +241,24 @@ app.use(
   })
 );
 
+app.use(
+  '/api/wallet',
+  rateLimit({
+    windowMs: 60_000,
+    max: 30,
+    keyFn: (req) => `wallet:${req.ip}`
+  })
+);
+
+app.use(
+  '/api/house/init',
+  rateLimit({
+    windowMs: 60_000,
+    max: 20,
+    keyFn: (req) => `house-init:${req.ip}`
+  })
+);
+
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
   let sid = cookies.et_session;
@@ -241,7 +267,7 @@ function ensureHumanSession(req, res) {
     session = createSession();
     sid = session.sessionId;
     // Cookie is the only "identity". No external auth required.
-    const secureFlag = req.secure ? '; Secure' : '';
+    const secureFlag = isProd || req.secure ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
   return session;
@@ -309,6 +335,18 @@ function postJson(url, payload, { timeoutMs = TOKEN_CHECK_TIMEOUT_MS } = {}) {
   });
 }
 
+async function postJsonWithFallback(urls, payload) {
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      return await postJson(url, payload);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('RPC_UNAVAILABLE');
+}
+
 function addressHasTokenValue(account) {
   const amount = account?.account?.data?.parsed?.info?.tokenAmount?.amount;
   if (typeof amount !== 'string') return false;
@@ -319,20 +357,39 @@ function addressHasTokenValue(account) {
   }
 }
 
+const tokenVerifyCache = new Map();
+function getCachedTokenEligibility(address) {
+  const cached = tokenVerifyCache.get(address);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    tokenVerifyCache.delete(address);
+    return null;
+  }
+  return cached.eligible;
+}
+
+function setCachedTokenEligibility(address, eligible) {
+  tokenVerifyCache.set(address, { eligible, expiresAt: Date.now() + TOKEN_VERIFY_CACHE_MS });
+}
+
 async function hasElizaTownToken(address) {
   if (process.env.NODE_ENV === 'test') {
     const testAddr = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
     return address === testAddr;
   }
+  const cached = getCachedTokenEligibility(address);
+  if (cached !== null) return cached;
   const payload = {
     jsonrpc: '2.0',
     id: 1,
     method: 'getTokenAccountsByOwner',
     params: [address, { mint: ELIZATOWN_MINT }, { encoding: 'jsonParsed' }]
   };
-  const data = await postJson(SOLANA_RPC_URL, payload);
+  const data = await postJsonWithFallback(SOLANA_RPC_URLS, payload);
   const accounts = Array.isArray(data?.result?.value) ? data.result.value : [];
-  return accounts.some(addressHasTokenValue);
+  const eligible = accounts.some(addressHasTokenValue);
+  setCachedTokenEligibility(address, eligible);
+  return eligible;
 }
 
 const MAX_HOUSE_ENTRIES = 200;
@@ -521,7 +578,7 @@ function verifyHouseAuth(req, house) {
   const tsNum = Number(ts);
   if (!Number.isFinite(tsNum)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   const skew = Math.abs(Date.now() - tsNum);
-  if (skew > 5 * 60 * 1000) return { ok: false, error: 'HOUSE_AUTH_EXPIRED' };
+  if (skew > HOUSE_AUTH_SKEW_MS) return { ok: false, error: 'HOUSE_AUTH_EXPIRED' };
   const key = decodeB64(house.authKey);
   if (!key || key.length < 16) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   const bodyHash = sha256Base64(req.rawBody || '');
@@ -956,6 +1013,110 @@ app.get('/api/share/:id', (req, res) => {
   res.json({ ok: true, share: rest });
 });
 
+app.get('/api/share/by-house/:houseId', (req, res) => {
+  const houseId = req.params.houseId;
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const rec = store.shares.find((x) => x.houseId === houseId);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, shareId: rec.id, sharePath: `/s/${rec.id}` });
+});
+
+app.post('/api/house/:id/share', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  let share = store.shares.find((x) => x.houseId === houseId);
+  const session = getSessionByHouseId(houseId);
+
+  if (!share) {
+    if (store.shares.length >= MAX_SHARES) {
+      return res.status(403).json({ ok: false, error: 'STORE_FULL' });
+    }
+    const shareId = `sh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    share = {
+      id: shareId,
+      createdAt: nowIso(),
+      matchedElement: session?.match?.elementId || null,
+      agentName: session?.agent?.name || 'OpenClaw',
+      mode: 'agent',
+      houseId,
+      xPostUrl: session?.human?.xPostUrl || null,
+      humanHandle: session?.human?.xHandle || null,
+      agentPosts: {
+        moltbookUrl: session?.agent?.posts?.moltbookUrl || null
+      },
+      referrals: 0,
+      locked: true,
+      lockedAt: nowIso(),
+      optIn: { human: true, agent: true },
+      public: false
+    };
+
+    store.shares.push(share);
+  }
+
+  ensurePublicTeamForShare(store, share, session);
+  writeStore(store);
+
+  if (session) {
+    session.share.id = share.id;
+    session.share.createdAt = share.createdAt;
+    session.human.optIn = true;
+    session.agent.optIn = true;
+  }
+
+  res.json({ ok: true, shareId: share.id, sharePath: `/s/${share.id}` });
+});
+
+app.post('/api/house/:id/posts', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const rawX = typeof req.body?.xPostUrl === 'string' ? req.body.xPostUrl.trim() : '';
+  const rawM = typeof req.body?.moltbookUrl === 'string' ? req.body.moltbookUrl.trim() : '';
+  const xPostUrl = rawX ? sanitizeUrl(rawX) : null;
+  const moltbookUrl = rawM ? sanitizeUrl(rawM) : null;
+  if (rawX && !xPostUrl) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
+  if (rawM && !moltbookUrl) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
+
+  const share = store.shares.find((x) => x.houseId === houseId);
+  if (!share) return res.status(404).json({ ok: false, error: 'SHARE_NOT_FOUND' });
+
+  share.xPostUrl = xPostUrl;
+  share.humanHandle = extractXHandle(xPostUrl) || null;
+  share.agentPosts = share.agentPosts || {};
+  share.agentPosts.moltbookUrl = moltbookUrl;
+
+  const pub = store.publicTeams.find((p) => p.shareId === share.id);
+  if (pub) {
+    pub.xPostUrl = xPostUrl;
+    pub.humanHandle = share.humanHandle;
+    pub.agentPosts = pub.agentPosts || {};
+    pub.agentPosts.moltbookUrl = moltbookUrl;
+  }
+
+  const session = getSessionByHouseId(houseId);
+  if (session) {
+    session.human.xPostUrl = xPostUrl;
+    session.human.xHandle = share.humanHandle;
+    session.agent.posts.moltbookUrl = moltbookUrl;
+  }
+
+  writeStore(store);
+  res.json({ ok: true, shareId: share.id, sharePath: `/s/${share.id}` });
+});
+
 app.get('/api/agent/share/instructions', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
@@ -971,6 +1132,34 @@ app.get('/api/agent/share/instructions', (req, res) => {
 });
 
 // Posts
+app.post('/api/human/posts', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const raw = typeof req.body?.xPostUrl === 'string' ? req.body.xPostUrl.trim() : '';
+  const shareIdRaw = typeof req.body?.shareId === 'string' ? req.body.shareId.trim() : '';
+  const xPostUrl = raw ? sanitizeUrl(raw) : null;
+  if (raw && !xPostUrl) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
+
+  s.human.xPostUrl = xPostUrl;
+  s.human.xHandle = extractXHandle(xPostUrl) || null;
+
+  const targetShareId = s.share.id || shareIdRaw || null;
+  if (targetShareId) {
+    const store = readStore();
+    const rec = store.shares.find((x) => x.id === targetShareId);
+    if (!rec) return res.status(404).json({ ok: false, error: 'SHARE_NOT_FOUND' });
+    rec.xPostUrl = xPostUrl;
+    rec.humanHandle = s.human.xHandle || null;
+    const pub = store.publicTeams.find((p) => p.shareId === targetShareId);
+    if (pub) {
+      pub.xPostUrl = xPostUrl;
+      pub.humanHandle = s.human.xHandle || null;
+    }
+    writeStore(store);
+  }
+
+  res.json({ ok: true });
+});
+
 app.post('/api/agent/posts', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
@@ -978,6 +1167,11 @@ app.post('/api/agent/posts', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
 
   const moltbookUrl = sanitizeUrl(req.body?.moltbookUrl);
+  // Guardrail: avoid polluting leaderboard/publicTeams with obviously-bad URLs.
+  // (The Moltbook API can rate-limit post creation; callers should not send placeholder/null URLs.)
+  if (!moltbookUrl || /moltbook\.comnull\/?$/i.test(moltbookUrl)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_URL' });
+  }
 
   s.agent.posts.moltbookUrl = moltbookUrl;
 
@@ -1032,6 +1226,31 @@ function maybeAddToLeaderboard(session) {
 
   writeStore(store);
   return { ok: true, already: false };
+}
+
+function ensurePublicTeamForShare(store, share, session = null) {
+  if (!share || !share.id) return false;
+  const exists = store.publicTeams.find((p) => p.shareId === share.id);
+  if (exists) return true;
+
+  const humanHandle = share.humanHandle || extractXHandle(share.xPostUrl);
+  const record = {
+    id: `p_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    shareId: share.id,
+    sharePath: `/s/${share.id}`,
+    houseId: share.houseId || session?.houseCeremony?.houseId || null,
+    matchedElement: session?.match?.elementId || share.matchedElement || null,
+    agentName: share.agentName || session?.agent?.name || 'OpenClaw',
+    xPostUrl: share.xPostUrl || null,
+    humanHandle,
+    agentPosts: share.agentPosts ? { moltbookUrl: share.agentPosts.moltbookUrl || null } : null
+  };
+
+  store.publicTeams.unshift(record);
+  share.public = true;
+  share.optIn = { human: true, agent: true };
+  return true;
 }
 
 function buildLeaderboard(store) {
@@ -1107,14 +1326,21 @@ app.post('/api/wallet/lookup', (req, res) => {
   const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
   if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
   if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
-  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (nonce !== s.walletLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
-
-  const msg = buildWalletLookupMessage({ address, nonce, houseId: houseId || null });
-  if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
-    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  const usingNonce = !!nonce;
+  if (usingNonce) {
+    if (nonce !== s.walletLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+    const msg = buildWalletLookupMessage({ address, nonce, houseId: houseId || null });
+    if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
+      return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+    }
+    s.walletLookupNonce = null;
+  } else {
+    if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+    const msg = buildHouseKeyWrapMessage({ houseId });
+    if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
+      return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+    }
   }
-  s.walletLookupNonce = null;
 
   const store = readStore();
   let matches = store.houses.filter(
@@ -1124,7 +1350,7 @@ app.post('/api/wallet/lookup', (req, res) => {
     matches = matches.filter((r) => r.id === houseId);
     if (!matches.length) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
   }
-  if (!matches.length) return res.json({ ok: true, houseId: null, keyWrap: null, keyWrapSig: null });
+  if (!matches.length) return res.json({ ok: true, houseId: null, keyWrap: null });
   matches.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
   const house = matches[matches.length - 1];
   if (house?.id) {
@@ -1135,8 +1361,7 @@ app.post('/api/wallet/lookup', (req, res) => {
   res.json({
     ok: true,
     houseId: house.id,
-    keyWrap: house.keyWrap || null,
-    keyWrapSig: house.keyWrapSig || null
+    keyWrap: house.keyWrap || null
   });
 });
 
@@ -1199,7 +1424,6 @@ app.post('/api/house/init', (req, res) => {
   const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
   const unlock = req.body?.unlock || null;
   const keyWrap = req.body?.keyWrap || null;
-  const keyWrapSig = typeof req.body?.keyWrapSig === 'string' ? req.body.keyWrapSig.trim() : '';
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
 
   if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
@@ -1209,6 +1433,9 @@ app.post('/api/house/init', (req, res) => {
   const authKeyBytes = decodeB64(houseAuthKey);
   if (!authKeyBytes || authKeyBytes.length < 16) {
     return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
+  }
+  if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
+    return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
   }
 
   // Converged for today's publish: ceremony-only houses.
@@ -1229,22 +1456,6 @@ app.post('/api/house/init', (req, res) => {
     }
   }
 
-  let normalizedKeyWrapSig = null;
-  if (keyWrapSig) {
-    const sigBytes = b64ToBytes(keyWrapSig);
-    if (!sigBytes || sigBytes.length !== 64) {
-      return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP_SIG' });
-    }
-    const address = unlock?.address || '';
-    if (address) {
-      const msg = buildHouseKeyWrapMessage({ houseId });
-      if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, keyWrapSig)) {
-        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP_SIG' });
-      }
-    }
-    normalizedKeyWrapSig = keyWrapSig;
-  }
-
   const store = readStore();
   if (store.houses.length >= MAX_HOUSES) {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
@@ -1260,7 +1471,6 @@ app.post('/api/house/init', (req, res) => {
     keyMode: 'ceremony',
     unlock,
     keyWrap: normalizedKeyWrap,
-    keyWrapSig: normalizedKeyWrapSig,
     authKey: houseAuthKey,
     entries: []
   });
@@ -1459,6 +1669,19 @@ app.post('/api/house/:id/append', (req, res) => {
 // --- Static + routes ---
 app.use(
   express.static(PUBLIC_DIR, {
+    etag: true,
+    maxAge: isProd ? '1h' : 0,
+    setHeaders: (res) => {
+      if (!isProd) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    }
+  })
+);
+
+app.use(
+  '/assets',
+  express.static(ASSETS_DIR, {
     etag: true,
     maxAge: isProd ? '1h' : 0,
     setHeaders: (res) => {

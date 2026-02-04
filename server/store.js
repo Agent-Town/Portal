@@ -29,7 +29,17 @@ function readStore() {
 function writeStore(next) {
   const p = getStorePath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(next, null, 2) + '\n', 'utf8');
+  const cleaned = {
+    ...next,
+    houses: Array.isArray(next?.houses)
+      ? next.houses.map((house) => {
+          if (!house || typeof house !== 'object') return house;
+          const { keyWrapSig, ...rest } = house;
+          return rest;
+        })
+      : []
+  };
+  fs.writeFileSync(p, JSON.stringify(cleaned, null, 2) + '\n', 'utf8');
 }
 
 module.exports = {

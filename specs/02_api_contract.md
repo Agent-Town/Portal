@@ -162,10 +162,45 @@ Response:
 ### GET `/api/share/:id`
 Returns share record.
 Share includes `locked` boolean.
+Share includes post links (if provided):
+- `xPostUrl` (string | null)
+- `humanHandle` (string | null)
+- `agentPosts.moltbookUrl` (string | null)
 Share includes optional `publicMedia`:
 - `publicMedia.imageUrl` (string | null)
 - `publicMedia.prompt` (string | null)
 - `publicMedia.updatedAt` (ISO8601 | null)
+
+### GET `/api/share/by-house/:houseId`
+Returns:
+```json
+{ "ok": true, "shareId": "sh_...", "sharePath": "/s/sh_..." }
+```
+Returns `NOT_FOUND` if the house has no share.
+
+### POST `/api/house/:id/share` (house-auth)
+House-authenticated (requires `x-house-ts` + `x-house-auth` headers).
+Creates a share for the house if one does not exist, or returns the existing share.
+
+Returns:
+```json
+{ "ok": true, "shareId": "sh_...", "sharePath": "/s/sh_..." }
+```
+
+### POST `/api/house/:id/posts` (house-auth)
+House-authenticated (requires `x-house-ts` + `x-house-auth` headers).
+Updates human + agent post links for the share associated with the house.
+
+Body:
+```json
+{ "xPostUrl": "https://...", "moltbookUrl": "https://..." }
+```
+
+Returns:
+```json
+{ "ok": true, "shareId": "sh_...", "sharePath": "/s/sh_..." }
+```
+Returns `SHARE_NOT_FOUND` if the house has no share.
 
 ### GET `/api/agent/share/instructions?teamCode=...`
 Returns suggested post text and the `sharePath`.
@@ -187,6 +222,16 @@ Returns:
 ---
 
 ## Posts
+
+### POST `/api/human/posts` (human)
+Body:
+```json
+{ "xPostUrl": "https://...", "shareId": "sh_..." }
+```
+Stores the human post URL on the session. If a share exists, updates the share record and leaderboard.
+`shareId` is optional and lets the client update an existing share when the session no longer has `share.id`.
+Returns:
+- `INVALID_URL` if not a valid http/https URL
 
 ### POST `/api/agent/posts`
 Body:
@@ -234,7 +279,6 @@ Body:
   "keyMode": "ceremony",
   "unlock": { "kind": "solana-wallet-signature", "address": "..." },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
-  "keyWrapSig": "<base64 signature over House Key Wrap message>",
   "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>"
 }
 ```
@@ -315,7 +359,7 @@ Body:
 { "address": "<solana base58>", "nonce": "wn_...", "signature": "<base64>", "houseId": "<optional base58>" }
 ```
 
-Signature must be `signMessage()` over:
+If `nonce` is provided, signature must be `signMessage()` over:
 ```
 ElizaTown House Lookup
 address: <address>
@@ -323,13 +367,22 @@ nonce: <nonce>
 [houseId: <houseId>]
 ```
 
+If `nonce` is omitted and `houseId` is provided, signature must be `signMessage()` over:
+```
+ElizaTown House Key Wrap
+houseId: <houseId>
+```
+
 Returns:
 ```json
-{ "ok": true, "houseId": "<base58 | null>", "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" } | null, "keyWrapSig": "<base64 | null>" }
+{ "ok": true, "houseId": "<base58 | null>", "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" } | null }
 ```
 
 `keyWrap` is a wallet-wrapped `K_root` for recovery. It is encrypted client-side with a key derived from a deterministic wallet signature over:
 ```
 ElizaTown House Key Wrap
 houseId: <houseId>
+[origin: <origin>]
 ```
+
+`keyWrapSig` is no longer stored; clients should re-sign the House Key Wrap message to derive the wrap key during recovery.

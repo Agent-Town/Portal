@@ -19,6 +19,18 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function setHouseNavLink(houseId) {
+  const link = el('houseNavLink');
+  if (!link) return;
+  if (houseId) {
+    link.classList.remove('is-hidden');
+    link.href = `/house?house=${encodeURIComponent(houseId)}`;
+  } else {
+    link.classList.add('is-hidden');
+    link.href = '/house';
+  }
+}
+
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
@@ -117,6 +129,7 @@ async function pollCanvas() {
 async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
+  setHouseNavLink(st.houseId || null);
   const params = new URLSearchParams(window.location.search);
   const requestedToken = params.get('mode') === 'token';
   const signupMode = st.signup?.mode || (st.signup?.complete ? 'agent' : null);
@@ -256,11 +269,10 @@ async function init() {
     return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
   }
 
-  function buildKeyWrapMessage({ houseId }) {
-    return [
-      'ElizaTown House Key Wrap',
-      `houseId: ${houseId}`
-    ].join('\n');
+  function buildKeyWrapMessage({ houseId, origin }) {
+    const parts = ['ElizaTown House Key Wrap', `houseId: ${houseId}`];
+    if (origin) parts.push(`origin: ${origin}`);
+    return parts.join('\n');
   }
 
   async function signMessageBytes(wallet, message) {
@@ -346,13 +358,12 @@ async function init() {
       const houseAuthKey = b64(await deriveHouseAuthKey(Kroot));
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
-      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey });
+      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
       const wrapSig = await signMessageBytes(wallet, wrapMsg);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
       const wrapped = await aesGcmEncrypt(wrapKey, Kroot);
       const keyWrap = { alg: 'AES-GCM', iv: b64(wrapped.iv), ct: b64(wrapped.ct) };
-      const keyWrapSig = b64(wrapSig);
 
       // 4) Create the house container on the server.
       // Key source of truth is the ceremony (K_root derived from Rh||Ra); we store only the wallet-wrapped K_root for recovery.
@@ -369,7 +380,6 @@ async function init() {
           keyMode: 'ceremony',
           unlock: { kind: 'solana-wallet-signature', address },
           keyWrap,
-          keyWrapSig,
           houseAuthKey
         })
       });

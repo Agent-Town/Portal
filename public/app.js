@@ -433,8 +433,9 @@ function updateUI(state) {
   }
   const tokenMode = pathMode === 'token' || signupMode === 'token';
 
-  // Counts
-  el('signupCount').textContent = String(state.stats?.signups ?? '—');
+  // Counts (optional on index)
+  const signupCount = el('signupCount');
+  if (signupCount) signupCount.textContent = String(state.stats?.signups ?? '—');
 
   // Team code (fallback for older servers that still send pairCode)
   const teamCode = state.teamCode || state.pairCode || '…';
@@ -442,6 +443,17 @@ function updateUI(state) {
 
   const origin = window.location.origin;
   el('teamSnippet').textContent = `Read ${origin}/skill.md and team with code: ${teamCode}`;
+
+  const houseNavLink = el('houseNavLink');
+  if (houseNavLink) {
+    if (houseId) {
+      houseNavLink.classList.remove('is-hidden');
+      houseNavLink.href = `/house?house=${encodeURIComponent(houseId)}`;
+    } else {
+      houseNavLink.classList.add('is-hidden');
+      houseNavLink.href = '/house';
+    }
+  }
 
   updatePathButtons();
   const pathNote = el('pathNote');

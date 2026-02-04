@@ -110,10 +110,6 @@ test('house unlock is wallet-signature gated (mocked wallet)', async ({ page, re
   await page.getByRole('button', { name: 'Connect wallet' }).click();
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
   await expect(page.locator('#erc8004Panel')).toBeHidden();
-  await page.getByRole('button', { name: 'Show ERC-8004' }).click();
-
-  // Phase 3: mint identity (mocked SDK) updates UI
-  await page.getByText('Mint ERC-8004 identity').click();
-  await expect(page.locator('#erc8004MintStatus')).toContainText('Minted identity: 11155111:123');
-  await expect(page.locator('#erc8004')).toHaveValue(/11155111:123/);
+  await expect(page.locator('#toggleErc8004Btn')).toHaveClass(/is-hidden/);
+  await expect(page.locator('#mintErc8004Btn')).toBeHidden();
 });

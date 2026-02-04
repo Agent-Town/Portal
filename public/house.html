@@ -38,8 +38,8 @@
 
       <div class="kv" style="gap:10px; flex-wrap: wrap;">
         <button class="btn" id="unlockBtn">Sign to unlock</button>
-        <button class="btn" id="toggleDescriptorBtn" disabled>Show house QR</button>
-        <button class="btn" id="toggleErc8004Btn" disabled>Show ERC-8004</button>
+        <button class="btn is-hidden" id="toggleDescriptorBtn" disabled>Show house QR</button>
+        <button class="btn is-hidden" id="toggleErc8004Btn" disabled>Show ERC-8004</button>
       </div>
 
       <div class="small" id="status" style="margin-top:10px; color: var(--muted);"></div>
@@ -126,6 +126,26 @@
             <button class="btn" id="copyShareLink">Copy share link</button>
             <a class="btn" id="openShareLink" href="/" target="_blank" rel="noreferrer">Open share</a>
           </div>
+        </div>
+        <div id="sharePosts" style="margin-top:12px; display:grid; gap:8px;">
+          <div class="small">Post links (optional)</div>
+          <span class="pill status share-agent-only" id="shareAgentStatusActive">
+            <span class="dot" id="shareAgentDotActive"></span>
+            <span id="shareAgentStatusTextActive">Agent not connected</span>
+          </span>
+          <div style="display:grid; gap:6px;">
+            <label class="small" for="shareHumanPost">Human X post</label>
+            <input id="shareHumanPost" type="url" placeholder="https://x.com/.../status/..." />
+          </div>
+          <div class="share-agent-only" style="display:grid; gap:6px;">
+            <label class="small" for="shareAgentPost">Agent Moltbook post</label>
+            <input id="shareAgentPost" type="url" placeholder="https://www.moltbook.com/..." />
+          </div>
+          <div class="kv">
+            <button class="btn" id="saveSharePosts">Save links</button>
+            <span class="pill" id="sharePostsStatus" style="display:none">Saved</span>
+          </div>
+          <div class="small" id="sharePostsError" style="margin-top:6px; color: var(--bad);"></div>
         </div>
       </div>
     </div>

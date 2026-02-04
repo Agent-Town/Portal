@@ -25,8 +25,20 @@ function el(id) {
 function setStatus(msg) {
   el('status').textContent = msg || '';
 }
+
+const ERROR_MESSAGES = {
+  AG0_SDK_NOT_BUNDLED: 'ERC-8004 minting is disabled until the Agent0 SDK is bundled.',
+  AG0_SDK_LOAD_FAILED: 'Unable to load the Agent0 SDK. Check your network or try again.'
+};
+
 function setError(msg) {
-  el('error').textContent = msg || '';
+  const node = el('error');
+  if (!node) return;
+  if (!msg) {
+    node.textContent = '';
+    return;
+  }
+  node.textContent = ERROR_MESSAGES[msg] || msg;
 }
 
 function setPublicMediaError(msg) {
@@ -83,6 +95,29 @@ const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const PUBLIC_MEDIA_MAX_BYTES = 1024 * 1024;
 const PUBLIC_MEDIA_PROMPT_MAX = 280;
 const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
+const AUTO_LOCK_MS = null;
+const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
+const AGENT0_SDK_CDN_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+
+async function loadAgent0Sdk(statusNode) {
+  if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
+
+  let localMod = null;
+  try {
+    localMod = await import(AGENT0_SDK_ESM_URL);
+  } catch {
+    localMod = null;
+  }
+
+  if (!localMod || localMod.AG0_SDK_BUNDLED === false) {
+    const ok = confirm('Agent0 SDK is not bundled locally. Load it from the official CDN for this mint?');
+    if (!ok) throw new Error('AG0_SDK_NOT_BUNDLED');
+    if (statusNode) statusNode.textContent = 'Loading Agent0 SDK…';
+    return await import(AGENT0_SDK_CDN_URL);
+  }
+
+  return localMod;
+}
 
 // --- base64 helpers ---
 function b64(bytes) {
@@ -441,6 +476,7 @@ let KrootBytes = null; // Uint8Array (memory only)
 let Kenc = null; // CryptoKey for house log encryption
 let KauthBytes = null; // Uint8Array (memory only)
 let KauthKey = null; // CryptoKey for HMAC auth
+let autoLockTimer = null;
 
 // Phase 3: store minted ERC-8004 ids locally (not persisted yet)
 let humanErc8004Id = null;
@@ -507,10 +543,9 @@ async function mintErc8004Identity() {
     if (!ok) return;
   }
 
-  // Use a locally hosted Agent0 SDK bundle to avoid CDN supply-chain risk.
+  // Prefer a locally hosted Agent0 SDK bundle; allow a CDN fallback with confirmation.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
-  const mod = window.__AG0_SDK_MOCK ? window.__AG0_SDK_MOCK : await import(AGENT0_SDK_ESM_URL);
+  const mod = await loadAgent0Sdk(status);
 
   const SDKClass = mod.SDK;
   if (typeof SDKClass !== 'function') throw new Error('AG0_SDK_LOAD_FAILED');
@@ -617,6 +652,15 @@ function clearDescriptorUI() {
   if (e) e.value = '';
 }
 
+function armAutoLock() {
+  if (!AUTO_LOCK_MS) return;
+  if (autoLockTimer) clearTimeout(autoLockTimer);
+  autoLockTimer = setTimeout(() => {
+    wipeKeys();
+    setStatus('Locked (inactive).');
+  }, AUTO_LOCK_MS);
+}
+
 function setPanelVisible(panelId, visible) {
   const panel = el(panelId);
   if (!panel) return;
@@ -634,6 +678,7 @@ function setDescriptorOpen(open) {
     btn.textContent = descriptorOpen ? 'Hide house QR' : 'Show house QR';
     btn.setAttribute('aria-pressed', descriptorOpen ? 'true' : 'false');
   }
+  if (unlocked) armAutoLock();
 }
 
 function setErc8004Open(open) {
@@ -644,6 +689,7 @@ function setErc8004Open(open) {
     btn.textContent = erc8004Open ? 'Hide ERC-8004' : 'Show ERC-8004';
     btn.setAttribute('aria-pressed', erc8004Open ? 'true' : 'false');
   }
+  if (unlocked) armAutoLock();
 }
 
 function setHousePanelButtonsEnabled(enabled) {
@@ -675,38 +721,36 @@ async function initKeysFromKroot(Kroot) {
 async function recoverHouseKeyWithWallet(houseId) {
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
   setStatus('Recovering house key…');
-  const nonceResp = await api('/api/wallet/nonce');
-  const lookupMsg = buildWalletLookupMessage({ address: walletAddr, nonce: nonceResp.nonce, houseId });
-  const lookupSig = await signMessageBytes(lookupMsg);
+  const primaryWrapMsg = buildKeyWrapMessage({ houseId });
+  const primaryWrapSig = await signMessageBytes(primaryWrapMsg);
   const lookup = await api('/api/wallet/lookup', {
     method: 'POST',
     body: JSON.stringify({
       address: walletAddr,
-      nonce: nonceResp.nonce,
-      signature: b64(lookupSig),
+      signature: b64(primaryWrapSig),
       houseId
     })
   });
   if (!lookup?.keyWrap || !lookup.keyWrap.iv || !lookup.keyWrap.ct) return false;
   if (lookup.keyWrap.alg && lookup.keyWrap.alg !== 'AES-GCM') throw new Error('INVALID_KEY_WRAP');
 
-  if (lookup.keyWrapSig) {
-    const sigBytes = unb64(lookup.keyWrapSig);
+  async function decryptWithSignature(sigBytes) {
     const wrapKeyBytes = await sha256(sigBytes);
     const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-    const kroot = await aesGcmDecrypt(wrapKey, unb64(lookup.keyWrap.iv), unb64(lookup.keyWrap.ct));
-    const houseIdBytes = await sha256(kroot);
-    const derivedHouseId = base58Encode(houseIdBytes);
-    if (derivedHouseId !== houseId) throw new Error('HOUSE_ID_MISMATCH');
-    await initKeysFromKroot(kroot);
-    return true;
+    return aesGcmDecrypt(wrapKey, unb64(lookup.keyWrap.iv), unb64(lookup.keyWrap.ct));
   }
 
   async function decryptWithMessage(wrapMsg) {
     const wrapSig = await signMessageBytes(wrapMsg);
-    const wrapKeyBytes = await sha256(wrapSig);
-    const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-    return aesGcmDecrypt(wrapKey, unb64(lookup.keyWrap.iv), unb64(lookup.keyWrap.ct));
+    return decryptWithSignature(wrapSig);
+  }
+
+  let kroot = null;
+  let lastErr = null;
+  try {
+    kroot = await decryptWithSignature(primaryWrapSig);
+  } catch (e) {
+    lastErr = e;
   }
 
   const attempts = [];
@@ -721,17 +765,16 @@ async function recoverHouseKeyWithWallet(houseId) {
       attempts.push(buildKeyWrapMessage({ houseId, origin: `${url.protocol}//localhost${portSuffix}` }));
     }
   }
-  attempts.push(buildKeyWrapMessage({ houseId }));
 
-  let kroot = null;
-  let lastErr = null;
-  for (const msg of attempts) {
-    try {
-      kroot = await decryptWithMessage(msg);
-      break;
-    } catch (e) {
-      lastErr = e;
-      setStatus('Retrying key recovery…');
+  if (!kroot) {
+    for (const msg of attempts) {
+      try {
+        kroot = await decryptWithMessage(msg);
+        break;
+      } catch (e) {
+        lastErr = e;
+        setStatus('Retrying key recovery…');
+      }
     }
   }
   if (!kroot) {
@@ -751,6 +794,10 @@ function wipeKeys() {
   Kenc = null;
   KauthBytes = null;
   KauthKey = null;
+  if (autoLockTimer) {
+    clearTimeout(autoLockTimer);
+    autoLockTimer = null;
+  }
   publicMedia = null;
   pendingPublicImage = null;
   el('entries').textContent = '';
@@ -783,6 +830,7 @@ async function unlockExistingHouse(houseId) {
   // Derive K_root from ceremony material (humanReveal + agentReveal) stored in the session.
   const mat = await api('/api/human/house/material');
   let recovered = false;
+  let usedCeremony = false;
   if (mat.humanReveal && mat.agentReveal) {
     const Rh = unb64(mat.humanReveal);
     const Ra = unb64(mat.agentReveal);
@@ -792,11 +840,17 @@ async function unlockExistingHouse(houseId) {
     const Kroot = await sha256(combo);
     const houseIdBytes = await sha256(Kroot);
     const derivedHouseId = base58Encode(houseIdBytes);
-    if (derivedHouseId !== houseId) throw new Error('HOUSE_ID_MISMATCH');
-    await initKeysFromKroot(Kroot);
-  } else {
+    if (derivedHouseId === houseId) {
+      await initKeysFromKroot(Kroot);
+      usedCeremony = true;
+    } else {
+      setStatus('Ceremony mismatch. Trying wallet recovery…');
+    }
+  }
+
+  if (!usedCeremony) {
     const recoveredOk = await recoverHouseKeyWithWallet(houseId);
-    if (!recoveredOk) throw new Error('CEREMONY_INCOMPLETE');
+    if (!recoveredOk) throw new Error(mat.humanReveal || mat.agentReveal ? 'HOUSE_ID_MISMATCH' : 'CEREMONY_INCOMPLETE');
     recovered = true;
   }
 
@@ -815,6 +869,7 @@ async function unlockExistingHouse(houseId) {
   saveWalletCache();
   setStatus(recovered ? 'Unlocked (wallet recovery).' : 'Unlocked.');
   setUnlockButtonState(true);
+  armAutoLock();
 
   renderDescriptorUI(house.houseId);
   setHousePanelButtonsEnabled(true);
@@ -826,6 +881,7 @@ async function unlockExistingHouse(houseId) {
 
 async function appendEntry() {
   if (!unlocked || !house || !Kenc) throw new Error('LOCKED');
+  armAutoLock();
   const type = el('entryType').value;
   const text = el('entryText').value;
   const payload = {
@@ -889,6 +945,7 @@ async function loadPublicMedia() {
 
 async function submitPublicMedia() {
   if (!unlocked || !house) throw new Error('LOCKED');
+  armAutoLock();
   const promptInput = el('publicPrompt');
   const prompt = promptInput ? promptInput.value.trim() : '';
   const imageUrl = currentPublicImageUrl();
@@ -916,6 +973,7 @@ async function submitPublicMedia() {
 
 async function clearPublicMedia() {
   if (!unlocked || !house) throw new Error('LOCKED');
+  armAutoLock();
   setPublicMediaStatus('Clearing…');
   const res = await houseApi(
     house.houseId,
@@ -952,6 +1010,14 @@ function saveShareCache(payload) {
     const houseId = payload.houseId || currentHouseId();
     const next = { ...payload, houseId: houseId || null };
     localStorage.setItem(SHARE_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearShareCache() {
+  try {
+    localStorage.removeItem(SHARE_CACHE_KEY);
   } catch {
     // ignore storage errors
   }
@@ -1014,6 +1080,8 @@ async function initSharePanel() {
   const shareLinks = el('shareLinks');
   const shareAgentDot = el('shareAgentDot');
   const shareAgentStatusText = el('shareAgentStatusText');
+  const shareAgentDotActive = el('shareAgentDotActive');
+  const shareAgentStatusTextActive = el('shareAgentStatusTextActive');
   const shareRequirement = el('shareRequirement');
   const sharePressRow = el('sharePressRow');
   const shareHumanPress = el('shareHumanPress');
@@ -1026,10 +1094,21 @@ async function initSharePanel() {
   const copyShareBtn = el('copyShareLink');
   const shareSetup = el('shareSetup');
   const shareActive = el('shareActive');
+  const shareHumanPost = el('shareHumanPost');
+  const shareAgentPost = el('shareAgentPost');
+  const saveSharePosts = el('saveSharePosts');
+  const sharePostsStatus = el('sharePostsStatus');
+  const sharePostsError = el('sharePostsError');
 
   let sharePublicUrl = null;
   let agentMessage = '';
   let lastState = null;
+  let teamCode = null;
+  let tokenMode = false;
+  let shareIdForPosts = null;
+  let sharePostsLoadedFor = null;
+  let sharePostRecord = null;
+  let shareLookupHouseId = null;
 
   if (createBtn) createBtn.disabled = true;
 
@@ -1044,14 +1123,108 @@ async function initSharePanel() {
   function setSharePanelMode(hasShare) {
     if (shareSetup) shareSetup.classList.toggle('is-hidden', hasShare);
     if (shareActive) shareActive.classList.toggle('is-hidden', !hasShare);
+    if (!hasShare) {
+      setSharePostsStatus('');
+      setSharePostsError('');
+    }
+  }
+
+  function setSharePostsStatus(msg) {
+    if (!sharePostsStatus) return;
+    sharePostsStatus.textContent = msg || 'Saved';
+    sharePostsStatus.style.display = msg ? 'inline-flex' : 'none';
+  }
+
+  function setSharePostsError(msg) {
+    if (sharePostsError) sharePostsError.textContent = msg || '';
+  }
+
+  function isValidHttpUrl(value) {
+    if (!value) return true;
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function updateSharePostInputs(state) {
+    const nextHuman = state?.human?.xPostUrl ?? sharePostRecord?.xPostUrl ?? '';
+    const nextAgent = state?.agent?.posts?.moltbookUrl ?? sharePostRecord?.agentPosts?.moltbookUrl ?? '';
+    if (shareHumanPost && document.activeElement !== shareHumanPost && shareHumanPost.value !== nextHuman) {
+      shareHumanPost.value = nextHuman;
+    }
+    if (shareAgentPost && document.activeElement !== shareAgentPost && shareAgentPost.value !== nextAgent) {
+      shareAgentPost.value = nextAgent;
+    }
+  }
+
+  async function hydrateSharePostsFromShare(shareId) {
+    if (!shareId || shareId === sharePostsLoadedFor) return;
+    sharePostsLoadedFor = shareId;
+    try {
+      const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
+      sharePostRecord = r.share || null;
+      updateSharePostInputs(lastState);
+    } catch (e) {
+      if (e.message === 'NOT_FOUND') {
+        sharePostRecord = null;
+        shareIdForPosts = null;
+        sharePostsLoadedFor = null;
+        clearShareCache();
+        setSharePostsError('Share not found. Regenerate the share link.');
+        setSharePanelMode(false);
+      }
+    }
+  }
+
+  async function hydrateShareIdFromHouse(houseId) {
+    if (!houseId || shareIdForPosts || shareLookupHouseId === houseId) return;
+    shareLookupHouseId = houseId;
+    try {
+      const r = await api(`/api/share/by-house/${encodeURIComponent(houseId)}`);
+      if (!r.shareId) return;
+      shareIdForPosts = r.shareId;
+      const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId };
+      saveShareCache(payload);
+      updateShareLinks(payload);
+    } catch (e) {
+      if (e.message === 'NOT_FOUND') {
+        shareLookupHouseId = null;
+      }
+    }
+  }
+
+  function resolveShareIdForPosts() {
+    if (shareIdForPosts) return shareIdForPosts;
+    const cached = loadShareCache();
+    if (cached?.shareId) return cached.shareId;
+    if (sharePublicUrl) {
+      try {
+        const url = new URL(sharePublicUrl);
+        const parts = url.pathname.split('/').filter(Boolean);
+        return parts[0] === 's' ? parts[1] || null : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 
   function updateAgentStatus(connected, name) {
-    if (!shareAgentDot || !shareAgentStatusText) return;
-    shareAgentDot.className = `dot ${connected ? 'good' : ''}`;
-    shareAgentStatusText.textContent = connected
-      ? `Agent connected${name ? `: ${name}` : ''}`
-      : 'Agent not connected';
+    if (shareAgentDot && shareAgentStatusText) {
+      shareAgentDot.className = `dot ${connected ? 'good' : ''}`;
+      shareAgentStatusText.textContent = connected
+        ? `Agent connected${name ? `: ${name}` : ''}`
+        : 'Agent not connected';
+    }
+    if (shareAgentDotActive && shareAgentStatusTextActive) {
+      shareAgentDotActive.className = `dot ${connected ? 'good' : ''}`;
+      shareAgentStatusTextActive.textContent = connected
+        ? `Agent connected${name ? `: ${name}` : ''}`
+        : 'Agent not connected';
+    }
   }
 
   function updateAgentMessage() {
@@ -1111,6 +1284,10 @@ async function initSharePanel() {
   function updateShareLinks({ shareId, sharePath }) {
     const resolvedSharePath = sharePath || (shareId ? `/s/${shareId}` : null);
     sharePublicUrl = toAbsoluteUrl(resolvedSharePath);
+    if (shareId) {
+      shareIdForPosts = shareId;
+      hydrateSharePostsFromShare(shareId);
+    }
 
     if (sharePublicUrl && sharePublicEl && openShareLink && shareLinks) {
       sharePublicEl.textContent = sharePublicUrl;
@@ -1125,19 +1302,22 @@ async function initSharePanel() {
 
   function applyState(state) {
     lastState = state;
+    teamCode = state?.teamCode || teamCode;
+    tokenMode = state?.signup?.mode === 'token';
+    if (state?.share?.id) shareIdForPosts = state.share.id;
     updateAgentStatus(!!state?.agent?.connected, state?.agent?.name || null);
     updatePressStatus(state);
     updateRequirementFromState(state);
     updateAgentMessage();
-    const tokenMode = state?.signup?.mode === 'token';
     document.querySelectorAll('.share-agent-only').forEach((node) => {
       node.classList.toggle('is-hidden', tokenMode);
     });
+    updateSharePostInputs(state);
     if (createBtn && state) {
-      const eligible = !!state.houseId && !state.share?.id;
+      const eligible = !!state.houseId && !state.share?.id && !shareIdForPosts;
       createBtn.disabled = !eligible;
     }
-    const shareId = state?.share?.id || null;
+    const shareId = state?.share?.id || shareIdForPosts || null;
     if (shareId) {
       const cached = loadShareCache();
       const payload = {
@@ -1146,8 +1326,12 @@ async function initSharePanel() {
         houseId: cached && cached.shareId === shareId ? cached.houseId : currentHouseId()
       };
       updateShareLinks(payload);
+      if (!state?.share?.id && shareIdForPosts) {
+        setShareRequirement('Share link is active (recovered from house).');
+      }
     } else {
       setSharePanelMode(false);
+      hydrateShareIdFromHouse(state?.houseId || currentHouseId());
     }
   }
 
@@ -1161,16 +1345,113 @@ async function initSharePanel() {
     copyAgentBtn.addEventListener('click', () => copyToClipboard(agentMessage, copyAgentBtn, AGENT_COPY_LABEL));
   }
 
+  if (saveSharePosts) {
+    saveSharePosts.addEventListener('click', async () => {
+      setSharePostsError('');
+      const humanUrl = shareHumanPost ? shareHumanPost.value.trim() : '';
+      const agentUrl = shareAgentPost ? shareAgentPost.value.trim() : '';
+      if (shareHumanPost && !isValidHttpUrl(humanUrl)) {
+        setSharePostsError('Enter a valid X post URL (http/https).');
+        return;
+      }
+      if (shareAgentPost && !tokenMode && !isValidHttpUrl(agentUrl)) {
+        setSharePostsError('Enter a valid Moltbook URL (http/https).');
+        return;
+      }
+      if (saveSharePosts) saveSharePosts.disabled = true;
+      setSharePostsStatus('Saving…');
+      try {
+        const houseId = currentHouseId();
+        if (houseId && KauthKey) {
+          const r = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/posts`, {
+            method: 'POST',
+            body: JSON.stringify({
+              xPostUrl: humanUrl,
+              moltbookUrl: tokenMode ? null : agentUrl
+            })
+          });
+          if (r?.shareId) {
+            shareIdForPosts = r.shareId;
+            updateShareLinks({ shareId: r.shareId, sharePath: r.sharePath, houseId });
+            await hydrateSharePostsFromShare(r.shareId);
+          }
+          setSharePostsStatus('Saved');
+          setTimeout(() => setSharePostsStatus(''), 1200);
+          return;
+        }
+
+        const shareId = resolveShareIdForPosts();
+        if (shareId) shareIdForPosts = shareId;
+        if (shareHumanPost) {
+          await api('/api/human/posts', {
+            method: 'POST',
+            body: JSON.stringify({ xPostUrl: humanUrl, shareId: shareIdForPosts })
+          });
+        }
+        if (shareAgentPost && !tokenMode) {
+          if (!teamCode) throw new Error('TEAM_CODE_MISSING');
+          await api('/api/agent/posts', { method: 'POST', body: JSON.stringify({ teamCode, moltbookUrl: agentUrl }) });
+        }
+        if (shareIdForPosts) {
+          await hydrateSharePostsFromShare(shareIdForPosts);
+        }
+        setSharePostsStatus('Saved');
+        setTimeout(() => setSharePostsStatus(''), 1200);
+      } catch (e) {
+        const msg = e.message === 'TEAM_CODE_MISSING'
+          ? 'Team code missing. Refresh the page and try again.'
+          : e.message === 'SHARE_NOT_FOUND'
+            ? 'Share not found for this session. Regenerate the share link.'
+          : e.message === 'NOT_FOUND'
+            ? 'Share not found for this house. Generate a share link first.'
+          : e.message === 'HTTP_404'
+            ? 'Missing /api/human/posts. Restart the server and try again.'
+          : e.message === 'INVALID_URL'
+            ? 'Enter a valid URL (http/https).'
+            : e.message;
+        setSharePostsError(msg);
+        setSharePostsStatus('');
+      } finally {
+        if (saveSharePosts) saveSharePosts.disabled = false;
+      }
+    });
+  }
+
   createBtn.addEventListener('click', async () => {
     setShareError('');
     if (shareStatus) shareStatus.style.display = 'inline-flex';
     createBtn.disabled = true;
     try {
+      const houseId = currentHouseId();
+      if (houseId) {
+        try {
+          const existing = await api(`/api/share/by-house/${encodeURIComponent(houseId)}`);
+          if (existing?.shareId) {
+            const payload = { shareId: existing.shareId, sharePath: existing.sharePath, houseId };
+            saveShareCache(payload);
+            updateShareLinks(payload);
+            setShareRequirement('Share link is active. New signups from it count as referrals.');
+            return;
+          }
+        } catch (e) {
+          if (e.message !== 'NOT_FOUND' && e.message !== 'HTTP_404') throw e;
+        }
+      }
+
+      if (houseId && KauthKey) {
+        const r = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/share`, { method: 'POST' });
+        const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId };
+        saveShareCache(payload);
+        updateShareLinks(payload);
+        setShareRequirement('Share link is active. New signups from it count as referrals.');
+        return;
+      }
+
       if (lastState?.signup?.mode === 'token') {
         await verifyTokenOwnershipForShare();
       }
       const r = await api('/api/share/create', { method: 'POST' });
-      const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId: currentHouseId() };
+      const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId };
       saveShareCache(payload);
       updateShareLinks(payload);
       setShareRequirement('Share link is active. New signups from it count as referrals.');
@@ -1180,7 +1461,8 @@ async function initSharePanel() {
         : e.message === 'HOUSE_NOT_READY'
           ? 'Finish the co-op house ceremony first.'
           : e.message === 'CEREMONY_INCOMPLETE'
-            ? 'Waiting for agent reveal to complete the ceremony.'
+            ? (KauthKey ? 'Share is unlocked, but ceremony state is missing. Refresh and try again.'
+              : 'Waiting for agent reveal to complete the ceremony.')
         : e.message === 'NO_TOKEN'
           ? 'No $ELIZATOWN found in this wallet.'
           : e.message === 'TOKEN_CHECK_REQUIRED'
@@ -1223,7 +1505,11 @@ async function initSharePanel() {
   updatePressStatus(null);
   const cached = loadShareCache();
   if (cached && cached.shareId) {
+    shareIdForPosts = cached.shareId;
+    hydrateSharePostsFromShare(cached.shareId);
     updateShareLinks(cached);
+  } else {
+    hydrateShareIdFromHouse(currentHouseId());
   }
   const poll = async () => {
     try {
