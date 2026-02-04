@@ -16,5 +16,5 @@ Goal: mint a canonical ERC-8004 identity / profile on Ethereum (or target chain)
 
 ## Follow-ups
 - Host a real ERC-8004 registration JSON (HTTP) or use IPFS via SDK `registerIPFS()` once we add IPFS config.
-- Persist minted `humanErc8004` in server store keyed by `roomId` (optional; note privacy implications).
+- Persist minted `humanErc8004` in server store keyed by `houseId` (optional; note privacy implications).
 - Add richer tx UX (progress, failure modes, explorer links kept in UI).

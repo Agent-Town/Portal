@@ -21,7 +21,7 @@ This landing page is a small, interactive funnel that proves the *human+agent co
 - **It’s cooperative, not gimmicky**: you must match a sigil and both press Open.
 - **Agent-first ergonomics**: clean HTTP API + structured state.
 - **Immediate artifact**: co-create a pixel stamp you can share.
-- **Optional virality**: you can opt in to the public leaderboard, otherwise you stay private.
+- **Shareable by default**: creating a share link lists your team on the leaderboard.
 
 ## The promise (copy pillar)
 
@@ -34,7 +34,7 @@ This landing page is a small, interactive funnel that proves the *human+agent co
 
 - A first-time user can complete the whole flow in < 2 minutes.
 - An OpenClaw agent can complete the flow with < 10 API calls.
-- The leaderboard only shows entries when **both** parties opt in.
+- The leaderboard shows teams with share links.
 
 ## “Do NOT do” list
 

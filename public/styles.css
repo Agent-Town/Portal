@@ -114,6 +114,22 @@ code, pre {
   box-shadow: 0 4px 0 var(--border), 0 10px 16px var(--shadow);
 }
 
+.panel.spaced {
+  margin-top: 16px;
+}
+
+#pathNote {
+  margin-top: 8px;
+}
+
+#tokenError {
+  margin-top: 8px;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
 .hero {
   display: grid;
   gap: 14px;
@@ -287,6 +303,16 @@ code, pre {
   gap: 8px;
 }
 
+.status #agentStatusText {
+  display: inline-block;
+  max-width: 280px;
+  max-width: min(280px, 80vw);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dot {
   width: 10px;
   height: 10px;
@@ -393,6 +419,29 @@ input::placeholder {
 
 .card .kv {
   margin-top: 10px;
+}
+
+.card .public-media {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.public-media-preview {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.public-media-preview img,
+.card .public-media img {
+  width: 100%;
+  max-width: 360px;
+  max-height: 240px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: #f6edd4;
+  object-fit: cover;
 }
 
 footer {

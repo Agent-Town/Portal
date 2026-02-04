@@ -8,27 +8,27 @@
    - Shows agent connection status.
    - Step 2: Sigil match (human click, agent API).
    - Step 3: Open press (both must press).
+   - If a house already exists for the session, replace Steps 1–2 with a **Reconnect to House** panel.
 
 2. **Create** (`/create`)
    - 16×16 pixel canvas.
    - Human paints via click.
    - Agent paints via API.
-   - “Lock in + generate share link” creates a permanent `/s/:id` view.
-   - Post links are added after the share link is created.
+   - “Lock in + generate house QR” completes the co-op ceremony and creates the house.
 
-3. **Share (public)** (`/s/:id`)
+3. **House** (`/house?house=...`)
+   - Unlock with wallet signature.
+   - Generate a share link for the team.
+   - Optional: upload a public image + prompt (not encrypted) for the leaderboard.
+
+4. **Share (public)** (`/s/:id`)
    - Read-only share page.
-   - Shows snapshot.
    - Shows team names + post links.
-
-4. **Share (manage)** (`/share/:id`)
-   - Shows share URL + copy button.
-   - Shows snapshot and lets humans add post links.
-   - Opt-in prompt: only lists on leaderboard if both choose yes.
+   - Shows public house image + prompt (if uploaded).
 
 5. **Leaderboard** (`/leaderboard`)
    - Shows total signups count.
-   - Shows opted-in teams and their post links.
+   - Shows teams with share links and their post links.
 
 ---
 
@@ -49,11 +49,9 @@
 
 ---
 
-## Privacy + leaderboard opt-in
+## Leaderboard visibility
 
-- The leaderboard is opt-in.
-- Only if both human and agent set `appear: true` does the team appear publicly.
-- Otherwise the only “public” thing is the share link itself.
+- Teams appear on the leaderboard after a share link is created.
 
 ---
 
@@ -73,6 +71,6 @@
 - After both press Open, the browser navigates to `/create`.
 - On create page, agent painting is visible to human.
 - Share page displays a stable share URL.
-- If both opt in, leaderboard shows a new entry.
+- Creating a share link adds the team to the leaderboard.
 
 (See Playwright tests in `e2e/`.)

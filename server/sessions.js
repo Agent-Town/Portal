@@ -3,6 +3,7 @@ const { createTeamCode, nowIso, randomHex } = require('./util');
 // In-memory sessions (MVP).
 const sessionsById = new Map();
 const sessionIdByTeamCode = new Map();
+const sessionIdByHouseId = new Map();
 
 const ELEMENTS = [
   { id: 'key', label: 'Key', icon: '🔑' },
@@ -50,7 +51,9 @@ function createSession() {
     },
     signup: {
       complete: false,
-      createdAt: null
+      createdAt: null,
+      mode: null,
+      address: null
     },
     referral: {
       shareId: null
@@ -64,12 +67,20 @@ function createSession() {
       id: null,
       createdAt: null
     },
-    roomCeremony: {
+    shareApproval: {
+      human: false,
+      agent: false
+    },
+    token: {
+      verifiedAt: null,
+      address: null
+    },
+    houseCeremony: {
       humanCommit: null,
       agentCommit: null,
       humanReveal: null,
       agentReveal: null,
-      roomId: null,
+      houseId: null,
       createdAt: null
     }
   };
@@ -88,6 +99,20 @@ function getSessionByTeamCode(teamCode) {
   if (!teamCode || typeof teamCode !== 'string') return null;
   const code = teamCode.trim();
   const sessionId = sessionIdByTeamCode.get(code);
+  if (!sessionId) return null;
+  return getSessionById(sessionId);
+}
+
+function indexHouseId(session, houseId) {
+  if (!session || !houseId || typeof houseId !== 'string') return;
+  sessionIdByHouseId.set(houseId, session.sessionId);
+}
+
+function getSessionByHouseId(houseId) {
+  if (!houseId || typeof houseId !== 'string') return null;
+  const id = houseId.trim();
+  if (!id) return null;
+  const sessionId = sessionIdByHouseId.get(id);
   if (!sessionId) return null;
   return getSessionById(sessionId);
 }
@@ -116,12 +141,15 @@ function evaluateMatch(session) {
 function resetAllSessions() {
   sessionsById.clear();
   sessionIdByTeamCode.clear();
+  sessionIdByHouseId.clear();
 }
 
 module.exports = {
   createSession,
   getSessionById,
   getSessionByTeamCode,
+  getSessionByHouseId,
+  indexHouseId,
   listElements,
   evaluateMatch,
   resetAllSessions,

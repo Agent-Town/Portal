@@ -1,10 +1,10 @@
 ## Executive summary
-Agent Town Landing is a public, minimal web app with a cookie-based human session and a Team Code-based agent API, backed by in-memory sessions and a local JSON store. The highest risks come from unauthenticated write surfaces (share management and room append), stored XSS on public pages, and transport/session hardening gaps. Because room artifacts are intended to be E2EE and not readable by the server, integrity and cryptographic access control for `/api/room/:id/*` are the most urgent security gaps. Evidence anchors: `server/index.js`, `public/room.js`.
+Agent Town Landing is a public, minimal web app with a cookie-based human session, Team Code agent API, and a new “house” flow that aims for E2EE logs with HMAC-authenticated house APIs. The top risks now center on house key material handling (notably the stored `keyWrapSig` + `keyWrap` which makes K_root recoverable from the server store), client-side key compromise, and abuse of bearer-style identifiers (Team Code / houseId). Availability risks also come from store caps and external Solana RPC dependency. Evidence anchors: `server/index.js`, `public/house.js`, `public/create.js`, `specs/02_api_contract.md`.
 
 ## Scope and assumptions
 In-scope paths:
-- `server/` (Express API, session and storage logic)
-- `public/` (browser UI and crypto flows)
+- `server/` (Express API, security headers, house auth, token verification)
+- `public/` (browser UI, crypto, wallet flows)
 - `specs/02_api_contract.md` (API contract)
 - `data/store.json` (runtime data shape)
 
@@ -13,42 +13,66 @@ Out-of-scope:
 - `node_modules/` (third-party packages)
 - Build/dev tooling beyond runtime behavior
 
-Assumptions (based on your clarifications):
-- The service is public internet-facing. Evidence: `README.md`, `server/index.js` route exposure.
-- TLS termination is present but not confirmed; the Node server does not enforce HTTPS. Evidence: cookie set without `Secure` in `server/index.js`.
-- Optional post URLs/handles are stored; treat them as low-sensitivity PII. Evidence: `server/index.js`, `server/store.js`.
-- Room artifacts must be E2EE and not readable by the server; access must be cryptographically secured using the room key (K_root). Evidence: client-side AES-GCM in `public/room.js`.
-- Single-node deployment with local JSON persistence. Evidence: `server/store.js` writes `data/store.json`.
+Assumptions (based on your clarifications and repo evidence):
+- The service is public internet-facing. Evidence: `server/index.js`, `README.md`.
+- TLS is terminated at a proxy; `req.secure` relies on `trust proxy`. Evidence: `server/index.js` `app.set('trust proxy', 1)` and HTTPS redirect.
+- The house flow must remain E2EE; server should not be able to read house plaintext. Evidence: client-side AES-GCM and HKDF in `public/house.js` and `public/create.js`.
+- Signups no longer store email; token mode stores a wallet address. Evidence: `server/index.js` `recordSignup`.
+- JSON store is used in production (single-node persistence). Evidence: `server/store.js`.
 
 Open questions that could materially change risk ranking:
-- Is HTTPS enforced end-to-end (HSTS/redirects), or could HTTP be reachable in production?
-- What are the expected scale and abuse tolerance (rate limits, per-IP caps)?
-- Data retention policy for `data/store.json` (shares, post URLs/handles, room logs)?
-- Is multi-tenancy a requirement (strong isolation between teams), or is this a demo-only model?
+- Is it acceptable for the server to store `keyWrapSig` (which enables K_root recovery from `data/store.json`), or should the server be unable to recover K_root?
+- Do you want house availability to survive store caps (`MAX_HOUSES`, `MAX_HOUSE_ENTRIES`), or are these intended as hard ceilings?
+- Is HTTPS always enforced in production (including correct proxy config), or can HTTP be reachable?
 
 ## System model
 ### Primary components
-- Express HTTP server with JSON API and static file serving. Evidence: `server/index.js`.
-- In-memory session and Team Code mapping. Evidence: `server/sessions.js`.
-- File-based JSON store for signups, shares, public teams, rooms. Evidence: `server/store.js`, `data/store.json`.
-- Browser UI and polling logic for human flow. Evidence: `public/app.js`, `public/create.js`.
-- E2EE room client logic (K_root, AES-GCM, wallet signature). Evidence: `public/room.js`.
-- External wallet providers (Solana/EVM). Evidence: `public/create.js`, `public/room.js`.
-- External Agent0 SDK loaded from CDN. Evidence: `public/room.js`.
+- Express HTTP server with API routes, security headers, HTTPS redirect, and rate limiting. Evidence: `server/index.js`.
+- In-memory sessions for Team Code and houseId mapping. Evidence: `server/sessions.js`.
+- File-based JSON store for signups, shares, public teams, houses, and auth material. Evidence: `server/store.js`.
+- Browser UI with polling and house cryptography (AES-GCM + HKDF). Evidence: `public/app.js`, `public/create.js`, `public/house.js`.
+- Wallet signature flows for house unlock, key wrap, and token verification. Evidence: `public/house.js`, `public/create.js`, `server/index.js`.
+- External Solana RPC dependency for token gate checks. Evidence: `server/index.js` `hasElizaTownToken`.
 
 ### Data flows and trust boundaries
-- Internet browser (human) -> Express API
-  Data: session cookie, sigil selection, canvas pixels, shareId, URLs. Protocol: HTTP/HTTPS. Security: `HttpOnly` + `SameSite=Lax` cookie, no CSRF token, no auth for many endpoints. Validation: JSON size limit 200kb, element allowlist, URL sanitization. Evidence: `server/index.js`.
-- Internet agent client -> Express API
-  Data: Team Code, selections, posts, room ceremony commit/reveal. Protocol: HTTP/HTTPS. Security: Team Code only, no rate limit. Validation: element allowlist and basic trims. Evidence: `server/index.js`, `server/sessions.js`.
-- Express API -> In-memory sessions
-  Data: human/agent state, match, signup, room ceremony. Internal trust boundary. Evidence: `server/sessions.js`.
-- Express API -> JSON store
-  Data: signups (team codes + matched element), shares, public teams, rooms, ciphertext logs, post URLs. File I/O boundary, no encryption at rest. Evidence: `server/store.js`.
-- Browser -> Wallet providers
-  Data: unlock message, wallet signatures, key derivation. Trust boundary to wallet extension. Evidence: `public/room.js`, `public/create.js`.
-- Browser -> External CDN
-  Data: loads `agent0-sdk` JS at runtime; executes in page origin. Evidence: `public/room.js`.
+- Internet browser (human) → Express API.
+Data types: session cookie, sigil selection, open press, canvas pixels, share creation.
+Channel: HTTPS (assumed), JSON.
+Security: `HttpOnly` + `SameSite=Lax` cookie; CSP, HSTS in prod; rate limiting.
+Validation: JSON size limit 200kb, element allowlist, URL sanitization.
+Evidence: `server/index.js`.
+
+- Agent client → Express API.
+Data types: Team Code, agent connect, open press, house ceremony, agent posts.
+Channel: HTTPS (assumed), JSON.
+Security: Team Code only; rate limiting.
+Validation: agent name normalization and element allowlist.
+Evidence: `server/index.js` `normalizeAgentName`, `/api/agent/*` routes.
+
+- Browser → House API (`/api/house/:id/*`).
+Data types: ciphertext logs, house metadata.
+Channel: HTTPS (assumed), JSON.
+Security: HMAC auth with `x-house-auth` + `x-house-ts` derived from K_auth.
+Validation: ciphertext shape checks; time skew window.
+Evidence: `server/index.js` `verifyHouseAuth`, `public/house.js` `houseAuthHeaders`.
+
+- Browser → Wallet provider.
+Data types: wallet signatures for lookup, token check, unlock.
+Channel: wallet extension API.
+Security: wallet signature gating.
+Evidence: `public/app.js`, `public/house.js`.
+
+- Express API → Solana RPC.
+Data types: token balance lookup.
+Channel: HTTPS POST to RPC.
+Security: none beyond TLS; relies on RPC correctness.
+Evidence: `server/index.js` `postJson`, `hasElizaTownToken`.
+
+- Express API → JSON store (`data/store.json`).
+Data types: signups (wallet addresses), shares, houses, `authKey`, `keyWrap`, `keyWrapSig`, ciphertext logs.
+Channel: local file I/O.
+Security: no encryption at rest.
+Evidence: `server/store.js`, `server/index.js` house init.
 
 #### Diagram
 ```mermaid
@@ -59,123 +83,118 @@ flowchart TD
   C["Session Store (memory)"]
   D["JSON Store (files)"]
   E["Wallet Providers"]
-  F["External CDN"]
+  F["Solana RPC"]
   A -->|HTTPS| B
   G -->|HTTPS| B
   B --> C
   B --> D
   A --> E
-  A --> F
+  B --> F
 ```
 
 ## Assets and security objectives
 | Asset | Why it matters | Security objective (C/I/A) |
 | --- | --- | --- |
-| `et_session` cookie / sessionId | Only human identity; used to mutate state and create shares | C, I |
-| Team Code | Only agent identity; enables agent actions | C, I |
-| Post URLs / handles (optional) | Low-sensitivity PII | C |
-| Shares / leaderboard metadata | Public reputation, link integrity, anti-spam | I, A |
-| Room wrappedKey + ciphertext logs | E2EE data; server should not read plaintext | C, I |
-| K_root / Kenc (client-side keys) | Exposure breaks E2EE guarantees | C |
-| `data/store.json` | Single persistence store; corruption or growth affects availability | I, A |
-| Service availability | User flow depends on responsive API | A |
+| `et_session` cookie / sessionId | Human identity and state mutations | C, I |
+| Team Code | Agent identity; enables agent actions | C, I |
+| House K_root / K_enc (client-side) | Core E2EE secret; decrypts house logs | C |
+| House K_auth (`authKey`) | Required for HMAC auth to house APIs | C, I |
+| `keyWrap` + `keyWrapSig` | Enables recovery of K_root if combined | C |
+| House ciphertext logs | Integrity/availability of shared house | I, A |
+| Wallet addresses (token mode) | User privacy + access control | C |
+| Shares and leaderboard data | Reputation and link integrity | I, A |
+| `data/store.json` | Single persistence store | I, A |
 
 ## Attacker model
 ### Capabilities
 - Remote internet attacker can send arbitrary HTTP requests to all API endpoints.
-- Attacker can access public share URLs and extract shareIds from `/s/:id` pages.
-- Attacker can supply arbitrary `agentName` via `/api/agent/connect` if they know a Team Code.
-- Attacker can script high-rate requests because no rate limiting is present.
-- Attacker can influence external content by hosting URLs provided in `xPostUrl`/`moltbookUrl`.
+- Attacker can obtain shareIds from public `/s/:id` pages and referrals.
+- Attacker can attempt Team Code brute force (rate limited per IP).
+- Attacker can attempt houseId guessing if they learn the format, or obtain houseId via sharing.
+- Attacker can attempt phishing to obtain wallet signatures.
 
 ### Non-capabilities
-- Attacker cannot break SHA-256 or AES-GCM or derive K_root without the room ceremony/wallet signature.
-- Attacker cannot read `HttpOnly` cookies directly from browser JS without an XSS.
-- Attacker does not have server filesystem access unless they exploit a separate server compromise.
-- Attacker does not have access to user wallet private keys (assuming wallet security holds).
+- Attacker cannot break AES-GCM, HKDF, or SHA-256.
+- Attacker cannot forge wallet signatures without access to the wallet.
+- Attacker cannot pass house API auth without K_auth (unless it leaks).
 
 ## Entry points and attack surfaces
 | Surface | How reached | Trust boundary | Notes | Evidence (repo path / symbol) |
 | --- | --- | --- | --- | --- |
-| Static pages (`/`, `/create`, `/room`, `/leaderboard`, `/share/:id`, `/s/:id`) | Browser GET | Internet -> Express | Public HTML/JS entry | `server/index.js` `app.use(express.static)` and `app.get('/create' ...)` |
-| `GET /api/session` | Browser fetch | Internet -> Express | Sets `et_session` cookie if missing | `server/index.js` `ensureHumanSession` |
-| `GET /api/state`, `GET /api/canvas/state` | Browser fetch | Internet -> Express | Session-based state polling | `server/index.js` |
-| `POST /api/human/*` | Browser fetch | Internet -> Express | Human actions, cookie-based | `server/index.js` routes |
-| `POST /api/agent/*` | Agent client | Internet -> Express | Team Code-based actions | `server/index.js` routes |
-| `GET /api/agent/state` | Agent client | Internet -> Express | Team Code query param | `server/index.js` |
-| `POST /api/share/create`, `GET /api/share/:id` | Browser / public | Internet -> Express | Share creation + public retrieval | `server/index.js` |
-| `POST /api/human/posts`, `POST /api/human/optin` | Browser / public | Internet -> Express | Accepts `shareId` without auth | `server/index.js` `resolveHumanShare` |
-| `GET /api/leaderboard`, `/api/wall` | Browser | Internet -> Express | Public listing | `server/index.js` |
-| `POST /api/room/init`, `GET /api/room/:id/meta`, `GET /api/room/:id/log`, `POST /api/room/:id/append` | Browser | Internet -> Express | No auth; stores ciphertext | `server/index.js` room routes |
-| `POST /__test__/reset` | Test runner | Internet -> Express | Enabled only with `NODE_ENV=test` | `server/index.js` |
+| Static pages (`/`, `/create`, `/house`, `/leaderboard`, `/s/:id`) | Browser GET | Internet → Express | Public HTML/JS entry | `server/index.js` static routes |
+| `GET /api/session`, `GET /api/state` | Browser fetch | Internet → Express | Sets `et_session` cookie | `server/index.js` `ensureHumanSession` |
+| `POST /api/human/*` | Browser fetch | Internet → Express | Human actions (select/open/canvas/house) | `server/index.js` |
+| `POST /api/agent/*` | Agent client | Internet → Express | Team Code + house connect | `server/index.js` |
+| `GET /api/agent/state` | Agent client | Internet → Express | Team Code query param | `server/index.js` |
+| `POST /api/share/create`, `GET /api/share/:id` | Browser / public | Internet → Express | Share creation + retrieval | `server/index.js` |
+| `POST /api/agent/posts` | Agent client | Internet → Express | Moltbook URL storage | `server/index.js` |
+| `GET /api/leaderboard`, `/api/wall` | Browser | Internet → Express | Public listing | `server/index.js` |
+| `POST /api/house/init` | Browser | Internet → Express | House creation, stores auth/keyWrap | `server/index.js` |
+| `GET /api/house/:id/meta`, `/log`, `/descriptor` | Browser | Internet → Express | HMAC-authenticated house metadata | `server/index.js` `verifyHouseAuth` |
+| `POST /api/house/:id/append` | Browser | Internet → Express | HMAC-authenticated append | `server/index.js` |
+| `GET /api/house/nonce` | Browser | Internet → Express | House nonce | `server/index.js` |
+| `GET /api/wallet/nonce`, `POST /api/wallet/lookup` | Browser | Internet → Express | Wallet lookup + keyWrap | `server/index.js` |
+| `GET /api/token/nonce`, `POST /api/token/verify` | Browser | Internet → Express | Token gate verification | `server/index.js` |
 
 ## Top abuse paths
-1. Deface a public share by using its public `shareId`.
-   Steps: visit `/s/:id` -> call `/api/human/posts` with `shareId` and malicious URL -> share shows attacker link. Impact: reputation damage, phishing.
-2. Inject stored XSS via `agentName` and execute on leaderboard visitors.
-   Steps: connect with agentName containing HTML -> opt-in -> leaderboard renders via `innerHTML` -> attacker JS runs. Impact: session manipulation, phishing.
-3. Tamper with E2EE room logs without authorization.
-   Steps: obtain `roomId` -> call `/api/room/:id/append` with garbage ciphertext -> clients see decrypt failures or spam. Impact: integrity/availability loss.
-4. Harvest room metadata and ciphertext.
-   Steps: obtain `roomId` -> call `/api/room/:id/meta` and `/api/room/:id/log` -> collect encrypted payloads and metadata. Impact: metadata privacy leak; future cryptanalysis surface.
-5. Hijack agent actions by guessing or stealing Team Code.
-   Steps: brute-force Team Codes -> call `/api/agent/select` or `/api/agent/optin` -> sabotage flow. Impact: integrity loss.
-6. Sniff or downgrade transport to steal session cookie.
-   Steps: HTTP access or TLS misconfig -> intercept `et_session` -> replay to mutate state. Impact: session takeover.
-7. Fill JSON store to deny service.
-   Steps: spam `/api/room/:id/append` or create many signups -> `data/store.json` grows -> slower I/O or disk full. Impact: availability loss.
-8. Compromise room crypto via CDN supply chain.
-   Steps: malicious `agent0-sdk` script served from CDN -> exfiltrate K_root or wallet signatures. Impact: E2EE break, wallet risk.
+1. Recover K_root from server data.
+Steps: attacker gains `data/store.json` → uses `keyWrapSig` + `keyWrap` to decrypt K_root → decrypts house logs. Impact: E2EE confidentiality failure.
+2. Phish wallet signatures to recover house keys.
+Steps: attacker convinces user to sign “House Lookup” and “House Key Wrap” messages → calls `/api/wallet/lookup` → decrypts K_root → reads house logs. Impact: E2EE confidentiality failure.
+3. Leak K_auth or K_root from client runtime.
+Steps: XSS or malicious extension reads in-memory keys → forges `x-house-auth` → appends spam or reads ciphertext logs. Impact: house integrity/availability loss.
+4. Team Code compromise.
+Steps: attacker brute-forces or steals Team Code → calls `/api/agent/connect` + `/api/agent/posts` or `/api/agent/open/press` → impersonates agent and posts malicious links. Impact: reputation damage, flow sabotage.
+5. Store exhaustion DoS.
+Steps: attacker spams `/api/house/init` or `/api/house/:id/append` → hits `MAX_HOUSES`/`MAX_HOUSE_ENTRIES` → legitimate users blocked. Impact: availability loss.
+6. TLS/proxy misconfig capture.
+Steps: HTTP allowed or proxy misconfigured → cookies or `x-house-auth` captured → session hijack or house tamper within timestamp window. Impact: integrity loss.
 
 ## Threat model table
 | Threat ID | Threat source | Prerequisites | Threat action | Impact | Impacted assets | Existing controls (evidence) | Gaps | Recommended mitigations | Detection ideas | Likelihood | Impact severity | Priority |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TM-001 | Remote user | Knows `shareId` (public via `/s/:id`) | Update share metadata via `/api/human/posts` or `/api/human/optin` | Defacement, spam, reputation damage | Shares, leaderboard integrity | URL sanitization for `xPostUrl` in `server/index.js` `sanitizeUrl` | No auth or ownership check for share updates | Introduce separate secret manage token; bind updates to creator session; add CSRF token to manage actions | Log share updates and rate anomalies | High | Medium | High |
-| TM-002 | Malicious agent | Team Code access and opt-in | Inject HTML in `agentName`, render via `innerHTML` | Stored XSS on leaderboard | Session integrity, user safety | None for `agentName`; `leaderboard.js` uses `innerHTML` | No output encoding or validation | Use `textContent` for user fields; validate `agentName` charset/length; add CSP | CSP violation reports; log unusual agentName values | Medium | High | High |
-| TM-003 | Remote user | `roomId` known or guessed | Read `/api/room/:id/log` and append garbage | Integrity/availability loss; metadata disclosure | Room logs, room metadata | Client-side AES-GCM encryption in `public/room.js`; JSON body limit 200kb in `server/index.js` | No auth or cryptographic access control for room endpoints | Add cryptographic request auth tied to K_root (e.g., derived signing key pair, server stores public key); rate limit; cap entries | Alert on append rate and decrypt failures | High | High | Critical |
-| TM-004 | Remote user | Can race or guess `roomId` | Pre-create room with spoofed metadata | Denial of room creation; confusion | Room metadata, user flow | RoomId derived from random K_root in `public/room.js` | `/api/room/init` has no auth or signature validation | Require signed init payload (wallet signature or derived key); tie init to nonce from prior human session | Alert on failed init attempts per roomId | Low | Medium | Medium |
-| TM-005 | Network attacker | HTTP access or TLS misconfig | Sniff or replay `et_session` cookie | Session takeover, data exposure | Session identity, share metadata | `HttpOnly` + `SameSite=Lax` cookie in `server/index.js` | No `Secure` flag; TLS/HSTS not enforced | Enforce HTTPS, set `Secure`, add HSTS, redirect HTTP to HTTPS | Log non-HTTPS requests; security headers audit | Medium | High | High |
-| TM-006 | Remote user | High request rate | Brute-force Team Codes to impersonate agent | Sabotage match/opt-in/room ceremony | Team Code integrity | Random Team Code via `crypto.randomBytes` in `server/util.js` | No rate limiting or lockout | Rate limit agent endpoints; short TTL; require human confirmation on sensitive agent actions | Alert on failed `TEAM_NOT_FOUND` bursts | Low | Medium | Medium |
-| TM-007 | Remote user | Unbounded requests | Spam room append or signups to grow store | Storage and CPU exhaustion | `data/store.json`, service availability | JSON body size limit 200kb in `server/index.js` | No quotas, no per-room caps, no cleanup | Rate limit; cap entries per room; periodic cleanup; move to DB with limits | Monitor file size, response latency | Medium | Medium | Medium |
-| TM-008 | Supply-chain attacker | Control of CDN or script injection | Malicious SDK exfiltrates keys | E2EE compromise, wallet risk | K_root, wallet signatures | None | External runtime dependency without integrity pinning | Bundle dependency locally; use SRI; CSP with hashes; pin version | CSP reports; subresource integrity validation | Medium | High | High |
-| TM-009 | Misconfiguration | `NODE_ENV=test` in prod | POST `/__test__/reset` wipes data | Data loss | Store integrity, availability | Endpoint gated by `NODE_ENV === 'test'` in `server/index.js` | Relies solely on environment correctness | Add extra guard or remove from prod builds; require secret token | Alert on any `/__test__/reset` access | Low | High | Medium |
+| TM-001 | Server/data store attacker | Access to `data/store.json` | Decrypt K_root using `keyWrapSig` + `keyWrap` | E2EE confidentiality break | K_root, house logs | AES-GCM wrap + wallet signatures (`public/create.js`) | Server stores `keyWrapSig`; enables recovery | Do not store `keyWrapSig`; require wallet to re-sign per recovery; consider asymmetric encryption for key wrap | Audit access to store; alert on unexpected reads | Medium | High | High |
+| TM-002 | Client-side attacker | XSS, malicious extension, or compromised asset | Read K_root/K_auth from memory and forge house API calls | House integrity/availability loss | K_auth, house logs | CSP + local SDK (`server/index.js`, `public/house.js`) | No runtime isolation; keys in JS memory | Add strict CSP reporting; isolate crypto in secure worker; short-lived keys; consider hardware-backed wallet-based auth | Monitor `HOUSE_AUTH_INVALID` bursts and append rates | Medium | High | High |
+| TM-003 | Remote attacker | Team Code exposure or brute force | Impersonate agent, post malicious links, sabotage flow | Reputation loss, flow integrity | Team Code, shares | Random Team Codes, rate limit `/api/agent` | No rotation/revocation; no agent proof | Allow regenerate Team Code; tie agent connect to short-lived challenge | Alert on repeated `TEAM_NOT_FOUND` and new agent IPs | Low | Medium | Medium |
+| TM-004 | Remote attacker | TLS/proxy misconfig, intercepted headers | Replay or forge `x-house-auth` within skew window | Unauthorized append or read | House integrity | HMAC auth + 5-minute skew window (`server/index.js`) | Relies on correct TLS/proxy setup | Enforce HTTPS at edge; set `Secure` cookie in prod regardless of `req.secure`; reduce skew window | Log non-HTTPS requests and auth failures | Low | Medium | Medium |
+| TM-005 | Remote attacker | High request rate | Fill house/store caps via `/api/house/init` or append | Availability loss | `data/store.json`, house creation | Rate limits; `MAX_HOUSES` and `MAX_HOUSE_ENTRIES` | IP-based only; no global cleanup | Add per-session quotas; purge oldest houses; move to DB with TTL | Monitor store size and house creation rate | Medium | Medium | Medium |
+| TM-006 | External dependency | Solana RPC failure or manipulation | Token gate unavailable or incorrect | Access control failure or denial | Token gating | Rate limit on `/api/token`, signature verification | RPC trust and availability | Add multiple RPC backends; cache results; explicit fallback messaging | Track RPC error rate and latency | Medium | Medium | Medium |
+| TM-007 | Remote attacker | houseId leakage | Use `/api/agent/house/connect` to mark agent connected | Co-op bypass for share creation | Co-op integrity | houseId is derived from K_root (not listed publicly) | houseId is a bearer identifier | Require agent challenge using K_auth or a signed agent attestation | Log agent connects by houseId/IP | Low | Low | Low |
 
 ## Criticality calibration
 Critical:
-- Any compromise of room keys or decryption capability (e.g., XSS or CDN injection leading to K_root exfiltration). Evidence: `public/room.js` key derivation.
-- Unauthenticated room log tampering that blocks or corrupts E2EE communication at scale. Evidence: `server/index.js` room append.
+- Any compromise enabling decryption of house logs (K_root exposure).
+- Server compromise that allows K_root recovery at scale (if `keyWrapSig` is stored).
 
 High:
-- Stored XSS on public pages enabling same-origin script execution. Evidence: `public/leaderboard.js` `innerHTML`.
-- Unauthenticated share management (defacement/phishing) using public `shareId`. Evidence: `server/index.js` `resolveHumanShare`.
+- Client-side key compromise enabling house log tampering or decryption.
+- Systemic bypass of co-op gating by agent impersonation at scale.
 
 Medium:
-- Team Code guessing leading to nuisance or sabotage. Evidence: `server/util.js`, `server/index.js`.
-- Availability loss from unbounded store growth. Evidence: `server/store.js`.
+- Targeted denial of house creation via store caps.
+- Token gate unavailability causing service disruption.
 
 Low:
-- Minor metadata leakage (signup counts, share stats) that does not expose PII. Evidence: `server/index.js` `/api/leaderboard`.
+- Single-session abuse with limited blast radius (e.g., one house append spam).
 
 ## Focus paths for security review
 | Path | Why it matters | Related Threat IDs |
 | --- | --- | --- |
-| `server/index.js` | All API routes, cookie settings, share/room auth gaps | TM-001, TM-003, TM-004, TM-005, TM-007, TM-009 |
-| `server/store.js` | Local JSON persistence; DoS and data integrity risks | TM-007 |
-| `server/sessions.js` | Team Code/session mapping; identity assumptions | TM-006 |
-| `server/util.js` | Team Code generation | TM-005, TM-006 |
-| `public/leaderboard.js` | `innerHTML` rendering of user-controlled fields | TM-002 |
-| `public/share_manage.js` | Share management UI exposes public shareId | TM-001 |
-| `public/share_public.js` | Public share rendering, link handling | TM-001 |
-| `public/room.js` | E2EE logic, key derivation, CDN dependency | TM-003, TM-004, TM-008 |
-| `public/create.js` | Room ceremony commit/reveal, wallet usage | TM-003, TM-004 |
-| `specs/02_api_contract.md` | Intended API behavior vs current enforcement | TM-001, TM-003 |
+| `server/index.js` | House auth, token verify, rate limits, security headers | TM-001, TM-004, TM-005, TM-006 |
+| `server/store.js` | At-rest storage of auth/keyWrap material | TM-001, TM-005 |
+| `server/sessions.js` | Team Code and houseId mapping | TM-003, TM-007 |
+| `public/house.js` | K_root/K_auth handling, house auth headers | TM-001, TM-002 |
+| `public/create.js` | House ceremony, key wrap + keyWrapSig | TM-001, TM-002 |
+| `public/app.js` | Token gate flow + wallet signatures | TM-006 |
+| `public/leaderboard.js` | Link rendering and share visibility | TM-003 |
+| `specs/02_api_contract.md` | Intended API behavior vs implementation | TM-001, TM-004 |
 
 ## Notes on use
 Quality check:
 - All discovered entry points are covered in the Entry Points table.
-- Each trust boundary appears in the Threat Model table.
-- Runtime vs test-only functionality is separated (`/__test__/reset`).
-- User clarifications on E2EE and sensitivity are reflected.
-- Remaining assumptions (TLS enforcement, scale, retention) are explicit.
+- Each trust boundary appears in threats.
+- Runtime vs test-only functionality is separated.
+- User clarifications on E2EE and email removal are reflected.
+- Remaining assumptions (TLS enforcement and keyWrapSig policy) are explicit.
 
-Evidence anchors used throughout include `server/index.js`, `server/store.js`, `server/sessions.js`, `server/util.js`, `public/room.js`, and `public/leaderboard.js`.
+Evidence anchors used throughout include `server/index.js`, `server/sessions.js`, `server/store.js`, `public/house.js`, `public/create.js`, `public/app.js`, and `specs/02_api_contract.md`.

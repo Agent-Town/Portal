@@ -56,21 +56,23 @@ test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, r
   await page.waitForURL('**/create');
 
   // Agent ceremony
-  // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
+  // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
   const ra = require('crypto').randomBytes(32);
   const raB64 = ra.toString('base64');
   const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
-  await request.post('/api/agent/room/commit', { data: { teamCode, commit: raCommit } });
-  await request.post('/api/agent/room/reveal', { data: { teamCode, reveal: raB64 } });
+  await request.post('/api/agent/house/commit', { data: { teamCode, commit: raCommit } });
+  await request.post('/api/agent/house/reveal', { data: { teamCode, reveal: raB64 } });
 
   // Human paints + lock in
   await page.getByTestId('px-0-0').click();
   await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/room\?room=/);
+  await page.waitForURL(/\/house\?house=/);
 
   // Unlock (solana sig)
   await page.getByRole('button', { name: 'Connect wallet' }).click();
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.locator('#erc8004Panel')).toBeHidden();
+  await page.getByRole('button', { name: 'Show ERC-8004' }).click();
 
   // Mint
   await page.getByRole('button', { name: 'Mint ERC-8004 identity' }).click();

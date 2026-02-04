@@ -1,5 +1,8 @@
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
+const https = require('https');
+const http = require('http');
 const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
@@ -8,6 +11,8 @@ const {
   createSession,
   getSessionById,
   getSessionByTeamCode,
+  getSessionByHouseId,
+  indexHouseId,
   listElements,
   evaluateMatch,
   resetAllSessions,
@@ -45,12 +50,68 @@ function base58Encode(bytes) {
   return out || '1';
 }
 
+function base58Decode(str) {
+  if (!str || typeof str !== 'string') return null;
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let num = 0n;
+  for (const ch of str) {
+    const idx = alphabet.indexOf(ch);
+    if (idx < 0) return null;
+    num = num * 58n + BigInt(idx);
+  }
+  const bytes = [];
+  while (num > 0n) {
+    bytes.push(Number(num & 0xffn));
+    num >>= 8n;
+  }
+  bytes.reverse();
+  let leadingZeros = 0;
+  for (let i = 0; i < str.length && str[i] === '1'; i++) leadingZeros++;
+  if (leadingZeros) {
+    return new Uint8Array(Array(leadingZeros).fill(0).concat(bytes));
+  }
+  return new Uint8Array(bytes);
+}
+
+function buildWalletLookupMessage({ address, nonce, houseId }) {
+  const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
+  if (houseId) parts.push(`houseId: ${houseId}`);
+  return parts.join('\n');
+}
+
+function buildHouseKeyWrapMessage({ houseId }) {
+  return ['ElizaTown House Key Wrap', `houseId: ${houseId}`].join('\n');
+}
+
+function buildTokenCheckMessage({ address, nonce, ca }) {
+  return ['ElizaTown Token Check', `address: ${address}`, `CA: ${ca}`, `nonce: ${nonce}`].join('\n');
+}
+
+function verifySolanaSignature(address, message, signatureB64) {
+  try {
+    const pubKey = base58Decode(address);
+    if (!pubKey || pubKey.length !== 32) return false;
+    const sig = Buffer.from(signatureB64 || '', 'base64');
+    if (sig.length !== 64) return false;
+    const spki = Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(pubKey)]);
+    const key = crypto.createPublicKey({ key: spki, format: 'der', type: 'spki' });
+    return crypto.verify(null, Buffer.from(message, 'utf8'), key, sig);
+  } catch (e) {
+    console.warn('wallet signature verify failed', e);
+    return false;
+  }
+}
+
+function isTestMockAddress(address) {
+  return process.env.NODE_ENV === 'test' && typeof address === 'string' && address.startsWith('So1anaMock');
+}
+
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(
   express.json({
-    limit: '200kb',
+    limit: '3mb',
     verify: (req, _res, buf) => {
       req.rawBody = buf.toString('utf8');
     }
@@ -68,6 +129,10 @@ app.use((err, req, res, next) => {
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const isProd = process.env.NODE_ENV === 'production';
+const ELIZATOWN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const TOKEN_CHECK_TIMEOUT_MS = 5_000;
+const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -144,11 +209,11 @@ app.use(
 );
 
 app.use(
-  '/api/room',
+  '/api/house',
   rateLimit({
     windowMs: 60_000,
     max: 180,
-    keyFn: (req) => `room:${req.ip}`
+    keyFn: (req) => `house:${req.ip}`
   })
 );
 
@@ -158,8 +223,15 @@ const shareLimiter = rateLimit({
   keyFn: (req) => `share:${req.ip}`
 });
 app.use('/api/share/create', shareLimiter);
-app.use('/api/human/posts', shareLimiter);
-app.use('/api/human/optin', shareLimiter);
+
+app.use(
+  '/api/token',
+  rateLimit({
+    windowMs: 60_000,
+    max: 30,
+    keyFn: (req) => `token:${req.ip}`
+  })
+);
 
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
@@ -189,11 +261,87 @@ function sanitizeUrl(url) {
   }
 }
 
-const MAX_ROOM_ENTRIES = 200;
-const MAX_ROOMS = 500;
+function postJson(url, payload, { timeoutMs = TOKEN_CHECK_TIMEOUT_MS } = {}) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify(payload);
+    const target = new URL(url);
+    const lib = target.protocol === 'http:' ? http : https;
+    const req = lib.request(
+      {
+        method: 'POST',
+        hostname: target.hostname,
+        port: target.port || (target.protocol === 'http:' ? 80 : 443),
+        path: `${target.pathname}${target.search}`,
+        headers: {
+          'content-type': 'application/json',
+          'content-length': Buffer.byteLength(body)
+        }
+      },
+      (res) => {
+        let raw = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          raw += chunk;
+        });
+        res.on('end', () => {
+          let json = null;
+          try {
+            json = JSON.parse(raw);
+          } catch {
+            // ignore
+          }
+          if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+            const err = new Error(`RPC_${res.statusCode || 0}`);
+            err.status = res.statusCode || 0;
+            err.body = raw;
+            err.json = json;
+            return reject(err);
+          }
+          if (!json) return reject(new Error('RPC_BAD_JSON'));
+          return resolve(json);
+        });
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('RPC_TIMEOUT')));
+    req.write(body);
+    req.end();
+  });
+}
+
+function addressHasTokenValue(account) {
+  const amount = account?.account?.data?.parsed?.info?.tokenAmount?.amount;
+  if (typeof amount !== 'string') return false;
+  try {
+    return BigInt(amount) > 0n;
+  } catch {
+    return false;
+  }
+}
+
+async function hasElizaTownToken(address) {
+  if (process.env.NODE_ENV === 'test') {
+    const testAddr = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
+    return address === testAddr;
+  }
+  const payload = {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'getTokenAccountsByOwner',
+    params: [address, { mint: ELIZATOWN_MINT }, { encoding: 'jsonParsed' }]
+  };
+  const data = await postJson(SOLANA_RPC_URL, payload);
+  const accounts = Array.isArray(data?.result?.value) ? data.result.value : [];
+  return accounts.some(addressHasTokenValue);
+}
+
+const MAX_HOUSE_ENTRIES = 200;
+const MAX_HOUSES = 500;
 const MAX_SHARES = 2000;
 const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
+const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
+const MAX_PUBLIC_PROMPT_CHARS = 280;
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -246,34 +394,42 @@ function normalizeAgentName(name) {
   return cleaned || null;
 }
 
-function hashToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
-
-function verifyToken(hash, token) {
-  if (!hash || !token) return false;
-  const next = hashToken(token);
-  const a = Buffer.from(hash, 'hex');
-  const b = Buffer.from(next, 'hex');
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
-
-function resolveShareWithToken(req, session) {
-  const bodyShareId = typeof req.body?.shareId === 'string' ? req.body.shareId.trim() : '';
-  const shareId = bodyShareId || session.share.id || '';
-  if (!shareId) return { ok: false, error: 'SHARE_NOT_READY' };
-  const store = readStore();
-  const share = store.shares.find((x) => x.id === shareId);
-  if (!share) return { ok: false, error: 'NOT_FOUND' };
-  const token = typeof req.body?.manageToken === 'string' ? req.body.manageToken.trim() : '';
-  if (!token) return { ok: false, error: 'MANAGE_TOKEN_REQUIRED' };
-  if (!share.manageTokenHash || !verifyToken(share.manageTokenHash, token)) {
-    return { ok: false, error: 'INVALID_TOKEN' };
+function recordSignup(session, { mode, agentName = null, matchedElement = null, address = null } = {}) {
+  if (session.signup.complete) {
+    return { complete: true, already: true, createdAt: session.signup.createdAt || null };
   }
-  session.share.id = shareId;
-  session.share.createdAt = share.createdAt || null;
-  return { ok: true, shareId, store, share };
+
+  const store = readStore();
+  if (store.signups.length >= MAX_SIGNUPS) {
+    return { complete: false, reason: 'STORE_FULL' };
+  }
+  const signupId = `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const referralShareId = session.referral?.shareId || null;
+  const record = {
+    id: signupId,
+    createdAt: nowIso(),
+    teamCode: session.teamCode,
+    agentName,
+    matchedElement,
+    referralShareId,
+    mode,
+    walletAddress: address || null
+  };
+  if (referralShareId) {
+    const share = store.shares.find((x) => x.id === referralShareId);
+    if (share) {
+      share.referrals = typeof share.referrals === 'number' ? share.referrals + 1 : 1;
+    }
+  }
+  store.signups.push(record);
+  writeStore(store);
+
+  session.signup.complete = true;
+  session.signup.createdAt = record.createdAt;
+  session.signup.mode = mode;
+  session.signup.address = address || null;
+
+  return { complete: true, already: false, createdAt: record.createdAt };
 }
 
 function decodeB64(input) {
@@ -284,24 +440,97 @@ function decodeB64(input) {
   }
 }
 
-function verifyRoomAuth(req, room) {
-  if (!room || !room.authKey) return { ok: false, error: 'ROOM_AUTH_REQUIRED' };
-  const ts = req.header('x-room-ts');
-  const auth = req.header('x-room-auth');
-  if (!ts || !auth) return { ok: false, error: 'ROOM_AUTH_REQUIRED' };
+function parsePublicImageDataUrl(dataUrl) {
+  if (dataUrl == null || dataUrl === '') return { dataUrl: null };
+  if (typeof dataUrl !== 'string') return { error: 'INVALID_PUBLIC_IMAGE' };
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return { error: 'INVALID_PUBLIC_IMAGE' };
+  const mime = match[1];
+  const payload = match[2];
+  let bytes;
+  try {
+    bytes = Buffer.from(payload, 'base64');
+  } catch {
+    return { error: 'INVALID_PUBLIC_IMAGE' };
+  }
+  if (!bytes || bytes.length === 0) return { error: 'INVALID_PUBLIC_IMAGE' };
+  if (bytes.length > MAX_PUBLIC_IMAGE_BYTES) return { error: 'PUBLIC_IMAGE_TOO_LARGE' };
+  return { dataUrl, mime, bytes };
+}
+
+function normalizePublicPrompt(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
+}
+
+function serializePublicMedia(house) {
+  const media = house?.publicMedia;
+  if (!media) return null;
+  const prompt = typeof media.prompt === 'string' ? media.prompt : null;
+  const image = typeof media.image === 'string' ? media.image : null;
+  if (!prompt && !image) return null;
+  const imageUrl = image
+    ? `/api/house/${encodeURIComponent(house.id)}/public-media/image${media.updatedAt ? `?v=${encodeURIComponent(media.updatedAt)}` : ''}`
+    : null;
+  return {
+    prompt,
+    imageUrl,
+    updatedAt: media.updatedAt || null
+  };
+}
+
+function escapeHtmlAttr(input) {
+  return String(input || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildShareMeta({ shareId, publicMedia, origin }) {
+  const title = 'Agent Town — House Share';
+  const description = publicMedia?.prompt || 'Human + agent co-op house in Agent Town.';
+  const url = `${origin}/s/${encodeURIComponent(shareId)}`;
+  const imagePath = publicMedia?.imageUrl || '/logo.jpg';
+  const imageUrl = imagePath.startsWith('http')
+    ? imagePath
+    : `${origin}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
+  const card = publicMedia?.imageUrl ? 'summary_large_image' : 'summary';
+
+  return [
+    `<meta property="og:title" content="${escapeHtmlAttr(title)}" />`,
+    `<meta property="og:description" content="${escapeHtmlAttr(description)}" />`,
+    `<meta property="og:type" content="website" />`,
+    `<meta property="og:url" content="${escapeHtmlAttr(url)}" />`,
+    `<meta property="og:image" content="${escapeHtmlAttr(imageUrl)}" />`,
+    `<meta name="twitter:card" content="${escapeHtmlAttr(card)}" />`,
+    `<meta name="twitter:title" content="${escapeHtmlAttr(title)}" />`,
+    `<meta name="twitter:description" content="${escapeHtmlAttr(description)}" />`,
+    `<meta name="twitter:image" content="${escapeHtmlAttr(imageUrl)}" />`
+  ].join('\n  ');
+}
+
+function verifyHouseAuth(req, house) {
+  if (!house || !house.authKey) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
+  const ts = req.header('x-house-ts');
+  const auth = req.header('x-house-auth');
+  if (!ts || !auth) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
   const tsNum = Number(ts);
-  if (!Number.isFinite(tsNum)) return { ok: false, error: 'ROOM_AUTH_INVALID' };
+  if (!Number.isFinite(tsNum)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   const skew = Math.abs(Date.now() - tsNum);
-  if (skew > 5 * 60 * 1000) return { ok: false, error: 'ROOM_AUTH_EXPIRED' };
-  const key = decodeB64(room.authKey);
-  if (!key || key.length < 16) return { ok: false, error: 'ROOM_AUTH_INVALID' };
+  if (skew > 5 * 60 * 1000) return { ok: false, error: 'HOUSE_AUTH_EXPIRED' };
+  const key = decodeB64(house.authKey);
+  if (!key || key.length < 16) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   const bodyHash = sha256Base64(req.rawBody || '');
-  const msg = `${room.id}.${ts}.${req.method.toUpperCase()}.${req.path}.${bodyHash}`;
+  const msg = `${house.id}.${ts}.${req.method.toUpperCase()}.${req.path}.${bodyHash}`;
   const expected = crypto.createHmac('sha256', key).update(msg).digest('base64');
   const a = Buffer.from(expected, 'base64');
   const b = Buffer.from(auth, 'base64');
-  if (a.length !== b.length) return { ok: false, error: 'ROOM_AUTH_INVALID' };
-  if (!crypto.timingSafeEqual(a, b)) return { ok: false, error: 'ROOM_AUTH_INVALID' };
+  if (a.length !== b.length) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
+  if (!crypto.timingSafeEqual(a, b)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   return { ok: true };
 }
 
@@ -348,6 +577,8 @@ app.get('/api/state', (req, res) => {
     match: s.match,
     signup: s.signup,
     share: s.share,
+    shareApproval: s.shareApproval || { human: false, agent: false },
+    houseId: s.houseCeremony?.houseId || null,
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -384,7 +615,22 @@ app.post('/api/agent/connect', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   s.agent.connected = true;
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = true;
   res.json({ ok: true });
+});
+
+app.post('/api/agent/house/connect', (req, res) => {
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const agentName = normalizeAgentName(req.body?.agentName);
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const s = getSessionByHouseId(houseId);
+  if (!s) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+  s.agent.connected = true;
+  s.agent.name = agentName || s.agent.name || 'OpenClaw';
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = true;
+  res.json({ ok: true, houseId });
 });
 
 app.get('/api/agent/state', (req, res) => {
@@ -405,7 +651,7 @@ app.get('/api/agent/state', (req, res) => {
     signup: s.signup,
     share: s.share,
     canvas: { w: s.canvas.w, h: s.canvas.h },
-    roomId: s.roomCeremony?.roomId || null
+    houseId: s.houseCeremony?.houseId || null
   });
 });
 
@@ -425,38 +671,11 @@ app.post('/api/agent/select', (req, res) => {
 function maybeCompleteOpen(session) {
   if (!session.match.matched) return { complete: false, reason: 'LOCKED' };
   if (!session.human.openPressed || !session.agent.openPressed) return { complete: false, reason: 'WAITING' };
-
-  if (session.signup.complete) {
-    return { complete: true, already: true };
-  }
-
-  const store = readStore();
-  if (store.signups.length >= MAX_SIGNUPS) {
-    return { complete: false, reason: 'STORE_FULL' };
-  }
-  const signupId = `s_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  const referralShareId = session.referral?.shareId || null;
-  const record = {
-    id: signupId,
-    createdAt: nowIso(),
-    teamCode: session.teamCode,
+  return recordSignup(session, {
+    mode: 'agent',
     agentName: session.agent.name || null,
-    matchedElement: session.match.elementId,
-    referralShareId
-  };
-  if (referralShareId) {
-    const share = store.shares.find((x) => x.id === referralShareId);
-    if (share) {
-      share.referrals = typeof share.referrals === 'number' ? share.referrals + 1 : 1;
-    }
-  }
-  store.signups.push(record);
-  writeStore(store);
-
-  session.signup.complete = true;
-  session.signup.createdAt = record.createdAt;
-
-  return { complete: true, already: false, createdAt: record.createdAt };
+    matchedElement: session.match.elementId || null
+  });
 }
 
 app.post('/api/human/open/press', (req, res) => {
@@ -518,8 +737,8 @@ app.post('/api/agent/canvas/paint', (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Room ceremony (agent + human) ---
-app.get('/api/agent/room/state', (req, res) => {
+// --- House ceremony (agent + human) ---
+app.get('/api/agent/house/state', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
@@ -528,27 +747,27 @@ app.get('/api/agent/room/state', (req, res) => {
     ok: true,
     teamCode: s.teamCode,
     ceremony: {
-      humanCommit: !!s.roomCeremony?.humanCommit,
-      agentCommit: !!s.roomCeremony?.agentCommit,
-      humanReveal: !!s.roomCeremony?.humanReveal,
-      agentReveal: !!s.roomCeremony?.agentReveal,
-      roomId: s.roomCeremony?.roomId || null
+      humanCommit: !!s.houseCeremony?.humanCommit,
+      agentCommit: !!s.houseCeremony?.agentCommit,
+      humanReveal: !!s.houseCeremony?.humanReveal,
+      agentReveal: !!s.houseCeremony?.agentReveal,
+      houseId: s.houseCeremony?.houseId || null
     }
   });
 });
 
-app.post('/api/agent/room/commit', (req, res) => {
+app.post('/api/agent/house/commit', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
-  s.roomCeremony.agentCommit = commit;
+  s.houseCeremony.agentCommit = commit;
   res.json({ ok: true });
 });
 
-app.post('/api/agent/room/reveal', (req, res) => {
+app.post('/api/agent/house/reveal', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
@@ -559,99 +778,124 @@ app.post('/api/agent/room/reveal', (req, res) => {
   // Verify reveal matches commit if present.
   const ra = b64ToBytes(reveal);
   const ch = bytesToB64(sha256Bytes(ra));
-  if (s.roomCeremony.agentCommit && s.roomCeremony.agentCommit !== ch) {
+  if (s.houseCeremony.agentCommit && s.houseCeremony.agentCommit !== ch) {
     return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
   }
 
-  s.roomCeremony.agentReveal = reveal;
+  s.houseCeremony.agentReveal = reveal;
 
-  // If both reveals exist, compute roomId and store it (no secrets persisted).
-  if (s.roomCeremony.humanReveal && s.roomCeremony.agentReveal) {
-    const rh = b64ToBytes(s.roomCeremony.humanReveal);
+  // If both reveals exist, compute houseId and store it (no secrets persisted).
+  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+    const rh = b64ToBytes(s.houseCeremony.humanReveal);
     const combo = new Uint8Array(rh.length + ra.length);
     combo.set(rh, 0);
     combo.set(ra, rh.length);
     const kroot = sha256Bytes(combo);
-    const roomIdBytes = sha256Bytes(kroot);
-    s.roomCeremony.roomId = base58Encode(roomIdBytes);
-    s.roomCeremony.createdAt = s.roomCeremony.createdAt || nowIso();
+    const houseIdBytes = sha256Bytes(kroot);
+    s.houseCeremony.houseId = base58Encode(houseIdBytes);
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, s.houseCeremony.houseId);
   }
 
-  res.json({ ok: true, roomId: s.roomCeremony.roomId || null });
+  res.json({ ok: true, houseId: s.houseCeremony.houseId || null });
 });
 
-app.post('/api/human/room/commit', (req, res) => {
+app.post('/api/human/house/commit', (req, res) => {
   const s = ensureHumanSession(req, res);
   const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
   if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
-  s.roomCeremony.humanCommit = commit;
+  s.houseCeremony.humanCommit = commit;
   res.json({ ok: true });
 });
 
-app.post('/api/human/room/reveal', (req, res) => {
+app.post('/api/human/house/reveal', (req, res) => {
   const s = ensureHumanSession(req, res);
   const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
   if (!reveal) return res.status(400).json({ ok: false, error: 'MISSING_REVEAL' });
 
   const rh = b64ToBytes(reveal);
   const ch = bytesToB64(sha256Bytes(rh));
-  if (s.roomCeremony.humanCommit && s.roomCeremony.humanCommit !== ch) {
+  if (s.houseCeremony.humanCommit && s.houseCeremony.humanCommit !== ch) {
     return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
   }
 
-  s.roomCeremony.humanReveal = reveal;
+  s.houseCeremony.humanReveal = reveal;
 
-  // If both reveals exist, compute roomId.
-  if (s.roomCeremony.humanReveal && s.roomCeremony.agentReveal) {
-    const ra = b64ToBytes(s.roomCeremony.agentReveal);
+  // If both reveals exist, compute houseId.
+  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+    const ra = b64ToBytes(s.houseCeremony.agentReveal);
     const combo = new Uint8Array(rh.length + ra.length);
     combo.set(rh, 0);
     combo.set(ra, rh.length);
     const kroot = sha256Bytes(combo);
-    const roomIdBytes = sha256Bytes(kroot);
-    s.roomCeremony.roomId = base58Encode(roomIdBytes);
-    s.roomCeremony.createdAt = s.roomCeremony.createdAt || nowIso();
+    const houseIdBytes = sha256Bytes(kroot);
+    s.houseCeremony.houseId = base58Encode(houseIdBytes);
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, s.houseCeremony.houseId);
   }
 
-  res.json({ ok: true, roomId: s.roomCeremony.roomId || null });
+  res.json({ ok: true, houseId: s.houseCeremony.houseId || null });
 });
 
-app.get('/api/human/room/state', (req, res) => {
+app.get('/api/human/house/state', (req, res) => {
   const s = ensureHumanSession(req, res);
   res.json({
     ok: true,
     ceremony: {
-      humanCommit: !!s.roomCeremony?.humanCommit,
-      agentCommit: !!s.roomCeremony?.agentCommit,
-      humanReveal: !!s.roomCeremony?.humanReveal,
-      agentReveal: !!s.roomCeremony?.agentReveal,
-      roomId: s.roomCeremony?.roomId || null
+      humanCommit: !!s.houseCeremony?.humanCommit,
+      agentCommit: !!s.houseCeremony?.agentCommit,
+      humanReveal: !!s.houseCeremony?.humanReveal,
+      agentReveal: !!s.houseCeremony?.agentReveal,
+      houseId: s.houseCeremony?.houseId || null
     }
   });
 });
 
-app.get('/api/human/room/material', (req, res) => {
+app.get('/api/human/house/material', (req, res) => {
   const s = ensureHumanSession(req, res);
   res.json({
     ok: true,
-    roomId: s.roomCeremony?.roomId || null,
-    humanReveal: s.roomCeremony?.humanReveal || null,
-    agentReveal: s.roomCeremony?.agentReveal || null
+    houseId: s.houseCeremony?.houseId || null,
+    humanReveal: s.houseCeremony?.humanReveal || null,
+    agentReveal: s.houseCeremony?.agentReveal || null
   });
 });
 
-app.get('/api/agent/room/material', (req, res) => {
+app.get('/api/agent/house/material', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
-  res.json({ ok: true, roomId: s.roomCeremony?.roomId || null, humanReveal: s.roomCeremony?.humanReveal || null });
+  res.json({ ok: true, houseId: s.houseCeremony?.houseId || null, humanReveal: s.houseCeremony?.humanReveal || null });
 });
 
 // Share creation + retrieval
 app.post('/api/share/create', (req, res) => {
   const s = ensureHumanSession(req, res);
-  if (!s.signup.complete) return res.status(403).json({ ok: false, error: 'SIGNUP_REQUIRED' });
+  const tokenMode = s.signup?.mode === 'token';
+  const tokenVerifiedAt = s.token?.verifiedAt || null;
+  const tokenVerifiedAddress = s.token?.address || null;
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.human = true;
+  if (tokenMode) {
+    s.shareApproval.agent = true;
+    if (!s.agent.name) s.agent.name = '$ELIZATOWN';
+  }
+  if (!s.houseCeremony?.houseId) return res.status(403).json({ ok: false, error: 'HOUSE_NOT_READY' });
+  if (!tokenMode) {
+    if (!s.houseCeremony?.humanReveal || !s.houseCeremony?.agentReveal) {
+      return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+    }
+    if (!s.agent?.connected) return res.status(403).json({ ok: false, error: 'AGENT_REQUIRED' });
+  } else {
+    const now = Date.now();
+    if (!tokenVerifiedAt || now - tokenVerifiedAt > TOKEN_VERIFY_TTL_MS) {
+      return res.status(403).json({ ok: false, error: 'TOKEN_CHECK_REQUIRED' });
+    }
+    if (s.signup?.address && tokenVerifiedAddress && s.signup.address !== tokenVerifiedAddress) {
+      return res.status(403).json({ ok: false, error: 'TOKEN_ADDRESS_MISMATCH' });
+    }
+  }
   if (!canvasHasInk(s.canvas.pixels)) {
     return res.status(403).json({ ok: false, error: 'EMPTY_CANVAS' });
   }
@@ -661,15 +905,13 @@ app.post('/api/share/create', (req, res) => {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
   }
   const shareId = `sh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  const manageToken = randomHex(16);
-  const manageTokenHash = hashToken(manageToken);
   const record = {
     id: shareId,
     createdAt: nowIso(),
-    matchedElement: s.match.elementId,
-    agentName: s.agent.name,
-    pixels: s.canvas.pixels,
-    canvas: { w: s.canvas.w, h: s.canvas.h },
+    matchedElement: tokenMode ? null : s.match.elementId,
+    agentName: tokenMode ? (s.agent.name || '$ELIZATOWN') : s.agent.name,
+    mode: tokenMode ? 'token' : 'agent',
+    houseId: s.houseCeremony?.houseId || null,
     // These are optionally added later:
     xPostUrl: s.human.xPostUrl,
     humanHandle: s.human.xHandle || null,
@@ -680,8 +922,7 @@ app.post('/api/share/create', (req, res) => {
     locked: true,
     lockedAt: nowIso(),
     optIn: { human: null, agent: null },
-    public: false,
-    manageTokenHash
+    public: false
   };
 
   store.shares.push(record);
@@ -689,12 +930,14 @@ app.post('/api/share/create', (req, res) => {
 
   s.share.id = shareId;
   s.share.createdAt = record.createdAt;
+  s.human.optIn = true;
+  s.agent.optIn = true;
+  maybeAddToLeaderboard(s);
 
   res.json({
     ok: true,
     shareId,
-    sharePath: `/s/${shareId}`,
-    managePath: `/share/${shareId}?k=${manageToken}`
+    sharePath: `/s/${shareId}`
   });
 });
 
@@ -703,11 +946,14 @@ app.get('/api/share/:id', (req, res) => {
   const store = readStore();
   const rec = store.shares.find((x) => x.id === id);
   if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const { teamCode, ...rest } = rec;
+  const { teamCode, houseId, ...rest } = rec;
   if (rest.agentPosts) {
     rest.agentPosts = { moltbookUrl: rest.agentPosts.moltbookUrl || null };
   }
-  res.json({ ok: true, share: rest, palette: palette() });
+  const house = houseId ? store.houses.find((h) => h.id === houseId) : null;
+  const publicMedia = house ? serializePublicMedia(house) : null;
+  rest.publicMedia = publicMedia;
+  res.json({ ok: true, share: rest });
 });
 
 app.get('/api/agent/share/instructions', (req, res) => {
@@ -725,62 +971,6 @@ app.get('/api/agent/share/instructions', (req, res) => {
 });
 
 // Posts
-app.post('/api/human/posts', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const wantsShare = Boolean(req.body?.shareId || s.share.id);
-  const resolved = wantsShare ? resolveShareWithToken(req, s) : null;
-  if (resolved && !resolved.ok && resolved.error !== 'SHARE_NOT_READY') {
-    return res.status(resolved.error === 'NOT_FOUND' ? 404 : 403).json({ ok: false, error: resolved.error });
-  }
-  const url = sanitizeUrl(req.body?.xPostUrl);
-  if (!url) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
-  const handle = extractXHandle(url);
-  const store = (resolved && resolved.store) || readStore();
-  if (handle) {
-    const handleLower = handle.toLowerCase();
-    const takenBySignup = store.signups.some(
-      (rec) => rec.humanHandle && rec.humanHandle.toLowerCase() === handleLower && rec.teamCode !== s.teamCode
-    );
-    const takenByShare = store.shares.some((rec) => {
-      const recHandle = rec.humanHandle || extractXHandle(rec.xPostUrl);
-      if (!recHandle || recHandle.toLowerCase() !== handleLower) return false;
-      return resolved ? rec.id !== resolved.shareId : true;
-    });
-    const takenByPublic = store.publicTeams.some((rec) => {
-      const recHandle = rec.humanHandle || extractXHandle(rec.xPostUrl);
-      return !!recHandle && recHandle.toLowerCase() === handleLower;
-    });
-    if (takenBySignup || takenByShare || takenByPublic) {
-      return res.status(409).json({ ok: false, error: 'HANDLE_TAKEN' });
-    }
-  }
-  s.human.xPostUrl = url;
-  s.human.xHandle = handle;
-
-  let signupsChanged = false;
-  if (handle) {
-    const signup = store.signups.find((rec) => rec.teamCode === s.teamCode);
-    if (signup) {
-      signup.humanHandle = handle;
-      signupsChanged = true;
-    }
-  }
-  const rec = resolved && resolved.ok ? (resolved.share || store.shares.find((x) => x.id === resolved.shareId)) : null;
-  if (rec) {
-    rec.xPostUrl = url;
-    rec.humanHandle = handle;
-    const pub = store.publicTeams.find((p) => p.shareId === s.share.id);
-    if (pub) {
-      pub.xPostUrl = url;
-      pub.humanHandle = handle;
-    }
-    writeStore(store);
-  } else if (signupsChanged) {
-    writeStore(store);
-  }
-  res.json({ ok: true });
-});
-
 app.post('/api/agent/posts', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
@@ -806,7 +996,7 @@ app.post('/api/agent/posts', (req, res) => {
   res.json({ ok: true });
 });
 
-// Opt-in gating: only list team if BOTH opted in.
+// Leaderboard helper: list team when share exists.
 function maybeAddToLeaderboard(session) {
   if (!session.share.id) return { ok: false, error: 'SHARE_NOT_READY' };
   if (session.human.optIn !== true || session.agent.optIn !== true) return { ok: false, error: 'WAITING' };
@@ -828,6 +1018,7 @@ function maybeAddToLeaderboard(session) {
     createdAt: nowIso(),
     shareId: session.share.id,
     sharePath: `/s/${session.share.id}`,
+    houseId: session.houseCeremony?.houseId || null,
     matchedElement: session.match.elementId,
     agentName: session.agent.name,
     xPostUrl: share.xPostUrl,
@@ -843,59 +1034,25 @@ function maybeAddToLeaderboard(session) {
   return { ok: true, already: false };
 }
 
-app.post('/api/human/optin', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const resolved = resolveShareWithToken(req, s);
-  if (!resolved.ok) {
-    return res.status(resolved.error === 'NOT_FOUND' ? 404 : 403).json({ ok: false, error: resolved.error });
-  }
-  const appear = typeof req.body?.appear === 'boolean' ? req.body.appear : null;
-  if (appear === null) return res.status(400).json({ ok: false, error: 'MISSING_APPEAR' });
-  s.human.optIn = appear;
-
-  const store = resolved.store || readStore();
-  const share = resolved.share || store.shares.find((x) => x.id === resolved.shareId);
-  if (share) {
-    share.optIn = { ...(share.optIn || {}), human: appear };
-    writeStore(store);
-  }
-
-  const result = maybeAddToLeaderboard(s);
-  res.json({ ok: true, result });
-});
-
-app.post('/api/agent/optin', (req, res) => {
-  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
-  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
-  const appear = typeof req.body?.appear === 'boolean' ? req.body.appear : null;
-  if (appear === null) return res.status(400).json({ ok: false, error: 'MISSING_APPEAR' });
-
-  const s = getSessionByTeamCode(teamCode);
-  if (!s || !s.share.id) return res.status(404).json({ ok: false, error: 'SHARE_NOT_READY' });
-
-  s.agent.optIn = appear;
-
-  const store = readStore();
-  const share = store.shares.find((x) => x.id === s.share.id);
-  if (share) {
-    share.optIn = { ...(share.optIn || {}), agent: appear };
-    writeStore(store);
-  }
-
-  const result = maybeAddToLeaderboard(s);
-  res.json({ ok: true, result });
-});
-
 function buildLeaderboard(store) {
   const referralsByShare = new Map(
     store.shares.map((s) => [s.id, typeof s.referrals === 'number' ? s.referrals : 0])
   );
-  const teams = store.publicTeams.map((p) => ({
-    ...p,
-    humanHandle: p.humanHandle || extractXHandle(p.xPostUrl),
-    referrals: referralsByShare.get(p.shareId) || 0,
-    agentPosts: p.agentPosts ? { moltbookUrl: p.agentPosts.moltbookUrl || null } : null
-  }));
+  const sharesById = new Map(store.shares.map((s) => [s.id, s]));
+  const housesById = new Map(store.houses.map((h) => [h.id, h]));
+  const teams = store.publicTeams.map((p) => {
+    const share = sharesById.get(p.shareId);
+    const { houseId: storedHouseId, ...rest } = p;
+    const houseId = storedHouseId || share?.houseId || null;
+    const house = houseId ? housesById.get(houseId) : null;
+    return {
+      ...rest,
+      humanHandle: p.humanHandle || extractXHandle(p.xPostUrl),
+      referrals: referralsByShare.get(p.shareId) || 0,
+      agentPosts: p.agentPosts ? { moltbookUrl: p.agentPosts.moltbookUrl || null } : null,
+      publicMedia: house ? serializePublicMedia(house) : null
+    };
+  });
   teams.sort((a, b) => (b.referrals || 0) - (a.referrals || 0));
   const referralsTotal = teams.reduce((sum, t) => sum + (t.referrals || 0), 0);
   return { teams, referralsTotal };
@@ -920,89 +1077,228 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], rooms: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [] });
     resetAllSessions();
     res.json({ ok: true });
   });
 }
 
-// --- Rooms (Phase 1 MVP) ---
+// --- Houses (Phase 1 MVP) ---
 function makeNonce() {
   return `n_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
-app.get('/api/room/nonce', (_req, res) => {
+app.get('/api/house/nonce', (_req, res) => {
   res.json({ ok: true, nonce: makeNonce() });
 });
 
-app.post('/api/room/init', (req, res) => {
-  const roomId = typeof req.body?.roomId === 'string' ? req.body.roomId.trim() : '';
-  const roomPubKey = typeof req.body?.roomPubKey === 'string' ? req.body.roomPubKey.trim() : '';
+app.get('/api/wallet/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const nonce = `wn_${randomHex(16)}`;
+  s.walletLookupNonce = nonce;
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/wallet/lookup', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (nonce !== s.walletLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+
+  const msg = buildWalletLookupMessage({ address, nonce, houseId: houseId || null });
+  if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
+    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  }
+  s.walletLookupNonce = null;
+
+  const store = readStore();
+  let matches = store.houses.filter(
+    (r) => r && r.unlock && r.unlock.kind === 'solana-wallet-signature' && r.unlock.address === address
+  );
+  if (houseId) {
+    matches = matches.filter((r) => r.id === houseId);
+    if (!matches.length) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+  }
+  if (!matches.length) return res.json({ ok: true, houseId: null, keyWrap: null, keyWrapSig: null });
+  matches.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+  const house = matches[matches.length - 1];
+  if (house?.id) {
+    s.houseCeremony.houseId = house.id;
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || house.createdAt || nowIso();
+    indexHouseId(s, house.id);
+  }
+  res.json({
+    ok: true,
+    houseId: house.id,
+    keyWrap: house.keyWrap || null,
+    keyWrapSig: house.keyWrapSig || null
+  });
+});
+
+app.get('/api/token/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const nonce = `tn_${randomHex(16)}`;
+  s.tokenLookupNonce = nonce;
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/token/verify', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (nonce !== s.tokenLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+
+  const msg = buildTokenCheckMessage({ address, nonce, ca: ELIZATOWN_MINT });
+  const testAddr = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
+  const skipSig = process.env.NODE_ENV === 'test' && address === testAddr;
+  if (!skipSig && !verifySolanaSignature(address, msg, signature)) {
+    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  }
+  s.tokenLookupNonce = null;
+
+  if (s.signup.complete && s.signup.mode === 'token' && s.signup.address && s.signup.address !== address) {
+    return res.status(409).json({ ok: false, error: 'ADDRESS_MISMATCH' });
+  }
+  if (s.signup.complete && s.signup.mode && s.signup.mode !== 'token') {
+    return res.status(409).json({ ok: false, error: 'ALREADY_SIGNED_UP' });
+  }
+
+  let eligible = false;
+  try {
+    eligible = await hasElizaTownToken(address);
+  } catch (e) {
+    console.warn('token verify failed', e);
+    return res.status(503).json({ ok: false, error: 'RPC_UNAVAILABLE' });
+  }
+  if (!eligible) return res.json({ ok: true, eligible: false });
+
+  const status = recordSignup(s, { mode: 'token', address });
+  if (!status.complete) return res.status(403).json({ ok: false, error: status.reason || 'STORE_FULL' });
+  if (!s.signup.address) s.signup.address = address;
+  s.token = s.token || { verifiedAt: null, address: null };
+  s.token.verifiedAt = Date.now();
+  s.token.address = address;
+
+  res.json({ ok: true, eligible: true, status });
+});
+
+app.post('/api/house/init', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const housePubKey = typeof req.body?.housePubKey === 'string' ? req.body.housePubKey.trim() : '';
   const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
   const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
   const unlock = req.body?.unlock || null;
-  const roomAuthKey = typeof req.body?.roomAuthKey === 'string' ? req.body.roomAuthKey.trim() : '';
+  const keyWrap = req.body?.keyWrap || null;
+  const keyWrapSig = typeof req.body?.keyWrapSig === 'string' ? req.body.keyWrapSig.trim() : '';
+  const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
 
-  if (!roomId || !roomPubKey) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
-  if (roomId !== roomPubKey) return res.status(400).json({ ok: false, error: 'ROOM_ID_MISMATCH' });
+  if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
   if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (!roomAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_AUTH' });
-  const authKeyBytes = decodeB64(roomAuthKey);
+  if (!houseAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_AUTH' });
+  const authKeyBytes = decodeB64(houseAuthKey);
   if (!authKeyBytes || authKeyBytes.length < 16) {
-    return res.status(400).json({ ok: false, error: 'INVALID_ROOM_AUTH' });
+    return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
   }
 
-  // Converged for today's publish: ceremony-only rooms.
+  // Converged for today's publish: ceremony-only houses.
   if (keyMode !== 'ceremony') {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
   }
 
+  let normalizedKeyWrap = null;
+  if (keyWrap && typeof keyWrap === 'object') {
+    const alg = typeof keyWrap.alg === 'string' ? keyWrap.alg.trim() : '';
+    const iv = typeof keyWrap.iv === 'string' ? keyWrap.iv.trim() : '';
+    const ct = typeof keyWrap.ct === 'string' ? keyWrap.ct.trim() : '';
+    if (alg && iv && ct) {
+      if (alg !== 'AES-GCM') {
+        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP' });
+      }
+      normalizedKeyWrap = { alg, iv, ct };
+    }
+  }
+
+  let normalizedKeyWrapSig = null;
+  if (keyWrapSig) {
+    const sigBytes = b64ToBytes(keyWrapSig);
+    if (!sigBytes || sigBytes.length !== 64) {
+      return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP_SIG' });
+    }
+    const address = unlock?.address || '';
+    if (address) {
+      const msg = buildHouseKeyWrapMessage({ houseId });
+      if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, keyWrapSig)) {
+        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP_SIG' });
+      }
+    }
+    normalizedKeyWrapSig = keyWrapSig;
+  }
+
   const store = readStore();
-  if (store.rooms.length >= MAX_ROOMS) {
+  if (store.houses.length >= MAX_HOUSES) {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
   }
-  const exists = store.rooms.find((r) => r.id === roomId);
-  if (exists) return res.status(409).json({ ok: false, error: 'ROOM_EXISTS' });
+  const exists = store.houses.find((r) => r.id === houseId);
+  if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
 
-  store.rooms.push({
-    id: roomId,
-    roomPubKey,
+  store.houses.push({
+    id: houseId,
+    housePubKey,
     createdAt: nowIso(),
     nonce,
     keyMode: 'ceremony',
     unlock,
-    authKey: roomAuthKey,
+    keyWrap: normalizedKeyWrap,
+    keyWrapSig: normalizedKeyWrapSig,
+    authKey: houseAuthKey,
     entries: []
   });
   writeStore(store);
 
-  res.json({ ok: true, roomId });
+  if (s && s.houseCeremony) {
+    s.houseCeremony.houseId = houseId;
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, houseId);
+  }
+
+  res.json({ ok: true, houseId });
 });
 
-app.get('/api/room/:id/meta', (req, res) => {
-  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+app.get('/api/house/:id/meta', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const store = readStore();
-  const room = store.rooms.find((r) => r.id === roomId);
-  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyRoomAuth(req, room);
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
   res.json({
     ok: true,
-    roomId: room.id,
-    roomPubKey: room.roomPubKey,
-    nonce: room.nonce,
+    houseId: house.id,
+    housePubKey: house.housePubKey,
+    nonce: house.nonce,
     keyMode: 'ceremony'
   });
 });
 
-app.get('/api/room/:id/descriptor', (req, res) => {
-  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+app.get('/api/house/:id/descriptor', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const store = readStore();
-  const room = store.rooms.find((r) => r.id === roomId);
-  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyRoomAuth(req, room);
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
 
   const origin = `${req.protocol}://${req.get('host')}`;
@@ -1010,10 +1306,10 @@ app.get('/api/room/:id/descriptor', (req, res) => {
     ok: true,
     descriptor: {
       v: 1,
-      kind: 'agent-town-room',
-      room: {
-        id: room.id,
-        pub: room.roomPubKey,
+      kind: 'agent-town-house',
+      house: {
+        id: house.id,
+        pub: house.housePubKey,
         mailboxes: [
           {
             chain: 'solana',
@@ -1025,31 +1321,116 @@ app.get('/api/room/:id/descriptor', (req, res) => {
         ]
       },
       endpoints: {
-        meta: `${origin}/api/room/${encodeURIComponent(room.id)}/meta`,
-        log: `${origin}/api/room/${encodeURIComponent(room.id)}/log`,
-        append: `${origin}/api/room/${encodeURIComponent(room.id)}/append`
+        meta: `${origin}/api/house/${encodeURIComponent(house.id)}/meta`,
+        log: `${origin}/api/house/${encodeURIComponent(house.id)}/log`,
+        append: `${origin}/api/house/${encodeURIComponent(house.id)}/append`
       },
       ui: {
-        roomUrl: `${origin}/room?room=${encodeURIComponent(room.id)}`
+        houseUrl: `${origin}/house?house=${encodeURIComponent(house.id)}`
       }
     }
   });
 });
 
-app.get('/api/room/:id/log', (req, res) => {
-  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+app.get('/api/house/:id/log', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const store = readStore();
-  const room = store.rooms.find((r) => r.id === roomId);
-  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyRoomAuth(req, room);
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  res.json({ ok: true, entries: Array.isArray(room.entries) ? room.entries : [] });
+  res.json({ ok: true, entries: Array.isArray(house.entries) ? house.entries : [] });
 });
 
-app.post('/api/room/:id/append', (req, res) => {
-  const roomId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!roomId) return res.status(400).json({ ok: false, error: 'MISSING_ROOM_ID' });
+app.get('/api/house/:id/public-media', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+});
+
+app.get('/api/house/:id/public-media/image', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house || !house.publicMedia?.image) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const parsed = parsePublicImageDataUrl(house.publicMedia.image);
+  if (parsed.error || !parsed.bytes) return res.status(500).json({ ok: false, error: 'INVALID_PUBLIC_IMAGE' });
+  res.setHeader('Content-Type', parsed.mime || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.end(parsed.bytes);
+});
+
+app.post('/api/house/:id/public-media', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const body = req.body || {};
+  const hasImage = Object.prototype.hasOwnProperty.call(body, 'image');
+  const hasPrompt = Object.prototype.hasOwnProperty.call(body, 'prompt');
+  const clear = body?.clear === true;
+  if (!clear && !hasImage && !hasPrompt) {
+    return res.status(400).json({ ok: false, error: 'MISSING_PUBLIC_MEDIA' });
+  }
+
+  let nextImage = house.publicMedia?.image || null;
+  let nextPrompt = house.publicMedia?.prompt || null;
+
+  if (clear) {
+    nextImage = null;
+    nextPrompt = null;
+  }
+
+  if (hasImage) {
+    if (body.image == null || body.image === '') {
+      nextImage = null;
+    } else {
+      const parsed = parsePublicImageDataUrl(body.image);
+      if (parsed.error) return res.status(400).json({ ok: false, error: parsed.error });
+      nextImage = parsed.dataUrl;
+    }
+  }
+
+  if (hasPrompt) {
+    if (body.prompt != null && typeof body.prompt !== 'string') {
+      return res.status(400).json({ ok: false, error: 'INVALID_PUBLIC_PROMPT' });
+    }
+    nextPrompt = normalizePublicPrompt(body.prompt);
+  }
+
+  if (nextImage && !nextPrompt) {
+    return res.status(400).json({ ok: false, error: 'PUBLIC_PROMPT_REQUIRED' });
+  }
+  if (nextPrompt && !nextImage) {
+    return res.status(400).json({ ok: false, error: 'PUBLIC_IMAGE_REQUIRED' });
+  }
+
+  if (!nextImage && !nextPrompt) {
+    house.publicMedia = null;
+  } else {
+    house.publicMedia = {
+      image: nextImage,
+      prompt: nextPrompt,
+      updatedAt: nowIso()
+    };
+  }
+
+  writeStore(store);
+  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+});
+
+app.post('/api/house/:id/append', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const ciphertext = req.body?.ciphertext;
   const author = typeof req.body?.author === 'string' ? req.body.author.trim() : 'unknown';
   if (!ciphertext || typeof ciphertext.iv !== 'string' || typeof ciphertext.ct !== 'string') {
@@ -1057,15 +1438,15 @@ app.post('/api/room/:id/append', (req, res) => {
   }
 
   const store = readStore();
-  const room = store.rooms.find((r) => r.id === roomId);
-  if (!room) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyRoomAuth(req, room);
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  room.entries = Array.isArray(room.entries) ? room.entries : [];
-  if (room.entries.length >= MAX_ROOM_ENTRIES) {
-    return res.status(403).json({ ok: false, error: 'ROOM_FULL' });
+  house.entries = Array.isArray(house.entries) ? house.entries : [];
+  if (house.entries.length >= MAX_HOUSE_ENTRIES) {
+    return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
   }
-  room.entries.push({
+  house.entries.push({
     id: `re_${Date.now()}_${Math.random().toString(16).slice(2)}`,
     createdAt: nowIso(),
     author,
@@ -1089,11 +1470,23 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
-app.get('/room', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'room.html')));
+app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
-app.get('/share/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'share_manage.html')));
-app.get('/s/:id', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'share.html')));
+app.get('/s/:id', (req, res) => {
+  const shareId = req.params.id;
+  const store = readStore();
+  const share = store.shares.find((x) => x.id === shareId) || null;
+  const house = share?.houseId ? store.houses.find((h) => h.id === share.houseId) : null;
+  const publicMedia = house ? serializePublicMedia(house) : null;
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const meta = buildShareMeta({ shareId, publicMedia, origin });
+  const template = fs.readFileSync(path.join(PUBLIC_DIR, 'share.html'), 'utf8');
+  const html = template.replace('</head>', `  ${meta}\n</head>`);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (!isProd) res.setHeader('Cache-Control', 'no-store');
+  res.send(html);
+});
 
 // Default route
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));

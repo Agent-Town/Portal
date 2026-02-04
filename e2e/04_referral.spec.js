@@ -11,19 +11,19 @@ function hkdf(ikm, info, len = 32) {
   return crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len);
 }
 
-function roomAuthHeaders(roomId, method, path, body, key) {
+function houseAuthHeaders(houseId, method, path, body, key) {
   const ts = String(Date.now());
   const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
-  const msg = `${roomId}.${ts}.${method}.${path}.${bodyHash}`;
+  const msg = `${houseId}.${ts}.${method}.${path}.${bodyHash}`;
   const auth = crypto.createHmac('sha256', key).update(msg).digest('base64');
-  return { 'x-room-ts': ts, 'x-room-auth': auth };
+  return { 'x-house-ts': ts, 'x-house-auth': auth };
 }
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, request }) => {
+test('house unlock is wallet-signature gated (mocked wallet)', async ({ page, request }) => {
   await page.addInitScript(() => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (255 - i) & 0xff;
@@ -76,28 +76,28 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
   await page.waitForURL('**/create');
 
   // Agent contributes to ceremony (commit+reveal) before human locks in.
-  // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
+  // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
   const ra = crypto.randomBytes(32);
   const raB64 = ra.toString('base64');
   const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
-  await request.post('/api/agent/room/commit', { data: { teamCode: teamCodeA, commit: raCommit } });
-  await request.post('/api/agent/room/reveal', { data: { teamCode: teamCodeA, reveal: raB64 } });
+  await request.post('/api/agent/house/commit', { data: { teamCode: teamCodeA, commit: raCommit } });
+  await request.post('/api/agent/house/reveal', { data: { teamCode: teamCodeA, reveal: raB64 } });
 
   await page.getByTestId('px-0-0').click();
   await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/room\?room=/);
+  await page.waitForURL(/\/house\?house=/);
 
-  const roomId = new URL(page.url()).searchParams.get('room');
-  expect(roomId).toBeTruthy();
+  const houseId = new URL(page.url()).searchParams.get('house');
+  expect(houseId).toBeTruthy();
 
-  // Meta exists and includes nonce; ceremony rooms do not include wrappedKey.
-  const matResp = await request.get(`/api/agent/room/material?teamCode=${encodeURIComponent(teamCodeA)}`);
+  // Meta exists and includes nonce; ceremony houses do not include wrappedKey.
+  const matResp = await request.get(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCodeA)}`);
   const mat = await matResp.json();
   const rh = Buffer.from(mat.humanReveal, 'base64');
   const kroot = sha256(Buffer.concat([rh, ra]));
-  const kauth = hkdf(kroot, 'elizatown-room-auth-v1', 32);
-  const metaPath = `/api/room/${roomId}/meta`;
-  const metaHeaders = roomAuthHeaders(roomId, 'GET', metaPath, '', kauth);
+  const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
+  const metaPath = `/api/house/${houseId}/meta`;
+  const metaHeaders = houseAuthHeaders(houseId, 'GET', metaPath, '', kauth);
   const metaResp = await request.get(metaPath, { headers: metaHeaders });
   expect(metaResp.ok()).toBeTruthy();
   const meta = await metaResp.json();
@@ -105,6 +105,12 @@ test('room unlock is wallet-signature gated (mocked wallet)', async ({ page, req
   expect(meta.nonce).toContain('n_');
   expect(meta.keyMode).toBe('ceremony');
   expect(meta.wrappedKey ?? null).toBeNull();
+
+  // Unlock (solana sig) before showing ERC-8004 panel
+  await page.getByRole('button', { name: 'Connect wallet' }).click();
+  await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.locator('#erc8004Panel')).toBeHidden();
+  await page.getByRole('button', { name: 'Show ERC-8004' }).click();
 
   // Phase 3: mint identity (mocked SDK) updates UI
   await page.getByText('Mint ERC-8004 identity').click();

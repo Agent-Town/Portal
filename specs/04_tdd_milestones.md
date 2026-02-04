@@ -35,13 +35,11 @@ Each milestone has a measurable “done” state validated by Playwright.
 
 ## M6 — Share link
 - Human generates share link.
-- Manage page loads snapshot and shows share URL.
+- House page shows share URL.
 - Public share page is read-only.
 
-## M7 — Dual opt-in
-- Human opts in.
-- Agent opts in.
-- Share page shows “Added to leaderboard”.
+## M7 — Leaderboard
+- Creating a share link adds the team.
 - Leaderboard lists the team.
 
 **Tests**: `e2e/03_create_share_leaderboard.spec.js`

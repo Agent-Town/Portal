@@ -1,8 +1,9 @@
-async function api(url, opts) {
+async function api(url, opts = {}) {
+  const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
   const res = await fetch(url, {
-    headers: { 'content-type': 'application/json', ...(opts && opts.headers ? opts.headers : {}) },
     credentials: 'include',
-    ...opts
+    ...opts,
+    headers
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -88,6 +89,22 @@ function render(teams) {
 
     card.appendChild(title);
     card.appendChild(meta);
+    if (p.publicMedia && p.publicMedia.imageUrl) {
+      const media = document.createElement('div');
+      media.className = 'public-media';
+      const img = document.createElement('img');
+      img.src = p.publicMedia.imageUrl;
+      img.alt = p.publicMedia.prompt ? `Public image: ${p.publicMedia.prompt}` : 'Public house image';
+      img.loading = 'lazy';
+      media.appendChild(img);
+      if (p.publicMedia.prompt) {
+        const prompt = document.createElement('div');
+        prompt.className = 'small';
+        prompt.textContent = p.publicMedia.prompt;
+        media.appendChild(prompt);
+      }
+      card.appendChild(media);
+    }
     card.appendChild(links);
     list.appendChild(card);
   });

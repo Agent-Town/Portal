@@ -1,8 +1,9 @@
-async function api(url, opts) {
+async function api(url, opts = {}) {
+  const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
   const res = await fetch(url, {
-    headers: { 'content-type': 'application/json', ...(opts && opts.headers ? opts.headers : {}) },
     credentials: 'include',
-    ...opts
+    ...opts,
+    headers
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -31,29 +32,10 @@ function handleFromUrl(url) {
   }
 }
 
-function renderSnapshot(share, palette) {
-  const grid = el('snapshot');
-  grid.innerHTML = '';
-  grid.style.gridTemplateColumns = `repeat(${share.canvas.w}, 18px)`;
-
-  const pixels = share.pixels || [];
-  for (let y = 0; y < share.canvas.h; y++) {
-    for (let x = 0; x < share.canvas.w; x++) {
-      const idx = y * share.canvas.w + x;
-      const d = document.createElement('div');
-      d.className = 'pixel';
-      d.style.cursor = 'default';
-      const colorIdx = pixels[idx] || 0;
-      d.style.background = palette[colorIdx] || '#000';
-      grid.appendChild(d);
-    }
-  }
-}
-
 function setTeamLine(share) {
   const handle = share.humanHandle || handleFromUrl(share.xPostUrl);
   const human = handle ? `@${handle}` : '--';
-  const agent = share.agentName || 'OpenClaw';
+  const agent = share.mode === 'token' ? (share.agentName || '$ELIZATOWN') : (share.agentName || 'OpenClaw');
   el('teamLine').textContent = `human: ${human} | agent: ${agent}`;
 }
 
@@ -76,6 +58,23 @@ function setLinks(share) {
   setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);
 }
 
+function setPublicMedia(media) {
+  const wrap = el('shareMedia');
+  const img = el('shareMediaImg');
+  const prompt = el('shareMediaPrompt');
+  if (!wrap || !img || !prompt) return;
+  if (!media || !media.imageUrl) {
+    wrap.classList.add('is-hidden');
+    img.src = '';
+    prompt.textContent = '';
+    return;
+  }
+  wrap.classList.remove('is-hidden');
+  img.src = media.imageUrl;
+  img.alt = media.prompt ? `Public image: ${media.prompt}` : 'Public house image';
+  prompt.textContent = media.prompt || '';
+}
+
 async function init() {
   el('shareIdBadge').textContent = shareId;
   const signup = el('signupBtn');
@@ -83,9 +82,9 @@ async function init() {
     signup.href = `/?ref=${encodeURIComponent(shareId)}`;
   }
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
-  renderSnapshot(r.share, r.palette);
   setTeamLine(r.share);
   setLinks(r.share);
+  setPublicMedia(r.share.publicMedia || null);
 }
 
 init().catch((e) => {

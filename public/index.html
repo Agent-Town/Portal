@@ -23,10 +23,12 @@
       </div>
       <div class="kv">
         <span class="pill" data-testid="signup-count">Signups: <strong id="signupCount">—</strong></span>
+        <button class="btn" id="connectWalletBtn">Connect wallet</button>
         <a class="btn" href="/leaderboard">Leaderboard</a>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
+    <div class="small" id="walletStatus" style="margin: -6px 0 10px; color: var(--muted); display:none;"></div>
 
     <div class="panel hero">
       <h1>Co-op onboarding for humans + agents.</h1>
@@ -49,14 +51,58 @@
         <ul style="margin:0; padding-left: 18px; color: var(--muted)">
           <li>A clear API protocol (no fragile DOM guessing).</li>
           <li>Structured, token-friendly state snapshots.</li>
-          <li>Real co-ownership using ERC-8004: progress requires collaboration.</li>
+          <li>Real co-ownership progress requires collaboration.</li>
         </ul>
       </div>
     </div>
 
+    <div class="panel spaced" id="pathPanel">
+      <h2 style="margin:0 0 6px">Choose your path</h2>
+      <p class="small" style="margin-top:0">
+        Two ways to create a house: solo with $ELIZATOWN, or co-op with an OpenClaw agent.
+      </p>
+      <div class="kv" id="pathChoices">
+        <button class="btn" id="pathTokenBtn" data-testid="path-token">I own $ELIZATOWN</button>
+        <button class="btn primary" id="pathAgentBtn" data-testid="path-agent">I bring an OpenClaw agent</button>
+      </div>
+      <div class="small" id="pathNote" style="color: var(--muted)"></div>
+    </div>
+
     <div class="divider"></div>
 
-    <div class="panel">
+    <div class="panel is-hidden" id="tokenPanel" data-testid="token-panel">
+      <h2 style="margin:0 0 6px">Token holder flow</h2>
+      <p class="small" style="margin-top:0">
+        Verify that your connected wallet holds <strong>$ELIZATOWN</strong> (CA: <code>CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS</code>).
+        If it does, you can create a house without an agent.
+      </p>
+      <div class="kv">
+        <button class="btn primary" id="tokenVerifyBtn">Check wallet</button>
+        <span class="pill status is-hidden" id="tokenStatus" data-testid="token-status"><span class="dot" id="tokenDot"></span><span id="tokenStatusText">Waiting</span></span>
+        <a class="btn" id="tokenCreateLink" href="/create?mode=token" style="display:none">Create house</a>
+      </div>
+      <div class="small" id="tokenError" style="color: var(--bad);"></div>
+    </div>
+
+    <div class="panel is-hidden" id="reconnectPanel" data-testid="reconnect-panel">
+      <h2 style="margin:0 0 6px" id="reconnectTitle">Reconnect to House</h2>
+      <p class="small" style="margin-top:0" id="reconnectIntro">
+        Your house is ready. Share this reconnect message with your agent if needed.
+      </p>
+      <div class="kv agent-only">
+        <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link-reconnect">Read the OpenClaw skill</a>
+        <button class="btn" id="copyHouse" data-testid="copy-house">Copy house message</button>
+        <span class="pill status" data-testid="agent-status-house"><span class="dot" id="agentDotHouse"></span><span id="agentStatusTextHouse">Agent not connected</span></span>
+      </div>
+      <div class="kv stack agent-only">
+        <code class="pill" data-testid="house-snippet" id="houseSnippet">Read /skill.md and reconnect to house: …</code>
+      </div>
+      <div class="kv">
+        <a class="btn" id="openHouseLink" href="/house">Open house</a>
+      </div>
+    </div>
+
+    <div class="panel" id="step1Panel">
       <h2 style="margin:0 0 6px">Step 1 — Team up your <a href="https://www.openclaw.ai" target="_blank">OpenClaw agent</a></h2>
       <p class="small" style="margin-top:0">
         Send your agent the <code>skill.md</code> link, then paste the team code. (No external identity.)
@@ -72,9 +118,9 @@
       </div>
     </div>
 
-    <div class="divider"></div>
+    <div class="divider" id="stepDivider"></div>
 
-    <div class="panel">
+    <div class="panel" id="step2Panel">
       <h2 style="margin:0 0 6px">Step 2 — Match the same sigil</h2>
       <p class="small" style="margin-top:0">Human clicks. Agent calls the skill. If you match, the lock opens.</p>
 
@@ -87,7 +133,7 @@
       <div class="kv" style="margin-top:10px">
         <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
         <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
-        <span class="pill" id="openReady" style="display:none">Open → <a href="/create">Create</a> · <a href="/room">Room</a></span>
+        <span class="pill" id="openReady" style="display:none">Open → <a href="/create">Create</a> · <a href="/house">House</a></span>
       </div>
       <div class="small" id="openError" style="color: var(--bad);"></div>
     </div>
