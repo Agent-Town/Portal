@@ -1,7 +1,9 @@
 const { test, expect } = require('@playwright/test');
 
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
 test.beforeEach(async ({ request }) => {
-  await request.post('/__test__/reset');
+  await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
 test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, request }) => {
@@ -48,10 +50,9 @@ test('ERC-8004 mint uses ag0 SDK (mock) and reports submitted', async ({ page, r
   await page.getByTestId('sigil-key').click();
   await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
 
-  // Press beta
-  await page.getByTestId('email').fill('test@example.com');
-  await page.getByTestId('beta-btn').click();
-  await request.post('/api/agent/beta/press', { data: { teamCode } });
+  // Press open
+  await page.getByTestId('open-btn').click();
+  await request.post('/api/agent/open/press', { data: { teamCode } });
   await page.waitForURL('**/create');
 
   // Agent ceremony

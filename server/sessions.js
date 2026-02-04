@@ -30,7 +30,7 @@ function createSession() {
       connected: false,
       name: null,
       selected: null,
-      betaPressed: false,
+      openPressed: false,
       optIn: null,
       posts: {
         moltbookUrl: null
@@ -38,9 +38,8 @@ function createSession() {
     },
     human: {
       selected: null,
-      betaPressed: false,
+      openPressed: false,
       optIn: null,
-      email: null,
       xPostUrl: null,
       xHandle: null
     },
@@ -108,9 +107,9 @@ function evaluateMatch(session) {
     session.match.matched = false;
     session.match.elementId = null;
     session.match.unlockedAt = null;
-    // Reset beta gating if the match breaks.
-    session.human.betaPressed = false;
-    session.agent.betaPressed = false;
+    // Reset open gating if the match breaks.
+    session.human.openPressed = false;
+    session.agent.openPressed = false;
   }
 }
 

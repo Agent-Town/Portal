@@ -147,6 +147,18 @@ async function init() {
     return new Uint8Array(digest);
   }
 
+  async function deriveRoomAuthKey(Kroot) {
+    const info = new TextEncoder().encode('elizatown-room-auth-v1');
+    const salt = new Uint8Array([]);
+    const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-256', salt, info },
+      baseKey,
+      256
+    );
+    return new Uint8Array(bits);
+  }
+
   async function deriveRhFromCanvas(pxs) {
     const raw = new TextEncoder().encode(JSON.stringify({ v: 1, pixels: pxs }));
     return sha256(raw);
@@ -219,6 +231,7 @@ async function init() {
       const Kroot = await sha256(combo);
       const roomIdBytes = await sha256(Kroot);
       const roomPubKey = base58Encode(roomIdBytes);
+      const roomAuthKey = b64(await deriveRoomAuthKey(Kroot));
 
       // 4) Create the room container on the server.
       // Key source of truth is the ceremony (K_root derived from Rh||Ra); we do NOT store K_root (wrapped or otherwise) at rest.
@@ -233,7 +246,8 @@ async function init() {
           roomPubKey,
           nonce,
           keyMode: 'ceremony',
-          unlock: { kind: 'solana-wallet-signature', address }
+          unlock: { kind: 'solana-wallet-signature', address },
+          roomAuthKey
         })
       });
 

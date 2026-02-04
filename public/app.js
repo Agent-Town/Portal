@@ -110,20 +110,20 @@ function updateUI(state) {
   el('matchState').textContent = matched ? 'UNLOCKED' : 'LOCKED';
   el('matchState').className = `state ${matched ? 'good' : 'bad'}`;
   el('matchDetail').textContent = matched
-    ? `Matched on “${state.match.elementId}”. Now press beta together.`
+    ? `Matched on “${state.match.elementId}”. Now press Open together.`
     : 'Pick the same sigil to unlock.';
 
-  // Beta panel gating
-  const betaBtn = el('betaBtn');
-  betaBtn.disabled = !matched;
+  // Open gating
+  const openBtn = el('openBtn');
+  openBtn.disabled = !matched;
 
   // Signup completion
   const complete = !!state.signup?.complete;
-  el('betaReady').style.display = complete ? 'inline-flex' : 'none';
+  el('openReady').style.display = complete ? 'inline-flex' : 'none';
 
   // Waiting pill: show if human pressed but not complete
-  const waiting = !!state.human?.betaPressed && !complete;
-  el('betaWaiting').style.display = waiting ? 'inline-flex' : 'none';
+  const waiting = !!state.human?.openPressed && !complete;
+  el('openWaiting').style.display = waiting ? 'inline-flex' : 'none';
 
   // Auto-redirect only once per completed signup.
   let freshComplete = false;
@@ -200,16 +200,15 @@ async function init() {
     }
   });
 
-  el('betaBtn').addEventListener('click', async () => {
-    el('betaError').textContent = '';
-    const email = el('email').value.trim();
+  el('openBtn').addEventListener('click', async () => {
+    el('openError').textContent = '';
     try {
-      await api('/api/human/beta/press', {
+      await api('/api/human/open/press', {
         method: 'POST',
-        body: JSON.stringify({ email })
+        body: JSON.stringify({})
       });
     } catch (e) {
-      el('betaError').textContent = e.message === 'INVALID_EMAIL' ? 'Enter a valid email.' : `Error: ${e.message}`;
+      el('openError').textContent = `Error: ${e.message}`;
     }
   });
 

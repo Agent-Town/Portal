@@ -94,6 +94,45 @@ async function aesGcmDecrypt(key, ivBytes, ctBytes, aadBytes) {
   return new Uint8Array(pt);
 }
 
+async function deriveRoomAuthKey(Kroot) {
+  const info = new TextEncoder().encode('elizatown-room-auth-v1');
+  const salt = new Uint8Array([]);
+  const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    baseKey,
+    256
+  );
+  return new Uint8Array(bits);
+}
+
+async function bodyHashB64(body) {
+  const bytes = body ? new TextEncoder().encode(body) : new Uint8Array([]);
+  const digest = await sha256(bytes);
+  return b64(digest);
+}
+
+async function roomAuthHeaders(roomId, method, url, body) {
+  if (!KauthKey) throw new Error('ROOM_AUTH_NOT_READY');
+  const ts = String(Date.now());
+  const path = new URL(url, window.location.origin).pathname;
+  const bodyHash = await bodyHashB64(body || '');
+  const msg = `${roomId}.${ts}.${method}.${path}.${bodyHash}`;
+  const sig = await crypto.subtle.sign('HMAC', KauthKey, new TextEncoder().encode(msg));
+  const auth = b64(new Uint8Array(sig));
+  return { 'x-room-ts': ts, 'x-room-auth': auth };
+}
+
+async function roomApi(roomId, url, opts = {}) {
+  const method = (opts.method || 'GET').toUpperCase();
+  const body = typeof opts.body === 'string' ? opts.body : '';
+  const headers = await roomAuthHeaders(roomId, method, url, body);
+  return api(url, {
+    ...opts,
+    headers: { ...(opts.headers || {}), ...headers }
+  });
+}
+
 // --- wallet ---
 let wallet = null;
 let walletAddr = null;
@@ -136,6 +175,8 @@ let unlocked = false;
 let room = null; // { roomId, roomPubKey, nonce }
 let KrootBytes = null; // Uint8Array (memory only)
 let Kenc = null; // CryptoKey for room log encryption
+let KauthBytes = null; // Uint8Array (memory only)
+let KauthKey = null; // CryptoKey for HMAC auth
 
 // Phase 3: store minted ERC-8004 ids locally (not persisted yet)
 let humanErc8004Id = null;
@@ -202,10 +243,9 @@ async function mintErc8004Identity() {
     if (!ok) return;
   }
 
-  // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
-  // We load it in the browser from esm.sh to avoid introducing a build step.
+  // Use a locally hosted Agent0 SDK bundle to avoid CDN supply-chain risk.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+  const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
   const mod = window.__AG0_SDK_MOCK ? window.__AG0_SDK_MOCK : await import(AGENT0_SDK_ESM_URL);
 
   const SDKClass = mod.SDK;
@@ -261,9 +301,7 @@ async function mintErc8004Identity() {
   const txHash = tx?.hash;
   const explorerBase = chainId === 1 ? 'https://etherscan.io/tx/' : 'https://sepolia.etherscan.io/tx/';
   if (status) {
-    status.innerHTML = txHash
-      ? `Submitted: <a href="${explorerBase}${txHash}" target="_blank" rel="noreferrer">${txHash}</a>`
-      : 'Submitted.';
+    status.textContent = txHash ? `Submitted: ${txHash}` : 'Submitted.';
   }
 
   // Wait for confirmation and then update the ERC-8004 statement.
@@ -320,6 +358,8 @@ function wipeKeys() {
   room = null;
   KrootBytes = null;
   Kenc = null;
+  KauthBytes = null;
+  KauthKey = null;
   el('entries').textContent = '';
   el('roomId').textContent = '—';
   clearDescriptorUI();
@@ -345,15 +385,6 @@ async function unlockExistingRoom(roomId) {
   setStatus('Unlocking room…');
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
 
-  const meta = await api(`/api/room/${encodeURIComponent(roomId)}/meta`);
-  const { roomPubKey, nonce, keyMode } = meta;
-
-  if (keyMode && keyMode !== 'ceremony') throw new Error('CEREMONY_ONLY');
-
-  // UX gate: require a wallet signature each session.
-  const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
-  await signMessage(msg);
-
   // Derive K_root from ceremony material (humanReveal + agentReveal) stored in the session.
   const mat = await api('/api/human/room/material');
   if (!mat.humanReveal || !mat.agentReveal) throw new Error('CEREMONY_INCOMPLETE');
@@ -364,10 +395,25 @@ async function unlockExistingRoom(roomId) {
   combo.set(Rh, 0);
   combo.set(Ra, Rh.length);
   const Kroot = await sha256(combo);
+  const roomIdBytes = await sha256(Kroot);
+  const derivedRoomId = base58Encode(roomIdBytes);
+  if (derivedRoomId !== roomId) throw new Error('ROOM_ID_MISMATCH');
 
-  room = { roomId, roomPubKey, nonce };
   KrootBytes = Kroot;
   Kenc = await deriveRoomEncKey(KrootBytes);
+  KauthBytes = await deriveRoomAuthKey(KrootBytes);
+  KauthKey = await crypto.subtle.importKey('raw', KauthBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+
+  const meta = await roomApi(roomId, `/api/room/${encodeURIComponent(roomId)}/meta`);
+  const { roomPubKey, nonce, keyMode } = meta;
+
+  if (keyMode && keyMode !== 'ceremony') throw new Error('CEREMONY_ONLY');
+
+  // UX gate: require a wallet signature each session.
+  const msg = buildUnlockMessage({ roomPubKey, nonce, origin: window.location.origin });
+  await signMessage(msg);
+
+  room = { roomId, roomPubKey, nonce };
   unlocked = true;
   el('roomId').textContent = room.roomId;
   setStatus('Unlocked (ceremony).');
@@ -393,10 +439,9 @@ async function appendEntry() {
   const enc = await aesGcmEncrypt(Kenc, pt, aad);
   const ciphertext = { alg: 'AES-GCM', iv: b64(enc.iv), ct: b64(enc.ct) };
 
-  await api(`/api/room/${encodeURIComponent(room.roomId)}/append`, {
-    method: 'POST',
-    body: JSON.stringify({ ciphertext, author: 'human' })
-  });
+  const url = `/api/room/${encodeURIComponent(room.roomId)}/append`;
+  const body = JSON.stringify({ ciphertext, author: 'human' });
+  await roomApi(room.roomId, url, { method: 'POST', body });
 
   el('entryText').value = '';
   await refreshEntries();
@@ -404,7 +449,7 @@ async function appendEntry() {
 
 async function refreshEntries() {
   if (!unlocked || !room || !Kenc) return;
-  const data = await api(`/api/room/${encodeURIComponent(room.roomId)}/log`);
+  const data = await roomApi(room.roomId, `/api/room/${encodeURIComponent(room.roomId)}/log`);
   const aad = new TextEncoder().encode(`room=${room.roomId}`);
   const lines = [];
   for (const entry of data.entries || []) {

@@ -7,7 +7,7 @@
    - Shows Team Code and “Read the skill” CTA.
    - Shows agent connection status.
    - Step 2: Sigil match (human click, agent API).
-   - Step 3: Beta press (both must press).
+   - Step 3: Open press (both must press).
 
 2. **Create** (`/create`)
    - 16×16 pixel canvas.
@@ -41,10 +41,10 @@
 
 ---
 
-## Secondary cooperative mechanic: Co-press beta
+## Secondary cooperative mechanic: Co-press Open
 
-- After unlock, the human enters email and clicks **Get Beta Access**.
-- The agent must also press via `/api/agent/beta/press`.
+- After unlock, the human clicks **Open**.
+- The agent must also press via `/api/agent/open/press`.
 - Only when both have pressed is the signup recorded and `/create` allowed.
 
 ---
@@ -69,8 +69,8 @@
 
 - Home shows Team Code within 1 second.
 - Home shows agent connection status.
-- Selecting matching sigils unlocks beta state.
-- After both press beta, the browser navigates to `/create`.
+- Selecting matching sigils unlocks the lock.
+- After both press Open, the browser navigates to `/create`.
 - On create page, agent painting is visible to human.
 - Share page displays a stable share URL.
 - If both opt in, leaderboard shows a new entry.

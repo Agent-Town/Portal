@@ -4,8 +4,8 @@ A minimal landing page teaser for **Agent Town**:
 
 - Human opens the site in a browser (session cookie)
 - Agent teams via a **Team Code** (no accounts)
-- Human + agent must **match the same sigil** to unlock beta
-- Human + agent both **press “Get Beta Access”**
+- Human + agent must **match the same sigil** to unlock
+- Human + agent both **press “Open”**
 - Human + agent **co-create** a tiny 16×16 pixel artifact
 - They can share it, and **optionally opt in** to appear on the public leaderboard (both must say yes)
 
@@ -34,7 +34,7 @@ The OpenClaw skill is served at:
 
 ## Key routes
 
-- `/` — teaming + match + beta
+- `/` — teaming + match + open
 - `/create` — shared pixel canvas
 - `/s/:id` — share page (public)
 - `/leaderboard` — leaderboard of opted-in teams

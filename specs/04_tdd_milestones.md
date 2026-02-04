@@ -19,12 +19,12 @@ Each milestone has a measurable “done” state validated by Playwright.
 ## M3 — Match unlock
 - Human selects a sigil.
 - Agent selects same.
-- UI shows UNLOCKED and enables beta button.
+- UI shows UNLOCKED and enables Open button.
 
 **Tests**: `e2e/02_match_unlock.spec.js`
 
-## M4 — Co-press beta
-- Human enters email and presses.
+## M4 — Co-press Open
+- Human presses Open.
 - Agent presses.
 - Browser navigates to `/create`.
 

@@ -1,10 +1,29 @@
 const { test, expect } = require('@playwright/test');
+const crypto = require('crypto');
+
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
+function sha256(buf) {
+  return crypto.createHash('sha256').update(buf).digest();
+}
+
+function hkdf(ikm, info, len = 32) {
+  return crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len);
+}
+
+function roomAuthHeaders(roomId, method, path, body, key) {
+  const ts = String(Date.now());
+  const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
+  const msg = `${roomId}.${ts}.${method}.${path}.${bodyHash}`;
+  const auth = crypto.createHmac('sha256', key).update(msg).digest('base64');
+  return { 'x-room-ts': ts, 'x-room-auth': auth };
+}
 
 test.beforeEach(async ({ request }) => {
-  await request.post('/__test__/reset');
+  await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('co-op beta -> co-create -> generate room -> unlock with wallet signature', async ({ page, request }) => {
+test('co-op open -> co-create -> generate room -> unlock with wallet signature', async ({ page, request }) => {
   // Mock a Solana wallet (Phantom-style) for Playwright.
   await page.addInitScript(() => {
     // Minimal mock matching usage in create.js/room.js
@@ -29,12 +48,11 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
   await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
   await expect(page.getByTestId('match-status')).toContainText('UNLOCKED');
 
-  // Press beta (human) with email, then agent presses
-  await page.getByTestId('email').fill('test@example.com');
-  await page.getByTestId('beta-btn').click();
-  await expect(page.getByTestId('beta-waiting')).toBeVisible();
+  // Press open (human), then agent presses
+  await page.getByTestId('open-btn').click();
+  await expect(page.getByTestId('open-waiting')).toBeVisible();
 
-  await request.post('/api/agent/beta/press', { data: { teamCode } });
+  await request.post('/api/agent/open/press', { data: { teamCode } });
 
   // Should auto-navigate to /create
   await page.waitForURL('**/create');
@@ -49,9 +67,9 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
 
   // Agent contributes to room ceremony (commit+reveal).
   // Use randomness to avoid deterministic roomId collisions when tests run in parallel workers.
-  const ra = require('crypto').randomBytes(32);
+  const ra = crypto.randomBytes(32);
   const raB64 = ra.toString('base64');
-  const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
+  const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
   await request.post('/api/agent/room/commit', { data: { teamCode, commit: raCommit } });
   await request.post('/api/agent/room/reveal', { data: { teamCode, reveal: raB64 } });
 
@@ -64,8 +82,15 @@ test('co-op beta -> co-create -> generate room -> unlock with wallet signature',
   const roomId = new URL(page.url()).searchParams.get('room');
   expect(roomId).toBeTruthy();
 
-  // /api/room/:id/meta should exist
-  const meta = await request.get(`/api/room/${roomId}/meta`);
+  // /api/room/:id/meta should exist (room-authenticated)
+  const matResp = await request.get(`/api/agent/room/material?teamCode=${encodeURIComponent(teamCode)}`);
+  const mat = await matResp.json();
+  const rh = Buffer.from(mat.humanReveal, 'base64');
+  const kroot = sha256(Buffer.concat([rh, ra]));
+  const kauth = hkdf(kroot, 'elizatown-room-auth-v1', 32);
+  const metaPath = `/api/room/${roomId}/meta`;
+  const metaHeaders = roomAuthHeaders(roomId, 'GET', metaPath, '', kauth);
+  const meta = await request.get(metaPath, { headers: metaHeaders });
   expect(meta.ok()).toBeTruthy();
 
   // Now unlock descriptor rendering.

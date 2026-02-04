@@ -311,7 +311,7 @@ code, pre {
 
 .lock .state.bad { color: var(--bad); }
 
-input[type="email"], input[type="url"] {
+input[type="url"] {
   width: 100%;
   border: 2px solid var(--border);
   border-radius: 8px;

@@ -1,8 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('crypto');
 
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
 test.beforeEach(async ({ request }) => {
-  await request.post('/__test__/reset');
+  await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
 function sha256(buf) {
@@ -12,6 +14,14 @@ function sha256(buf) {
 function hkdf(ikm, info, len = 32) {
   // Node >= 15
   return crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len);
+}
+
+function roomAuthHeaders(roomId, method, path, body, key) {
+  const ts = String(Date.now());
+  const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
+  const msg = `${roomId}.${ts}.${method}.${path}.${bodyHash}`;
+  const auth = crypto.createHmac('sha256', key).update(msg).digest('base64');
+  return { 'x-room-ts': ts, 'x-room-auth': auth };
 }
 
 function aesGcmEncrypt(key32, plaintext, aad) {
@@ -45,10 +55,9 @@ test('agent derives ceremony key and appends; human can decrypt in room UI', asy
   await page.getByTestId('sigil-key').click();
   await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
 
-  // Press beta
-  await page.getByTestId('email').fill('test@example.com');
-  await page.getByTestId('beta-btn').click();
-  await request.post('/api/agent/beta/press', { data: { teamCode } });
+  // Press open
+  await page.getByTestId('open-btn').click();
+  await request.post('/api/agent/open/press', { data: { teamCode } });
   await page.waitForURL('**/create');
 
   // Agent ceremony
@@ -79,6 +88,7 @@ test('agent derives ceremony key and appends; human can decrypt in room UI', asy
   const combo = Buffer.concat([rh, ra]);
   const kroot = sha256(combo);
   const kenc = hkdf(kroot, 'elizatown-room-enc-v1', 32);
+  const kauth = hkdf(kroot, 'elizatown-room-auth-v1', 32);
 
   // Encrypt an entry as the agent.
   const payload = {
@@ -99,7 +109,13 @@ test('agent derives ceremony key and appends; human can decrypt in room UI', asy
     ct: enc.ct.toString('base64')
   };
 
-  const appendResp = await request.post(`/api/room/${roomId}/append`, { data: { ciphertext, author: 'agent' } });
+  const appendPath = `/api/room/${roomId}/append`;
+  const appendBody = JSON.stringify({ ciphertext, author: 'agent' });
+  const headers = roomAuthHeaders(roomId, 'POST', appendPath, appendBody, kauth);
+  const appendResp = await request.post(appendPath, {
+    data: appendBody,
+    headers: { 'content-type': 'application/json', ...headers }
+  });
   expect(appendResp.ok()).toBeTruthy();
 
   // Human unlocks and can decrypt it.

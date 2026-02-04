@@ -61,15 +61,12 @@ Agent-friendly state snapshot.
 
 ---
 
-## Beta press
+## Open press
 
-### POST `/api/human/beta/press`
-Body:
-```json
-{ "email": "you@domain.com" }
-```
+### POST `/api/human/open/press`
+Body: `{}` (empty)
 
-### POST `/api/agent/beta/press`
+### POST `/api/agent/open/press`
 Body:
 ```json
 { "teamCode": "TEAM-ABCD-EFGH" }
@@ -77,8 +74,7 @@ Body:
 
 Signup is recorded only when:
 - `match.matched === true`
-- **both** betaPressed are true
-- email is valid
+- **both** openPressed are true
 
 ---
 
@@ -113,7 +109,7 @@ Returns `EMPTY_CANVAS` if no pixels are painted.
 
 Response:
 ```json
-{ "ok": true, "shareId": "sh_...", "sharePath": "/s/sh_...", "managePath": "/share/sh_..." }
+{ "ok": true, "shareId": "sh_...", "sharePath": "/s/sh_...", "managePath": "/share/sh_...?k=MANAGE_TOKEN" }
 ```
 
 ### GET `/api/share/:id`
@@ -148,7 +144,7 @@ Body:
 ```
 Optional (when calling from a fresh session on `/s/:id`):
 ```json
-{ "shareId": "sh_...", "xPostUrl": "https://x.com/..." }
+{ "shareId": "sh_...", "manageToken": "MANAGE_TOKEN", "xPostUrl": "https://x.com/..." }
 ```
 Can be called before a share is created; values are stored on the session and applied when the share is created.
 Returns `HANDLE_TAKEN` if the X handle is already used by another team.
@@ -171,7 +167,7 @@ Body:
 ```
 Optional (when calling from a fresh session on `/s/:id`):
 ```json
-{ "shareId": "sh_...", "appear": true }
+{ "shareId": "sh_...", "manageToken": "MANAGE_TOKEN", "appear": true }
 ```
 
 ### POST `/api/agent/optin`
@@ -187,3 +183,53 @@ Returns:
 - `signups` count
 - `referralsTotal` (total referrals across teams)
 - `teams[]` (public teams, sorted by referrals; each includes `referrals`)
+
+---
+
+## Rooms (ceremony + E2EE)
+
+### POST `/api/room/init` (human)
+Body:
+```json
+{
+  "roomId": "<base58>",
+  "roomPubKey": "<base58>",
+  "nonce": "n_...",
+  "keyMode": "ceremony",
+  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "roomAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-room-auth-v1)>"
+}
+```
+
+### Room auth headers (required)
+For these endpoints:
+- `GET /api/room/:id/meta`
+- `GET /api/room/:id/log`
+- `POST /api/room/:id/append`
+
+Send:
+- `x-room-ts`: unix ms timestamp as string
+- `x-room-auth`: base64(HMAC-SHA256(K_auth, message))
+
+Where:
+- `K_auth = HKDF-SHA256(K_root, info="elizatown-room-auth-v1", len=32)`
+- `bodyHash = base64(sha256(rawBody))` (empty body for GET)
+- `message = "${roomId}.${ts}.${method}.${path}.${bodyHash}"`
+
+### GET `/api/room/:id/meta`
+Returns:
+```json
+{ "ok": true, "roomId": "...", "roomPubKey": "...", "nonce": "...", "keyMode": "ceremony" }
+```
+
+### GET `/api/room/:id/log`
+Returns:
+```json
+{ "ok": true, "entries": [ { "ciphertext": { "iv": "...", "ct": "..." } } ] }
+```
+
+### POST `/api/room/:id/append`
+Body:
+```json
+{ "author": "human", "ciphertext": { "alg": "AES-GCM", "iv": "...", "ct": "..." } }
+```

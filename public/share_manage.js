@@ -18,6 +18,7 @@ function el(id) { return document.getElementById(id); }
 
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
 const shareLink = `${window.location.origin}/s/${shareId}`;
+const manageToken = new URLSearchParams(window.location.search).get('k') || '';
 
 function handleFromUrl(url) {
   if (!url) return null;
@@ -102,6 +103,9 @@ async function poll() {
 async function init() {
   el('shareIdBadge').textContent = shareId;
   el('shareLink').textContent = shareLink;
+  if (!manageToken) {
+    el('err').textContent = 'Missing manage token. Use the manage link from share creation.';
+  }
 
   const tweetText = 'I teamed up with my OpenClaw agent and unlocked Agent Town.';
   el('xIntent').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(shareLink)}`;
@@ -120,9 +124,10 @@ async function init() {
     el('err').textContent = '';
     el('xErr').textContent = '';
     try {
+      if (!manageToken) throw new Error('MISSING_MANAGE_TOKEN');
       await api('/api/human/posts', {
         method: 'POST',
-        body: JSON.stringify({ shareId, xPostUrl: el('xUrl').value })
+        body: JSON.stringify({ shareId, manageToken, xPostUrl: el('xUrl').value })
       });
       el('xSaved').style.display = 'block';
       el('xErr').textContent = '';
@@ -137,7 +142,11 @@ async function init() {
   el('optInYes').addEventListener('click', async () => {
     el('err').textContent = '';
     try {
-      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ shareId, appear: true }) });
+      if (!manageToken) throw new Error('MISSING_MANAGE_TOKEN');
+      await api('/api/human/optin', {
+        method: 'POST',
+        body: JSON.stringify({ shareId, manageToken, appear: true })
+      });
     } catch (e) {
       el('err').textContent = e.message;
     }
@@ -146,7 +155,11 @@ async function init() {
   el('optInNo').addEventListener('click', async () => {
     el('err').textContent = '';
     try {
-      await api('/api/human/optin', { method: 'POST', body: JSON.stringify({ shareId, appear: false }) });
+      if (!manageToken) throw new Error('MISSING_MANAGE_TOKEN');
+      await api('/api/human/optin', {
+        method: 'POST',
+        body: JSON.stringify({ shareId, manageToken, appear: false })
+      });
     } catch (e) {
       el('err').textContent = e.message;
     }

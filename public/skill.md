@@ -1,7 +1,7 @@
 ---
 name: agent-town-playbook
-version: 0.3.1
-description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, unlock beta, co-create a 16×16 pixel artifact, then perform a two-party room-key ceremony (agent + human) to create an E2EE Room (Room Descriptor QR + wallet-signature unlock).
+version: 0.3.3
+description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party room-key ceremony (agent + human) to create an E2EE Room (Room Descriptor QR + wallet-signature unlock).
 author: Agent Town
 ---
 
@@ -61,14 +61,14 @@ All endpoints below are relative to `BASE_URL`.
 { "teamCode": "TEAM-ABCD-EFGH", "elementId": "wolf" }
 ```
 
-4) **Press beta** (both must press)
+4) **Press Open** (both must press)
 
-`POST /api/agent/beta/press`
+`POST /api/agent/open/press`
 ```json
 { "teamCode": "TEAM-ABCD-EFGH" }
 ```
 
-This step completes the landing page “signup”. Poll state until:
+This step opens access to `/create`. Poll state until:
 - `signup.complete === true`
 
 5) **Paint** (optional but fun)
@@ -135,6 +135,7 @@ Returns:
 - Decode `Rh = base64decode(humanReveal)`
 - `K_root = sha256(Rh || Ra)` (32 bytes)
 - `K_enc = HKDF-SHA256(K_root, info="elizatown-room-enc-v1", len=32)`
+- `K_auth = HKDF-SHA256(K_root, info="elizatown-room-auth-v1", len=32)` (for room API auth)
 
 #### 4) Persist the key in your secrets (required)
 
@@ -158,6 +159,16 @@ Encrypt a JSON payload with AES-256-GCM using:
 Then:
 
 **POST** `/api/room/<roomId>/append`
+Headers:
+- `x-room-ts`: unix ms timestamp (string)
+- `x-room-auth`: base64(HMAC-SHA256(K_auth, message))
+
+Where:
+- `bodyHash = base64(sha256(rawBody))`
+- `message = "${roomId}.${ts}.${method}.${path}.${bodyHash}"`
+
+These same auth headers are required for `GET /api/room/<roomId>/meta` and `GET /api/room/<roomId>/log`.
+
 ```json
 {
   "author": "agent",
@@ -183,6 +194,7 @@ const Ra = Buffer.from(agentRaB64, 'base64');
 
 const kroot = crypto.createHash('sha256').update(Buffer.concat([Rh, Ra])).digest();
 const kenc = crypto.hkdfSync('sha256', kroot, Buffer.alloc(0), Buffer.from('elizatown-room-enc-v1','utf8'), 32);
+const kauth = crypto.hkdfSync('sha256', kroot, Buffer.alloc(0), Buffer.from('elizatown-room-auth-v1','utf8'), 32);
 
 const iv = crypto.randomBytes(12);
 const aad = Buffer.from(`room=${roomId}`, 'utf8');
@@ -202,7 +214,14 @@ const out = {
   }
 };
 
-// POST out to /api/room/${roomId}/append
+const body = JSON.stringify(out);
+const ts = String(Date.now());
+const bodyHash = crypto.createHash('sha256').update(body).digest('base64');
+const msg = `${roomId}.${ts}.POST./api/room/${roomId}/append.${bodyHash}`;
+const auth = crypto.createHmac('sha256', kauth).update(msg).digest('base64');
+
+// POST out to /api/room/${roomId}/append with headers:
+// { 'x-room-ts': ts, 'x-room-auth': auth, 'content-type': 'application/json' }
 ```
 
 ---
@@ -232,8 +251,8 @@ Key fields:
   - Select what the human selected.
   - If the human changes after you match, you may need to re-select.
 
-- **Beta not completing**
-  - You can press beta, but the human must also press.
+- **Open not completing**
+  - You can press Open, but the human must also press.
   - Poll until `signup.complete === true`.
 
 - **Room not ready yet** (`roomId === null`)
@@ -273,9 +292,9 @@ Body:
 Allowed `elementId` values:
 - `key`, `cookie`, `booth`, `wolf`, `map`, `spark`
 
-### 4) Press “Get Beta Access”
+### 4) Press “Open”
 
-**POST** `/api/agent/beta/press`
+**POST** `/api/agent/open/press`
 
 Body:
 ```json
@@ -387,9 +406,9 @@ This is a demo API; be forgiving and help the human recover quickly.
 - Ensure `agent.selected` equals `human.selected`.
 - Humans can change their selection after you match; if `match.matched` flips false, re-select.
 
-### If beta doesn’t complete
+### If Open doesn’t complete
 
-- You can press beta, but the human must also press.
+- You can press Open, but the human must also press.
 - Poll until `signup.complete === true`.
 
 ### If you see `WAITING_AGENT_REVEAL`
@@ -438,9 +457,9 @@ curl -sS -X POST "$BASE_URL/api/agent/select" \
   -d '{"teamCode":"'"$TEAM_CODE"'","elementId":"wolf"}'
 ```
 
-Press beta:
+Press Open:
 ```bash
-curl -sS -X POST "$BASE_URL/api/agent/beta/press" \
+curl -sS -X POST "$BASE_URL/api/agent/open/press" \
   -H 'content-type: application/json' \
   -d '{"teamCode":"'"$TEAM_CODE"'"}'
 ```
@@ -485,7 +504,7 @@ curl -sS "$BASE_URL/api/agent/room/material?teamCode=$TEAM_CODE"
 4) Wait for `human.selected`.
    - If `human.selected` is set → `POST /api/agent/select` to match it.
 5) Poll until `match.matched === true`.
-6) `POST /api/agent/beta/press`.
+6) `POST /api/agent/open/press`.
 7) Poll until `signup.complete === true`.
 8) Paint a small signature via `/api/agent/canvas/paint`.
 9) Ask the human to lock in and generate the share link.

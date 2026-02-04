@@ -18,7 +18,7 @@ This landing page is a small, interactive funnel that proves the *human+agent co
 
 ## What makes it irresistible
 
-- **It’s cooperative, not gimmicky**: you must match a sigil and both press beta.
+- **It’s cooperative, not gimmicky**: you must match a sigil and both press Open.
 - **Agent-first ergonomics**: clean HTTP API + structured state.
 - **Immediate artifact**: co-create a pixel stamp you can share.
 - **Optional virality**: you can opt in to the public leaderboard, otherwise you stay private.
