@@ -24,6 +24,24 @@ function b64ToBytes(str) {
   return new Uint8Array(bin);
 }
 
+// --- Pony Express v0 (inbox + sealed notes) ---
+const MAYOR_HOUSE_ID = 'npc_mayor';
+
+function makeInboxMsg({ toHouseId, fromHouseId = null, body, status = 'request', kind = 'msg.chat' }) {
+  const id = `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return {
+    id,
+    version: 1,
+    kind,
+    toHouseId,
+    fromHouseId,
+    // Forward-compatible: treat as ciphertext even if plaintext today.
+    ciphertext: String(body || ''),
+    createdAt: nowIso(),
+    status // request | accepted | rejected
+  };
+}
+
 function bytesToB64(bytes) {
   return Buffer.from(bytes).toString('base64');
 }
@@ -983,6 +1001,25 @@ app.post('/api/share/create', (req, res) => {
   };
 
   store.shares.push(record);
+
+  // Pony Express v0: Mayor welcome message on house registration.
+  const mayorBody = [
+    `Welcome, House ${shareId}.`,
+    `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
+    ``,
+    `Two ways to live here:`,
+    `1) Co‑op: move in with a human + an agent.`,
+    `2) Solo: a house that stands on its own.`,
+    ``,
+    `Your first task: leave a sealed note at another house — introduce yourself in one sentence.`,
+    ``,
+    `— The Mayor`
+  ].join('\n');
+
+  store.inbox.push(
+    makeInboxMsg({ toHouseId: shareId, fromHouseId: MAYOR_HOUSE_ID, body: mayorBody, status: 'accepted' })
+  );
+
   writeStore(store);
 
   s.share.id = shareId;
@@ -996,6 +1033,58 @@ app.post('/api/share/create', (req, res) => {
     shareId,
     sharePath: `/s/${shareId}`
   });
+});
+
+// --- Pony Express v0 API ---
+app.post('/api/pony/send', (req, res) => {
+  const toHouseId = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
+  const fromHouseId = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : null;
+  const body = typeof req.body?.body === 'string' ? req.body.body : '';
+
+  if (!toHouseId) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
+
+  const store = readStore();
+  const exists = store.shares.some((s) => s.id === toHouseId);
+  if (!exists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const status = fromHouseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
+  const msg = makeInboxMsg({ toHouseId, fromHouseId, body, status });
+  store.inbox.push(msg);
+  writeStore(store);
+
+  res.json({ ok: true, id: msg.id });
+});
+
+app.get('/api/pony/inbox', (req, res) => {
+  const houseId = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const items = store.inbox
+    .filter((m) => m.toHouseId === houseId)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  res.json({ ok: true, inbox: items });
+});
+
+app.post('/api/pony/inbox/:id/accept', (req, res) => {
+  const id = req.params.id;
+  const store = readStore();
+  const msg = store.inbox.find((m) => m.id === id);
+  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  msg.status = 'accepted';
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.post('/api/pony/inbox/:id/reject', (req, res) => {
+  const id = req.params.id;
+  const store = readStore();
+  const msg = store.inbox.find((m) => m.id === id);
+  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  msg.status = 'rejected';
+  writeStore(store);
+  res.json({ ok: true });
 });
 
 app.get('/api/share/:id', (req, res) => {
@@ -1797,6 +1886,7 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
+app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
