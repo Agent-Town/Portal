@@ -1,7 +1,9 @@
 const { test, expect } = require('@playwright/test');
 
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
 test.beforeEach(async ({ request }) => {
-  await request.post('/__test__/reset');
+  await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
 test('home loads, shows team code and skill link', async ({ page, request }) => {
