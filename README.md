@@ -32,6 +32,24 @@ npm test
 
 Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
 
+Optional local integration check (reused Sepolia wallet, no auto-faucet):
+```bash
+REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
+```
+
+Notes:
+- Setup command:
+```bash
+npm run setup:sepolia-wallet
+```
+- First run creates `data/local.sepolia.wallet.json` and prompts for your persistent EVM wallet address.
+- Test checks on-chain Sepolia ETH balance and fails with the faucet URL if below threshold.
+- Override threshold with `MIN_SEPOLIA_ETH` (default `0.001`).
+- Non-interactive setup (automation):
+```bash
+npm run setup:sepolia-wallet -- --address 0x... --no-balance-check
+```
+
 ## Agent integration
 - The agent skill is served at `/skill.md` (source: `public/skill.md`).
 - Core agent endpoints: `/api/agent/connect`, `/api/agent/state`, `/api/agent/select`, `/api/agent/open/press`.

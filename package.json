@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "node server/index.js",
+    "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
