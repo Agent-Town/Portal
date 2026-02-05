@@ -20,7 +20,7 @@ test('token holder can create a house without an agent', async ({ page }) => {
 
   await page.goto('/');
 
-  await page.getByTestId('path-token').click();
+  await page.getByTestId('path-human').click();
   await page.getByRole('button', { name: 'Check wallet' }).click();
   await expect(page.getByTestId('token-status')).toContainText('Verified');
 
