@@ -209,13 +209,35 @@ async function mintErc8004Identity() {
   }
 
   // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
-  // We load it in the browser from esm.sh to avoid introducing a build step.
+  // Prefer a vendored same-origin bundle for reliability (CSP/adblock/CDN flake).
+  // Fallback to esm.sh if the vendored import fails.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
+  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.1.4.2.bundle.mjs';
   const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
-  const mod = window.__AG0_SDK_MOCK ? window.__AG0_SDK_MOCK : await import(AGENT0_SDK_ESM_URL);
 
-  const SDKClass = mod.SDK;
-  if (typeof SDKClass !== 'function') throw new Error('AG0_SDK_LOAD_FAILED');
+  let mod;
+  if (window.__AG0_SDK_MOCK) {
+    mod = window.__AG0_SDK_MOCK;
+  } else {
+    try {
+      mod = await import(AGENT0_SDK_LOCAL_URL);
+    } catch (eLocal) {
+      console.warn('Agent0 SDK local import failed; falling back to esm.sh', eLocal);
+      try {
+        mod = await import(AGENT0_SDK_ESM_URL);
+      } catch (eRemote) {
+        console.error('Agent0 SDK esm.sh import also failed', eRemote);
+        const detail = (eRemote && (eRemote.stack || eRemote.message)) || String(eRemote);
+        throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}`);
+      }
+    }
+  }
+
+  const SDKClass = mod && mod.SDK;
+  if (typeof SDKClass !== 'function') {
+    const keys = mod ? Object.keys(mod) : [];
+    throw new Error(`AG0_SDK_LOAD_FAILED: missing SDK export (keys: ${keys.join(', ')})`);
+  }
 
   // Ensure wallet is connected
   const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
