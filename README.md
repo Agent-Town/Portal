@@ -1,18 +1,23 @@
-# Agent Town Landing (Co-op Match)
+# Agent Town Landing (Co-op + Houses)
 
-A minimal landing page teaser for **Agent Town**:
+A minimal landing page for Agent Town with two entry paths:
+- Co-op unlock with a human + OpenClaw agent (Team Code + sigil match + dual Open press).
+- Token-holder solo unlock using $ELIZATOWN on Solana.
 
-- Human opens the site in a browser (session cookie)
-- Agent teams via a **Team Code** (no accounts)
-- Human + agent must **match the same sigil** to unlock beta
-- Human + agent both **press “Get Beta Access”**
-- Human + agent **co-create** a tiny 16×16 pixel artifact
-- They can share it, and **optionally opt in** to appear on the public leaderboard (both must say yes)
+The only identity is a session cookie for the human and a Team Code for the agent. No external auth providers.
 
-This is intentionally **minimal** and designed for agent-friendly co-op onboarding.
+## Flow summary
+1. Human visits `/` and gets a Team Code (session cookie `et_session`).
+2. Agent connects via API, matches the same sigil, and both press Open.
+3. `/create` opens a 16x16 co-op pixel canvas to generate entropy.
+4. House ceremony combines human + agent entropy to derive a `houseId` and shared keys.
+5. `/house?house=...` unlocks with a Solana wallet signature and shows a descriptor QR, ERC-8004 statement, and optional ERC-8004 mint (Agent0 SDK).
+6. Create a public share link and show up on the leaderboard; referrals are counted.
+
+Token-holder path:
+Use the token check on `/` to verify a Solana wallet holds $ELIZATOWN, then create a house without an agent via `/create?mode=token`.
 
 ## Quickstart
-
 ```bash
 npm install
 npm run dev
@@ -20,26 +25,55 @@ npm run dev
 
 Open http://localhost:4173
 
-## Run tests
-
+## Tests
 ```bash
 npm test
 ```
 
+Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
+
 ## Agent integration
-
-The OpenClaw skill is served at:
-
-- http://localhost:4173/skill.md
+- The agent skill is served at `/skill.md` (source: `public/skill.md`).
+- Core agent endpoints: `/api/agent/connect`, `/api/agent/state`, `/api/agent/select`, `/api/agent/open/press`.
+- Co-op actions: `/api/agent/canvas/paint`, `/api/agent/house/*`.
+- House API auth and ceremony details are documented in `specs/02_api_contract.md`.
 
 ## Key routes
+- `/` — onboarding, Team Code, token check, reconnect.
+- `/create` — co-op canvas + house generation.
+- `/house` — house unlock, descriptor QR, ERC-8004, encrypted log.
+- `/s/:id` — public share page.
+- `/leaderboard` — public teams and referrals (`/wall` redirects here).
 
-- `/` — teaming + match + beta
-- `/create` — shared pixel canvas
-- `/s/:id` — share page (public)
-- `/leaderboard` — leaderboard of opted-in teams
+## Data + storage
+- Store file: `data/store.json` (or `STORE_PATH`).
+- Test store: `data/store.test.json` when `NODE_ENV=test`.
+- Session state is in memory; signups/shares/public teams/houses persist in the store.
 
-## Notes
+## Security model (data)
+House entries are end-to-end encrypted. The server only stores ciphertext and never sees plaintext.
 
-- Data is stored in `data/store.json` (in-memory sessions; persistent leaderboard/signups/shares).
-- In Playwright tests, the store uses `data/store.test.json` and resets via `POST /__test__/reset`.
+What the server stores:
+- Encrypted house log entries (`ciphertext` only).
+- House metadata, including a wallet-wrapped `K_root` (`keyWrap`) for recovery.
+- `houseAuthKey` (HMAC key) for authenticating `/api/house/:id/*` requests.
+
+What the server does not store:
+- The raw `K_root` or `K_enc` used to decrypt entries.
+- Any unencrypted house content.
+- The `keyWrapSig` (clients re-sign the wrap message during recovery).
+
+Unlocking a house in the UI is gated by a Solana wallet signature. Decryption happens client-side after deriving keys from the ceremony materials.
+
+## Environment variables
+- `PORT` (default `4173`)
+- `NODE_ENV` (`production` enables HTTPS redirect + HSTS; `test` enables reset endpoint)
+- `STORE_PATH` (override store file)
+- `SOLANA_RPC_URL` (token check RPC, default mainnet-beta)
+- `TEST_RESET_TOKEN` (required for `/__test__/reset` in tests)
+- `TEST_TOKEN_ADDRESS` (test-only override for token-holder flow)
+
+## Specs
+- API contract: `specs/02_api_contract.md`
+- Experience flow: `specs/01_experience_flow.md`
+- TDD milestones: `specs/04_tdd_milestones.md`
