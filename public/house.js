@@ -599,7 +599,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
   });
 
   if (discoverable) {
-    setAnchorStatus('Registering for messaging…');
+    setAnchorStatus('Publishing mapping…');
     await api('/api/anchors/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -615,7 +615,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
     });
   }
 
-  setAnchorStatus(discoverable ? 'Linked + registered.' : 'Linked.');
+  setAnchorStatus(discoverable ? 'Linked + published.' : 'Linked.');
   setTimeout(() => setAnchorStatus(''), 1200);
   await refreshEntries();
 }

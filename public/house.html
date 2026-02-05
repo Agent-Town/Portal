@@ -94,7 +94,7 @@
       <h2 style="margin:0 0 6px">Anchors (private vault)</h2>
       <p class="small" style="margin-top:0">
         Link this house to an ERC-8004 identity. The link is stored <strong>encrypted</strong> inside the house vault.
-        Nothing is published publicly unless you choose to share it.
+        The house mailbox exists regardless — publishing only makes this alias discoverable for routing.
       </p>
 
       <div class="row" style="gap: 10px; align-items: end;">
@@ -104,7 +104,7 @@
           <div class="small" style="margin-top:6px; color: var(--muted)">We store the ID exactly as Agent0 returns it (includes chainId).</div>
           <label class="small" style="margin-top:10px; display:flex; gap:8px; align-items:center; color: var(--muted)">
             <input id="anchorDiscoverable" type="checkbox" checked />
-            Make discoverable for messaging
+            Publish ERC-8004 → house mapping (discoverable)
           </label>
         </div>
         <div class="kv">
