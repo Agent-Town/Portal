@@ -32,7 +32,7 @@ npm test
 
 Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
 
-Optional local integration check (reused Sepolia wallet, no auto-faucet):
+Optional local integration check (reused Sepolia wallet):
 ```bash
 REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
 ```
@@ -42,12 +42,21 @@ Notes:
 ```bash
 npm run setup:sepolia-wallet
 ```
-- First run creates `data/local.sepolia.wallet.json` and prompts for your persistent EVM wallet address.
+- Fresh setup auto-generates an EVM private key + address and stores it in `data/local.sepolia.wallet.json`.
+- If balance is below threshold on fresh generation, setup attempts a Google Sepolia faucet request automatically.
 - Test checks on-chain Sepolia ETH balance and fails with the faucet URL if below threshold.
 - Override threshold with `MIN_SEPOLIA_ETH` (default `0.001`).
 - Non-interactive setup (automation):
 ```bash
-npm run setup:sepolia-wallet -- --address 0x... --no-balance-check
+npm run setup:sepolia-wallet -- --no-balance-check
+```
+- Provide your own wallet:
+```bash
+npm run setup:sepolia-wallet -- --address 0x...
+```
+- Disable faucet automation:
+```bash
+npm run setup:sepolia-wallet -- --no-faucet
 ```
 
 ## Agent integration

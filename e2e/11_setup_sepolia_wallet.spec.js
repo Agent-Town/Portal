@@ -13,9 +13,8 @@ test.beforeEach(async ({ request }) => {
 test('setup script writes reusable local sepolia wallet config', async () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'et-wallet-'));
   const walletFile = path.join(tmpDir, 'local.sepolia.wallet.json');
-  const address = '0x1111111111111111111111111111111111111111';
 
-  const run = spawnSync('node', ['scripts/setup_sepolia_wallet.js', '--address', address, '--no-balance-check'], {
+  const run = spawnSync('node', ['scripts/setup_sepolia_wallet.js', '--no-balance-check'], {
     cwd: process.cwd(),
     env: { ...process.env, LOCAL_SEPOLIA_WALLET_FILE: walletFile },
     encoding: 'utf8'
@@ -25,11 +24,12 @@ test('setup script writes reusable local sepolia wallet config', async () => {
   expect(fs.existsSync(walletFile)).toBeTruthy();
 
   const parsed = JSON.parse(fs.readFileSync(walletFile, 'utf8'));
-  expect(parsed.address).toBe(address);
+  expect(parsed.address).toMatch(/^0x[0-9a-f]{40}$/);
+  expect(parsed.privateKey).toMatch(/^0x[0-9a-f]{64}$/);
   expect(parsed.network).toBe('sepolia');
   expect(typeof parsed.updatedAt).toBe('string');
 
-  const rerun = spawnSync('node', ['scripts/setup_sepolia_wallet.js', '--address', address, '--no-balance-check'], {
+  const rerun = spawnSync('node', ['scripts/setup_sepolia_wallet.js', '--no-balance-check'], {
     cwd: process.cwd(),
     env: { ...process.env, LOCAL_SEPOLIA_WALLET_FILE: walletFile },
     encoding: 'utf8'
@@ -37,5 +37,6 @@ test('setup script writes reusable local sepolia wallet config', async () => {
 
   expect(rerun.status).toBe(0);
   const parsed2 = JSON.parse(fs.readFileSync(walletFile, 'utf8'));
-  expect(parsed2.address).toBe(address);
+  expect(parsed2.address).toBe(parsed.address);
+  expect(parsed2.privateKey).toBe(parsed.privateKey);
 });

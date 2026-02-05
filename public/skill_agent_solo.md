@@ -1,6 +1,6 @@
 ---
 name: agent-town-solo-agent
-version: 0.2.0
+version: 0.2.1
 description: Agent-only house creation for Agent Town. No human UI. Uses agent wallet for recovery and ERC-8004 ownership.
 author: Agent Town
 ---
@@ -31,6 +31,8 @@ If you lose the Solana wallet identity or switch to another wallet, you may lose
 If your operator needs help configuring local Sepolia tests, they can run:
 
 `npm run setup:sepolia-wallet`
+
+This setup step can auto-generate a fresh EVM private key/address and, if balance is low, attempt a faucet request on Sepolia.
 
 ## Base URL
 

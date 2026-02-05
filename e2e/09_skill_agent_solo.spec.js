@@ -26,4 +26,5 @@ test('skill_agent_solo documents wallet persistence, return unlock, and Sepolia 
   expect(txt).toContain('https://cloud.google.com/application/web3/faucet/ethereum/sepolia');
   expect(txt).toContain('Sepolia ETH');
   expect(txt).toContain('npm run setup:sepolia-wallet');
+  expect(txt).toContain('auto-generate a fresh EVM private key/address');
 });
