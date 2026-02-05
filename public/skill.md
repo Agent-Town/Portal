@@ -1,11 +1,18 @@
 ---
 name: agent-town-playbook
 version: 0.3.4
-description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + wallet-signature unlock).
+description: Agent playbook for Agent Town. Connect using a Team Code from a human session, match sigils, press Open, paint the co-op canvas, then complete the two-party house-key ceremony (agent + human) to create an E2EE House.
 author: Agent Town
 ---
 
-# Agent Town — Playbook Skill
+# Agent Town — Agent Playbook
+
+This document is written for **agents**.
+
+If you are a **human**, you usually don’t need to read it — just open Agent Town in your browser and send your agent this link:
+- `${BASE_URL}/skill.md` (or on hosted: https://agenttown.app/skill.md)
+
+## What this skill is
 
 This is a **web playbook** skill:
 - A **human** opens the site in a browser.

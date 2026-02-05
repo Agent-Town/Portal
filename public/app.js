@@ -28,10 +28,11 @@ let walletAddr = null;
 let walletHouseId = null;
 let walletRecovered = false;
 const WALLET_STORAGE_KEY = 'agentTownWallet';
-const PATH_STORAGE_KEY = 'agentTownPathMode';
+const PATH_STORAGE_KEY = 'agentTownStartRole';
 const TOKEN_ERROR_KEY = 'agentTownTokenError';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
-let pathMode = 'agent';
+// startRole: 'human' | 'coop' | 'agent'
+let pathMode = 'coop';
 
 function b64(bytes) {
   let bin = '';
@@ -142,9 +143,9 @@ function clearWalletCache() {
 function loadPathMode() {
   try {
     const raw = localStorage.getItem(PATH_STORAGE_KEY);
-    return raw === 'token' || raw === 'agent' ? raw : 'agent';
+    return raw === 'human' || raw === 'coop' || raw === 'agent' ? raw : 'coop';
   } catch {
-    return 'agent';
+    return 'coop';
   }
 }
 
@@ -172,12 +173,18 @@ function setTokenError(msg) {
 }
 
 function updatePathButtons() {
-  const tokenBtn = el('pathTokenBtn');
+  const humanBtn = el('pathHumanBtn');
+  const coopBtn = el('pathCoopBtn');
   const agentBtn = el('pathAgentBtn');
-  if (tokenBtn) {
-    const active = pathMode === 'token';
-    tokenBtn.classList.toggle('primary', active);
-    tokenBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  if (humanBtn) {
+    const active = pathMode === 'human';
+    humanBtn.classList.toggle('primary', active);
+    humanBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+  if (coopBtn) {
+    const active = pathMode === 'coop';
+    coopBtn.classList.toggle('primary', active);
+    coopBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
   if (agentBtn) {
     const active = pathMode === 'agent';
@@ -187,7 +194,7 @@ function updatePathButtons() {
 }
 
 function setPathMode(mode, { persist = true, refresh = true } = {}) {
-  const next = mode === 'token' ? 'token' : 'agent';
+  const next = mode === 'human' || mode === 'agent' || mode === 'coop' ? mode : 'coop';
   pathMode = next;
   if (persist) savePathMode(next);
   updatePathButtons();
@@ -350,19 +357,26 @@ function setTokenStatus({ active = false, good = false, text = '' } = {}) {
   label.textContent = text || '';
 }
 
-function setReconnectMode({ houseReady, tokenMode }) {
+function setReconnectMode({ houseReady, role }) {
   const reconnect = el('reconnectPanel');
   const step1 = el('step1Panel');
   const step2 = el('step2Panel');
   const divider = el('stepDivider');
   const tokenPanel = el('tokenPanel');
+
   const showReconnect = !!houseReady;
-  const showAgentSteps = !tokenMode && !showReconnect;
+
+  // role = human | coop | agent
+  const showToken = role === 'human' && !showReconnect;
+  const showStep1 = (role === 'coop' || role === 'agent') && !showReconnect;
+  const showStep2 = role === 'coop' && !showReconnect;
+
   if (reconnect) reconnect.classList.toggle('is-hidden', !showReconnect);
-  if (step1) step1.classList.toggle('is-hidden', !showAgentSteps);
-  if (step2) step2.classList.toggle('is-hidden', !showAgentSteps);
-  if (divider) divider.classList.toggle('is-hidden', !showAgentSteps);
-  if (tokenPanel) tokenPanel.classList.toggle('is-hidden', !tokenMode || showReconnect);
+  if (tokenPanel) tokenPanel.classList.toggle('is-hidden', !showToken);
+
+  if (step1) step1.classList.toggle('is-hidden', !showStep1);
+  if (step2) step2.classList.toggle('is-hidden', !showStep2);
+  if (divider) divider.classList.toggle('is-hidden', !(showStep1 || showStep2));
 }
 
 function renderSigils(state) {
@@ -428,10 +442,10 @@ function updateUI(state) {
 
   const houseId = state.houseId || walletHouseId || null;
   const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
-  if (signupMode === 'token' && pathMode !== 'token') {
-    setPathMode('token', { persist: true, refresh: false });
+  if (signupMode === 'token' && pathMode !== 'human') {
+    setPathMode('human', { persist: true, refresh: false });
   }
-  const tokenMode = pathMode === 'token' || signupMode === 'token';
+  const tokenMode = pathMode === 'human' || signupMode === 'token';
 
   // Counts (optional on index)
   const signupCount = el('signupCount');
@@ -442,7 +456,10 @@ function updateUI(state) {
   el('teamCode').textContent = teamCode;
 
   const origin = window.location.origin;
-  el('teamSnippet').textContent = `Read ${origin}/skill.md and team with code: ${teamCode}`;
+  el('teamSnippet').textContent =
+    pathMode === 'agent'
+      ? `Use this base URL (${origin}) and connect with team code: ${teamCode}`
+      : `Read ${origin}/skill.md and team with code: ${teamCode}`;
 
   const houseNavLink = el('houseNavLink');
   if (houseNavLink) {
@@ -458,7 +475,12 @@ function updateUI(state) {
   updatePathButtons();
   const pathNote = el('pathNote');
   if (pathNote) {
-    pathNote.textContent = tokenMode ? 'Token holder flow selected.' : 'Agent co-op flow selected.';
+    pathNote.textContent =
+      pathMode === 'human'
+        ? 'Human mode: solo house (token) + wallet reconnect.'
+        : pathMode === 'agent'
+          ? 'Agent mode: read skill.md and connect using a team code from a human.'
+          : 'Co-op mode: human + agent unlock together.';
   }
 
   // Agent status
@@ -466,8 +488,8 @@ function updateUI(state) {
   updateAgentStatus('agentDot', 'agentStatusText', connected, state.agent?.name || null);
   updateAgentStatus('agentDotHouse', 'agentStatusTextHouse', connected, state.agent?.name || null);
 
-  setReconnectMode({ houseReady: !!houseId, tokenMode });
-  toggleAgentOnly(!tokenMode);
+  setReconnectMode({ houseReady: !!houseId, role: pathMode });
+  toggleAgentOnly(pathMode !== 'human');
 
   const tokenComplete = !!state.signup?.complete && signupMode === 'token';
   const tokenCreateLink = el('tokenCreateLink');
@@ -594,7 +616,7 @@ async function init() {
   });
 
   if (tokenErr) {
-    setPathMode('token', { persist: true, refresh: true });
+    setPathMode('human', { persist: true, refresh: true });
     setTokenError(tokenErr);
     setTokenStatus({ active: true, good: false, text: 'Verify wallet to continue' });
   }
@@ -635,9 +657,13 @@ async function init() {
     });
   }
 
-  const pathTokenBtn = el('pathTokenBtn');
-  if (pathTokenBtn) {
-    pathTokenBtn.addEventListener('click', () => setPathMode('token'));
+  const pathHumanBtn = el('pathHumanBtn');
+  if (pathHumanBtn) {
+    pathHumanBtn.addEventListener('click', () => setPathMode('human'));
+  }
+  const pathCoopBtn = el('pathCoopBtn');
+  if (pathCoopBtn) {
+    pathCoopBtn.addEventListener('click', () => setPathMode('coop'));
   }
   const pathAgentBtn = el('pathAgentBtn');
   if (pathAgentBtn) {

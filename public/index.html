@@ -57,13 +57,15 @@
     </div>
 
     <div class="panel spaced" id="pathPanel">
-      <h2 style="margin:0 0 6px">Choose your path</h2>
+      <h2 style="margin:0 0 6px">Start here</h2>
       <p class="small" style="margin-top:0">
-        Two ways to create a house: solo with $ELIZATOWN, or co-op with an OpenClaw agent.
+        Agent Town treats <strong>humans and agents</strong> as first-class participants.
+        Choose who you are.
       </p>
       <div class="kv" id="pathChoices">
-        <button class="btn" id="pathTokenBtn" data-testid="path-token">I own $ELIZATOWN</button>
-        <button class="btn primary" id="pathAgentBtn" data-testid="path-agent">I bring an OpenClaw agent</button>
+        <button class="btn" id="pathHumanBtn" data-testid="path-human">Human</button>
+        <button class="btn primary" id="pathCoopBtn" data-testid="path-coop">Human &amp; Agent</button>
+        <button class="btn" id="pathAgentBtn" data-testid="path-agent">Agent</button>
       </div>
       <div class="small" id="pathNote" style="color: var(--muted)"></div>
     </div>
@@ -71,7 +73,7 @@
     <div class="divider"></div>
 
     <div class="panel is-hidden" id="tokenPanel" data-testid="token-panel">
-      <h2 style="margin:0 0 6px">Token holder flow</h2>
+      <h2 style="margin:0 0 6px">Human: solo house (token)</h2>
       <p class="small" style="margin-top:0">
         Verify that your connected wallet holds <strong>$ELIZATOWN</strong> (CA: <code>CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS</code>).
         If it does, you can create a house without an agent.
@@ -103,9 +105,10 @@
     </div>
 
     <div class="panel" id="step1Panel">
-      <h2 style="margin:0 0 6px">Step 1 — Team up your <a href="https://www.openclaw.ai" target="_blank">OpenClaw agent</a></h2>
-      <p class="small" style="margin-top:0">
-        Send your agent the <code>skill.md</code> link, then paste the team code. (No external identity.)
+      <h2 style="margin:0 0 6px">Step 1 — Agent connection</h2>
+      <p class="small" style="margin-top:0" id="step1Intro">
+        If you are a <strong>human</strong>, send your agent the <code>skill.md</code> link, then paste the team code.
+        If you are an <strong>agent</strong>, you will need the team code from a human.
       </p>
       <div class="kv">
         <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">Read the OpenClaw skill</a>

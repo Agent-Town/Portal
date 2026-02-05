@@ -1378,6 +1378,110 @@ app.get('/api/wall', (_req, res) => {
   res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
+// --- Anchors (ERC-8004 routing directory) ---
+const { verifyMessage } = require('ethers');
+
+function makeAnchorNonce() {
+  return `an_${randomHex(16)}`;
+}
+
+function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
+  return [
+    'AgentTown Anchor Link',
+    `houseId: ${houseId}`,
+    `erc8004Id: ${erc8004Id}`,
+    `origin: ${origin}`,
+    `nonce: ${nonce}`,
+    `createdAtMs: ${createdAtMs}`
+  ].join('\n');
+}
+
+app.get('/api/anchors/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const nonce = makeAnchorNonce();
+  s.anchorPublishNonce = nonce;
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/anchors/register', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const erc8004Id = typeof req.body?.erc8004Id === 'string' ? req.body.erc8004Id.trim() : '';
+  const signer = typeof req.body?.signer === 'string' ? req.body.signer.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  const origin = typeof req.body?.origin === 'string' ? req.body.origin.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const createdAtMs = Number(req.body?.createdAtMs || 0);
+  const chainId = Number(req.body?.chainId || 0);
+
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  if (!signer) return res.status(400).json({ ok: false, error: 'MISSING_SIGNER' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!createdAtMs) return res.status(400).json({ ok: false, error: 'MISSING_TIMESTAMP' });
+
+  if (!s.anchorPublishNonce || nonce !== s.anchorPublishNonce) {
+    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  }
+
+  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+  // Require message origin to match server origin (prevents signing for a different site).
+  if (origin && origin !== expectedOrigin) {
+    return res.status(400).json({ ok: false, error: 'ORIGIN_MISMATCH' });
+  }
+
+  const msg = buildAnchorLinkMessage({
+    houseId,
+    erc8004Id,
+    origin: expectedOrigin,
+    nonce,
+    createdAtMs
+  });
+
+  let recovered = '';
+  try {
+    recovered = verifyMessage(msg, signature) || '';
+  } catch {
+    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  }
+
+  if (recovered.toLowerCase() !== signer.toLowerCase()) {
+    return res.status(401).json({ ok: false, error: 'SIGNER_MISMATCH' });
+  }
+
+  // Consume nonce
+  s.anchorPublishNonce = null;
+
+  const store = readStore();
+  const houseExists = store.houses.find((h) => h && h.id === houseId);
+  if (!houseExists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  // Upsert by erc8004Id (latest wins)
+  store.anchors = Array.isArray(store.anchors) ? store.anchors : [];
+  store.anchors = store.anchors.filter((a) => a && a.erc8004Id !== erc8004Id);
+  store.anchors.unshift({
+    erc8004Id,
+    houseId,
+    signer,
+    chainId: chainId || null,
+    createdAtMs,
+    updatedAt: nowIso()
+  });
+
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.get('/api/anchors/resolve', (req, res) => {
+  const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  const store = readStore();
+  const rec = (store.anchors || []).find((a) => a && a.erc8004Id === erc8004Id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, erc8004Id, houseId: rec.houseId });
+});
+
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
   app.post('/__test__/reset', (_req, res) => {
@@ -1385,7 +1489,7 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [] });
     resetAllSessions();
     res.json({ ok: true });
   });

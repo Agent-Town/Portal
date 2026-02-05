@@ -21,9 +21,11 @@ function readStore() {
       publicTeams: Array.isArray(parsed.publicTeams) ? parsed.publicTeams : [],
       houses: Array.isArray(parsed.houses) ? parsed.houses : [],
       inbox: Array.isArray(parsed.inbox) ? parsed.inbox : []
+      anchors: Array.isArray(parsed.anchors) ? parsed.anchors : []
     };
   } catch (err) {
-    return { signups: [], shares: [], publicTeams: [], houses: [], inbox: [] };
+
+    return { signups: [], shares: [], publicTeams: [], houses: [], inbox: [], anchors: [] };
   }
 }
 
