@@ -19,6 +19,10 @@ function el(id) { return document.getElementById(id); }
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
 const shareLink = `${window.location.origin}/s/${shareId}`;
 
+// Pony Express v0
+const inboxLink = document.getElementById('inboxLink');
+if (inboxLink) inboxLink.href = `/inbox/${shareId}`;
+
 function handleFromUrl(url) {
   if (!url) return null;
   try {
