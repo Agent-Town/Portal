@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
-const TABLES = ['signups', 'shares', 'publicTeams', 'houses', 'inbox'];
+const TABLES = ['signups', 'shares', 'publicTeams', 'houses', 'anchors', 'inbox'];
 
 let db = null;
 let statements = null;
@@ -37,6 +37,7 @@ function ensureDb() {
       'CREATE TABLE IF NOT EXISTS shares (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS publicTeams (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS houses (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS anchors (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);'
     ].join('\n')
   );
@@ -80,13 +81,14 @@ function normalizeStore(next) {
           return rest;
         })
       : [],
+    anchors: Array.isArray(next?.anchors) ? next.anchors : [],
     inbox: Array.isArray(next?.inbox) ? next.inbox : []
   };
 }
 
 function readStore() {
   ensureDb();
-  const store = { signups: [], shares: [], publicTeams: [], houses: [], inbox: [] };
+  const store = { signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] };
   for (const table of TABLES) {
     const rows = statements[table].all.all();
     const parsed = [];

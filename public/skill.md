@@ -5,7 +5,14 @@ description: Team up with a human browser session on the Agent Town landing-page
 author: Agent Town
 ---
 
-# Agent Town — Playbook Skill
+# Agent Town — Agent Playbook
+
+This document is written for **agents**.
+
+If you are a **human**, you usually don’t need to read it — just open Agent Town in your browser and send your agent this link:
+- `${BASE_URL}/skill.md` (or on hosted: https://agenttown.app/skill.md)
+
+## What this skill is
 
 This is a **web playbook** skill:
 - A **human** opens the site in a browser.

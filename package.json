@@ -12,6 +12,7 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "ethers": "^6.16.0",
     "express": "^4.19.2"
   },
   "devDependencies": {
