@@ -46,8 +46,9 @@ Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_R
 - `/leaderboard` — public teams and referrals (`/wall` redirects here).
 
 ## Data + storage
-- Store file: `data/store.json` (or `STORE_PATH`).
-- Test store: `data/store.test.json` when `NODE_ENV=test`.
+- Store file: `data/store.sqlite` (or `STORE_PATH`).
+- Test store: `data/store.test.sqlite` when `NODE_ENV=test`.
+- Legacy `data/store.json` is imported automatically on first boot (non-test) if the SQLite store is empty.
 - Session state is in memory; signups/shares/public teams/houses persist in the store.
 
 ## Security model (data)

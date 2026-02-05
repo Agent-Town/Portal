@@ -6,7 +6,7 @@ In-scope paths:
 - `server/` (Express API, security headers, house auth, token verification)
 - `public/` (browser UI, crypto, wallet flows)
 - `specs/02_api_contract.md` (API contract)
-- `data/store.json` (runtime data shape)
+- `data/store.sqlite` (runtime data shape)
 
 Out-of-scope:
 - `e2e/`, `test-results/` (tests)
@@ -18,7 +18,7 @@ Assumptions (based on your clarifications and repo evidence):
 - TLS is terminated at a proxy; `req.secure` relies on `trust proxy`. Evidence: `server/index.js` `app.set('trust proxy', 1)` and HTTPS redirect.
 - The house flow must remain E2EE; server should not be able to read house plaintext. Evidence: client-side AES-GCM and HKDF in `public/house.js` and `public/create.js`.
 - Signups no longer store email; token mode stores a wallet address. Evidence: `server/index.js` `recordSignup`.
-- JSON store is used in production (single-node persistence). Evidence: `server/store.js`.
+- SQLite store is used in production (single-node persistence). Evidence: `server/store.js`.
 
 Open questions that could materially change risk ranking:
 - Should any legacy houses with stored `keyWrapSig` be purged or migrated now that recovery re-signs the wrap message?
@@ -29,7 +29,7 @@ Open questions that could materially change risk ranking:
 ### Primary components
 - Express HTTP server with API routes, security headers, HTTPS redirect, and rate limiting. Evidence: `server/index.js`.
 - In-memory sessions for Team Code and houseId mapping. Evidence: `server/sessions.js`.
-- File-based JSON store for signups, shares, public teams, houses, and auth material. Evidence: `server/store.js`.
+- SQLite store for signups, shares, public teams, houses, and auth material. Evidence: `server/store.js`.
 - Browser UI with polling and house cryptography (AES-GCM + HKDF). Evidence: `public/app.js`, `public/create.js`, `public/house.js`.
 - Wallet signature flows for house unlock, key wrap, and token verification. Evidence: `public/house.js`, `public/create.js`, `server/index.js`.
 - External Solana RPC dependency for token gate checks. Evidence: `server/index.js` `hasElizaTownToken`.
@@ -68,7 +68,7 @@ Channel: HTTPS POST to RPC.
 Security: none beyond TLS; relies on RPC correctness.
 Evidence: `server/index.js` `postJson`, `hasElizaTownToken`.
 
-- Express API → JSON store (`data/store.json`).
+- Express API → SQLite store (`data/store.sqlite`).
 Data types: signups (wallet addresses), shares, houses, `authKey`, `keyWrap`, ciphertext logs.
 Channel: local file I/O.
 Security: no encryption at rest.
@@ -81,7 +81,7 @@ flowchart TD
   G["Agent Client"]
   B["Express API"]
   C["Session Store (memory)"]
-  D["JSON Store (files)"]
+  D["SQLite Store (file)"]
   E["Wallet Providers"]
   F["Solana RPC"]
   A -->|HTTPS| B
@@ -103,7 +103,7 @@ flowchart TD
 | House ciphertext logs | Integrity/availability of shared house | I, A |
 | Wallet addresses (token mode) | User privacy + access control | C |
 | Shares and leaderboard data | Reputation and link integrity | I, A |
-| `data/store.json` | Single persistence store | I, A |
+| `data/store.sqlite` | Single persistence store | I, A |
 
 ## Attacker model
 ### Capabilities
@@ -155,7 +155,7 @@ Steps: HTTP allowed or proxy misconfigured → cookies or `x-house-auth` capture
 | TM-002 | Client-side attacker | XSS, malicious extension, or compromised asset | Read K_root/K_auth from memory and forge house API calls | House integrity/availability loss | K_auth, house logs | CSP + local SDK (`server/index.js`, `public/house.js`) | No runtime isolation; keys in JS memory | Add strict CSP reporting; isolate crypto in secure worker; short-lived keys; consider hardware-backed wallet-based auth | Monitor `HOUSE_AUTH_INVALID` bursts and append rates | Medium | High | High |
 | TM-003 | Remote attacker | Team Code exposure or brute force | Impersonate agent, post malicious links, sabotage flow | Reputation loss, flow integrity | Team Code, shares | Random Team Codes, rate limit `/api/agent` | No rotation/revocation; no agent proof | Allow regenerate Team Code; tie agent connect to short-lived challenge | Alert on repeated `TEAM_NOT_FOUND` and new agent IPs | Low | Medium | Medium |
 | TM-004 | Remote attacker | TLS/proxy misconfig, intercepted headers | Replay or forge `x-house-auth` within skew window | Unauthorized append or read | House integrity | HMAC auth + 5-minute skew window (`server/index.js`) | Relies on correct TLS/proxy setup | Enforce HTTPS at edge; set `Secure` cookie in prod regardless of `req.secure`; reduce skew window | Log non-HTTPS requests and auth failures | Low | Medium | Medium |
-| TM-005 | Remote attacker | High request rate | Fill house/store caps via `/api/house/init` or append | Availability loss | `data/store.json`, house creation | Rate limits; `MAX_HOUSES` and `MAX_HOUSE_ENTRIES` | IP-based only; no global cleanup | Add per-session quotas; purge oldest houses; move to DB with TTL | Monitor store size and house creation rate | Medium | Medium | Medium |
+| TM-005 | Remote attacker | High request rate | Fill house/store caps via `/api/house/init` or append | Availability loss | `data/store.sqlite`, house creation | Rate limits; `MAX_HOUSES` and `MAX_HOUSE_ENTRIES` | IP-based only; no global cleanup | Add per-session quotas; purge oldest houses; move to DB with TTL | Monitor store size and house creation rate | Medium | Medium | Medium |
 | TM-006 | External dependency | Solana RPC failure or manipulation | Token gate unavailable or incorrect | Access control failure or denial | Token gating | Rate limit on `/api/token`, signature verification | RPC trust and availability | Add multiple RPC backends; cache results; explicit fallback messaging | Track RPC error rate and latency | Medium | Medium | Medium |
 | TM-007 | Remote attacker | houseId leakage | Use `/api/agent/house/connect` to mark agent connected | Co-op bypass for share creation | Co-op integrity | houseId is derived from K_root (not listed publicly) | houseId is a bearer identifier | Require agent challenge using K_auth or a signed agent attestation | Log agent connects by houseId/IP | Low | Low | Low |
 
