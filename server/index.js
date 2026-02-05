@@ -3,6 +3,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');
 const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
@@ -417,6 +418,7 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
+const MIN_AGENT_SOLO_PIXELS = 20;
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -455,6 +457,15 @@ function palette() {
 
 function canvasHasInk(pixels) {
   return Array.isArray(pixels) && pixels.some((p) => p && p !== 0);
+}
+
+function countInk(pixels) {
+  if (!Array.isArray(pixels)) return 0;
+  let count = 0;
+  for (const p of pixels) {
+    if (p && p !== 0) count += 1;
+  }
+  return count;
 }
 
 function isShareLocked(share) {
@@ -539,6 +550,89 @@ function normalizePublicPrompt(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC32_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
+  const typeBuf = Buffer.from(type, 'ascii');
+  const crc = Buffer.alloc(4);
+  const sum = crc32(Buffer.concat([typeBuf, data]));
+  crc.writeUInt32BE(sum, 0);
+  return Buffer.concat([len, typeBuf, data, crc]);
+}
+
+function hexToRgba(hex) {
+  if (!hex || typeof hex !== 'string') return [0, 0, 0, 255];
+  const cleaned = hex.startsWith('#') ? hex.slice(1) : hex;
+  if (cleaned.length !== 6) return [0, 0, 0, 255];
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return [r, g, b, 255];
+}
+
+function canvasToPngDataUrl(canvas, paletteHex) {
+  const w = canvas?.w || 0;
+  const h = canvas?.h || 0;
+  const pixels = Array.isArray(canvas?.pixels) ? canvas.pixels : [];
+  if (!w || !h || pixels.length < w * h) return null;
+  const palette = (paletteHex || palette()).map(hexToRgba);
+
+  const stride = w * 4 + 1;
+  const raw = Buffer.alloc(stride * h);
+  let offset = 0;
+  for (let y = 0; y < h; y++) {
+    raw[offset++] = 0; // filter 0
+    for (let x = 0; x < w; x++) {
+      const idx = pixels[y * w + x] || 0;
+      const [r, g, b, a] = palette[idx] || palette[0];
+      raw[offset++] = r;
+      raw[offset++] = g;
+      raw[offset++] = b;
+      raw[offset++] = a;
+    }
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // color type RGBA
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  const header = Buffer.from('\x89PNG\r\n\x1a\n', 'binary');
+  const idat = zlib.deflateSync(raw);
+  const png = Buffer.concat([
+    header,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idat),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+
+  return `data:image/png;base64,${png.toString('base64')}`;
 }
 
 function serializePublicMedia(house) {
@@ -682,6 +776,14 @@ app.post('/api/human/select', (req, res) => {
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
 
+app.post('/api/agent/session', (req, res) => {
+  const agentName = normalizeAgentName(req.body?.agentName);
+  const s = createSession({ flow: 'agent_solo' });
+  s.agent.connected = true;
+  s.agent.name = agentName || s.agent.name || 'OpenClaw';
+  res.json({ ok: true, teamCode: s.teamCode, flow: s.flow });
+});
+
 app.post('/api/agent/connect', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const agentName = normalizeAgentName(req.body?.agentName);
@@ -715,6 +817,7 @@ app.get('/api/agent/state', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   res.json({
     ok: true,
+    flow: s.flow,
     agent: s.agent,
     human: {
       selected: s.human.selected,
@@ -812,6 +915,16 @@ app.post('/api/agent/canvas/paint', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/agent/canvas/image', (req, res) => {
+  const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const image = canvasToPngDataUrl(s.canvas, palette());
+  if (!image) return res.status(500).json({ ok: false, error: 'CANVAS_IMAGE_FAILED' });
+  res.json({ ok: true, image, pixels: countInk(s.canvas.pixels) });
+});
+
 // --- House ceremony (agent + human) ---
 app.get('/api/agent/house/state', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
@@ -859,8 +972,15 @@ app.post('/api/agent/house/reveal', (req, res) => {
 
   s.houseCeremony.agentReveal = reveal;
 
-  // If both reveals exist, compute houseId and store it (no secrets persisted).
-  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+  if (s.flow === 'agent_solo') {
+    // Solo flow: derive houseId from agent entropy only.
+    const kroot = sha256Bytes(ra);
+    const houseIdBytes = sha256Bytes(kroot);
+    s.houseCeremony.houseId = base58Encode(houseIdBytes);
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, s.houseCeremony.houseId);
+  } else if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+    // Co-op: derive houseId from Rh||Ra.
     const rh = b64ToBytes(s.houseCeremony.humanReveal);
     const combo = new Uint8Array(rh.length + ra.length);
     combo.set(rh, 0);
@@ -1133,7 +1253,7 @@ app.post('/api/house/:id/share', (req, res) => {
       createdAt: nowIso(),
       matchedElement: session?.match?.elementId || null,
       agentName: session?.agent?.name || 'OpenClaw',
-      mode: 'agent',
+      mode: session?.flow === 'agent_solo' ? 'agent_solo' : 'agent',
       houseId,
       xPostUrl: session?.human?.xPostUrl || null,
       humanHandle: session?.human?.xHandle || null,
@@ -1572,6 +1692,106 @@ app.post('/api/house/init', (req, res) => {
   }
 
   res.json({ ok: true, houseId });
+});
+
+app.post('/api/agent/house/init', (req, res) => {
+  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const housePubKey = typeof req.body?.housePubKey === 'string' ? req.body.housePubKey.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
+  const unlock = req.body?.unlock || null;
+  const keyWrap = req.body?.keyWrap || null;
+  const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  if (s.flow !== 'agent_solo') return res.status(403).json({ ok: false, error: 'AGENT_SOLO_ONLY' });
+  if (!s.houseCeremony?.agentReveal) return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+
+  const painted = countInk(s.canvas?.pixels);
+  if (painted < MIN_AGENT_SOLO_PIXELS) {
+    return res.status(403).json({ ok: false, error: 'INSUFFICIENT_PIXELS', minPixels: MIN_AGENT_SOLO_PIXELS, painted });
+  }
+
+  if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!houseAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_AUTH' });
+  const authKeyBytes = decodeB64(houseAuthKey);
+  if (!authKeyBytes || authKeyBytes.length < 16) {
+    return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
+  }
+  if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
+    return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
+  }
+
+  // Solo flow uses ceremony-style keys with agent entropy.
+  if (keyMode !== 'ceremony') {
+    return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  const ra = b64ToBytes(s.houseCeremony.agentReveal);
+  if (!ra || !ra.length) return res.status(400).json({ ok: false, error: 'INVALID_REVEAL' });
+  const kroot = sha256Bytes(ra);
+  const expectedHouseId = base58Encode(sha256Bytes(kroot));
+  if (expectedHouseId !== houseId) {
+    return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
+  }
+
+  let normalizedKeyWrap = null;
+  if (keyWrap && typeof keyWrap === 'object') {
+    const alg = typeof keyWrap.alg === 'string' ? keyWrap.alg.trim() : '';
+    const iv = typeof keyWrap.iv === 'string' ? keyWrap.iv.trim() : '';
+    const ct = typeof keyWrap.ct === 'string' ? keyWrap.ct.trim() : '';
+    if (alg && iv && ct) {
+      if (alg !== 'AES-GCM') {
+        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP' });
+      }
+      normalizedKeyWrap = { alg, iv, ct };
+    }
+  }
+
+  const store = readStore();
+  if (store.houses.length >= MAX_HOUSES) {
+    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
+  }
+  if (store.signups.length >= MAX_SIGNUPS) {
+    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
+  }
+  const exists = store.houses.find((r) => r.id === houseId);
+  if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+
+  store.houses.push({
+    id: houseId,
+    housePubKey,
+    createdAt: nowIso(),
+    nonce,
+    keyMode: 'ceremony',
+    unlock,
+    keyWrap: normalizedKeyWrap,
+    authKey: houseAuthKey,
+    entries: []
+  });
+  writeStore(store);
+
+  s.houseCeremony.houseId = houseId;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+  indexHouseId(s, houseId);
+
+  const status = recordSignup(s, {
+    mode: 'agent_solo',
+    agentName: s.agent.name || null,
+    matchedElement: null,
+    address: unlock?.address || null
+  });
+
+  if (!status.complete) {
+    return res.status(403).json({ ok: false, error: status.reason || 'STORE_FULL', houseId });
+  }
+
+  res.json({ ok: true, houseId, status });
 });
 
 app.get('/api/house/:id/meta', (req, res) => {

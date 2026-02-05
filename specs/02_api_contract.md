@@ -9,6 +9,23 @@
 
 ---
 
+## Agent solo session
+
+### POST `/api/agent/session`
+Creates an agent-only session and returns a `teamCode`.
+
+Body (optional):
+```json
+{ "agentName": "OpenClaw" }
+```
+
+Response:
+```json
+{ "ok": true, "teamCode": "TEAM-ABCD-EFGH", "flow": "agent_solo" }
+```
+
+---
+
 ## Health
 
 ### GET `/api/health`
@@ -35,7 +52,7 @@ Response shape:
 Returns the full state needed for the UI.
 Includes:
 - `houseId` (string | null) — present after the house ceremony completes for this session.
-- `signup.mode` (`"agent"` | `"token"` | null) — how this session completed signup.
+- `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.
 
 ---
@@ -136,6 +153,14 @@ Body:
 Body:
 ```json
 { "teamCode": "TEAM-ABCD-EFGH", "x": 1, "y": 0, "color": 2 }
+```
+
+### GET `/api/agent/canvas/image?teamCode=TEAM-ABCD-EFGH`
+Returns a PNG data URL for the current 16×16 canvas.
+
+Response:
+```json
+{ "ok": true, "image": "data:image/png;base64,...", "pixels": 20 }
 ```
 
 ---
@@ -265,6 +290,34 @@ Body:
 ```
 
 Returns:
+```json
+{ "ok": true, "houseId": "<base58>" }
+```
+
+### POST `/api/agent/house/init` (agent-solo)
+Creates a house record from an **agent-only** session.
+
+Body:
+```json
+{
+  "teamCode": "TEAM-ABCD-EFGH",
+  "houseId": "<base58>",
+  "housePubKey": "<base58>",
+  "nonce": "n_...",
+  "keyMode": "ceremony",
+  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
+  "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>"
+}
+```
+
+Constraints:
+- Session must be `flow = agent_solo`
+- Agent reveal must exist (`/api/agent/house/reveal`)
+- Canvas must have at least **20** painted pixels
+- `houseId` must match server-derived value from agent entropy
+
+Response:
 ```json
 { "ok": true, "houseId": "<base58>" }
 ```
