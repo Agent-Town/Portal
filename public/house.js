@@ -544,11 +544,23 @@ async function linkErc8004AnchorToVault(erc8004Id) {
   const clean = (erc8004Id || '').trim();
   if (!clean) throw new Error('ERC8004_ID_REQUIRED');
 
+  const discoverable = !!el('anchorDiscoverable')?.checked;
+
   setAnchorError('');
   setAnchorStatus('Requesting signature…');
 
   const createdAtMs = Date.now();
-  const nonce = randomNonce('a_');
+  // Use a server-issued nonce if we are publishing to a server directory (prevents replay).
+  let nonce = randomNonce('a_');
+  if (discoverable) {
+    try {
+      const n = await api('/api/anchors/nonce');
+      if (n && n.nonce) nonce = String(n.nonce);
+    } catch {
+      // fallback to random nonce
+    }
+  }
+
   const msg = buildAnchorLinkMessage({
     houseId: house.houseId,
     erc8004Id: clean,
@@ -579,11 +591,31 @@ async function linkErc8004AnchorToVault(erc8004Id) {
         signer,
         message: msg,
         signature
+      },
+      publish: {
+        discoverable
       }
     }
   });
 
-  setAnchorStatus('Linked.');
+  if (discoverable) {
+    setAnchorStatus('Registering for messaging…');
+    await api('/api/anchors/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        houseId: house.houseId,
+        erc8004Id: clean,
+        createdAtMs,
+        nonce,
+        signer,
+        signature,
+        chainId,
+        origin: window.location.origin
+      })
+    });
+  }
+
+  setAnchorStatus(discoverable ? 'Linked + registered.' : 'Linked.');
   setTimeout(() => setAnchorStatus(''), 1200);
   await refreshEntries();
 }
@@ -1040,7 +1072,8 @@ function renderAnchors(anchorLinks) {
   const dev = [];
 
   for (const a of anchorLinks) {
-    const label = `${a.erc8004Id}${a.signer ? ` (signer ${a.signer.slice(0, 6)}…${a.signer.slice(-4)})` : ''}`;
+    const pub = a.discoverable ? ' · discoverable' : '';
+    const label = `${a.erc8004Id}${a.signer ? ` (signer ${a.signer.slice(0, 6)}…${a.signer.slice(-4)})` : ''}${pub}`;
     const parsed = parseAgent0Erc8004Id(a.erc8004Id);
     const chainId = parsed?.chainId ?? a.chainId ?? null;
     // classification: 1 = Ethereum mainnet, 11155111 = Sepolia
@@ -1076,7 +1109,8 @@ async function refreshEntries() {
         anchorLinks.push({
           erc8004Id: b.anchor.erc8004Id,
           signer: b.proof?.signer || null,
-          chainId: b.anchor?.chainId || null
+          chainId: b.anchor?.chainId || null,
+          discoverable: !!b.publish?.discoverable
         });
       }
     } catch (e) {

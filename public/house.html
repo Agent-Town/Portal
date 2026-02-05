@@ -102,9 +102,13 @@
           <label class="small" for="anchorErc8004Id">ERC-8004 ID (Agent0 format)</label>
           <input id="anchorErc8004Id" type="text" placeholder="e.g. 11155111:123" />
           <div class="small" style="margin-top:6px; color: var(--muted)">We store the ID exactly as Agent0 returns it (includes chainId).</div>
+          <label class="small" style="margin-top:10px; display:flex; gap:8px; align-items:center; color: var(--muted)">
+            <input id="anchorDiscoverable" type="checkbox" checked />
+            Make discoverable for messaging
+          </label>
         </div>
         <div class="kv">
-          <button class="btn" id="linkAnchorBtn">Sign + link to vault</button>
+          <button class="btn" id="linkAnchorBtn">Sign + link</button>
         </div>
       </div>
 
