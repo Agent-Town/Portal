@@ -72,7 +72,8 @@ Promptless avatar pipeline (upload-only):
 - Outputs: `x1` + `x2` sprite atlases and metadata JSON.
 
 UI pages:
-- `/avatar` — upload + preview (desktop + mobile)
+- `/lab` — unified avatar + static asset generator (desktop + mobile)
+- `/avatar` — avatar-only upload + preview (legacy, still supported)
 - `/world` — minimal world-map runtime consuming the package
 
 Endpoints:
@@ -96,6 +97,9 @@ Promptless static asset pipeline (upload-only):
 - Upload an asset image (decal/prop/building).
 - Deterministic pipeline (`normalize -> export`).
 - Outputs: `sprite.png`, `sprite@2x.png`, `manifest.json`.
+
+UI page:
+- `/lab` — upload + sliders + preview
 
 Endpoints:
 - `POST /api/static-asset/upload`

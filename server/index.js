@@ -2609,6 +2609,7 @@ app.use(
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
 app.get('/avatar', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'avatar.html')));
+app.get('/lab', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'lab.html')));
 app.get('/world', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'world.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
