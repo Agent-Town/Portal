@@ -76,14 +76,33 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
   const frameW = metadata.frame.w;
   const frameH = metadata.frame.h;
 
-  const speed = 60; // px/s
+  const pivot = metadata && metadata.pivot && typeof metadata.pivot.x === 'number' ? metadata.pivot : { x: frameW / 2, y: frameH };
+
+  // Isometric (2:1 diamond) world settings.
+  const tileW = 64;
+  const tileH = 32;
+  const mapW = 18;
+  const mapH = 18;
+
+  const origin = {
+    x: canvas.width / 2,
+    y: 46
+  };
+
+  const drawScale = 2;
+  const dstW = frameW * drawScale;
+  const dstH = frameH * drawScale;
+  const pivotX = pivot.x * drawScale;
+  const pivotY = pivot.y * drawScale;
+
+  const speedTiles = 2.2; // tiles/s
 
   const state = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
+    tx: mapW / 2,
+    ty: mapH / 2,
     vx: 0,
     vy: 0,
-    dir: 'south',
+    dir: 'se',
     clip: 'idle',
     frameIdx: 0,
     tClipMs: 0,
@@ -91,13 +110,11 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
   };
 
   function chooseDirection(vx, vy, current) {
-    if (Math.abs(vx) > Math.abs(vy)) {
-      if (vx > 0) return 'east';
-      if (vx < 0) return 'west';
-    } else {
-      if (vy > 0) return 'south';
-      if (vy < 0) return 'north';
-    }
+    // Map motion vector to iso facings (SE, SW, NW, NE).
+    if (vx > 0) return 'se'; // +x projects down-right
+    if (vx < 0) return 'nw'; // -x projects up-left
+    if (vy > 0) return 'sw'; // +y projects down-left
+    if (vy < 0) return 'ne'; // -y projects up-right
     return current;
   }
 
@@ -119,19 +136,81 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
     return frames.length - 1;
   }
 
+  function tileTop(tx, ty) {
+    return {
+      x: origin.x + (tx - ty) * (tileW / 2),
+      y: origin.y + (tx + ty) * (tileH / 2)
+    };
+  }
+
+  function tileCenter(tx, ty) {
+    const t = tileTop(tx, ty);
+    return { x: t.x, y: t.y + tileH / 2 };
+  }
+
+  function drawDiamond(topX, topY, fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.lineTo(topX + tileW / 2, topY + tileH / 2);
+    ctx.lineTo(topX, topY + tileH);
+    ctx.lineTo(topX - tileW / 2, topY + tileH / 2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   function drawMap() {
-    // Simple grass checkerboard.
-    const tile = 16;
-    for (let y = 0; y < canvas.height; y += tile) {
-      for (let x = 0; x < canvas.width; x += tile) {
-        const on = ((x / tile) | 0) % 2 === ((y / tile) | 0) % 2;
-        ctx.fillStyle = on ? 'rgba(45, 105, 70, 0.95)' : 'rgba(40, 95, 64, 0.95)';
-        ctx.fillRect(x, y, tile, tile);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(28, 70, 50, 1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let ty = 0; ty < mapH; ty += 1) {
+      for (let tx = 0; tx < mapW; tx += 1) {
+        const top = tileTop(tx, ty);
+        const on = (tx + ty) % 2 === 0;
+        drawDiamond(top.x, top.y, on ? 'rgba(45, 105, 70, 0.98)' : 'rgba(41, 97, 66, 0.98)');
       }
     }
-    // Path strip.
-    ctx.fillStyle = 'rgba(210, 180, 110, 0.9)';
-    ctx.fillRect(canvas.width / 2 - 60, 0, 120, canvas.height);
+
+    // A minimal "house" demo (base layer). Roof is drawn after the avatar for occlusion.
+    const house = tileCenter(10, 8);
+    drawHouseBase(house.x, house.y);
+  }
+
+  function drawHouseBase(x, y) {
+    // Pivot at bottom-center contact point.
+    // Footprint (ground) diamond:
+    ctx.fillStyle = 'rgba(120, 85, 55, 0.95)';
+    ctx.beginPath();
+    ctx.moveTo(x, y - tileH / 2);
+    ctx.lineTo(x + tileW / 2, y);
+    ctx.lineTo(x, y + tileH / 2);
+    ctx.lineTo(x - tileW / 2, y);
+    ctx.closePath();
+    ctx.fill();
+
+    // Walls (simple block).
+    ctx.fillStyle = 'rgba(145, 105, 70, 0.95)';
+    ctx.fillRect(Math.round(x - 18), Math.round(y - 32), 36, 26);
+
+    // Door hint.
+    ctx.fillStyle = 'rgba(65, 45, 30, 0.95)';
+    ctx.fillRect(Math.round(x - 6), Math.round(y - 18), 12, 12);
+  }
+
+  function drawHouseRoof(x, y) {
+    // Roof sits above walls; intentionally drawn after avatar for "walk behind" occlusion.
+    ctx.fillStyle = 'rgba(95, 52, 38, 0.98)';
+    ctx.beginPath();
+    ctx.moveTo(x, y - 54);
+    ctx.lineTo(x + 26, y - 40);
+    ctx.lineTo(x, y - 28);
+    ctx.lineTo(x - 26, y - 40);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(78, 40, 30, 0.98)';
+    ctx.fillRect(Math.round(x - 2), Math.round(y - 62), 4, 10);
   }
 
   function drawAvatar() {
@@ -141,14 +220,23 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
     state.frameIdx = idx;
     if (!f) return;
 
-    const dstW = frameW * 2;
-    const dstH = frameH * 2;
     const sx = f.x * atlasScale;
     const sy = f.y * atlasScale;
     const sw = f.w * atlasScale;
     const sh = f.h * atlasScale;
 
-    ctx.drawImage(atlasImg, sx, sy, sw, sh, Math.round(state.x - dstW / 2), Math.round(state.y - dstH), dstW, dstH);
+    const pos = tileCenter(state.tx, state.ty);
+    ctx.drawImage(
+      atlasImg,
+      sx,
+      sy,
+      sw,
+      sh,
+      Math.round(pos.x - pivotX),
+      Math.round(pos.y - pivotY),
+      dstW,
+      dstH
+    );
   }
 
   function updateDebug() {
@@ -173,11 +261,13 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
     state.dir = nextDir;
 
     const dt = dtMs / 1000;
-    state.x = clamp(state.x + state.vx * speed * dt, 24, canvas.width - 24);
-    state.y = clamp(state.y + state.vy * speed * dt, 48, canvas.height - 8);
+    state.tx = clamp(state.tx + state.vx * speedTiles * dt, 0, mapW - 1);
+    state.ty = clamp(state.ty + state.vy * speedTiles * dt, 0, mapH - 1);
 
     drawMap();
     drawAvatar();
+    const house = tileCenter(10, 8);
+    drawHouseRoof(house.x, house.y);
     updateDebug();
 
     requestAnimationFrame(tick);
@@ -195,15 +285,32 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
       keys.add(e.key);
       e.preventDefault();
     }
-    const vx = keys.has('ArrowLeft') ? -1 : keys.has('ArrowRight') ? 1 : 0;
-    const vy = keys.has('ArrowUp') ? -1 : keys.has('ArrowDown') ? 1 : 0;
-    setMove(vx, vy);
+    // Keep to 4 iso directions (no 8-way input).
+    const next =
+      keys.has('ArrowUp')
+        ? { vx: -1, vy: 0 }
+        : keys.has('ArrowDown')
+          ? { vx: 1, vy: 0 }
+          : keys.has('ArrowLeft')
+            ? { vx: 0, vy: 1 }
+            : keys.has('ArrowRight')
+              ? { vx: 0, vy: -1 }
+              : { vx: 0, vy: 0 };
+    setMove(next.vx, next.vy);
   });
   window.addEventListener('keyup', (e) => {
     keys.delete(e.key);
-    const vx = keys.has('ArrowLeft') ? -1 : keys.has('ArrowRight') ? 1 : 0;
-    const vy = keys.has('ArrowUp') ? -1 : keys.has('ArrowDown') ? 1 : 0;
-    setMove(vx, vy);
+    const next =
+      keys.has('ArrowUp')
+        ? { vx: -1, vy: 0 }
+        : keys.has('ArrowDown')
+          ? { vx: 1, vy: 0 }
+          : keys.has('ArrowLeft')
+            ? { vx: 0, vy: 1 }
+            : keys.has('ArrowRight')
+              ? { vx: 0, vy: -1 }
+              : { vx: 0, vy: 0 };
+    setMove(next.vx, next.vy);
   });
 
   // D-pad buttons (mouse/touch).
@@ -226,10 +333,11 @@ function startWorld({ avatarId, metadata, atlasImg, atlasScale }) {
     btn.addEventListener('pointerleave', up);
   }
 
-  bindHold(el('btnLeft'), -1, 0);
-  bindHold(el('btnRight'), 1, 0);
-  bindHold(el('btnUp'), 0, -1);
-  bindHold(el('btnDown'), 0, 1);
+  // D-pad maps to screen directions, which are diagonal in iso.
+  bindHold(el('btnUp'), -1, 0); // NW
+  bindHold(el('btnDown'), 1, 0); // SE
+  bindHold(el('btnLeft'), 0, 1); // SW
+  bindHold(el('btnRight'), 0, -1); // NE
 
   // Start.
   drawMap();

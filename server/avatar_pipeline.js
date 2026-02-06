@@ -5,8 +5,8 @@ const sharp = require('sharp');
 
 const { nowIso, randomHex } = require('./util');
 
-// Bump when changing output bytes deterministically (atlas layout, QC, scaling, etc).
-const PIPELINE_VERSION = 'v1.3.0';
+// Bump when changing output bytes deterministically (atlas layout, QC, scaling, projections, etc).
+const PIPELINE_VERSION = 'v1.4.0';
 const TEMPLATE_VERSION = 't1.0.0';
 
 // Work canvas controls how much detail survives normalization.
@@ -18,7 +18,8 @@ const SCALE_FACTORS = { x1: 1, x2: 2 };
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
-const DIRECTIONS = ['south', 'east', 'west', 'north'];
+// Isometric (2:1 diamond) uses 4 diagonal facings.
+const DIRECTIONS = ['se', 'sw', 'nw', 'ne'];
 const CLIPS = ['idle', 'walk'];
 
 const ARTIFACT_ROOT = process.env.AVATAR_ARTIFACT_ROOT || path.join(process.cwd(), 'data', 'avatar_artifacts');
@@ -477,23 +478,21 @@ async function normalizeImage(sourceBuffer, outPath) {
 }
 
 async function directionPose(baseBuffer, direction) {
-  if (direction === 'south') return baseBuffer;
+  // Isometric diagonal facings:
+  // - se: front-right
+  // - sw: front-left (flop)
+  // - nw: back-left (modulate + flop)
+  // - ne: back-right (modulate)
+  const isBack = direction === 'nw' || direction === 'ne';
+  const isLeft = direction === 'sw' || direction === 'nw';
 
-  if (direction === 'north') {
-    // Back-facing: subtle darken/desaturate only.
-    // NOTE: avoid hard overlays (previous versions produced a visible \"black box\").
-    return sharp(baseBuffer)
-      .modulate({ brightness: 0.9, saturation: 0.86 })
-      .png()
-      .toBuffer();
-  }
-
-  const targetW = Math.max(1, Math.round(FRAME.w * 0.875));
+  // Slight slimming helps read as a 3/4 view without heavy transforms.
+  const targetW = Math.max(1, Math.round(FRAME.w * 0.92));
   const pad = Math.max(0, FRAME.w - targetW);
   const padL = Math.floor(pad / 2);
   const padR = pad - padL;
 
-  let side = await sharp(baseBuffer)
+  let posed = await sharp(baseBuffer)
     .resize(targetW, FRAME.h, { fit: 'fill', kernel: sharp.kernel.nearest })
     .extend({
       top: 0,
@@ -505,10 +504,17 @@ async function directionPose(baseBuffer, direction) {
     .png()
     .toBuffer();
 
-  if (direction === 'west') {
-    side = await sharp(side).flop().png().toBuffer();
+  if (isBack) {
+    // Back-facing: subtle darken/desaturate only.
+    // NOTE: avoid hard overlays (previous versions produced a visible "black box").
+    posed = await sharp(posed).modulate({ brightness: 0.9, saturation: 0.86 }).png().toBuffer();
   }
-  return side;
+
+  if (isLeft) {
+    posed = await sharp(posed).flop().png().toBuffer();
+  }
+
+  return posed;
 }
 
 function transformPoint(x, y, { angleRad = 0, pivotX = 0, pivotY = 0, dx = 0, dy = 0 } = {}) {
@@ -621,6 +627,7 @@ async function renderPackage(normalizedBuffer, artifactDir) {
   const baseFrame = await sharp(normalizedBuffer)
     .resize(FRAME.w, FRAME.h, {
       fit: 'contain',
+      position: 'bottom',
       background: { r: 0, g: 0, b: 0, alpha: 0 },
       kernel: sharp.kernel.nearest
     })
@@ -774,7 +781,7 @@ async function renderPackage(normalizedBuffer, artifactDir) {
     }
   }
 
-  // Rows: idle (south,east,west,north) then walk (south,east,west,north).
+  // Rows: idle (se,sw,nw,ne) then walk (se,sw,nw,ne).
   const rows = [];
   for (const clip of CLIPS) {
     for (const direction of DIRECTIONS) {
@@ -790,7 +797,13 @@ async function renderPackage(normalizedBuffer, artifactDir) {
     version: 1,
     pipelineVersion: PIPELINE_VERSION,
     templateVersion: TEMPLATE_VERSION,
+    projection: {
+      kind: 'iso-2:1',
+      tile: { w: 64, h: 32 },
+      directions: DIRECTIONS
+    },
     frame: { w: FRAME.w, h: FRAME.h },
+    pivot: { name: 'feet', x: FRAME.w / 2, y: FRAME.h },
     atlas: { w: atlasWidth, h: atlasHeight },
     scales: {
       x1: { factor: 1, frame: { w: FRAME.w, h: FRAME.h }, atlas: { w: atlasWidth, h: atlasHeight } },
@@ -844,22 +857,62 @@ async function renderPackage(normalizedBuffer, artifactDir) {
   fs.writeFileSync(atlas2xPath, atlas2xBuffer);
   fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 
+  const manifest = {
+    schemaVersion: 1,
+    kind: 'agent-town-avatar-pack',
+    pipelineVersion: PIPELINE_VERSION,
+    templateVersion: TEMPLATE_VERSION,
+    projection: {
+      kind: 'iso-2:1',
+      tile: { w: 64, h: 32 },
+      directions: DIRECTIONS
+    },
+    sprite: {
+      frame: { w: FRAME.w, h: FRAME.h },
+      pivot: { name: 'feet', x: FRAME.w / 2, y: FRAME.h }
+    },
+    // Atlas layout: rows are (idle.se, idle.sw, idle.nw, idle.ne, walk.se, ...).
+    clips: rows.reduce((acc, rowItem, rowIndex) => {
+      if (!acc[rowItem.clip]) acc[rowItem.clip] = {};
+      acc[rowItem.clip][rowItem.direction] = {
+        row: rowIndex,
+        frames: rowItem.frames.length,
+        durationMs: rowItem.clip === 'idle' ? 220 : 120
+      };
+      return acc;
+    }, {}),
+    files: {
+      atlasPng: 'atlas.png',
+      atlas2xPng: 'atlas@2x.png',
+      atlasJson: 'atlas.json'
+    }
+  };
+  const manifestPath = path.join(artifactDir, 'manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
   const previewDir = path.join(artifactDir, 'preview');
   ensureDir(previewDir);
-  await writePreviewSheet(path.join(previewDir, 'walk_south.png'), clips.walk.south[0], clips.walk.south[1]);
-  await writePreviewSheet(path.join(previewDir, 'walk_east.png'), clips.walk.east[0], clips.walk.east[1]);
-  await writePreviewSheet(path.join(previewDir, 'walk_west.png'), clips.walk.west[0], clips.walk.west[1]);
-  await writePreviewSheet(path.join(previewDir, 'walk_north.png'), clips.walk.north[0], clips.walk.north[1]);
+  await writePreviewSheet(path.join(previewDir, 'walk_se.png'), clips.walk.se[0], clips.walk.se[1]);
+  await writePreviewSheet(path.join(previewDir, 'walk_sw.png'), clips.walk.sw[0], clips.walk.sw[1]);
+  await writePreviewSheet(path.join(previewDir, 'walk_nw.png'), clips.walk.nw[0], clips.walk.nw[1]);
+  await writePreviewSheet(path.join(previewDir, 'walk_ne.png'), clips.walk.ne[0], clips.walk.ne[1]);
 
-  fs.copyFileSync(path.join(previewDir, 'walk_west.png'), path.join(previewDir, 'walk_left.png'));
-  fs.copyFileSync(path.join(previewDir, 'walk_east.png'), path.join(previewDir, 'walk_right.png'));
-  fs.copyFileSync(path.join(previewDir, 'walk_south.png'), path.join(previewDir, 'walk_towards_camera.png'));
-  fs.copyFileSync(path.join(previewDir, 'walk_north.png'), path.join(previewDir, 'walk_away_from_camera.png'));
+  // Compatibility helpers for older naming (left/right/towards/away).
+  // In iso 2:1, we map:
+  // - left  => SW (screen down-left)
+  // - right => NE (screen up-right)
+  // - towards_camera => SE (screen down-right)
+  // - away_from_camera => NW (screen up-left)
+  fs.copyFileSync(path.join(previewDir, 'walk_sw.png'), path.join(previewDir, 'walk_left.png'));
+  fs.copyFileSync(path.join(previewDir, 'walk_ne.png'), path.join(previewDir, 'walk_right.png'));
+  fs.copyFileSync(path.join(previewDir, 'walk_se.png'), path.join(previewDir, 'walk_towards_camera.png'));
+  fs.copyFileSync(path.join(previewDir, 'walk_nw.png'), path.join(previewDir, 'walk_away_from_camera.png'));
 
   return {
     atlasPath,
     atlas2xPath,
     metadataPath,
+    manifestPath,
     previewDir,
     previewByMeaning: {
       left: path.join(previewDir, 'walk_left.png'),
@@ -873,7 +926,8 @@ async function renderPackage(normalizedBuffer, artifactDir) {
 
 async function evaluateQuality(bounds, qcInputs) {
   const silhouetteIntegrity = Math.min(1, bounds.coverage / 0.42);
-  const grounded = bounds.maxY >= 112 ? 1 : 0.5;
+  const groundedThreshold = Math.round(WORK_CANVAS * 0.84);
+  const grounded = bounds.maxY >= groundedThreshold ? 1 : 0.5;
   const anim = await analyzeAnimationClips(qcInputs?.clips || null);
 
   const qc = {
@@ -927,15 +981,17 @@ function buildPackageFromDisk({ artifactDir, sourceSha256 }) {
   const atlasPath = path.join(artifactDir, 'atlas.png');
   const atlas2xPath = path.join(artifactDir, 'atlas@2x.png');
   const metadataPath = path.join(artifactDir, 'atlas.json');
+  const manifestPath = path.join(artifactDir, 'manifest.json');
   const previewDir = path.join(artifactDir, 'preview');
 
-  const required = [normalizedPath, keypointsPath, rigPath, atlasPath, atlas2xPath, metadataPath, qcPath];
+  const required = [normalizedPath, keypointsPath, rigPath, atlasPath, atlas2xPath, metadataPath, manifestPath, qcPath];
   if (!required.every((p) => fs.existsSync(p))) return null;
 
   const qcRaw = JSON.parse(fs.readFileSync(qcPath, 'utf8'));
   const atlasBuf = fs.readFileSync(atlasPath);
   const atlas2xBuf = fs.readFileSync(atlas2xPath);
   const metaBuf = fs.readFileSync(metadataPath);
+  const manifestBuf = fs.readFileSync(manifestPath);
   const normalizedBuf = fs.readFileSync(normalizedPath);
 
   return {
@@ -946,7 +1002,8 @@ function buildPackageFromDisk({ artifactDir, sourceSha256 }) {
       normalizedPngSha256: sha256Hex(normalizedBuf),
       atlasPngSha256: sha256Hex(atlasBuf),
       atlas2xPngSha256: sha256Hex(atlas2xBuf),
-      metadataJsonSha256: sha256Hex(metaBuf)
+      metadataJsonSha256: sha256Hex(metaBuf),
+      manifestJsonSha256: sha256Hex(manifestBuf)
     },
     qc: qcRaw?.qc || null,
     paths: {
@@ -960,6 +1017,7 @@ function buildPackageFromDisk({ artifactDir, sourceSha256 }) {
       atlasPath,
       atlas2xPath,
       metadataPath,
+      manifestPath,
       previewDir,
       previewByMeaning: {
         left: path.join(previewDir, 'walk_left.png'),
@@ -1030,6 +1088,7 @@ async function runPipelineJob(job) {
     const atlasBuf = fs.readFileSync(rendered.atlasPath);
     const atlas2xBuf = fs.readFileSync(rendered.atlas2xPath);
     const metaBuf = fs.readFileSync(rendered.metadataPath);
+    const manifestBuf = fs.readFileSync(rendered.manifestPath);
 
     const pkg = {
       pipelineVersion: PIPELINE_VERSION,
@@ -1039,7 +1098,8 @@ async function runPipelineJob(job) {
         normalizedPngSha256: normalizedSha256,
         atlasPngSha256: sha256Hex(atlasBuf),
         atlas2xPngSha256: sha256Hex(atlas2xBuf),
-        metadataJsonSha256: sha256Hex(metaBuf)
+        metadataJsonSha256: sha256Hex(metaBuf),
+        manifestJsonSha256: sha256Hex(manifestBuf)
       },
       qc,
       paths: {
@@ -1053,6 +1113,7 @@ async function runPipelineJob(job) {
         atlasPath: rendered.atlasPath,
         atlas2xPath: rendered.atlas2xPath,
         metadataPath: rendered.metadataPath,
+        manifestPath: rendered.manifestPath,
         previewDir: rendered.previewDir,
         previewByMeaning: rendered.previewByMeaning
       }
@@ -1274,6 +1335,7 @@ function resolveAvatarAssetPath(avatarId, kind) {
   if (kind === 'atlas') return avatar.package.paths.atlasPath;
   if (kind === 'atlas2x') return avatar.package.paths.atlas2xPath;
   if (kind === 'metadata') return avatar.package.paths.metadataPath;
+  if (kind === 'manifest') return avatar.package.paths.manifestPath;
   if (kind === 'previewDir') return avatar.package.paths.previewDir;
 
   if (kind && kind.startsWith('stage:')) {
@@ -1301,7 +1363,8 @@ function buildPackagePayload(avatarId) {
     assets: {
       atlasPng: `/api/avatar/${encodeURIComponent(avatar.avatarId)}/atlas.png`,
       atlas2xPng: `/api/avatar/${encodeURIComponent(avatar.avatarId)}/atlas@2x.png`,
-      metadataJson: `/api/avatar/${encodeURIComponent(avatar.avatarId)}/atlas.json`
+      metadataJson: `/api/avatar/${encodeURIComponent(avatar.avatarId)}/atlas.json`,
+      manifestJson: `/api/avatar/${encodeURIComponent(avatar.avatarId)}/manifest.json`
     }
   };
 }

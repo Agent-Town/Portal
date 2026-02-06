@@ -47,7 +47,7 @@ test('world runtime maps movement state to correct clip+direction', async ({ pag
   await page.dispatchEvent('[data-testid="dpad-left"]', 'pointerdown');
   await page.waitForTimeout(300);
   await expect(state).toContainText('clip=walk');
-  await expect(state).toContainText('dir=west');
+  await expect(state).toContainText('dir=sw');
 
   const t1 = await state.textContent();
   await page.waitForTimeout(300);
@@ -77,7 +77,7 @@ test.describe('mobile', () => {
     const b = await state.textContent();
 
     expect(b).not.toBe(a);
-    await expect(state).toContainText('dir=south');
+    await expect(state).toContainText('dir=se');
 
     await page.dispatchEvent('[data-testid="dpad-down"]', 'pointerup');
     await page.waitForTimeout(150);

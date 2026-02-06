@@ -90,10 +90,10 @@ function startDirectionalPreview({ metadata, atlasImg, atlasScale }) {
   if (previewPanel) previewPanel.classList.remove('is-hidden');
 
   const directions = [
-    { dir: 'south', canvas: el('prevSouth') },
-    { dir: 'north', canvas: el('prevNorth') },
-    { dir: 'west', canvas: el('prevWest') },
-    { dir: 'east', canvas: el('prevEast') }
+    { dir: 'se', canvas: el('prevSE') },
+    { dir: 'sw', canvas: el('prevSW') },
+    { dir: 'nw', canvas: el('prevNW') },
+    { dir: 'ne', canvas: el('prevNE') }
   ];
 
   const targetW = metadata.frame.w * 2;
@@ -124,8 +124,8 @@ function startDirectionalPreview({ metadata, atlasImg, atlasScale }) {
 
   function tick(now) {
     const t = now - startAt;
-    const idxSouth = frameIndex(framesByDir.south, t);
-    setDebug(`atlasScale=${atlasScale} walk(south) frame=${idxSouth}`);
+    const idxSe = frameIndex(framesByDir.se, t);
+    setDebug(`atlasScale=${atlasScale} walk(se) frame=${idxSe}`);
 
     for (const { dir, ctx } of contexts) {
       const frames = framesByDir[dir];

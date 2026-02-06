@@ -285,7 +285,8 @@ Response:
     "normalizedPngSha256": "hex",
     "atlasPngSha256": "hex",
     "atlas2xPngSha256": "hex",
-    "metadataJsonSha256": "hex"
+    "metadataJsonSha256": "hex",
+    "manifestJsonSha256": "hex"
   },
   "qc": {
     "silhouetteIntegrity": 0.712,
@@ -297,7 +298,8 @@ Response:
   "assets": {
     "atlasPng": "/api/avatar/ava_.../atlas.png",
     "atlas2xPng": "/api/avatar/ava_.../atlas@2x.png",
-    "metadataJson": "/api/avatar/ava_.../atlas.json"
+    "metadataJson": "/api/avatar/ava_.../atlas.json",
+    "manifestJson": "/api/avatar/ava_.../manifest.json"
   }
 }
 ```
@@ -315,6 +317,9 @@ Returns a nearest-neighbor `x2` atlas (`image/png`).
 
 ### GET `/api/avatar/:avatarId/atlas.json` (human)
 Returns generated atlas metadata JSON.
+
+### GET `/api/avatar/:avatarId/manifest.json` (human)
+Returns a versioned manifest JSON for runtime loaders (projection + tile footprint + pivot + clip row ranges).
 
 ### GET `/api/avatar/:avatarId/stages/:name` (human)
 Returns pipeline stage artifacts (debug/testing).

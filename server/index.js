@@ -954,6 +954,19 @@ app.get('/api/avatar/:avatarId/atlas.json', (req, res) => {
   res.send(fs.readFileSync(metadataPath, 'utf8'));
 });
 
+app.get('/api/avatar/:avatarId/manifest.json', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const manifestPath = resolveAvatarAssetPath(avatarId, 'manifest');
+  if (!manifestPath || !fs.existsSync(manifestPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/json');
+  res.send(fs.readFileSync(manifestPath, 'utf8'));
+});
+
 app.get('/api/avatar/:avatarId/stages/:name', (req, res) => {
   const s = ensureHumanSession(req, res);
   const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';

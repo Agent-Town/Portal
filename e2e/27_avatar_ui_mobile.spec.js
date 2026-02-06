@@ -15,5 +15,5 @@ test('mobile UI: upload -> preview without layout break', async ({ page }) => {
   await page.getByTestId('avatar-upload-btn').click();
 
   await expect(page.getByTestId('avatar-preview-panel')).toBeVisible();
-  await expect(page.getByTestId('prev-north')).toBeVisible();
+  await expect(page.getByTestId('prev-ne')).toBeVisible();
 });

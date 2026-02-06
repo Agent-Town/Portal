@@ -30,12 +30,18 @@ This is optimized for:
 
 For each accepted upload, publish an `AvatarPackage`:
 
-- `idle`: 4 directions (`north`, `south`, `east`, `west`), 2 frames each.
-- `walk`: 4 directions, 8 frames each.
+- `idle`: 4 diagonal facings (`se`, `sw`, `nw`, `ne`), 2 frames each.
+- `walk`: 4 diagonal facings, 8 frames each.
 - Base frame size: `48x72`.
-- Delivery scale: `x1` and `x2` (`64x96`) nearest-neighbor.
+- Delivery scale: `x1` and `x2` (`96x144`) nearest-neighbor.
 - Transparent background.
-- Sprite atlas PNG + JSON metadata.
+- Sprite atlas PNG + JSON metadata (`atlas.json`).
+- Versioned `manifest.json` for runtime loaders (projection + tile footprint + pivot + clip row ranges).
+
+Isometric requirements:
+- Projection: 2:1 "diamond" pixel isometric.
+- Tile footprint: `64x32`.
+- Sprite pivot: character feet (`bottom-center`) published as metadata (`pivot`).
 
 `AvatarPackage` must be deterministic:
 - Same source bytes + same pipeline version + same template version => identical output hashes.
@@ -93,7 +99,7 @@ For each accepted upload, publish an `AvatarPackage`:
 
 5. **Render**
 - Play fixed animation clips (`idle`, `walk`) over rig.
-- Render four directions via deterministic transforms and layer swaps.
+- Render 4 isometric facings (`se`, `sw`, `nw`, `ne`) via deterministic transforms and layer swaps.
 
 6. **Quality gate**
 - Reject if silhouette, jitter, or identity score below threshold.
@@ -144,11 +150,15 @@ Multipart upload, returns job:
   "templateVersion": "t1.0.0",
   "hashes": {
     "atlasPngSha256": "...",
-    "metadataJsonSha256": "..."
+    "atlas2xPngSha256": "...",
+    "metadataJsonSha256": "...",
+    "manifestJsonSha256": "..."
   },
   "assets": {
     "atlasPng": "/api/avatar/ava_.../atlas.png",
-    "metadataJson": "/api/avatar/ava_.../atlas.json"
+    "atlas2xPng": "/api/avatar/ava_.../atlas@2x.png",
+    "metadataJson": "/api/avatar/ava_.../atlas.json",
+    "manifestJson": "/api/avatar/ava_.../manifest.json"
   }
 }
 ```

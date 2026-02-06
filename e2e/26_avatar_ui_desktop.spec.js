@@ -12,10 +12,10 @@ test('desktop UI: upload -> processing -> preview loop', async ({ page }) => {
   await page.getByTestId('avatar-upload-btn').click();
 
   await expect(page.getByTestId('avatar-preview-panel')).toBeVisible();
-  await expect(page.getByTestId('prev-south')).toBeVisible();
+  await expect(page.getByTestId('prev-se')).toBeVisible();
 
   const debug = page.getByTestId('avatar-debug');
-  await expect(debug).toContainText('walk(south) frame=');
+  await expect(debug).toContainText('walk(se) frame=');
 
   const t1 = await debug.textContent();
   await page.waitForTimeout(350);

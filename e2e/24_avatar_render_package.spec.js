@@ -17,6 +17,7 @@ test('package contains idle+walk for 4 directions and ships x1 + x2 atlases', as
   expect(pkg.hashes.atlasPngSha256).toMatch(/^[a-f0-9]{64}$/);
   expect(pkg.hashes.atlas2xPngSha256).toMatch(/^[a-f0-9]{64}$/);
   expect(pkg.hashes.metadataJsonSha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(pkg.hashes.manifestJsonSha256).toMatch(/^[a-f0-9]{64}$/);
 
   const metaResp = await request.get(pkg.assets.metadataJson);
   expect(metaResp.ok()).toBeTruthy();
@@ -25,10 +26,24 @@ test('package contains idle+walk for 4 directions and ships x1 + x2 atlases', as
   expect(meta.frame.w).toBe(48);
   expect(meta.frame.h).toBe(72);
 
-  for (const dir of ['south', 'north', 'east', 'west']) {
+  for (const dir of ['se', 'sw', 'nw', 'ne']) {
     expect(meta.clips.idle[dir].length).toBe(2);
     expect(meta.clips.walk[dir].length).toBe(8);
   }
+
+  const manifestResp = await request.get(pkg.assets.manifestJson);
+  expect(manifestResp.ok()).toBeTruthy();
+  const manifest = await manifestResp.json();
+  expect(manifest.projection.kind).toBe('iso-2:1');
+  expect(manifest.projection.tile.w).toBe(64);
+  expect(manifest.projection.tile.h).toBe(32);
+  expect(manifest.sprite.frame.w).toBe(48);
+  expect(manifest.sprite.frame.h).toBe(72);
+  expect(manifest.sprite.pivot.name).toBe('feet');
+  expect(manifest.sprite.pivot.x).toBe(24);
+  expect(manifest.sprite.pivot.y).toBe(72);
+  expect(manifest.clips.walk.se.frames).toBe(8);
+  expect(manifest.clips.idle.nw.frames).toBe(2);
 
   const atlasResp = await request.get(pkg.assets.atlasPng);
   expect(atlasResp.ok()).toBeTruthy();
@@ -79,6 +94,7 @@ test('package contains idle+walk for 4 directions and ships x1 + x2 atlases', as
     const pkg2 = await pkgResp2.json();
     expect(pkg2.hashes.atlasPngSha256).toBe(pkg.hashes.atlasPngSha256);
     expect(pkg2.hashes.metadataJsonSha256).toBe(pkg.hashes.metadataJsonSha256);
+    expect(pkg2.hashes.manifestJsonSha256).toBe(pkg.hashes.manifestJsonSha256);
   } finally {
     await isolated.dispose();
   }

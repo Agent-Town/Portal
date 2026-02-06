@@ -59,7 +59,7 @@
     <div class="panel hero">
       <h1>Deterministic avatar sprites.</h1>
       <p>
-        Upload a character image and get a stable 4-direction idle+walk pack.
+        Upload a character image and get a stable 4-direction (isometric) idle+walk pack.
         No prompting.
       </p>
     </div>
@@ -85,20 +85,20 @@
       </p>
       <div class="avatarGrid" id="avatarPreviewGrid">
         <div class="avatarCard">
-          <div class="small">Walk south</div>
-          <canvas class="avatarCanvas" id="prevSouth" data-testid="prev-south"></canvas>
+          <div class="small">Walk SE</div>
+          <canvas class="avatarCanvas" id="prevSE" data-testid="prev-se"></canvas>
         </div>
         <div class="avatarCard">
-          <div class="small">Walk north</div>
-          <canvas class="avatarCanvas" id="prevNorth" data-testid="prev-north"></canvas>
+          <div class="small">Walk SW</div>
+          <canvas class="avatarCanvas" id="prevSW" data-testid="prev-sw"></canvas>
         </div>
         <div class="avatarCard">
-          <div class="small">Walk west</div>
-          <canvas class="avatarCanvas" id="prevWest" data-testid="prev-west"></canvas>
+          <div class="small">Walk NW</div>
+          <canvas class="avatarCanvas" id="prevNW" data-testid="prev-nw"></canvas>
         </div>
         <div class="avatarCard">
-          <div class="small">Walk east</div>
-          <canvas class="avatarCanvas" id="prevEast" data-testid="prev-east"></canvas>
+          <div class="small">Walk NE</div>
+          <canvas class="avatarCanvas" id="prevNE" data-testid="prev-ne"></canvas>
         </div>
       </div>
       <div class="small" id="avatarDebug" data-testid="avatar-debug" style="margin-top:10px; color: var(--muted)"></div>
