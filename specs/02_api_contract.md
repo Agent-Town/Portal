@@ -432,6 +432,50 @@ Body:
 ```
 Requires house-auth and message must belong to that house.
 
+### GET `/api/pony/friends?houseId=...`
+Returns a minimal friends list for a house. Requires house-auth.
+
+Friends are:
+- Derived from accepted inbox messages (accepted senders/receivers) with `sources: ["accepted"]`.
+- Manually added entries stored on the house with `sources: ["manual"]`.
+
+Response:
+```json
+{
+  "ok": true,
+  "houseId": "<base58>",
+  "friends": [
+    {
+      "houseId": "<base58>",
+      "sources": ["accepted", "manual"],
+      "label": "optional nickname",
+      "addedAt": "ISO8601|null",
+      "erc8004Id": "11155111:123|null"
+    }
+  ]
+}
+```
+
+### POST `/api/pony/friends`
+Body:
+```json
+{
+  "houseId": "<houseId or shareId>",
+  "friendHouseId": "<optional houseId or shareId>",
+  "friendErc8004Id": "<optional e.g. 11155111:123>",
+  "label": "optional nickname"
+}
+```
+Requires house-auth. Friend target is resolved to canonical `houseId`.
+
+Errors:
+- `MISSING_HOUSE`
+- `MISSING_FRIEND`
+- `HOUSE_NOT_FOUND`
+- `FRIEND_NOT_FOUND`
+- `SELF_FRIEND`
+- standard house-auth errors.
+
 ### POST `/api/pony/vault/append`
 Body:
 ```json

@@ -33,11 +33,28 @@
     </div>
 
     <div class="panel">
-      <h2>Send a note</h2>
-      <p class="muted">Pony Express v0.1: envelope format is now explicit and inbox actions require house-auth.</p>
-      <textarea id="body" rows="5" style="width:100%;"></textarea>
+      <h2>Friends</h2>
+      <p class="muted">Derived from accepted senders. Add by houseId or erc8004Id.</p>
+
+      <div id="friends" class="stack"></div>
+
+      <div class="divider"></div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <input id="addFriendInput" placeholder="houseId or erc8004Id (11155111:123)" style="flex:1;" />
+        <button class="btn" id="addFriendBtn">Add</button>
+      </div>
+      <div id="friendsStatus" class="muted" style="margin-top:8px;"></div>
+
+      <div class="divider"></div>
+
+      <h3 style="margin:0 0 6px">Compose</h3>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <select id="friendSelect" style="flex:1;"></select>
+        <input id="toInput" placeholder="toHouseId or erc8004Id" style="flex:1;" />
+      </div>
+      <textarea id="body" rows="5" style="width:100%; margin-top:10px;"></textarea>
       <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
-        <input id="fromHouseId" placeholder="fromHouseId (optional)" style="flex:1;" />
         <button class="btn" id="sendBtn">Send</button>
       </div>
       <div id="sendStatus" class="muted" style="margin-top:8px;"></div>

@@ -248,6 +248,35 @@ function ensureHouseVault(house) {
   return house.ponyVault;
 }
 
+function normalizePonyFriendLabel(label) {
+  if (typeof label !== 'string') return null;
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  return trimmed.length > 64 ? trimmed.slice(0, 64) : trimmed;
+}
+
+function ensureHousePonyFriends(house) {
+  if (!house || typeof house !== 'object') return [];
+  if (!Array.isArray(house.ponyFriends)) house.ponyFriends = [];
+  house.ponyFriends = house.ponyFriends.filter(
+    (f) => f && typeof f === 'object' && typeof f.houseId === 'string' && f.houseId.trim()
+  );
+  return house.ponyFriends;
+}
+
+function deriveHousePonyFriendsFromAcceptedInbox(store, houseId) {
+  const out = new Set();
+  for (const m of store?.inbox || []) {
+    if (!m || m.status !== 'accepted') continue;
+    const from = typeof m.fromHouseId === 'string' ? m.fromHouseId : '';
+    const to = typeof m.toHouseId === 'string' ? m.toHouseId : '';
+
+    if (to === houseId && from && from !== houseId) out.add(from);
+    if (from === houseId && to && to !== houseId) out.add(to);
+  }
+  return [...out];
+}
+
 function computeVaultEventHash(event) {
   const payload = {
     id: event.id,
@@ -1703,6 +1732,89 @@ app.post('/api/pony/policy', (req, res) => {
     }
     return res.status(400).json({ ok: false, error: 'INVALID_POLICY' });
   }
+});
+
+app.get('/api/pony/friends', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const derived = deriveHousePonyFriendsFromAcceptedInbox(store, resolved.houseId);
+  const manual = ensureHousePonyFriends(resolved.house);
+
+  const friendMap = new Map();
+  for (const friendHouseId of derived) {
+    friendMap.set(friendHouseId, { houseId: friendHouseId, sources: ['accepted'] });
+  }
+
+  for (const f of manual) {
+    const friendHouseId = typeof f?.houseId === 'string' ? f.houseId.trim() : '';
+    if (!friendHouseId || friendHouseId === resolved.houseId) continue;
+
+    const prev = friendMap.get(friendHouseId);
+    const sources = new Set(Array.isArray(prev?.sources) ? prev.sources : []);
+    sources.add('manual');
+    if (prev?.sources?.includes?.('accepted')) sources.add('accepted');
+
+    friendMap.set(friendHouseId, {
+      houseId: friendHouseId,
+      sources: [...sources],
+      label: normalizePonyFriendLabel(f?.label),
+      addedAt: typeof f?.addedAt === 'string' ? f.addedAt : null,
+      erc8004Id: typeof f?.erc8004Id === 'string' ? f.erc8004Id : null
+    });
+  }
+
+  const friends = [...friendMap.values()].sort((a, b) => String(a.houseId).localeCompare(String(b.houseId)));
+  return res.json({ ok: true, houseId: resolved.houseId, friends });
+});
+
+app.post('/api/pony/friends', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const friendHouseAddress = typeof req.body?.friendHouseId === 'string' ? req.body.friendHouseId.trim() : '';
+  const friendErc8004Id = typeof req.body?.friendErc8004Id === 'string' ? req.body.friendErc8004Id.trim() : '';
+  if (!friendHouseAddress && !friendErc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_FRIEND' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  let friendResolved = null;
+  if (friendHouseAddress) friendResolved = resolveHouseAddress(store, friendHouseAddress);
+  if (!friendResolved && friendErc8004Id) friendResolved = resolveHouseByErc8004Id(store, friendErc8004Id);
+  if (!friendResolved) return res.status(404).json({ ok: false, error: 'FRIEND_NOT_FOUND' });
+  if (friendResolved.houseId === resolved.houseId) return res.status(400).json({ ok: false, error: 'SELF_FRIEND' });
+
+  const label = normalizePonyFriendLabel(req.body?.label);
+  const friends = ensureHousePonyFriends(resolved.house);
+  const existing = friends.find((f) => f && f.houseId === friendResolved.houseId) || null;
+  if (existing) {
+    if (label) existing.label = label;
+    if (!existing.erc8004Id && friendResolved.erc8004Id) existing.erc8004Id = friendResolved.erc8004Id;
+  } else {
+    friends.unshift({
+      houseId: friendResolved.houseId,
+      erc8004Id: friendResolved.erc8004Id || null,
+      label: label || null,
+      addedAt: nowIso()
+    });
+  }
+
+  writeStore(store);
+  return res.json({ ok: true, houseId: resolved.houseId, friend: { houseId: friendResolved.houseId } });
 });
 
 app.get('/api/pony/vault', (req, res) => {
