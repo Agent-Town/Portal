@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>World — Agent Town</title>
+  <meta name="description" content="Public world map for houses and inhabitants in Agent Town." />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/logo.jpg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/world.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <a class="logoLink" href="/" aria-label="Agent Town home">
+          <img class="logoImg" src="/logo.jpg" alt="" />
+        </a>
+        <strong>World</strong>
+        <span class="badge">public map</span>
+      </div>
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/create">Create</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h1 data-testid="world-title">Agent Town World</h1>
+      <p class="small">
+        Public read-only map of houses and inhabitants. Pan to explore and click a marker for details.
+      </p>
+      <div class="kv world-meta">
+        <span class="pill">Instance: <strong id="worldInstance" data-testid="world-instance">public</strong></span>
+        <span class="pill">Houses: <strong id="worldHouseCount" data-testid="world-house-count">0</strong></span>
+        <span class="pill">Inhabitants: <strong id="worldInhabitantCount" data-testid="world-inhabitant-count">0</strong></span>
+        <span class="pill">Camera X: <strong id="worldCameraX" data-testid="world-camera-x">0</strong></span>
+        <span class="pill">Camera Y: <strong id="worldCameraY" data-testid="world-camera-y">0</strong></span>
+        <span class="pill">Zoom: <strong id="worldCameraZoom" data-testid="world-camera-zoom">1.00</strong></span>
+        <span class="pill">View: <strong id="worldViewMode" data-testid="world-view-mode">topdown</strong></span>
+        <span class="pill world-status" id="worldStatus" data-testid="world-status">Loading…</span>
+      </div>
+      <div class="kv world-controls">
+        <button class="btn" id="worldPanLeftBtn" data-testid="world-pan-left">Pan left</button>
+        <button class="btn" id="worldPanRightBtn" data-testid="world-pan-right">Pan right</button>
+        <button class="btn" id="worldPanUpBtn" data-testid="world-pan-up">Pan up</button>
+        <button class="btn" id="worldPanDownBtn" data-testid="world-pan-down">Pan down</button>
+        <button class="btn" id="worldZoomInBtn" data-testid="world-zoom-in">Zoom in</button>
+        <button class="btn" id="worldZoomOutBtn" data-testid="world-zoom-out">Zoom out</button>
+        <button class="btn" id="worldResetViewBtn" data-testid="world-reset-view">Reset view</button>
+        <a class="btn" href="/world" data-testid="world-view-topdown">Top-down</a>
+        <a class="btn" href="/world?view=iso" data-testid="world-view-iso">2.5D (iso)</a>
+      </div>
+      <div id="worldCanvas" class="world-canvas" data-testid="world-canvas"></div>
+      <div class="world-visible-wrap">
+        <h3>Visible on camera</h3>
+        <ol id="worldVisibleHouseList" class="world-visible-house-list" data-testid="world-visible-house-list"></ol>
+      </div>
+    </div>
+
+    <div class="row two world-panels">
+      <div class="panel">
+        <h2>Houses</h2>
+        <ol class="world-house-list" id="worldHouseList" data-testid="world-house-list"></ol>
+      </div>
+      <div class="panel">
+        <h2>House details</h2>
+        <div id="worldHouseDetail" data-testid="world-house-detail" class="world-house-detail"></div>
+      </div>
+    </div>
+
+    <div class="row two world-panels">
+      <div class="panel">
+        <h2>Realtime</h2>
+        <div class="kv world-controls">
+          <button class="btn primary" id="worldJoinBtn" data-testid="world-join-btn">Join instance</button>
+          <button class="btn" id="worldLeaveBtn" data-testid="world-leave-btn" disabled>Leave</button>
+          <span class="pill" id="worldRealtimeStatus" data-testid="world-realtime-status">Disconnected</span>
+          <span class="pill">Instance: <strong id="worldRealtimeInstance" data-testid="world-realtime-instance">-</strong></span>
+          <span class="pill">Players: <strong id="worldPlayerCount" data-testid="world-player-count">0</strong></span>
+        </div>
+        <div class="kv world-controls">
+          <button class="btn" id="worldMoveLeftBtn" data-testid="world-move-left" disabled>Move left</button>
+          <button class="btn" id="worldMoveRightBtn" data-testid="world-move-right" disabled>Move right</button>
+          <button class="btn" id="worldMoveUpBtn" data-testid="world-move-up" disabled>Move up</button>
+          <button class="btn" id="worldMoveDownBtn" data-testid="world-move-down" disabled>Move down</button>
+        </div>
+        <div class="world-visible-wrap">
+          <h3>Players</h3>
+          <ol id="worldPlayerList" data-testid="world-player-list" class="world-visible-house-list"></ol>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Special house interactions</h2>
+        <div class="kv world-controls">
+          <label class="small" for="worldInteractTarget">Target house</label>
+          <select id="worldInteractTarget" data-testid="world-interact-target"></select>
+          <button class="btn" id="worldInteractBtn" data-testid="world-interact-btn" disabled>Interact</button>
+        </div>
+        <div class="world-visible-wrap">
+          <h3>Interaction log</h3>
+          <ol id="worldInteractionLog" data-testid="world-interaction-log" class="world-visible-house-list"></ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel world-panels">
+      <h2>Clip recording</h2>
+      <div class="kv world-controls">
+        <button class="btn primary" id="worldRecordBtn" data-testid="world-record-btn">Start recording</button>
+        <button class="btn" id="worldUploadClipBtn" data-testid="world-upload-clip-btn" disabled>Upload clip</button>
+        <span class="pill" id="worldRecordStatus" data-testid="world-record-status">Idle</span>
+        <span class="pill">Duration: <strong id="worldClipDuration" data-testid="world-clip-duration">0.0s</strong></span>
+      </div>
+      <div class="kv">
+        <a id="worldClipDownload" data-testid="world-clip-download" class="btn is-hidden" download="agent-town-clip.webm">Download clip</a>
+        <a id="worldClipShareLink" data-testid="world-clip-share-link" class="btn is-hidden" target="_blank" rel="noreferrer">Open share</a>
+      </div>
+      <div class="small" id="worldUploadStatus" data-testid="world-upload-status"></div>
+    </div>
+  </div>
+
+  <script src="/vendor/phaser/phaser.min.js"></script>
+  <script src="/vendor/colyseus/colyseus.js"></script>
+  <script src="/world.js?v=20260206"></script>
+</body>
+</html>

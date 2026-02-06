@@ -12,6 +12,8 @@ module.exports = defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   expect: { timeout: 8_000 },
+  // Shared in-memory session state + global reset endpoint require serial test execution.
+  workers: 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   projects: [

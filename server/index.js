@@ -3,11 +3,15 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+const { spawn } = require('child_process');
 const zlib = require('zlib');
 const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
+const { getWorldSnapshot, upsertTestWorldEntry, resetWorldState } = require('./world');
+const { createPresenceAdapter, WorldInstanceManager } = require('./world_instances');
+const { startWorldRealtimeServer } = require('./world_realtime');
 const {
   createSession,
   getSessionById,
@@ -148,6 +152,8 @@ app.use((err, req, res, next) => {
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
 const ASSETS_DIR = path.join(process.cwd(), 'assets');
+const PHASER_DIST_DIR = path.join(process.cwd(), 'node_modules', 'phaser', 'dist');
+const COLYSEUS_DIST_DIR = path.join(process.cwd(), 'node_modules', 'colyseus.js', 'dist');
 const isProd = process.env.NODE_ENV === 'production';
 const ELIZATOWN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
@@ -169,7 +175,21 @@ function setSecurityHeaders(req, res, next) {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'DENY');
 
-  const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
+  const runtimePort = Number(process.env.PORT || 4173);
+  const runtimeRtPort = Number(process.env.WORLD_RT_PORT || runtimePort + 1);
+  const connectSrc = [
+    "'self'",
+    'https://eth.llamarpc.com',
+    'https://rpc.ankr.com',
+    `http://localhost:${runtimeRtPort}`,
+    `https://localhost:${runtimeRtPort}`,
+    `ws://localhost:${runtimeRtPort}`,
+    `wss://localhost:${runtimeRtPort}`,
+    `http://[::1]:${runtimeRtPort}`,
+    `https://[::1]:${runtimeRtPort}`,
+    `ws://[::1]:${runtimeRtPort}`,
+    `wss://[::1]:${runtimeRtPort}`
+  ];
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -419,6 +439,15 @@ const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
 const MIN_AGENT_SOLO_PIXELS = 20;
+const TEST_HOUSE_AUTH_KEY = Buffer.from('test-house-auth-key-material', 'utf8').toString('base64');
+const CLIP_MIN_SECONDS = 1;
+const CLIP_MAX_SECONDS = 60;
+const MAX_CLIP_UPLOAD_BYTES = 8 * 1024 * 1024;
+const MEDIA_DIR = path.join(process.cwd(), 'data', 'media', 'clips');
+
+let worldInstanceManager = null;
+let worldRealtime = null;
+const clipFinalizeTimers = new Map();
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -703,9 +732,336 @@ function verifyHouseAuth(req, house) {
   return { ok: true };
 }
 
+function formatWsHost(hostname) {
+  if (!hostname) return 'localhost';
+  if (hostname.includes(':') && !hostname.startsWith('[')) return `[${hostname}]`;
+  return hostname;
+}
+
+function worldRealtimeWsUrl(req) {
+  const hostOverride = process.env.WORLD_RT_PUBLIC_HOST || '';
+  const host = hostOverride || formatWsHost(req.hostname || 'localhost');
+  const wsProto = req.secure || req.protocol === 'https' ? 'https' : 'http';
+  const port = worldRealtime?.port || Number(process.env.WORLD_RT_PORT || 2570);
+  return `${wsProto}://${host}:${port}`;
+}
+
+function ensureMediaDir() {
+  fs.mkdirSync(MEDIA_DIR, { recursive: true });
+}
+
+function clipSourcePath(clipId) {
+  return path.join(MEDIA_DIR, `${clipId}.webm`);
+}
+
+function clipFinalPath(clipId) {
+  return path.join(MEDIA_DIR, `${clipId}.mp4`);
+}
+
+function clipPublicPath(filename) {
+  return `/media/clips/${filename}`;
+}
+
+function toBase64Bytes(input) {
+  if (typeof input !== 'string' || !input) return null;
+  try {
+    return Buffer.from(input, 'base64');
+  } catch {
+    return null;
+  }
+}
+
+function findClipRecord(store, clipId) {
+  const clips = Array.isArray(store.clips) ? store.clips : [];
+  return clips.find((clip) => clip && clip.clipId === clipId) || null;
+}
+
+function serializeClip(clip) {
+  return {
+    clipId: clip.clipId,
+    ownerSessionId: clip.ownerSessionId,
+    instanceId: clip.instanceId,
+    durationSec: clip.durationSec,
+    status: clip.status,
+    error: clip.error || null,
+    storage: clip.storage || { sourceUrl: null, mp4Url: null },
+    sharePath: clip.sharePath || null,
+    createdAt: clip.createdAt,
+    updatedAt: clip.updatedAt || clip.createdAt
+  };
+}
+
+function scheduleClipFinalize(clipId) {
+  if (clipFinalizeTimers.has(clipId)) return;
+  const timer = setTimeout(() => {
+    clipFinalizeTimers.delete(clipId);
+    finalizeClip(clipId).catch((err) => {
+      console.warn('[clips] finalize failed', err?.message || err);
+    });
+  }, 250);
+  clipFinalizeTimers.set(clipId, timer);
+}
+
+function runFfmpegTranscode({ inputPath, outputPath }) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-y',
+      '-i',
+      inputPath,
+      // H.264 + faststart is broadly compatible for sharing.
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '28',
+      '-movflags',
+      '+faststart',
+      // No audio for now (canvas capture is silent in this MVP).
+      '-an',
+      outputPath
+    ];
+    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+      if (stderr.length > 8_000) stderr = stderr.slice(-8_000);
+    });
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code === 0) return resolve();
+      const err = new Error(`FFMPEG_${code || 0}`);
+      err.stderr = stderr;
+      return reject(err);
+    });
+  });
+}
+
+async function finalizeClip(clipId) {
+  const store = readStore();
+  const clip = findClipRecord(store, clipId);
+  if (!clip || clip.status !== 'processing') return;
+
+  ensureMediaDir();
+  const sourceUrl = clipPublicPath(`${clipId}.webm`);
+  const sourcePath = clipSourcePath(clipId);
+  const finalPath = clipFinalPath(clipId);
+
+  let mp4Url = null;
+
+  // In tests we upload synthetic bytes, so ffmpeg would fail. Keep tests deterministic.
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      await runFfmpegTranscode({ inputPath: sourcePath, outputPath: finalPath });
+      mp4Url = clipPublicPath(`${clipId}.mp4`);
+    } catch (err) {
+      // Fall back to sharing the original WebM if transcoding fails.
+      console.warn('[clips] transcode failed, using webm fallback', err?.message || err);
+      mp4Url = null;
+    }
+  }
+
+  clip.status = 'ready';
+  clip.storage = {
+    sourceUrl,
+    mp4Url
+  };
+  clip.sharePath = `/c/${clipId}`;
+  clip.updatedAt = nowIso();
+  clip.error = null;
+
+  writeStore(store);
+}
+
 // --- API ---
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
+});
+
+app.get('/api/world/snapshot', (req, res) => {
+  const instanceParam = typeof req.query?.instance === 'string' ? req.query.instance.trim() : '';
+  const instance = instanceParam || 'public';
+  const snapshot = getWorldSnapshot(instance, readStore());
+  if (!snapshot) {
+    return res.status(400).json({ ok: false, error: 'INVALID_INSTANCE' });
+  }
+  return res.json({
+    ok: true,
+    instance: snapshot.instance,
+    world: snapshot.world,
+    houses: snapshot.houses,
+    inhabitants: snapshot.inhabitants
+  });
+});
+
+app.get('/api/world/realtime/config', (req, res) => {
+  if (!worldRealtime) return res.status(503).json({ ok: false, error: 'REALTIME_UNAVAILABLE' });
+  return res.json({
+    ok: true,
+    roomName: worldRealtime.roomName,
+    wsUrl: worldRealtimeWsUrl(req),
+    policy: worldInstanceManager.getPolicy()
+  });
+});
+
+app.get('/api/world/instance/policy', (_req, res) => {
+  if (!worldInstanceManager) return res.status(503).json({ ok: false, error: 'REALTIME_UNAVAILABLE' });
+  return res.json({ ok: true, policy: worldInstanceManager.getPolicy() });
+});
+
+app.post('/api/world/instance/assign', (req, res) => {
+  if (!worldInstanceManager || !worldRealtime) {
+    return res.status(503).json({ ok: false, error: 'REALTIME_UNAVAILABLE' });
+  }
+  const s = ensureHumanSession(req, res);
+  const requestedInstanceId = typeof req.body?.instanceId === 'string' ? req.body.instanceId.trim() : '';
+  const assignment = worldInstanceManager.assign({
+    sessionId: s.sessionId,
+    houseId: s.houseCeremony?.houseId || null,
+    requestedInstanceId: requestedInstanceId || null
+  });
+  if (!assignment) return res.status(500).json({ ok: false, error: 'ASSIGNMENT_FAILED' });
+  return res.json({
+    ok: true,
+    instanceId: assignment.instanceId,
+    roomName: assignment.roomName,
+    policy: assignment.policy,
+    composition: assignment.composition,
+    houses: assignment.houses,
+    realtime: {
+      wsUrl: worldRealtimeWsUrl(req),
+      roomName: worldRealtime.roomName
+    }
+  });
+});
+
+app.get('/api/world/instance/:instanceId', async (req, res) => {
+  const instanceId = typeof req.params?.instanceId === 'string' ? req.params.instanceId.trim() : '';
+  if (!instanceId) return res.status(400).json({ ok: false, error: 'MISSING_INSTANCE_ID' });
+  const instance = worldInstanceManager.getInstance(instanceId);
+  if (!instance) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const presence = await worldInstanceManager.presence.count(instanceId);
+  return res.json({ ok: true, instance: { ...instance, presence } });
+});
+
+app.get('/api/world/houses/:houseId', (req, res) => {
+  const houseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+
+  const instanceParam = typeof req.query?.instance === 'string' ? req.query.instance.trim() : '';
+  const instance = instanceParam || 'public';
+  const snapshot = getWorldSnapshot(instance, readStore());
+  if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_INSTANCE' });
+
+  const house = snapshot.houses.find((item) => item.houseId === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const inhabitants = snapshot.inhabitants.filter((inh) => inh.houseId === houseId);
+  return res.json({ ok: true, house, inhabitants });
+});
+
+app.get('/api/world/inhabitants/:inhabitantId', (req, res) => {
+  const inhabitantId = typeof req.params?.inhabitantId === 'string' ? req.params.inhabitantId.trim() : '';
+  if (!inhabitantId) return res.status(400).json({ ok: false, error: 'MISSING_INHABITANT_ID' });
+
+  const instanceParam = typeof req.query?.instance === 'string' ? req.query.instance.trim() : '';
+  const instance = instanceParam || 'public';
+  const snapshot = getWorldSnapshot(instance, readStore());
+  if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_INSTANCE' });
+
+  const inhabitant = snapshot.inhabitants.find((item) => item.inhabitantId === inhabitantId);
+  if (!inhabitant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.json({ ok: true, inhabitant });
+});
+
+app.post('/api/clips', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const durationSec = Number(req.body?.durationSec || 0);
+  const instanceId = typeof req.body?.instanceId === 'string' ? req.body.instanceId.trim() : null;
+  const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : null;
+  const sizeBytes = Number(req.body?.sizeBytes || 0);
+
+  if (!Number.isFinite(durationSec) || durationSec < CLIP_MIN_SECONDS || durationSec > CLIP_MAX_SECONDS) {
+    return res.status(400).json({ ok: false, error: 'INVALID_DURATION' });
+  }
+  if (mimeType && !mimeType.startsWith('video/')) {
+    return res.status(400).json({ ok: false, error: 'INVALID_CLIP' });
+  }
+  if (!Number.isFinite(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_CLIP_UPLOAD_BYTES) {
+    return res.status(400).json({ ok: false, error: 'INVALID_CLIP_SIZE' });
+  }
+
+  const store = readStore();
+  store.clips = Array.isArray(store.clips) ? store.clips : [];
+  const clipId = `clp_${randomHex(8)}`;
+  const clip = {
+    clipId,
+    ownerSessionId: s.sessionId,
+    instanceId: instanceId || null,
+    durationSec: Number(durationSec.toFixed(1)),
+    status: 'uploaded',
+    storage: { sourceUrl: null, mp4Url: null },
+    sharePath: null,
+    error: null,
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  store.clips.unshift(clip);
+  writeStore(store);
+  return res.json({ ok: true, clipId: clip.clipId, status: clip.status });
+});
+
+app.post('/api/clips/:clipId/upload-complete', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const clipId = typeof req.params?.clipId === 'string' ? req.params.clipId.trim() : '';
+  if (!clipId) return res.status(400).json({ ok: false, error: 'MISSING_CLIP_ID' });
+
+  const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : '';
+  const sizeBytes = Number(req.body?.sizeBytes || 0);
+  const dataBase64 = typeof req.body?.dataBase64 === 'string' ? req.body.dataBase64.trim() : '';
+  if (!mimeType.startsWith('video/')) return res.status(400).json({ ok: false, error: 'INVALID_CLIP' });
+  if (!Number.isFinite(sizeBytes) || sizeBytes < 1) return res.status(400).json({ ok: false, error: 'INVALID_CLIP_SIZE' });
+  if (sizeBytes > MAX_CLIP_UPLOAD_BYTES) return res.status(413).json({ ok: false, error: 'CLIP_TOO_LARGE' });
+  if (!dataBase64) return res.status(400).json({ ok: false, error: 'MISSING_DATA' });
+
+  const store = readStore();
+  const clip = findClipRecord(store, clipId);
+  if (!clip) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (clip.ownerSessionId !== s.sessionId) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  if (clip.status === 'ready' || clip.status === 'processing') {
+    return res.json({ ok: true, clipId: clip.clipId, status: clip.status });
+  }
+
+  const bytes = toBase64Bytes(dataBase64);
+  if (!bytes || !bytes.length) return res.status(400).json({ ok: false, error: 'INVALID_CLIP' });
+  if (bytes.length > MAX_CLIP_UPLOAD_BYTES) return res.status(413).json({ ok: false, error: 'CLIP_TOO_LARGE' });
+
+  try {
+    ensureMediaDir();
+    fs.writeFileSync(clipSourcePath(clipId), bytes);
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: 'CLIP_WRITE_FAILED' });
+  }
+
+  clip.status = 'processing';
+  clip.storage = {
+    sourceUrl: clipPublicPath(`${clipId}.webm`),
+    mp4Url: null
+  };
+  clip.updatedAt = nowIso();
+  writeStore(store);
+  scheduleClipFinalize(clipId);
+
+  return res.json({ ok: true, clipId: clip.clipId, status: clip.status });
+});
+
+app.get('/api/clips/:clipId', (req, res) => {
+  const clipId = typeof req.params?.clipId === 'string' ? req.params.clipId.trim() : '';
+  if (!clipId) return res.status(400).json({ ok: false, error: 'MISSING_CLIP_ID' });
+  const store = readStore();
+  const clip = findClipRecord(store, clipId);
+  if (!clip) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.json({ ok: true, ...serializeClip(clip) });
 });
 
 app.get('/api/session', (req, res) => {
@@ -1604,14 +1960,69 @@ app.get('/api/anchors/resolve', (req, res) => {
 
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
-  app.post('/__test__/reset', (_req, res) => {
+  app.post('/__test__/reset', async (_req, res) => {
     const token = process.env.TEST_RESET_TOKEN;
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [], clips: [] });
     resetAllSessions();
+    resetWorldState();
+    if (worldInstanceManager) await worldInstanceManager.reset();
     res.json({ ok: true });
+  });
+
+  app.post('/__test__/world/upsert', (req, res) => {
+    const instance = typeof req.body?.instance === 'string' ? req.body.instance.trim() : 'public';
+    const house = req.body?.house || null;
+    const inhabitants = Array.isArray(req.body?.inhabitants) ? req.body.inhabitants : [];
+    const houseId = typeof house?.houseId === 'string' ? house.houseId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+    const ok = upsertTestWorldEntry({ instance, house, inhabitants });
+    if (!ok) return res.status(400).json({ ok: false, error: 'INVALID_INSTANCE' });
+    return res.json({ ok: true });
+  });
+
+  app.post('/__test__/world/policy', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    if (!worldInstanceManager) return res.status(503).json({ ok: false, error: 'REALTIME_UNAVAILABLE' });
+    const policy = worldInstanceManager.setPolicy(req.body || {});
+    return res.json({ ok: true, policy });
+  });
+
+  app.post('/__test__/world/session-house', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+
+    const s = ensureHumanSession(req, res);
+    s.houseCeremony.houseId = houseId;
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, houseId);
+
+    const store = readStore();
+    if (!store.houses.find((h) => h.id === houseId)) {
+      store.houses.push({
+        id: houseId,
+        housePubKey: houseId,
+        createdAt: nowIso(),
+        nonce: `n_test_${randomHex(8)}`,
+        keyMode: 'ceremony',
+        unlock: null,
+        keyWrap: null,
+        authKey: TEST_HOUSE_AUTH_KEY,
+        entries: []
+      });
+      writeStore(store);
+    }
+    return res.json({ ok: true, houseId });
   });
 }
 
@@ -2105,11 +2516,91 @@ app.use(
   })
 );
 
+ensureMediaDir();
+app.use(
+  '/media/clips',
+  express.static(MEDIA_DIR, {
+    etag: true,
+    maxAge: isProd ? '1h' : 0,
+    setHeaders: (res) => {
+      if (!isProd) {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    }
+  })
+);
+
+if (fs.existsSync(PHASER_DIST_DIR)) {
+  app.use(
+    '/vendor/phaser',
+    express.static(PHASER_DIST_DIR, {
+      etag: true,
+      maxAge: isProd ? '1h' : 0,
+      setHeaders: (res) => {
+        if (!isProd) {
+          res.setHeader('Cache-Control', 'no-store');
+        }
+      }
+    })
+  );
+}
+
+if (fs.existsSync(COLYSEUS_DIST_DIR)) {
+  app.use(
+    '/vendor/colyseus',
+    express.static(COLYSEUS_DIST_DIR, {
+      etag: true,
+      maxAge: isProd ? '1h' : 0,
+      setHeaders: (res) => {
+        if (!isProd) {
+          res.setHeader('Cache-Control', 'no-store');
+        }
+      }
+    })
+  );
+}
+
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
+app.get('/world', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'world.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
+app.get('/c/:id', (req, res) => {
+  const clipId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!clipId) return res.status(400).send('Missing clip id');
+  const store = readStore();
+  const clip = findClipRecord(store, clipId);
+  if (!clip || clip.status !== 'ready' || (!clip.storage?.mp4Url && !clip.storage?.sourceUrl)) {
+    return res.status(404).send('Clip not found');
+  }
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const videoPath = clip.storage.mp4Url || clip.storage.sourceUrl;
+  const videoUrl = `${origin}${videoPath}`;
+  const videoType = videoPath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+  const title = `Agent Town clip ${clipId}`;
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtmlAttr(title)}</title>
+  <meta property="og:title" content="${escapeHtmlAttr(title)}" />
+  <meta property="og:type" content="video.other" />
+  <meta property="og:video" content="${escapeHtmlAttr(videoUrl)}" />
+  <meta property="og:video:type" content="${escapeHtmlAttr(videoType)}" />
+  <meta property="og:url" content="${escapeHtmlAttr(`${origin}/c/${clipId}`)}" />
+  <meta name="twitter:card" content="summary_large_image" />
+</head>
+<body style="font-family: monospace; margin: 20px;">
+  <h1>${escapeHtmlAttr(title)}</h1>
+  <video controls playsinline src="${escapeHtmlAttr(videoUrl)}" style="max-width: 100%;"></video>
+</body>
+</html>`;
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (!isProd) res.setHeader('Cache-Control', 'no-store');
+  return res.send(html);
+});
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;
   const store = readStore();
@@ -2129,6 +2620,30 @@ app.get('/s/:id', (req, res) => {
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
 const port = Number(process.env.PORT || 4173);
-app.listen(port, () => {
-  console.log(`[agent-town] http://localhost:${port}`);
+const realtimePort = Number(process.env.WORLD_RT_PORT || port + 1);
+
+async function start() {
+  const httpServer = http.createServer(app);
+  const presence = await createPresenceAdapter();
+  worldInstanceManager = new WorldInstanceManager({
+    getSnapshot: (instance) => getWorldSnapshot(instance, readStore()),
+    presence
+  });
+
+  worldRealtime = await startWorldRealtimeServer({
+    port: realtimePort,
+    publicPort: port,
+    manager: worldInstanceManager,
+    server: httpServer
+  });
+
+  httpServer.listen(port, () => {
+    console.log(`[agent-town] http://localhost:${port}`);
+    console.log(`[agent-town] realtime on same origin port ${worldRealtime.port}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('[agent-town] failed to start', err);
+  process.exit(1);
 });

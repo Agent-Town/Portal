@@ -1,0 +1,138 @@
+.world-meta {
+  margin-bottom: 10px;
+}
+
+.world-controls {
+  margin-bottom: 10px;
+}
+
+.world-controls .btn {
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+#worldInteractTarget {
+  min-width: 180px;
+  padding: 8px 10px;
+  border: 2px solid #4a3422;
+  border-radius: 4px;
+  font-family: inherit;
+  background: #f1ddb0;
+  color: #3b2b1e;
+}
+
+.world-status {
+  min-width: 140px;
+  justify-content: center;
+}
+
+.world-status.is-error {
+  background: #ffd5d2;
+  color: #812018;
+  border-color: #a53126;
+}
+
+.world-canvas {
+  width: 100%;
+  height: 520px;
+  border: 3px solid #3d2d1f;
+  border-radius: 6px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, #6fb8e8 0%, #9ed7ff 38%, #9bc77a 38%, #7cad64 100%),
+    radial-gradient(circle at 10% 10%, rgba(255, 255, 255, 0.6) 0 30%, rgba(255, 255, 255, 0) 60%);
+}
+
+.world-panels {
+  margin-top: 12px;
+}
+
+.world-visible-wrap {
+  margin-top: 12px;
+}
+
+.world-visible-wrap h3 {
+  margin: 0 0 8px;
+}
+
+.world-visible-house-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.world-house-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.world-house-list button {
+  all: unset;
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.world-house-list button:hover {
+  color: #174a88;
+}
+
+.world-house-list button.is-selected {
+  color: #173a32;
+  font-weight: 700;
+}
+
+.world-visible-house-list button {
+  all: unset;
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.world-visible-house-list button:hover {
+  color: #174a88;
+}
+
+.world-visible-house-list button.is-selected {
+  color: #173a32;
+  font-weight: 700;
+}
+
+.world-house-id {
+  display: inline-block;
+  min-width: 54px;
+}
+
+.world-house-name {
+  opacity: 0.85;
+}
+
+.world-house-detail {
+  min-height: 160px;
+  color: var(--muted);
+}
+
+.world-house-detail h3 {
+  margin: 0 0 8px;
+}
+
+.world-house-detail .small {
+  margin-top: 6px;
+}
+
+@media (max-width: 740px) {
+  .world-canvas {
+    height: 400px;
+  }
+}

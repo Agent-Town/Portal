@@ -12,8 +12,13 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@colyseus/ws-transport": "^0.16.5",
+    "colyseus": "^0.16.5",
+    "colyseus.js": "^0.16.5",
     "ethers": "^6.16.0",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "phaser": "^3.90.0",
+    "redis": "^4.7.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0"

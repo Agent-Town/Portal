@@ -33,6 +33,230 @@ Returns `{ ok: true, time: ISO8601 }`.
 
 ---
 
+## World map (read-only foundation)
+
+### GET `/api/world/snapshot?instance=public`
+Returns a deterministic world projection snapshot for visitors.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "instance": "public",
+  "world": {
+    "version": "world_projection_v1",
+    "seed": "test-world-v1",
+    "revision": "ab12cd34ef56",
+    "updatedAt": "2026-02-06T00:00:00.000Z",
+    "width": 2400,
+    "height": 1400
+  },
+  "houses": [
+    {
+      "houseId": "H_001",
+      "type": "experience",
+      "name": "Town Hall",
+      "instanceTags": ["welcome"],
+      "coord": { "x": 260, "y": 300 },
+      "spriteKey": "house.placeholder.townhall.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z",
+      "inhabitants": 1
+    }
+  ],
+  "inhabitants": [
+    {
+      "inhabitantId": "I_001",
+      "houseId": "H_001",
+      "label": "Mayor Bot",
+      "role": "npc",
+      "spriteKey": "inhabitant.placeholder.mayor.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+Errors:
+- `INVALID_INSTANCE` (400) for unsupported instance values.
+
+### GET `/api/world/houses/:houseId?instance=public`
+Returns a single house and its inhabitants from the projection.
+
+Response:
+```json
+{
+  "ok": true,
+  "house": {
+    "houseId": "H_001",
+    "type": "experience",
+    "name": "Town Hall",
+    "instanceTags": ["welcome", "events"],
+    "coord": { "x": 260, "y": 300 },
+    "spriteKey": "house.placeholder.townhall.v1",
+    "updatedAt": "2026-02-06T00:00:00.000Z",
+    "inhabitants": 1
+  },
+  "inhabitants": [
+    {
+      "inhabitantId": "I_001",
+      "houseId": "H_001",
+      "label": "Mayor Bot",
+      "role": "npc",
+      "spriteKey": "inhabitant.placeholder.mayor.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+Errors:
+- `MISSING_HOUSE_ID` (400)
+- `INVALID_INSTANCE` (400)
+- `NOT_FOUND` (404)
+
+### GET `/api/world/inhabitants/:inhabitantId?instance=public`
+Returns one inhabitant from the projection.
+
+Errors:
+- `MISSING_INHABITANT_ID` (400)
+- `INVALID_INSTANCE` (400)
+- `NOT_FOUND` (404)
+
+### GET `/api/world/realtime/config`
+Returns realtime client connection config.
+
+Response:
+```json
+{
+  "ok": true,
+  "roomName": "world_instance_v1",
+  "wsUrl": "http://localhost:4174",
+  "policy": {
+    "maxPlayers": 120,
+    "maxHouses": 400,
+    "minExperienceHouses": 20,
+    "strategy": "player_houses_plus_curated_fill_v1"
+  }
+}
+```
+
+### GET `/api/world/instance/policy`
+Returns active world instance policy.
+
+### POST `/api/world/instance/assign`
+Assigns the current session to an instance and returns the composed house set.
+
+Response:
+```json
+{
+  "ok": true,
+  "instanceId": "inst_public_001",
+  "roomName": "world_instance_v1",
+  "policy": { "maxPlayers": 120, "maxHouses": 400, "minExperienceHouses": 20, "strategy": "player_houses_plus_curated_fill_v1" },
+  "composition": {
+    "playerHouseIds": ["H_USER_001"],
+    "experienceHouses": 20
+  },
+  "houses": [],
+  "realtime": {
+    "wsUrl": "http://localhost:4174",
+    "roomName": "world_instance_v1"
+  }
+}
+```
+
+### GET `/api/world/instance/:instanceId`
+Returns instance membership and composed house set.
+
+Errors:
+- `MISSING_INSTANCE_ID` (400)
+- `NOT_FOUND` (404)
+
+### Test-only world helpers (`NODE_ENV=test`)
+- `POST /__test__/world/upsert` — inject/replace projection entries.
+- `POST /__test__/world/policy` — override instance policy for deterministic tests.
+- `POST /__test__/world/session-house` — assign a deterministic house to current test session.
+
+### Colyseus realtime room
+Room name: `world_instance_v1`
+
+Client -> server messages:
+- `move_intent { dirX, dirY, seq }`
+- `interact_intent { targetType, targetId }`
+
+Server -> client messages:
+- `room_joined { ok, instanceId, playerId }`
+- `state_patch { instanceId, players[], houses[], tickAt }`
+- `interaction_result { ok, ... }`
+
+---
+
+## Clips (record/upload/share)
+
+### POST `/api/clips`
+Creates a clip record for the current session.
+
+Validation:
+- `durationSec` must be in `[1, 60]`
+- `mimeType` must start with `video/`
+- `sizeBytes` must be > 0 and <= 8MB
+
+Errors:
+- `INVALID_DURATION`
+- `INVALID_CLIP`
+- `INVALID_CLIP_SIZE`
+
+### POST `/api/clips/:clipId/upload-complete`
+Uploads clip payload and starts async processing.
+
+Body:
+```json
+{
+  "mimeType": "video/webm",
+  "sizeBytes": 12345,
+  "dataBase64": "..."
+}
+```
+
+Errors:
+- `MISSING_CLIP_ID`
+- `MISSING_DATA`
+- `INVALID_CLIP`
+- `INVALID_CLIP_SIZE`
+- `CLIP_TOO_LARGE` (413)
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `CLIP_WRITE_FAILED`
+
+Status behavior:
+- first successful upload transitions to `processing`
+- repeated uploads when `processing` or `ready` are idempotent
+
+### GET `/api/clips/:clipId`
+Returns clip status + storage URLs + share path.
+
+Response:
+```json
+{
+  "ok": true,
+  "clipId": "clp_abc123",
+  "ownerSessionId": "sess_abc",
+  "instanceId": "inst_public_001",
+  "durationSec": 12.5,
+  "status": "uploaded|processing|ready|failed",
+  "error": null,
+  "storage": {
+    "sourceUrl": "/media/clips/clp_abc123.webm",
+    "mp4Url": "/media/clips/clp_abc123.mp4"
+  },
+  "sharePath": "/c/clp_abc123",
+  "createdAt": "2026-02-06T00:00:00.000Z",
+  "updatedAt": "2026-02-06T00:00:00.000Z"
+}
+```
+
+---
+
 ## Home / state
 
 ### GET `/api/session` (human)

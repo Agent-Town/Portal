@@ -67,9 +67,11 @@ npm run setup:sepolia-wallet -- --no-faucet
 
 ## Key routes
 - `/` — onboarding, Team Code, token check, reconnect.
+- `/world` — public world map (read-only + realtime + interactions + recording/export).
 - `/create` — co-op canvas + house generation.
 - `/house` — house unlock, descriptor QR, ERC-8004, encrypted log.
 - `/s/:id` — public share page.
+- `/c/:id` — public clip share page.
 - `/leaderboard` — public teams and referrals (`/wall` redirects here).
 
 ## Data + storage
@@ -95,6 +97,8 @@ Unlocking a house in the UI is gated by a Solana wallet signature. Decryption ha
 
 ## Environment variables
 - `PORT` (default `4173`)
+- `WORLD_RT_PORT` (optional; defaults to `PORT + 1`, used for CSP allowlist / external realtime hosting)
+- `REDIS_URL` (optional; enables Redis-backed world presence tracking)
 - `NODE_ENV` (`production` enables HTTPS redirect + HSTS; `test` enables reset endpoint)
 - `STORE_PATH` (override store file)
 - `SOLANA_RPC_URL` (token check RPC, default mainnet-beta)
@@ -105,3 +109,4 @@ Unlocking a house in the UI is gated by a Solana wallet signature. Decryption ha
 - API contract: `specs/02_api_contract.md`
 - Experience flow: `specs/01_experience_flow.md`
 - TDD milestones: `specs/04_tdd_milestones.md`
+- World map TDD spec: `specs/07_world_map_tdd_spec.md`

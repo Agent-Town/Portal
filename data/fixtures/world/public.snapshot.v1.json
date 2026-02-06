@@ -1,0 +1,157 @@
+{
+  "world": {
+    "version": "world_projection_v1",
+    "seed": "test-world-v1",
+    "updatedAt": "2026-02-06T00:00:00.000Z",
+    "width": 2400,
+    "height": 1400
+  },
+  "houses": [
+    {
+      "houseId": "H_001",
+      "type": "experience",
+      "name": "Town Hall",
+      "instanceTags": ["welcome", "events"],
+      "coord": { "x": 260, "y": 300 },
+      "spriteKey": "house.placeholder.townhall.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_002",
+      "type": "player",
+      "name": "Prairie Porch",
+      "instanceTags": ["social"],
+      "coord": { "x": 520, "y": 330 },
+      "spriteKey": "house.placeholder.porch.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_003",
+      "type": "experience",
+      "name": "Crawfish Stage",
+      "instanceTags": ["music", "live"],
+      "coord": { "x": 760, "y": 270 },
+      "spriteKey": "house.placeholder.stage.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_004",
+      "type": "player",
+      "name": "Sagebrush Studio",
+      "instanceTags": ["art", "creator"],
+      "coord": { "x": 1020, "y": 360 },
+      "spriteKey": "house.placeholder.studio.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_005",
+      "type": "player",
+      "name": "Agent Forge",
+      "instanceTags": ["dev", "tools"],
+      "coord": { "x": 1270, "y": 310 },
+      "spriteKey": "house.placeholder.forge.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_006",
+      "type": "experience",
+      "name": "Portal Market",
+      "instanceTags": ["trade", "quests"],
+      "coord": { "x": 1540, "y": 390 },
+      "spriteKey": "house.placeholder.market.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_007",
+      "type": "player",
+      "name": "Rustler Ranch",
+      "instanceTags": ["guild"],
+      "coord": { "x": 1740, "y": 250 },
+      "spriteKey": "house.placeholder.ranch.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "houseId": "H_008",
+      "type": "experience",
+      "name": "Open Range Theater",
+      "instanceTags": ["story", "showcase"],
+      "coord": { "x": 1980, "y": 420 },
+      "spriteKey": "house.placeholder.theater.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    }
+  ],
+  "inhabitants": [
+    {
+      "inhabitantId": "I_001",
+      "houseId": "H_001",
+      "label": "Mayor Bot",
+      "role": "npc",
+      "spriteKey": "inhabitant.placeholder.mayor.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_002",
+      "houseId": "H_002",
+      "label": "Ranger Robin",
+      "role": "human",
+      "spriteKey": "inhabitant.placeholder.ranger.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_003",
+      "houseId": "H_003",
+      "label": "Cray Sheriff",
+      "role": "agent",
+      "spriteKey": "inhabitant.placeholder.sheriff.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_004",
+      "houseId": "H_004",
+      "label": "Sketch Cat",
+      "role": "human",
+      "spriteKey": "inhabitant.placeholder.cat.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_005",
+      "houseId": "H_005",
+      "label": "Toolsmith AI",
+      "role": "agent",
+      "spriteKey": "inhabitant.placeholder.toolsmith.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_006",
+      "houseId": "H_006",
+      "label": "Portal Host",
+      "role": "npc",
+      "spriteKey": "inhabitant.placeholder.host.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_007",
+      "houseId": "H_007",
+      "label": "Ranch Agent",
+      "role": "agent",
+      "spriteKey": "inhabitant.placeholder.ranch.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_008",
+      "houseId": "H_008",
+      "label": "Story Curator",
+      "role": "human",
+      "spriteKey": "inhabitant.placeholder.curator.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    },
+    {
+      "inhabitantId": "I_009",
+      "houseId": "H_008",
+      "label": "Audience Bot",
+      "role": "npc",
+      "spriteKey": "inhabitant.placeholder.audience.v1",
+      "updatedAt": "2026-02-06T00:00:00.000Z"
+    }
+  ]
+}
