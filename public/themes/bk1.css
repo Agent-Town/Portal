@@ -1,0 +1,24 @@
+:root {
+  /* BK1: Sky + Coral + Gold */
+  --panel: #fff4e0;
+  --panel-2: #ffecc7;
+  --text: #2c4563;
+  --muted: #5c7a8a;
+  --accent: #5b9bd5;
+  --good: #6bb36b;
+  --bad: #e63946;
+  --border: #2c4563;
+
+  --world-sky: #80caff;
+  --world-ground: #8fbc8f;
+  --world-road: #fff4e0;
+  --world-marker-stroke: #2c4563;
+  --world-marker-selected-stroke: #1a2d3f;
+  --world-house-player: #ffd95a;
+  --world-house-experience: #ff9b7c;
+  --world-player: #5b9bd5;
+  --world-player-self: #6bb36b;
+  --world-label: #2c4563;
+  --world-player-label: #2f5e82;
+}
+

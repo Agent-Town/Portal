@@ -1,0 +1,24 @@
+:root {
+  /* BK3: Portal Purple + Neon Cyan + Cosmic Pink */
+  --panel: #f0f0ff;
+  --panel-2: #e5e5ff;
+  --text: #312e81;
+  --muted: #6060a8;
+  --accent: #8b5cf6;
+  --good: #10b981;
+  --bad: #dc2626;
+  --border: #4c1d95;
+
+  --world-sky: #ddd6fe;
+  --world-ground: #f0f0ff;
+  --world-road: #e5e5ff;
+  --world-marker-stroke: #4c1d95;
+  --world-marker-selected-stroke: #5b21b6;
+  --world-house-player: #06b6d4;
+  --world-house-experience: #ec4899;
+  --world-player: #8b5cf6;
+  --world-player-self: #10b981;
+  --world-label: #312e81;
+  --world-player-label: #4c1d95;
+}
+

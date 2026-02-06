@@ -1,0 +1,24 @@
+:root {
+  /* BK2: Canyon Blue + Desert Sand + Gold */
+  --panel: #faebd7;
+  --panel-2: #f0dfc7;
+  --text: #5d4e37;
+  --muted: #8b7355;
+  --accent: #6ba3d0;
+  --good: #8fbc8f;
+  --bad: #d2691e;
+  --border: #5d4e37;
+
+  --world-sky: #85bde5;
+  --world-ground: #8fbc8f;
+  --world-road: #faebd7;
+  --world-marker-stroke: #5d4e37;
+  --world-marker-selected-stroke: #356688;
+  --world-house-player: #ffd95a;
+  --world-house-experience: #f4a460;
+  --world-player: #6ba3d0;
+  --world-player-self: #8fbc8f;
+  --world-label: #5d4e37;
+  --world-player-label: #245170;
+}
+

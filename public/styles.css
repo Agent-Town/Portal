@@ -27,6 +27,19 @@
   --tile-pebble: url("/assets/Tileset Asset/paths/PebbleTan.png");
   --tile-brick: url("/assets/Tileset Asset/paths/BrickGray.png");
   --tile-wood: url("/assets/Tileset Asset/Floor/Flooring_01.png");
+
+  /* World map theme tokens (overridden by theme packs in /themes/*.css). */
+  --world-sky: #77bae3;
+  --world-ground: #9cd37b;
+  --world-road: #f9f0cf;
+  --world-marker-stroke: #2f251d;
+  --world-marker-selected-stroke: #14213d;
+  --world-house-player: #f5d071;
+  --world-house-experience: #ff8a5b;
+  --world-player: #2b66d9;
+  --world-player-self: #00a86b;
+  --world-label: #10212e;
+  --world-player-label: #0d2a58;
 }
 
 * { box-sizing: border-box; }

@@ -76,6 +76,7 @@ let pollTimer = null;
 let polling = false;
 let visibleListKey = '';
 let renderSpace = null;
+let worldTheme = null;
 
 const houseMarkerById = new Map();
 const playerMarkerById = new Map();
@@ -171,9 +172,10 @@ function updateListSelection() {
 }
 
 function updateHouseMarkerSelection() {
+  const theme = getWorldTheme();
   houseMarkerById.forEach((entry, houseId) => {
     const selected = houseId === selectedHouseId;
-    entry.circle.setStrokeStyle(2, selected ? 0x14213d : 0x2f251d, 1);
+    entry.circle.setStrokeStyle(2, selected ? theme.markerSelectedStroke : theme.markerStroke, 1);
     entry.circle.setScale(selected ? 1.2 : 1);
   });
 }
@@ -313,6 +315,62 @@ function getCamera() {
   return gameScene?.cameras?.main || null;
 }
 
+function cssVar(name, fallback) {
+  try {
+    const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+    const trimmed = String(value || '').trim();
+    return trimmed || fallback;
+  } catch (_err) {
+    return fallback;
+  }
+}
+
+function parseHexColor(input, fallback) {
+  const raw = String(input || '').trim();
+  if (!raw) return fallback;
+  if (raw.startsWith('#')) {
+    const hex = raw.slice(1);
+    if (hex.length === 3) {
+      const r = hex[0] + hex[0];
+      const g = hex[1] + hex[1];
+      const b = hex[2] + hex[2];
+      return parseInt(`${r}${g}${b}`, 16);
+    }
+    if (hex.length === 6) return parseInt(hex, 16);
+  }
+  return fallback;
+}
+
+function getWorldTheme() {
+  if (worldTheme) return worldTheme;
+  const skyCss = cssVar('--world-sky', '#77bae3');
+  const groundCss = cssVar('--world-ground', '#9cd37b');
+  const roadCss = cssVar('--world-road', '#f9f0cf');
+  const strokeCss = cssVar('--world-marker-stroke', '#2f251d');
+  const selectedStrokeCss = cssVar('--world-marker-selected-stroke', '#14213d');
+  const housePlayerCss = cssVar('--world-house-player', '#f5d071');
+  const houseExperienceCss = cssVar('--world-house-experience', '#ff8a5b');
+  const playerCss = cssVar('--world-player', '#2b66d9');
+  const playerSelfCss = cssVar('--world-player-self', '#00a86b');
+  const labelCss = cssVar('--world-label', '#10212e');
+  const playerLabelCss = cssVar('--world-player-label', '#0d2a58');
+
+  worldTheme = {
+    skyCss,
+    labelCss,
+    playerLabelCss,
+    ground: parseHexColor(groundCss, 0x9cd37b),
+    road: parseHexColor(roadCss, 0xf9f0cf),
+    markerStroke: parseHexColor(strokeCss, 0x2f251d),
+    markerSelectedStroke: parseHexColor(selectedStrokeCss, 0x14213d),
+    housePlayer: parseHexColor(housePlayerCss, 0xf5d071),
+    houseExperience: parseHexColor(houseExperienceCss, 0xff8a5b),
+    player: parseHexColor(playerCss, 0x2b66d9),
+    playerSelf: parseHexColor(playerSelfCss, 0x00a86b)
+  };
+  return worldTheme;
+}
+
 function clampCameraCenter(x, y) {
   const cam = getCamera();
   if (!cam) return { x, y };
@@ -349,16 +407,17 @@ function applyCameraZoom(nextZoom) {
 function syncPlayerMarkers() {
   if (!gameScene) return;
   const scene = gameScene;
+  const theme = getWorldTheme();
   const existing = new Set(realtime.players.keys());
   for (const [playerId, player] of realtime.players.entries()) {
     const pos = projectWorldXY(player.x, player.y);
     let marker = playerMarkerById.get(playerId);
     if (!marker) {
-      const circle = scene.add.circle(pos.x, pos.y, 7, 0x2b66d9, 0.9);
+      const circle = scene.add.circle(pos.x, pos.y, 7, theme.player, 0.9);
       circle.setStrokeStyle(2, 0xffffff, 1);
       const label = scene.add.text(pos.x + 8, pos.y - 9, playerId.slice(0, 6), {
         fontSize: '11px',
-        color: '#0d2a58',
+        color: theme.playerLabelCss,
         fontFamily: 'monospace'
       });
       label.setResolution(2);
@@ -367,7 +426,7 @@ function syncPlayerMarkers() {
     }
     marker.circle.setPosition(pos.x, pos.y);
     marker.label.setPosition(pos.x + 8, pos.y - 9);
-    marker.circle.setFillStyle(playerId === realtime.selfId ? 0x00a86b : 0x2b66d9, 0.9);
+    marker.circle.setFillStyle(playerId === realtime.selfId ? theme.playerSelf : theme.player, 0.9);
   }
 
   for (const [playerId, marker] of Array.from(playerMarkerById.entries())) {
@@ -441,6 +500,7 @@ function initPhaserWorld() {
   destroyGame();
   if (!window.Phaser) return;
 
+  const theme = getWorldTheme();
   const canvasRoot = el('worldCanvas');
   const width = Math.max(640, canvasRoot.clientWidth || 640);
   const height = Math.max(360, canvasRoot.clientHeight || 360);
@@ -453,7 +513,7 @@ function initPhaserWorld() {
     width,
     height,
     pixelArt: true,
-    backgroundColor: '#77bae3',
+    backgroundColor: theme.skyCss,
     scene: {
       key: 'world',
       create() {
@@ -472,7 +532,7 @@ function initPhaserWorld() {
           const p10 = space.project(w, 0);
           const p11 = space.project(w, h);
           const p01 = space.project(0, h);
-          bg.fillStyle(0x9cd37b, 1);
+          bg.fillStyle(theme.ground, 1);
           bg.fillPoints([p00, p10, p11, p01], true);
           const step = 120;
           for (let x = 0; x <= w; x += step) {
@@ -486,9 +546,9 @@ function initPhaserWorld() {
             bg.lineBetween(a.x, a.y, b.x, b.y);
           }
         } else {
-          bg.fillStyle(0x9cd37b, 1);
+          bg.fillStyle(theme.ground, 1);
           bg.fillRect(0, dims.height * 0.45, dims.width, dims.height * 0.55);
-          bg.fillStyle(0xf9f0cf, 1);
+          bg.fillStyle(theme.road, 1);
           bg.fillRoundedRect(100, dims.height * 0.42, Math.max(200, dims.width - 200), 150, 28);
           for (let x = 0; x <= dims.width; x += 120) bg.lineBetween(x, 0, x, dims.height);
           for (let y = 0; y <= dims.height; y += 120) bg.lineBetween(0, y, dims.width, y);
@@ -496,15 +556,15 @@ function initPhaserWorld() {
 
         for (const house of state.houses) {
           const pos = space.project(house.coord.x, house.coord.y);
-          const tint = house.type === 'experience' ? 0xff8a5b : 0xf5d071;
+          const tint = house.type === 'experience' ? theme.houseExperience : theme.housePlayer;
           const circle = scene.add.circle(pos.x, pos.y, 10, tint, 1);
-          circle.setStrokeStyle(2, 0x2f251d, 1);
+          circle.setStrokeStyle(2, theme.markerStroke, 1);
           circle.setInteractive({ useHandCursor: true });
           circle.on('pointerdown', () => selectHouse(house.houseId, { focusCamera: false }));
 
           const label = scene.add.text(pos.x + 14, pos.y - 8, house.houseId, {
             fontSize: '12px',
-            color: '#10212e',
+            color: theme.labelCss,
             fontFamily: 'monospace'
           });
           label.setResolution(2);
@@ -891,6 +951,7 @@ function applySnapshot(snapshot) {
   state.inhabitants = Array.isArray(snapshot.inhabitants) ? snapshot.inhabitants : [];
   state.revision = nextRevision;
   renderSpace = null;
+  worldTheme = null;
 
   renderCounts();
   renderHouseList();
