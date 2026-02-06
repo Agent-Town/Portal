@@ -288,6 +288,67 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
+## Pony Express inbox (phase 1)
+
+Canonical addressing:
+- Preferred house address is `houseId` (base58).
+- Legacy share ids are accepted as aliases for `toHouseId` / `fromHouseId` and are resolved to the linked `houseId`.
+
+Message envelope (`msg.chat.v1`):
+```json
+{
+  "kind": "msg.chat.v1",
+  "toHouseId": "<base58>",
+  "fromHouseId": "<base58|null>",
+  "envelope": {
+    "ciphertext": { "alg": "...", "iv": "...", "ct": "..." }
+  }
+}
+```
+
+### POST `/api/pony/send`
+Body:
+```json
+{
+  "toHouseId": "<houseId or shareId>",
+  "fromHouseId": "<optional houseId or shareId>",
+  "ciphertext": { "alg": "PLAINTEXT", "iv": "", "ct": "hello" }
+}
+```
+
+Rules:
+- `toHouseId` is required.
+- If `fromHouseId` is provided, request must be house-auth signed by that house.
+- Reserved sender `npc_mayor` is server-only.
+
+Errors:
+- `MISSING_TO`
+- `HOUSE_NOT_FOUND`
+- `FROM_HOUSE_NOT_FOUND`
+- `RESERVED_FROM`
+- `MISSING_CIPHERTEXT`
+- `INVALID_CIPHERTEXT`
+- standard house-auth errors when sender auth is required.
+
+### GET `/api/pony/inbox?houseId=...`
+Returns inbox for a house. Requires house-auth for that house.
+
+### POST `/api/pony/inbox/:id/accept`
+Body:
+```json
+{ "houseId": "<houseId or shareId>" }
+```
+Requires house-auth and message must belong to that house.
+
+### POST `/api/pony/inbox/:id/reject`
+Body:
+```json
+{ "houseId": "<houseId or shareId>" }
+```
+Requires house-auth and message must belong to that house.
+
+---
+
 ## Referrals
 
 ### POST `/api/referral` (human)

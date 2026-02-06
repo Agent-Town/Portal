@@ -28,16 +28,48 @@ function b64ToBytes(str) {
 // --- Pony Express v0 (inbox + sealed notes) ---
 const MAYOR_HOUSE_ID = 'npc_mayor';
 
-function makeInboxMsg({ toHouseId, fromHouseId = null, body, status = 'request', kind = 'msg.chat' }) {
+function normalizePonyCiphertext(ciphertext, legacyBody = '') {
+  if (ciphertext && typeof ciphertext === 'object') {
+    const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : '';
+    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct : '';
+    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv : '';
+    if (!alg || !ct) throw new Error('INVALID_CIPHERTEXT');
+    return { alg, iv, ct };
+  }
+  if (typeof legacyBody === 'string' && legacyBody.trim()) {
+    return { alg: 'PLAINTEXT', iv: '', ct: legacyBody };
+  }
+  throw new Error('MISSING_CIPHERTEXT');
+}
+
+function resolveHouseAddress(store, input) {
+  const raw = typeof input === 'string' ? input.trim() : '';
+  if (!raw) return null;
+  const house = store.houses.find((h) => h && h.id === raw);
+  if (house) return { houseId: house.id, house, source: 'house' };
+
+  // Legacy alias support: allow share ids to resolve to house ids.
+  const share = store.shares.find((s) => s && s.id === raw && typeof s.houseId === 'string' && s.houseId.trim());
+  if (!share) return null;
+  const mappedHouse = store.houses.find((h) => h && h.id === share.houseId);
+  if (!mappedHouse) return null;
+  return { houseId: mappedHouse.id, house: mappedHouse, source: 'share' };
+}
+
+function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status = 'request', kind = 'msg.chat.v1' }) {
   const id = `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const normalizedCiphertext = normalizePonyCiphertext(ciphertext, body);
   return {
     id,
     version: 1,
     kind,
     toHouseId,
     fromHouseId,
-    // Forward-compatible: treat as ciphertext even if plaintext today.
-    ciphertext: String(body || ''),
+    to: { houseId: toHouseId },
+    from: fromHouseId ? { houseId: fromHouseId } : null,
+    envelope: { ciphertext: normalizedCiphertext },
+    // Compatibility field (clients should migrate to envelope.ciphertext).
+    ciphertext: normalizedCiphertext,
     createdAt: nowIso(),
     status // request | accepted | rejected
   };
@@ -1123,22 +1155,30 @@ app.post('/api/share/create', (req, res) => {
   store.shares.push(record);
 
   // Pony Express v0: Mayor welcome message on house registration.
-  const mayorBody = [
-    `Welcome, House ${shareId}.`,
-    `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
-    ``,
-    `Two ways to live here:`,
-    `1) Co‑op: move in with a human + an agent.`,
-    `2) Solo: a house that stands on its own.`,
-    ``,
-    `Your first task: leave a sealed note at another house — introduce yourself in one sentence.`,
-    ``,
-    `— The Mayor`
-  ].join('\n');
+  const mayorTargetHouseId = record.houseId;
+  if (mayorTargetHouseId) {
+    const mayorBody = [
+      `Welcome, House ${mayorTargetHouseId}.`,
+      `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
+      ``,
+      `Two ways to live here:`,
+      `1) Co‑op: move in with a human + an agent.`,
+      `2) Solo: a house that stands on its own.`,
+      ``,
+      `Your first task: leave a sealed note at another house — introduce yourself in one sentence.`,
+      ``,
+      `— The Mayor`
+    ].join('\n');
 
-  store.inbox.push(
-    makeInboxMsg({ toHouseId: shareId, fromHouseId: MAYOR_HOUSE_ID, body: mayorBody, status: 'accepted' })
-  );
+    store.inbox.push(
+      makeInboxMsg({
+        toHouseId: mayorTargetHouseId,
+        fromHouseId: MAYOR_HOUSE_ID,
+        ciphertext: { alg: 'PLAINTEXT', iv: '', ct: mayorBody },
+        status: 'accepted'
+      })
+    );
+  }
 
   writeStore(store);
 
@@ -1157,41 +1197,86 @@ app.post('/api/share/create', (req, res) => {
 
 // --- Pony Express v0 API ---
 app.post('/api/pony/send', (req, res) => {
-  const toHouseId = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
-  const fromHouseId = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : null;
-  const body = typeof req.body?.body === 'string' ? req.body.body : '';
+  const toAddress = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
+  const fromAddress = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : '';
+  const legacyBody = typeof req.body?.body === 'string' ? req.body.body : '';
 
-  if (!toHouseId) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
+  if (!toAddress) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
+  if (fromAddress === MAYOR_HOUSE_ID) return res.status(403).json({ ok: false, error: 'RESERVED_FROM' });
 
   const store = readStore();
-  const exists = store.shares.some((s) => s.id === toHouseId);
-  if (!exists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+  const toResolved = resolveHouseAddress(store, toAddress);
+  if (!toResolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
 
-  const status = fromHouseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
-  const msg = makeInboxMsg({ toHouseId, fromHouseId, body, status });
+  let fromResolved = null;
+  if (fromAddress) {
+    fromResolved = resolveHouseAddress(store, fromAddress);
+    if (!fromResolved) return res.status(404).json({ ok: false, error: 'FROM_HOUSE_NOT_FOUND' });
+    const auth = verifyHouseAuth(req, fromResolved.house);
+    if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+  }
+
+  let normalizedCiphertext;
+  try {
+    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, legacyBody);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err?.message || 'INVALID_CIPHERTEXT' });
+  }
+
+  const status = fromResolved?.houseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
+  const msg = makeInboxMsg({
+    toHouseId: toResolved.houseId,
+    fromHouseId: fromResolved?.houseId || null,
+    ciphertext: normalizedCiphertext,
+    status
+  });
   store.inbox.push(msg);
   writeStore(store);
 
-  res.json({ ok: true, id: msg.id });
+  res.json({
+    ok: true,
+    id: msg.id,
+    toHouseId: toResolved.houseId,
+    fromHouseId: fromResolved?.houseId || null
+  });
 });
 
 app.get('/api/pony/inbox', (req, res) => {
-  const houseId = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
 
   const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
   const items = store.inbox
-    .filter((m) => m.toHouseId === houseId)
+    .filter((m) => m.toHouseId === resolved.houseId)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
-  res.json({ ok: true, inbox: items });
+  res.json({ ok: true, houseId: resolved.houseId, inbox: items });
 });
 
 app.post('/api/pony/inbox/:id/accept', (req, res) => {
   const id = req.params.id;
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
   const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
   const msg = store.inbox.find((m) => m.id === id);
   if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (msg.toHouseId !== resolved.houseId) return res.status(403).json({ ok: false, error: 'MESSAGE_NOT_FOR_HOUSE' });
+
   msg.status = 'accepted';
   writeStore(store);
   res.json({ ok: true });
@@ -1199,9 +1284,22 @@ app.post('/api/pony/inbox/:id/accept', (req, res) => {
 
 app.post('/api/pony/inbox/:id/reject', (req, res) => {
   const id = req.params.id;
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
   const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
   const msg = store.inbox.find((m) => m.id === id);
   if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (msg.toHouseId !== resolved.houseId) return res.status(403).json({ ok: false, error: 'MESSAGE_NOT_FOR_HOUSE' });
+
   msg.status = 'rejected';
   writeStore(store);
   res.json({ ok: true });
@@ -1609,7 +1707,7 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
     resetAllSessions();
     res.json({ ok: true });
   });

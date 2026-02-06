@@ -89,6 +89,7 @@ function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
 }
 
 const SHARE_CACHE_KEY = 'agentTownShareCache';
+const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const SHARE_COPY_LABEL = 'Copy share link';
 const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
@@ -130,6 +131,28 @@ function unb64(str) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+
+function houseAuthCacheKey(houseId) {
+  return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
+}
+
+function cacheHouseAuthBytes(houseId, keyBytes) {
+  if (!houseId || !keyBytes || !keyBytes.length) return;
+  try {
+    sessionStorage.setItem(houseAuthCacheKey(houseId), b64(keyBytes));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearHouseAuthCache(houseId) {
+  if (!houseId) return;
+  try {
+    sessionStorage.removeItem(houseAuthCacheKey(houseId));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 // --- base58 (minimal) ---
@@ -929,12 +952,14 @@ async function recoverHouseKeyWithWallet(houseId) {
 }
 
 function wipeKeys() {
+  const prevHouseId = house?.houseId || null;
   unlocked = false;
   house = null;
   KrootBytes = null;
   Kenc = null;
   KauthBytes = null;
   KauthKey = null;
+  clearHouseAuthCache(prevHouseId);
   if (autoLockTimer) {
     clearTimeout(autoLockTimer);
     autoLockTimer = null;
@@ -946,6 +971,11 @@ function wipeKeys() {
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
   setUnlockButtonState(false);
+  const inboxNav = el('inboxNavLink');
+  if (inboxNav) {
+    inboxNav.classList.add('is-hidden');
+    inboxNav.href = '#';
+  }
 }
 
 async function deriveHouseEncKey(Kroot) {
@@ -1008,6 +1038,12 @@ async function unlockExistingHouse(houseId) {
   unlocked = true;
   walletHouseId = house.houseId;
   saveWalletCache();
+  cacheHouseAuthBytes(house.houseId, KauthBytes);
+  const inboxNav = el('inboxNavLink');
+  if (inboxNav) {
+    inboxNav.href = `/inbox/${encodeURIComponent(house.houseId)}`;
+    inboxNav.classList.remove('is-hidden');
+  }
   setStatus(recovered ? 'Unlocked (wallet recovery).' : 'Unlocked.');
   setUnlockButtonState(true);
   armAutoLock();
