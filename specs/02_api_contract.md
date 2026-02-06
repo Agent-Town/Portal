@@ -288,7 +288,7 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox + vault (phases 1-3)
+## Pony Express inbox + vault (phases 1-4)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
@@ -330,6 +330,13 @@ Rules:
 - If `fromHouseId` is provided, request must be house-auth signed by that house.
 - Reserved sender `npc_mayor` is server-only.
 - Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`).
+- Transport dispatch is adapter-based:
+  - default adapter handles `relay.http.v1`
+  - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
+- Postage verification hook runs before dispatch:
+  - `pow.v1` enforces digest shape
+  - when `requirePostageAnonymous=true` and sender is anonymous, `pow.v1.difficulty` must meet server minimum (`>= 8`)
+  - `receipt.v1` currently uses a server verification stub (shape + non-empty receipts)
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
 
 Errors:
@@ -344,6 +351,9 @@ Errors:
 - `INVALID_POSTAGE_KIND`
 - `ANONYMOUS_NOT_ALLOWED`
 - `POSTAGE_REQUIRED`
+- `POSTAGE_POW_DIFFICULTY_TOO_LOW`
+- `POSTAGE_POW_DIGEST_INVALID`
+- `POSTAGE_RECEIPT_INVALID`
 - `SENDER_BLOCKED`
 - `RATE_LIMITED_PONY`
 - standard house-auth errors when sender auth is required.
@@ -394,6 +404,7 @@ Body:
 }
 ```
 Requires house-auth. Appends a hash-chained encrypted event for the house vault.
+Postage verification hook also runs here (`pow.v1` threshold/digest checks, `receipt.v1` stub checks).
 
 ### GET `/api/pony/vault?houseId=...&limit=50`
 Returns most recent vault events (default 50, max 200) and current `head` hash. Requires house-auth.
@@ -531,12 +542,14 @@ Returns:
 ```json
 { "ok": true, "entries": [ { "ciphertext": { "iv": "...", "ct": "..." } } ] }
 ```
+Implementation note: this endpoint is now backed by a house-vault storage backend interface (`server.store.v1` default), but response shape is unchanged.
 
 ### POST `/api/house/:id/append`
 Body:
 ```json
 { "author": "human", "ciphertext": { "alg": "AES-GCM", "iv": "...", "ct": "..." } }
 ```
+Implementation note: append is routed through the same backend interface; API surface and `HOUSE_FULL` behavior are unchanged.
 
 ### GET `/api/house/:id/public-media`
 Returns:
