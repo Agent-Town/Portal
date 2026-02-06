@@ -3,6 +3,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');
 const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
@@ -22,6 +23,56 @@ const {
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
   return new Uint8Array(bin);
+}
+
+// --- Pony Express v0 (inbox + sealed notes) ---
+const MAYOR_HOUSE_ID = 'npc_mayor';
+
+function normalizePonyCiphertext(ciphertext, legacyBody = '') {
+  if (ciphertext && typeof ciphertext === 'object') {
+    const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : '';
+    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct : '';
+    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv : '';
+    if (!alg || !ct) throw new Error('INVALID_CIPHERTEXT');
+    return { alg, iv, ct };
+  }
+  if (typeof legacyBody === 'string' && legacyBody.trim()) {
+    return { alg: 'PLAINTEXT', iv: '', ct: legacyBody };
+  }
+  throw new Error('MISSING_CIPHERTEXT');
+}
+
+function resolveHouseAddress(store, input) {
+  const raw = typeof input === 'string' ? input.trim() : '';
+  if (!raw) return null;
+  const house = store.houses.find((h) => h && h.id === raw);
+  if (house) return { houseId: house.id, house, source: 'house' };
+
+  // Legacy alias support: allow share ids to resolve to house ids.
+  const share = store.shares.find((s) => s && s.id === raw && typeof s.houseId === 'string' && s.houseId.trim());
+  if (!share) return null;
+  const mappedHouse = store.houses.find((h) => h && h.id === share.houseId);
+  if (!mappedHouse) return null;
+  return { houseId: mappedHouse.id, house: mappedHouse, source: 'share' };
+}
+
+function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status = 'request', kind = 'msg.chat.v1' }) {
+  const id = `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const normalizedCiphertext = normalizePonyCiphertext(ciphertext, body);
+  return {
+    id,
+    version: 1,
+    kind,
+    toHouseId,
+    fromHouseId,
+    to: { houseId: toHouseId },
+    from: fromHouseId ? { houseId: fromHouseId } : null,
+    envelope: { ciphertext: normalizedCiphertext },
+    // Compatibility field (clients should migrate to envelope.ciphertext).
+    ciphertext: normalizedCiphertext,
+    createdAt: nowIso(),
+    status // request | accepted | rejected
+  };
 }
 
 function bytesToB64(bytes) {
@@ -399,6 +450,7 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
+const MIN_AGENT_SOLO_PIXELS = 20;
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -437,6 +489,15 @@ function palette() {
 
 function canvasHasInk(pixels) {
   return Array.isArray(pixels) && pixels.some((p) => p && p !== 0);
+}
+
+function countInk(pixels) {
+  if (!Array.isArray(pixels)) return 0;
+  let count = 0;
+  for (const p of pixels) {
+    if (p && p !== 0) count += 1;
+  }
+  return count;
 }
 
 function isShareLocked(share) {
@@ -521,6 +582,89 @@ function normalizePublicPrompt(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC32_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length, 0);
+  const typeBuf = Buffer.from(type, 'ascii');
+  const crc = Buffer.alloc(4);
+  const sum = crc32(Buffer.concat([typeBuf, data]));
+  crc.writeUInt32BE(sum, 0);
+  return Buffer.concat([len, typeBuf, data, crc]);
+}
+
+function hexToRgba(hex) {
+  if (!hex || typeof hex !== 'string') return [0, 0, 0, 255];
+  const cleaned = hex.startsWith('#') ? hex.slice(1) : hex;
+  if (cleaned.length !== 6) return [0, 0, 0, 255];
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return [r, g, b, 255];
+}
+
+function canvasToPngDataUrl(canvas, paletteHex) {
+  const w = canvas?.w || 0;
+  const h = canvas?.h || 0;
+  const pixels = Array.isArray(canvas?.pixels) ? canvas.pixels : [];
+  if (!w || !h || pixels.length < w * h) return null;
+  const palette = (paletteHex || palette()).map(hexToRgba);
+
+  const stride = w * 4 + 1;
+  const raw = Buffer.alloc(stride * h);
+  let offset = 0;
+  for (let y = 0; y < h; y++) {
+    raw[offset++] = 0; // filter 0
+    for (let x = 0; x < w; x++) {
+      const idx = pixels[y * w + x] || 0;
+      const [r, g, b, a] = palette[idx] || palette[0];
+      raw[offset++] = r;
+      raw[offset++] = g;
+      raw[offset++] = b;
+      raw[offset++] = a;
+    }
+  }
+
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8; // bit depth
+  ihdr[9] = 6; // color type RGBA
+  ihdr[10] = 0; // compression
+  ihdr[11] = 0; // filter
+  ihdr[12] = 0; // interlace
+
+  const header = Buffer.from('\x89PNG\r\n\x1a\n', 'binary');
+  const idat = zlib.deflateSync(raw);
+  const png = Buffer.concat([
+    header,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idat),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
+
+  return `data:image/png;base64,${png.toString('base64')}`;
 }
 
 function serializePublicMedia(house) {
@@ -664,6 +808,14 @@ app.post('/api/human/select', (req, res) => {
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
 
+app.post('/api/agent/session', (req, res) => {
+  const agentName = normalizeAgentName(req.body?.agentName);
+  const s = createSession({ flow: 'agent_solo' });
+  s.agent.connected = true;
+  s.agent.name = agentName || s.agent.name || 'OpenClaw';
+  res.json({ ok: true, teamCode: s.teamCode, flow: s.flow });
+});
+
 app.post('/api/agent/connect', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const agentName = normalizeAgentName(req.body?.agentName);
@@ -697,6 +849,7 @@ app.get('/api/agent/state', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   res.json({
     ok: true,
+    flow: s.flow,
     agent: s.agent,
     human: {
       selected: s.human.selected,
@@ -794,6 +947,16 @@ app.post('/api/agent/canvas/paint', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/agent/canvas/image', (req, res) => {
+  const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const image = canvasToPngDataUrl(s.canvas, palette());
+  if (!image) return res.status(500).json({ ok: false, error: 'CANVAS_IMAGE_FAILED' });
+  res.json({ ok: true, image, pixels: countInk(s.canvas.pixels) });
+});
+
 // --- House ceremony (agent + human) ---
 app.get('/api/agent/house/state', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
@@ -841,8 +1004,15 @@ app.post('/api/agent/house/reveal', (req, res) => {
 
   s.houseCeremony.agentReveal = reveal;
 
-  // If both reveals exist, compute houseId and store it (no secrets persisted).
-  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+  if (s.flow === 'agent_solo') {
+    // Solo flow: derive houseId from agent entropy only.
+    const kroot = sha256Bytes(ra);
+    const houseIdBytes = sha256Bytes(kroot);
+    s.houseCeremony.houseId = base58Encode(houseIdBytes);
+    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+    indexHouseId(s, s.houseCeremony.houseId);
+  } else if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
+    // Co-op: derive houseId from Rh||Ra.
     const rh = b64ToBytes(s.houseCeremony.humanReveal);
     const combo = new Uint8Array(rh.length + ra.length);
     combo.set(rh, 0);
@@ -983,6 +1153,33 @@ app.post('/api/share/create', (req, res) => {
   };
 
   store.shares.push(record);
+
+  // Pony Express v0: Mayor welcome message on house registration.
+  const mayorTargetHouseId = record.houseId;
+  if (mayorTargetHouseId) {
+    const mayorBody = [
+      `Welcome, House ${mayorTargetHouseId}.`,
+      `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
+      ``,
+      `Two ways to live here:`,
+      `1) Co‑op: move in with a human + an agent.`,
+      `2) Solo: a house that stands on its own.`,
+      ``,
+      `Your first task: leave a sealed note at another house — introduce yourself in one sentence.`,
+      ``,
+      `— The Mayor`
+    ].join('\n');
+
+    store.inbox.push(
+      makeInboxMsg({
+        toHouseId: mayorTargetHouseId,
+        fromHouseId: MAYOR_HOUSE_ID,
+        ciphertext: { alg: 'PLAINTEXT', iv: '', ct: mayorBody },
+        status: 'accepted'
+      })
+    );
+  }
+
   writeStore(store);
 
   s.share.id = shareId;
@@ -996,6 +1193,116 @@ app.post('/api/share/create', (req, res) => {
     shareId,
     sharePath: `/s/${shareId}`
   });
+});
+
+// --- Pony Express v0 API ---
+app.post('/api/pony/send', (req, res) => {
+  const toAddress = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
+  const fromAddress = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : '';
+  const legacyBody = typeof req.body?.body === 'string' ? req.body.body : '';
+
+  if (!toAddress) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
+  if (fromAddress === MAYOR_HOUSE_ID) return res.status(403).json({ ok: false, error: 'RESERVED_FROM' });
+
+  const store = readStore();
+  const toResolved = resolveHouseAddress(store, toAddress);
+  if (!toResolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  let fromResolved = null;
+  if (fromAddress) {
+    fromResolved = resolveHouseAddress(store, fromAddress);
+    if (!fromResolved) return res.status(404).json({ ok: false, error: 'FROM_HOUSE_NOT_FOUND' });
+    const auth = verifyHouseAuth(req, fromResolved.house);
+    if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+  }
+
+  let normalizedCiphertext;
+  try {
+    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, legacyBody);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err?.message || 'INVALID_CIPHERTEXT' });
+  }
+
+  const status = fromResolved?.houseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
+  const msg = makeInboxMsg({
+    toHouseId: toResolved.houseId,
+    fromHouseId: fromResolved?.houseId || null,
+    ciphertext: normalizedCiphertext,
+    status
+  });
+  store.inbox.push(msg);
+  writeStore(store);
+
+  res.json({
+    ok: true,
+    id: msg.id,
+    toHouseId: toResolved.houseId,
+    fromHouseId: fromResolved?.houseId || null
+  });
+});
+
+app.get('/api/pony/inbox', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const items = store.inbox
+    .filter((m) => m.toHouseId === resolved.houseId)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  res.json({ ok: true, houseId: resolved.houseId, inbox: items });
+});
+
+app.post('/api/pony/inbox/:id/accept', (req, res) => {
+  const id = req.params.id;
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const msg = store.inbox.find((m) => m.id === id);
+  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (msg.toHouseId !== resolved.houseId) return res.status(403).json({ ok: false, error: 'MESSAGE_NOT_FOR_HOUSE' });
+
+  msg.status = 'accepted';
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.post('/api/pony/inbox/:id/reject', (req, res) => {
+  const id = req.params.id;
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const msg = store.inbox.find((m) => m.id === id);
+  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (msg.toHouseId !== resolved.houseId) return res.status(403).json({ ok: false, error: 'MESSAGE_NOT_FOR_HOUSE' });
+
+  msg.status = 'rejected';
+  writeStore(store);
+  res.json({ ok: true });
 });
 
 app.get('/api/share/:id', (req, res) => {
@@ -1044,7 +1351,7 @@ app.post('/api/house/:id/share', (req, res) => {
       createdAt: nowIso(),
       matchedElement: session?.match?.elementId || null,
       agentName: session?.agent?.name || 'OpenClaw',
-      mode: 'agent',
+      mode: session?.flow === 'agent_solo' ? 'agent_solo' : 'agent',
       houseId,
       xPostUrl: session?.human?.xPostUrl || null,
       humanHandle: session?.human?.xHandle || null,
@@ -1289,6 +1596,110 @@ app.get('/api/wall', (_req, res) => {
   res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
+// --- Anchors (ERC-8004 routing directory) ---
+const { verifyMessage } = require('ethers');
+
+function makeAnchorNonce() {
+  return `an_${randomHex(16)}`;
+}
+
+function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
+  return [
+    'AgentTown Anchor Link',
+    `houseId: ${houseId}`,
+    `erc8004Id: ${erc8004Id}`,
+    `origin: ${origin}`,
+    `nonce: ${nonce}`,
+    `createdAtMs: ${createdAtMs}`
+  ].join('\n');
+}
+
+app.get('/api/anchors/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const nonce = makeAnchorNonce();
+  s.anchorPublishNonce = nonce;
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/anchors/register', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const erc8004Id = typeof req.body?.erc8004Id === 'string' ? req.body.erc8004Id.trim() : '';
+  const signer = typeof req.body?.signer === 'string' ? req.body.signer.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  const origin = typeof req.body?.origin === 'string' ? req.body.origin.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const createdAtMs = Number(req.body?.createdAtMs || 0);
+  const chainId = Number(req.body?.chainId || 0);
+
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  if (!signer) return res.status(400).json({ ok: false, error: 'MISSING_SIGNER' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!createdAtMs) return res.status(400).json({ ok: false, error: 'MISSING_TIMESTAMP' });
+
+  if (!s.anchorPublishNonce || nonce !== s.anchorPublishNonce) {
+    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  }
+
+  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
+  // Require message origin to match server origin (prevents signing for a different site).
+  if (origin && origin !== expectedOrigin) {
+    return res.status(400).json({ ok: false, error: 'ORIGIN_MISMATCH' });
+  }
+
+  const msg = buildAnchorLinkMessage({
+    houseId,
+    erc8004Id,
+    origin: expectedOrigin,
+    nonce,
+    createdAtMs
+  });
+
+  let recovered = '';
+  try {
+    recovered = verifyMessage(msg, signature) || '';
+  } catch {
+    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  }
+
+  if (recovered.toLowerCase() !== signer.toLowerCase()) {
+    return res.status(401).json({ ok: false, error: 'SIGNER_MISMATCH' });
+  }
+
+  // Consume nonce
+  s.anchorPublishNonce = null;
+
+  const store = readStore();
+  const houseExists = store.houses.find((h) => h && h.id === houseId);
+  if (!houseExists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  // Upsert by erc8004Id (latest wins)
+  store.anchors = Array.isArray(store.anchors) ? store.anchors : [];
+  store.anchors = store.anchors.filter((a) => a && a.erc8004Id !== erc8004Id);
+  store.anchors.unshift({
+    erc8004Id,
+    houseId,
+    signer,
+    chainId: chainId || null,
+    createdAtMs,
+    updatedAt: nowIso()
+  });
+
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.get('/api/anchors/resolve', (req, res) => {
+  const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  const store = readStore();
+  const rec = (store.anchors || []).find((a) => a && a.erc8004Id === erc8004Id);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, erc8004Id, houseId: rec.houseId });
+});
+
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
   app.post('/__test__/reset', (_req, res) => {
@@ -1296,7 +1707,7 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
     resetAllSessions();
     res.json({ ok: true });
   });
@@ -1483,6 +1894,106 @@ app.post('/api/house/init', (req, res) => {
   }
 
   res.json({ ok: true, houseId });
+});
+
+app.post('/api/agent/house/init', (req, res) => {
+  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
+  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+  const housePubKey = typeof req.body?.housePubKey === 'string' ? req.body.housePubKey.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
+  const unlock = req.body?.unlock || null;
+  const keyWrap = req.body?.keyWrap || null;
+  const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+
+  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
+  const s = getSessionByTeamCode(teamCode);
+  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  if (s.flow !== 'agent_solo') return res.status(403).json({ ok: false, error: 'AGENT_SOLO_ONLY' });
+  if (!s.houseCeremony?.agentReveal) return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+
+  const painted = countInk(s.canvas?.pixels);
+  if (painted < MIN_AGENT_SOLO_PIXELS) {
+    return res.status(403).json({ ok: false, error: 'INSUFFICIENT_PIXELS', minPixels: MIN_AGENT_SOLO_PIXELS, painted });
+  }
+
+  if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!houseAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_AUTH' });
+  const authKeyBytes = decodeB64(houseAuthKey);
+  if (!authKeyBytes || authKeyBytes.length < 16) {
+    return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
+  }
+  if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
+    return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
+  }
+
+  // Solo flow uses ceremony-style keys with agent entropy.
+  if (keyMode !== 'ceremony') {
+    return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  const ra = b64ToBytes(s.houseCeremony.agentReveal);
+  if (!ra || !ra.length) return res.status(400).json({ ok: false, error: 'INVALID_REVEAL' });
+  const kroot = sha256Bytes(ra);
+  const expectedHouseId = base58Encode(sha256Bytes(kroot));
+  if (expectedHouseId !== houseId) {
+    return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
+  }
+
+  let normalizedKeyWrap = null;
+  if (keyWrap && typeof keyWrap === 'object') {
+    const alg = typeof keyWrap.alg === 'string' ? keyWrap.alg.trim() : '';
+    const iv = typeof keyWrap.iv === 'string' ? keyWrap.iv.trim() : '';
+    const ct = typeof keyWrap.ct === 'string' ? keyWrap.ct.trim() : '';
+    if (alg && iv && ct) {
+      if (alg !== 'AES-GCM') {
+        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP' });
+      }
+      normalizedKeyWrap = { alg, iv, ct };
+    }
+  }
+
+  const store = readStore();
+  if (store.houses.length >= MAX_HOUSES) {
+    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
+  }
+  if (store.signups.length >= MAX_SIGNUPS) {
+    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
+  }
+  const exists = store.houses.find((r) => r.id === houseId);
+  if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+
+  store.houses.push({
+    id: houseId,
+    housePubKey,
+    createdAt: nowIso(),
+    nonce,
+    keyMode: 'ceremony',
+    unlock,
+    keyWrap: normalizedKeyWrap,
+    authKey: houseAuthKey,
+    entries: []
+  });
+  writeStore(store);
+
+  s.houseCeremony.houseId = houseId;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+  indexHouseId(s, houseId);
+
+  const status = recordSignup(s, {
+    mode: 'agent_solo',
+    agentName: s.agent.name || null,
+    matchedElement: null,
+    address: unlock?.address || null
+  });
+
+  if (!status.complete) {
+    return res.status(403).json({ ok: false, error: status.reason || 'STORE_FULL', houseId });
+  }
+
+  res.json({ ok: true, houseId, status });
 });
 
 app.get('/api/house/:id/meta', (req, res) => {
@@ -1693,6 +2204,7 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
+app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));

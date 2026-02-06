@@ -46,8 +46,8 @@ module.exports = defineConfig({
       NODE_ENV: 'test',
       PORT: String(PORT),
       TEST_RESET_TOKEN: 'test-reset',
-      // Avoid modifying tracked data/store.test.json during e2e runs.
-      STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.json')
+      // Avoid modifying tracked data/store.json during e2e runs.
+      STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.sqlite')
     }
   }
 });

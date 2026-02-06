@@ -20,12 +20,13 @@ function emptyCanvas() {
   return Array(CANVAS.w * CANVAS.h).fill(0);
 }
 
-function createSession() {
+function createSession({ flow } = {}) {
   const sessionId = randomHex(16);
   const teamCode = createTeamCode();
   const session = {
     sessionId,
     teamCode,
+    flow: flow === 'agent_solo' ? 'agent_solo' : 'human',
     createdAt: nowIso(),
     agent: {
       connected: false,

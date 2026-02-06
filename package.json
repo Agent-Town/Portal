@@ -6,11 +6,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "node server/index.js",
+    "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "ethers": "^6.16.0",
     "express": "^4.19.2"
   },
   "devDependencies": {

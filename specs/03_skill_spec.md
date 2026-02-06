@@ -1,8 +1,10 @@
 # Skill spec
 
-The skill is delivered as a single markdown file served at:
+The primary skill is delivered as a single markdown file served at:
 
 - `/skill.md`
+
+Optional extension skills may be served at additional paths (e.g. `/skill_agent_solo.md`) and linked from `/skill.md` for agent-only flows.
 
 It contains:
 

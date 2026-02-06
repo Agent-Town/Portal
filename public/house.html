@@ -20,6 +20,7 @@
       </div>
       <div class="kv">
         <button class="btn" id="connectWalletBtn">Connect wallet</button>
+        <a class="btn is-hidden" id="inboxNavLink" href="#">Inbox</a>
         <a class="btn" href="/leaderboard">Leaderboard</a>
         <a class="btn" href="/">Home</a>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
@@ -88,6 +89,44 @@
         </div>
       </div>
       <div class="small" id="erc8004MintStatus" style="margin-top:8px; color: var(--muted)"></div>
+    </div>
+
+    <div class="panel" id="anchorsPanel" style="margin-top: 14px;">
+      <h2 style="margin:0 0 6px">Anchors (private vault)</h2>
+      <p class="small" style="margin-top:0">
+        Link this house to an ERC-8004 identity. The link is stored <strong>encrypted</strong> inside the house vault.
+        The house mailbox exists regardless — publishing only makes this alias discoverable for routing.
+      </p>
+
+      <div class="row" style="gap: 10px; align-items: end;">
+        <div style="flex: 1; min-width: 240px;">
+          <label class="small" for="anchorErc8004Id">ERC-8004 ID (Agent0 format)</label>
+          <input id="anchorErc8004Id" type="text" placeholder="e.g. 11155111:123" />
+          <div class="small" style="margin-top:6px; color: var(--muted)">We store the ID exactly as Agent0 returns it (includes chainId).</div>
+          <label class="small" style="margin-top:10px; display:flex; gap:8px; align-items:center; color: var(--muted)">
+            <input id="anchorDiscoverable" type="checkbox" checked />
+            Publish ERC-8004 → house mapping (discoverable)
+          </label>
+        </div>
+        <div class="kv">
+          <button class="btn" id="linkAnchorBtn">Sign + link</button>
+        </div>
+      </div>
+
+      <div class="small" id="anchorStatus" style="margin-top:8px; color: var(--muted)"></div>
+      <div class="small" id="anchorError" style="margin-top:6px; color: var(--bad)"></div>
+
+      <div class="divider" style="margin: 14px 0;"></div>
+      <div class="row two" style="gap: 14px; align-items: start;">
+        <div class="panel" style="margin:0;">
+          <h3 style="margin:0 0 6px">Mainnets</h3>
+          <div class="small" id="anchorsMainnet" style="white-space: pre-wrap; color: var(--muted)">—</div>
+        </div>
+        <div class="panel" style="margin:0;">
+          <h3 style="margin:0 0 6px">Devnets</h3>
+          <div class="small" id="anchorsDevnet" style="white-space: pre-wrap; color: var(--muted)">—</div>
+        </div>
+      </div>
     </div>
 
     <div class="panel" id="sharePanel" style="margin-top: 14px;">

@@ -89,6 +89,7 @@ function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
 }
 
 const SHARE_CACHE_KEY = 'agentTownShareCache';
+const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const SHARE_COPY_LABEL = 'Copy share link';
 const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
@@ -130,6 +131,28 @@ function unb64(str) {
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
+}
+
+function houseAuthCacheKey(houseId) {
+  return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
+}
+
+function cacheHouseAuthBytes(houseId, keyBytes) {
+  if (!houseId || !keyBytes || !keyBytes.length) return;
+  try {
+    sessionStorage.setItem(houseAuthCacheKey(houseId), b64(keyBytes));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearHouseAuthCache(houseId) {
+  if (!houseId) return;
+  try {
+    sessionStorage.removeItem(houseAuthCacheKey(houseId));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 // --- base58 (minimal) ---
@@ -482,6 +505,144 @@ let autoLockTimer = null;
 let humanErc8004Id = null;
 let agentErc8004Id = null;
 
+function randomNonce(prefix = 'n_') {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `${prefix}${Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
+  // Human-readable, stable message for EVM signature.
+  return [
+    'AgentTown Anchor Link',
+    `houseId: ${houseId}`,
+    `erc8004Id: ${erc8004Id}`,
+    `origin: ${origin}`,
+    `nonce: ${nonce}`,
+    `createdAtMs: ${createdAtMs}`
+  ].join('\n');
+}
+
+async function signEvmMessage(message) {
+  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  const signer = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  if (!signer) throw new Error('NO_EVM_ACCOUNT');
+  // personal_sign expects [data, address]
+  const sig = await window.ethereum.request({
+    method: 'personal_sign',
+    params: [message, signer]
+  });
+  const chainHex = await window.ethereum.request({ method: 'eth_chainId' });
+  const chainId = parseInt(chainHex, 16);
+  return { signer, signature: sig, chainId };
+}
+
+async function appendVaultObject({ type = 'anchor', body }) {
+  if (!unlocked || !house || !Kenc) throw new Error('LOCKED');
+  armAutoLock();
+
+  const payload = {
+    v: 1,
+    id: `e_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    ts: Date.now(),
+    author: 'human',
+    type,
+    body
+  };
+
+  const pt = new TextEncoder().encode(JSON.stringify(payload));
+  const aad = new TextEncoder().encode(`house=${house.houseId}`);
+  const enc = await aesGcmEncrypt(Kenc, pt, aad);
+  const ciphertext = { alg: 'AES-GCM', iv: b64(enc.iv), ct: b64(enc.ct) };
+
+  const url = `/api/house/${encodeURIComponent(house.houseId)}/append`;
+  const reqBody = JSON.stringify({ ciphertext, author: 'human' });
+  await houseApi(house.houseId, url, { method: 'POST', body: reqBody });
+}
+
+async function linkErc8004AnchorToVault(erc8004Id) {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  const clean = (erc8004Id || '').trim();
+  if (!clean) throw new Error('ERC8004_ID_REQUIRED');
+
+  const discoverable = !!el('anchorDiscoverable')?.checked;
+
+  setAnchorError('');
+  setAnchorStatus('Requesting signature…');
+
+  const createdAtMs = Date.now();
+  // Use a server-issued nonce if we are publishing to a server directory (prevents replay).
+  let nonce = randomNonce('a_');
+  if (discoverable) {
+    try {
+      const n = await api('/api/anchors/nonce');
+      if (n && n.nonce) nonce = String(n.nonce);
+    } catch {
+      // fallback to random nonce
+    }
+  }
+
+  const msg = buildAnchorLinkMessage({
+    houseId: house.houseId,
+    erc8004Id: clean,
+    origin: window.location.origin,
+    nonce,
+    createdAtMs
+  });
+
+  const { signer, signature, chainId } = await signEvmMessage(msg);
+
+  setAnchorStatus('Saving to encrypted vault…');
+  await appendVaultObject({
+    type: 'anchor',
+    body: {
+      kind: 'anchor.link.v1',
+      createdAtMs,
+      nonce,
+      origin: window.location.origin,
+      anchor: {
+        kind: 'erc8004',
+        // Store exactly what Agent0 returns (includes chain id in the string).
+        erc8004Id: clean,
+        // Also store the wallet chainId for debugging/UX grouping.
+        chainId
+      },
+      proof: {
+        kind: 'eip191.personal_sign',
+        signer,
+        message: msg,
+        signature
+      },
+      publish: {
+        discoverable
+      }
+    }
+  });
+
+  if (discoverable) {
+    setAnchorStatus('Publishing mapping…');
+    await api('/api/anchors/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        houseId: house.houseId,
+        erc8004Id: clean,
+        createdAtMs,
+        nonce,
+        signer,
+        signature,
+        chainId,
+        origin: window.location.origin
+      })
+    });
+  }
+
+  setAnchorStatus(discoverable ? 'Linked + published.' : 'Linked.');
+  setTimeout(() => setAnchorStatus(''), 1200);
+  await refreshEntries();
+}
+
 function buildHouseDescriptor(currentHouseId) {
   const origin = window.location.origin;
   return {
@@ -612,6 +773,9 @@ async function mintErc8004Identity() {
       humanErc8004Id = agentId;
       // If we haven't unlocked yet, still re-render the statement using the URL houseId
       renderDescriptorUI((house && house.houseId) ? house.houseId : houseId);
+      // Prefill anchor link input for convenience.
+      const anchorInput = el('anchorErc8004Id');
+      if (anchorInput && !anchorInput.value) anchorInput.value = String(agentId);
       if (status) status.textContent = `Minted identity: ${agentId}`;
     } else {
       if (status) status.textContent = 'Confirmed (no agentId returned).';
@@ -788,12 +952,14 @@ async function recoverHouseKeyWithWallet(houseId) {
 }
 
 function wipeKeys() {
+  const prevHouseId = house?.houseId || null;
   unlocked = false;
   house = null;
   KrootBytes = null;
   Kenc = null;
   KauthBytes = null;
   KauthKey = null;
+  clearHouseAuthCache(prevHouseId);
   if (autoLockTimer) {
     clearTimeout(autoLockTimer);
     autoLockTimer = null;
@@ -805,6 +971,11 @@ function wipeKeys() {
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
   setUnlockButtonState(false);
+  const inboxNav = el('inboxNavLink');
+  if (inboxNav) {
+    inboxNav.classList.add('is-hidden');
+    inboxNav.href = '#';
+  }
 }
 
 async function deriveHouseEncKey(Kroot) {
@@ -867,6 +1038,12 @@ async function unlockExistingHouse(houseId) {
   unlocked = true;
   walletHouseId = house.houseId;
   saveWalletCache();
+  cacheHouseAuthBytes(house.houseId, KauthBytes);
+  const inboxNav = el('inboxNavLink');
+  if (inboxNav) {
+    inboxNav.href = `/inbox/${encodeURIComponent(house.houseId)}`;
+    inboxNav.classList.remove('is-hidden');
+  }
   setStatus(recovered ? 'Unlocked (wallet recovery).' : 'Unlocked.');
   setUnlockButtonState(true);
   armAutoLock();
@@ -905,23 +1082,80 @@ async function appendEntry() {
   await refreshEntries();
 }
 
+function setAnchorStatus(msg) {
+  const s = el('anchorStatus');
+  if (s) s.textContent = msg || '';
+}
+function setAnchorError(msg) {
+  const e = el('anchorError');
+  if (e) e.textContent = msg || '';
+}
+
+function parseAgent0Erc8004Id(str) {
+  // Agent0 currently returns `chainId:agentId` (e.g. "11155111:123").
+  if (!str || typeof str !== 'string') return null;
+  const m = str.trim().match(/^(\d+):(.+)$/);
+  if (!m) return null;
+  return { chainId: Number(m[1]), id: m[2] };
+}
+
+function renderAnchors(anchorLinks) {
+  const mainEl = el('anchorsMainnet');
+  const devEl = el('anchorsDevnet');
+  if (!mainEl || !devEl) return;
+
+  const main = [];
+  const dev = [];
+
+  for (const a of anchorLinks) {
+    const pub = a.discoverable ? ' · discoverable' : '';
+    const label = `${a.erc8004Id}${a.signer ? ` (signer ${a.signer.slice(0, 6)}…${a.signer.slice(-4)})` : ''}${pub}`;
+    const parsed = parseAgent0Erc8004Id(a.erc8004Id);
+    const chainId = parsed?.chainId ?? a.chainId ?? null;
+    // classification: 1 = Ethereum mainnet, 11155111 = Sepolia
+    if (chainId === 1) main.push(`Ethereum: ${label}`);
+    else if (chainId === 11155111) dev.push(`Sepolia: ${label}`);
+    else if (chainId) dev.push(`Chain ${chainId}: ${label}`);
+    else dev.push(label);
+  }
+
+  mainEl.textContent = main.length ? main.join('\n') : '—';
+  devEl.textContent = dev.length ? dev.join('\n') : '—';
+}
+
 async function refreshEntries() {
   if (!unlocked || !house || !Kenc) return;
   const data = await houseApi(house.houseId, `/api/house/${encodeURIComponent(house.houseId)}/log`);
   const aad = new TextEncoder().encode(`house=${house.houseId}`);
   const lines = [];
+  const anchorLinks = [];
+
   for (const entry of data.entries || []) {
     try {
       const iv = unb64(entry.ciphertext.iv);
       const ct = unb64(entry.ciphertext.ct);
       const pt = await aesGcmDecrypt(Kenc, iv, ct, aad);
       const obj = JSON.parse(new TextDecoder().decode(pt));
-      lines.push(`[${new Date(obj.ts).toLocaleString()}] (${obj.author}) ${obj.type}: ${obj.body?.text ?? ''}`);
+
+      const bodyText = obj.body?.text ?? (obj.body ? JSON.stringify(obj.body) : '');
+      lines.push(`[${new Date(obj.ts).toLocaleString()}] (${obj.author}) ${obj.type}: ${bodyText}`);
+
+      const b = obj.body || null;
+      if (b && b.kind === 'anchor.link.v1' && b.anchor?.kind === 'erc8004' && typeof b.anchor?.erc8004Id === 'string') {
+        anchorLinks.push({
+          erc8004Id: b.anchor.erc8004Id,
+          signer: b.proof?.signer || null,
+          chainId: b.anchor?.chainId || null,
+          discoverable: !!b.publish?.discoverable
+        });
+      }
     } catch (e) {
       lines.push(`[decrypt failed] ${e.message}`);
     }
   }
+
   el('entries').textContent = lines.join('\n\n');
+  renderAnchors(anchorLinks);
 }
 
 async function loadPublicMedia() {
@@ -1624,6 +1858,20 @@ async function init() {
       setError(e.message);
     }
   });
+
+  const linkAnchorBtn = el('linkAnchorBtn');
+  if (linkAnchorBtn) {
+    linkAnchorBtn.addEventListener('click', async () => {
+      setAnchorError('');
+      try {
+        const id = el('anchorErc8004Id')?.value || '';
+        await linkErc8004AnchorToVault(id);
+      } catch (e) {
+        setAnchorStatus('');
+        setAnchorError(e.message);
+      }
+    });
+  }
 
   const publicImage = el('publicImage');
   if (publicImage) {

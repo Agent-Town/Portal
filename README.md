@@ -32,6 +32,33 @@ npm test
 
 Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
 
+Optional local integration check (reused Sepolia wallet):
+```bash
+REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
+```
+
+Notes:
+- Setup command:
+```bash
+npm run setup:sepolia-wallet
+```
+- Fresh setup auto-generates an EVM private key + address and stores it in `data/local.sepolia.wallet.json`.
+- If balance is below threshold on fresh generation, setup attempts a Google Sepolia faucet request automatically.
+- Test checks on-chain Sepolia ETH balance and fails with the faucet URL if below threshold.
+- Override threshold with `MIN_SEPOLIA_ETH` (default `0.001`).
+- Non-interactive setup (automation):
+```bash
+npm run setup:sepolia-wallet -- --no-balance-check
+```
+- Provide your own wallet:
+```bash
+npm run setup:sepolia-wallet -- --address 0x...
+```
+- Disable faucet automation:
+```bash
+npm run setup:sepolia-wallet -- --no-faucet
+```
+
 ## Agent integration
 - The agent skill is served at `/skill.md` (source: `public/skill.md`).
 - Core agent endpoints: `/api/agent/connect`, `/api/agent/state`, `/api/agent/select`, `/api/agent/open/press`.
@@ -46,8 +73,9 @@ Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_R
 - `/leaderboard` — public teams and referrals (`/wall` redirects here).
 
 ## Data + storage
-- Store file: `data/store.json` (or `STORE_PATH`).
-- Test store: `data/store.test.json` when `NODE_ENV=test`.
+- Store file: `data/store.sqlite` (or `STORE_PATH`).
+- Test store: `data/store.test.sqlite` when `NODE_ENV=test`.
+- Legacy `data/store.json` is imported automatically on first boot (non-test) if the SQLite store is empty.
 - Session state is in memory; signups/shares/public teams/houses persist in the store.
 
 ## Security model (data)

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inbox — Agent Town</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <a class="logoLink" href="/" aria-label="Agent Town home">
+          <img class="logoImg" src="/logo.jpg" alt="" />
+        </a>
+        <strong>Inbox</strong>
+        <span class="badge" id="houseBadge"></span>
+      </div>
+      <div class="actions">
+        <a class="btn" id="backLink" href="/">Back</a>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Requests</h2>
+      <div id="requests" class="stack"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Accepted</h2>
+      <div id="accepted" class="stack"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Send a note</h2>
+      <p class="muted">Pony Express v0.1: envelope format is now explicit and inbox actions require house-auth.</p>
+      <textarea id="body" rows="5" style="width:100%;"></textarea>
+      <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+        <input id="fromHouseId" placeholder="fromHouseId (optional)" style="flex:1;" />
+        <button class="btn" id="sendBtn">Send</button>
+      </div>
+      <div id="sendStatus" class="muted" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script src="/inbox.js"></script>
+</body>
+</html>
