@@ -22,8 +22,8 @@ test('package contains idle+walk for 4 directions and ships x1 + x2 atlases', as
   expect(metaResp.ok()).toBeTruthy();
   const meta = await metaResp.json();
 
-  expect(meta.frame.w).toBe(32);
-  expect(meta.frame.h).toBe(48);
+  expect(meta.frame.w).toBe(48);
+  expect(meta.frame.h).toBe(72);
 
   for (const dir of ['south', 'north', 'east', 'west']) {
     expect(meta.clips.idle[dir].length).toBe(2);

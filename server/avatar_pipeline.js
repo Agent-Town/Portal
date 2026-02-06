@@ -6,11 +6,13 @@ const sharp = require('sharp');
 const { nowIso, randomHex } = require('./util');
 
 // Bump when changing output bytes deterministically (atlas layout, QC, scaling, etc).
-const PIPELINE_VERSION = 'v1.2.0';
+const PIPELINE_VERSION = 'v1.3.0';
 const TEMPLATE_VERSION = 't1.0.0';
 
-const WORK_CANVAS = 128;
-const FRAME = { w: 32, h: 48 };
+// Work canvas controls how much detail survives normalization.
+// Frame controls the exported sprite resolution.
+const WORK_CANVAS = 192;
+const FRAME = { w: 48, h: 72 };
 const SCALE_FACTORS = { x1: 1, x2: 2 };
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
@@ -266,8 +268,10 @@ function extractLimbLayers(raw, width, height, bounds) {
   const RL = p('RIGHT LEG');
 
   // Wider thresholds to capture full limbs in pixel art.
-  const armThreshold2 = 6.2 * 6.2;
-  const legThreshold2 = 7.4 * 7.4;
+  // Scale with the posed frame size (bigger frames need bigger thresholds).
+  const scale = Math.max(0.8, width / 32);
+  const armThreshold2 = (6.2 * scale) ** 2;
+  const legThreshold2 = (7.4 * scale) ** 2;
 
   const armL = Buffer.alloc(raw.length);
   const armR = Buffer.alloc(raw.length);
@@ -455,7 +459,10 @@ async function normalizeImage(sourceBuffer, outPath) {
   if (!bounds) {
     throw new PipelineError('NO_FOREGROUND', 'No clear foreground character detected.');
   }
-  if (bounds.h < 70 || bounds.maxY < 108) {
+  // Scale-aware full-body requirement (tuned from 128px baseline).
+  const minHeight = Math.round(WORK_CANVAS * 0.55);
+  const minGroundY = Math.round(WORK_CANVAS * 0.84);
+  if (bounds.h < minHeight || bounds.maxY < minGroundY) {
     throw new PipelineError('FULL_BODY_REQUIRED', 'Please upload a full standing character.');
   }
 
@@ -473,30 +480,26 @@ async function directionPose(baseBuffer, direction) {
   if (direction === 'south') return baseBuffer;
 
   if (direction === 'north') {
-    const occluder = await sharp({
-      create: {
-        width: 12,
-        height: 8,
-        channels: 4,
-        background: { r: 35, g: 30, b: 32, alpha: 190 }
-      }
-    })
-      .png()
-      .toBuffer();
+    // Back-facing: subtle darken/desaturate only.
+    // NOTE: avoid hard overlays (previous versions produced a visible \"black box\").
     return sharp(baseBuffer)
-      .modulate({ brightness: 0.84, saturation: 0.88 })
-      .composite([{ input: occluder, left: 10, top: 14 }])
+      .modulate({ brightness: 0.9, saturation: 0.86 })
       .png()
       .toBuffer();
   }
 
+  const targetW = Math.max(1, Math.round(FRAME.w * 0.875));
+  const pad = Math.max(0, FRAME.w - targetW);
+  const padL = Math.floor(pad / 2);
+  const padR = pad - padL;
+
   let side = await sharp(baseBuffer)
-    .resize(28, FRAME.h, { fit: 'fill', kernel: sharp.kernel.nearest })
+    .resize(targetW, FRAME.h, { fit: 'fill', kernel: sharp.kernel.nearest })
     .extend({
       top: 0,
       bottom: 0,
-      left: 2,
-      right: 2,
+      left: padL,
+      right: padR,
       background: { r: 0, g: 0, b: 0, alpha: 0 }
     })
     .png()

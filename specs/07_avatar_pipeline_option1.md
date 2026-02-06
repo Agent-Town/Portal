@@ -32,7 +32,7 @@ For each accepted upload, publish an `AvatarPackage`:
 
 - `idle`: 4 directions (`north`, `south`, `east`, `west`), 2 frames each.
 - `walk`: 4 directions, 8 frames each.
-- Base frame size: `32x48`.
+- Base frame size: `48x72`.
 - Delivery scale: `x1` and `x2` (`64x96`) nearest-neighbor.
 - Transparent background.
 - Sprite atlas PNG + JSON metadata.
@@ -77,7 +77,7 @@ For each accepted upload, publish an `AvatarPackage`:
 - Convert to PNG.
 - Background separation.
 - Crop and center character.
-- Scale to canonical working canvas (`128x128`).
+- Scale to canonical working canvas (`192x192`).
 
 2. **Pose + keypoints**
 - Detect fixed set of body landmarks.
@@ -217,7 +217,7 @@ Pass:
 ## M2: Deterministic normalize stage
 
 Deliverables:
-- Canonical normalize output (`128x128`, transparent bg).
+- Canonical normalize output (`192x192`, transparent bg).
 - Content-hash cache.
 
 Playwright:
