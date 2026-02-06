@@ -288,7 +288,7 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox + vault (phases 1-4)
+## Pony Express inbox + vault (phases 1-5)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
@@ -305,7 +305,15 @@ Message envelope (`msg.chat.v1`):
     "ciphertext": { "alg": "...", "iv": "...", "ct": "..." }
   },
   "transport": { "kind": "relay.http.v1", "relayHints": [] },
-  "postage": { "kind": "none" }
+  "postage": { "kind": "none" },
+  "dispatch": {
+    "receiptId": "dr_...",
+    "ok": true,
+    "adapter": "relay.http.v1",
+    "transportKind": "relay.http.v1",
+    "relayHints": [],
+    "dispatchedAt": "ISO8601"
+  }
 }
 ```
 
@@ -333,11 +341,33 @@ Rules:
 - Transport dispatch is adapter-based:
   - default adapter handles `relay.http.v1`
   - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
+  - dispatch result is persisted on each delivered message under `dispatch.*`
 - Postage verification hook runs before dispatch:
   - `pow.v1` enforces digest shape
   - when `requirePostageAnonymous=true` and sender is anonymous, `pow.v1.difficulty` must meet server minimum (`>= 8`)
-  - `receipt.v1` currently uses a server verification stub (shape + non-empty receipts)
+  - `receipt.v1` validates receipt ids
+  - dispatch-style receipt ids (`dr_...`) are resolved against stored dispatch receipts
+  - when a dispatch receipt is resolved, it must belong to the same `toHouseId`
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
+
+Response:
+```json
+{
+  "ok": true,
+  "id": "msg_...",
+  "toHouseId": "<base58>",
+  "fromHouseId": "<base58|null>",
+  "status": "request",
+  "dispatch": {
+    "receiptId": "dr_...",
+    "ok": true,
+    "adapter": "relay.http.v1",
+    "transportKind": "relay.http.v1",
+    "relayHints": [],
+    "dispatchedAt": "ISO8601"
+  }
+}
+```
 
 Errors:
 - `MISSING_TO`
@@ -353,7 +383,12 @@ Errors:
 - `POSTAGE_REQUIRED`
 - `POSTAGE_POW_DIFFICULTY_TOO_LOW`
 - `POSTAGE_POW_DIGEST_INVALID`
+- `POSTAGE_RECEIPT_EMPTY`
 - `POSTAGE_RECEIPT_INVALID`
+- `POSTAGE_RECEIPT_DUPLICATE`
+- `POSTAGE_RECEIPT_NOT_FOUND`
+- `POSTAGE_RECEIPT_HOUSE_MISMATCH`
+- `POSTAGE_RECEIPT_LOOKUP_FAILED`
 - `SENDER_BLOCKED`
 - `RATE_LIMITED_PONY`
 - standard house-auth errors when sender auth is required.
@@ -400,11 +435,31 @@ Body:
   "kind": "vault.append.v1",
   "ciphertext": { "alg": "AES-GCM", "iv": "...", "ct": "..." },
   "refs": ["ipfs://..."],
-  "postage": { "kind": "receipt.v1", "receipts": ["rcpt-1"] }
+  "refsMeta": [
+    {
+      "ref": "ipfs://...",
+      "mediaType": "application/json",
+      "bytes": 321,
+      "sha256": "<64 hex chars>"
+    }
+  ],
+  "postage": { "kind": "receipt.v1", "receipts": ["dr_..."] }
 }
 ```
 Requires house-auth. Appends a hash-chained encrypted event for the house vault.
-Postage verification hook also runs here (`pow.v1` threshold/digest checks, `receipt.v1` stub checks).
+Postage verification hook also runs here (`pow.v1` threshold/digest checks, `receipt.v1` dispatch receipt checks).
+`refsMeta` (optional) is contract-validated: each item must reference a known `refs` entry, and duplicate `ref` values are rejected.
+
+Additional vault errors:
+- `INVALID_VAULT_REFS_META`
+- `VAULT_REFS_META_TOO_MANY`
+- `VAULT_REF_META_MISSING_REF`
+- `VAULT_REF_META_REF_UNKNOWN`
+- `VAULT_REF_META_DUPLICATE`
+- `VAULT_REF_META_MEDIA_TYPE_INVALID`
+- `VAULT_REF_META_BYTES_INVALID`
+- `VAULT_REF_META_SHA256_INVALID`
+- `VAULT_REF_META_EMPTY`
 
 ### GET `/api/pony/vault?houseId=...&limit=50`
 Returns most recent vault events (default 50, max 200) and current `head` hash. Requires house-auth.
