@@ -35,6 +35,77 @@ function getViewMode() {
 
 const viewMode = getViewMode();
 
+function getArtMode() {
+  const raw = new URLSearchParams(window.location.search).get('art') || '';
+  const value = String(raw).trim().toLowerCase();
+  if (value === 'sprites') return 'sprites';
+  if (value === 'markers') return 'markers';
+  return 'auto';
+}
+
+function isProbablyMobile() {
+  return window.matchMedia ? window.matchMedia('(max-width: 740px)').matches : false;
+}
+
+function getTextureSizePreference() {
+  const raw = new URLSearchParams(window.location.search).get('tex') || '';
+  const value = String(raw).trim().toLowerCase();
+  if (value === 'hd' || value === '2x') return 'hd';
+  if (value === 'sd' || value === '1x') return 'sd';
+  return 'auto';
+}
+
+function pickTextureSize() {
+  const pref = getTextureSizePreference();
+  if (pref === 'sd' || pref === 'hd') return pref;
+  // Mobile-first: default to SD even on high-DPR devices. HD can be forced with ?tex=hd.
+  if (isProbablyMobile()) return 'sd';
+  return window.devicePixelRatio >= 2 ? 'hd' : 'sd';
+}
+
+function getAssetsPackUrl() {
+  const raw = new URLSearchParams(window.location.search).get('assets');
+  if (raw == null) return '/world_assets/pack.json';
+  const value = String(raw).trim();
+  if (!value) return '/world_assets/pack.json';
+  if (value.toLowerCase() === 'off') return null;
+  if (value.toLowerCase() === 'demo') return '/world_assets/demo/pack.json';
+  if (value.startsWith('/')) return value;
+  return `/world_assets/${encodeURIComponent(value)}/pack.json`;
+}
+
+function urlDir(url) {
+  const idx = String(url || '').lastIndexOf('/');
+  if (idx < 0) return '/';
+  return url.slice(0, idx + 1);
+}
+
+function resolveUrl(base, maybeRelative) {
+  const value = String(maybeRelative || '').trim();
+  if (!value) return null;
+  if (/^https?:\\/\\//i.test(value)) return value;
+  if (value.startsWith('/')) return value;
+  return `${base}${value}`;
+}
+
+async function fetchJsonMaybe(url) {
+  const res = await fetch(url, { credentials: 'include' });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP_${res.status}`);
+  return res.json();
+}
+
+const assets = {
+  mode: 'markers', // markers | sprites
+  artPref: getArtMode(),
+  texSize: pickTextureSize(), // sd | hd
+  packUrl: getAssetsPackUrl(),
+  packBaseUrl: null,
+  pack: null,
+  error: null,
+  stats: { spriteHouses: 0, totalHouses: 0 }
+};
+
 const state = {
   instance: 'public',
   world: null,
@@ -77,6 +148,7 @@ let polling = false;
 let visibleListKey = '';
 let renderSpace = null;
 let worldTheme = null;
+let assetsLoadedOnce = false;
 
 const houseMarkerById = new Map();
 const playerMarkerById = new Map();
@@ -177,6 +249,9 @@ function updateHouseMarkerSelection() {
     const selected = houseId === selectedHouseId;
     entry.circle.setStrokeStyle(2, selected ? theme.markerSelectedStroke : theme.markerStroke, 1);
     entry.circle.setScale(selected ? 1.2 : 1);
+    if (entry.sprite && typeof entry.baseSpriteScale === 'number') {
+      entry.sprite.setScale(selected ? entry.baseSpriteScale * 1.05 : entry.baseSpriteScale);
+    }
   });
 }
 
@@ -455,6 +530,7 @@ function applyCullingAndTelemetry() {
 
     entry.circle.setVisible(inView);
     entry.label.setVisible(inView);
+    if (entry.sprite) entry.sprite.setVisible(inView);
     if (inView) visible.push(houseId);
   });
 
@@ -496,6 +572,80 @@ function destroyGame() {
   }
 }
 
+function shouldUseSprites() {
+  if (!assets.pack) return false;
+  if (assets.artPref === 'sprites') return true;
+  if (assets.artPref === 'markers') return false;
+  return true;
+}
+
+function validateAssetPack(pack) {
+  if (!pack || typeof pack !== 'object') return false;
+  if (pack.version !== 'world_assets_v1') return false;
+  if (!Array.isArray(pack.atlases)) return false;
+  if (!pack.sprites || typeof pack.sprites !== 'object') return false;
+  return true;
+}
+
+async function initAssetPack() {
+  assets.error = null;
+  assets.pack = null;
+  assets.packBaseUrl = null;
+  if (!assets.packUrl) {
+    assets.mode = 'markers';
+    return;
+  }
+
+  try {
+    const pack = await fetchJsonMaybe(assets.packUrl);
+    if (!pack) {
+      assets.mode = 'markers';
+      return;
+    }
+    if (!validateAssetPack(pack)) {
+      throw new Error('ASSET_PACK_INVALID');
+    }
+    assets.pack = pack;
+    assets.packBaseUrl = urlDir(assets.packUrl);
+    assets.mode = shouldUseSprites() ? 'sprites' : 'markers';
+  } catch (err) {
+    assets.error = err;
+    assets.mode = 'markers';
+  }
+}
+
+function registerAtlasFrames(scene, atlas) {
+  if (!atlas || typeof atlas !== 'object') return 0;
+  if (!atlas.key || typeof atlas.key !== 'string') return 0;
+  const frames = atlas.frames;
+  if (!frames || typeof frames !== 'object') return 0;
+
+  const texture = scene.textures.get(atlas.key);
+  if (!texture) return 0;
+
+  let added = 0;
+  for (const [frameName, rect] of Object.entries(frames)) {
+    if (!rect || typeof rect !== 'object') continue;
+    const x = Number(rect.x);
+    const y = Number(rect.y);
+    const w = Number(rect.w);
+    const h = Number(rect.h);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(w) || !Number.isFinite(h)) continue;
+    if (w <= 0 || h <= 0) continue;
+    // Source index is always 0 since each atlas uses one image source.
+    texture.add(frameName, 0, x, y, w, h);
+    added += 1;
+  }
+  return added;
+}
+
+function resolveAtlasImageUrl(atlas) {
+  const base = assets.packBaseUrl || '/';
+  const useHd = assets.texSize === 'hd';
+  const path = useHd && atlas.image2x ? atlas.image2x : atlas.image;
+  return resolveUrl(base, path);
+}
+
 function initPhaserWorld() {
   destroyGame();
   if (!window.Phaser) return;
@@ -506,6 +656,7 @@ function initPhaserWorld() {
   const height = Math.max(360, canvasRoot.clientHeight || 360);
   const space = getRenderSpace();
   const dims = space.dims;
+  const useSprites = assets.mode === 'sprites' && !!assets.pack;
 
   const config = {
     type: window.Phaser.AUTO,
@@ -516,12 +667,29 @@ function initPhaserWorld() {
     backgroundColor: theme.skyCss,
     scene: {
       key: 'world',
+      preload() {
+        if (!useSprites) return;
+        const pack = assets.pack;
+        for (const atlas of pack.atlases || []) {
+          const url = resolveAtlasImageUrl(atlas);
+          if (!url) continue;
+          // Key becomes the texture key; frames are added in create().
+          this.load.image(atlas.key, url);
+        }
+      },
       create() {
         gameScene = this;
         const scene = this;
         const cam = scene.cameras.main;
         cam.setBounds(0, 0, dims.width, dims.height);
         setCameraCenter(dims.width / 2, dims.height / 2, 0);
+
+        if (useSprites) {
+          // Add named frames to each loaded atlas texture using pack-provided clip rects.
+          for (const atlas of assets.pack.atlases || []) {
+            registerAtlasFrames(scene, atlas);
+          }
+        }
 
         const bg = scene.add.graphics();
         bg.lineStyle(1, 0xffffff, 0.25);
@@ -554,13 +722,31 @@ function initPhaserWorld() {
           for (let y = 0; y <= dims.height; y += 120) bg.lineBetween(0, y, dims.width, y);
         }
 
+        assets.stats = { spriteHouses: 0, totalHouses: state.houses.length };
         for (const house of state.houses) {
           const pos = space.project(house.coord.x, house.coord.y);
+          const spec = useSprites ? assets.pack?.sprites?.[house.spriteKey] : null;
+          let sprite = null;
+          let baseSpriteScale = 1;
+          if (spec && spec.atlas && spec.frame) {
+            const origin = Array.isArray(spec.origin) ? spec.origin : null;
+            baseSpriteScale = Number.isFinite(Number(spec.scale)) ? Number(spec.scale) : 1;
+            sprite = scene.add.sprite(pos.x, pos.y, spec.atlas, spec.frame);
+            if (origin && origin.length === 2) sprite.setOrigin(Number(origin[0]), Number(origin[1]));
+            else sprite.setOrigin(0.5, 1);
+            sprite.setScale(baseSpriteScale);
+            sprite.setDepth(pos.y);
+            sprite.setInteractive({ useHandCursor: true });
+            sprite.on('pointerdown', () => selectHouse(house.houseId, { focusCamera: false }));
+            assets.stats.spriteHouses += 1;
+          }
+
           const tint = house.type === 'experience' ? theme.houseExperience : theme.housePlayer;
-          const circle = scene.add.circle(pos.x, pos.y, 10, tint, 1);
-          circle.setStrokeStyle(2, theme.markerStroke, 1);
+          const circle = scene.add.circle(pos.x, pos.y, 12, tint, sprite ? 0 : 1);
+          circle.setStrokeStyle(2, theme.markerStroke, sprite ? 0.6 : 1);
           circle.setInteractive({ useHandCursor: true });
           circle.on('pointerdown', () => selectHouse(house.houseId, { focusCamera: false }));
+          circle.setDepth(pos.y + 1);
 
           const label = scene.add.text(pos.x + 14, pos.y - 8, house.houseId, {
             fontSize: '12px',
@@ -568,8 +754,9 @@ function initPhaserWorld() {
             fontFamily: 'monospace'
           });
           label.setResolution(2);
+          label.setDepth(pos.y + 2);
 
-          houseMarkerById.set(house.houseId, { house, circle, label });
+          houseMarkerById.set(house.houseId, { house, circle, label, sprite, baseSpriteScale });
         }
 
         let drag = null;
@@ -952,6 +1139,7 @@ function applySnapshot(snapshot) {
   state.revision = nextRevision;
   renderSpace = null;
   worldTheme = null;
+  assetsLoadedOnce = false;
 
   renderCounts();
   renderHouseList();
@@ -1074,6 +1262,7 @@ async function init() {
   setStatus('Loading snapshot…');
 
   try {
+    await initAssetPack();
     const snapshot = await fetchSnapshot();
     applySnapshot(snapshot);
     setStatus(`Loaded ${snapshot.houses.length} houses.`);
@@ -1111,6 +1300,18 @@ window.__worldDebug = {
   },
   getSelfId() {
     return realtime.selfId;
+  },
+  getAssets() {
+    return {
+      mode: assets.mode,
+      artPref: assets.artPref,
+      texSize: assets.texSize,
+      packUrl: assets.packUrl,
+      packBaseUrl: assets.packBaseUrl,
+      packId: assets.pack?.packId || null,
+      error: assets.error ? assets.error.message : null,
+      stats: assets.stats
+    };
   }
 };
 
