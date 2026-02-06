@@ -78,6 +78,10 @@ function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status 
   };
 }
 
+function makeDispatchReceiptId() {
+  return `dr_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
 const PONY_RATE_WINDOW_MS = 60_000;
 const PONY_RATE_MAX_PER_PAIR = 20;
 const PONY_MAX_VAULT_EVENTS = 2000;
@@ -121,6 +125,74 @@ function normalizeRelayHints(values, max = 8) {
   return out;
 }
 
+const HEX_SHA256_RE = /^[0-9a-f]{64}$/i;
+
+function normalizePostageReceipts(values, max = 16) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    out.push(trimmed);
+    if (out.length > max) throw new Error('INVALID_POSTAGE');
+  }
+  return out;
+}
+
+function normalizeVaultRefsMeta(refs, refsMeta, max = 16, maxBytes = 1024 * 1024 * 1024) {
+  if (refsMeta == null) return [];
+  if (!Array.isArray(refsMeta)) throw new Error('INVALID_VAULT_REFS_META');
+  if (refsMeta.length > max) throw new Error('VAULT_REFS_META_TOO_MANY');
+
+  const knownRefs = new Set(Array.isArray(refs) ? refs : []);
+  const out = [];
+  const seen = new Set();
+
+  for (const item of refsMeta) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('INVALID_VAULT_REFS_META');
+    }
+
+    const ref = typeof item.ref === 'string' ? item.ref.trim() : '';
+    if (!ref) throw new Error('VAULT_REF_META_MISSING_REF');
+    if (!knownRefs.has(ref)) throw new Error('VAULT_REF_META_REF_UNKNOWN');
+    if (seen.has(ref)) throw new Error('VAULT_REF_META_DUPLICATE');
+    seen.add(ref);
+
+    const normalized = { ref };
+    let hasMeta = false;
+
+    if (Object.prototype.hasOwnProperty.call(item, 'mediaType')) {
+      const mediaType = typeof item.mediaType === 'string' ? item.mediaType.trim() : '';
+      if (!mediaType || mediaType.length > 120) throw new Error('VAULT_REF_META_MEDIA_TYPE_INVALID');
+      normalized.mediaType = mediaType;
+      hasMeta = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(item, 'bytes')) {
+      const bytes = Number(item.bytes);
+      if (!Number.isFinite(bytes) || bytes < 0 || Math.floor(bytes) !== bytes || bytes > maxBytes) {
+        throw new Error('VAULT_REF_META_BYTES_INVALID');
+      }
+      normalized.bytes = bytes;
+      hasMeta = true;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(item, 'sha256')) {
+      const sha256 = typeof item.sha256 === 'string' ? item.sha256.trim().toLowerCase() : '';
+      if (!HEX_SHA256_RE.test(sha256)) throw new Error('VAULT_REF_META_SHA256_INVALID');
+      normalized.sha256 = sha256;
+      hasMeta = true;
+    }
+
+    if (!hasMeta) throw new Error('VAULT_REF_META_EMPTY');
+    out.push(normalized);
+  }
+
+  return out;
+}
+
 function normalizePonyTransport(transport) {
   if (transport == null) {
     return {
@@ -158,7 +230,7 @@ function normalizePonyPostage(postage) {
   }
 
   if (kind === 'receipt.v1') {
-    const receipts = normalizeRelayHints(postage.receipts, 16);
+    const receipts = normalizePostageReceipts(postage.receipts, 16);
     if (!receipts.length) throw new Error('INVALID_POSTAGE');
     return {
       kind,
@@ -184,6 +256,7 @@ function computeVaultEventHash(event) {
     prevHash: event.prevHash || null,
     envelope: event.envelope,
     refs: Array.isArray(event.refs) ? event.refs : [],
+    refsMeta: Array.isArray(event.refsMeta) ? event.refsMeta : [],
     postage: event.postage || { kind: 'none' }
   };
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
@@ -589,11 +662,23 @@ const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
+const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
 
 const ponyTransportService = createPonyTransportService();
 const ponyPostageVerifier = createPostageVerifier({
   basePowMinDifficulty: 1,
-  anonymousPowMinDifficulty: PONY_ANON_POSTAGE_MIN_DIFFICULTY
+  anonymousPowMinDifficulty: PONY_ANON_POSTAGE_MIN_DIFFICULTY,
+  resolveReceipt: ({ receiptId, context } = {}) => {
+    const store = context?.store;
+    if (!store || !Array.isArray(store.inbox)) return null;
+    const message = store.inbox.find((entry) => entry?.dispatch?.receiptId === receiptId);
+    if (!message) return null;
+    return {
+      id: receiptId,
+      messageId: message.id || null,
+      toHouseId: message.toHouseId || null
+    };
+  }
 });
 const houseVaultBackend = createServerHouseVaultBackend({
   maxEntries: MAX_HOUSE_ENTRIES,
@@ -1433,6 +1518,7 @@ app.post('/api/pony/send', (req, res) => {
     ponyPostageVerifier.verify({
       postage: normalizedPostage,
       context: {
+        store,
         fromHouseId: senderHouseId,
         toHouseId: toResolved.houseId,
         requirePostageAnonymous: policy.requirePostageAnonymous
@@ -1449,7 +1535,13 @@ app.post('/api/pony/send', (req, res) => {
       });
     }
     if (msg.startsWith('POSTAGE_') || msg === 'INVALID_POSTAGE_KIND') {
-      return res.status(400).json({ ok: false, error: msg });
+      const payload = { ok: false, error: msg };
+      if (typeof err?.receiptId === 'string' && err.receiptId) payload.receiptId = err.receiptId;
+      if (msg === 'POSTAGE_RECEIPT_HOUSE_MISMATCH') {
+        if (typeof err?.receiptToHouseId === 'string') payload.receiptToHouseId = err.receiptToHouseId;
+        if (typeof err?.expectedToHouseId === 'string') payload.expectedToHouseId = err.expectedToHouseId;
+      }
+      return res.status(400).json(payload);
     }
     return res.status(400).json({ ok: false, error: 'INVALID_POSTAGE' });
   }
@@ -1483,8 +1575,9 @@ app.post('/api/pony/send', (req, res) => {
     };
   }
 
+  let dispatchResult;
   try {
-    ponyTransportService.dispatch({
+    dispatchResult = ponyTransportService.dispatch({
       store,
       message: msg,
       transport: normalizedTransport,
@@ -1500,6 +1593,18 @@ app.post('/api/pony/send', (req, res) => {
     }
     return res.status(502).json({ ok: false, error: 'TRANSPORT_DELIVERY_FAILED' });
   }
+
+  msg.dispatch = {
+    receiptId: makeDispatchReceiptId(),
+    ok: dispatchResult?.ok !== false,
+    adapter: typeof dispatchResult?.adapter === 'string' && dispatchResult.adapter.trim()
+      ? dispatchResult.adapter.trim()
+      : 'relay.unknown.v1',
+    transportKind: normalizedTransport.kind,
+    relayHints: normalizedTransport.relayHints,
+    dispatchedAt: nowIso()
+  };
+
   writeStore(store);
 
   res.json({
@@ -1507,7 +1612,8 @@ app.post('/api/pony/send', (req, res) => {
     id: msg.id,
     toHouseId: toResolved.houseId,
     fromHouseId: senderHouseId,
-    status
+    status,
+    dispatch: msg.dispatch
   });
 });
 
@@ -1628,23 +1734,32 @@ app.post('/api/pony/vault/append', (req, res) => {
 
   let normalizedCiphertext;
   let normalizedPostage;
+  const refs = normalizeRelayHints(req.body?.refs, 16);
+  let refsMeta = [];
   const kind = typeof req.body?.kind === 'string' && req.body.kind.trim() ? req.body.kind.trim() : 'vault.append.v1';
   try {
     normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body);
     normalizedPostage = normalizePonyPostage(req.body?.postage);
+    refsMeta = normalizeVaultRefsMeta(refs, req.body?.refsMeta, 16, MAX_VAULT_REF_BYTES);
     ponyPostageVerifier.verify({
       postage: normalizedPostage,
       context: {
+        store,
         fromHouseId: resolved.houseId,
         toHouseId: resolved.houseId,
         requirePostageAnonymous: false
       }
     });
   } catch (err) {
-    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_VAULT_EVENT') });
+    const payload = { ok: false, error: String(err?.message || 'INVALID_VAULT_EVENT') };
+    if (typeof err?.receiptId === 'string' && err.receiptId) payload.receiptId = err.receiptId;
+    if (payload.error === 'POSTAGE_RECEIPT_HOUSE_MISMATCH') {
+      if (typeof err?.receiptToHouseId === 'string') payload.receiptToHouseId = err.receiptToHouseId;
+      if (typeof err?.expectedToHouseId === 'string') payload.expectedToHouseId = err.expectedToHouseId;
+    }
+    return res.status(400).json(payload);
   }
 
-  const refs = normalizeRelayHints(req.body?.refs, 16);
   const events = ensureHouseVault(resolved.house);
   const prevHash = events.length ? events[events.length - 1].hash || null : null;
   const entry = {
@@ -1653,6 +1768,7 @@ app.post('/api/pony/vault/append', (req, res) => {
     houseId: resolved.houseId,
     envelope: { ciphertext: normalizedCiphertext },
     refs,
+    refsMeta,
     postage: normalizedPostage,
     prevHash,
     createdAt: nowIso()
