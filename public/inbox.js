@@ -1,4 +1,5 @@
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+let lastFriends = [];
 
 function getHouseId() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -148,15 +149,95 @@ function setInboxError(msg) {
   status.textContent = msg || '';
 }
 
+function setFriendsStatus(msg) {
+  const el = document.getElementById('friendsStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+}
+
+function setComposeReceiver(value) {
+  const toInput = document.getElementById('toInput');
+  if (!toInput) return;
+  toInput.value = value || '';
+}
+
+function friendOptionLabel(friend) {
+  const label = typeof friend?.label === 'string' ? friend.label.trim() : '';
+  if (label) return `${label} (${friend.houseId})`;
+  return friend.houseId;
+}
+
+function renderFriend(friend) {
+  const wrap = document.createElement('div');
+  wrap.className = 'card';
+
+  const sources = Array.isArray(friend?.sources) ? friend.sources : [];
+  const sourceText = sources.length ? sources.join(', ') : '';
+  const label = typeof friend?.label === 'string' ? friend.label.trim() : '';
+
+  wrap.innerHTML = `
+    <div class="muted" style="display:flex; justify-content:space-between; gap:10px;">
+      <div>
+        <strong>${escapeHtml(label || friend.houseId)}</strong>
+        ${label ? `<span class="muted"> · ${escapeHtml(friend.houseId)}</span>` : ''}
+      </div>
+      <div>${escapeHtml(sourceText)}</div>
+    </div>
+  `;
+
+  const row = document.createElement('div');
+  row.style.display = 'flex';
+  row.style.gap = '10px';
+  row.style.marginTop = '10px';
+
+  const compose = document.createElement('button');
+  compose.className = 'btn';
+  compose.textContent = 'Compose';
+  compose.onclick = () => {
+    const sel = document.getElementById('friendSelect');
+    if (sel) sel.value = friend.houseId;
+    setComposeReceiver(friend.houseId);
+  };
+
+  row.appendChild(compose);
+  wrap.appendChild(row);
+
+  return wrap;
+}
+
+async function loadFriends(houseId) {
+  const data = await authedApi({ houseId, url: `/api/pony/friends?houseId=${encodeURIComponent(houseId)}` });
+  lastFriends = Array.isArray(data?.friends) ? data.friends : [];
+
+  const friendsEl = document.getElementById('friends');
+  if (friendsEl) {
+    friendsEl.innerHTML = '';
+    if (!lastFriends.length) friendsEl.innerHTML = '<div class="muted">No friends yet.</div>';
+    for (const f of lastFriends) friendsEl.appendChild(renderFriend(f));
+  }
+
+  const sel = document.getElementById('friendSelect');
+  if (sel) {
+    sel.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'Select friend…';
+    sel.appendChild(empty);
+    for (const f of lastFriends) {
+      const opt = document.createElement('option');
+      opt.value = f.houseId;
+      opt.textContent = friendOptionLabel(f);
+      sel.appendChild(opt);
+    }
+  }
+}
+
 async function load() {
   const houseId = getHouseId();
   if (!houseId) return;
 
   document.getElementById('houseBadge').textContent = houseId;
   document.getElementById('backLink').href = `/house?house=${encodeURIComponent(houseId)}`;
-
-  const fromInput = document.getElementById('fromHouseId');
-  if (fromInput && !fromInput.value) fromInput.value = houseId;
 
   let data;
   try {
@@ -186,44 +267,74 @@ async function load() {
 
   for (const m of requests) reqEl.appendChild(renderMsg(m, { houseId, showActions: true }));
   for (const m of accepted) accEl.appendChild(renderMsg(m, { houseId, showActions: false }));
+
+  try {
+    await loadFriends(houseId);
+    setFriendsStatus('');
+  } catch (e) {
+    setFriendsStatus(`Error: ${e.message}`);
+  }
 }
 
 async function send() {
   const houseId = getHouseId();
   const body = document.getElementById('body').value;
-  const fromHouseId = document.getElementById('fromHouseId').value.trim();
+  const toRaw = document.getElementById('toInput')?.value?.trim() || '';
   const sendStatus = document.getElementById('sendStatus');
   sendStatus.textContent = '';
 
-  const payload = {
-    toHouseId: houseId,
-    ciphertext: {
-      alg: 'PLAINTEXT',
-      iv: '',
-      ct: body
-    }
-  };
+  if (!toRaw) {
+    sendStatus.textContent = 'Error: missing receiver.';
+    return;
+  }
 
-  if (fromHouseId) payload.fromHouseId = fromHouseId;
+  const payload = {
+    fromHouseId: houseId,
+    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: body }
+  };
+  if (toRaw.includes(':')) payload.toErc8004Id = toRaw;
+  else payload.toHouseId = toRaw;
 
   try {
-    if (fromHouseId) {
-      if (fromHouseId !== houseId) throw new Error('FROM_HOUSE_MISMATCH');
-      await authedApi({ houseId: fromHouseId, url: '/api/pony/send', method: 'POST', json: payload });
-    } else {
-      await api('/api/pony/send', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-    }
-
+    await authedApi({ houseId, url: '/api/pony/send', method: 'POST', json: payload });
     document.getElementById('body').value = '';
     sendStatus.textContent = 'Sent.';
-    await load();
   } catch (e) {
     sendStatus.textContent = `Error: ${e.message}`;
   }
 }
 
-document.getElementById('sendBtn').onclick = send;
+async function addFriend() {
+  const houseId = getHouseId();
+  const raw = document.getElementById('addFriendInput')?.value?.trim() || '';
+  if (!raw) return;
+
+  const payload = { houseId };
+  if (raw.includes(':')) payload.friendErc8004Id = raw;
+  else payload.friendHouseId = raw;
+
+  try {
+    await authedApi({ houseId, url: '/api/pony/friends', method: 'POST', json: payload });
+    document.getElementById('addFriendInput').value = '';
+    await loadFriends(houseId);
+    setFriendsStatus('Added.');
+  } catch (e) {
+    setFriendsStatus(`Error: ${e.message}`);
+  }
+}
+
+const sendBtn = document.getElementById('sendBtn');
+if (sendBtn) sendBtn.onclick = send;
+
+const addBtn = document.getElementById('addFriendBtn');
+if (addBtn) addBtn.onclick = addFriend;
+
+const friendSelect = document.getElementById('friendSelect');
+if (friendSelect) {
+  friendSelect.onchange = () => {
+    const v = friendSelect.value;
+    if (v) setComposeReceiver(v);
+  };
+}
+
 load();
