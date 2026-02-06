@@ -8,6 +8,9 @@ const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
+const { createPonyTransportService } = require('./ponyTransport');
+const { createServerHouseVaultBackend } = require('./houseVaultBackend');
+const { createPostageVerifier } = require('./postageVerifier');
 const {
   createSession,
   getSessionById,
@@ -585,6 +588,17 @@ const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
 const MIN_AGENT_SOLO_PIXELS = 20;
+const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
+
+const ponyTransportService = createPonyTransportService();
+const ponyPostageVerifier = createPostageVerifier({
+  basePowMinDifficulty: 1,
+  anonymousPowMinDifficulty: PONY_ANON_POSTAGE_MIN_DIFFICULTY
+});
+const houseVaultBackend = createServerHouseVaultBackend({
+  maxEntries: MAX_HOUSE_ENTRIES,
+  nowIso
+});
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -1415,6 +1429,31 @@ app.post('/api/pony/send', (req, res) => {
     return res.status(403).json({ ok: false, error: 'SENDER_BLOCKED' });
   }
 
+  try {
+    ponyPostageVerifier.verify({
+      postage: normalizedPostage,
+      context: {
+        fromHouseId: senderHouseId,
+        toHouseId: toResolved.houseId,
+        requirePostageAnonymous: policy.requirePostageAnonymous
+      }
+    });
+  } catch (err) {
+    const msg = String(err?.message || 'INVALID_POSTAGE');
+    if (msg === 'POSTAGE_POW_DIFFICULTY_TOO_LOW') {
+      return res.status(402).json({
+        ok: false,
+        error: msg,
+        requiredDifficulty: err?.requiredDifficulty || PONY_ANON_POSTAGE_MIN_DIFFICULTY,
+        actualDifficulty: err?.actualDifficulty || 0
+      });
+    }
+    if (msg.startsWith('POSTAGE_') || msg === 'INVALID_POSTAGE_KIND') {
+      return res.status(400).json({ ok: false, error: msg });
+    }
+    return res.status(400).json({ ok: false, error: 'INVALID_POSTAGE' });
+  }
+
   const senderKey = senderHouseId || 'anon';
   const rate = checkPonyRateLimit({ senderKey, toHouseId: toResolved.houseId });
   if (!rate.ok) {
@@ -1444,7 +1483,23 @@ app.post('/api/pony/send', (req, res) => {
     };
   }
 
-  store.inbox.push(msg);
+  try {
+    ponyTransportService.dispatch({
+      store,
+      message: msg,
+      transport: normalizedTransport,
+      context: {
+        fromHouseId: senderHouseId,
+        toHouseId: toResolved.houseId
+      }
+    });
+  } catch (err) {
+    const msg = String(err?.message || 'TRANSPORT_DELIVERY_FAILED');
+    if (msg === 'TRANSPORT_ADAPTER_UNAVAILABLE') {
+      return res.status(500).json({ ok: false, error: msg });
+    }
+    return res.status(502).json({ ok: false, error: 'TRANSPORT_DELIVERY_FAILED' });
+  }
   writeStore(store);
 
   res.json({
@@ -1577,6 +1632,14 @@ app.post('/api/pony/vault/append', (req, res) => {
   try {
     normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body);
     normalizedPostage = normalizePonyPostage(req.body?.postage);
+    ponyPostageVerifier.verify({
+      postage: normalizedPostage,
+      context: {
+        fromHouseId: resolved.houseId,
+        toHouseId: resolved.houseId,
+        requirePostageAnonymous: false
+      }
+    });
   } catch (err) {
     return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_VAULT_EVENT') });
   }
@@ -2415,7 +2478,8 @@ app.get('/api/house/:id/log', (req, res) => {
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  res.json({ ok: true, entries: Array.isArray(house.entries) ? house.entries : [] });
+  const entries = houseVaultBackend.listEntries({ house });
+  res.json({ ok: true, entries });
 });
 
 app.get('/api/house/:id/public-media', (req, res) => {
@@ -2517,16 +2581,17 @@ app.post('/api/house/:id/append', (req, res) => {
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   const auth = verifyHouseAuth(req, house);
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  house.entries = Array.isArray(house.entries) ? house.entries : [];
-  if (house.entries.length >= MAX_HOUSE_ENTRIES) {
-    return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
+  try {
+    houseVaultBackend.appendEntry({
+      house,
+      author,
+      ciphertext
+    });
+  } catch (err) {
+    const msg = String(err?.message || 'HOUSE_APPEND_FAILED');
+    if (msg === 'HOUSE_FULL') return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
+    return res.status(500).json({ ok: false, error: 'HOUSE_APPEND_FAILED' });
   }
-  house.entries.push({
-    id: `re_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    createdAt: nowIso(),
-    author,
-    ciphertext
-  });
   writeStore(store);
   res.json({ ok: true });
 });
