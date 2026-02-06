@@ -32,13 +32,14 @@ npm test
 
 Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
 
-Optional local integration check (reused Sepolia wallet):
+Optional local integration checks (reused wallets):
 ```bash
 REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
+REAL_SOLANA_WALLET_TEST=1 npx playwright test e2e/13_solana_wallet_reuse.spec.js
 ```
 
 Notes:
-- Setup command:
+- Setup EVM wallet:
 ```bash
 npm run setup:sepolia-wallet
 ```
@@ -57,6 +58,30 @@ npm run setup:sepolia-wallet -- --address 0x...
 - Disable faucet automation:
 ```bash
 npm run setup:sepolia-wallet -- --no-faucet
+```
+- Setup Solana devnet wallet:
+```bash
+npm run setup:solana-wallet
+```
+- Fresh setup auto-generates a Solana secret key + address and stores it in `data/local.solana.devnet.wallet.json`.
+- If balance is below threshold on fresh generation, setup attempts a Solana devnet faucet request automatically.
+- Test checks on-chain Solana devnet balance and fails with the faucet URL if below threshold.
+- Override threshold with `MIN_SOLANA_DEVNET_SOL` (default `0.1`).
+- Non-interactive setup (automation):
+```bash
+npm run setup:solana-wallet -- --no-balance-check
+```
+- Provide your own wallet address:
+```bash
+npm run setup:solana-wallet -- --address <base58>
+```
+- Provide your own secret key:
+```bash
+npm run setup:solana-wallet -- --secret-key <base58-or-json-array>
+```
+- Disable faucet automation:
+```bash
+npm run setup:solana-wallet -- --no-faucet
 ```
 
 ## Agent integration

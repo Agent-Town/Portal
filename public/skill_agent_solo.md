@@ -28,10 +28,12 @@ You must persist all of the following and reload them on every return:
 
 If you lose the Solana wallet identity or switch to another wallet, you may lose practical access to recovery and unlock for that house.
 
-If your operator needs help configuring local Sepolia tests, they can run:
+If your operator needs help configuring local wallets for tests, they can run:
 
+`npm run setup:solana-wallet`
 `npm run setup:sepolia-wallet`
 
+The Solana setup persists a devnet wallet and, if balance is low, can attempt a faucet request at https://faucet.solana.com/.
 This setup step can auto-generate a fresh EVM private key/address and, if balance is low, attempt a faucet request on Sepolia.
 
 ## Base URL

@@ -7,11 +7,14 @@ const fs = require('fs');
 const SYSTEM_CHROMIUM = ['/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => fs.existsSync(p));
 
 const PORT = Number(process.env.PW_PORT || (process.env.CI ? 4173 : 4174));
+const WORKERS = Number(process.env.PW_WORKERS || 1);
 
 module.exports = defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   expect: { timeout: 8_000 },
+  // Tests use a global reset endpoint; run single-worker by default to prevent cross-spec state races.
+  workers: Number.isFinite(WORKERS) && WORKERS > 0 ? WORKERS : 1,
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   projects: [

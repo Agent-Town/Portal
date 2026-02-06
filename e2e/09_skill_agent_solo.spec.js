@@ -6,7 +6,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('skill_agent_solo documents wallet persistence, return unlock, and Sepolia faucet', async ({ request }) => {
+test('skill_agent_solo documents wallet persistence, return unlock, and wallet faucet setup', async ({ request }) => {
   const resp = await request.get('/skill_agent_solo.md');
   expect(resp.ok()).toBeTruthy();
 
@@ -22,7 +22,9 @@ test('skill_agent_solo documents wallet persistence, return unlock, and Sepolia 
   expect(txt).toContain('BASE_URL/house?house=<houseId>');
   expect(txt).toContain('Sign to unlock');
 
-  // Faucet guidance is pinned to Sepolia.
+  // Faucet guidance covers Solana and Sepolia setup.
+  expect(txt).toContain('https://faucet.solana.com/');
+  expect(txt).toContain('npm run setup:solana-wallet');
   expect(txt).toContain('https://cloud.google.com/application/web3/faucet/ethereum/sepolia');
   expect(txt).toContain('Sepolia ETH');
   expect(txt).toContain('npm run setup:sepolia-wallet');
