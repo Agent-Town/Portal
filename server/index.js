@@ -75,6 +75,55 @@ function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status 
   };
 }
 
+const PONY_RATE_WINDOW_MS = 60_000;
+const PONY_RATE_MAX_PER_PAIR = 20;
+const ponyRateBuckets = new Map();
+
+function normalizeHouseList(values) {
+  if (!Array.isArray(values)) return [];
+  const out = new Set();
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    out.add(trimmed);
+  }
+  return [...out];
+}
+
+function getHousePonyPolicy(house) {
+  const policy = house?.ponyPolicy || {};
+  return {
+    allowlist: normalizeHouseList(policy.allowlist),
+    blocklist: normalizeHouseList(policy.blocklist),
+    autoAcceptAllowlist: policy.autoAcceptAllowlist !== false,
+    allowAnonymous: policy.allowAnonymous !== false
+  };
+}
+
+function checkPonyRateLimit({ senderKey, toHouseId }) {
+  const now = Date.now();
+  const key = `${senderKey}->${toHouseId}`;
+  let bucket = ponyRateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    bucket = { count: 0, resetAt: now + PONY_RATE_WINDOW_MS };
+    ponyRateBuckets.set(key, bucket);
+  }
+  bucket.count += 1;
+  if (bucket.count > PONY_RATE_MAX_PER_PAIR) {
+    return { ok: false, retryAfterMs: bucket.resetAt - now };
+  }
+  return { ok: true };
+}
+
+function resolveHouseByErc8004Id(store, erc8004Id) {
+  const rec = (store.anchors || []).find((a) => a && a.erc8004Id === erc8004Id);
+  if (!rec || !rec.houseId) return null;
+  const house = store.houses.find((h) => h && h.id === rec.houseId);
+  if (!house) return null;
+  return { houseId: house.id, house, source: 'anchor', erc8004Id };
+}
+
 function bytesToB64(bytes) {
   return Buffer.from(bytes).toString('base64');
 }
@@ -1196,16 +1245,50 @@ app.post('/api/share/create', (req, res) => {
 });
 
 // --- Pony Express v0 API ---
+function normalizePolicyHouseEntries(store, values) {
+  const out = [];
+  const seen = new Set();
+  for (const value of normalizeHouseList(values)) {
+    const resolved = resolveHouseAddress(store, value);
+    if (!resolved) throw new Error(`INVALID_POLICY_HOUSE:${value}`);
+    if (seen.has(resolved.houseId)) continue;
+    seen.add(resolved.houseId);
+    out.push(resolved.houseId);
+  }
+  return out;
+}
+
+app.get('/api/pony/resolve', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
+  if (!houseAddress && !erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_TARGET' });
+
+  const store = readStore();
+  if (houseAddress) {
+    const resolved = resolveHouseAddress(store, houseAddress);
+    if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+    return res.json({ ok: true, houseId: resolved.houseId, source: resolved.source || 'house' });
+  }
+
+  const resolvedByAnchor = resolveHouseByErc8004Id(store, erc8004Id);
+  if (!resolvedByAnchor) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  return res.json({ ok: true, houseId: resolvedByAnchor.houseId, source: 'anchor', erc8004Id });
+});
+
 app.post('/api/pony/send', (req, res) => {
   const toAddress = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
+  const toErc8004Id = typeof req.body?.toErc8004Id === 'string' ? req.body.toErc8004Id.trim() : '';
   const fromAddress = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : '';
   const legacyBody = typeof req.body?.body === 'string' ? req.body.body : '';
 
-  if (!toAddress) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
+  if (!toAddress && !toErc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
   if (fromAddress === MAYOR_HOUSE_ID) return res.status(403).json({ ok: false, error: 'RESERVED_FROM' });
 
   const store = readStore();
-  const toResolved = resolveHouseAddress(store, toAddress);
+
+  let toResolved = null;
+  if (toAddress) toResolved = resolveHouseAddress(store, toAddress);
+  if (!toResolved && toErc8004Id) toResolved = resolveHouseByErc8004Id(store, toErc8004Id);
   if (!toResolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
 
   let fromResolved = null;
@@ -1223,13 +1306,42 @@ app.post('/api/pony/send', (req, res) => {
     return res.status(400).json({ ok: false, error: err?.message || 'INVALID_CIPHERTEXT' });
   }
 
-  const status = fromResolved?.houseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
+  const policy = getHousePonyPolicy(toResolved.house);
+  const senderHouseId = fromResolved?.houseId || null;
+
+  if (!senderHouseId && !policy.allowAnonymous) {
+    return res.status(403).json({ ok: false, error: 'ANONYMOUS_NOT_ALLOWED' });
+  }
+  if (senderHouseId && policy.blocklist.includes(senderHouseId)) {
+    return res.status(403).json({ ok: false, error: 'SENDER_BLOCKED' });
+  }
+
+  const senderKey = senderHouseId || 'anon';
+  const rate = checkPonyRateLimit({ senderKey, toHouseId: toResolved.houseId });
+  if (!rate.ok) {
+    const retryAfter = Math.max(1, Math.ceil((rate.retryAfterMs || 0) / 1000));
+    res.setHeader('Retry-After', retryAfter);
+    return res.status(429).json({ ok: false, error: 'RATE_LIMITED_PONY', retryAfter });
+  }
+
+  let status = 'request';
+  if (senderHouseId === MAYOR_HOUSE_ID) status = 'accepted';
+  else if (senderHouseId && policy.autoAcceptAllowlist && policy.allowlist.includes(senderHouseId)) status = 'accepted';
+
   const msg = makeInboxMsg({
     toHouseId: toResolved.houseId,
-    fromHouseId: fromResolved?.houseId || null,
+    fromHouseId: senderHouseId,
     ciphertext: normalizedCiphertext,
     status
   });
+
+  if (toErc8004Id) {
+    msg.routing = {
+      by: 'erc8004',
+      erc8004Id: toErc8004Id
+    };
+  }
+
   store.inbox.push(msg);
   writeStore(store);
 
@@ -1237,7 +1349,8 @@ app.post('/api/pony/send', (req, res) => {
     ok: true,
     id: msg.id,
     toHouseId: toResolved.houseId,
-    fromHouseId: fromResolved?.houseId || null
+    fromHouseId: senderHouseId,
+    status
   });
 });
 
@@ -1257,6 +1370,66 @@ app.get('/api/pony/inbox', (req, res) => {
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
   res.json({ ok: true, houseId: resolved.houseId, inbox: items });
+});
+
+app.get('/api/pony/policy', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  return res.json({
+    ok: true,
+    houseId: resolved.houseId,
+    policy: getHousePonyPolicy(resolved.house)
+  });
+});
+
+app.post('/api/pony/policy', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  try {
+    const nextPolicy = getHousePonyPolicy({ ponyPolicy: resolved.house.ponyPolicy || {} });
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowlist')) {
+      nextPolicy.allowlist = normalizePolicyHouseEntries(store, req.body.allowlist);
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'blocklist')) {
+      nextPolicy.blocklist = normalizePolicyHouseEntries(store, req.body.blocklist);
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'autoAcceptAllowlist')) {
+      nextPolicy.autoAcceptAllowlist = req.body.autoAcceptAllowlist !== false;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowAnonymous')) {
+      nextPolicy.allowAnonymous = req.body.allowAnonymous !== false;
+    }
+
+    resolved.house.ponyPolicy = nextPolicy;
+    writeStore(store);
+
+    return res.json({ ok: true, houseId: resolved.houseId, policy: nextPolicy });
+  } catch (err) {
+    const msg = String(err?.message || 'INVALID_POLICY');
+    if (msg.startsWith('INVALID_POLICY_HOUSE:')) {
+      return res.status(400).json({ ok: false, error: 'INVALID_POLICY_HOUSE', value: msg.split(':').slice(1).join(':') });
+    }
+    return res.status(400).json({ ok: false, error: 'INVALID_POLICY' });
+  }
 });
 
 app.post('/api/pony/inbox/:id/accept', (req, res) => {
@@ -1709,6 +1882,8 @@ if (process.env.NODE_ENV === 'test') {
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
     writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
     resetAllSessions();
+    rateBuckets.clear();
+    ponyRateBuckets.clear();
     res.json({ ok: true });
   });
 }
