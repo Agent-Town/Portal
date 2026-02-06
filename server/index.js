@@ -5,6 +5,7 @@ const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 const express = require('express');
+const multer = require('multer');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
@@ -19,6 +20,18 @@ const {
   resetAllSessions,
   CANVAS
 } = require('./sessions');
+const {
+  MAX_UPLOAD_BYTES,
+  ALLOWED_MIME_TYPES,
+  PipelineError,
+  enqueueAvatarJob,
+  getAvatar,
+  getAvatarJob,
+  resolveAvatarAssetPath,
+  buildPackagePayload,
+  buildPreviewPayload,
+  resetAvatarPipelineState
+} = require('./avatar_pipeline');
 
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
@@ -278,6 +291,23 @@ app.use(
   })
 );
 
+app.use(
+  '/api/avatar',
+  rateLimit({
+    windowMs: 60_000,
+    max: process.env.NODE_ENV === 'test' ? 1000 : 30,
+    keyFn: (req) => `avatar:${req.ip}`
+  })
+);
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: MAX_UPLOAD_BYTES,
+    files: 1
+  }
+});
+
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
   let sid = cookies.et_session;
@@ -290,6 +320,41 @@ function ensureHumanSession(req, res) {
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
   return session;
+}
+
+function parseAvatarUpload(req) {
+  if (req.file && Buffer.isBuffer(req.file.buffer)) {
+    return {
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype || 'application/octet-stream',
+      filename: req.file.originalname || 'upload.bin'
+    };
+  }
+
+  const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64.trim() : '';
+  const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : '';
+  if (!imageBase64) {
+    throw new PipelineError('MISSING_IMAGE', 'Expected multipart file field "avatar" or JSON imageBase64.');
+  }
+  let buffer;
+  let inferredMime = mimeType || '';
+  try {
+    if (imageBase64.startsWith('data:')) {
+      const m = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!m) throw new Error('bad-data-url');
+      inferredMime = inferredMime || m[1];
+      buffer = Buffer.from(m[2], 'base64');
+    } else {
+      buffer = Buffer.from(imageBase64, 'base64');
+    }
+  } catch {
+    throw new PipelineError('INVALID_IMAGE_BASE64', 'Could not decode imageBase64.');
+  }
+  return {
+    buffer,
+    mimeType: inferredMime || 'application/octet-stream',
+    filename: 'upload.base64'
+  };
 }
 
 function sanitizeUrl(url) {
@@ -753,6 +818,193 @@ app.get('/api/state', (req, res) => {
       publicTeams: store.publicTeams.length
     }
   });
+});
+
+app.post('/api/avatar/upload', (req, res) => {
+  avatarUpload.single('avatar')(req, res, (uploadErr) => {
+    if (uploadErr) {
+      if (uploadErr.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, error: 'IMAGE_TOO_LARGE', maxBytes: MAX_UPLOAD_BYTES });
+      }
+      return res.status(400).json({ ok: false, error: 'UPLOAD_FAILED' });
+    }
+
+    const s = ensureHumanSession(req, res);
+    try {
+      const input = parseAvatarUpload(req);
+      const normalizedMime = String(input.mimeType || '').toLowerCase();
+      if (!ALLOWED_MIME_TYPES.has(normalizedMime)) {
+        return res.status(415).json({ ok: false, error: 'UNSUPPORTED_MEDIA_TYPE' });
+      }
+
+      const out = enqueueAvatarJob({
+        sessionId: s.sessionId,
+        buffer: input.buffer,
+        mimeType: normalizedMime,
+        injectFailOnce:
+          process.env.NODE_ENV === 'test' && String(req.header('x-avatar-inject-fail-once') || '') === '1'
+      });
+
+      return res.json({
+        ok: true,
+        jobId: out.job.jobId,
+        avatarId: out.avatar.avatarId,
+        status: out.job.status
+      });
+    } catch (err) {
+      if (err instanceof PipelineError) {
+        return res.status(400).json({ ok: false, error: err.code || 'PIPELINE_INPUT_ERROR' });
+      }
+      return res.status(500).json({ ok: false, error: 'PIPELINE_UPLOAD_FAILED' });
+    }
+  });
+});
+
+app.get('/api/avatar/jobs/:jobId', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const jobId = typeof req.params?.jobId === 'string' ? req.params.jobId.trim() : '';
+  if (!jobId) return res.status(400).json({ ok: false, error: 'MISSING_JOB_ID' });
+  const job = getAvatarJob(jobId);
+  if (!job || job.sessionId !== s.sessionId) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  }
+  res.json({
+    ok: true,
+    job: {
+      jobId: job.jobId,
+      avatarId: job.avatarId,
+      status: job.status,
+      stage: job.stage,
+      errorCode: job.errorCode || null,
+      attempts: job.attempts || 0,
+      maxAttempts: job.maxAttempts || 0,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt
+    }
+  });
+});
+
+app.get('/api/avatar/:avatarId/package', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (avatar.status !== 'completed') {
+    return res.status(409).json({
+      ok: false,
+      error: 'NOT_READY',
+      status: avatar.status,
+      stage: avatar.stage,
+      errorCode: avatar.errorCode || null
+    });
+  }
+  const payload = buildPackagePayload(avatarId);
+  if (!payload) return res.status(500).json({ ok: false, error: 'PACKAGE_MISSING' });
+  res.json(payload);
+});
+
+app.get('/api/avatar/:avatarId/preview', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const payload = buildPreviewPayload(avatarId);
+  if (!payload) return res.status(500).json({ ok: false, error: 'PREVIEW_MISSING' });
+  res.json(payload);
+});
+
+app.get('/api/avatar/:avatarId/atlas.png', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const atlasPath = resolveAvatarAssetPath(avatarId, 'atlas');
+  if (!atlasPath || !fs.existsSync(atlasPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  res.sendFile(path.resolve(atlasPath));
+});
+
+app.get('/api/avatar/:avatarId/atlas@2x.png', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const atlasPath = resolveAvatarAssetPath(avatarId, 'atlas2x');
+  if (!atlasPath || !fs.existsSync(atlasPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  res.sendFile(path.resolve(atlasPath));
+});
+
+app.get('/api/avatar/:avatarId/atlas.json', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const metadataPath = resolveAvatarAssetPath(avatarId, 'metadata');
+  if (!metadataPath || !fs.existsSync(metadataPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/json');
+  res.send(fs.readFileSync(metadataPath, 'utf8'));
+});
+
+app.get('/api/avatar/:avatarId/stages/:name', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  const name = typeof req.params?.name === 'string' ? req.params.name.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const nameToStage = {
+    'normalized.png': { kind: 'stage:normalized', type: 'png' },
+    'keypoints.json': { kind: 'stage:keypoints', type: 'json' },
+    'rig.json': { kind: 'stage:rig', type: 'json' },
+    'qc.json': { kind: 'stage:qc', type: 'json' }
+  };
+  const stage = nameToStage[name];
+  if (!stage) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const p = resolveAvatarAssetPath(avatarId, stage.kind);
+  if (!p || !fs.existsSync(p)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  if (stage.type === 'png') {
+    res.type('png');
+    return res.sendFile(path.resolve(p));
+  }
+  res.type('application/json');
+  return res.send(fs.readFileSync(p, 'utf8'));
+});
+
+app.get('/api/avatar/:avatarId/preview/:name', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const avatarId = typeof req.params?.avatarId === 'string' ? req.params.avatarId.trim() : '';
+  const name = typeof req.params?.name === 'string' ? req.params.name.trim() : '';
+  if (!avatarId) return res.status(400).json({ ok: false, error: 'MISSING_AVATAR_ID' });
+  const avatar = getAvatar(avatarId);
+  if (!avatar || avatar.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const nameToKey = {
+    'walk_left.png': 'left',
+    'walk_right.png': 'right',
+    'walk_towards_camera.png': 'towards_camera',
+    'walk_away_from_camera.png': 'away_from_camera'
+  };
+  const key = nameToKey[name];
+  if (!key) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const previewPath = resolveAvatarAssetPath(avatarId, `preview:${key}`);
+  if (!previewPath || !fs.existsSync(previewPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  res.sendFile(path.resolve(previewPath));
 });
 
 app.post('/api/referral', (req, res) => {
@@ -1609,8 +1861,9 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
     resetAllSessions();
+    resetAvatarPipelineState();
     res.json({ ok: true });
   });
 }
@@ -2106,6 +2359,8 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
+app.get('/avatar', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'avatar.html')));
+app.get('/world', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'world.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));

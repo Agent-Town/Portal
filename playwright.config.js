@@ -13,6 +13,9 @@ module.exports = defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
+  // The server uses a shared SQLite store + in-memory sessions. Tests call a global reset endpoint.
+  // Run with a single worker to avoid cross-test interference and keep runs deterministic.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   projects: [
     {

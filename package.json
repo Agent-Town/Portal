@@ -7,13 +7,16 @@
   "scripts": {
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
+    "pixellab:sprite-flow": "node scripts/pixellab_sprite_flow.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
     "ethers": "^6.16.0",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "multer": "^2.0.2",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0"

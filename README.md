@@ -65,6 +65,75 @@ npm run setup:sepolia-wallet -- --no-faucet
 - Co-op actions: `/api/agent/canvas/paint`, `/api/agent/house/*`.
 - House API auth and ceremony details are documented in `specs/02_api_contract.md`.
 
+## Avatar pipeline (deterministic upload-only)
+Promptless avatar pipeline (upload-only):
+- Upload a character image.
+- Deterministic pipeline (`normalize -> keypoints -> rig -> render -> qc`).
+- Outputs: `x1` + `x2` sprite atlases and metadata JSON.
+
+UI pages:
+- `/avatar` — upload + preview (desktop + mobile)
+- `/world` — minimal world-map runtime consuming the package
+
+Endpoints:
+- `POST /api/avatar/upload`
+- `GET /api/avatar/jobs/:jobId`
+- `GET /api/avatar/:avatarId/package`
+- `GET /api/avatar/:avatarId/preview`
+- `GET /api/avatar/:avatarId/atlas.png`
+- `GET /api/avatar/:avatarId/atlas@2x.png`
+- `GET /api/avatar/:avatarId/atlas.json`
+- `GET /api/avatar/:avatarId/stages/:name`
+- `GET /api/avatar/:avatarId/preview/:name`
+
+Playwright (avatar suite):
+```bash
+npx playwright test e2e/20_avatar_contract.spec.js
+```
+
+## PixelLab sprite flow (experimental)
+Use this script to test image -> directional sprite -> walk animation generation with PixelLab.
+
+1. Set your API token:
+```bash
+export PIXELLAB_API_TOKEN="YOUR_TOKEN"
+```
+
+2. Run the flow:
+```bash
+npm run pixellab:sprite-flow -- \
+  --input assets/eliza.jpg \
+  --description "pixel art chibi cowgirl with long black hair, brown hat with star badge, brown vest, white shirt, blue jeans, boots"
+```
+
+3. Output:
+- Sprites and animations are written to `assets/generated/pixellab/<timestamp>/`.
+- A `manifest.json` is generated with endpoints used and estimated USD usage.
+- Walk GIF previews are generated in `assets/generated/pixellab/<timestamp>/gifs/`:
+  - `walk_left.gif`
+  - `walk_right.gif`
+  - `walk_towards_camera.gif`
+  - `walk_away_from_camera.gif`
+- PNG contact-sheet previews (first two frames) are also generated in `assets/generated/pixellab/<timestamp>/gif_preview/`:
+  - `walk_left.png`
+  - `walk_right.png`
+  - `walk_towards_camera.png`
+  - `walk_away_from_camera.png`
+- For a faster smoke test, limit animations:
+```bash
+npm run pixellab:sprite-flow -- --input assets/eliza.jpg --walk-directions south
+```
+- Pipelines:
+  - `bitforge-rotate-text` (default): generate a 128x128 anchor with `/generate-image-bitforge`, rotate idles with `/rotate`, then animate walks with `/animate-with-text`.
+  - `text`: direct `/animate-with-text` for idles + walks.
+```bash
+npm run pixellab:sprite-flow -- --input assets/eliza.jpg --pipeline bitforge-rotate-text --anchor-size 128
+```
+- To test API behavior with the original reference bytes (no pre-resize), add:
+```bash
+npm run pixellab:sprite-flow -- --input assets/eliza.jpg --no-resize-reference
+```
+
 ## Key routes
 - `/` — onboarding, Team Code, token check, reconnect.
 - `/create` — co-op canvas + house generation.

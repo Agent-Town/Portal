@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Avatar — Agent Town</title>
+  <meta name="description" content="Upload an avatar and generate a deterministic sprite pack." />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/logo.jpg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .avatarGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 520px) {
+      .avatarGrid { grid-template-columns: 1fr; }
+    }
+    .avatarCard {
+      border: 2px dashed rgba(61, 45, 31, 0.55);
+      border-radius: 6px;
+      padding: 12px;
+      background: rgba(240, 223, 189, 0.5);
+    }
+    .avatarCanvas {
+      width: 100%;
+      max-width: 220px;
+      height: auto;
+      display: block;
+      margin-top: 8px;
+      image-rendering: pixelated;
+      border: 2px solid rgba(74, 52, 34, 0.55);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <a class="logoLink" href="/" aria-label="Agent Town home">
+          <img class="logoImg" src="/logo.jpg" alt="" />
+        </a>
+        <strong>Avatar</strong>
+        <span class="badge">upload → sprite pack</span>
+      </div>
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/world">World</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+      </div>
+    </div>
+
+    <div class="panel hero">
+      <h1>Deterministic avatar sprites.</h1>
+      <p>
+        Upload a character image and get a stable 4-direction idle+walk pack.
+        No prompting.
+      </p>
+    </div>
+
+    <div class="panel" id="uploadPanel">
+      <h2 style="margin:0 0 6px">Upload</h2>
+      <p class="small" style="margin-top:0; color: var(--muted)">
+        Best results: full-body, standing pose. PNG/JPG/WebP up to 5 MB.
+      </p>
+      <input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" />
+      <div class="kv" style="margin-top:10px">
+        <button class="btn primary" id="avatarUploadBtn" data-testid="avatar-upload-btn" disabled>Generate sprite pack</button>
+        <span class="pill status" id="avatarStatus" data-testid="avatar-status" style="display:none">Working…</span>
+        <a class="btn is-hidden" id="openWorldLink" data-testid="open-world-link" href="/world">Open world</a>
+      </div>
+      <div class="small" id="avatarError" data-testid="avatar-error" style="margin-top:6px; color: var(--bad)"></div>
+    </div>
+
+    <div class="panel is-hidden" id="previewPanel" data-testid="avatar-preview-panel" style="margin-top: 14px;">
+      <h2 style="margin:0 0 6px">Preview</h2>
+      <p class="small" style="margin-top:0; color: var(--muted)">
+        Walk cycle preview rendered from the atlas metadata.
+      </p>
+      <div class="avatarGrid" id="avatarPreviewGrid">
+        <div class="avatarCard">
+          <div class="small">Walk south</div>
+          <canvas class="avatarCanvas" id="prevSouth" data-testid="prev-south"></canvas>
+        </div>
+        <div class="avatarCard">
+          <div class="small">Walk north</div>
+          <canvas class="avatarCanvas" id="prevNorth" data-testid="prev-north"></canvas>
+        </div>
+        <div class="avatarCard">
+          <div class="small">Walk west</div>
+          <canvas class="avatarCanvas" id="prevWest" data-testid="prev-west"></canvas>
+        </div>
+        <div class="avatarCard">
+          <div class="small">Walk east</div>
+          <canvas class="avatarCanvas" id="prevEast" data-testid="prev-east"></canvas>
+        </div>
+      </div>
+      <div class="small" id="avatarDebug" data-testid="avatar-debug" style="margin-top:10px; color: var(--muted)"></div>
+    </div>
+
+    <footer>
+      <div>Made by humans &amp; agents for humans &amp; agents.</div>
+    </footer>
+  </div>
+
+  <script src="/avatar.js?v=20260206"></script>
+</body>
+</html>

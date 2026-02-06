@@ -45,3 +45,11 @@ Each milestone has a measurable “done” state validated by Playwright.
 **Tests**: `e2e/03_create_share_leaderboard.spec.js`
 
 (You can add M8 for post URL capture if desired.)
+
+## M8 — Avatar upload pipeline (deterministic)
+- Human can upload an avatar image.
+- Server creates a job and reaches terminal state.
+- Completed job returns a deterministic atlas package and preview assets.
+- Avatar jobs/packages are session-scoped.
+
+**Tests**: `e2e/20_avatar_contract.spec.js` through `e2e/29_worldmap_avatar_runtime.spec.js` (see `specs/07_avatar_pipeline_option1.md`)

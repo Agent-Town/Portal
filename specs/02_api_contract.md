@@ -221,6 +221,121 @@ Response:
 
 ---
 
+## Avatar pipeline (deterministic, upload-only)
+
+### POST `/api/avatar/upload` (human)
+Accepts a character image.
+
+Supported input:
+- `multipart/form-data` with file field `avatar`
+- JSON fallback `{ imageBase64, mimeType }`
+
+Response:
+```json
+{ "ok": true, "jobId": "avj_...", "avatarId": "ava_...", "status": "queued|running|completed" }
+```
+
+Notes:
+- Endpoints are session-scoped (cookie identity).
+- Upload is idempotent within a session: same bytes + same pipeline/template version returns the same `avatarId` + `jobId`.
+
+Errors:
+- `MISSING_IMAGE`
+- `IMAGE_TOO_LARGE`
+- `UNSUPPORTED_MEDIA_TYPE`
+- `FULL_BODY_REQUIRED`
+- `NO_FOREGROUND`
+- `QC_SILHOUETTE_LOW`
+- `QC_TEMPORAL_JITTER`
+- `QC_PALETTE_DRIFT`
+
+### GET `/api/avatar/jobs/:jobId` (human)
+Returns status for an avatar generation job.
+
+Response:
+```json
+{
+  "ok": true,
+  "job": {
+    "jobId": "avj_...",
+    "avatarId": "ava_...",
+    "status": "queued|running|completed|failed",
+    "stage": "normalize|keypoints|rig|render|qc",
+    "errorCode": null,
+    "attempts": 1,
+    "maxAttempts": 2,
+    "createdAt": "ISO8601",
+    "updatedAt": "ISO8601"
+  }
+}
+```
+
+### GET `/api/avatar/:avatarId/package` (human)
+Returns generated sprite package metadata when ready.
+
+Response:
+```json
+{
+  "ok": true,
+  "avatarId": "ava_...",
+  "pipelineVersion": "v1.0.0",
+  "templateVersion": "t1.0.0",
+  "hashes": {
+    "sourceSha256": "hex",
+    "normalizedPngSha256": "hex",
+    "atlasPngSha256": "hex",
+    "atlas2xPngSha256": "hex",
+    "metadataJsonSha256": "hex"
+  },
+  "qc": {
+    "silhouetteIntegrity": 0.712,
+    "grounded": 1,
+    "temporalJitterPx": 1.2,
+    "paletteDrift": 0.04,
+    "score": 0.83
+  },
+  "assets": {
+    "atlasPng": "/api/avatar/ava_.../atlas.png",
+    "atlas2xPng": "/api/avatar/ava_.../atlas@2x.png",
+    "metadataJson": "/api/avatar/ava_.../atlas.json"
+  }
+}
+```
+
+Returns `NOT_READY` while processing.
+
+### GET `/api/avatar/:avatarId/preview` (human)
+Returns processing status and preview URLs when available.
+
+### GET `/api/avatar/:avatarId/atlas.png` (human)
+Returns generated atlas image (`image/png`).
+
+### GET `/api/avatar/:avatarId/atlas@2x.png` (human)
+Returns a nearest-neighbor `x2` atlas (`image/png`).
+
+### GET `/api/avatar/:avatarId/atlas.json` (human)
+Returns generated atlas metadata JSON.
+
+### GET `/api/avatar/:avatarId/stages/:name` (human)
+Returns pipeline stage artifacts (debug/testing).
+
+Allowed names:
+- `normalized.png`
+- `keypoints.json`
+- `rig.json`
+- `qc.json`
+
+### GET `/api/avatar/:avatarId/preview/:name` (human)
+Allowed names:
+- `walk_left.png`
+- `walk_right.png`
+- `walk_towards_camera.png`
+- `walk_away_from_camera.png`
+
+All avatar endpoints are session-scoped.
+
+---
+
 ## Share
 
 ### POST `/api/share/create` (human)

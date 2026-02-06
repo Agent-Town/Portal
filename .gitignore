@@ -1,6 +1,12 @@
 .DS_Store
 
+node_modules/
+
 data/store.e2e.json
 data/store*.sqlite
 data/store*.sqlite-wal
 data/store*.sqlite-shm
+data/avatars/
+data/avatar_artifacts/
+
+assets/generated/

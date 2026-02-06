@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>World — Agent Town</title>
+  <meta name="description" content="Minimal world map runtime for avatar sprite packs." />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/logo.jpg" />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .worldWrap {
+      display: grid;
+      gap: 12px;
+    }
+    .worldCanvas {
+      width: 100%;
+      height: auto;
+      border: 3px solid #3d2d1f;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.12);
+      image-rendering: pixelated;
+      touch-action: none;
+    }
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 320px;
+    }
+    .dpad .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .dpad .spacer {
+      visibility: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <a class="logoLink" href="/" aria-label="Agent Town home">
+          <img class="logoImg" src="/logo.jpg" alt="" />
+        </a>
+        <strong>World</strong>
+        <span class="badge">runtime sprite test</span>
+      </div>
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/avatar">Avatar</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+      </div>
+    </div>
+
+    <div class="panel hero">
+      <h1>Walk around.</h1>
+      <p>
+        This is a minimal runtime that proves: direction + movement state map to the correct sprite clips.
+      </p>
+    </div>
+
+    <div class="panel worldWrap">
+      <div class="kv">
+        <span class="pill" data-testid="world-avatar-state" id="worldAvatarState">avatar: —</span>
+        <a class="btn" id="worldPickAvatar" href="/avatar">Pick avatar</a>
+      </div>
+
+      <canvas id="worldCanvas" class="worldCanvas" data-testid="world-canvas" width="640" height="360"></canvas>
+
+      <div class="dpad" aria-label="Movement controls">
+        <div class="btn spacer">.</div>
+        <button class="btn" id="btnUp" data-testid="dpad-up" type="button">Up</button>
+        <div class="btn spacer">.</div>
+        <button class="btn" id="btnLeft" data-testid="dpad-left" type="button">Left</button>
+        <button class="btn" id="btnDown" data-testid="dpad-down" type="button">Down</button>
+        <button class="btn" id="btnRight" data-testid="dpad-right" type="button">Right</button>
+      </div>
+
+      <div class="small" id="worldError" data-testid="world-error" style="color: var(--bad)"></div>
+    </div>
+
+    <footer>
+      <div>Made by humans &amp; agents for humans &amp; agents.</div>
+    </footer>
+  </div>
+
+  <script src="/world.js?v=20260206"></script>
+</body>
+</html>
