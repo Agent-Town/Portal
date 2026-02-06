@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { reset, uploadFixture, waitForTerminalJob, pngSize } = require('./helpers/avatar');
+const sharp = require('sharp');
 
 test.beforeEach(async ({ request }) => {
   await reset(request);
@@ -30,6 +31,38 @@ test('package contains idle+walk for 4 directions and ships x1 + x2 atlases', as
     expect(meta.clips.idle[dir].length).toBe(2);
     expect(meta.clips.walk[dir].length).toBe(8);
   }
+
+  // Regression: idle frames must include legs (standing still should not "lose" lower body).
+  // Compare alpha coverage in the bottom third of the frame for idle vs walk.
+  const atlasRespRaw = await request.get(pkg.assets.atlasPng);
+  expect(atlasRespRaw.ok()).toBeTruthy();
+  const atlasBytesRaw = await atlasRespRaw.body();
+  const decoded = await sharp(atlasBytesRaw).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const atlasW = decoded.info.width;
+  const atlasH = decoded.info.height;
+  expect(atlasW).toBe(meta.atlas.w);
+  expect(atlasH).toBe(meta.atlas.h);
+
+  function alphaCountInBottomThird(rect) {
+    const { x, y, w, h } = rect;
+    const y0 = y + Math.floor(h * 0.66);
+    const y1 = y + h;
+    let count = 0;
+    for (let py = y0; py < y1; py += 1) {
+      for (let px = x; px < x + w; px += 1) {
+        const i = (py * atlasW + px) * 4 + 3;
+        if (decoded.data[i] > 24) count += 1;
+      }
+    }
+    return count;
+  }
+
+  const idle0 = meta.clips.idle.se[0];
+  const walk0 = meta.clips.walk.se[0];
+  const idleBottom = alphaCountInBottomThird(idle0);
+  const walkBottom = alphaCountInBottomThird(walk0);
+  // Idle should retain most of the leg pixels.
+  expect(idleBottom).toBeGreaterThan(Math.floor(walkBottom * 0.75));
 
   const manifestResp = await request.get(pkg.assets.manifestJson);
   expect(manifestResp.ok()).toBeTruthy();

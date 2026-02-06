@@ -6,7 +6,7 @@ const sharp = require('sharp');
 const { nowIso, randomHex } = require('./util');
 
 // Bump when changing output bytes deterministically (atlas layout, QC, scaling, projections, etc).
-const PIPELINE_VERSION = 'v1.4.0';
+const PIPELINE_VERSION = 'v1.4.1';
 const TEMPLATE_VERSION = 't1.0.0';
 
 // Work canvas controls how much detail survives normalization.
@@ -438,9 +438,10 @@ async function normalizeImage(sourceBuffer, outPath) {
 
   // Deterministic background separation:
   // 1) If corners agree, flood-remove contiguous background from edges.
-  // 2) Remove near-white pixels (common for user-cutouts).
+  // 2) Optionally remove near-white pixels (common for user-cutouts with white BG).
   const bg = pickBackgroundColor(raw, width, height);
-  floodRemoveBackground(raw, width, height, bg, 36);
+  const bgRemoved = floodRemoveBackground(raw, width, height, bg, 36);
+  const shouldRemoveNearWhite = Boolean(bg && bgRemoved > 0 && bg.r >= 235 && bg.g >= 235 && bg.b >= 235);
 
   for (let i = 0; i < raw.length; i += 4) {
     const r = raw[i];
@@ -451,7 +452,9 @@ async function normalizeImage(sourceBuffer, outPath) {
       raw[i + 3] = 0;
       continue;
     }
-    if (r > 245 && g > 245 && b > 245) {
+    // Only apply near-white removal when we have strong evidence the image has a white background.
+    // (If the input already has transparency, near-white pixels are often valid sprite highlights.)
+    if (shouldRemoveNearWhite && r > 245 && g > 245 && b > 245) {
       raw[i + 3] = 0;
     }
   }
@@ -666,6 +669,9 @@ async function renderPackage(normalizedBuffer, artifactDir) {
       const bob = Math.round(Math.abs(breath) * 1);
       const aSwing = breath * 4;
 
+      // Legs should remain visible even while idle (standing still on the map).
+      const legLF = transformRaw(rig.layers.legL, width, height, { dx: 0, dy: bob });
+      const legRF = transformRaw(rig.layers.legR, width, height, { dx: 0, dy: bob });
       const coreF = transformRaw(rig.layers.core, width, height, { dx: 0, dy: bob });
       const armLF = transformRaw(rig.layers.armL, width, height, {
         angleRad: degToRad(-aSwing),
@@ -683,6 +689,8 @@ async function renderPackage(normalizedBuffer, artifactDir) {
       });
 
       const frameRaw = Buffer.alloc(raw.length);
+      compositeOverwrite(frameRaw, legLF);
+      compositeOverwrite(frameRaw, legRF);
       compositeOverwrite(frameRaw, coreF);
       compositeOverwrite(frameRaw, armLF);
       compositeOverwrite(frameRaw, armRF);
