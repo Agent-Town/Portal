@@ -106,7 +106,8 @@ function getHousePonyPolicy(house) {
     blocklist: normalizeHouseList(policy.blocklist),
     autoAcceptAllowlist: policy.autoAcceptAllowlist !== false,
     allowAnonymous: policy.allowAnonymous !== false,
-    requirePostageAnonymous: policy.requirePostageAnonymous === true
+    requirePostageAnonymous: policy.requirePostageAnonymous === true,
+    requireReceiptAnonymous: policy.requireReceiptAnonymous === true
   };
 }
 
@@ -1510,6 +1511,9 @@ app.post('/api/pony/send', (req, res) => {
   if (!senderHouseId && policy.requirePostageAnonymous && normalizedPostage.kind === 'none') {
     return res.status(402).json({ ok: false, error: 'POSTAGE_REQUIRED' });
   }
+  if (!senderHouseId && policy.requireReceiptAnonymous && normalizedPostage.kind !== 'receipt.v1') {
+    return res.status(402).json({ ok: false, error: 'POSTAGE_RECEIPT_REQUIRED' });
+  }
   if (senderHouseId && policy.blocklist.includes(senderHouseId)) {
     return res.status(403).json({ ok: false, error: 'SENDER_BLOCKED' });
   }
@@ -1683,6 +1687,9 @@ app.post('/api/pony/policy', (req, res) => {
     }
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'requirePostageAnonymous')) {
       nextPolicy.requirePostageAnonymous = req.body.requirePostageAnonymous === true;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'requireReceiptAnonymous')) {
+      nextPolicy.requireReceiptAnonymous = req.body.requireReceiptAnonymous === true;
     }
 
     resolved.house.ponyPolicy = nextPolicy;

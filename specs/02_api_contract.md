@@ -288,7 +288,7 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox + vault (phases 1-5)
+## Pony Express inbox + vault (phases 1-6)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
@@ -337,14 +337,16 @@ Rules:
 - At least one of `toHouseId` / `toErc8004Id` is required.
 - If `fromHouseId` is provided, request must be house-auth signed by that house.
 - Reserved sender `npc_mayor` is server-only.
-- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`).
+- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`, `requireReceiptAnonymous`).
 - Transport dispatch is adapter-based:
   - default adapter handles `relay.http.v1`
   - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
   - dispatch result is persisted on each delivered message under `dispatch.*`
 - Postage verification hook runs before dispatch:
   - `pow.v1` enforces digest shape
-  - when `requirePostageAnonymous=true` and sender is anonymous, `pow.v1.difficulty` must meet server minimum (`>= 8`)
+  - when `requirePostageAnonymous=true` and sender is anonymous, postage is required
+  - when `requireReceiptAnonymous=true` and sender is anonymous, postage must be `receipt.v1`
+  - when `requirePostageAnonymous=true` and sender is anonymous and using `pow.v1`, `difficulty` must meet server minimum (`>= 8`)
   - `receipt.v1` validates receipt ids
   - dispatch-style receipt ids (`dr_...`) are resolved against stored dispatch receipts
   - when a dispatch receipt is resolved, it must belong to the same `toHouseId`
@@ -381,6 +383,7 @@ Errors:
 - `INVALID_POSTAGE_KIND`
 - `ANONYMOUS_NOT_ALLOWED`
 - `POSTAGE_REQUIRED`
+- `POSTAGE_RECEIPT_REQUIRED`
 - `POSTAGE_POW_DIFFICULTY_TOO_LOW`
 - `POSTAGE_POW_DIGEST_INVALID`
 - `POSTAGE_RECEIPT_EMPTY`
@@ -408,10 +411,12 @@ Body:
   "blocklist": ["<houseId or shareId>"],
   "autoAcceptAllowlist": true,
   "allowAnonymous": false,
-  "requirePostageAnonymous": true
+  "requirePostageAnonymous": true,
+  "requireReceiptAnonymous": false
 }
 ```
 Requires house-auth. Policy lists are normalized to canonical house ids.
+`requireReceiptAnonymous=true` enforces receipt-backed anonymous postage (`receipt.v1`) and rejects anonymous `pow.v1`/`none`.
 
 ### POST `/api/pony/inbox/:id/accept`
 Body:
