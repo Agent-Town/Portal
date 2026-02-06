@@ -32,6 +32,16 @@ const {
   buildPreviewPayload,
   resetAvatarPipelineState
 } = require('./avatar_pipeline');
+const {
+  MAX_UPLOAD_BYTES: STATIC_MAX_UPLOAD_BYTES,
+  ALLOWED_MIME_TYPES: STATIC_ALLOWED_MIME_TYPES,
+  enqueueStaticAssetJob,
+  getStaticAsset,
+  getStaticAssetJob,
+  resolveStaticAssetPath,
+  buildStaticAssetPackagePayload,
+  resetStaticAssetPipelineState
+} = require('./static_asset_pipeline');
 
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
@@ -300,10 +310,27 @@ app.use(
   })
 );
 
+app.use(
+  '/api/static-asset',
+  rateLimit({
+    windowMs: 60_000,
+    max: process.env.NODE_ENV === 'test' ? 1000 : 30,
+    keyFn: (req) => `static-asset:${req.ip}`
+  })
+);
+
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: MAX_UPLOAD_BYTES,
+    files: 1
+  }
+});
+
+const staticAssetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: STATIC_MAX_UPLOAD_BYTES,
     files: 1
   }
 });
@@ -335,6 +362,41 @@ function parseAvatarUpload(req) {
   const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : '';
   if (!imageBase64) {
     throw new PipelineError('MISSING_IMAGE', 'Expected multipart file field "avatar" or JSON imageBase64.');
+  }
+  let buffer;
+  let inferredMime = mimeType || '';
+  try {
+    if (imageBase64.startsWith('data:')) {
+      const m = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+      if (!m) throw new Error('bad-data-url');
+      inferredMime = inferredMime || m[1];
+      buffer = Buffer.from(m[2], 'base64');
+    } else {
+      buffer = Buffer.from(imageBase64, 'base64');
+    }
+  } catch {
+    throw new PipelineError('INVALID_IMAGE_BASE64', 'Could not decode imageBase64.');
+  }
+  return {
+    buffer,
+    mimeType: inferredMime || 'application/octet-stream',
+    filename: 'upload.base64'
+  };
+}
+
+function parseStaticAssetUpload(req) {
+  if (req.file && Buffer.isBuffer(req.file.buffer)) {
+    return {
+      buffer: req.file.buffer,
+      mimeType: req.file.mimetype || 'application/octet-stream',
+      filename: req.file.originalname || 'upload.bin'
+    };
+  }
+
+  const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64.trim() : '';
+  const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : '';
+  if (!imageBase64) {
+    throw new PipelineError('MISSING_IMAGE', 'Expected multipart file field "asset" or JSON imageBase64.');
   }
   let buffer;
   let inferredMime = mimeType || '';
@@ -860,6 +922,59 @@ app.post('/api/avatar/upload', (req, res) => {
   });
 });
 
+app.post('/api/static-asset/upload', (req, res) => {
+  staticAssetUpload.single('asset')(req, res, (uploadErr) => {
+    if (uploadErr) {
+      if (uploadErr.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ ok: false, error: 'IMAGE_TOO_LARGE', maxBytes: STATIC_MAX_UPLOAD_BYTES });
+      }
+      return res.status(400).json({ ok: false, error: 'UPLOAD_FAILED' });
+    }
+
+    const s = ensureHumanSession(req, res);
+    try {
+      const input = parseStaticAssetUpload(req);
+      const normalizedMime = String(input.mimeType || '').toLowerCase();
+      if (!STATIC_ALLOWED_MIME_TYPES.has(normalizedMime)) {
+        return res.status(415).json({ ok: false, error: 'UNSUPPORTED_MEDIA_TYPE' });
+      }
+
+      const kind = typeof req.body?.kind === 'string' ? req.body.kind.trim() : req.body?.kind;
+      const tileFootprint = (() => {
+        const v = req.body?.tileFootprint;
+        if (v && typeof v === 'object') return v;
+        const w = req.body?.tileFootprintW ?? req.body?.footprintW ?? req.body?.footprint?.w;
+        const h = req.body?.tileFootprintH ?? req.body?.footprintH ?? req.body?.footprint?.h;
+        return { w, h };
+      })();
+      const pixelateTo = req.body?.pixelateTo ?? req.body?.pixelate;
+      const quantizeBits = req.body?.quantizeBits ?? req.body?.quantize;
+
+      const out = enqueueStaticAssetJob({
+        sessionId: s.sessionId,
+        buffer: input.buffer,
+        mimeType: normalizedMime,
+        kind,
+        tileFootprint,
+        pixelateTo,
+        quantizeBits
+      });
+
+      return res.json({
+        ok: true,
+        jobId: out.job.jobId,
+        assetId: out.asset.assetId,
+        status: out.job.status
+      });
+    } catch (err) {
+      if (err instanceof PipelineError) {
+        return res.status(400).json({ ok: false, error: err.code || 'PIPELINE_INPUT_ERROR' });
+      }
+      return res.status(500).json({ ok: false, error: 'PIPELINE_UPLOAD_FAILED' });
+    }
+  });
+});
+
 app.get('/api/avatar/jobs/:jobId', (req, res) => {
   const s = ensureHumanSession(req, res);
   const jobId = typeof req.params?.jobId === 'string' ? req.params.jobId.trim() : '';
@@ -873,6 +988,30 @@ app.get('/api/avatar/jobs/:jobId', (req, res) => {
     job: {
       jobId: job.jobId,
       avatarId: job.avatarId,
+      status: job.status,
+      stage: job.stage,
+      errorCode: job.errorCode || null,
+      attempts: job.attempts || 0,
+      maxAttempts: job.maxAttempts || 0,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt
+    }
+  });
+});
+
+app.get('/api/static-asset/jobs/:jobId', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const jobId = typeof req.params?.jobId === 'string' ? req.params.jobId.trim() : '';
+  if (!jobId) return res.status(400).json({ ok: false, error: 'MISSING_JOB_ID' });
+  const job = getStaticAssetJob(jobId);
+  if (!job || job.sessionId !== s.sessionId) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  }
+  res.json({
+    ok: true,
+    job: {
+      jobId: job.jobId,
+      assetId: job.assetId,
       status: job.status,
       stage: job.stage,
       errorCode: job.errorCode || null,
@@ -900,6 +1039,26 @@ app.get('/api/avatar/:avatarId/package', (req, res) => {
     });
   }
   const payload = buildPackagePayload(avatarId);
+  if (!payload) return res.status(500).json({ ok: false, error: 'PACKAGE_MISSING' });
+  res.json(payload);
+});
+
+app.get('/api/static-asset/:assetId/package', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const assetId = typeof req.params?.assetId === 'string' ? req.params.assetId.trim() : '';
+  if (!assetId) return res.status(400).json({ ok: false, error: 'MISSING_ASSET_ID' });
+  const asset = getStaticAsset(assetId);
+  if (!asset || asset.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  if (asset.status !== 'completed') {
+    return res.status(409).json({
+      ok: false,
+      error: 'NOT_READY',
+      status: asset.status,
+      stage: asset.stage,
+      errorCode: asset.errorCode || null
+    });
+  }
+  const payload = buildStaticAssetPackagePayload(assetId);
   if (!payload) return res.status(500).json({ ok: false, error: 'PACKAGE_MISSING' });
   res.json(payload);
 });
@@ -1018,6 +1177,67 @@ app.get('/api/avatar/:avatarId/preview/:name', (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.type('png');
   res.sendFile(path.resolve(previewPath));
+});
+
+app.get('/api/static-asset/:assetId/sprite.png', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const assetId = typeof req.params?.assetId === 'string' ? req.params.assetId.trim() : '';
+  if (!assetId) return res.status(400).json({ ok: false, error: 'MISSING_ASSET_ID' });
+  const asset = getStaticAsset(assetId);
+  if (!asset || asset.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const spritePath = resolveStaticAssetPath(assetId, 'sprite');
+  if (!spritePath || !fs.existsSync(spritePath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  res.sendFile(path.resolve(spritePath));
+});
+
+app.get('/api/static-asset/:assetId/sprite@2x.png', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const assetId = typeof req.params?.assetId === 'string' ? req.params.assetId.trim() : '';
+  if (!assetId) return res.status(400).json({ ok: false, error: 'MISSING_ASSET_ID' });
+  const asset = getStaticAsset(assetId);
+  if (!asset || asset.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const spritePath = resolveStaticAssetPath(assetId, 'sprite2x');
+  if (!spritePath || !fs.existsSync(spritePath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  res.sendFile(path.resolve(spritePath));
+});
+
+app.get('/api/static-asset/:assetId/manifest.json', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const assetId = typeof req.params?.assetId === 'string' ? req.params.assetId.trim() : '';
+  if (!assetId) return res.status(400).json({ ok: false, error: 'MISSING_ASSET_ID' });
+  const asset = getStaticAsset(assetId);
+  if (!asset || asset.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const manifestPath = resolveStaticAssetPath(assetId, 'manifest');
+  if (!manifestPath || !fs.existsSync(manifestPath)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('application/json');
+  res.send(fs.readFileSync(manifestPath, 'utf8'));
+});
+
+app.get('/api/static-asset/:assetId/stages/:name', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const assetId = typeof req.params?.assetId === 'string' ? req.params.assetId.trim() : '';
+  const name = typeof req.params?.name === 'string' ? req.params.name.trim() : '';
+  if (!assetId) return res.status(400).json({ ok: false, error: 'MISSING_ASSET_ID' });
+
+  const asset = getStaticAsset(assetId);
+  if (!asset || asset.sessionId !== s.sessionId) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const nameToStage = {
+    'normalized.png': { kind: 'stage:normalized', type: 'png' }
+  };
+  const stage = nameToStage[name];
+  if (!stage) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const p = resolveStaticAssetPath(assetId, stage.kind);
+  if (!p || !fs.existsSync(p)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('png');
+  return res.sendFile(path.resolve(p));
 });
 
 app.post('/api/referral', (req, res) => {
@@ -1877,6 +2097,7 @@ if (process.env.NODE_ENV === 'test') {
     writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
     resetAllSessions();
     resetAvatarPipelineState();
+    resetStaticAssetPipelineState();
     res.json({ ok: true });
   });
 }
@@ -2346,6 +2567,21 @@ app.post('/api/house/:id/append', (req, res) => {
 });
 
 // --- Static + routes ---
+app.get('/', (req, res) => {
+  // Render the landing page with the session's team code already filled in.
+  // This avoids a client-side race where tests (and humans) can read "…" before /api/session resolves.
+  const s = ensureHumanSession(req, res);
+  const template = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+  const safeCode = String(s.teamCode || '…').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = template.replace(
+    /<strong data-testid="team-code" id="teamCode">[^<]*<\/strong>/g,
+    `<strong data-testid="team-code" id="teamCode">${safeCode}</strong>`
+  );
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  if (!isProd) res.setHeader('Cache-Control', 'no-store');
+  res.send(html);
+});
+
 app.use(
   express.static(PUBLIC_DIR, {
     etag: true,

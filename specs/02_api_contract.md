@@ -341,6 +341,87 @@ All avatar endpoints are session-scoped.
 
 ---
 
+## Static asset pipeline (deterministic, upload-only)
+
+Generates a `StaticAssetPack` (single sprite + manifest) from an uploaded image.
+
+### POST `/api/static-asset/upload` (human)
+Accepts an asset image.
+
+Supported input:
+- `multipart/form-data` with file field `asset`
+- JSON fallback `{ imageBase64, mimeType }`
+
+Optional fields (multipart or JSON):
+- `kind`: `decal|prop|building` (default: `prop`)
+- `tileFootprintW`, `tileFootprintH` (default: `1x1`)
+- `pixelateTo`: max dimension for `sprite.png` (0 disables)
+- `quantizeBits`: RGB quantization bits per channel (0 disables)
+
+Response:
+```json
+{ "ok": true, "jobId": "asj_...", "assetId": "ast_...", "status": "queued|running|completed" }
+```
+
+Notes:
+- Endpoints are session-scoped (cookie identity).
+- Upload is idempotent within a session: same bytes + same options + same pipeline/template version returns the same `assetId` + `jobId`.
+
+Errors:
+- `MISSING_IMAGE`
+- `INVALID_IMAGE_BASE64`
+- `IMAGE_TOO_LARGE`
+- `UNSUPPORTED_MEDIA_TYPE`
+
+### GET `/api/static-asset/jobs/:jobId` (human)
+Returns status for a static-asset generation job.
+
+### GET `/api/static-asset/:assetId/package` (human)
+Returns generated asset pack metadata when ready.
+
+Response:
+```json
+{
+  "ok": true,
+  "assetId": "ast_...",
+  "pipelineVersion": "v1.0.0",
+  "templateVersion": "t1.0.0",
+  "hashes": {
+    "sourceSha256": "hex",
+    "normalizedPngSha256": "hex",
+    "spritePngSha256": "hex",
+    "sprite2xPngSha256": "hex",
+    "manifestJsonSha256": "hex"
+  },
+  "assets": {
+    "spritePng": "/api/static-asset/ast_.../sprite.png",
+    "sprite2xPng": "/api/static-asset/ast_.../sprite@2x.png",
+    "manifestJson": "/api/static-asset/ast_.../manifest.json"
+  }
+}
+```
+
+Returns `NOT_READY` while processing.
+
+### GET `/api/static-asset/:assetId/sprite.png` (human)
+Returns generated sprite (`image/png`).
+
+### GET `/api/static-asset/:assetId/sprite@2x.png` (human)
+Returns a nearest-neighbor `x2` sprite (`image/png`).
+
+### GET `/api/static-asset/:assetId/manifest.json` (human)
+Returns the static asset manifest JSON.
+
+### GET `/api/static-asset/:assetId/stages/:name` (human)
+Returns pipeline stage artifacts (debug/testing).
+
+Allowed names:
+- `normalized.png`
+
+All static-asset endpoints are session-scoped.
+
+---
+
 ## Share
 
 ### POST `/api/share/create` (human)

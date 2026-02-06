@@ -8,5 +8,6 @@ data/store*.sqlite-wal
 data/store*.sqlite-shm
 data/avatars/
 data/avatar_artifacts/
+data/static_asset_artifacts/
 
 assets/generated/
