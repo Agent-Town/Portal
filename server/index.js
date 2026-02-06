@@ -77,6 +77,7 @@ function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status 
 
 const PONY_RATE_WINDOW_MS = 60_000;
 const PONY_RATE_MAX_PER_PAIR = 20;
+const PONY_MAX_VAULT_EVENTS = 2000;
 const ponyRateBuckets = new Map();
 
 function normalizeHouseList(values) {
@@ -97,8 +98,92 @@ function getHousePonyPolicy(house) {
     allowlist: normalizeHouseList(policy.allowlist),
     blocklist: normalizeHouseList(policy.blocklist),
     autoAcceptAllowlist: policy.autoAcceptAllowlist !== false,
-    allowAnonymous: policy.allowAnonymous !== false
+    allowAnonymous: policy.allowAnonymous !== false,
+    requirePostageAnonymous: policy.requirePostageAnonymous === true
   };
+}
+
+function normalizeRelayHints(values, max = 8) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function normalizePonyTransport(transport) {
+  if (transport == null) {
+    return {
+      kind: 'relay.http.v1',
+      relayHints: []
+    };
+  }
+  if (!transport || typeof transport !== 'object') throw new Error('INVALID_TRANSPORT');
+  const kind = typeof transport.kind === 'string' && transport.kind.trim() ? transport.kind.trim() : 'relay.http.v1';
+  return {
+    kind,
+    relayHints: normalizeRelayHints(transport.relayHints)
+  };
+}
+
+function normalizePonyPostage(postage) {
+  if (postage == null) return { kind: 'none' };
+  if (!postage || typeof postage !== 'object') throw new Error('INVALID_POSTAGE');
+  const kind = typeof postage.kind === 'string' ? postage.kind.trim() : '';
+  if (!kind || kind === 'none') return { kind: 'none' };
+
+  if (kind === 'pow.v1') {
+    const nonce = typeof postage.nonce === 'string' ? postage.nonce.trim() : '';
+    const digest = typeof postage.digest === 'string' ? postage.digest.trim() : '';
+    const difficulty = Number(postage.difficulty || 0);
+    if (!nonce || !digest || !Number.isFinite(difficulty) || difficulty < 1) {
+      throw new Error('INVALID_POSTAGE');
+    }
+    return {
+      kind,
+      nonce,
+      digest,
+      difficulty: Math.floor(difficulty)
+    };
+  }
+
+  if (kind === 'receipt.v1') {
+    const receipts = normalizeRelayHints(postage.receipts, 16);
+    if (!receipts.length) throw new Error('INVALID_POSTAGE');
+    return {
+      kind,
+      receipts
+    };
+  }
+
+  throw new Error('INVALID_POSTAGE_KIND');
+}
+
+function ensureHouseVault(house) {
+  if (!house || typeof house !== 'object') return [];
+  if (!Array.isArray(house.ponyVault)) house.ponyVault = [];
+  return house.ponyVault;
+}
+
+function computeVaultEventHash(event) {
+  const payload = {
+    id: event.id,
+    houseId: event.houseId,
+    kind: event.kind,
+    createdAt: event.createdAt,
+    prevHash: event.prevHash || null,
+    envelope: event.envelope,
+    refs: Array.isArray(event.refs) ? event.refs : [],
+    postage: event.postage || { kind: 'none' }
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
 function checkPonyRateLimit({ senderKey, toHouseId }) {
@@ -1300,10 +1385,21 @@ app.post('/api/pony/send', (req, res) => {
   }
 
   let normalizedCiphertext;
+  let normalizedTransport;
+  let normalizedPostage;
   try {
     normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, legacyBody);
+    normalizedTransport = normalizePonyTransport(req.body?.transport);
+    normalizedPostage = normalizePonyPostage(req.body?.postage);
   } catch (err) {
-    return res.status(400).json({ ok: false, error: err?.message || 'INVALID_CIPHERTEXT' });
+    const msg = String(err?.message || 'INVALID_PONY_MESSAGE');
+    if (msg === 'INVALID_POSTAGE' || msg === 'INVALID_POSTAGE_KIND') {
+      return res.status(400).json({ ok: false, error: msg });
+    }
+    if (msg === 'INVALID_TRANSPORT') {
+      return res.status(400).json({ ok: false, error: msg });
+    }
+    return res.status(400).json({ ok: false, error: msg || 'INVALID_CIPHERTEXT' });
   }
 
   const policy = getHousePonyPolicy(toResolved.house);
@@ -1311,6 +1407,9 @@ app.post('/api/pony/send', (req, res) => {
 
   if (!senderHouseId && !policy.allowAnonymous) {
     return res.status(403).json({ ok: false, error: 'ANONYMOUS_NOT_ALLOWED' });
+  }
+  if (!senderHouseId && policy.requirePostageAnonymous && normalizedPostage.kind === 'none') {
+    return res.status(402).json({ ok: false, error: 'POSTAGE_REQUIRED' });
   }
   if (senderHouseId && policy.blocklist.includes(senderHouseId)) {
     return res.status(403).json({ ok: false, error: 'SENDER_BLOCKED' });
@@ -1334,6 +1433,9 @@ app.post('/api/pony/send', (req, res) => {
     ciphertext: normalizedCiphertext,
     status
   });
+
+  msg.transport = normalizedTransport;
+  msg.postage = normalizedPostage;
 
   if (toErc8004Id) {
     msg.routing = {
@@ -1418,6 +1520,9 @@ app.post('/api/pony/policy', (req, res) => {
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowAnonymous')) {
       nextPolicy.allowAnonymous = req.body.allowAnonymous !== false;
     }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'requirePostageAnonymous')) {
+      nextPolicy.requirePostageAnonymous = req.body.requirePostageAnonymous === true;
+    }
 
     resolved.house.ponyPolicy = nextPolicy;
     writeStore(store);
@@ -1430,6 +1535,80 @@ app.post('/api/pony/policy', (req, res) => {
     }
     return res.status(400).json({ ok: false, error: 'INVALID_POLICY' });
   }
+});
+
+app.get('/api/pony/vault', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const limitRaw = Number(req.query?.limit || 50);
+  const limit = Math.min(200, Math.max(1, Number.isFinite(limitRaw) ? Math.floor(limitRaw) : 50));
+
+  const events = ensureHouseVault(resolved.house);
+  const items = events.slice(-limit);
+  const head = items.length ? items[items.length - 1].hash || null : null;
+
+  return res.json({ ok: true, houseId: resolved.houseId, head, items });
+});
+
+app.post('/api/pony/vault/append', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  let normalizedCiphertext;
+  let normalizedPostage;
+  const kind = typeof req.body?.kind === 'string' && req.body.kind.trim() ? req.body.kind.trim() : 'vault.append.v1';
+  try {
+    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body);
+    normalizedPostage = normalizePonyPostage(req.body?.postage);
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_VAULT_EVENT') });
+  }
+
+  const refs = normalizeRelayHints(req.body?.refs, 16);
+  const events = ensureHouseVault(resolved.house);
+  const prevHash = events.length ? events[events.length - 1].hash || null : null;
+  const entry = {
+    id: `pv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    kind,
+    houseId: resolved.houseId,
+    envelope: { ciphertext: normalizedCiphertext },
+    refs,
+    postage: normalizedPostage,
+    prevHash,
+    createdAt: nowIso()
+  };
+  entry.hash = computeVaultEventHash(entry);
+
+  events.push(entry);
+  if (events.length > PONY_MAX_VAULT_EVENTS) {
+    events.splice(0, events.length - PONY_MAX_VAULT_EVENTS);
+  }
+  writeStore(store);
+
+  return res.json({
+    ok: true,
+    id: entry.id,
+    hash: entry.hash,
+    prevHash,
+    head: entry.hash
+  });
 });
 
 app.post('/api/pony/inbox/:id/accept', (req, res) => {

@@ -288,7 +288,7 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox (phases 1-2)
+## Pony Express inbox + vault (phases 1-3)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
@@ -303,7 +303,9 @@ Message envelope (`msg.chat.v1`):
   "fromHouseId": "<base58|null>",
   "envelope": {
     "ciphertext": { "alg": "...", "iv": "...", "ct": "..." }
-  }
+  },
+  "transport": { "kind": "relay.http.v1", "relayHints": [] },
+  "postage": { "kind": "none" }
 }
 ```
 
@@ -317,7 +319,9 @@ Body:
   "toHouseId": "<optional houseId or shareId>",
   "toErc8004Id": "<optional e.g. 11155111:123>",
   "fromHouseId": "<optional houseId or shareId>",
-  "ciphertext": { "alg": "PLAINTEXT", "iv": "", "ct": "hello" }
+  "ciphertext": { "alg": "PLAINTEXT", "iv": "", "ct": "hello" },
+  "transport": { "kind": "relay.http.v1", "relayHints": ["relay://peer-a"] },
+  "postage": { "kind": "pow.v1", "nonce": "...", "digest": "...", "difficulty": 12 }
 }
 ```
 
@@ -325,7 +329,7 @@ Rules:
 - At least one of `toHouseId` / `toErc8004Id` is required.
 - If `fromHouseId` is provided, request must be house-auth signed by that house.
 - Reserved sender `npc_mayor` is server-only.
-- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`).
+- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`).
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
 
 Errors:
@@ -335,7 +339,11 @@ Errors:
 - `RESERVED_FROM`
 - `MISSING_CIPHERTEXT`
 - `INVALID_CIPHERTEXT`
+- `INVALID_TRANSPORT`
+- `INVALID_POSTAGE`
+- `INVALID_POSTAGE_KIND`
 - `ANONYMOUS_NOT_ALLOWED`
+- `POSTAGE_REQUIRED`
 - `SENDER_BLOCKED`
 - `RATE_LIMITED_PONY`
 - standard house-auth errors when sender auth is required.
@@ -354,7 +362,8 @@ Body:
   "allowlist": ["<houseId or shareId>"],
   "blocklist": ["<houseId or shareId>"],
   "autoAcceptAllowlist": true,
-  "allowAnonymous": false
+  "allowAnonymous": false,
+  "requirePostageAnonymous": true
 }
 ```
 Requires house-auth. Policy lists are normalized to canonical house ids.
@@ -372,6 +381,22 @@ Body:
 { "houseId": "<houseId or shareId>" }
 ```
 Requires house-auth and message must belong to that house.
+
+### POST `/api/pony/vault/append`
+Body:
+```json
+{
+  "houseId": "<houseId or shareId>",
+  "kind": "vault.append.v1",
+  "ciphertext": { "alg": "AES-GCM", "iv": "...", "ct": "..." },
+  "refs": ["ipfs://..."],
+  "postage": { "kind": "receipt.v1", "receipts": ["rcpt-1"] }
+}
+```
+Requires house-auth. Appends a hash-chained encrypted event for the house vault.
+
+### GET `/api/pony/vault?houseId=...&limit=50`
+Returns most recent vault events (default 50, max 200) and current `head` hash. Requires house-auth.
 
 ---
 
