@@ -288,11 +288,12 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox (phase 1)
+## Pony Express inbox (phases 1-2)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
-- Legacy share ids are accepted as aliases for `toHouseId` / `fromHouseId` and are resolved to the linked `houseId`.
+- Legacy share ids are accepted as aliases for `toHouseId` / `fromHouseId` / `houseId` and are resolved to linked `houseId`.
+- Anchor routing supports `erc8004Id -> houseId` via `/api/anchors/*` and `/api/pony/resolve`.
 
 Message envelope (`msg.chat.v1`):
 ```json
@@ -306,20 +307,26 @@ Message envelope (`msg.chat.v1`):
 }
 ```
 
+### GET `/api/pony/resolve?houseId=...` or `?erc8004Id=...`
+Resolves an address target to canonical `houseId`.
+
 ### POST `/api/pony/send`
 Body:
 ```json
 {
-  "toHouseId": "<houseId or shareId>",
+  "toHouseId": "<optional houseId or shareId>",
+  "toErc8004Id": "<optional e.g. 11155111:123>",
   "fromHouseId": "<optional houseId or shareId>",
   "ciphertext": { "alg": "PLAINTEXT", "iv": "", "ct": "hello" }
 }
 ```
 
 Rules:
-- `toHouseId` is required.
+- At least one of `toHouseId` / `toErc8004Id` is required.
 - If `fromHouseId` is provided, request must be house-auth signed by that house.
 - Reserved sender `npc_mayor` is server-only.
+- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`).
+- Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
 
 Errors:
 - `MISSING_TO`
@@ -328,10 +335,29 @@ Errors:
 - `RESERVED_FROM`
 - `MISSING_CIPHERTEXT`
 - `INVALID_CIPHERTEXT`
+- `ANONYMOUS_NOT_ALLOWED`
+- `SENDER_BLOCKED`
+- `RATE_LIMITED_PONY`
 - standard house-auth errors when sender auth is required.
 
 ### GET `/api/pony/inbox?houseId=...`
 Returns inbox for a house. Requires house-auth for that house.
+
+### GET `/api/pony/policy?houseId=...`
+Returns receiver policy for a house. Requires house-auth.
+
+### POST `/api/pony/policy`
+Body:
+```json
+{
+  "houseId": "<houseId or shareId>",
+  "allowlist": ["<houseId or shareId>"],
+  "blocklist": ["<houseId or shareId>"],
+  "autoAcceptAllowlist": true,
+  "allowAnonymous": false
+}
+```
+Requires house-auth. Policy lists are normalized to canonical house ids.
 
 ### POST `/api/pony/inbox/:id/accept`
 Body:

@@ -13,6 +13,8 @@ module.exports = defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
+  // Tests share a single in-memory session map + reset endpoint; run one worker for deterministic e2e.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   projects: [
     {
