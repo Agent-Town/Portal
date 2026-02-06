@@ -91,6 +91,26 @@ Playwright (avatar suite):
 npx playwright test e2e/20_avatar_contract.spec.js
 ```
 
+## Static asset pipeline (deterministic upload-only)
+Promptless static asset pipeline (upload-only):
+- Upload an asset image (decal/prop/building).
+- Deterministic pipeline (`normalize -> export`).
+- Outputs: `sprite.png`, `sprite@2x.png`, `manifest.json`.
+
+Endpoints:
+- `POST /api/static-asset/upload`
+- `GET /api/static-asset/jobs/:jobId`
+- `GET /api/static-asset/:assetId/package`
+- `GET /api/static-asset/:assetId/sprite.png`
+- `GET /api/static-asset/:assetId/sprite@2x.png`
+- `GET /api/static-asset/:assetId/manifest.json`
+- `GET /api/static-asset/:assetId/stages/:name`
+
+Playwright (static asset suite):
+```bash
+npx playwright test e2e/30_static_asset_contract.spec.js
+```
+
 ## PixelLab sprite flow (experimental)
 Use this script to test image -> directional sprite -> walk animation generation with PixelLab.
 

@@ -53,3 +53,11 @@ Each milestone has a measurable “done” state validated by Playwright.
 - Avatar jobs/packages are session-scoped.
 
 **Tests**: `e2e/20_avatar_contract.spec.js` through `e2e/29_worldmap_avatar_runtime.spec.js` (see `specs/07_avatar_pipeline_option1.md`)
+
+## M9 — Static asset pipeline (deterministic)
+- Human can upload a static asset image.
+- Server creates a job and reaches terminal state.
+- Completed job returns `sprite.png`, `sprite@2x.png`, and `manifest.json`.
+- Static asset jobs/packages are session-scoped.
+
+**Tests**: `e2e/30_static_asset_contract.spec.js` through `e2e/32_static_asset_determinism.spec.js` (see `specs/08_static_asset_pipeline.md`)
