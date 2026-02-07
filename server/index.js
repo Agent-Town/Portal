@@ -1296,7 +1296,7 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], claims: [] });
     resetAllSessions();
     res.json({ ok: true });
   });
@@ -1414,6 +1414,51 @@ app.post('/api/token/verify', async (req, res) => {
   s.token.address = address;
 
   res.json({ ok: true, eligible: true, status });
+});
+
+app.get('/api/claim/erc8004/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.query?.agentId === 'string' ? req.query.agentId.trim() : '';
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+
+  // Minimal nonce for e2e scaffolding; real ERC-8004 verification TBD.
+  const nonce = randomHex(16);
+  s.claim = s.claim || {};
+  s.claim.erc8004 = { agentId, nonce, createdAt: Date.now() };
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/claim/erc8004/verify', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+
+  const expected = s.claim?.erc8004;
+  if (!expected || expected.agentId !== agentId) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (expected.nonce !== nonce) {
+    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  }
+
+  // Test-mode shortcut: accept any non-empty signature.
+  if (process.env.NODE_ENV !== 'test') {
+    return res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED' });
+  }
+
+  // Mark signup as complete so /create is a usable human-only flow in tests.
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'token';
+  s.signup.address = s.signup.address || (typeof req.body?.address === 'string' ? req.body.address.trim() : null);
+
+  s.claim.erc8004.verifiedAt = Date.now();
+  res.json({ ok: true, verified: true, nextUrl: '/create' });
 });
 
 app.post('/api/house/init', (req, res) => {
@@ -1693,6 +1738,7 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
+app.get('/claim', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'claim.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
