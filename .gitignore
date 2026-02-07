@@ -1,5 +1,6 @@
 .DS_Store
 
+# e2e store fixture
 data/store.e2e.json
 data/store*.sqlite
 data/store*.sqlite-wal
@@ -11,4 +12,12 @@ data/local.solana.devnet.wallet.json
 data/solana.faucet.browser-profile/
 
 node_modules
+
+# local secrets (never commit)
+.secrets/
+.env
+.env.*
+
+# local stores
+data/store.test.json
 

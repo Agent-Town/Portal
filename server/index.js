@@ -1461,6 +1461,112 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
   res.json({ ok: true, verified: true, nextUrl: '/create' });
 });
 
+// --- X claim (public post challenge) ---
+app.get('/api/claim/x/challenge', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const raw = typeof req.query?.handle === 'string' ? req.query.handle.trim() : '';
+  const handle = raw.replace(/^@/, '').toLowerCase();
+  if (!handle) return res.status(400).json({ ok: false, error: 'MISSING_HANDLE' });
+  if (!/^[a-z0-9_]{1,15}$/.test(handle)) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const nonce = randomHex(12);
+  const challenge = `AgentTown X Claim\nhandle: @${handle}\nnonce: ${nonce}`;
+  const ttlMs = 30 * 60 * 1000;
+  s.claim = s.claim || {};
+  s.claim.x = { handle, nonce, challenge, createdAt: Date.now(), expiresAt: Date.now() + ttlMs };
+  res.json({ ok: true, handle, nonce, challenge, expiresInMs: ttlMs });
+});
+
+app.post('/api/claim/x/verify', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const raw = typeof req.body?.handle === 'string' ? req.body.handle.trim() : '';
+  const handle = raw.replace(/^@/, '').toLowerCase();
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const tweetUrl = typeof req.body?.tweetUrl === 'string' ? req.body.tweetUrl.trim() : '';
+
+  if (!handle) return res.status(400).json({ ok: false, error: 'MISSING_HANDLE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!tweetUrl) return res.status(400).json({ ok: false, error: 'MISSING_TWEET_URL' });
+
+  const pending = s.claim?.x;
+  if (!pending || pending.handle !== handle) return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  if (pending.nonce !== nonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  if (pending.expiresAt && Date.now() > pending.expiresAt) return res.status(400).json({ ok: false, error: 'CHALLENGE_EXPIRED' });
+
+  let u;
+  try {
+    u = new URL(tweetUrl);
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+  if (!/^https?:$/.test(u.protocol)) return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  if (!/(^|\.)x\.com$/.test(u.hostname) && !/(^|\.)twitter\.com$/.test(u.hostname)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+
+  const html = await new Promise((resolve, reject) => {
+    const getter = u.protocol === 'https:' ? https.get : http.get;
+    const req2 = getter(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AgentTownBot/1.0; +https://github.com/Agent-Town)'
+        },
+        timeout: 10_000
+      },
+      (r) => {
+        let buf = '';
+        r.setEncoding('utf8');
+        r.on('data', (chunk) => (buf += chunk));
+        r.on('end', () => resolve({ status: r.statusCode || 0, body: buf }));
+      }
+    );
+    req2.on('error', reject);
+    req2.on('timeout', () => {
+      req2.destroy(new Error('timeout'));
+    });
+  }).catch(() => null);
+
+  if (!html || html.status < 200 || html.status >= 400) {
+    return res.status(502).json({ ok: false, error: 'TWEET_FETCH_FAILED' });
+  }
+
+  const body = html.body || '';
+  const challenge = pending.challenge;
+  if (!body.includes(challenge)) {
+    return res.status(401).json({ ok: false, error: 'CHALLENGE_NOT_FOUND' });
+  }
+
+  // Best-effort author check: require the handle to appear in the URL path.
+  // (This is not perfect; can be tightened later with API/oEmbed.)
+  const pathLower = u.pathname.toLowerCase();
+  if (!pathLower.includes(`/${handle}/status/`)) {
+    return res.status(401).json({ ok: false, error: 'HANDLE_MISMATCH' });
+  }
+
+  // Record durable claim (no expiry).
+  const store = readStore();
+  store.claims = Array.isArray(store.claims) ? store.claims : [];
+  store.claims.push({
+    id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    handle,
+    tweetUrl,
+    challenge
+  });
+  writeStore(store);
+
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'x';
+  s.signup.handle = handle;
+
+  s.claim.x.verifiedAt = Date.now();
+  res.json({ ok: true, verified: true, nextUrl: '/create?mode=token' });
+});
+
 app.post('/api/house/init', (req, res) => {
   const s = ensureHumanSession(req, res);
   const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
