@@ -76,6 +76,7 @@ function createSession({ flow } = {}) {
       verifiedAt: null,
       address: null
     },
+    reservedHouseId: null,
     houseCeremony: {
       humanCommit: null,
       agentCommit: null,

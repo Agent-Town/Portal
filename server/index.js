@@ -14,6 +14,8 @@ const { readStore, writeStore } = require('./store');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
 const { createPostageVerifier } = require('./postageVerifier');
+const { emitMilestone } = require('./milestones');
+const { computeRewardsSummary } = require('./rewards');
 const {
   createSession,
   getSessionById,
@@ -3111,16 +3113,26 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
 // --- X claim (public post challenge) ---
 app.get('/api/claim/x/challenge', (req, res) => {
   const s = ensureHumanSession(req, res);
-  const raw = typeof req.query?.handle === 'string' ? req.query.handle.trim() : '';
-  const handle = raw.replace(/^@/, '').toLowerCase();
-  if (!handle) return res.status(400).json({ ok: false, error: 'MISSING_HANDLE' });
-  if (!/^[a-z0-9_]{1,15}$/.test(handle)) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
 
   const nonce = randomHex(12);
   const challenge = `AgentTown X Claim\nhandle: @${handle}\nnonce: ${nonce}`;
   const ttlMs = 30 * 60 * 1000;
   s.claim = s.claim || {};
-  s.claim.x = { handle, nonce, challenge, createdAt: Date.now(), expiresAt: Date.now() + ttlMs };
+  s.claim.x = {
+    handle,
+    nonce,
+    challenge,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + ttlMs,
+    reservedHouseId: reservation.houseId
+  };
   res.json({ ok: true, handle, nonce, challenge, expiresInMs: ttlMs });
 });
 
@@ -3192,8 +3204,13 @@ app.post('/api/claim/x/verify', async (req, res) => {
     return res.status(401).json({ ok: false, error: 'HANDLE_MISMATCH' });
   }
 
-  // Record durable claim (no expiry).
   const store = readStore();
+
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+
+  // Record durable claim (no expiry).
   store.claims = Array.isArray(store.claims) ? store.claims : [];
   store.claims.push({
     id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
@@ -3203,6 +3220,22 @@ app.post('/api/claim/x/verify', async (req, res) => {
     tweetUrl,
     challenge
   });
+
+  // Update reservation
+  reservation.status = 'verified';
+  reservation.verifiedAt = nowIso();
+
+  // Session binds this verification to a reserved house id.
+  s.reservedHouseId = reservation.houseId;
+
+  emitMilestone(store, {
+    houseId: reservation.houseId,
+    event: 'CLAIM_VERIFIED',
+    source: 'human',
+    value: 1,
+    meta: { kind: 'x', handle }
+  });
+
   writeStore(store);
 
   s.signup = s.signup || {};
@@ -3211,7 +3244,7 @@ app.post('/api/claim/x/verify', async (req, res) => {
   s.signup.handle = handle;
 
   s.claim.x.verifiedAt = Date.now();
-  res.json({ ok: true, verified: true, nextUrl: '/create?mode=token' });
+  res.json({ ok: true, verified: true, houseId: reservation.houseId, nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}` });
 });
 
 app.post('/api/house/init', (req, res) => {
@@ -3239,6 +3272,11 @@ app.post('/api/house/init', (req, res) => {
       || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
     }
+  }
+ 
+  const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
+  if (enforcedReserved && enforcedReserved !== houseId) {
+    return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
   }
   if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
     return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
@@ -3298,6 +3336,15 @@ app.post('/api/house/init', (req, res) => {
       }
       : null
   });
+
+  emitMilestone(store, {
+    houseId,
+    event: 'CEREMONY_COMPLETED',
+    source: 'human',
+    value: 1,
+    meta: { reserved: !!enforcedReserved }
+  });
+
   writeStore(store);
 
   if (s && s.houseCeremony) {
@@ -3498,6 +3545,19 @@ app.get('/api/house/:id/public-media', (req, res) => {
   res.json({ ok: true, publicMedia: serializePublicMedia(house) });
 });
 
+app.get('/api/house/:id/rewards', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const summary = computeRewardsSummary(store, houseId);
+  res.json({ ok: true, ...summary });
+});
+
 app.get('/api/house/:id/public-media/image', (req, res) => {
   const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
   if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
@@ -3598,6 +3658,17 @@ app.post('/api/house/:id/append', (req, res) => {
     const msg = String(err?.message || 'HOUSE_APPEND_FAILED');
     if (msg === 'HOUSE_FULL') return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
     return res.status(500).json({ ok: false, error: 'HOUSE_APPEND_FAILED' });
+  }
+
+  const ctLen = typeof ciphertext.ct === 'string' ? ciphertext.ct.length : 0;
+  if (ctLen >= 32) {
+    emitMilestone(store, {
+      houseId,
+      event: 'HOUSE_APPEND',
+      source: 'human',
+      value: 1,
+      meta: { ctLen }
+    });
   }
   writeStore(store);
   res.json({ ok: true });
