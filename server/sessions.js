@@ -75,6 +75,7 @@ function createSession() {
       verifiedAt: null,
       address: null
     },
+    reservedHouseId: null,
     houseCeremony: {
       humanCommit: null,
       agentCommit: null,
