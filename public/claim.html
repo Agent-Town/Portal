@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claim</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Claim</h1>
+      <p class="muted">Claim an existing identity and generate a house.</p>
+
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/create">Create</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+      </div>
+
+      <section class="card">
+        <h2>ERC-8004 (EVM)</h2>
+        <label class="label">Agent ID</label>
+        <input id="erc8004AgentId" class="input" placeholder="11155111:947" />
+        <div class="row">
+          <button class="btn" id="erc8004GetNonce">Get nonce</button>
+          <button class="btn" id="erc8004Verify">Verify</button>
+        </div>
+        <pre id="erc8004Out" class="pre"></pre>
+      </section>
+
+      <section class="card">
+        <h2>X</h2>
+        <label class="label">Handle</label>
+        <input id="xHandle" class="input" placeholder="example" />
+        <div class="row">
+          <button class="btn" id="xChallenge">Get challenge</button>
+          <button class="btn" id="xVerify">Verify</button>
+        </div>
+        <label class="label">Tweet URL (containing the challenge)</label>
+        <input id="xTweetUrl" class="input" placeholder="https://x.com/.../status/..." />
+        <pre id="xOut" class="pre"></pre>
+      </section>
+
+      <p class="muted">Note: In production, ERC-8004 verifies on-chain ownership; X verifies a public-post challenge.</p>
+    </main>
+
+    <script src="/claim.js"></script>
+  </body>
+</html>

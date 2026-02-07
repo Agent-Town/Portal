@@ -19,10 +19,11 @@ function readStore() {
       signups: Array.isArray(parsed.signups) ? parsed.signups : [],
       shares: Array.isArray(parsed.shares) ? parsed.shares : [],
       publicTeams: Array.isArray(parsed.publicTeams) ? parsed.publicTeams : [],
-      houses: Array.isArray(parsed.houses) ? parsed.houses : []
+      houses: Array.isArray(parsed.houses) ? parsed.houses : [],
+      claims: Array.isArray(parsed.claims) ? parsed.claims : []
     };
   } catch (err) {
-    return { signups: [], shares: [], publicTeams: [], houses: [] };
+    return { signups: [], shares: [], publicTeams: [], houses: [], claims: [] };
   }
 }
 
