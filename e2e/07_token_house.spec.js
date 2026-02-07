@@ -24,6 +24,8 @@ test('token holder can create a house without an agent', async ({ page }) => {
   await page.getByRole('button', { name: 'Check wallet' }).click();
   await expect(page.getByTestId('token-status')).toContainText('Verified');
 
+  // Link is toggled via style.display; under parallel load it can be delayed.
+  await expect(page.getByRole('link', { name: 'Create house' })).toBeVisible();
   await page.getByRole('link', { name: 'Create house' }).click();
   await page.waitForURL('**/create?mode=token');
 

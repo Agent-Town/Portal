@@ -13,6 +13,9 @@ module.exports = defineConfig({
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
+  // This repo's server keeps session state in-memory; parallel workers can cross-contaminate.
+  // Keep e2e deterministic by default.
+  workers: process.env.CI ? undefined : 1,
   retries: process.env.CI ? 1 : 0,
   projects: [
     {

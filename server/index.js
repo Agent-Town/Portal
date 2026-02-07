@@ -3,11 +3,12 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
-const zlib = require('zlib');
 const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
+const { emitMilestone } = require('./milestones');
+const { computeRewardsSummary } = require('./rewards');
 const {
   createSession,
   getSessionById,
@@ -25,24 +26,6 @@ function b64ToBytes(str) {
   return new Uint8Array(bin);
 }
 
-// --- Pony Express v0 (inbox + sealed notes) ---
-const MAYOR_HOUSE_ID = 'npc_mayor';
-
-function makeInboxMsg({ toHouseId, fromHouseId = null, body, status = 'request', kind = 'msg.chat' }) {
-  const id = `msg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  return {
-    id,
-    version: 1,
-    kind,
-    toHouseId,
-    fromHouseId,
-    // Forward-compatible: treat as ciphertext even if plaintext today.
-    ciphertext: String(body || ''),
-    createdAt: nowIso(),
-    status // request | accepted | rejected
-  };
-}
-
 function bytesToB64(bytes) {
   return Buffer.from(bytes).toString('base64');
 }
@@ -53,6 +36,12 @@ function sha256Bytes(bytes) {
 
 function sha256Base64(input) {
   return crypto.createHash('sha256').update(input).digest('base64');
+}
+
+function reservedHouseId(kind, key) {
+  const seed = `agenttown:reserved:${kind}:${key}`;
+  const bytes = crypto.createHash('sha256').update(seed).digest();
+  return base58Encode(bytes);
 }
 
 function base58Encode(bytes) {
@@ -160,6 +149,22 @@ const TOKEN_CHECK_TIMEOUT_MS = 5_000;
 const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
+
+function isAdmin(req) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return false;
+  const header = req.header('x-admin-token');
+  if (!header) return false;
+  return header === token;
+}
+
+function normalizeXHandle(input) {
+  if (typeof input !== 'string') return null;
+  const handle = input.trim().replace(/^@/, '').toLowerCase();
+  if (!handle) return null;
+  if (!/^[a-z0-9_]{1,15}$/.test(handle)) return null;
+  return handle;
+}
 
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -418,7 +423,6 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
-const MIN_AGENT_SOLO_PIXELS = 20;
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -457,15 +461,6 @@ function palette() {
 
 function canvasHasInk(pixels) {
   return Array.isArray(pixels) && pixels.some((p) => p && p !== 0);
-}
-
-function countInk(pixels) {
-  if (!Array.isArray(pixels)) return 0;
-  let count = 0;
-  for (const p of pixels) {
-    if (p && p !== 0) count += 1;
-  }
-  return count;
 }
 
 function isShareLocked(share) {
@@ -550,89 +545,6 @@ function normalizePublicPrompt(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
-}
-
-const CRC32_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) {
-      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-    }
-    table[i] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    c = CRC32_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function pngChunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length, 0);
-  const typeBuf = Buffer.from(type, 'ascii');
-  const crc = Buffer.alloc(4);
-  const sum = crc32(Buffer.concat([typeBuf, data]));
-  crc.writeUInt32BE(sum, 0);
-  return Buffer.concat([len, typeBuf, data, crc]);
-}
-
-function hexToRgba(hex) {
-  if (!hex || typeof hex !== 'string') return [0, 0, 0, 255];
-  const cleaned = hex.startsWith('#') ? hex.slice(1) : hex;
-  if (cleaned.length !== 6) return [0, 0, 0, 255];
-  const r = parseInt(cleaned.slice(0, 2), 16);
-  const g = parseInt(cleaned.slice(2, 4), 16);
-  const b = parseInt(cleaned.slice(4, 6), 16);
-  return [r, g, b, 255];
-}
-
-function canvasToPngDataUrl(canvas, paletteHex) {
-  const w = canvas?.w || 0;
-  const h = canvas?.h || 0;
-  const pixels = Array.isArray(canvas?.pixels) ? canvas.pixels : [];
-  if (!w || !h || pixels.length < w * h) return null;
-  const palette = (paletteHex || palette()).map(hexToRgba);
-
-  const stride = w * 4 + 1;
-  const raw = Buffer.alloc(stride * h);
-  let offset = 0;
-  for (let y = 0; y < h; y++) {
-    raw[offset++] = 0; // filter 0
-    for (let x = 0; x < w; x++) {
-      const idx = pixels[y * w + x] || 0;
-      const [r, g, b, a] = palette[idx] || palette[0];
-      raw[offset++] = r;
-      raw[offset++] = g;
-      raw[offset++] = b;
-      raw[offset++] = a;
-    }
-  }
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // color type RGBA
-  ihdr[10] = 0; // compression
-  ihdr[11] = 0; // filter
-  ihdr[12] = 0; // interlace
-
-  const header = Buffer.from('\x89PNG\r\n\x1a\n', 'binary');
-  const idat = zlib.deflateSync(raw);
-  const png = Buffer.concat([
-    header,
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', idat),
-    pngChunk('IEND', Buffer.alloc(0))
-  ]);
-
-  return `data:image/png;base64,${png.toString('base64')}`;
 }
 
 function serializePublicMedia(house) {
@@ -766,6 +678,50 @@ app.post('/api/referral', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Reservations (admin-only for MVP) ---
+app.post('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  const handle = normalizeXHandle(req.body?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
+  const key = `@${handle}`;
+  const existing = store.reservations.find((r) => r && r.kind === 'x' && r.key === key);
+  if (existing) {
+    return res.json({ ok: true, already: true, houseId: existing.houseId, status: existing.status || 'reserved' });
+  }
+
+  const houseId = reservedHouseId('x', key);
+  const record = {
+    id: `rv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    key,
+    houseId,
+    status: 'reserved',
+    verifiedAt: null,
+    claimedAt: null,
+    meta: {}
+  };
+  store.reservations.push(record);
+  writeStore(store);
+
+  res.json({ ok: true, houseId, status: record.status });
+});
+
+app.get('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+  const store = readStore();
+  const key = `@${handle}`;
+  const rec = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, houseId: rec.houseId, status: rec.status || 'reserved' });
+});
+
 app.post('/api/human/select', (req, res) => {
   const s = ensureHumanSession(req, res);
   const elementId = typeof req.body?.elementId === 'string' ? req.body.elementId.trim() : '';
@@ -776,12 +732,21 @@ app.post('/api/human/select', (req, res) => {
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
 
+// --- Agent solo session creation ---
+// This is the agent-only flow (no human UI): create a session and return a Team Code.
 app.post('/api/agent/session', (req, res) => {
   const agentName = normalizeAgentName(req.body?.agentName);
-  const s = createSession({ flow: 'agent_solo' });
-  s.agent.connected = true;
-  s.agent.name = agentName || s.agent.name || 'OpenClaw';
-  res.json({ ok: true, teamCode: s.teamCode, flow: s.flow });
+  const session = createSession({ flow: 'agent_solo' });
+  session.agent.connected = true;
+  session.agent.name = agentName || session.agent.name || 'OpenClaw';
+  // In solo mode there is no human counterpart; treat as already unlocked.
+  session.match.matched = true;
+  session.match.elementId = 'key';
+  session.match.unlockedAt = session.match.unlockedAt || nowIso();
+  // Allow the solo agent to proceed with actions gated on agent connect.
+  session.shareApproval = session.shareApproval || { human: false, agent: false };
+  session.shareApproval.agent = true;
+  return res.json({ ok: true, teamCode: session.teamCode, flow: session.flow });
 });
 
 app.post('/api/agent/connect', (req, res) => {
@@ -817,7 +782,6 @@ app.get('/api/agent/state', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   res.json({
     ok: true,
-    flow: s.flow,
     agent: s.agent,
     human: {
       selected: s.human.selected,
@@ -915,16 +879,6 @@ app.post('/api/agent/canvas/paint', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/agent/canvas/image', (req, res) => {
-  const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
-  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
-  const s = getSessionByTeamCode(teamCode);
-  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
-  const image = canvasToPngDataUrl(s.canvas, palette());
-  if (!image) return res.status(500).json({ ok: false, error: 'CANVAS_IMAGE_FAILED' });
-  res.json({ ok: true, image, pixels: countInk(s.canvas.pixels) });
-});
-
 // --- House ceremony (agent + human) ---
 app.get('/api/agent/house/state', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
@@ -972,15 +926,8 @@ app.post('/api/agent/house/reveal', (req, res) => {
 
   s.houseCeremony.agentReveal = reveal;
 
-  if (s.flow === 'agent_solo') {
-    // Solo flow: derive houseId from agent entropy only.
-    const kroot = sha256Bytes(ra);
-    const houseIdBytes = sha256Bytes(kroot);
-    s.houseCeremony.houseId = base58Encode(houseIdBytes);
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-    indexHouseId(s, s.houseCeremony.houseId);
-  } else if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
-    // Co-op: derive houseId from Rh||Ra.
+  // If both reveals exist, compute houseId and store it (no secrets persisted).
+  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
     const rh = b64ToBytes(s.houseCeremony.humanReveal);
     const combo = new Uint8Array(rh.length + ra.length);
     combo.set(rh, 0);
@@ -1121,25 +1068,6 @@ app.post('/api/share/create', (req, res) => {
   };
 
   store.shares.push(record);
-
-  // Pony Express v0: Mayor welcome message on house registration.
-  const mayorBody = [
-    `Welcome, House ${shareId}.`,
-    `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
-    ``,
-    `Two ways to live here:`,
-    `1) Co‑op: move in with a human + an agent.`,
-    `2) Solo: a house that stands on its own.`,
-    ``,
-    `Your first task: leave a sealed note at another house — introduce yourself in one sentence.`,
-    ``,
-    `— The Mayor`
-  ].join('\n');
-
-  store.inbox.push(
-    makeInboxMsg({ toHouseId: shareId, fromHouseId: MAYOR_HOUSE_ID, body: mayorBody, status: 'accepted' })
-  );
-
   writeStore(store);
 
   s.share.id = shareId;
@@ -1153,58 +1081,6 @@ app.post('/api/share/create', (req, res) => {
     shareId,
     sharePath: `/s/${shareId}`
   });
-});
-
-// --- Pony Express v0 API ---
-app.post('/api/pony/send', (req, res) => {
-  const toHouseId = typeof req.body?.toHouseId === 'string' ? req.body.toHouseId.trim() : '';
-  const fromHouseId = typeof req.body?.fromHouseId === 'string' ? req.body.fromHouseId.trim() : null;
-  const body = typeof req.body?.body === 'string' ? req.body.body : '';
-
-  if (!toHouseId) return res.status(400).json({ ok: false, error: 'MISSING_TO' });
-
-  const store = readStore();
-  const exists = store.shares.some((s) => s.id === toHouseId);
-  if (!exists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
-
-  const status = fromHouseId === MAYOR_HOUSE_ID ? 'accepted' : 'request';
-  const msg = makeInboxMsg({ toHouseId, fromHouseId, body, status });
-  store.inbox.push(msg);
-  writeStore(store);
-
-  res.json({ ok: true, id: msg.id });
-});
-
-app.get('/api/pony/inbox', (req, res) => {
-  const houseId = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
-
-  const store = readStore();
-  const items = store.inbox
-    .filter((m) => m.toHouseId === houseId)
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
-
-  res.json({ ok: true, inbox: items });
-});
-
-app.post('/api/pony/inbox/:id/accept', (req, res) => {
-  const id = req.params.id;
-  const store = readStore();
-  const msg = store.inbox.find((m) => m.id === id);
-  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  msg.status = 'accepted';
-  writeStore(store);
-  res.json({ ok: true });
-});
-
-app.post('/api/pony/inbox/:id/reject', (req, res) => {
-  const id = req.params.id;
-  const store = readStore();
-  const msg = store.inbox.find((m) => m.id === id);
-  if (!msg) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  msg.status = 'rejected';
-  writeStore(store);
-  res.json({ ok: true });
 });
 
 app.get('/api/share/:id', (req, res) => {
@@ -1253,7 +1129,7 @@ app.post('/api/house/:id/share', (req, res) => {
       createdAt: nowIso(),
       matchedElement: session?.match?.elementId || null,
       agentName: session?.agent?.name || 'OpenClaw',
-      mode: session?.flow === 'agent_solo' ? 'agent_solo' : 'agent',
+      mode: 'agent',
       houseId,
       xPostUrl: session?.human?.xPostUrl || null,
       humanHandle: session?.human?.xHandle || null,
@@ -1498,110 +1374,6 @@ app.get('/api/wall', (_req, res) => {
   res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
-// --- Anchors (ERC-8004 routing directory) ---
-const { verifyMessage } = require('ethers');
-
-function makeAnchorNonce() {
-  return `an_${randomHex(16)}`;
-}
-
-function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
-  return [
-    'AgentTown Anchor Link',
-    `houseId: ${houseId}`,
-    `erc8004Id: ${erc8004Id}`,
-    `origin: ${origin}`,
-    `nonce: ${nonce}`,
-    `createdAtMs: ${createdAtMs}`
-  ].join('\n');
-}
-
-app.get('/api/anchors/nonce', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const nonce = makeAnchorNonce();
-  s.anchorPublishNonce = nonce;
-  res.json({ ok: true, nonce });
-});
-
-app.post('/api/anchors/register', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
-  const erc8004Id = typeof req.body?.erc8004Id === 'string' ? req.body.erc8004Id.trim() : '';
-  const signer = typeof req.body?.signer === 'string' ? req.body.signer.trim() : '';
-  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
-  const origin = typeof req.body?.origin === 'string' ? req.body.origin.trim() : '';
-  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
-  const createdAtMs = Number(req.body?.createdAtMs || 0);
-  const chainId = Number(req.body?.chainId || 0);
-
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
-  if (!signer) return res.status(400).json({ ok: false, error: 'MISSING_SIGNER' });
-  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
-  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (!createdAtMs) return res.status(400).json({ ok: false, error: 'MISSING_TIMESTAMP' });
-
-  if (!s.anchorPublishNonce || nonce !== s.anchorPublishNonce) {
-    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
-  }
-
-  const expectedOrigin = `${req.protocol}://${req.get('host')}`;
-  // Require message origin to match server origin (prevents signing for a different site).
-  if (origin && origin !== expectedOrigin) {
-    return res.status(400).json({ ok: false, error: 'ORIGIN_MISMATCH' });
-  }
-
-  const msg = buildAnchorLinkMessage({
-    houseId,
-    erc8004Id,
-    origin: expectedOrigin,
-    nonce,
-    createdAtMs
-  });
-
-  let recovered = '';
-  try {
-    recovered = verifyMessage(msg, signature) || '';
-  } catch {
-    return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
-  }
-
-  if (recovered.toLowerCase() !== signer.toLowerCase()) {
-    return res.status(401).json({ ok: false, error: 'SIGNER_MISMATCH' });
-  }
-
-  // Consume nonce
-  s.anchorPublishNonce = null;
-
-  const store = readStore();
-  const houseExists = store.houses.find((h) => h && h.id === houseId);
-  if (!houseExists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
-
-  // Upsert by erc8004Id (latest wins)
-  store.anchors = Array.isArray(store.anchors) ? store.anchors : [];
-  store.anchors = store.anchors.filter((a) => a && a.erc8004Id !== erc8004Id);
-  store.anchors.unshift({
-    erc8004Id,
-    houseId,
-    signer,
-    chainId: chainId || null,
-    createdAtMs,
-    updatedAt: nowIso()
-  });
-
-  writeStore(store);
-  res.json({ ok: true });
-});
-
-app.get('/api/anchors/resolve', (req, res) => {
-  const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
-  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
-  const store = readStore();
-  const rec = (store.anchors || []).find((a) => a && a.erc8004Id === erc8004Id);
-  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  res.json({ ok: true, erc8004Id, houseId: rec.houseId });
-});
-
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
   app.post('/__test__/reset', (_req, res) => {
@@ -1609,7 +1381,7 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [] });
+    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], claims: [] });
     resetAllSessions();
     res.json({ ok: true });
   });
@@ -1729,6 +1501,188 @@ app.post('/api/token/verify', async (req, res) => {
   res.json({ ok: true, eligible: true, status });
 });
 
+app.get('/api/claim/erc8004/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.query?.agentId === 'string' ? req.query.agentId.trim() : '';
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+
+  // Minimal nonce for e2e scaffolding; real ERC-8004 verification TBD.
+  const nonce = randomHex(16);
+  s.claim = s.claim || {};
+  s.claim.erc8004 = { agentId, nonce, createdAt: Date.now() };
+  res.json({ ok: true, nonce });
+});
+
+app.post('/api/claim/erc8004/verify', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+
+  const expected = s.claim?.erc8004;
+  if (!expected || expected.agentId !== agentId) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (expected.nonce !== nonce) {
+    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  }
+
+  // Test-mode shortcut: accept any non-empty signature.
+  if (process.env.NODE_ENV !== 'test') {
+    return res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED' });
+  }
+
+  // Mark signup as complete so /create is a usable human-only flow in tests.
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'token';
+  s.signup.address = s.signup.address || (typeof req.body?.address === 'string' ? req.body.address.trim() : null);
+
+  s.claim.erc8004.verifiedAt = Date.now();
+  res.json({ ok: true, verified: true, nextUrl: '/create' });
+});
+
+// --- X claim (public post challenge) ---
+app.get('/api/claim/x/challenge', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+
+  const nonce = randomHex(12);
+  const challenge = `AgentTown X Claim\nhandle: @${handle}\nnonce: ${nonce}`;
+  const ttlMs = 30 * 60 * 1000;
+  s.claim = s.claim || {};
+  s.claim.x = {
+    handle,
+    nonce,
+    challenge,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + ttlMs,
+    reservedHouseId: reservation.houseId
+  };
+  res.json({ ok: true, handle, nonce, challenge, expiresInMs: ttlMs });
+});
+
+app.post('/api/claim/x/verify', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const raw = typeof req.body?.handle === 'string' ? req.body.handle.trim() : '';
+  const handle = raw.replace(/^@/, '').toLowerCase();
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const tweetUrl = typeof req.body?.tweetUrl === 'string' ? req.body.tweetUrl.trim() : '';
+
+  if (!handle) return res.status(400).json({ ok: false, error: 'MISSING_HANDLE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!tweetUrl) return res.status(400).json({ ok: false, error: 'MISSING_TWEET_URL' });
+
+  const pending = s.claim?.x;
+  if (!pending || pending.handle !== handle) return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  if (pending.nonce !== nonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  if (pending.expiresAt && Date.now() > pending.expiresAt) return res.status(400).json({ ok: false, error: 'CHALLENGE_EXPIRED' });
+
+  let u;
+  try {
+    u = new URL(tweetUrl);
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+  if (!/^https?:$/.test(u.protocol)) return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  if (!/(^|\.)x\.com$/.test(u.hostname) && !/(^|\.)twitter\.com$/.test(u.hostname)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+
+  const html = await new Promise((resolve, reject) => {
+    const getter = u.protocol === 'https:' ? https.get : http.get;
+    const req2 = getter(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AgentTownBot/1.0; +https://github.com/Agent-Town)'
+        },
+        timeout: 10_000
+      },
+      (r) => {
+        let buf = '';
+        r.setEncoding('utf8');
+        r.on('data', (chunk) => (buf += chunk));
+        r.on('end', () => resolve({ status: r.statusCode || 0, body: buf }));
+      }
+    );
+    req2.on('error', reject);
+    req2.on('timeout', () => {
+      req2.destroy(new Error('timeout'));
+    });
+  }).catch(() => null);
+
+  if (!html || html.status < 200 || html.status >= 400) {
+    return res.status(502).json({ ok: false, error: 'TWEET_FETCH_FAILED' });
+  }
+
+  const body = html.body || '';
+  const challenge = pending.challenge;
+  if (!body.includes(challenge)) {
+    return res.status(401).json({ ok: false, error: 'CHALLENGE_NOT_FOUND' });
+  }
+
+  // Best-effort author check: require the handle to appear in the URL path.
+  // (This is not perfect; can be tightened later with API/oEmbed.)
+  const pathLower = u.pathname.toLowerCase();
+  if (!pathLower.includes(`/${handle}/status/`)) {
+    return res.status(401).json({ ok: false, error: 'HANDLE_MISMATCH' });
+  }
+
+  const store = readStore();
+
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+
+  // Record durable claim (no expiry).
+  store.claims = Array.isArray(store.claims) ? store.claims : [];
+  store.claims.push({
+    id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    handle,
+    tweetUrl,
+    challenge
+  });
+
+  // Update reservation
+  reservation.status = 'verified';
+  reservation.verifiedAt = nowIso();
+
+  // Session binds this verification to a reserved house id.
+  s.reservedHouseId = reservation.houseId;
+
+  emitMilestone(store, {
+    houseId: reservation.houseId,
+    event: 'CLAIM_VERIFIED',
+    source: 'human',
+    value: 1,
+    meta: { kind: 'x', handle }
+  });
+
+  writeStore(store);
+
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'x';
+  s.signup.handle = handle;
+
+  s.claim.x.verifiedAt = Date.now();
+  res.json({ ok: true, verified: true, houseId: reservation.houseId, nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}` });
+});
+
 app.post('/api/house/init', (req, res) => {
   const s = ensureHumanSession(req, res);
   const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
@@ -1747,6 +1701,11 @@ app.post('/api/house/init', (req, res) => {
   if (!authKeyBytes || authKeyBytes.length < 16) {
     return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
   }
+  const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
+  if (enforcedReserved && enforcedReserved !== houseId) {
+    return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
+  }
+
   if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
     return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
   }
@@ -1787,6 +1746,15 @@ app.post('/api/house/init', (req, res) => {
     authKey: houseAuthKey,
     entries: []
   });
+
+  emitMilestone(store, {
+    houseId,
+    event: 'CEREMONY_COMPLETED',
+    source: 'human',
+    value: 1,
+    meta: { reserved: !!enforcedReserved }
+  });
+
   writeStore(store);
 
   if (s && s.houseCeremony) {
@@ -1796,106 +1764,6 @@ app.post('/api/house/init', (req, res) => {
   }
 
   res.json({ ok: true, houseId });
-});
-
-app.post('/api/agent/house/init', (req, res) => {
-  const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
-  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
-  const housePubKey = typeof req.body?.housePubKey === 'string' ? req.body.housePubKey.trim() : '';
-  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
-  const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
-  const unlock = req.body?.unlock || null;
-  const keyWrap = req.body?.keyWrap || null;
-  const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
-
-  if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
-  const s = getSessionByTeamCode(teamCode);
-  if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
-  if (s.flow !== 'agent_solo') return res.status(403).json({ ok: false, error: 'AGENT_SOLO_ONLY' });
-  if (!s.houseCeremony?.agentReveal) return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
-
-  const painted = countInk(s.canvas?.pixels);
-  if (painted < MIN_AGENT_SOLO_PIXELS) {
-    return res.status(403).json({ ok: false, error: 'INSUFFICIENT_PIXELS', minPixels: MIN_AGENT_SOLO_PIXELS, painted });
-  }
-
-  if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
-  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (!houseAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_AUTH' });
-  const authKeyBytes = decodeB64(houseAuthKey);
-  if (!authKeyBytes || authKeyBytes.length < 16) {
-    return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
-  }
-  if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
-    return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
-  }
-
-  // Solo flow uses ceremony-style keys with agent entropy.
-  if (keyMode !== 'ceremony') {
-    return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
-  }
-
-  const ra = b64ToBytes(s.houseCeremony.agentReveal);
-  if (!ra || !ra.length) return res.status(400).json({ ok: false, error: 'INVALID_REVEAL' });
-  const kroot = sha256Bytes(ra);
-  const expectedHouseId = base58Encode(sha256Bytes(kroot));
-  if (expectedHouseId !== houseId) {
-    return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
-  }
-
-  let normalizedKeyWrap = null;
-  if (keyWrap && typeof keyWrap === 'object') {
-    const alg = typeof keyWrap.alg === 'string' ? keyWrap.alg.trim() : '';
-    const iv = typeof keyWrap.iv === 'string' ? keyWrap.iv.trim() : '';
-    const ct = typeof keyWrap.ct === 'string' ? keyWrap.ct.trim() : '';
-    if (alg && iv && ct) {
-      if (alg !== 'AES-GCM') {
-        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP' });
-      }
-      normalizedKeyWrap = { alg, iv, ct };
-    }
-  }
-
-  const store = readStore();
-  if (store.houses.length >= MAX_HOUSES) {
-    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
-  }
-  if (store.signups.length >= MAX_SIGNUPS) {
-    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
-  }
-  const exists = store.houses.find((r) => r.id === houseId);
-  if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
-
-  store.houses.push({
-    id: houseId,
-    housePubKey,
-    createdAt: nowIso(),
-    nonce,
-    keyMode: 'ceremony',
-    unlock,
-    keyWrap: normalizedKeyWrap,
-    authKey: houseAuthKey,
-    entries: []
-  });
-  writeStore(store);
-
-  s.houseCeremony.houseId = houseId;
-  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-  indexHouseId(s, houseId);
-
-  const status = recordSignup(s, {
-    mode: 'agent_solo',
-    agentName: s.agent.name || null,
-    matchedElement: null,
-    address: unlock?.address || null
-  });
-
-  if (!status.complete) {
-    return res.status(403).json({ ok: false, error: status.reason || 'STORE_FULL', houseId });
-  }
-
-  res.json({ ok: true, houseId, status });
 });
 
 app.get('/api/house/:id/meta', (req, res) => {
@@ -1973,6 +1841,19 @@ app.get('/api/house/:id/public-media', (req, res) => {
   const house = store.houses.find((r) => r.id === houseId);
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+});
+
+app.get('/api/house/:id/rewards', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const summary = computeRewardsSummary(store, houseId);
+  res.json({ ok: true, ...summary });
 });
 
 app.get('/api/house/:id/public-media/image', (req, res) => {
@@ -2075,6 +1956,18 @@ app.post('/api/house/:id/append', (req, res) => {
     author,
     ciphertext
   });
+
+  const ctLen = typeof ciphertext.ct === 'string' ? ciphertext.ct.length : 0;
+  if (ctLen >= 32) {
+    emitMilestone(store, {
+      houseId,
+      event: 'HOUSE_APPEND',
+      source: 'human',
+      value: 1,
+      meta: { ctLen }
+    });
+  }
+
   writeStore(store);
   res.json({ ok: true });
 });
@@ -2106,7 +1999,7 @@ app.use(
 );
 
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
-app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
+app.get('/claim', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'claim.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
