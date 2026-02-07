@@ -55,7 +55,8 @@ test('agent derives ceremony key and appends; human can decrypt in house UI', as
   await page.getByTestId('sigil-key').click();
   await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
 
-  // Press open
+  // Press open (wait for enable to avoid flake under parallel workers)
+  await expect(page.getByTestId('open-btn')).toBeEnabled();
   await page.getByTestId('open-btn').click();
   await request.post('/api/agent/open/press', { data: { teamCode } });
   await page.waitForURL('**/create');
