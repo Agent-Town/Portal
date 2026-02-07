@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
-const TABLES = ['signups', 'shares', 'publicTeams', 'houses', 'anchors', 'inbox'];
+const TABLES = ['signups', 'shares', 'publicTeams', 'houses', 'claims', 'reservations', 'milestones', 'rewardsLedger', 'anchors', 'inbox'];
 
 let db = null;
 let statements = null;
@@ -37,6 +37,10 @@ function ensureDb() {
       'CREATE TABLE IF NOT EXISTS shares (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS publicTeams (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS houses (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS claims (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS reservations (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS milestones (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS rewardsLedger (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS anchors (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);'
     ].join('\n')
@@ -81,6 +85,10 @@ function normalizeStore(next) {
           return rest;
         })
       : [],
+    claims: Array.isArray(next?.claims) ? next.claims : [],
+    reservations: Array.isArray(next?.reservations) ? next.reservations : [],
+    milestones: Array.isArray(next?.milestones) ? next.milestones : [],
+    rewardsLedger: Array.isArray(next?.rewardsLedger) ? next.rewardsLedger : [],
     anchors: Array.isArray(next?.anchors) ? next.anchors : [],
     inbox: Array.isArray(next?.inbox) ? next.inbox : []
   };
@@ -88,7 +96,18 @@ function normalizeStore(next) {
 
 function readStore() {
   ensureDb();
-  const store = { signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] };
+  const store = {
+    signups: [],
+    shares: [],
+    publicTeams: [],
+    houses: [],
+    claims: [],
+    reservations: [],
+    milestones: [],
+    rewardsLedger: [],
+    anchors: [],
+    inbox: []
+  };
   for (const table of TABLES) {
     const rows = statements[table].all.all();
     const parsed = [];
