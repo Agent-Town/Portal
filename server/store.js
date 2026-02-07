@@ -20,10 +20,13 @@ function readStore() {
       shares: Array.isArray(parsed.shares) ? parsed.shares : [],
       publicTeams: Array.isArray(parsed.publicTeams) ? parsed.publicTeams : [],
       houses: Array.isArray(parsed.houses) ? parsed.houses : [],
-      claims: Array.isArray(parsed.claims) ? parsed.claims : []
+      claims: Array.isArray(parsed.claims) ? parsed.claims : [],
+      reservations: Array.isArray(parsed.reservations) ? parsed.reservations : [],
+      milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
+      rewardsLedger: Array.isArray(parsed.rewardsLedger) ? parsed.rewardsLedger : []
     };
   } catch (err) {
-    return { signups: [], shares: [], publicTeams: [], houses: [], claims: [] };
+    return { signups: [], shares: [], publicTeams: [], houses: [], claims: [], reservations: [], milestones: [], rewardsLedger: [] };
   }
 }
 
