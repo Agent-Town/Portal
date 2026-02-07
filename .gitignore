@@ -4,3 +4,11 @@ data/store.e2e.json
 data/store*.sqlite
 data/store*.sqlite-wal
 data/store*.sqlite-shm
+
+data/local.sepolia.wallet.json
+data/faucet.browser-profile/
+data/local.solana.devnet.wallet.json
+data/solana.faucet.browser-profile/
+
+node_modules
+
