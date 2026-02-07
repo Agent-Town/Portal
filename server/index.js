@@ -148,6 +148,22 @@ const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
 
+function isAdmin(req) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return false;
+  const header = req.header('x-admin-token');
+  if (!header) return false;
+  return header === token;
+}
+
+function normalizeXHandle(input) {
+  if (typeof input !== 'string') return null;
+  const handle = input.trim().replace(/^@/, '').toLowerCase();
+  if (!handle) return null;
+  if (!/^[a-z0-9_]{1,15}$/.test(handle)) return null;
+  return handle;
+}
+
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -658,6 +674,50 @@ app.post('/api/referral', (req, res) => {
   if (!share) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   s.referral.shareId = shareId;
   res.json({ ok: true });
+});
+
+// --- Reservations (admin-only for MVP) ---
+app.post('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  const handle = normalizeXHandle(req.body?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
+  const key = `@${handle}`;
+  const existing = store.reservations.find((r) => r && r.kind === 'x' && r.key === key);
+  if (existing) {
+    return res.json({ ok: true, already: true, houseId: existing.houseId, status: existing.status || 'reserved' });
+  }
+
+  const houseId = reservedHouseId('x', key);
+  const record = {
+    id: `rv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    key,
+    houseId,
+    status: 'reserved',
+    verifiedAt: null,
+    claimedAt: null,
+    meta: {}
+  };
+  store.reservations.push(record);
+  writeStore(store);
+
+  res.json({ ok: true, houseId, status: record.status });
+});
+
+app.get('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+  const store = readStore();
+  const key = `@${handle}`;
+  const rec = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, houseId: rec.houseId, status: rec.status || 'reserved' });
 });
 
 app.post('/api/human/select', (req, res) => {
