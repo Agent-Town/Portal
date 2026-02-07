@@ -36,6 +36,12 @@ function sha256Base64(input) {
   return crypto.createHash('sha256').update(input).digest('base64');
 }
 
+function reservedHouseId(kind, key) {
+  const seed = `agenttown:reserved:${kind}:${key}`;
+  const bytes = crypto.createHash('sha256').update(seed).digest();
+  return base58Encode(bytes);
+}
+
 function base58Encode(bytes) {
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   let x = BigInt('0x' + Buffer.from(bytes).toString('hex'));
