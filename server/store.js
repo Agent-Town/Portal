@@ -57,11 +57,6 @@ function buildStatements(database) {
       clear: database.prepare(`DELETE FROM ${table}`),
       insert: database.prepare(`INSERT INTO ${table} (pos, data) VALUES (?, ?)`),
       count: database.prepare(`SELECT COUNT(1) as count FROM ${table}`)
-    };
-  }
-  return out;
-}
-
 function withTransaction(database, fn) {
   database.exec('BEGIN');
   try {
