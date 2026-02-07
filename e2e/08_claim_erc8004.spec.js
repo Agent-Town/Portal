@@ -5,8 +5,19 @@ const { test, expect } = require('@playwright/test');
 
 test('ERC-8004 claim (solo) -> create -> house unlock', async ({ page }) => {
   // Reset all state (test-only endpoint).
-  await page.request.post('/api/test/reset-all', {
-    headers: { 'x-test-reset': process.env.TEST_RESET_TOKEN || 'test-reset-token' }
+  await page.request.post('/__test__/reset', {
+    headers: { 'x-test-reset': process.env.TEST_RESET_TOKEN || 'test-reset' }
+  });
+
+  await page.addInitScript(() => {
+    const sig = new Uint8Array(64);
+    for (let i = 0; i < sig.length; i++) sig[i] = (i * 7) & 0xff;
+    const address = 'So1anaMockToken1111111111111111111111111111';
+    window.solana = {
+      isPhantom: true,
+      connect: async () => ({ publicKey: { toString: () => address } }),
+      signMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
+    };
   });
 
   await page.goto('/');
@@ -23,7 +34,8 @@ test('ERC-8004 claim (solo) -> create -> house unlock', async ({ page }) => {
   expect(nonceJson.nonce).toBeTruthy();
 
   // Verify claim (test mode accepts provided address and skips crypto/RPC).
-  const address = '0x1111111111111111111111111111111111111111';
+  // Must match the mocked Phantom address used below.
+  const address = 'So1anaMockToken1111111111111111111111111111';
   const verifyRes = await page.request.post('/api/claim/erc8004/verify', {
     data: {
       agentId,
@@ -41,19 +53,26 @@ test('ERC-8004 claim (solo) -> create -> house unlock', async ({ page }) => {
   // Continue to create flow.
   await page.goto('/create');
 
-  // In solo flow, we can complete human reveal and lock.
-  await page.getByRole('button', { name: /open press/i }).click();
+  // Continue with the standard create flow UI.
+  // Seed the entropy grid so the "Generate house key" button becomes enabled.
+  const grid = page.getByTestId('canvas');
+  await expect(grid).toBeVisible();
+  // Click actual pixel buttons so /api/human/canvas/paint runs and enables the share button.
+  await page.getByTestId('px-0-0').click();
+  await page.getByTestId('px-1-1').click();
 
-  // The UI uses a pixel canvas; just click a few times to seed.
-  const canvas = page.locator('#createCanvas');
-  await expect(canvas).toBeVisible();
-  const box = await canvas.boundingBox();
-  await page.mouse.click(box.x + 10, box.y + 10);
-  await page.mouse.click(box.x + 20, box.y + 20);
+  const shareBtn = page.getByTestId('share-btn');
+  await expect(shareBtn).toBeEnabled();
 
-  await page.getByRole('button', { name: /lock/i }).click();
+  await shareBtn.click();
 
-  // After locking, user should be able to navigate to house.
-  await page.waitForURL(/\/house/);
-  await expect(page.locator('text=House')).toBeVisible();
+  // Debug if we didn't navigate.
+  const errText = await page.locator('#err').textContent().catch(() => '');
+  if (errText && errText.trim()) {
+    throw new Error(`create error: ${errText.trim()}`);
+  }
+
+  // After key generation, the app navigates to /house.
+  await page.waitForURL(/\/house/, { timeout: 15000 });
+  await expect(page.getByRole('heading', { name: /house/i })).toBeVisible();
 });
