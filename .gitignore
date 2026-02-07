@@ -1,4 +1,13 @@
 .DS_Store
 
+# e2e store fixture
 data/store.e2e.json
+
+# local secrets (never commit)
+.secrets/
+.env
+.env.*
+
+# local stores
+data/store.test.json
 
