@@ -732,6 +732,23 @@ app.post('/api/human/select', (req, res) => {
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
 
+// --- Agent solo session creation ---
+// This is the agent-only flow (no human UI): create a session and return a Team Code.
+app.post('/api/agent/session', (req, res) => {
+  const agentName = normalizeAgentName(req.body?.agentName);
+  const session = createSession({ flow: 'agent_solo' });
+  session.agent.connected = true;
+  session.agent.name = agentName || session.agent.name || 'OpenClaw';
+  // In solo mode there is no human counterpart; treat as already unlocked.
+  session.match.matched = true;
+  session.match.elementId = 'key';
+  session.match.unlockedAt = session.match.unlockedAt || nowIso();
+  // Allow the solo agent to proceed with actions gated on agent connect.
+  session.shareApproval = session.shareApproval || { human: false, agent: false };
+  session.shareApproval.agent = true;
+  return res.json({ ok: true, teamCode: session.teamCode, flow: session.flow });
+});
+
 app.post('/api/agent/connect', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
   const agentName = normalizeAgentName(req.body?.agentName);
