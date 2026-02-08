@@ -302,6 +302,67 @@ Returns:
 
 ---
 
+## Pony Express (v0)
+
+An MVP inbox for “sealed notes”.
+
+Notes:
+- The `ciphertext` field is treated as an **opaque string**. In v0 it may be plaintext.
+- v0 endpoints are **not authenticated**. Do not treat Pony v0 as secure.
+- Addressing uses the `shareId` namespace (the destination must be an existing share id).
+
+Message schema:
+```json
+{
+  "id": "msg_...",
+  "version": 1,
+  "kind": "msg.chat",
+  "toHouseId": "sh_...",
+  "fromHouseId": "sh_...|npc_mayor|null",
+  "ciphertext": "opaque string",
+  "createdAt": "ISO8601",
+  "status": "request|accepted|rejected"
+}
+```
+
+### POST `/api/pony/send`
+Body:
+```json
+{ "toHouseId": "sh_...", "fromHouseId": "sh_...|null", "body": "..." }
+```
+Creates an inbox message for the destination.
+
+Returns:
+```json
+{ "ok": true, "id": "msg_..." }
+```
+
+Errors:
+- `MISSING_TO` if `toHouseId` missing/empty
+- `HOUSE_NOT_FOUND` if `toHouseId` does not exist
+
+### GET `/api/pony/inbox?houseId=sh_...`
+Lists inbox messages for the destination id.
+
+Returns:
+```json
+{ "ok": true, "inbox": [ { "...": "message" } ] }
+```
+
+Errors:
+- `MISSING_HOUSE` if missing/empty `houseId`
+
+### POST `/api/pony/inbox/:id/accept`
+Marks a message as accepted.
+
+### POST `/api/pony/inbox/:id/reject`
+Marks a message as rejected.
+
+Errors:
+- `NOT_FOUND` if the message id does not exist
+
+---
+
 ## Posts
 
 ### POST `/api/human/posts` (human)

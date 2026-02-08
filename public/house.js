@@ -119,99 +119,28 @@ async function loadAgent0Sdk(statusNode) {
   return localMod;
 }
 
-// --- base64 helpers ---
-function b64(bytes) {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
-function unb64(str) {
-  const bin = atob(str);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-// --- base58 (minimal) ---
-const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-function base58Encode(bytes) {
-  // Adapted minimal implementation.
-  if (!bytes || bytes.length === 0) return '';
-  const digits = [0];
-  for (let i = 0; i < bytes.length; i++) {
-    let carry = bytes[i];
-    for (let j = 0; j < digits.length; j++) {
-      carry += digits[j] << 8;
-      digits[j] = carry % 58;
-      carry = (carry / 58) | 0;
-    }
-    while (carry) {
-      digits.push(carry % 58);
-      carry = (carry / 58) | 0;
-    }
-  }
-  let out = '';
-  // leading zeros
-  for (let k = 0; k < bytes.length && bytes[k] === 0; k++) out += '1';
-  for (let q = digits.length - 1; q >= 0; q--) out += B58[digits[q]];
-  return out;
-}
-
-// --- crypto primitives ---
-async function sha256(bytes) {
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return new Uint8Array(digest);
-}
+const HP = window.HousesProtocol;
+if (!HP) throw new Error('HOUSES_PROTOCOL_MISSING');
+const {
+  b64,
+  unb64,
+  base58Encode,
+  sha256,
+  aesGcmEncrypt,
+  aesGcmDecrypt,
+  deriveHouseAuthKey,
+  deriveHouseEncKey,
+  signMessageBytes: signSolanaMessageBytes,
+  houseAuthHeaders: makeHouseAuthHeaders,
+  buildUnlockMessage,
+  buildKeyWrapMessage
+} = HP;
 
 // (Publish convergence) Ceremony-only houses.
 // We store only a wallet-wrapped K_root for recovery; wallet signature is still the UX gate.
 
-async function aesGcmEncrypt(key, plaintextBytes, aadBytes) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ct = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: aadBytes || new Uint8Array([]) },
-    key,
-    plaintextBytes
-  );
-  return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
-}
-
-async function aesGcmDecrypt(key, ivBytes, ctBytes, aadBytes) {
-  const pt = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: ivBytes, additionalData: aadBytes || new Uint8Array([]) },
-    key,
-    ctBytes
-  );
-  return new Uint8Array(pt);
-}
-
-async function deriveHouseAuthKey(Kroot) {
-  const info = new TextEncoder().encode('elizatown-house-auth-v1');
-  const salt = new Uint8Array([]);
-  const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'HKDF', hash: 'SHA-256', salt, info },
-    baseKey,
-    256
-  );
-  return new Uint8Array(bits);
-}
-
-async function bodyHashB64(body) {
-  const bytes = body ? new TextEncoder().encode(body) : new Uint8Array([]);
-  const digest = await sha256(bytes);
-  return b64(digest);
-}
-
 async function houseAuthHeaders(houseId, method, url, body) {
-  if (!KauthKey) throw new Error('HOUSE_AUTH_NOT_READY');
-  const ts = String(Date.now());
-  const path = new URL(url, window.location.origin).pathname;
-  const bodyHash = await bodyHashB64(body || '');
-  const msg = `${houseId}.${ts}.${method}.${path}.${bodyHash}`;
-  const sig = await crypto.subtle.sign('HMAC', KauthKey, new TextEncoder().encode(msg));
-  const auth = b64(new Uint8Array(sig));
-  return { 'x-house-ts': ts, 'x-house-auth': auth };
+  return makeHouseAuthHeaders({ houseId, method, url, body, KauthKey });
 }
 
 async function houseApi(houseId, url, opts = {}) {
@@ -331,55 +260,9 @@ async function signMessage(message) {
   await signMessageBytes(message);
 }
 
-function base58Decode(str) {
-  if (!str || typeof str !== 'string') return null;
-  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let num = 0n;
-  for (const ch of str) {
-    const idx = alphabet.indexOf(ch);
-    if (idx < 0) return null;
-    num = num * 58n + BigInt(idx);
-  }
-  const bytes = [];
-  while (num > 0n) {
-    bytes.push(Number(num & 0xffn));
-    num >>= 8n;
-  }
-  bytes.reverse();
-  let leadingZeros = 0;
-  for (let i = 0; i < str.length && str[i] === '1'; i++) leadingZeros++;
-  if (leadingZeros) {
-    return new Uint8Array(Array(leadingZeros).fill(0).concat(bytes));
-  }
-  return new Uint8Array(bytes);
-}
-
-function normalizeSignatureBytes(sig) {
-  if (sig instanceof Uint8Array) return sig;
-  if (sig instanceof ArrayBuffer) return new Uint8Array(sig);
-  if (ArrayBuffer.isView(sig)) return new Uint8Array(sig.buffer);
-  if (Array.isArray(sig)) return new Uint8Array(sig);
-  if (typeof sig === 'string') {
-    const b58 = base58Decode(sig);
-    if (b58 && b58.length === 64) return b58;
-    try {
-      const bin = atob(sig);
-      if (bin.length === 64) return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    } catch {
-      // ignore
-    }
-  }
-  return null;
-}
-
 async function signMessageBytes(message) {
   if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-  return sigArr;
+  return signSolanaMessageBytes(wallet, message);
 }
 
 async function verifyTokenOwnershipForShare() {
@@ -402,15 +285,6 @@ async function verifyTokenOwnershipForShare() {
   return result;
 }
 
-function buildUnlockMessage({ housePubKey, nonce, origin }) {
-  return [
-    'ElizaTown House Unlock',
-    `housePubKey: ${housePubKey}`,
-    `origin: ${origin}`,
-    `nonce: ${nonce}`
-  ].join('\n');
-}
-
 function buildWalletLookupMessage({ address, nonce, houseId }) {
   const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
   if (houseId) parts.push(`houseId: ${houseId}`);
@@ -419,12 +293,6 @@ function buildWalletLookupMessage({ address, nonce, houseId }) {
 
 function buildTokenCheckMessage({ address, nonce }) {
   return ['ElizaTown Token Check', `address: ${address}`, `CA: ${TOKEN_MINT}`, `nonce: ${nonce}`].join('\n');
-}
-
-function buildKeyWrapMessage({ houseId, origin }) {
-  const parts = ['ElizaTown House Key Wrap', `houseId: ${houseId}`];
-  if (origin) parts.push(`origin: ${origin}`);
-  return parts.join('\n');
 }
 
 async function lookupWalletHouseId() {
@@ -946,19 +814,6 @@ function wipeKeys() {
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
   setUnlockButtonState(false);
-}
-
-async function deriveHouseEncKey(Kroot) {
-  const info = new TextEncoder().encode('elizatown-house-enc-v1');
-  const salt = new Uint8Array([]);
-  const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt, info },
-    baseKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
 }
 
 // Ceremony-only publish: house creation happens on /create.

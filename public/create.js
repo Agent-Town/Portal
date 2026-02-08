@@ -190,132 +190,13 @@ async function init() {
     return { wallet: window.solana, address: resp.publicKey.toString() };
   }
 
-  async function sha256(bytes) {
-    const digest = await crypto.subtle.digest('SHA-256', bytes);
-    return new Uint8Array(digest);
-  }
-
-  async function deriveHouseAuthKey(Kroot) {
-    const info = new TextEncoder().encode('elizatown-house-auth-v1');
-    const salt = new Uint8Array([]);
-    const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
-    const bits = await crypto.subtle.deriveBits(
-      { name: 'HKDF', hash: 'SHA-256', salt, info },
-      baseKey,
-      256
-    );
-    return new Uint8Array(bits);
-  }
+  const HP = window.HousesProtocol;
+  if (!HP) throw new Error('HOUSES_PROTOCOL_MISSING');
+  const { b64, unb64, sha256, base58Encode, aesGcmEncrypt, deriveHouseAuthKey, buildKeyWrapMessage, signMessageBytes } = HP;
 
   async function deriveRhFromCanvas(pxs) {
     const raw = new TextEncoder().encode(JSON.stringify({ v: 1, pixels: pxs }));
     return sha256(raw);
-  }
-
-  function b64(bytes) {
-    let bin = '';
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    return btoa(bin);
-  }
-
-  function base58Decode(str) {
-    if (!str || typeof str !== 'string') return null;
-    const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let num = 0n;
-    for (const ch of str) {
-      const idx = alphabet.indexOf(ch);
-      if (idx < 0) return null;
-      num = num * 58n + BigInt(idx);
-    }
-    const bytes = [];
-    while (num > 0n) {
-      bytes.push(Number(num & 0xffn));
-      num >>= 8n;
-    }
-    bytes.reverse();
-    let leadingZeros = 0;
-    for (let i = 0; i < str.length && str[i] === '1'; i++) leadingZeros++;
-    if (leadingZeros) {
-      return new Uint8Array(Array(leadingZeros).fill(0).concat(bytes));
-    }
-    return new Uint8Array(bytes);
-  }
-
-  function normalizeSignatureBytes(sig) {
-    if (sig instanceof Uint8Array) return sig;
-    if (sig instanceof ArrayBuffer) return new Uint8Array(sig);
-    if (ArrayBuffer.isView(sig)) return new Uint8Array(sig.buffer);
-    if (Array.isArray(sig)) return new Uint8Array(sig);
-    if (typeof sig === 'string') {
-      const b58 = base58Decode(sig);
-      if (b58 && b58.length === 64) return b58;
-      try {
-        const bin = atob(sig);
-        if (bin.length === 64) return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-      } catch {
-        // ignore
-      }
-    }
-    return null;
-  }
-
-  async function aesGcmEncrypt(key, plaintextBytes, aadBytes) {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt(
-      { name: 'AES-GCM', iv, additionalData: aadBytes || new Uint8Array([]) },
-      key,
-      plaintextBytes
-    );
-    return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
-  }
-
-  function buildKeyWrapMessage({ houseId, origin }) {
-    const parts = ['ElizaTown House Key Wrap', `houseId: ${houseId}`];
-    if (origin) parts.push(`origin: ${origin}`);
-    return parts.join('\n');
-  }
-
-  async function signMessageBytes(wallet, message) {
-    const msgBytes = new TextEncoder().encode(message);
-    const resp = await wallet.signMessage(msgBytes, 'utf8');
-    const sigBytes = resp?.signature || resp;
-    const sigArr = normalizeSignatureBytes(sigBytes);
-    if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-    return sigArr;
-  }
-
-  // (Ceremony houses) We store only a wallet-wrapped K_root (never raw).
-  // Wallet signature is still the UX "unlock" gate on /house.
-
-  function base58Encode(bytes) {
-    const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    if (!bytes || bytes.length === 0) return '';
-    const digits = [0];
-    for (let i = 0; i < bytes.length; i++) {
-      let carry = bytes[i];
-      for (let j = 0; j < digits.length; j++) {
-        carry += digits[j] << 8;
-        digits[j] = carry % 58;
-        carry = (carry / 58) | 0;
-      }
-      while (carry) {
-        digits.push(carry % 58);
-        carry = (carry / 58) | 0;
-      }
-    }
-    let out = '';
-    for (let k = 0; k < bytes.length && bytes[k] === 0; k++) out += '1';
-    for (let q = digits.length - 1; q >= 0; q--) out += B58[digits[q]];
-    return out;
-  }
-
-  function buildUnlockMessage({ housePubKey, nonce, origin }) {
-    return [
-      'ElizaTown House Unlock',
-      `housePubKey: ${housePubKey}`,
-      `origin: ${origin}`,
-      `nonce: ${nonce}`
-    ].join('\n');
   }
 
   el('shareBtn').addEventListener('click', async () => {
@@ -344,7 +225,7 @@ async function init() {
         if (!mat.agentReveal) {
           throw new Error('WAITING_AGENT_REVEAL');
         }
-        const Ra = Uint8Array.from(atob(mat.agentReveal), (c) => c.charCodeAt(0));
+        const Ra = unb64(mat.agentReveal);
 
         // 3) Derive Kroot = sha256(Rh||Ra) and houseId.
         const combo = new Uint8Array(Rh.length + Ra.length);
