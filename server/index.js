@@ -677,6 +677,20 @@ app.post('/api/agent/house/connect', (req, res) => {
   res.json({ ok: true, houseId });
 });
 
+// --- Agent interaction (MVP) ---
+// Simple, safe default: echo + light guidance. Can be wired to a real agent later.
+app.post('/api/agent/chat', (req, res) => {
+  const msg = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!msg) return res.status(400).json({ ok: false, error: 'MISSING_MESSAGE' });
+
+  const reply = (
+    "I’m your Agent Town guide (MVP). Right now I can’t execute actions from here yet — but I can help you navigate the ceremony/rooms/anchors.\n\n" +
+    `You said: ${msg}`
+  );
+
+  res.json({ ok: true, reply });
+});
+
 app.get('/api/agent/state', (req, res) => {
   const teamCode = typeof req.query?.teamCode === 'string' ? req.query.teamCode.trim() : '';
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });

@@ -731,9 +731,72 @@ async function init() {
     }
   });
 
+  // --- Agent drawer (MVP) ---
+  setupAgentDrawer();
+
   updateWalletUI();
   restoreWalletConnection();
   poll();
+}
+
+function setupAgentDrawer() {
+  const btn = el('agentDrawerBtn');
+  const closeBtn = el('agentDrawerCloseBtn');
+  const drawer = el('agentDrawer');
+  const backdrop = el('agentDrawerBackdrop');
+  const chat = el('agentChat');
+  const input = el('agentInput');
+  const sendBtn = el('agentSendBtn');
+
+  if (!btn || !closeBtn || !drawer || !backdrop || !chat || !input || !sendBtn) return;
+
+  function setOpen(open) {
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    drawer.classList.toggle('is-hidden', !open);
+    backdrop.classList.toggle('is-hidden', !open);
+    drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+    backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
+    if (open) setTimeout(() => input.focus(), 0);
+  }
+
+  function addMsg(text, role) {
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  async function send() {
+    const text = (input.value || '').trim();
+    if (!text) return;
+    input.value = '';
+    addMsg(text, 'user');
+    sendBtn.disabled = true;
+    try {
+      const res = await api('/api/agent/chat', { method: 'POST', body: JSON.stringify({ message: text }) });
+      const reply = res?.reply || '(no reply)';
+      addMsg(reply, 'agent');
+    } catch (e) {
+      addMsg(`Error: ${e.message}`, 'agent');
+    } finally {
+      sendBtn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', () => setOpen(true));
+  closeBtn.addEventListener('click', () => setOpen(false));
+  backdrop.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setOpen(false);
+  });
+  sendBtn.addEventListener('click', send);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') send();
+  });
+
+  // Seed
+  addMsg('What are you building today?', 'agent');
 }
 
 init().catch((e) => {

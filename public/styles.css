@@ -667,6 +667,79 @@ footer::before {
   border: 3px solid #3d2d1f;
 }
 
+/* --- Agent drawer (MVP) --- */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 12, 6, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(420px, 92vw);
+  background: #f2e0b6;
+  border-left: 3px solid #3d2d1f;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.35);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-head {
+  padding: 12px;
+  border-bottom: 3px solid #3d2d1f;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawer-body {
+  padding: 12px;
+  flex: 1;
+  overflow: auto;
+}
+
+.drawer-foot {
+  padding: 12px;
+  border-top: 3px solid #3d2d1f;
+  display: flex;
+  gap: 8px;
+}
+
+.drawer-foot .input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 3px solid #3d2d1f;
+  border-radius: 6px;
+  background: #fff3d9;
+  outline: none;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat .msg {
+  border: 3px solid #3d2d1f;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff3d9;
+}
+
+.chat .msg.user {
+  background: #f3d6a4;
+}
+
+.is-hidden { display: none !important; }
+
 @media (max-width: 720px) {
   .topbar {
     flex-direction: column;
