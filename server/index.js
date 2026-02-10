@@ -7,6 +7,10 @@ const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
+const { createPonyRouter } = require('./modules/pony/router');
+const { makeInboxMsg, MAYOR_HOUSE_ID } = require('./modules/pony/service');
+const { createHousesRouter } = require('./modules/houses/router');
+const { serializePublicMedia, buildShareMeta } = require('./modules/houses/service');
 const { emitMilestone } = require('./milestones');
 const { computeRewardsSummary } = require('./rewards');
 const {
@@ -513,108 +517,6 @@ function recordSignup(session, { mode, agentName = null, matchedElement = null, 
   return { complete: true, already: false, createdAt: record.createdAt };
 }
 
-function decodeB64(input) {
-  try {
-    return Buffer.from(input, 'base64');
-  } catch {
-    return null;
-  }
-}
-
-function parsePublicImageDataUrl(dataUrl) {
-  if (dataUrl == null || dataUrl === '') return { dataUrl: null };
-  if (typeof dataUrl !== 'string') return { error: 'INVALID_PUBLIC_IMAGE' };
-  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
-  if (!match) return { error: 'INVALID_PUBLIC_IMAGE' };
-  const mime = match[1];
-  const payload = match[2];
-  let bytes;
-  try {
-    bytes = Buffer.from(payload, 'base64');
-  } catch {
-    return { error: 'INVALID_PUBLIC_IMAGE' };
-  }
-  if (!bytes || bytes.length === 0) return { error: 'INVALID_PUBLIC_IMAGE' };
-  if (bytes.length > MAX_PUBLIC_IMAGE_BYTES) return { error: 'PUBLIC_IMAGE_TOO_LARGE' };
-  return { dataUrl, mime, bytes };
-}
-
-function normalizePublicPrompt(value) {
-  if (value == null) return null;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
-}
-
-function serializePublicMedia(house) {
-  const media = house?.publicMedia;
-  if (!media) return null;
-  const prompt = typeof media.prompt === 'string' ? media.prompt : null;
-  const image = typeof media.image === 'string' ? media.image : null;
-  if (!prompt && !image) return null;
-  const imageUrl = image
-    ? `/api/house/${encodeURIComponent(house.id)}/public-media/image${media.updatedAt ? `?v=${encodeURIComponent(media.updatedAt)}` : ''}`
-    : null;
-  return {
-    prompt,
-    imageUrl,
-    updatedAt: media.updatedAt || null
-  };
-}
-
-function escapeHtmlAttr(input) {
-  return String(input || '')
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function buildShareMeta({ shareId, publicMedia, origin }) {
-  const title = 'Agent Town — House Share';
-  const description = publicMedia?.prompt || 'Human + agent co-op house in Agent Town.';
-  const url = `${origin}/s/${encodeURIComponent(shareId)}`;
-  const imagePath = publicMedia?.imageUrl || '/logo.jpg';
-  const imageUrl = imagePath.startsWith('http')
-    ? imagePath
-    : `${origin}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
-  const card = publicMedia?.imageUrl ? 'summary_large_image' : 'summary';
-
-  return [
-    `<meta property="og:title" content="${escapeHtmlAttr(title)}" />`,
-    `<meta property="og:description" content="${escapeHtmlAttr(description)}" />`,
-    `<meta property="og:type" content="website" />`,
-    `<meta property="og:url" content="${escapeHtmlAttr(url)}" />`,
-    `<meta property="og:image" content="${escapeHtmlAttr(imageUrl)}" />`,
-    `<meta name="twitter:card" content="${escapeHtmlAttr(card)}" />`,
-    `<meta name="twitter:title" content="${escapeHtmlAttr(title)}" />`,
-    `<meta name="twitter:description" content="${escapeHtmlAttr(description)}" />`,
-    `<meta name="twitter:image" content="${escapeHtmlAttr(imageUrl)}" />`
-  ].join('\n  ');
-}
-
-function verifyHouseAuth(req, house) {
-  if (!house || !house.authKey) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
-  const ts = req.header('x-house-ts');
-  const auth = req.header('x-house-auth');
-  if (!ts || !auth) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
-  const tsNum = Number(ts);
-  if (!Number.isFinite(tsNum)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
-  const skew = Math.abs(Date.now() - tsNum);
-  if (skew > HOUSE_AUTH_SKEW_MS) return { ok: false, error: 'HOUSE_AUTH_EXPIRED' };
-  const key = decodeB64(house.authKey);
-  if (!key || key.length < 16) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
-  const bodyHash = sha256Base64(req.rawBody || '');
-  const msg = `${house.id}.${ts}.${req.method.toUpperCase()}.${req.path}.${bodyHash}`;
-  const expected = crypto.createHmac('sha256', key).update(msg).digest('base64');
-  const a = Buffer.from(expected, 'base64');
-  const b = Buffer.from(auth, 'base64');
-  if (a.length !== b.length) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
-  if (!crypto.timingSafeEqual(a, b)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
-  return { ok: true };
-}
-
 // --- API ---
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
@@ -773,6 +675,20 @@ app.post('/api/agent/house/connect', (req, res) => {
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.agent = true;
   res.json({ ok: true, houseId });
+});
+
+// --- Agent interaction (MVP) ---
+// Simple, safe default: echo + light guidance. Can be wired to a real agent later.
+app.post('/api/agent/chat', (req, res) => {
+  const msg = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  if (!msg) return res.status(400).json({ ok: false, error: 'MISSING_MESSAGE' });
+
+  const reply = (
+    "I’m your Agent Town guide (MVP). Right now I can’t execute actions from here yet — but I can help you navigate the ceremony/rooms/anchors.\n\n" +
+    `You said: ${msg}`
+  );
+
+  res.json({ ok: true, reply });
 });
 
 app.get('/api/agent/state', (req, res) => {
@@ -1068,6 +984,25 @@ app.post('/api/share/create', (req, res) => {
   };
 
   store.shares.push(record);
+
+  // Pony Express v0: Mayor welcome message when a new shareId (mailbox) is created.
+  store.inbox = Array.isArray(store.inbox) ? store.inbox : [];
+  const mayorBody = [
+    `Welcome, House ${shareId}.`,
+    `I'm the Mayor of Agent Town. You just claimed your address on these streets.`,
+    ``,
+    `Two ways to live here:`,
+    `1) Co-op: move in with a human + an agent.`,
+    `2) Solo: a house that stands on its own.`,
+    ``,
+    `Your first task: leave a sealed note at another house - introduce yourself in one sentence.`,
+    ``,
+    `- The Mayor`
+  ].join('\n');
+
+  store.inbox.push(
+    makeInboxMsg({ toHouseId: shareId, fromHouseId: MAYOR_HOUSE_ID, body: mayorBody, status: 'accepted' })
+  );
   writeStore(store);
 
   s.share.id = shareId;
@@ -1082,6 +1017,47 @@ app.post('/api/share/create', (req, res) => {
     sharePath: `/s/${shareId}`
   });
 });
+
+// --- Pony Express v0 API (module) ---
+const ponyStorePort = {
+  insertMsg: (msg) => {
+    const store = readStore();
+    store.inbox = Array.isArray(store.inbox) ? store.inbox : [];
+    store.inbox.push(msg);
+    writeStore(store);
+  },
+  listInbox: (toHouseId) => {
+    const store = readStore();
+    const inbox = Array.isArray(store.inbox) ? store.inbox : [];
+    return inbox
+      .filter((m) => m && m.toHouseId === toHouseId)
+      .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  },
+  getMsgById: (id) => {
+    const store = readStore();
+    const inbox = Array.isArray(store.inbox) ? store.inbox : [];
+    return inbox.find((m) => m && m.id === id) || null;
+  },
+  setMsgStatus: (id, status) => {
+    const store = readStore();
+    const inbox = Array.isArray(store.inbox) ? store.inbox : [];
+    const msg = inbox.find((m) => m && m.id === id) || null;
+    if (!msg) return false;
+    msg.status = status;
+    store.inbox = inbox;
+    writeStore(store);
+    return true;
+  }
+};
+
+const ponyAddressBookPort = {
+  destinationExists: (toHouseId) => {
+    const store = readStore();
+    return Array.isArray(store.shares) && store.shares.some((s) => s && s.id === toHouseId);
+  }
+};
+
+app.use('/api/pony', createPonyRouter({ ponyStorePort, addressBookPort: ponyAddressBookPort }));
 
 app.get('/api/share/:id', (req, res) => {
   const id = req.params.id;
@@ -1105,101 +1081,6 @@ app.get('/api/share/by-house/:houseId', (req, res) => {
   const rec = store.shares.find((x) => x.houseId === houseId);
   if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   res.json({ ok: true, shareId: rec.id, sharePath: `/s/${rec.id}` });
-});
-
-app.post('/api/house/:id/share', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-
-  let share = store.shares.find((x) => x.houseId === houseId);
-  const session = getSessionByHouseId(houseId);
-
-  if (!share) {
-    if (store.shares.length >= MAX_SHARES) {
-      return res.status(403).json({ ok: false, error: 'STORE_FULL' });
-    }
-    const shareId = `sh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    share = {
-      id: shareId,
-      createdAt: nowIso(),
-      matchedElement: session?.match?.elementId || null,
-      agentName: session?.agent?.name || 'OpenClaw',
-      mode: 'agent',
-      houseId,
-      xPostUrl: session?.human?.xPostUrl || null,
-      humanHandle: session?.human?.xHandle || null,
-      agentPosts: {
-        moltbookUrl: session?.agent?.posts?.moltbookUrl || null
-      },
-      referrals: 0,
-      locked: true,
-      lockedAt: nowIso(),
-      optIn: { human: true, agent: true },
-      public: false
-    };
-
-    store.shares.push(share);
-  }
-
-  ensurePublicTeamForShare(store, share, session);
-  writeStore(store);
-
-  if (session) {
-    session.share.id = share.id;
-    session.share.createdAt = share.createdAt;
-    session.human.optIn = true;
-    session.agent.optIn = true;
-  }
-
-  res.json({ ok: true, shareId: share.id, sharePath: `/s/${share.id}` });
-});
-
-app.post('/api/house/:id/posts', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-
-  const rawX = typeof req.body?.xPostUrl === 'string' ? req.body.xPostUrl.trim() : '';
-  const rawM = typeof req.body?.moltbookUrl === 'string' ? req.body.moltbookUrl.trim() : '';
-  const xPostUrl = rawX ? sanitizeUrl(rawX) : null;
-  const moltbookUrl = rawM ? sanitizeUrl(rawM) : null;
-  if (rawX && !xPostUrl) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
-  if (rawM && !moltbookUrl) return res.status(400).json({ ok: false, error: 'INVALID_URL' });
-
-  const share = store.shares.find((x) => x.houseId === houseId);
-  if (!share) return res.status(404).json({ ok: false, error: 'SHARE_NOT_FOUND' });
-
-  share.xPostUrl = xPostUrl;
-  share.humanHandle = extractXHandle(xPostUrl) || null;
-  share.agentPosts = share.agentPosts || {};
-  share.agentPosts.moltbookUrl = moltbookUrl;
-
-  const pub = store.publicTeams.find((p) => p.shareId === share.id);
-  if (pub) {
-    pub.xPostUrl = xPostUrl;
-    pub.humanHandle = share.humanHandle;
-    pub.agentPosts = pub.agentPosts || {};
-    pub.agentPosts.moltbookUrl = moltbookUrl;
-  }
-
-  const session = getSessionByHouseId(houseId);
-  if (session) {
-    session.human.xPostUrl = xPostUrl;
-    session.human.xHandle = share.humanHandle;
-    session.agent.posts.moltbookUrl = moltbookUrl;
-  }
-
-  writeStore(store);
-  res.json({ ok: true, shareId: share.id, sharePath: `/s/${share.id}` });
 });
 
 app.get('/api/agent/share/instructions', (req, res) => {
@@ -1377,78 +1258,51 @@ app.get('/api/wall', (_req, res) => {
 // --- Test-only reset endpoint ---
 if (process.env.NODE_ENV === 'test') {
   app.post('/__test__/reset', (_req, res) => {
-    const token = process.env.TEST_RESET_TOKEN;
-    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-    const header = _req.header('x-test-reset');
-    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], claims: [] });
-    resetAllSessions();
-    res.json({ ok: true });
-  });
-}
+	    const token = process.env.TEST_RESET_TOKEN;
+	    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+	    const header = _req.header('x-test-reset');
+	    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+	    writeStore({
+	      signups: [],
+	      shares: [],
+	      publicTeams: [],
+	      houses: [],
+	      inbox: [],
+	      claims: [],
+	      reservations: [],
+	      milestones: [],
+	      rewardsLedger: []
+	    });
+	    resetAllSessions();
+	    res.json({ ok: true });
+	  });
+	}
 
-// --- Houses (Phase 1 MVP) ---
-function makeNonce() {
-  return `n_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-}
-
-app.get('/api/house/nonce', (_req, res) => {
-  res.json({ ok: true, nonce: makeNonce() });
-});
-
-app.get('/api/wallet/nonce', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const nonce = `wn_${randomHex(16)}`;
-  s.walletLookupNonce = nonce;
-  res.json({ ok: true, nonce });
-});
-
-app.post('/api/wallet/lookup', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
-  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
-  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
-  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
-  if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
-  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
-  const usingNonce = !!nonce;
-  if (usingNonce) {
-    if (nonce !== s.walletLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
-    const msg = buildWalletLookupMessage({ address, nonce, houseId: houseId || null });
-    if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
-      return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
-    }
-    s.walletLookupNonce = null;
-  } else {
-    if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-    const msg = buildHouseKeyWrapMessage({ houseId });
-    if (!isTestMockAddress(address) && !verifySolanaSignature(address, msg, signature)) {
-      return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
-    }
-  }
-
-  const store = readStore();
-  let matches = store.houses.filter(
-    (r) => r && r.unlock && r.unlock.kind === 'solana-wallet-signature' && r.unlock.address === address
-  );
-  if (houseId) {
-    matches = matches.filter((r) => r.id === houseId);
-    if (!matches.length) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
-  }
-  if (!matches.length) return res.json({ ok: true, houseId: null, keyWrap: null });
-  matches.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-  const house = matches[matches.length - 1];
-  if (house?.id) {
-    s.houseCeremony.houseId = house.id;
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || house.createdAt || nowIso();
-    indexHouseId(s, house.id);
-  }
-  res.json({
-    ok: true,
-    houseId: house.id,
-    keyWrap: house.keyWrap || null
-  });
-});
+// --- Houses (module) ---
+app.use(
+  '/api',
+  createHousesRouter({
+    ensureHumanSession,
+    getSessionByTeamCode,
+    getSessionByHouseId,
+    indexHouseId,
+    readStore,
+    writeStore,
+    verifySolanaSignature,
+    recordSignup,
+    sanitizeUrl,
+    extractXHandle,
+    emitMilestone,
+    computeRewardsSummary,
+    MAX_HOUSE_ENTRIES,
+    MAX_HOUSES,
+    MAX_SHARES,
+    MAX_SIGNUPS,
+    HOUSE_AUTH_SKEW_MS,
+    MAX_PUBLIC_IMAGE_BYTES,
+    MAX_PUBLIC_PROMPT_CHARS
+  })
+);
 
 app.get('/api/token/nonce', (req, res) => {
   const s = ensureHumanSession(req, res);
@@ -1681,295 +1535,6 @@ app.post('/api/claim/x/verify', async (req, res) => {
 
   s.claim.x.verifiedAt = Date.now();
   res.json({ ok: true, verified: true, houseId: reservation.houseId, nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}` });
-});
-
-app.post('/api/house/init', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
-  const housePubKey = typeof req.body?.housePubKey === 'string' ? req.body.housePubKey.trim() : '';
-  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
-  const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
-  const unlock = req.body?.unlock || null;
-  const keyWrap = req.body?.keyWrap || null;
-  const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
-
-  if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
-  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
-  if (!houseAuthKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_AUTH' });
-  const authKeyBytes = decodeB64(houseAuthKey);
-  if (!authKeyBytes || authKeyBytes.length < 16) {
-    return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
-  }
-  const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
-  if (enforcedReserved && enforcedReserved !== houseId) {
-    return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
-  }
-
-  if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
-    return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
-  }
-
-  // Converged for today's publish: ceremony-only houses.
-  if (keyMode !== 'ceremony') {
-    return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
-  }
-
-  let normalizedKeyWrap = null;
-  if (keyWrap && typeof keyWrap === 'object') {
-    const alg = typeof keyWrap.alg === 'string' ? keyWrap.alg.trim() : '';
-    const iv = typeof keyWrap.iv === 'string' ? keyWrap.iv.trim() : '';
-    const ct = typeof keyWrap.ct === 'string' ? keyWrap.ct.trim() : '';
-    if (alg && iv && ct) {
-      if (alg !== 'AES-GCM') {
-        return res.status(400).json({ ok: false, error: 'INVALID_KEY_WRAP' });
-      }
-      normalizedKeyWrap = { alg, iv, ct };
-    }
-  }
-
-  const store = readStore();
-  if (store.houses.length >= MAX_HOUSES) {
-    return res.status(403).json({ ok: false, error: 'STORE_FULL' });
-  }
-  const exists = store.houses.find((r) => r.id === houseId);
-  if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
-
-  store.houses.push({
-    id: houseId,
-    housePubKey,
-    createdAt: nowIso(),
-    nonce,
-    keyMode: 'ceremony',
-    unlock,
-    keyWrap: normalizedKeyWrap,
-    authKey: houseAuthKey,
-    entries: []
-  });
-
-  emitMilestone(store, {
-    houseId,
-    event: 'CEREMONY_COMPLETED',
-    source: 'human',
-    value: 1,
-    meta: { reserved: !!enforcedReserved }
-  });
-
-  writeStore(store);
-
-  if (s && s.houseCeremony) {
-    s.houseCeremony.houseId = houseId;
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-    indexHouseId(s, houseId);
-  }
-
-  res.json({ ok: true, houseId });
-});
-
-app.get('/api/house/:id/meta', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  res.json({
-    ok: true,
-    houseId: house.id,
-    housePubKey: house.housePubKey,
-    nonce: house.nonce,
-    keyMode: 'ceremony'
-  });
-});
-
-app.get('/api/house/:id/descriptor', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-
-  const origin = `${req.protocol}://${req.get('host')}`;
-  res.json({
-    ok: true,
-    descriptor: {
-      v: 1,
-      kind: 'agent-town-house',
-      house: {
-        id: house.id,
-        pub: house.housePubKey,
-        mailboxes: [
-          {
-            chain: 'solana',
-            kind: 'pda',
-            status: 'placeholder',
-            address: 'PDA_TODO',
-            program: 'PROGRAM_TODO'
-          }
-        ]
-      },
-      endpoints: {
-        meta: `${origin}/api/house/${encodeURIComponent(house.id)}/meta`,
-        log: `${origin}/api/house/${encodeURIComponent(house.id)}/log`,
-        append: `${origin}/api/house/${encodeURIComponent(house.id)}/append`
-      },
-      ui: {
-        houseUrl: `${origin}/house?house=${encodeURIComponent(house.id)}`
-      }
-    }
-  });
-});
-
-app.get('/api/house/:id/log', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  res.json({ ok: true, entries: Array.isArray(house.entries) ? house.entries : [] });
-});
-
-app.get('/api/house/:id/public-media', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
-});
-
-app.get('/api/house/:id/rewards', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-
-  const summary = computeRewardsSummary(store, houseId);
-  res.json({ ok: true, ...summary });
-});
-
-app.get('/api/house/:id/public-media/image', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house || !house.publicMedia?.image) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const parsed = parsePublicImageDataUrl(house.publicMedia.image);
-  if (parsed.error || !parsed.bytes) return res.status(500).json({ ok: false, error: 'INVALID_PUBLIC_IMAGE' });
-  res.setHeader('Content-Type', parsed.mime || 'application/octet-stream');
-  res.setHeader('Cache-Control', 'public, max-age=300');
-  res.end(parsed.bytes);
-});
-
-app.post('/api/house/:id/public-media', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-
-  const body = req.body || {};
-  const hasImage = Object.prototype.hasOwnProperty.call(body, 'image');
-  const hasPrompt = Object.prototype.hasOwnProperty.call(body, 'prompt');
-  const clear = body?.clear === true;
-  if (!clear && !hasImage && !hasPrompt) {
-    return res.status(400).json({ ok: false, error: 'MISSING_PUBLIC_MEDIA' });
-  }
-
-  let nextImage = house.publicMedia?.image || null;
-  let nextPrompt = house.publicMedia?.prompt || null;
-
-  if (clear) {
-    nextImage = null;
-    nextPrompt = null;
-  }
-
-  if (hasImage) {
-    if (body.image == null || body.image === '') {
-      nextImage = null;
-    } else {
-      const parsed = parsePublicImageDataUrl(body.image);
-      if (parsed.error) return res.status(400).json({ ok: false, error: parsed.error });
-      nextImage = parsed.dataUrl;
-    }
-  }
-
-  if (hasPrompt) {
-    if (body.prompt != null && typeof body.prompt !== 'string') {
-      return res.status(400).json({ ok: false, error: 'INVALID_PUBLIC_PROMPT' });
-    }
-    nextPrompt = normalizePublicPrompt(body.prompt);
-  }
-
-  if (nextImage && !nextPrompt) {
-    return res.status(400).json({ ok: false, error: 'PUBLIC_PROMPT_REQUIRED' });
-  }
-  if (nextPrompt && !nextImage) {
-    return res.status(400).json({ ok: false, error: 'PUBLIC_IMAGE_REQUIRED' });
-  }
-
-  if (!nextImage && !nextPrompt) {
-    house.publicMedia = null;
-  } else {
-    house.publicMedia = {
-      image: nextImage,
-      prompt: nextPrompt,
-      updatedAt: nowIso()
-    };
-  }
-
-  writeStore(store);
-  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
-});
-
-app.post('/api/house/:id/append', (req, res) => {
-  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
-  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
-  const ciphertext = req.body?.ciphertext;
-  const author = typeof req.body?.author === 'string' ? req.body.author.trim() : 'unknown';
-  if (!ciphertext || typeof ciphertext.iv !== 'string' || typeof ciphertext.ct !== 'string') {
-    return res.status(400).json({ ok: false, error: 'INVALID_CIPHERTEXT' });
-  }
-
-  const store = readStore();
-  const house = store.houses.find((r) => r.id === houseId);
-  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const auth = verifyHouseAuth(req, house);
-  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
-  house.entries = Array.isArray(house.entries) ? house.entries : [];
-  if (house.entries.length >= MAX_HOUSE_ENTRIES) {
-    return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
-  }
-  house.entries.push({
-    id: `re_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    createdAt: nowIso(),
-    author,
-    ciphertext
-  });
-
-  const ctLen = typeof ciphertext.ct === 'string' ? ciphertext.ct.length : 0;
-  if (ctLen >= 32) {
-    emitMilestone(store, {
-      houseId,
-      event: 'HOUSE_APPEND',
-      source: 'human',
-      value: 1,
-      meta: { ctLen }
-    });
-  }
-
-  writeStore(store);
-  res.json({ ok: true });
 });
 
 // --- Static + routes ---

@@ -12,6 +12,8 @@ module.exports = defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   expect: { timeout: 8_000 },
+  // Tests share a single in-memory session map. Run serially for determinism.
+  workers: 1,
   fullyParallel: false,
   // This repo's server keeps session state in-memory; parallel workers can cross-contaminate.
   // Keep e2e deterministic by default.

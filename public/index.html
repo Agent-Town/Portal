@@ -26,9 +26,27 @@
         
         <a class="btn" href="/claim">Claim</a>
         <a class="btn" href="/leaderboard">Leaderboard</a>
+        <button class="btn" id="agentDrawerBtn" aria-controls="agentDrawer" aria-expanded="false" title="Talk to Agent">Agent</button>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
+
+    <!-- Agent drawer (MVP) -->
+    <div class="drawer-backdrop is-hidden" id="agentDrawerBackdrop" tabindex="-1" aria-hidden="true"></div>
+    <aside class="drawer is-hidden" id="agentDrawer" aria-label="Agent drawer" aria-hidden="true">
+      <div class="drawer-head">
+        <strong>Agent</strong>
+        <span class="small" style="color: var(--muted)">Ask questions, get guidance.</span>
+        <button class="btn" id="agentDrawerCloseBtn" aria-label="Close agent drawer">Close</button>
+      </div>
+      <div class="drawer-body">
+        <div class="chat" id="agentChat"></div>
+      </div>
+      <div class="drawer-foot">
+        <input class="input" id="agentInput" placeholder="Ask the agent…" />
+        <button class="btn primary" id="agentSendBtn">Send</button>
+      </div>
+    </aside>
     <div class="small" id="walletStatus" style="margin: -6px 0 10px; color: var(--muted); display:none;"></div>
 
     <div class="panel hero">
