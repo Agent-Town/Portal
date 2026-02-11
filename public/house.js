@@ -259,6 +259,27 @@ const WALLET_STORAGE_KEY = 'agentTownWallet';
 let publicMedia = null;
 let pendingPublicImage = null;
 
+function houseIdFromSearch() {
+  return new URLSearchParams(window.location.search).get('house');
+}
+
+function resolvedInboxHouseId() {
+  return (house && house.houseId) || houseIdFromSearch() || walletHouseId || null;
+}
+
+function syncInboxNavLink() {
+  const inboxNav = el('inboxNavLink');
+  if (!inboxNav) return;
+  const targetHouseId = resolvedInboxHouseId();
+  if (!targetHouseId) {
+    inboxNav.classList.add('is-hidden');
+    inboxNav.href = '#';
+    return;
+  }
+  inboxNav.href = `/inbox/${encodeURIComponent(targetHouseId)}`;
+  inboxNav.classList.remove('is-hidden');
+}
+
 function updateWalletUI() {
   const connected = !!walletAddr;
   const btn = el('connectWalletBtn');
@@ -328,6 +349,7 @@ function bindWalletEvents() {
       walletHouseId = null;
       updateWalletUI();
       saveWalletCache();
+      syncInboxNavLink();
       if (unlocked) {
         // Switching accounts should lock immediately; the unlock UX is per-wallet.
         wipeKeys();
@@ -397,6 +419,7 @@ async function connectWallet({ silent = false } = {}) {
 
   updateWalletUI();
   saveWalletCache();
+  syncInboxNavLink();
 }
 
 function clearClientFlowState() {
@@ -445,6 +468,7 @@ async function disconnectWallet({ fromProvider = false, resetSession = false } =
   walletHouseId = null;
   updateWalletUI();
   clearWalletCache();
+  syncInboxNavLink();
 
   // If the house was unlocked, disconnecting the wallet should also lock.
   // This avoids "sticky" unlocked state on shared devices.
@@ -573,6 +597,7 @@ async function lookupWalletHouseId() {
   if (lookup?.houseId) {
     walletHouseId = lookup.houseId;
     saveWalletCache();
+    syncInboxNavLink();
     return lookup.houseId;
   }
   return null;
@@ -586,11 +611,13 @@ async function restoreWalletConnection({ houseIdFromUrl } = {}) {
   } catch {
     clearWalletCache();
     updateWalletUI();
+    syncInboxNavLink();
     return;
   }
   if (cached.address !== walletAddr) {
     walletHouseId = null;
     saveWalletCache();
+    syncInboxNavLink();
     return;
   }
   if (!houseIdFromUrl && cached.houseId) {
@@ -598,6 +625,7 @@ async function restoreWalletConnection({ houseIdFromUrl } = {}) {
   }
   setStatus('Wallet connected.');
   saveWalletCache();
+  syncInboxNavLink();
 }
 
 let unlocked = false;
@@ -1078,11 +1106,7 @@ function wipeKeys() {
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
   setUnlockButtonState(false);
-  const inboxNav = el('inboxNavLink');
-  if (inboxNav) {
-    inboxNav.classList.add('is-hidden');
-    inboxNav.href = '#';
-  }
+  syncInboxNavLink();
 }
 
 async function deriveHouseEncKey(Kroot) {
@@ -1146,11 +1170,7 @@ async function unlockExistingHouse(houseId) {
   walletHouseId = house.houseId;
   saveWalletCache();
   cacheHouseAuthBytes(house.houseId, KauthBytes);
-  const inboxNav = el('inboxNavLink');
-  if (inboxNav) {
-    inboxNav.href = `/inbox/${encodeURIComponent(house.houseId)}`;
-    inboxNav.classList.remove('is-hidden');
-  }
+  syncInboxNavLink();
   setStatus(recovered ? 'Unlocked (wallet recovery).' : 'Unlocked.');
   setUnlockButtonState(true);
   armAutoLock();
@@ -2058,6 +2078,7 @@ async function init() {
   initSharePanel();
   updateWalletUI();
   setHousePanelButtonsEnabled(false);
+  syncInboxNavLink();
   setStatus('Ready. Connect wallet, then create or unlock a house.');
   restoreWalletConnection({ houseIdFromUrl: !!houseId });
 }
