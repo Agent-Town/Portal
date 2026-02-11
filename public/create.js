@@ -195,6 +195,19 @@ async function init() {
     return new Uint8Array(digest);
   }
 
+  const CEREMONY_E2EE_P256_AESGCM_V1 = 'CEREMONY_E2EE_P256_AESGCM_V1';
+
+  function unb64(str) {
+    try {
+      const bin = atob(str);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    } catch {
+      return null;
+    }
+  }
+
   async function deriveHouseAuthKey(Kroot) {
     const info = new TextEncoder().encode('elizatown-house-auth-v1');
     const salt = new Uint8Array([]);
@@ -205,6 +218,145 @@ async function init() {
       256
     );
     return new Uint8Array(bits);
+  }
+
+  function makeCeremonyRevealKeyInfo({ direction = '', teamCode = '' }) {
+    return `elizatown-ceremony-reveal-v1|dir=${direction}|team=${teamCode || ''}`;
+  }
+
+  async function deriveCeremonyRevealKey({ sharedSecret, direction, teamCode, usages = ['encrypt'] }) {
+    const baseKey = await crypto.subtle.importKey('raw', sharedSecret, 'HKDF', false, ['deriveKey']);
+    const info = new TextEncoder().encode(makeCeremonyRevealKeyInfo({ direction, teamCode }));
+    return crypto.subtle.deriveKey(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array([]), info },
+      baseKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      usages
+    );
+  }
+
+  async function encryptCeremonyReveal({ revealBytes, recipientRevealPub, direction, teamCode }) {
+    const recipientBytes = unb64(recipientRevealPub || '');
+    if (!recipientBytes || !recipientBytes.length) throw new Error('WAITING_AGENT_REVEAL');
+
+    const recipientPub = await crypto.subtle.importKey(
+      'spki',
+      recipientBytes,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      []
+    );
+    const eph = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits']
+    );
+    const sharedBits = await crypto.subtle.deriveBits(
+      { name: 'ECDH', public: recipientPub },
+      eph.privateKey,
+      256
+    );
+    const sharedSecret = new Uint8Array(sharedBits);
+    const key = await deriveCeremonyRevealKey({
+      sharedSecret,
+      direction,
+      teamCode,
+      usages: ['encrypt']
+    });
+
+    const aadBytes = new TextEncoder().encode(JSON.stringify({
+      v: 1,
+      direction,
+      teamCode: teamCode || null
+    }));
+    const plaintext = new TextEncoder().encode(JSON.stringify({
+      v: 1,
+      reveal: b64(revealBytes)
+    }));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ciphertext = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData: aadBytes },
+      key,
+      plaintext
+    );
+    const epk = new Uint8Array(await crypto.subtle.exportKey('spki', eph.publicKey));
+
+    return {
+      alg: CEREMONY_E2EE_P256_AESGCM_V1,
+      epk: b64(epk),
+      iv: b64(iv),
+      ct: b64(new Uint8Array(ciphertext)),
+      aad: b64(aadBytes)
+    };
+  }
+
+  async function decryptCeremonyReveal({ sealed, privateKey, direction, teamCode }) {
+    const epk = unb64(sealed?.epk || '');
+    const iv = unb64(sealed?.iv || '');
+    const ct = unb64(sealed?.ct || '');
+    const aad = unb64(sealed?.aad || '');
+    if (!epk || !iv || !ct || !aad) throw new Error('INVALID_REVEAL_ENVELOPE');
+
+    const peerPublic = await crypto.subtle.importKey(
+      'spki',
+      epk,
+      { name: 'ECDH', namedCurve: 'P-256' },
+      false,
+      []
+    );
+    const sharedBits = await crypto.subtle.deriveBits({ name: 'ECDH', public: peerPublic }, privateKey, 256);
+    const sharedSecret = new Uint8Array(sharedBits);
+    const decryptKey = await deriveCeremonyRevealKey({
+      sharedSecret,
+      direction,
+      teamCode,
+      usages: ['decrypt']
+    });
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: aad },
+      decryptKey,
+      ct
+    );
+    const decoded = JSON.parse(new TextDecoder().decode(new Uint8Array(plaintext)));
+    const reveal = unb64(decoded?.reveal || '');
+    if (!reveal || !reveal.length) throw new Error('INVALID_REVEAL_ENVELOPE');
+    return reveal;
+  }
+
+  async function derivePonyInboxWrapKey(Kroot) {
+    const info = new TextEncoder().encode('elizatown-pony-inbox-wrap-v1');
+    const salt = new Uint8Array([]);
+    const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-256', salt, info },
+      baseKey,
+      256
+    );
+    return new Uint8Array(bits);
+  }
+
+  async function makePonyInboxRegistration(Kroot) {
+    const pair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits']
+    );
+    const pub = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+    const priv = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+
+    const wrapKeyBytes = await derivePonyInboxWrapKey(Kroot);
+    const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+    const wrapped = await aesGcmEncrypt(wrapKey, priv);
+
+    return {
+      ponyInboxPub: b64(pub),
+      ponyInboxPrivWrap: {
+        alg: 'AES-GCM',
+        iv: b64(wrapped.iv),
+        ct: b64(wrapped.ct)
+      }
+    };
   }
 
   async function deriveRhFromCanvas(pxs) {
@@ -318,6 +470,9 @@ async function init() {
     ].join('\n');
   }
 
+  let ceremonyRevealPair = null;
+  let ceremonyRevealPub = '';
+
   el('shareBtn').addEventListener('click', async () => {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
@@ -327,24 +482,64 @@ async function init() {
         throw new Error('WALLET_MISMATCH');
       }
 
-      // 1) Human computes Rh from canvas and commits+reveals it.
+      // 1) Human computes Rh from canvas and commits with a reveal-exchange pubkey.
       const Rh = await deriveRhFromCanvas(pixels);
       const humanCommit = b64(await sha256(Rh));
-      const humanReveal = b64(Rh);
-      await api('/api/human/house/commit', { method: 'POST', body: JSON.stringify({ commit: humanCommit }) });
-      await api('/api/human/house/reveal', { method: 'POST', body: JSON.stringify({ reveal: humanReveal }) });
+      if (!tokenMode && !ceremonyRevealPair) {
+        ceremonyRevealPair = await crypto.subtle.generateKey(
+          { name: 'ECDH', namedCurve: 'P-256' },
+          true,
+          ['deriveBits']
+        );
+        const revealPubBytes = new Uint8Array(await crypto.subtle.exportKey('spki', ceremonyRevealPair.publicKey));
+        ceremonyRevealPub = b64(revealPubBytes);
+      }
+      await api('/api/human/house/commit', {
+        method: 'POST',
+        body: JSON.stringify({
+          commit: humanCommit,
+          revealPub: tokenMode ? undefined : ceremonyRevealPub
+        })
+      });
 
       let Kroot = null;
       if (tokenMode) {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {
-        // 2) Wait for agent reveal (agent contributes Ra) via agent endpoints.
+        // 2) Exchange sealed reveals and derive Kroot locally once agent payload is available.
         const mat = await api('/api/human/house/material');
-        if (!mat.agentReveal) {
+        if (!mat.agentCommit || !mat.agentRevealPub) {
           throw new Error('WAITING_AGENT_REVEAL');
         }
-        const Ra = Uint8Array.from(atob(mat.agentReveal), (c) => c.charCodeAt(0));
+
+        const sealedForAgent = await encryptCeremonyReveal({
+          revealBytes: Rh,
+          recipientRevealPub: mat.agentRevealPub,
+          direction: 'human_to_agent',
+          teamCode: st.teamCode
+        });
+        await api('/api/human/house/reveal', {
+          method: 'POST',
+          body: JSON.stringify({ sealedForAgent })
+        });
+
+        let matAfter = await api('/api/human/house/material');
+        for (let i = 0; i < 10 && !matAfter.agentRevealSealed; i++) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          matAfter = await api('/api/human/house/material');
+        }
+        if (!matAfter.agentRevealSealed) throw new Error('WAITING_AGENT_REVEAL');
+        const Ra = await decryptCeremonyReveal({
+          sealed: matAfter.agentRevealSealed,
+          privateKey: ceremonyRevealPair.privateKey,
+          direction: 'agent_to_human',
+          teamCode: st.teamCode
+        });
+        const expectedCommitBytes = await sha256(Ra);
+        if (b64(expectedCommitBytes) !== matAfter.agentCommit) {
+          throw new Error('COMMIT_MISMATCH');
+        }
 
         // 3) Derive Kroot = sha256(Rh||Ra) and houseId.
         const combo = new Uint8Array(Rh.length + Ra.length);
@@ -356,6 +551,7 @@ async function init() {
       const houseIdBytes = await sha256(Kroot);
       const housePubKey = base58Encode(houseIdBytes);
       const houseAuthKey = b64(await deriveHouseAuthKey(Kroot));
+      const ponyInbox = await makePonyInboxRegistration(Kroot);
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
       const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
@@ -380,7 +576,9 @@ async function init() {
           keyMode: 'ceremony',
           unlock: { kind: 'solana-wallet-signature', address },
           keyWrap,
-          houseAuthKey
+          houseAuthKey,
+          ponyInboxPub: ponyInbox.ponyInboxPub,
+          ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
         })
       });
 

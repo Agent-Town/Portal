@@ -30,19 +30,118 @@ function b64ToBytes(str) {
 
 // --- Pony Express v0 (inbox + sealed notes) ---
 const MAYOR_HOUSE_ID = 'npc_mayor';
+const CEREMONY_E2EE_P256_AESGCM_V1 = 'CEREMONY_E2EE_P256_AESGCM_V1';
+const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
+const PONY_MAX_PLAINTEXT_CT_BYTES = 4096;
+const PONY_MAX_E2EE_CT_BYTES = 32 * 1024;
+const PONY_MAX_E2EE_AAD_BYTES = 4096;
 
-function normalizePonyCiphertext(ciphertext, legacyBody = '') {
+function makePonyMsgKeyInfo({ fromHouseId = '', toHouseId = '' }) {
+  const from = typeof fromHouseId === 'string' ? fromHouseId : '';
+  const to = typeof toHouseId === 'string' ? toHouseId : '';
+  return `elizatown-pony-msg-v1|from=${from}|to=${to}`;
+}
+
+function normalizePonyCiphertextE2EE(ciphertext) {
+  const epk = typeof ciphertext.epk === 'string' ? ciphertext.epk.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const aad = typeof ciphertext.aad === 'string' ? ciphertext.aad.trim() : '';
+  if (!epk || !ct || !iv || !aad) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!isCanonicalBase64(epk) || !isCanonicalBase64(ct) || !isCanonicalBase64(iv) || !isCanonicalBase64(aad)) {
+    throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  }
+
+  const ivBytes = decodeB64(iv);
+  const ctBytes = decodeB64(ct);
+  const epkBytes = decodeB64(epk);
+  const aadBytes = decodeB64(aad);
+  if (!ivBytes || ivBytes.length < 8 || ivBytes.length > 32) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!ctBytes || ctBytes.length < 17 || ctBytes.length > PONY_MAX_E2EE_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
+  if (!epkBytes || epkBytes.length < 48 || epkBytes.length > 2048) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!aadBytes || !aadBytes.length || aadBytes.length > PONY_MAX_E2EE_AAD_BYTES) {
+    throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  }
+
+  return {
+    alg: PONY_E2EE_P256_AESGCM_V1,
+    epk,
+    iv,
+    ct,
+    aad
+  };
+}
+
+function normalizePonyCiphertext(ciphertext, legacyBody = '', opts = {}) {
+  const allowCustomAlg = opts && opts.allowCustomAlg === true;
   if (ciphertext && typeof ciphertext === 'object') {
     const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : '';
-    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct : '';
-    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv : '';
+    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
     if (!alg || !ct) throw new Error('INVALID_CIPHERTEXT');
+    if (alg === PONY_E2EE_P256_AESGCM_V1) return normalizePonyCiphertextE2EE(ciphertext);
+    if (alg !== 'PLAINTEXT') {
+      if (!allowCustomAlg) throw new Error('UNSUPPORTED_PONY_CIPHER');
+      return { alg, iv, ct };
+    }
+    if (Buffer.byteLength(ct, 'utf8') > PONY_MAX_PLAINTEXT_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
     return { alg, iv, ct };
   }
   if (typeof legacyBody === 'string' && legacyBody.trim()) {
+    if (Buffer.byteLength(legacyBody, 'utf8') > PONY_MAX_PLAINTEXT_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
     return { alg: 'PLAINTEXT', iv: '', ct: legacyBody };
   }
   throw new Error('MISSING_CIPHERTEXT');
+}
+
+function encryptPonyE2EEForHouse({ plaintext, fromHouseId = null, toHouseId, recipientPonyInboxPub, kind = 'msg.chat.v1', createdAt = nowIso() }) {
+  if (!toHouseId || typeof toHouseId !== 'string') throw new Error('INVALID_PONY_E2EE_TARGET');
+  if (!recipientPonyInboxPub || typeof recipientPonyInboxPub !== 'string') throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+  const recipientKeyDer = decodeB64(recipientPonyInboxPub);
+  if (!recipientKeyDer || !recipientKeyDer.length) throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+
+  let recipientPub;
+  try {
+    recipientPub = crypto.createPublicKey({ key: recipientKeyDer, format: 'der', type: 'spki' });
+  } catch {
+    throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+  }
+
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(crypto.hkdfSync('sha256', shared, Buffer.alloc(0), Buffer.from(makePonyMsgKeyInfo({
+    fromHouseId: fromHouseId || '',
+    toHouseId
+  }), 'utf8'), 32));
+  const iv = crypto.randomBytes(12);
+
+  const aadPayload = {
+    v: 1,
+    kind,
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt
+  };
+  const aadBytes = Buffer.from(JSON.stringify(aadPayload), 'utf8');
+  const plaintextPayload = Buffer.from(JSON.stringify({
+    v: 1,
+    body: String(plaintext || '')
+  }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aadBytes);
+  const enc = Buffer.concat([cipher.update(plaintextPayload), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const ct = Buffer.concat([enc, tag]);
+  const epkDer = eph.publicKey.export({ type: 'spki', format: 'der' });
+
+  return {
+    alg: PONY_E2EE_P256_AESGCM_V1,
+    epk: epkDer.toString('base64'),
+    iv: iv.toString('base64'),
+    ct: ct.toString('base64'),
+    aad: aadBytes.toString('base64')
+  };
 }
 
 function resolveHouseAddress(store, input) {
@@ -85,6 +184,8 @@ function makeDispatchReceiptId() {
 const PONY_RATE_WINDOW_MS = 60_000;
 const PONY_RATE_MAX_PER_PAIR = 20;
 const PONY_MAX_VAULT_EVENTS = 2000;
+const PONY_INBOX_KEY_VERSION = 1;
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const ponyRateBuckets = new Map();
 
 function normalizeHouseList(values) {
@@ -101,13 +202,17 @@ function normalizeHouseList(values) {
 
 function getHousePonyPolicy(house) {
   const policy = house?.ponyPolicy || {};
+  const hasPonyInbox = !!getHousePonyInboxKey(house);
   return {
     allowlist: normalizeHouseList(policy.allowlist),
     blocklist: normalizeHouseList(policy.blocklist),
     autoAcceptAllowlist: policy.autoAcceptAllowlist !== false,
     allowAnonymous: policy.allowAnonymous !== false,
     requirePostageAnonymous: policy.requirePostageAnonymous === true,
-    requireReceiptAnonymous: policy.requireReceiptAnonymous === true
+    requireReceiptAnonymous: policy.requireReceiptAnonymous === true,
+    allowLegacyPlaintext: typeof policy.allowLegacyPlaintext === 'boolean'
+      ? policy.allowLegacyPlaintext
+      : !hasPonyInbox
   };
 }
 
@@ -246,6 +351,191 @@ function ensureHouseVault(house) {
   if (!house || typeof house !== 'object') return [];
   if (!Array.isArray(house.ponyVault)) house.ponyVault = [];
   return house.ponyVault;
+}
+
+function normalizePonyFriendLabel(label) {
+  if (typeof label !== 'string') return null;
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  return trimmed.length > 64 ? trimmed.slice(0, 64) : trimmed;
+}
+
+function ensureHousePonyFriends(house) {
+  if (!house || typeof house !== 'object') return [];
+  if (!Array.isArray(house.ponyFriends)) house.ponyFriends = [];
+  house.ponyFriends = house.ponyFriends.filter(
+    (f) => f && typeof f === 'object' && typeof f.houseId === 'string' && f.houseId.trim()
+  );
+  return house.ponyFriends;
+}
+
+function deriveHousePonyFriendsFromAcceptedInbox(store, houseId) {
+  const out = new Set();
+  for (const m of store?.inbox || []) {
+    if (!m || m.status !== 'accepted') continue;
+    const from = typeof m.fromHouseId === 'string' ? m.fromHouseId : '';
+    const to = typeof m.toHouseId === 'string' ? m.toHouseId : '';
+
+    if (to === houseId && from && from !== houseId) out.add(from);
+    if (from === houseId && to && to !== houseId) out.add(to);
+  }
+  return [...out];
+}
+
+function isCanonicalBase64(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length % 4 !== 0) return false;
+  if (!BASE64_RE.test(trimmed)) return false;
+  const decoded = decodeB64(trimmed);
+  return !!(decoded && decoded.length);
+}
+
+function normalizeCeremonyCommit(value) {
+  const commit = typeof value === 'string' ? value.trim() : '';
+  if (!commit) throw new Error('MISSING_COMMIT');
+  if (!isCanonicalBase64(commit)) throw new Error('INVALID_COMMIT');
+  const bytes = decodeB64(commit);
+  if (!bytes || bytes.length !== 32) throw new Error('INVALID_COMMIT');
+  return commit;
+}
+
+function normalizeCeremonyRevealPub(value, { required = false } = {}) {
+  const pub = typeof value === 'string' ? value.trim() : '';
+  if (!pub) {
+    if (required) throw new Error('MISSING_REVEAL_PUB');
+    return null;
+  }
+  if (!isCanonicalBase64(pub)) throw new Error('INVALID_REVEAL_PUB');
+  const pubBytes = decodeB64(pub);
+  if (!pubBytes || pubBytes.length < 48 || pubBytes.length > 2048) throw new Error('INVALID_REVEAL_PUB');
+  try {
+    crypto.createPublicKey({ key: pubBytes, format: 'der', type: 'spki' });
+  } catch {
+    throw new Error('INVALID_REVEAL_PUB');
+  }
+  return pub;
+}
+
+function normalizeCeremonySealedReveal(sealed, { required = false } = {}) {
+  if (sealed == null) {
+    if (required) throw new Error('MISSING_REVEAL');
+    return null;
+  }
+  if (!sealed || typeof sealed !== 'object' || Array.isArray(sealed)) {
+    throw new Error('INVALID_REVEAL_ENVELOPE');
+  }
+
+  const alg = typeof sealed.alg === 'string' ? sealed.alg.trim() : '';
+  const epk = typeof sealed.epk === 'string' ? sealed.epk.trim() : '';
+  const iv = typeof sealed.iv === 'string' ? sealed.iv.trim() : '';
+  const ct = typeof sealed.ct === 'string' ? sealed.ct.trim() : '';
+  const aad = typeof sealed.aad === 'string' ? sealed.aad.trim() : '';
+
+  if (alg !== CEREMONY_E2EE_P256_AESGCM_V1 || !epk || !iv || !ct || !aad) {
+    throw new Error('INVALID_REVEAL_ENVELOPE');
+  }
+  if (!isCanonicalBase64(epk) || !isCanonicalBase64(iv) || !isCanonicalBase64(ct) || !isCanonicalBase64(aad)) {
+    throw new Error('INVALID_REVEAL_ENVELOPE');
+  }
+
+  const epkBytes = decodeB64(epk);
+  const ivBytes = decodeB64(iv);
+  const ctBytes = decodeB64(ct);
+  const aadBytes = decodeB64(aad);
+  if (!epkBytes || epkBytes.length < 48 || epkBytes.length > 2048) throw new Error('INVALID_REVEAL_ENVELOPE');
+  if (!ivBytes || ivBytes.length !== 12) throw new Error('INVALID_REVEAL_ENVELOPE');
+  if (!ctBytes || ctBytes.length < 17 || ctBytes.length > 4096) throw new Error('INVALID_REVEAL_ENVELOPE');
+  if (!aadBytes || !aadBytes.length || aadBytes.length > 1024) throw new Error('INVALID_REVEAL_ENVELOPE');
+
+  return { alg, epk, iv, ct, aad };
+}
+
+function normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required = false } = {}) {
+  if (ponyInboxPrivWrap == null) {
+    if (required) throw new Error('MISSING_PONY_INBOX_PRIV_WRAP');
+    return null;
+  }
+  if (!ponyInboxPrivWrap || typeof ponyInboxPrivWrap !== 'object' || Array.isArray(ponyInboxPrivWrap)) {
+    throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  }
+
+  const alg = typeof ponyInboxPrivWrap.alg === 'string' ? ponyInboxPrivWrap.alg.trim() : '';
+  const iv = typeof ponyInboxPrivWrap.iv === 'string' ? ponyInboxPrivWrap.iv.trim() : '';
+  const ct = typeof ponyInboxPrivWrap.ct === 'string' ? ponyInboxPrivWrap.ct.trim() : '';
+  if (alg !== 'AES-GCM' || !iv || !ct) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  if (!isCanonicalBase64(iv) || !isCanonicalBase64(ct)) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+
+  const ivBytes = decodeB64(iv);
+  const ctBytes = decodeB64(ct);
+  if (!ivBytes || ivBytes.length < 8 || ivBytes.length > 32) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  if (!ctBytes || ctBytes.length < 16) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+
+  return { alg: 'AES-GCM', iv, ct };
+}
+
+function normalizePonyInboxRegistration({ ponyInboxPub, ponyInboxPrivWrap }, { required = false } = {}) {
+  const pub = typeof ponyInboxPub === 'string' ? ponyInboxPub.trim() : '';
+  const hasPub = !!pub;
+  const hasPrivWrap = ponyInboxPrivWrap != null;
+
+  if (!hasPub && !hasPrivWrap) {
+    if (required) throw new Error('MISSING_PONY_INBOX_PUB');
+    return null;
+  }
+  if (!hasPub) throw new Error('MISSING_PONY_INBOX_PUB');
+  if (!isCanonicalBase64(pub)) throw new Error('INVALID_PONY_INBOX_PUB');
+
+  const pubBytes = decodeB64(pub);
+  if (!pubBytes || pubBytes.length < 48 || pubBytes.length > 2048) throw new Error('INVALID_PONY_INBOX_PUB');
+
+  const privWrap = normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required: true });
+  return {
+    version: PONY_INBOX_KEY_VERSION,
+    pub,
+    privWrap
+  };
+}
+
+function getHousePonyInboxKey(house) {
+  if (!house || typeof house !== 'object') return null;
+  const ponyInbox = house.ponyInbox;
+  if (!ponyInbox || typeof ponyInbox !== 'object') return null;
+
+  const pub = typeof ponyInbox.pub === 'string' ? ponyInbox.pub.trim() : '';
+  if (!pub) return null;
+
+  const versionRaw = Number(ponyInbox.version);
+  const version = Number.isFinite(versionRaw) && versionRaw >= 1 ? Math.floor(versionRaw) : PONY_INBOX_KEY_VERSION;
+
+  let privWrap = null;
+  if (ponyInbox.privWrap && typeof ponyInbox.privWrap === 'object') {
+    const alg = typeof ponyInbox.privWrap.alg === 'string' ? ponyInbox.privWrap.alg.trim() : '';
+    const iv = typeof ponyInbox.privWrap.iv === 'string' ? ponyInbox.privWrap.iv.trim() : '';
+    const ct = typeof ponyInbox.privWrap.ct === 'string' ? ponyInbox.privWrap.ct.trim() : '';
+    if (alg === 'AES-GCM' && iv && ct) privWrap = { alg, iv, ct };
+  }
+
+  return {
+    version,
+    pub,
+    privWrap,
+    createdAt: typeof ponyInbox.createdAt === 'string' ? ponyInbox.createdAt : null,
+    updatedAt: typeof ponyInbox.updatedAt === 'string' ? ponyInbox.updatedAt : null
+  };
+}
+
+function writeHousePonyInboxKey(house, registration) {
+  if (!house || typeof house !== 'object' || !registration) return;
+  const existing = getHousePonyInboxKey(house);
+  const now = nowIso();
+  house.ponyInbox = {
+    version: registration.version || PONY_INBOX_KEY_VERSION,
+    pub: registration.pub,
+    privWrap: registration.privWrap,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  };
 }
 
 function computeVaultEventHash(event) {
@@ -1225,8 +1515,10 @@ app.get('/api/agent/house/state', (req, res) => {
     ceremony: {
       humanCommit: !!s.houseCeremony?.humanCommit,
       agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanReveal,
-      agentReveal: !!s.houseCeremony?.agentReveal,
+      humanReveal: !!s.houseCeremony?.humanRevealSealed,
+      agentReveal: !!s.houseCeremony?.agentRevealSealed,
+      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
+      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
       houseId: s.houseCeremony?.houseId || null
     }
   });
@@ -1234,88 +1526,82 @@ app.get('/api/agent/house/state', (req, res) => {
 
 app.post('/api/agent/house/commit', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
-  const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
+  const commitRaw = req.body?.commit;
+  const revealPubRaw = req.body?.revealPub;
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
-  if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+
+  let commit;
+  let revealPub;
+  try {
+    commit = normalizeCeremonyCommit(commitRaw);
+    revealPub = normalizeCeremonyRevealPub(revealPubRaw, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
+  }
+
   s.houseCeremony.agentCommit = commit;
-  res.json({ ok: true });
+  if (revealPub) s.houseCeremony.agentRevealPub = revealPub;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+  res.json({ ok: true, agentRevealPub: s.houseCeremony.agentRevealPub || null });
 });
 
 app.post('/api/agent/house/reveal', (req, res) => {
   const teamCode = typeof req.body?.teamCode === 'string' ? req.body.teamCode.trim() : '';
-  const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
+  const sealedRaw = req.body?.sealedForHuman || req.body?.sealedReveal || req.body?.sealed || null;
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
-  if (!reveal) return res.status(400).json({ ok: false, error: 'MISSING_REVEAL' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  if (!s.houseCeremony?.humanCommit) return res.status(409).json({ ok: false, error: 'WAITING_HUMAN_COMMIT' });
+  if (!s.houseCeremony?.humanRevealPub) return res.status(409).json({ ok: false, error: 'WAITING_HUMAN_REVEAL_PUB' });
 
-  // Verify reveal matches commit if present.
-  const ra = b64ToBytes(reveal);
-  const ch = bytesToB64(sha256Bytes(ra));
-  if (s.houseCeremony.agentCommit && s.houseCeremony.agentCommit !== ch) {
-    return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
+  let sealed;
+  try {
+    sealed = normalizeCeremonySealedReveal(sealedRaw, { required: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_REVEAL_ENVELOPE') });
   }
 
-  s.houseCeremony.agentReveal = reveal;
-
-  if (s.flow === 'agent_solo') {
-    // Solo flow: derive houseId from agent entropy only.
-    const kroot = sha256Bytes(ra);
-    const houseIdBytes = sha256Bytes(kroot);
-    s.houseCeremony.houseId = base58Encode(houseIdBytes);
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-    indexHouseId(s, s.houseCeremony.houseId);
-  } else if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
-    // Co-op: derive houseId from Rh||Ra.
-    const rh = b64ToBytes(s.houseCeremony.humanReveal);
-    const combo = new Uint8Array(rh.length + ra.length);
-    combo.set(rh, 0);
-    combo.set(ra, rh.length);
-    const kroot = sha256Bytes(combo);
-    const houseIdBytes = sha256Bytes(kroot);
-    s.houseCeremony.houseId = base58Encode(houseIdBytes);
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-    indexHouseId(s, s.houseCeremony.houseId);
-  }
+  s.houseCeremony.agentRevealSealed = sealed;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
 
   res.json({ ok: true, houseId: s.houseCeremony.houseId || null });
 });
 
 app.post('/api/human/house/commit', (req, res) => {
   const s = ensureHumanSession(req, res);
-  const commit = typeof req.body?.commit === 'string' ? req.body.commit.trim() : '';
-  if (!commit) return res.status(400).json({ ok: false, error: 'MISSING_COMMIT' });
+  const commitRaw = req.body?.commit;
+  const revealPubRaw = req.body?.revealPub;
+  let commit;
+  let revealPub;
+  try {
+    commit = normalizeCeremonyCommit(commitRaw);
+    revealPub = normalizeCeremonyRevealPub(revealPubRaw, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_CEREMONY_COMMIT') });
+  }
   s.houseCeremony.humanCommit = commit;
-  res.json({ ok: true });
+  if (revealPub) s.houseCeremony.humanRevealPub = revealPub;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
+  res.json({ ok: true, humanRevealPub: s.houseCeremony.humanRevealPub || null });
 });
 
 app.post('/api/human/house/reveal', (req, res) => {
   const s = ensureHumanSession(req, res);
-  const reveal = typeof req.body?.reveal === 'string' ? req.body.reveal.trim() : '';
-  if (!reveal) return res.status(400).json({ ok: false, error: 'MISSING_REVEAL' });
+  const sealedRaw = req.body?.sealedForAgent || req.body?.sealedReveal || req.body?.sealed || null;
+  if (!s.houseCeremony?.agentCommit) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_COMMIT' });
+  if (!s.houseCeremony?.agentRevealPub) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_REVEAL_PUB' });
 
-  const rh = b64ToBytes(reveal);
-  const ch = bytesToB64(sha256Bytes(rh));
-  if (s.houseCeremony.humanCommit && s.houseCeremony.humanCommit !== ch) {
-    return res.status(400).json({ ok: false, error: 'COMMIT_MISMATCH' });
+  let sealed;
+  try {
+    sealed = normalizeCeremonySealedReveal(sealedRaw, { required: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_REVEAL_ENVELOPE') });
   }
 
-  s.houseCeremony.humanReveal = reveal;
-
-  // If both reveals exist, compute houseId.
-  if (s.houseCeremony.humanReveal && s.houseCeremony.agentReveal) {
-    const ra = b64ToBytes(s.houseCeremony.agentReveal);
-    const combo = new Uint8Array(rh.length + ra.length);
-    combo.set(rh, 0);
-    combo.set(ra, rh.length);
-    const kroot = sha256Bytes(combo);
-    const houseIdBytes = sha256Bytes(kroot);
-    s.houseCeremony.houseId = base58Encode(houseIdBytes);
-    s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
-    indexHouseId(s, s.houseCeremony.houseId);
-  }
+  s.houseCeremony.humanRevealSealed = sealed;
+  s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
 
   res.json({ ok: true, houseId: s.houseCeremony.houseId || null });
 });
@@ -1327,8 +1613,10 @@ app.get('/api/human/house/state', (req, res) => {
     ceremony: {
       humanCommit: !!s.houseCeremony?.humanCommit,
       agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanReveal,
-      agentReveal: !!s.houseCeremony?.agentReveal,
+      humanReveal: !!s.houseCeremony?.humanRevealSealed,
+      agentReveal: !!s.houseCeremony?.agentRevealSealed,
+      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
+      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
       houseId: s.houseCeremony?.houseId || null
     }
   });
@@ -1339,8 +1627,11 @@ app.get('/api/human/house/material', (req, res) => {
   res.json({
     ok: true,
     houseId: s.houseCeremony?.houseId || null,
-    humanReveal: s.houseCeremony?.humanReveal || null,
-    agentReveal: s.houseCeremony?.agentReveal || null
+    humanCommit: s.houseCeremony?.humanCommit || null,
+    agentCommit: s.houseCeremony?.agentCommit || null,
+    humanRevealPub: s.houseCeremony?.humanRevealPub || null,
+    agentRevealPub: s.houseCeremony?.agentRevealPub || null,
+    agentRevealSealed: s.houseCeremony?.agentRevealSealed || null
   });
 });
 
@@ -1349,7 +1640,15 @@ app.get('/api/agent/house/material', (req, res) => {
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
-  res.json({ ok: true, houseId: s.houseCeremony?.houseId || null, humanReveal: s.houseCeremony?.humanReveal || null });
+  res.json({
+    ok: true,
+    houseId: s.houseCeremony?.houseId || null,
+    humanCommit: s.houseCeremony?.humanCommit || null,
+    agentCommit: s.houseCeremony?.agentCommit || null,
+    humanRevealPub: s.houseCeremony?.humanRevealPub || null,
+    agentRevealPub: s.houseCeremony?.agentRevealPub || null,
+    humanRevealSealed: s.houseCeremony?.humanRevealSealed || null
+  });
 });
 
 // Share creation + retrieval
@@ -1366,7 +1665,8 @@ app.post('/api/share/create', (req, res) => {
   }
   if (!s.houseCeremony?.houseId) return res.status(403).json({ ok: false, error: 'HOUSE_NOT_READY' });
   if (!tokenMode) {
-    if (!s.houseCeremony?.humanReveal || !s.houseCeremony?.agentReveal) {
+    if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
+      || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
     }
     if (!s.agent?.connected) return res.status(403).json({ ok: false, error: 'AGENT_REQUIRED' });
@@ -1413,6 +1713,8 @@ app.post('/api/share/create', (req, res) => {
   // Pony Express v0: Mayor welcome message on house registration.
   const mayorTargetHouseId = record.houseId;
   if (mayorTargetHouseId) {
+    const mayorTarget = store.houses.find((h) => h && h.id === mayorTargetHouseId) || null;
+    const mayorTargetPony = getHousePonyInboxKey(mayorTarget);
     const mayorBody = [
       `Welcome, House ${mayorTargetHouseId}.`,
       `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
@@ -1426,14 +1728,34 @@ app.post('/api/share/create', (req, res) => {
       `— The Mayor`
     ].join('\n');
 
-    store.inbox.push(
-      makeInboxMsg({
-        toHouseId: mayorTargetHouseId,
-        fromHouseId: MAYOR_HOUSE_ID,
-        ciphertext: { alg: 'PLAINTEXT', iv: '', ct: mayorBody },
-        status: 'accepted'
-      })
-    );
+    let mayorCiphertext = null;
+    if (mayorTargetPony?.pub) {
+      try {
+        mayorCiphertext = encryptPonyE2EEForHouse({
+          plaintext: mayorBody,
+          fromHouseId: MAYOR_HOUSE_ID,
+          toHouseId: mayorTargetHouseId,
+          recipientPonyInboxPub: mayorTargetPony.pub,
+          createdAt: nowIso()
+        });
+      } catch {
+        mayorCiphertext = null;
+      }
+    } else {
+      // Migration fallback for old houses that do not publish Pony inbox keys.
+      mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
+    }
+
+    if (mayorCiphertext) {
+      store.inbox.push(
+        makeInboxMsg({
+          toHouseId: mayorTargetHouseId,
+          fromHouseId: MAYOR_HOUSE_ID,
+          ciphertext: mayorCiphertext,
+          status: 'accepted'
+        })
+      );
+    }
   }
 
   writeStore(store);
@@ -1474,12 +1796,61 @@ app.get('/api/pony/resolve', (req, res) => {
   if (houseAddress) {
     const resolved = resolveHouseAddress(store, houseAddress);
     if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
-    return res.json({ ok: true, houseId: resolved.houseId, source: resolved.source || 'house' });
+    const ponyInbox = getHousePonyInboxKey(resolved.house);
+    return res.json({
+      ok: true,
+      houseId: resolved.houseId,
+      source: resolved.source || 'house',
+      ponyInboxPub: ponyInbox?.pub || null,
+      ponyInboxKeyVersion: ponyInbox?.version || null
+    });
   }
 
   const resolvedByAnchor = resolveHouseByErc8004Id(store, erc8004Id);
   if (!resolvedByAnchor) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  return res.json({ ok: true, houseId: resolvedByAnchor.houseId, source: 'anchor', erc8004Id });
+  const ponyInbox = getHousePonyInboxKey(resolvedByAnchor.house);
+  return res.json({
+    ok: true,
+    houseId: resolvedByAnchor.houseId,
+    source: 'anchor',
+    erc8004Id,
+    ponyInboxPub: ponyInbox?.pub || null,
+    ponyInboxKeyVersion: ponyInbox?.version || null
+  });
+});
+
+app.post('/api/pony/keys/register', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  let registration;
+  try {
+    registration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
+  }
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  writeHousePonyInboxKey(resolved.house, registration);
+  writeStore(store);
+
+  return res.json({
+    ok: true,
+    houseId: resolved.houseId,
+    ponyInboxPub: registration.pub,
+    ponyInboxKeyVersion: registration.version
+  });
 });
 
 app.post('/api/pony/send', (req, res) => {
@@ -1521,11 +1892,18 @@ app.post('/api/pony/send', (req, res) => {
     if (msg === 'INVALID_TRANSPORT') {
       return res.status(400).json({ ok: false, error: msg });
     }
+    if (msg === 'UNSUPPORTED_PONY_CIPHER' || msg === 'PONY_CIPHERTEXT_TOO_LARGE') {
+      return res.status(400).json({ ok: false, error: msg });
+    }
     return res.status(400).json({ ok: false, error: msg || 'INVALID_CIPHERTEXT' });
   }
 
   const policy = getHousePonyPolicy(toResolved.house);
   const senderHouseId = fromResolved?.houseId || null;
+
+  if (normalizedCiphertext.alg === 'PLAINTEXT' && !policy.allowLegacyPlaintext) {
+    return res.status(400).json({ ok: false, error: 'PONY_CIPHERTEXT_REQUIRED' });
+  }
 
   if (!senderHouseId && !policy.allowAnonymous) {
     return res.status(403).json({ ok: false, error: 'ANONYMOUS_NOT_ALLOWED' });
@@ -1657,8 +2035,15 @@ app.get('/api/pony/inbox', (req, res) => {
   const items = store.inbox
     .filter((m) => m.toHouseId === resolved.houseId)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const ponyInbox = getHousePonyInboxKey(resolved.house);
 
-  res.json({ ok: true, houseId: resolved.houseId, inbox: items });
+  res.json({
+    ok: true,
+    houseId: resolved.houseId,
+    inbox: items,
+    ponyInboxPrivWrap: ponyInbox?.privWrap || null,
+    ponyInboxKeyVersion: ponyInbox?.version || null
+  });
 });
 
 app.get('/api/pony/policy', (req, res) => {
@@ -1693,7 +2078,9 @@ app.post('/api/pony/policy', (req, res) => {
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
 
   try {
-    const nextPolicy = getHousePonyPolicy({ ponyPolicy: resolved.house.ponyPolicy || {} });
+    // Seed from the resolved house so defaults that depend on house state (e.g. ponyInbox presence)
+    // are preserved when patching only a subset of policy fields.
+    const nextPolicy = getHousePonyPolicy(resolved.house);
 
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowlist')) {
       nextPolicy.allowlist = normalizePolicyHouseEntries(store, req.body.allowlist);
@@ -1713,6 +2100,9 @@ app.post('/api/pony/policy', (req, res) => {
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'requireReceiptAnonymous')) {
       nextPolicy.requireReceiptAnonymous = req.body.requireReceiptAnonymous === true;
     }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowLegacyPlaintext')) {
+      nextPolicy.allowLegacyPlaintext = req.body.allowLegacyPlaintext === true;
+    }
 
     resolved.house.ponyPolicy = nextPolicy;
     writeStore(store);
@@ -1725,6 +2115,89 @@ app.post('/api/pony/policy', (req, res) => {
     }
     return res.status(400).json({ ok: false, error: 'INVALID_POLICY' });
   }
+});
+
+app.get('/api/pony/friends', (req, res) => {
+  const houseAddress = typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '';
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const derived = deriveHousePonyFriendsFromAcceptedInbox(store, resolved.houseId);
+  const manual = ensureHousePonyFriends(resolved.house);
+
+  const friendMap = new Map();
+  for (const friendHouseId of derived) {
+    friendMap.set(friendHouseId, { houseId: friendHouseId, sources: ['accepted'] });
+  }
+
+  for (const f of manual) {
+    const friendHouseId = typeof f?.houseId === 'string' ? f.houseId.trim() : '';
+    if (!friendHouseId || friendHouseId === resolved.houseId) continue;
+
+    const prev = friendMap.get(friendHouseId);
+    const sources = new Set(Array.isArray(prev?.sources) ? prev.sources : []);
+    sources.add('manual');
+    if (prev?.sources?.includes?.('accepted')) sources.add('accepted');
+
+    friendMap.set(friendHouseId, {
+      houseId: friendHouseId,
+      sources: [...sources],
+      label: normalizePonyFriendLabel(f?.label),
+      addedAt: typeof f?.addedAt === 'string' ? f.addedAt : null,
+      erc8004Id: typeof f?.erc8004Id === 'string' ? f.erc8004Id : null
+    });
+  }
+
+  const friends = [...friendMap.values()].sort((a, b) => String(a.houseId).localeCompare(String(b.houseId)));
+  return res.json({ ok: true, houseId: resolved.houseId, friends });
+});
+
+app.post('/api/pony/friends', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  const friendHouseAddress = typeof req.body?.friendHouseId === 'string' ? req.body.friendHouseId.trim() : '';
+  const friendErc8004Id = typeof req.body?.friendErc8004Id === 'string' ? req.body.friendErc8004Id.trim() : '';
+  if (!friendHouseAddress && !friendErc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_FRIEND' });
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  let friendResolved = null;
+  if (friendHouseAddress) friendResolved = resolveHouseAddress(store, friendHouseAddress);
+  if (!friendResolved && friendErc8004Id) friendResolved = resolveHouseByErc8004Id(store, friendErc8004Id);
+  if (!friendResolved) return res.status(404).json({ ok: false, error: 'FRIEND_NOT_FOUND' });
+  if (friendResolved.houseId === resolved.houseId) return res.status(400).json({ ok: false, error: 'SELF_FRIEND' });
+
+  const label = normalizePonyFriendLabel(req.body?.label);
+  const friends = ensureHousePonyFriends(resolved.house);
+  const existing = friends.find((f) => f && f.houseId === friendResolved.houseId) || null;
+  if (existing) {
+    if (label) existing.label = label;
+    if (!existing.erc8004Id && friendResolved.erc8004Id) existing.erc8004Id = friendResolved.erc8004Id;
+  } else {
+    friends.unshift({
+      houseId: friendResolved.houseId,
+      erc8004Id: friendResolved.erc8004Id || null,
+      label: label || null,
+      addedAt: nowIso()
+    });
+  }
+
+  writeStore(store);
+  return res.json({ ok: true, houseId: resolved.houseId, friend: { houseId: friendResolved.houseId } });
 });
 
 app.get('/api/pony/vault', (req, res) => {
@@ -1767,7 +2240,7 @@ app.post('/api/pony/vault/append', (req, res) => {
   let refsMeta = [];
   const kind = typeof req.body?.kind === 'string' && req.body.kind.trim() ? req.body.kind.trim() : 'vault.append.v1';
   try {
-    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body);
+    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body, { allowCustomAlg: true });
     normalizedPostage = normalizePonyPostage(req.body?.postage);
     refsMeta = normalizeVaultRefsMeta(refs, req.body?.refsMeta, 16, MAX_VAULT_REF_BYTES);
     ponyPostageVerifier.verify({
@@ -2398,6 +2871,7 @@ app.post('/api/house/init', (req, res) => {
   const unlock = req.body?.unlock || null;
   const keyWrap = req.body?.keyWrap || null;
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+  let ponyInboxRegistration = null;
 
   if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
@@ -2407,6 +2881,13 @@ app.post('/api/house/init', (req, res) => {
   if (!authKeyBytes || authKeyBytes.length < 16) {
     return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
   }
+  const tokenMode = s.signup?.mode === 'token';
+  if (!tokenMode) {
+    if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
+      || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
+      return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+    }
+  }
   if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
     return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
   }
@@ -2414,6 +2895,15 @@ app.post('/api/house/init', (req, res) => {
   // Converged for today's publish: ceremony-only houses.
   if (keyMode !== 'ceremony') {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  try {
+    ponyInboxRegistration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
   }
 
   let normalizedKeyWrap = null;
@@ -2445,7 +2935,16 @@ app.post('/api/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
-    entries: []
+    entries: [],
+    ponyInbox: ponyInboxRegistration
+      ? {
+          version: ponyInboxRegistration.version,
+          pub: ponyInboxRegistration.pub,
+          privWrap: ponyInboxRegistration.privWrap,
+          createdAt: nowIso(),
+          updatedAt: nowIso()
+        }
+      : null
   });
   writeStore(store);
 
@@ -2467,12 +2966,13 @@ app.post('/api/agent/house/init', (req, res) => {
   const unlock = req.body?.unlock || null;
   const keyWrap = req.body?.keyWrap || null;
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+  let ponyInboxRegistration = null;
 
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   if (s.flow !== 'agent_solo') return res.status(403).json({ ok: false, error: 'AGENT_SOLO_ONLY' });
-  if (!s.houseCeremony?.agentReveal) return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+  if (!s.houseCeremony?.agentCommit) return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
 
   const painted = countInk(s.canvas?.pixels);
   if (painted < MIN_AGENT_SOLO_PIXELS) {
@@ -2496,12 +2996,13 @@ app.post('/api/agent/house/init', (req, res) => {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
   }
 
-  const ra = b64ToBytes(s.houseCeremony.agentReveal);
-  if (!ra || !ra.length) return res.status(400).json({ ok: false, error: 'INVALID_REVEAL' });
-  const kroot = sha256Bytes(ra);
-  const expectedHouseId = base58Encode(sha256Bytes(kroot));
-  if (expectedHouseId !== houseId) {
-    return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
+  try {
+    ponyInboxRegistration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
   }
 
   let normalizedKeyWrap = null;
@@ -2536,7 +3037,16 @@ app.post('/api/agent/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
-    entries: []
+    entries: [],
+    ponyInbox: ponyInboxRegistration
+      ? {
+          version: ponyInboxRegistration.version,
+          pub: ponyInboxRegistration.pub,
+          privWrap: ponyInboxRegistration.privWrap,
+          createdAt: nowIso(),
+          updatedAt: nowIso()
+        }
+      : null
   });
   writeStore(store);
 

@@ -1,5 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('crypto');
+const {
+  makeCeremonyRevealPair,
+  encryptCeremonyReveal,
+  decryptCeremonyReveal,
+  waitForAgentHouseMaterial
+} = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -44,19 +50,45 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   await page.waitForURL('**/create');
 
   const ra = crypto.randomBytes(32);
-  await request.post('/api/agent/house/commit', { data: { teamCode, commit: sha256(ra).toString('base64') } });
-  await request.post('/api/agent/house/reveal', { data: { teamCode, reveal: ra.toString('base64') } });
+  const agentRevealPair = makeCeremonyRevealPair();
+  const commitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode, commit: sha256(ra).toString('base64'), revealPub: agentRevealPair.publicKeyB64 }
+  });
+  expect(commitResp.ok()).toBeTruthy();
 
   await page.getByTestId('px-0-0').click();
-  await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/house\?house=/);
+  const relayAgentReveal = (async () => {
+    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
+    expect(mat).toBeTruthy();
+    const sealedForHuman = encryptCeremonyReveal({
+      revealBytes: ra,
+      recipientRevealPubB64: mat.humanRevealPub,
+      direction: 'agent_to_human',
+      teamCode
+    });
+    const revealResp = await request.post('/api/agent/house/reveal', {
+      data: { teamCode, sealedForHuman }
+    });
+    expect(revealResp.ok()).toBeTruthy();
+  })();
+  await Promise.all([
+    relayAgentReveal,
+    page.getByTestId('share-btn').click(),
+    page.waitForURL(/\/house\?house=/)
+  ]);
 
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();
 
-  const matResp = await request.get(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`);
-  const mat = await matResp.json();
-  const rh = Buffer.from(mat.humanReveal, 'base64');
+  const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealSealed, 60, 100);
+  expect(mat).toBeTruthy();
+  const rh = decryptCeremonyReveal({
+    sealed: mat.humanRevealSealed,
+    privateKey: agentRevealPair.privateKey,
+    direction: 'human_to_agent',
+    teamCode
+  });
+  expect(sha256(rh).toString('base64')).toBe(mat.humanCommit);
   const kroot = sha256(Buffer.concat([rh, ra]));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
 
@@ -72,6 +104,16 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   const createShare = await createShareResp.json();
   const shareId = createShare.shareId;
   expect(shareId).toBeTruthy();
+
+  // Phase-7 cutover: this test still verifies legacy plaintext acceptance, so opt in explicitly.
+  const policyPath = '/api/pony/policy';
+  const policyBody = JSON.stringify({ houseId, allowLegacyPlaintext: true });
+  const policyHeaders = houseAuthHeaders(houseId, 'POST', policyPath, policyBody, kauth);
+  const policyResp = await request.post(policyPath, {
+    data: policyBody,
+    headers: { 'content-type': 'application/json', ...policyHeaders }
+  });
+  expect(policyResp.ok()).toBeTruthy();
 
   // Send to share id alias; server should normalize destination to canonical house id.
   const sendPath = '/api/pony/send';

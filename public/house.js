@@ -159,6 +159,7 @@ function clearHouseAuthCache(houseId) {
   }
 }
 
+
 // --- base58 (minimal) ---
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function base58Encode(bytes) {
@@ -437,7 +438,8 @@ function clearClientFlowState() {
     // Clear any cached house auth keys for this origin.
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
-      if (key && key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
+      if (!key) continue;
+      if (key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
     }
   } catch {
     // ignore
@@ -1129,32 +1131,9 @@ async function unlockExistingHouse(houseId) {
   setStatus('Unlocking house…');
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
 
-  // Derive K_root from ceremony material (humanReveal + agentReveal) stored in the session.
-  const mat = await api('/api/human/house/material');
-  let recovered = false;
-  let usedCeremony = false;
-  if (mat.humanReveal && mat.agentReveal) {
-    const Rh = unb64(mat.humanReveal);
-    const Ra = unb64(mat.agentReveal);
-    const combo = new Uint8Array(Rh.length + Ra.length);
-    combo.set(Rh, 0);
-    combo.set(Ra, Rh.length);
-    const Kroot = await sha256(combo);
-    const houseIdBytes = await sha256(Kroot);
-    const derivedHouseId = base58Encode(houseIdBytes);
-    if (derivedHouseId === houseId) {
-      await initKeysFromKroot(Kroot);
-      usedCeremony = true;
-    } else {
-      setStatus('Ceremony mismatch. Trying wallet recovery…');
-    }
-  }
-
-  if (!usedCeremony) {
-    const recoveredOk = await recoverHouseKeyWithWallet(houseId);
-    if (!recoveredOk) throw new Error(mat.humanReveal || mat.agentReveal ? 'HOUSE_ID_MISMATCH' : 'CEREMONY_INCOMPLETE');
-    recovered = true;
-  }
+  const recoveredOk = await recoverHouseKeyWithWallet(houseId);
+  if (!recoveredOk) throw new Error('KEY_RECOVERY_REQUIRED');
+  const recovered = true;
 
   const meta = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/meta`);
   const { housePubKey, nonce, keyMode } = meta;
@@ -1823,7 +1802,7 @@ async function initSharePanel() {
           ? 'Finish the co-op house ceremony first.'
           : e.message === 'CEREMONY_INCOMPLETE'
             ? (KauthKey ? 'Share is unlocked, but ceremony state is missing. Refresh and try again.'
-              : 'Waiting for agent reveal to complete the ceremony.')
+              : 'Waiting for agent ceremony exchange to complete.')
         : e.message === 'NO_TOKEN'
           ? 'No $ELIZATOWN found in this wallet.'
           : e.message === 'TOKEN_CHECK_REQUIRED'
