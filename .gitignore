@@ -4,3 +4,6 @@ data/store.e2e.json
 data/store*.sqlite
 data/store*.sqlite-wal
 data/store*.sqlite-shm
+
+node_modules/
+
