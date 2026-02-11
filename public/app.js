@@ -31,6 +31,7 @@ const WALLET_STORAGE_KEY = 'agentTownWallet';
 const PATH_STORAGE_KEY = 'agentTownStartRole';
 const TOKEN_ERROR_KEY = 'agentTownTokenError';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
+const AGENT_API_KEY_STORAGE_KEY = 'agentTownAgentOpenAIKey';
 // startRole: 'human' | 'coop' | 'agent'
 let pathMode = 'coop';
 
@@ -747,8 +748,38 @@ function setupAgentDrawer() {
   const chat = el('agentChat');
   const input = el('agentInput');
   const sendBtn = el('agentSendBtn');
+  const keyInput = el('agentApiKeyInput');
+  const keySaveBtn = el('agentApiKeySaveBtn');
+  const keyStatus = el('agentApiKeyStatus');
 
-  if (!btn || !closeBtn || !drawer || !backdrop || !chat || !input || !sendBtn) return;
+  if (!btn || !closeBtn || !drawer || !backdrop || !chat || !input || !sendBtn || !keyInput || !keySaveBtn || !keyStatus) return;
+
+  const transcript = [];
+  const model = 'gpt-4o-mini';
+  let sending = false;
+  let runtimeCaps = { llm: { codexCli: false } };
+
+  function readSavedKey() {
+    try {
+      return (localStorage.getItem(AGENT_API_KEY_STORAGE_KEY) || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function saveKey(value) {
+    const key = (value || '').trim();
+    try {
+      if (key) localStorage.setItem(AGENT_API_KEY_STORAGE_KEY, key);
+      else localStorage.removeItem(AGENT_API_KEY_STORAGE_KEY);
+    } catch {
+      // ignore localStorage failures
+    }
+    return key;
+  }
+
+  let apiKey = readSavedKey();
+  keyInput.value = apiKey;
 
   function setOpen(open) {
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -767,22 +798,114 @@ function setupAgentDrawer() {
     chat.scrollTop = chat.scrollHeight;
   }
 
+  function setKeyStatus(text, bad = false) {
+    keyStatus.textContent = text;
+    keyStatus.style.color = bad ? 'var(--bad)' : 'var(--muted)';
+  }
+
+  function extractAssistantText(payload) {
+    const raw = payload?.choices?.[0]?.message?.content;
+    if (typeof raw === 'string') return raw.trim();
+    if (Array.isArray(raw)) {
+      return raw
+        .map((item) => (item && item.type === 'text' ? item.text : ''))
+        .join('')
+        .trim();
+    }
+    return '';
+  }
+
+  function buildSystemPrompt() {
+    const teamCode = lastState?.teamCode || 'unknown';
+    const houseId = lastState?.houseId || walletHouseId || 'none';
+    return [
+      'You are the Agent Town browser agent.',
+      'Constraints:',
+      '- Chat guidance only, no claims of external side effects.',
+      '- Be concise, practical, and specific.',
+      `Context: teamCode=${teamCode}, houseId=${houseId}`
+    ].join('\n');
+  }
+
+  async function fetchRuntimeCaps() {
+    try {
+      const caps = await api('/api/runtime/capabilities');
+      runtimeCaps = caps || runtimeCaps;
+    } catch {
+      runtimeCaps = { llm: { codexCli: false } };
+    }
+
+    if (runtimeCaps?.llm?.codexCli === true) {
+      setKeyStatus('Codex CLI bridge enabled (no API key required).');
+    } else if (apiKey) {
+      setKeyStatus('OpenAI key loaded from this browser.');
+    } else {
+      setKeyStatus('Set an OpenAI key to enable browser-agent replies.', true);
+    }
+  }
+
+  async function runBrowserAgentTurn(userText) {
+    const messages = [{ role: 'system', content: buildSystemPrompt() }, ...transcript.slice(-14)];
+
+    const headers = { 'content-type': 'application/json' };
+    if (runtimeCaps?.llm?.codexCli !== true) {
+      if (!apiKey) throw new Error('MISSING_OPENAI_API_KEY');
+      headers.authorization = `Bearer ${apiKey}`;
+    }
+
+    const res = await fetch('/api/llm/openai/v1/chat/completions', {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: JSON.stringify({ model, stream: false, messages })
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error || `HTTP_${res.status}`);
+    }
+
+    const body = await res.json().catch(() => ({}));
+    const reply = extractAssistantText(body);
+    if (!reply) throw new Error('EMPTY_AGENT_REPLY');
+    return reply;
+  }
+
   async function send() {
     const text = (input.value || '').trim();
-    if (!text) return;
+    if (!text || sending) return;
+
     input.value = '';
+    transcript.push({ role: 'user', content: text });
     addMsg(text, 'user');
+
+    sending = true;
     sendBtn.disabled = true;
+    keySaveBtn.disabled = true;
+
     try {
-      const res = await api('/api/agent/chat', { method: 'POST', body: JSON.stringify({ message: text }) });
-      const reply = res?.reply || '(no reply)';
+      const reply = await runBrowserAgentTurn(text);
+      transcript.push({ role: 'assistant', content: reply });
       addMsg(reply, 'agent');
     } catch (e) {
       addMsg(`Error: ${e.message}`, 'agent');
     } finally {
+      sending = false;
       sendBtn.disabled = false;
+      keySaveBtn.disabled = false;
     }
   }
+
+  keySaveBtn.addEventListener('click', () => {
+    apiKey = saveKey(keyInput.value || '');
+    if (runtimeCaps?.llm?.codexCli === true) {
+      setKeyStatus('Codex CLI bridge enabled (no API key required).');
+    } else if (apiKey) {
+      setKeyStatus('OpenAI key saved in this browser.');
+    } else {
+      setKeyStatus('OpenAI key cleared.', true);
+    }
+  });
 
   btn.addEventListener('click', () => setOpen(true));
   closeBtn.addEventListener('click', () => setOpen(false));
@@ -795,8 +918,8 @@ function setupAgentDrawer() {
     if (e.key === 'Enter') send();
   });
 
-  // Seed
-  addMsg('What are you building today?', 'agent');
+  addMsg('Browser agent is ready. Ask me anything about your current Portal flow.', 'agent');
+  fetchRuntimeCaps();
 }
 
 init().catch((e) => {

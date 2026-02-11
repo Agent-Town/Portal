@@ -40,6 +40,13 @@
         <button class="btn" id="agentDrawerCloseBtn" aria-label="Close agent drawer">Close</button>
       </div>
       <div class="drawer-body">
+        <div class="agent-settings">
+          <div class="kv">
+            <input class="input" id="agentApiKeyInput" type="password" placeholder="OpenAI API key (local to browser)" />
+            <button class="btn" id="agentApiKeySaveBtn">Save</button>
+          </div>
+          <div class="small" id="agentApiKeyStatus" style="color: var(--muted)"></div>
+        </div>
         <div class="chat" id="agentChat"></div>
       </div>
       <div class="drawer-foot">
