@@ -1,4 +1,5 @@
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
 let lastFriends = [];
 
 function getHouseId() {
@@ -20,6 +21,12 @@ function unb64(str) {
   } catch {
     return null;
   }
+}
+
+function b64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
 }
 
 async function sha256Base64(input) {
@@ -65,6 +72,89 @@ async function authedApi({ houseId, url, method = 'GET', json = null }) {
       ...authHeaders
     }
   });
+}
+
+async function resolvePonyTarget(toRaw) {
+  const raw = String(toRaw || '').trim();
+  if (!raw) throw new Error('MISSING_TO');
+  const isAnchor = raw.includes(':');
+  const query = isAnchor
+    ? `erc8004Id=${encodeURIComponent(raw)}`
+    : `houseId=${encodeURIComponent(raw)}`;
+  const resolved = await api(`/api/pony/resolve?${query}`);
+  return {
+    sourceInput: raw,
+    isAnchor,
+    houseId: typeof resolved?.houseId === 'string' ? resolved.houseId : raw,
+    ponyInboxPub: typeof resolved?.ponyInboxPub === 'string' ? resolved.ponyInboxPub : ''
+  };
+}
+
+async function derivePonyMessageKey({ sharedSecret, fromHouseId, toHouseId }) {
+  const baseKey = await crypto.subtle.importKey('raw', sharedSecret, 'HKDF', false, ['deriveKey']);
+  const info = new TextEncoder().encode(`elizatown-pony-msg-v1|from=${fromHouseId || ''}|to=${toHouseId || ''}`);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array([]), info },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+}
+
+async function encryptPonyMessage({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
+  const recipientBytes = unb64(recipientPonyInboxPub);
+  if (!recipientBytes || !recipientBytes.length) throw new Error('RECEIVER_KEY_UNAVAILABLE');
+
+  const recipientPub = await crypto.subtle.importKey(
+    'spki',
+    recipientBytes,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    []
+  );
+  const eph = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveBits']
+  );
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: 'ECDH', public: recipientPub },
+    eph.privateKey,
+    256
+  );
+  const sharedSecret = new Uint8Array(sharedBits);
+  const key = await derivePonyMessageKey({ sharedSecret, fromHouseId, toHouseId });
+
+  const createdAt = new Date().toISOString();
+  const aadObj = {
+    v: 1,
+    kind: 'msg.chat.v1',
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt
+  };
+  const aadBytes = new TextEncoder().encode(JSON.stringify(aadObj));
+  const plaintextObj = { v: 1, body: String(body || '') };
+  const plaintextBytes = new TextEncoder().encode(JSON.stringify(plaintextObj));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertextBuf = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: aadBytes },
+    key,
+    plaintextBytes
+  );
+  const epk = new Uint8Array(await crypto.subtle.exportKey('spki', eph.publicKey));
+
+  return {
+    createdAt,
+    ciphertext: {
+      alg: PONY_E2EE_P256_AESGCM_V1,
+      epk: b64(epk),
+      iv: b64(iv),
+      ct: b64(new Uint8Array(ciphertextBuf)),
+      aad: b64(aadBytes)
+    }
+  };
 }
 
 function messageCiphertext(msg) {
@@ -288,14 +378,27 @@ async function send() {
     return;
   }
 
-  const payload = {
-    fromHouseId: houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: body }
-  };
-  if (toRaw.includes(':')) payload.toErc8004Id = toRaw;
-  else payload.toHouseId = toRaw;
-
   try {
+    const resolved = await resolvePonyTarget(toRaw);
+    const payload = {
+      fromHouseId: houseId
+    };
+    if (resolved.isAnchor) payload.toErc8004Id = resolved.sourceInput;
+    else payload.toHouseId = resolved.houseId;
+
+    if (resolved.ponyInboxPub) {
+      const encrypted = await encryptPonyMessage({
+        fromHouseId: houseId,
+        toHouseId: resolved.houseId,
+        recipientPonyInboxPub: resolved.ponyInboxPub,
+        body
+      });
+      payload.ciphertext = encrypted.ciphertext;
+    } else {
+      // Compatibility fallback during migration for houses that do not have Pony inbox keys yet.
+      payload.ciphertext = { alg: 'PLAINTEXT', iv: '', ct: body };
+    }
+
     await authedApi({ houseId, url: '/api/pony/send', method: 'POST', json: payload });
     document.getElementById('body').value = '';
     sendStatus.textContent = 'Sent.';

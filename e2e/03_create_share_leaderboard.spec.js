@@ -89,6 +89,14 @@ test('co-op open -> co-create -> generate house -> unlock with wallet signature'
   expect(ponyResolveData.ponyInboxPub.length).toBeGreaterThan(20);
   expect(ponyResolveData.ponyInboxKeyVersion).toBe(1);
 
+  const createdShare = await page.evaluate(async () => {
+    const resp = await fetch('/api/share/create', { method: 'POST', credentials: 'include' });
+    const data = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, status: resp.status, data };
+  });
+  expect(createdShare.ok).toBeTruthy();
+  expect(createdShare.data?.shareId).toBeTruthy();
+
   // /api/house/:id/meta should exist (house-authenticated)
   const matResp = await request.get(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`);
   const mat = await matResp.json();
@@ -99,6 +107,15 @@ test('co-op open -> co-create -> generate house -> unlock with wallet signature'
   const metaHeaders = houseAuthHeaders(houseId, 'GET', metaPath, '', kauth);
   const meta = await request.get(metaPath, { headers: metaHeaders });
   expect(meta.ok()).toBeTruthy();
+
+  const inboxPath = '/api/pony/inbox';
+  const inboxHeaders = houseAuthHeaders(houseId, 'GET', inboxPath, '', kauth);
+  const inboxResp = await request.get(`${inboxPath}?houseId=${encodeURIComponent(houseId)}`, { headers: inboxHeaders });
+  expect(inboxResp.ok()).toBeTruthy();
+  const inboxData = await inboxResp.json();
+  const mayorMsg = (inboxData.inbox || []).find((m) => m.fromHouseId === 'npc_mayor');
+  expect(mayorMsg).toBeTruthy();
+  expect(mayorMsg.envelope?.ciphertext?.alg).toBe('PONY_E2EE_P256_AESGCM_V1');
 
   // Now unlock descriptor rendering.
   await page.getByRole('button', { name: 'Connect wallet' }).click();

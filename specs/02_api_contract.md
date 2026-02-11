@@ -353,7 +353,13 @@ Body:
   "toHouseId": "<optional houseId or shareId>",
   "toErc8004Id": "<optional e.g. 11155111:123>",
   "fromHouseId": "<optional houseId or shareId>",
-  "ciphertext": { "alg": "PLAINTEXT", "iv": "", "ct": "hello" },
+  "ciphertext": {
+    "alg": "PONY_E2EE_P256_AESGCM_V1",
+    "epk": "<base64 SPKI>",
+    "iv": "<base64>",
+    "ct": "<base64 ciphertext||tag>",
+    "aad": "<base64 canonical AAD json>"
+  },
   "transport": { "kind": "relay.http.v1", "relayHints": ["relay://peer-a"] },
   "postage": { "kind": "pow.v1", "nonce": "...", "digest": "...", "difficulty": 12 }
 }
@@ -377,6 +383,7 @@ Rules:
   - dispatch-style receipt ids (`dr_...`) are resolved against stored dispatch receipts
   - when a dispatch receipt is resolved, it must belong to the same `toHouseId`
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
+- Migration compatibility: legacy `{ "alg": "PLAINTEXT", "iv": "", "ct": "..." }` is still accepted in phase-7 rollout.
 
 Response:
 ```json
@@ -404,6 +411,7 @@ Errors:
 - `RESERVED_FROM`
 - `MISSING_CIPHERTEXT`
 - `INVALID_CIPHERTEXT`
+- `INVALID_PONY_E2EE_ENVELOPE`
 - `INVALID_TRANSPORT`
 - `INVALID_POSTAGE`
 - `INVALID_POSTAGE_KIND`

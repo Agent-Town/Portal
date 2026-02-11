@@ -30,19 +30,105 @@ function b64ToBytes(str) {
 
 // --- Pony Express v0 (inbox + sealed notes) ---
 const MAYOR_HOUSE_ID = 'npc_mayor';
+const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
+
+function makePonyMsgKeyInfo({ fromHouseId = '', toHouseId = '' }) {
+  const from = typeof fromHouseId === 'string' ? fromHouseId : '';
+  const to = typeof toHouseId === 'string' ? toHouseId : '';
+  return `elizatown-pony-msg-v1|from=${from}|to=${to}`;
+}
+
+function normalizePonyCiphertextE2EE(ciphertext) {
+  const epk = typeof ciphertext.epk === 'string' ? ciphertext.epk.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const aad = typeof ciphertext.aad === 'string' ? ciphertext.aad.trim() : '';
+  if (!epk || !ct || !iv || !aad) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!isCanonicalBase64(epk) || !isCanonicalBase64(ct) || !isCanonicalBase64(iv) || !isCanonicalBase64(aad)) {
+    throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  }
+
+  const ivBytes = decodeB64(iv);
+  const ctBytes = decodeB64(ct);
+  const epkBytes = decodeB64(epk);
+  const aadBytes = decodeB64(aad);
+  if (!ivBytes || ivBytes.length < 8 || ivBytes.length > 32) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!ctBytes || ctBytes.length < 17) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!epkBytes || epkBytes.length < 48 || epkBytes.length > 2048) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!aadBytes || !aadBytes.length) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+
+  return {
+    alg: PONY_E2EE_P256_AESGCM_V1,
+    epk,
+    iv,
+    ct,
+    aad
+  };
+}
 
 function normalizePonyCiphertext(ciphertext, legacyBody = '') {
   if (ciphertext && typeof ciphertext === 'object') {
     const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : '';
-    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct : '';
-    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv : '';
+    const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+    const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
     if (!alg || !ct) throw new Error('INVALID_CIPHERTEXT');
+    if (alg === PONY_E2EE_P256_AESGCM_V1) return normalizePonyCiphertextE2EE(ciphertext);
     return { alg, iv, ct };
   }
   if (typeof legacyBody === 'string' && legacyBody.trim()) {
     return { alg: 'PLAINTEXT', iv: '', ct: legacyBody };
   }
   throw new Error('MISSING_CIPHERTEXT');
+}
+
+function encryptPonyE2EEForHouse({ plaintext, fromHouseId = null, toHouseId, recipientPonyInboxPub, kind = 'msg.chat.v1', createdAt = nowIso() }) {
+  if (!toHouseId || typeof toHouseId !== 'string') throw new Error('INVALID_PONY_E2EE_TARGET');
+  if (!recipientPonyInboxPub || typeof recipientPonyInboxPub !== 'string') throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+  const recipientKeyDer = decodeB64(recipientPonyInboxPub);
+  if (!recipientKeyDer || !recipientKeyDer.length) throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+
+  let recipientPub;
+  try {
+    recipientPub = crypto.createPublicKey({ key: recipientKeyDer, format: 'der', type: 'spki' });
+  } catch {
+    throw new Error('INVALID_PONY_E2EE_TARGET_KEY');
+  }
+
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(crypto.hkdfSync('sha256', shared, Buffer.alloc(0), Buffer.from(makePonyMsgKeyInfo({
+    fromHouseId: fromHouseId || '',
+    toHouseId
+  }), 'utf8'), 32));
+  const iv = crypto.randomBytes(12);
+
+  const aadPayload = {
+    v: 1,
+    kind,
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt
+  };
+  const aadBytes = Buffer.from(JSON.stringify(aadPayload), 'utf8');
+  const plaintextPayload = Buffer.from(JSON.stringify({
+    v: 1,
+    body: String(plaintext || '')
+  }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aadBytes);
+  const enc = Buffer.concat([cipher.update(plaintextPayload), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const ct = Buffer.concat([enc, tag]);
+  const epkDer = eph.publicKey.export({ type: 'spki', format: 'der' });
+
+  return {
+    alg: PONY_E2EE_P256_AESGCM_V1,
+    epk: epkDer.toString('base64'),
+    iv: iv.toString('base64'),
+    ct: ct.toString('base64'),
+    aad: aadBytes.toString('base64')
+  };
 }
 
 function resolveHouseAddress(store, input) {
@@ -1540,6 +1626,8 @@ app.post('/api/share/create', (req, res) => {
   // Pony Express v0: Mayor welcome message on house registration.
   const mayorTargetHouseId = record.houseId;
   if (mayorTargetHouseId) {
+    const mayorTarget = store.houses.find((h) => h && h.id === mayorTargetHouseId) || null;
+    const mayorTargetPony = getHousePonyInboxKey(mayorTarget);
     const mayorBody = [
       `Welcome, House ${mayorTargetHouseId}.`,
       `I’m the Mayor of Agent Town. You just claimed your address on these streets.`,
@@ -1553,11 +1641,26 @@ app.post('/api/share/create', (req, res) => {
       `— The Mayor`
     ].join('\n');
 
+    let mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
+    if (mayorTargetPony?.pub) {
+      try {
+        mayorCiphertext = encryptPonyE2EEForHouse({
+          plaintext: mayorBody,
+          fromHouseId: MAYOR_HOUSE_ID,
+          toHouseId: mayorTargetHouseId,
+          recipientPonyInboxPub: mayorTargetPony.pub,
+          createdAt: nowIso()
+        });
+      } catch {
+        mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
+      }
+    }
+
     store.inbox.push(
       makeInboxMsg({
         toHouseId: mayorTargetHouseId,
         fromHouseId: MAYOR_HOUSE_ID,
-        ciphertext: { alg: 'PLAINTEXT', iv: '', ct: mayorBody },
+        ciphertext: mayorCiphertext,
         status: 'accepted'
       })
     );
