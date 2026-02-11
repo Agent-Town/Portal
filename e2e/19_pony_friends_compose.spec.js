@@ -37,6 +37,68 @@ function base58Encode(bytes) {
   return out || '1';
 }
 
+function buildPonyInboxBundle(kroot) {
+  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const ponyInboxPub = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+  const ponyInboxPriv = pair.privateKey.export({ type: 'pkcs8', format: 'der' });
+
+  const wrapKey = hkdf(kroot, 'elizatown-pony-inbox-wrap-v1', 32);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', wrapKey, iv);
+  const enc = Buffer.concat([cipher.update(ponyInboxPriv), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    ponyInboxPub,
+    ponyInboxPrivWrap: {
+      alg: 'AES-GCM',
+      iv: iv.toString('base64'),
+      ct: Buffer.concat([enc, tag]).toString('base64')
+    }
+  };
+}
+
+function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
+  const recipientPub = crypto.createPublicKey({
+    key: Buffer.from(recipientPonyInboxPub, 'base64'),
+    format: 'der',
+    type: 'spki'
+  });
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(
+    crypto.hkdfSync(
+      'sha256',
+      shared,
+      Buffer.alloc(0),
+      Buffer.from(`elizatown-pony-msg-v1|from=${fromHouseId || ''}|to=${toHouseId || ''}`, 'utf8'),
+      32
+    )
+  );
+  const iv = crypto.randomBytes(12);
+  const aad = Buffer.from(JSON.stringify({
+    v: 1,
+    kind: 'msg.chat.v1',
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt: new Date().toISOString()
+  }), 'utf8');
+  const plaintext = Buffer.from(JSON.stringify({ v: 1, body: String(body || '') }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aad);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    alg: 'PONY_E2EE_P256_AESGCM_V1',
+    epk: eph.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    iv: iv.toString('base64'),
+    ct: Buffer.concat([enc, tag]).toString('base64'),
+    aad: aad.toString('base64')
+  };
+}
+
 async function createAgentSoloHouse(request, label) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
@@ -67,6 +129,7 @@ async function createAgentSoloHouse(request, label) {
   const houseId = base58Encode(sha256(kroot));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const houseAuthKey = kauth.toString('base64');
+  const ponyInbox = buildPonyInboxBundle(kroot);
 
   const init = await request.post('/api/agent/house/init', {
     data: {
@@ -76,12 +139,14 @@ async function createAgentSoloHouse(request, label) {
       nonce,
       keyMode: 'ceremony',
       unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
-      houseAuthKey
+      houseAuthKey,
+      ponyInboxPub: ponyInbox.ponyInboxPub,
+      ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
     }
   });
   expect(init.ok()).toBeTruthy();
 
-  return { houseId, kauth };
+  return { houseId, kauth, ponyInboxPub: ponyInbox.ponyInboxPub };
 }
 
 function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
@@ -105,7 +170,12 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
   const sendBody = JSON.stringify({
     toHouseId: houseB.houseId,
     fromHouseId: houseA.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'hey B (from A)' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseA.houseId,
+      toHouseId: houseB.houseId,
+      recipientPonyInboxPub: houseB.ponyInboxPub,
+      body: 'hey B (from A)'
+    })
   });
   const sendHeaders = houseAuthHeaders(houseA.houseId, 'POST', sendPath, sendBody, houseA.kauth);
   const sendResp = await request.post(sendPath, {
@@ -191,8 +261,8 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
   expect(inboxRespA.ok()).toBeTruthy();
   const inboxDataA = await inboxRespA.json();
   const received = (inboxDataA.inbox || []).find(
-    (m) => m.fromHouseId === houseB.houseId && m.envelope?.ciphertext?.ct === 'hello A (from B via compose)'
+    (m) => m.fromHouseId === houseB.houseId && m.envelope?.ciphertext?.alg === 'PONY_E2EE_P256_AESGCM_V1'
   );
   expect(received).toBeTruthy();
+  expect(received.envelope?.ciphertext?.ct).not.toBe('hello A (from B via compose)');
 });
-

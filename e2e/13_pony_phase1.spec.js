@@ -73,6 +73,16 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   const shareId = createShare.shareId;
   expect(shareId).toBeTruthy();
 
+  // Phase-7 cutover: this test still verifies legacy plaintext acceptance, so opt in explicitly.
+  const policyPath = '/api/pony/policy';
+  const policyBody = JSON.stringify({ houseId, allowLegacyPlaintext: true });
+  const policyHeaders = houseAuthHeaders(houseId, 'POST', policyPath, policyBody, kauth);
+  const policyResp = await request.post(policyPath, {
+    data: policyBody,
+    headers: { 'content-type': 'application/json', ...policyHeaders }
+  });
+  expect(policyResp.ok()).toBeTruthy();
+
   // Send to share id alias; server should normalize destination to canonical house id.
   const sendPath = '/api/pony/send';
   const sendBody = JSON.stringify({

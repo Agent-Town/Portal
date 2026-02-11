@@ -535,14 +535,17 @@ async function send() {
       });
       payload.ciphertext = encrypted.ciphertext;
     } else {
-      // Compatibility fallback during migration for houses that do not have Pony inbox keys yet.
-      payload.ciphertext = { alg: 'PLAINTEXT', iv: '', ct: body };
+      throw new Error('RECEIVER_KEY_UNAVAILABLE');
     }
 
     await authedApi({ houseId, url: '/api/pony/send', method: 'POST', json: payload });
     document.getElementById('body').value = '';
     sendStatus.textContent = 'Sent.';
   } catch (e) {
+    if (e.message === 'RECEIVER_KEY_UNAVAILABLE') {
+      sendStatus.textContent = 'Error: receiver does not publish Pony inbox keys yet.';
+      return;
+    }
     sendStatus.textContent = `Error: ${e.message}`;
   }
 }

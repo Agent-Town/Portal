@@ -57,7 +57,7 @@ function buildPonyInboxBundle(kroot) {
   };
 }
 
-async function createAgentSoloHouse(request, label) {
+async function createAgentSoloHouse(request, label, { withPonyInbox = false } = {}) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
   const teamCode = (await sess.json()).teamCode;
@@ -87,79 +87,83 @@ async function createAgentSoloHouse(request, label) {
   const houseId = base58Encode(sha256(kroot));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const houseAuthKey = kauth.toString('base64');
-  const ponyInbox = buildPonyInboxBundle(kroot);
 
-  const init = await request.post('/api/agent/house/init', {
-    data: {
-      teamCode,
-      houseId,
-      housePubKey: houseId,
-      nonce,
-      keyMode: 'ceremony',
-      unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
-      houseAuthKey,
-      ponyInboxPub: ponyInbox.ponyInboxPub,
-      ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
-    }
-  });
+  const payload = {
+    teamCode,
+    houseId,
+    housePubKey: houseId,
+    nonce,
+    keyMode: 'ceremony',
+    unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
+    houseAuthKey
+  };
+
+  if (withPonyInbox) {
+    const ponyInbox = buildPonyInboxBundle(kroot);
+    payload.ponyInboxPub = ponyInbox.ponyInboxPub;
+    payload.ponyInboxPrivWrap = ponyInbox.ponyInboxPrivWrap;
+  }
+
+  const init = await request.post('/api/agent/house/init', { data: payload });
   expect(init.ok()).toBeTruthy();
 
-  return { houseId, kroot, kauth };
+  return { houseId, kauth };
 }
 
-test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, request }) => {
-  const houseA = await createAgentSoloHouse(request, 'A');
-  const houseB = await createAgentSoloHouse(request, 'B');
+test('phase7 cutover: plaintext rejection default + policy override + payload limits', async ({ request }) => {
+  const strictHouse = await createAgentSoloHouse(request, 'Strict', { withPonyInbox: true });
+  const legacyHouse = await createAgentSoloHouse(request, 'Legacy', { withPonyInbox: false });
 
   const policyPath = '/api/pony/policy';
-  const policyBody = JSON.stringify({ houseId: houseA.houseId, allowLegacyPlaintext: true });
-  const policyHeaders = houseAuthHeaders(houseA.houseId, 'POST', policyPath, policyBody, houseA.kauth);
+  const strictPolicyHeaders = houseAuthHeaders(strictHouse.houseId, 'GET', policyPath, '', strictHouse.kauth);
+  const strictPolicyGet = await request.get(`${policyPath}?houseId=${encodeURIComponent(strictHouse.houseId)}`, {
+    headers: strictPolicyHeaders
+  });
+  expect(strictPolicyGet.ok()).toBeTruthy();
+  const strictPolicy = await strictPolicyGet.json();
+  expect(strictPolicy.policy.allowLegacyPlaintext).toBe(false);
+
+  const legacyPolicyHeaders = houseAuthHeaders(legacyHouse.houseId, 'GET', policyPath, '', legacyHouse.kauth);
+  const legacyPolicyGet = await request.get(`${policyPath}?houseId=${encodeURIComponent(legacyHouse.houseId)}`, {
+    headers: legacyPolicyHeaders
+  });
+  expect(legacyPolicyGet.ok()).toBeTruthy();
+  const legacyPolicy = await legacyPolicyGet.json();
+  expect(legacyPolicy.policy.allowLegacyPlaintext).toBe(true);
+
+  const sendPath = '/api/pony/send';
+  const rejectedPlain = await request.post(sendPath, {
+    data: {
+      toHouseId: strictHouse.houseId,
+      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'plaintext should be rejected' }
+    }
+  });
+  expect(rejectedPlain.status()).toBe(400);
+  expect((await rejectedPlain.json()).error).toBe('PONY_CIPHERTEXT_REQUIRED');
+
+  const setPolicyBody = JSON.stringify({ houseId: strictHouse.houseId, allowLegacyPlaintext: true });
+  const setPolicyHeaders = houseAuthHeaders(strictHouse.houseId, 'POST', policyPath, setPolicyBody, strictHouse.kauth);
   const setPolicy = await request.post(policyPath, {
-    data: policyBody,
-    headers: { 'content-type': 'application/json', ...policyHeaders }
+    data: setPolicyBody,
+    headers: { 'content-type': 'application/json', ...setPolicyHeaders }
   });
   expect(setPolicy.ok()).toBeTruthy();
+  expect((await setPolicy.json()).policy.allowLegacyPlaintext).toBe(true);
 
-  const legacySend = await request.post('/api/pony/send', {
+  const allowedPlain = await request.post(sendPath, {
     data: {
-      toHouseId: houseA.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'legacy plaintext migration note' }
+      toHouseId: strictHouse.houseId,
+      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'plaintext allowed temporarily by policy' }
     }
   });
-  expect(legacySend.ok()).toBeTruthy();
+  expect(allowedPlain.ok()).toBeTruthy();
 
-  await page.addInitScript(
-    ({ houseId, houseAuthB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
-    },
-    {
-      houseId: houseB.houseId,
-      houseAuthB64: houseB.kauth.toString('base64')
+  const oversized = await request.post(sendPath, {
+    data: {
+      toHouseId: strictHouse.houseId,
+      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'x'.repeat(5000) }
     }
-  );
-
-  await page.goto(`/inbox/${encodeURIComponent(houseB.houseId)}`);
-  await page.locator('#toInput').fill(houseA.houseId);
-  await page.locator('#body').fill('pony e2ee read body');
-  await page.locator('#sendBtn').click();
-  await expect(page.locator('#sendStatus')).toContainText('Sent.');
-
-  await page.evaluate(
-    ({ houseId, houseAuthB64, krootB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
-      sessionStorage.setItem(`agentTownHouseKroot:${houseId}`, krootB64);
-    },
-    {
-      houseId: houseA.houseId,
-      houseAuthB64: houseA.kauth.toString('base64'),
-      krootB64: houseA.kroot.toString('base64')
-    }
-  );
-
-  await page.goto(`/inbox/${encodeURIComponent(houseA.houseId)}`);
-
-  await expect(page.locator('#requests')).toContainText('E2EE decrypted');
-  await expect(page.locator('#requests')).toContainText('pony e2ee read body');
-  await expect(page.locator('#requests')).toContainText('Legacy plaintext');
-  await expect(page.locator('#requests')).toContainText('legacy plaintext migration note');
+  });
+  expect(oversized.status()).toBe(400);
+  expect((await oversized.json()).error).toBe('PONY_CIPHERTEXT_TOO_LARGE');
 });

@@ -31,6 +31,9 @@ function b64ToBytes(str) {
 // --- Pony Express v0 (inbox + sealed notes) ---
 const MAYOR_HOUSE_ID = 'npc_mayor';
 const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
+const PONY_MAX_PLAINTEXT_CT_BYTES = 4096;
+const PONY_MAX_E2EE_CT_BYTES = 32 * 1024;
+const PONY_MAX_E2EE_AAD_BYTES = 4096;
 
 function makePonyMsgKeyInfo({ fromHouseId = '', toHouseId = '' }) {
   const from = typeof fromHouseId === 'string' ? fromHouseId : '';
@@ -53,9 +56,11 @@ function normalizePonyCiphertextE2EE(ciphertext) {
   const epkBytes = decodeB64(epk);
   const aadBytes = decodeB64(aad);
   if (!ivBytes || ivBytes.length < 8 || ivBytes.length > 32) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
-  if (!ctBytes || ctBytes.length < 17) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!ctBytes || ctBytes.length < 17 || ctBytes.length > PONY_MAX_E2EE_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
   if (!epkBytes || epkBytes.length < 48 || epkBytes.length > 2048) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
-  if (!aadBytes || !aadBytes.length) throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  if (!aadBytes || !aadBytes.length || aadBytes.length > PONY_MAX_E2EE_AAD_BYTES) {
+    throw new Error('INVALID_PONY_E2EE_ENVELOPE');
+  }
 
   return {
     alg: PONY_E2EE_P256_AESGCM_V1,
@@ -66,16 +71,23 @@ function normalizePonyCiphertextE2EE(ciphertext) {
   };
 }
 
-function normalizePonyCiphertext(ciphertext, legacyBody = '') {
+function normalizePonyCiphertext(ciphertext, legacyBody = '', opts = {}) {
+  const allowCustomAlg = opts && opts.allowCustomAlg === true;
   if (ciphertext && typeof ciphertext === 'object') {
     const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : '';
     const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
     const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
     if (!alg || !ct) throw new Error('INVALID_CIPHERTEXT');
     if (alg === PONY_E2EE_P256_AESGCM_V1) return normalizePonyCiphertextE2EE(ciphertext);
+    if (alg !== 'PLAINTEXT') {
+      if (!allowCustomAlg) throw new Error('UNSUPPORTED_PONY_CIPHER');
+      return { alg, iv, ct };
+    }
+    if (Buffer.byteLength(ct, 'utf8') > PONY_MAX_PLAINTEXT_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
     return { alg, iv, ct };
   }
   if (typeof legacyBody === 'string' && legacyBody.trim()) {
+    if (Buffer.byteLength(legacyBody, 'utf8') > PONY_MAX_PLAINTEXT_CT_BYTES) throw new Error('PONY_CIPHERTEXT_TOO_LARGE');
     return { alg: 'PLAINTEXT', iv: '', ct: legacyBody };
   }
   throw new Error('MISSING_CIPHERTEXT');
@@ -189,13 +201,17 @@ function normalizeHouseList(values) {
 
 function getHousePonyPolicy(house) {
   const policy = house?.ponyPolicy || {};
+  const hasPonyInbox = !!getHousePonyInboxKey(house);
   return {
     allowlist: normalizeHouseList(policy.allowlist),
     blocklist: normalizeHouseList(policy.blocklist),
     autoAcceptAllowlist: policy.autoAcceptAllowlist !== false,
     allowAnonymous: policy.allowAnonymous !== false,
     requirePostageAnonymous: policy.requirePostageAnonymous === true,
-    requireReceiptAnonymous: policy.requireReceiptAnonymous === true
+    requireReceiptAnonymous: policy.requireReceiptAnonymous === true,
+    allowLegacyPlaintext: typeof policy.allowLegacyPlaintext === 'boolean'
+      ? policy.allowLegacyPlaintext
+      : !hasPonyInbox
   };
 }
 
@@ -1641,7 +1657,7 @@ app.post('/api/share/create', (req, res) => {
       `— The Mayor`
     ].join('\n');
 
-    let mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
+    let mayorCiphertext = null;
     if (mayorTargetPony?.pub) {
       try {
         mayorCiphertext = encryptPonyE2EEForHouse({
@@ -1652,18 +1668,23 @@ app.post('/api/share/create', (req, res) => {
           createdAt: nowIso()
         });
       } catch {
-        mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
+        mayorCiphertext = null;
       }
+    } else {
+      // Migration fallback for old houses that do not publish Pony inbox keys.
+      mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
     }
 
-    store.inbox.push(
-      makeInboxMsg({
-        toHouseId: mayorTargetHouseId,
-        fromHouseId: MAYOR_HOUSE_ID,
-        ciphertext: mayorCiphertext,
-        status: 'accepted'
-      })
-    );
+    if (mayorCiphertext) {
+      store.inbox.push(
+        makeInboxMsg({
+          toHouseId: mayorTargetHouseId,
+          fromHouseId: MAYOR_HOUSE_ID,
+          ciphertext: mayorCiphertext,
+          status: 'accepted'
+        })
+      );
+    }
   }
 
   writeStore(store);
@@ -1800,11 +1821,18 @@ app.post('/api/pony/send', (req, res) => {
     if (msg === 'INVALID_TRANSPORT') {
       return res.status(400).json({ ok: false, error: msg });
     }
+    if (msg === 'UNSUPPORTED_PONY_CIPHER' || msg === 'PONY_CIPHERTEXT_TOO_LARGE') {
+      return res.status(400).json({ ok: false, error: msg });
+    }
     return res.status(400).json({ ok: false, error: msg || 'INVALID_CIPHERTEXT' });
   }
 
   const policy = getHousePonyPolicy(toResolved.house);
   const senderHouseId = fromResolved?.houseId || null;
+
+  if (normalizedCiphertext.alg === 'PLAINTEXT' && !policy.allowLegacyPlaintext) {
+    return res.status(400).json({ ok: false, error: 'PONY_CIPHERTEXT_REQUIRED' });
+  }
 
   if (!senderHouseId && !policy.allowAnonymous) {
     return res.status(403).json({ ok: false, error: 'ANONYMOUS_NOT_ALLOWED' });
@@ -1999,6 +2027,9 @@ app.post('/api/pony/policy', (req, res) => {
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'requireReceiptAnonymous')) {
       nextPolicy.requireReceiptAnonymous = req.body.requireReceiptAnonymous === true;
     }
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowLegacyPlaintext')) {
+      nextPolicy.allowLegacyPlaintext = req.body.allowLegacyPlaintext === true;
+    }
 
     resolved.house.ponyPolicy = nextPolicy;
     writeStore(store);
@@ -2136,7 +2167,7 @@ app.post('/api/pony/vault/append', (req, res) => {
   let refsMeta = [];
   const kind = typeof req.body?.kind === 'string' && req.body.kind.trim() ? req.body.kind.trim() : 'vault.append.v1';
   try {
-    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body);
+    normalizedCiphertext = normalizePonyCiphertext(req.body?.ciphertext, req.body?.body, { allowCustomAlg: true });
     normalizedPostage = normalizePonyPostage(req.body?.postage);
     refsMeta = normalizeVaultRefsMeta(refs, req.body?.refsMeta, 16, MAX_VAULT_REF_BYTES);
     ponyPostageVerifier.verify({

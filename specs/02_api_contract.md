@@ -303,7 +303,7 @@ Returns suggested post text and the `sharePath`.
 
 ---
 
-## Pony Express inbox + vault (phases 1-6)
+## Pony Express inbox + vault (phases 1-7)
 
 Canonical addressing:
 - Preferred house address is `houseId` (base58).
@@ -369,7 +369,7 @@ Rules:
 - At least one of `toHouseId` / `toErc8004Id` is required.
 - If `fromHouseId` is provided, request must be house-auth signed by that house.
 - Reserved sender `npc_mayor` is server-only.
-- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`, `requireReceiptAnonymous`).
+- Receiver policy is enforced (`allowAnonymous`, `allowlist`, `blocklist`, `autoAcceptAllowlist`, `requirePostageAnonymous`, `requireReceiptAnonymous`, `allowLegacyPlaintext`).
 - Transport dispatch is adapter-based:
   - default adapter handles `relay.http.v1`
   - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
@@ -383,7 +383,10 @@ Rules:
   - dispatch-style receipt ids (`dr_...`) are resolved against stored dispatch receipts
   - when a dispatch receipt is resolved, it must belong to the same `toHouseId`
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
-- Migration compatibility: legacy `{ "alg": "PLAINTEXT", "iv": "", "ct": "..." }` is still accepted in phase-7 rollout.
+- Strict cutover:
+  - `ciphertext.alg` must be `PONY_E2EE_P256_AESGCM_V1` for key-enabled houses unless `allowLegacyPlaintext=true` is set on receiver policy.
+  - For houses without Pony inbox keys, legacy plaintext remains allowed by default during migration.
+  - Plaintext payload size is capped (`PONY_CIPHERTEXT_TOO_LARGE`).
 
 Response:
 ```json
@@ -411,6 +414,9 @@ Errors:
 - `RESERVED_FROM`
 - `MISSING_CIPHERTEXT`
 - `INVALID_CIPHERTEXT`
+- `UNSUPPORTED_PONY_CIPHER`
+- `PONY_CIPHERTEXT_REQUIRED`
+- `PONY_CIPHERTEXT_TOO_LARGE`
 - `INVALID_PONY_E2EE_ENVELOPE`
 - `INVALID_TRANSPORT`
 - `INVALID_POSTAGE`
@@ -479,11 +485,13 @@ Body:
   "autoAcceptAllowlist": true,
   "allowAnonymous": false,
   "requirePostageAnonymous": true,
-  "requireReceiptAnonymous": false
+  "requireReceiptAnonymous": false,
+  "allowLegacyPlaintext": false
 }
 ```
 Requires house-auth. Policy lists are normalized to canonical house ids.
 `requireReceiptAnonymous=true` enforces receipt-backed anonymous postage (`receipt.v1`) and rejects anonymous `pow.v1`/`none`.
+`allowLegacyPlaintext=false` enforces E2EE-only inbound messages for key-enabled houses.
 
 ### POST `/api/pony/inbox/:id/accept`
 Body:
