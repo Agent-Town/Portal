@@ -90,6 +90,7 @@ function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
 
 const SHARE_CACHE_KEY = 'agentTownShareCache';
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+const HOUSE_KROOT_CACHE_PREFIX = 'agentTownHouseKroot:';
 const SHARE_COPY_LABEL = 'Copy share link';
 const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
@@ -141,6 +142,10 @@ function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
 
+function houseKrootCacheKey(houseId) {
+  return `${HOUSE_KROOT_CACHE_PREFIX}${houseId}`;
+}
+
 function cacheHouseAuthBytes(houseId, keyBytes) {
   if (!houseId || !keyBytes || !keyBytes.length) return;
   try {
@@ -154,6 +159,24 @@ function clearHouseAuthCache(houseId) {
   if (!houseId) return;
   try {
     sessionStorage.removeItem(houseAuthCacheKey(houseId));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function cacheHouseKrootBytes(houseId, keyBytes) {
+  if (!houseId || !keyBytes || !keyBytes.length) return;
+  try {
+    sessionStorage.setItem(houseKrootCacheKey(houseId), b64(keyBytes));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearHouseKrootCache(houseId) {
+  if (!houseId) return;
+  try {
+    sessionStorage.removeItem(houseKrootCacheKey(houseId));
   } catch {
     // ignore storage errors
   }
@@ -437,7 +460,10 @@ function clearClientFlowState() {
     // Clear any cached house auth keys for this origin.
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
-      if (key && key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
+      if (!key) continue;
+      if (key.startsWith(HOUSE_AUTH_CACHE_PREFIX) || key.startsWith(HOUSE_KROOT_CACHE_PREFIX)) {
+        sessionStorage.removeItem(key);
+      }
     }
   } catch {
     // ignore
@@ -1010,11 +1036,12 @@ function setUnlockButtonState(isUnlocked) {
   btn.disabled = !!isUnlocked;
 }
 
-async function initKeysFromKroot(Kroot) {
+async function initKeysFromKroot(Kroot, houseId = null) {
   KrootBytes = Kroot;
   Kenc = await deriveHouseEncKey(KrootBytes);
   KauthBytes = await deriveHouseAuthKey(KrootBytes);
   KauthKey = await crypto.subtle.importKey('raw', KauthBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  if (houseId) cacheHouseKrootBytes(houseId, KrootBytes);
 }
 
 async function recoverHouseKeyWithWallet(houseId) {
@@ -1082,7 +1109,7 @@ async function recoverHouseKeyWithWallet(houseId) {
   const houseIdBytes = await sha256(kroot);
   const derivedHouseId = base58Encode(houseIdBytes);
   if (derivedHouseId !== houseId) throw new Error('HOUSE_ID_MISMATCH');
-  await initKeysFromKroot(kroot);
+  await initKeysFromKroot(kroot, houseId);
   return true;
 }
 
@@ -1095,6 +1122,7 @@ function wipeKeys() {
   KauthBytes = null;
   KauthKey = null;
   clearHouseAuthCache(prevHouseId);
+  clearHouseKrootCache(prevHouseId);
   if (autoLockTimer) {
     clearTimeout(autoLockTimer);
     autoLockTimer = null;
@@ -1143,7 +1171,7 @@ async function unlockExistingHouse(houseId) {
     const houseIdBytes = await sha256(Kroot);
     const derivedHouseId = base58Encode(houseIdBytes);
     if (derivedHouseId === houseId) {
-      await initKeysFromKroot(Kroot);
+      await initKeysFromKroot(Kroot, houseId);
       usedCeremony = true;
     } else {
       setStatus('Ceremony mismatch. Trying wallet recovery…');
