@@ -82,6 +82,13 @@ test('co-op open -> co-create -> generate house -> unlock with wallet signature'
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();
 
+  const ponyResolve = await request.get(`/api/pony/resolve?houseId=${encodeURIComponent(houseId)}`);
+  expect(ponyResolve.ok()).toBeTruthy();
+  const ponyResolveData = await ponyResolve.json();
+  expect(typeof ponyResolveData.ponyInboxPub).toBe('string');
+  expect(ponyResolveData.ponyInboxPub.length).toBeGreaterThan(20);
+  expect(ponyResolveData.ponyInboxKeyVersion).toBe(1);
+
   // /api/house/:id/meta should exist (house-authenticated)
   const matResp = await request.get(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`);
   const mat = await matResp.json();

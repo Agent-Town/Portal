@@ -207,6 +207,41 @@ async function init() {
     return new Uint8Array(bits);
   }
 
+  async function derivePonyInboxWrapKey(Kroot) {
+    const info = new TextEncoder().encode('elizatown-pony-inbox-wrap-v1');
+    const salt = new Uint8Array([]);
+    const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveBits']);
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'HKDF', hash: 'SHA-256', salt, info },
+      baseKey,
+      256
+    );
+    return new Uint8Array(bits);
+  }
+
+  async function makePonyInboxRegistration(Kroot) {
+    const pair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits']
+    );
+    const pub = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+    const priv = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+
+    const wrapKeyBytes = await derivePonyInboxWrapKey(Kroot);
+    const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+    const wrapped = await aesGcmEncrypt(wrapKey, priv);
+
+    return {
+      ponyInboxPub: b64(pub),
+      ponyInboxPrivWrap: {
+        alg: 'AES-GCM',
+        iv: b64(wrapped.iv),
+        ct: b64(wrapped.ct)
+      }
+    };
+  }
+
   async function deriveRhFromCanvas(pxs) {
     const raw = new TextEncoder().encode(JSON.stringify({ v: 1, pixels: pxs }));
     return sha256(raw);
@@ -356,6 +391,7 @@ async function init() {
       const houseIdBytes = await sha256(Kroot);
       const housePubKey = base58Encode(houseIdBytes);
       const houseAuthKey = b64(await deriveHouseAuthKey(Kroot));
+      const ponyInbox = await makePonyInboxRegistration(Kroot);
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
       const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
@@ -380,7 +416,9 @@ async function init() {
           keyMode: 'ceremony',
           unlock: { kind: 'solana-wallet-signature', address },
           keyWrap,
-          houseAuthKey
+          houseAuthKey,
+          ponyInboxPub: ponyInbox.ponyInboxPub,
+          ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
         })
       });
 
