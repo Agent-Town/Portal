@@ -34,6 +34,7 @@ const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const AGENT_API_KEY_STORAGE_KEY = 'agentTownAgentOpenAIKey';
 // startRole: 'human' | 'coop' | 'agent'
 let pathMode = 'coop';
+let agentChatRuntime = null;
 
 function b64(bytes) {
   let bin = '';
@@ -196,10 +197,15 @@ function updatePathButtons() {
 
 function setPathMode(mode, { persist = true, refresh = true } = {}) {
   const next = mode === 'human' || mode === 'agent' || mode === 'coop' ? mode : 'coop';
+  const previous = pathMode;
   pathMode = next;
   if (persist) savePathMode(next);
   updatePathButtons();
   if (refresh && lastState) updateUI(lastState);
+
+  if (next === 'coop' && previous !== 'coop' && agentChatRuntime) {
+    agentChatRuntime.startHatching({ openWindow: true });
+  }
 }
 
 function toggleAgentOnly(show) {
@@ -481,7 +487,30 @@ function updateUI(state) {
         ? 'Human mode: solo house (token) + wallet reconnect.'
         : pathMode === 'agent'
           ? 'Agent mode: read skill.md and connect using a team code from a human.'
-          : 'Co-op mode: human + agent unlock together.';
+          : 'Co-op mode: hatching starts browser-agent + human onboarding together.';
+  }
+
+  const startHatchingBtn = el('startHatchingBtn');
+  const hatchingStatus = el('hatchingStatus');
+  const isCoop = pathMode === 'coop';
+  if (startHatchingBtn) {
+    startHatchingBtn.classList.toggle('is-hidden', !isCoop);
+    const started = !!state.hatching?.started;
+    startHatchingBtn.textContent = started ? 'Open hatching chat' : 'Start hatching with browser agent';
+  }
+  if (hatchingStatus) {
+    if (!isCoop) {
+      hatchingStatus.classList.add('is-hidden');
+    } else {
+      hatchingStatus.classList.remove('is-hidden');
+      hatchingStatus.textContent = state.hatching?.started
+        ? `Hatching active${state.hatching?.completedAt ? ' (onboarding complete)' : ''}`
+        : 'Hatching idle';
+    }
+  }
+
+  if (isCoop && state.hatching?.started && agentChatRuntime) {
+    agentChatRuntime.onStateUpdate(state);
   }
 
   // Agent status
@@ -671,6 +700,14 @@ async function init() {
     pathAgentBtn.addEventListener('click', () => setPathMode('agent'));
   }
 
+  const startHatchingBtn = el('startHatchingBtn');
+  if (startHatchingBtn) {
+    startHatchingBtn.addEventListener('click', () => {
+      setPathMode('coop');
+      agentChatRuntime?.startHatching({ openWindow: true });
+    });
+  }
+
   const tokenVerifyBtn = el('tokenVerifyBtn');
   if (tokenVerifyBtn) {
     tokenVerifyBtn.addEventListener('click', async () => {
@@ -732,8 +769,8 @@ async function init() {
     }
   });
 
-  // --- Agent drawer (MVP) ---
-  setupAgentDrawer();
+  // --- Agent drawer / browser-agent runtime ---
+  agentChatRuntime = setupAgentDrawer();
 
   updateWalletUI();
   restoreWalletConnection();
@@ -758,6 +795,8 @@ function setupAgentDrawer() {
   const model = 'gpt-4o-mini';
   let sending = false;
   let runtimeCaps = { llm: { codexCli: false } };
+  let hatchingStarted = false;
+  let lastOnboardingPhase = null;
 
   function readSavedKey() {
     try {
@@ -825,6 +864,71 @@ function setupAgentDrawer() {
       '- Be concise, practical, and specific.',
       `Context: teamCode=${teamCode}, houseId=${houseId}`
     ].join('\n');
+  }
+
+  function onboardingPhaseFromState(state) {
+    if (!state || pathMode !== 'coop') return null;
+    if (state.signup?.complete) return 'complete';
+    if (!state.agent?.connected) return 'connect-agent';
+    if (!state.match?.matched) return 'match-sigil';
+    if (!state.human?.openPressed || !state.agent?.openPressed) return 'press-open';
+    return 'finalizing';
+  }
+
+  function onboardingHintForPhase(phase, state) {
+    const teamCode = state?.teamCode || 'unknown';
+    if (phase === 'connect-agent') {
+      return `Hatching started. Step 1: connect your browser agent with team code ${teamCode}.`;
+    }
+    if (phase === 'match-sigil') {
+      return 'Step 2: pick a sigil and ask your browser agent to pick the same one.';
+    }
+    if (phase === 'press-open') {
+      return 'Step 3: both of you press Open to finish onboarding.';
+    }
+    if (phase === 'finalizing') {
+      return 'Great — both Open presses are in. Finalizing onboarding now.';
+    }
+    if (phase === 'complete') {
+      return 'Onboarding complete. Next: create your house and continue hatching together.';
+    }
+    return null;
+  }
+
+  async function startHatching({ openWindow = true } = {}) {
+    let startedPayload = null;
+    try {
+      const result = await api('/api/hatching/start', { method: 'POST', body: JSON.stringify({ mode: 'coop' }) });
+      hatchingStarted = !!result?.hatching?.started;
+      startedPayload = result?.hatching || null;
+    } catch {
+      hatchingStarted = true;
+    }
+
+    if (openWindow) setOpen(true);
+    if (!hatchingStarted) return;
+
+    if (lastState) {
+      if (startedPayload) {
+        updateUI({ ...lastState, hatching: startedPayload });
+      }
+      const phase = onboardingPhaseFromState(lastState);
+      if (phase && phase !== lastOnboardingPhase) {
+        const hint = onboardingHintForPhase(phase, lastState);
+        if (hint) addMsg(hint, 'agent');
+        lastOnboardingPhase = phase;
+      }
+    }
+  }
+
+  function onStateUpdate(state) {
+    if (state?.hatching?.started) hatchingStarted = true;
+    if (!hatchingStarted || pathMode !== 'coop') return;
+    const phase = onboardingPhaseFromState(state);
+    if (!phase || phase === lastOnboardingPhase) return;
+    const hint = onboardingHintForPhase(phase, state);
+    if (hint) addMsg(hint, 'agent');
+    lastOnboardingPhase = phase;
   }
 
   async function fetchRuntimeCaps() {
@@ -920,6 +1024,12 @@ function setupAgentDrawer() {
 
   addMsg('Browser agent is ready. Ask me anything about your current Portal flow.', 'agent');
   fetchRuntimeCaps();
+
+  return {
+    open: () => setOpen(true),
+    startHatching,
+    onStateUpdate
+  };
 }
 
 init().catch((e) => {

@@ -516,6 +516,13 @@ function recordSignup(session, { mode, agentName = null, matchedElement = null, 
   session.signup.mode = mode;
   session.signup.address = address || null;
 
+  if (!session.hatching) {
+    session.hatching = { started: false, startedAt: null, completedAt: null, mode: null };
+  }
+  if (session.hatching.started && !session.hatching.completedAt) {
+    session.hatching.completedAt = record.createdAt;
+  }
+
   return { complete: true, already: false, createdAt: record.createdAt };
 }
 
@@ -696,6 +703,7 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: s.houseCeremony?.houseId || null,
+    hatching: s.hatching || { started: false, startedAt: null, completedAt: null, mode: null },
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -811,6 +819,33 @@ app.post('/api/agent/house/connect', (req, res) => {
   res.json({ ok: true, houseId });
 });
 
+app.post('/api/hatching/start', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const mode = typeof req.body?.mode === 'string' ? req.body.mode.trim() : 'coop';
+  if (!s.hatching) {
+    s.hatching = { started: false, startedAt: null, completedAt: null, mode: null };
+  }
+  if (!s.hatching.started) {
+    s.hatching.started = true;
+    s.hatching.startedAt = nowIso();
+  }
+  s.hatching.mode = mode || 'coop';
+
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    hatching: s.hatching,
+    onboarding: {
+      steps: [
+        'Connect browser agent with team code',
+        'Match sigils (human + agent)',
+        'Press Open together',
+        'Create house and continue onboarding'
+      ]
+    }
+  });
+});
+
 // --- Agent interaction ---
 // Browser agent lives client-side; this endpoint stays as an explicit guardrail.
 app.post('/api/agent/chat', (req, res) => {
@@ -842,7 +877,8 @@ app.get('/api/agent/state', (req, res) => {
     signup: s.signup,
     share: s.share,
     canvas: { w: s.canvas.w, h: s.canvas.h },
-    houseId: s.houseCeremony?.houseId || null
+    houseId: s.houseCeremony?.houseId || null,
+    hatching: s.hatching || { started: false, startedAt: null, completedAt: null, mode: null }
   });
 });
 

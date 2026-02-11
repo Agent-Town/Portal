@@ -84,6 +84,12 @@ function createSession({ flow } = {}) {
       agentReveal: null,
       houseId: null,
       createdAt: null
+    },
+    hatching: {
+      started: false,
+      startedAt: null,
+      completedAt: null,
+      mode: null
     }
   };
 

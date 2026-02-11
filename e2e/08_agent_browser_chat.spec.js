@@ -9,7 +9,8 @@ test.beforeEach(async ({ request }) => {
 test('agent drawer uses in-browser runtime + llm proxy path', async ({ page, request }) => {
   await page.goto('/');
 
-  await page.click('#agentDrawerBtn');
+  await page.click('#startHatchingBtn');
+  await expect(page.locator('#hatchingStatus')).toContainText('Hatching active');
   await expect(page.locator('#agentDrawer')).toBeVisible();
 
   await page.fill('#agentApiKeyInput', 'test-key');
