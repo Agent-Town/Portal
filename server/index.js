@@ -2007,7 +2007,9 @@ app.post('/api/pony/policy', (req, res) => {
   if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
 
   try {
-    const nextPolicy = getHousePonyPolicy({ ponyPolicy: resolved.house.ponyPolicy || {} });
+    // Seed from the resolved house so defaults that depend on house state (e.g. ponyInbox presence)
+    // are preserved when patching only a subset of policy fields.
+    const nextPolicy = getHousePonyPolicy(resolved.house);
 
     if (Object.prototype.hasOwnProperty.call(req.body || {}, 'allowlist')) {
       nextPolicy.allowlist = normalizePolicyHouseEntries(store, req.body.allowlist);

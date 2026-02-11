@@ -131,6 +131,15 @@ test('phase7 cutover: plaintext rejection default + policy override + payload li
   const legacyPolicy = await legacyPolicyGet.json();
   expect(legacyPolicy.policy.allowLegacyPlaintext).toBe(true);
 
+  const tightenPolicyBody = JSON.stringify({ houseId: strictHouse.houseId, autoAcceptAllowlist: true });
+  const tightenPolicyHeaders = houseAuthHeaders(strictHouse.houseId, 'POST', policyPath, tightenPolicyBody, strictHouse.kauth);
+  const tightenPolicy = await request.post(policyPath, {
+    data: tightenPolicyBody,
+    headers: { 'content-type': 'application/json', ...tightenPolicyHeaders }
+  });
+  expect(tightenPolicy.ok()).toBeTruthy();
+  expect((await tightenPolicy.json()).policy.allowLegacyPlaintext).toBe(false);
+
   const sendPath = '/api/pony/send';
   const rejectedPlain = await request.post(sendPath, {
     data: {
@@ -166,4 +175,40 @@ test('phase7 cutover: plaintext rejection default + policy override + payload li
   });
   expect(oversized.status()).toBe(400);
   expect((await oversized.json()).error).toBe('PONY_CIPHERTEXT_TOO_LARGE');
+});
+
+test('policy patch keeps allowLegacyPlaintext disabled for key-enabled houses', async ({ request }) => {
+  const strictHouse = await createAgentSoloHouse(request, 'StrictPolicyMerge', { withPonyInbox: true });
+
+  const policyPath = '/api/pony/policy';
+  const getHeaders = houseAuthHeaders(strictHouse.houseId, 'GET', policyPath, '', strictHouse.kauth);
+  let getPolicy = await request.get(`${policyPath}?houseId=${encodeURIComponent(strictHouse.houseId)}`, {
+    headers: getHeaders
+  });
+  expect(getPolicy.ok()).toBeTruthy();
+  expect((await getPolicy.json()).policy.allowLegacyPlaintext).toBe(false);
+
+  const patchBody = JSON.stringify({ houseId: strictHouse.houseId, requirePostageAnonymous: true });
+  const patchHeaders = houseAuthHeaders(strictHouse.houseId, 'POST', policyPath, patchBody, strictHouse.kauth);
+  const patchPolicy = await request.post(policyPath, {
+    data: patchBody,
+    headers: { 'content-type': 'application/json', ...patchHeaders }
+  });
+  expect(patchPolicy.ok()).toBeTruthy();
+  expect((await patchPolicy.json()).policy.allowLegacyPlaintext).toBe(false);
+
+  getPolicy = await request.get(`${policyPath}?houseId=${encodeURIComponent(strictHouse.houseId)}`, {
+    headers: getHeaders
+  });
+  expect(getPolicy.ok()).toBeTruthy();
+  expect((await getPolicy.json()).policy.allowLegacyPlaintext).toBe(false);
+
+  const sendPlain = await request.post('/api/pony/send', {
+    data: {
+      toHouseId: strictHouse.houseId,
+      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'plaintext should remain blocked' }
+    }
+  });
+  expect(sendPlain.status()).toBe(400);
+  expect((await sendPlain.json()).error).toBe('PONY_CIPHERTEXT_REQUIRED');
 });
