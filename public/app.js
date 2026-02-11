@@ -347,15 +347,24 @@ async function resetSessionAndReload() {
 }
 
 async function maybeResetAfterWalletDisconnect() {
-  // Only auto-reset after a house exists for this session; this avoids nuking
-  // sessions mid-flow (e.g. after token verify but before /create).
-  if (lastState && lastState.houseId) {
+  // Auto-reset when this session is carrying identity-bound progress.
+  // This includes:
+  // - existing house session (shared-device safety)
+  // - token-verified human flow on the landing page
+  const shouldResetForState = (st) => !!(
+    st && (
+      st.houseId
+      || (st.signup?.complete && st.signup?.mode === 'token')
+    )
+  );
+
+  if (shouldResetForState(lastState)) {
     await resetSessionAndReload();
     return;
   }
   try {
     const st = await api('/api/state');
-    if (st && st.houseId) {
+    if (shouldResetForState(st)) {
       await resetSessionAndReload();
     }
   } catch {
