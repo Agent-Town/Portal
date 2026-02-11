@@ -522,6 +522,22 @@ input::placeholder {
   margin-top: 10px;
 }
 
+.inbox-scroll {
+  max-height: min(42vh, 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+
+.inbox-scroll .card + .card {
+  margin-top: 10px;
+}
+
+.inbox-scroll pre {
+  overflow-wrap: anywhere;
+}
+
 .card .public-media {
   margin-top: 10px;
   display: grid;

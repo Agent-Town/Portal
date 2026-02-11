@@ -1,8 +1,11 @@
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
 const PONY_INBOX_WRAP_INFO = 'elizatown-pony-inbox-wrap-v1';
+const INBOX_AUTO_REFRESH_MS = 3000;
 const houseKrootMemory = new Map();
 let lastFriends = [];
+let loadInFlight = null;
+let refreshTimer = null;
 
 function getHouseId() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -509,7 +512,7 @@ function escapeHtml(s) {
 }
 
 function setInboxError(msg) {
-  const status = document.getElementById('sendStatus');
+  const status = document.getElementById('inboxStatus');
   if (!status) return;
   status.textContent = msg || '';
 }
@@ -597,7 +600,7 @@ async function loadFriends(houseId) {
   }
 }
 
-async function load() {
+async function loadInternal() {
   const houseId = getHouseId();
   if (!houseId) return;
 
@@ -646,6 +649,26 @@ async function load() {
   }
 }
 
+async function load() {
+  if (loadInFlight) return loadInFlight;
+  loadInFlight = (async () => {
+    try {
+      await loadInternal();
+    } finally {
+      loadInFlight = null;
+    }
+  })();
+  return loadInFlight;
+}
+
+function startAutoRefresh() {
+  if (refreshTimer) return;
+  refreshTimer = window.setInterval(() => {
+    if (document.hidden) return;
+    load().catch(() => {});
+  }, INBOX_AUTO_REFRESH_MS);
+}
+
 async function send() {
   const houseId = getHouseId();
   const body = document.getElementById('body').value;
@@ -681,6 +704,7 @@ async function send() {
     await authedApi({ houseId, url: '/api/pony/send', method: 'POST', json: payload });
     document.getElementById('body').value = '';
     sendStatus.textContent = 'Sent.';
+    await load();
   } catch (e) {
     if (e.message === 'RECEIVER_KEY_UNAVAILABLE') {
       sendStatus.textContent = 'Error: receiver does not publish Pony inbox keys yet.';
@@ -723,4 +747,18 @@ if (friendSelect) {
   };
 }
 
-load();
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) load().catch(() => {});
+});
+
+window.addEventListener('beforeunload', () => {
+  if (!refreshTimer) return;
+  clearInterval(refreshTimer);
+  refreshTimer = null;
+});
+
+load()
+  .catch(() => {})
+  .finally(() => {
+    startAutoRefresh();
+  });

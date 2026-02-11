@@ -14,6 +14,10 @@ async function api(url, opts = {}) {
 }
 
 function el(id) { return document.getElementById(id); }
+const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+const friendAddStatusByShare = new Map();
+let cachedCurrentHouseId = null;
+let currentHouseLookup = null;
 
 function loadHouseIdFromCache() {
   try {
@@ -29,18 +33,126 @@ function loadHouseIdFromCache() {
   }
 }
 
+function houseAuthCacheKey(houseId) {
+  return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
+}
+
+function unb64(str) {
+  try {
+    const bin = atob(str);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+async function sha256Base64(input) {
+  const bytes = new TextEncoder().encode(input || '');
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const arr = new Uint8Array(digest);
+  let bin = '';
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+  return btoa(bin);
+}
+
+async function importHouseAuthKey(houseId) {
+  const raw = sessionStorage.getItem(houseAuthCacheKey(houseId));
+  if (!raw) return null;
+  const keyBytes = unb64(raw);
+  if (!keyBytes || keyBytes.length < 16) return null;
+  return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+}
+
+async function houseAuthHeaders(houseId, method, path, body) {
+  const key = await importHouseAuthKey(houseId);
+  if (!key) throw new Error('HOUSE_AUTH_NOT_READY');
+  const ts = String(Date.now());
+  const bodyHash = await sha256Base64(body || '');
+  const msg = `${houseId}.${ts}.${method.toUpperCase()}.${path}.${bodyHash}`;
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  const bytes = new Uint8Array(sig);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return { 'x-house-ts': ts, 'x-house-auth': btoa(bin) };
+}
+
+async function authedApi({ houseId, url, method = 'GET', json = null }) {
+  const parsed = new URL(url, window.location.origin);
+  const path = parsed.pathname;
+  const body = json == null ? '' : JSON.stringify(json);
+  const authHeaders = await houseAuthHeaders(houseId, method, path, body);
+  return api(url, {
+    method,
+    body: json == null ? undefined : body,
+    headers: {
+      ...authHeaders
+    }
+  });
+}
+
+async function resolveCurrentHouseId() {
+  if (cachedCurrentHouseId) return cachedCurrentHouseId;
+  if (currentHouseLookup) return currentHouseLookup;
+  currentHouseLookup = (async () => {
+    let houseId = loadHouseIdFromCache();
+    if (!houseId) {
+      try {
+        const st = await api('/api/state');
+        houseId = st.houseId || null;
+      } catch {
+        houseId = null;
+      }
+    }
+    cachedCurrentHouseId = houseId || null;
+    return cachedCurrentHouseId;
+  })();
+  try {
+    return await currentHouseLookup;
+  } finally {
+    currentHouseLookup = null;
+  }
+}
+
+function setFriendStatus(shareId, msg, isError = false) {
+  if (!shareId) return;
+  if (!msg) {
+    friendAddStatusByShare.delete(shareId);
+    return;
+  }
+  friendAddStatusByShare.set(shareId, { msg, isError });
+}
+
+function mapFriendError(error) {
+  const msg = String(error?.message || '');
+  if (msg === 'HOUSE_AUTH_NOT_READY' || msg === 'HOUSE_AUTH_REQUIRED' || msg === 'HOUSE_AUTH_INVALID' || msg === 'HOUSE_AUTH_EXPIRED') {
+    return 'Unlock your house first in this same tab.';
+  }
+  if (msg === 'HOUSE_NOT_READY') return 'Create or reconnect to your house first.';
+  if (msg === 'FRIEND_NOT_FOUND') return 'Target share could not be resolved.';
+  if (msg === 'SELF_FRIEND') return 'That is already your house.';
+  return `Error: ${msg || 'UNKNOWN'}`;
+}
+
+async function addShareAsFriend(targetShareId) {
+  const houseId = await resolveCurrentHouseId();
+  if (!houseId) throw new Error('HOUSE_NOT_READY');
+  await authedApi({
+    houseId,
+    url: '/api/pony/friends',
+    method: 'POST',
+    json: {
+      houseId,
+      friendHouseId: targetShareId
+    }
+  });
+}
+
 async function initHouseNavLink() {
   const link = el('houseNavLink');
   if (!link) return;
-  let houseId = loadHouseIdFromCache();
-  if (!houseId) {
-    try {
-      const st = await api('/api/state');
-      houseId = st.houseId || null;
-    } catch {
-      houseId = null;
-    }
-  }
+  const houseId = await resolveCurrentHouseId();
   if (houseId) {
     link.classList.remove('is-hidden');
     link.href = `/house?house=${encodeURIComponent(houseId)}`;
@@ -102,6 +214,31 @@ function render(teams) {
 
     links.appendChild(share);
 
+    const add = document.createElement('button');
+    add.className = 'btn';
+    add.type = 'button';
+    add.textContent = 'Add as friend';
+    add.onclick = async () => {
+      add.disabled = true;
+      setFriendStatus(p.shareId, 'Adding…', false);
+      status.textContent = 'Adding…';
+      status.style.color = 'var(--muted)';
+      try {
+        await addShareAsFriend(p.shareId);
+        setFriendStatus(p.shareId, 'Added to Pony friends.', false);
+        status.textContent = 'Added to Pony friends.';
+        status.style.color = 'var(--muted)';
+      } catch (error) {
+        const msg = mapFriendError(error);
+        setFriendStatus(p.shareId, msg, true);
+        status.textContent = msg;
+        status.style.color = 'var(--bad)';
+      } finally {
+        add.disabled = false;
+      }
+    };
+    links.appendChild(add);
+
     if (p.xPostUrl) {
       const x = document.createElement('a');
       x.className = 'btn';
@@ -120,6 +257,19 @@ function render(teams) {
       mb.rel = 'noreferrer';
       mb.textContent = 'Moltbook post';
       links.appendChild(mb);
+    }
+
+    const status = document.createElement('div');
+    status.className = 'small';
+    status.dataset.friendAddStatus = p.shareId;
+    status.style.minHeight = '1em';
+    const friendStatus = friendAddStatusByShare.get(p.shareId);
+    if (friendStatus?.msg) {
+      status.textContent = friendStatus.msg;
+      status.style.color = friendStatus.isError ? 'var(--bad)' : 'var(--muted)';
+    } else {
+      status.textContent = '';
+      status.style.color = 'var(--muted)';
     }
 
     card.appendChild(title);
@@ -141,6 +291,7 @@ function render(teams) {
       card.appendChild(media);
     }
     card.appendChild(links);
+    card.appendChild(status);
     list.appendChild(card);
   });
 }

@@ -16,6 +16,9 @@ async function api(url, opts = {}) {
 }
 
 function el(id) { return document.getElementById(id); }
+const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+let cachedCurrentHouseId = null;
+let currentHouseLookup = null;
 
 function loadHouseIdFromCache() {
   try {
@@ -31,18 +34,104 @@ function loadHouseIdFromCache() {
   }
 }
 
+function houseAuthCacheKey(houseId) {
+  return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
+}
+
+function unb64(str) {
+  try {
+    const bin = atob(str);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+async function sha256Base64(input) {
+  const bytes = new TextEncoder().encode(input || '');
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const arr = new Uint8Array(digest);
+  let bin = '';
+  for (let i = 0; i < arr.length; i++) bin += String.fromCharCode(arr[i]);
+  return btoa(bin);
+}
+
+async function importHouseAuthKey(houseId) {
+  const raw = sessionStorage.getItem(houseAuthCacheKey(houseId));
+  if (!raw) return null;
+  const keyBytes = unb64(raw);
+  if (!keyBytes || keyBytes.length < 16) return null;
+  return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+}
+
+async function houseAuthHeaders(houseId, method, path, body) {
+  const key = await importHouseAuthKey(houseId);
+  if (!key) throw new Error('HOUSE_AUTH_NOT_READY');
+  const ts = String(Date.now());
+  const bodyHash = await sha256Base64(body || '');
+  const msg = `${houseId}.${ts}.${method.toUpperCase()}.${path}.${bodyHash}`;
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
+  const bytes = new Uint8Array(sig);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return { 'x-house-ts': ts, 'x-house-auth': btoa(bin) };
+}
+
+async function authedApi({ houseId, url, method = 'GET', json = null }) {
+  const parsed = new URL(url, window.location.origin);
+  const path = parsed.pathname;
+  const body = json == null ? '' : JSON.stringify(json);
+  const authHeaders = await houseAuthHeaders(houseId, method, path, body);
+  return api(url, {
+    method,
+    body: json == null ? undefined : body,
+    headers: {
+      ...authHeaders
+    }
+  });
+}
+
+async function resolveCurrentHouseId() {
+  if (cachedCurrentHouseId) return cachedCurrentHouseId;
+  if (currentHouseLookup) return currentHouseLookup;
+  currentHouseLookup = (async () => {
+    let houseId = loadHouseIdFromCache();
+    if (!houseId) {
+      try {
+        const st = await api('/api/state');
+        houseId = st.houseId || null;
+      } catch {
+        houseId = null;
+      }
+    }
+    cachedCurrentHouseId = houseId || null;
+    return cachedCurrentHouseId;
+  })();
+  try {
+    return await currentHouseLookup;
+  } finally {
+    currentHouseLookup = null;
+  }
+}
+
+function syncInboxLink(houseId) {
+  const link = el('openInboxLink');
+  if (!link) return;
+  if (houseId) {
+    link.classList.remove('is-hidden');
+    link.href = `/inbox/${encodeURIComponent(houseId)}`;
+  } else {
+    link.classList.add('is-hidden');
+    link.href = '#';
+  }
+}
+
 async function initHouseNavLink() {
   const link = el('houseNavLink');
   if (!link) return;
-  let houseId = loadHouseIdFromCache();
-  if (!houseId) {
-    try {
-      const st = await api('/api/state');
-      houseId = st.houseId || null;
-    } catch {
-      houseId = null;
-    }
-  }
+  const houseId = await resolveCurrentHouseId();
   if (houseId) {
     link.classList.remove('is-hidden');
     link.href = `/house?house=${encodeURIComponent(houseId)}`;
@@ -50,6 +139,7 @@ async function initHouseNavLink() {
     link.classList.add('is-hidden');
     link.href = '/house';
   }
+  syncInboxLink(houseId);
 }
 
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
@@ -110,12 +200,61 @@ function setPublicMedia(media) {
   prompt.textContent = media.prompt || '';
 }
 
+function setFriendAddStatus(msg, isError = false) {
+  const status = el('friendAddStatus');
+  if (!status) return;
+  status.textContent = msg || '';
+  status.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
+function mapFriendError(error) {
+  const msg = String(error?.message || '');
+  if (msg === 'HOUSE_AUTH_NOT_READY' || msg === 'HOUSE_AUTH_REQUIRED' || msg === 'HOUSE_AUTH_INVALID' || msg === 'HOUSE_AUTH_EXPIRED') {
+    return 'Unlock your house first in this same tab, then try again.';
+  }
+  if (msg === 'HOUSE_NOT_READY') return 'Create or reconnect to your house first.';
+  if (msg === 'FRIEND_NOT_FOUND') return 'Share target could not be resolved.';
+  if (msg === 'SELF_FRIEND') return 'That is already your house.';
+  return `Error: ${msg || 'UNKNOWN'}`;
+}
+
+async function addShareAsFriend(targetShareId) {
+  const houseId = await resolveCurrentHouseId();
+  if (!houseId) throw new Error('HOUSE_NOT_READY');
+  await authedApi({
+    houseId,
+    url: '/api/pony/friends',
+    method: 'POST',
+    json: {
+      houseId,
+      friendHouseId: targetShareId
+    }
+  });
+  return houseId;
+}
+
 async function init() {
   el('shareIdBadge').textContent = shareId;
-  initHouseNavLink();
+  await initHouseNavLink();
   const signup = el('signupBtn');
   if (signup) {
     signup.href = `/?ref=${encodeURIComponent(shareId)}`;
+  }
+  const addBtn = el('addFriendBtn');
+  if (addBtn) {
+    addBtn.onclick = async () => {
+      addBtn.disabled = true;
+      setFriendAddStatus('Adding…');
+      try {
+        const houseId = await addShareAsFriend(shareId);
+        syncInboxLink(houseId);
+        setFriendAddStatus('Added to Pony friends.');
+      } catch (error) {
+        setFriendAddStatus(mapFriendError(error), true);
+      } finally {
+        addBtn.disabled = false;
+      }
+    };
   }
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
   setTeamLine(r.share);
