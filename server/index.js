@@ -85,6 +85,8 @@ function makeDispatchReceiptId() {
 const PONY_RATE_WINDOW_MS = 60_000;
 const PONY_RATE_MAX_PER_PAIR = 20;
 const PONY_MAX_VAULT_EVENTS = 2000;
+const PONY_INBOX_KEY_VERSION = 1;
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const ponyRateBuckets = new Map();
 
 function normalizeHouseList(values) {
@@ -275,6 +277,102 @@ function deriveHousePonyFriendsFromAcceptedInbox(store, houseId) {
     if (from === houseId && to && to !== houseId) out.add(to);
   }
   return [...out];
+}
+
+function isCanonicalBase64(value) {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length % 4 !== 0) return false;
+  if (!BASE64_RE.test(trimmed)) return false;
+  const decoded = decodeB64(trimmed);
+  return !!(decoded && decoded.length);
+}
+
+function normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required = false } = {}) {
+  if (ponyInboxPrivWrap == null) {
+    if (required) throw new Error('MISSING_PONY_INBOX_PRIV_WRAP');
+    return null;
+  }
+  if (!ponyInboxPrivWrap || typeof ponyInboxPrivWrap !== 'object' || Array.isArray(ponyInboxPrivWrap)) {
+    throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  }
+
+  const alg = typeof ponyInboxPrivWrap.alg === 'string' ? ponyInboxPrivWrap.alg.trim() : '';
+  const iv = typeof ponyInboxPrivWrap.iv === 'string' ? ponyInboxPrivWrap.iv.trim() : '';
+  const ct = typeof ponyInboxPrivWrap.ct === 'string' ? ponyInboxPrivWrap.ct.trim() : '';
+  if (alg !== 'AES-GCM' || !iv || !ct) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  if (!isCanonicalBase64(iv) || !isCanonicalBase64(ct)) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+
+  const ivBytes = decodeB64(iv);
+  const ctBytes = decodeB64(ct);
+  if (!ivBytes || ivBytes.length < 8 || ivBytes.length > 32) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+  if (!ctBytes || ctBytes.length < 16) throw new Error('INVALID_PONY_INBOX_PRIV_WRAP');
+
+  return { alg: 'AES-GCM', iv, ct };
+}
+
+function normalizePonyInboxRegistration({ ponyInboxPub, ponyInboxPrivWrap }, { required = false } = {}) {
+  const pub = typeof ponyInboxPub === 'string' ? ponyInboxPub.trim() : '';
+  const hasPub = !!pub;
+  const hasPrivWrap = ponyInboxPrivWrap != null;
+
+  if (!hasPub && !hasPrivWrap) {
+    if (required) throw new Error('MISSING_PONY_INBOX_PUB');
+    return null;
+  }
+  if (!hasPub) throw new Error('MISSING_PONY_INBOX_PUB');
+  if (!isCanonicalBase64(pub)) throw new Error('INVALID_PONY_INBOX_PUB');
+
+  const pubBytes = decodeB64(pub);
+  if (!pubBytes || pubBytes.length < 48 || pubBytes.length > 2048) throw new Error('INVALID_PONY_INBOX_PUB');
+
+  const privWrap = normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required: true });
+  return {
+    version: PONY_INBOX_KEY_VERSION,
+    pub,
+    privWrap
+  };
+}
+
+function getHousePonyInboxKey(house) {
+  if (!house || typeof house !== 'object') return null;
+  const ponyInbox = house.ponyInbox;
+  if (!ponyInbox || typeof ponyInbox !== 'object') return null;
+
+  const pub = typeof ponyInbox.pub === 'string' ? ponyInbox.pub.trim() : '';
+  if (!pub) return null;
+
+  const versionRaw = Number(ponyInbox.version);
+  const version = Number.isFinite(versionRaw) && versionRaw >= 1 ? Math.floor(versionRaw) : PONY_INBOX_KEY_VERSION;
+
+  let privWrap = null;
+  if (ponyInbox.privWrap && typeof ponyInbox.privWrap === 'object') {
+    const alg = typeof ponyInbox.privWrap.alg === 'string' ? ponyInbox.privWrap.alg.trim() : '';
+    const iv = typeof ponyInbox.privWrap.iv === 'string' ? ponyInbox.privWrap.iv.trim() : '';
+    const ct = typeof ponyInbox.privWrap.ct === 'string' ? ponyInbox.privWrap.ct.trim() : '';
+    if (alg === 'AES-GCM' && iv && ct) privWrap = { alg, iv, ct };
+  }
+
+  return {
+    version,
+    pub,
+    privWrap,
+    createdAt: typeof ponyInbox.createdAt === 'string' ? ponyInbox.createdAt : null,
+    updatedAt: typeof ponyInbox.updatedAt === 'string' ? ponyInbox.updatedAt : null
+  };
+}
+
+function writeHousePonyInboxKey(house, registration) {
+  if (!house || typeof house !== 'object' || !registration) return;
+  const existing = getHousePonyInboxKey(house);
+  const now = nowIso();
+  house.ponyInbox = {
+    version: registration.version || PONY_INBOX_KEY_VERSION,
+    pub: registration.pub,
+    privWrap: registration.privWrap,
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  };
 }
 
 function computeVaultEventHash(event) {
@@ -1503,12 +1601,61 @@ app.get('/api/pony/resolve', (req, res) => {
   if (houseAddress) {
     const resolved = resolveHouseAddress(store, houseAddress);
     if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
-    return res.json({ ok: true, houseId: resolved.houseId, source: resolved.source || 'house' });
+    const ponyInbox = getHousePonyInboxKey(resolved.house);
+    return res.json({
+      ok: true,
+      houseId: resolved.houseId,
+      source: resolved.source || 'house',
+      ponyInboxPub: ponyInbox?.pub || null,
+      ponyInboxKeyVersion: ponyInbox?.version || null
+    });
   }
 
   const resolvedByAnchor = resolveHouseByErc8004Id(store, erc8004Id);
   if (!resolvedByAnchor) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  return res.json({ ok: true, houseId: resolvedByAnchor.houseId, source: 'anchor', erc8004Id });
+  const ponyInbox = getHousePonyInboxKey(resolvedByAnchor.house);
+  return res.json({
+    ok: true,
+    houseId: resolvedByAnchor.houseId,
+    source: 'anchor',
+    erc8004Id,
+    ponyInboxPub: ponyInbox?.pub || null,
+    ponyInboxKeyVersion: ponyInbox?.version || null
+  });
+});
+
+app.post('/api/pony/keys/register', (req, res) => {
+  const houseAddress = typeof req.body?.houseId === 'string'
+    ? req.body.houseId.trim()
+    : (typeof req.query?.houseId === 'string' ? req.query.houseId.trim() : '');
+  if (!houseAddress) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE' });
+
+  let registration;
+  try {
+    registration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
+  }
+
+  const store = readStore();
+  const resolved = resolveHouseAddress(store, houseAddress);
+  if (!resolved) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const auth = verifyHouseAuth(req, resolved.house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  writeHousePonyInboxKey(resolved.house, registration);
+  writeStore(store);
+
+  return res.json({
+    ok: true,
+    houseId: resolved.houseId,
+    ponyInboxPub: registration.pub,
+    ponyInboxKeyVersion: registration.version
+  });
 });
 
 app.post('/api/pony/send', (req, res) => {
@@ -1686,8 +1833,15 @@ app.get('/api/pony/inbox', (req, res) => {
   const items = store.inbox
     .filter((m) => m.toHouseId === resolved.houseId)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const ponyInbox = getHousePonyInboxKey(resolved.house);
 
-  res.json({ ok: true, houseId: resolved.houseId, inbox: items });
+  res.json({
+    ok: true,
+    houseId: resolved.houseId,
+    inbox: items,
+    ponyInboxPrivWrap: ponyInbox?.privWrap || null,
+    ponyInboxKeyVersion: ponyInbox?.version || null
+  });
 });
 
 app.get('/api/pony/policy', (req, res) => {
@@ -2510,6 +2664,7 @@ app.post('/api/house/init', (req, res) => {
   const unlock = req.body?.unlock || null;
   const keyWrap = req.body?.keyWrap || null;
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+  let ponyInboxRegistration = null;
 
   if (!houseId || !housePubKey) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   if (houseId !== housePubKey) return res.status(400).json({ ok: false, error: 'HOUSE_ID_MISMATCH' });
@@ -2526,6 +2681,15 @@ app.post('/api/house/init', (req, res) => {
   // Converged for today's publish: ceremony-only houses.
   if (keyMode !== 'ceremony') {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  try {
+    ponyInboxRegistration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
   }
 
   let normalizedKeyWrap = null;
@@ -2557,7 +2721,16 @@ app.post('/api/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
-    entries: []
+    entries: [],
+    ponyInbox: ponyInboxRegistration
+      ? {
+          version: ponyInboxRegistration.version,
+          pub: ponyInboxRegistration.pub,
+          privWrap: ponyInboxRegistration.privWrap,
+          createdAt: nowIso(),
+          updatedAt: nowIso()
+        }
+      : null
   });
   writeStore(store);
 
@@ -2579,6 +2752,7 @@ app.post('/api/agent/house/init', (req, res) => {
   const unlock = req.body?.unlock || null;
   const keyWrap = req.body?.keyWrap || null;
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
+  let ponyInboxRegistration = null;
 
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
@@ -2606,6 +2780,15 @@ app.post('/api/agent/house/init', (req, res) => {
   // Solo flow uses ceremony-style keys with agent entropy.
   if (keyMode !== 'ceremony') {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  try {
+    ponyInboxRegistration = normalizePonyInboxRegistration({
+      ponyInboxPub: req.body?.ponyInboxPub,
+      ponyInboxPrivWrap: req.body?.ponyInboxPrivWrap
+    }, { required: false });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_PONY_INBOX_KEY') });
   }
 
   const ra = b64ToBytes(s.houseCeremony.agentReveal);
@@ -2648,7 +2831,16 @@ app.post('/api/agent/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
-    entries: []
+    entries: [],
+    ponyInbox: ponyInboxRegistration
+      ? {
+          version: ponyInboxRegistration.version,
+          pub: ponyInboxRegistration.pub,
+          privWrap: ponyInboxRegistration.privWrap,
+          createdAt: nowIso(),
+          updatedAt: nowIso()
+        }
+      : null
   });
   writeStore(store);
 

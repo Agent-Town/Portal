@@ -335,6 +335,17 @@ Message envelope (`msg.chat.v1`):
 ### GET `/api/pony/resolve?houseId=...` or `?erc8004Id=...`
 Resolves an address target to canonical `houseId`.
 
+Response fields include optional Pony inbox key metadata:
+```json
+{
+  "ok": true,
+  "houseId": "<base58>",
+  "source": "house|share|anchor",
+  "ponyInboxPub": "<base64 SPKI>|null",
+  "ponyInboxKeyVersion": 1
+}
+```
+
 ### POST `/api/pony/send`
 Body:
 ```json
@@ -413,6 +424,39 @@ Errors:
 
 ### GET `/api/pony/inbox?houseId=...`
 Returns inbox for a house. Requires house-auth for that house.
+Response also includes optional Pony key-wrap metadata for local decrypt flows:
+```json
+{
+  "ok": true,
+  "houseId": "<base58>",
+  "inbox": [],
+  "ponyInboxPrivWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" } | null,
+  "ponyInboxKeyVersion": 1
+}
+```
+
+### POST `/api/pony/keys/register`
+Registers or updates Pony inbox key material for an existing house.
+
+Body:
+```json
+{
+  "houseId": "<houseId or shareId>",
+  "ponyInboxPub": "<base64 SPKI>",
+  "ponyInboxPrivWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" }
+}
+```
+
+Requires house-auth.
+
+Errors:
+- `MISSING_HOUSE`
+- `HOUSE_NOT_FOUND`
+- `MISSING_PONY_INBOX_PUB`
+- `MISSING_PONY_INBOX_PRIV_WRAP`
+- `INVALID_PONY_INBOX_PUB`
+- `INVALID_PONY_INBOX_PRIV_WRAP`
+- standard house-auth errors.
 
 ### GET `/api/pony/policy?houseId=...`
 Returns receiver policy for a house. Requires house-auth.
@@ -605,7 +649,9 @@ Body:
   "keyMode": "ceremony",
   "unlock": { "kind": "solana-wallet-signature", "address": "..." },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
-  "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>"
+  "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
+  "ponyInboxPub": "<optional base64 SPKI>",
+  "ponyInboxPrivWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" }
 }
 ```
 
@@ -630,7 +676,9 @@ Body:
   "keyMode": "ceremony",
   "unlock": { "kind": "solana-wallet-signature", "address": "..." },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
-  "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>"
+  "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
+  "ponyInboxPub": "<optional base64 SPKI>",
+  "ponyInboxPrivWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" }
 }
 ```
 
