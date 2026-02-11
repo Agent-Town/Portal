@@ -1,5 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('crypto');
+const {
+  makeCeremonyRevealPair,
+  encryptCeremonyReveal,
+  decryptCeremonyReveal,
+  waitForAgentHouseMaterial
+} = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -75,25 +81,50 @@ test('house unlock is wallet-signature gated (mocked wallet)', async ({ page, re
   await request.post('/api/agent/open/press', { data: { teamCode: teamCodeA } });
   await page.waitForURL('**/create');
 
-  // Agent contributes to ceremony (commit+reveal) before human locks in.
+  // Agent contributes to ceremony (commit + sealed reveal relay) before human locks in.
   // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
   const ra = crypto.randomBytes(32);
-  const raB64 = ra.toString('base64');
+  const agentRevealPair = makeCeremonyRevealPair();
   const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
-  await request.post('/api/agent/house/commit', { data: { teamCode: teamCodeA, commit: raCommit } });
-  await request.post('/api/agent/house/reveal', { data: { teamCode: teamCodeA, reveal: raB64 } });
+  const commitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode: teamCodeA, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
+  });
+  expect(commitResp.ok()).toBeTruthy();
 
   await page.getByTestId('px-0-0').click();
-  await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/house\?house=/);
+  const relayAgentReveal = (async () => {
+    const mat = await waitForAgentHouseMaterial(request, teamCodeA, (m) => !!m?.humanRevealPub, 60, 100);
+    expect(mat).toBeTruthy();
+    const sealedForHuman = encryptCeremonyReveal({
+      revealBytes: ra,
+      recipientRevealPubB64: mat.humanRevealPub,
+      direction: 'agent_to_human',
+      teamCode: teamCodeA
+    });
+    const revealResp = await request.post('/api/agent/house/reveal', {
+      data: { teamCode: teamCodeA, sealedForHuman }
+    });
+    expect(revealResp.ok()).toBeTruthy();
+  })();
+  await Promise.all([
+    relayAgentReveal,
+    page.getByTestId('share-btn').click(),
+    page.waitForURL(/\/house\?house=/)
+  ]);
 
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();
 
   // Meta exists and includes nonce; ceremony houses do not include wrappedKey.
-  const matResp = await request.get(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCodeA)}`);
-  const mat = await matResp.json();
-  const rh = Buffer.from(mat.humanReveal, 'base64');
+  const mat = await waitForAgentHouseMaterial(request, teamCodeA, (m) => !!m?.humanRevealSealed, 60, 100);
+  expect(mat).toBeTruthy();
+  const rh = decryptCeremonyReveal({
+    sealed: mat.humanRevealSealed,
+    privateKey: agentRevealPair.privateKey,
+    direction: 'human_to_agent',
+    teamCode: teamCodeA
+  });
+  expect(sha256(rh).toString('base64')).toBe(mat.humanCommit);
   const kroot = sha256(Buffer.concat([rh, ra]));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const metaPath = `/api/house/${houseId}/meta`;

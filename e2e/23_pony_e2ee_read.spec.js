@@ -15,6 +15,14 @@ function hkdf(ikm, info, len = 32) {
   return Buffer.from(crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len));
 }
 
+function aesGcmEncrypt(key32, plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key32, iv);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return { iv, ct: Buffer.concat([enc, tag]) };
+}
+
 function houseAuthHeaders(houseId, method, path, body, key) {
   const ts = String(Date.now());
   const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
@@ -72,12 +80,9 @@ async function createAgentSoloHouse(request, label) {
 
   const ra = crypto.randomBytes(32);
   const commit = sha256(ra).toString('base64');
-  const reveal = ra.toString('base64');
 
   const c = await request.post('/api/agent/house/commit', { data: { teamCode, commit } });
   expect(c.ok()).toBeTruthy();
-  const r = await request.post('/api/agent/house/reveal', { data: { teamCode, reveal } });
-  expect(r.ok()).toBeTruthy();
 
   const nonceResp = await request.get('/api/house/nonce');
   expect(nonceResp.ok()).toBeTruthy();
@@ -88,6 +93,15 @@ async function createAgentSoloHouse(request, label) {
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const houseAuthKey = kauth.toString('base64');
   const ponyInbox = buildPonyInboxBundle(kroot);
+  const walletAddress = `So1anaMock${label}11111111111111111111111111111`;
+  const wrapSig = Buffer.alloc(64, String(label || 'A').charCodeAt(0) & 0xff);
+  const wrapKey = sha256(wrapSig);
+  const wrapped = aesGcmEncrypt(wrapKey, kroot);
+  const keyWrap = {
+    alg: 'AES-GCM',
+    iv: wrapped.iv.toString('base64'),
+    ct: wrapped.ct.toString('base64')
+  };
 
   const init = await request.post('/api/agent/house/init', {
     data: {
@@ -96,7 +110,8 @@ async function createAgentSoloHouse(request, label) {
       housePubKey: houseId,
       nonce,
       keyMode: 'ceremony',
-      unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
+      unlock: { kind: 'solana-wallet-signature', address: walletAddress },
+      keyWrap,
       houseAuthKey,
       ponyInboxPub: ponyInbox.ponyInboxPub,
       ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
@@ -104,7 +119,7 @@ async function createAgentSoloHouse(request, label) {
   });
   expect(init.ok()).toBeTruthy();
 
-  return { houseId, kroot, kauth };
+  return { houseId, kroot, kauth, walletAddress, walletSigB64: wrapSig.toString('base64') };
 }
 
 test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, request }) => {
@@ -145,15 +160,27 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
   await expect(page.locator('#sendStatus')).toContainText('Sent.');
 
   await page.evaluate(
-    ({ houseId, houseAuthB64, krootB64 }) => {
+    ({ houseId, houseAuthB64 }) => {
       sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
-      sessionStorage.setItem(`agentTownHouseKroot:${houseId}`, krootB64);
     },
     {
       houseId: houseA.houseId,
-      houseAuthB64: houseA.kauth.toString('base64'),
-      krootB64: houseA.kroot.toString('base64')
+      houseAuthB64: houseA.kauth.toString('base64')
     }
+  );
+
+  await page.addInitScript(
+    ({ walletAddress, walletSigB64 }) => {
+      const bin = atob(walletSigB64);
+      const sig = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
+      window.solana = {
+        isPhantom: true,
+        connect: async () => ({ publicKey: { toString: () => walletAddress } }),
+        signMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
+      };
+    },
+    { walletAddress: houseA.walletAddress, walletSigB64: houseA.walletSigB64 }
   );
 
   await page.goto(`/inbox/${encodeURIComponent(houseA.houseId)}`);

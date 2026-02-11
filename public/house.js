@@ -90,7 +90,6 @@ function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
 
 const SHARE_CACHE_KEY = 'agentTownShareCache';
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
-const HOUSE_KROOT_CACHE_PREFIX = 'agentTownHouseKroot:';
 const SHARE_COPY_LABEL = 'Copy share link';
 const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
@@ -142,10 +141,6 @@ function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
 
-function houseKrootCacheKey(houseId) {
-  return `${HOUSE_KROOT_CACHE_PREFIX}${houseId}`;
-}
-
 function cacheHouseAuthBytes(houseId, keyBytes) {
   if (!houseId || !keyBytes || !keyBytes.length) return;
   try {
@@ -164,23 +159,6 @@ function clearHouseAuthCache(houseId) {
   }
 }
 
-function cacheHouseKrootBytes(houseId, keyBytes) {
-  if (!houseId || !keyBytes || !keyBytes.length) return;
-  try {
-    sessionStorage.setItem(houseKrootCacheKey(houseId), b64(keyBytes));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function clearHouseKrootCache(houseId) {
-  if (!houseId) return;
-  try {
-    sessionStorage.removeItem(houseKrootCacheKey(houseId));
-  } catch {
-    // ignore storage errors
-  }
-}
 
 // --- base58 (minimal) ---
 const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -461,9 +439,7 @@ function clearClientFlowState() {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
       if (!key) continue;
-      if (key.startsWith(HOUSE_AUTH_CACHE_PREFIX) || key.startsWith(HOUSE_KROOT_CACHE_PREFIX)) {
-        sessionStorage.removeItem(key);
-      }
+      if (key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
     }
   } catch {
     // ignore
@@ -1036,12 +1012,11 @@ function setUnlockButtonState(isUnlocked) {
   btn.disabled = !!isUnlocked;
 }
 
-async function initKeysFromKroot(Kroot, houseId = null) {
+async function initKeysFromKroot(Kroot) {
   KrootBytes = Kroot;
   Kenc = await deriveHouseEncKey(KrootBytes);
   KauthBytes = await deriveHouseAuthKey(KrootBytes);
   KauthKey = await crypto.subtle.importKey('raw', KauthBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  if (houseId) cacheHouseKrootBytes(houseId, KrootBytes);
 }
 
 async function recoverHouseKeyWithWallet(houseId) {
@@ -1109,7 +1084,7 @@ async function recoverHouseKeyWithWallet(houseId) {
   const houseIdBytes = await sha256(kroot);
   const derivedHouseId = base58Encode(houseIdBytes);
   if (derivedHouseId !== houseId) throw new Error('HOUSE_ID_MISMATCH');
-  await initKeysFromKroot(kroot, houseId);
+  await initKeysFromKroot(kroot);
   return true;
 }
 
@@ -1122,7 +1097,6 @@ function wipeKeys() {
   KauthBytes = null;
   KauthKey = null;
   clearHouseAuthCache(prevHouseId);
-  clearHouseKrootCache(prevHouseId);
   if (autoLockTimer) {
     clearTimeout(autoLockTimer);
     autoLockTimer = null;
@@ -1157,32 +1131,9 @@ async function unlockExistingHouse(houseId) {
   setStatus('Unlocking house…');
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
 
-  // Derive K_root from ceremony material (humanReveal + agentReveal) stored in the session.
-  const mat = await api('/api/human/house/material');
-  let recovered = false;
-  let usedCeremony = false;
-  if (mat.humanReveal && mat.agentReveal) {
-    const Rh = unb64(mat.humanReveal);
-    const Ra = unb64(mat.agentReveal);
-    const combo = new Uint8Array(Rh.length + Ra.length);
-    combo.set(Rh, 0);
-    combo.set(Ra, Rh.length);
-    const Kroot = await sha256(combo);
-    const houseIdBytes = await sha256(Kroot);
-    const derivedHouseId = base58Encode(houseIdBytes);
-    if (derivedHouseId === houseId) {
-      await initKeysFromKroot(Kroot, houseId);
-      usedCeremony = true;
-    } else {
-      setStatus('Ceremony mismatch. Trying wallet recovery…');
-    }
-  }
-
-  if (!usedCeremony) {
-    const recoveredOk = await recoverHouseKeyWithWallet(houseId);
-    if (!recoveredOk) throw new Error(mat.humanReveal || mat.agentReveal ? 'HOUSE_ID_MISMATCH' : 'CEREMONY_INCOMPLETE');
-    recovered = true;
-  }
+  const recoveredOk = await recoverHouseKeyWithWallet(houseId);
+  if (!recoveredOk) throw new Error('KEY_RECOVERY_REQUIRED');
+  const recovered = true;
 
   const meta = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/meta`);
   const { housePubKey, nonce, keyMode } = meta;
@@ -1851,7 +1802,7 @@ async function initSharePanel() {
           ? 'Finish the co-op house ceremony first.'
           : e.message === 'CEREMONY_INCOMPLETE'
             ? (KauthKey ? 'Share is unlocked, but ceremony state is missing. Refresh and try again.'
-              : 'Waiting for agent reveal to complete the ceremony.')
+              : 'Waiting for agent ceremony exchange to complete.')
         : e.message === 'NO_TOKEN'
           ? 'No $ELIZATOWN found in this wallet.'
           : e.message === 'TOKEN_CHECK_REQUIRED'

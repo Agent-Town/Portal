@@ -1,4 +1,10 @@
 const { test, expect } = require('@playwright/test');
+const crypto = require('crypto');
+const {
+  makeCeremonyRevealPair,
+  encryptCeremonyReveal,
+  waitForAgentHouseMaterial
+} = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -57,16 +63,35 @@ test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
 
   // Agent ceremony
   // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
-  const ra = require('crypto').randomBytes(32);
-  const raB64 = ra.toString('base64');
-  const raCommit = require('crypto').createHash('sha256').update(ra).digest('base64');
-  await request.post('/api/agent/house/commit', { data: { teamCode, commit: raCommit } });
-  await request.post('/api/agent/house/reveal', { data: { teamCode, reveal: raB64 } });
+  const ra = crypto.randomBytes(32);
+  const agentRevealPair = makeCeremonyRevealPair();
+  const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
+  const commitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
+  });
+  expect(commitResp.ok()).toBeTruthy();
 
   // Human paints + lock in
   await page.getByTestId('px-0-0').click();
-  await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/house\?house=/);
+  const relayAgentReveal = (async () => {
+    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
+    expect(mat).toBeTruthy();
+    const sealedForHuman = encryptCeremonyReveal({
+      revealBytes: ra,
+      recipientRevealPubB64: mat.humanRevealPub,
+      direction: 'agent_to_human',
+      teamCode
+    });
+    const revealResp = await request.post('/api/agent/house/reveal', {
+      data: { teamCode, sealedForHuman }
+    });
+    expect(revealResp.ok()).toBeTruthy();
+  })();
+  await Promise.all([
+    relayAgentReveal,
+    page.getByTestId('share-btn').click(),
+    page.waitForURL(/\/house\?house=/)
+  ]);
 
   // Unlock (solana sig)
   await page.getByRole('button', { name: 'Connect wallet' }).click();

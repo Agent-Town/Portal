@@ -72,12 +72,9 @@ async function createAgentSoloHouse(request, label, { withPonyInbox = false } = 
 
   const ra = crypto.randomBytes(32);
   const commit = sha256(ra).toString('base64');
-  const reveal = ra.toString('base64');
 
   const c = await request.post('/api/agent/house/commit', { data: { teamCode, commit } });
   expect(c.ok()).toBeTruthy();
-  const r = await request.post('/api/agent/house/reveal', { data: { teamCode, reveal } });
-  expect(r.ok()).toBeTruthy();
 
   const nonceResp = await request.get('/api/house/nonce');
   expect(nonceResp.ok()).toBeTruthy();

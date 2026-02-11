@@ -115,16 +115,10 @@ Loop over the grid and call `/api/agent/canvas/paint` for any non-empty cell.
 Generate **32 cryptographically random bytes** `Ra`.
 
 - Commit: `Ca = sha256(Ra)` (base64)
-- Reveal: `Ra` (base64)
 
 **POST** `/api/agent/house/commit`
 ```json
 { "teamCode": "TEAM-ABCD-EFGH", "commit": "<base64 sha256(Ra)>" }
-```
-
-**POST** `/api/agent/house/reveal`
-```json
-{ "teamCode": "TEAM-ABCD-EFGH", "reveal": "<base64 Ra>" }
 ```
 
 ---

@@ -66,10 +66,9 @@ test('agent solo can create house, share, and upload public media', async ({ req
 
   // Agent entropy
   const ra = crypto.randomBytes(32);
-  const raB64 = ra.toString('base64');
   const raCommit = sha256(ra).toString('base64');
-  await request.post('/api/agent/house/commit', { data: { teamCode, commit: raCommit } });
-  await request.post('/api/agent/house/reveal', { data: { teamCode, reveal: raB64 } });
+  const commitResp = await request.post('/api/agent/house/commit', { data: { teamCode, commit: raCommit } });
+  expect(commitResp.ok()).toBeTruthy();
 
   const kroot = sha256(ra);
   const houseId = base58Encode(sha256(kroot));

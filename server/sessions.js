@@ -79,8 +79,10 @@ function createSession({ flow } = {}) {
     houseCeremony: {
       humanCommit: null,
       agentCommit: null,
-      humanReveal: null,
-      agentReveal: null,
+      humanRevealPub: null,
+      agentRevealPub: null,
+      humanRevealSealed: null,
+      agentRevealSealed: null,
       houseId: null,
       createdAt: null
     }

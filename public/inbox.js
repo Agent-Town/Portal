@@ -1,7 +1,7 @@
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
-const HOUSE_KROOT_CACHE_PREFIX = 'agentTownHouseKroot:';
 const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
 const PONY_INBOX_WRAP_INFO = 'elizatown-pony-inbox-wrap-v1';
+const houseKrootMemory = new Map();
 let lastFriends = [];
 
 function getHouseId() {
@@ -12,10 +12,6 @@ function getHouseId() {
 
 function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
-}
-
-function houseKrootCacheKey(houseId) {
-  return `${HOUSE_KROOT_CACHE_PREFIX}${houseId}`;
 }
 
 function unb64(str) {
@@ -33,6 +29,11 @@ function b64(bytes) {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
+}
+
+async function sha256(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return new Uint8Array(digest);
 }
 
 async function sha256Base64(input) {
@@ -63,6 +64,149 @@ async function houseAuthHeaders(houseId, method, path, body) {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return { 'x-house-ts': ts, 'x-house-auth': btoa(bin) };
+}
+
+function buildKeyWrapMessage({ houseId, origin }) {
+  const parts = ['ElizaTown House Key Wrap', `houseId: ${houseId}`];
+  if (origin) parts.push(`origin: ${origin}`);
+  return parts.join('\n');
+}
+
+function base58Encode(bytes) {
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  if (!bytes || !bytes.length) return '';
+  const digits = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry) {
+      digits.push(carry % 58);
+      carry = (carry / 58) | 0;
+    }
+  }
+  let out = '';
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) out += '1';
+  for (let i = digits.length - 1; i >= 0; i--) out += alphabet[digits[i]];
+  return out;
+}
+
+function normalizeSignatureBytes(sig) {
+  if (sig instanceof Uint8Array) return sig;
+  if (sig instanceof ArrayBuffer) return new Uint8Array(sig);
+  if (ArrayBuffer.isView(sig)) return new Uint8Array(sig.buffer);
+  if (Array.isArray(sig)) return new Uint8Array(sig);
+  if (typeof sig === 'string') {
+    try {
+      const bin = atob(sig);
+      if (bin.length === 64) return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+async function signWalletMessageBytes(wallet, message) {
+  const msgBytes = new TextEncoder().encode(message);
+  const resp = await wallet.signMessage(msgBytes, 'utf8');
+  const sig = resp?.signature || resp;
+  const bytes = normalizeSignatureBytes(sig);
+  if (!bytes) throw new Error('SIGNATURE_FORMAT');
+  return bytes;
+}
+
+async function connectWalletOrThrow() {
+  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
+  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
+  const resp = await window.solana.connect();
+  const address = resp?.publicKey?.toString?.() || window.solana?.publicKey?.toString?.();
+  if (!address) throw new Error('WALLET_NOT_CONNECTED');
+  return { wallet: window.solana, address };
+}
+
+async function aesGcmDecrypt(key, iv, ct) {
+  const pt = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv, additionalData: new Uint8Array([]) },
+    key,
+    ct
+  );
+  return new Uint8Array(pt);
+}
+
+async function recoverHouseKrootWithWallet(houseId) {
+  if (houseKrootMemory.has(houseId)) return houseKrootMemory.get(houseId);
+
+  const { wallet, address } = await connectWalletOrThrow();
+  const primaryMsg = buildKeyWrapMessage({ houseId });
+  const primarySig = await signWalletMessageBytes(wallet, primaryMsg);
+
+  const lookup = await api('/api/wallet/lookup', {
+    method: 'POST',
+    body: JSON.stringify({
+      address,
+      signature: b64(primarySig),
+      houseId
+    })
+  });
+  if (!lookup?.keyWrap?.iv || !lookup?.keyWrap?.ct) throw new Error('KEY_WRAP_UNAVAILABLE');
+  if (lookup.keyWrap.alg && lookup.keyWrap.alg !== 'AES-GCM') throw new Error('INVALID_KEY_WRAP');
+
+  async function decryptWithSig(sigBytes) {
+    const wrapKeyBytes = await sha256(sigBytes);
+    const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+    const iv = unb64(lookup.keyWrap.iv);
+    const ct = unb64(lookup.keyWrap.ct);
+    if (!iv || !ct) throw new Error('INVALID_KEY_WRAP');
+    return aesGcmDecrypt(wrapKey, iv, ct);
+  }
+
+  async function decryptWithMessage(msg) {
+    const sig = await signWalletMessageBytes(wallet, msg);
+    return decryptWithSig(sig);
+  }
+
+  let kroot = null;
+  let lastErr = null;
+  try {
+    kroot = await decryptWithSig(primarySig);
+  } catch (e) {
+    lastErr = e;
+  }
+
+  const origin = window.location.origin;
+  const attempts = [];
+  if (origin) {
+    attempts.push(buildKeyWrapMessage({ houseId, origin }));
+    try {
+      const u = new URL(origin);
+      const port = u.port ? `:${u.port}` : '';
+      if (u.hostname === 'localhost') attempts.push(buildKeyWrapMessage({ houseId, origin: `${u.protocol}//127.0.0.1${port}` }));
+      else if (u.hostname === '127.0.0.1') attempts.push(buildKeyWrapMessage({ houseId, origin: `${u.protocol}//localhost${port}` }));
+    } catch {
+      // ignore invalid origin parsing
+    }
+  }
+
+  if (!kroot) {
+    for (const msg of attempts) {
+      try {
+        kroot = await decryptWithMessage(msg);
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+  }
+  if (!kroot) throw new Error(lastErr?.message || 'KEY_WRAP_DECRYPT_FAILED');
+
+  const derivedHouseId = base58Encode(await sha256(kroot));
+  if (derivedHouseId !== houseId) throw new Error('HOUSE_ID_MISMATCH');
+  houseKrootMemory.set(houseId, kroot);
+  return kroot;
 }
 
 async function authedApi({ houseId, url, method = 'GET', json = null }) {
@@ -180,14 +324,6 @@ function messageCiphertext(msg) {
   return { alg: 'UNKNOWN', ct: '', iv: '' };
 }
 
-function readCachedHouseKroot(houseId) {
-  const raw = sessionStorage.getItem(houseKrootCacheKey(houseId));
-  if (!raw) return null;
-  const keyBytes = unb64(raw);
-  if (!keyBytes || keyBytes.length < 16) return null;
-  return keyBytes;
-}
-
 async function derivePonyInboxWrapKey(krootBytes) {
   const info = new TextEncoder().encode(PONY_INBOX_WRAP_INFO);
   const baseKey = await crypto.subtle.importKey('raw', krootBytes, 'HKDF', false, ['deriveKey']);
@@ -204,8 +340,7 @@ async function loadInboxPrivateKey({ houseId, ponyInboxPrivWrap }) {
   if (!ponyInboxPrivWrap || typeof ponyInboxPrivWrap !== 'object') return null;
   if (ponyInboxPrivWrap.alg !== 'AES-GCM') return null;
 
-  const krootBytes = readCachedHouseKroot(houseId);
-  if (!krootBytes) return null;
+  const krootBytes = await recoverHouseKrootWithWallet(houseId);
 
   const iv = unb64(ponyInboxPrivWrap.iv || '');
   const ct = unb64(ponyInboxPrivWrap.ct || '');
@@ -263,8 +398,13 @@ async function hydrateInboxItemsForDisplay({ houseId, items, ponyInboxPrivWrap }
   let keyLoadError = null;
   try {
     privateKey = await loadInboxPrivateKey({ houseId, ponyInboxPrivWrap });
-  } catch {
-    keyLoadError = 'Encrypted key unavailable.';
+  } catch (e) {
+    if (e?.message === 'NO_SOLANA_WALLET') keyLoadError = 'Connect a Solana wallet to decrypt.';
+    else if (e?.message === 'NO_SOLANA_SIGN') keyLoadError = 'Wallet does not support message signing.';
+    else if (e?.message === 'KEY_WRAP_UNAVAILABLE') keyLoadError = 'No wallet key-wrap is available for this house.';
+    else if (e?.message === 'HOUSE_ID_MISMATCH') keyLoadError = 'Wallet key-wrap does not match this house.';
+    else if (e?.message === 'SIGNATURE_FORMAT') keyLoadError = 'Wallet signature format is unsupported.';
+    else keyLoadError = 'Encrypted key unavailable.';
   }
 
   for (const msg of items) {

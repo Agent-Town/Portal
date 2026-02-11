@@ -652,6 +652,101 @@ Returns:
 { "ok": true, "houseId": "<base58>" }
 ```
 
+### Ceremony Relay (no raw reveals on backend)
+Raw ceremony reveals (`Rh`, `Ra`) are never posted in plaintext.
+
+Each side posts:
+1. Commit: `sha256(revealBytes)` (base64)
+2. Reveal pubkey: P-256 SPKI (base64)
+3. Sealed reveal envelope for the counterparty
+
+Envelope format (`sealedForHuman` / `sealedForAgent`):
+```json
+{
+  "alg": "CEREMONY_E2EE_P256_AESGCM_V1",
+  "epk": "<base64 SPKI ephemeral pub>",
+  "iv": "<base64 12-byte iv>",
+  "ct": "<base64 ciphertext||tag>",
+  "aad": "<base64 aad json>"
+}
+```
+
+### POST `/api/agent/house/commit`
+Body:
+```json
+{
+  "teamCode": "TEAM-ABCD-EFGH",
+  "commit": "<base64 sha256(Ra)>",
+  "revealPub": "<optional base64 SPKI>"
+}
+```
+
+### POST `/api/human/house/commit`
+Body:
+```json
+{
+  "commit": "<base64 sha256(Rh)>",
+  "revealPub": "<optional base64 SPKI>"
+}
+```
+
+### POST `/api/agent/house/reveal`
+Body:
+```json
+{
+  "teamCode": "TEAM-ABCD-EFGH",
+  "sealedForHuman": {
+    "alg": "CEREMONY_E2EE_P256_AESGCM_V1",
+    "epk": "<base64>",
+    "iv": "<base64>",
+    "ct": "<base64>",
+    "aad": "<base64>"
+  }
+}
+```
+
+### POST `/api/human/house/reveal`
+Body:
+```json
+{
+  "sealedForAgent": {
+    "alg": "CEREMONY_E2EE_P256_AESGCM_V1",
+    "epk": "<base64>",
+    "iv": "<base64>",
+    "ct": "<base64>",
+    "aad": "<base64>"
+  }
+}
+```
+
+### GET `/api/human/house/material`
+Returns ceremony metadata + sealed payload for human:
+```json
+{
+  "ok": true,
+  "houseId": "<base58|null>",
+  "humanCommit": "<base64|null>",
+  "agentCommit": "<base64|null>",
+  "humanRevealPub": "<base64|null>",
+  "agentRevealPub": "<base64|null>",
+  "agentRevealSealed": { "...": "..." } | null
+}
+```
+
+### GET `/api/agent/house/material?teamCode=...`
+Returns ceremony metadata + sealed payload for agent:
+```json
+{
+  "ok": true,
+  "houseId": "<base58|null>",
+  "humanCommit": "<base64|null>",
+  "agentCommit": "<base64|null>",
+  "humanRevealPub": "<base64|null>",
+  "agentRevealPub": "<base64|null>",
+  "humanRevealSealed": { "...": "..." } | null
+}
+```
+
 ### POST `/api/agent/house/init` (agent-solo)
 Creates a house record from an **agent-only** session.
 
@@ -673,9 +768,8 @@ Body:
 
 Constraints:
 - Session must be `flow = agent_solo`
-- Agent reveal must exist (`/api/agent/house/reveal`)
+- Agent commit must exist (`/api/agent/house/commit`)
 - Canvas must have at least **20** painted pixels
-- `houseId` must match server-derived value from agent entropy
 
 Response:
 ```json
