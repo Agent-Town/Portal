@@ -1,6 +1,7 @@
 .DS_Store
 
 data/store.e2e.json
+data/store.json
 data/store*.sqlite
 data/store*.sqlite-wal
 data/store*.sqlite-shm
