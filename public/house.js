@@ -93,6 +93,10 @@ const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const SHARE_COPY_LABEL = 'Copy share link';
 const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
+const PATH_STORAGE_KEY = 'agentTownStartRole';
+const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
+const TOKEN_ERROR_KEY = 'agentTownTokenError';
+const SIGNUP_COMPLETE_AT_KEY = 'agentTownSignupCompleteAt';
 const PUBLIC_MEDIA_MAX_BYTES = 1024 * 1024;
 const PUBLIC_MEDIA_PROMPT_MAX = 280;
 const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -302,6 +306,65 @@ function clearWalletCache() {
   }
 }
 
+let walletEventBindings = null;
+function bindWalletEvents() {
+  if (!wallet || typeof wallet.on !== 'function') return;
+  if (walletEventBindings && walletEventBindings.wallet === wallet) return;
+
+  unbindWalletEvents();
+
+  const onDisconnect = () => {
+    // Wallet disconnected outside the app (extension UI, etc).
+    disconnectWallet({ fromProvider: true, resetSession: unlocked }).catch(() => {});
+  };
+  const onAccountChanged = (publicKey) => {
+    const nextAddr = publicKey && typeof publicKey.toString === 'function' ? publicKey.toString() : null;
+    if (!nextAddr) {
+      disconnectWallet({ fromProvider: true, resetSession: unlocked }).catch(() => {});
+      return;
+    }
+    if (walletAddr && walletAddr !== nextAddr) {
+      walletAddr = nextAddr;
+      walletHouseId = null;
+      updateWalletUI();
+      saveWalletCache();
+      if (unlocked) {
+        // Switching accounts should lock immediately; the unlock UX is per-wallet.
+        wipeKeys();
+        setStatus('Locked (wallet account changed).');
+      }
+    }
+  };
+
+  wallet.on('disconnect', onDisconnect);
+  wallet.on('accountChanged', onAccountChanged);
+  walletEventBindings = { wallet, onDisconnect, onAccountChanged };
+}
+
+function unbindWalletEvents() {
+  if (!walletEventBindings) return;
+  const { wallet: boundWallet, onDisconnect, onAccountChanged } = walletEventBindings;
+  const off =
+    typeof boundWallet.off === 'function'
+      ? boundWallet.off.bind(boundWallet)
+      : typeof boundWallet.removeListener === 'function'
+        ? boundWallet.removeListener.bind(boundWallet)
+        : null;
+  if (off) {
+    try {
+      off('disconnect', onDisconnect);
+    } catch {
+      // ignore
+    }
+    try {
+      off('accountChanged', onAccountChanged);
+    } catch {
+      // ignore
+    }
+  }
+  walletEventBindings = null;
+}
+
 async function connectWallet({ silent = false } = {}) {
   // Accept any Solana wallet adapter injected as `window.solana` that supports
   // `connect()` and `signMessage()` (Phantom, Solflare, Backpack, etc.).
@@ -317,6 +380,7 @@ async function connectWallet({ silent = false } = {}) {
     resp = await window.solana.connect(opts);
     wallet = window.solana;
   }
+  bindWalletEvents();
 
   const pk = resp?.publicKey || wallet?.publicKey;
   walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
@@ -335,19 +399,62 @@ async function connectWallet({ silent = false } = {}) {
   saveWalletCache();
 }
 
-async function disconnectWallet() {
-  if (wallet && typeof wallet.disconnect === 'function') {
+function clearClientFlowState() {
+  try {
+    localStorage.removeItem(WALLET_STORAGE_KEY);
+    localStorage.removeItem(PATH_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_PATH_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_ERROR_KEY);
+    localStorage.removeItem(SIGNUP_COMPLETE_AT_KEY);
+    localStorage.removeItem(SHARE_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    // Clear any cached house auth keys for this origin.
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function resetSessionAndGoHome() {
+  try {
+    await api('/api/session/reset', { method: 'POST', body: JSON.stringify({}) });
+  } catch (e) {
+    console.warn('session reset failed', e);
+  }
+  clearClientFlowState();
+  window.location.replace('/');
+}
+
+async function disconnectWallet({ fromProvider = false, resetSession = false } = {}) {
+  if (!fromProvider && wallet && typeof wallet.disconnect === 'function') {
     try {
       await wallet.disconnect();
     } catch {
       // ignore disconnect errors; we still clear local state
     }
   }
+  unbindWalletEvents();
   wallet = null;
   walletAddr = null;
   walletHouseId = null;
   updateWalletUI();
   clearWalletCache();
+
+  // If the house was unlocked, disconnecting the wallet should also lock.
+  // This avoids "sticky" unlocked state on shared devices.
+  if (unlocked) {
+    wipeKeys();
+    setStatus('Locked (wallet disconnected).');
+    if (resetSession) {
+      await resetSessionAndGoHome();
+    }
+  }
 }
 
 async function signMessage(message) {
@@ -1767,8 +1874,9 @@ async function init() {
     setError('');
     try {
       if (walletAddr) {
-        await disconnectWallet();
-        setStatus('Wallet disconnected.');
+        const wasUnlocked = unlocked;
+        await disconnectWallet({ resetSession: wasUnlocked });
+        if (!wasUnlocked) setStatus('Wallet disconnected.');
         return;
       }
       await connectWallet();

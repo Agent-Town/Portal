@@ -988,6 +988,28 @@ app.get('/api/session', (req, res) => {
   });
 });
 
+// Rotates the human session cookie to a fresh session/team code.
+// Useful for shared devices where multiple people onboard sequentially.
+app.post('/api/session/reset', (req, res) => {
+  // Ensure we still have a valid response cookie context (Secure flag in prod).
+  const store = readStore();
+  const next = createSession();
+  const secureFlag = isProd || req.secure ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `et_session=${encodeURIComponent(next.sessionId)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`
+  );
+  res.json({
+    ok: true,
+    teamCode: next.teamCode,
+    elements: listElements(),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
 app.get('/api/state', (req, res) => {
   const s = ensureHumanSession(req, res);
   const store = readStore();

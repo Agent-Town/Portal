@@ -48,6 +48,21 @@ Response shape:
 }
 ```
 
+### POST `/api/session/reset` (human)
+Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
+
+Use this on shared devices to let the next person start a clean co-op flow without manually clearing cookies.
+
+Response shape (same fields as `/api/session`):
+```json
+{
+  "ok": true,
+  "teamCode": "TEAM-ABCD-EFGH",
+  "elements": [{"id": "cookie", "label": "Cookie"}],
+  "stats": { "signups": 0, "publicTeams": 0 }
+}
+```
+
 ### GET `/api/state` (human)
 Returns the full state needed for the UI.
 Includes:
