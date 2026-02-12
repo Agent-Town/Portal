@@ -1,6 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap");
 
 :root {
+  --font-display: "Press Start 2P", "Silkscreen", monospace;
+  --font-ui: "Silkscreen", "Trebuchet MS", "Segoe UI", sans-serif;
   --sky-50: #e6f4ff;
   --sky-100: #b3dfff;
   --sky-200: #80caff;
@@ -47,7 +49,7 @@ body {
 body {
   position: relative;
   color: var(--text-strong);
-  font-family: "Silkscreen", "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   letter-spacing: 0.2px;
   background:
     radial-gradient(circle at 15% 12%, rgba(255, 255, 255, 0.7) 0, rgba(255, 255, 255, 0) 30%),
@@ -101,7 +103,7 @@ h2,
 h3 {
   margin: 0 0 6px;
   color: var(--text-strong);
-  font-family: "Silkscreen", "Press Start 2P", monospace;
+  font-family: var(--font-display);
   letter-spacing: 0.5px;
 }
 
@@ -136,8 +138,8 @@ h3 {
   background-size: 170px auto, 170px auto;
   background-repeat: no-repeat;
   background-position: right 16px top 6px, left 8px top 90px;
-  opacity: 0.16;
-  filter: saturate(0.88);
+  opacity: 0.28;
+  filter: saturate(0.95);
   pointer-events: none;
   z-index: 0;
 }
@@ -179,13 +181,40 @@ h3 {
 }
 
 .brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 10px;
+  padding: 6px 86px 6px 10px;
   border-radius: 10px;
   background: rgba(230, 244, 255, 0.66);
   box-shadow: inset 0 0 0 2px rgba(91, 155, 213, 0.22);
+}
+
+.brand::before,
+.brand::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--border);
+  border-radius: 7px;
+  transform: translateY(-50%);
+  background-color: #fff4e0;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 2px 0 rgba(44, 69, 99, 0.5);
+}
+
+.brand::before {
+  right: 44px;
+  background-image: url("/brand-kit/openclaw-sheriff.png");
+}
+
+.brand::after {
+  right: 10px;
+  background-image: url("/brand-kit/elizaos-sheriff.png");
 }
 
 .brand .logoLink {
@@ -204,16 +233,17 @@ h3 {
 }
 
 .brand strong {
-  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-family: var(--font-display);
   font-size: 14px;
   color: var(--text-strong);
   line-height: 1.35;
 }
 
 .badge {
+  font-family: var(--font-display);
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.45px;
   color: var(--sky-700);
 }
 
@@ -310,6 +340,7 @@ h3 {
   background: linear-gradient(180deg, #eff8ff 0%, #dcefff 100%);
   color: var(--text);
   font-size: 13px;
+  font-family: var(--font-ui);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 }
 
@@ -328,8 +359,10 @@ h3 {
   border-radius: 10px;
   padding: 10px 14px;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  line-height: 1.35;
+  letter-spacing: 0.3px;
   color: var(--text-strong);
   background: linear-gradient(180deg, #ffe27d 0%, #ffd95a 100%);
   box-shadow:
@@ -389,6 +422,7 @@ h3 {
 .muted {
   font-size: 13px;
   color: var(--muted);
+  font-family: var(--font-ui);
   line-height: 1.45;
 }
 
@@ -623,7 +657,7 @@ input[type="file"] {
   padding: 10px 12px;
   background: var(--cream-50);
   color: var(--text-strong);
-  font-family: inherit;
+  font-family: var(--font-ui);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
@@ -727,7 +761,7 @@ footer::before {
     height: 220px;
     background-size: 132px auto, 132px auto;
     background-position: right -8px top 8px, left -8px top 94px;
-    opacity: 0.13;
+    opacity: 0.22;
   }
 }
 
@@ -737,7 +771,7 @@ footer::before {
   }
 
   .wrap::before {
-    opacity: 0.09;
+    opacity: 0.16;
   }
 
   .topbar {
@@ -750,6 +784,25 @@ footer::before {
 @media (max-width: 520px) {
   .brand strong {
     font-size: 11px;
+  }
+
+  .brand {
+    padding-right: 72px;
+  }
+
+  .brand::before,
+  .brand::after {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+  }
+
+  .brand::before {
+    right: 38px;
+  }
+
+  .brand::after {
+    right: 10px;
   }
 
   .badge {
