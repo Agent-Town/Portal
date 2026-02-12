@@ -100,15 +100,11 @@ body::before {
 }
 
 body::after {
-  z-index: 2;
-  opacity: 0.18;
+  z-index: 0;
+  opacity: 0.08;
   background-image:
-    url("/brand-kit/openclaw-sheriff.png"),
-    url("/brand-kit/elizaos-sheriff.png");
-  background-repeat: no-repeat, no-repeat;
-  background-size: 240px auto, 240px auto;
-  background-position: calc(100% - 12px) 128px, 10px 210px;
-  filter: saturate(0.95);
+    repeating-linear-gradient(0deg, rgba(44, 69, 99, 0.28) 0 1px, transparent 1px 16px),
+    repeating-linear-gradient(90deg, rgba(44, 69, 99, 0.28) 0 1px, transparent 1px 16px);
 }
 
 a {
@@ -180,7 +176,7 @@ h3 {
   align-items: center;
   gap: 12px;
   margin-bottom: 18px;
-  padding: 16px;
+  padding: 16px 16px 16px 10px;
   border: 3px solid var(--border);
   border-radius: 14px;
   background:
@@ -208,37 +204,11 @@ h3 {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 86px 6px 10px;
+  gap: 8px;
+  padding: 6px 8px 6px 6px;
   border-radius: 10px;
   background: rgba(230, 244, 255, 0.66);
   box-shadow: inset 0 0 0 2px rgba(91, 155, 213, 0.22);
-}
-
-.brand::before,
-.brand::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  width: 28px;
-  height: 28px;
-  border: 2px solid var(--border);
-  border-radius: 7px;
-  transform: translateY(-50%);
-  background-color: #fff4e0;
-  background-size: cover;
-  background-position: center;
-  box-shadow: 0 2px 0 rgba(44, 69, 99, 0.5);
-}
-
-.brand::before {
-  right: 44px;
-  background-image: url("/brand-kit/openclaw-sheriff.png");
-}
-
-.brand::after {
-  right: 10px;
-  background-image: url("/brand-kit/elizaos-sheriff.png");
 }
 
 .brand .logoLink {
@@ -781,22 +751,11 @@ footer::before {
 }
 
 @media (max-width: 980px) {
-  body::after {
-    opacity: 0.16;
-    background-size: 180px auto, 180px auto;
-    background-position: calc(100% + 18px) 152px, -26px 252px;
-  }
 }
 
 @media (max-width: 720px) {
   .wrap {
     padding: 20px 12px 72px;
-  }
-
-  body::after {
-    opacity: 0.14;
-    background-size: 126px auto, 126px auto;
-    background-position: calc(100% + 20px) 190px, -30px 300px;
   }
 
   .topbar {
@@ -809,25 +768,6 @@ footer::before {
 @media (max-width: 520px) {
   .brand strong {
     font-size: 11px;
-  }
-
-  .brand {
-    padding-right: 72px;
-  }
-
-  .brand::before,
-  .brand::after {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
-  }
-
-  .brand::before {
-    right: 38px;
-  }
-
-  .brand::after {
-    right: 10px;
   }
 
   .badge {
@@ -852,12 +792,6 @@ footer::before {
 
   .topbar .kv .btn.coin {
     flex: 0 0 40px;
-  }
-
-  body::after {
-    opacity: 0.12;
-    background-size: 100px auto, 100px auto;
-    background-position: calc(100% + 24px) 204px, -28px 324px;
   }
 }
 
