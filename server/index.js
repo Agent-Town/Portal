@@ -202,7 +202,6 @@ function normalizeHouseList(values) {
 
 function getHousePonyPolicy(house) {
   const policy = house?.ponyPolicy || {};
-  const hasPonyInbox = !!getHousePonyInboxKey(house);
   return {
     allowlist: normalizeHouseList(policy.allowlist),
     blocklist: normalizeHouseList(policy.blocklist),
@@ -212,7 +211,7 @@ function getHousePonyPolicy(house) {
     requireReceiptAnonymous: policy.requireReceiptAnonymous === true,
     allowLegacyPlaintext: typeof policy.allowLegacyPlaintext === 'boolean'
       ? policy.allowLegacyPlaintext
-      : !hasPonyInbox
+      : false
   };
 }
 
@@ -1741,9 +1740,6 @@ app.post('/api/share/create', (req, res) => {
       } catch {
         mayorCiphertext = null;
       }
-    } else {
-      // Migration fallback for old houses that do not publish Pony inbox keys.
-      mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
     }
 
     if (mayorCiphertext) {

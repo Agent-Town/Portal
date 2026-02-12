@@ -126,7 +126,7 @@ test('phase7 cutover: plaintext rejection default + policy override + payload li
   });
   expect(legacyPolicyGet.ok()).toBeTruthy();
   const legacyPolicy = await legacyPolicyGet.json();
-  expect(legacyPolicy.policy.allowLegacyPlaintext).toBe(true);
+  expect(legacyPolicy.policy.allowLegacyPlaintext).toBe(false);
 
   const tightenPolicyBody = JSON.stringify({ houseId: strictHouse.houseId, autoAcceptAllowlist: true });
   const tightenPolicyHeaders = houseAuthHeaders(strictHouse.houseId, 'POST', policyPath, tightenPolicyBody, strictHouse.kauth);

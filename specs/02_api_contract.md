@@ -385,7 +385,7 @@ Rules:
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
 - Strict cutover:
   - `ciphertext.alg` must be `PONY_E2EE_P256_AESGCM_V1` for key-enabled houses unless `allowLegacyPlaintext=true` is set on receiver policy.
-  - For houses without Pony inbox keys, legacy plaintext remains allowed by default during migration.
+  - For houses without Pony inbox keys, legacy plaintext is blocked by default unless receiver policy explicitly enables it.
   - Plaintext payload size is capped (`PONY_CIPHERTEXT_TOO_LARGE`).
 
 Response:

@@ -16,6 +16,14 @@ function hkdf(ikm, info, len = 32) {
   return Buffer.from(crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len));
 }
 
+function aesGcmEncrypt(key32, plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key32, iv);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return { iv, ct: Buffer.concat([enc, tag]) };
+}
+
 function houseAuthHeaders(houseId, method, path, body, key) {
   const ts = String(Date.now());
   const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
@@ -99,7 +107,7 @@ function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxP
   };
 }
 
-async function createAgentSoloHouse(request, label) {
+async function createAgentSoloHouse(request, label, { withPonyInbox = true } = {}) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
   const teamCode = (await sess.json()).teamCode;
@@ -126,24 +134,43 @@ async function createAgentSoloHouse(request, label) {
   const houseId = base58Encode(sha256(kroot));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const houseAuthKey = kauth.toString('base64');
-  const ponyInbox = buildPonyInboxBundle(kroot);
+  const ponyInbox = withPonyInbox ? buildPonyInboxBundle(kroot) : null;
+  const walletAddress = `So1anaMock${label}11111111111111111111111111111`;
+  const wrapSig = Buffer.alloc(64, String(label || 'A').charCodeAt(0) & 0xff);
+  const wrapKey = sha256(wrapSig);
+  const wrapped = aesGcmEncrypt(wrapKey, kroot);
+  const keyWrap = {
+    alg: 'AES-GCM',
+    iv: wrapped.iv.toString('base64'),
+    ct: wrapped.ct.toString('base64')
+  };
+  const initPayload = {
+    teamCode,
+    houseId,
+    housePubKey: houseId,
+    nonce,
+    keyMode: 'ceremony',
+    unlock: { kind: 'solana-wallet-signature', address: walletAddress },
+    keyWrap,
+    houseAuthKey
+  };
+  if (ponyInbox) {
+    initPayload.ponyInboxPub = ponyInbox.ponyInboxPub;
+    initPayload.ponyInboxPrivWrap = ponyInbox.ponyInboxPrivWrap;
+  }
 
   const init = await request.post('/api/agent/house/init', {
-    data: {
-      teamCode,
-      houseId,
-      housePubKey: houseId,
-      nonce,
-      keyMode: 'ceremony',
-      unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
-      houseAuthKey,
-      ponyInboxPub: ponyInbox.ponyInboxPub,
-      ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
-    }
+    data: initPayload
   });
   expect(init.ok()).toBeTruthy();
 
-  return { houseId, kauth, ponyInboxPub: ponyInbox.ponyInboxPub };
+  return {
+    houseId,
+    kauth,
+    ponyInboxPub: ponyInbox?.ponyInboxPub || null,
+    walletAddress,
+    walletSigB64: wrapSig.toString('base64')
+  };
 }
 
 function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
@@ -262,4 +289,66 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
   );
   expect(received).toBeTruthy();
   expect(received.envelope?.ciphertext?.ct).not.toBe('hello A (from B via compose)');
+});
+
+test('legacy house upgrades Pony keys from inbox and receives encrypted compose', async ({ page, request }) => {
+  const sender = await createAgentSoloHouse(request, 'Sender');
+  const legacyReceiver = await createAgentSoloHouse(request, 'LegacyReceiver', { withPonyInbox: false });
+
+  await page.addInitScript(
+    ({ houseId, houseAuthB64, walletAddress, walletSigB64 }) => {
+      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+
+      const bin = atob(walletSigB64);
+      const sig = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
+      window.solana = {
+        isPhantom: true,
+        connect: async () => ({ publicKey: { toString: () => walletAddress } }),
+        signMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
+      };
+    },
+    {
+      houseId: legacyReceiver.houseId,
+      houseAuthB64: legacyReceiver.kauth.toString('base64'),
+      walletAddress: legacyReceiver.walletAddress,
+      walletSigB64: legacyReceiver.walletSigB64
+    }
+  );
+
+  await page.goto(`/inbox/${encodeURIComponent(legacyReceiver.houseId)}`);
+
+  const resolvePath = `/api/pony/resolve?houseId=${encodeURIComponent(legacyReceiver.houseId)}`;
+  await expect.poll(async () => {
+    const resolve = await request.get(resolvePath);
+    const data = await resolve.json();
+    return typeof data.ponyInboxPub === 'string' && data.ponyInboxPub.length > 20;
+  }).toBe(true);
+
+  const resolved = await request.get(resolvePath);
+  expect(resolved.ok()).toBeTruthy();
+  const resolvedData = await resolved.json();
+  expect(typeof resolvedData.ponyInboxPub).toBe('string');
+  expect(resolvedData.ponyInboxPub.length).toBeGreaterThan(20);
+
+  const sendPath = '/api/pony/send';
+  const sendBody = JSON.stringify({
+    toHouseId: legacyReceiver.houseId,
+    fromHouseId: sender.houseId,
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: sender.houseId,
+      toHouseId: legacyReceiver.houseId,
+      recipientPonyInboxPub: resolvedData.ponyInboxPub,
+      body: 'hello upgraded legacy'
+    })
+  });
+  const sendHeaders = houseAuthHeaders(sender.houseId, 'POST', sendPath, sendBody, sender.kauth);
+  const sendResp = await request.post(sendPath, {
+    data: sendBody,
+    headers: { 'content-type': 'application/json', ...sendHeaders }
+  });
+  expect(sendResp.ok()).toBeTruthy();
+
+  await expect(page.locator('#requests')).toContainText('E2EE decrypted');
+  await expect(page.locator('#requests')).toContainText('hello upgraded legacy');
 });

@@ -36,6 +36,59 @@ function base58Encode(bytes) {
   return out || '1';
 }
 
+function buildPonyInboxBundle() {
+  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  return {
+    ponyInboxPub: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    ponyInboxPrivWrap: {
+      alg: 'AES-GCM',
+      iv: crypto.randomBytes(12).toString('base64'),
+      ct: crypto.randomBytes(96).toString('base64')
+    }
+  };
+}
+
+function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
+  const recipientPub = crypto.createPublicKey({
+    key: Buffer.from(recipientPonyInboxPub, 'base64'),
+    format: 'der',
+    type: 'spki'
+  });
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(
+    crypto.hkdfSync(
+      'sha256',
+      shared,
+      Buffer.alloc(0),
+      Buffer.from(`elizatown-pony-msg-v1|from=${fromHouseId || ''}|to=${toHouseId || ''}`, 'utf8'),
+      32
+    )
+  );
+  const iv = crypto.randomBytes(12);
+  const aad = Buffer.from(JSON.stringify({
+    v: 1,
+    kind: 'msg.chat.v1',
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt: new Date().toISOString()
+  }), 'utf8');
+  const plaintext = Buffer.from(JSON.stringify({ v: 1, body: String(body || '') }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aad);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    alg: 'PONY_E2EE_P256_AESGCM_V1',
+    epk: eph.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    iv: iv.toString('base64'),
+    ct: Buffer.concat([enc, tag]).toString('base64'),
+    aad: aad.toString('base64')
+  };
+}
+
 async function createAgentSoloHouse(request, label) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
@@ -62,6 +115,7 @@ async function createAgentSoloHouse(request, label) {
   const kroot = sha256(ra);
   const houseId = base58Encode(sha256(kroot));
   const houseAuthKey = hkdf(kroot, 'elizatown-house-auth-v1', 32).toString('base64');
+  const ponyInbox = buildPonyInboxBundle();
 
   const init = await request.post('/api/agent/house/init', {
     data: {
@@ -71,14 +125,17 @@ async function createAgentSoloHouse(request, label) {
       nonce,
       keyMode: 'ceremony',
       unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
-      houseAuthKey
+      houseAuthKey,
+      ponyInboxPub: ponyInbox.ponyInboxPub,
+      ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
     }
   });
   expect(init.ok()).toBeTruthy();
 
   return {
     houseId,
-    kauth: hkdf(kroot, 'elizatown-house-auth-v1', 32)
+    kauth: hkdf(kroot, 'elizatown-house-auth-v1', 32),
+    ponyInboxPub: ponyInbox.ponyInboxPub
   };
 }
 
@@ -114,7 +171,12 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   const anonNone = await request.post('/api/pony/send', {
     data: {
       toHouseId: houseA.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'anon-none' }
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'anon-none'
+      })
     }
   });
   expect(anonNone.status()).toBe(402);
@@ -124,7 +186,12 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   const anonPow = await request.post('/api/pony/send', {
     data: {
       toHouseId: houseA.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'anon-pow' },
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'anon-pow'
+      }),
       postage: { kind: 'pow.v1', nonce: 'pow-1', digest: '00abc123', difficulty: 9 }
     }
   });
@@ -136,7 +203,12 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   const seedBody = JSON.stringify({
     toHouseId: houseA.houseId,
     fromHouseId: houseB.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'seed-receipt-a' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseB.houseId,
+      toHouseId: houseA.houseId,
+      recipientPonyInboxPub: houseA.ponyInboxPub,
+      body: 'seed-receipt-a'
+    })
   });
   const seedHeaders = houseAuthHeaders(houseB.houseId, 'POST', sendPath, seedBody, houseB.kauth);
   const seedSend = await request.post(sendPath, {
@@ -151,17 +223,28 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   const anonReceipt = await request.post('/api/pony/send', {
     data: {
       toHouseId: houseA.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'anon-receipt-ok' },
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'anon-receipt-ok'
+      }),
       postage: { kind: 'receipt.v1', receipts: [seedData.dispatch.receiptId] }
     }
   });
   expect(anonReceipt.ok()).toBeTruthy();
+  const anonReceiptData = await anonReceipt.json();
 
   // Create a receipt for a different target houseC.
   const otherSeedBody = JSON.stringify({
     toHouseId: houseC.houseId,
     fromHouseId: houseB.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'seed-receipt-c' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseB.houseId,
+      toHouseId: houseC.houseId,
+      recipientPonyInboxPub: houseC.ponyInboxPub,
+      body: 'seed-receipt-c'
+    })
   });
   const otherSeedHeaders = houseAuthHeaders(houseB.houseId, 'POST', sendPath, otherSeedBody, houseB.kauth);
   const otherSeedSend = await request.post(sendPath, {
@@ -175,7 +258,12 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   const wrongHouseReceipt = await request.post('/api/pony/send', {
     data: {
       toHouseId: houseA.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'anon-receipt-wrong-house' },
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'anon-receipt-wrong-house'
+      }),
       postage: { kind: 'receipt.v1', receipts: [otherSeedData.dispatch.receiptId] }
     }
   });
@@ -193,7 +281,7 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
   });
   expect(inbox.ok()).toBeTruthy();
   const inboxData = await inbox.json();
-  const anonDelivered = inboxData.inbox.find((m) => m.envelope?.ciphertext?.ct === 'anon-receipt-ok');
+  const anonDelivered = inboxData.inbox.find((m) => m.id === anonReceiptData.id);
   expect(anonDelivered).toBeTruthy();
   expect(anonDelivered.fromHouseId).toBeNull();
 });
