@@ -253,7 +253,7 @@ async function houseApi(houseId, url, opts = {}) {
 }
 
 // --- wallet ---
-let wallet = null;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 let walletAddr = null;
 let walletHouseId = null;
 const WALLET_STORAGE_KEY = 'agentTownWallet';
@@ -329,18 +329,30 @@ function clearWalletCache() {
 }
 
 let walletEventBindings = null;
-function bindWalletEvents() {
-  if (!wallet || typeof wallet.on !== 'function') return;
-  if (walletEventBindings && walletEventBindings.wallet === wallet) return;
+function walletAddressFromEvent(next) {
+  if (!next) return null;
+  if (typeof next === 'string') return next || null;
+  if (next.publicKey && typeof next.publicKey.toString === 'function') {
+    const addr = next.publicKey.toString();
+    return typeof addr === 'string' && addr ? addr : null;
+  }
+  if (typeof next.toString === 'function') {
+    const addr = next.toString();
+    if (typeof addr === 'string' && addr && addr !== '[object Object]') return addr;
+  }
+  return null;
+}
 
-  unbindWalletEvents();
+function bindWalletEvents() {
+  if (!walletClient) return;
+  if (walletEventBindings) return;
 
   const onDisconnect = () => {
-    // Wallet disconnected outside the app (extension UI, etc).
+    // Wallet disconnected outside the app.
     disconnectWallet({ fromProvider: true, resetSession: unlocked }).catch(() => {});
   };
-  const onAccountChanged = (publicKey) => {
-    const nextAddr = publicKey && typeof publicKey.toString === 'function' ? publicKey.toString() : null;
+  const onAccountChanged = (next) => {
+    const nextAddr = walletAddressFromEvent(next);
     if (!nextAddr) {
       disconnectWallet({ fromProvider: true, resetSession: unlocked }).catch(() => {});
       return;
@@ -359,54 +371,27 @@ function bindWalletEvents() {
     }
   };
 
-  wallet.on('disconnect', onDisconnect);
-  wallet.on('accountChanged', onAccountChanged);
-  walletEventBindings = { wallet, onDisconnect, onAccountChanged };
+  walletClient.on('disconnect', onDisconnect);
+  walletClient.on('accountChanged', onAccountChanged);
+  walletEventBindings = { onDisconnect, onAccountChanged };
 }
 
 function unbindWalletEvents() {
   if (!walletEventBindings) return;
-  const { wallet: boundWallet, onDisconnect, onAccountChanged } = walletEventBindings;
-  const off =
-    typeof boundWallet.off === 'function'
-      ? boundWallet.off.bind(boundWallet)
-      : typeof boundWallet.removeListener === 'function'
-        ? boundWallet.removeListener.bind(boundWallet)
-        : null;
-  if (off) {
-    try {
-      off('disconnect', onDisconnect);
-    } catch {
-      // ignore
-    }
-    try {
-      off('accountChanged', onAccountChanged);
-    } catch {
-      // ignore
-    }
+  const { onDisconnect, onAccountChanged } = walletEventBindings;
+  if (walletClient) {
+    walletClient.off('disconnect', onDisconnect);
+    walletClient.off('accountChanged', onAccountChanged);
   }
   walletEventBindings = null;
 }
 
 async function connectWallet({ silent = false } = {}) {
-  // Accept any Solana wallet adapter injected as `window.solana` that supports
-  // `connect()` and `signMessage()` (Phantom, Solflare, Backpack, etc.).
-  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
   const previousAddr = walletAddr;
-  let resp = null;
-  if (window.solana.isConnected && window.solana.publicKey) {
-    wallet = window.solana;
-  } else {
-    const opts = silent ? { onlyIfTrusted: true } : undefined;
-    resp = await window.solana.connect(opts);
-    wallet = window.solana;
-  }
+  const connected = await walletClient.connect({ chain: 'solana', silent: !!silent });
   bindWalletEvents();
-
-  const pk = resp?.publicKey || wallet?.publicKey;
-  walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
+  walletAddr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
   if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
   if (previousAddr && previousAddr !== walletAddr) {
     walletHouseId = null;
@@ -457,15 +442,14 @@ async function resetSessionAndGoHome() {
 }
 
 async function disconnectWallet({ fromProvider = false, resetSession = false } = {}) {
-  if (!fromProvider && wallet && typeof wallet.disconnect === 'function') {
+  if (!fromProvider && walletClient) {
     try {
-      await wallet.disconnect();
+      await walletClient.disconnect({ chain: 'solana' });
     } catch {
       // ignore disconnect errors; we still clear local state
     }
   }
   unbindWalletEvents();
-  wallet = null;
   walletAddr = null;
   walletHouseId = null;
   updateWalletUI();
@@ -529,13 +513,9 @@ function normalizeSignatureBytes(sig) {
 }
 
 async function signMessageBytes(message) {
-  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-  return sigArr;
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+  return walletClient.signMessage({ chain: 'solana', message });
 }
 
 async function verifyTokenOwnershipForShare() {
@@ -584,7 +564,7 @@ function buildKeyWrapMessage({ houseId, origin }) {
 }
 
 async function lookupWalletHouseId() {
-  if (!wallet || !walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
   const nonceResp = await api('/api/wallet/nonce');
   const lookupMsg = buildWalletLookupMessage({ address: walletAddr, nonce: nonceResp.nonce, houseId: null });
   const lookupSig = await signMessageBytes(lookupMsg);
@@ -662,17 +642,12 @@ function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs
 }
 
 async function signEvmMessage(message) {
-  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const signer = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  if (!walletClient) throw new Error('NO_EVM_WALLET');
+  const connected = await walletClient.connect({ chain: 'evm' });
+  const signer = connected?.address || walletClient.getAddress({ chain: 'evm' }) || null;
   if (!signer) throw new Error('NO_EVM_ACCOUNT');
-  // personal_sign expects [data, address]
-  const sig = await window.ethereum.request({
-    method: 'personal_sign',
-    params: [message, signer]
-  });
-  const chainHex = await window.ethereum.request({ method: 'eth_chainId' });
-  const chainId = parseInt(chainHex, 16);
+  const sig = await walletClient.signMessage({ chain: 'evm', message, address: signer });
+  const chainId = await walletClient.getChainId({ chain: 'evm' });
   return { signer, signature: sig, chainId };
 }
 
@@ -829,7 +804,9 @@ async function mintErc8004Identity() {
   const status = el('erc8004MintStatus');
   if (status) status.textContent = '';
 
-  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
+  if (!walletClient) throw new Error('NO_EVM_WALLET');
+  const evmProvider = walletClient.getProvider({ chain: 'evm' });
+  if (!evmProvider) throw new Error('NO_EVM_WALLET');
   const houseId = house?.houseId || new URLSearchParams(window.location.search).get('house');
   if (!houseId) throw new Error('NO_HOUSE_ID');
 
@@ -849,19 +826,15 @@ async function mintErc8004Identity() {
   if (typeof SDKClass !== 'function') throw new Error('AG0_SDK_LOAD_FAILED');
 
   // Ensure wallet is connected
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const owner = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  const connected = await walletClient.connect({ chain: 'evm' });
+  const owner = connected?.address || walletClient.getAddress({ chain: 'evm' }) || null;
   if (!owner) throw new Error('NO_EVM_ACCOUNT');
 
   // Best-effort chain switch
-  const currentChainHex = await window.ethereum.request({ method: 'eth_chainId' });
-  const currentChainId = parseInt(currentChainHex, 16);
+  const currentChainId = await walletClient.getChainId({ chain: 'evm' });
   if (currentChainId !== chainId) {
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${chainId.toString(16)}` }]
-      });
+      await walletClient.switchChain({ chain: 'evm', chainId });
     } catch {
       throw new Error('WRONG_CHAIN');
     }
@@ -874,7 +847,7 @@ async function mintErc8004Identity() {
   const sdk = new SDKClass({
     chainId,
     rpcUrl,
-    walletProvider: window.ethereum
+    walletProvider: evmProvider
   });
 
   const agentName = `Agent Town House ${houseId.slice(0, 10)}`;
@@ -1813,10 +1786,10 @@ async function initSharePanel() {
                 ? 'Connect the same wallet used to create this house.'
                 : e.message === 'BAD_SIGNATURE'
                   ? 'Wallet signature failed.'
-                  : e.message === 'SIGNATURE_FORMAT'
+                    : e.message === 'SIGNATURE_FORMAT'
                     ? 'Wallet signature failed.'
                     : e.message === 'NO_SOLANA_WALLET'
-                      ? 'No Solana wallet found (need Phantom/Solflare).'
+                      ? 'No Privy-connected Solana wallet found.'
                       : e.message === 'NO_SOLANA_SIGN'
                         ? 'Wallet does not support message signing.'
         : e.message === 'EMPTY_CANVAS'
@@ -1883,7 +1856,7 @@ async function init() {
     } catch (e) {
       setError(
         e.message === 'NO_SOLANA_WALLET'
-          ? 'No Solana wallet found (need Phantom/Solflare).'
+          ? 'No Privy-connected Solana wallet found.'
           : e.message === 'NO_SOLANA_SIGN'
             ? 'Wallet does not support message signing.'
             : e.message

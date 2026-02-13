@@ -1,7 +1,7 @@
 ---
 name: agent-town-playbook
 version: 0.3.5
-description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + wallet-signature unlock).
+description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + Privy wallet-signature unlock).
 author: Agent Town
 ---
 
@@ -523,7 +523,7 @@ This is a demo API; be forgiving and help the human recover quickly.
 ### If you see `HOUSE_EXISTS`
 
 - A house was already initialized for this `houseId`.
-- The human can open `/house?house=<houseId>` and unlock with their wallet.
+- The human can open `/house?house=<houseId>` and unlock with their Privy wallet.
 
 ### If you see `EMPTY_CANVAS`
 

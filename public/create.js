@@ -34,6 +34,7 @@ function setHouseNavLink(houseId) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 
 function renderPalette() {
   const c = el('palette');
@@ -165,8 +166,8 @@ async function init() {
   const nextNote = el('createNextNote');
   if (nextNote) {
     nextNote.textContent = tokenMode
-      ? 'Next: unlock the house with a Solana wallet signature. You can invite an agent later.'
-      : 'Next: unlock the house with a Solana wallet signature. Then you and the agent can read/write encrypted entries.';
+      ? 'Next: unlock the house with a wallet signature. You can invite an agent later.'
+      : 'Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.';
   }
 
   const state = await api('/api/canvas/state');
@@ -184,10 +185,11 @@ async function init() {
   updateLockState();
 
   async function connectWalletOrThrow() {
-    if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-    if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-    const resp = await window.solana.connect();
-    return { wallet: window.solana, address: resp.publicKey.toString() };
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    const connected = await walletClient.connect({ chain: 'solana', silent: false });
+    const address = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+    if (!address) throw new Error('NO_SOLANA_PUBKEY');
+    return { address };
   }
 
   async function sha256(bytes) {
@@ -427,13 +429,9 @@ async function init() {
     return parts.join('\n');
   }
 
-  async function signMessageBytes(wallet, message) {
-    const msgBytes = new TextEncoder().encode(message);
-    const resp = await wallet.signMessage(msgBytes, 'utf8');
-    const sigBytes = resp?.signature || resp;
-    const sigArr = normalizeSignatureBytes(sigBytes);
-    if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-    return sigArr;
+  async function signMessageBytes(message) {
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    return walletClient.signMessage({ chain: 'solana', message });
   }
 
   // (Ceremony houses) We store only a wallet-wrapped K_root (never raw).
@@ -477,7 +475,7 @@ async function init() {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
     try {
-      const { wallet, address } = await connectWalletOrThrow();
+      const { address } = await connectWalletOrThrow();
       if (tokenMode && tokenAddress && address !== tokenAddress) {
         throw new Error('WALLET_MISMATCH');
       }
@@ -555,7 +553,7 @@ async function init() {
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
       const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
-      const wrapSig = await signMessageBytes(wallet, wrapMsg);
+      const wrapSig = await signMessageBytes(wrapMsg);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
       const wrapped = await aesGcmEncrypt(wrapKey, Kroot);
@@ -574,7 +572,12 @@ async function init() {
           housePubKey,
           nonce,
           keyMode: 'ceremony',
-          unlock: { kind: 'solana-wallet-signature', address },
+          unlock: {
+            kind: 'wallet-signature',
+            provider: 'privy',
+            chain: 'solana',
+            address
+          },
           keyWrap,
           houseAuthKey,
           ponyInboxPub: ponyInbox.ponyInboxPub,

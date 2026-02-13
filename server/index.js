@@ -5,6 +5,9 @@ const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 const express = require('express');
+const { loadDotEnv } = require('./env');
+
+loadDotEnv();
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
@@ -638,6 +641,18 @@ function buildTokenCheckMessage({ address, nonce, ca }) {
   return ['ElizaTown Token Check', `address: ${address}`, `CA: ${ca}`, `nonce: ${nonce}`].join('\n');
 }
 
+function unlockAddressForLookup(unlock) {
+  if (!unlock || typeof unlock !== 'object') return null;
+  const address = typeof unlock.address === 'string' ? unlock.address.trim() : '';
+  if (!address) return null;
+  if (unlock.kind === 'solana-wallet-signature') return address;
+  if (unlock.kind === 'wallet-signature') {
+    const chain = typeof unlock.chain === 'string' ? unlock.chain.trim().toLowerCase() : '';
+    if (chain === 'solana') return address;
+  }
+  return null;
+}
+
 function verifySolanaSignature(address, message, signatureB64) {
   try {
     const pubKey = base58Decode(address);
@@ -693,6 +708,107 @@ const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
 
+function splitCsvEnv(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function parseBoolEnv(raw, fallback = false) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return !!fallback;
+  const normalized = String(raw).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return !!fallback;
+}
+
+function parseJsonObjectEnv(raw) {
+  const src = String(raw || '').trim();
+  if (!src) return {};
+  try {
+    const parsed = JSON.parse(src);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function sanitizePublicConfig(value) {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((item) => sanitizePublicConfig(item));
+
+  const out = {};
+  for (const [key, val] of Object.entries(value)) {
+    const lower = key.toLowerCase();
+    if (lower.includes('secret') || lower.includes('private') || lower.includes('api_key')) continue;
+    out[key] = sanitizePublicConfig(val);
+  }
+  return out;
+}
+
+const PRIVY_APP_ID = String(process.env.PRIVY_APP_ID || '').trim();
+const PRIVY_CLIENT_ID = String(process.env.PRIVY_CLIENT_ID || '').trim();
+const PRIVY_SDK_SCRIPT_URL = String(process.env.PRIVY_SDK_SCRIPT_URL || '').trim();
+const PRIVY_SDK_MODULE_URL = String(process.env.PRIVY_SDK_MODULE_URL || '').trim();
+const PRIVY_LOGIN_METHOD = String(process.env.PRIVY_LOGIN_METHOD || 'email').trim().toLowerCase();
+const PRIVY_PUBLIC_CONFIG_JSON = sanitizePublicConfig(parseJsonObjectEnv(process.env.PRIVY_PUBLIC_CONFIG_JSON));
+const PRIVY_PUBLIC_CONFIG = {
+  ...PRIVY_PUBLIC_CONFIG_JSON,
+  ...(PRIVY_APP_ID ? { appId: PRIVY_APP_ID } : {}),
+  ...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {}),
+  ...(PRIVY_SDK_SCRIPT_URL ? { sdkScriptUrl: PRIVY_SDK_SCRIPT_URL } : {}),
+  ...(PRIVY_SDK_MODULE_URL ? { sdkModuleUrl: PRIVY_SDK_MODULE_URL } : {}),
+  ...(PRIVY_LOGIN_METHOD ? { loginMethod: PRIVY_LOGIN_METHOD } : {})
+};
+const PRIVY_ENABLED_RAW = !!PRIVY_PUBLIC_CONFIG.appId;
+const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, false);
+const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
+const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
+const HOME_ROUTE_FILE = START_PAGE_ENABLED ? 'start.html' : 'index.html';
+
+const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
+const PRIVY_SCRIPT_SRC_DEFAULT = [
+  'https://esm.sh',
+  'https://auth.privy.io',
+  'https://*.privy.io',
+  'https://*.privy.app',
+  'https://*.privy.com'
+];
+const scriptSrc = [
+  "'self'",
+  ...(PRIVY_ENABLED ? PRIVY_SCRIPT_SRC_DEFAULT : []),
+  ...CSP_SCRIPT_SRC_EXTRA
+];
+const SCRIPT_SRC = [...new Set(scriptSrc)];
+const CSP_CONNECT_SRC_EXTRA = splitCsvEnv(process.env.CSP_CONNECT_SRC_EXTRA);
+const PRIVY_CONNECT_SRC_DEFAULT = [
+  'https://auth.privy.io',
+  'https://api.privy.io',
+  'https://*.privy.io',
+  'https://*.privy.app',
+  'https://*.privy.com',
+  'wss://*.privy.io',
+  'wss://*.privy.app',
+  'wss://*.privy.com'
+];
+const connectSrc = [
+  "'self'",
+  'https://eth.llamarpc.com',
+  'https://rpc.ankr.com',
+  ...(PRIVY_ENABLED ? PRIVY_CONNECT_SRC_DEFAULT : []),
+  ...CSP_CONNECT_SRC_EXTRA
+];
+const CONNECT_SRC = [...new Set(connectSrc)];
+const CSP_FRAME_SRC_EXTRA = splitCsvEnv(process.env.CSP_FRAME_SRC_EXTRA);
+const frameSrc = [
+  "'self'",
+  ...(PRIVY_ENABLED ? ['https://auth.privy.io', 'https://*.privy.io', 'https://*.privy.app', 'https://*.privy.com'] : []),
+  ...CSP_FRAME_SRC_EXTRA
+];
+const FRAME_SRC = [...new Set(frameSrc)];
+
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -701,13 +817,15 @@ function setSecurityHeaders(req, res, next) {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', 'DENY');
 
-  const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src ${SCRIPT_SRC.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
-    `connect-src ${connectSrc.join(' ')}`,
+    "media-src 'self'",
+    "worker-src 'self' blob:",
+    `frame-src ${FRAME_SRC.join(' ')}`,
+    `connect-src ${CONNECT_SRC.join(' ')}`,
     "object-src 'none'",
     "base-uri 'none'",
     "frame-ancestors 'none'"
@@ -1261,6 +1379,16 @@ function verifyHouseAuth(req, house) {
 // --- API ---
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
+});
+
+app.get('/api/privy/config', (_req, res) => {
+  res.json({
+    ok: true,
+    enabled: PRIVY_ENABLED,
+    config: PRIVY_ENABLED ? PRIVY_PUBLIC_CONFIG : null,
+    startPageEnabled: START_PAGE_ENABLED,
+    appPath: '/app'
+  });
 });
 
 app.get('/api/session', (req, res) => {
@@ -2786,7 +2914,7 @@ app.post('/api/wallet/lookup', (req, res) => {
 
   const store = readStore();
   let matches = store.houses.filter(
-    (r) => r && r.unlock && r.unlock.kind === 'solana-wallet-signature' && r.unlock.address === address
+    (r) => r && unlockAddressForLookup(r.unlock) === address
   );
   if (houseId) {
     matches = matches.filter((r) => r.id === houseId);
@@ -2934,12 +3062,12 @@ app.post('/api/house/init', (req, res) => {
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
-          version: ponyInboxRegistration.version,
-          pub: ponyInboxRegistration.pub,
-          privWrap: ponyInboxRegistration.privWrap,
-          createdAt: nowIso(),
-          updatedAt: nowIso()
-        }
+        version: ponyInboxRegistration.version,
+        pub: ponyInboxRegistration.pub,
+        privWrap: ponyInboxRegistration.privWrap,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }
       : null
   });
   writeStore(store);
@@ -3036,12 +3164,12 @@ app.post('/api/agent/house/init', (req, res) => {
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
-          version: ponyInboxRegistration.version,
-          pub: ponyInboxRegistration.pub,
-          privWrap: ponyInboxRegistration.privWrap,
-          createdAt: nowIso(),
-          updatedAt: nowIso()
-        }
+        version: ponyInboxRegistration.version,
+        pub: ponyInboxRegistration.pub,
+        privWrap: ponyInboxRegistration.privWrap,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }
       : null
   });
   writeStore(store);
@@ -3250,6 +3378,7 @@ app.post('/api/house/:id/append', (req, res) => {
 // --- Static + routes ---
 app.use(
   express.static(PUBLIC_DIR, {
+    index: false,
     etag: true,
     maxAge: isProd ? '1h' : 0,
     setHeaders: (res) => {
@@ -3273,6 +3402,9 @@ app.use(
   })
 );
 
+app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, HOME_ROUTE_FILE)));
+app.get('/start', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'start.html')));
+app.get('/app', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
@@ -3294,7 +3426,7 @@ app.get('/s/:id', (req, res) => {
 });
 
 // Default route
-app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, HOME_ROUTE_FILE)));
 
 const port = Number(process.env.PORT || 4173);
 app.listen(port, () => {

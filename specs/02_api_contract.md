@@ -31,6 +31,36 @@ Response:
 ### GET `/api/health`
 Returns `{ ok: true, time: ISO8601 }`.
 
+### GET `/api/privy/config`
+Returns browser-safe Privy config from server env.
+
+Response (enabled):
+```json
+{
+  "ok": true,
+  "enabled": true,
+  "startPageEnabled": true,
+  "appPath": "/app",
+  "config": {
+    "appId": "<privy app id>",
+    "clientId": "<optional>",
+    "sdkScriptUrl": "<optional>",
+    "sdkModuleUrl": "<optional>",
+    "loginMethod": "email"
+  }
+}
+```
+
+Response (disabled):
+```json
+{ "ok": true, "enabled": false, "startPageEnabled": false, "appPath": "/app", "config": null }
+```
+
+Notes:
+- Only public config is returned.
+- `PRIVY_APP_SECRET` is server-only and is never exposed by this endpoint.
+- In `NODE_ENV=test`, this endpoint is disabled by default unless `ENABLE_PRIVY_IN_TEST=true`.
+
 ---
 
 ## Home / state
@@ -758,7 +788,12 @@ Body:
   "housePubKey": "<base58>",
   "nonce": "n_...",
   "keyMode": "ceremony",
-  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "unlock": {
+    "kind": "wallet-signature",
+    "provider": "privy",
+    "chain": "solana",
+    "address": "..."
+  },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
   "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
   "ponyInboxPub": "<optional base64 SPKI>",
@@ -784,7 +819,12 @@ Body:
   "housePubKey": "<base58>",
   "nonce": "n_...",
   "keyMode": "ceremony",
-  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "unlock": {
+    "kind": "wallet-signature",
+    "provider": "privy",
+    "chain": "solana",
+    "address": "..."
+  },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
   "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
   "ponyInboxPub": "<optional base64 SPKI>",
@@ -888,6 +928,11 @@ Returns:
 ```json
 { "ok": true, "houseId": "<base58 | null>", "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" } | null }
 ```
+
+Lookup matching behavior during migration:
+- New house records use `unlock.kind = "wallet-signature"` with `provider = "privy"` and `chain = "solana"`.
+- Legacy records with `unlock.kind = "solana-wallet-signature"` are still matched during migration.
+- If a returning user connects the same wallet address via Privy, lookup/unlock continues to work.
 
 `keyWrap` is a wallet-wrapped `K_root` for recovery. It is encrypted client-side with a key derived from a deterministic wallet signature over:
 ```

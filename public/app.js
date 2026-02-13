@@ -23,7 +23,7 @@ function el(id) {
 let elements = [];
 let lastState = null;
 let redirecting = false;
-let wallet = null;
+const appWalletClient = window.initWalletClient ? window.initWalletClient() : null;
 let walletAddr = null;
 let walletHouseId = null;
 let walletRecovered = false;
@@ -108,21 +108,32 @@ function updateWalletUI() {
 }
 
 let walletEventBindings = null;
-function bindWalletEvents() {
-  if (!wallet || typeof wallet.on !== 'function') return;
-  if (walletEventBindings && walletEventBindings.wallet === wallet) return;
+function walletAddressFromEvent(next) {
+  if (!next) return null;
+  if (typeof next === 'string') return next || null;
+  if (next.publicKey && typeof next.publicKey.toString === 'function') {
+    const addr = next.publicKey.toString();
+    return typeof addr === 'string' && addr ? addr : null;
+  }
+  if (typeof next.toString === 'function') {
+    const addr = next.toString();
+    if (typeof addr === 'string' && addr && addr !== '[object Object]') return addr;
+  }
+  return null;
+}
 
-  // If a wallet object changes (rare), unbind previous listeners.
-  unbindWalletEvents();
+function bindWalletEvents() {
+  if (!appWalletClient) return;
+  if (walletEventBindings) return;
 
   const onDisconnect = () => {
-    // Wallet disconnected outside the app (extension UI, etc).
+    // Wallet disconnected outside the app.
     disconnectWallet({ fromProvider: true })
       .then(() => maybeResetAfterWalletDisconnect())
       .catch(() => {});
   };
-  const onAccountChanged = (publicKey) => {
-    const nextAddr = publicKey && typeof publicKey.toString === 'function' ? publicKey.toString() : null;
+  const onAccountChanged = (next) => {
+    const nextAddr = walletAddressFromEvent(next);
     if (!nextAddr) {
       disconnectWallet({ fromProvider: true }).catch(() => {});
       return;
@@ -137,31 +148,17 @@ function bindWalletEvents() {
     }
   };
 
-  wallet.on('disconnect', onDisconnect);
-  wallet.on('accountChanged', onAccountChanged);
-  walletEventBindings = { wallet, onDisconnect, onAccountChanged };
+  appWalletClient.on('disconnect', onDisconnect);
+  appWalletClient.on('accountChanged', onAccountChanged);
+  walletEventBindings = { onDisconnect, onAccountChanged };
 }
 
 function unbindWalletEvents() {
   if (!walletEventBindings) return;
-  const { wallet: boundWallet, onDisconnect, onAccountChanged } = walletEventBindings;
-  const off =
-    typeof boundWallet.off === 'function'
-      ? boundWallet.off.bind(boundWallet)
-      : typeof boundWallet.removeListener === 'function'
-        ? boundWallet.removeListener.bind(boundWallet)
-        : null;
-  if (off) {
-    try {
-      off('disconnect', onDisconnect);
-    } catch {
-      // ignore
-    }
-    try {
-      off('accountChanged', onAccountChanged);
-    } catch {
-      // ignore
-    }
+  const { onDisconnect, onAccountChanged } = walletEventBindings;
+  if (appWalletClient) {
+    appWalletClient.off('disconnect', onDisconnect);
+    appWalletClient.off('accountChanged', onAccountChanged);
   }
   walletEventBindings = null;
 }
@@ -280,21 +277,11 @@ function buildTokenCheckMessage({ address, nonce }) {
 }
 
 async function connectWallet({ silent = false } = {}) {
-  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
+  if (!appWalletClient) throw new Error('NO_SOLANA_WALLET');
   const previousAddr = walletAddr;
-  let resp = null;
-  if (window.solana.isConnected && window.solana.publicKey) {
-    wallet = window.solana;
-  } else {
-    const opts = silent ? { onlyIfTrusted: true } : undefined;
-    resp = await window.solana.connect(opts);
-    wallet = window.solana;
-  }
+  const connected = await appWalletClient.connect({ chain: 'solana', silent: !!silent });
   bindWalletEvents();
-  const pk = resp?.publicKey || wallet?.publicKey;
-  walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
+  walletAddr = connected?.address || appWalletClient.getAddress({ chain: 'solana' }) || null;
   if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
   if (previousAddr && previousAddr !== walletAddr) {
     walletHouseId = null;
@@ -305,15 +292,14 @@ async function connectWallet({ silent = false } = {}) {
 }
 
 async function disconnectWallet({ fromProvider = false } = {}) {
-  if (!fromProvider && wallet && typeof wallet.disconnect === 'function') {
+  if (!fromProvider && appWalletClient) {
     try {
-      await wallet.disconnect();
+      await appWalletClient.disconnect({ chain: 'solana' });
     } catch {
       // ignore disconnect errors; we still clear local state
     }
   }
   unbindWalletEvents();
-  wallet = null;
   walletAddr = null;
   walletHouseId = null;
   walletRecovered = false;
@@ -373,18 +359,15 @@ async function maybeResetAfterWalletDisconnect() {
 }
 
 async function lookupWalletHouse(houseIdOverride = null) {
-  if (!wallet || !walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!appWalletClient) throw new Error('NO_SOLANA_WALLET');
   const nonceResp = await api('/api/wallet/nonce');
   const msg = buildWalletLookupMessage({
     address: walletAddr,
     nonce: nonceResp.nonce,
     houseId: houseIdOverride || null
   });
-  const msgBytes = new TextEncoder().encode(msg);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
+  const sigArr = await appWalletClient.signMessage({ chain: 'solana', message: msg });
   const signature = b64(sigArr);
   const body = {
     address: walletAddr,
@@ -437,14 +420,11 @@ async function verifyTokenOwnership() {
   if (!walletAddr) {
     await connectWallet();
   }
-  if (!wallet || !walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!appWalletClient) throw new Error('NO_SOLANA_WALLET');
   const nonceResp = await api('/api/token/nonce');
   const msg = buildTokenCheckMessage({ address: walletAddr, nonce: nonceResp.nonce });
-  const msgBytes = new TextEncoder().encode(msg);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
+  const sigArr = await appWalletClient.signMessage({ chain: 'solana', message: msg });
   const signature = b64(sigArr);
   const result = await api('/api/token/verify', {
     method: 'POST',
@@ -762,7 +742,7 @@ async function init() {
       } catch (e) {
         setWalletStatus(
           e.message === 'NO_SOLANA_WALLET'
-            ? 'No Solana wallet found (need Phantom/Solflare).'
+            ? 'No Privy-connected Solana wallet found.'
             : e.message === 'NO_SOLANA_SIGN'
               ? 'Wallet does not support message signing.'
               : e.message,
@@ -808,7 +788,7 @@ async function init() {
             : e.message === 'RPC_UNAVAILABLE'
               ? 'Token check is unavailable. Try again.'
               : e.message === 'NO_SOLANA_WALLET'
-                ? 'No Solana wallet found (need Phantom/Solflare).'
+                ? 'No Privy-connected Solana wallet found.'
                 : e.message === 'NO_SOLANA_SIGN'
                   ? 'Wallet does not support message signing.'
                   : e.message;

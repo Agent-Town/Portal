@@ -10,6 +10,7 @@ const ponyUpgradeFailureMsg = new Map();
 let lastFriends = [];
 let loadInFlight = null;
 let refreshTimer = null;
+const inboxWalletClient = window.initWalletClient ? window.initWalletClient() : null;
 
 function getHouseId() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -117,22 +118,17 @@ function normalizeSignatureBytes(sig) {
   return null;
 }
 
-async function signWalletMessageBytes(wallet, message) {
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sig = resp?.signature || resp;
-  const bytes = normalizeSignatureBytes(sig);
-  if (!bytes) throw new Error('SIGNATURE_FORMAT');
-  return bytes;
+async function signWalletMessageBytes(message) {
+  if (!inboxWalletClient) throw new Error('NO_SOLANA_WALLET');
+  return inboxWalletClient.signMessage({ chain: 'solana', message });
 }
 
 async function connectWalletOrThrow() {
-  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-  const resp = await window.solana.connect();
-  const address = resp?.publicKey?.toString?.() || window.solana?.publicKey?.toString?.();
+  if (!inboxWalletClient) throw new Error('NO_SOLANA_WALLET');
+  const connected = await inboxWalletClient.connect({ chain: 'solana', silent: false });
+  const address = connected?.address || inboxWalletClient.getAddress({ chain: 'solana' }) || null;
   if (!address) throw new Error('WALLET_NOT_CONNECTED');
-  return { wallet: window.solana, address };
+  return { address };
 }
 
 async function aesGcmDecrypt(key, iv, ct) {
@@ -147,9 +143,9 @@ async function aesGcmDecrypt(key, iv, ct) {
 async function recoverHouseKrootWithWallet(houseId) {
   if (houseKrootMemory.has(houseId)) return houseKrootMemory.get(houseId);
 
-  const { wallet, address } = await connectWalletOrThrow();
+  const { address } = await connectWalletOrThrow();
   const primaryMsg = buildKeyWrapMessage({ houseId });
-  const primarySig = await signWalletMessageBytes(wallet, primaryMsg);
+  const primarySig = await signWalletMessageBytes(primaryMsg);
 
   const lookup = await api('/api/wallet/lookup', {
     method: 'POST',
@@ -172,7 +168,7 @@ async function recoverHouseKrootWithWallet(houseId) {
   }
 
   async function decryptWithMessage(msg) {
-    const sig = await signWalletMessageBytes(wallet, msg);
+    const sig = await signWalletMessageBytes(msg);
     return decryptWithSig(sig);
   }
 

@@ -8,3 +8,6 @@ data/store*.sqlite-shm
 
 node_modules/
 
+.env
+.env.*
+!.env.example

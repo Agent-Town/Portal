@@ -750,6 +750,121 @@ footer::before {
   }
 }
 
+.startWrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.startCard {
+  width: min(760px, 100%);
+  border: 3px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 250, 236, 0.98) 0%, rgba(255, 242, 214, 0.98) 100%);
+  box-shadow: 0 6px 0 rgba(44, 69, 99, 0.5), 0 18px 30px var(--shadow);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.startLogo {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 3px solid var(--border);
+  justify-self: center;
+  box-shadow: 0 4px 0 rgba(44, 69, 99, 0.45);
+}
+
+.startVideo {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #1f2f44;
+  object-fit: cover;
+  display: block;
+}
+
+.startHero {
+  position: relative;
+  border-radius: 12px;
+  border: 3px solid var(--border);
+  overflow: hidden;
+  background: #1f2f44;
+}
+
+.startHero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(20, 30, 48, 0.1) 0%, rgba(20, 30, 48, 0.22) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.startTitle {
+  text-align: center;
+  margin: 0;
+}
+
+.startEntryActions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.startEnterBtn,
+.startWalletBtn {
+  min-width: 180px;
+}
+
+.startStatus {
+  text-align: center;
+  min-height: 1.4em;
+  margin: 0;
+}
+
+.startAuthBox {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: min(460px, calc(100% - 24px));
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 249, 232, 0.92);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(25, 34, 56, 0.38);
+  backdrop-filter: blur(5px);
+}
+
+.startAuthTitle {
+  margin: 0;
+  font-size: 18px;
+}
+
+.startAuthHelp {
+  margin: 0;
+}
+
+.startAuthForm {
+  display: grid;
+  gap: 8px;
+}
+
+.startAuthActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 980px) {
 }
 
@@ -766,6 +881,21 @@ footer::before {
 }
 
 @media (max-width: 520px) {
+  .startEntryActions {
+    width: 100%;
+  }
+
+  .startEnterBtn,
+  .startWalletBtn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .startAuthBox {
+    width: calc(100% - 16px);
+    padding: 10px;
+  }
+
   .brand strong {
     font-size: 11px;
   }
