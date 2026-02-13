@@ -8,6 +8,8 @@ test.beforeEach(async ({ request }) => {
 
 test('home loads, shows team code and skill link', async ({ page, request }) => {
   await page.goto('/');
+  await page.getByTestId('auth-signin').click();
+  await expect(page.getByTestId('hatch-panel')).toBeVisible();
 
   await expect(page.getByTestId('team-code')).toHaveText(/TEAM-[A-Z0-9]{4}-[A-Z0-9]{4}/);
   await expect(page.getByTestId('skill-link')).toBeVisible();

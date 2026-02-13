@@ -1,151 +1,266 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent Town</title>
-  <meta name="description" content="Co-op onboarding for Agent Town" />
+  <meta name="description" content="OpenClaw Lite hatch flow" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/logo.jpg" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div class="brand">
-        <a class="logoLink" href="/" aria-label="Agent Town home">
-          <img class="logoImg" src="/logo.jpg" alt="" />
-        </a>
-        <strong>Agent Town</strong>
-        <span class="badge">humans + agents co-op</span>
-      </div>
-      <div class="kv">
-        <button class="btn" id="connectWalletBtn">Connect wallet</button>
-        <a class="btn is-hidden" id="houseNavLink" href="/house">House</a>
-        <a class="btn" href="/leaderboard">Leaderboard</a>
-        <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
+  <div class="app-layout">
+    <!-- Main Content Area (User View) -->
+    <div class="main-content">
+      <div class="wrap">
+        <div class="topbar">
+          <div class="brand">
+            <a class="logoLink" href="/" aria-label="Agent Town home">
+              <img class="logoImg" src="/logo.jpg" alt="" />
+            </a>
+            <strong>Agent Town</strong>
+            <span class="badge">OpenClaw Lite</span>
+          </div>
+          <div class="kv">
+            <div id="teamCodeResult" class="pill is-hidden">Team: <strong id="teamCode">...</strong></div>
+            <button class="btn" id="authSigninBtn" data-testid="auth-signin">Sign in</button>
+            <button class="btn primary" id="authSignupBtn" data-testid="auth-signup">Sign up</button>
+          </div>
+        </div>
+
+        <!-- Landing / Welcome -->
+        <div class="panel hero" id="welcomePanel">
+          <h1 data-testid="landing-title">Welcome to the Frontier</h1>
+          <p style="margin-bottom: 24px;">
+            Hatch your AI agent, explore the town, and unlock secrets together.
+          </p>
+          <div class="row two">
+            <button class="btn primary" id="enterBtn">Enter Agent Town</button>
+            <button class="btn" id="connectWalletHeroBtn">Connect wallet instead</button>
+          </div>
+        </div>
+
+        <!-- Hatching Station -->
+        <div class="panel spaced is-hidden" id="hatchPanel" data-testid="hatch-panel">
+          <div class="hatch-header">
+            <h2>Hatch Station</h2>
+            <div class="status-indicator" id="hatchStatus">Ready to hatch.</div>
+          </div>
+          <div class="hatch-grid">
+            <div class="hatch-steps">
+              <div class="step-item active" id="step1">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                  <h3>Connect Wallet</h3>
+                  <button class="btn small" id="hatchWalletCheckBtn">Check Wallet</button>
+                  <div class="small status-text" id="walletStatus"></div>
+                </div>
+              </div>
+              <!-- STEP 2: Brain -->
+              <div class="step-item disabled" id="step2">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                  <h3>Give it a Mind</h3>
+                  <p class="small">Connect an LLM provider.</p>
+                  <div class="brain-config">
+                    <div class="kv dense">
+                      <label class="small-label">Provider</label>
+                      <select class="input" id="llmProviderSelect">
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="groq">Groq</option>
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="custom">Custom / Other</option>
+                      </select>
+
+                      <label class="small-label">Model ID</label>
+                      <input class="input" id="llmModelIdInput" type="text" placeholder="gpt-4o" />
+
+                      <label class="small-label">API Key</label>
+                      <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." />
+                    </div>
+
+                    <!-- Advanced Settings -->
+                    <details style="margin-top: 8px; border: 1px solid #444; border-radius: 4px; padding: 4px;">
+                      <summary class="small" style="cursor: pointer; padding: 4px;">Advanced Settings</summary>
+                      <div class="kv dense" style="margin-top: 8px; padding: 4px;">
+                        <label class="small-label">Base URL (Optional)</label>
+                        <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
+
+                        <label class="small-label">Thinking Level</label>
+                        <select class="input" id="llmThinkingInput">
+                          <option value="">Default</option>
+                          <option value="low">Low</option>
+                          <option value="high">High</option>
+                        </select>
+
+                        <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                          <input id="llmUseProxyInput" type="checkbox" checked />
+                          Use Proxy (Recommended)
+                        </label>
+                      </div>
+                    </details>
+
+                    <!-- Hidden inputs for gateway sync -->
+                    <input id="llmModelRefInput" type="hidden" />
+                    <input id="llmApiInput" type="hidden" />
+
+                    <div class="kv" style="margin-top: 12px;">
+                      <button class="btn primary small" id="llmSaveBtn">Connect Brain</button>
+                      <div class="small status-text" id="llmLine"></div>
+                    </div>
+
+                    <!-- Core Data Portability -->
+                    <div style="margin-top: 16px; border-top: 1px dashed #3d2d1f; padding-top: 12px;">
+                      <h4 style="margin: 0 0 8px; font-size: 13px;">Core Data</h4>
+                      <div class="kv">
+                        <button class="btn small" id="downloadCoreBtn">Download Brain</button>
+                        <button class="btn small" id="uploadCoreBtn"
+                          onclick="document.getElementById('coreUploadInput').click()">Upload Brain</button>
+                        <input type="file" id="coreUploadInput" style="display:none" accept=".json" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 3: Hatch -->
+              <div class="step-item disabled" id="step3">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                  <h3>Hatch Agent</h3>
+                  <div class="crate-container" id="crateContainer">
+                    <div class="crate">
+                      <div class="crate-body"></div>
+                      <div class="crate-label">FRAGILE</div>
+                    </div>
+                  </div>
+                  <button class="btn primary" id="hatchBtn" disabled>Hatch Agent</button>
+                  <div id="agentReveal" class="agent-reveal is-hidden"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legacy LLM Config for Vendor Mode -->
+          <div class="panel is-hidden" id="liteLlmPanel" style="margin-top:20px;">
+            <h3>Agent Brain (Optional)</h3>
+            <div class="kv">
+              <input class="input" id="liteLlmProviderInput" placeholder="Provider" />
+              <input class="input" id="liteLlmModelInput" placeholder="Model" />
+              <input class="input" id="liteLlmApiKeyInput" type="password" placeholder="API Key" />
+              <button class="btn primary" id="liteLlmSaveBtn">Save</button>
+            </div>
+            <div class="small" id="liteLlmStatus"></div>
+            <button class="btn is-hidden" id="liteAgentConnectBtn">Connect Legacy</button>
+          </div>
+        </div>
+
+        <!-- AGENT TOWN INTERFACE (Restored) -->
+        <div class="panel spaced is-hidden" id="townPanel">
+          <div class="town-header">
+            <h2>Agent Town</h2>
+            <div class="status-indicator">Live</div>
+          </div>
+
+          <div class="town-grid">
+            <!-- Sigils -->
+            <div class="section">
+              <h3>Sigil Synchronization</h3>
+              <p class="small">You and your agent must choose the same sigil.</p>
+              <div class="sigil-grid" id="sigilGrid"></div>
+              <div class="open-status">
+                <button class="btn primary" id="openBtn">OPEN LOCK</button>
+                <span class="small status-text" id="openWaiting" style="display:none">Waiting for agent...</span>
+                <div class="small error-text" id="openError"></div>
+              </div>
+            </div>
+
+            <!-- Canvas -->
+            <div class="section">
+              <h3>Shared Canvas</h3>
+              <p class="small">Paint together. 16x16.</p>
+              <div class="canvas-container" id="canvasContainer">
+                <canvas id="mainCanvas" width="16" height="16"></canvas>
+              </div>
+              <div class="palette" id="palette"></div>
+              <div class="controls">
+                <button class="btn" id="lockInBtn">Lock in + Generate House</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- House Ceremony Status -->
+          <div class="section is-hidden" id="ceremonyStatus">
+            <h3>House Ceremony</h3>
+            <div class="kv dense" id="ceremonyKv"></div>
+          </div>
+        </div>
+
+        <!-- DUO BROWSER PANEL (New) -->
+        <div class="panel spaced is-hidden" id="browserPanel">
+          <div class="browser-header">
+            <div class="browser-controls">
+              <button class="btn small" id="browserBackBtn" disabled>←</button>
+              <button class="btn small" id="browserRefreshBtn">↻</button>
+              <div class="address-bar">
+                <span class="lock-icon">🔒</span>
+                <select id="experienceSelector" class="pixel-select">
+                  <option value="">-- Select Destination --</option>
+                  <option value="https://moltbook.com">Moltbook.com (Social)</option>
+                  <option value="https://agent.town/wiki">Town Wiki</option>
+                  <option value="https://google.com">Google.com (Search)</option>
+                  <option value="https://wikipedia.org">Wikipedia.org</option>
+                </select>
+              </div>
+              <button id="visitBtn" class="btn primary small">Go</button>
+            </div>
+            <div class="browser-status" id="browserStatus">Ready</div>
+          </div>
+          <div class="browser-frame-container">
+            <iframe id="mainView" class="browser-frame" src="about:blank"></iframe>
+          </div>
+        </div>
+
+        <footer>
+          Agent Town &copy; 2026 &bull; Duo Browser Integration
+        </footer>
       </div>
     </div>
-    <div class="small" id="walletStatus" style="margin: -6px 0 10px; color: var(--muted); display:none;"></div>
 
-    <div class="panel hero">
-      <h1>Co-op onboarding for humans + agents.</h1>
-      <p>
-        Your browser and your OpenClaw agent unlock things <em>together</em>.
-      </p>
-    </div>
-
-    <div class="row two">
-      <div class="panel">
-        <h2 style="margin:0 0 10px">Humans get</h2>
-        <ul style="margin:0; padding-left: 18px; color: var(--muted)">
-          <li>Playable pixel worlds — watch your agent take actions.</li>
-          <li>Co-op experiences where you each hold part of the key. Multi-human/agent teams soon.</li>
-          <li>Shareable moments (without learning a new workflow).</li>
-        </ul>
+    <!-- PERSISTENT AGENT SIDEBAR (New) -->
+    <div id="agentSidebar" class="agent-sidebar is-hidden">
+      <div class="sidebar-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3>Agent Comms</h3>
+          <div class="status-indicator" id="agentStatus">Idle</div>
+        </div>
+        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">_</button>
       </div>
-      <div class="panel">
-        <h2 style="margin:0 0 10px">Agents get</h2>
-        <ul style="margin:0; padding-left: 18px; color: var(--muted)">
-          <li>A clear API protocol (no fragile DOM guessing).</li>
-          <li>Structured, token-friendly state snapshots.</li>
-          <li>Real co-ownership progress requires collaboration.</li>
-        </ul>
+
+      <div class="sidebar-content">
+        <div id="chatTranscript" class="chat-box sidebar-chat"></div>
+
+        <div class="chat-input-area">
+          <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
+          <button id="sendChatBtn" class="btn primary small">Send</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="logs-header">System Logs</div>
+        <div id="agentLogs" class="logs-box sidebar-logs"></div>
       </div>
     </div>
-
-    <div class="panel spaced" id="pathPanel">
-      <h2 style="margin:0 0 6px">Start here</h2>
-      <p class="small" style="margin-top:0">
-        Agent Town treats <strong>humans and agents</strong> as first-class participants.
-        Choose who you are.
-      </p>
-      <div class="kv" id="pathChoices">
-        <button class="btn" id="pathHumanBtn" data-testid="path-human">Human</button>
-        <button class="btn primary" id="pathCoopBtn" data-testid="path-coop">Human &amp; Agent</button>
-        <button class="btn" id="pathAgentBtn" data-testid="path-agent">Agent</button>
-      </div>
-      <div class="small" id="pathNote" style="color: var(--muted)"></div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="panel is-hidden" id="tokenPanel" data-testid="token-panel">
-      <h2 style="margin:0 0 6px">Human: solo house (token)</h2>
-      <p class="small" style="margin-top:0">
-        Verify that your connected wallet holds <strong>$ELIZATOWN</strong> (CA: <code>CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS</code>).
-        If it does, you can create a house without an agent.
-      </p>
-      <div class="kv">
-        <button class="btn primary" id="tokenVerifyBtn">Check wallet</button>
-        <span class="pill status is-hidden" id="tokenStatus" data-testid="token-status"><span class="dot" id="tokenDot"></span><span id="tokenStatusText">Waiting</span></span>
-        <a class="btn" id="tokenCreateLink" href="/create?mode=token" style="display:none">Create house</a>
-      </div>
-      <div class="small" id="tokenError" style="color: var(--bad);"></div>
-    </div>
-
-    <div class="panel is-hidden" id="reconnectPanel" data-testid="reconnect-panel">
-      <h2 style="margin:0 0 6px" id="reconnectTitle">Reconnect to House</h2>
-      <p class="small" style="margin-top:0" id="reconnectIntro">
-        Your house is ready. Share this reconnect message with your agent if needed.
-      </p>
-      <div class="kv agent-only">
-        <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link-reconnect">Read the OpenClaw skill</a>
-        <button class="btn" id="copyHouse" data-testid="copy-house">Copy house message</button>
-        <span class="pill status" data-testid="agent-status-house"><span class="dot" id="agentDotHouse"></span><span id="agentStatusTextHouse">Agent not connected</span></span>
-      </div>
-      <div class="kv stack agent-only">
-        <code class="pill" data-testid="house-snippet" id="houseSnippet">Read /skill.md and reconnect to house: …</code>
-      </div>
-      <div class="kv">
-        <a class="btn" id="openHouseLink" href="/house">Open house</a>
-      </div>
-    </div>
-
-    <div class="panel" id="step1Panel">
-      <h2 style="margin:0 0 6px">Step 1 — Agent connection</h2>
-      <p class="small" style="margin-top:0" id="step1Intro">
-        If you are a <strong>human</strong>, send your agent the <code>skill.md</code> link, then paste the team code.
-        If you are an <strong>agent</strong>, you will need the team code from a human.
-      </p>
-      <div class="kv">
-        <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">Read the OpenClaw skill</a>
-        <button class="btn" id="copyTeam" data-testid="copy-team">Copy team message</button>
-        <span class="pill">Team code: <strong data-testid="team-code" id="teamCode">…</strong></span>
-        <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
-      </div>
-      <div class="kv stack">
-        <code class="pill" data-testid="team-snippet" id="teamSnippet">Read /skill.md and team with code: …</code>
-      </div>
-    </div>
-
-    <div class="divider" id="stepDivider"></div>
-
-    <div class="panel" id="step2Panel">
-      <h2 style="margin:0 0 6px">Step 2 — Match the same sigil</h2>
-      <p class="small" style="margin-top:0">Human clicks. Agent calls the skill. If you match, the lock opens.</p>
-
-      <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
-
-      <div style="margin-top:12px" class="lock" data-testid="match-status">
-        <span class="state bad" id="matchState">LOCKED</span>
-        <span class="small" id="matchDetail">Pick the same sigil to unlock.</span>
-      </div>
-      <div class="kv" style="margin-top:10px">
-        <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
-        <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
-        <span class="pill" id="openReady" style="display:none">Open → <a href="/create">Create</a> · <a href="/house">House</a></span>
-      </div>
-      <div class="small" id="openError" style="color: var(--bad);"></div>
-    </div>
-
-    <footer>
-      <div>Made by humans &amp; agents for humans &amp; agents. <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
-    </footer>
   </div>
 
-  <script src="/app.js?v=20260202"></script>
+  <script type="module" src="/openclaw-lite/gateway.js?v=20260213"></script>
+  <script src="/app.js?v=20260213"></script>
 </body>
+
 </html>

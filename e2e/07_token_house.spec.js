@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -7,30 +9,19 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('token holder can create a house without an agent', async ({ page }) => {
-  await page.addInitScript(() => {
-    const sig = new Uint8Array(64);
-    for (let i = 0; i < sig.length; i++) sig[i] = (i * 7) & 0xff;
-    const address = 'So1anaMockToken1111111111111111111111111111';
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => address } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
-    };
-  });
-
+  await installMockSolanaWallet(page);
   await page.goto('/');
 
-  await page.getByTestId('path-human').click();
-  await page.getByRole('button', { name: 'Check wallet' }).click();
-  await expect(page.getByTestId('token-status')).toContainText('Verified');
+  // Product cut: no solo path controls on landing.
+  await expect(page.getByTestId('path-human')).toHaveCount(0);
+  await expect(page.getByTestId('path-coop')).toHaveCount(0);
+  await expect(page.getByTestId('path-agent')).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Create house' }).click();
-  await page.waitForURL('**/create?mode=token');
-
+  await reachCreateViaLite(page);
   await page.getByTestId('px-0-0').click();
   await expect(page.getByTestId('share-btn')).toBeEnabled();
   await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/house\?house=/);
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
   const connectBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
   const label = (await connectBtn.textContent()) || '';

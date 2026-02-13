@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterHatch, completeHatch, configureLiteLlm, ensureLiteConnected } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -6,27 +7,18 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('agent can connect and match the human sigil to unlock', async ({ page, request }) => {
-  await page.goto('/');
-
-  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
-
-  // Agent connects
-  const connect = await request.post('/api/agent/connect', {
-    data: { teamCode, agentName: 'ClawTest' }
+test('agent can connect and match the human sigil to unlock', async ({ page }) => {
+  await enterHatch(page, 'signin');
+  await completeHatch(page);
+  await configureLiteLlm(page, {
+    provider: 'test-local',
+    model: 'deterministic',
+    apiKey: 'legacy-02-key'
   });
-  expect(connect.ok()).toBeTruthy();
+  await ensureLiteConnected(page);
 
-  await expect(page.getByTestId('agent-status')).toContainText('Agent connected');
-
-  // Human selects the cookie sigil
+  // Human selects the cookie sigil; vendor runtime mirrors via agent-select.
   await page.getByTestId('sigil-cookie').click();
-
-  // Agent selects the same sigil
-  const sel = await request.post('/api/agent/select', {
-    data: { teamCode, elementId: 'cookie' }
-  });
-  expect(sel.ok()).toBeTruthy();
 
   await expect(page.getByTestId('match-status')).toContainText('UNLOCKED');
   await expect(page.getByTestId('open-btn')).toBeEnabled();

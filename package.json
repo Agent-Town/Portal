@@ -5,6 +5,9 @@
   "description": "Minimal Agent Town landing page (human+agent co-op unlock + shared pixel canvas)",
   "license": "MIT",
   "scripts": {
+    "build:openclaw-lite": "node scripts/build_openclaw_lite_runtime.mjs",
+    "predev": "npm run build:openclaw-lite",
+    "pretest": "npm run build:openclaw-lite",
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
     "test": "playwright test",

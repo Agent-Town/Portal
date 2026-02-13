@@ -20,22 +20,24 @@ function el(id) {
   return document.getElementById(id);
 }
 
+const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
+
 let elements = [];
 let lastState = null;
-let redirecting = false;
 let wallet = null;
 let walletAddr = null;
-let walletHouseId = null;
-let walletRecovered = false;
-const WALLET_STORAGE_KEY = 'agentTownWallet';
-const PATH_STORAGE_KEY = 'agentTownStartRole';
-const TOKEN_ERROR_KEY = 'agentTownTokenError';
-const SIGNUP_COMPLETE_AT_KEY = 'agentTownSignupCompleteAt';
-const SHARE_CACHE_KEY = 'agentTownShareCache';
-const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
-const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
-// startRole: 'human' | 'coop' | 'agent'
-let pathMode = 'coop';
+let redirecting = false;
+let pendingHatchComplete = false;
+let pendingLiteConnect = false;
+let pendingLlmSave = false;
+let pendingLlmClear = false;
+let pendingRuntimeBootstrap = false;
+let statusOverride = '';
+let runtimeBootstrapDone = false;
+let llmRestoreAttempted = false;
+let llmLibraryPromise = null;
+let runtimeBridgeInitKey = '';
+const runtimeBridge = window.OpenClawLiteRuntimeBridge || null;
 
 function b64(bytes) {
   let bin = '';
@@ -84,428 +86,569 @@ function normalizeSignatureBytes(sig) {
   return null;
 }
 
-function setWalletStatus(msg, isError = false) {
-  const elStatus = el('walletStatus');
-  if (!elStatus) return;
-  if (!msg || !isError) {
-    elStatus.textContent = '';
-    elStatus.style.display = 'none';
-    return;
-  }
-  elStatus.style.display = 'block';
-  elStatus.textContent = msg;
-  elStatus.style.color = 'var(--bad)';
-}
-
-function updateWalletUI() {
-  const btn = el('connectWalletBtn');
-  if (btn) {
-    btn.textContent = walletAddr ? 'Disconnect wallet' : 'Connect wallet';
-    btn.setAttribute('aria-pressed', walletAddr ? 'true' : 'false');
-  }
-  const addr = el('walletAddr');
-  if (addr) addr.textContent = walletAddr || '—';
-}
-
-let walletEventBindings = null;
-function bindWalletEvents() {
-  if (!wallet || typeof wallet.on !== 'function') return;
-  if (walletEventBindings && walletEventBindings.wallet === wallet) return;
-
-  // If a wallet object changes (rare), unbind previous listeners.
-  unbindWalletEvents();
-
-  const onDisconnect = () => {
-    // Wallet disconnected outside the app (extension UI, etc).
-    disconnectWallet({ fromProvider: true })
-      .then(() => maybeResetAfterWalletDisconnect())
-      .catch(() => {});
-  };
-  const onAccountChanged = (publicKey) => {
-    const nextAddr = publicKey && typeof publicKey.toString === 'function' ? publicKey.toString() : null;
-    if (!nextAddr) {
-      disconnectWallet({ fromProvider: true }).catch(() => {});
-      return;
-    }
-    if (walletAddr && walletAddr !== nextAddr) {
-      walletAddr = nextAddr;
-      walletHouseId = null;
-      walletRecovered = false;
-      updateWalletUI();
-      saveWalletCache();
-      if (lastState) updateUI(lastState);
-    }
-  };
-
-  wallet.on('disconnect', onDisconnect);
-  wallet.on('accountChanged', onAccountChanged);
-  walletEventBindings = { wallet, onDisconnect, onAccountChanged };
-}
-
-function unbindWalletEvents() {
-  if (!walletEventBindings) return;
-  const { wallet: boundWallet, onDisconnect, onAccountChanged } = walletEventBindings;
-  const off =
-    typeof boundWallet.off === 'function'
-      ? boundWallet.off.bind(boundWallet)
-      : typeof boundWallet.removeListener === 'function'
-        ? boundWallet.removeListener.bind(boundWallet)
-        : null;
-  if (off) {
-    try {
-      off('disconnect', onDisconnect);
-    } catch {
-      // ignore
-    }
-    try {
-      off('accountChanged', onAccountChanged);
-    } catch {
-      // ignore
-    }
-  }
-  walletEventBindings = null;
-}
-
-function loadWalletCache() {
-  try {
-    const raw = localStorage.getItem(WALLET_STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || typeof data.address !== 'string') return null;
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function saveWalletCache() {
-  try {
-    if (!walletAddr) {
-      localStorage.removeItem(WALLET_STORAGE_KEY);
-      return;
-    }
-    const payload = {
-      address: walletAddr,
-      houseId: walletHouseId || null
-    };
-    localStorage.setItem(WALLET_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function clearWalletCache() {
-  try {
-    localStorage.removeItem(WALLET_STORAGE_KEY);
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function loadPathMode() {
-  try {
-    const raw = localStorage.getItem(PATH_STORAGE_KEY);
-    return raw === 'human' || raw === 'coop' || raw === 'agent' ? raw : 'coop';
-  } catch {
-    return 'coop';
-  }
-}
-
-function savePathMode(mode) {
-  try {
-    localStorage.setItem(PATH_STORAGE_KEY, mode);
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function loadTokenError() {
-  try {
-    const msg = localStorage.getItem(TOKEN_ERROR_KEY);
-    if (msg) localStorage.removeItem(TOKEN_ERROR_KEY);
-    return msg || null;
-  } catch {
-    return null;
-  }
-}
-
-function setTokenError(msg) {
-  const tokenError = el('tokenError');
-  if (tokenError) tokenError.textContent = msg || '';
-}
-
-function updatePathButtons() {
-  const humanBtn = el('pathHumanBtn');
-  const coopBtn = el('pathCoopBtn');
-  const agentBtn = el('pathAgentBtn');
-  if (humanBtn) {
-    const active = pathMode === 'human';
-    humanBtn.classList.toggle('primary', active);
-    humanBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
-  if (coopBtn) {
-    const active = pathMode === 'coop';
-    coopBtn.classList.toggle('primary', active);
-    coopBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
-  if (agentBtn) {
-    const active = pathMode === 'agent';
-    agentBtn.classList.toggle('primary', active);
-    agentBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
-}
-
-function setPathMode(mode, { persist = true, refresh = true } = {}) {
-  const next = mode === 'human' || mode === 'agent' || mode === 'coop' ? mode : 'coop';
-  pathMode = next;
-  if (persist) savePathMode(next);
-  updatePathButtons();
-  if (refresh && lastState) updateUI(lastState);
-}
-
-function toggleAgentOnly(show) {
-  document.querySelectorAll('.agent-only').forEach((el) => {
-    el.classList.toggle('is-hidden', !show);
-  });
-}
-
 function buildWalletLookupMessage({ address, nonce, houseId }) {
   const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
   if (houseId) parts.push(`houseId: ${houseId}`);
   return parts.join('\n');
 }
 
-function buildTokenCheckMessage({ address, nonce }) {
-  return ['ElizaTown Token Check', `address: ${address}`, `CA: ${TOKEN_MINT}`, `nonce: ${nonce}`].join('\n');
+function loadHatchVisible() {
+  try {
+    return localStorage.getItem(HATCH_VISIBILITY_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
-async function connectWallet({ silent = false } = {}) {
+function setHatchVisible(value) {
+  const on = !!value;
+  try {
+    localStorage.setItem(HATCH_VISIBILITY_KEY, on ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+  applyVisibility(lastState);
+}
+
+function setHatchStatus(text) {
+  const status = el('hatchStatus');
+  if (!status) return;
+  status.textContent = text || '';
+}
+
+function setOpenError(text) {
+  const node = el('openError');
+  if (!node) return;
+  node.textContent = text || '';
+}
+
+function setLiteLlmStatus(text) {
+  const node = el('liteLlmStatus');
+  if (!node) return;
+  node.textContent = text || '';
+}
+
+function liteState(state) {
+  if (!state || typeof state !== 'object' || !state.lite || typeof state.lite !== 'object') return {};
+  return state.lite;
+}
+
+function isVendorLite(state) {
+  return liteState(state).driver === 'vendor';
+}
+
+function isLiteConnected(state) {
+  return !!(state?.agent?.connected && state?.agent?.source === 'openclaw-lite');
+}
+
+function isAnyAgentConnected(state) {
+  return !!state?.agent?.connected;
+}
+
+async function ensureVendorRuntimeBridge(state) {
+  if (!runtimeBridge) return;
+  if (!isVendorLite(state)) return;
+  if (!state?.hatch?.complete) return;
+  const teamCode = String(state?.teamCode || '').trim();
+  if (!teamCode) return;
+
+  const nextKey = `${teamCode}:vendor`;
+  if (runtimeBridgeInitKey && runtimeBridgeInitKey !== nextKey) {
+    runtimeBridge.dispose();
+    runtimeBridgeInitKey = '';
+  }
+  if (runtimeBridgeInitKey === nextKey) return;
+
+  await runtimeBridge.init({
+    driver: 'vendor',
+    teamCode
+  });
+  runtimeBridgeInitKey = nextKey;
+}
+
+async function loadLiteLlmLibrary() {
+  if (!llmLibraryPromise) {
+    llmLibraryPromise = import('/openclaw-lite/llm-config-library.js');
+  }
+  return llmLibraryPromise;
+}
+
+function updateLiteAgentStatus(state) {
+  const dot = el('liteAgentDot');
+  const text = el('liteAgentStatus');
+  if (!dot || !text) return;
+  const lite = liteState(state);
+  const failed = typeof lite.lastError === 'string' && lite.lastError;
+  const liteConnected = isLiteConnected(state);
+  dot.className = `dot ${liteConnected ? 'good' : ''}`;
+  if (failed) {
+    text.textContent = `OpenClaw Lite error: ${lite.lastError}`;
+  } else if (isAnyAgentConnected(state) && state?.agent?.source === 'external') {
+    text.textContent = 'External agent connected';
+  } else {
+    text.textContent = liteConnected ? 'Agent connected: OpenClaw Lite' : 'Agent offline';
+  }
+}
+
+// Replaced by new implementation below
+function applyVisibility(state) {
+  const hatchPanel = el('hatchPanel');
+  const townPanel = el('townPanel');
+  const sidebar = el('agentSidebar');
+  const hatchComplete = !!state?.hatch?.complete;
+  const visible = loadHatchVisible();
+  // If hatch is complete, we show townPanel instead of hatchPanel
+  // Unless browser is active?
+
+  const browserActive = el('browserPanel') && !el('browserPanel').classList.contains('is-hidden');
+
+  if (hatchPanel) {
+    if (hatchComplete) {
+      hatchPanel.classList.add('is-hidden');
+    } else {
+      hatchPanel.classList.toggle('is-hidden', !visible);
+    }
+  }
+
+  if (townPanel) {
+    if (browserActive) {
+      townPanel.classList.add('is-hidden');
+    } else {
+      townPanel.classList.toggle('is-hidden', !hatchComplete);
+    }
+  }
+
+  // Show Agent Sidebar if Hatch is complete
+  if (sidebar) sidebar.classList.toggle('is-hidden', !hatchComplete);
+}
+
+async function connectWallet() {
   if (!window.solana) throw new Error('NO_SOLANA_WALLET');
   if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
   if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-  const previousAddr = walletAddr;
+
   let resp = null;
   if (window.solana.isConnected && window.solana.publicKey) {
     wallet = window.solana;
   } else {
-    const opts = silent ? { onlyIfTrusted: true } : undefined;
-    resp = await window.solana.connect(opts);
+    resp = await window.solana.connect();
     wallet = window.solana;
   }
-  bindWalletEvents();
   const pk = resp?.publicKey || wallet?.publicKey;
   walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
   if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
-  if (previousAddr && previousAddr !== walletAddr) {
-    walletHouseId = null;
-    walletRecovered = false;
-  }
-  updateWalletUI();
-  saveWalletCache();
+  return walletAddr;
 }
 
-async function disconnectWallet({ fromProvider = false } = {}) {
-  if (!fromProvider && wallet && typeof wallet.disconnect === 'function') {
-    try {
-      await wallet.disconnect();
-    } catch {
-      // ignore disconnect errors; we still clear local state
-    }
-  }
-  unbindWalletEvents();
-  wallet = null;
-  walletAddr = null;
-  walletHouseId = null;
-  walletRecovered = false;
-  updateWalletUI();
-  clearWalletCache();
-  if (lastState) updateUI(lastState);
+async function signWalletMessage(message) {
+  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
+  const msgBytes = new TextEncoder().encode(message);
+  const resp = await wallet.signMessage(msgBytes, 'utf8');
+  const sigBytes = resp?.signature || resp;
+  const sigArr = normalizeSignatureBytes(sigBytes);
+  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
+  return b64(sigArr);
 }
 
-function clearClientFlowState() {
-  try {
-    localStorage.removeItem(WALLET_STORAGE_KEY);
-    localStorage.removeItem(PATH_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_PATH_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_ERROR_KEY);
-    localStorage.removeItem(SIGNUP_COMPLETE_AT_KEY);
-    localStorage.removeItem(SHARE_CACHE_KEY);
-  } catch {
-    // ignore storage errors
-  }
-}
-
-async function resetSessionAndReload() {
-  try {
-    await api('/api/session/reset', { method: 'POST', body: JSON.stringify({}) });
-  } catch (e) {
-    console.warn('session reset failed', e);
-  }
-  clearClientFlowState();
-  // Full reload so we pick up the new `et_session` cookie.
-  window.location.replace('/');
-}
-
-async function maybeResetAfterWalletDisconnect() {
-  // Auto-reset when this session is carrying identity-bound progress.
-  // This includes:
-  // - existing house session (shared-device safety)
-  // - token-verified human flow on the landing page
-  const shouldResetForState = (st) => !!(
-    st && (
-      st.houseId
-      || (st.signup?.complete && st.signup?.mode === 'token')
-    )
-  );
-
-  if (shouldResetForState(lastState)) {
-    await resetSessionAndReload();
-    return;
-  }
-  try {
-    const st = await api('/api/state');
-    if (shouldResetForState(st)) {
-      await resetSessionAndReload();
-    }
-  } catch {
-    // ignore
-  }
-}
-
-async function lookupWalletHouse(houseIdOverride = null) {
-  if (!wallet || !walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+async function lookupWalletHouse() {
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
   const nonceResp = await api('/api/wallet/nonce');
   const msg = buildWalletLookupMessage({
     address: walletAddr,
     nonce: nonceResp.nonce,
-    houseId: houseIdOverride || null
+    houseId: null
   });
-  const msgBytes = new TextEncoder().encode(msg);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-  const signature = b64(sigArr);
-  const body = {
-    address: walletAddr,
-    nonce: nonceResp.nonce,
-    signature
-  };
-  if (houseIdOverride) body.houseId = houseIdOverride;
-  const lookup = await api('/api/wallet/lookup', { method: 'POST', body: JSON.stringify(body) });
-  return lookup;
-}
-
-async function connectWalletAndLookup({ silent = false } = {}) {
-  await connectWallet({ silent });
-  setWalletStatus('Wallet connected. Checking for houses…');
-  const lookup = await lookupWalletHouse();
-  if (lookup.houseId) {
-    walletHouseId = lookup.houseId;
-    walletRecovered = true;
-    setWalletStatus('Welcome back. House found.');
-    if (lastState) updateUI({ ...lastState, houseId: lookup.houseId });
-  } else {
-    walletHouseId = null;
-    walletRecovered = false;
-    setWalletStatus('No houses found for this wallet yet.');
-    if (lastState) updateUI({ ...lastState, houseId: null });
-  }
-  saveWalletCache();
-}
-
-async function restoreWalletConnection() {
-  const cached = loadWalletCache();
-  if (!cached || !cached.address) return;
-  try {
-    await connectWallet({ silent: true });
-  } catch {
-    clearWalletCache();
-    updateWalletUI();
-    return;
-  }
-  if (cached.houseId) {
-    walletHouseId = cached.houseId;
-    walletRecovered = true;
-    if (lastState) updateUI({ ...lastState, houseId: cached.houseId });
-  }
-  setWalletStatus('Wallet connected.');
-  saveWalletCache();
-}
-
-async function verifyTokenOwnership() {
-  if (!walletAddr) {
-    await connectWallet();
-  }
-  if (!wallet || !walletAddr) throw new Error('WALLET_NOT_CONNECTED');
-  const nonceResp = await api('/api/token/nonce');
-  const msg = buildTokenCheckMessage({ address: walletAddr, nonce: nonceResp.nonce });
-  const msgBytes = new TextEncoder().encode(msg);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-  const signature = b64(sigArr);
-  const result = await api('/api/token/verify', {
+  const signature = await signWalletMessage(msg);
+  return api('/api/wallet/lookup', {
     method: 'POST',
-    body: JSON.stringify({ address: walletAddr, nonce: nonceResp.nonce, signature })
+    body: JSON.stringify({
+      address: walletAddr,
+      nonce: nonceResp.nonce,
+      signature
+    })
   });
-  return result;
 }
 
-function updateAgentStatus(dotId, textId, connected, name) {
-  const dot = el(dotId);
-  const text = el(textId);
-  if (!dot || !text) return;
-  dot.className = `dot ${connected ? 'good' : ''}`;
-  text.textContent = connected ? `Agent connected${name ? `: ${name}` : ''}` : 'Agent not connected';
+async function checkWalletStep() {
+  const step1 = el('step1');
+  const step2 = el('step2');
+  const walletStatus = el('walletStatus');
+  const hatchBtn = el('hatchBtn');
+
+  if (walletStatus) walletStatus.textContent = 'Checking wallet...';
+
+  try {
+    await connectWallet();
+    const lookup = await lookupWalletHouse();
+    if (lookup?.houseId) {
+      if (walletStatus) walletStatus.textContent = 'House found! Redirecting...';
+      window.location.href = `/house?house=${encodeURIComponent(lookup.houseId)}`;
+      return;
+    }
+
+    // No house found - Proceed to Step 2 (LLM Config)
+    if (walletStatus) {
+      walletStatus.textContent = 'Wallet verified. Configure brain.';
+      walletStatus.style.color = 'var(--good)';
+    }
+    if (step1) step1.classList.add('done');
+
+    // Unlock Step 2
+    if (step2) {
+      step2.classList.remove('disabled');
+      step2.classList.add('active');
+    }
+
+    // Auto-focus provider if possible
+    const providerInput = el('liteLlmProviderInput');
+    if (providerInput) setTimeout(() => providerInput.focus(), 100);
+
+    setHatchStatus('Wallet checked. Give your agent a mind.');
+
+  } catch (e) {
+    const msg = e.message === 'NO_SOLANA_WALLET'
+      ? 'No Solana wallet found.'
+      : e.message === 'NO_SOLANA_SIGN'
+        ? 'Wallet signing failed.'
+        : 'Wallet check failed.';
+    if (walletStatus) {
+      walletStatus.textContent = msg;
+      walletStatus.style.color = 'var(--bad)';
+    }
+    setHatchStatus(msg);
+  }
 }
 
-function setTokenStatus({ active = false, good = false, text = '' } = {}) {
-  const pill = el('tokenStatus');
-  const dot = el('tokenDot');
-  const label = el('tokenStatusText');
-  if (!pill || !dot || !label) return;
-  pill.classList.toggle('is-hidden', !active);
-  dot.className = `dot ${good ? 'good' : ''}`;
-  label.textContent = text || '';
+// Kept for backward compat / direct calls if needed
+async function runWalletProfileCheck() {
+  await checkWalletStep();
 }
 
-function setReconnectMode({ houseReady, role }) {
-  const reconnect = el('reconnectPanel');
-  const step1 = el('step1Panel');
-  const step2 = el('step2Panel');
-  const divider = el('stepDivider');
-  const tokenPanel = el('tokenPanel');
+async function completeHatch() {
+  if (pendingHatchComplete) return;
+  pendingHatchComplete = true;
 
-  const showReconnect = !!houseReady;
+  const crateContainer = el('crateContainer');
+  const agentReveal = el('agentReveal');
+  const hatchStatus = el('hatchStatus');
+  const hatchBtn = el('hatchBtn');
 
-  // role = human | coop | agent
-  const showToken = role === 'human' && !showReconnect;
-  const showStep1 = (role === 'coop' || role === 'agent') && !showReconnect;
-  const showStep2 = role === 'coop' && !showReconnect;
+  statusOverride = 'Hatching Sequence Initiated...';
+  setHatchStatus(statusOverride);
 
-  if (reconnect) reconnect.classList.toggle('is-hidden', !showReconnect);
-  if (tokenPanel) tokenPanel.classList.toggle('is-hidden', !showToken);
+  if (crateContainer) crateContainer.classList.add('shaking');
+  if (hatchBtn) hatchBtn.disabled = true;
 
-  if (step1) step1.classList.toggle('is-hidden', !showStep1);
-  if (step2) step2.classList.toggle('is-hidden', !showStep2);
-  if (divider) divider.classList.toggle('is-hidden', !(showStep1 || showStep2));
+  // Simulate delay for animation
+  await new Promise(r => setTimeout(r, 2500));
+
+  try {
+    if (crateContainer) crateContainer.classList.remove('shaking');
+
+    await api('/api/hatch/complete', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+
+    // Success UI updates
+    if (crateContainer) crateContainer.style.display = 'none';
+    if (agentReveal) agentReveal.classList.remove('is-hidden');
+
+    const state = await api('/api/state');
+    updateUI(state);
+
+    if (isVendorLite(state)) {
+      await bootstrapVendorRuntime();
+      await ensureVendorRuntimeBridge(state);
+      await restoreLiteLlmConfigFromLocalIfNeeded(state);
+    }
+
+    statusOverride = isVendorLite(state)
+      ? 'Hatch successful! Configure Agent Brain.'
+      : 'Hatch successful! Welcome to Agent Town.';
+
+  } catch (e) {
+    statusOverride = `Hatch failed: ${e.message}`;
+    if (crateContainer) crateContainer.classList.remove('shaking');
+    if (hatchBtn) hatchBtn.disabled = false;
+  } finally {
+    pendingHatchComplete = false;
+    setHatchStatus(statusOverride);
+  }
+}
+
+async function connectLiteAgent() {
+  if (pendingLiteConnect) return;
+  pendingLiteConnect = true;
+  setHatchStatus('Connecting OpenClaw Lite…');
+  try {
+    await api('/api/agent/lite/connect', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    statusOverride = 'OpenClaw Lite connected.';
+  } catch (e) {
+    statusOverride = `Agent connect failed: ${e.message}`;
+  } finally {
+    pendingLiteConnect = false;
+    setHatchStatus(statusOverride);
+    applyVisibility(lastState);
+  }
+}
+
+async function bootstrapVendorRuntime() {
+  if (pendingRuntimeBootstrap || runtimeBootstrapDone) return;
+  if (!lastState?.hatch?.complete || !isVendorLite(lastState)) return;
+
+  pendingRuntimeBootstrap = true;
+  try {
+    const manifestResp = await fetch('/openclaw-lite/manifest.json', {
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
+    await manifestResp.json().catch(() => ({}));
+
+    await api('/api/agent/lite/runtime');
+    await api('/api/agent/lite/runtime/boot', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    if (lastState) {
+      await ensureVendorRuntimeBridge(lastState);
+    }
+    runtimeBootstrapDone = true;
+    setLiteLlmStatus('Runtime ready. Configure provider, model, and API key.');
+  } catch (e) {
+    runtimeBootstrapDone = false;
+    const msg = e?.message || 'RUNTIME_BOOT_FAILED';
+    statusOverride = `OpenClaw Lite runtime failed: ${msg}`;
+    setHatchStatus(statusOverride);
+    setLiteLlmStatus(`Runtime failed: ${msg}`);
+    try {
+      await api('/api/agent/lite/runtime/error', {
+        method: 'POST',
+        body: JSON.stringify({ error: msg })
+      });
+    } catch {
+      // ignore secondary error reporting failures
+    }
+  } finally {
+    pendingRuntimeBootstrap = false;
+  }
+}
+
+
+function initAdvancedLlmUi() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const refInput = el('llmModelRefInput');
+
+  if (!providerSel || !modelInput || !refInput) return;
+  if (providerSel.dataset.listening) return;
+  providerSel.dataset.listening = 'true';
+
+  const updateRef = () => {
+    const p = providerSel.value;
+    const m = modelInput.value.trim();
+    if (p === 'custom') {
+      refInput.value = m;
+    } else {
+      refInput.value = m ? `${p}/${m}` : '';
+    }
+  };
+
+  providerSel.addEventListener('change', () => {
+    const p = providerSel.value;
+    if (p === 'openai') modelInput.placeholder = 'gpt-4o';
+    else if (p === 'anthropic') modelInput.placeholder = 'claude-3-5-sonnet-20240620';
+    else if (p === 'google') modelInput.placeholder = 'gemini-1.5-flash';
+    else if (p === 'groq') modelInput.placeholder = 'llama3-8b-8192';
+    else if (p === 'openrouter') modelInput.placeholder = 'anthropic/claude-3.5-sonnet';
+    else modelInput.placeholder = 'provider/model';
+
+    updateRef();
+  });
+
+  modelInput.addEventListener('input', updateRef);
+}
+
+function hydrateLlmInputsFromState(state) {
+  const lite = liteState(state);
+
+  // Hydrate advanced UI
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const refInput = el('llmModelRefInput');
+
+  if (lite.llmModel && providerSel && modelInput) {
+    const raw = lite.llmModel;
+    const parts = raw.split('/');
+    const options = Array.from(providerSel.options).map(o => o.value);
+
+    if (parts.length >= 2 && options.includes(parts[0])) {
+      providerSel.value = parts[0];
+      modelInput.value = parts.slice(1).join('/');
+    } else {
+      providerSel.value = 'custom';
+      modelInput.value = raw;
+    }
+    if (refInput) refInput.value = raw;
+  }
+}
+
+async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
+  if (!isVendorLite(state)) return;
+  if (!state?.hatch?.complete) return;
+  if (liteState(state).llmConfigured) return;
+  if (llmRestoreAttempted) return;
+
+  llmRestoreAttempted = true;
+  try {
+    const lib = await loadLiteLlmLibrary();
+    const localCfg = await lib.loadLlmConfig();
+    if (!localCfg?.configured || !localCfg?.apiKey) return;
+
+    // Hydrate UI from local config
+    const providerSel = el('llmProviderSelect');
+    const modelInput = el('llmModelIdInput');
+    const keyInput = el('llmKeyInput');
+
+    if (providerSel && localCfg.provider) {
+      // approximate mapping if provider is clean
+      providerSel.value = localCfg.provider;
+    }
+    if (modelInput && localCfg.model) modelInput.value = localCfg.model;
+    if (keyInput) keyInput.value = localCfg.apiKey || '';
+
+    await api('/api/agent/lite/llm/config', {
+      method: 'POST',
+      body: JSON.stringify({
+        provider: localCfg.provider,
+        model: localCfg.model,
+        apiKey: localCfg.apiKey
+      })
+    });
+    if (runtimeBridge) {
+      await ensureVendorRuntimeBridge(state);
+      await runtimeBridge.setLlmConfig({
+        provider: localCfg.provider,
+        model: localCfg.model
+      });
+    }
+    setLiteLlmStatus('LLM configured from local OpenClaw Lite backup.');
+    await connectLiteAgent();
+  } catch (e) {
+    console.warn('local LLM restore skipped', e);
+  }
+}
+
+// Replaces legacy saveLiteLlmConfig with gateway supervision
+function initStep2Listener() {
+  const btn = el('llmSaveBtn');
+  if (!btn || btn.dataset.listening) return;
+  btn.dataset.listening = 'true';
+
+  btn.addEventListener('click', async () => {
+    // gateway.js handles the actual save to worker.
+    // We just wait a bit and check/unlock.
+    const status = el('llmLine');
+    if (status) status.textContent = 'Saving...';
+
+    await new Promise(r => setTimeout(r, 1000)); // Give gateway time
+
+    // Unlock Step 3
+    const step2 = el('step2');
+    const step3 = el('step3');
+    const hatchBtn = el('hatchBtn');
+
+    if (step2) step2.classList.add('done');
+    if (step3) {
+      step3.classList.remove('disabled');
+      step3.classList.add('active');
+    }
+    if (hatchBtn) hatchBtn.disabled = false;
+
+    setHatchStatus('Brain connected. Ready to hatch.');
+  });
+}
+
+function saveLiteLlmConfig() {
+  // No-op, managed by gateway.js + initStep2Listener
+}
+
+async function clearLiteLlmConfig() {
+  if (pendingLlmClear) return;
+  const providerInput = el('liteLlmProviderInput');
+  const modelInput = el('liteLlmModelInput');
+  const keyInput = el('liteLlmApiKeyInput');
+  const clearBtn = el('liteLlmClearBtn');
+  if (!clearBtn) return;
+
+  pendingLlmClear = true;
+  clearBtn.disabled = true;
+  setLiteLlmStatus('Clearing LLM configuration…');
+  try {
+    const lib = await loadLiteLlmLibrary();
+    await lib.clearLlmConfig();
+    await api('/api/agent/lite/llm/config', {
+      method: 'DELETE',
+      body: JSON.stringify({})
+    });
+    if (providerInput) providerInput.value = '';
+    if (modelInput) modelInput.value = '';
+    if (keyInput) keyInput.value = '';
+    if (runtimeBridge && lastState?.hatch?.complete && isVendorLite(lastState)) {
+      await ensureVendorRuntimeBridge(lastState);
+      await runtimeBridge.setLlmConfig({ provider: null, model: null });
+    }
+    statusOverride = 'OpenClaw Lite LLM config cleared.';
+    setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    const state = await api('/api/state');
+    updateUI(state);
+  } catch (e) {
+    statusOverride = `LLM clear failed: ${e.message}`;
+    setLiteLlmStatus(`LLM clear failed: ${e.message}`);
+  } finally {
+    pendingLlmClear = false;
+    clearBtn.disabled = false;
+    setHatchStatus(statusOverride);
+  }
+}
+
+async function triggerVendorAgentSelect(elementId) {
+  if (!isVendorLite(lastState)) return;
+  if (!isLiteConnected(lastState)) return;
+  const teamCode = String(lastState?.teamCode || '').trim();
+  if (!teamCode) return;
+  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
+  await ensureVendorRuntimeBridge(lastState);
+  await runtimeBridge.selectSigil({ teamCode, elementId });
+}
+
+async function triggerVendorAgentOpenPress() {
+  if (!isVendorLite(lastState)) return null;
+  if (!isLiteConnected(lastState)) return null;
+  const teamCode = String(lastState?.teamCode || '').trim();
+  if (!teamCode) return null;
+  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
+  await ensureVendorRuntimeBridge(lastState);
+  return runtimeBridge.pressOpen({ teamCode });
 }
 
 function renderSigils(state) {
   const grid = el('sigilGrid');
+  if (!grid) return;
   grid.innerHTML = '';
-
-  const humanSel = state.human?.selected || null;
-  const agentSel = state.agent?.selected || null;
+  const humanSel = state?.human?.selected || null;
+  const agentSel = state?.agent?.selected || null;
 
   for (const item of elements) {
     const btn = document.createElement('button');
     btn.className = 'btn sigil';
     btn.type = 'button';
-    btn.dataset.elementId = item.id;
     btn.setAttribute('data-testid', `sigil-${item.id}`);
+    btn.dataset.elementId = item.id;
 
     const left = document.createElement('div');
     const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
@@ -528,7 +671,6 @@ function renderSigils(state) {
 
     right.appendChild(you);
     right.appendChild(agent);
-
     btn.appendChild(left);
     btn.appendChild(right);
 
@@ -537,13 +679,19 @@ function renderSigils(state) {
     }
 
     btn.addEventListener('click', async () => {
+      setOpenError('');
       try {
         await api('/api/human/select', {
           method: 'POST',
           body: JSON.stringify({ elementId: item.id })
         });
+        if (isVendorLite(lastState)) {
+          triggerVendorAgentSelect(item.id).catch((e) => {
+            setOpenError(`Agent select failed: ${e.message}`);
+          });
+        }
       } catch (e) {
-        console.warn(e);
+        setOpenError(`Select failed: ${e.message}`);
       }
     });
 
@@ -551,139 +699,361 @@ function renderSigils(state) {
   }
 }
 
+function updateMatchUi(state) {
+  const matched = !!state?.match?.matched;
+  const matchState = el('matchState');
+  const matchDetail = el('matchDetail');
+  const openBtn = el('openBtn');
+  const openWaiting = el('openWaiting');
+  const complete = !!state?.signup?.complete && state?.signup?.mode === 'agent';
+
+  if (matchState) {
+    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.className = `state ${matched ? 'good' : 'bad'}`;
+  }
+  if (matchDetail) {
+    matchDetail.textContent = matched
+      ? `Matched on "${state.match.elementId}". Press Open.`
+      : 'Pick the same sigil to unlock.';
+  }
+  if (openBtn) {
+    openBtn.disabled = !matched || complete;
+  }
+  if (openWaiting) {
+    const waiting = !!state?.human?.openPressed && !complete;
+    openWaiting.style.display = waiting ? 'inline-flex' : 'none';
+  }
+}
+
+function renderAgentReveal(state) {
+  const container = el('agentReveal');
+  if (!container) return;
+
+  // Clean container
+  container.innerHTML = '';
+
+  const agentId = state?.agent?.id || '???';
+  const name = state?.agent?.name || `Agent #${agentId}`;
+
+  // Create reveal card
+  const card = document.createElement('div');
+  card.className = 'agent-card';
+  card.style.textAlign = 'center';
+
+  // Use local placeholder to avoid CSP issues with external DiceBear API
+  // const imgUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${agentId}&backgroundColor=1a1a1a`;
+  const imgUrl = '/logo.jpg'; // Fallback to local logo
+
+  card.innerHTML = `
+    <div style="width: 120px; height: 120px; margin: 0 auto 16px; border-radius: 12px; overflow: hidden; border: 4px solid #f2c874; box-shadow: 0 0 20px rgba(242, 200, 116, 0.3);">
+      <img src="${imgUrl}" alt="${name}" style="width: 100%; height: 100%; object-fit: cover;">
+    </div>
+    <h3 style="margin: 0; color: var(--text); font-size: 20px;">${name}</h3>
+    ${agentId && agentId !== '???' ? `<div class="pill" style="margin-top: 8px;">ID: ${agentId}</div>` : ''}
+  `;
+
+  container.appendChild(card);
+}
+
+async function renderCanvas(state) {
+  const cvs = el('mainCanvas');
+  if (!cvs) return;
+  // Fetch image
+  try {
+    const res = await api(`/api/agent/canvas/image?teamCode=${state.teamCode}`);
+    if (res.image) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = cvs.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+      };
+      img.src = res.image;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Paint listener
+  if (!cvs.dataset.listening) {
+    cvs.dataset.listening = 'true';
+    cvs.addEventListener('click', async (e) => {
+      const rect = cvs.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / (rect.width / 16));
+      const y = Math.floor((e.clientY - rect.top) / (rect.height / 16));
+      const color = 2; // red default
+      await api('/api/human/canvas/paint', {
+        method: 'POST',
+        body: JSON.stringify({ x, y, color })
+      });
+      renderCanvas(lastState);
+    });
+  }
+}
+
+function renderCeremony(state) {
+  const kv = el('ceremonyKv');
+  if (!kv) return;
+  const status = el('ceremonyStatus');
+  if (status) status.classList.remove('is-hidden');
+
+  if (!state.houseId) {
+    kv.innerHTML = `<div>Waiting for ceremony completion...</div>`;
+  } else {
+    kv.innerHTML = `<div>House Created: ${state.houseId}</div>`;
+  }
+}
+
+// --- Dock Minimize Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('minimizeChatBtn');
+  const dock = document.getElementById('agentSidebar');
+  const header = document.querySelector('.sidebar-header');
+
+  if (dock && header && btn) {
+    header.addEventListener('click', (e) => {
+      // Toggle minimize
+      dock.classList.toggle('minimized');
+      const isMin = dock.classList.contains('minimized');
+      btn.textContent = isMin ? '□' : '_';
+    });
+
+    // Prevent button click from triggering double toggle if it bubbles, 
+    // but actually we want the button to just work. 
+    // If we click button, it bubbles to header. 
+    // So we don't need a separate listener on button if header handles it.
+    // BUT checking for e.target is safer or just removing button listener.
+    // Let's remove the specific button listener I added before and just use header.
+  }
+});
+
 function updateUI(state) {
   lastState = state;
-
-  const houseId = state.houseId || walletHouseId || null;
-  const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
-  if (signupMode === 'token' && pathMode !== 'human') {
-    setPathMode('human', { persist: true, refresh: false });
+  elements = Array.isArray(state?.elements) ? state.elements : elements;
+  if (!state?.hatch?.complete) {
+    runtimeBootstrapDone = false;
+    llmRestoreAttempted = false;
+    if (runtimeBridge && runtimeBridgeInitKey) {
+      runtimeBridge.dispose();
+      runtimeBridgeInitKey = '';
+    }
   }
-  const tokenMode = pathMode === 'human' || signupMode === 'token';
 
-  // Counts (optional on index)
-  const signupCount = el('signupCount');
-  if (signupCount) signupCount.textContent = String(state.stats?.signups ?? '—');
+  const teamCode = state?.teamCode || '…';
+  const teamCodeNode = el('teamCode');
+  if (teamCodeNode) teamCodeNode.textContent = teamCode;
 
-  // Team code (fallback for older servers that still send pairCode)
-  const teamCode = state.teamCode || state.pairCode || '…';
-  el('teamCode').textContent = teamCode;
+  applyVisibility(state);
+  updateLiteAgentStatus(state);
+  hydrateLlmInputsFromState(state);
+  initStep2Listener();
+  initAdvancedLlmUi();
 
-  const origin = window.location.origin;
-  el('teamSnippet').textContent =
-    pathMode === 'agent'
-      ? `Use this base URL (${origin}) and connect with team code: ${teamCode}`
-      : `Read ${origin}/skill.md and team with code: ${teamCode}`;
+  // --- New Flow UI Updates ---
+  // --- New Flow UI Updates ---
+  const step1 = el('step1');
+  const step2 = el('step2');
+  const step3 = el('step3');
+  const hatchBtn = el('hatchBtn');
+  const crateContainer = el('crateContainer');
+  const agentReveal = el('agentReveal');
 
-  const houseNavLink = el('houseNavLink');
-  if (houseNavLink) {
-    if (houseId) {
-      houseNavLink.classList.remove('is-hidden');
-      houseNavLink.href = `/house?house=${encodeURIComponent(houseId)}`;
+  if (state?.hatch?.complete) {
+    // Hatch Complete State
+    if (step1) step1.classList.add('done');
+    if (step2) step2.classList.add('done');
+    if (step3) {
+      step3.classList.remove('disabled');
+      step3.classList.add('done');
+    }
+    if (hatchBtn) {
+      hatchBtn.disabled = true;
+      hatchBtn.textContent = 'Hatched';
+    }
+
+    if (crateContainer) crateContainer.style.display = 'none';
+    if (agentReveal) {
+      agentReveal.classList.remove('is-hidden');
+      renderAgentReveal(state);
+    }
+  } else if (walletAddr) {
+    // Wallet Connected
+    if (step1) step1.classList.add('done');
+    // We don't auto-unlock step 2 here because we depend on the checkWallet result (handled in checkWalletStep)
+    // But if we reload page and have walletAddr, we should probably allow it? 
+    // For now, let's keep it simple: checkWalletStep handles the unlock.
+  }
+  // ---------------------------
+
+  const lite = liteState(state);
+  const vendor = isVendorLite(state);
+  if (vendor && state?.hatch?.complete) {
+    ensureVendorRuntimeBridge(state).catch((e) => {
+      setOpenError(`Runtime bridge failed: ${e.message}`);
+    });
+    if (lite.lastError) {
+      setLiteLlmStatus(`Runtime failed: ${lite.lastError}`);
+    } else if (lite.llmConfigured) {
+      setLiteLlmStatus(`LLM configured: ${lite.llmProvider || 'provider'}/${lite.llmModel || 'model'} (ready).`);
     } else {
-      houseNavLink.classList.add('is-hidden');
-      houseNavLink.href = '/house';
+      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
     }
   }
 
-  updatePathButtons();
-  const pathNote = el('pathNote');
-  if (pathNote) {
-    pathNote.textContent =
-      pathMode === 'human'
-        ? 'Human mode: solo house (token) + wallet reconnect.'
-        : pathMode === 'agent'
-          ? 'Agent mode: read skill.md and connect using a team code from a human.'
-          : 'Co-op mode: human + agent unlock together.';
+  if (statusOverride) {
+    setHatchStatus(statusOverride);
+  } else if (vendor && state?.hatch?.complete && lite.lastError) {
+    setHatchStatus(`OpenClaw Lite runtime failed: ${lite.lastError}`);
+  } else if (vendor && state?.hatch?.complete && !lite.llmConfigured) {
+    setHatchStatus('Hatch complete. Configure LLM to continue.');
+  } else if (state?.hatch?.complete) {
+    setHatchStatus('Hatch complete.');
+  } else if (walletAddr) {
+    setHatchStatus('Wallet connected. You can hatch now.');
+  } else {
+    setHatchStatus('Choose sign in or sign up to continue.');
   }
 
-  // Agent status
-  const connected = !!state.agent?.connected;
-  updateAgentStatus('agentDot', 'agentStatusText', connected, state.agent?.name || null);
-  updateAgentStatus('agentDotHouse', 'agentStatusTextHouse', connected, state.agent?.name || null);
-
-  setReconnectMode({ houseReady: !!houseId, role: pathMode });
-  toggleAgentOnly(pathMode !== 'human');
-
-  const tokenComplete = !!state.signup?.complete && signupMode === 'token';
-  const tokenCreateLink = el('tokenCreateLink');
-  if (tokenCreateLink) {
-    tokenCreateLink.style.display = tokenComplete ? 'inline-flex' : 'none';
-    if (tokenComplete) tokenCreateLink.href = '/create?mode=token';
-  }
-  if (tokenComplete) {
-    setTokenStatus({ active: true, good: true, text: 'Verified' });
-  } else if (!tokenMode) {
-    setTokenStatus({ active: false });
+  if (state?.hatch?.complete) {
+    renderSigils(state);
+    renderCanvas(state);
+    renderCeremony(state);
+    // updateMatchUi(state);
   }
 
-  if (houseId) {
-    const title = el('reconnectTitle');
-    const intro = el('reconnectIntro');
-    if (title && intro) {
-      if (tokenMode) {
-        title.textContent = 'House ready';
-        intro.textContent = 'Your house is ready. Open it to unlock with your wallet.';
-      } else if (walletRecovered) {
-        title.textContent = 'Welcome back';
-        intro.textContent = 'We found a house for this wallet. Share this reconnect message with your agent if needed.';
-      } else {
-        title.textContent = 'Reconnect to House';
-        intro.textContent = 'Your house is ready. Share this reconnect message with your agent if needed.';
+  if (vendor && state?.hatch?.complete && !runtimeBootstrapDone && !lite.lastError) {
+    bootstrapVendorRuntime().catch(() => { });
+  }
+  if (vendor && state?.hatch?.complete && !lite.llmConfigured) {
+    restoreLiteLlmConfigFromLocalIfNeeded(state).catch(() => { });
+  }
+  if (state?.hatch?.complete && !isAnyAgentConnected(state) && !pendingLiteConnect) {
+    if (vendor) {
+      if (lite.llmConfigured && lite.runtimeReady) {
+        connectLiteAgent().catch(() => { });
       }
+    } else {
+      connectLiteAgent().catch(() => { });
     }
-    const houseSnippet = el('houseSnippet');
-    const openHouseLink = el('openHouseLink');
-    if (houseSnippet) houseSnippet.textContent = `Read ${origin}/skill.md and reconnect to your house.`;
-    if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
+  }
+
+  if (state?.signup?.complete && state?.signup?.mode === 'agent' && !redirecting) {
+    redirecting = true;
+    window.location.href = '/create';
+  }
+}
+
+// --- Agent Layout Logic ---
+
+let gateway = null;
+
+async function initGateway() {
+  if (gateway) return gateway;
+  try {
+    // Dynamic import of the gateway module
+    const module = await import('/openclaw-lite/gateway.js');
+    gateway = module.default || module;
+    if (gateway instanceof Promise) {
+      gateway = await gateway;
+    }
+
+    // Subscribe to agent events
+    gateway.on('message', (msg) => {
+      // Logic fix: accept empty strings as valid content/thinking
+      const text = (typeof msg.text === 'string') ? msg.text : JSON.stringify(msg);
+      appendChatMessage('agent', text);
+    });
+    gateway.on('log', (entry) => {
+      appendAgentLog(`[${entry.level}] ${entry.message}`);
+    });
+    gateway.on('status', (status) => {
+      const elStatus = el('agentStatus');
+      if (elStatus) elStatus.textContent = status;
+    });
+
+    return gateway;
+  } catch (e) {
+    console.error('Failed to load gateway:', e);
+    appendAgentLog(`Error: Failed to load agent gateway. ${e.message}`);
+    return null;
+  }
+}
+
+function appendChatMessage(role, text) {
+  const box = el('chatTranscript');
+  if (!box) return;
+
+  const div = document.createElement('div');
+  div.className = `chat-message ${role}`;
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendAgentLog(text) {
+  const box = el('agentLogs');
+  if (!box) return;
+
+  const div = document.createElement('div');
+  div.textContent = `> ${text}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function handleVisit() {
+  const selector = el('experienceSelector');
+  const url = selector ? selector.value : '';
+  if (!url) {
+    appendAgentLog('Please select a valid experience.');
     return;
   }
 
-  // Sigils
-  renderSigils(state);
+  appendChatMessage('system', `Navigating agent to ${url}...`);
+  if (!gateway) await initGateway();
 
-  // Match lock
-  const matched = !!state.match?.matched;
-  el('matchState').textContent = matched ? 'UNLOCKED' : 'LOCKED';
-  el('matchState').className = `state ${matched ? 'good' : 'bad'}`;
-  el('matchDetail').textContent = matched
-    ? `Matched on “${state.match.elementId}”. Now press Open together.`
-    : 'Pick the same sigil to unlock.';
-
-  // Open gating
-  const openBtn = el('openBtn');
-  openBtn.disabled = !matched;
-
-  // Signup completion
-  const complete = !!state.signup?.complete && signupMode === 'agent';
-  el('openReady').style.display = complete ? 'inline-flex' : 'none';
-
-  // Waiting pill: show if human pressed but not complete
-  const waiting = !!state.human?.openPressed && !complete;
-  el('openWaiting').style.display = waiting ? 'inline-flex' : 'none';
-
-  // Auto-redirect only once per completed signup.
-  let freshComplete = false;
-  if (complete && state.signup?.createdAt) {
-    try {
-      const key = SIGNUP_COMPLETE_AT_KEY;
-      const last = localStorage.getItem(key);
-      if (last !== state.signup.createdAt) {
-        localStorage.setItem(key, state.signup.createdAt);
-        freshComplete = true;
-      }
-    } catch {
-      freshComplete = true;
-    }
-  }
-  if (complete && freshComplete && !redirecting) {
-    redirecting = true;
-    // small delay for perceived continuity
-    setTimeout(() => {
-      window.location.href = '/create';
-    }, 150);
+  try {
+    // Send navigation/fetch command to agent
+    // Depending on agent capability, this might be a 'tool' execution or a hard navigation
+    // For now, we ask the agent to "visit" it.
+    await gateway.send({ type: 'command', command: 'visit', url });
+    appendAgentLog(`Sent visit command for ${url}`);
+  } catch (e) {
+    appendAgentLog(`Visit failed: ${e.message}`);
   }
 }
+
+async function handleChat() {
+  const input = el('chatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  appendChatMessage('user', text);
+
+  if (!gateway) await initGateway();
+  try {
+    await gateway.send({ type: 'chat', text });
+  } catch (e) {
+    appendChatMessage('system', `Failed to send: ${e.message}`);
+  }
+}
+
+function setupAgentInterface() {
+  const visitBtn = el('visitBtn');
+  const sendBtn = el('sendChatBtn');
+  const chatInput = el('chatInput');
+
+  if (visitBtn) visitBtn.addEventListener('click', handleVisit);
+  if (sendBtn) sendBtn.addEventListener('click', handleChat);
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleChat();
+    });
+  }
+}
+
+// --------------------------
 
 async function poll() {
   try {
@@ -692,165 +1062,162 @@ async function poll() {
   } catch (e) {
     console.warn('state poll failed', e);
   } finally {
-    setTimeout(poll, 800);
+    setTimeout(poll, 700);
   }
 }
 
 async function init() {
-  const params = new URLSearchParams(window.location.search);
-  const ref = params.get('ref');
-  if (ref) {
-    try {
-      await api('/api/referral', { method: 'POST', body: JSON.stringify({ shareId: ref }) });
-    } catch {
-      // ignore invalid referral
-    }
-    params.delete('ref');
-    const qs = params.toString();
-    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
-    window.history.replaceState({}, '', nextUrl);
+  const authSigninBtn = el('authSigninBtn');
+  const authSignupBtn = el('authSignupBtn');
+  const hatchWalletCheckBtn = el('hatchWalletCheckBtn');
+  const hatchBtn = el('hatchBtn');
+  const liteAgentConnectBtn = el('liteAgentConnectBtn');
+  const liteLlmSaveBtn = el('liteLlmSaveBtn');
+  const liteLlmClearBtn = el('liteLlmClearBtn');
+  const openBtn = el('openBtn');
+
+  if (authSigninBtn) {
+    authSigninBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Sign in selected. Continue to hatch.';
+      setHatchStatus(statusOverride);
+    });
   }
 
-  const tokenErr = loadTokenError();
-  pathMode = loadPathMode();
-  updatePathButtons();
-
-  const session = await api('/api/session');
-  elements = session.elements || [];
-  // Update UI quickly using /api/state next.
-  updateUI({
-    teamCode: session.teamCode,
-    elements,
-    agent: { connected: false },
-    human: {},
-    match: { matched: false },
-    signup: { complete: false, mode: null },
-    share: { id: null },
-    stats: session.stats
-  });
-
-  if (tokenErr) {
-    setPathMode('human', { persist: true, refresh: true });
-    setTokenError(tokenErr);
-    setTokenStatus({ active: true, good: false, text: 'Verify wallet to continue' });
+  if (authSignupBtn) {
+    authSignupBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Sign up selected. Continue to hatch.';
+      setHatchStatus(statusOverride);
+    });
   }
 
-  el('copyTeam').addEventListener('click', async () => {
-    const msg = el('teamSnippet').textContent;
-    try {
-      await navigator.clipboard.writeText(msg);
-      el('copyTeam').textContent = 'Copied ✓';
-      setTimeout(() => (el('copyTeam').textContent = 'Copy team message'), 1200);
-    } catch {
-      // Fallback
-      alert(msg);
-    }
-  });
+  if (hatchWalletCheckBtn) {
+    hatchWalletCheckBtn.addEventListener('click', async () => {
+      setHatchVisible(true);
+      await runWalletProfileCheck();
+    });
+  }
 
-  const connectWalletBtn = el('connectWalletBtn');
-  if (connectWalletBtn) {
-    connectWalletBtn.addEventListener('click', async () => {
-      setWalletStatus('');
+  if (hatchBtn) {
+    hatchBtn.addEventListener('click', async () => {
+      setHatchVisible(true);
+      await completeHatch();
+    });
+  }
+
+  if (liteAgentConnectBtn) {
+    liteAgentConnectBtn.addEventListener('click', async () => {
+      await connectLiteAgent();
+    });
+  }
+
+  if (liteLlmSaveBtn) {
+    liteLlmSaveBtn.addEventListener('click', async () => {
+      await saveLiteLlmConfig();
+    });
+  }
+
+  if (liteLlmClearBtn) {
+    liteLlmClearBtn.addEventListener('click', async () => {
+      await clearLiteLlmConfig();
+    });
+  }
+
+  if (openBtn) {
+    openBtn.addEventListener('click', async () => {
+      setOpenError('');
+      const openWaiting = el('openWaiting');
       try {
-        if (walletAddr) {
-          await disconnectWallet();
-          setWalletStatus('Wallet disconnected.');
-          await maybeResetAfterWalletDisconnect();
+        const result = await api('/api/human/open/press', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        if (result?.nextUrl) {
+          window.location.href = result.nextUrl;
           return;
         }
-        await connectWalletAndLookup();
-      } catch (e) {
-        setWalletStatus(
-          e.message === 'NO_SOLANA_WALLET'
-            ? 'No Solana wallet found (need Phantom/Solflare).'
-            : e.message === 'NO_SOLANA_SIGN'
-              ? 'Wallet does not support message signing.'
-              : e.message,
-          true
-        );
-      }
-    });
-  }
-
-  const pathHumanBtn = el('pathHumanBtn');
-  if (pathHumanBtn) {
-    pathHumanBtn.addEventListener('click', () => setPathMode('human'));
-  }
-  const pathCoopBtn = el('pathCoopBtn');
-  if (pathCoopBtn) {
-    pathCoopBtn.addEventListener('click', () => setPathMode('coop'));
-  }
-  const pathAgentBtn = el('pathAgentBtn');
-  if (pathAgentBtn) {
-    pathAgentBtn.addEventListener('click', () => setPathMode('agent'));
-  }
-
-  const tokenVerifyBtn = el('tokenVerifyBtn');
-  if (tokenVerifyBtn) {
-    tokenVerifyBtn.addEventListener('click', async () => {
-      setTokenError('');
-      setTokenStatus({ active: true, good: false, text: 'Checking wallet…' });
-      tokenVerifyBtn.disabled = true;
-      try {
-        const result = await verifyTokenOwnership();
-        if (result?.eligible) {
-          setTokenStatus({ active: true, good: true, text: 'Verified' });
-        } else {
-          setTokenStatus({ active: true, good: false, text: 'No $ELIZATOWN found' });
+        if (openWaiting) openWaiting.style.display = 'inline-flex';
+        if (isVendorLite(lastState)) {
+          const agentResult = await triggerVendorAgentOpenPress();
+          if (agentResult?.nextUrl) {
+            window.location.href = agentResult.nextUrl;
+          }
         }
       } catch (e) {
-        const msg = e.message === 'ALREADY_SIGNED_UP'
-          ? 'This session already signed up.'
-          : e.message === 'BAD_SIGNATURE'
-            ? 'Wallet signature failed.'
-            : e.message === 'SIGNATURE_FORMAT'
-              ? 'Wallet signature failed.'
-            : e.message === 'RPC_UNAVAILABLE'
-              ? 'Token check is unavailable. Try again.'
-              : e.message === 'NO_SOLANA_WALLET'
-                ? 'No Solana wallet found (need Phantom/Solflare).'
-                : e.message === 'NO_SOLANA_SIGN'
-                  ? 'Wallet does not support message signing.'
-                  : e.message;
-        if (tokenError) tokenError.textContent = msg;
-        setTokenStatus({ active: true, good: false, text: 'Check failed' });
-      } finally {
-        tokenVerifyBtn.disabled = false;
+        setOpenError(`Open failed: ${e.message}`);
       }
     });
   }
 
-  const copyHouse = el('copyHouse');
-  if (copyHouse) {
-    copyHouse.addEventListener('click', async () => {
-      const msg = el('houseSnippet').textContent;
-      try {
-        await navigator.clipboard.writeText(msg);
-        copyHouse.textContent = 'Copied ✓';
-        setTimeout(() => (copyHouse.textContent = 'Copy house message'), 1200);
-      } catch {
-        alert(msg);
-      }
-    });
-  }
 
-  el('openBtn').addEventListener('click', async () => {
-    el('openError').textContent = '';
+  async function loadCodexProfile() {
     try {
-      await api('/api/human/open/press', {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-    } catch (e) {
-      el('openError').textContent = `Error: ${e.message}`;
-    }
-  });
+      const res = await fetch('/codex_profile.json');
+      if (!res.ok) return;
+      const data = await res.json();
+      const profile = data?.profiles?.['openai-codex:default'];
+      if (!profile || !profile.access) return;
 
-  updateWalletUI();
-  restoreWalletConnection();
+      console.log('Found Codex Profile, auto-configuring...');
+
+      // Auto-fill UI
+      const providerSel = el('llmProviderSelect');
+      const modelInput = el('llmModelIdInput');
+      const keyInput = el('llmKeyInput');
+      const saveBtn = el('llmSaveBtn');
+
+      if (providerSel) {
+        // Add custom option if not present or just use 'custom'
+        // But we can just set it to 'custom' and handle the mapping
+        // Or if we want to add it to the dropdown:
+        let opt = Array.from(providerSel.options).find(o => o.value === 'openai-codex');
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = 'openai-codex';
+          opt.textContent = 'OpenAI Codex (OAuth)';
+          providerSel.appendChild(opt);
+        }
+        providerSel.value = 'openai-codex';
+      }
+
+      if (modelInput) modelInput.value = 'gpt-5.3-codex';
+      if (keyInput) keyInput.value = profile.access;
+
+      // Trigger update of hidden fields
+      if (providerSel) providerSel.dispatchEvent(new Event('change'));
+      if (modelInput) modelInput.dispatchEvent(new Event('input'));
+
+      // Auto-save if not already configured
+      if (saveBtn && !liteState(lastState).llmConfigured) {
+        setHatchStatus('Auto-connecting Codex 5.3...');
+        saveBtn.click();
+      }
+
+    } catch (e) {
+      console.warn('Failed to load codex profile', e);
+    }
+  }
+
+  const initial = await api('/api/state');
+  elements = Array.isArray(initial?.elements) ? initial.elements : [];
+  if (loadHatchVisible() || initial?.hatch?.complete) {
+    setHatchVisible(true);
+  }
+  updateUI(initial);
+  if (initial?.hatch?.complete && isVendorLite(initial)) {
+    await bootstrapVendorRuntime();
+    await restoreLiteLlmConfigFromLocalIfNeeded(initial);
+  }
+
+  // Try to load Codex Profile instructions
+  await loadCodexProfile();
+
+  setupAgentInterface();
   poll();
 }
 
 init().catch((e) => {
   console.error(e);
+  setHatchStatus(`Init failed: ${e.message}`);
 });

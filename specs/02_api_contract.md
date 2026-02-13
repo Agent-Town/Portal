@@ -69,6 +69,109 @@ Includes:
 - `houseId` (string | null) — present after the house ceremony completes for this session.
 - `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.
+- `hatch` — Phase 1 single-path hatch state:
+  - `hatch.complete` (boolean)
+  - `hatch.createdAt` (ISO string | null)
+  - `hatch.agentKind` (`"openclaw-lite"` | null)
+- `agent.source` (`"openclaw-lite"` | `"external"` | null)
+- `lite` — OpenClaw Lite runtime state:
+  - `lite.driver` (`"vendor"` | `"phase1"`)
+  - `lite.runtimeReady` (boolean)
+  - `lite.llmConfigured` (boolean)
+  - `lite.llmProvider` (string | null)
+  - `lite.llmModel` (string | null)
+  - `lite.runtimeVersion` (string | null)
+  - `lite.lastError` (string | null)
+
+### POST `/api/hatch/complete` (human)
+Marks hatch completion for the current browser session.
+
+Behavior:
+- sets `hatch.complete=true`
+- sets `hatch.agentKind="openclaw-lite"`
+- when `lite.driver="phase1"`:
+  - sets `agent.connected=true`
+  - sets `agent.source="openclaw-lite"`
+- when `lite.driver="vendor"`:
+  - leaves agent disconnected until runtime boot + explicit LLM config are complete
+
+Response:
+```json
+{
+  "ok": true,
+  "hatch": { "complete": true, "createdAt": "2026-02-12T00:00:00.000Z", "agentKind": "openclaw-lite" },
+  "agent": { "connected": true, "source": "openclaw-lite", "name": "OpenClaw Lite" }
+}
+```
+
+### POST `/api/agent/lite/connect` (human)
+Connects the in-browser OpenClaw Lite agent for the current session.
+
+Body:
+```json
+{}
+```
+
+Errors:
+- `HATCH_REQUIRED` (hatch must be completed first)
+- `LLM_CONFIG_REQUIRED` (vendor mode requires LLM config first)
+- `LITE_RUNTIME_NOT_READY` (vendor runtime bootstrap not completed)
+
+### GET `/api/agent/lite/runtime` (human)
+Returns deterministic runtime bootstrap metadata.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "teamCode": "TEAM-ABCD-EFGH",
+  "origin": "http://localhost:4173",
+  "runtimeVersion": "1.2.0",
+  "driver": "vendor",
+  "featureFlags": { "llmConfigRequired": true }
+}
+```
+
+### GET `/api/agent/lite/llm/config` (human)
+Returns non-secret LLM config status for the current session.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "configured": false,
+  "provider": null,
+  "model": null,
+  "apiKeySet": false
+}
+```
+
+### POST `/api/agent/lite/llm/config` (human)
+Saves LLM provider/model/key metadata for OpenClaw Lite vendor flow.
+
+Body:
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "apiKey": "sk-..."
+}
+```
+
+Errors:
+- `HATCH_REQUIRED`
+- `MISSING_LLM_PROVIDER`
+- `MISSING_LLM_MODEL`
+- `MISSING_LLM_API_KEY`
+
+### DELETE `/api/agent/lite/llm/config` (human)
+Clears stored LLM configuration metadata for the current session.
+
+Behavior:
+- sets `lite.llmConfigured=false`
+- clears `lite.llmProvider` and `lite.llmModel`
+- keeps API key secret material server-hidden
+- in vendor driver mode, disconnects `agent.source="openclaw-lite"` until configuration is saved again
 
 ---
 
@@ -87,6 +190,8 @@ Body:
 ```
 
 ### POST `/api/agent/connect`
+Connects an external agent client by Team Code.
+
 Body:
 ```json
 { "teamCode": "TEAM-ABCD-EFGH", "agentName": "OpenClaw" }

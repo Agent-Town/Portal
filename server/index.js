@@ -20,7 +20,8 @@ const {
   listElements,
   evaluateMatch,
   resetAllSessions,
-  CANVAS
+  CANVAS,
+  defaultLiteState
 } = require('./sessions');
 
 function b64ToBytes(str) {
@@ -451,6 +452,131 @@ function normalizeCeremonySealedReveal(sealed, { required = false } = {}) {
   return { alg, epk, iv, ct, aad };
 }
 
+function isLiteAgentSession(session) {
+  return !!(session && session.agent && session.agent.connected && session.agent.source === 'openclaw-lite');
+}
+
+function isPhase1LiteSession(session) {
+  if (!isLiteAgentSession(session)) return false;
+  const driver = normalizeLiteDriver(session?.lite?.driver);
+  return driver === 'phase1';
+}
+
+function makeCeremonyRevealKeyInfo({ direction = '', teamCode = '' }) {
+  return `elizatown-ceremony-reveal-v1|dir=${direction || ''}|team=${teamCode || ''}`;
+}
+
+function makeCeremonyRevealPub() {
+  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const der = pair.publicKey.export({ type: 'spki', format: 'der' });
+  return Buffer.from(der).toString('base64');
+}
+
+function encryptCeremonyRevealForRecipient({ revealBytes, recipientRevealPubB64, direction, teamCode }) {
+  const recipientDer = decodeB64(recipientRevealPubB64);
+  if (!recipientDer || !recipientDer.length) throw new Error('INVALID_REVEAL_PUB');
+  let recipientPub;
+  try {
+    recipientPub = crypto.createPublicKey({ key: recipientDer, format: 'der', type: 'spki' });
+  } catch {
+    throw new Error('INVALID_REVEAL_PUB');
+  }
+
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(crypto.hkdfSync(
+    'sha256',
+    shared,
+    Buffer.alloc(0),
+    Buffer.from(makeCeremonyRevealKeyInfo({ direction, teamCode }), 'utf8'),
+    32
+  ));
+  const iv = crypto.randomBytes(12);
+  const aadBytes = Buffer.from(JSON.stringify({
+    v: 1,
+    direction,
+    teamCode: teamCode || null
+  }), 'utf8');
+  const plaintext = Buffer.from(JSON.stringify({
+    v: 1,
+    reveal: Buffer.from(revealBytes).toString('base64')
+  }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aadBytes);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const ct = Buffer.concat([enc, tag]);
+  const epkDer = eph.publicKey.export({ type: 'spki', format: 'der' });
+
+  return {
+    alg: CEREMONY_E2EE_P256_AESGCM_V1,
+    epk: Buffer.from(epkDer).toString('base64'),
+    iv: iv.toString('base64'),
+    ct: ct.toString('base64'),
+    aad: aadBytes.toString('base64')
+  };
+}
+
+function ensureLiteAgentCeremonyMaterial(session, { humanRevealPub } = {}) {
+  if (!isPhase1LiteSession(session)) return;
+  if (!session?.houseCeremony) return;
+  const recipientRevealPub = typeof humanRevealPub === 'string' ? humanRevealPub.trim() : '';
+  if (!recipientRevealPub) return;
+
+  let revealBytes = null;
+  if (typeof session.houseCeremony.liteAgentReveal === 'string' && session.houseCeremony.liteAgentReveal) {
+    const decoded = decodeB64(session.houseCeremony.liteAgentReveal);
+    if (decoded && decoded.length === 32) revealBytes = decoded;
+  }
+  if (!revealBytes) {
+    revealBytes = crypto.randomBytes(32);
+    session.houseCeremony.liteAgentReveal = Buffer.from(revealBytes).toString('base64');
+  }
+
+  session.houseCeremony.agentCommit = crypto.createHash('sha256').update(Buffer.from(revealBytes)).digest('base64');
+  session.houseCeremony.agentRevealPub = session.houseCeremony.agentRevealPub || makeCeremonyRevealPub();
+  session.houseCeremony.agentRevealSealed = encryptCeremonyRevealForRecipient({
+    revealBytes,
+    recipientRevealPubB64: recipientRevealPub,
+    direction: 'agent_to_human',
+    teamCode: session.teamCode || ''
+  });
+  session.houseCeremony.createdAt = session.houseCeremony.createdAt || nowIso();
+}
+
+function maybeLiteAgentAutoPaint(session, { x, y, color } = {}) {
+  if (!isPhase1LiteSession(session)) return null;
+  const canvas = session?.canvas;
+  if (!canvas || !Array.isArray(canvas.pixels)) return null;
+  const w = Number(canvas.w || 0);
+  const h = Number(canvas.h || 0);
+  const total = w * h;
+  if (!Number.isInteger(w) || !Number.isInteger(h) || total <= 0) return null;
+  if (canvas.pixels.length !== total) return null;
+
+  const start = Number.isInteger(x) && Number.isInteger(y) ? ((y * w + x) % total + total) % total : 0;
+  let target = -1;
+  for (let step = 1; step < total; step += 1) {
+    const idx = (start + step) % total;
+    if (canvas.pixels[idx] === 0) {
+      target = idx;
+      break;
+    }
+  }
+  if (target < 0) return null;
+
+  const maxColor = Math.max(1, palette().length - 1);
+  const baseColor = Number.isInteger(color) && color > 0 ? color : 1;
+  const nextColor = (baseColor % maxColor) + 1;
+  canvas.pixels[target] = nextColor;
+  return {
+    x: target % w,
+    y: Math.floor(target / w),
+    color: nextColor
+  };
+}
+
 function normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required = false } = {}) {
   if (ponyInboxPrivWrap == null) {
     if (required) throw new Error('MISSING_PONY_INBOX_PRIV_WRAP');
@@ -693,6 +819,178 @@ const TOKEN_CHECK_TIMEOUT_MS = 5_000;
 const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
+const VENDOR_LITE_ROOT = path.join(process.cwd(), 'vendors', 'openclaw-lite-main');
+const VENDOR_LITE_BUILD_DIR = path.join(PUBLIC_DIR, 'openclaw-lite');
+
+function safeReadJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function computeVendorLiteBuildTime() {
+  const files = [
+    path.join(VENDOR_LITE_BUILD_DIR, 'gateway.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'worker.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'runtime-worker.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'runtime-bridge.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'build-info.json'),
+    path.join(VENDOR_LITE_ROOT, 'package.json')
+  ];
+  let latest = 0;
+  for (const filePath of files) {
+    try {
+      const st = fs.statSync(filePath);
+      const ms = Number(st?.mtimeMs || 0);
+      if (ms > latest) latest = ms;
+    } catch {
+      // ignore missing files; fallback to now below.
+    }
+  }
+  return latest > 0 ? new Date(latest).toISOString() : nowIso();
+}
+
+function buildVendorLiteManifest() {
+  const pkgPath = path.join(VENDOR_LITE_ROOT, 'package.json');
+  const pkg = safeReadJson(pkgPath) || {};
+  const vendorVersion = typeof pkg.version === 'string' && pkg.version.trim() ? pkg.version.trim() : '0.0.0-dev';
+  return {
+    vendorPath: 'vendors/openclaw-lite-main',
+    vendorVersion,
+    buildTime: computeVendorLiteBuildTime(),
+    entrypoints: {
+      gateway: '/openclaw-lite/gateway.js',
+      worker: '/openclaw-lite/worker.js'
+    }
+  };
+}
+
+const VENDOR_LITE_MANIFEST = Object.freeze(buildVendorLiteManifest());
+
+function normalizeLiteDriver(value) {
+  return value === 'phase1' ? 'phase1' : 'vendor';
+}
+
+function ensureLiteState(session, { liteDriver = null } = {}) {
+  if (!session || typeof session !== 'object') return defaultLiteState();
+  const next = {
+    ...defaultLiteState(),
+    ...(session.lite && typeof session.lite === 'object' ? session.lite : {})
+  };
+  if (liteDriver) next.driver = normalizeLiteDriver(liteDriver);
+  next.driver = normalizeLiteDriver(next.driver);
+  next.runtimeBooted = next.runtimeBooted === true;
+  next.runtimeVersion = next.driver === 'vendor' && next.runtimeBooted ? VENDOR_LITE_MANIFEST.vendorVersion : null;
+  session.lite = next;
+  return next;
+}
+
+function parseLiteDriverFromRequest(req) {
+  const fromQuery = typeof req.query?.liteDriver === 'string' ? req.query.liteDriver.trim().toLowerCase() : '';
+  if (fromQuery) return normalizeLiteDriver(fromQuery);
+
+  const fromHeader = typeof req.header === 'function'
+    ? String(req.header('x-lite-driver') || '').trim().toLowerCase()
+    : '';
+  if (fromHeader) return normalizeLiteDriver(fromHeader);
+
+  const referer = typeof req.header === 'function' ? String(req.header('referer') || '').trim() : '';
+  if (!referer) return null;
+  try {
+    const fallbackOrigin = `${req.protocol || 'http'}://${req.get('host') || 'localhost'}`;
+    const refererUrl = new URL(referer, fallbackOrigin);
+    const fromReferer = String(refererUrl.searchParams.get('liteDriver') || '').trim().toLowerCase();
+    if (!fromReferer) return null;
+    return normalizeLiteDriver(fromReferer);
+  } catch {
+    return null;
+  }
+}
+
+function updateLiteRuntimeReady(session) {
+  const lite = ensureLiteState(session);
+  const connected = !!(session?.agent?.connected && session?.agent?.source === 'openclaw-lite');
+  if (lite.driver === 'vendor') {
+    const booted = lite.runtimeBooted === true;
+    lite.runtimeReady = !!(session?.hatch?.complete && booted && lite.llmConfigured && connected && !lite.lastError);
+    return;
+  }
+  lite.runtimeReady = !!(session?.hatch?.complete && connected && !lite.lastError);
+}
+
+function markLiteRuntimeBooted(session) {
+  const lite = ensureLiteState(session);
+  lite.runtimeBooted = true;
+  lite.runtimeVersion = VENDOR_LITE_MANIFEST.vendorVersion;
+  lite.lastError = null;
+  updateLiteRuntimeReady(session);
+}
+
+function markLiteRuntimeError(session, message) {
+  const lite = ensureLiteState(session);
+  lite.runtimeBooted = false;
+  lite.runtimeVersion = null;
+  lite.lastError = String(message || 'RUNTIME_BOOT_FAILED');
+  updateLiteRuntimeReady(session);
+}
+
+function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 'gpt-4o-mini') {
+  const ref = String(modelRef || '').trim();
+  if (!ref) {
+    return {
+      provider: fallbackProvider,
+      modelId: fallbackModelId,
+      modelRef: `${fallbackProvider}/${fallbackModelId}`
+    };
+  }
+  const slash = ref.indexOf('/');
+  if (slash > 0) {
+    const provider = ref.slice(0, slash).trim();
+    const modelId = ref.slice(slash + 1).trim();
+    if (provider && modelId) {
+      return { provider, modelId, modelRef: `${provider}/${modelId}` };
+    }
+  }
+  return {
+    provider: fallbackProvider,
+    modelId: ref,
+    modelRef: `${fallbackProvider}/${ref}`
+  };
+}
+
+function normalizeLiteLlmPayload(body) {
+  const providerInput = typeof body?.provider === 'string' ? body.provider.trim() : '';
+  const modelInput = typeof body?.model === 'string' ? body.model.trim() : '';
+  const modelRefInput = typeof body?.modelRef === 'string' ? body.modelRef.trim() : '';
+  const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+
+  if (!providerInput && !modelRefInput) throw new Error('MISSING_LLM_PROVIDER');
+  if (!modelInput && !modelRefInput) throw new Error('MISSING_LLM_MODEL');
+  if (!apiKey) throw new Error('MISSING_LLM_API_KEY');
+
+  const parsed = modelRefInput
+    ? parseModelRef(modelRefInput, providerInput || 'openai', modelInput || 'gpt-4o-mini')
+    : parseModelRef(`${providerInput}/${modelInput}`, providerInput || 'openai', modelInput || 'gpt-4o-mini');
+
+  const provider = String(parsed.provider || '').trim();
+  const model = String(parsed.modelId || '').trim();
+  const modelRef = String(parsed.modelRef || '').trim();
+  if (!provider) throw new Error('MISSING_LLM_PROVIDER');
+  if (!model) throw new Error('MISSING_LLM_MODEL');
+
+  return {
+    provider,
+    model,
+    modelRef,
+    apiKey
+  };
+}
+
+function sha256Hex(text) {
+  return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
+}
 
 function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -750,6 +1048,7 @@ function rateLimit({ windowMs, max, keyFn }) {
     if (bucket.count > max) {
       const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
       res.setHeader('Retry-After', retryAfter);
+      console.warn(`[rate-limit] 429 for ${req.method} ${req.originalUrl} (${key})`);
       return res.status(429).json({ ok: false, error: 'RATE_LIMITED' });
     }
     res.setHeader('X-RateLimit-Limit', max);
@@ -763,7 +1062,7 @@ app.use(
   '/api/agent',
   rateLimit({
     windowMs: 60_000,
-    max: 120,
+    max: 1200,
     keyFn: (req) => `agent:${req.ip}`
   })
 );
@@ -822,6 +1121,9 @@ function ensureHumanSession(req, res) {
     const secureFlag = isProd || req.secure ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
+  const requestedLiteDriver = parseLiteDriverFromRequest(req);
+  ensureLiteState(session, { liteDriver: requestedLiteDriver });
+  updateLiteRuntimeReady(session);
   return session;
 }
 
@@ -1302,6 +1604,8 @@ app.post('/api/session/reset', (req, res) => {
 
 app.get('/api/state', (req, res) => {
   const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
   const store = readStore();
   res.json({
     ok: true,
@@ -1309,6 +1613,7 @@ app.get('/api/state', (req, res) => {
     elements: listElements(),
     agent: {
       connected: s.agent.connected,
+      source: s.agent.source || null,
       name: s.agent.name,
       selected: s.agent.selected,
       openPressed: s.agent.openPressed,
@@ -1323,6 +1628,20 @@ app.get('/api/state', (req, res) => {
     },
     match: s.match,
     signup: s.signup,
+    hatch: {
+      complete: !!s.hatch?.complete,
+      createdAt: s.hatch?.createdAt || null,
+      agentKind: s.hatch?.agentKind || null
+    },
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      llmConfigured: !!lite.llmConfigured,
+      llmProvider: lite.llmProvider || null,
+      llmModel: lite.llmModel || null,
+      runtimeVersion: lite.runtimeVersion || null,
+      lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
+    },
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: s.houseCeremony?.houseId || null,
@@ -1330,6 +1649,203 @@ app.get('/api/state', (req, res) => {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
     }
+  });
+});
+
+app.post('/api/hatch/complete', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  s.hatch = s.hatch || { complete: false, createdAt: null, agentKind: null };
+  s.hatch.complete = true;
+  s.hatch.createdAt = s.hatch.createdAt || nowIso();
+  s.hatch.agentKind = 'openclaw-lite';
+  lite.lastError = null;
+  if (lite.driver === 'vendor') {
+    lite.runtimeBooted = false;
+    lite.runtimeVersion = null;
+    s.agent.connected = false;
+    s.agent.source = null;
+    s.agent.name = s.agent.name || 'OpenClaw Lite';
+  } else {
+    s.agent.connected = true;
+    s.agent.source = 'openclaw-lite';
+    s.agent.name = s.agent.name || 'OpenClaw Lite';
+  }
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = lite.driver === 'phase1';
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    hatch: s.hatch,
+    agent: {
+      connected: s.agent.connected,
+      source: s.agent.source,
+      name: s.agent.name
+    },
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      llmConfigured: !!lite.llmConfigured,
+      llmProvider: lite.llmProvider || null,
+      llmModel: lite.llmModel || null
+    }
+  });
+});
+
+app.post('/api/agent/lite/connect', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
+  if (lite.driver === 'vendor') {
+    if (!lite.llmConfigured) return res.status(403).json({ ok: false, error: 'LLM_CONFIG_REQUIRED' });
+    if (lite.runtimeBooted !== true) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_NOT_READY' });
+    if (lite.lastError) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_FAILED' });
+  }
+  s.agent.connected = true;
+  s.agent.source = 'openclaw-lite';
+  s.agent.name = s.agent.name || 'OpenClaw Lite';
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = true;
+  updateLiteRuntimeReady(s);
+  res.json({ ok: true });
+});
+
+app.get('/api/agent/lite/runtime', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
+  const origin = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    origin,
+    runtimeVersion: VENDOR_LITE_MANIFEST.vendorVersion,
+    driver: lite.driver,
+    featureFlags: {
+      llmConfigRequired: lite.driver === 'vendor'
+    }
+  });
+});
+
+app.post('/api/agent/lite/runtime/boot', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
+  markLiteRuntimeBooted(s);
+  const lite = ensureLiteState(s);
+  res.json({
+    ok: true,
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      runtimeVersion: lite.runtimeVersion || null,
+      lastError: lite.lastError || null
+    }
+  });
+});
+
+app.post('/api/agent/lite/runtime/error', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const reason = typeof req.body?.error === 'string' ? req.body.error.trim() : '';
+  if (!reason) return res.status(400).json({ ok: false, error: 'MISSING_ERROR' });
+  markLiteRuntimeError(s, reason);
+  const lite = ensureLiteState(s);
+  res.json({
+    ok: true,
+    lite: {
+      runtimeReady: !!lite.runtimeReady,
+      lastError: lite.lastError || null
+    }
+  });
+});
+
+app.get('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
+  res.json({
+    ok: true,
+    configured: !!lite.llmConfigured,
+    provider: lite.llmProvider || null,
+    model: lite.llmModel || null,
+    apiKeySet: !!lite.llmApiKeySet
+  });
+});
+
+app.post('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
+  const lite = ensureLiteState(s);
+
+  let payload;
+  try {
+    payload = normalizeLiteLlmPayload(req.body || {});
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
+  }
+
+  lite.llmConfigured = true;
+  lite.llmProvider = payload.provider;
+  lite.llmModel = payload.model;
+  lite.llmModelRef = payload.modelRef;
+  lite.llmConfiguredAt = nowIso();
+  lite.llmApiKeySet = true;
+  lite.llmApiKeyHash = sha256Hex(payload.apiKey);
+
+  if (!lite.runtimeBooted && lite.driver === 'phase1') {
+    lite.runtimeBooted = true;
+  }
+
+  if (lite.driver === 'phase1' || lite.runtimeBooted === true) {
+    s.agent.connected = true;
+    s.agent.source = 'openclaw-lite';
+    s.agent.name = s.agent.name || 'OpenClaw Lite';
+    s.shareApproval = s.shareApproval || { human: false, agent: false };
+    s.shareApproval.agent = true;
+  }
+
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    configured: !!lite.llmConfigured,
+    provider: lite.llmProvider,
+    model: lite.llmModel,
+    apiKeySet: !!lite.llmApiKeySet,
+    runtimeReady: !!lite.runtimeReady
+  });
+});
+
+app.delete('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+
+  lite.llmConfigured = false;
+  lite.llmProvider = null;
+  lite.llmModel = null;
+  lite.llmModelRef = null;
+  lite.llmConfiguredAt = null;
+  lite.llmApiKeySet = false;
+  lite.llmApiKeyHash = null;
+
+  if (lite.driver === 'vendor') {
+    if (s.agent.source === 'openclaw-lite') {
+      s.agent.connected = false;
+      s.agent.source = null;
+    }
+    s.shareApproval = s.shareApproval || { human: false, agent: false };
+    s.shareApproval.agent = s.agent.source === 'external';
+  }
+
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    configured: false,
+    provider: null,
+    model: null,
+    apiKeySet: false,
+    runtimeReady: !!lite.runtimeReady
   });
 });
 
@@ -1346,10 +1862,14 @@ app.post('/api/referral', (req, res) => {
 
 app.post('/api/human/select', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const elementId = typeof req.body?.elementId === 'string' ? req.body.elementId.trim() : '';
   const allowed = new Set(listElements().map((e) => e.id));
   if (!allowed.has(elementId)) return res.status(400).json({ ok: false, error: 'INVALID_ELEMENT' });
   s.human.selected = elementId;
+  if (isPhase1LiteSession(s)) {
+    s.agent.selected = elementId;
+  }
   evaluateMatch(s);
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
@@ -1358,6 +1878,7 @@ app.post('/api/agent/session', (req, res) => {
   const agentName = normalizeAgentName(req.body?.agentName);
   const s = createSession({ flow: 'agent_solo' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   res.json({ ok: true, teamCode: s.teamCode, flow: s.flow });
 });
@@ -1369,6 +1890,7 @@ app.post('/api/agent/connect', (req, res) => {
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.agent = true;
@@ -1382,6 +1904,7 @@ app.post('/api/agent/house/connect', (req, res) => {
   const s = getSessionByHouseId(houseId);
   if (!s) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.agent = true;
@@ -1436,8 +1959,12 @@ function maybeCompleteOpen(session) {
 
 app.post('/api/human/open/press', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   if (!s.match.matched) return res.status(403).json({ ok: false, error: 'LOCKED' });
   s.human.openPressed = true;
+  if (isPhase1LiteSession(s)) {
+    s.agent.openPressed = true;
+  }
 
   const status = maybeCompleteOpen(s);
   res.json({ ok: true, status, nextUrl: status.complete ? '/create' : null });
@@ -1472,12 +1999,14 @@ function paint(session, x, y, color) {
 
 app.post('/api/human/canvas/paint', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const x = req.body?.x;
   const y = req.body?.y;
   const color = req.body?.color;
   const result = paint(s, x, y, color);
   if (!result.ok) return res.status(400).json(result);
-  res.json({ ok: true });
+  const litePaint = maybeLiteAgentAutoPaint(s, { x, y, color });
+  res.json({ ok: true, litePaint: litePaint || null });
 });
 
 app.post('/api/agent/canvas/paint', (req, res) => {
@@ -1571,6 +2100,7 @@ app.post('/api/agent/house/reveal', (req, res) => {
 
 app.post('/api/human/house/commit', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const commitRaw = req.body?.commit;
   const revealPubRaw = req.body?.revealPub;
   let commit;
@@ -1583,6 +2113,9 @@ app.post('/api/human/house/commit', (req, res) => {
   }
   s.houseCeremony.humanCommit = commit;
   if (revealPub) s.houseCeremony.humanRevealPub = revealPub;
+  if (s.houseCeremony.humanRevealPub && isPhase1LiteSession(s)) {
+    ensureLiteAgentCeremonyMaterial(s, { humanRevealPub: s.houseCeremony.humanRevealPub });
+  }
   s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
   res.json({ ok: true, humanRevealPub: s.houseCeremony.humanRevealPub || null });
 });
@@ -1590,6 +2123,9 @@ app.post('/api/human/house/commit', (req, res) => {
 app.post('/api/human/house/reveal', (req, res) => {
   const s = ensureHumanSession(req, res);
   const sealedRaw = req.body?.sealedForAgent || req.body?.sealedReveal || req.body?.sealed || null;
+  if (s.houseCeremony?.humanRevealPub && isPhase1LiteSession(s)) {
+    ensureLiteAgentCeremonyMaterial(s, { humanRevealPub: s.houseCeremony.humanRevealPub });
+  }
   if (!s.houseCeremony?.agentCommit) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_COMMIT' });
   if (!s.houseCeremony?.agentRevealPub) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_REVEAL_PUB' });
 
@@ -2938,12 +3474,12 @@ app.post('/api/house/init', (req, res) => {
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
-          version: ponyInboxRegistration.version,
-          pub: ponyInboxRegistration.pub,
-          privWrap: ponyInboxRegistration.privWrap,
-          createdAt: nowIso(),
-          updatedAt: nowIso()
-        }
+        version: ponyInboxRegistration.version,
+        pub: ponyInboxRegistration.pub,
+        privWrap: ponyInboxRegistration.privWrap,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }
       : null
   });
   writeStore(store);
@@ -3040,12 +3576,12 @@ app.post('/api/agent/house/init', (req, res) => {
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
-          version: ponyInboxRegistration.version,
-          pub: ponyInboxRegistration.pub,
-          privWrap: ponyInboxRegistration.privWrap,
-          createdAt: nowIso(),
-          updatedAt: nowIso()
-        }
+        version: ponyInboxRegistration.version,
+        pub: ponyInboxRegistration.pub,
+        privWrap: ponyInboxRegistration.privWrap,
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      }
       : null
   });
   writeStore(store);
@@ -3252,6 +3788,21 @@ app.post('/api/house/:id/append', (req, res) => {
 });
 
 // --- Static + routes ---
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const accept = String(req.headers?.accept || '');
+  if (!accept.includes('text/html')) return next();
+  if (req.path.startsWith('/api/')) return next();
+  if (req.path.startsWith('/openclaw-lite/')) return next();
+  if (req.path.startsWith('/assets/')) return next();
+  ensureHumanSession(req, res);
+  return next();
+});
+
+app.get('/openclaw-lite/manifest.json', (_req, res) => {
+  res.json(VENDOR_LITE_MANIFEST);
+});
+
 app.use(
   express.static(PUBLIC_DIR, {
     etag: true,
@@ -3299,6 +3850,185 @@ app.get('/s/:id', (req, res) => {
 
 // Default route
 app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+
+// --- OpenClaw Lite Tool Proxies ---
+
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; OpenClawLite/1.0; +https://agent.town)';
+
+async function proxyFetch(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs || 30000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        'User-Agent': DEFAULT_USER_AGENT,
+        ...(options.headers || {})
+      },
+      body: options.body,
+      redirect: options.followRedirects ? 'follow' : 'manual',
+      signal: controller.signal
+    });
+
+    // Convert ArrayBuffer to Buffer for processing
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const headers = {};
+    res.headers.forEach((v, k) => headers[k] = v);
+
+    return {
+      ok: true,
+      status: res.status,
+      url: res.url,
+      headers,
+      buffer
+    };
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { ok: false, error: 'TIMEOUT' };
+    }
+    return { ok: false, error: e.message };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
+  const { url, maxBytes = 262144, followRedirects = true, expectedMime = 'any' } = req.body;
+  if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+
+  try {
+    const result = await proxyFetch(url, {
+      method: 'GET',
+      followRedirects,
+      timeoutMs: 15000
+    });
+
+    if (!result.ok) {
+      return res.json({ ok: false, error: { code: 'FETCH_FAILED', message: result.error } });
+    }
+
+    const contentType = result.headers['content-type'] || '';
+    if (expectedMime !== 'any' && !contentType.toLowerCase().startsWith(expectedMime)) {
+      return res.json({
+        ok: false,
+        error: {
+          code: 'MIME_MISMATCH',
+          message: `Expected ${expectedMime}, got ${contentType}`,
+          details: { contentType }
+        }
+      });
+    }
+
+    let buffer = result.buffer;
+    let truncated = false;
+    if (buffer.length > maxBytes) {
+      buffer = buffer.subarray(0, maxBytes);
+      truncated = true;
+    }
+
+    const text = buffer.toString('utf8');
+    const sha256B64 = crypto.createHash('sha256').update(text).digest('base64');
+
+    res.json({
+      ok: true,
+      url,
+      finalUrl: result.url,
+      status: result.status,
+      contentType,
+      etag: result.headers['etag'],
+      lastModified: result.headers['last-modified'],
+      sha256B64,
+      text,
+      truncated,
+      fromCache: false
+    });
+  } catch (e) {
+    res.json({ ok: false, error: { code: 'SERVER_ERROR', message: e.message } });
+  }
+});
+
+app.post('/api/tools/http_request', express.json(), async (req, res) => {
+  const { url, method = 'GET', headers = {}, body, timeoutMs = 30000, followRedirects = true, maxBytes = 262144, responseMode = 'auto' } = req.body;
+  if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+
+  // Safety: Sanitize headers
+  const safeHeaders = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === 'host') continue;
+    safeHeaders[k] = v;
+  }
+
+  // Handle body
+  let fetchBody = undefined;
+  if (body && body.kind === 'json') fetchBody = JSON.stringify(body.json);
+  else if (body && body.kind === 'text') fetchBody = body.text;
+  else if (body && body.kind === 'base64') fetchBody = Buffer.from(body.base64, 'base64');
+
+  const startedAtMs = Date.now();
+  try {
+    const result = await proxyFetch(url, {
+      method,
+      headers: safeHeaders,
+      body: fetchBody,
+      timeoutMs: Math.min(timeoutMs, 60000), // Cap at 60s
+      followRedirects
+    });
+
+    if (!result.ok) {
+      return res.json({ ok: false, error: { code: 'REQUEST_FAILED', message: result.error } });
+    }
+
+    let buffer = result.buffer;
+    let truncated = false;
+    if (buffer.length > maxBytes) {
+      buffer = buffer.subarray(0, maxBytes);
+      truncated = true;
+    }
+
+    // Decode response
+    let bodyText = null;
+    let bodyJson = null;
+    let bodyBase64 = null;
+    const contentType = result.headers['content-type'] || '';
+
+    if (responseMode === 'text' || responseMode === 'auto') {
+      try { bodyText = buffer.toString('utf8'); } catch { }
+    }
+
+    if (responseMode === 'json' || (responseMode === 'auto' && contentType.includes('application/json'))) {
+      try {
+        if (!bodyText) bodyText = buffer.toString('utf8');
+        bodyJson = JSON.parse(bodyText);
+      } catch { }
+    }
+
+    if (responseMode === 'base64' || (responseMode === 'auto' && !bodyText && !bodyJson)) {
+      bodyBase64 = buffer.toString('base64');
+    }
+
+    res.json({
+      ok: true,
+      status: result.status,
+      finalUrl: result.url,
+      headers: result.headers,
+      bodyText,
+      bodyJson,
+      bodyBase64,
+      truncated,
+      timing: {
+        startedAtMs,
+        durationMs: Date.now() - startedAtMs
+      }
+    });
+
+  } catch (e) {
+    res.json({ ok: false, error: { code: 'SERVER_ERROR', message: e.message } });
+  }
+});
 
 const port = Number(process.env.PORT || 4173);
 app.listen(port, () => {

@@ -34,6 +34,37 @@ function setHouseNavLink(houseId) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
+let liteDriver = 'vendor';
+let runtimeTeamCode = '';
+let runtimeBridgeReady = false;
+const runtimeBridge = window.OpenClawLiteRuntimeBridge || null;
+
+function isVendorLiteDriver() {
+  return liteDriver === 'vendor';
+}
+
+async function ensureVendorRuntimeBridge() {
+  if (!isVendorLiteDriver()) return;
+  if (!runtimeTeamCode) throw new Error('MISSING_TEAM_CODE');
+  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
+  if (runtimeBridgeReady) return;
+  await runtimeBridge.init({
+    driver: 'vendor',
+    teamCode: runtimeTeamCode
+  });
+  runtimeBridgeReady = true;
+}
+
+function applyLocalPixel(x, y, color, w = 16) {
+  const idx = y * w + x;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= pixels.length) return;
+  pixels[idx] = color;
+  const canvas = el('canvas');
+  const cell = canvas ? canvas.querySelector(`[data-x="${x}"][data-y="${y}"]`) : null;
+  if (!cell) return;
+  cell.dataset.color = String(color);
+  cell.style.background = palette[color] || '#000';
+}
 
 function renderPalette() {
   const c = el('palette');
@@ -83,10 +114,20 @@ function renderCanvas(w, h) {
             method: 'POST',
             body: JSON.stringify({ x, y, color: selectedColor })
           });
-          // Optimistically update
-          pixels[idx] = selectedColor;
-          b.dataset.color = String(selectedColor);
-          b.style.background = palette[selectedColor];
+          // Optimistically update local human paint first.
+          applyLocalPixel(x, y, selectedColor, w);
+
+          if (isVendorLiteDriver() && runtimeTeamCode) {
+            await ensureVendorRuntimeBridge();
+            const contribution = await runtimeBridge.contributeCanvas({
+              teamCode: runtimeTeamCode,
+              humanX: x,
+              humanY: y,
+              humanColor: selectedColor
+            });
+            const agentPaint = contribution?.paint || null;
+            if (agentPaint) applyLocalPixel(agentPaint.x, agentPaint.y, agentPaint.color, w);
+          }
           updateLockState();
         } catch (e) {
           el('err').textContent = e.message;
@@ -129,6 +170,12 @@ async function pollCanvas() {
 async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
+  liteDriver = typeof st?.lite?.driver === 'string' ? st.lite.driver : 'vendor';
+  runtimeTeamCode = typeof st?.teamCode === 'string' ? st.teamCode : '';
+  runtimeBridgeReady = false;
+  if (isVendorLiteDriver() && runtimeTeamCode && runtimeBridge) {
+    ensureVendorRuntimeBridge().catch(() => {});
+  }
   setHouseNavLink(st.houseId || null);
   const params = new URLSearchParams(window.location.search);
   const requestedToken = params.get('mode') === 'token';
@@ -507,6 +554,13 @@ async function init() {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {
+        if (isVendorLiteDriver() && runtimeTeamCode) {
+          await ensureVendorRuntimeBridge();
+          await runtimeBridge.ceremonyCommit({
+            teamCode: runtimeTeamCode
+          });
+        }
+
         // 2) Exchange sealed reveals and derive Kroot locally once agent payload is available.
         const mat = await api('/api/human/house/material');
         if (!mat.agentCommit || !mat.agentRevealPub) {
@@ -525,6 +579,14 @@ async function init() {
         });
 
         let matAfter = await api('/api/human/house/material');
+        if (isVendorLiteDriver() && runtimeTeamCode && matAfter.humanRevealPub) {
+          await ensureVendorRuntimeBridge();
+          await runtimeBridge.ceremonyReveal({
+            teamCode: runtimeTeamCode,
+            humanRevealPub: matAfter.humanRevealPub
+          });
+          matAfter = await api('/api/human/house/material');
+        }
         for (let i = 0; i < 10 && !matAfter.agentRevealSealed; i++) {
           await new Promise((resolve) => setTimeout(resolve, 250));
           matAfter = await api('/api/human/house/material');
@@ -591,7 +653,7 @@ async function init() {
         : e.message === 'SIGNATURE_FORMAT'
           ? 'Wallet signature failed.'
         : e.message === 'WAITING_AGENT_REVEAL'
-          ? 'Waiting for agent to contribute to the house ceremony. Ask your agent to call /api/agent/house/commit then /api/agent/house/reveal (see skill.md).'
+          ? 'Waiting for OpenClaw Lite runtime to finish the house ceremony.'
           : e.message;
       el('shareStatus').style.display = 'none';
     }
