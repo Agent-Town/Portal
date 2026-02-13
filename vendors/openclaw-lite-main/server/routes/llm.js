@@ -1,6 +1,5 @@
 const { Readable } = require("stream");
 
-const { proxyViaCodexCli } = require("../codex_bridge");
 
 function registerLlmRoutes(app) {
   // --- LLM proxy (OpenAI-compatible) ---
@@ -223,7 +222,6 @@ function registerLlmRoutes(app) {
 
   app.post("/api/llm/openai/v1/chat/completions", async (req, res) => {
     if (process.env.NODE_ENV === "test") return handleTestOpenAiChatCompletions(req, res);
-    if (process.env.OPENCLAW_LITE_CODEX_CLI === "1") return proxyViaCodexCli(req, res);
     return await proxyToOpenAI(req, res, "chat/completions");
   });
 

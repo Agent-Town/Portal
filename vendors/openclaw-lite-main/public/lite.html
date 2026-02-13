@@ -42,8 +42,16 @@
         <div class="small" id="walletLine" style="margin-top: 8px; color: var(--muted)"></div>
 
         <div class="kv" style="margin-top: 10px; flex-wrap: wrap;">
+          <select id="llmAuthModeSelect" class="input" style="min-width: 220px;">
+            <option value="api-key">API Key</option>
+            <option value="oauth-json">OpenAI OAuth Profile / Token</option>
+          </select>
           <input data-testid="llm-key-input" id="llmKeyInput" class="input" type="password" placeholder="LLM API key (stored locally)" style="min-width: 260px; flex: 1;" />
-          <button data-testid="llm-key-save" class="btn" id="llmSaveBtn">Save LLM key</button>
+          <button data-testid="llm-key-save" class="btn" id="llmSaveBtn">Save LLM config</button>
+        </div>
+        <div class="kv" style="margin-top: 8px; flex-wrap: wrap;">
+          <textarea id="llmOauthProfileInput" class="input" rows="3" placeholder="Paste OpenClaw OAuth profile JSON (or raw token)." style="min-width: 320px; flex: 1; display: none;"></textarea>
+          <div id="llmOauthProfileHint" class="small" style="min-width: 320px; color: var(--muted)"></div>
         </div>
         <div class="kv" style="margin-top: 8px; flex-wrap: wrap;">
           <input id="llmModelRefInput" class="input" placeholder="provider/model (e.g. openai-codex/gpt-5.3-codex)" style="min-width: 320px; flex: 1;" />

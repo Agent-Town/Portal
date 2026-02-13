@@ -47,6 +47,20 @@
       <div class="small" id="error" style="margin-top:6px; color: var(--bad);"></div>
     </div>
 
+    <div class="panel" id="agentStatePanel" style="margin-top: 14px;">
+      <h2 style="margin:0 0 6px">Agent state backup</h2>
+      <p class="small" style="margin-top:0">Save and restore OpenClaw Lite config, memory, and LLM OAuth/API settings.</p>
+      <div class="kv" style="gap:10px; flex-wrap: wrap;">
+        <button class="btn" id="saveAgentStateBtn" disabled>Store in house</button>
+        <button class="btn" id="restoreAgentStateBtn" disabled>Restore from house</button>
+        <button class="btn" id="downloadAgentStateBtn" disabled>Download local backup</button>
+        <button class="btn" id="uploadAgentStateBtn" disabled>Upload backup</button>
+        <input id="uploadAgentStateInput" type="file" accept="application/json,.json" class="is-hidden" />
+      </div>
+      <div class="small" id="agentStateStatus" style="margin-top:10px; color: var(--muted);"></div>
+      <div class="small" id="agentStateError" style="margin-top:6px; color: var(--bad);"></div>
+    </div>
+
     <div class="panel is-hidden" id="descriptorPanel" style="margin-top: 14px;">
       <h2 style="margin:0 0 6px">House QR (descriptor)</h2>
       <p class="small" style="margin-top:0">Share this QR with your agent/client to locate the house. It contains no secrets.</p>
@@ -241,6 +255,7 @@
   </div>
 
   <script src="/vendor/qrcode.js?v=20260203"></script>
-  <script src="/house.js?v=20260204"></script>
+  <script src="/house.js?v=20260214"></script>
+  <script src="/agent_panel.js?v=20260213"></script>
 </body>
 </html>

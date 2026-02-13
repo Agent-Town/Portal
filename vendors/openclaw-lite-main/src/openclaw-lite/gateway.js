@@ -105,6 +105,7 @@ async function init() {
   const runtimeLogs = byId("runtimeLogs");
   const workspaceEvents = byId("workspaceEvents");
   const chatTranscript = byId("chatTranscript");
+  const hasSidebarChatUi = !!byId("sendChatBtn");
   const chatInput = byId("chatInput");
   const llmKeyInput = byId("llmKeyInput");
   const llmModelRefInput = byId("llmModelRefInput");
@@ -112,6 +113,9 @@ async function init() {
   const llmBaseUrlInput = byId("llmBaseUrlInput");
   const llmThinkingInput = byId("llmThinkingInput");
   const llmUseProxyInput = byId("llmUseProxyInput");
+  const llmAuthModeInput = byId("llmAuthModeSelect");
+  const llmOauthProfileInput = byId("llmOauthProfileInput");
+  const llmOauthProfileHint = byId("llmOauthProfileHint");
   const llmLine = byId("llmLine");
 
   const connectWalletBtn = byId("connectWalletBtn");
@@ -212,37 +216,6 @@ async function init() {
     return true;
   }
 
-  function setCodexCliMode(enabled) {
-    const on = enabled === true;
-    sendToWorker({ type: "gateway.command.setRuntimeCaps", codexCli: on });
-
-    if (llmKeyInput) {
-      llmKeyInput.disabled = on;
-      llmKeyInput.placeholder = on ? "Codex CLI bridge enabled (no API key required)" : "LLM API key (stored locally)";
-      if (on) llmKeyInput.value = "";
-    }
-    if (llmModelRefInput) llmModelRefInput.disabled = on;
-    if (llmApiInput) llmApiInput.disabled = on;
-    if (llmBaseUrlInput) llmBaseUrlInput.disabled = on;
-    if (llmThinkingInput) llmThinkingInput.disabled = on;
-    if (llmUseProxyInput) llmUseProxyInput.disabled = on;
-    if (llmSaveBtn) llmSaveBtn.disabled = on;
-    if (llmLine) llmLine.textContent = on ? "LLM: Codex CLI bridge (local)" : llmLine.textContent;
-  }
-
-  async function loadCapabilities() {
-    try {
-      const res = await fetch("/api/runtime/capabilities", { credentials: "include" });
-      const data = await res.json().catch(() => null);
-      setCodexCliMode(!!data?.llm?.codexCli);
-    } catch {
-      // Older servers won't have this endpoint; default to requiring a real API key.
-      setCodexCliMode(false);
-    }
-  }
-
-  loadCapabilities();
-
   function parseModelRef(modelRef, fallbackProvider = "openai", fallbackModelId = "gpt-4o-mini") {
     const ref = String(modelRef || "").trim();
     if (!ref) return { provider: fallbackProvider, modelId: fallbackModelId, modelRef: `${fallbackProvider}/${fallbackModelId}` };
@@ -255,6 +228,253 @@ async function init() {
     return { provider: fallbackProvider, modelId: ref, modelRef: `${fallbackProvider}/${ref}` };
   }
 
+  function setLlmAuthModeUi() {
+    const authMode = String(llmAuthModeInput?.value || "").trim() === "oauth-json" ? "oauth-json" : "api-key";
+    if (llmOauthProfileInput) {
+      llmOauthProfileInput.style.display = authMode === "oauth-json" ? "block" : "none";
+      if (authMode === "oauth-json") {
+        llmOauthProfileInput.placeholder = "Paste OAuth callback URL, auth.json profile JSON, or raw access token.";
+      }
+    }
+    if (llmKeyInput) {
+      llmKeyInput.placeholder = authMode === "oauth-json"
+        ? "Optional override token (usually auto-derived from OAuth input)"
+        : "LLM API key (stored locally)";
+    }
+    if (llmOauthProfileHint) {
+      llmOauthProfileHint.textContent = authMode === "oauth-json"
+        ? 'Use "Sign in with ChatGPT" (subscription) and paste callback URL, auth JSON, or token here.'
+        : "";
+    }
+  }
+
+  function getAccessTokenFromProfileValue(value) {
+    if (!value || typeof value !== "object") return "";
+    const direct = typeof value.access === "string"
+      ? value.access.trim()
+      : typeof value.access_token === "string"
+        ? value.access_token.trim()
+        : typeof value.accessToken === "string"
+          ? value.accessToken.trim()
+          : "";
+    return direct;
+  }
+
+  function getOAuthProviderAliases(providerHint) {
+    const normalized = String(providerHint || "").trim().toLowerCase();
+    if (!normalized) return [];
+    const aliases = new Set([normalized]);
+    if (normalized === "openai-codex") {
+      aliases.add("openai");
+      aliases.add("chatgpt");
+    }
+    if (normalized === "openai") {
+      aliases.add("openai-codex");
+      aliases.add("chatgpt");
+    }
+    return [...aliases];
+  }
+
+  function providerAliasMatches(aliasSet, rawName) {
+    if (!aliasSet || !aliasSet.size) return true;
+    const normalized = String(rawName || "").trim().toLowerCase();
+    if (!normalized) return false;
+    if (aliasSet.has(normalized)) return true;
+    const prefix = normalized.match(/^[a-z0-9_-]+/);
+    if (prefix && aliasSet.has(prefix[0])) return true;
+    return false;
+  }
+
+  function decodeMaybeUriComponent(value) {
+    const text = String(value || "").trim();
+    if (!text || !text.includes("%")) return text;
+    try {
+      return decodeURIComponent(text);
+    } catch {
+      return text;
+    }
+  }
+
+  function normalizeTokenCandidate(value) {
+    const text = String(value || "").trim().replace(/^['"]+|['"]+$/g, "");
+    if (!text) return "";
+    return text.replace(/^bearer\s+/i, "").trim();
+  }
+
+  function isLikelyJwtToken(value) {
+    return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || ""));
+  }
+
+  function isLikelyOpaqueOAuthToken(value) {
+    return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ""));
+  }
+
+  function collectOAuthCandidatesFromUrl(rawUrl) {
+    let parsed = null;
+    try {
+      parsed = new URL(String(rawUrl || "").trim());
+    } catch {
+      return [];
+    }
+
+    const out = [];
+    const seen = new Set();
+    const pushCandidate = (value) => {
+      const normalized = normalizeTokenCandidate(value);
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      out.push(normalized);
+      const decoded = decodeMaybeUriComponent(normalized);
+      if (decoded && decoded !== normalized && !seen.has(decoded)) {
+        seen.add(decoded);
+        out.push(decoded);
+      }
+    };
+
+    const readParams = (params) => {
+      for (const [rawKey, rawValue] of params.entries()) {
+        const key = String(rawKey || "").trim().toLowerCase();
+        const value = String(rawValue || "").trim();
+        if (!key || !value) continue;
+        const include = key === "access"
+          || key === "access_token"
+          || key === "token"
+          || key === "oauth_token"
+          || key === "id_token"
+          || key === "auth"
+          || key === "profile"
+          || key === "credentials"
+          || key.includes("token");
+        if (!include) continue;
+        pushCandidate(value);
+      }
+    };
+
+    readParams(parsed.searchParams);
+
+    const hashRaw = String(parsed.hash || "").replace(/^#/, "").trim();
+    if (hashRaw) {
+      const hashQuery = hashRaw.startsWith("?") ? hashRaw.slice(1) : hashRaw;
+      readParams(new URLSearchParams(hashQuery));
+    }
+
+    return out;
+  }
+
+  function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
+    if (!profileMap || typeof profileMap !== "object") return "";
+    if (Array.isArray(profileMap)) {
+      for (const item of profileMap) {
+        const token = extractOAuthTokenFromProfileMap(item, providerHint);
+        if (token) return token;
+      }
+      return "";
+    }
+
+    const aliasSet = new Set(getOAuthProviderAliases(providerHint));
+    const direct = getAccessTokenFromProfileValue(profileMap);
+    if (direct) return direct;
+
+    for (const alias of aliasSet) {
+      if (!alias) continue;
+      if (profileMap[alias]) {
+        const directProfile = getAccessTokenFromProfileValue(profileMap[alias]);
+        if (directProfile) return directProfile;
+      }
+    }
+
+    for (const key of Object.keys(profileMap)) {
+      const profile = profileMap[key];
+      const profileToken = getAccessTokenFromProfileValue(profile);
+      const profileProvider = String(profile?.provider || profile?.type || key || "").trim().toLowerCase();
+      if (!profileToken) continue;
+      if (providerAliasMatches(aliasSet, profileProvider) || providerAliasMatches(aliasSet, key)) {
+        return profileToken;
+      }
+    }
+    return "";
+  }
+
+  function extractOAuthAccessTokenFromObject(parsed, providerHint) {
+    const candidates = [];
+    if (parsed && typeof parsed === "object") {
+      candidates.push(parsed);
+      if (parsed.profiles && typeof parsed.profiles === "object") candidates.push(parsed.profiles);
+      if (parsed.auth && parsed.auth.profiles && typeof parsed.auth.profiles === "object") candidates.push(parsed.auth.profiles);
+      if (parsed.profile && typeof parsed.profile === "object") candidates.push(parsed.profile);
+      if (parsed.providerProfiles && typeof parsed.providerProfiles === "object") candidates.push(parsed.providerProfiles);
+    }
+    for (const candidate of candidates) {
+      const token = extractOAuthTokenFromProfileMap(candidate, providerHint);
+      if (token) return token;
+    }
+    const direct = getAccessTokenFromProfileValue(parsed);
+    if (direct) return direct;
+    return "";
+  }
+
+  function extractOAuthAccessToken(raw, providerHint) {
+    const text = String(raw || "").trim();
+    if (!text) {
+      return { ok: false, error: "MISSING_OAUTH_PROFILE_JSON" };
+    }
+
+    const directToken = normalizeTokenCandidate(text);
+    if (isLikelyJwtToken(directToken) || isLikelyOpaqueOAuthToken(directToken)) {
+      return { ok: true, token: directToken };
+    }
+
+    if (text.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(text);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        return token
+          ? { ok: true, token }
+          : { ok: false, error: "NO_OAUTH_ACCESS_TOKEN_FOUND" };
+      } catch {
+        return { ok: false, error: "INVALID_OAUTH_PROFILE_JSON" };
+      }
+    }
+
+    const decodedText = decodeMaybeUriComponent(text);
+    if (decodedText && decodedText !== text) {
+      const decodedDirectToken = normalizeTokenCandidate(decodedText);
+      if (isLikelyJwtToken(decodedDirectToken) || isLikelyOpaqueOAuthToken(decodedDirectToken)) {
+        return { ok: true, token: decodedDirectToken };
+      }
+      if (decodedText.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(decodedText);
+          const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+          if (token) return { ok: true, token };
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    const urlCandidates = collectOAuthCandidatesFromUrl(text);
+    for (const candidate of urlCandidates) {
+      if (isLikelyJwtToken(candidate) || isLikelyOpaqueOAuthToken(candidate)) {
+        return { ok: true, token: candidate };
+      }
+      if (candidate.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(candidate);
+          const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+          if (token) return { ok: true, token };
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(text)) {
+      return { ok: false, error: "NO_OAUTH_ACCESS_TOKEN_FOUND" };
+    }
+    return { ok: false, error: "INVALID_OAUTH_PROFILE_JSON" };
+  }
+
   function normalizeThinkingLevel(value) {
     const v = String(value || "").trim().toLowerCase();
     if (!v) return "";
@@ -263,8 +483,16 @@ async function init() {
   }
 
   function configureLlm({ apiKey }) {
-    const key = String(apiKey || "").trim();
     const modelParsed = parseModelRef(llmModelRefInput?.value || "");
+    const authMode = String(llmAuthModeInput?.value || "").trim() === "oauth-json" ? "oauth-json" : "api-key";
+    const oauthText = String(llmOauthProfileInput?.value || "").trim();
+    const providerHint = modelParsed?.provider || "openai";
+    const parsedToken = authMode === "oauth-json" ? extractOAuthAccessToken(oauthText, providerHint) : null;
+    const manualApiKey = String(apiKey || "").trim();
+    const resolvedApiKey = manualApiKey || (parsedToken?.ok ? String(parsedToken.token || "").trim() : "");
+    const oauthError = authMode === "oauth-json" && oauthText && parsedToken && !parsedToken.ok
+      ? String(parsedToken.error || "INVALID_OAUTH_PROFILE_JSON")
+      : "";
     let api = String(llmApiInput?.value || "").trim();
     const baseOverride = String(llmBaseUrlInput?.value || "").trim();
     const thinking = normalizeThinkingLevel(llmThinkingInput?.value || "");
@@ -275,7 +503,7 @@ async function init() {
 
     sendToWorker({
       type: "gateway.command.setLlmConfig",
-      apiKey: key,
+      apiKey: resolvedApiKey,
       api,
       provider: modelParsed.provider,
       modelRef: modelParsed.modelRef,
@@ -285,7 +513,9 @@ async function init() {
       useProxy,
     });
     if (llmLine) {
-      const keyStatus = key ? "key saved" : "missing key";
+      const keyStatus = resolvedApiKey
+        ? (authMode === "oauth-json" ? "oauth saved" : "key saved")
+        : (oauthError ? `oauth error: ${oauthError}` : "missing key");
       llmLine.textContent = `LLM: ${modelParsed.modelRef} (${keyStatus}, proxy=${useProxy ? "on" : "off"
         }, thinking=${thinking || "default"})`;
     }
@@ -295,8 +525,12 @@ async function init() {
     configureLlm({ apiKey: llmKeyInput?.value || "" });
   });
 
+  llmAuthModeInput?.addEventListener("change", () => {
+    setLlmAuthModeUi();
+  });
   if (llmModelRefInput && !llmModelRefInput.value) llmModelRefInput.value = "openai/gpt-4o-mini";
   if (llmUseProxyInput) llmUseProxyInput.checked = true;
+  setLlmAuthModeUi();
 
   createHouseBtn?.addEventListener("click", () => {
     const rh = new Uint8Array(32);
@@ -391,7 +625,9 @@ async function init() {
     if (msg.type === "worker.chat.append") {
       const role = String(msg.role || "unknown");
       const text = String(msg.text || "");
-      appendLine(chatTranscript, `${role}: ${text}`);
+      if (!hasSidebarChatUi) {
+        appendLine(chatTranscript, `${role}: ${text}`);
+      }
       gatewayEvents.emit('message', { role, text });
       return;
     }

@@ -24,6 +24,24 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
   };
 }
 
+function defaultProviderApi(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') return 'openai-completions';
+  if (p === 'openai-codex') return 'openai-codex-responses';
+  return '';
+}
+
+function defaultProviderBaseUrl(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') {
+    return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  }
+  if (p === 'openai-codex') {
+    return 'https://chatgpt.com/backend-api';
+  }
+  return '';
+}
+
 async function metaGet(key) {
   const rec = await getRecord('meta', key);
   return rec ? rec.value : null;
@@ -33,26 +51,26 @@ async function metaSet(key, value) {
   await putRecord('meta', { key, value });
 }
 
-export async function saveLlmConfig({ provider, model, apiKey }) {
+export async function saveLlmConfig({ provider, model, apiKey, authMode }) {
   const providerTrim = String(provider || '').trim();
   const modelTrim = String(model || '').trim();
   const keyTrim = String(apiKey || '').trim();
+  const normalizedAuthMode = String(authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
   if (!providerTrim) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelTrim) throw new Error('MISSING_LLM_MODEL');
   if (!keyTrim) throw new Error('MISSING_LLM_API_KEY');
 
   const parsed = parseModelRef(`${providerTrim}/${modelTrim}`, providerTrim, modelTrim);
   const useProxy = true;
-  const api = parsed.provider === 'openai' ? 'openai-completions' : '';
-  const baseUrl = parsed.provider === 'openai'
-    ? new URL('/api/llm/openai/v1', window.location.origin).toString()
-    : '';
+  const api = defaultProviderApi(parsed.provider);
+  const baseUrl = defaultProviderBaseUrl(parsed.provider);
 
   await metaSet('llmApiKey', keyTrim);
   await metaSet('llmApi', api || null);
   await metaSet('llmProvider', parsed.provider || null);
   await metaSet('llmModelRef', parsed.modelRef || null);
   await metaSet('llmModelId', parsed.modelId || null);
+  await metaSet('llmAuthMode', normalizedAuthMode);
   await metaSet('llmBaseUrl', baseUrl || null);
   await metaSet('llmReasoning', null);
   await metaSet('llmUseProxy', useProxy);
@@ -62,6 +80,7 @@ export async function saveLlmConfig({ provider, model, apiKey }) {
     provider: parsed.provider,
     model: parsed.modelId,
     modelRef: parsed.modelRef,
+    authMode: normalizedAuthMode,
     apiKeySet: true
   };
 }
@@ -71,12 +90,14 @@ export async function loadLlmConfig() {
   const model = await metaGet('llmModelId');
   const modelRef = await metaGet('llmModelRef');
   const apiKey = await metaGet('llmApiKey');
+  const authMode = await metaGet('llmAuthMode');
   return {
     configured: !!(provider && model && apiKey),
     provider: provider || null,
     model: model || null,
     modelRef: modelRef || null,
     apiKey: typeof apiKey === 'string' ? apiKey : '',
+    authMode: authMode === 'oauth-json' ? 'oauth-json' : 'api-key',
     apiKeySet: !!apiKey
   };
 }
@@ -84,6 +105,7 @@ export async function loadLlmConfig() {
 export async function clearLlmConfig() {
   await metaSet('llmApiKey', null);
   await metaSet('llmApi', null);
+  await metaSet('llmAuthMode', null);
   await metaSet('llmProvider', null);
   await metaSet('llmModelRef', null);
   await metaSet('llmModelId', null);

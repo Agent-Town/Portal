@@ -68,6 +68,16 @@ function setPublicMediaEnabled(enabled) {
   }
 }
 
+function setAgentStateStatus(msg) {
+  const node = el('agentStateStatus');
+  if (node) node.textContent = msg || '';
+}
+
+function setAgentStateError(msg) {
+  const node = el('agentStateError');
+  if (node) node.textContent = msg || '';
+}
+
 function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
   const preview = el('publicPreview');
   const img = el('publicPreviewImg');
@@ -103,6 +113,14 @@ const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const AUTO_LOCK_MS = null;
 const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
 const AGENT0_SDK_CDN_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+const OPENCLAW_DB_NAME = 'openclaw-lite';
+const OPENCLAW_DB_VERSION = 1;
+const AGENT_STATE_KIND = 'openclaw-lite-state';
+const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_MAX_BYTES = 8 * 1024 * 1024;
+const AGENT_STATE_MAX_META_RECORDS = 2048;
+const AGENT_STATE_MAX_VFS_RECORDS = 20000;
+const AGENT_STATE_MAX_CHECKPOINT_RECORDS = 5000;
 
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
@@ -157,6 +175,286 @@ function clearHouseAuthCache(houseId) {
   } catch {
     // ignore storage errors
   }
+}
+
+let openClawDbPromise = null;
+let agentStateBusy = false;
+
+function setAgentStateControlsEnabled(enabled) {
+  const canUse = !!enabled && !agentStateBusy;
+  const saveBtn = el('saveAgentStateBtn');
+  const restoreBtn = el('restoreAgentStateBtn');
+  const downloadBtn = el('downloadAgentStateBtn');
+  const uploadBtn = el('uploadAgentStateBtn');
+  const uploadInput = el('uploadAgentStateInput');
+  if (saveBtn) saveBtn.disabled = !canUse;
+  if (restoreBtn) restoreBtn.disabled = !canUse;
+  if (downloadBtn) downloadBtn.disabled = !canUse;
+  if (uploadBtn) uploadBtn.disabled = !canUse;
+  if (uploadInput) uploadInput.disabled = !canUse;
+  if (!enabled && !agentStateBusy) {
+    setAgentStateStatus('');
+    setAgentStateError('');
+  }
+}
+
+function setAgentStateBusy(busy) {
+  agentStateBusy = !!busy;
+  setAgentStateControlsEnabled(unlocked);
+}
+
+function idbReqToPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
+  });
+}
+
+function idbTxDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+    tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+  });
+}
+
+function openOpenClawDb() {
+  if (openClawDbPromise) return openClawDbPromise;
+  openClawDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(OPENCLAW_DB_NAME, OPENCLAW_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('checkpoints')) {
+        const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+        s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+      }
+      if (!db.objectStoreNames.contains('vfs')) {
+        db.createObjectStore('vfs', { keyPath: 'path' });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+  });
+  return openClawDbPromise;
+}
+
+async function idbGetAll(storeName) {
+  const db = await openOpenClawDb();
+  const tx = db.transaction([storeName], 'readonly');
+  const req = tx.objectStore(storeName).getAll();
+  const rows = await idbReqToPromise(req);
+  await idbTxDone(tx);
+  return Array.isArray(rows) ? rows : [];
+}
+
+function isRecordObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneJsonSafe(value) {
+  if (value === undefined) return null;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) return null;
+    return JSON.parse(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAgentStateMetaRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_META_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const key = typeof item.key === 'string' ? item.key.trim() : '';
+    if (!key || key.length > 256 || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, value: cloneJsonSafe(item.value) });
+  }
+  return out;
+}
+
+function normalizeAgentStateVfsRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_VFS_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const path = typeof item.path === 'string' ? item.path.trim() : '';
+    const dataB64 = typeof item.dataB64 === 'string' ? item.dataB64.trim() : '';
+    if (!path || path.length > 1024 || !dataB64 || seen.has(path)) continue;
+    seen.add(path);
+    const updatedAtMs = Number(item.updatedAtMs);
+    out.push({
+      path,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateCheckpoints(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_CHECKPOINT_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const checkpointId = typeof item.checkpointId === 'string' ? item.checkpointId.trim() : '';
+    if (!checkpointId || checkpointId.length > 256 || seen.has(checkpointId)) continue;
+    const cloned = cloneJsonSafe(item);
+    if (!isRecordObject(cloned)) continue;
+    cloned.checkpointId = checkpointId;
+    seen.add(checkpointId);
+    out.push(cloned);
+  }
+  return out;
+}
+
+function normalizeAgentStateSnapshot(raw) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const stores = raw.stores;
+  if (!isRecordObject(stores)) throw new Error('INVALID_AGENT_STATE');
+
+  return {
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : new Date().toISOString(),
+    stores: {
+      meta: normalizeAgentStateMetaRecords(stores.meta || []),
+      vfs: normalizeAgentStateVfsRecords(stores.vfs || []),
+      checkpoints: normalizeAgentStateCheckpoints(stores.checkpoints || [])
+    }
+  };
+}
+
+function snapshotByteLength(snapshot) {
+  return new TextEncoder().encode(JSON.stringify(snapshot)).length;
+}
+
+function extractSnapshotHouseId(snapshot) {
+  if (!isRecordObject(snapshot)) return null;
+  const list = Array.isArray(snapshot?.stores?.meta) ? snapshot.stores.meta : [];
+  const record = list.find((entry) => isRecordObject(entry) && entry.key === 'houseId');
+  const houseId = typeof record?.value === 'string' ? record.value.trim() : '';
+  return houseId || null;
+}
+
+function assertSnapshotMatchesHouse(snapshot, expectedHouseId) {
+  const snapshotHouseId = extractSnapshotHouseId(snapshot);
+  if (expectedHouseId && snapshotHouseId && snapshotHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+}
+
+async function exportLocalAgentStateSnapshot() {
+  const [metaRows, vfsRows, checkpointRows] = await Promise.all([
+    idbGetAll('meta'),
+    idbGetAll('vfs'),
+    idbGetAll('checkpoints')
+  ]);
+  const snapshot = normalizeAgentStateSnapshot({
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: new Date().toISOString(),
+    stores: {
+      meta: metaRows,
+      vfs: vfsRows,
+      checkpoints: checkpointRows
+    }
+  });
+  const sizeBytes = snapshotByteLength(snapshot);
+  if (sizeBytes > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+  return { snapshot, sizeBytes };
+}
+
+async function replaceLocalAgentStateSnapshot(snapshot) {
+  const normalized = normalizeAgentStateSnapshot(snapshot);
+  const sizeBytes = snapshotByteLength(normalized);
+  if (sizeBytes > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+
+  const db = await openOpenClawDb();
+  const tx = db.transaction(['meta', 'vfs', 'checkpoints'], 'readwrite');
+  tx.objectStore('meta').clear();
+  tx.objectStore('vfs').clear();
+  tx.objectStore('checkpoints').clear();
+  for (const row of normalized.stores.meta) tx.objectStore('meta').put(row);
+  for (const row of normalized.stores.vfs) tx.objectStore('vfs').put(row);
+  for (const row of normalized.stores.checkpoints) tx.objectStore('checkpoints').put(row);
+  await idbTxDone(tx);
+  return { snapshot: normalized, sizeBytes };
+}
+
+async function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsText(file);
+  });
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+  if (bytes < 1024) return `${Math.floor(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function triggerJsonDownload({ filename, data }) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+}
+
+function mapAgentStateError(error) {
+  const msg = String(error?.message || error || '');
+  if (!msg) return 'Agent state operation failed.';
+  if (msg === 'LOCKED') return 'Unlock the house first.';
+  if (msg === 'INVALID_AGENT_STATE') return 'Invalid agent backup format.';
+  if (msg === 'AGENT_STATE_TOO_LARGE') return 'Agent backup is too large.';
+  if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return 'Backup belongs to a different house.';
+  if (msg === 'NOT_FOUND') return 'House not found.';
+  if (msg === 'FILE_READ_FAILED') return 'Failed to read backup file.';
+  return msg;
+}
+
+async function getHouseAgentStateSnapshot(houseId) {
+  const data = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/agent-state`);
+  return {
+    snapshot: data?.agentState || null,
+    updatedAt: data?.updatedAt || null,
+    sizeBytes: Number(data?.sizeBytes || 0) || 0
+  };
+}
+
+async function putHouseAgentStateSnapshot(houseId, snapshot) {
+  const body = JSON.stringify({ snapshot });
+  return houseApi(
+    houseId,
+    `/api/house/${encodeURIComponent(houseId)}/agent-state`,
+    { method: 'POST', body }
+  );
 }
 
 
@@ -999,6 +1297,7 @@ function setHousePanelButtonsEnabled(enabled) {
   if (descBtn) descBtn.disabled = !enabled;
   if (ercBtn) ercBtn.disabled = !enabled;
   setPublicMediaEnabled(enabled);
+  setAgentStateControlsEnabled(enabled);
   if (!enabled) {
     setDescriptorOpen(false);
     setErc8004Open(false);
@@ -1160,6 +1459,68 @@ async function unlockExistingHouse(houseId) {
   setErc8004Open(false);
   await refreshEntries();
   await loadPublicMedia();
+  try {
+    await restoreAgentStateFromHouse({ silent: true });
+  } catch (err) {
+    setAgentStateError(mapAgentStateError(err));
+  }
+}
+
+async function restoreAgentStateFromHouse({ silent = false } = {}) {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  const { snapshot, sizeBytes, updatedAt } = await getHouseAgentStateSnapshot(house.houseId);
+  if (!snapshot) {
+    if (!silent) setAgentStateStatus('No saved agent state found in this house.');
+    return { restored: false, sizeBytes: 0 };
+  }
+  assertSnapshotMatchesHouse(snapshot, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(snapshot);
+  const label = updatedAt ? `from ${new Date(updatedAt).toLocaleString()}` : 'from house';
+  setAgentStateStatus(`Agent state restored ${label} (${formatBytes(sizeBytes || imported.sizeBytes)}).`);
+  setAgentStateError('');
+  return { restored: true, sizeBytes: sizeBytes || imported.sizeBytes };
+}
+
+async function saveAgentStateToHouse() {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  const exported = await exportLocalAgentStateSnapshot();
+  assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
+  const response = await putHouseAgentStateSnapshot(house.houseId, exported.snapshot);
+  const when = response?.updatedAt ? new Date(response.updatedAt).toLocaleString() : 'now';
+  setAgentStateStatus(`Saved agent state to house (${formatBytes(exported.sizeBytes)} at ${when}).`);
+  setAgentStateError('');
+  return exported;
+}
+
+async function downloadAgentStateBackup() {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  const exported = await exportLocalAgentStateSnapshot();
+  assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
+  const iso = new Date().toISOString().replace(/[:]/g, '-');
+  const shortHouseId = house.houseId.slice(0, 12);
+  const filename = `agent-town-state-${shortHouseId}-${iso}.json`;
+  triggerJsonDownload({ filename, data: exported.snapshot });
+  setAgentStateStatus(`Downloaded local backup (${formatBytes(exported.sizeBytes)}).`);
+  setAgentStateError('');
+}
+
+async function uploadAgentStateBackup(file) {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  if (!file) throw new Error('INVALID_AGENT_STATE');
+  if (file.size > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+  const raw = await readTextFile(file);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+  assertSnapshotMatchesHouse(parsed, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(parsed);
+  await putHouseAgentStateSnapshot(house.houseId, imported.snapshot);
+  setAgentStateStatus(`Uploaded and replaced agent state (${formatBytes(imported.sizeBytes)}).`);
+  setAgentStateError('');
+  return imported;
 }
 
 async function appendEntry() {
@@ -1728,7 +2089,7 @@ async function initSharePanel() {
             body: JSON.stringify({ xPostUrl: humanUrl, shareId: shareIdForPosts })
           });
         }
-        if (shareAgentPost && !tokenMode) {
+        if (shareAgentPost && !tokenMode && agentUrl) {
           if (!teamCode) throw new Error('TEAM_CODE_MISSING');
           await api('/api/agent/posts', { method: 'POST', body: JSON.stringify({ teamCode, moltbookUrl: agentUrl }) });
         }
@@ -1931,6 +2292,74 @@ async function init() {
     wipeKeys();
     setStatus('Locked (key wiped from memory).');
   });
+
+  const saveAgentStateBtn = el('saveAgentStateBtn');
+  if (saveAgentStateBtn) {
+    saveAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await saveAgentStateToHouse();
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const restoreAgentStateBtn = el('restoreAgentStateBtn');
+  if (restoreAgentStateBtn) {
+    restoreAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await restoreAgentStateFromHouse({ silent: false });
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const downloadAgentStateBtn = el('downloadAgentStateBtn');
+  if (downloadAgentStateBtn) {
+    downloadAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await downloadAgentStateBackup();
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const uploadAgentStateBtn = el('uploadAgentStateBtn');
+  const uploadAgentStateInput = el('uploadAgentStateInput');
+  if (uploadAgentStateBtn && uploadAgentStateInput) {
+    uploadAgentStateBtn.addEventListener('click', () => {
+      if (uploadAgentStateBtn.disabled) return;
+      uploadAgentStateInput.click();
+    });
+    uploadAgentStateInput.addEventListener('change', async () => {
+      const file = uploadAgentStateInput.files && uploadAgentStateInput.files[0];
+      uploadAgentStateInput.value = '';
+      if (!file) return;
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await uploadAgentStateBackup(file);
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
 
   el('copyDescriptorBtn').addEventListener('click', async () => {
     setError('');

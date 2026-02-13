@@ -81,7 +81,17 @@
 
     state.initPromise = (async () => {
       state.manifest = await fetchManifest();
-      const workerPath = String(state.manifest?.entrypoints?.worker || '/openclaw-lite/worker.js');
+      const workerPath = String(state.manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      const gatewayWorkerPath = String(state.manifest?.entrypoints?.worker || '/openclaw-lite/worker.js');
+      const runtimeWorkerPath = String(state.manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      fetch(gatewayWorkerPath, {
+        credentials: 'include',
+        cache: 'no-store'
+      }).catch(() => null);
+      fetch(runtimeWorkerPath, {
+        credentials: 'include',
+        cache: 'no-store'
+      }).catch(() => null);
       ensureWorker(workerPath);
       await request('bootstrap', { teamCode: state.teamCode }, 5_000);
       state.ready = true;
@@ -152,10 +162,17 @@
     );
   }
 
-  async function setLlmConfig({ provider, model } = {}) {
+  async function setLlmConfig({ provider, model, apiKey } = {}) {
     if (state.driver !== 'vendor') return { ok: true };
     await bootstrapWorker();
-    return request('setLlmConfig', { provider, model });
+    const hasProvider = provider !== undefined;
+    const hasModel = model !== undefined;
+    const hasApiKey = apiKey !== undefined;
+    const payload = {};
+    if (hasProvider) payload.provider = provider;
+    if (hasModel) payload.model = model;
+    if (hasApiKey) payload.apiKey = apiKey;
+    return request('setLlmConfig', payload);
   }
 
   async function resetCeremony() {

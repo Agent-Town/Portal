@@ -5,6 +5,7 @@ const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 const express = require('express');
+const { registerLlmRoutes } = require('../vendors/openclaw-lite-main/server/routes/llm');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
@@ -789,7 +790,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(
   express.json({
-    limit: '3mb',
+    limit: '10mb',
     verify: (req, _res, buf) => {
       req.rawBody = buf.toString('utf8');
     }
@@ -862,7 +863,9 @@ function buildVendorLiteManifest() {
     buildTime: computeVendorLiteBuildTime(),
     entrypoints: {
       gateway: '/openclaw-lite/gateway.js',
-      worker: '/openclaw-lite/worker.js'
+      worker: '/openclaw-lite/worker.js',
+      runtimeWorker: '/openclaw-lite/runtime-worker.js',
+      runtimeBridge: '/openclaw-lite/runtime-bridge.js'
     }
   };
 }
@@ -964,11 +967,12 @@ function normalizeLiteLlmPayload(body) {
   const providerInput = typeof body?.provider === 'string' ? body.provider.trim() : '';
   const modelInput = typeof body?.model === 'string' ? body.model.trim() : '';
   const modelRefInput = typeof body?.modelRef === 'string' ? body.modelRef.trim() : '';
-  const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+  const rawAuthMode = typeof body?.authMode === 'string' ? body.authMode.trim() : '';
+  const normalizedAuthMode = rawAuthMode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const hasCredential = body?.hasCredential === false ? false : true;
 
   if (!providerInput && !modelRefInput) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelInput && !modelRefInput) throw new Error('MISSING_LLM_MODEL');
-  if (!apiKey) throw new Error('MISSING_LLM_API_KEY');
 
   const parsed = modelRefInput
     ? parseModelRef(modelRefInput, providerInput || 'openai', modelInput || 'gpt-4o-mini')
@@ -984,12 +988,9 @@ function normalizeLiteLlmPayload(body) {
     provider,
     model,
     modelRef,
-    apiKey
+    authMode: normalizedAuthMode,
+    hasCredential
   };
-}
-
-function sha256Hex(text) {
-  return crypto.createHash('sha256').update(String(text || ''), 'utf8').digest('hex');
 }
 
 function setSecurityHeaders(req, res, next) {
@@ -1031,6 +1032,18 @@ app.use((req, res, next) => {
 });
 
 app.use(setSecurityHeaders);
+
+// OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
+registerLlmRoutes(app);
+
+app.get('/api/runtime/capabilities', (_req, res) => {
+  res.json({
+    ok: true,
+    llm: {
+      codexCli: false
+    }
+  });
+});
 
 // --- rate limiting ---
 const rateBuckets = new Map();
@@ -1256,6 +1269,12 @@ const MAX_PUBLIC_PROMPT_CHARS = 280;
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
 const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
+const MAX_AGENT_STATE_BYTES = 8 * 1024 * 1024;
+const MAX_AGENT_STATE_META_RECORDS = 2048;
+const MAX_AGENT_STATE_VFS_RECORDS = 20000;
+const MAX_AGENT_STATE_CHECKPOINT_RECORDS = 5000;
+const AGENT_STATE_KIND = 'openclaw-lite-state';
+const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
 
 const ponyTransportService = createPonyTransportService();
 const ponyPostageVerifier = createPostageVerifier({
@@ -1509,6 +1528,116 @@ function serializePublicMedia(house) {
   };
 }
 
+function isRecordObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneJsonSafe(value) {
+  if (value === undefined) return null;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) return null;
+    return JSON.parse(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAgentStateMetaRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_META_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const key = typeof item.key === 'string' ? item.key.trim() : '';
+    if (!key || key.length > 256 || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      key,
+      value: cloneJsonSafe(item.value)
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateVfsRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_VFS_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const pathValue = typeof item.path === 'string' ? item.path.trim() : '';
+    const dataB64 = typeof item.dataB64 === 'string' ? item.dataB64.trim() : '';
+    if (!pathValue || pathValue.length > 1024 || !dataB64 || dataB64.length > MAX_AGENT_STATE_BYTES) continue;
+    if (seen.has(pathValue)) continue;
+    seen.add(pathValue);
+    const updatedAtMs = Number(item.updatedAtMs);
+    out.push({
+      path: pathValue,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateCheckpointRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_CHECKPOINT_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const checkpointId = typeof item.checkpointId === 'string' ? item.checkpointId.trim() : '';
+    if (!checkpointId || checkpointId.length > 256 || seen.has(checkpointId)) continue;
+    const cloned = cloneJsonSafe(item);
+    if (!isRecordObject(cloned)) continue;
+    cloned.checkpointId = checkpointId;
+    seen.add(checkpointId);
+    out.push(cloned);
+  }
+  return out;
+}
+
+function extractAgentStateHouseId(snapshot) {
+  if (!isRecordObject(snapshot)) return null;
+  const metaRecords = Array.isArray(snapshot?.stores?.meta) ? snapshot.stores.meta : [];
+  const houseIdEntry = metaRecords.find((entry) => isRecordObject(entry) && entry.key === 'houseId');
+  const houseId = typeof houseIdEntry?.value === 'string' ? houseIdEntry.value.trim() : '';
+  return houseId || null;
+}
+
+function normalizeAgentStateSnapshot(raw, { expectedHouseId = null } = {}) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const stores = raw.stores;
+  if (!isRecordObject(stores)) throw new Error('INVALID_AGENT_STATE');
+
+  const normalized = {
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : nowIso(),
+    stores: {
+      meta: normalizeAgentStateMetaRecords(stores.meta || []),
+      vfs: normalizeAgentStateVfsRecords(stores.vfs || []),
+      checkpoints: normalizeAgentStateCheckpointRecords(stores.checkpoints || [])
+    }
+  };
+
+  const snapshotHouseId = extractAgentStateHouseId(normalized);
+  if (expectedHouseId && snapshotHouseId && snapshotHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+
+  const sizeBytes = Buffer.byteLength(JSON.stringify(normalized), 'utf8');
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_AGENT_STATE_BYTES) {
+    throw new Error('AGENT_STATE_TOO_LARGE');
+  }
+  return { snapshot: normalized, sizeBytes };
+}
+
 function escapeHtmlAttr(input) {
   return String(input || '')
     .replace(/&/g, '&amp;')
@@ -1639,6 +1768,8 @@ app.get('/api/state', (req, res) => {
       llmConfigured: !!lite.llmConfigured,
       llmProvider: lite.llmProvider || null,
       llmModel: lite.llmModel || null,
+      llmAuthMode: lite.llmAuthMode || 'api-key',
+      llmApiKeySet: !!lite.llmApiKeySet,
       runtimeVersion: lite.runtimeVersion || null,
       lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
     },
@@ -1768,6 +1899,7 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
     configured: !!lite.llmConfigured,
     provider: lite.llmProvider || null,
     model: lite.llmModel || null,
+    authMode: lite.llmAuthMode || 'api-key',
     apiKeySet: !!lite.llmApiKeySet
   });
 });
@@ -1789,8 +1921,9 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   lite.llmModel = payload.model;
   lite.llmModelRef = payload.modelRef;
   lite.llmConfiguredAt = nowIso();
-  lite.llmApiKeySet = true;
-  lite.llmApiKeyHash = sha256Hex(payload.apiKey);
+  lite.llmApiKeySet = payload.hasCredential !== false;
+  lite.llmAuthMode = payload.authMode || 'api-key';
+  lite.llmApiKeyHash = null;
 
   if (!lite.runtimeBooted && lite.driver === 'phase1') {
     lite.runtimeBooted = true;
@@ -1811,6 +1944,7 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
     configured: !!lite.llmConfigured,
     provider: lite.llmProvider,
     model: lite.llmModel,
+    authMode: lite.llmAuthMode || 'api-key',
     apiKeySet: !!lite.llmApiKeySet,
     runtimeReady: !!lite.runtimeReady
   });
@@ -1827,6 +1961,7 @@ app.delete('/api/agent/lite/llm/config', (req, res) => {
   lite.llmConfiguredAt = null;
   lite.llmApiKeySet = false;
   lite.llmApiKeyHash = null;
+  lite.llmAuthMode = null;
 
   if (lite.driver === 'vendor') {
     if (s.agent.source === 'openclaw-lite') {
@@ -3756,6 +3891,56 @@ app.post('/api/house/:id/public-media', (req, res) => {
 
   writeStore(store);
   res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+});
+
+app.get('/api/house/:id/agent-state', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const payload = isRecordObject(house.agentState) ? house.agentState : null;
+  res.json({
+    ok: true,
+    agentState: isRecordObject(payload?.snapshot) ? payload.snapshot : null,
+    updatedAt: typeof payload?.updatedAt === 'string' ? payload.updatedAt : null,
+    sizeBytes: Number.isFinite(payload?.sizeBytes) ? payload.sizeBytes : null
+  });
+});
+
+app.post('/api/house/:id/agent-state', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const rawSnapshot = isRecordObject(req.body?.snapshot) ? req.body.snapshot : req.body;
+  let normalized;
+  try {
+    normalized = normalizeAgentStateSnapshot(rawSnapshot, { expectedHouseId: house.id });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_AGENT_STATE') });
+  }
+
+  house.agentState = {
+    version: 1,
+    snapshot: normalized.snapshot,
+    sizeBytes: normalized.sizeBytes,
+    updatedAt: nowIso()
+  };
+  writeStore(store);
+
+  res.json({
+    ok: true,
+    updatedAt: house.agentState.updatedAt,
+    sizeBytes: normalized.sizeBytes
+  });
 });
 
 app.post('/api/house/:id/append', (req, res) => {

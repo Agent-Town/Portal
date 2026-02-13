@@ -31,6 +31,7 @@ function defaultLiteState() {
     llmProvider: null,
     llmModel: null,
     llmApiKeySet: false,
+    llmAuthMode: null,
     llmConfiguredAt: null
   };
 }

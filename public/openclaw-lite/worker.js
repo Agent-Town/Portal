@@ -47939,17 +47939,6 @@ function normalizeReasoningLevel(value) {
   if (v === "minimal" || v === "low" || v === "medium" || v === "high" || v === "xhigh") return v;
   return null;
 }
-function isCodexCliSentinelEligible(model) {
-  if (!state.codexCliEnabled) return false;
-  if (!model || model.provider !== "openai" || model.api !== "openai-completions") return false;
-  try {
-    const origin = safeOrigin();
-    const u = new URL(String(model.baseUrl || ""), origin || "http://localhost");
-    return !!origin && u.origin === origin && u.pathname.startsWith("/api/llm/openai/v1");
-  } catch {
-    return false;
-  }
-}
 function makeAssistant(text, { stopReason = "stop", errorMessage = null } = {}) {
   const model = getConfiguredModel();
   const msg = {
@@ -48371,13 +48360,13 @@ async function runAgentTurn(userText) {
     timestamp: nowMs()
   };
   const model = getConfiguredModel();
-  const apiKey = state.llmApiKey || (isCodexCliSentinelEligible(model) ? "codex-cli" : "");
+  const apiKey = state.llmApiKey || "";
   if (!apiKey) {
-    const m = makeAssistant("LLM not configured. Set your API key in the Gateway panel.", { stopReason: "error" });
+    const m = makeAssistant("LLM not configured. Set your API key or OAuth token in the Gateway panel.", { stopReason: "error" });
     state.transcript.push(prompt);
     state.transcript.push(m);
     post({ type: "worker.chat.append", role: "user", text: String(userText || "") });
-    post({ type: "worker.chat.append", role: "assistant", text: "LLM not configured. Set your API key in the Gateway panel." });
+    post({ type: "worker.chat.append", role: "assistant", text: "LLM not configured. Set your API key or OAuth token in the Gateway panel." });
     await persistTranscript();
     return;
   }
@@ -49314,7 +49303,6 @@ var state = {
   secretMarker: null,
   sessionId: null,
   transcript: [],
-  codexCliEnabled: false,
   llmApi: null,
   llmProvider: null,
   llmModelRef: null,
@@ -49466,11 +49454,6 @@ self.addEventListener("message", async (ev) => {
     if (msg.type === "gateway.command.freezeNow") {
       await writeCheckpoint("manual");
       log("freeze ok");
-      return;
-    }
-    if (msg.type === "gateway.command.setRuntimeCaps") {
-      state.codexCliEnabled = msg.codexCli === true;
-      log(`caps codexCli=${state.codexCliEnabled ? "1" : "0"}`);
       return;
     }
     if (msg.type === "gateway.command.setLlmConfig") {

@@ -57,6 +57,19 @@ function buildPonyInboxBundle(kroot) {
   };
 }
 
+function buildHouseKeyWrap(kroot, signatureBytes) {
+  const wrapKey = sha256(signatureBytes);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', wrapKey, iv);
+  const enc = Buffer.concat([cipher.update(kroot), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    alg: 'AES-GCM',
+    iv: iv.toString('base64'),
+    ct: Buffer.concat([enc, tag]).toString('base64')
+  };
+}
+
 async function createAgentSoloHouse(request, label) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
@@ -83,6 +96,9 @@ async function createAgentSoloHouse(request, label) {
   const houseId = base58Encode(sha256(kroot));
   const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
   const ponyInbox = buildPonyInboxBundle(kroot);
+  const unlockAddress = `So1anaMock${label}11111111111111111111111111111`;
+  const keyWrapSig = crypto.randomBytes(64);
+  const keyWrap = buildHouseKeyWrap(kroot, keyWrapSig);
 
   const init = await request.post('/api/agent/house/init', {
     data: {
@@ -91,7 +107,8 @@ async function createAgentSoloHouse(request, label) {
       housePubKey: houseId,
       nonce,
       keyMode: 'ceremony',
-      unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
+      unlock: { kind: 'solana-wallet-signature', address: unlockAddress },
+      keyWrap,
       houseAuthKey: kauth.toString('base64'),
       ponyInboxPub: ponyInbox.ponyInboxPub,
       ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
@@ -99,7 +116,7 @@ async function createAgentSoloHouse(request, label) {
   });
   expect(init.ok()).toBeTruthy();
 
-  return { houseId, kauth };
+  return { houseId, kauth, unlockAddress, keyWrapSig };
 }
 
 async function createShareForHouse(request, house) {
@@ -122,14 +139,33 @@ test('share page and leaderboard can add houses into Pony friends', async ({ pag
   const leaderboardTargetShare = await createShareForHouse(request, leaderboardTarget);
 
   await page.addInitScript(
-    ({ houseId, keyB64 }) => {
+    ({ houseId, keyB64, address, keyWrapSigB64 }) => {
+      const sigBytes = Uint8Array.from(atob(keyWrapSigB64), (c) => c.charCodeAt(0));
+      const publicKey = { toString: () => address };
+      window.solana = {
+        isConnected: false,
+        publicKey: null,
+        async connect() {
+          this.isConnected = true;
+          this.publicKey = publicKey;
+          return { publicKey };
+        },
+        async signMessage() {
+          return { signature: sigBytes };
+        }
+      };
       sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
       localStorage.setItem('agentTownWallet', JSON.stringify({
-        address: 'So1anaMockFriendSource111111111111111111111111111',
+        address,
         houseId
       }));
     },
-    { houseId: selfHouse.houseId, keyB64: selfHouse.kauth.toString('base64') }
+    {
+      houseId: selfHouse.houseId,
+      keyB64: selfHouse.kauth.toString('base64'),
+      address: selfHouse.unlockAddress,
+      keyWrapSigB64: selfHouse.keyWrapSig.toString('base64')
+    }
   );
 
   await page.goto(`/s/${encodeURIComponent(shareTargetShare.shareId)}`);
@@ -138,6 +174,10 @@ test('share page and leaderboard can add houses into Pony friends', async ({ pag
 
   await page.goto(`/inbox/${encodeURIComponent(selfHouse.houseId)}`);
   await expect(page.locator('#friends')).toContainText(shareTarget.houseId);
+
+  await page.evaluate((houseId) => {
+    sessionStorage.removeItem(`agentTownHouseAuth:${houseId}`);
+  }, selfHouse.houseId);
 
   await page.goto('/leaderboard');
   const targetCard = page.locator('.card').filter({ hasText: leaderboardTargetShare.shareId }).first();

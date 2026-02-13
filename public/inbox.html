@@ -63,6 +63,29 @@
     </div>
   </div>
 
+  <div id="agentSidebar" class="agent-sidebar minimized" data-testid="agent-panel">
+    <div class="sidebar-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <h3>Agent Comms</h3>
+        <div class="status-indicator" id="agentStatus">Idle</div>
+      </div>
+      <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">□</button>
+    </div>
+
+    <div class="sidebar-content">
+      <div id="chatTranscript" class="chat-box sidebar-chat"></div>
+
+      <div class="chat-input-area">
+        <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
+        <button id="sendChatBtn" class="btn primary small">Send</button>
+      </div>
+
+      <div class="divider"></div>
+      <div class="logs-header">System Logs</div>
+      <div id="agentLogs" class="logs-box sidebar-logs"></div>
+    </div>
+  </div>
+
   <script src="/app.js"></script>
   <script src="/inbox.js"></script>
 </body>

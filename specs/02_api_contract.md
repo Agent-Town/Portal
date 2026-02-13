@@ -903,6 +903,8 @@ For these endpoints:
 - `GET /api/house/:id/log`
 - `POST /api/house/:id/append`
 - `POST /api/house/:id/public-media`
+- `GET /api/house/:id/agent-state`
+- `POST /api/house/:id/agent-state`
 
 Send:
 - `x-house-ts`: unix ms timestamp as string
@@ -958,6 +960,54 @@ Constraints:
 - `image` must be PNG/JPG/WebP base64 data URL, max 1 MB.
 - `prompt` max 280 chars.
 - `image` and `prompt` must both be present (or both cleared).
+
+### GET `/api/house/:id/agent-state`
+Returns the latest persisted OpenClaw Lite agent snapshot for this house.
+
+Response:
+```json
+{
+  "ok": true,
+  "agentState": {
+    "v": 1,
+    "kind": "openclaw-lite-state",
+    "schema": "openclaw-lite-state@1",
+    "createdAt": "ISO8601",
+    "stores": {
+      "meta": [{ "key": "llmApiKey", "value": "..." }],
+      "vfs": [{ "path": "workspace/AGENTS.md", "updatedAtMs": 0, "dataB64": "..." }],
+      "checkpoints": [{ "checkpointId": "cp_..." }]
+    }
+  } | null,
+  "updatedAt": "ISO8601|null",
+  "sizeBytes": 12345
+}
+```
+
+### POST `/api/house/:id/agent-state`
+Stores or replaces the OpenClaw Lite snapshot for this house.
+
+Body:
+```json
+{
+  "snapshot": {
+    "v": 1,
+    "kind": "openclaw-lite-state",
+    "schema": "openclaw-lite-state@1",
+    "createdAt": "ISO8601",
+    "stores": {
+      "meta": [{ "key": "houseId", "value": "<base58>" }],
+      "vfs": [{ "path": "workspace/AGENTS.md", "updatedAtMs": 0, "dataB64": "..." }],
+      "checkpoints": [{ "checkpointId": "cp_..." }]
+    }
+  }
+}
+```
+
+Errors:
+- `INVALID_AGENT_STATE`
+- `AGENT_STATE_TOO_LARGE`
+- `AGENT_STATE_HOUSE_MISMATCH`
 
 ---
 

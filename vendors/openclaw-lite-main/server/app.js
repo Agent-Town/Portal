@@ -74,12 +74,12 @@ function createApp() {
     res.json({ ok: true, time: nowIso() });
   });
 
-  // Runtime feature flags/capabilities (minimal; used by the Gateway UI).
+  // Capability endpoint kept for backwards compatibility; CLI bridging is disabled.
   app.get("/api/runtime/capabilities", (_req, res) => {
     res.json({
       ok: true,
       llm: {
-        codexCli: process.env.OPENCLAW_LITE_CODEX_CLI === "1",
+        codexCli: false,
       },
     });
   });
