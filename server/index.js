@@ -880,6 +880,9 @@ app.use((req, res, next) => {
 
 app.use(setSecurityHeaders);
 
+app.use('/api/llm', requireProxySessionAccess);
+app.use('/api/tools', requireProxySessionAccess);
+
 // OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
 registerLlmRoutes(app);
 
@@ -984,6 +987,58 @@ function ensureHumanSession(req, res) {
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
+}
+
+function getExistingHumanSession(req) {
+  const cookies = parseCookies(req.header('cookie') || '');
+  const sid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
+  if (!sid) return null;
+  return getSessionById(sid) || null;
+}
+
+function hasSameOriginNavigationContext(req) {
+  const host = String(req.get('host') || '').trim().toLowerCase();
+  if (!host) return false;
+
+  const originHeader = String(req.get('origin') || '').trim();
+  const refererHeader = String(req.get('referer') || '').trim();
+  if (!originHeader && !refererHeader) {
+    return false;
+  }
+
+  if (originHeader) {
+    try {
+      const originHost = new URL(originHeader).host.toLowerCase();
+      if (originHost !== host) return false;
+    } catch {
+      return false;
+    }
+  }
+
+  if (refererHeader) {
+    try {
+      const refererHost = new URL(refererHeader).host.toLowerCase();
+      if (refererHost !== host) return false;
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function requireProxySessionAccess(req, res, next) {
+  const session = getExistingHumanSession(req);
+  if (!session) {
+    return res.status(401).json({ ok: false, error: 'SESSION_REQUIRED' });
+  }
+  if (!session?.hatch?.complete) {
+    return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
+  }
+  if (!hasSameOriginNavigationContext(req)) {
+    return res.status(403).json({ ok: false, error: 'FORBIDDEN_ORIGIN' });
+  }
+  return next();
 }
 
 function sanitizeUrl(url) {

@@ -111,6 +111,16 @@ function parseUrlOrigin(url) {
   return u.origin;
 }
 
+function isSameOriginHttpUrl(url) {
+  const localOrigin = safeOrigin();
+  if (!localOrigin) return false;
+  try {
+    return parseUrlOrigin(url) === localOrigin;
+  } catch {
+    return false;
+  }
+}
+
 function parseOriginMethods(methods) {
   if (!Array.isArray(methods) || methods.length === 0) return null;
   const out = methods
@@ -326,9 +336,10 @@ function contentTypeSummary(headers) {
 }
 
 async function webFetchSameOrigin(input) {
+  const sameOrigin = isSameOriginHttpUrl(input.url);
   const response = await fetch(input.url, {
     method: "GET",
-    credentials: "include",
+    credentials: sameOrigin ? "include" : "omit",
     redirect: input.followRedirects ? "follow" : "manual",
     cache: cacheModeToFetchCache(input.cacheMode),
   });
@@ -356,6 +367,18 @@ async function webFetchSameOrigin(input) {
     truncated,
     fromCache: false,
   });
+}
+
+function shouldProxyFallbackForFetchError(error) {
+  const msg = String(error?.message || error || "").toLowerCase();
+  if (!msg) return true;
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("load failed") ||
+    msg.includes("cors") ||
+    msg.includes("network request")
+  );
 }
 
 async function webFetchCrossOriginViaProxy(input) {
@@ -396,27 +419,35 @@ async function runWebFetch(params, toolName = "web_fetch") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", e?.message || "web_fetch failed"));
   }
 
-  const access = evaluateOriginAccess({
-    url: normalized.url,
-    capability: "web_fetch",
-    method: "GET",
-    consume: true,
-  });
-  if (!access.allowed) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("NETWORK_BLOCKED", "Origin not granted", { origin: access.origin }));
-  }
+  const sameOrigin = isSameOriginHttpUrl(normalized.url);
 
   try {
-    const envelope = access.sameOrigin
-      ? await webFetchSameOrigin(normalized)
-      : await webFetchCrossOriginViaProxy(normalized);
-    return withToolMeta(toolName, startedAtMs, envelope);
+    const directEnvelope = await webFetchSameOrigin(normalized);
+    return withToolMeta(toolName, startedAtMs, directEnvelope);
   } catch (e) {
-    const msg = String(e?.message || "web_fetch failed");
-    if (msg === "NETWORK_BLOCKED") {
-      return withToolMeta(toolName, startedAtMs, makeToolFailure("NETWORK_BLOCKED", "Network blocked"));
+    if (sameOrigin || !shouldProxyFallbackForFetchError(e)) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", String(e?.message || "web_fetch failed")));
     }
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", msg));
+
+    const rate = consumeHttpRateLimit(normalized.url);
+    if (!rate.ok) {
+      return withToolMeta(
+        toolName,
+        startedAtMs,
+        makeToolFailure("RATE_LIMIT", "Rate limit exceeded", { origin: rate.origin, retryAfterMs: rate.retryAfterMs }),
+      );
+    }
+
+    try {
+      const proxyEnvelope = await webFetchCrossOriginViaProxy(normalized);
+      return withToolMeta(toolName, startedAtMs, proxyEnvelope);
+    } catch (proxyErr) {
+      return withToolMeta(
+        toolName,
+        startedAtMs,
+        makeToolFailure("UNSUPPORTED", proxyErr?.message || "web_fetch failed"),
+      );
+    }
   }
 }
 
@@ -684,6 +715,7 @@ function decodeHttpResponse(bytes, responseMode, contentType) {
 
 async function runHttpRequestSameOrigin(input) {
   const startedAtMs = nowMs();
+  const sameOrigin = isSameOriginHttpUrl(input.url);
   const abort = new AbortController();
   const timeoutId = setTimeout(() => abort.abort(), input.timeoutMs);
   let response;
@@ -692,7 +724,7 @@ async function runHttpRequestSameOrigin(input) {
       method: input.method,
       headers: input.headers,
       body: input.fetchBody == null ? undefined : input.fetchBody,
-      credentials: "include",
+      credentials: sameOrigin ? "include" : "omit",
       redirect: input.followRedirects ? "follow" : "manual",
       signal: abort.signal,
     });
@@ -725,6 +757,24 @@ async function runHttpRequestSameOrigin(input) {
       durationMs: Math.max(0, nowMs() - startedAtMs),
     },
   });
+}
+
+function shouldProxyFallbackForHttpEnvelope(envelope) {
+  if (!envelope || envelope.ok !== false || !envelope.error || typeof envelope.error !== "object") {
+    return false;
+  }
+  const code = String(envelope.error.code || "").toUpperCase();
+  if (code === "TIMEOUT") return true;
+  if (code !== "UNSUPPORTED") return false;
+  const msg = String(envelope.error.message || "").toLowerCase();
+  if (!msg) return true;
+  return (
+    msg.includes("failed to fetch") ||
+    msg.includes("networkerror") ||
+    msg.includes("load failed") ||
+    msg.includes("cors") ||
+    msg.includes("network request")
+  );
 }
 
 async function runHttpRequestCrossOriginViaProxy(input) {
@@ -894,16 +944,6 @@ async function runWsOpen(params, toolName = "ws_open") {
     ? params.protocols.map((p) => String(p || "").trim()).filter(Boolean).slice(0, 5)
     : [];
   const connectTimeoutMs = normalizeWsConnectTimeoutMs(params?.connectTimeoutMs);
-
-  const access = evaluateOriginAccess({
-    url: url.replace(/^wss:/, "https:").replace(/^ws:/, "http:"),
-    capability: "ws_open",
-    method: "GET",
-    consume: true,
-  });
-  if (!access.allowed) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("NETWORK_BLOCKED", "Origin not granted", { origin: access.origin }));
-  }
 
   const result = await new Promise((resolve) => {
     let settled = false;
@@ -1111,15 +1151,7 @@ async function runHttpRequest(params, toolName = "http_request") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Invalid http_request arguments"));
   }
 
-  const access = evaluateOriginAccess({
-    url: input.url,
-    capability: "http_request",
-    method: input.method,
-    consume: true,
-  });
-  if (!access.allowed) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("NETWORK_BLOCKED", "Origin not granted", { origin: access.origin }));
-  }
+  const sameOrigin = isSameOriginHttpUrl(input.url);
 
   const authApplied = applyHttpAuthToHeaders(input.auth, input.headers);
   if (!authApplied.ok) {
@@ -1128,17 +1160,12 @@ async function runHttpRequest(params, toolName = "http_request") {
   input.headers = authApplied.headers;
   const secretValues = authApplied.secretValues || [];
 
-  if (input.method === "POST" || input.method === "PUT" || input.method === "PATCH" || input.method === "DELETE") {
-    const decision = await requestApproval({
-      title: "Approval",
-      body: `HTTP ${input.method}: ${input.url}`,
-    });
-    if (decision !== "approve") {
-      return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "HTTP mutation rejected"));
+  try {
+    const directEnvelope = await runHttpRequestSameOrigin(input);
+    if (sameOrigin || directEnvelope.ok === true || !shouldProxyFallbackForHttpEnvelope(directEnvelope)) {
+      return withToolMeta(toolName, startedAtMs, redactEnvelopeSecrets(directEnvelope, secretValues));
     }
-  }
 
-  if (!access.sameOrigin) {
     const rate = consumeHttpRateLimit(input.url);
     if (!rate.ok) {
       return withToolMeta(
@@ -1147,13 +1174,9 @@ async function runHttpRequest(params, toolName = "http_request") {
         makeToolFailure("RATE_LIMIT", "Rate limit exceeded", { origin: rate.origin, retryAfterMs: rate.retryAfterMs }),
       );
     }
-  }
 
-  try {
-    const envelope = access.sameOrigin
-      ? await runHttpRequestSameOrigin(input)
-      : await runHttpRequestCrossOriginViaProxy(input);
-    return withToolMeta(toolName, startedAtMs, redactEnvelopeSecrets(envelope, secretValues));
+    const proxyEnvelope = await runHttpRequestCrossOriginViaProxy(input);
+    return withToolMeta(toolName, startedAtMs, redactEnvelopeSecrets(proxyEnvelope, secretValues));
   } catch (e) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", e?.message || "http_request failed"));
   }
