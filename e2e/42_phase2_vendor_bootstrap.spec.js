@@ -7,7 +7,43 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('vendor runtime requires LLM config and becomes ready after user saves LLM settings', async ({ page }) => {
+async function readLocalMetaValue(page, key) {
+  return page.evaluate(async (lookupKey) => {
+    const openDb = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open('openclaw-lite', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('checkpoints')) {
+          const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+          s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+        }
+        if (!db.objectStoreNames.contains('vfs')) db.createObjectStore('vfs', { keyPath: 'path' });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+    });
+    const txDone = (tx) => new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+      tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+    });
+    const reqToPromise = (req) => new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
+    });
+
+    const db = await openDb();
+    const tx = db.transaction(['meta'], 'readonly');
+    const req = tx.objectStore('meta').get(String(lookupKey || ''));
+    const rec = await reqToPromise(req);
+    await txDone(tx);
+    db.close();
+    return rec ? rec.value : null;
+  }, key);
+}
+
+test('vendor runtime uses local-only LLM config while runtime stays server-bootstrapped', async ({ page }) => {
   await enterHatch(page, 'signin');
   await completeHatch(page);
 
@@ -18,7 +54,6 @@ test('vendor runtime requires LLM config and becomes ready after user saves LLM 
   expect(before.lite).toBeTruthy();
   expect(before.lite.driver).toBe('vendor');
   expect(before.lite.llmConfigured).toBe(false);
-  expect(before.lite.runtimeReady).toBe(false);
 
   await configureLiteLlm(page, {
     provider: 'test-local',
@@ -31,12 +66,14 @@ test('vendor runtime requires LLM config and becomes ready after user saves LLM 
   const state = await fetchSessionState(page);
   expect(state.lite).toBeTruthy();
   expect(state.lite.driver).toBe('vendor');
-  expect(state.lite.llmConfigured).toBe(true);
-  expect(state.lite.llmProvider).toBe('test-local');
-  expect(state.lite.llmModel).toBe('deterministic');
+  expect(state.lite.llmConfigured).toBe(false);
+  expect(state.lite.llmProvider ?? null).toBeNull();
+  expect(state.lite.llmModel ?? null).toBeNull();
   expect(state.lite.runtimeReady).toBe(true);
   expect(typeof state.lite.runtimeVersion).toBe('string');
   expect(state.lite.runtimeVersion.length).toBeGreaterThan(0);
   expect(state.lite.lastError ?? null).toBeNull();
+  await expect.poll(() => readLocalMetaValue(page, 'llmProvider')).toBe('test-local');
+  await expect.poll(() => readLocalMetaValue(page, 'llmModelId')).toBe('deterministic');
   expect(JSON.stringify(state)).not.toContain('phase2-test-key');
 });

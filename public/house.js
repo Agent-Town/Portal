@@ -78,6 +78,20 @@ function setAgentStateError(msg) {
   if (node) node.textContent = msg || '';
 }
 
+function setMindConfigStatus(msg) {
+  const node = el('llmLine');
+  if (!node) return;
+  node.textContent = msg || '';
+  node.style.color = 'var(--muted)';
+}
+
+function setMindConfigError(msg) {
+  const node = el('llmLine');
+  if (!node) return;
+  node.textContent = msg || '';
+  node.style.color = msg ? 'var(--bad)' : 'var(--muted)';
+}
+
 function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
   const preview = el('publicPreview');
   const img = el('publicPreviewImg');
@@ -117,10 +131,56 @@ const OPENCLAW_DB_NAME = 'openclaw-lite';
 const OPENCLAW_DB_VERSION = 1;
 const AGENT_STATE_KIND = 'openclaw-lite-state';
 const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_SEALED_KIND = 'openclaw-lite-state-sealed';
+const AGENT_STATE_SEALED_SCHEMA = 'openclaw-lite-state-sealed@1';
+const AGENT_STATE_ZIP_KIND = 'openclaw-lite-state-zip';
+const AGENT_STATE_ZIP_SCHEMA = 'openclaw-lite-state-zip@1';
 const AGENT_STATE_MAX_BYTES = 8 * 1024 * 1024;
 const AGENT_STATE_MAX_META_RECORDS = 2048;
 const AGENT_STATE_MAX_VFS_RECORDS = 20000;
 const AGENT_STATE_MAX_CHECKPOINT_RECORDS = 5000;
+const MIND_DEFAULT_PROVIDER = 'openai';
+const MIND_DEFAULT_MODEL = 'gpt-4o-mini';
+const MIND_AUTH_API_KEY = 'api-key';
+const MIND_AUTH_OAUTH = 'oauth-json';
+const MIND_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
+  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
+  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
+  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
+  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
+  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
+  litellm: Object.freeze(['claude-opus-4-6']),
+  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
+  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
+  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
+  'kimi-coding': Object.freeze(['k2p5']),
+  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
+  opencode: Object.freeze(['claude-opus-4-6']),
+  zai: Object.freeze(['glm-5']),
+  glm: Object.freeze(['glm-5']),
+  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
+  qianfan: Object.freeze(['model-id']),
+  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
+  qwen: Object.freeze(['coder-model', 'vision-model']),
+  together: Object.freeze(['moonshotai/Kimi-K2.5']),
+  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
+  xiaomi: Object.freeze(['mimo-v2-flash']),
+  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
+  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
+  vllm: Object.freeze(['your-model-id']),
+  nvidia: Object.freeze(['model-id']),
+  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
+  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
+  'test-local': Object.freeze(['deterministic'])
+});
+const MIND_PROVIDER_ALIASES = Object.freeze({
+  glm: 'zai',
+  qwen: 'qwen-portal'
+});
+const MIND_OAUTH_START_URL_BY_PROVIDER = Object.freeze({
+  openai: 'https://chatgpt.com/auth/login',
+  'openai-codex': 'https://chatgpt.com/auth/login'
+});
 
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
@@ -155,6 +215,14 @@ function unb64(str) {
   return out;
 }
 
+function unb64Safe(str) {
+  try {
+    return unb64(str);
+  } catch {
+    return null;
+  }
+}
+
 function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
@@ -178,7 +246,9 @@ function clearHouseAuthCache(houseId) {
 }
 
 let openClawDbPromise = null;
+let llmConfigLibraryPromise = null;
 let agentStateBusy = false;
+let liteGatewayPromise = null;
 
 function setAgentStateControlsEnabled(enabled) {
   const canUse = !!enabled && !agentStateBusy;
@@ -187,20 +257,142 @@ function setAgentStateControlsEnabled(enabled) {
   const downloadBtn = el('downloadAgentStateBtn');
   const uploadBtn = el('uploadAgentStateBtn');
   const uploadInput = el('uploadAgentStateInput');
+  const llmProvider = el('llmProviderSelect');
+  const llmModel = el('llmModelIdInput');
+  const llmAuthMode = el('llmAuthModeSelect');
+  const llmOauth = el('llmOauthProfileInput');
+  const llmCredential = el('llmKeyInput');
+  const llmBaseUrl = el('llmBaseUrlInput');
+  const llmThinking = el('llmThinkingInput');
+  const llmUseProxy = el('llmUseProxyInput');
+  const llmOauthLaunch = el('llmOauthLaunchBtn');
+  const llmSave = el('llmSaveBtn');
+  const llmClear = el('llmClearBtn');
   if (saveBtn) saveBtn.disabled = !canUse;
   if (restoreBtn) restoreBtn.disabled = !canUse;
   if (downloadBtn) downloadBtn.disabled = !canUse;
   if (uploadBtn) uploadBtn.disabled = !canUse;
   if (uploadInput) uploadInput.disabled = !canUse;
+  if (llmProvider) llmProvider.disabled = !canUse;
+  if (llmModel) llmModel.disabled = !canUse;
+  if (llmAuthMode) llmAuthMode.disabled = !canUse;
+  if (llmOauth) llmOauth.disabled = !canUse;
+  if (llmCredential) llmCredential.disabled = !canUse;
+  if (llmBaseUrl) llmBaseUrl.disabled = !canUse;
+  if (llmThinking) llmThinking.disabled = !canUse;
+  if (llmUseProxy) llmUseProxy.disabled = !canUse;
+  if (llmOauthLaunch) llmOauthLaunch.disabled = !canUse;
+  if (llmSave) llmSave.disabled = !canUse;
+  if (llmClear) llmClear.disabled = !canUse;
   if (!enabled && !agentStateBusy) {
     setAgentStateStatus('');
     setAgentStateError('');
+    setMindConfigStatus('');
+    setMindConfigError('');
   }
 }
 
 function setAgentStateBusy(busy) {
   agentStateBusy = !!busy;
   setAgentStateControlsEnabled(unlocked);
+}
+
+async function loadLiteLlmLibrary() {
+  if (!llmConfigLibraryPromise) {
+    llmConfigLibraryPromise = import('/openclaw-lite/llm-config-library.js');
+  }
+  return llmConfigLibraryPromise;
+}
+
+async function loadLiteGateway() {
+  if (!liteGatewayPromise) {
+    liteGatewayPromise = import('/openclaw-lite/gateway.js')
+      .then((mod) => mod?.default || mod)
+      .then(async (gatewayOrPromise) => {
+        if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+          return await gatewayOrPromise;
+        }
+        return gatewayOrPromise;
+      })
+      .catch(() => null);
+  }
+  return liteGatewayPromise;
+}
+
+function defaultProviderApi(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  return '';
+}
+
+function defaultProviderBaseUrl(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  return '';
+}
+
+function normalizeThinkingLevel(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return '';
+  if (v === 'minimal' || v === 'low' || v === 'medium' || v === 'high' || v === 'xhigh') return v;
+  return '';
+}
+
+function buildGatewayLlmPayload(config) {
+  const provider = String(config?.provider || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const model = String(config?.model || MIND_DEFAULT_MODEL).trim() || MIND_DEFAULT_MODEL;
+  const modelRef = String(config?.modelRef || `${provider}/${model}`).trim() || `${provider}/${model}`;
+  const credential = String(config?.credential || '').trim();
+  const overrideApi = String(el('llmApiInput')?.value || '').trim();
+  const overrideBaseUrl = String(el('llmBaseUrlInput')?.value || '').trim();
+  const useProxy = el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true;
+  return {
+    type: 'gateway.command.setLlmConfig',
+    apiKey: credential,
+    api: overrideApi || defaultProviderApi(provider),
+    provider,
+    modelRef,
+    modelId: model,
+    baseUrl: overrideBaseUrl || defaultProviderBaseUrl(provider),
+    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    useProxy
+  };
+}
+
+async function activateMindConfig(config) {
+  const provider = String(config?.provider || '').trim();
+  const model = String(config?.model || '').trim();
+  const modelRef = String(config?.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+  const credential = String(config?.credential || '').trim();
+  if (!provider || !model || !modelRef || !credential) return;
+
+  const gateway = await loadLiteGateway();
+  if (gateway && typeof gateway.send === 'function') {
+    gateway.send(buildGatewayLlmPayload({
+      provider,
+      model,
+      modelRef,
+      credential
+    }));
+  }
+}
+
+async function deactivateMindConfig() {
+  const gateway = await loadLiteGateway();
+  if (gateway && typeof gateway.send === 'function') {
+    gateway.send({
+      type: 'gateway.command.setLlmConfig',
+      apiKey: '',
+      api: '',
+      provider: '',
+      modelRef: '',
+      modelId: '',
+      baseUrl: '',
+      reasoning: '',
+      useProxy: true
+    });
+  }
 }
 
 function idbReqToPromise(req) {
@@ -248,6 +440,576 @@ async function idbGetAll(storeName) {
   const rows = await idbReqToPromise(req);
   await idbTxDone(tx);
   return Array.isArray(rows) ? rows : [];
+}
+
+async function idbPutMetaRecords(entries) {
+  const db = await openOpenClawDb();
+  const tx = db.transaction(['meta'], 'readwrite');
+  const store = tx.objectStore('meta');
+  for (const entry of entries || []) {
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    const key = typeof entry[0] === 'string' ? entry[0].trim() : '';
+    if (!key) continue;
+    store.put({ key, value: cloneJsonSafe(entry[1]) });
+  }
+  await idbTxDone(tx);
+}
+
+function parseModelRef(modelRef, fallbackProvider = MIND_DEFAULT_PROVIDER, fallbackModelId = MIND_DEFAULT_MODEL) {
+  const ref = String(modelRef || '').trim();
+  if (!ref) {
+    return {
+      provider: fallbackProvider,
+      modelId: fallbackModelId,
+      modelRef: `${fallbackProvider}/${fallbackModelId}`
+    };
+  }
+  const slash = ref.indexOf('/');
+  if (slash > 0) {
+    const provider = ref.slice(0, slash).trim();
+    const modelId = ref.slice(slash + 1).trim();
+    if (provider && modelId) {
+      return { provider, modelId, modelRef: `${provider}/${modelId}` };
+    }
+  }
+  return {
+    provider: fallbackProvider,
+    modelId: ref,
+    modelRef: `${fallbackProvider}/${ref}`
+  };
+}
+
+function normalizeMindAuthMode(mode) {
+  return String(mode || '').trim() === MIND_AUTH_OAUTH ? MIND_AUTH_OAUTH : MIND_AUTH_API_KEY;
+}
+
+function getSupportedMindModels(provider) {
+  const raw = String(provider || '').trim();
+  const key = MIND_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (MIND_PROVIDER_ALIASES[raw] || raw);
+  const options = MIND_MODEL_OPTIONS_BY_PROVIDER[key];
+  return Array.isArray(options) ? [...options] : [];
+}
+
+function replaceSelectOptions(select, values) {
+  if (!select || select.tagName !== 'SELECT') return;
+  select.innerHTML = '';
+  for (const value of values || []) {
+    const next = String(value || '').trim();
+    if (!next) continue;
+    const option = document.createElement('option');
+    option.value = next;
+    option.textContent = next;
+    select.appendChild(option);
+  }
+}
+
+function ensureSelectOption(select, value, label) {
+  if (!select || select.tagName !== 'SELECT') return;
+  const next = String(value || '').trim();
+  if (!next) return;
+  const exists = Array.from(select.options).some((opt) => String(opt.value || '').trim() === next);
+  if (exists) return;
+  const option = document.createElement('option');
+  option.value = next;
+  option.textContent = String(label || next);
+  option.dataset.injected = 'true';
+  select.appendChild(option);
+}
+
+function applyMindProviderSelection(preferredProvider) {
+  const providerSelect = el('llmProviderSelect');
+  const selected = String(preferredProvider || providerSelect?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  if (!providerSelect) return selected;
+  if (providerSelect.tagName === 'SELECT') {
+    const providers = Object.keys(MIND_MODEL_OPTIONS_BY_PROVIDER);
+    replaceSelectOptions(providerSelect, providers);
+    providerSelect.value = providers.includes(selected) ? selected : MIND_DEFAULT_PROVIDER;
+    return String(providerSelect.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  }
+  providerSelect.value = selected;
+  return selected;
+}
+
+function applyMindModelSelection(provider, preferredModel) {
+  const modelSelect = el('llmModelIdInput');
+  const fallbackModel = getDefaultLlmModelForProvider(provider);
+  const selected = String(preferredModel || modelSelect?.value || '').trim();
+  if (!modelSelect) return selected || fallbackModel;
+  if (modelSelect.tagName === 'SELECT') {
+    const models = getSupportedMindModels(provider);
+    const baseOptions = models.length ? models : [fallbackModel];
+    replaceSelectOptions(modelSelect, baseOptions);
+    const resolved = baseOptions.includes(selected) ? selected : (baseOptions[0] || fallbackModel);
+    modelSelect.value = resolved;
+    return String(modelSelect.value || fallbackModel).trim() || fallbackModel;
+  }
+  if (selected) {
+    modelSelect.value = selected;
+    return selected;
+  }
+  modelSelect.value = fallbackModel;
+  return fallbackModel;
+}
+
+function applyMindProviderModelSelection(provider, model) {
+  const selectedProvider = applyMindProviderSelection(provider);
+  const selectedModel = applyMindModelSelection(selectedProvider, model);
+  return { provider: selectedProvider, model: selectedModel };
+}
+
+function getMindOauthLaunchUrl(provider) {
+  const key = String(provider || '').trim().toLowerCase();
+  return MIND_OAUTH_START_URL_BY_PROVIDER[key] || '';
+}
+
+function updateMindOauthLaunchUi() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  if (!launchBtn) return;
+  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const mode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
+  const url = getMindOauthLaunchUrl(provider);
+  launchBtn.dataset.oauthUrl = url;
+  launchBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
+  launchBtn.disabled = !url;
+  launchBtn.title = url
+    ? 'Open OAuth sign-in in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+}
+
+function launchMindOauthInNewTab() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  if (!launchBtn) return;
+  const url = String(launchBtn.dataset.oauthUrl || '').trim();
+  if (!url) {
+    setMindConfigError('OAuth launch is available for OpenAI providers only.');
+    return;
+  }
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    setMindConfigError('Popup blocked. Allow popups and retry OAuth launch.');
+  }
+}
+
+function getDefaultLlmModelForProvider(provider) {
+  const supported = getSupportedMindModels(provider);
+  if (supported.length > 0) return supported[0];
+  return MIND_DEFAULT_MODEL;
+}
+
+function mapMindConfigError(error) {
+  const msg = String(error?.message || error || '');
+  if (msg === 'MISSING_LLM_PROVIDER') return 'Enter a provider.';
+  if (msg === 'MISSING_LLM_MODEL') return 'Enter a model.';
+  if (msg === 'MISSING_LLM_CREDENTIAL') return 'Enter an API key or OAuth token.';
+  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return 'Paste an OAuth profile JSON, callback URL, or token.';
+  if (msg === 'INVALID_OAUTH_PROFILE_JSON') return 'Invalid OAuth profile/token format.';
+  if (msg === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return 'No access token found in OAuth profile JSON.';
+  if (msg === 'IDB_OPEN_FAILED') return 'Local OpenClaw state is unavailable.';
+  return msg || 'Mind configuration failed.';
+}
+
+function setMindAuthModeUi(mode) {
+  const normalized = normalizeMindAuthMode(mode);
+  const authMode = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const oauthHint = el('llmOauthProfileHint');
+  const keyInput = el('llmKeyInput');
+  if (authMode) authMode.value = normalized;
+  if (oauthInput) oauthInput.style.display = normalized === MIND_AUTH_OAUTH ? 'block' : 'none';
+  if (keyInput) {
+    keyInput.placeholder = normalized === MIND_AUTH_OAUTH
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
+  }
+  if (oauthHint) {
+    oauthHint.textContent = normalized === MIND_AUTH_OAUTH
+      ? 'Use "Sign in with ChatGPT" (subscription) and paste callback URL, auth JSON, or token here.'
+      : '';
+  }
+  updateMindOauthLaunchUi();
+}
+
+function syncMindModelRefFromInputs() {
+  const providerInput = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const modelRefInput = el('llmModelRefInput');
+  if (!providerInput || !modelInput || !modelRefInput) return;
+  const providerRaw = String(providerInput.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const provider = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const model = String(modelInput.value || '').trim();
+  modelRefInput.value = model ? `${provider}/${model}` : '';
+}
+
+function getAccessTokenFromProfileValue(value) {
+  if (!value || typeof value !== 'object') return '';
+  const direct = typeof value.access === 'string'
+    ? value.access.trim()
+    : typeof value.access_token === 'string'
+      ? value.access_token.trim()
+      : typeof value.accessToken === 'string'
+        ? value.accessToken.trim()
+        : '';
+  return direct;
+}
+
+function getOAuthProviderAliases(providerHint) {
+  const normalized = String(providerHint || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const aliases = new Set([normalized]);
+  if (normalized === 'openai-codex') {
+    aliases.add('openai');
+    aliases.add('chatgpt');
+  }
+  if (normalized === 'openai') {
+    aliases.add('openai-codex');
+    aliases.add('chatgpt');
+  }
+  return [...aliases];
+}
+
+function providerAliasMatches(aliasSet, rawName) {
+  if (!aliasSet || !aliasSet.size) return true;
+  const normalized = String(rawName || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (aliasSet.has(normalized)) return true;
+  const prefix = normalized.match(/^[a-z0-9_-]+/);
+  if (prefix && aliasSet.has(prefix[0])) return true;
+  return false;
+}
+
+function decodeMaybeUriComponent(value) {
+  const text = String(value || '').trim();
+  if (!text || !text.includes('%')) return text;
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizeTokenCandidate(value) {
+  const text = String(value || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!text) return '';
+  return text.replace(/^bearer\s+/i, '').trim();
+}
+
+function isLikelyJwtToken(value) {
+  return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || ''));
+}
+
+function isLikelyOpaqueOAuthToken(value) {
+  return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function collectOAuthCandidatesFromUrl(rawUrl) {
+  let parsed = null;
+  try {
+    parsed = new URL(String(rawUrl || '').trim());
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  const seen = new Set();
+  const pushCandidate = (value) => {
+    const normalized = normalizeTokenCandidate(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+    const decoded = decodeMaybeUriComponent(normalized);
+    if (decoded && decoded !== normalized && !seen.has(decoded)) {
+      seen.add(decoded);
+      out.push(decoded);
+    }
+  };
+
+  const readParams = (params) => {
+    for (const [rawKey, rawValue] of params.entries()) {
+      const key = String(rawKey || '').trim().toLowerCase();
+      const value = String(rawValue || '').trim();
+      if (!key || !value) continue;
+      const include = key === 'access'
+        || key === 'access_token'
+        || key === 'token'
+        || key === 'oauth_token'
+        || key === 'id_token'
+        || key === 'auth'
+        || key === 'profile'
+        || key === 'credentials'
+        || key.includes('token');
+      if (!include) continue;
+      pushCandidate(value);
+    }
+  };
+
+  readParams(parsed.searchParams);
+
+  const hashRaw = String(parsed.hash || '').replace(/^#/, '').trim();
+  if (hashRaw) {
+    const hashQuery = hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw;
+    readParams(new URLSearchParams(hashQuery));
+  }
+
+  return out;
+}
+
+function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
+  if (!profileMap || typeof profileMap !== 'object') return '';
+  if (Array.isArray(profileMap)) {
+    for (const item of profileMap) {
+      const token = extractOAuthTokenFromProfileMap(item, providerHint);
+      if (token) return token;
+    }
+    return '';
+  }
+  const aliasSet = new Set(getOAuthProviderAliases(providerHint));
+  const direct = getAccessTokenFromProfileValue(profileMap);
+  if (direct) return direct;
+
+  for (const alias of aliasSet) {
+    if (!alias) continue;
+    if (profileMap[alias]) {
+      const directProfile = getAccessTokenFromProfileValue(profileMap[alias]);
+      if (directProfile) return directProfile;
+    }
+  }
+
+  for (const key of Object.keys(profileMap)) {
+    const profile = profileMap[key];
+    const profileToken = getAccessTokenFromProfileValue(profile);
+    const profileProvider = String(profile?.provider || profile?.type || key || '').trim().toLowerCase();
+    if (!profileToken) continue;
+    if (providerAliasMatches(aliasSet, profileProvider) || providerAliasMatches(aliasSet, key)) {
+      return profileToken;
+    }
+  }
+  return '';
+}
+
+function extractOAuthAccessTokenFromObject(parsed, providerHint) {
+  const candidates = [];
+  if (parsed && typeof parsed === 'object') {
+    candidates.push(parsed);
+    if (parsed.profiles && typeof parsed.profiles === 'object') candidates.push(parsed.profiles);
+    if (parsed.auth && parsed.auth.profiles && typeof parsed.auth.profiles === 'object') candidates.push(parsed.auth.profiles);
+    if (parsed.profile && typeof parsed.profile === 'object') candidates.push(parsed.profile);
+    if (parsed.providerProfiles && typeof parsed.providerProfiles === 'object') candidates.push(parsed.providerProfiles);
+  }
+  for (const candidate of candidates) {
+    const token = extractOAuthTokenFromProfileMap(candidate, providerHint);
+    if (token) return token;
+  }
+  const direct = getAccessTokenFromProfileValue(parsed);
+  if (direct) return direct;
+  return '';
+}
+
+function extractOAuthAccessToken(raw, providerHint) {
+  const text = String(raw || '').trim();
+  if (!text) return { ok: false, error: 'MISSING_OAUTH_PROFILE_JSON' };
+
+  const directToken = normalizeTokenCandidate(text);
+  if (isLikelyJwtToken(directToken) || isLikelyOpaqueOAuthToken(directToken)) {
+    return { ok: true, token: directToken };
+  }
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+      return token
+        ? { ok: true, token }
+        : { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+    } catch {
+      return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+    }
+  }
+
+  const decodedText = decodeMaybeUriComponent(text);
+  if (decodedText && decodedText !== text) {
+    const decodedDirectToken = normalizeTokenCandidate(decodedText);
+    if (isLikelyJwtToken(decodedDirectToken) || isLikelyOpaqueOAuthToken(decodedDirectToken)) {
+      return { ok: true, token: decodedDirectToken };
+    }
+    if (decodedText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(decodedText);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  const urlCandidates = collectOAuthCandidatesFromUrl(text);
+  for (const candidate of urlCandidates) {
+    if (isLikelyJwtToken(candidate) || isLikelyOpaqueOAuthToken(candidate)) {
+      return { ok: true, token: candidate };
+    }
+    if (candidate.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(text)) {
+    return { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+  }
+  return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+}
+
+function applyMindConfigToInputs(config) {
+  const providerInput = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const modelRefInput = el('llmModelRefInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const selected = applyMindProviderModelSelection(
+    config?.provider || MIND_DEFAULT_PROVIDER,
+    config?.model || MIND_DEFAULT_MODEL
+  );
+  if (providerInput) providerInput.value = selected.provider;
+  if (modelInput) modelInput.value = selected.model;
+  setMindAuthModeUi(config?.authMode || MIND_AUTH_API_KEY);
+  if (modelRefInput) {
+    const resolved = parseModelRef(
+      config?.modelRef || `${selected.provider}/${selected.model}`,
+      selected.provider,
+      selected.model
+    );
+    modelRefInput.value = resolved.modelRef;
+  }
+  if (keyInput) keyInput.value = config?.authMode === MIND_AUTH_OAUTH ? '' : (config?.credential || '');
+  if (oauthInput) oauthInput.value = config?.authMode === MIND_AUTH_OAUTH ? (config?.credential || '') : '';
+  syncMindModelRefFromInputs();
+}
+
+async function readLocalMindConfig() {
+  const lib = await loadLiteLlmLibrary();
+  const localCfg = await lib.loadLlmConfig();
+  const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
+  const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
+  const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
+  const credential = typeof localCfg?.apiKey === 'string' ? localCfg.apiKey : '';
+  const authMode = normalizeMindAuthMode(localCfg?.authMode);
+  const parsed = parseModelRef(
+    modelRefRaw || `${providerRaw || MIND_DEFAULT_PROVIDER}/${modelRaw || MIND_DEFAULT_MODEL}`,
+    providerRaw || MIND_DEFAULT_PROVIDER,
+    modelRaw || MIND_DEFAULT_MODEL
+  );
+  const provider = providerRaw || parsed.provider || MIND_DEFAULT_PROVIDER;
+  const model = modelRaw || parsed.modelId || MIND_DEFAULT_MODEL;
+  const modelRef = modelRefRaw || parsed.modelRef;
+  return {
+    configured: !!(provider && model && credential && localCfg?.configured),
+    provider,
+    model,
+    modelRef,
+    credential,
+    authMode
+  };
+}
+
+async function hydrateMindConfigFromLocal({ silent = false } = {}) {
+  const config = await readLocalMindConfig();
+  applyMindConfigToInputs(config);
+  if (config.configured) {
+    await activateMindConfig(config);
+  } else {
+    await deactivateMindConfig();
+  }
+  if (!silent) {
+    if (config.configured) {
+      setMindConfigStatus(`Mind loaded: ${config.provider}/${config.model}.`);
+    } else {
+      setMindConfigStatus('Mind not configured yet.');
+    }
+  }
+  setMindConfigError('');
+  return config;
+}
+
+function resolveMindConfigFromInputs() {
+  const providerRaw = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const providerInput = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const modelInput = String(el('llmModelIdInput')?.value || '').trim();
+  const authMode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
+  const keyInput = String(el('llmKeyInput')?.value || '').trim();
+  const oauthInput = String(el('llmOauthProfileInput')?.value || '').trim();
+  if (!providerInput) throw new Error('MISSING_LLM_PROVIDER');
+  if (!modelInput) throw new Error('MISSING_LLM_MODEL');
+  const parsed = parseModelRef(
+    `${providerInput}/${modelInput || getDefaultLlmModelForProvider(providerInput)}`,
+    providerInput,
+    modelInput || getDefaultLlmModelForProvider(providerInput)
+  );
+
+  let credential = keyInput;
+  let oauthError = '';
+  if (authMode === MIND_AUTH_OAUTH) {
+    const token = extractOAuthAccessToken(oauthInput, providerInput);
+    oauthError = oauthInput && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
+    const parsedCredential = token.ok ? String(token.token || '').trim() : '';
+    credential = keyInput || parsedCredential;
+  }
+  if (!credential) throw new Error(oauthError || 'MISSING_LLM_CREDENTIAL');
+
+  const modelRefInput = el('llmModelRefInput');
+  if (modelRefInput) modelRefInput.value = parsed.modelRef;
+
+  return {
+    provider: parsed.provider,
+    model: parsed.modelId,
+    modelRef: parsed.modelRef,
+    credential,
+    authMode
+  };
+}
+
+async function saveMindConfigToLocal({ silent = false } = {}) {
+  const config = resolveMindConfigFromInputs();
+  const lib = await loadLiteLlmLibrary();
+  await lib.saveLlmConfig({
+    provider: config.provider,
+    model: config.model,
+    apiKey: config.credential,
+    authMode: config.authMode
+  });
+  if (house?.houseId) {
+    await idbPutMetaRecords([['houseId', house.houseId]]);
+  }
+  await activateMindConfig(config);
+  if (!silent) setMindConfigStatus(`Mind saved: ${config.provider}/${config.model}.`);
+  setMindConfigError('');
+  return config;
+}
+
+async function persistMindConfigDraftIfPresent() {
+  const credential = String(el('llmKeyInput')?.value || '').trim();
+  const oauth = String(el('llmOauthProfileInput')?.value || '').trim();
+  if (!credential && !oauth) return false;
+  await saveMindConfigToLocal({ silent: true });
+  return true;
+}
+
+async function clearMindConfigFromLocal() {
+  const lib = await loadLiteLlmLibrary();
+  await lib.clearLlmConfig();
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
+  await deactivateMindConfig();
+  setMindConfigStatus('Mind config cleared.');
+  setMindConfigError('');
 }
 
 function isRecordObject(value) {
@@ -337,8 +1099,403 @@ function normalizeAgentStateSnapshot(raw) {
   };
 }
 
+function normalizeSealedAgentStateSnapshot(raw) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const ciphertext = raw.ciphertext;
+  if (!isRecordObject(ciphertext)) throw new Error('INVALID_AGENT_STATE');
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : 'AES-GCM';
+  const houseId = typeof raw.houseId === 'string' ? raw.houseId.trim() : '';
+  if (!iv || !ct || alg !== 'AES-GCM') throw new Error('INVALID_AGENT_STATE');
+  if (!unb64Safe(iv) || !unb64Safe(ct)) throw new Error('INVALID_AGENT_STATE');
+  return {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : new Date().toISOString(),
+    houseId: houseId || null,
+    ciphertext: { alg: 'AES-GCM', iv, ct }
+  };
+}
+
+function isSealedAgentStateSnapshot(snapshot) {
+  return !!(snapshot && snapshot.kind === AGENT_STATE_SEALED_KIND && isRecordObject(snapshot.ciphertext));
+}
+
+async function deriveAgentStateSealKey(Kroot) {
+  const info = new TextEncoder().encode('elizatown-agent-state-seal-v1');
+  const salt = new Uint8Array([]);
+  const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function sealAgentStateSnapshot(snapshot, expectedHouseId) {
+  if (!KrootBytes) throw new Error('HOUSE_KEY_NOT_READY');
+  const normalized = normalizeAgentStateSnapshot(snapshot);
+  assertSnapshotMatchesHouse(normalized, expectedHouseId);
+  const key = await deriveAgentStateSealKey(KrootBytes);
+  const aad = new TextEncoder().encode(`house=${expectedHouseId || ''}`);
+  const pt = new TextEncoder().encode(JSON.stringify(normalized));
+  const enc = await aesGcmEncrypt(key, pt, aad);
+  return {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: new Date().toISOString(),
+    houseId: expectedHouseId || null,
+    ciphertext: {
+      alg: 'AES-GCM',
+      iv: b64(enc.iv),
+      ct: b64(enc.ct)
+    }
+  };
+}
+
+async function resolveSnapshotForLocalImport(rawSnapshot, expectedHouseId) {
+  if (!isRecordObject(rawSnapshot)) throw new Error('INVALID_AGENT_STATE');
+  if (isSealedAgentStateSnapshot(rawSnapshot)) {
+    if (!KrootBytes) throw new Error('HOUSE_KEY_NOT_READY');
+    const sealed = normalizeSealedAgentStateSnapshot(rawSnapshot);
+    if (expectedHouseId && sealed.houseId && sealed.houseId !== expectedHouseId) {
+      throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+    }
+    const key = await deriveAgentStateSealKey(KrootBytes);
+    const aadHouseId = sealed.houseId || expectedHouseId || '';
+    const aad = new TextEncoder().encode(`house=${aadHouseId}`);
+    const iv = unb64Safe(sealed.ciphertext.iv);
+    const ct = unb64Safe(sealed.ciphertext.ct);
+    if (!iv || !ct) throw new Error('INVALID_AGENT_STATE');
+    let pt;
+    try {
+      pt = await aesGcmDecrypt(key, iv, ct, aad);
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(pt));
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const normalized = normalizeAgentStateSnapshot(parsed);
+    assertSnapshotMatchesHouse(normalized, expectedHouseId);
+    return normalized;
+  }
+  const normalized = normalizeAgentStateSnapshot(rawSnapshot);
+  assertSnapshotMatchesHouse(normalized, expectedHouseId);
+  return normalized;
+}
+
 function snapshotByteLength(snapshot) {
   return new TextEncoder().encode(JSON.stringify(snapshot)).length;
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function concatBytes(chunks) {
+  let length = 0;
+  for (const chunk of chunks) length += chunk.length;
+  const out = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+function sanitizeZipRelativePath(pathValue) {
+  const normalized = String(pathValue || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!normalized || normalized.includes('\0')) return null;
+  const parts = normalized.split('/').filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.some((part) => part === '.' || part === '..')) return null;
+  return parts.join('/');
+}
+
+function makeZip(entries) {
+  const encoder = new TextEncoder();
+  const localChunks = [];
+  const centralChunks = [];
+  let offset = 0;
+
+  for (const entry of entries) {
+    const name = sanitizeZipRelativePath(entry?.name);
+    if (!name) continue;
+    const nameBytes = encoder.encode(name);
+    const data = entry.data instanceof Uint8Array ? entry.data : new Uint8Array([]);
+    const crc = crc32(data);
+    const size = data.length >>> 0;
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const localView = new DataView(localHeader.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 1 << 11, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint16(10, 0, true);
+    localView.setUint16(12, 0, true);
+    localView.setUint32(14, crc >>> 0, true);
+    localView.setUint32(18, size, true);
+    localView.setUint32(22, size, true);
+    localView.setUint16(26, nameBytes.length, true);
+    localView.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localChunks.push(localHeader, data);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(centralHeader.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 1 << 11, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint16(12, 0, true);
+    centralView.setUint16(14, 0, true);
+    centralView.setUint32(16, crc >>> 0, true);
+    centralView.setUint32(20, size, true);
+    centralView.setUint32(24, size, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint16(30, 0, true);
+    centralView.setUint16(32, 0, true);
+    centralView.setUint16(34, 0, true);
+    centralView.setUint16(36, 0, true);
+    centralView.setUint32(38, 0, true);
+    centralView.setUint32(42, offset >>> 0, true);
+    centralHeader.set(nameBytes, 46);
+    centralChunks.push(centralHeader);
+
+    offset += localHeader.length + data.length;
+  }
+
+  const centralDir = concatBytes(centralChunks);
+  const end = new Uint8Array(22);
+  const endView = new DataView(end.buffer);
+  const entryCount = Math.min(0xffff, centralChunks.length);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(4, 0, true);
+  endView.setUint16(6, 0, true);
+  endView.setUint16(8, entryCount, true);
+  endView.setUint16(10, entryCount, true);
+  endView.setUint32(12, centralDir.length >>> 0, true);
+  endView.setUint32(16, offset >>> 0, true);
+  endView.setUint16(20, 0, true);
+
+  return concatBytes([...localChunks, centralDir, end]);
+}
+
+async function parseStoredZip(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array([]);
+  if (data.length < 22) throw new Error('INVALID_AGENT_STATE');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  let eocdOffset = -1;
+  const minOffset = Math.max(0, data.length - (22 + 0xffff));
+  for (let i = data.length - 22; i >= minOffset; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error('INVALID_AGENT_STATE');
+
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  const centralOffset = view.getUint32(eocdOffset + 16, true);
+  const decoder = new TextDecoder();
+  const out = new Map();
+  let cursor = centralOffset;
+
+  for (let i = 0; i < entryCount; i++) {
+    if (cursor + 46 > data.length || view.getUint32(cursor, true) !== 0x02014b50) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const compression = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const nameLen = view.getUint16(cursor + 28, true);
+    const extraLen = view.getUint16(cursor + 30, true);
+    const commentLen = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const nameStart = cursor + 46;
+    const nameEnd = nameStart + nameLen;
+    if (nameEnd > data.length) throw new Error('INVALID_AGENT_STATE');
+    const name = decoder.decode(data.subarray(nameStart, nameEnd));
+
+    if (compression !== 0) throw new Error('UNSUPPORTED_ZIP_COMPRESSION');
+    if (localOffset + 30 > data.length || view.getUint32(localOffset, true) !== 0x04034b50) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const localNameLen = view.getUint16(localOffset + 26, true);
+    const localExtraLen = view.getUint16(localOffset + 28, true);
+    const fileStart = localOffset + 30 + localNameLen + localExtraLen;
+    const fileEnd = fileStart + compressedSize;
+    if (fileEnd > data.length) throw new Error('INVALID_AGENT_STATE');
+    const fileBytes = data.subarray(fileStart, fileEnd);
+    if (fileBytes.length !== uncompressedSize) throw new Error('INVALID_AGENT_STATE');
+    out.set(name, new Uint8Array(fileBytes));
+
+    cursor += 46 + nameLen + extraLen + commentLen;
+  }
+
+  return out;
+}
+
+function textBytes(text) {
+  return new TextEncoder().encode(String(text || ''));
+}
+
+function bytesToText(bytes) {
+  return new TextDecoder().decode(bytes || new Uint8Array([]));
+}
+
+function parseJsonBytes(bytes) {
+  try {
+    return JSON.parse(bytesToText(bytes));
+  } catch {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+}
+
+function isZipFile(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  return name.endsWith('.zip') || type === 'application/zip' || type === 'application/x-zip-compressed';
+}
+
+async function readFileAsBytes(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result || new ArrayBuffer(0)));
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function buildZipBackupFromSnapshot(snapshot, expectedHouseId) {
+  const normalized = normalizeAgentStateSnapshot(snapshot);
+  assertSnapshotMatchesHouse(normalized, expectedHouseId);
+  const vfsIndex = [];
+  const entries = [];
+  const seenFileNames = new Set();
+
+  entries.push({
+    name: 'agent-state-manifest.json',
+    data: textBytes(JSON.stringify({
+      v: 1,
+      kind: AGENT_STATE_ZIP_KIND,
+      schema: AGENT_STATE_ZIP_SCHEMA,
+      createdAt: new Date().toISOString(),
+      houseId: expectedHouseId || null
+    }, null, 2))
+  });
+  entries.push({
+    name: 'meta.json',
+    data: textBytes(JSON.stringify(normalized.stores.meta || [], null, 2))
+  });
+  entries.push({
+    name: 'checkpoints.json',
+    data: textBytes(JSON.stringify(normalized.stores.checkpoints || [], null, 2))
+  });
+
+  for (const row of normalized.stores.vfs || []) {
+    const safePath = sanitizeZipRelativePath(row.path);
+    if (!safePath) continue;
+    const fileName = `vfs/${safePath}`;
+    if (seenFileNames.has(fileName)) continue;
+    seenFileNames.add(fileName);
+    const bytes = unb64Safe(row.dataB64);
+    if (!bytes) continue;
+    vfsIndex.push({
+      path: safePath,
+      updatedAtMs: Number.isFinite(Number(row.updatedAtMs)) ? Math.max(0, Math.floor(Number(row.updatedAtMs))) : Date.now()
+    });
+    entries.push({ name: fileName, data: bytes });
+  }
+
+  entries.push({
+    name: 'vfs-index.json',
+    data: textBytes(JSON.stringify(vfsIndex, null, 2))
+  });
+
+  return makeZip(entries);
+}
+
+async function parseZipBackupToSnapshot(bytes, expectedHouseId = null) {
+  const files = await parseStoredZip(bytes);
+  const manifestBytes = files.get('agent-state-manifest.json');
+  const metaBytes = files.get('meta.json');
+  const checkpointsBytes = files.get('checkpoints.json');
+  const vfsIndexBytes = files.get('vfs-index.json');
+  if (!manifestBytes || !metaBytes || !checkpointsBytes || !vfsIndexBytes) throw new Error('INVALID_AGENT_STATE');
+
+  const manifest = parseJsonBytes(manifestBytes);
+  if (!isRecordObject(manifest)) throw new Error('INVALID_AGENT_STATE');
+  const manifestKind = typeof manifest.kind === 'string' ? manifest.kind.trim() : '';
+  const manifestSchema = typeof manifest.schema === 'string' ? manifest.schema.trim() : '';
+  if (manifestKind !== AGENT_STATE_ZIP_KIND || manifestSchema !== AGENT_STATE_ZIP_SCHEMA) {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+  const manifestHouseId = typeof manifest.houseId === 'string' ? manifest.houseId.trim() : '';
+  if (expectedHouseId && manifestHouseId && manifestHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+
+  const meta = parseJsonBytes(metaBytes);
+  const checkpoints = parseJsonBytes(checkpointsBytes);
+  const vfsIndex = parseJsonBytes(vfsIndexBytes);
+  if (!Array.isArray(vfsIndex)) throw new Error('INVALID_AGENT_STATE');
+
+  const vfs = [];
+  for (const row of vfsIndex) {
+    if (!isRecordObject(row)) continue;
+    const safePath = sanitizeZipRelativePath(row.path);
+    if (!safePath) continue;
+    const fileBytes = files.get(`vfs/${safePath}`);
+    if (!fileBytes) throw new Error('INVALID_AGENT_STATE');
+    const updatedAtMs = Number(row.updatedAtMs);
+    vfs.push({
+      path: safePath,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64: b64(fileBytes)
+    });
+  }
+
+  return normalizeAgentStateSnapshot({
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: new Date().toISOString(),
+    stores: {
+      meta: Array.isArray(meta) ? meta : [],
+      vfs,
+      checkpoints: Array.isArray(checkpoints) ? checkpoints : []
+    }
+  });
 }
 
 function extractSnapshotHouseId(snapshot) {
@@ -412,8 +1569,9 @@ function formatBytes(value) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function triggerJsonDownload({ filename, data }) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+function triggerBytesDownload({ filename, bytes, type = 'application/octet-stream' }) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array([]);
+  const blob = new Blob([payload], { type });
   const url = URL.createObjectURL(blob);
   try {
     const a = document.createElement('a');
@@ -431,9 +1589,11 @@ function mapAgentStateError(error) {
   const msg = String(error?.message || error || '');
   if (!msg) return 'Agent state operation failed.';
   if (msg === 'LOCKED') return 'Unlock the house first.';
+  if (msg === 'HOUSE_KEY_NOT_READY') return 'House key is not ready. Unlock again.';
   if (msg === 'INVALID_AGENT_STATE') return 'Invalid agent backup format.';
   if (msg === 'AGENT_STATE_TOO_LARGE') return 'Agent backup is too large.';
   if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return 'Backup belongs to a different house.';
+  if (msg === 'UNSUPPORTED_ZIP_COMPRESSION') return 'Unsupported zip compression. Use a backup exported from this page.';
   if (msg === 'NOT_FOUND') return 'House not found.';
   if (msg === 'FILE_READ_FAILED') return 'Failed to read backup file.';
   return msg;
@@ -1403,6 +2563,12 @@ function wipeKeys() {
   publicMedia = null;
   pendingPublicImage = null;
   el('entries').textContent = '';
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
   clearDescriptorUI();
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
@@ -1464,6 +2630,11 @@ async function unlockExistingHouse(houseId) {
   } catch (err) {
     setAgentStateError(mapAgentStateError(err));
   }
+  try {
+    await hydrateMindConfigFromLocal({ silent: true });
+  } catch (err) {
+    setMindConfigError(mapMindConfigError(err));
+  }
 }
 
 async function restoreAgentStateFromHouse({ silent = false } = {}) {
@@ -1473,8 +2644,9 @@ async function restoreAgentStateFromHouse({ silent = false } = {}) {
     if (!silent) setAgentStateStatus('No saved agent state found in this house.');
     return { restored: false, sizeBytes: 0 };
   }
-  assertSnapshotMatchesHouse(snapshot, house.houseId);
-  const imported = await replaceLocalAgentStateSnapshot(snapshot);
+  const plainSnapshot = await resolveSnapshotForLocalImport(snapshot, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(plainSnapshot);
+  await hydrateMindConfigFromLocal({ silent });
   const label = updatedAt ? `from ${new Date(updatedAt).toLocaleString()}` : 'from house';
   setAgentStateStatus(`Agent state restored ${label} (${formatBytes(sizeBytes || imported.sizeBytes)}).`);
   setAgentStateError('');
@@ -1483,24 +2655,29 @@ async function restoreAgentStateFromHouse({ silent = false } = {}) {
 
 async function saveAgentStateToHouse() {
   if (!unlocked || !house) throw new Error('LOCKED');
+  await persistMindConfigDraftIfPresent();
   const exported = await exportLocalAgentStateSnapshot();
   assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
-  const response = await putHouseAgentStateSnapshot(house.houseId, exported.snapshot);
+  const sealed = await sealAgentStateSnapshot(exported.snapshot, house.houseId);
+  const response = await putHouseAgentStateSnapshot(house.houseId, sealed);
   const when = response?.updatedAt ? new Date(response.updatedAt).toLocaleString() : 'now';
-  setAgentStateStatus(`Saved agent state to house (${formatBytes(exported.sizeBytes)} at ${when}).`);
+  setAgentStateStatus(`Saved encrypted agent state to house (${formatBytes(exported.sizeBytes)} at ${when}).`);
   setAgentStateError('');
   return exported;
 }
 
 async function downloadAgentStateBackup() {
   if (!unlocked || !house) throw new Error('LOCKED');
+  await persistMindConfigDraftIfPresent();
   const exported = await exportLocalAgentStateSnapshot();
   assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
+  const zipBytes = await buildZipBackupFromSnapshot(exported.snapshot, house.houseId);
+  if (zipBytes.length > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
   const iso = new Date().toISOString().replace(/[:]/g, '-');
   const shortHouseId = house.houseId.slice(0, 12);
-  const filename = `agent-town-state-${shortHouseId}-${iso}.json`;
-  triggerJsonDownload({ filename, data: exported.snapshot });
-  setAgentStateStatus(`Downloaded local backup (${formatBytes(exported.sizeBytes)}).`);
+  const filename = `agent-town-state-${shortHouseId}-${iso}.zip`;
+  triggerBytesDownload({ filename, bytes: zipBytes, type: 'application/zip' });
+  setAgentStateStatus(`Downloaded local backup ZIP (${formatBytes(zipBytes.length)}).`);
   setAgentStateError('');
 }
 
@@ -1508,16 +2685,25 @@ async function uploadAgentStateBackup(file) {
   if (!unlocked || !house) throw new Error('LOCKED');
   if (!file) throw new Error('INVALID_AGENT_STATE');
   if (file.size > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
-  const raw = await readTextFile(file);
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('INVALID_AGENT_STATE');
+  let sourceSnapshot;
+  if (isZipFile(file)) {
+    const bytes = await readFileAsBytes(file);
+    sourceSnapshot = await parseZipBackupToSnapshot(bytes, house.houseId);
+  } else {
+    const raw = await readTextFile(file);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    sourceSnapshot = parsed;
   }
-  assertSnapshotMatchesHouse(parsed, house.houseId);
-  const imported = await replaceLocalAgentStateSnapshot(parsed);
-  await putHouseAgentStateSnapshot(house.houseId, imported.snapshot);
+  const plainSnapshot = await resolveSnapshotForLocalImport(sourceSnapshot, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(plainSnapshot);
+  await hydrateMindConfigFromLocal({ silent: true });
+  const sealed = await sealAgentStateSnapshot(imported.snapshot, house.houseId);
+  await putHouseAgentStateSnapshot(house.houseId, sealed);
   setAgentStateStatus(`Uploaded and replaced agent state (${formatBytes(imported.sizeBytes)}).`);
   setAgentStateError('');
   return imported;
@@ -2361,6 +3547,79 @@ async function init() {
     });
   }
 
+  const llmProviderInput = el('llmProviderSelect');
+  const llmModelInput = el('llmModelIdInput');
+  const llmAuthModeInput = el('llmAuthModeSelect');
+  const llmOauthInput = el('llmOauthProfileInput');
+  const llmOauthLaunchBtn = el('llmOauthLaunchBtn');
+  if (llmProviderInput && llmModelInput) {
+    const selected = applyMindProviderModelSelection(
+      llmProviderInput.value || MIND_DEFAULT_PROVIDER,
+      llmModelInput.value || MIND_DEFAULT_MODEL
+    );
+    llmProviderInput.value = selected.provider;
+    llmModelInput.value = selected.model;
+  }
+  if (llmProviderInput) {
+    llmProviderInput.addEventListener('change', () => {
+      const provider = applyMindProviderSelection(llmProviderInput.value || MIND_DEFAULT_PROVIDER);
+      if (llmModelInput) applyMindModelSelection(provider, llmModelInput.value || '');
+      syncMindModelRefFromInputs();
+      setMindAuthModeUi(llmAuthModeInput?.value);
+    });
+  }
+  if (llmModelInput) {
+    if (llmModelInput.tagName === 'SELECT') {
+      llmModelInput.addEventListener('change', () => syncMindModelRefFromInputs());
+    } else {
+      llmModelInput.addEventListener('input', () => syncMindModelRefFromInputs());
+    }
+  }
+  if (llmAuthModeInput) {
+    llmAuthModeInput.addEventListener('change', () => {
+      setMindAuthModeUi(llmAuthModeInput.value);
+      syncMindModelRefFromInputs();
+    });
+  }
+  if (llmOauthInput) {
+    llmOauthInput.addEventListener('input', () => syncMindModelRefFromInputs());
+  }
+  if (llmOauthLaunchBtn) {
+    llmOauthLaunchBtn.addEventListener('click', () => launchMindOauthInNewTab());
+  }
+  setMindAuthModeUi(llmAuthModeInput?.value);
+  syncMindModelRefFromInputs();
+
+  const saveMindConfigBtn = el('llmSaveBtn');
+  if (saveMindConfigBtn) {
+    saveMindConfigBtn.addEventListener('click', async () => {
+      setMindConfigError('');
+      setAgentStateBusy(true);
+      try {
+        await saveMindConfigToLocal();
+      } catch (err) {
+        setMindConfigError(mapMindConfigError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const clearMindConfigBtn = el('llmClearBtn');
+  if (clearMindConfigBtn) {
+    clearMindConfigBtn.addEventListener('click', async () => {
+      setMindConfigError('');
+      setAgentStateBusy(true);
+      try {
+        await clearMindConfigFromLocal();
+      } catch (err) {
+        setMindConfigError(mapMindConfigError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
   el('copyDescriptorBtn').addEventListener('click', async () => {
     setError('');
     try {
@@ -2485,6 +3744,12 @@ async function init() {
 
   initSharePanel();
   updateWalletUI();
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
   setHousePanelButtonsEnabled(false);
   syncInboxNavLink();
   setStatus('Ready. Connect wallet, then create or unlock a house.');

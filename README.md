@@ -25,6 +25,12 @@ npm run dev
 
 Open http://localhost:4173
 
+## Docs
+- Docs home: `docs/README.md`
+- Getting started: `docs/getting-started.md`
+- Which provider should I pick?: `docs/which-provider.md`
+- Provider reference: `docs/providers/README.md`
+
 ## Tests
 ```bash
 npm test

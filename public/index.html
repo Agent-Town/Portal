@@ -75,19 +75,42 @@
                   <div class="brain-config">
                       <div class="kv dense">
                       <label class="small-label">Provider</label>
-                      <input class="input" id="llmProviderSelect" type="text" list="llmProviderOptions" value="openai" placeholder="openai" data-testid="lite-llm-provider" />
-                      <datalist id="llmProviderOptions">
-                        <option value="openai"></option>
-                        <option value="openai-codex"></option>
-                        <option value="anthropic"></option>
-                        <option value="google"></option>
-                        <option value="groq"></option>
-                        <option value="openrouter"></option>
-                        <option value="custom"></option>
-                      </datalist>
+                      <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
+                        <option value="openai">openai</option>
+                        <option value="ollama">ollama</option>
+                        <option value="openai-codex">openai-codex</option>
+                        <option value="anthropic">anthropic</option>
+                        <option value="openrouter">openrouter</option>
+                        <option value="litellm">litellm</option>
+                        <option value="amazon-bedrock">amazon-bedrock</option>
+                        <option value="vercel-ai-gateway">vercel-ai-gateway</option>
+                        <option value="moonshot">moonshot</option>
+                        <option value="kimi-coding">kimi-coding</option>
+                        <option value="minimax">minimax</option>
+                        <option value="opencode">opencode</option>
+                        <option value="zai">zai</option>
+                        <option value="glm">glm</option>
+                        <option value="synthetic">synthetic</option>
+                        <option value="qianfan">qianfan</option>
+                        <option value="qwen-portal">qwen-portal</option>
+                        <option value="qwen">qwen</option>
+                        <option value="together">together</option>
+                        <option value="cloudflare-ai-gateway">cloudflare-ai-gateway</option>
+                        <option value="xiaomi">xiaomi</option>
+                        <option value="venice">venice</option>
+                        <option value="huggingface">huggingface</option>
+                        <option value="vllm">vllm</option>
+                        <option value="nvidia">nvidia</option>
+                        <option value="google">google</option>
+                        <option value="groq">groq</option>
+                        <option value="test-local">test-local</option>
+                      </select>
 
                       <label class="small-label">Model ID</label>
-                      <input class="input" id="llmModelIdInput" type="text" placeholder="gpt-4o" data-testid="lite-llm-model" />
+                      <select class="input" id="llmModelIdInput" data-testid="lite-llm-model">
+                        <option value="gpt-4o">gpt-4o</option>
+                        <option value="gpt-4o-mini">gpt-4o-mini</option>
+                      </select>
 
                       <label class="small-label">Auth mode</label>
                       <select class="input" id="llmAuthModeSelect">
@@ -98,6 +121,7 @@
                       <label class="small-label">OAuth callback URL / profile JSON / token</label>
                       <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste callback URL from Sign in with ChatGPT, auth.json profile JSON, or raw access token." style="display: none;"></textarea>
                       <div class="small" id="llmOauthProfileHint"></div>
+                      <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
 
                       <label class="small-label">API Key</label>
                       <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />

@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('external agent API flow remains compatible when runtime fallback is requested', async ({ page, request }) => {
+test('external agent API flow remains compatible (runtime fallback params are ignored)', async ({ page, request }) => {
   await page.goto('/?liteDriver=phase1');
 
   const initial = await fetchSessionState(page);
@@ -28,22 +28,37 @@ test('external agent API flow remains compatible when runtime fallback is reques
   });
   expect(connectResp.ok()).toBeTruthy();
 
-  await page.getByTestId('sigil-key').click();
+  await page.evaluate(async () => {
+    await fetch('/api/human/select', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ elementId: 'key' })
+    });
+  });
   const selectResp = await request.post('/api/agent/select', {
     data: { teamCode, elementId: 'key' }
   });
   expect(selectResp.ok()).toBeTruthy();
-  await expect(page.getByTestId('match-status')).toContainText('UNLOCKED');
+  await expect.poll(async () => {
+    const state = await fetchSessionState(page);
+    return state.match?.matched;
+  }).toBe(true);
 
-  await page.getByTestId('open-btn').click();
+  await page.evaluate(async () => {
+    await fetch('/api/human/open/press', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+  });
   const openResp = await request.post('/api/agent/open/press', { data: { teamCode } });
   expect(openResp.ok()).toBeTruthy();
-  await page.waitForURL('**/create');
 
   const state = await fetchSessionState(page);
   expect(state.signup?.complete).toBe(true);
   expect(state.agent?.source).toBe('external');
   expect(state.lite).toBeTruthy();
-  expect(state.lite.driver).toBe('phase1');
+  expect(state.lite.driver).toBe('vendor');
 });
-

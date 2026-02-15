@@ -39,6 +39,18 @@ let llmRestoreAttempted = false;
 let llmLibraryPromise = null;
 let runtimeBridgeInitKey = '';
 const runtimeBridge = window.OpenClawLiteRuntimeBridge || null;
+let liteGatewayPromise = null;
+const DEFAULT_LOCAL_LITE_LLM = Object.freeze({
+  loaded: false,
+  configured: false,
+  provider: null,
+  model: null,
+  modelRef: null,
+  authMode: 'api-key',
+  credential: '',
+  apiKeySet: false
+});
+let localLiteLlm = { ...DEFAULT_LOCAL_LITE_LLM };
 
 function b64(bytes) {
   let bin = '';
@@ -147,20 +159,214 @@ function setLiteLlmStatus(text) {
   node.textContent = text || '';
 }
 
+function setLocalLiteLlm(config) {
+  const provider = typeof config?.provider === 'string' ? config.provider.trim() : '';
+  const model = typeof config?.model === 'string' ? config.model.trim() : '';
+  const modelRef = typeof config?.modelRef === 'string' ? config.modelRef.trim() : '';
+  const authMode = String(config?.authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const credential = typeof config?.credential === 'string' ? config.credential : '';
+  const configured = !!(config?.configured && provider && model && credential);
+
+  localLiteLlm = {
+    loaded: config?.loaded === false ? false : true,
+    configured,
+    provider: provider || null,
+    model: model || null,
+    modelRef: modelRef || (provider && model ? `${provider}/${model}` : null),
+    authMode,
+    credential,
+    apiKeySet: !!(credential || config?.apiKeySet)
+  };
+  return localLiteLlm;
+}
+
+function getLocalLiteLlm() {
+  return localLiteLlm;
+}
+
+function isLocalLiteLlmConfigured() {
+  return !!getLocalLiteLlm().configured;
+}
+
 function liteState(state) {
   if (!state || typeof state !== 'object' || !state.lite || typeof state.lite !== 'object') return {};
   return state.lite;
 }
 
+const LLM_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
+  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
+  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
+  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
+  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
+  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
+  litellm: Object.freeze(['claude-opus-4-6']),
+  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
+  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
+  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
+  'kimi-coding': Object.freeze(['k2p5']),
+  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
+  opencode: Object.freeze(['claude-opus-4-6']),
+  zai: Object.freeze(['glm-5']),
+  glm: Object.freeze(['glm-5']),
+  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
+  qianfan: Object.freeze(['model-id']),
+  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
+  qwen: Object.freeze(['coder-model', 'vision-model']),
+  together: Object.freeze(['moonshotai/Kimi-K2.5']),
+  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
+  xiaomi: Object.freeze(['mimo-v2-flash']),
+  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
+  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
+  vllm: Object.freeze(['your-model-id']),
+  nvidia: Object.freeze(['model-id']),
+  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
+  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
+  'test-local': Object.freeze(['deterministic'])
+});
+
+const LLM_PROVIDER_ALIASES = Object.freeze({
+  glm: 'zai',
+  qwen: 'qwen-portal'
+});
+
+const OAUTH_START_URL_BY_PROVIDER = Object.freeze({
+  openai: 'https://chatgpt.com/auth/login',
+  'openai-codex': 'https://chatgpt.com/auth/login'
+});
+
+function getSupportedLlmModels(provider) {
+  const raw = String(provider || '').trim();
+  const key = LLM_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (LLM_PROVIDER_ALIASES[raw] || raw);
+  const options = LLM_MODEL_OPTIONS_BY_PROVIDER[key];
+  return Array.isArray(options) ? [...options] : [];
+}
+
+function replaceSelectOptions(select, values) {
+  if (!select || select.tagName !== 'SELECT') return;
+  select.innerHTML = '';
+  for (const value of values || []) {
+    const next = String(value || '').trim();
+    if (!next) continue;
+    const option = document.createElement('option');
+    option.value = next;
+    option.textContent = next;
+    select.appendChild(option);
+  }
+}
+
+function ensureSelectOption(select, value, label) {
+  if (!select || select.tagName !== 'SELECT') return;
+  const next = String(value || '').trim();
+  if (!next) return;
+  const exists = Array.from(select.options).some((opt) => String(opt.value || '').trim() === next);
+  if (exists) return;
+  const option = document.createElement('option');
+  option.value = next;
+  option.textContent = String(label || next);
+  option.dataset.injected = 'true';
+  select.appendChild(option);
+}
+
+function applyLlmProviderSelection(preferredProvider) {
+  const providerSelect = el('llmProviderSelect');
+  const fallbackProvider = 'openai';
+  const selected = String(preferredProvider || providerSelect?.value || fallbackProvider).trim() || fallbackProvider;
+  if (!providerSelect) return selected;
+  if (providerSelect.tagName === 'SELECT') {
+    const providers = Object.keys(LLM_MODEL_OPTIONS_BY_PROVIDER);
+    replaceSelectOptions(providerSelect, providers);
+    providerSelect.value = providers.includes(selected) ? selected : fallbackProvider;
+    return String(providerSelect.value || fallbackProvider).trim() || fallbackProvider;
+  }
+  providerSelect.value = selected;
+  return selected;
+}
+
+function applyLlmModelSelection(provider, preferredModel) {
+  const modelSelect = el('llmModelIdInput');
+  const fallbackModel = getDefaultLlmModelForProvider(provider);
+  const selected = String(preferredModel || modelSelect?.value || '').trim();
+  if (!modelSelect) return selected || fallbackModel;
+  if (modelSelect.tagName === 'SELECT') {
+    const models = getSupportedLlmModels(provider);
+    const baseOptions = models.length ? models : [fallbackModel];
+    replaceSelectOptions(modelSelect, baseOptions);
+    const resolved = baseOptions.includes(selected) ? selected : (baseOptions[0] || fallbackModel);
+    modelSelect.value = resolved;
+    return String(modelSelect.value || fallbackModel).trim() || fallbackModel;
+  }
+  if (selected) {
+    modelSelect.value = selected;
+    return selected;
+  }
+  modelSelect.value = fallbackModel;
+  return fallbackModel;
+}
+
+function applyLlmProviderModelSelection(provider, model) {
+  const selectedProvider = applyLlmProviderSelection(provider);
+  const selectedModel = applyLlmModelSelection(selectedProvider, model);
+  return { provider: selectedProvider, model: selectedModel };
+}
+
+function getLlmOauthLaunchUrl(provider) {
+  const key = String(provider || '').trim().toLowerCase();
+  return OAUTH_START_URL_BY_PROVIDER[key] || '';
+}
+
+function updateLlmOauthLaunchUi() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  if (!launchBtn) return;
+  const provider = String(el('llmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const mode = readLlmAuthMode();
+  const url = getLlmOauthLaunchUrl(provider);
+  launchBtn.dataset.oauthUrl = url;
+  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  launchBtn.disabled = !url;
+  launchBtn.title = url
+    ? 'Open OAuth sign-in in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+}
+
+function launchLlmOauthInNewTab() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  if (!launchBtn) return;
+  const url = String(launchBtn.dataset.oauthUrl || '').trim();
+  const status = el('llmLine');
+  if (!url) {
+    if (status) status.textContent = 'OAuth launch is available for OpenAI providers only.';
+    return;
+  }
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!popup && status) {
+    status.textContent = 'Popup blocked. Allow popups and retry OAuth launch.';
+  }
+}
+
 function getDefaultLlmModelForProvider(provider) {
-  const normalized = String(provider || 'openai').trim().toLowerCase();
-  if (normalized === 'openai') return 'gpt-4o';
-  if (normalized === 'openai-codex') return 'gpt-5.3-codex';
-  if (normalized === 'anthropic') return 'claude-3-5-sonnet-20240620';
-  if (normalized === 'google') return 'gemini-1.5-flash';
-  if (normalized === 'groq') return 'llama3-8b-8192';
-  if (normalized === 'openrouter') return 'anthropic/claude-3.5-sonnet';
+  const supported = getSupportedLlmModels(provider);
+  if (supported.length > 0) return supported[0];
   return 'gpt-4o-mini';
+}
+
+function defaultProviderApi(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  return '';
+}
+
+function defaultProviderBaseUrl(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  return '';
+}
+
+function normalizeThinkingLevel(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return '';
+  if (v === 'minimal' || v === 'low' || v === 'medium' || v === 'high' || v === 'xhigh') return v;
+  return '';
 }
 
 function readLlmAuthMode() {
@@ -178,28 +384,22 @@ function setLlmAuthModeUI(mode) {
 
   if (authModeSelect) authModeSelect.value = authMode;
   if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
-  if (oauthInput && authMode !== 'oauth-json') {
-    oauthInput.value = '';
-  }
   if (keyInput) {
     keyInput.placeholder = authMode === 'oauth-json'
-      ? 'OAuth access token (from profile JSON)'
-      : 'OpenAI API key / Bearer token';
-    if (authMode === 'api-key') {
-      keyInput.disabled = false;
-    } else {
-      keyInput.disabled = false;
-    }
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
   }
   if (oauthHint) {
     oauthHint.textContent = authMode === 'oauth-json'
-      ? 'Paste OpenClaw OAuth profile JSON (for example "profiles[\"openai-codex:default\"].access").'
+      ? 'Use "Sign in with ChatGPT" (subscription) and paste callback URL, auth JSON, or token here.'
       : '';
   }
+  updateLlmOauthLaunchUi();
 }
 
 function resolveLlmModelRefFromInputs(provider, model) {
-  const normalizedProvider = String(provider || 'openai').trim();
+  const providerInput = String(provider || 'openai').trim();
+  const normalizedProvider = LLM_PROVIDER_ALIASES[providerInput] || providerInput || 'openai';
   const modelTrim = String(model || '').trim();
 
   if (normalizedProvider === 'custom') {
@@ -271,6 +471,82 @@ function providerAliasMatches(aliasSet, rawName) {
   return false;
 }
 
+function decodeMaybeUriComponent(value) {
+  const text = String(value || '').trim();
+  if (!text || !text.includes('%')) return text;
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizeTokenCandidate(value) {
+  const text = String(value || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!text) return '';
+  return text.replace(/^bearer\s+/i, '').trim();
+}
+
+function isLikelyJwtToken(value) {
+  return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || ''));
+}
+
+function isLikelyOpaqueOAuthToken(value) {
+  return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function collectOAuthCandidatesFromUrl(rawUrl) {
+  let parsed = null;
+  try {
+    parsed = new URL(String(rawUrl || '').trim());
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  const seen = new Set();
+  const pushCandidate = (value) => {
+    const normalized = normalizeTokenCandidate(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+    const decoded = decodeMaybeUriComponent(normalized);
+    if (decoded && decoded !== normalized && !seen.has(decoded)) {
+      seen.add(decoded);
+      out.push(decoded);
+    }
+  };
+
+  const readParams = (params) => {
+    for (const [rawKey, rawValue] of params.entries()) {
+      const key = String(rawKey || '').trim().toLowerCase();
+      const value = String(rawValue || '').trim();
+      if (!key || !value) continue;
+      const include = key === 'access'
+        || key === 'access_token'
+        || key === 'token'
+        || key === 'oauth_token'
+        || key === 'id_token'
+        || key === 'auth'
+        || key === 'profile'
+        || key === 'credentials'
+        || key.includes('token');
+      if (!include) continue;
+      pushCandidate(value);
+    }
+  };
+
+  readParams(parsed.searchParams);
+
+  const hashRaw = String(parsed.hash || '').replace(/^#/, '').trim();
+  if (hashRaw) {
+    const hashQuery = hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw;
+    readParams(new URLSearchParams(hashQuery));
+  }
+
+  return out;
+}
+
 function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
   if (!profileMap || typeof profileMap !== 'object') return '';
   if (Array.isArray(profileMap)) {
@@ -304,24 +580,7 @@ function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
   return '';
 }
 
-function extractOAuthAccessToken(raw, providerHint) {
-  const text = String(raw || '').trim();
-  if (!text) {
-    return { ok: false, error: 'MISSING_OAUTH_PROFILE_JSON' };
-  }
-  if (!text.startsWith('{')) {
-    return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(text)
-      ? { ok: true, token: text }
-      : { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
-  }
-
-  let parsed = null;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
-  }
-
+function extractOAuthAccessTokenFromObject(parsed, providerHint) {
   const candidates = [];
   if (parsed && typeof parsed === 'object') {
     candidates.push(parsed);
@@ -330,15 +589,75 @@ function extractOAuthAccessToken(raw, providerHint) {
     if (parsed.profile && typeof parsed.profile === 'object') candidates.push(parsed.profile);
     if (parsed.providerProfiles && typeof parsed.providerProfiles === 'object') candidates.push(parsed.providerProfiles);
   }
-
   for (const candidate of candidates) {
     const token = extractOAuthTokenFromProfileMap(candidate, providerHint);
-    if (token) return { ok: true, token };
+    if (token) return token;
+  }
+  const direct = getAccessTokenFromProfileValue(parsed);
+  if (direct) return direct;
+  return '';
+}
+
+function extractOAuthAccessToken(raw, providerHint) {
+  const text = String(raw || '').trim();
+  if (!text) {
+    return { ok: false, error: 'MISSING_OAUTH_PROFILE_JSON' };
   }
 
-  const direct = getAccessTokenFromProfileValue(parsed);
-  if (direct) return { ok: true, token: direct };
-  return { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+  const directToken = normalizeTokenCandidate(text);
+  if (isLikelyJwtToken(directToken) || isLikelyOpaqueOAuthToken(directToken)) {
+    return { ok: true, token: directToken };
+  }
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+      return token
+        ? { ok: true, token }
+        : { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+    } catch {
+      return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+    }
+  }
+
+  const decodedText = decodeMaybeUriComponent(text);
+  if (decodedText && decodedText !== text) {
+    const decodedDirectToken = normalizeTokenCandidate(decodedText);
+    if (isLikelyJwtToken(decodedDirectToken) || isLikelyOpaqueOAuthToken(decodedDirectToken)) {
+      return { ok: true, token: decodedDirectToken };
+    }
+    if (decodedText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(decodedText);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  const urlCandidates = collectOAuthCandidatesFromUrl(text);
+  for (const candidate of urlCandidates) {
+    if (isLikelyJwtToken(candidate) || isLikelyOpaqueOAuthToken(candidate)) {
+      return { ok: true, token: candidate };
+    }
+    if (candidate.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(text)) {
+    return { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+  }
+  return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
 }
 
 function resolveLlmConfigFromUi() {
@@ -352,24 +671,22 @@ function resolveLlmConfigFromUi() {
   const modelText = String(modelInput?.value || '').trim();
   const mode = readLlmAuthMode();
 
-  const parsedModel = provider === 'custom'
-    ? parseModelRefFromText(modelText || `${provider}/gpt-4o-mini`, 'openai', 'gpt-4o-mini')
-    : resolveLlmModelRefFromInputs(provider, modelText);
-  const rawCredential = String(keyInput?.value || '').trim();
-  let credential = rawCredential;
+  const parsedModel = resolveLlmModelRefFromInputs(provider, modelText);
+  const manualCredential = String(keyInput?.value || '').trim();
+  let credential = manualCredential;
+  let oauthError = '';
 
   if (mode === 'oauth-json') {
     const oauthText = String(oauthInput?.value || '').trim();
     const token = extractOAuthAccessToken(oauthText, provider);
-    if (!token.ok) {
-      throw new Error(token.error || 'INVALID_OAUTH_PROFILE_JSON');
-    }
-    credential = token.token;
+    oauthError = oauthText && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
+    const parsedCredential = token.ok ? String(token.token || '').trim() : '';
+    credential = manualCredential || parsedCredential;
   }
 
   if (!credential) {
     const msg = mode === 'oauth-json'
-      ? 'No access token found in OAuth profile JSON.'
+      ? (oauthError || 'No access token found in OAuth profile JSON.')
       : `Missing ${provider === 'openai-codex' ? 'API key or OAuth token' : 'API key'} for ${parsedModel.provider}/${parsedModel.modelId}.`;
     throw new Error(msg);
   }
@@ -388,7 +705,10 @@ function isVendorLite(state) {
 }
 
 function isLiteConnected(state) {
-  return !!(state?.agent?.connected && state?.agent?.source === 'openclaw-lite');
+  const connected = !!(state?.agent?.connected && state?.agent?.source === 'openclaw-lite');
+  if (!connected) return false;
+  if (isVendorLite(state) && !isLocalLiteLlmConfigured()) return false;
+  return true;
 }
 
 function isAnyAgentConnected(state) {
@@ -423,6 +743,66 @@ async function loadLiteLlmLibrary() {
   return llmLibraryPromise;
 }
 
+async function loadLiteGateway() {
+  if (!liteGatewayPromise) {
+    liteGatewayPromise = import('/openclaw-lite/gateway.js')
+      .then((mod) => mod?.default || mod)
+      .then(async (gatewayOrPromise) => {
+        if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+          return await gatewayOrPromise;
+        }
+        return gatewayOrPromise;
+      })
+      .catch((err) => {
+        console.warn('failed to load lite gateway', err);
+        return null;
+      });
+  }
+  return liteGatewayPromise;
+}
+
+function buildGatewayLlmPayload(config) {
+  const provider = String(config?.provider || '').trim();
+  const model = String(config?.model || '').trim();
+  const modelRef = String(config?.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+  const credential = String(config?.credential || '').trim();
+
+  if (!provider || !model || !modelRef || !credential) {
+    return {
+      type: 'gateway.command.setLlmConfig',
+      apiKey: '',
+      api: '',
+      provider: '',
+      modelRef: '',
+      modelId: '',
+      baseUrl: '',
+      reasoning: '',
+      useProxy: true
+    };
+  }
+
+  const apiOverride = String(el('llmApiInput')?.value || '').trim();
+  const baseUrlOverride = String(el('llmBaseUrlInput')?.value || '').trim();
+  const useProxy = el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true;
+  return {
+    type: 'gateway.command.setLlmConfig',
+    apiKey: credential,
+    api: apiOverride || defaultProviderApi(provider),
+    provider,
+    modelRef,
+    modelId: model,
+    baseUrl: baseUrlOverride || defaultProviderBaseUrl(provider),
+    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    useProxy
+  };
+}
+
+async function applyGatewayLlmConfig(config) {
+  const gatewayApi = await loadLiteGateway();
+  if (!gatewayApi || typeof gatewayApi.send !== 'function') return;
+  gatewayApi.send(buildGatewayLlmPayload(config));
+}
+
 function updateLiteAgentStatus(state) {
   const dot = el('liteAgentDot');
   const text = el('liteAgentStatus');
@@ -447,8 +827,7 @@ function applyVisibility(state) {
   const sidebar = el('agentSidebar');
   const hatchComplete = !!state?.hatch?.complete;
   const visible = loadHatchVisible();
-  const lite = liteState(state);
-  const vendorNeedsSetup = isVendorLite(state) && hatchComplete && (!lite.llmConfigured || !isLiteConnected(state));
+  const vendorNeedsSetup = isVendorLite(state) && hatchComplete && (!isLocalLiteLlmConfigured() || !isLiteConnected(state));
   // If hatch is complete, we show townPanel instead of hatchPanel
   // Unless browser is active?
 
@@ -626,6 +1005,11 @@ async function completeHatch() {
 
 async function connectLiteAgent() {
   if (pendingLiteConnect) return;
+  if (isVendorLite(lastState) && !isLocalLiteLlmConfigured()) {
+    statusOverride = 'Configure your local brain settings before connecting OpenClaw Lite.';
+    setHatchStatus(statusOverride);
+    return;
+  }
   pendingLiteConnect = true;
   setHatchStatus('Connecting OpenClaw Lite…');
   try {
@@ -697,35 +1081,31 @@ function initAdvancedLlmUi() {
   const refInput = el('llmModelRefInput');
   const authModeSel = el('llmAuthModeSelect');
   const oauthInput = el('llmOauthProfileInput');
+  const oauthLaunchBtn = el('llmOauthLaunchBtn');
 
   if (!providerSel || !modelInput || !refInput) return;
   if (providerSel.dataset.listening) return;
   providerSel.dataset.listening = 'true';
+  const initialized = applyLlmProviderModelSelection(providerSel.value || 'openai', modelInput.value || '');
+  providerSel.value = initialized.provider;
+  modelInput.value = initialized.model;
 
   const updateRef = () => {
-    const p = providerSel.value;
-    const m = modelInput.value.trim();
-    if (p === 'custom') {
-      refInput.value = m;
-    } else {
-      refInput.value = m ? `${p}/${m}` : '';
-    }
+    syncModelRefFromInputs();
   };
 
   providerSel.addEventListener('change', () => {
-    const p = providerSel.value;
-    if (p === 'openai') modelInput.placeholder = 'gpt-4o';
-    else if (p === 'openai-codex') modelInput.placeholder = 'gpt-5.3-codex';
-    else if (p === 'anthropic') modelInput.placeholder = 'claude-3-5-sonnet-20240620';
-    else if (p === 'google') modelInput.placeholder = 'gemini-1.5-flash';
-    else if (p === 'groq') modelInput.placeholder = 'llama3-8b-8192';
-    else if (p === 'openrouter') modelInput.placeholder = 'anthropic/claude-3.5-sonnet';
-    else modelInput.placeholder = 'provider/model';
-
+    const selectedProvider = applyLlmProviderSelection(providerSel.value || 'openai');
+    applyLlmModelSelection(selectedProvider, modelInput.value || '');
     updateRef();
+    setLlmAuthModeUI(readLlmAuthMode());
   });
 
-  modelInput.addEventListener('input', updateRef);
+  if (modelInput.tagName === 'SELECT') {
+    modelInput.addEventListener('change', updateRef);
+  } else {
+    modelInput.addEventListener('input', updateRef);
+  }
   if (authModeSel && !authModeSel.dataset.listening) {
     authModeSel.dataset.listening = 'true';
     authModeSel.addEventListener('change', () => {
@@ -737,7 +1117,12 @@ function initAdvancedLlmUi() {
     oauthInput.dataset.listening = 'true';
     oauthInput.addEventListener('input', () => syncModelRefFromInputs());
   }
+  if (oauthLaunchBtn && !oauthLaunchBtn.dataset.listening) {
+    oauthLaunchBtn.dataset.listening = 'true';
+    oauthLaunchBtn.addEventListener('click', () => launchLlmOauthInNewTab());
+  }
   setLlmAuthModeUI(readLlmAuthMode());
+  syncModelRefFromInputs();
 }
 
 function syncModelRefFromInputs() {
@@ -747,102 +1132,92 @@ function syncModelRefFromInputs() {
   if (!providerSel || !modelInput || !refInput) return;
   const p = String(providerSel.value || 'openai').trim();
   const m = String(modelInput.value || '').trim();
-  if (p === 'custom') {
-    refInput.value = m;
-    return;
-  }
   const resolved = resolveLlmModelRefFromInputs(p, m);
   refInput.value = m ? resolved.modelRef : '';
 }
 
-function hydrateLlmInputsFromState(state) {
-  const lite = liteState(state);
+async function readLocalLiteLlmConfig() {
+  const lib = await loadLiteLlmLibrary();
+  const localCfg = await lib.loadLlmConfig();
+  const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
+  const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
+  const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
+  const defaultProvider = providerRaw || 'openai';
+  const defaultModel = modelRaw || getDefaultLlmModelForProvider(defaultProvider);
+  const parsed = parseModelRefFromText(
+    modelRefRaw || `${defaultProvider}/${defaultModel}`,
+    defaultProvider,
+    defaultModel
+  );
+  const provider = providerRaw || parsed.provider || defaultProvider;
+  const model = modelRaw || parsed.modelId || defaultModel;
+  const modelRef = modelRefRaw || parsed.modelRef || `${provider}/${model}`;
+  const credential = typeof localCfg?.apiKey === 'string' ? localCfg.apiKey : '';
+  const authMode = String(localCfg?.authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  return {
+    loaded: true,
+    configured: !!(localCfg?.configured && provider && model && credential),
+    provider,
+    model,
+    modelRef,
+    credential,
+    authMode,
+    apiKeySet: !!credential
+  };
+}
 
-  // Hydrate advanced UI
+function applyLocalLiteLlmToInputs(config) {
   const providerSel = el('llmProviderSelect');
   const modelInput = el('llmModelIdInput');
-  const refInput = el('llmModelRefInput');
+  const keyInput = el('llmKeyInput');
   const authModeSel = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const mode = config?.authMode === 'oauth-json' ? 'oauth-json' : 'api-key';
 
   if (providerSel && modelInput) {
-    const providerFromState = String(lite.llmProvider || 'openai').trim() || 'openai';
-    const modelFromState = String(lite.llmModel || '').trim();
-
-    if (providerSel.tagName === 'SELECT') {
-      const options = Array.from(providerSel.options).map((o) => String(o.value || '').trim());
-      if (options.includes(providerFromState)) {
-        providerSel.value = providerFromState;
-      } else {
-        providerSel.value = 'custom';
-      }
-    } else {
-      providerSel.value = providerFromState;
-    }
-    modelInput.value = modelFromState;
-    if (refInput) refInput.value = modelFromState ? `${providerSel.value}/${modelFromState}` : '';
-    if (authModeSel) setLlmAuthModeUI(lite.llmAuthMode || 'api-key');
+    const selected = applyLlmProviderModelSelection(config?.provider || 'openai', config?.model || '');
+    providerSel.value = selected.provider;
+    modelInput.value = selected.model;
   }
+  if (keyInput) keyInput.value = mode === 'api-key' ? config?.credential || '' : '';
+  if (authModeSel) setLlmAuthModeUI(mode);
+  if (oauthInput) {
+    if (mode === 'oauth-json') {
+      oauthInput.value = config?.credential || '';
+      oauthInput.placeholder = 'OAuth profile JSON/token used to derive this session credential.';
+    } else {
+      oauthInput.value = '';
+      oauthInput.placeholder = 'Paste OpenAI/OAuth profile JSON (or raw token) for OAuth mode.';
+    }
+  }
+  syncModelRefFromInputs();
 }
 
 async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
   if (!isVendorLite(state)) return;
   if (!state?.hatch?.complete) return;
-  if (liteState(state).llmConfigured) return;
   if (llmRestoreAttempted) return;
 
   llmRestoreAttempted = true;
   try {
-    const lib = await loadLiteLlmLibrary();
-    const localCfg = await lib.loadLlmConfig();
-    if (!localCfg?.configured || !localCfg?.apiKeySet) return;
+    const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
+    applyLocalLiteLlmToInputs(localCfg);
 
-    // Hydrate UI from local config
-    const providerSel = el('llmProviderSelect');
-    const modelInput = el('llmModelIdInput');
-    const keyInput = el('llmKeyInput');
-    const authModeSel = el('llmAuthModeSelect');
-    const oauthInput = el('llmOauthProfileInput');
-    const mode = localCfg.authMode === 'oauth-json' ? 'oauth-json' : 'api-key';
-
-    if (providerSel && localCfg.provider) {
-      // approximate mapping if provider is clean
-      providerSel.value = localCfg.provider;
-    }
-    if (modelInput && localCfg.model) modelInput.value = localCfg.model;
-    if (keyInput) keyInput.value = mode === 'api-key' ? localCfg.apiKey || '' : '';
-    if (authModeSel && mode) {
-      setLlmAuthModeUI(mode);
-    }
-    if (oauthInput) {
-      if (mode === 'oauth-json') {
-        oauthInput.value = localCfg.apiKey || '';
-        oauthInput.placeholder = 'OAuth profile JSON/token used to derive this session credential.';
-      } else {
-        oauthInput.value = '';
-        oauthInput.placeholder = 'Paste OpenAI/OAuth profile JSON (or raw token) for OAuth mode.';
-      }
-    }
-    syncModelRefFromInputs();
-
-    await api('/api/agent/lite/llm/config', {
-      method: 'POST',
-      body: JSON.stringify({
-        provider: localCfg.provider,
-        model: localCfg.model,
-        modelRef: localCfg.modelRef || `${localCfg.provider}/${localCfg.model}`,
-        authMode: mode
-      })
-    });
+    await applyGatewayLlmConfig(localCfg);
     if (runtimeBridge) {
       await ensureVendorRuntimeBridge(state);
       await runtimeBridge.setLlmConfig({
-        provider: localCfg.provider,
-        model: localCfg.model,
-        apiKey: localCfg.apiKey || ''
+        provider: localCfg.configured ? localCfg.provider : '',
+        model: localCfg.configured ? localCfg.model : '',
+        apiKey: localCfg.configured ? localCfg.credential || '' : ''
       });
     }
-    setLiteLlmStatus('LLM configured from local OpenClaw Lite backup.');
-    await connectLiteAgent();
+    if (localCfg.configured) {
+      setLiteLlmStatus(`LLM configured locally: ${localCfg.provider}/${localCfg.model}.`);
+    } else {
+      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    }
+    if (lastState) updateUI(lastState);
   } catch (e) {
     console.warn('local LLM restore skipped', e);
   }
@@ -854,20 +1229,8 @@ function initStep2Listener() {
   if (!btn || btn.dataset.listening) return;
   btn.dataset.listening = 'true';
 
-  btn.addEventListener('click', () => {
-    const providerSel = el('llmProviderSelect');
-    const keyInput = el('llmKeyInput');
-    const oauthInput = el('llmOauthProfileInput');
-    if (!keyInput || readLlmAuthMode() !== 'oauth-json') return;
-
-    const provider = String(providerSel?.value || 'openai').trim() || 'openai';
-    const token = extractOAuthAccessToken(oauthInput?.value || '', provider);
-    keyInput.value = token.ok ? token.token : '';
-  }, { capture: true });
-
   btn.addEventListener('click', async () => {
-    // app.js validates credentials and persists metadata locally + to server;
-    // gateway.js persists credentials in browser runtime worker.
+    // Persist the LLM mind config locally and apply it to active local runtimes.
     const status = el('llmLine');
     const providerSel = el('llmProviderSelect');
     const modelInput = el('llmModelIdInput');
@@ -902,31 +1265,36 @@ function initStep2Listener() {
         authMode: config.authMode
       });
 
-      await api('/api/agent/lite/llm/config', {
-        method: 'POST',
-        body: JSON.stringify({
-          provider: config.provider,
-          model: config.model,
-          modelRef: config.modelRef,
-          authMode: config.authMode
-        })
+      const localCfg = setLocalLiteLlm({
+        loaded: true,
+        configured: true,
+        provider: config.provider,
+        model: config.model,
+        modelRef: config.modelRef,
+        credential: config.credential,
+        authMode: config.authMode,
+        apiKeySet: true
       });
+      await applyGatewayLlmConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
-      if (runtimeBridge) {
-        ensureVendorRuntimeBridge(lastState)
-          .then(() => runtimeBridge.setLlmConfig({
+      if (runtimeBridge && lastState?.hatch?.complete && isVendorLite(lastState)) {
+        try {
+          await ensureVendorRuntimeBridge(lastState);
+          await runtimeBridge.setLlmConfig({
             provider: config.provider,
             model: config.model,
             apiKey: config.credential
-          }))
-          .catch((err) => {
-            console.warn('runtime bridge llm sync failed', err);
           });
+        } catch (err) {
+          console.warn('runtime bridge llm sync failed', err);
+        }
       }
 
       await new Promise(r => setTimeout(r, 300));
       status.textContent = 'Brain configured.';
+      setLiteLlmStatus(`LLM configured locally: ${config.provider}/${config.model}.`);
+      if (lastState) updateUI(lastState);
 
       // Unlock Step 3
       const step2 = el('step2');
@@ -971,18 +1339,31 @@ async function clearLiteLlmConfig() {
   try {
     const lib = await loadLiteLlmLibrary();
     await lib.clearLlmConfig();
-    await api('/api/agent/lite/llm/config', {
-      method: 'DELETE',
-      body: JSON.stringify({})
+    setLocalLiteLlm({
+      loaded: true,
+      configured: false,
+      provider: null,
+      model: null,
+      modelRef: null,
+      credential: '',
+      authMode: 'api-key',
+      apiKeySet: false
     });
+    await applyGatewayLlmConfig({ configured: false });
     if (authModeSel) {
       authModeSel.value = 'api-key';
       setLlmAuthModeUI('api-key');
     }
-    if (providerInput) providerInput.value = 'openai';
-    if (modelInput) modelInput.value = '';
+    if (providerInput && modelInput) {
+      const selected = applyLlmProviderModelSelection('openai', getDefaultLlmModelForProvider('openai'));
+      providerInput.value = selected.provider;
+      modelInput.value = selected.model;
+    }
     if (keyInput) keyInput.value = '';
-    if (modelRefInput) modelRefInput.value = '';
+    if (modelRefInput) {
+      const resolved = resolveLlmModelRefFromInputs(providerInput?.value || 'openai', modelInput?.value || '');
+      modelRefInput.value = resolved.modelRef;
+    }
     if (oauthInput) oauthInput.value = '';
     if (runtimeBridge && lastState?.hatch?.complete && isVendorLite(lastState)) {
       await ensureVendorRuntimeBridge(lastState);
@@ -990,8 +1371,7 @@ async function clearLiteLlmConfig() {
     }
     statusOverride = 'OpenClaw Lite LLM config cleared.';
     setLiteLlmStatus('Not configured. Save provider, model, and API key.');
-    const state = await api('/api/state');
-    updateUI(state);
+    if (lastState) updateUI(lastState);
   } catch (e) {
     statusOverride = `LLM clear failed: ${e.message}`;
     setLiteLlmStatus(`LLM clear failed: ${e.message}`);
@@ -1225,10 +1605,10 @@ function updateUI(state) {
   const teamCode = state?.teamCode || '…';
   const teamCodeNode = el('teamCode');
   if (teamCodeNode) teamCodeNode.textContent = teamCode;
+  const localLlm = getLocalLiteLlm();
 
   applyVisibility(state);
   updateLiteAgentStatus(state);
-  hydrateLlmInputsFromState(state);
   initStep2Listener();
   initAdvancedLlmUi();
 
@@ -1245,7 +1625,7 @@ function updateUI(state) {
     // Hatch Complete State
     if (step1) step1.classList.add('done');
     if (step2) {
-      const needsBrainAfterHatch = isVendorLite(state) && !liteState(state).llmConfigured;
+      const needsBrainAfterHatch = isVendorLite(state) && !localLlm.configured;
       step2.classList.remove('disabled');
       if (needsBrainAfterHatch) {
         step2.classList.add('active');
@@ -1296,8 +1676,8 @@ function updateUI(state) {
     });
     if (lite.lastError) {
       setLiteLlmStatus(`Runtime failed: ${lite.lastError}`);
-    } else if (lite.llmConfigured) {
-      setLiteLlmStatus(`LLM configured: ${lite.llmProvider || 'provider'}/${lite.llmModel || 'model'} (ready).`);
+    } else if (localLlm.configured) {
+      setLiteLlmStatus(`LLM configured locally: ${localLlm.provider || 'provider'}/${localLlm.model || 'model'}.`);
     } else {
       setLiteLlmStatus('Not configured. Save provider, model, and API key.');
     }
@@ -1307,7 +1687,7 @@ function updateUI(state) {
     setHatchStatus(statusOverride);
   } else if (vendor && state?.hatch?.complete && lite.lastError) {
     setHatchStatus(`OpenClaw Lite runtime failed: ${lite.lastError}`);
-  } else if (vendor && state?.hatch?.complete && !lite.llmConfigured) {
+  } else if (vendor && state?.hatch?.complete && !localLlm.configured) {
     setHatchStatus('Hatch complete. Configure LLM to continue.');
   } else if (state?.hatch?.complete) {
     setHatchStatus('Hatch complete.');
@@ -1327,12 +1707,12 @@ function updateUI(state) {
   if (vendor && state?.hatch?.complete && !runtimeBootstrapDone && !lite.lastError) {
     bootstrapVendorRuntime().catch(() => { });
   }
-  if (vendor && state?.hatch?.complete && !lite.llmConfigured) {
+  if (vendor && state?.hatch?.complete && (!localLlm.loaded || !localLlm.configured)) {
     restoreLiteLlmConfigFromLocalIfNeeded(state).catch(() => { });
   }
   if (state?.hatch?.complete && !isAnyAgentConnected(state) && !pendingLiteConnect) {
     if (vendor) {
-      if (lite.llmConfigured && lite.runtimeReady) {
+      if (localLlm.configured && lite.runtimeReady) {
         connectLiteAgent().catch(() => { });
       }
     } else {
@@ -1569,6 +1949,12 @@ async function init() {
   elements = Array.isArray(initial?.elements) ? initial.elements : [];
   if (loadHatchVisible() || initial?.hatch?.complete) {
     setHatchVisible(true);
+  }
+  try {
+    const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
+    applyLocalLiteLlmToInputs(localCfg);
+  } catch (e) {
+    console.warn('local LLM preload failed', e);
   }
   updateUI(initial);
   if (initial?.hatch?.complete && isVendorLite(initial)) {

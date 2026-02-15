@@ -12,7 +12,7 @@ test('phase2 harness exposes lite runtime contract and bootstrap endpoint', asyn
   const state = await stateResp.json();
 
   expect(state.lite).toBeTruthy();
-  expect(['phase1', 'vendor']).toContain(state.lite.driver);
+  expect(state.lite.driver).toBe('vendor');
   expect(state.lite.runtimeReady).toBe(false);
   expect(state.lite.llmConfigured).toBe(false);
   expect(state.lite.llmProvider ?? null).toBeNull();

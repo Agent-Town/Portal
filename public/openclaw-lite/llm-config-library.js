@@ -26,8 +26,7 @@ function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 
 
 function defaultProviderApi(provider) {
   const p = String(provider || '').trim();
-  if (p === 'openai') return 'openai-completions';
-  if (p === 'openai-codex') return 'openai-codex-responses';
+  if (p === 'openai' || p === 'ollama') return 'openai-completions';
   return '';
 }
 
@@ -36,8 +35,8 @@ function defaultProviderBaseUrl(provider) {
   if (p === 'openai') {
     return new URL('/api/llm/openai/v1', window.location.origin).toString();
   }
-  if (p === 'openai-codex') {
-    return 'https://chatgpt.com/backend-api';
+  if (p === 'ollama') {
+    return 'http://127.0.0.1:11434/v1';
   }
   return '';
 }

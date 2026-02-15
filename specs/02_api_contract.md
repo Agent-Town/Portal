@@ -75,11 +75,11 @@ Includes:
   - `hatch.agentKind` (`"openclaw-lite"` | null)
 - `agent.source` (`"openclaw-lite"` | `"external"` | null)
 - `lite` — OpenClaw Lite runtime state:
-  - `lite.driver` (`"vendor"` | `"phase1"`)
+  - `lite.driver` (`"vendor"`)
   - `lite.runtimeReady` (boolean)
-  - `lite.llmConfigured` (boolean)
-  - `lite.llmProvider` (string | null)
-  - `lite.llmModel` (string | null)
+  - `lite.llmConfigured` (boolean, legacy server metadata; local-only UI flow does not rely on it)
+  - `lite.llmProvider` (string | null, legacy server metadata)
+  - `lite.llmModel` (string | null, legacy server metadata)
   - `lite.runtimeVersion` (string | null)
   - `lite.lastError` (string | null)
 
@@ -89,18 +89,14 @@ Marks hatch completion for the current browser session.
 Behavior:
 - sets `hatch.complete=true`
 - sets `hatch.agentKind="openclaw-lite"`
-- when `lite.driver="phase1"`:
-  - sets `agent.connected=true`
-  - sets `agent.source="openclaw-lite"`
-- when `lite.driver="vendor"`:
-  - leaves agent disconnected until runtime boot + explicit LLM config are complete
+- leaves agent disconnected until runtime boot is complete and the browser has local LLM config
 
 Response:
 ```json
 {
   "ok": true,
   "hatch": { "complete": true, "createdAt": "2026-02-12T00:00:00.000Z", "agentKind": "openclaw-lite" },
-  "agent": { "connected": true, "source": "openclaw-lite", "name": "OpenClaw Lite" }
+  "agent": { "connected": false, "source": null, "name": "OpenClaw Lite" }
 }
 ```
 
@@ -114,7 +110,6 @@ Body:
 
 Errors:
 - `HATCH_REQUIRED` (hatch must be completed first)
-- `LLM_CONFIG_REQUIRED` (vendor mode requires LLM config first)
 - `LITE_RUNTIME_NOT_READY` (vendor runtime bootstrap not completed)
 
 ### GET `/api/agent/lite/runtime` (human)
@@ -133,7 +128,8 @@ Response shape:
 ```
 
 ### GET `/api/agent/lite/llm/config` (human)
-Returns non-secret LLM config status for the current session.
+Returns non-secret server-side LLM metadata for the current session.
+This endpoint is legacy for the local-only vendor flow.
 
 Response shape:
 ```json
@@ -147,7 +143,8 @@ Response shape:
 ```
 
 ### POST `/api/agent/lite/llm/config` (human)
-Saves LLM provider/model/key metadata for OpenClaw Lite vendor flow.
+Saves server-side LLM provider/model metadata.
+Local-only vendor flow does not require calling this endpoint.
 
 Body:
 ```json
@@ -165,13 +162,13 @@ Errors:
 - `MISSING_LLM_API_KEY`
 
 ### DELETE `/api/agent/lite/llm/config` (human)
-Clears stored LLM configuration metadata for the current session.
+Clears server-side LLM configuration metadata for the current session.
 
 Behavior:
 - sets `lite.llmConfigured=false`
 - clears `lite.llmProvider` and `lite.llmModel`
 - keeps API key secret material server-hidden
-- in vendor driver mode, disconnects `agent.source="openclaw-lite"` until configuration is saved again
+- disconnects `agent.source="openclaw-lite"` until configuration is saved again
 
 ---
 
@@ -970,24 +967,42 @@ Response:
   "ok": true,
   "agentState": {
     "v": 1,
-    "kind": "openclaw-lite-state",
-    "schema": "openclaw-lite-state@1",
+    "kind": "openclaw-lite-state-sealed",
+    "schema": "openclaw-lite-state-sealed@1",
     "createdAt": "ISO8601",
-    "stores": {
-      "meta": [{ "key": "llmApiKey", "value": "..." }],
-      "vfs": [{ "path": "workspace/AGENTS.md", "updatedAtMs": 0, "dataB64": "..." }],
-      "checkpoints": [{ "checkpointId": "cp_..." }]
+    "houseId": "<base58|null>",
+    "ciphertext": {
+      "alg": "AES-GCM",
+      "iv": "<base64>",
+      "ct": "<base64>"
     }
   } | null,
   "updatedAt": "ISO8601|null",
   "sizeBytes": 12345
 }
 ```
+Notes:
+- House UI stores agent state as sealed ciphertext JSON (`openclaw-lite-state-sealed@1`) derived from the unlocked house key.
+- Legacy/plain snapshots (`openclaw-lite-state@1`) may still exist and are accepted.
 
 ### POST `/api/house/:id/agent-state`
 Stores or replaces the OpenClaw Lite snapshot for this house.
 
-Body:
+Body (sealed, preferred):
+```json
+{
+  "snapshot": {
+    "v": 1,
+    "kind": "openclaw-lite-state-sealed",
+    "schema": "openclaw-lite-state-sealed@1",
+    "createdAt": "ISO8601",
+    "houseId": "<base58|null>",
+    "ciphertext": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" }
+  }
+}
+```
+
+Body (plain, accepted for migration/import tools):
 ```json
 {
   "snapshot": {

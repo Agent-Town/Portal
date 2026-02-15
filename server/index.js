@@ -453,131 +453,6 @@ function normalizeCeremonySealedReveal(sealed, { required = false } = {}) {
   return { alg, epk, iv, ct, aad };
 }
 
-function isLiteAgentSession(session) {
-  return !!(session && session.agent && session.agent.connected && session.agent.source === 'openclaw-lite');
-}
-
-function isPhase1LiteSession(session) {
-  if (!isLiteAgentSession(session)) return false;
-  const driver = normalizeLiteDriver(session?.lite?.driver);
-  return driver === 'phase1';
-}
-
-function makeCeremonyRevealKeyInfo({ direction = '', teamCode = '' }) {
-  return `elizatown-ceremony-reveal-v1|dir=${direction || ''}|team=${teamCode || ''}`;
-}
-
-function makeCeremonyRevealPub() {
-  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const der = pair.publicKey.export({ type: 'spki', format: 'der' });
-  return Buffer.from(der).toString('base64');
-}
-
-function encryptCeremonyRevealForRecipient({ revealBytes, recipientRevealPubB64, direction, teamCode }) {
-  const recipientDer = decodeB64(recipientRevealPubB64);
-  if (!recipientDer || !recipientDer.length) throw new Error('INVALID_REVEAL_PUB');
-  let recipientPub;
-  try {
-    recipientPub = crypto.createPublicKey({ key: recipientDer, format: 'der', type: 'spki' });
-  } catch {
-    throw new Error('INVALID_REVEAL_PUB');
-  }
-
-  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
-  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
-  const key = Buffer.from(crypto.hkdfSync(
-    'sha256',
-    shared,
-    Buffer.alloc(0),
-    Buffer.from(makeCeremonyRevealKeyInfo({ direction, teamCode }), 'utf8'),
-    32
-  ));
-  const iv = crypto.randomBytes(12);
-  const aadBytes = Buffer.from(JSON.stringify({
-    v: 1,
-    direction,
-    teamCode: teamCode || null
-  }), 'utf8');
-  const plaintext = Buffer.from(JSON.stringify({
-    v: 1,
-    reveal: Buffer.from(revealBytes).toString('base64')
-  }), 'utf8');
-
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  cipher.setAAD(aadBytes);
-  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  const ct = Buffer.concat([enc, tag]);
-  const epkDer = eph.publicKey.export({ type: 'spki', format: 'der' });
-
-  return {
-    alg: CEREMONY_E2EE_P256_AESGCM_V1,
-    epk: Buffer.from(epkDer).toString('base64'),
-    iv: iv.toString('base64'),
-    ct: ct.toString('base64'),
-    aad: aadBytes.toString('base64')
-  };
-}
-
-function ensureLiteAgentCeremonyMaterial(session, { humanRevealPub } = {}) {
-  if (!isPhase1LiteSession(session)) return;
-  if (!session?.houseCeremony) return;
-  const recipientRevealPub = typeof humanRevealPub === 'string' ? humanRevealPub.trim() : '';
-  if (!recipientRevealPub) return;
-
-  let revealBytes = null;
-  if (typeof session.houseCeremony.liteAgentReveal === 'string' && session.houseCeremony.liteAgentReveal) {
-    const decoded = decodeB64(session.houseCeremony.liteAgentReveal);
-    if (decoded && decoded.length === 32) revealBytes = decoded;
-  }
-  if (!revealBytes) {
-    revealBytes = crypto.randomBytes(32);
-    session.houseCeremony.liteAgentReveal = Buffer.from(revealBytes).toString('base64');
-  }
-
-  session.houseCeremony.agentCommit = crypto.createHash('sha256').update(Buffer.from(revealBytes)).digest('base64');
-  session.houseCeremony.agentRevealPub = session.houseCeremony.agentRevealPub || makeCeremonyRevealPub();
-  session.houseCeremony.agentRevealSealed = encryptCeremonyRevealForRecipient({
-    revealBytes,
-    recipientRevealPubB64: recipientRevealPub,
-    direction: 'agent_to_human',
-    teamCode: session.teamCode || ''
-  });
-  session.houseCeremony.createdAt = session.houseCeremony.createdAt || nowIso();
-}
-
-function maybeLiteAgentAutoPaint(session, { x, y, color } = {}) {
-  if (!isPhase1LiteSession(session)) return null;
-  const canvas = session?.canvas;
-  if (!canvas || !Array.isArray(canvas.pixels)) return null;
-  const w = Number(canvas.w || 0);
-  const h = Number(canvas.h || 0);
-  const total = w * h;
-  if (!Number.isInteger(w) || !Number.isInteger(h) || total <= 0) return null;
-  if (canvas.pixels.length !== total) return null;
-
-  const start = Number.isInteger(x) && Number.isInteger(y) ? ((y * w + x) % total + total) % total : 0;
-  let target = -1;
-  for (let step = 1; step < total; step += 1) {
-    const idx = (start + step) % total;
-    if (canvas.pixels[idx] === 0) {
-      target = idx;
-      break;
-    }
-  }
-  if (target < 0) return null;
-
-  const maxColor = Math.max(1, palette().length - 1);
-  const baseColor = Number.isInteger(color) && color > 0 ? color : 1;
-  const nextColor = (baseColor % maxColor) + 1;
-  canvas.pixels[target] = nextColor;
-  return {
-    x: target % w,
-    y: Math.floor(target / w),
-    color: nextColor
-  };
-}
-
 function normalizePonyInboxPrivWrap(ponyInboxPrivWrap, { required = false } = {}) {
   if (ponyInboxPrivWrap == null) {
     if (required) throw new Error('MISSING_PONY_INBOX_PRIV_WRAP');
@@ -873,54 +748,26 @@ function buildVendorLiteManifest() {
 const VENDOR_LITE_MANIFEST = Object.freeze(buildVendorLiteManifest());
 
 function normalizeLiteDriver(value) {
-  return value === 'phase1' ? 'phase1' : 'vendor';
+  return 'vendor';
 }
 
-function ensureLiteState(session, { liteDriver = null } = {}) {
+function ensureLiteState(session) {
   if (!session || typeof session !== 'object') return defaultLiteState();
   const next = {
     ...defaultLiteState(),
     ...(session.lite && typeof session.lite === 'object' ? session.lite : {})
   };
-  if (liteDriver) next.driver = normalizeLiteDriver(liteDriver);
   next.driver = normalizeLiteDriver(next.driver);
   next.runtimeBooted = next.runtimeBooted === true;
-  next.runtimeVersion = next.driver === 'vendor' && next.runtimeBooted ? VENDOR_LITE_MANIFEST.vendorVersion : null;
+  next.runtimeVersion = next.runtimeBooted ? VENDOR_LITE_MANIFEST.vendorVersion : null;
   session.lite = next;
   return next;
 }
 
-function parseLiteDriverFromRequest(req) {
-  const fromQuery = typeof req.query?.liteDriver === 'string' ? req.query.liteDriver.trim().toLowerCase() : '';
-  if (fromQuery) return normalizeLiteDriver(fromQuery);
-
-  const fromHeader = typeof req.header === 'function'
-    ? String(req.header('x-lite-driver') || '').trim().toLowerCase()
-    : '';
-  if (fromHeader) return normalizeLiteDriver(fromHeader);
-
-  const referer = typeof req.header === 'function' ? String(req.header('referer') || '').trim() : '';
-  if (!referer) return null;
-  try {
-    const fallbackOrigin = `${req.protocol || 'http'}://${req.get('host') || 'localhost'}`;
-    const refererUrl = new URL(referer, fallbackOrigin);
-    const fromReferer = String(refererUrl.searchParams.get('liteDriver') || '').trim().toLowerCase();
-    if (!fromReferer) return null;
-    return normalizeLiteDriver(fromReferer);
-  } catch {
-    return null;
-  }
-}
-
 function updateLiteRuntimeReady(session) {
   const lite = ensureLiteState(session);
-  const connected = !!(session?.agent?.connected && session?.agent?.source === 'openclaw-lite');
-  if (lite.driver === 'vendor') {
-    const booted = lite.runtimeBooted === true;
-    lite.runtimeReady = !!(session?.hatch?.complete && booted && lite.llmConfigured && connected && !lite.lastError);
-    return;
-  }
-  lite.runtimeReady = !!(session?.hatch?.complete && connected && !lite.lastError);
+  const booted = lite.runtimeBooted === true;
+  lite.runtimeReady = !!(session?.hatch?.complete && booted && !lite.lastError);
 }
 
 function markLiteRuntimeBooted(session) {
@@ -1134,8 +981,7 @@ function ensureHumanSession(req, res) {
     const secureFlag = isProd || req.secure ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
-  const requestedLiteDriver = parseLiteDriverFromRequest(req);
-  ensureLiteState(session, { liteDriver: requestedLiteDriver });
+  ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
 }
@@ -1275,6 +1121,8 @@ const MAX_AGENT_STATE_VFS_RECORDS = 20000;
 const MAX_AGENT_STATE_CHECKPOINT_RECORDS = 5000;
 const AGENT_STATE_KIND = 'openclaw-lite-state';
 const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_SEALED_KIND = 'openclaw-lite-state-sealed';
+const AGENT_STATE_SEALED_SCHEMA = 'openclaw-lite-state-sealed@1';
 
 const ponyTransportService = createPonyTransportService();
 const ponyPostageVerifier = createPostageVerifier({
@@ -1609,8 +1457,45 @@ function extractAgentStateHouseId(snapshot) {
   return houseId || null;
 }
 
+function normalizeAgentStateSealedSnapshot(raw, { expectedHouseId = null } = {}) {
+  const ciphertext = raw.ciphertext;
+  if (!isRecordObject(ciphertext)) throw new Error('INVALID_AGENT_STATE');
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : 'AES-GCM';
+  const houseId = typeof raw.houseId === 'string' ? raw.houseId.trim() : '';
+  if (alg !== 'AES-GCM' || !iv || !ct || !isCanonicalBase64(iv) || !isCanonicalBase64(ct)) {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+  if (expectedHouseId && houseId && houseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+  const normalized = {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : nowIso(),
+    houseId: houseId || null,
+    ciphertext: {
+      alg: 'AES-GCM',
+      iv,
+      ct
+    }
+  };
+  const sizeBytes = Buffer.byteLength(JSON.stringify(normalized), 'utf8');
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_AGENT_STATE_BYTES) {
+    throw new Error('AGENT_STATE_TOO_LARGE');
+  }
+  return { snapshot: normalized, sizeBytes };
+}
+
 function normalizeAgentStateSnapshot(raw, { expectedHouseId = null } = {}) {
   if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const kind = typeof raw.kind === 'string' ? raw.kind.trim() : '';
+  const schema = typeof raw.schema === 'string' ? raw.schema.trim() : '';
+  if (kind === AGENT_STATE_SEALED_KIND || schema === AGENT_STATE_SEALED_SCHEMA) {
+    return normalizeAgentStateSealedSnapshot(raw, { expectedHouseId });
+  }
   const stores = raw.stores;
   if (!isRecordObject(stores)) throw new Error('INVALID_AGENT_STATE');
 
@@ -1791,19 +1676,13 @@ app.post('/api/hatch/complete', (req, res) => {
   s.hatch.createdAt = s.hatch.createdAt || nowIso();
   s.hatch.agentKind = 'openclaw-lite';
   lite.lastError = null;
-  if (lite.driver === 'vendor') {
-    lite.runtimeBooted = false;
-    lite.runtimeVersion = null;
-    s.agent.connected = false;
-    s.agent.source = null;
-    s.agent.name = s.agent.name || 'OpenClaw Lite';
-  } else {
-    s.agent.connected = true;
-    s.agent.source = 'openclaw-lite';
-    s.agent.name = s.agent.name || 'OpenClaw Lite';
-  }
+  lite.runtimeBooted = false;
+  lite.runtimeVersion = null;
+  s.agent.connected = false;
+  s.agent.source = null;
+  s.agent.name = s.agent.name || 'OpenClaw Lite';
   s.shareApproval = s.shareApproval || { human: false, agent: false };
-  s.shareApproval.agent = lite.driver === 'phase1';
+  s.shareApproval.agent = false;
   updateLiteRuntimeReady(s);
 
   res.json({
@@ -1828,11 +1707,8 @@ app.post('/api/agent/lite/connect', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
   if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
-  if (lite.driver === 'vendor') {
-    if (!lite.llmConfigured) return res.status(403).json({ ok: false, error: 'LLM_CONFIG_REQUIRED' });
-    if (lite.runtimeBooted !== true) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_NOT_READY' });
-    if (lite.lastError) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_FAILED' });
-  }
+  if (lite.runtimeBooted !== true) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_NOT_READY' });
+  if (lite.lastError) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_FAILED' });
   s.agent.connected = true;
   s.agent.source = 'openclaw-lite';
   s.agent.name = s.agent.name || 'OpenClaw Lite';
@@ -1854,7 +1730,7 @@ app.get('/api/agent/lite/runtime', (req, res) => {
     runtimeVersion: VENDOR_LITE_MANIFEST.vendorVersion,
     driver: lite.driver,
     featureFlags: {
-      llmConfigRequired: lite.driver === 'vendor'
+      llmConfigRequired: true
     }
   });
 });
@@ -1925,11 +1801,7 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   lite.llmAuthMode = payload.authMode || 'api-key';
   lite.llmApiKeyHash = null;
 
-  if (!lite.runtimeBooted && lite.driver === 'phase1') {
-    lite.runtimeBooted = true;
-  }
-
-  if (lite.driver === 'phase1' || lite.runtimeBooted === true) {
+  if (lite.runtimeBooted === true) {
     s.agent.connected = true;
     s.agent.source = 'openclaw-lite';
     s.agent.name = s.agent.name || 'OpenClaw Lite';
@@ -1963,14 +1835,12 @@ app.delete('/api/agent/lite/llm/config', (req, res) => {
   lite.llmApiKeyHash = null;
   lite.llmAuthMode = null;
 
-  if (lite.driver === 'vendor') {
-    if (s.agent.source === 'openclaw-lite') {
-      s.agent.connected = false;
-      s.agent.source = null;
-    }
-    s.shareApproval = s.shareApproval || { human: false, agent: false };
-    s.shareApproval.agent = s.agent.source === 'external';
+  if (s.agent.source === 'openclaw-lite') {
+    s.agent.connected = false;
+    s.agent.source = null;
   }
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = s.agent.source === 'external';
 
   updateLiteRuntimeReady(s);
 
@@ -2002,9 +1872,6 @@ app.post('/api/human/select', (req, res) => {
   const allowed = new Set(listElements().map((e) => e.id));
   if (!allowed.has(elementId)) return res.status(400).json({ ok: false, error: 'INVALID_ELEMENT' });
   s.human.selected = elementId;
-  if (isPhase1LiteSession(s)) {
-    s.agent.selected = elementId;
-  }
   evaluateMatch(s);
   res.json({ ok: true, match: s.match, humanSelected: s.human.selected });
 });
@@ -2097,9 +1964,6 @@ app.post('/api/human/open/press', (req, res) => {
   ensureLiteState(s);
   if (!s.match.matched) return res.status(403).json({ ok: false, error: 'LOCKED' });
   s.human.openPressed = true;
-  if (isPhase1LiteSession(s)) {
-    s.agent.openPressed = true;
-  }
 
   const status = maybeCompleteOpen(s);
   res.json({ ok: true, status, nextUrl: status.complete ? '/create' : null });
@@ -2140,8 +2004,7 @@ app.post('/api/human/canvas/paint', (req, res) => {
   const color = req.body?.color;
   const result = paint(s, x, y, color);
   if (!result.ok) return res.status(400).json(result);
-  const litePaint = maybeLiteAgentAutoPaint(s, { x, y, color });
-  res.json({ ok: true, litePaint: litePaint || null });
+  res.json({ ok: true, litePaint: null });
 });
 
 app.post('/api/agent/canvas/paint', (req, res) => {
@@ -2248,9 +2111,6 @@ app.post('/api/human/house/commit', (req, res) => {
   }
   s.houseCeremony.humanCommit = commit;
   if (revealPub) s.houseCeremony.humanRevealPub = revealPub;
-  if (s.houseCeremony.humanRevealPub && isPhase1LiteSession(s)) {
-    ensureLiteAgentCeremonyMaterial(s, { humanRevealPub: s.houseCeremony.humanRevealPub });
-  }
   s.houseCeremony.createdAt = s.houseCeremony.createdAt || nowIso();
   res.json({ ok: true, humanRevealPub: s.houseCeremony.humanRevealPub || null });
 });
@@ -2258,9 +2118,6 @@ app.post('/api/human/house/commit', (req, res) => {
 app.post('/api/human/house/reveal', (req, res) => {
   const s = ensureHumanSession(req, res);
   const sealedRaw = req.body?.sealedForAgent || req.body?.sealedReveal || req.body?.sealed || null;
-  if (s.houseCeremony?.humanRevealPub && isPhase1LiteSession(s)) {
-    ensureLiteAgentCeremonyMaterial(s, { humanRevealPub: s.houseCeremony.humanRevealPub });
-  }
   if (!s.houseCeremony?.agentCommit) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_COMMIT' });
   if (!s.houseCeremony?.agentRevealPub) return res.status(409).json({ ok: false, error: 'WAITING_AGENT_REVEAL_PUB' });
 

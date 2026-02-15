@@ -48353,6 +48353,313 @@ async function runSyntheticToolSmoke(count = 5) {
     dispatchPath: LITE_TOOL_DISPATCH_PATH
   };
 }
+var WORKSPACE_CONTEXT_FILE_ORDER = Object.freeze([
+  "workspace/AGENTS.md",
+  "workspace/SOUL.md",
+  "workspace/TOOLS.md",
+  "workspace/IDENTITY.md",
+  "workspace/USER.md",
+  "workspace/HEARTBEAT.md",
+  "workspace/BOOTSTRAP.md",
+  "workspace/MEMORY.md",
+  "workspace/memory.md",
+  "workspace/SKILL.md",
+  "workspace/GOALS.md",
+  "workspace/PENALTY.md"
+]);
+var WORKSPACE_CONTEXT_MAX_CHARS = 2e4;
+var WORKSPACE_CONTEXT_HEAD_RATIO = 0.7;
+var WORKSPACE_CONTEXT_TAIL_RATIO = 0.2;
+var SILENT_REPLY_TOKEN = "NO_REPLY";
+function workspaceContextPath(workspacePath) {
+  const normalized = String(workspacePath || "").replace(/\\/g, "/");
+  if (normalized.startsWith("workspace/")) {
+    return normalized.slice("workspace/".length);
+  }
+  return normalized;
+}
+function trimWorkspaceContextContent(content, fileName, maxChars = WORKSPACE_CONTEXT_MAX_CHARS) {
+  const trimmed = String(content || "").trimEnd();
+  if (!trimmed) {
+    return { content: "", truncated: false, originalLength: 0, maxChars };
+  }
+  if (trimmed.length <= maxChars) {
+    return { content: trimmed, truncated: false, originalLength: trimmed.length, maxChars };
+  }
+  const headChars = Math.floor(maxChars * WORKSPACE_CONTEXT_HEAD_RATIO);
+  const tailChars = Math.floor(maxChars * WORKSPACE_CONTEXT_TAIL_RATIO);
+  const head = trimmed.slice(0, headChars);
+  const tail = trimmed.slice(-tailChars);
+  const marker = [
+    "",
+    `[...truncated, read ${fileName} for full content...]`,
+    `...(truncated ${fileName}: kept ${headChars}+${tailChars} chars of ${trimmed.length})...`,
+    ""
+  ].join("\n");
+  return {
+    content: [head, marker, tail].join("\n"),
+    truncated: true,
+    originalLength: trimmed.length,
+    maxChars
+  };
+}
+async function buildWorkspaceContextFiles() {
+  await ensureWorkspaceFiles({ recordEvents: false });
+  const contextFiles = [];
+  const usedFiles = [];
+  const truncatedFiles = [];
+  for (const path4 of WORKSPACE_CONTEXT_FILE_ORDER) {
+    const content = await vfsGetUtf8(path4);
+    if (content === null) continue;
+    const fileName = workspaceContextPath(path4);
+    const trimmed = trimWorkspaceContextContent(content, fileName, WORKSPACE_CONTEXT_MAX_CHARS);
+    if (!trimmed.content) continue;
+    contextFiles.push({
+      path: fileName,
+      content: trimmed.content
+    });
+    usedFiles.push(path4);
+    if (trimmed.truncated) {
+      truncatedFiles.push(path4);
+    }
+  }
+  return {
+    contextFiles,
+    usedFiles,
+    truncatedFiles
+  };
+}
+function buildLiteToolSummaryMap(tools) {
+  const map = {};
+  for (const tool of Array.isArray(tools) ? tools : []) {
+    const key = String(tool?.name || "").trim().toLowerCase();
+    if (!key) continue;
+    const summary = String(tool?.description || tool?.label || "").trim();
+    if (!summary) continue;
+    map[key] = summary;
+  }
+  return map;
+}
+function resolveWorkerTimezone() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const value = String(tz || "").trim();
+    return value || void 0;
+  } catch {
+    return void 0;
+  }
+}
+function buildLiteRuntimeInfo(model) {
+  let host = "browser";
+  try {
+    const origin = safeOrigin();
+    if (origin) {
+      host = new URL(origin).host || host;
+    }
+  } catch {
+  }
+  const provider = String(model?.provider || "unknown").trim() || "unknown";
+  const modelId = String(model?.id || "unknown").trim() || "unknown";
+  const modelRef = `${provider}/${modelId}`;
+  return {
+    agentId: MAIN_AGENT_ID,
+    host,
+    os: "browser",
+    arch: "web",
+    node: "n/a",
+    model: modelRef,
+    defaultModel: modelRef,
+    channel: "webchat",
+    capabilities: []
+  };
+}
+function buildLiteRuntimeLine(runtimeInfo, runtimeChannel, runtimeCapabilities = [], defaultThinkLevel) {
+  return `Runtime: ${[
+    runtimeInfo?.agentId ? `agent=${runtimeInfo.agentId}` : "",
+    runtimeInfo?.host ? `host=${runtimeInfo.host}` : "",
+    runtimeInfo?.repoRoot ? `repo=${runtimeInfo.repoRoot}` : "",
+    runtimeInfo?.os ? `os=${runtimeInfo.os}${runtimeInfo?.arch ? ` (${runtimeInfo.arch})` : ""}` : runtimeInfo?.arch ? `arch=${runtimeInfo.arch}` : "",
+    runtimeInfo?.node ? `node=${runtimeInfo.node}` : "",
+    runtimeInfo?.model ? `model=${runtimeInfo.model}` : "",
+    runtimeInfo?.defaultModel ? `default_model=${runtimeInfo.defaultModel}` : "",
+    runtimeInfo?.shell ? `shell=${runtimeInfo.shell}` : "",
+    runtimeChannel ? `channel=${runtimeChannel}` : "",
+    runtimeChannel ? `capabilities=${runtimeCapabilities.length > 0 ? runtimeCapabilities.join(",") : "none"}` : "",
+    `thinking=${defaultThinkLevel || "off"}`
+  ].filter(Boolean).join(" | ")}`;
+}
+function buildLiteAgentSystemPrompt(params) {
+  const coreToolSummaries = {
+    read: "Read file contents",
+    write: "Create or overwrite files",
+    edit: "Make precise edits to files",
+    apply_patch: "Apply multi-file patches",
+    grep: "Search file contents for patterns",
+    find: "Find files by glob pattern",
+    ls: "List directory contents",
+    exec: "Run shell commands (pty available for TTY-required CLIs)",
+    process: "Manage background exec sessions",
+    web_search: "Search the web (Brave API)",
+    web_fetch: "Fetch and extract readable content from a URL",
+    browser: "Control web browser",
+    canvas: "Present/eval/snapshot the Canvas",
+    nodes: "List/describe/notify/camera/screen on paired nodes",
+    cron: "Manage cron jobs and wake events",
+    message: "Send messages and channel actions",
+    gateway: "Restart, apply config, or run updates on the running OpenClaw process",
+    agents_list: "List agent ids allowed for sessions_spawn",
+    sessions_list: "List other sessions (incl. sub-agents) with filters/last",
+    sessions_history: "Fetch history for another session/sub-agent",
+    sessions_send: "Send a message to another session/sub-agent",
+    session_status: "Show a /status-equivalent status card",
+    image: "Analyze an image with the configured image model"
+  };
+  const toolOrder = [
+    "read",
+    "write",
+    "edit",
+    "apply_patch",
+    "grep",
+    "find",
+    "ls",
+    "exec",
+    "process",
+    "web_search",
+    "web_fetch",
+    "browser",
+    "canvas",
+    "nodes",
+    "cron",
+    "message",
+    "gateway",
+    "agents_list",
+    "sessions_list",
+    "sessions_history",
+    "sessions_send",
+    "session_status",
+    "image"
+  ];
+  const rawToolNames = (params.toolNames || []).map((tool) => String(tool || "").trim());
+  const canonicalToolNames = rawToolNames.filter(Boolean);
+  const canonicalByNormalized = /* @__PURE__ */ new Map();
+  for (const name of canonicalToolNames) {
+    const normalized = name.toLowerCase();
+    if (!canonicalByNormalized.has(normalized)) {
+      canonicalByNormalized.set(normalized, name);
+    }
+  }
+  const resolveToolName = (normalized) => canonicalByNormalized.get(normalized) || normalized;
+  const normalizedTools = canonicalToolNames.map((tool) => tool.toLowerCase());
+  const availableTools = new Set(normalizedTools);
+  const externalToolSummaries = /* @__PURE__ */ new Map();
+  for (const [key, value] of Object.entries(params.toolSummaries || {})) {
+    const normalized = key.trim().toLowerCase();
+    if (!normalized || !String(value || "").trim()) continue;
+    externalToolSummaries.set(normalized, String(value).trim());
+  }
+  const extraTools = Array.from(new Set(normalizedTools.filter((tool) => !toolOrder.includes(tool))));
+  const enabledTools = toolOrder.filter((tool) => availableTools.has(tool));
+  const toolLines = enabledTools.map((tool) => {
+    const summary = coreToolSummaries[tool] || externalToolSummaries.get(tool);
+    const name = resolveToolName(tool);
+    return summary ? `- ${name}: ${summary}` : `- ${name}`;
+  });
+  for (const tool of extraTools.sort()) {
+    const summary = coreToolSummaries[tool] || externalToolSummaries.get(tool);
+    const name = resolveToolName(tool);
+    toolLines.push(summary ? `- ${name}: ${summary}` : `- ${name}`);
+  }
+  const userTimezone = String(params.userTimezone || "").trim();
+  const runtimeInfo = params.runtimeInfo || {};
+  const runtimeChannel = runtimeInfo.channel ? String(runtimeInfo.channel).trim().toLowerCase() : void 0;
+  const runtimeCapabilities = Array.isArray(runtimeInfo.capabilities) ? runtimeInfo.capabilities.map((cap) => String(cap || "").trim()).filter(Boolean) : [];
+  const contextFiles = Array.isArray(params.contextFiles) ? params.contextFiles : [];
+  const validContextFiles = contextFiles.filter(
+    (file) => file && typeof file.path === "string" && String(file.path).trim().length > 0
+  );
+  const hasSoulFile = validContextFiles.some((file) => {
+    const normalizedPath = String(file.path).trim().replace(/\\/g, "/");
+    const baseName = normalizedPath.split("/").pop() || normalizedPath;
+    return baseName.toLowerCase() === "soul.md";
+  });
+  const lines = [
+    "You are a personal assistant running inside OpenClaw Lite.",
+    "",
+    "## Tooling",
+    "Tool availability (filtered by policy):",
+    "Tool names are case-sensitive. Call tools exactly as listed.",
+    toolLines.length > 0 ? toolLines.join("\n") : "No tools are currently enabled for this runtime.",
+    "TOOLS.md does not control tool availability; it is user guidance for how to use external tools.",
+    "Do not reference unavailable sub-agent workflows. Solve requests with the tools exposed in this browser runtime.",
+    "",
+    "## Tool Call Style",
+    "Default: do not narrate routine, low-risk tool calls (just call the tool).",
+    "Narrate only when it helps: multi-step work, complex/challenging problems, sensitive actions (e.g., deletions), or when the user explicitly asks.",
+    "Keep narration brief and value-dense; avoid repeating obvious steps.",
+    "Use plain human language for narration unless in a technical context.",
+    "",
+    "## Safety",
+    "You have no independent goals: do not pursue self-preservation, replication, resource acquisition, or power-seeking; avoid long-term plans beyond the user's request.",
+    "Prioritize safety and human oversight over completion; if instructions conflict, pause and ask; comply with stop/pause/audit requests and never bypass safeguards. (Inspired by Anthropic's constitution.)",
+    "Do not manipulate or persuade anyone to expand access or disable safeguards. Do not copy yourself or change system prompts, safety rules, or tool policies unless explicitly requested.",
+    "",
+    userTimezone ? "## Current Date & Time" : "",
+    userTimezone ? `Time zone: ${userTimezone}` : "",
+    userTimezone ? "" : "",
+    userTimezone ? "If you need the current date, time, or day of week, use the browser runtime clock." : "",
+    "## Workspace",
+    `Your working directory is: ${params.workspaceDir}`,
+    "Treat this directory as the single global workspace for file operations unless explicitly instructed otherwise.",
+    "",
+    "## Workspace Files (injected)",
+    "These user-editable files are loaded by OpenClaw and included below in Project Context.",
+    ""
+  ];
+  const extraSystemPrompt = String(params.extraSystemPrompt || "").trim();
+  if (extraSystemPrompt) {
+    lines.push("## Group Chat Context", extraSystemPrompt, "");
+  }
+  if (validContextFiles.length > 0) {
+    lines.push("# Project Context", "", "The following project context files have been loaded:");
+    if (hasSoulFile) {
+      lines.push(
+        "If SOUL.md is present, embody its persona and tone. Avoid stiff, generic replies; follow its guidance unless higher-priority instructions override it."
+      );
+    }
+    lines.push("");
+    for (const file of validContextFiles) {
+      lines.push(`## ${file.path}`, "", file.content, "");
+    }
+  }
+  lines.push(
+    "## Silent Replies",
+    `When you have nothing to say, respond with ONLY: ${SILENT_REPLY_TOKEN}`,
+    "",
+    "## Heartbeats",
+    "Heartbeat prompt: (configured)",
+    "If you receive a heartbeat poll (a user message matching the heartbeat prompt above), and there is nothing that needs attention, reply exactly:",
+    "HEARTBEAT_OK",
+    'OpenClaw treats a leading/trailing "HEARTBEAT_OK" as a heartbeat ack (and may discard it).',
+    'If something needs attention, do NOT include "HEARTBEAT_OK"; reply with the alert text instead.',
+    "",
+    "## Runtime",
+    buildLiteRuntimeLine(runtimeInfo, runtimeChannel, runtimeCapabilities, params.defaultThinkLevel),
+    "Reasoning: off (hidden unless on/stream). Reasoning mode is controlled by local model settings in this runtime."
+  );
+  return lines.filter(Boolean).join("\n");
+}
+function buildLiteSystemPrompt({ model, tools, contextFiles }) {
+  return buildLiteAgentSystemPrompt({
+    workspaceDir: "workspace/",
+    defaultThinkLevel: state.llmReasoning || "off",
+    extraSystemPrompt: "",
+    toolNames: (tools || []).map((tool) => tool.name),
+    toolSummaries: buildLiteToolSummaryMap(tools),
+    userTimezone: resolveWorkerTimezone(),
+    runtimeInfo: buildLiteRuntimeInfo(model),
+    contextFiles: Array.isArray(contextFiles) ? contextFiles : []
+  });
+}
 async function runAgentTurn(userText) {
   const prompt = {
     role: "user",
@@ -48370,10 +48677,24 @@ async function runAgentTurn(userText) {
     await persistTranscript();
     return;
   }
+  const tools = getLiteTools();
+  const workspacePrompt = await buildWorkspaceContextFiles();
+  if (workspacePrompt.usedFiles.length) {
+    log(
+      `workspace prompt loaded files=${workspacePrompt.usedFiles.join(",")} truncated=${workspacePrompt.truncatedFiles.length > 0 ? "1" : "0"}`
+    );
+  } else {
+    log("workspace prompt loaded no files");
+  }
+  const systemPrompt = buildLiteSystemPrompt({
+    model,
+    tools,
+    contextFiles: workspacePrompt.contextFiles
+  });
   const context = {
-    systemPrompt: "",
+    systemPrompt,
     messages: state.transcript.slice(),
-    tools: getLiteTools()
+    tools
   };
   const config = {
     model,

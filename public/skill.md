@@ -20,7 +20,7 @@ This is a **web playbook** skill:
 
 Runtime note (2026-02):
 - The default website path now uses the in-browser **OpenClaw Lite runtime bridge** for sigil/open/canvas/ceremony agent actions.
-- The external `/api/agent/*` flow in this skill remains supported for compatibility (`lite.driver=phase1` or explicit external-agent operation).
+- The external `/api/agent/*` flow in this skill remains supported for explicit external-agent operation.
 
 No accounts. No passwords. **The only credential is the Team Code** shown on the human’s page.
 If the human is reconnecting to an existing house, they will give you a `houseId` instead.

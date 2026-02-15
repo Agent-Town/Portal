@@ -29,8 +29,8 @@ async function configureLiteLlm(page, {
   await expect(page.getByTestId('lite-llm-api-key')).toBeVisible({ timeout: 2000 });
   await expect(page.getByTestId('lite-llm-save')).toBeVisible({ timeout: 2000 });
 
-  await page.getByTestId('lite-llm-provider').fill(provider);
-  await page.getByTestId('lite-llm-model').fill(model);
+  await page.getByTestId('lite-llm-provider').selectOption(provider);
+  await page.getByTestId('lite-llm-model').selectOption(model);
   await page.getByTestId('lite-llm-api-key').fill(apiKey);
   await page.getByTestId('lite-llm-save').click();
   await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready/i, { timeout: 2000 });
