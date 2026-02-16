@@ -50,3 +50,23 @@ npx playwright test e2e/02_match_unlock.spec.js
 - UX remains minimal.
 - API contract stays documented in `specs/02_api_contract.md`.
 - Skill remains correct and readable at `/skill.md`.
+
+## Skill Contract Convention (mandatory)
+
+To keep future skill and worker work safe, preserve this convention:
+
+- `public/skill.md` is the source of truth for the external-agent playbook.
+- `e2e/55_phase3_skill_contract_line.spec.js` is the baseline contract line for skill compatibility.
+- `docs/internal-skill-testline.md` tracks capability-to-test mapping and planned expansions.
+
+When changing skill behavior:
+
+- Update `public/skill.md`.
+- Update or extend `e2e/55_phase3_skill_contract_line.spec.js` (or add `e2e/56+` tests).
+- Update `docs/internal-skill-testline.md` with the new capability row and coverage.
+
+When changing worker behavior required by skill files (`skill.md` / `SKILL.md`):
+
+- Add deterministic Playwright coverage first (test-first).
+- Keep tests API-first and behavior-focused so UI reshuffles do not break contract validation.
+- Do not merge worker-skill changes unless the full suite passes (`npm test`).
