@@ -20,6 +20,25 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function safeSetText(elementId, value, fallback = '') {
+  const node = el(elementId);
+  if (!node) return null;
+  node.textContent = value == null ? fallback : value;
+  return node;
+}
+
+function readTextContent(elementId, fallback = '') {
+  const node = el(elementId);
+  return node && typeof node.textContent === 'string' ? node.textContent : fallback;
+}
+
+function safeSetClassList(node, className, add) {
+  if (!node || !node.classList) return;
+  node.classList.toggle(className, add);
+}
+
+let appPrivyConfig = null;
+
 let elements = [];
 let lastState = null;
 let redirecting = false;
@@ -36,12 +55,79 @@ const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 // startRole: 'human' | 'coop' | 'agent'
 let pathMode = 'coop';
+let activeDistrict = 'house';
+const districtViews = {
+  house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
+  townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
+  saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
+  pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
+  leaderboard: { title: 'Town Board', viewPath: '/views/leaderboard.html' }
+};
+const districtViewCache = new Map();
+let currentDistrict = null;
+let lastDistrictLoad = 0;
+let townBoardPollTimer = null;
+let touchPrimedDistrict = null;
+let touchPrimedAt = 0;
+let suppressDistrictClickUntil = 0;
+const TOUCH_PRIME_WINDOW_MS = 1500;
+const TOUCH_CLICK_SUPPRESS_MS = 700;
+const isTownHub = !!document.getElementById('districtMap') && !!document.getElementById('districtModalBackdrop');
+const popupDistrictByPath = {
+  '/leaderboard': 'leaderboard',
+  '/wall': 'leaderboard',
+  '/house': 'house'
+};
 
 function b64(bytes) {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
+
+async function loadPrivyConfigForApp() {
+  if (appPrivyConfig !== null) return appPrivyConfig;
+  try {
+    const resp = await fetch('/api/privy/config', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (!resp.ok) {
+      appPrivyConfig = { ok: false, enabled: false, appPath: '/app' };
+      return appPrivyConfig;
+    }
+    const payload = await resp.json().catch(() => null);
+    const enabled = payload && payload.enabled === true;
+    appPrivyConfig = {
+      ok: payload?.ok === true,
+      enabled,
+      appPath: payload?.appPath || '/app'
+    };
+    return appPrivyConfig;
+  } catch {
+    appPrivyConfig = { ok: false, enabled: false, appPath: '/app' };
+    return appPrivyConfig;
+  }
+}
+
+async function ensurePrivyAuthenticatedForHub() {
+  if (!isTownHub) return true;
+
+  const cfg = await loadPrivyConfigForApp();
+  if (!cfg || cfg.enabled !== true) return true;
+  if (!appWalletClient) return true;
+
+  try {
+    await connectWallet({ silent: true });
+  } catch {
+    // no-op; wallet actions will surface specific errors when needed.
+  }
+
+  updateWalletUI();
+  return true;
+}
+
 
 function base58Decode(str) {
   if (!str || typeof str !== 'string') return null;
@@ -260,6 +346,595 @@ function setPathMode(mode, { persist = true, refresh = true } = {}) {
   if (refresh && lastState) updateUI(lastState);
 }
 
+function districtStatusText(district) {
+  if (!district) return 'Select a district on the map.';
+  if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
+  if (district === 'saloon') return 'Saloon selected: reserved for future menu content.';
+  if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
+  if (district === 'leaderboard') return 'Town Board selected: public rankings and team snapshots.';
+  return 'Plan Wagons selected: unlock and enter your house flow.';
+}
+
+function setActiveDistrict(district) {
+  const next = district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+    ? district
+    : null;
+  activeDistrict = next;
+
+  document.querySelectorAll('.townDistrictHotspot[data-district]').forEach((hotspot) => {
+    const isActive = hotspot.getAttribute('data-district') === next;
+    hotspot.classList.toggle('is-active', isActive);
+    hotspot.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+
+  const status = el('townSceneStatus');
+  if (status) status.textContent = districtStatusText(next);
+}
+
+function normalizeDistrict(district) {
+  return district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+    ? district
+    : 'house';
+}
+
+function clearTouchDistrictPrime() {
+  touchPrimedDistrict = null;
+  touchPrimedAt = 0;
+}
+
+function clearDistrictSelection() {
+  clearTouchDistrictPrime();
+  setActiveDistrict(null);
+}
+
+function bindDistrictMapInteractions() {
+  if (!isTownHub) return;
+
+  const hotspots = document.querySelectorAll('.townDistrictHotspot[data-district]');
+  hotspots.forEach((hotspot) => {
+    const district = normalizeDistrict(hotspot.getAttribute('data-district') || 'house');
+
+    hotspot.addEventListener('pointerenter', (ev) => {
+      if (ev.pointerType === 'touch') return;
+      hotspot.classList.add('is-hovered');
+    });
+
+    hotspot.addEventListener('pointerleave', () => {
+      hotspot.classList.remove('is-hovered');
+    });
+
+    hotspot.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType !== 'touch') {
+        clearTouchDistrictPrime();
+        return;
+      }
+
+      suppressDistrictClickUntil = Date.now() + TOUCH_CLICK_SUPPRESS_MS;
+      const now = Date.now();
+      const isSecondTap = touchPrimedDistrict === district && (now - touchPrimedAt) <= TOUCH_PRIME_WINDOW_MS;
+
+      if (isSecondTap) {
+        clearTouchDistrictPrime();
+        ev.preventDefault();
+        showDistrict(district);
+        return;
+      }
+
+      touchPrimedDistrict = district;
+      touchPrimedAt = now;
+      setActiveDistrict(district);
+      ev.preventDefault();
+    });
+
+    hotspot.addEventListener('click', () => {
+      if (Date.now() <= suppressDistrictClickUntil) {
+        return;
+      }
+      clearTouchDistrictPrime();
+      showDistrict(district);
+    });
+  });
+
+  document.addEventListener('pointerdown', (ev) => {
+    const districtHotspot = ev.target && ev.target.closest ? ev.target.closest('.townDistrictHotspot[data-district]') : null;
+    if (!districtHotspot) {
+      clearDistrictSelection();
+    }
+  });
+}
+
+function clearTownBoardPoll() {
+  if (townBoardPollTimer) {
+    clearTimeout(townBoardPollTimer);
+    townBoardPollTimer = null;
+  }
+}
+
+function formatPublicHandle(value) {
+  if (!value) return '—';
+  const trimmed = String(value).trim();
+  if (!trimmed) return '—';
+  return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+}
+
+function renderTownBoard(data) {
+  const signups = el('townBoardSignups');
+  const teams = el('townBoardTeams');
+  const referrals = el('townBoardReferrals');
+  const list = el('townBoardList');
+  const empty = el('townBoardEmpty');
+  if (!signups || !teams || !referrals || !list || !empty) return;
+
+  signups.textContent = String(data?.signups ?? '—');
+  teams.textContent = String((data?.teams || []).length);
+  referrals.textContent = String(data?.referralsTotal ?? '—');
+
+  const publicTeams = Array.isArray(data?.teams) ? data.teams : [];
+  list.innerHTML = '';
+
+  if (!publicTeams.length) {
+    empty.classList.remove('is-hidden');
+    return;
+  }
+
+  empty.classList.add('is-hidden');
+  publicTeams.forEach((team) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const title = document.createElement('div');
+    const heading = document.createElement('strong');
+    heading.textContent = `Team ${team.shareId || '—'}`;
+    title.appendChild(heading);
+    card.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.appendChild(document.createTextNode(`Referrals: ${team.referrals || 0}`));
+    if (team.createdAt) {
+      meta.appendChild(document.createTextNode(` • Created: ${team.createdAt}`));
+    }
+    if (team.humanHandle || team.agentName || team.publicMedia?.prompt) {
+      meta.appendChild(document.createTextNode(' • '));
+      const human = team.humanHandle ? formatPublicHandle(team.humanHandle) : '';
+      const agent = team.agentName ? `agent: ${team.agentName}` : '';
+      const parts = [];
+      if (human) parts.push(`human: ${human}`);
+      if (agent) parts.push(agent);
+      const label = parts.length ? parts.join(' • ') : '';
+      meta.appendChild(document.createTextNode(label || ''));
+    }
+    card.appendChild(meta);
+
+    if (team.publicMedia?.imageUrl) {
+      const media = document.createElement('div');
+      media.className = 'public-media';
+      const img = document.createElement('img');
+      img.src = team.publicMedia.imageUrl;
+      img.alt = team.publicMedia.prompt ? `Public image: ${team.publicMedia.prompt}` : 'Public house image';
+      img.loading = 'lazy';
+      media.appendChild(img);
+      if (team.publicMedia.prompt) {
+        const caption = document.createElement('div');
+        caption.className = 'small';
+        caption.textContent = team.publicMedia.prompt;
+        media.appendChild(caption);
+      }
+      card.appendChild(media);
+    }
+
+    const links = document.createElement('div');
+    links.className = 'kv';
+
+    const share = document.createElement('a');
+    share.className = 'btn';
+    if (team.shareId) {
+      share.href = `/s/${team.shareId}`;
+      share.textContent = 'Open share';
+    } else {
+      share.textContent = 'Share unavailable';
+      share.href = '#';
+      share.classList.add('is-hidden');
+    }
+    links.appendChild(share);
+
+    if (team.publicMedia?.imageUrl && team.shareId) {
+      const mediaBtn = document.createElement('a');
+      mediaBtn.className = 'btn';
+      mediaBtn.href = `/s/${team.shareId}`;
+      mediaBtn.textContent = 'View public media';
+      links.appendChild(mediaBtn);
+    }
+    card.appendChild(links);
+    list.appendChild(card);
+  });
+}
+
+function scheduleTownBoardPoll() {
+  clearTownBoardPoll();
+  const loadOnce = async () => {
+    if (currentDistrict !== 'leaderboard' || !isTownHub) return;
+    try {
+      const data = await api('/api/leaderboard');
+      if (currentDistrict === 'leaderboard') {
+        renderTownBoard(data);
+      }
+    } catch {
+      // ignore polling failures
+    }
+    if (currentDistrict === 'leaderboard') {
+      townBoardPollTimer = setTimeout(loadOnce, 2000);
+    }
+  };
+  loadOnce();
+}
+
+function setModalBusy(isBusy) {
+  const body = el('districtModalBody');
+  if (!body) return;
+  safeSetClassList(body, 'is-loading', isBusy);
+}
+
+async function loadDistrictView(district) {
+  const safeDistrict = normalizeDistrict(district);
+  if (!districtViewCache.has(safeDistrict)) {
+    const source = districtViews[safeDistrict]?.viewPath;
+    if (!source) {
+      throw new Error(`Missing view for district: ${safeDistrict}`);
+    }
+    const resp = await fetch(source);
+    if (!resp.ok) {
+      throw new Error(`HTTP_${resp.status}`);
+    }
+    const text = await resp.text();
+    districtViewCache.set(safeDistrict, text);
+  }
+  return districtViewCache.get(safeDistrict);
+}
+
+function bindTownDistrictControls() {
+  const pathHumanBtn = el('pathHumanBtn');
+  if (pathHumanBtn) {
+    pathHumanBtn.onclick = () => setPathMode('human');
+  }
+
+  const pathCoopBtn = el('pathCoopBtn');
+  if (pathCoopBtn) {
+    pathCoopBtn.onclick = () => setPathMode('coop');
+  }
+
+  const pathAgentBtn = el('pathAgentBtn');
+  if (pathAgentBtn) {
+    pathAgentBtn.onclick = () => setPathMode('agent');
+  }
+
+  const tokenVerifyBtn = el('tokenVerifyBtn');
+  if (tokenVerifyBtn) {
+    tokenVerifyBtn.onclick = async () => {
+      setTokenError('');
+      setTokenStatus({ active: true, good: false, text: 'Checking wallet…' });
+      tokenVerifyBtn.disabled = true;
+      try {
+        const result = await verifyTokenOwnership();
+        if (result?.eligible) {
+          setTokenStatus({ active: true, good: true, text: 'Verified' });
+        } else {
+          setTokenStatus({ active: true, good: false, text: 'No $ELIZATOWN found' });
+        }
+      } catch (e) {
+        const msg = e.message === 'ALREADY_SIGNED_UP'
+          ? 'This session already signed up.'
+          : e.message === 'BAD_SIGNATURE'
+            ? 'Wallet signature failed.'
+            : e.message === 'SIGNATURE_FORMAT'
+              ? 'Wallet signature failed.'
+              : e.message === 'RPC_UNAVAILABLE'
+                ? 'Token check is unavailable. Try again.'
+                : e.message === 'NO_SOLANA_WALLET'
+                  ? 'No Privy-connected Solana wallet found.'
+                  : e.message === 'NO_SOLANA_SIGN'
+                    ? 'Wallet does not support message signing.'
+                    : e.message;
+        setTokenError(msg);
+        setTokenStatus({ active: true, good: false, text: 'Check failed' });
+      } finally {
+        tokenVerifyBtn.disabled = false;
+      }
+    };
+  }
+
+  const copyTeam = el('copyTeam');
+  if (copyTeam) {
+    copyTeam.onclick = async () => {
+      const msg = readTextContent('teamSnippet');
+      try {
+        await navigator.clipboard.writeText(msg);
+        copyTeam.textContent = 'Copied ✓';
+        setTimeout(() => (copyTeam.textContent = 'Copy team message'), 1200);
+      } catch {
+        alert(msg);
+      }
+    };
+  }
+
+  const copyHouse = el('copyHouse');
+  if (copyHouse) {
+    copyHouse.onclick = async () => {
+      const msg = readTextContent('houseSnippet');
+      try {
+        await navigator.clipboard.writeText(msg);
+        copyHouse.textContent = 'Copied ✓';
+        setTimeout(() => (copyHouse.textContent = 'Copy house message'), 1200);
+      } catch {
+        alert(msg);
+      }
+    };
+  }
+
+  const openBtn = el('openBtn');
+  if (openBtn) {
+    openBtn.onclick = async () => {
+      const openError = safeSetText('openError');
+      if (openError) openError.textContent = '';
+      try {
+        await api('/api/human/open/press', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+      } catch (e) {
+        if (openError) openError.textContent = `Error: ${e.message}`;
+      }
+    };
+  }
+}
+
+function isBlankOrModifierClick(event) {
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0;
+}
+
+function routeHasSameOrigin(rawHref) {
+  try {
+    const url = new URL(rawHref, window.location.href);
+    return url.origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
+function resolveDistrictRoute(rawHref) {
+  try {
+    const url = new URL(rawHref, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    const path = url.pathname;
+    if (popupDistrictByPath[path]) {
+      return { mode: 'district', district: popupDistrictByPath[path] };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function routeToPopupMode(rawHref) {
+  let parsed;
+  try {
+    parsed = new URL(rawHref, window.location.href);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== window.location.origin) return null;
+
+  const route = resolveDistrictRoute(parsed.pathname);
+  if (route) return route;
+
+  const path = parsed.pathname;
+  if (path === '/app' || path === '/') {
+    return { mode: 'leave', url: parsed.pathname };
+  }
+  if (path === '/start') {
+    return { mode: 'leave', url: '/start' };
+  }
+  if (path === '/inbox' || path.startsWith('/inbox/')) {
+    return {
+      mode: 'leave',
+      url: `${parsed.pathname}${parsed.search}${parsed.hash}`
+    };
+  }
+  if (path === '/create') {
+    return {
+      mode: 'leave',
+      url: `${parsed.pathname}${parsed.search}${parsed.hash}`
+    };
+  }
+  if (path === '/claim-wallet' || path === '/claim') {
+    return {
+      mode: 'leave',
+      url: path === '/claim' ? '/claim' : '/claim-wallet'
+    };
+  }
+  if (path === '/wall') {
+    return { mode: 'district', district: 'leaderboard' };
+  }
+  if (path.startsWith('/s/')) {
+    return {
+      mode: 'leave',
+      url: `${parsed.pathname}`
+    };
+  }
+
+  if (path === '/house') {
+    return { mode: 'district', district: 'house' };
+  }
+
+  return {
+    mode: 'leave',
+    url: `${parsed.pathname}${parsed.search}${parsed.hash}`
+  };
+}
+
+function extractSafeUrlFromEventTarget(linkEl) {
+  if (!linkEl) return '';
+  if (linkEl.getAttribute('target') === '_blank') return null;
+  if (linkEl.hasAttribute('download')) return null;
+  const href = linkEl.getAttribute('href');
+  if (!href || href.startsWith('javascript:') || href.startsWith('#')) return null;
+  if (!routeHasSameOrigin(href)) return null;
+  return href;
+}
+
+function onDistrictModalLinkClick(ev) {
+  const anchor = ev.target && ev.target.closest ? ev.target.closest('a') : null;
+  if (!anchor) return;
+  if (isBlankOrModifierClick(ev)) return;
+  const safeHref = extractSafeUrlFromEventTarget(anchor);
+  if (!safeHref) return;
+  const resolved = routeToPopupMode(safeHref);
+  if (!resolved) return;
+  ev.preventDefault();
+  if (resolved.mode === 'district') {
+    showDistrict(resolved.district);
+    return;
+  }
+  if (resolved.mode === 'leave') {
+    hideDistrict();
+    window.location.assign(resolved.url);
+    return;
+  }
+  if (resolved.mode === 'frame') {
+    openRouteInModalFrame(resolved.url, resolved.title);
+    return;
+  }
+}
+
+function openRouteInModalFrame(url, title) {
+  if (!isTownHub) return;
+
+  const body = el('districtModalBody');
+  const backdrop = el('districtModalBackdrop');
+  const modalTitle = el('districtModalTitle');
+  const safeTitle = title || 'District detail';
+  const loadId = ++lastDistrictLoad;
+  currentDistrict = null;
+  clearTownBoardPoll();
+
+  if (body) {
+    if (modalTitle) modalTitle.textContent = safeTitle;
+    body.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'districtFrameWrap';
+    const frame = document.createElement('iframe');
+    frame.className = 'districtFrame';
+    frame.title = safeTitle;
+    frame.loading = 'eager';
+    frame.setAttribute('referrerpolicy', 'no-referrer-when-downgrade');
+    frame.src = url;
+    wrap.appendChild(frame);
+    body.appendChild(wrap);
+    setModalBusy(true);
+    frame.addEventListener('load', () => {
+      if (loadId !== lastDistrictLoad) return;
+      setModalBusy(false);
+    });
+    frame.addEventListener('error', () => {
+      if (loadId !== lastDistrictLoad) return;
+      setModalBusy(false);
+      body.innerHTML = '<p class="small" style="color: var(--bad)">Could not load this page.</p>';
+    });
+    if (backdrop) backdrop.classList.remove('is-hidden');
+    backdrop.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('district-modal-open');
+  }
+}
+
+async function showDistrict(district) {
+  if (!isTownHub) return;
+
+  const safeDistrict = normalizeDistrict(district);
+  const currentLoad = ++lastDistrictLoad;
+  currentDistrict = safeDistrict;
+  setActiveDistrict(safeDistrict);
+
+  const modal = el('districtModalBackdrop');
+  const body = el('districtModalBody');
+  const title = el('districtModalTitle');
+  const cfg = districtViews[safeDistrict] || districtViews.house;
+
+  if (title) title.textContent = cfg.title;
+  if (modal) modal.classList.remove('is-hidden');
+  if (modal) modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('district-modal-open');
+  setModalBusy(true);
+
+  try {
+    const html = await loadDistrictView(safeDistrict);
+    if (lastDistrictLoad !== currentLoad) return;
+    if (body) {
+      body.innerHTML = html;
+      if (body.classList.contains('is-loading')) body.classList.remove('is-loading');
+    }
+    if (lastState) {
+      updateUI(lastState);
+    }
+    setModalBusy(false);
+    bindTownDistrictControls();
+    if (safeDistrict === 'leaderboard') {
+      scheduleTownBoardPoll();
+    } else {
+      clearTownBoardPoll();
+    }
+  } catch (e) {
+    if (lastDistrictLoad !== currentLoad) return;
+    if (body) {
+      body.classList.remove('is-loading');
+      body.innerHTML = `<p class="small" style="color: var(--bad)">Could not load this district: ${e.message}</p>`;
+    }
+    console.warn('Failed to load district view', e);
+  }
+}
+
+function hideDistrict() {
+  const modal = el('districtModalBackdrop');
+  currentDistrict = null;
+  lastDistrictLoad += 1;
+  clearTouchDistrictPrime();
+  if (modal) modal.classList.add('is-hidden');
+  if (modal) modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('district-modal-open');
+  const body = el('districtModalBody');
+  if (body) {
+    body.innerHTML = '';
+    body.classList.remove('is-loading');
+  }
+  clearTownBoardPoll();
+}
+
+function updateTownHubLinks(houseId) {
+  const targetHousePath = houseId ? `/house?house=${encodeURIComponent(houseId)}` : '/house';
+  const targetInboxPath = houseId ? `/inbox/${encodeURIComponent(houseId)}` : '#';
+
+  const townHallHouseLink = el('townHallHouseLink');
+  if (townHallHouseLink) townHallHouseLink.href = targetHousePath;
+
+  const townHallStatus = el('townHallStatus');
+  if (townHallStatus) {
+    townHallStatus.textContent = houseId
+      ? `House ${houseId} is available. Continue ERC-8004 ceremony and image updates.`
+      : 'Connect or recover a house first, then continue ERC-8004 ceremony and picture updates.';
+  }
+
+  const ponyInboxLink = el('ponyInboxLink');
+  if (ponyInboxLink) {
+    ponyInboxLink.href = targetInboxPath;
+    ponyInboxLink.setAttribute('aria-disabled', houseId ? 'false' : 'true');
+  }
+
+  const ponyInboxHint = el('ponyInboxHint');
+  if (ponyInboxHint) {
+    ponyInboxHint.textContent = houseId
+      ? `Inbox route ready for house ${houseId}.`
+      : 'Connect or recover a house to open a house-scoped inbox directly.';
+  }
+}
+
 function toggleAgentOnly(show) {
   document.querySelectorAll('.agent-only').forEach((el) => {
     el.classList.toggle('is-hidden', !show);
@@ -340,7 +1015,7 @@ async function maybeResetAfterWalletDisconnect() {
   const shouldResetForState = (st) => !!(
     st && (
       st.houseId
-      || (st.signup?.complete && st.signup?.mode === 'token')
+      || (st.signup?.complete && (st.signup?.mode === 'token' || st.signup?.mode === 'claim'))
     )
   );
 
@@ -475,6 +1150,7 @@ function setReconnectMode({ houseReady, role }) {
 
 function renderSigils(state) {
   const grid = el('sigilGrid');
+  if (!grid) return;
   grid.innerHTML = '';
 
   const humanSel = state.human?.selected || null;
@@ -536,24 +1212,25 @@ function updateUI(state) {
 
   const houseId = state.houseId || walletHouseId || null;
   const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
-  if (signupMode === 'token' && pathMode !== 'human') {
+  if ((signupMode === 'token' || signupMode === 'claim') && pathMode !== 'human') {
     setPathMode('human', { persist: true, refresh: false });
   }
-  const tokenMode = pathMode === 'human' || signupMode === 'token';
+  const tokenMode = pathMode === 'human' || signupMode === 'token' || signupMode === 'claim';
 
   // Counts (optional on index)
-  const signupCount = el('signupCount');
-  if (signupCount) signupCount.textContent = String(state.stats?.signups ?? '—');
+  safeSetText('signupCount', String(state.stats?.signups ?? '—'));
 
   // Team code (fallback for older servers that still send pairCode)
   const teamCode = state.teamCode || state.pairCode || '…';
-  el('teamCode').textContent = teamCode;
+  safeSetText('teamCode', teamCode);
 
   const origin = window.location.origin;
-  el('teamSnippet').textContent =
+  safeSetText(
+    'teamSnippet',
     pathMode === 'agent'
       ? `Use this base URL (${origin}) and connect with team code: ${teamCode}`
-      : `Read ${origin}/skill.md and team with code: ${teamCode}`;
+      : `Read ${origin}/skill.md and team with code: ${teamCode}`
+  );
 
   const houseNavLink = el('houseNavLink');
   if (houseNavLink) {
@@ -565,17 +1242,17 @@ function updateUI(state) {
       houseNavLink.href = '/house';
     }
   }
+  updateTownHubLinks(houseId);
 
   updatePathButtons();
-  const pathNote = el('pathNote');
-  if (pathNote) {
-    pathNote.textContent =
-      pathMode === 'human'
-        ? 'Human mode: solo house (token) + wallet reconnect.'
-        : pathMode === 'agent'
-          ? 'Agent mode: read skill.md and connect using a team code from a human.'
-          : 'Co-op mode: human + agent unlock together.';
-  }
+  safeSetText(
+    'pathNote',
+    pathMode === 'human'
+      ? 'Human mode: solo house (token) + wallet reconnect.'
+      : pathMode === 'agent'
+        ? 'Agent mode: read skill.md and connect using a team code from a human.'
+        : 'Co-op mode: human + agent unlock together.'
+  );
 
   // Agent status
   const connected = !!state.agent?.connected;
@@ -585,7 +1262,7 @@ function updateUI(state) {
   setReconnectMode({ houseReady: !!houseId, role: pathMode });
   toggleAgentOnly(pathMode !== 'human');
 
-  const tokenComplete = !!state.signup?.complete && signupMode === 'token';
+  const tokenComplete = !!state.signup?.complete && (signupMode === 'token' || signupMode === 'claim');
   const tokenCreateLink = el('tokenCreateLink');
   if (tokenCreateLink) {
     tokenCreateLink.style.display = tokenComplete ? 'inline-flex' : 'none';
@@ -598,49 +1275,47 @@ function updateUI(state) {
   }
 
   if (houseId) {
-    const title = el('reconnectTitle');
-    const intro = el('reconnectIntro');
-    if (title && intro) {
-      if (tokenMode) {
-        title.textContent = 'House ready';
-        intro.textContent = 'Your house is ready. Open it to unlock with your wallet.';
-      } else if (walletRecovered) {
-        title.textContent = 'Welcome back';
-        intro.textContent = 'We found a house for this wallet. Share this reconnect message with your agent if needed.';
-      } else {
-        title.textContent = 'Reconnect to House';
-        intro.textContent = 'Your house is ready. Share this reconnect message with your agent if needed.';
-      }
+    if (tokenMode) {
+      safeSetText('reconnectTitle', 'House ready');
+      safeSetText('reconnectIntro', 'Your house is ready. Open it to unlock with your wallet.');
+    } else if (walletRecovered) {
+      safeSetText('reconnectTitle', 'Welcome back');
+      safeSetText('reconnectIntro', 'We found a house for this wallet. Share this reconnect message with your agent if needed.');
+    } else {
+      safeSetText('reconnectTitle', 'Reconnect to House');
+      safeSetText('reconnectIntro', 'Your house is ready. Share this reconnect message with your agent if needed.');
     }
-    const houseSnippet = el('houseSnippet');
+    safeSetText('houseSnippet', `Read ${origin}/skill.md and reconnect to your house.`);
     const openHouseLink = el('openHouseLink');
-    if (houseSnippet) houseSnippet.textContent = `Read ${origin}/skill.md and reconnect to your house.`;
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
     return;
   }
 
+  const matched = !!state.match?.matched;
+  const matchState = el('matchState');
+  if (matchState) {
+    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.className = `state ${matched ? 'good' : 'bad'}`;
+  }
+
+  safeSetText('matchDetail', matched
+    ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
+    : 'Pick the same sigil to unlock.'
+  );
+
+  const openBtn = el('openBtn');
+  if (openBtn) openBtn.disabled = !matched;
+
+  const complete = !!state.signup?.complete && signupMode === 'agent';
+  const openReady = el('openReady');
+  if (openReady) openReady.style.display = complete ? 'inline-flex' : 'none';
+
+  const waiting = !!state.human?.openPressed && !complete;
+  const waitingNode = el('openWaiting');
+  if (waitingNode) waitingNode.style.display = waiting ? 'inline-flex' : 'none';
+
   // Sigils
   renderSigils(state);
-
-  // Match lock
-  const matched = !!state.match?.matched;
-  el('matchState').textContent = matched ? 'UNLOCKED' : 'LOCKED';
-  el('matchState').className = `state ${matched ? 'good' : 'bad'}`;
-  el('matchDetail').textContent = matched
-    ? `Matched on “${state.match.elementId}”. Now press Open together.`
-    : 'Pick the same sigil to unlock.';
-
-  // Open gating
-  const openBtn = el('openBtn');
-  openBtn.disabled = !matched;
-
-  // Signup completion
-  const complete = !!state.signup?.complete && signupMode === 'agent';
-  el('openReady').style.display = complete ? 'inline-flex' : 'none';
-
-  // Waiting pill: show if human pressed but not complete
-  const waiting = !!state.human?.openPressed && !complete;
-  el('openWaiting').style.display = waiting ? 'inline-flex' : 'none';
 
   // Auto-redirect only once per completed signup.
   let freshComplete = false;
@@ -694,6 +1369,31 @@ async function init() {
   const tokenErr = loadTokenError();
   pathMode = loadPathMode();
   updatePathButtons();
+  setActiveDistrict('house');
+
+  if (isTownHub) {
+    bindDistrictMapInteractions();
+
+    const closeBtn = el('districtModalClose');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => hideDistrict());
+    }
+
+    const backdrop = el('districtModalBackdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', (ev) => {
+        if (ev.target === backdrop) hideDistrict();
+      });
+    }
+
+    const modalBody = el('districtModalBody');
+    if (modalBody) {
+      modalBody.addEventListener('click', onDistrictModalLinkClick);
+    }
+  }
+
+  const canRun = await ensurePrivyAuthenticatedForHub();
+  if (!canRun) return;
 
   const session = await api('/api/session');
   elements = session.elements || [];
@@ -709,122 +1409,15 @@ async function init() {
     stats: session.stats
   });
 
+  if (isTownHub) {
+    await showDistrict(activeDistrict);
+  }
+
   if (tokenErr) {
     setPathMode('human', { persist: true, refresh: true });
     setTokenError(tokenErr);
     setTokenStatus({ active: true, good: false, text: 'Verify wallet to continue' });
   }
-
-  el('copyTeam').addEventListener('click', async () => {
-    const msg = el('teamSnippet').textContent;
-    try {
-      await navigator.clipboard.writeText(msg);
-      el('copyTeam').textContent = 'Copied ✓';
-      setTimeout(() => (el('copyTeam').textContent = 'Copy team message'), 1200);
-    } catch {
-      // Fallback
-      alert(msg);
-    }
-  });
-
-  const connectWalletBtn = el('connectWalletBtn');
-  if (connectWalletBtn) {
-    connectWalletBtn.addEventListener('click', async () => {
-      setWalletStatus('');
-      try {
-        if (walletAddr) {
-          await disconnectWallet();
-          setWalletStatus('Wallet disconnected.');
-          await maybeResetAfterWalletDisconnect();
-          return;
-        }
-        await connectWalletAndLookup();
-      } catch (e) {
-        setWalletStatus(
-          e.message === 'NO_SOLANA_WALLET'
-            ? 'No Privy-connected Solana wallet found.'
-            : e.message === 'NO_SOLANA_SIGN'
-              ? 'Wallet does not support message signing.'
-              : e.message,
-          true
-        );
-      }
-    });
-  }
-
-  const pathHumanBtn = el('pathHumanBtn');
-  if (pathHumanBtn) {
-    pathHumanBtn.addEventListener('click', () => setPathMode('human'));
-  }
-  const pathCoopBtn = el('pathCoopBtn');
-  if (pathCoopBtn) {
-    pathCoopBtn.addEventListener('click', () => setPathMode('coop'));
-  }
-  const pathAgentBtn = el('pathAgentBtn');
-  if (pathAgentBtn) {
-    pathAgentBtn.addEventListener('click', () => setPathMode('agent'));
-  }
-
-  const tokenVerifyBtn = el('tokenVerifyBtn');
-  if (tokenVerifyBtn) {
-    tokenVerifyBtn.addEventListener('click', async () => {
-      setTokenError('');
-      setTokenStatus({ active: true, good: false, text: 'Checking wallet…' });
-      tokenVerifyBtn.disabled = true;
-      try {
-        const result = await verifyTokenOwnership();
-        if (result?.eligible) {
-          setTokenStatus({ active: true, good: true, text: 'Verified' });
-        } else {
-          setTokenStatus({ active: true, good: false, text: 'No $ELIZATOWN found' });
-        }
-      } catch (e) {
-        const msg = e.message === 'ALREADY_SIGNED_UP'
-          ? 'This session already signed up.'
-          : e.message === 'BAD_SIGNATURE'
-            ? 'Wallet signature failed.'
-            : e.message === 'SIGNATURE_FORMAT'
-              ? 'Wallet signature failed.'
-            : e.message === 'RPC_UNAVAILABLE'
-              ? 'Token check is unavailable. Try again.'
-              : e.message === 'NO_SOLANA_WALLET'
-                ? 'No Privy-connected Solana wallet found.'
-                : e.message === 'NO_SOLANA_SIGN'
-                  ? 'Wallet does not support message signing.'
-                  : e.message;
-        if (tokenError) tokenError.textContent = msg;
-        setTokenStatus({ active: true, good: false, text: 'Check failed' });
-      } finally {
-        tokenVerifyBtn.disabled = false;
-      }
-    });
-  }
-
-  const copyHouse = el('copyHouse');
-  if (copyHouse) {
-    copyHouse.addEventListener('click', async () => {
-      const msg = el('houseSnippet').textContent;
-      try {
-        await navigator.clipboard.writeText(msg);
-        copyHouse.textContent = 'Copied ✓';
-        setTimeout(() => (copyHouse.textContent = 'Copy house message'), 1200);
-      } catch {
-        alert(msg);
-      }
-    });
-  }
-
-  el('openBtn').addEventListener('click', async () => {
-    el('openError').textContent = '';
-    try {
-      await api('/api/human/open/press', {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-    } catch (e) {
-      el('openError').textContent = `Error: ${e.message}`;
-    }
-  });
 
   updateWalletUI();
   restoreWalletConnection();

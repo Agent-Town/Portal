@@ -2,7 +2,6 @@
 
 (function initPrivyBridgeBootstrap() {
   const DEFAULT_PRIVY_SDK_MODULE_URL = 'https://esm.sh/@privy-io/js-sdk-core@0.60.0?bundle';
-  const PRIVY_AUTH_METHOD_KEY = 'agent_town_privy_auth_method';
 
   let cachedConfig = null;
   let configPromise = null;
@@ -20,22 +19,13 @@
   }
 
   function hasBridge() {
-    return !!window.__PRIVY_WALLET_BRIDGE__ || !!window.__PRIVY_MOCK__;
+    return !!window.__PRIVY_WALLET_BRIDGE__;
   }
 
   function getFactory() {
     if (typeof window.__PRIVY_BRIDGE_FACTORY__ === 'function') return window.__PRIVY_BRIDGE_FACTORY__;
     if (typeof window.createPrivyWalletBridge === 'function') return window.createPrivyWalletBridge;
     return null;
-  }
-
-  function getAuthMethodPreference() {
-    try {
-      const stored = window.localStorage.getItem(PRIVY_AUTH_METHOD_KEY);
-      return String(stored || '').trim().toLowerCase();
-    } catch {
-      return '';
-    }
   }
 
   function bytesToBase64(bytes) {
@@ -288,8 +278,6 @@
       user: null,
       solanaAccount: null,
       solanaProvider: null,
-      externalSolanaAddress: null,
-      externalSolanaProvider: null,
       evmAccount: null,
       evmProvider: null
     };
@@ -304,8 +292,6 @@
         state.user = null;
         state.solanaAccount = null;
         state.solanaProvider = null;
-        state.externalSolanaAddress = null;
-        state.externalSolanaProvider = null;
         state.evmAccount = null;
         state.evmProvider = null;
         return true;
@@ -350,99 +336,7 @@
       return state.user;
     }
 
-    function getExternalSolanaProvider() {
-      const provider = window.solana;
-      if (!provider || typeof provider.connect !== 'function' || typeof provider.signMessage !== 'function') return null;
-      return provider;
-    }
-
-    async function signExternalSolanaMessage(provider, messageBytes) {
-      if (!provider || typeof provider.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-      try {
-        return await provider.signMessage(messageBytes, 'utf8');
-      } catch (err) {
-        if (!errorContains(err, 'utf8')) {
-          throw err;
-        }
-      }
-      return provider.signMessage(messageBytes);
-    }
-
-    async function loginWithSolanaWallet({ interactive = true } = {}) {
-      try {
-        const provider = state.externalSolanaProvider || getExternalSolanaProvider();
-        if (!provider) throw new Error('NO_SOLANA_WALLET');
-
-        let connectResult = null;
-        if (provider.publicKey && provider.isConnected) {
-          connectResult = { publicKey: provider.publicKey };
-        } else if (!interactive) {
-          connectResult = await provider.connect({ onlyIfTrusted: true });
-        } else {
-          connectResult = await provider.connect();
-        }
-
-        const address = normalizeAddress(connectResult?.publicKey || provider.publicKey || connectResult?.address);
-        if (!address) throw new Error('NO_SOLANA_PUBKEY');
-
-        const existingUser = state.user || (await refreshUser());
-        if (!existingUser) {
-          if (!client.auth?.siws || typeof client.auth.siws.fetchNonce !== 'function' || typeof client.auth.siws.login !== 'function') {
-            throw new Error('PRIVY_SIWS_UNAVAILABLE');
-          }
-          if (typeof sdk.createSiwsMessage !== 'function') throw new Error('PRIVY_SIWS_HELPER_MISSING');
-
-          const attemptSiwsLogin = async () => {
-            const nonceOut = await client.auth.siws.fetchNonce({ address });
-            const nonce = String(nonceOut?.nonce || '').trim();
-            if (!nonce) throw new Error('PRIVY_SIWS_NONCE_FAILED');
-
-            const message = sdk.createSiwsMessage({
-              address,
-              nonce,
-              domain: window.location.host,
-              uri: window.location.origin
-            });
-            const signed = await signExternalSolanaMessage(provider, textBytes(message));
-            const signatureBytes = normalizeBytes(signed?.signature || signed);
-            if (!signatureBytes) throw new Error('SIGNATURE_FORMAT');
-
-            return client.auth.siws.login({
-              mode: 'login-or-sign-up',
-              message,
-              signature: bytesToBase58(signatureBytes),
-              opts: buildLoginOptions('solana')
-            });
-          };
-
-          try {
-            const out = await attemptSiwsLogin();
-            state.user = out?.user || null;
-          } catch (err) {
-            const downgraded = await downgradeClientIdIfNeeded(err);
-            if (!downgraded) throw err;
-            const out = await attemptSiwsLogin();
-            state.user = out?.user || null;
-          }
-        }
-
-        state.externalSolanaAddress = address;
-        state.externalSolanaProvider = provider;
-        return { user: state.user, address, provider };
-      } catch (err) {
-        if (errorContains(err, 'no_solana_wallet') || errorContains(err, 'no solana wallet')) {
-          throw buildPrivyError('PRIVY_EXTERNAL_WALLET_MISSING', err);
-        }
-        throw buildPrivyError('PRIVY_WALLET_LOGIN_FAILED', err);
-      }
-    }
-
     async function loginInteractive({ preferred = 'solana', loginUi = null } = {}) {
-      if (preferred === 'wallet') {
-        const out = await loginWithSolanaWallet({ interactive: true });
-        return out?.user || state.user;
-      }
-
       const method = String(config.loginMethod || 'email').trim().toLowerCase();
       if (method === 'guest') {
         try {
@@ -561,19 +455,7 @@
 
     return {
       ensureLoggedIn,
-      loginWithSolanaWallet: async ({ interactive = true } = {}) => {
-        const out = await loginWithSolanaWallet({ interactive });
-        return out?.user || null;
-      },
       connectSolana: async ({ silent = false } = {}) => {
-        const preferExternal = getAuthMethodPreference() === 'wallet' || !!state.externalSolanaProvider;
-        if (preferExternal) {
-          const ext = await loginWithSolanaWallet({ interactive: !silent });
-          if (ext && ext.address) {
-            return { address: ext.address, provider: ext.provider };
-          }
-        }
-
         const { account, provider } = await ensureSolanaProvider({ interactive: !silent });
         const address = normalizeAddress(account.public_key || account.address || null);
         if (!address) throw new Error('NO_SOLANA_PUBKEY');
@@ -588,27 +470,10 @@
         state.user = null;
         state.solanaAccount = null;
         state.solanaProvider = null;
-        if (state.externalSolanaProvider && typeof state.externalSolanaProvider.disconnect === 'function') {
-          try {
-            await state.externalSolanaProvider.disconnect();
-          } catch {
-            // ignore provider disconnect issues
-          }
-        }
-        state.externalSolanaAddress = null;
-        state.externalSolanaProvider = null;
         state.evmAccount = null;
         state.evmProvider = null;
       },
       signSolanaMessage: async ({ message = '', bytes = null } = {}) => {
-        if (state.externalSolanaProvider) {
-          const msgBytes = normalizeBytes(bytes) || textBytes(message);
-          const signed = await signExternalSolanaMessage(state.externalSolanaProvider, msgBytes);
-          const sig = normalizeBytes(signed?.signature || signed);
-          if (!sig) throw new Error('SIGNATURE_FORMAT');
-          return { signature: sig };
-        }
-
         const { provider } = await ensureSolanaProvider({ interactive: true });
         const msgBytes = normalizeBytes(bytes) || textBytes(message);
         const resp = await provider.request({
@@ -635,8 +500,6 @@
         state.user = null;
         state.solanaAccount = null;
         state.solanaProvider = null;
-        state.externalSolanaAddress = null;
-        state.externalSolanaProvider = null;
         state.evmAccount = null;
         state.evmProvider = null;
       },
@@ -759,24 +622,7 @@
   };
 
   window.ensurePrivyWalletLogin = async function ensurePrivyWalletLogin(options = {}) {
-    const interactive = !(options && options.interactive === false);
-    const ready = await bootstrapPrivyBridge();
-    if (!ready) return false;
-
-    const bridge = window.__PRIVY_WALLET_BRIDGE__;
-    if (!bridge || typeof bridge !== 'object') return false;
-
-    if (typeof bridge.loginWithSolanaWallet === 'function') {
-      const user = await bridge.loginWithSolanaWallet({ interactive });
-      return !!user;
-    }
-
-    if (typeof bridge.connectSolana === 'function') {
-      await bridge.connectSolana({ silent: !interactive });
-      return true;
-    }
-
-    return false;
+    return window.ensurePrivyLogin(options);
   };
 
   bootstrapPrivyBridge();

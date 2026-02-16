@@ -45,9 +45,10 @@ test('agent derives ceremony key and appends; human can decrypt in house UI', as
   await page.addInitScript(() => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 19) & 0xff;
-    window.solana = {
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMockAgentAppend11111111111111111111111' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockAgentAppend11111111111111111111111' } })
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So1anaMockAgentAppend11111111111111111111111' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockAgentAppend11111111111111111111111' } })
     };
   });
 

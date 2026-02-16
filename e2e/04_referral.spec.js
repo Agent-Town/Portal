@@ -33,21 +33,24 @@ test('house unlock is wallet-signature gated (mocked wallet)', async ({ page, re
   await page.addInitScript(() => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (255 - i) & 0xff;
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMock222222222222222222222222222222222' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMock222222222222222222222222222222222' } })
-    };
-
-    // Mock EVM wallet + Agent0 SDK for Phase 3 flow
-    window.ethereum = {
+    const solanaAddress = 'So1anaMock222222222222222222222222222222222';
+    const evmAddress = '0x1111111111111111111111111111111111111111';
+    const evmProvider = {
       request: async ({ method, params }) => {
-        if (method === 'eth_requestAccounts') return ['0x1111111111111111111111111111111111111111'];
+        if (method === 'eth_requestAccounts') return [evmAddress];
         if (method === 'eth_chainId') return '0xaa36a7'; // sepolia
         if (method === 'wallet_switchEthereumChain') return null;
-        // The SDK uses viem + wallet provider; in our mocked SDK we won't hit other methods.
-        throw new Error(`unmocked ethereum.request: ${method} ${JSON.stringify(params || [])}`);
+        if (method === 'personal_sign') return '0x';
+        throw new Error(`unmocked evmProvider.request: ${method} ${JSON.stringify(params || [])}`);
       }
+    };
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: solanaAddress }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => solanaAddress } }),
+      connectEvm: async () => ({ address: evmAddress }),
+      signEvmMessage: async () => '0x',
+      getEvmProvider: () => evmProvider
     };
 
     window.__AG0_SDK_MOCK = {

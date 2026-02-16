@@ -33,9 +33,10 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   await page.addInitScript(() => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 23) & 0xff;
-    window.solana = {
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } })
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So1anaMockPony1111111111111111111111111111111' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } })
     };
   });
 

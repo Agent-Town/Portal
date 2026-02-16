@@ -1559,7 +1559,7 @@ async function initSharePanel() {
       setShareRequirement('Share link is active. New signups from it count as referrals.');
       return;
     }
-    if (state.signup?.mode === 'token') {
+    if (state.signup?.mode === 'token' || state.signup?.mode === 'claim') {
       setShareRequirement('Token holder flow: generate a share link (no agent approval required).');
       return;
     }
@@ -1616,7 +1616,7 @@ async function initSharePanel() {
   function applyState(state) {
     lastState = state;
     teamCode = state?.teamCode || teamCode;
-    tokenMode = state?.signup?.mode === 'token';
+    tokenMode = state?.signup?.mode === 'token' || state?.signup?.mode === 'claim';
     if (state?.share?.id) shareIdForPosts = state.share.id;
     updateAgentStatus(!!state?.agent?.connected, state?.agent?.name || null);
     updatePressStatus(state);

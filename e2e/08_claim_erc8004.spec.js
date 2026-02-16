@@ -13,6 +13,17 @@ test('ERC-8004 claim (solo) -> create -> house unlock', async ({ page }) => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 7) & 0xff;
     const address = 'So1anaMockToken1111111111111111111111111111';
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({
+        address,
+        wallet: {
+          on: () => {},
+          off: () => {}
+        }
+      }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig })
+    };
     window.solana = {
       isPhantom: true,
       connect: async () => ({ publicKey: { toString: () => address } }),

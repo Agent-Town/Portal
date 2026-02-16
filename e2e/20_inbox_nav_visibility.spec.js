@@ -11,10 +11,10 @@ test('inbox nav stays visible for the current house after reload and lock', asyn
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 17) & 0xff;
     const address = 'So1anaMockToken1111111111111111111111111111';
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => address } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
     };
   });
 

@@ -6,10 +6,17 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('start page offers wallet login path and enters app when wallet login succeeds', async ({ page }) => {
+test('start page uses Privy email login only', async ({ page }) => {
   await page.addInitScript(() => {
     window.__PRIVY_BRIDGE_FACTORY__ = async () => ({
-      loginWithSolanaWallet: async () => ({ id: 'wallet-user' })
+      ensureLoggedIn: async ({ interactive, loginUi }) => {
+        if (!interactive || !loginUi) return null;
+        const email = await loginUi.requestEmail();
+        loginUi.notifyCodeSent({ email });
+        const code = await loginUi.requestCode({ email });
+        if (!code) return null;
+        return { id: 'wallet-user', email };
+      }
     });
   });
 
@@ -33,7 +40,16 @@ test('start page offers wallet login path and enters app when wallet login succe
   });
 
   await page.goto('/start');
-  await page.getByRole('button', { name: 'Connect wallet instead' }).click();
+  await expect(page.getByRole('button', { name: 'Connect wallet instead' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page.locator('[data-testid=\"privy-auth-box\"]')).toBeVisible();
+  await page.locator('#privyEmailInput').fill('wallet-only@example.com');
+  await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();
+  await expect(page.locator('#privyCodeForm')).toBeVisible();
+  await page.locator('#privyCodeInput').fill('123456');
+  await page.locator('#privyCodeForm').getByRole('button', { name: 'Verify code' }).click();
+
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.getByRole('button', { name: 'Open' })).toBeVisible();
 });

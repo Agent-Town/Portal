@@ -18,20 +18,24 @@ test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
     // Solana mock
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 17) & 0xff;
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMockMint11111111111111111111111111111' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockMint11111111111111111111111111111' } })
-    };
-
-    // EVM wallet mock
-    window.ethereum = {
+    const solanaAddress = 'So1anaMockMint11111111111111111111111111111';
+    const evmAddress = '0x000000000000000000000000000000000000dEaD';
+    const evmProvider = {
       request: async ({ method, params }) => {
-        if (method === 'eth_requestAccounts') return ['0x000000000000000000000000000000000000dEaD'];
+        if (method === 'eth_requestAccounts') return [evmAddress];
         if (method === 'eth_chainId') return '0xaa36a7'; // sepolia
         if (method === 'wallet_switchEthereumChain') return null;
-        throw new Error(`unhandled method ${method}`);
+        if (method === 'personal_sign') return '0x';
+        throw new Error(`unhandled method ${method} ${JSON.stringify(params || [])}`);
       }
+    };
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: solanaAddress }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => solanaAddress } }),
+      connectEvm: async () => ({ address: evmAddress, provider: evmProvider }),
+      signEvmMessage: async () => '0x',
+      getEvmProvider: () => evmProvider
     };
 
     // ag0 SDK mock

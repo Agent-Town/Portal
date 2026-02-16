@@ -15,9 +15,14 @@
       <img class="startLogo" src="/logo.jpg" alt="Agent Town logo" />
 
       <div class="startHero">
-        <video class="startVideo" autoplay muted loop playsinline preload="metadata" poster="/background.webp">
-          <source src="/hero-loop.mp4" type="video/mp4" />
-        </video>
+        <iframe
+          class="startVideo"
+          src="https://www.youtube.com/embed/ZW7tUUZqhdY?rel=0"
+          title="Agent Town intro video"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
 
         <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
           <h2 class="startAuthTitle">Sign in with Privy</h2>
@@ -48,6 +53,7 @@
       <p class="small startStatus" id="startStatus" aria-live="polite"></p>
     </section>
   </main>
+  <p class="startWarning" aria-label="AI warning">WARNING! CONTAINS AND PRODUCES AI SLOP</p>
 
   <script src="/privy_bridge.js?v=20260212"></script>
   <script src="/start.js?v=20260212"></script>

@@ -74,7 +74,7 @@
     }
 
     _bridge() {
-      return window.__PRIVY_WALLET_BRIDGE__ || window.__PRIVY_MOCK__ || null;
+      return window.__PRIVY_WALLET_BRIDGE__ || null;
     }
 
     _emit(event, payload) {
@@ -223,14 +223,6 @@
           return provider;
         }
       }
-      if (bridge && bridge.evm && bridge.evm.provider) {
-        this.evmProvider = bridge.evm.provider;
-        return this.evmProvider;
-      }
-      if (window.ethereum) {
-        this.evmProvider = window.ethereum;
-        return this.evmProvider;
-      }
       return null;
     }
 
@@ -244,44 +236,13 @@
         this._bindSolanaProvider(out?.wallet || out?.provider || null);
         return { chain: CHAIN_SOLANA, address };
       }
-      if (bridge && bridge.solana && typeof bridge.solana.connect === 'function') {
-        const opts = silent ? { onlyIfTrusted: true } : undefined;
-        const out = await bridge.solana.connect(opts);
-        const address = extractAddress(out?.publicKey || bridge.solana.publicKey || out?.address);
-        if (!address) throw new Error('NO_SOLANA_PUBKEY');
-        this.solanaAddress = address;
-        this._bindSolanaProvider(bridge.solana);
-        return { chain: CHAIN_SOLANA, address };
-      }
-
-      const provider = window.solana;
-      if (!provider || typeof provider.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
-      if (typeof provider.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-
-      let out = null;
-      if (provider.isConnected && provider.publicKey) {
-        out = { publicKey: provider.publicKey };
-      } else {
-        const opts = silent ? { onlyIfTrusted: true } : undefined;
-        out = await provider.connect(opts);
-      }
-      const address = extractAddress(out?.publicKey || provider.publicKey || out?.address);
-      if (!address) throw new Error('NO_SOLANA_PUBKEY');
-      this.solanaAddress = address;
-      this._bindSolanaProvider(provider);
-      return { chain: CHAIN_SOLANA, address };
+      throw new Error('NO_SOLANA_WALLET');
     }
 
     async _disconnectSolana() {
       const bridge = this._bridge();
       if (bridge && typeof bridge.disconnectSolana === 'function') {
         await bridge.disconnectSolana();
-      } else if (bridge && bridge.solana && typeof bridge.solana.disconnect === 'function') {
-        await bridge.solana.disconnect();
-      } else if (this.solanaProvider && typeof this.solanaProvider.disconnect === 'function') {
-        await this.solanaProvider.disconnect();
-      } else if (window.solana && typeof window.solana.disconnect === 'function') {
-        await window.solana.disconnect();
       }
       if (this.solanaUnsub) {
         this.solanaUnsub();
@@ -301,19 +262,7 @@
         if (!sig) throw new Error('SIGNATURE_FORMAT');
         return sig;
       }
-      if (bridge && bridge.solana && typeof bridge.solana.signMessage === 'function') {
-        const out = await bridge.solana.signMessage(msgBytes, 'utf8');
-        const sig = normalizeSignatureBytes(out?.signature || out);
-        if (!sig) throw new Error('SIGNATURE_FORMAT');
-        return sig;
-      }
-
-      const provider = this.solanaProvider || window.solana;
-      if (!provider || typeof provider.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-      const out = await provider.signMessage(msgBytes, 'utf8');
-      const sig = normalizeSignatureBytes(out?.signature || out);
-      if (!sig) throw new Error('SIGNATURE_FORMAT');
-      return sig;
+      throw new Error('NO_SOLANA_SIGN');
     }
 
     async _getEvmProvider() {
@@ -332,29 +281,13 @@
         if (out?.provider) this.evmProvider = out.provider;
         return { chain: CHAIN_EVM, address };
       }
-      if (bridge && bridge.evm && typeof bridge.evm.connect === 'function') {
-        const out = await bridge.evm.connect();
-        const address = extractAddress(out?.address || out?.account || out?.signer || out);
-        if (!address) throw new Error('NO_EVM_ACCOUNT');
-        this.evmAddress = address;
-        if (bridge.evm.provider) this.evmProvider = bridge.evm.provider;
-        return { chain: CHAIN_EVM, address };
-      }
-      const provider = await this._getEvmProvider();
-      const accounts = await provider.request({ method: 'eth_requestAccounts' });
-      const address = Array.isArray(accounts) && accounts.length ? extractAddress(accounts[0]) : null;
-      if (!address) throw new Error('NO_EVM_ACCOUNT');
-      this.evmAddress = address;
-      this.evmProvider = provider;
-      return { chain: CHAIN_EVM, address };
+      throw new Error('NO_EVM_WALLET');
     }
 
     async _disconnectEvm() {
       const bridge = this._bridge();
       if (bridge && typeof bridge.disconnectEvm === 'function') {
         await bridge.disconnectEvm();
-      } else if (bridge && bridge.evm && typeof bridge.evm.disconnect === 'function') {
-        await bridge.evm.disconnect();
       }
       this.evmAddress = null;
       this.evmProvider = null;
@@ -364,12 +297,6 @@
       const bridge = this._bridge();
       if (bridge && typeof bridge.signEvmMessage === 'function') {
         const out = await bridge.signEvmMessage({ message: String(message || ''), address: address || this.evmAddress });
-        const sig = typeof out?.signature === 'string' ? out.signature : typeof out === 'string' ? out : null;
-        if (!sig) throw new Error('SIGNATURE_FORMAT');
-        return sig;
-      }
-      if (bridge && bridge.evm && typeof bridge.evm.signMessage === 'function') {
-        const out = await bridge.evm.signMessage({ message: String(message || ''), address: address || this.evmAddress });
         const sig = typeof out?.signature === 'string' ? out.signature : typeof out === 'string' ? out : null;
         if (!sig) throw new Error('SIGNATURE_FORMAT');
         return sig;

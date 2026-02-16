@@ -135,6 +135,8 @@ async function init() {
   const requestedToken = params.get('mode') === 'token';
   const signupMode = st.signup?.mode || (st.signup?.complete ? 'agent' : null);
   const tokenMode = signupMode === 'token';
+  const claimMode = signupMode === 'claim';
+  const soloMode = tokenMode || claimMode;
   const tokenAddress = st.signup?.address || null;
   if (st.signup?.complete && st.signup?.createdAt) {
     try {
@@ -147,7 +149,7 @@ async function init() {
     window.location.href = '/';
     return;
   }
-  if (requestedToken && signupMode !== 'token') {
+  if (requestedToken && !soloMode) {
     try {
       localStorage.setItem('agentTownPathMode', 'token');
       localStorage.setItem('agentTownTokenError', 'Verify your wallet to create a token-gated house.');
@@ -159,13 +161,13 @@ async function init() {
   }
   const intro = el('createIntro');
   if (intro) {
-    intro.textContent = tokenMode
+    intro.textContent = soloMode
       ? 'Solo flow: paint a few pixels to seed your house key, then lock it in.'
       : 'Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.';
   }
   const nextNote = el('createNextNote');
   if (nextNote) {
-    nextNote.textContent = tokenMode
+    nextNote.textContent = soloMode
       ? 'Next: unlock the house with a wallet signature. You can invite an agent later.'
       : 'Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.';
   }
@@ -483,7 +485,7 @@ async function init() {
       // 1) Human computes Rh from canvas and commits with a reveal-exchange pubkey.
       const Rh = await deriveRhFromCanvas(pixels);
       const humanCommit = b64(await sha256(Rh));
-      if (!tokenMode && !ceremonyRevealPair) {
+      if (!soloMode && !ceremonyRevealPair) {
         ceremonyRevealPair = await crypto.subtle.generateKey(
           { name: 'ECDH', namedCurve: 'P-256' },
           true,
@@ -496,12 +498,12 @@ async function init() {
         method: 'POST',
         body: JSON.stringify({
           commit: humanCommit,
-          revealPub: tokenMode ? undefined : ceremonyRevealPub
+          revealPub: soloMode ? undefined : ceremonyRevealPub
         })
       });
 
       let Kroot = null;
-      if (tokenMode) {
+      if (soloMode) {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {

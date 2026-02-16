@@ -181,6 +181,145 @@ Errors:
 
 ---
 
+## Claimable reservations
+
+Reservations pre-assign deterministic `houseId`s that can later be claimed.
+
+Reservation kinds:
+- `x` (X handle claim)
+- `erc8004` (ERC-8004 owner-wallet claim, EVM or Solana)
+
+### POST `/api/reservations/x` (admin)
+Creates an X reservation for `@handle`.
+
+Body:
+```json
+{ "handle": "alice" }
+```
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response:
+```json
+{ "ok": true, "houseId": "<base58>", "status": "reserved" }
+```
+
+### POST `/api/reservations/erc8004` (admin)
+Creates an ERC-8004 reservation bound to an owner wallet.
+
+Body:
+```json
+{
+  "agentId": "11155111:0x...:947|11155111:947|solana:<asset>",
+  "claimChain": "evm|solana",
+  "ownerAddress": "0x...|<base58>",
+  "aliases": ["optional additional IDs"]
+}
+```
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response:
+```json
+{
+  "ok": true,
+  "reservationId": "rv_...",
+  "houseId": "<base58>",
+  "status": "reserved",
+  "claimChain": "evm|solana",
+  "agentId": "<canonical key>"
+}
+```
+
+### GET `/api/claim/x/challenge?handle=...` (human)
+Starts X claim challenge for a reserved handle.
+
+Response:
+```json
+{
+  "ok": true,
+  "handle": "alice",
+  "nonce": "<hex>",
+  "challenge": "AgentTown X Claim\\nhandle: @alice\\nnonce: ...",
+  "expiresInMs": 1800000
+}
+```
+
+Errors:
+- `RESERVATION_REQUIRED`
+- `INVALID_HANDLE`
+
+### POST `/api/claim/x/verify` (human)
+Verifies public X post challenge and binds session to the reserved `houseId`.
+
+Body:
+```json
+{ "handle": "alice", "nonce": "<hex>", "tweetUrl": "https://x.com/alice/status/..." }
+```
+
+Response:
+```json
+{ "ok": true, "verified": true, "houseId": "<base58>", "nextUrl": "/create?reserved=..." }
+```
+
+### GET `/api/claim/erc8004/nonce?agentId=...` (human)
+Starts ERC-8004 claim challenge for a reserved ERC-8004 identity.
+
+`agentId` formats currently accepted:
+- EVM short: `<chainId>:<tokenId>`
+- EVM full: `<chainId>:<contractAddress>:<tokenId>`
+- Solana: `solana:<asset>` (or bare `<asset>`)
+
+Response:
+```json
+{
+  "ok": true,
+  "nonce": "<hex>",
+  "message": "Agent Town ERC-8004 Claim\\nagentId: ...\\nnonce: ...",
+  "agentId": "<canonical agent id>",
+  "claimChain": "evm|solana"
+}
+```
+
+Errors:
+- `RESERVATION_REQUIRED`
+- `CLAIM_UNAVAILABLE`
+
+### POST `/api/claim/erc8004/verify` (human)
+Verifies claim signature against reservation owner wallet and binds session to reserved `houseId`.
+
+Body:
+```json
+{
+  "agentId": "<canonical agent id from nonce response>",
+  "nonce": "<hex>",
+  "signature": "<hex for EVM | base64 for Solana>",
+  "address": "<owner wallet address>"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "verified": true,
+  "claimChain": "evm|solana",
+  "houseId": "<base58>",
+  "nextUrl": "/create?reserved=..."
+}
+```
+
+Errors:
+- `NONCE_MISMATCH`
+- `BAD_SIGNATURE`
+- `OWNER_MISMATCH`
+- `RESERVATION_REQUIRED`
+- `CLAIM_UNAVAILABLE`
+
+---
+
 ## Anchors (ERC-8004 routing directory)
 
 House anchor links are stored in the **E2EE house vault**, so the server cannot read them.

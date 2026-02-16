@@ -103,7 +103,7 @@ test('existing legacy-unlock house remains unlockable via Privy wallet mock with
       const sig = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
 
-      window.__PRIVY_MOCK__ = {
+      window.__PRIVY_WALLET_BRIDGE__ = {
         connectSolana: async () => ({ address: walletAddress }),
         disconnectSolana: async () => {},
         signSolanaMessage: async () => ({ signature: sig })

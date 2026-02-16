@@ -1,11 +1,11 @@
-const PRIVY_AUTH_METHOD_KEY = 'agent_town_privy_auth_method';
-
 function setStatus(msg, isError = false) {
   const el = document.getElementById('startStatus');
   if (!el) return;
   el.textContent = msg || '';
   el.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
 }
+
+let cachedPrivyConfig = null;
 
 function explainPrivyError(err) {
   const code = err && typeof err.code === 'string' ? err.code : '';
@@ -36,6 +36,37 @@ async function fetchPrivyConfig() {
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+async function getCachedPrivyConfig() {
+  if (cachedPrivyConfig) return cachedPrivyConfig;
+  cachedPrivyConfig = await fetchPrivyConfig();
+  return cachedPrivyConfig;
+}
+
+async function maybeAutoSkipStart() {
+  // Skip the start screen only for the default entry path
+  // when Privy is already logged in.
+  if (window.location.pathname !== '/') return;
+
+  const cfg = await getCachedPrivyConfig();
+  const appPath = cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
+
+  if (!cfg || cfg.enabled !== true) {
+    window.location.replace(appPath);
+    return;
+  }
+
+  if (typeof window.ensurePrivyLogin !== 'function') return;
+
+  try {
+    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
+    if (alreadySignedIn) {
+      window.location.replace(appPath);
+    }
+  } catch {
+    // no-op; let user continue manually
+  }
 }
 
 function createLoginUi() {
@@ -128,15 +159,6 @@ function createLoginUi() {
   };
 }
 
-function setAuthPreference(method) {
-  try {
-    if (!method) return;
-    localStorage.setItem(PRIVY_AUTH_METHOD_KEY, String(method));
-  } catch {
-    // ignore storage failures
-  }
-}
-
 function setEntryButtonsDisabled(disabled) {
   const enterBtn = document.getElementById('enterBtn');
   if (enterBtn) enterBtn.disabled = !!disabled;
@@ -147,7 +169,7 @@ async function handleEnter() {
 
   const loginUi = createLoginUi();
   try {
-    const cfg = await fetchPrivyConfig();
+    const cfg = await getCachedPrivyConfig();
     const appPath = cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
 
     if (!cfg || cfg.enabled !== true) {
@@ -160,7 +182,6 @@ async function handleEnter() {
     ok = typeof window.ensurePrivyLogin === 'function'
       ? await window.ensurePrivyLogin({ interactive: true, loginUi })
       : false;
-    if (ok) setAuthPreference('email');
 
     if (!ok) throw new Error('PRIVY_LOGIN_FAILED');
 
@@ -176,6 +197,8 @@ async function handleEnter() {
 }
 
 function boot() {
+  maybeAutoSkipStart().catch(() => {});
+
   const enterBtn = document.getElementById('enterBtn');
   if (enterBtn) {
     enterBtn.addEventListener('click', () => {

@@ -774,7 +774,7 @@ const PRIVY_ENABLED_RAW = !!PRIVY_PUBLIC_CONFIG.appId;
 const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, false);
 const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
 const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
-const HOME_ROUTE_FILE = START_PAGE_ENABLED ? 'start.html' : 'index.html';
+const HOME_ROUTE_FILE = 'start.html';
 
 const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
 const PRIVY_SCRIPT_SRC_DEFAULT = [
@@ -812,6 +812,8 @@ const CONNECT_SRC = [...new Set(connectSrc)];
 const CSP_FRAME_SRC_EXTRA = splitCsvEnv(process.env.CSP_FRAME_SRC_EXTRA);
 const frameSrc = [
   "'self'",
+  'https://www.youtube.com',
+  'https://www.youtube-nocookie.com',
   ...(PRIVY_ENABLED ? ['https://auth.privy.io', 'https://*.privy.io', 'https://*.privy.app', 'https://*.privy.com'] : []),
   ...CSP_FRAME_SRC_EXTRA
 ];
@@ -1539,6 +1541,84 @@ app.get('/api/reservations/x', (req, res) => {
   res.json({ ok: true, houseId: rec.houseId, status: rec.status || 'reserved' });
 });
 
+app.post('/api/reservations/erc8004', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  const agentIdRaw = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : '';
+  if (!agentIdRaw) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+
+  const claimChainRaw = typeof req.body?.claimChain === 'string' ? req.body.claimChain.trim().toLowerCase() : '';
+  const claimChain = claimChainRaw || guessClaimChain(agentIdRaw) || 'evm';
+  if (claimChain !== 'evm' && claimChain !== 'solana') {
+    return res.status(400).json({ ok: false, error: 'INVALID_CLAIM_CHAIN' });
+  }
+
+  const ownerAddressRaw = typeof req.body?.ownerAddress === 'string' ? req.body.ownerAddress.trim() : '';
+  const ownerAddress = claimChain === 'evm'
+    ? normalizeEvmAddress(ownerAddressRaw)
+    : normalizeSolanaAddress(ownerAddressRaw);
+  if (!ownerAddress) return res.status(400).json({ ok: false, error: 'INVALID_OWNER_ADDRESS' });
+
+  const aliasesRaw = Array.isArray(req.body?.aliases) ? req.body.aliases : [];
+  const aliases = [];
+  for (const alias of aliasesRaw) {
+    if (typeof alias !== 'string') continue;
+    const clean = alias.trim();
+    if (!clean) continue;
+    aliases.push(clean);
+  }
+  const agentId = claimChain === 'evm' ? agentIdRaw.toLowerCase() : agentIdRaw;
+  const claimAliases = [...new Set([agentId, ...aliases.map((a) => (claimChain === 'evm' ? a.toLowerCase() : a))])];
+
+  const store = readStore();
+  store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
+  const existing = store.reservations.find((r) =>
+    r
+      && r.kind === 'erc8004'
+      && listErc8004ClaimAliases(r).some((alias) => reservationAliasMatchesInput(alias, agentId)),
+  );
+  if (existing) {
+    return res.json({
+      ok: true,
+      already: true,
+      reservationId: existing.id,
+      houseId: existing.houseId,
+      status: existing.status || 'reserved'
+    });
+  }
+
+  const houseId = reservedHouseId('erc8004', agentId);
+  const record = {
+    id: `rv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'erc8004',
+    key: agentId,
+    houseId,
+    status: 'reserved',
+    verifiedAt: null,
+    claimedAt: null,
+    meta: {
+      source: 'manual_admin',
+      claimChain,
+      ownerAddress,
+      agentId,
+      claimAliases
+    }
+  };
+
+  store.reservations.push(record);
+  writeStore(store);
+
+  res.json({
+    ok: true,
+    reservationId: record.id,
+    houseId: record.houseId,
+    status: record.status,
+    claimChain,
+    agentId
+  });
+});
+
 app.post('/api/human/select', (req, res) => {
   const s = ensureHumanSession(req, res);
   const elementId = typeof req.body?.elementId === 'string' ? req.body.elementId.trim() : '';
@@ -1850,22 +1930,24 @@ app.get('/api/agent/house/material', (req, res) => {
 app.post('/api/share/create', (req, res) => {
   const s = ensureHumanSession(req, res);
   const tokenMode = s.signup?.mode === 'token';
+  const claimMode = s.signup?.mode === 'claim';
+  const soloMode = tokenMode || claimMode;
   const tokenVerifiedAt = s.token?.verifiedAt || null;
   const tokenVerifiedAddress = s.token?.address || null;
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.human = true;
-  if (tokenMode) {
+  if (soloMode) {
     s.shareApproval.agent = true;
     if (!s.agent.name) s.agent.name = '$ELIZATOWN';
   }
   if (!s.houseCeremony?.houseId) return res.status(403).json({ ok: false, error: 'HOUSE_NOT_READY' });
-  if (!tokenMode) {
+  if (!soloMode) {
     if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
       || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
     }
     if (!s.agent?.connected) return res.status(403).json({ ok: false, error: 'AGENT_REQUIRED' });
-  } else {
+  } else if (tokenMode) {
     const now = Date.now();
     if (!tokenVerifiedAt || now - tokenVerifiedAt > TOKEN_VERIFY_TTL_MS) {
       return res.status(403).json({ ok: false, error: 'TOKEN_CHECK_REQUIRED' });
@@ -1886,9 +1968,9 @@ app.post('/api/share/create', (req, res) => {
   const record = {
     id: shareId,
     createdAt: nowIso(),
-    matchedElement: tokenMode ? null : s.match.elementId,
-    agentName: tokenMode ? (s.agent.name || '$ELIZATOWN') : s.agent.name,
-    mode: tokenMode ? 'token' : 'agent',
+    matchedElement: soloMode ? null : s.match.elementId,
+    agentName: soloMode ? (s.agent.name || '$ELIZATOWN') : s.agent.name,
+    mode: soloMode ? 'token' : 'agent',
     houseId: s.houseCeremony?.houseId || null,
     // These are optionally added later:
     xPostUrl: s.human.xPostUrl,
@@ -2839,6 +2921,116 @@ function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs
   ].join('\n');
 }
 
+function buildErc8004ClaimMessage({ agentId, nonce }) {
+  return [
+    'Agent Town ERC-8004 Claim',
+    `agentId: ${agentId}`,
+    `nonce: ${nonce}`
+  ].join('\n');
+}
+
+function normalizeEvmAddress(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(v)) return null;
+  return v;
+}
+
+function normalizeSolanaAddress(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (!v) return null;
+  const bytes = base58Decode(v);
+  if (!bytes || bytes.length !== 32) return null;
+  return v;
+}
+
+function guessClaimChain(value) {
+  const v = typeof value === 'string' ? value.trim() : '';
+  if (!v) return null;
+  if (/^solana:/i.test(v)) return 'solana';
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(v)) return 'solana';
+  return 'evm';
+}
+
+function listErc8004ClaimAliases(reservation) {
+  if (!reservation || typeof reservation !== 'object') return [];
+  const aliases = new Set();
+  if (typeof reservation.key === 'string' && reservation.key.trim()) aliases.add(reservation.key.trim());
+  const claimAliases = reservation.meta?.claimAliases;
+  if (Array.isArray(claimAliases)) {
+    for (const alias of claimAliases) {
+      if (typeof alias !== 'string') continue;
+      const clean = alias.trim();
+      if (!clean) continue;
+      aliases.add(clean);
+    }
+  }
+  if (typeof reservation.meta?.agentId === 'string' && reservation.meta.agentId.trim()) {
+    aliases.add(reservation.meta.agentId.trim());
+  }
+  return [...aliases];
+}
+
+function reservationAliasMatchesInput(alias, input) {
+  if (alias === input) return true;
+
+  // EVM IDs are case-insensitive; Solana asset IDs remain case-sensitive.
+  const evmLike = alias.startsWith('evm:')
+    || /^\d+:/.test(alias)
+    || alias.includes('0x')
+    || input.startsWith('evm:')
+    || /^\d+:/.test(input)
+    || input.includes('0x');
+  if (!evmLike) return false;
+  return alias.toLowerCase() === input.toLowerCase();
+}
+
+function resolveErc8004ClaimReservation(store, inputAgentId) {
+  const cleanInput = typeof inputAgentId === 'string' ? inputAgentId.trim() : '';
+  if (!cleanInput) return null;
+
+  const candidates = (store.reservations || []).filter(
+    (r) => r && r.kind === 'erc8004' && (r.status || 'reserved') !== 'deleted',
+  );
+
+  for (const reservation of candidates) {
+    const aliases = listErc8004ClaimAliases(reservation);
+    if (aliases.some((alias) => reservationAliasMatchesInput(alias, cleanInput))) {
+      const chain = reservation.meta?.claimChain || guessClaimChain(reservation.key);
+      const ownerRaw = reservation.meta?.ownerAddress;
+      const ownerAddress = chain === 'evm'
+        ? normalizeEvmAddress(ownerRaw)
+        : chain === 'solana'
+          ? normalizeSolanaAddress(ownerRaw)
+          : null;
+      if (!ownerAddress) return null;
+      const canonicalAgentId = typeof reservation.meta?.agentId === 'string' && reservation.meta.agentId.trim()
+        ? reservation.meta.agentId.trim()
+        : reservation.key;
+      return {
+        reservation,
+        claimChain: chain,
+        ownerAddress,
+        canonicalAgentId
+      };
+    }
+  }
+  return null;
+}
+
+function verifyEvmClaimSignature({ message, signature, address }) {
+  const expected = normalizeEvmAddress(address);
+  if (!expected) return false;
+  let recovered = '';
+  try {
+    recovered = verifyMessage(message, signature) || '';
+  } catch {
+    return false;
+  }
+  return recovered.toLowerCase() === expected;
+}
+
 app.get('/api/anchors/nonce', (req, res) => {
   const s = ensureHumanSession(req, res);
   const nonce = makeAnchorNonce();
@@ -3068,13 +3260,66 @@ app.post('/api/token/verify', async (req, res) => {
 app.get('/api/claim/erc8004/nonce', (req, res) => {
   const s = ensureHumanSession(req, res);
   const agentId = typeof req.query?.agentId === 'string' ? req.query.agentId.trim() : '';
+  const forceRealInTest = String(req.query?.real || '').trim() === '1';
   if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
 
-  // Minimal nonce for e2e scaffolding; real ERC-8004 verification TBD.
   const nonce = randomHex(16);
+  const testBypass = process.env.NODE_ENV === 'test'
+    && !forceRealInTest
+    && String(process.env.ENABLE_REAL_ERC8004_CLAIMS_IN_TEST || '').trim() !== 'true';
+
+  if (testBypass) {
+    const message = buildErc8004ClaimMessage({ agentId, nonce });
+    s.claim = s.claim || {};
+    s.claim.erc8004 = {
+      agentId,
+      nonce,
+      message,
+      claimChain: null,
+      ownerAddress: null,
+      reservedHouseId: null,
+      reservationId: null,
+      createdAt: Date.now(),
+      testBypass: true
+    };
+    return res.json({ ok: true, nonce, message, claimChain: null, agentId });
+  }
+
+  const store = readStore();
+  const resolved = resolveErc8004ClaimReservation(store, agentId);
+  if (!resolved || !resolved.reservation) {
+    return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+  }
+  const reservationStatus = resolved.reservation.status || 'reserved';
+  if (reservationStatus === 'claimed') {
+    return res.status(409).json({ ok: false, error: 'CLAIM_UNAVAILABLE' });
+  }
+
+  const message = buildErc8004ClaimMessage({
+    agentId: resolved.canonicalAgentId,
+    nonce
+  });
+
   s.claim = s.claim || {};
-  s.claim.erc8004 = { agentId, nonce, createdAt: Date.now() };
-  res.json({ ok: true, nonce });
+  s.claim.erc8004 = {
+    agentId: resolved.canonicalAgentId,
+    nonce,
+    message,
+    claimChain: resolved.claimChain,
+    ownerAddress: resolved.ownerAddress,
+    reservedHouseId: resolved.reservation.houseId || null,
+    reservationId: resolved.reservation.id || null,
+    createdAt: Date.now(),
+    testBypass: false
+  };
+
+  res.json({
+    ok: true,
+    nonce,
+    message,
+    agentId: resolved.canonicalAgentId,
+    claimChain: resolved.claimChain
+  });
 });
 
 app.post('/api/claim/erc8004/verify', (req, res) => {
@@ -3088,26 +3333,116 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
   if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
 
   const expected = s.claim?.erc8004;
-  if (!expected || expected.agentId !== agentId) {
+  if (!expected) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (!reservationAliasMatchesInput(expected.agentId || '', agentId)) {
     return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
   }
   if (expected.nonce !== nonce) {
     return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
   }
 
-  // Test-mode shortcut: accept any non-empty signature.
-  if (process.env.NODE_ENV !== 'test') {
-    return res.status(501).json({ ok: false, error: 'NOT_IMPLEMENTED' });
+  const message = typeof expected.message === 'string' && expected.message
+    ? expected.message
+    : buildErc8004ClaimMessage({ agentId, nonce });
+  const claimedAddress = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+  const claimChain = expected.claimChain;
+
+  if (expected.testBypass === true) {
+    s.signup = s.signup || {};
+    s.signup.complete = true;
+    s.signup.mode = 'claim';
+    s.signup.address = null;
+    s.claim.erc8004.address = claimedAddress || null;
+    s.claim.erc8004.claimChain = null;
+    s.claim.erc8004.verifiedAt = Date.now();
+    return res.json({ ok: true, verified: true, nextUrl: '/create' });
   }
 
-  // Mark signup as complete so /create is a usable human-only flow in tests.
+  if (!claimChain || !expected.ownerAddress) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (!claimedAddress) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+
+  let verified = false;
+  if (claimChain === 'evm') {
+    const owner = normalizeEvmAddress(expected.ownerAddress);
+    const address = normalizeEvmAddress(claimedAddress);
+    if (!owner || !address || owner !== address) {
+      return res.status(401).json({ ok: false, error: 'OWNER_MISMATCH' });
+    }
+    verified = verifyEvmClaimSignature({ message, signature, address });
+  } else if (claimChain === 'solana') {
+    const owner = normalizeSolanaAddress(expected.ownerAddress);
+    const address = normalizeSolanaAddress(claimedAddress);
+    if (!owner || !address || owner !== address) {
+      return res.status(401).json({ ok: false, error: 'OWNER_MISMATCH' });
+    }
+    verified = verifySolanaSignature(address, message, signature);
+  } else {
+    return res.status(400).json({ ok: false, error: 'UNSUPPORTED_CLAIM_CHAIN' });
+  }
+  if (!verified) return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  if (s.signup.complete && s.signup.mode && s.signup.mode !== 'claim') {
+    return res.status(409).json({ ok: false, error: 'ALREADY_SIGNED_UP' });
+  }
+
+  const store = readStore();
+  const reservation = (store.reservations || []).find(
+    (r) => r && r.kind === 'erc8004' && r.id === expected.reservationId,
+  );
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+  if ((reservation.status || 'reserved') === 'claimed') {
+    return res.status(409).json({ ok: false, error: 'CLAIM_UNAVAILABLE' });
+  }
+
+  const now = nowIso();
+  reservation.status = 'verified';
+  reservation.verifiedAt = now;
+
+  store.claims = Array.isArray(store.claims) ? store.claims : [];
+  const claimAddressCmp = claimChain === 'evm' ? claimedAddress.toLowerCase() : claimedAddress;
+  const existingClaim = store.claims.find((c) =>
+    c
+      && c.kind === 'erc8004'
+      && c.reservationId === reservation.id
+      && typeof c.address === 'string'
+      && (claimChain === 'evm' ? c.address.toLowerCase() : c.address) === claimAddressCmp,
+  );
+  if (!existingClaim) {
+    store.claims.push({
+      id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      createdAt: now,
+      kind: 'erc8004',
+      claimChain,
+      agentId: expected.agentId,
+      address: claimedAddress,
+      reservationId: reservation.id,
+      houseId: reservation.houseId
+    });
+  }
+  writeStore(store);
+
+  // Bind this session to the reserved house from the verified claim.
+  s.reservedHouseId = reservation.houseId;
+
   s.signup = s.signup || {};
   s.signup.complete = true;
-  s.signup.mode = 'token';
-  s.signup.address = s.signup.address || (typeof req.body?.address === 'string' ? req.body.address.trim() : null);
+  s.signup.mode = 'claim';
+  s.signup.address = null;
+  s.claim.erc8004.address = claimedAddress;
+  s.claim.erc8004.claimChain = claimChain;
+  s.claim.erc8004.reservedHouseId = reservation.houseId;
 
   s.claim.erc8004.verifiedAt = Date.now();
-  res.json({ ok: true, verified: true, nextUrl: '/create' });
+  res.json({
+    ok: true,
+    verified: true,
+    claimChain,
+    houseId: reservation.houseId,
+    nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}`
+  });
 });
 
 // --- X claim (public post challenge) ---
@@ -3267,7 +3602,9 @@ app.post('/api/house/init', (req, res) => {
     return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
   }
   const tokenMode = s.signup?.mode === 'token';
-  if (!tokenMode) {
+  const claimMode = s.signup?.mode === 'claim';
+  const soloMode = tokenMode || claimMode;
+  if (!soloMode) {
     if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
       || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
@@ -3277,6 +3614,13 @@ app.post('/api/house/init', (req, res) => {
   const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
   if (enforcedReserved && enforcedReserved !== houseId) {
     return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
+  }
+  if (claimMode && s.claim?.erc8004?.claimChain === 'solana' && typeof s.claim?.erc8004?.address === 'string') {
+    const expectedAddress = normalizeSolanaAddress(s.claim.erc8004.address);
+    const unlockAddress = normalizeSolanaAddress(unlockAddressForLookup(unlock));
+    if (expectedAddress && unlockAddress !== expectedAddress) {
+      return res.status(403).json({ ok: false, error: 'CLAIM_ADDRESS_MISMATCH' });
+    }
   }
   if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
     return res.status(409).json({ ok: false, error: 'HOUSE_ALREADY_EXISTS' });
@@ -3336,6 +3680,15 @@ app.post('/api/house/init', (req, res) => {
       }
       : null
   });
+
+  if (enforcedReserved) {
+    const reservation = (store.reservations || []).find((r) => r && r.houseId === houseId);
+    if (reservation) {
+      reservation.status = 'claimed';
+      reservation.verifiedAt = reservation.verifiedAt || nowIso();
+      reservation.claimedAt = nowIso();
+    }
+  }
 
   emitMilestone(store, {
     houseId,
@@ -3706,7 +4059,8 @@ app.get('/start', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'start.html'
 app.get('/app', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
-app.get('/claim', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'claim.html')));
+app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
+app.get('/claim-wallet', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'claim-wallet.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
