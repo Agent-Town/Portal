@@ -756,8 +756,9 @@ function routeToPopupMode(rawHref) {
   }
   if (path.startsWith('/s/')) {
     return {
-      mode: 'leave',
-      url: `${parsed.pathname}`
+      mode: 'frame',
+      url: `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      title: 'Share'
     };
   }
 
@@ -805,6 +806,13 @@ function onDistrictModalLinkClick(ev) {
   }
 }
 
+function setDistrictModalMode(mode) {
+  const modal = document.querySelector('#districtModalBackdrop .districtModal');
+  if (!modal) return;
+  modal.classList.toggle('is-district', mode === 'district');
+  modal.classList.toggle('is-frame', mode === 'frame');
+}
+
 function openRouteInModalFrame(url, title) {
   if (!isTownHub) return;
 
@@ -815,6 +823,7 @@ function openRouteInModalFrame(url, title) {
   const loadId = ++lastDistrictLoad;
   currentDistrict = null;
   clearTownBoardPoll();
+  setDistrictModalMode('frame');
 
   if (body) {
     if (modalTitle) modalTitle.textContent = safeTitle;
@@ -857,6 +866,7 @@ async function showDistrict(district) {
   const body = el('districtModalBody');
   const title = el('districtModalTitle');
   const cfg = districtViews[safeDistrict] || districtViews.house;
+  setDistrictModalMode('district');
 
   if (title) title.textContent = cfg.title;
   if (modal) modal.classList.remove('is-hidden');
@@ -896,6 +906,7 @@ function hideDistrict() {
   currentDistrict = null;
   lastDistrictLoad += 1;
   clearTouchDistrictPrime();
+  setDistrictModalMode('district');
   if (modal) modal.classList.add('is-hidden');
   if (modal) modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('district-modal-open');

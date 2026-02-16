@@ -836,12 +836,13 @@ function normalizeXHandle(input) {
 }
 
 function setSecurityHeaders(req, res, next) {
+  const allowSameOriginFrame = typeof req.path === 'string' && req.path.startsWith('/s/');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
 
   const csp = [
     "default-src 'self'",
@@ -854,7 +855,7 @@ function setSecurityHeaders(req, res, next) {
     `connect-src ${CONNECT_SRC.join(' ')}`,
     "object-src 'none'",
     "base-uri 'none'",
-    "frame-ancestors 'none'"
+    `frame-ancestors ${allowSameOriginFrame ? "'self'" : "'none'"}`
   ].join('; ');
   res.setHeader('Content-Security-Policy', csp);
 

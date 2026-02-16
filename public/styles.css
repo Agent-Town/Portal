@@ -539,24 +539,29 @@ h3 {
   align-items: center;
   justify-content: center;
   z-index: 70;
-  padding: 18px;
-  background: rgba(18, 34, 58, 0.45);
+  padding: 8px;
+  background:
+    radial-gradient(circle at 16% 14%, rgba(255, 250, 239, 0.5) 0%, rgba(255, 250, 239, 0.08) 32%),
+    linear-gradient(180deg, rgba(44, 69, 99, 0.28) 0%, rgba(44, 69, 99, 0.44) 100%);
+  backdrop-filter: blur(2px);
   pointer-events: all;
 }
 
 .districtModal {
   display: flex;
   flex-direction: column;
-  width: min(1120px, calc(100% - 40px));
-  height: min(90vh, 860px);
+  width: min(1360px, calc(100vw - 16px));
+  height: min(96vh, 980px);
   overflow: auto;
   border: 3px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 14px 40px rgba(24, 32, 58, 0.55);
+  border-radius: 18px;
+  box-shadow:
+    0 8px 0 rgba(44, 69, 99, 0.42),
+    0 26px 48px rgba(44, 69, 99, 0.38);
   background:
-    linear-gradient(160deg, rgba(12, 25, 42, 0.96) 0%, rgba(9, 18, 34, 0.98) 60%, rgba(7, 14, 28, 0.98) 100%);
+    linear-gradient(155deg, rgba(255, 249, 236, 0.98) 0%, rgba(255, 241, 216, 0.98) 58%, rgba(255, 233, 190, 0.98) 100%);
   animation: panelRise 180ms ease;
-  backdrop-filter: blur(2px);
+  color: var(--text-strong);
 }
 
 .districtModalHeader {
@@ -564,21 +569,40 @@ h3 {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: 8px 10px;
   border-bottom: 2px solid rgba(44, 69, 99, 0.2);
-  color: #f4f7ff;
+  color: var(--text-strong);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 223, 0.9) 0%, rgba(255, 239, 208, 0.9) 100%);
 }
 
 .districtModalBody {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 12px 14px 14px;
+  padding: 8px;
   overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 235, 0.62) 0%, rgba(255, 245, 224, 0.72) 100%);
 }
 
 .districtModalClose {
   min-width: 88px;
+}
+
+.districtModal.is-district .districtModalHeader {
+  justify-content: flex-end;
+  border-bottom: 0;
+  padding-bottom: 0;
+  background: transparent;
+}
+
+.districtModal.is-district .districtModalHeader h2 {
+  display: none;
+}
+
+.districtModal.is-district .districtModalBody {
+  padding: 4px;
 }
 
 .districtModalBody.is-loading {
@@ -590,7 +614,7 @@ h3 {
 .districtBackdrop .districtModalBody.is-loading::before {
   content: "Loading district...";
   display: block;
-  color: #dbe5ff;
+  color: var(--text-strong);
 }
 
 .districtFrameWrap {
@@ -598,10 +622,10 @@ h3 {
   min-height: 0;
   height: 100%;
   width: 100%;
-  border: 2px solid rgba(255, 245, 220, 0.2);
+  border: 2px solid rgba(44, 69, 99, 0.35);
   border-radius: 12px;
   overflow: hidden;
-  background: #0a1422;
+  background: #fff4e0;
 }
 
 .districtFrame {
@@ -1295,6 +1319,24 @@ footer::before {
   .townDistrict-wagons .townDistrictLabel {
     width: min(84%, 520px);
     min-height: 54px;
+  }
+
+  .districtBackdrop {
+    padding: 6px;
+  }
+
+  .districtModal {
+    width: calc(100vw - 12px);
+    height: min(97vh, 940px);
+    border-radius: 14px;
+  }
+
+  .districtModalBody {
+    padding: 6px;
+  }
+
+  .districtModal.is-district .districtModalBody {
+    padding: 2px;
   }
 
   .topbar {
