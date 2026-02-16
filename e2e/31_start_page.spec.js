@@ -30,5 +30,5 @@ test('start page renders logo/video embed/welcome and Enter opens app page', asy
 
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('button', { name: 'Open' })).toBeVisible();
+  await expect(page.getByTestId('open-btn')).toBeVisible();
 });

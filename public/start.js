@@ -1,11 +1,25 @@
 function setStatus(msg, isError = false) {
-  const el = document.getElementById('startStatus');
-  if (!el) return;
-  el.textContent = msg || '';
-  el.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
+  const statusNode = document.getElementById('startStatus');
+  if (!statusNode) return;
+  statusNode.textContent = msg || '';
+  statusNode.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
+}
+
+function setTeamCode(value) {
+  const node = document.getElementById('startTeamCode');
+  if (!node) return;
+  node.textContent = value || '…';
+}
+
+function setStateHint(value) {
+  const node = document.getElementById('startStateHint');
+  if (!node) return;
+  node.textContent = value || '';
 }
 
 let cachedPrivyConfig = null;
+let autoRedirecting = false;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 
 function explainPrivyError(err) {
   const code = err && typeof err.code === 'string' ? err.code : '';
@@ -15,6 +29,7 @@ function explainPrivyError(err) {
   ).toLowerCase();
 
   if (code === 'PRIVY_LOGIN_CANCELLED') return 'Login cancelled.';
+  if (code === 'PRIVY_WALLET_CREATE_FAILED') return 'Could not create/connect the Privy wallet. Try again.';
   if (detail.includes('invalid nativeappid') || detail.includes('invalid_native_app_id')) {
     return 'Privy rejected your app/client ID. Verify PRIVY_APP_ID and remove PRIVY_CLIENT_ID unless it is a web app client.';
   }
@@ -44,29 +59,27 @@ async function getCachedPrivyConfig() {
   return cachedPrivyConfig;
 }
 
-async function maybeAutoSkipStart() {
-  // Skip the start screen only for the default entry path
-  // when Privy is already logged in.
-  if (window.location.pathname !== '/') return;
+async function fetchStartSessionContext() {
+  const [sessionResp, stateResp] = await Promise.all([
+    fetch('/api/session', { method: 'GET', credentials: 'include', cache: 'no-store' }).catch(() => null),
+    fetch('/api/state', { method: 'GET', credentials: 'include', cache: 'no-store' }).catch(() => null)
+  ]);
 
-  const cfg = await getCachedPrivyConfig();
-  const appPath = cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
+  let teamCode = null;
+  let houseId = null;
+  let signupComplete = false;
 
-  if (!cfg || cfg.enabled !== true) {
-    window.location.replace(appPath);
-    return;
+  if (sessionResp && sessionResp.ok) {
+    const payload = await sessionResp.json().catch(() => ({}));
+    teamCode = payload?.teamCode || null;
+  }
+  if (stateResp && stateResp.ok) {
+    const payload = await stateResp.json().catch(() => ({}));
+    houseId = payload?.houseId || null;
+    signupComplete = !!payload?.signup?.complete;
   }
 
-  if (typeof window.ensurePrivyLogin !== 'function') return;
-
-  try {
-    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
-    if (alreadySignedIn) {
-      window.location.replace(appPath);
-    }
-  } catch {
-    // no-op; let user continue manually
-  }
+  return { teamCode, houseId, signupComplete };
 }
 
 function createLoginUi() {
@@ -164,26 +177,82 @@ function setEntryButtonsDisabled(disabled) {
   if (enterBtn) enterBtn.disabled = !!disabled;
 }
 
+function privyBridgeSupportsSolanaConnect() {
+  const bridge = window.__PRIVY_WALLET_BRIDGE__;
+  return !!(bridge && typeof bridge.connectSolana === 'function');
+}
+
+async function ensurePrivyWallet({ silent = true } = {}) {
+  if (!walletClient) return false;
+  if (!privyBridgeSupportsSolanaConnect()) return false;
+  try {
+    const connected = await walletClient.connect({ chain: 'solana', silent: !!silent });
+    const addr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+    return !!addr;
+  } catch {
+    return false;
+  }
+}
+
+function appPathFromConfig(cfg) {
+  return cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
+}
+
+async function maybeAutoSkipStart() {
+  const pathname = window.location.pathname;
+  if (pathname !== '/' && pathname !== '/start') return;
+  if (autoRedirecting) return;
+
+  const cfg = await getCachedPrivyConfig();
+  const appPath = appPathFromConfig(cfg);
+
+  if (!cfg || cfg.enabled !== true) {
+    if (pathname === '/') {
+      autoRedirecting = true;
+      window.location.replace(appPath);
+    }
+    return;
+  }
+
+  if (typeof window.ensurePrivyLogin !== 'function') return;
+
+  try {
+    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
+    if (!alreadySignedIn) return;
+    const walletReady = await ensurePrivyWallet({ silent: true });
+    if (!walletReady) return;
+    autoRedirecting = true;
+    window.location.replace(appPath);
+  } catch {
+    // no-op; allow manual entry
+  }
+}
+
 async function handleEnter() {
   setEntryButtonsDisabled(true);
 
   const loginUi = createLoginUi();
   try {
     const cfg = await getCachedPrivyConfig();
-    const appPath = cfg && typeof cfg.appPath === 'string' && cfg.appPath ? cfg.appPath : '/app';
+    const appPath = appPathFromConfig(cfg);
 
     if (!cfg || cfg.enabled !== true) {
       window.location.assign(appPath);
       return;
     }
 
-    let ok = false;
     setStatus('Connecting to Privy...');
-    ok = typeof window.ensurePrivyLogin === 'function'
+    const ok = typeof window.ensurePrivyLogin === 'function'
       ? await window.ensurePrivyLogin({ interactive: true, loginUi })
       : false;
 
     if (!ok) throw new Error('PRIVY_LOGIN_FAILED');
+
+    if (privyBridgeSupportsSolanaConnect()) {
+      setStatus('Preparing wallet...');
+      const walletReady = await ensurePrivyWallet({ silent: false });
+      if (!walletReady) throw new Error('PRIVY_WALLET_CREATE_FAILED');
+    }
 
     if (loginUi && typeof loginUi.close === 'function') loginUi.close();
     setStatus('Success. Entering Agent Town...');
@@ -196,7 +265,28 @@ async function handleEnter() {
   }
 }
 
+async function hydrateStartSessionContext() {
+  try {
+    const context = await fetchStartSessionContext();
+    setTeamCode(context.teamCode || '…');
+
+    if (context.houseId) {
+      setStateHint(`Returning house detected: ${context.houseId}`);
+      return;
+    }
+    if (context.signupComplete) {
+      setStateHint('Session already completed onboarding. Enter town to continue.');
+      return;
+    }
+    setStateHint('Use this session to continue your co-op unlock flow.');
+  } catch {
+    setTeamCode('…');
+    setStateHint('Session state unavailable. You can still enter town.');
+  }
+}
+
 function boot() {
+  hydrateStartSessionContext().catch(() => {});
   maybeAutoSkipStart().catch(() => {});
 
   const enterBtn = document.getElementById('enterBtn');

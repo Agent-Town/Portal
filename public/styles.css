@@ -484,6 +484,20 @@ h3 {
     0 0 0 2px rgba(255, 217, 90, 0.5) inset;
 }
 
+.townDistrictHotspot.is-locked {
+  cursor: not-allowed;
+}
+
+.townDistrictHotspot.is-locked::before {
+  border-color: rgba(255, 165, 165, 0.42);
+  background: rgba(20, 20, 20, 0.28);
+}
+
+.townDistrictHotspot.is-locked .townDistrictLabel {
+  border-color: rgba(255, 165, 165, 0.38);
+  background: rgba(20, 20, 20, 0.42);
+}
+
 .townDistrict-fountain {
   left: 45%;
   top: 44%;

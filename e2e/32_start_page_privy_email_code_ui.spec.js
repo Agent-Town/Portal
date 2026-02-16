@@ -54,5 +54,5 @@ test('start page uses email+code auth box for Privy login before entering app', 
   await page.locator('#privyCodeForm').getByRole('button', { name: 'Verify code' }).click();
 
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole('button', { name: 'Open' })).toBeVisible();
+  await expect(page.getByTestId('open-btn')).toBeVisible();
 });

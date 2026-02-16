@@ -53,6 +53,8 @@ const SIGNUP_COMPLETE_AT_KEY = 'agentTownSignupCompleteAt';
 const SHARE_CACHE_KEY = 'agentTownShareCache';
 const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
+const TOWNHALL_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const TOWNHALL_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 // startRole: 'human' | 'coop' | 'agent'
 let pathMode = 'coop';
 let activeDistrict = 'house';
@@ -78,6 +80,8 @@ const popupDistrictByPath = {
   '/wall': 'leaderboard',
   '/house': 'house'
 };
+let pendingTownhallHumanImage = null;
+let pendingTownhallAgentImage = null;
 
 function b64(bytes) {
   let bin = '';
@@ -346,7 +350,43 @@ function setPathMode(mode, { persist = true, refresh = true } = {}) {
   if (refresh && lastState) updateUI(lastState);
 }
 
+function onboardingRequired(state) {
+  return !!state?.onboarding?.required;
+}
+
+function isTownhallRegistrationComplete(state) {
+  return !!state?.onboarding?.registrationComplete;
+}
+
+function isTownhallGateLocked(state) {
+  if (!isTownHub) return false;
+  if (!state) return false;
+  const hasHouse = !!(state.houseId || walletHouseId);
+  return onboardingRequired(state) && !hasHouse;
+}
+
+function canUseTownhallSigilFlow(state) {
+  if (!onboardingRequired(state)) return true;
+  if (state?.houseId || walletHouseId) return true;
+  return isTownhallRegistrationComplete(state);
+}
+
+function applyDistrictHotspotLocks(state) {
+  if (!isTownHub) return;
+  const gateLocked = isTownhallGateLocked(state);
+  document.querySelectorAll('.townDistrictHotspot[data-district]').forEach((hotspot) => {
+    const district = normalizeDistrict(hotspot.getAttribute('data-district') || 'house');
+    const blocked = gateLocked && district !== 'townhall';
+    hotspot.classList.toggle('is-locked', blocked);
+    hotspot.setAttribute('aria-disabled', blocked ? 'true' : 'false');
+  });
+}
+
 function districtStatusText(district) {
+  if (isTownhallGateLocked(lastState)) {
+    if (district === 'townhall') return 'Town Hall is required until you complete onboarding and generate a house.';
+    return 'Locked: finish Town Hall onboarding first.';
+  }
   if (!district) return 'Select a district on the map.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
   if (district === 'saloon') return 'Saloon selected: reserved for future menu content.';
@@ -409,6 +449,12 @@ function bindDistrictMapInteractions() {
         return;
       }
 
+      if (isTownhallGateLocked(lastState) && district !== 'townhall') {
+        setActiveDistrict('townhall');
+        ev.preventDefault();
+        return;
+      }
+
       suppressDistrictClickUntil = Date.now() + TOUCH_CLICK_SUPPRESS_MS;
       const now = Date.now();
       const isSecondTap = touchPrimedDistrict === district && (now - touchPrimedAt) <= TOUCH_PRIME_WINDOW_MS;
@@ -427,6 +473,10 @@ function bindDistrictMapInteractions() {
     });
 
     hotspot.addEventListener('click', () => {
+      if (isTownhallGateLocked(lastState) && district !== 'townhall') {
+        setActiveDistrict('townhall');
+        return;
+      }
       if (Date.now() <= suppressDistrictClickUntil) {
         return;
       }
@@ -436,6 +486,7 @@ function bindDistrictMapInteractions() {
   });
 
   document.addEventListener('pointerdown', (ev) => {
+    if (isTownhallGateLocked(lastState)) return;
     const districtHotspot = ev.target && ev.target.closest ? ev.target.closest('.townDistrictHotspot[data-district]') : null;
     if (!districtHotspot) {
       clearDistrictSelection();
@@ -591,7 +642,276 @@ async function loadDistrictView(district) {
   return districtViewCache.get(safeDistrict);
 }
 
+function setTownhallRegisterFeedback(message = '', isError = false) {
+  const status = el('townhallRegisterStatus');
+  const error = el('townhallRegisterError');
+  if (status) status.textContent = isError ? '' : message;
+  if (error) error.textContent = isError ? message : '';
+}
+
+function setTownhallAvatarPreview(kind, imageUrl) {
+  const isHuman = kind === 'human';
+  const wrap = el(isHuman ? 'townhallHumanPreview' : 'townhallAgentPreview');
+  const img = el(isHuman ? 'townhallHumanPreviewImg' : 'townhallAgentPreviewImg');
+  if (!wrap || !img) return;
+  if (!imageUrl) {
+    wrap.classList.add('is-hidden');
+    img.src = '';
+    return;
+  }
+  wrap.classList.remove('is-hidden');
+  img.src = imageUrl;
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const out = typeof reader.result === 'string' ? reader.result : '';
+      if (!out) {
+        reject(new Error('FILE_READ_FAILED'));
+        return;
+      }
+      resolve(out);
+    };
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function onTownhallImageChanged(kind, inputEl) {
+  const file = inputEl && inputEl.files && inputEl.files[0] ? inputEl.files[0] : null;
+  if (!file) return;
+  if (!TOWNHALL_IMAGE_TYPES.has(file.type)) {
+    setTownhallRegisterFeedback('Use PNG, JPG, or WebP images for Town Hall avatars.', true);
+    return;
+  }
+  if (file.size > TOWNHALL_IMAGE_MAX_BYTES) {
+    setTownhallRegisterFeedback('Avatar image is too large (max 2 MB).', true);
+    return;
+  }
+  const dataUrl = await readFileAsDataUrl(file);
+  if (kind === 'human') pendingTownhallHumanImage = dataUrl;
+  else pendingTownhallAgentImage = dataUrl;
+  setTownhallAvatarPreview(kind, dataUrl);
+  setTownhallRegisterFeedback('');
+}
+
+async function submitTownhallRegistration() {
+  const humanName = (el('townhallHumanName')?.value || '').trim();
+  const agentName = (el('townhallAgentName')?.value || '').trim();
+  const humanPrompt = (el('townhallHumanPrompt')?.value || '').trim();
+  const agentPrompt = (el('townhallAgentPrompt')?.value || '').trim();
+  const evmId = (el('townhallEvmErcId')?.value || '').trim();
+  const evmTxHash = (el('townhallEvmTxHash')?.value || '').trim();
+  const solanaId = (el('townhallSolanaErcId')?.value || '').trim();
+  const solanaTxSig = (el('townhallSolanaTxSig')?.value || '').trim();
+
+  const payload = {
+    profile: {
+      humanName,
+      agentName,
+      humanAvatar: {
+        prompt: humanPrompt
+      },
+      agentAvatar: {
+        prompt: agentPrompt
+      }
+    },
+    erc8004: {
+      evm: {
+        id: evmId,
+        chain: 'sepolia',
+        txHash: evmTxHash || null
+      },
+      solana: {
+        id: solanaId,
+        cluster: 'devnet',
+        txSig: solanaTxSig || null
+      }
+    }
+  };
+
+  if (pendingTownhallHumanImage) {
+    payload.profile.humanAvatar.image = pendingTownhallHumanImage;
+  }
+  if (pendingTownhallAgentImage) {
+    payload.profile.agentAvatar.image = pendingTownhallAgentImage;
+  }
+
+  setTownhallRegisterFeedback('Saving Town Hall registration...');
+  const registerBtn = el('townhallRegisterBtn');
+  if (registerBtn) registerBtn.disabled = true;
+
+  try {
+    const out = await api('/api/townhall/register', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    pendingTownhallHumanImage = null;
+    pendingTownhallAgentImage = null;
+    setTownhallRegisterFeedback('Registration saved. Continue with sigil unlock.');
+    if (lastState) {
+      updateUI({ ...lastState, onboarding: out.onboarding || lastState.onboarding });
+    }
+  } catch (e) {
+    const message = e?.message === 'MISSING_HUMAN_NAME'
+      ? 'Enter your human name.'
+      : e?.message === 'MISSING_AGENT_NAME'
+        ? 'Enter your agent name.'
+        : e?.message === 'MISSING_HUMAN_AVATAR_PROMPT'
+          ? 'Add the prompt used for the human avatar.'
+          : e?.message === 'MISSING_AGENT_AVATAR_PROMPT'
+            ? 'Add the prompt used for the agent avatar.'
+            : e?.message === 'MISSING_ERC8004_EVM_ID'
+              ? 'Enter the Sepolia ERC-8004 ID.'
+              : e?.message === 'MISSING_ERC8004_SOLANA_ID'
+                ? 'Enter the Solana devnet ERC-8004 ID.'
+                : e?.message === 'TOWNHALL_IMAGE_TOO_LARGE'
+                  ? 'Avatar image is too large (max 2 MB).'
+                  : e?.message === 'INVALID_TOWNHALL_IMAGE'
+                    ? 'Avatar upload must be PNG, JPG, or WebP.'
+                    : `Registration failed: ${e.message}`;
+    setTownhallRegisterFeedback(message, true);
+  } finally {
+    if (registerBtn) registerBtn.disabled = false;
+  }
+}
+
+function bindTownhallRegistrationControls() {
+  const registerBtn = el('townhallRegisterBtn');
+  if (registerBtn && registerBtn.dataset.bound !== '1') {
+    registerBtn.dataset.bound = '1';
+    registerBtn.addEventListener('click', () => {
+      submitTownhallRegistration();
+    });
+  }
+
+  const humanImageInput = el('townhallHumanImage');
+  if (humanImageInput && humanImageInput.dataset.bound !== '1') {
+    humanImageInput.dataset.bound = '1';
+    humanImageInput.addEventListener('change', () => {
+      onTownhallImageChanged('human', humanImageInput).catch((e) => {
+        setTownhallRegisterFeedback(`Avatar upload failed: ${e.message}`, true);
+      });
+    });
+  }
+
+  const agentImageInput = el('townhallAgentImage');
+  if (agentImageInput && agentImageInput.dataset.bound !== '1') {
+    agentImageInput.dataset.bound = '1';
+    agentImageInput.addEventListener('change', () => {
+      onTownhallImageChanged('agent', agentImageInput).catch((e) => {
+        setTownhallRegisterFeedback(`Avatar upload failed: ${e.message}`, true);
+      });
+    });
+  }
+}
+
+function syncTownhallRegistrationUI(state) {
+  const panel = el('townhallRegisterPanel');
+  if (!panel) return;
+
+  const onboarding = state?.onboarding || {};
+  const profile = onboarding.profile || {};
+  const humanAvatar = profile.humanAvatar || {};
+  const agentAvatar = profile.agentAvatar || {};
+
+  const humanNameInput = el('townhallHumanName');
+  if (humanNameInput && document.activeElement !== humanNameInput) {
+    humanNameInput.value = profile.humanName || '';
+  }
+  const agentNameInput = el('townhallAgentName');
+  if (agentNameInput && document.activeElement !== agentNameInput) {
+    agentNameInput.value = profile.agentName || '';
+  }
+
+  const humanPromptInput = el('townhallHumanPrompt');
+  if (humanPromptInput && document.activeElement !== humanPromptInput) {
+    humanPromptInput.value = humanAvatar.prompt || '';
+  }
+  const agentPromptInput = el('townhallAgentPrompt');
+  if (agentPromptInput && document.activeElement !== agentPromptInput) {
+    agentPromptInput.value = agentAvatar.prompt || '';
+  }
+
+  const evmIdInput = el('townhallEvmErcId');
+  if (evmIdInput && document.activeElement !== evmIdInput) {
+    evmIdInput.value = onboarding.erc8004?.evm?.id || '';
+  }
+  const evmTxInput = el('townhallEvmTxHash');
+  if (evmTxInput && document.activeElement !== evmTxInput) {
+    evmTxInput.value = onboarding.erc8004?.evm?.txHash || '';
+  }
+  const solIdInput = el('townhallSolanaErcId');
+  if (solIdInput && document.activeElement !== solIdInput) {
+    solIdInput.value = onboarding.erc8004?.solana?.id || '';
+  }
+  const solTxInput = el('townhallSolanaTxSig');
+  if (solTxInput && document.activeElement !== solTxInput) {
+    solTxInput.value = onboarding.erc8004?.solana?.txSig || '';
+  }
+
+  const humanImage = pendingTownhallHumanImage || humanAvatar.image || null;
+  const agentImage = pendingTownhallAgentImage || agentAvatar.image || null;
+  setTownhallAvatarPreview('human', humanImage);
+  setTownhallAvatarPreview('agent', agentImage);
+
+  const registerState = el('townhallRegisterState');
+  if (registerState) registerState.textContent = onboarding.registrationComplete ? 'Registered' : 'Not registered';
+
+  const gateHint = el('townHallGateHint');
+  if (gateHint) {
+    if (state?.houseId || walletHouseId) {
+      gateHint.textContent = 'House exists. You can use all districts.';
+    } else if (onboarding.required) {
+      gateHint.textContent = onboarding.registrationComplete
+        ? 'Registration complete. Continue with sigil unlock below.'
+        : 'Town Hall is required: complete registration to unlock the sigil steps.';
+    } else {
+      gateHint.textContent = 'Registration is optional in this environment.';
+    }
+  }
+
+  const sigilFlow = el('townhallSigilFlow');
+  if (sigilFlow) {
+    sigilFlow.classList.toggle('is-hidden', !canUseTownhallSigilFlow(state));
+  }
+
+  bindTownhallRegistrationControls();
+}
+
 function bindTownDistrictControls() {
+  if (lastState) syncTownhallRegistrationUI(lastState);
+
+  const connectWalletBtn = el('connectWalletBtn');
+  if (connectWalletBtn) {
+    connectWalletBtn.onclick = async () => {
+      connectWalletBtn.disabled = true;
+      setWalletStatus('');
+      try {
+        if (walletAddr) {
+          await disconnectWallet();
+          await maybeResetAfterWalletDisconnect();
+        } else {
+          await connectWalletAndLookup();
+        }
+      } catch (e) {
+        const msg = e.message === 'NO_SOLANA_WALLET'
+          ? 'No Privy-connected Solana wallet found.'
+          : e.message === 'NO_SOLANA_SIGN'
+            ? 'Wallet does not support message signing.'
+            : e.message === 'BAD_SIGNATURE'
+              ? 'Wallet signature failed.'
+              : e.message;
+        setWalletStatus(msg, true);
+      } finally {
+        connectWalletBtn.disabled = false;
+        updateWalletUI();
+      }
+    };
+  }
+
   const pathHumanBtn = el('pathHumanBtn');
   if (pathHumanBtn) {
     pathHumanBtn.onclick = () => setPathMode('human');
@@ -858,6 +1178,12 @@ async function showDistrict(district) {
   if (!isTownHub) return;
 
   const safeDistrict = normalizeDistrict(district);
+  if (isTownhallGateLocked(lastState) && safeDistrict !== 'townhall') {
+    setActiveDistrict('townhall');
+    const status = el('townSceneStatus');
+    if (status) status.textContent = 'Locked: complete Town Hall onboarding first.';
+    return;
+  }
   const currentLoad = ++lastDistrictLoad;
   currentDistrict = safeDistrict;
   setActiveDistrict(safeDistrict);
@@ -902,6 +1228,7 @@ async function showDistrict(district) {
 }
 
 function hideDistrict() {
+  if (isTownhallGateLocked(lastState)) return;
   const modal = el('districtModalBackdrop');
   currentDistrict = null;
   lastDistrictLoad += 1;
@@ -1218,6 +1545,29 @@ function renderSigils(state) {
   }
 }
 
+function syncTownhallGate(state) {
+  if (!isTownHub) return;
+  const gateLocked = isTownhallGateLocked(state);
+  applyDistrictHotspotLocks(state);
+
+  const closeBtn = el('districtModalClose');
+  if (closeBtn) {
+    closeBtn.classList.toggle('is-hidden', gateLocked);
+    closeBtn.disabled = gateLocked;
+  }
+
+  if (!gateLocked) return;
+
+  const status = el('townSceneStatus');
+  if (status) status.textContent = 'Town Hall is required until you complete onboarding and generate a house.';
+
+  const backdrop = el('districtModalBackdrop');
+  const modalHidden = !backdrop || backdrop.classList.contains('is-hidden');
+  if (currentDistrict !== 'townhall' || modalHidden) {
+    showDistrict('townhall');
+  }
+}
+
 function updateUI(state) {
   lastState = state;
 
@@ -1254,6 +1604,8 @@ function updateUI(state) {
     }
   }
   updateTownHubLinks(houseId);
+  syncTownhallRegistrationUI(state);
+  syncTownhallGate(state);
 
   updatePathButtons();
   safeSetText(
@@ -1378,9 +1730,15 @@ async function init() {
   }
 
   const tokenErr = loadTokenError();
-  pathMode = loadPathMode();
+  const modeParam = params.get('mode');
+  const districtParam = params.get('district');
+  pathMode = (modeParam === 'human' || modeParam === 'coop' || modeParam === 'agent')
+    ? modeParam
+    : loadPathMode();
+  const initialDistrict = normalizeDistrict(districtParam || 'house');
+  activeDistrict = initialDistrict;
   updatePathButtons();
-  setActiveDistrict('house');
+  setActiveDistrict(initialDistrict);
 
   if (isTownHub) {
     bindDistrictMapInteractions();
@@ -1417,6 +1775,7 @@ async function init() {
     match: { matched: false },
     signup: { complete: false, mode: null },
     share: { id: null },
+    onboarding: session.onboarding || { required: false, registrationComplete: true },
     stats: session.stats
   });
 

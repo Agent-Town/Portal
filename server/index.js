@@ -775,6 +775,12 @@ const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, fal
 const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
 const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
 const HOME_ROUTE_FILE = 'start.html';
+const ONBOARDING_REQUIRED = PRIVY_ENABLED;
+
+const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/elizaos-sheriff.png';
+const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/openclaw-sheriff.png';
+const DEFAULT_TOWNHALL_HUMAN_PROMPT = "Stylized 3D third-person game character concept: a gender-neutral, race-neutral wild west wizard known as a 'Promptmancer' with a friendly, approachable silhouette and expressive eyes.";
+const DEFAULT_TOWNHALL_AGENT_PROMPT = 'Stylized 3D prairie pup avatar doing a cute hat-tip emote with a wholesome mascot vibe in a cozy wild west frontier style.';
 
 const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
 const PRIVY_SCRIPT_SRC_DEFAULT = [
@@ -1095,6 +1101,10 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
+const MAX_TOWNHALL_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_TOWNHALL_PROMPT_CHARS = 4096;
+const MAX_TOWNHALL_NAME_CHARS = 48;
+const MAX_TOWNHALL_ERC_ID_CHARS = 160;
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
 const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
@@ -1178,6 +1188,115 @@ function normalizeAgentName(name) {
   if (!trimmed) return null;
   const cleaned = trimmed.replace(/[^A-Za-z0-9 _().-]/g, '').slice(0, 40);
   return cleaned || null;
+}
+
+function normalizeTownhallName(name) {
+  if (typeof name !== 'string') return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/[^A-Za-z0-9 _().-]/g, '').slice(0, MAX_TOWNHALL_NAME_CHARS);
+  return cleaned || null;
+}
+
+function normalizeTownhallErcId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TOWNHALL_ERC_ID_CHARS);
+}
+
+function normalizeTownhallTxRef(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 200);
+}
+
+function normalizeTownhallPrompt(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TOWNHALL_PROMPT_CHARS);
+}
+
+function parseTownhallImageDataUrl(dataUrl) {
+  if (dataUrl == null || dataUrl === '') return { dataUrl: null };
+  if (typeof dataUrl !== 'string') return { error: 'INVALID_TOWNHALL_IMAGE' };
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return { error: 'INVALID_TOWNHALL_IMAGE' };
+  const payload = match[2];
+  let bytes;
+  try {
+    bytes = Buffer.from(payload, 'base64');
+  } catch {
+    return { error: 'INVALID_TOWNHALL_IMAGE' };
+  }
+  if (!bytes || bytes.length === 0) return { error: 'INVALID_TOWNHALL_IMAGE' };
+  if (bytes.length > MAX_TOWNHALL_IMAGE_BYTES) return { error: 'TOWNHALL_IMAGE_TOO_LARGE' };
+  return { dataUrl };
+}
+
+function ensureSessionOnboarding(session) {
+  if (!session || typeof session !== 'object') return null;
+  if (!session.onboarding || typeof session.onboarding !== 'object') session.onboarding = {};
+  const onboarding = session.onboarding;
+  onboarding.required = ONBOARDING_REQUIRED;
+  onboarding.registrationComplete = onboarding.registrationComplete === true;
+  onboarding.registeredAt = typeof onboarding.registeredAt === 'string' ? onboarding.registeredAt : null;
+
+  if (!onboarding.profile || typeof onboarding.profile !== 'object') onboarding.profile = {};
+  onboarding.profile.humanName = typeof onboarding.profile.humanName === 'string' ? onboarding.profile.humanName : null;
+  onboarding.profile.agentName = typeof onboarding.profile.agentName === 'string' ? onboarding.profile.agentName : null;
+  if (!onboarding.profile.humanAvatar || typeof onboarding.profile.humanAvatar !== 'object') {
+    onboarding.profile.humanAvatar = {};
+  }
+  if (!onboarding.profile.agentAvatar || typeof onboarding.profile.agentAvatar !== 'object') {
+    onboarding.profile.agentAvatar = {};
+  }
+
+  const humanAvatar = onboarding.profile.humanAvatar;
+  const agentAvatar = onboarding.profile.agentAvatar;
+
+  humanAvatar.image = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
+    ? humanAvatar.image
+    : DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' && humanAvatar.prompt.trim()
+    ? humanAvatar.prompt
+    : DEFAULT_TOWNHALL_HUMAN_PROMPT;
+  humanAvatar.source = humanAvatar.source === 'upload' ? 'upload' : 'default';
+  humanAvatar.updatedAt = typeof humanAvatar.updatedAt === 'string' ? humanAvatar.updatedAt : null;
+
+  agentAvatar.image = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
+    ? agentAvatar.image
+    : DEFAULT_TOWNHALL_AGENT_IMAGE;
+  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' && agentAvatar.prompt.trim()
+    ? agentAvatar.prompt
+    : DEFAULT_TOWNHALL_AGENT_PROMPT;
+  agentAvatar.source = agentAvatar.source === 'upload' ? 'upload' : 'default';
+  agentAvatar.updatedAt = typeof agentAvatar.updatedAt === 'string' ? agentAvatar.updatedAt : null;
+
+  if (!onboarding.erc8004 || typeof onboarding.erc8004 !== 'object') onboarding.erc8004 = {};
+  if (!onboarding.erc8004.evm || typeof onboarding.erc8004.evm !== 'object') onboarding.erc8004.evm = {};
+  if (!onboarding.erc8004.solana || typeof onboarding.erc8004.solana !== 'object') onboarding.erc8004.solana = {};
+
+  const evm = onboarding.erc8004.evm;
+  const solana = onboarding.erc8004.solana;
+  evm.id = typeof evm.id === 'string' ? evm.id : null;
+  evm.chain = typeof evm.chain === 'string' && evm.chain.trim() ? evm.chain : 'sepolia';
+  evm.txHash = typeof evm.txHash === 'string' ? evm.txHash : null;
+  evm.updatedAt = typeof evm.updatedAt === 'string' ? evm.updatedAt : null;
+
+  solana.id = typeof solana.id === 'string' ? solana.id : null;
+  solana.cluster = typeof solana.cluster === 'string' && solana.cluster.trim() ? solana.cluster : 'devnet';
+  solana.txSig = typeof solana.txSig === 'string' ? solana.txSig : null;
+  solana.updatedAt = typeof solana.updatedAt === 'string' ? solana.updatedAt : null;
+
+  return onboarding;
+}
+
+function cloneOnboarding(onboarding) {
+  if (!onboarding || typeof onboarding !== 'object') return null;
+  return JSON.parse(JSON.stringify(onboarding));
 }
 
 function recordSignup(session, { mode, agentName = null, matchedElement = null, address = null } = {}) {
@@ -1421,10 +1540,12 @@ app.get('/api/privy/config', (_req, res) => {
 app.get('/api/session', (req, res) => {
   const s = ensureHumanSession(req, res);
   const store = readStore();
+  const onboarding = ensureSessionOnboarding(s);
   res.json({
     ok: true,
     teamCode: s.teamCode,
     elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -1438,6 +1559,7 @@ app.post('/api/session/reset', (req, res) => {
   // Ensure we still have a valid response cookie context (Secure flag in prod).
   const store = readStore();
   const next = createSession();
+  const onboarding = ensureSessionOnboarding(next);
   const secureFlag = isProd || req.secure ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
@@ -1447,6 +1569,7 @@ app.post('/api/session/reset', (req, res) => {
     ok: true,
     teamCode: next.teamCode,
     elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -1456,6 +1579,7 @@ app.post('/api/session/reset', (req, res) => {
 
 app.get('/api/state', (req, res) => {
   const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
   const store = readStore();
   res.json({
     ok: true,
@@ -1480,6 +1604,7 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: s.houseCeremony?.houseId || null,
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -1496,6 +1621,114 @@ app.post('/api/referral', (req, res) => {
   if (!share) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   s.referral.shareId = shareId;
   res.json({ ok: true });
+});
+
+app.get('/api/townhall/state', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const houseId = s.houseCeremony?.houseId || null;
+  res.json({
+    ok: true,
+    houseId,
+    locked: onboarding.required === true && !houseId,
+    onboarding: cloneOnboarding(onboarding)
+  });
+});
+
+app.post('/api/townhall/register', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : req.body || {};
+  const erc = req.body?.erc8004 && typeof req.body.erc8004 === 'object' ? req.body.erc8004 : {};
+
+  const humanName = normalizeTownhallName(profile.humanName);
+  const agentName = normalizeTownhallName(profile.agentName);
+  if (!humanName) return res.status(400).json({ ok: false, error: 'MISSING_HUMAN_NAME' });
+  if (!agentName) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_NAME' });
+
+  const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
+  const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
+
+  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt);
+  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt);
+  if (!humanPrompt) return res.status(400).json({ ok: false, error: 'MISSING_HUMAN_AVATAR_PROMPT' });
+  if (!agentPrompt) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_AVATAR_PROMPT' });
+
+  let humanImage = onboarding.profile?.humanAvatar?.image || DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  let agentImage = onboarding.profile?.agentAvatar?.image || DEFAULT_TOWNHALL_AGENT_IMAGE;
+  let humanSource = onboarding.profile?.humanAvatar?.source === 'upload' ? 'upload' : 'default';
+  let agentSource = onboarding.profile?.agentAvatar?.source === 'upload' ? 'upload' : 'default';
+
+  if (Object.prototype.hasOwnProperty.call(humanAvatarInput, 'image')) {
+    const parsedHuman = parseTownhallImageDataUrl(humanAvatarInput.image);
+    if (parsedHuman.error) return res.status(400).json({ ok: false, error: parsedHuman.error });
+    if (parsedHuman.dataUrl) {
+      humanImage = parsedHuman.dataUrl;
+      humanSource = 'upload';
+    } else {
+      humanImage = DEFAULT_TOWNHALL_HUMAN_IMAGE;
+      humanSource = 'default';
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(agentAvatarInput, 'image')) {
+    const parsedAgent = parseTownhallImageDataUrl(agentAvatarInput.image);
+    if (parsedAgent.error) return res.status(400).json({ ok: false, error: parsedAgent.error });
+    if (parsedAgent.dataUrl) {
+      agentImage = parsedAgent.dataUrl;
+      agentSource = 'upload';
+    } else {
+      agentImage = DEFAULT_TOWNHALL_AGENT_IMAGE;
+      agentSource = 'default';
+    }
+  }
+
+  const evmId = normalizeTownhallErcId(erc?.evm?.id);
+  const solanaId = normalizeTownhallErcId(erc?.solana?.id);
+  if (!evmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_EVM_ID' });
+  if (!solanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_SOLANA_ID' });
+
+  const evmChain = typeof erc?.evm?.chain === 'string' && erc.evm.chain.trim()
+    ? erc.evm.chain.trim().toLowerCase()
+    : 'sepolia';
+  const solanaCluster = typeof erc?.solana?.cluster === 'string' && erc.solana.cluster.trim()
+    ? erc.solana.cluster.trim().toLowerCase()
+    : 'devnet';
+
+  onboarding.profile = onboarding.profile || {};
+  onboarding.profile.humanName = humanName;
+  onboarding.profile.agentName = agentName;
+  onboarding.profile.humanAvatar = {
+    image: humanImage,
+    prompt: humanPrompt,
+    source: humanSource,
+    updatedAt: nowIso()
+  };
+  onboarding.profile.agentAvatar = {
+    image: agentImage,
+    prompt: agentPrompt,
+    source: agentSource,
+    updatedAt: nowIso()
+  };
+
+  onboarding.erc8004 = onboarding.erc8004 || {};
+  onboarding.erc8004.evm = {
+    id: evmId,
+    chain: evmChain,
+    txHash: normalizeTownhallTxRef(erc?.evm?.txHash),
+    updatedAt: nowIso()
+  };
+  onboarding.erc8004.solana = {
+    id: solanaId,
+    cluster: solanaCluster,
+    txSig: normalizeTownhallTxRef(erc?.solana?.txSig),
+    updatedAt: nowIso()
+  };
+
+  onboarding.registrationComplete = true;
+  onboarding.registeredAt = nowIso();
+
+  res.json({ ok: true, onboarding: cloneOnboarding(onboarding) });
 });
 
 // --- Reservations (admin-only for MVP) ---
@@ -3660,6 +3893,7 @@ app.post('/api/house/init', (req, res) => {
   }
   const exists = store.houses.find((r) => r.id === houseId);
   if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+  const onboardingSnapshot = cloneOnboarding(ensureSessionOnboarding(s));
 
   store.houses.push({
     id: houseId,
@@ -3670,6 +3904,7 @@ app.post('/api/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
+    onboarding: onboardingSnapshot,
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
@@ -3780,6 +4015,7 @@ app.post('/api/agent/house/init', (req, res) => {
   }
   const exists = store.houses.find((r) => r.id === houseId);
   if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+  const onboardingSnapshot = cloneOnboarding(ensureSessionOnboarding(s));
 
   store.houses.push({
     id: houseId,
@@ -3790,6 +4026,7 @@ app.post('/api/agent/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
+    onboarding: onboardingSnapshot,
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
@@ -3835,6 +4072,22 @@ app.get('/api/house/:id/meta', (req, res) => {
     housePubKey: house.housePubKey,
     nonce: house.nonce,
     keyMode: 'ceremony'
+  });
+});
+
+app.get('/api/house/:id/onboarding', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  res.json({
+    ok: true,
+    houseId,
+    onboarding: cloneOnboarding(house.onboarding || null)
   });
 });
 

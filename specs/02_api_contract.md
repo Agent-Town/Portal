@@ -74,6 +74,10 @@ Response shape:
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  },
   "stats": { "signups": 0, "publicTeams": 0 }
 }
 ```
@@ -89,6 +93,10 @@ Response shape (same fields as `/api/session`):
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  },
   "stats": { "signups": 0, "publicTeams": 0 }
 }
 ```
@@ -99,6 +107,58 @@ Includes:
 - `houseId` (string | null) — present after the house ceremony completes for this session.
 - `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.
+- `onboarding` — Town Hall onboarding state:
+  - `required` (boolean) — whether Town Hall gating is enforced in this deployment.
+  - `registrationComplete` (boolean)
+  - `profile.humanName`, `profile.agentName`
+  - `profile.humanAvatar` / `profile.agentAvatar` (`image`, `prompt`, `source`, `updatedAt`)
+  - `erc8004.evm` (`id`, `chain`, `txHash`, `updatedAt`)
+  - `erc8004.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+
+### GET `/api/townhall/state` (human)
+Returns Town Hall onboarding state for the current session.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "houseId": "....|null",
+  "locked": true,
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  }
+}
+```
+
+### POST `/api/townhall/register` (human)
+Saves Town Hall registration metadata and marks registration complete.
+
+Body:
+```json
+{
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  },
+  "erc8004": {
+    "evm": { "id": "11155111:123", "chain": "sepolia", "txHash": "0x..." },
+    "solana": { "id": "solana:asset...", "cluster": "devnet", "txSig": "..." }
+  }
+}
+```
+
+Errors:
+- `MISSING_HUMAN_NAME`
+- `MISSING_AGENT_NAME`
+- `MISSING_HUMAN_AVATAR_PROMPT`
+- `MISSING_AGENT_AVATAR_PROMPT`
+- `MISSING_ERC8004_EVM_ID`
+- `MISSING_ERC8004_SOLANA_ID`
+- `INVALID_TOWNHALL_IMAGE`
+- `TOWNHALL_IMAGE_TOO_LARGE`
 
 ---
 
@@ -974,6 +1034,7 @@ Body:
 ### House auth headers (required)
 For these endpoints:
 - `GET /api/house/:id/meta`
+- `GET /api/house/:id/onboarding`
 - `GET /api/house/:id/log`
 - `POST /api/house/:id/append`
 - `POST /api/house/:id/public-media`
@@ -991,6 +1052,23 @@ Where:
 Returns:
 ```json
 { "ok": true, "houseId": "...", "housePubKey": "...", "nonce": "...", "keyMode": "ceremony" }
+```
+
+### GET `/api/house/:id/onboarding`
+House-authenticated endpoint returning the onboarding metadata snapshot captured at house creation.
+
+Returns:
+```json
+{
+  "ok": true,
+  "houseId": "...",
+  "onboarding": {
+    "required": true,
+    "registrationComplete": true,
+    "profile": { "...": "..." },
+    "erc8004": { "...": "..." }
+  }
+}
 ```
 
 ### GET `/api/house/:id/log`
