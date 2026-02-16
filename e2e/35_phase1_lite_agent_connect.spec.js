@@ -8,7 +8,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('after hatch completion, the in-browser OpenClaw Lite agent is connected in state', async ({ page }) => {
+test('after setup, the in-browser OpenClaw Lite agent is connected in state', async ({ page }) => {
   await hatchAndConnectLite(page, 'signin');
 
   await expect(page.getByTestId('lite-agent-status')).toContainText(/connected/i, { timeout: 2000 });

@@ -74,6 +74,7 @@
         <div class="chat-input-area">
           <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
           <button id="sendChatBtn" class="btn primary small">Send</button>
+          <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
         </div>
 
         <div class="divider"></div>
@@ -168,6 +169,38 @@
     }
   }
 
+  async function handleNewSession() {
+    const btn = el('newSessionBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const liveGateway = await initGateway();
+      if (!liveGateway) {
+        appendChatMessage('system', 'Agent gateway is unavailable on this page.');
+        return;
+      }
+
+      if (typeof liveGateway.clearTranscript === 'function') {
+        await liveGateway.clearTranscript({ rotateSession: true, keepBootMessage: false });
+      } else if (window.__openclawLiteTest && typeof window.__openclawLiteTest.clearTranscript === 'function') {
+        await window.__openclawLiteTest.clearTranscript({ rotateSession: true, keepBootMessage: false });
+      } else {
+        throw new Error('Transcript reset is not available.');
+      }
+
+      const box = el('chatTranscript');
+      if (box) box.innerHTML = '';
+      appendChatMessage('system', 'New session started.');
+      appendAgentLog('Started new session (worker transcript cleared).');
+    } catch (e) {
+      const msg = e?.message || 'UNKNOWN';
+      appendChatMessage('system', `New session failed: ${msg}`);
+      appendAgentLog(`New session failed: ${msg}`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function bindPanel() {
     const panel = ensurePanelMarkup();
     if (!panel || panel.dataset.bound === '1') return;
@@ -188,6 +221,13 @@
     if (sendBtn) {
       sendBtn.addEventListener('click', () => {
         handleChat().catch(() => {});
+      });
+    }
+
+    const newSessionBtn = el('newSessionBtn');
+    if (newSessionBtn) {
+      newSessionBtn.addEventListener('click', () => {
+        handleNewSession().catch(() => {});
       });
     }
 

@@ -32,6 +32,8 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('## Required input');
   expect(txt).toContain('## Core co-op loop');
   expect(txt).toContain('## House ceremony (minimal)');
+  expect(txt).toContain('Use the current page origin');
+  expect(txt).not.toContain('http://localhost:4173');
 
   expect(txt).toContain('POST /api/agent/connect');
   expect(txt).toContain('GET /api/agent/state?teamCode=');

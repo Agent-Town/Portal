@@ -752,7 +752,7 @@ footer::before {
   text-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
 }
 
-/* --- Hatching Station --- */
+/* --- Setup Station --- */
 
 .hatch-header {
   display: flex;
@@ -1217,6 +1217,36 @@ footer::before {
 
 .chat-input-area input {
   flex: 1;
+}
+
+.agent-approvals {
+  border: 2px solid #3d2d1f;
+  background: #fff;
+  padding: 6px;
+  border-radius: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.approvals-header {
+  font-size: 0.7em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  color: #3d2d1f;
+}
+
+.approvals-box {
+  display: grid;
+  gap: 6px;
+}
+
+.approvals-box .kv {
+  margin-bottom: 0 !important;
+}
+
+.approvals-box .kv .btn {
+  padding: 4px 8px;
 }
 
 /* Hide logs in Dock Mode to focus on Chat */

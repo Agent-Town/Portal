@@ -131,6 +131,7 @@ const OPENCLAW_DB_NAME = 'openclaw-lite';
 const OPENCLAW_DB_VERSION = 1;
 const AGENT_STATE_KIND = 'openclaw-lite-state';
 const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_OPENCLAW_EXPORT_KIND = 'openclaw-lite-export';
 const AGENT_STATE_SEALED_KIND = 'openclaw-lite-state-sealed';
 const AGENT_STATE_SEALED_SCHEMA = 'openclaw-lite-state-sealed@1';
 const AGENT_STATE_ZIP_KIND = 'openclaw-lite-state-zip';
@@ -1197,38 +1198,6 @@ function snapshotByteLength(snapshot) {
   return new TextEncoder().encode(JSON.stringify(snapshot)).length;
 }
 
-const CRC32_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) {
-      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-    }
-    table[i] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(bytes) {
-  let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) {
-    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function concatBytes(chunks) {
-  let length = 0;
-  for (const chunk of chunks) length += chunk.length;
-  const out = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return out;
-}
-
 function sanitizeZipRelativePath(pathValue) {
   const normalized = String(pathValue || '').replace(/\\/g, '/').replace(/^\/+/, '');
   if (!normalized || normalized.includes('\0')) return null;
@@ -1236,77 +1205,6 @@ function sanitizeZipRelativePath(pathValue) {
   if (!parts.length) return null;
   if (parts.some((part) => part === '.' || part === '..')) return null;
   return parts.join('/');
-}
-
-function makeZip(entries) {
-  const encoder = new TextEncoder();
-  const localChunks = [];
-  const centralChunks = [];
-  let offset = 0;
-
-  for (const entry of entries) {
-    const name = sanitizeZipRelativePath(entry?.name);
-    if (!name) continue;
-    const nameBytes = encoder.encode(name);
-    const data = entry.data instanceof Uint8Array ? entry.data : new Uint8Array([]);
-    const crc = crc32(data);
-    const size = data.length >>> 0;
-
-    const localHeader = new Uint8Array(30 + nameBytes.length);
-    const localView = new DataView(localHeader.buffer);
-    localView.setUint32(0, 0x04034b50, true);
-    localView.setUint16(4, 20, true);
-    localView.setUint16(6, 1 << 11, true);
-    localView.setUint16(8, 0, true);
-    localView.setUint16(10, 0, true);
-    localView.setUint16(12, 0, true);
-    localView.setUint32(14, crc >>> 0, true);
-    localView.setUint32(18, size, true);
-    localView.setUint32(22, size, true);
-    localView.setUint16(26, nameBytes.length, true);
-    localView.setUint16(28, 0, true);
-    localHeader.set(nameBytes, 30);
-    localChunks.push(localHeader, data);
-
-    const centralHeader = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(centralHeader.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 1 << 11, true);
-    centralView.setUint16(10, 0, true);
-    centralView.setUint16(12, 0, true);
-    centralView.setUint16(14, 0, true);
-    centralView.setUint32(16, crc >>> 0, true);
-    centralView.setUint32(20, size, true);
-    centralView.setUint32(24, size, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint16(30, 0, true);
-    centralView.setUint16(32, 0, true);
-    centralView.setUint16(34, 0, true);
-    centralView.setUint16(36, 0, true);
-    centralView.setUint32(38, 0, true);
-    centralView.setUint32(42, offset >>> 0, true);
-    centralHeader.set(nameBytes, 46);
-    centralChunks.push(centralHeader);
-
-    offset += localHeader.length + data.length;
-  }
-
-  const centralDir = concatBytes(centralChunks);
-  const end = new Uint8Array(22);
-  const endView = new DataView(end.buffer);
-  const entryCount = Math.min(0xffff, centralChunks.length);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(4, 0, true);
-  endView.setUint16(6, 0, true);
-  endView.setUint16(8, entryCount, true);
-  endView.setUint16(10, entryCount, true);
-  endView.setUint32(12, centralDir.length >>> 0, true);
-  endView.setUint32(16, offset >>> 0, true);
-  endView.setUint16(20, 0, true);
-
-  return concatBytes([...localChunks, centralDir, end]);
 }
 
 async function parseStoredZip(bytes) {
@@ -1396,57 +1294,42 @@ async function readFileAsBytes(file) {
   });
 }
 
-async function buildZipBackupFromSnapshot(snapshot, expectedHouseId) {
-  const normalized = normalizeAgentStateSnapshot(snapshot);
-  assertSnapshotMatchesHouse(normalized, expectedHouseId);
-  const vfsIndex = [];
-  const entries = [];
-  const seenFileNames = new Set();
-
-  entries.push({
-    name: 'agent-state-manifest.json',
-    data: textBytes(JSON.stringify({
-      v: 1,
-      kind: AGENT_STATE_ZIP_KIND,
-      schema: AGENT_STATE_ZIP_SCHEMA,
-      createdAt: new Date().toISOString(),
-      houseId: expectedHouseId || null
-    }, null, 2))
-  });
-  entries.push({
-    name: 'meta.json',
-    data: textBytes(JSON.stringify(normalized.stores.meta || [], null, 2))
-  });
-  entries.push({
-    name: 'checkpoints.json',
-    data: textBytes(JSON.stringify(normalized.stores.checkpoints || [], null, 2))
-  });
-
-  for (const row of normalized.stores.vfs || []) {
-    const safePath = sanitizeZipRelativePath(row.path);
-    if (!safePath) continue;
-    const fileName = `vfs/${safePath}`;
-    if (seenFileNames.has(fileName)) continue;
-    seenFileNames.add(fileName);
-    const bytes = unb64Safe(row.dataB64);
-    if (!bytes) continue;
-    vfsIndex.push({
-      path: safePath,
-      updatedAtMs: Number.isFinite(Number(row.updatedAtMs)) ? Math.max(0, Math.floor(Number(row.updatedAtMs))) : Date.now()
-    });
-    entries.push({ name: fileName, data: bytes });
-  }
-
-  entries.push({
-    name: 'vfs-index.json',
-    data: textBytes(JSON.stringify(vfsIndex, null, 2))
-  });
-
-  return makeZip(entries);
-}
-
 async function parseZipBackupToSnapshot(bytes, expectedHouseId = null) {
   const files = await parseStoredZip(bytes);
+  const openClawManifestBytes = files.get('manifest.json');
+  if (openClawManifestBytes) {
+    const manifest = parseJsonBytes(openClawManifestBytes);
+    if (!isRecordObject(manifest)) throw new Error('INVALID_AGENT_STATE');
+    if (manifest.v !== 1 || manifest.kind !== AGENT_STATE_OPENCLAW_EXPORT_KIND) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const manifestCreatedAtMs = Number(manifest.createdAtMs);
+    const fallbackUpdatedAtMs = Number.isFinite(manifestCreatedAtMs)
+      ? Math.max(0, Math.floor(manifestCreatedAtMs))
+      : Date.now();
+    const vfs = [];
+    for (const [fileName, fileBytes] of files.entries()) {
+      const safePath = sanitizeZipRelativePath(fileName);
+      if (!safePath || safePath === 'manifest.json') continue;
+      vfs.push({
+        path: safePath,
+        updatedAtMs: fallbackUpdatedAtMs,
+        dataB64: b64(fileBytes)
+      });
+    }
+    return normalizeAgentStateSnapshot({
+      v: 1,
+      kind: AGENT_STATE_KIND,
+      schema: AGENT_STATE_SCHEMA,
+      createdAt: new Date().toISOString(),
+      stores: {
+        meta: expectedHouseId ? [{ key: 'houseId', value: expectedHouseId }] : [],
+        vfs,
+        checkpoints: []
+      }
+    });
+  }
+
   const manifestBytes = files.get('agent-state-manifest.json');
   const metaBytes = files.get('meta.json');
   const checkpointsBytes = files.get('checkpoints.json');
@@ -1569,26 +1452,11 @@ function formatBytes(value) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function triggerBytesDownload({ filename, bytes, type = 'application/octet-stream' }) {
-  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array([]);
-  const blob = new Blob([payload], { type });
-  const url = URL.createObjectURL(blob);
-  try {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } finally {
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-}
-
 function mapAgentStateError(error) {
   const msg = String(error?.message || error || '');
   if (!msg) return 'Agent state operation failed.';
   if (msg === 'LOCKED') return 'Unlock the house first.';
+  if (msg === 'RUNTIME_NOT_READY') return 'Local OpenClaw runtime is not ready yet. Try again in a moment.';
   if (msg === 'HOUSE_KEY_NOT_READY') return 'House key is not ready. Unlock again.';
   if (msg === 'INVALID_AGENT_STATE') return 'Invalid agent backup format.';
   if (msg === 'AGENT_STATE_TOO_LARGE') return 'Agent backup is too large.';
@@ -2671,14 +2539,12 @@ async function downloadAgentStateBackup() {
   await persistMindConfigDraftIfPresent();
   const exported = await exportLocalAgentStateSnapshot();
   assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
-  const zipBytes = await buildZipBackupFromSnapshot(exported.snapshot, house.houseId);
-  if (zipBytes.length > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
-  const iso = new Date().toISOString().replace(/[:]/g, '-');
-  const shortHouseId = house.houseId.slice(0, 12);
-  const filename = `agent-town-state-${shortHouseId}-${iso}.zip`;
-  triggerBytesDownload({ filename, bytes: zipBytes, type: 'application/zip' });
-  setAgentStateStatus(`Downloaded local backup ZIP (${formatBytes(zipBytes.length)}).`);
+  const gateway = await loadLiteGateway();
+  if (!gateway || typeof gateway.send !== 'function') throw new Error('RUNTIME_NOT_READY');
+  gateway.send({ type: 'gateway.command.exportZip' });
+  setAgentStateStatus('Downloaded OpenClaw-compatible ZIP from local runtime.');
   setAgentStateError('');
+  return { format: AGENT_STATE_OPENCLAW_EXPORT_KIND };
 }
 
 async function uploadAgentStateBackup(file) {

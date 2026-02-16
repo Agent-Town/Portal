@@ -22,7 +22,7 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
   expect(teamBefore).toMatch(/^TEAM-/);
 
   await page.getByTestId('hatch-wallet-check').click();
-  await expect(page.getByTestId('hatch-status')).toContainText(/no existing house|hatch your openclaw lite agent/i);
+  await expect(page.getByTestId('hatch-status')).toContainText(/no existing house|continue setting up/i);
   await expect(page.getByTestId('path-human')).toHaveCount(0);
 
   const resetResult = await page.evaluate(async () => {

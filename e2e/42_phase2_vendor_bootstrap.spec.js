@@ -43,7 +43,7 @@ async function readLocalMetaValue(page, key) {
   }, key);
 }
 
-test('vendor runtime uses local-only LLM config while runtime stays server-bootstrapped', async ({ page }) => {
+test('vendor runtime uses local-only LLM config without server runtime boot state', async ({ page }) => {
   await enterHatch(page, 'signin');
   await completeHatch(page);
 
@@ -69,9 +69,8 @@ test('vendor runtime uses local-only LLM config while runtime stays server-boots
   expect(state.lite.llmConfigured).toBe(false);
   expect(state.lite.llmProvider ?? null).toBeNull();
   expect(state.lite.llmModel ?? null).toBeNull();
-  expect(state.lite.runtimeReady).toBe(true);
-  expect(typeof state.lite.runtimeVersion).toBe('string');
-  expect(state.lite.runtimeVersion.length).toBeGreaterThan(0);
+  expect(state.lite.runtimeReady).toBe(false);
+  expect(state.lite.runtimeVersion ?? null).toBeNull();
   expect(state.lite.lastError ?? null).toBeNull();
   await expect.poll(() => readLocalMetaValue(page, 'llmProvider')).toBe('test-local');
   await expect.poll(() => readLocalMetaValue(page, 'llmModelId')).toBe('deterministic');

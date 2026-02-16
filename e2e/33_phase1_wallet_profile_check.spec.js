@@ -63,7 +63,7 @@ test('wallet profile check runs nonce+lookup and redirects to house when a profi
   expect(nonceIdx).toBeLessThan(lookupIdx);
 });
 
-test('wallet with no profile remains in hatch flow and exposes hatch controls', async ({ page }) => {
+test('wallet with no profile remains in setup flow and exposes brain config controls', async ({ page }) => {
   await installMockSolanaWallet(page, {
     address: 'So1anaNoHouse1111111111111111111111111111111'
   });
@@ -74,6 +74,5 @@ test('wallet with no profile remains in hatch flow and exposes hatch controls', 
   await page.waitForTimeout(2100);
   expect(page.url()).not.toMatch(/\/house\?house=/);
   await expect(page.getByTestId('hatch-panel')).toBeVisible();
-  await expect(page.getByTestId('hatch-btn')).toBeVisible();
+  await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
 });
-

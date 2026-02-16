@@ -9,7 +9,6 @@ test.beforeEach(async ({ request }) => {
 async function openHatchVia(page, intentTestId) {
   await page.getByTestId(intentTestId).click();
   await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
-  await expect(page.getByTestId('hatch-btn')).toBeVisible({ timeout: 500 });
   await expect(page.getByTestId('hatch-status')).toBeVisible({ timeout: 500 });
 }
 
@@ -37,18 +36,18 @@ async function resetSessionFromBrowser(page) {
   expect(out.ok).toBeTruthy();
 }
 
-test('sign in and sign up both transition to the same hatch step and reload keeps hatch visible', async ({ page }) => {
+test('sign in and sign up both transition to the same setup flow and reload keeps setup visible', async ({ page }) => {
   await page.goto('/');
 
   await openHatchVia(page, 'auth-signin');
   const signinControls = await captureVisibleHatchControls(page);
   expect(signinControls.length).toBeGreaterThanOrEqual(2);
-  expect(signinControls).toContain('hatch-btn');
+  expect(signinControls).toContain('lite-llm-panel');
   expect(signinControls).toContain('hatch-status');
 
   await page.reload();
   await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
-  await expect(page.getByTestId('hatch-btn')).toBeVisible({ timeout: 500 });
+  await expect(page.getByTestId('lite-llm-panel')).toBeVisible({ timeout: 500 });
 
   await resetSessionFromBrowser(page);
   await page.goto('/');
@@ -57,4 +56,3 @@ test('sign in and sign up both transition to the same hatch step and reload keep
   const signupControls = await captureVisibleHatchControls(page);
   expect(signupControls).toEqual(signinControls);
 });
-

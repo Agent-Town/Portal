@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('runtime bridge boots the OpenClaw Lite worker and keeps vendor runtime ready', async ({ page }) => {
+test('runtime bridge boots the OpenClaw Lite worker with server-lite runtime state remaining neutral', async ({ page }) => {
   const seen = {
     workerEntry: 0,
     workerRuntime: 0,
@@ -29,7 +29,7 @@ test('runtime bridge boots the OpenClaw Lite worker and keeps vendor runtime rea
 
   const state = await fetchSessionState(page);
   expect(state.lite.driver).toBe('vendor');
-  expect(state.lite.runtimeReady).toBe(true);
+  expect(state.lite.runtimeReady).toBe(false);
   expect(state.agent?.source).toBe('openclaw-lite');
 
   const bridgeShape = await page.evaluate(() => ({

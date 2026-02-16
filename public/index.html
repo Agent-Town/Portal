@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent Town</title>
-  <meta name="description" content="OpenClaw Lite hatch flow" />
+  <meta name="description" content="OpenClaw Lite onboarding flow" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
@@ -38,7 +38,7 @@
         <div class="panel hero" id="welcomePanel">
           <h1 data-testid="landing-title">Welcome to the Wild West!</h1>
           <p style="margin-bottom: 24px;">
-            Hatch your AI agent, explore the town, and unlock secrets together.
+            Set up your AI agent, explore the town, and unlock secrets together.
           </p>
           <div class="row two">
             <button class="btn primary" id="enterBtn">Enter Agent Town</button>
@@ -46,11 +46,11 @@
           </div>
         </div>
 
-        <!-- Hatching Station -->
+        <!-- Setup Station -->
         <div class="panel spaced is-hidden" id="hatchPanel" data-testid="hatch-panel">
           <div class="hatch-header">
-            <h2>Hatch Station</h2>
-            <div class="status-indicator" id="hatchStatus" data-testid="hatch-status">Ready to hatch.</div>
+            <h2>Setup Station (One-Time)</h2>
+            <div class="status-indicator" id="hatchStatus" data-testid="hatch-status">Ready.</div>
             <div class="small" style="display:flex; align-items:center; gap:8px;">
               <span class="dot" id="liteAgentDot"></span>
               <span id="liteAgentStatus" data-testid="lite-agent-status">Agent offline</span>
@@ -61,8 +61,8 @@
               <div class="step-item active" id="step1">
                 <div class="step-num">1</div>
                 <div class="step-content">
-                  <h3>Connect Wallet</h3>
-                  <button class="btn small" id="hatchWalletCheckBtn" data-testid="hatch-wallet-check">Check Wallet</button>
+                  <h3>Verify Wallet (one-time)</h3>
+                  <button class="btn small" id="hatchWalletCheckBtn" data-testid="hatch-wallet-check">Verify Wallet</button>
                   <div class="small status-text" id="walletStatus"></div>
                 </div>
               </div>
@@ -70,8 +70,8 @@
               <div class="step-item disabled" id="step2" data-testid="lite-llm-panel">
                 <div class="step-num">2</div>
                 <div class="step-content">
-                  <h3>Give it a Mind</h3>
-                  <p class="small">Connect an LLM provider.</p>
+                  <h3>Connect Brain (saved locally)</h3>
+                  <p class="small">Do this once per browser. It auto-restores on return.</p>
                   <div class="brain-config">
                       <div class="kv dense">
                       <label class="small-label">Provider</label>
@@ -163,8 +163,7 @@
                       <h4 style="margin: 0 0 8px; font-size: 13px;">Core Data</h4>
                       <div class="kv">
                         <button class="btn small" id="downloadCoreBtn">Download Brain</button>
-                        <button class="btn small" id="uploadCoreBtn"
-                          onclick="document.getElementById('coreUploadInput').click()">Upload Brain</button>
+                        <button class="btn small" id="uploadCoreBtn">Upload Brain</button>
                         <input type="file" id="coreUploadInput" style="display:none" accept=".json" />
                       </div>
                     </div>
@@ -172,21 +171,7 @@
                 </div>
               </div>
 
-              <!-- STEP 3: Hatch -->
-              <div class="step-item disabled" id="step3">
-                <div class="step-num">3</div>
-                <div class="step-content">
-                  <h3>Hatch Agent</h3>
-                  <div class="crate-container" id="crateContainer">
-                    <div class="crate">
-                      <div class="crate-body"></div>
-                      <div class="crate-label">FRAGILE</div>
-                    </div>
-                  </div>
-                  <button class="btn primary" id="hatchBtn" data-testid="hatch-btn" disabled>Hatch Agent</button>
-                  <div id="agentReveal" class="agent-reveal is-hidden"></div>
-                </div>
-              </div>
+              <div id="agentReveal" class="agent-reveal is-hidden"></div>
             </div>
           </div>
 
@@ -294,6 +279,12 @@
         <div class="chat-input-area">
           <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
           <button id="sendChatBtn" class="btn primary small">Send</button>
+          <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
+        </div>
+
+        <div id="approvalsPanel" class="agent-approvals is-hidden" data-testid="approvals-panel">
+          <div class="approvals-header">Approvals</div>
+          <div id="approvals" class="approvals-box" data-testid="approvals"></div>
         </div>
 
         <div class="divider"></div>

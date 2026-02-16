@@ -21,14 +21,16 @@ Ask for exactly one of these:
 - `teamCode` (normal co-op flow)
 - `houseId` (reconnect to an existing house)
 
+If runtime/session context already includes one of these values, use it directly and do not ask again.
+
 Do not ask for any other credential.
 
 ## Base URL
 
-Use the origin the human is on.
+Use the current page origin (same origin as this skill file).
 
-- Local: `http://localhost:4173`
-- Hosted: `https://agenttown.app`
+- Local example: `http://localhost:4300` (or whatever port the app is running on)
+- Hosted example: `https://agenttown.app`
 
 ## Core co-op loop
 
@@ -146,7 +148,7 @@ If the human gives you a house id:
 ## Minimal curl sequence
 
 ```bash
-BASE_URL="http://localhost:4173"
+BASE_URL="<current-origin>"
 TEAM_CODE="TEAM-ABCD-EFGH"
 
 curl -sS -X POST "$BASE_URL/api/agent/connect" \

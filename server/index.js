@@ -6,6 +6,12 @@ const http = require('http');
 const zlib = require('zlib');
 const express = require('express');
 const { registerLlmRoutes } = require('../vendors/openclaw-lite-main/server/routes/llm');
+let WebSocketServer = null;
+try {
+  ({ WebSocketServer } = require('ws'));
+} catch {
+  WebSocketServer = null;
+}
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
@@ -767,7 +773,7 @@ function ensureLiteState(session) {
 function updateLiteRuntimeReady(session) {
   const lite = ensureLiteState(session);
   const booted = lite.runtimeBooted === true;
-  lite.runtimeReady = !!(session?.hatch?.complete && booted && !lite.lastError);
+  lite.runtimeReady = !!(booted && !lite.lastError);
 }
 
 function markLiteRuntimeBooted(session) {
@@ -849,6 +855,19 @@ function setSecurityHeaders(req, res, next) {
   res.setHeader('X-Frame-Options', 'DENY');
 
   const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
+  if (!isProd) {
+    // Local development often runs UI/API on different localhost ports.
+    connectSrc.push(
+      'http://localhost:*',
+      'https://localhost:*',
+      'http://127.0.0.1:*',
+      'https://127.0.0.1:*',
+      'ws://localhost:*',
+      'wss://localhost:*',
+      'ws://127.0.0.1:*',
+      'wss://127.0.0.1:*'
+    );
+  }
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -1031,9 +1050,6 @@ function requireProxySessionAccess(req, res, next) {
   const session = getExistingHumanSession(req);
   if (!session) {
     return res.status(401).json({ ok: false, error: 'SESSION_REQUIRED' });
-  }
-  if (!session?.hatch?.complete) {
-    return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
   }
   if (!hasSameOriginNavigationContext(req)) {
     return res.status(403).json({ ok: false, error: 'FORBIDDEN_ORIGIN' });
@@ -1760,10 +1776,7 @@ app.post('/api/hatch/complete', (req, res) => {
 
 app.post('/api/agent/lite/connect', (req, res) => {
   const s = ensureHumanSession(req, res);
-  const lite = ensureLiteState(s);
-  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
-  if (lite.runtimeBooted !== true) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_NOT_READY' });
-  if (lite.lastError) return res.status(503).json({ ok: false, error: 'LITE_RUNTIME_FAILED' });
+  ensureLiteState(s);
   s.agent.connected = true;
   s.agent.source = 'openclaw-lite';
   s.agent.name = s.agent.name || 'OpenClaw Lite';
@@ -1792,7 +1805,6 @@ app.get('/api/agent/lite/runtime', (req, res) => {
 
 app.post('/api/agent/lite/runtime/boot', (req, res) => {
   const s = ensureHumanSession(req, res);
-  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
   markLiteRuntimeBooted(s);
   const lite = ensureLiteState(s);
   res.json({
@@ -1837,7 +1849,6 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
 
 app.post('/api/agent/lite/llm/config', (req, res) => {
   const s = ensureHumanSession(req, res);
-  if (!s.hatch?.complete) return res.status(403).json({ ok: false, error: 'HATCH_REQUIRED' });
   const lite = ensureLiteState(s);
 
   let payload;
@@ -4061,9 +4072,48 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
 
   // Handle body
   let fetchBody = undefined;
-  if (body && body.kind === 'json') fetchBody = JSON.stringify(body.json);
-  else if (body && body.kind === 'text') fetchBody = body.text;
-  else if (body && body.kind === 'base64') fetchBody = Buffer.from(body.base64, 'base64');
+  try {
+    if (body != null) {
+      if (typeof body === 'string') {
+        fetchBody = body;
+      } else if (typeof body !== 'object') {
+        fetchBody = String(body);
+      } else {
+        const hasOwn = (key) => Object.prototype.hasOwnProperty.call(body, key);
+        const hasKind = typeof body.kind === 'string' && body.kind.trim();
+        const kind = hasKind ? body.kind.trim().toLowerCase() : '';
+
+        if (!hasKind) {
+          if (hasOwn('json')) {
+            if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+            fetchBody = JSON.stringify(body.json);
+          } else if (hasOwn('text')) {
+            fetchBody = typeof body.text === 'string' ? body.text : String(body.text ?? '');
+          } else if (hasOwn('base64')) {
+            const base64 = typeof body.base64 === 'string' ? body.base64 : '';
+            if (!/^[A-Za-z0-9+/=]*$/.test(base64)) throw new Error('INVALID_BASE64');
+            fetchBody = Buffer.from(base64, 'base64');
+          } else {
+            if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+            fetchBody = JSON.stringify(body);
+          }
+        } else if (kind === 'json') {
+          if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+          fetchBody = JSON.stringify(body.json);
+        } else if (kind === 'text') {
+          fetchBody = typeof body.text === 'string' ? body.text : String(body.text ?? '');
+        } else if (kind === 'base64') {
+          const base64 = typeof body.base64 === 'string' ? body.base64 : '';
+          if (!/^[A-Za-z0-9+/=]*$/.test(base64)) throw new Error('INVALID_BASE64');
+          fetchBody = Buffer.from(base64, 'base64');
+        } else {
+          throw new Error('INVALID_BODY_KIND');
+        }
+      }
+    }
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENTS' });
+  }
 
   const startedAtMs = Date.now();
   try {
@@ -4128,6 +4178,70 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
 });
 
 const port = Number(process.env.PORT || 4173);
-app.listen(port, () => {
+const server = http.createServer(app);
+
+if (process.env.NODE_ENV === 'test' && WebSocketServer) {
+  const testExperienceWss = new WebSocketServer({ noServer: true });
+  testExperienceWss.on('connection', (socket) => {
+    socket.on('message', (raw) => {
+      const text = Buffer.isBuffer(raw)
+        ? raw.toString('utf8')
+        : typeof raw === 'string'
+          ? raw
+          : String(raw || '');
+      let payload = null;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+
+      if (!payload || typeof payload !== 'object') {
+        socket.send(JSON.stringify({ ok: false, error: 'INVALID_JSON' }));
+        return;
+      }
+
+      const type = typeof payload.type === 'string' ? payload.type.trim() : '';
+      if (type === 'experience.run') {
+        const files = payload.files && typeof payload.files === 'object' ? payload.files : {};
+        const fileKeys = Object.keys(files).filter((k) => typeof files[k] === 'string').sort();
+        socket.send(JSON.stringify({
+          ok: true,
+          receivedType: 'experience.run',
+          mode: 'ws-test',
+          fileKeys,
+          skillPresent: fileKeys.includes('skill'),
+          receivedAtMs: Date.now()
+        }));
+        return;
+      }
+
+      socket.send(JSON.stringify({
+        ok: true,
+        receivedType: type || 'unknown',
+        mode: 'ws-test',
+        receivedAtMs: Date.now()
+      }));
+    });
+  });
+
+  server.on('upgrade', (req, socket, head) => {
+    let pathname = '';
+    try {
+      pathname = new URL(String(req.url || '/'), 'http://localhost').pathname;
+    } catch {
+      pathname = '';
+    }
+    if (pathname !== '/__test__/experience/ws') {
+      socket.destroy();
+      return;
+    }
+    testExperienceWss.handleUpgrade(req, socket, head, (ws) => {
+      testExperienceWss.emit('connection', ws, req);
+    });
+  });
+}
+
+server.listen(port, () => {
   console.log(`[agent-town] http://localhost:${port}`);
 });

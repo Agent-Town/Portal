@@ -18,7 +18,7 @@ async function expectHiddenOrDisabled(locator) {
   }
 }
 
-test('hatch completion gates sigils/open and writes hatch state to /api/state', async ({ page }) => {
+test('setup flow has no explicit hatch activation button and keeps sigils gated pre-connect', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('auth-signup').click();
   await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
@@ -26,13 +26,11 @@ test('hatch completion gates sigils/open and writes hatch state to /api/state', 
   await expectHiddenOrAbsent(page.getByTestId('sigil-grid'));
   await expectHiddenOrAbsent(page.getByTestId('sigil-key'));
   await expectHiddenOrDisabled(page.getByTestId('open-btn'));
-
-  await page.getByTestId('hatch-btn').click();
-  await expect(page.getByTestId('hatch-status')).toContainText(/complete|hatched|ready/i, { timeout: 1000 });
+  await expect(page.getByTestId('hatch-btn')).toHaveCount(0);
 
   const state = await fetchSessionState(page);
   expect(state.hatch).toBeTruthy();
-  expect(state.hatch.complete).toBe(true);
-  expect(state.hatch.agentKind).toBe('openclaw-lite');
+  expect(state.hatch.complete).toBe(false);
+  expect(state.hatch.agentKind ?? null).toBeNull();
+  expect(state.agent?.connected).toBe(false);
 });
-

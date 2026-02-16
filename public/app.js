@@ -28,11 +28,12 @@ let lastState = null;
 let wallet = null;
 let walletAddr = null;
 let redirecting = false;
-let pendingHatchComplete = false;
+let pendingWalletCheck = false;
 let pendingLiteConnect = false;
 let pendingLlmSave = false;
 let pendingLlmClear = false;
 let pendingRuntimeBootstrap = false;
+let runtimeBootstrapPromise = null;
 let statusOverride = '';
 let runtimeBootstrapDone = false;
 let llmRestoreAttempted = false;
@@ -718,7 +719,6 @@ function isAnyAgentConnected(state) {
 async function ensureVendorRuntimeBridge(state) {
   if (!runtimeBridge) return;
   if (!isVendorLite(state)) return;
-  if (!state?.hatch?.complete) return;
   const teamCode = String(state?.teamCode || '').trim();
   if (!teamCode) return;
 
@@ -822,19 +822,27 @@ function updateLiteAgentStatus(state) {
 
 // Replaced by new implementation below
 function applyVisibility(state) {
+  const welcomePanel = el('welcomePanel');
   const hatchPanel = el('hatchPanel');
   const townPanel = el('townPanel');
   const sidebar = el('agentSidebar');
-  const hatchComplete = !!state?.hatch?.complete;
   const visible = loadHatchVisible();
-  const vendorNeedsSetup = isVendorLite(state) && hatchComplete && (!isLocalLiteLlmConfigured() || !isLiteConnected(state));
-  // If hatch is complete, we show townPanel instead of hatchPanel
-  // Unless browser is active?
+  const vendor = isVendorLite(state);
+  const liteConnected = isLiteConnected(state);
+  const vendorNeedsSetup = vendor && (!isLocalLiteLlmConfigured() || !liteConnected);
+  const onboardingComplete = vendor
+    ? !vendorNeedsSetup
+    : isAnyAgentConnected(state);
 
   const browserActive = el('browserPanel') && !el('browserPanel').classList.contains('is-hidden');
 
+  if (welcomePanel) {
+    const showWelcomePanel = !visible && !onboardingComplete;
+    welcomePanel.classList.toggle('is-hidden', !showWelcomePanel);
+  }
+
   if (hatchPanel) {
-    const showHatchPanel = hatchComplete ? vendorNeedsSetup : visible;
+    const showHatchPanel = visible && !onboardingComplete;
     hatchPanel.classList.toggle('is-hidden', !showHatchPanel);
   }
 
@@ -842,7 +850,7 @@ function applyVisibility(state) {
     if (browserActive) {
       townPanel.classList.add('is-hidden');
     } else {
-      const showTownPanel = hatchComplete && !vendorNeedsSetup;
+      const showTownPanel = onboardingComplete;
       townPanel.classList.toggle('is-hidden', !showTownPanel);
     }
   }
@@ -899,16 +907,39 @@ async function lookupWalletHouse() {
 }
 
 async function checkWalletStep() {
+  if (pendingWalletCheck) return;
   const step1 = el('step1');
   const step2 = el('step2');
   const walletStatus = el('walletStatus');
-  const hatchBtn = el('hatchBtn');
+  const walletBtn = el('hatchWalletCheckBtn');
 
+  pendingWalletCheck = true;
+  if (walletBtn) walletBtn.disabled = true;
   if (walletStatus) walletStatus.textContent = 'Checking wallet...';
+
+  const unlockStep2 = () => {
+    if (step1) step1.classList.add('done');
+    if (step2) {
+      step2.classList.remove('disabled');
+      step2.classList.add('active');
+    }
+    const providerInput = el('llmProviderSelect');
+    if (providerInput) setTimeout(() => providerInput.focus(), 100);
+  };
 
   try {
     await connectWallet();
-    const lookup = await lookupWalletHouse();
+    let lookup = null;
+    try {
+      lookup = await lookupWalletHouse();
+    } catch (lookupErr) {
+      const code = String(lookupErr?.message || '').trim();
+      if (code === 'NONCE_MISMATCH') {
+        lookup = await lookupWalletHouse();
+      } else {
+        throw lookupErr;
+      }
+    }
     if (lookup?.houseId) {
       statusOverride = 'House found! Redirecting...';
       if (walletStatus) walletStatus.textContent = statusOverride;
@@ -921,33 +952,37 @@ async function checkWalletStep() {
       walletStatus.textContent = 'Wallet verified. Configure brain.';
       walletStatus.style.color = 'var(--good)';
     }
-    if (step1) step1.classList.add('done');
+    unlockStep2();
 
-    // Unlock Step 2
-    if (step2) {
-      step2.classList.remove('disabled');
-      step2.classList.add('active');
-    }
-
-    // Auto-focus provider if possible
-    const providerInput = el('llmProviderSelect');
-    if (providerInput) setTimeout(() => providerInput.focus(), 100);
-
-    statusOverride = 'No existing house found. Hatch your OpenClaw Lite agent.';
+    statusOverride = 'No existing house found. Continue setting up your OpenClaw Lite agent.';
     setHatchStatus(statusOverride);
 
   } catch (e) {
-    const msg = e.message === 'NO_SOLANA_WALLET'
+    const raw = String(e?.message || '').trim();
+    const hasConnectedWallet = !!walletAddr;
+    const msg = raw === 'NO_SOLANA_WALLET'
       ? 'No Solana wallet found.'
-      : e.message === 'NO_SOLANA_SIGN'
-        ? 'Wallet signing failed.'
-        : 'Wallet check failed.';
+      : raw === 'NO_SOLANA_SIGN'
+        ? 'Wallet cannot sign messages.'
+        : raw === 'USER_REJECTED'
+          ? 'Wallet signature was cancelled.'
+          : raw.includes('USER_REJECTED')
+            ? 'Wallet signature was cancelled.'
+            : hasConnectedWallet
+              ? 'Wallet connected. Lookup skipped. Configure brain to continue.'
+              : 'Wallet check failed.';
     if (walletStatus) {
       walletStatus.textContent = msg;
-      walletStatus.style.color = 'var(--bad)';
+      walletStatus.style.color = hasConnectedWallet ? 'var(--muted)' : 'var(--bad)';
+    }
+    if (hasConnectedWallet) {
+      unlockStep2();
     }
     statusOverride = msg;
     setHatchStatus(statusOverride);
+  } finally {
+    pendingWalletCheck = false;
+    if (walletBtn) walletBtn.disabled = false;
   }
 }
 
@@ -956,59 +991,23 @@ async function runWalletProfileCheck() {
   await checkWalletStep();
 }
 
-async function completeHatch() {
-  if (pendingHatchComplete) return;
-  pendingHatchComplete = true;
-
-  const crateContainer = el('crateContainer');
-  const agentReveal = el('agentReveal');
-  const hatchStatus = el('hatchStatus');
-  const hatchBtn = el('hatchBtn');
-
-  statusOverride = 'Hatching Sequence Initiated...';
-  setHatchStatus(statusOverride);
-
-  if (crateContainer) crateContainer.classList.add('shaking');
-  if (hatchBtn) hatchBtn.disabled = true;
-
-  // Keep a brief animation beat without breaking deterministic test timing.
-  await new Promise(r => setTimeout(r, 120));
-
-  try {
-    if (crateContainer) crateContainer.classList.remove('shaking');
-
-    await api('/api/hatch/complete', {
-      method: 'POST',
-      body: JSON.stringify({})
-    });
-
-    // Success UI updates
-    if (crateContainer) crateContainer.style.display = 'none';
-    if (agentReveal) agentReveal.classList.remove('is-hidden');
-
-    const state = await api('/api/state');
-    updateUI(state);
-
-    statusOverride = isVendorLite(state)
-      ? 'Hatch complete. Configure Agent Brain.'
-      : 'Hatch complete. Welcome to Agent Town.';
-
-  } catch (e) {
-    statusOverride = `Hatch failed: ${e.message}`;
-    if (crateContainer) crateContainer.classList.remove('shaking');
-    if (hatchBtn) hatchBtn.disabled = false;
-  } finally {
-    pendingHatchComplete = false;
-    setHatchStatus(statusOverride);
-  }
-}
-
 async function connectLiteAgent() {
   if (pendingLiteConnect) return;
   if (isVendorLite(lastState) && !isLocalLiteLlmConfigured()) {
     statusOverride = 'Configure your local brain settings before connecting OpenClaw Lite.';
     setHatchStatus(statusOverride);
     return;
+  }
+  if (isVendorLite(lastState)) {
+    const booted = await bootstrapVendorRuntime();
+    if (!booted) {
+      if (!String(statusOverride || '').startsWith('OpenClaw Lite runtime failed:')) {
+        statusOverride = 'OpenClaw Lite runtime is starting…';
+      }
+      setHatchStatus(statusOverride);
+      applyVisibility(lastState);
+      return;
+    }
   }
   pendingLiteConnect = true;
   setHatchStatus('Connecting OpenClaw Lite…');
@@ -1028,50 +1027,44 @@ async function connectLiteAgent() {
 }
 
 async function bootstrapVendorRuntime() {
-  if (pendingRuntimeBootstrap || runtimeBootstrapDone) return;
-  if (!lastState?.hatch?.complete || !isVendorLite(lastState)) return;
+  if (runtimeBootstrapPromise) return runtimeBootstrapPromise;
+  if (!isVendorLite(lastState)) return false;
+  if (runtimeBootstrapDone) return true;
 
-  pendingRuntimeBootstrap = true;
-  try {
-    const manifestResp = await fetch('/openclaw-lite/manifest.json', {
-      credentials: 'include',
-      cache: 'no-store'
-    });
-    if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
-    const manifest = await manifestResp.json().catch(() => ({}));
-    const runtimeWorkerPath = String(manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
-    fetch(runtimeWorkerPath, {
-      credentials: 'include',
-      cache: 'no-store'
-    }).catch(() => null);
-
-    await api('/api/agent/lite/runtime');
-    await api('/api/agent/lite/runtime/boot', {
-      method: 'POST',
-      body: JSON.stringify({})
-    });
-    if (lastState) {
-      await ensureVendorRuntimeBridge(lastState);
-    }
-    runtimeBootstrapDone = true;
-    setLiteLlmStatus('Runtime ready. Configure provider, model, and API key.');
-  } catch (e) {
-    runtimeBootstrapDone = false;
-    const msg = e?.message || 'RUNTIME_BOOT_FAILED';
-    statusOverride = `OpenClaw Lite runtime failed: ${msg}`;
-    setHatchStatus(statusOverride);
-    setLiteLlmStatus(`Runtime failed: ${msg}`);
+  runtimeBootstrapPromise = (async () => {
+    pendingRuntimeBootstrap = true;
     try {
-      await api('/api/agent/lite/runtime/error', {
-        method: 'POST',
-        body: JSON.stringify({ error: msg })
+      const manifestResp = await fetch('/openclaw-lite/manifest.json', {
+        credentials: 'include',
+        cache: 'no-store'
       });
-    } catch {
-      // ignore secondary error reporting failures
+      if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
+      const manifest = await manifestResp.json().catch(() => ({}));
+      const runtimeWorkerPath = String(manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      fetch(runtimeWorkerPath, {
+        credentials: 'include',
+        cache: 'no-store'
+      }).catch(() => null);
+      if (lastState) {
+        await ensureVendorRuntimeBridge(lastState);
+      }
+      runtimeBootstrapDone = true;
+      setLiteLlmStatus('Runtime ready. Configure provider, model, and API key.');
+      return true;
+    } catch (e) {
+      runtimeBootstrapDone = false;
+      const msg = e?.message || 'RUNTIME_BOOT_FAILED';
+      statusOverride = `OpenClaw Lite runtime failed: ${msg}`;
+      setHatchStatus(statusOverride);
+      setLiteLlmStatus(`Runtime failed: ${msg}`);
+      return false;
+    } finally {
+      pendingRuntimeBootstrap = false;
+      runtimeBootstrapPromise = null;
     }
-  } finally {
-    pendingRuntimeBootstrap = false;
-  }
+  })();
+
+  return runtimeBootstrapPromise;
 }
 
 
@@ -1195,7 +1188,6 @@ function applyLocalLiteLlmToInputs(config) {
 
 async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
   if (!isVendorLite(state)) return;
-  if (!state?.hatch?.complete) return;
   if (llmRestoreAttempted) return;
 
   llmRestoreAttempted = true;
@@ -1213,7 +1205,7 @@ async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
       });
     }
     if (localCfg.configured) {
-      setLiteLlmStatus(`LLM configured locally: ${localCfg.provider}/${localCfg.model}.`);
+      setLiteLlmStatus(`Brain saved locally: ${localCfg.provider}/${localCfg.model}. Auto-restored on return.`);
     } else {
       setLiteLlmStatus('Not configured. Save provider, model, and API key.');
     }
@@ -1278,7 +1270,7 @@ function initStep2Listener() {
       await applyGatewayLlmConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
-      if (runtimeBridge && lastState?.hatch?.complete && isVendorLite(lastState)) {
+      if (runtimeBridge && isVendorLite(lastState)) {
         try {
           await ensureVendorRuntimeBridge(lastState);
           await runtimeBridge.setLlmConfig({
@@ -1293,20 +1285,23 @@ function initStep2Listener() {
 
       await new Promise(r => setTimeout(r, 300));
       status.textContent = 'Brain configured.';
-      setLiteLlmStatus(`LLM configured locally: ${config.provider}/${config.model}.`);
+      setLiteLlmStatus(`Brain saved locally: ${config.provider}/${config.model}. Auto-restored on return.`);
       if (lastState) updateUI(lastState);
 
-      // Unlock Step 3
       const step2 = el('step2');
-      const step3 = el('step3');
-      const hatchBtn = el('hatchBtn');
-      if (step2) step2.classList.add('done');
-      if (step3) {
-        step3.classList.remove('disabled');
-        step3.classList.add('active');
+      if (step2) {
+        step2.classList.add('done');
+        step2.classList.remove('active');
       }
-      if (hatchBtn) hatchBtn.disabled = false;
-      setHatchStatus('Brain connected. Ready to hatch.');
+      setHatchStatus('Brain connected. Connecting agent...');
+      if (isVendorLite(lastState)) {
+        const booted = await bootstrapVendorRuntime();
+        if (booted) {
+          await connectLiteAgent();
+        } else {
+          setHatchStatus('Brain configured locally. Runtime boot failed.');
+        }
+      }
     } catch (e) {
       if (status) status.textContent = `Brain config failed: ${e.message}`;
       setHatchStatus(`Brain config failed: ${e.message}`);
@@ -1365,7 +1360,7 @@ async function clearLiteLlmConfig() {
       modelRefInput.value = resolved.modelRef;
     }
     if (oauthInput) oauthInput.value = '';
-    if (runtimeBridge && lastState?.hatch?.complete && isVendorLite(lastState)) {
+    if (runtimeBridge && isVendorLite(lastState)) {
       await ensureVendorRuntimeBridge(lastState);
       await runtimeBridge.setLlmConfig({ provider: '', model: '', apiKey: '' });
     }
@@ -1593,8 +1588,10 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateUI(state) {
   lastState = state;
   elements = Array.isArray(state?.elements) ? state.elements : elements;
-  if (!state?.hatch?.complete) {
+  if (!isVendorLite(state)) {
     runtimeBootstrapDone = false;
+    runtimeBootstrapPromise = null;
+    pendingRuntimeBootstrap = false;
     llmRestoreAttempted = false;
     if (runtimeBridge && runtimeBridgeInitKey) {
       runtimeBridge.dispose();
@@ -1605,6 +1602,8 @@ function updateUI(state) {
   const teamCode = state?.teamCode || '…';
   const teamCodeNode = el('teamCode');
   if (teamCodeNode) teamCodeNode.textContent = teamCode;
+  const teamCodeResult = el('teamCodeResult');
+  if (teamCodeResult) teamCodeResult.classList.add('is-hidden');
   const localLlm = getLocalLiteLlm();
 
   applyVisibility(state);
@@ -1616,18 +1615,24 @@ function updateUI(state) {
   // --- New Flow UI Updates ---
   const step1 = el('step1');
   const step2 = el('step2');
-  const step3 = el('step3');
-  const hatchBtn = el('hatchBtn');
-  const crateContainer = el('crateContainer');
   const agentReveal = el('agentReveal');
+  const agentConnected = isAnyAgentConnected(state);
+  const lite = liteState(state);
+  const vendor = isVendorLite(state);
 
-  if (state?.hatch?.complete) {
-    // Hatch Complete State
-    if (step1) step1.classList.add('done');
+    if (step1) {
+      if (agentConnected || walletAddr || localLlm.configured) {
+        step1.classList.add('done');
+      } else {
+        step1.classList.remove('done');
+    }
+  }
+
+  if (agentConnected) {
     if (step2) {
-      const needsBrainAfterHatch = isVendorLite(state) && !localLlm.configured;
+      const needsBrainAfterConnect = vendor && !localLlm.configured;
       step2.classList.remove('disabled');
-      if (needsBrainAfterHatch) {
+      if (needsBrainAfterConnect) {
         step2.classList.add('active');
         step2.classList.remove('done');
       } else {
@@ -1635,84 +1640,75 @@ function updateUI(state) {
         step2.classList.add('done');
       }
     }
-    if (step3) {
-      step3.classList.remove('disabled');
-      step3.classList.add('done');
-    }
-    if (hatchBtn) {
-      hatchBtn.disabled = true;
-      hatchBtn.textContent = 'Hatched';
-    }
-
-    if (crateContainer) crateContainer.style.display = 'none';
     if (agentReveal) {
       agentReveal.classList.remove('is-hidden');
       renderAgentReveal(state);
     }
-  } else if (walletAddr) {
-    // Wallet Connected
-    if (step1) step1.classList.add('done');
-    // We don't auto-unlock step 2 here because we depend on the checkWallet result (handled in checkWalletStep)
-    // But if we reload page and have walletAddr, we should probably allow it? 
-    // For now, let's keep it simple: checkWalletStep handles the unlock.
-  }
-  if (!state?.hatch?.complete) {
-    if (step3) {
-      step3.classList.remove('disabled');
-      step3.classList.add('active');
+  } else {
+    if (step2) {
+      step2.classList.remove('disabled');
+      if (localLlm.configured) {
+        step2.classList.add('done');
+        step2.classList.remove('active');
+      } else {
+        step2.classList.remove('done');
+        step2.classList.add('active');
+      }
     }
-    if (hatchBtn) {
-      hatchBtn.disabled = false;
-      hatchBtn.textContent = 'Hatch Agent';
+    if (agentReveal) {
+      agentReveal.classList.add('is-hidden');
     }
   }
-  // ---------------------------
 
-  const lite = liteState(state);
-  const vendor = isVendorLite(state);
-  if (vendor && state?.hatch?.complete) {
+  if (vendor) {
     ensureVendorRuntimeBridge(state).catch((e) => {
       setOpenError(`Runtime bridge failed: ${e.message}`);
     });
     if (lite.lastError) {
       setLiteLlmStatus(`Runtime failed: ${lite.lastError}`);
     } else if (localLlm.configured) {
-      setLiteLlmStatus(`LLM configured locally: ${localLlm.provider || 'provider'}/${localLlm.model || 'model'}.`);
+      setLiteLlmStatus(`Brain saved locally: ${localLlm.provider || 'provider'}/${localLlm.model || 'model'}. Auto-restored on return.`);
     } else {
       setLiteLlmStatus('Not configured. Save provider, model, and API key.');
     }
   }
 
+  if (statusOverride === 'OpenClaw Lite runtime is starting…' && runtimeBootstrapDone) {
+    statusOverride = '';
+  }
+
   if (statusOverride) {
     setHatchStatus(statusOverride);
-  } else if (vendor && state?.hatch?.complete && lite.lastError) {
+  } else if (vendor && lite.lastError) {
     setHatchStatus(`OpenClaw Lite runtime failed: ${lite.lastError}`);
-  } else if (vendor && state?.hatch?.complete && !localLlm.configured) {
-    setHatchStatus('Hatch complete. Configure LLM to continue.');
-  } else if (state?.hatch?.complete) {
-    setHatchStatus('Hatch complete.');
+  } else if (vendor && !localLlm.configured) {
+    setHatchStatus('Configure LLM to continue.');
+  } else if (vendor && localLlm.configured && !agentConnected) {
+    setHatchStatus(runtimeBootstrapDone ? 'Brain saved. Connecting agent…' : 'Starting local runtime…');
+  } else if (agentConnected) {
+    setHatchStatus('Agent ready.');
   } else if (walletAddr) {
-    setHatchStatus('Wallet connected. You can hatch now.');
+    setHatchStatus('Wallet connected. Continue setup.');
   } else {
     setHatchStatus('Choose sign in or sign up to continue.');
   }
 
-  if (state?.hatch?.complete) {
+  if (agentConnected || !!state?.signup?.complete) {
     renderSigils(state);
     renderCanvas(state);
     renderCeremony(state);
     updateMatchUi(state);
   }
 
-  if (vendor && state?.hatch?.complete && !runtimeBootstrapDone && !lite.lastError) {
+  if (vendor && !runtimeBootstrapDone) {
     bootstrapVendorRuntime().catch(() => { });
   }
-  if (vendor && state?.hatch?.complete && (!localLlm.loaded || !localLlm.configured)) {
+  if (vendor && (!localLlm.loaded || !localLlm.configured)) {
     restoreLiteLlmConfigFromLocalIfNeeded(state).catch(() => { });
   }
-  if (state?.hatch?.complete && !isAnyAgentConnected(state) && !pendingLiteConnect) {
+  if (!agentConnected && !pendingLiteConnect) {
     if (vendor) {
-      if (localLlm.configured && lite.runtimeReady) {
+      if (localLlm.configured && runtimeBootstrapDone) {
         connectLiteAgent().catch(() => { });
       }
     } else {
@@ -1826,13 +1822,46 @@ async function handleChat() {
   }
 }
 
+async function handleNewSession() {
+  const btn = el('newSessionBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    if (!gateway) await initGateway();
+    if (!gateway) throw new Error('Gateway unavailable.');
+
+    if (typeof gateway.clearTranscript === 'function') {
+      await gateway.clearTranscript({ rotateSession: true, keepBootMessage: false });
+    } else if (window.__openclawLiteTest && typeof window.__openclawLiteTest.clearTranscript === 'function') {
+      await window.__openclawLiteTest.clearTranscript({ rotateSession: true, keepBootMessage: false });
+    } else {
+      throw new Error('Transcript reset is not available.');
+    }
+
+    const box = el('chatTranscript');
+    if (box) box.innerHTML = '';
+    appendChatMessage('system', 'New session started.');
+    appendAgentLog('Started new session (worker transcript cleared).');
+  } catch (e) {
+    const msg = e?.message || 'UNKNOWN';
+    appendChatMessage('system', `New session failed: ${msg}`);
+    appendAgentLog(`New session failed: ${msg}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function setupAgentInterface() {
   const visitBtn = el('visitBtn');
   const sendBtn = el('sendChatBtn');
+  const newSessionBtn = el('newSessionBtn');
   const chatInput = el('chatInput');
 
   if (visitBtn) visitBtn.addEventListener('click', handleVisit);
   if (sendBtn) sendBtn.addEventListener('click', handleChat);
+  if (newSessionBtn) newSessionBtn.addEventListener('click', () => {
+    handleNewSession().catch(() => { });
+  });
   if (chatInput) {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') handleChat();
@@ -1854,20 +1883,38 @@ async function poll() {
 }
 
 async function init() {
+  const enterBtn = el('enterBtn');
+  const connectWalletHeroBtn = el('connectWalletHeroBtn');
   const authSigninBtn = el('authSigninBtn');
   const authSignupBtn = el('authSignupBtn');
   const hatchWalletCheckBtn = el('hatchWalletCheckBtn');
-  const hatchBtn = el('hatchBtn');
   const liteAgentConnectBtn = el('liteAgentConnectBtn');
   const liteLlmSaveBtn = el('liteLlmSaveBtn');
   const liteLlmClearBtn = el('liteLlmClearBtn');
   const llmClearBtn = el('llmClearBtn');
+  const uploadCoreBtn = el('uploadCoreBtn');
+  const coreUploadInput = el('coreUploadInput');
   const openBtn = el('openBtn');
+
+  if (enterBtn) {
+    enterBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Continue setup.';
+      setHatchStatus(statusOverride);
+    });
+  }
+
+  if (connectWalletHeroBtn) {
+    connectWalletHeroBtn.addEventListener('click', async () => {
+      setHatchVisible(true);
+      await runWalletProfileCheck();
+    });
+  }
 
   if (authSigninBtn) {
     authSigninBtn.addEventListener('click', () => {
       setHatchVisible(true);
-      statusOverride = 'Sign in selected. Continue to hatch.';
+      statusOverride = 'Sign in selected. Continue setup.';
       setHatchStatus(statusOverride);
     });
   }
@@ -1875,7 +1922,7 @@ async function init() {
   if (authSignupBtn) {
     authSignupBtn.addEventListener('click', () => {
       setHatchVisible(true);
-      statusOverride = 'Sign up selected. Continue to hatch.';
+      statusOverride = 'Sign up selected. Continue setup.';
       setHatchStatus(statusOverride);
     });
   }
@@ -1884,13 +1931,6 @@ async function init() {
     hatchWalletCheckBtn.addEventListener('click', async () => {
       setHatchVisible(true);
       await runWalletProfileCheck();
-    });
-  }
-
-  if (hatchBtn) {
-    hatchBtn.addEventListener('click', async () => {
-      setHatchVisible(true);
-      await completeHatch();
     });
   }
 
@@ -1915,6 +1955,12 @@ async function init() {
   if (llmClearBtn) {
     llmClearBtn.addEventListener('click', async () => {
       await clearLiteLlmConfig();
+    });
+  }
+
+  if (uploadCoreBtn && coreUploadInput) {
+    uploadCoreBtn.addEventListener('click', () => {
+      coreUploadInput.click();
     });
   }
 
@@ -1947,7 +1993,7 @@ async function init() {
 
   const initial = await api('/api/state');
   elements = Array.isArray(initial?.elements) ? initial.elements : [];
-  if (loadHatchVisible() || initial?.hatch?.complete) {
+  if (loadHatchVisible() || isAnyAgentConnected(initial) || isLocalLiteLlmConfigured()) {
     setHatchVisible(true);
   }
   try {
@@ -1957,7 +2003,7 @@ async function init() {
     console.warn('local LLM preload failed', e);
   }
   updateUI(initial);
-  if (initial?.hatch?.complete && isVendorLite(initial)) {
+  if (isVendorLite(initial)) {
     await bootstrapVendorRuntime();
     await restoreLiteLlmConfigFromLocalIfNeeded(initial);
   }

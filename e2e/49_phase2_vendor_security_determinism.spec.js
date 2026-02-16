@@ -34,22 +34,21 @@ test('happy-path vendor flow avoids outbound non-local network requests', async 
   expect(external).toEqual([]);
 });
 
-test('runtime bootstrap failures are surfaced in UI and state', async ({ page }) => {
+test('runtime bootstrap failures are surfaced in UI while server runtime state stays neutral', async ({ page }) => {
   await page.route('**/openclaw-lite/**', async (route) => {
     await route.abort();
   });
 
   await page.goto('/');
   await page.getByTestId('auth-signin').click();
-  await page.getByTestId('hatch-btn').click();
+  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 1000 });
 
-  await expect(page.getByTestId('lite-agent-status')).toContainText(/error|failed/i, { timeout: 3000 });
+  await expect(page.getByTestId('hatch-status')).toContainText(/runtime failed|failed/i, { timeout: 3000 });
 
   const state = await fetchSessionState(page);
   expect(state.lite).toBeTruthy();
   expect(state.lite.runtimeReady).toBe(false);
-  expect(typeof state.lite.lastError).toBe('string');
-  expect(state.lite.lastError.length).toBeGreaterThan(0);
+  expect(state.lite.lastError ?? null).toBeNull();
 });
 
 test('server rejects plaintext ceremony reveals with INVALID_REVEAL_ENVELOPE', async ({ request }) => {
@@ -96,4 +95,3 @@ test('server rejects plaintext ceremony reveals with INVALID_REVEAL_ENVELOPE', a
   const badAgent = await badAgentReveal.json();
   expect(badAgent.error).toBe('INVALID_REVEAL_ENVELOPE');
 });
-

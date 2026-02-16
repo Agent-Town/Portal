@@ -17,7 +17,7 @@ function expectNonceLookupSequence(calls) {
   expect(nonceIdx).toBeLessThan(lookupIdx);
 }
 
-test('wallet with existing house mapping redirects to house in hatch flow', async ({ page, request }) => {
+test('wallet with existing house mapping redirects to house in setup flow', async ({ page, request }) => {
   await installMockSolanaWallet(page);
   const seeded = await seedRecoverableTokenHouse(request);
   const calls = attachPathRecorder(page, ['/api/wallet/nonce', '/api/wallet/lookup']);
@@ -31,7 +31,7 @@ test('wallet with existing house mapping redirects to house in hatch flow', asyn
   expectNonceLookupSequence(calls);
 });
 
-test('wallet without mapping stays in hatch flow and keeps hatch controls visible', async ({ page }) => {
+test('wallet without mapping stays in setup flow and keeps brain controls visible', async ({ page }) => {
   await installMockSolanaWallet(page, {
     address: 'So1anaNoHouseVendor11111111111111111111111111'
   });
@@ -43,7 +43,6 @@ test('wallet without mapping stays in hatch flow and keeps hatch controls visibl
   await page.waitForTimeout(2200);
   expect(page.url()).not.toMatch(/\/house\?house=/);
   await expect(page.getByTestId('hatch-panel')).toBeVisible();
-  await expect(page.getByTestId('hatch-btn')).toBeVisible();
+  await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
   expectNonceLookupSequence(calls);
 });
-

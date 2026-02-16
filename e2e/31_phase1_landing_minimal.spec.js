@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('landing is minimal, single-path, and hatch-gated', async ({ page }) => {
+test('landing is minimal, single-path, and setup-gated', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByTestId('landing-title')).toHaveText('Welcome to the Wild West!');
@@ -27,4 +27,3 @@ test('landing is minimal, single-path, and hatch-gated', async ({ page }) => {
   await expectHiddenOrAbsent(page.getByTestId('sigil-key'));
   await expectHiddenOrAbsent(page.getByTestId('open-btn'));
 });
-

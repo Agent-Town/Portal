@@ -46846,6 +46846,8 @@ var OPENCLAW_VERSION = "2026.2.12";
 var PI_VERSIONS = define_PI_VERSIONS_default;
 var MAIN_AGENT_ID = "main";
 var MAIN_SESSION_KEY = "agent:main:main";
+var TRANSCRIPT_DIGEST_QUEUE_META_KEY = "transcriptDigestQueueV1";
+var TRANSCRIPT_DIGEST_QUEUE_MAX = 500;
 var LITE_TOOL_DISPATCH_PATH = "lite_tool_dispatch_v1";
 var DEFAULT_WEB_FETCH_MAX_BYTES = 262144;
 var MAX_WEB_FETCH_MAX_BYTES = 1048576;
@@ -46864,18 +46866,78 @@ var WS_DEFAULT_RECV_WAIT_MS = 5e3;
 var WS_MAX_RECV_WAIT_MS = 3e4;
 var WS_MAX_RECV_MESSAGES = 50;
 var MAX_CHECKPOINTS_PER_HOUSE = 50;
+var VISIT_MAX_COMPANION_FILES = 12;
+var VISIT_COMPANION_EXT_RE = /\.(md|json)$/i;
+var VISIT_COMPAT_BASENAMES = /* @__PURE__ */ new Set([
+  "skill.md",
+  "heartbeat.md",
+  "goals.md",
+  "tools.md",
+  "penalty.md",
+  "rules.md",
+  "messaging.md",
+  "skill.json"
+]);
 function post(msg) {
   self.postMessage(msg);
 }
 function log(line) {
   post({ type: "worker.log.append", line: String(line || "") });
 }
+function normalizeSkillImportStatus(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "loading" || raw === "ready" || raw === "failed") return raw;
+  return "idle";
+}
+function normalizeSkillRunMode(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  return raw || null;
+}
+function skillImportSnapshot({ importedPathLimit = 200 } = {}) {
+  const pathLimit = Math.max(0, Math.floor(Number(importedPathLimit) || 0));
+  return {
+    status: normalizeSkillImportStatus(state.skillImport.status),
+    sourceUrl: typeof state.skillImport.sourceUrl === "string" && state.skillImport.sourceUrl ? state.skillImport.sourceUrl : null,
+    siteRoot: typeof state.skillImport.siteRoot === "string" && state.skillImport.siteRoot.startsWith("workspace/skills/") ? state.skillImport.siteRoot : null,
+    activeSkillPath: typeof state.skillImport.activeSkillPath === "string" && state.skillImport.activeSkillPath.startsWith("workspace/") ? state.skillImport.activeSkillPath : null,
+    lastImportedAtMs: Number.isFinite(Number(state.skillImport.lastImportedAtMs)) ? Number(state.skillImport.lastImportedAtMs) : null,
+    lastError: typeof state.skillImport.lastError === "string" && state.skillImport.lastError ? state.skillImport.lastError : null,
+    lastRunAtMs: Number.isFinite(Number(state.skillImport.lastRunAtMs)) ? Number(state.skillImport.lastRunAtMs) : null,
+    lastRunMode: normalizeSkillRunMode(state.skillImport.lastRunMode),
+    lastRunOk: typeof state.skillImport.lastRunOk === "boolean" ? state.skillImport.lastRunOk : null,
+    lastRunErrorCode: typeof state.skillImport.lastRunErrorCode === "string" && state.skillImport.lastRunErrorCode ? state.skillImport.lastRunErrorCode : null,
+    lastRunErrorMessage: typeof state.skillImport.lastRunErrorMessage === "string" && state.skillImport.lastRunErrorMessage ? state.skillImport.lastRunErrorMessage : null,
+    lastRunDurationMs: Number.isFinite(Number(state.skillImport.lastRunDurationMs)) ? Number(state.skillImport.lastRunDurationMs) : null,
+    importedPaths: Array.isArray(state.skillImport.importedPaths) ? state.skillImport.importedPaths.map((p) => typeof p === "string" ? p : "").filter(Boolean).slice(0, pathLimit) : []
+  };
+}
+async function recordSkillRunDiagnostic({ mode, envelope, startedAtMs }) {
+  const finishedAtMs = nowMs();
+  state.skillImport.lastRunAtMs = finishedAtMs;
+  state.skillImport.lastRunMode = normalizeSkillRunMode(mode);
+  state.skillImport.lastRunOk = envelope?.ok === true;
+  state.skillImport.lastRunDurationMs = Math.max(0, finishedAtMs - Number(startedAtMs || finishedAtMs));
+  if (envelope?.ok === false && envelope?.error && typeof envelope.error === "object") {
+    const codeRaw = String(envelope.error.code || "").trim();
+    state.skillImport.lastRunErrorCode = codeRaw || "UNSUPPORTED";
+    const messageRaw = String(envelope.error.message || "").trim();
+    state.skillImport.lastRunErrorMessage = messageRaw || state.skillImport.lastRunErrorCode;
+  } else {
+    state.skillImport.lastRunErrorCode = null;
+    state.skillImport.lastRunErrorMessage = null;
+  }
+  await persistSkillImportState();
+  updateGatewayState();
+  const runCode = state.skillImport.lastRunOk ? "ok" : state.skillImport.lastRunErrorCode || "UNSUPPORTED";
+  log(`skill run ${state.skillImport.lastRunOk ? "ok" : "failed"} mode=${state.skillImport.lastRunMode || "unknown"} code=${runCode}`);
+}
 function updateGatewayState() {
   post({
     type: "worker.state.update",
     state: {
       houseId: state.houseId,
-      vault: { latestBackupId: state.vaultLatestBackupId || null }
+      vault: { latestBackupId: state.vaultLatestBackupId || null },
+      skill: skillImportSnapshot({ importedPathLimit: 200 })
     }
   });
 }
@@ -47145,7 +47207,7 @@ async function webFetchSameOrigin(input) {
 function shouldProxyFallbackForFetchError(error) {
   const msg = String(error?.message || error || "").toLowerCase();
   if (!msg) return true;
-  return msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("cors") || msg.includes("network request");
+  return msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("cors") || msg.includes("network request") || msg.includes("content security policy") || msg.includes("violates the following content security policy") || msg.includes("refused to connect");
 }
 async function webFetchCrossOriginViaProxy(input) {
   const res = await fetch(WEB_FETCH_PROXY_PATH, {
@@ -47276,10 +47338,63 @@ function applyHttpQuery(url, query) {
   return parsed.toString();
 }
 function normalizeHttpBody(body, headers) {
-  if (!body || typeof body !== "object") {
+  if (body == null) {
     return { wire: null, fetchBody: null, byteLength: 0 };
   }
-  const kind = String(body.kind || "text").trim().toLowerCase();
+  if (typeof body === "string") {
+    return {
+      wire: { kind: "text", text: body },
+      fetchBody: body,
+      byteLength: utf8ToBytes(body).length
+    };
+  }
+  if (typeof body !== "object") {
+    const text = String(body);
+    return {
+      wire: { kind: "text", text },
+      fetchBody: text,
+      byteLength: utf8ToBytes(text).length
+    };
+  }
+  const hasOwn4 = (key) => Object.prototype.hasOwnProperty.call(body, key);
+  const hasExplicitKind = typeof body.kind === "string" && body.kind.trim();
+  const kind = hasExplicitKind ? String(body.kind).trim().toLowerCase() : "";
+  if (!hasExplicitKind) {
+    if (hasOwn4("json")) {
+      const jsonValue = body.json;
+      const text2 = JSON.stringify(jsonValue);
+      if (!headers["content-type"]) headers["content-type"] = "application/json";
+      return {
+        wire: { kind: "json", json: jsonValue },
+        fetchBody: text2,
+        byteLength: utf8ToBytes(text2).length
+      };
+    }
+    if (hasOwn4("text")) {
+      const text2 = typeof body.text === "string" ? body.text : String(body.text ?? "");
+      return {
+        wire: { kind: "text", text: text2 },
+        fetchBody: text2,
+        byteLength: utf8ToBytes(text2).length
+      };
+    }
+    if (hasOwn4("base64")) {
+      const base64 = typeof body.base64 === "string" ? body.base64 : "";
+      const bytes = b64ToBytes(base64);
+      return {
+        wire: { kind: "base64", base64 },
+        fetchBody: bytes,
+        byteLength: bytes.length
+      };
+    }
+    const text = JSON.stringify(body);
+    if (!headers["content-type"]) headers["content-type"] = "application/json";
+    return {
+      wire: { kind: "json", json: body },
+      fetchBody: text,
+      byteLength: utf8ToBytes(text).length
+    };
+  }
   if (kind === "json") {
     const jsonValue = body.json !== void 0 ? body.json : {};
     const text = JSON.stringify(jsonValue);
@@ -47500,7 +47615,7 @@ function shouldProxyFallbackForHttpEnvelope(envelope) {
   if (code !== "UNSUPPORTED") return false;
   const msg = String(envelope.error.message || "").toLowerCase();
   if (!msg) return true;
-  return msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("cors") || msg.includes("network request");
+  return msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed") || msg.includes("cors") || msg.includes("network request") || msg.includes("content security policy") || msg.includes("violates the following content security policy") || msg.includes("refused to connect");
 }
 async function runHttpRequestCrossOriginViaProxy(input) {
   const res = await fetch(HTTP_REQUEST_PROXY_PATH, {
@@ -48375,6 +48490,7 @@ var WORKSPACE_CONTEXT_FILE_ORDER = Object.freeze([
   "workspace/MEMORY.md",
   "workspace/memory.md",
   "workspace/SKILL.md",
+  "workspace/skill.md",
   "workspace/GOALS.md",
   "workspace/PENALTY.md"
 ]);
@@ -48382,12 +48498,18 @@ var WORKSPACE_CONTEXT_MAX_CHARS = 2e4;
 var WORKSPACE_CONTEXT_HEAD_RATIO = 0.7;
 var WORKSPACE_CONTEXT_TAIL_RATIO = 0.2;
 var SILENT_REPLY_TOKEN = "NO_REPLY";
+var LLM_NOT_CONFIGURED_MESSAGE = "LLM not configured. Set your API key or OAuth token in the Gateway panel.";
 function workspaceContextPath(workspacePath) {
   const normalized = String(workspacePath || "").replace(/\\/g, "/");
   if (normalized.startsWith("workspace/")) {
     return normalized.slice("workspace/".length);
   }
   return normalized;
+}
+function textFromMessageContent(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map((part) => part && part.type === "text" && typeof part.text === "string" ? part.text : "").join("");
 }
 function trimWorkspaceContextContent(content, fileName, maxChars = WORKSPACE_CONTEXT_MAX_CHARS) {
   const trimmed = String(content || "").trimEnd();
@@ -48419,9 +48541,13 @@ async function buildWorkspaceContextFiles() {
   const contextFiles = [];
   const usedFiles = [];
   const truncatedFiles = [];
+  const seenCaseFoldedPaths = /* @__PURE__ */ new Set();
   for (const path4 of WORKSPACE_CONTEXT_FILE_ORDER) {
+    const foldedPath = String(path4 || "").toLowerCase();
+    if (seenCaseFoldedPaths.has(foldedPath)) continue;
     const content = await vfsGetUtf8(path4);
     if (content === null) continue;
+    seenCaseFoldedPaths.add(foldedPath);
     const fileName = workspaceContextPath(path4);
     const trimmed = trimWorkspaceContextContent(content, fileName, WORKSPACE_CONTEXT_MAX_CHARS);
     if (!trimmed.content) continue;
@@ -48680,11 +48806,11 @@ async function runAgentTurn(userText) {
   const model = getConfiguredModel();
   const apiKey = state.llmApiKey || "";
   if (!apiKey) {
-    const m = makeAssistant("LLM not configured. Set your API key or OAuth token in the Gateway panel.", { stopReason: "error" });
+    const m = makeAssistant(LLM_NOT_CONFIGURED_MESSAGE, { stopReason: "error" });
     state.transcript.push(prompt);
     state.transcript.push(m);
     post({ type: "worker.chat.append", role: "user", text: String(userText || "") });
-    post({ type: "worker.chat.append", role: "assistant", text: "LLM not configured. Set your API key or OAuth token in the Gateway panel." });
+    post({ type: "worker.chat.append", role: "assistant", text: LLM_NOT_CONFIGURED_MESSAGE });
     await persistTranscript();
     return;
   }
@@ -48722,12 +48848,7 @@ async function runAgentTurn(userText) {
       state.transcript.push(m);
       if (m.role === "user") post({ type: "worker.chat.append", role: "user", text: userText });
       if (m.role === "assistant") {
-        let t = "";
-        if (typeof m.content === "string") {
-          t = m.content;
-        } else if (Array.isArray(m.content)) {
-          t = m.content.map((c) => c && c.type === "text" ? c.text : "").join("");
-        }
+        const t = textFromMessageContent(m.content);
         post({ type: "worker.chat.append", role: "assistant", text: t });
       }
       await persistTranscript();
@@ -48885,6 +49006,7 @@ function workspaceCoreFiles() {
   return [
     ["workspace/AGENTS.md", "# Agents\n\nOpenClaw Lite exports OpenClaw-compatible artifacts.\n"],
     ["workspace/SOUL.md", "# Soul\n\nThis is a minimal OpenClaw Lite soul.\n"],
+    ["workspace/SKILL.md", "# SKILL\n\nVisit an experience to import its skill package.\n"],
     ["workspace/USER.md", "# User\n\nUser profile is stored locally.\n"],
     ["workspace/IDENTITY.md", `# Identity
 
@@ -48962,6 +49084,79 @@ async function ensureWorkspaceFiles({ recordEvents = true } = {}) {
   await persistWorkspaceDirs();
   return createdPaths;
 }
+function resolveSessionTranscriptPath(sessionId) {
+  return `.openclaw/agents/${MAIN_AGENT_ID}/sessions/${sessionId}.jsonl`;
+}
+function resolveTranscriptArchivePath(sourcePath, reason = "new-session", timestampMs = nowMs()) {
+  const ts = new Date(timestampMs).toISOString().replaceAll(":", "-");
+  return `${sourcePath}.${reason}.${ts}`;
+}
+async function readTranscriptDigestQueue() {
+  const raw = await metaGet(TRANSCRIPT_DIGEST_QUEUE_META_KEY);
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const id = typeof item.id === "string" ? item.id : "";
+    const sessionId = typeof item.sessionId === "string" ? item.sessionId : "";
+    const archivedPath = typeof item.archivedPath === "string" ? item.archivedPath : "";
+    if (!id || !sessionId || !archivedPath) continue;
+    out.push({
+      id,
+      sessionId,
+      sourcePath: typeof item.sourcePath === "string" ? item.sourcePath : null,
+      archivedPath,
+      reason: typeof item.reason === "string" ? item.reason : "new-session",
+      status: typeof item.status === "string" ? item.status : "pending",
+      queuedAtMs: Number.isFinite(Number(item.queuedAtMs)) ? Number(item.queuedAtMs) : nowMs()
+    });
+    if (out.length >= TRANSCRIPT_DIGEST_QUEUE_MAX) break;
+  }
+  return out;
+}
+async function writeTranscriptDigestQueue(queue) {
+  const rows = Array.isArray(queue) ? queue.slice(0, TRANSCRIPT_DIGEST_QUEUE_MAX) : [];
+  await metaSet(TRANSCRIPT_DIGEST_QUEUE_META_KEY, rows);
+  return rows;
+}
+async function archiveSessionTranscriptForDigest(sessionId, reason = "new-session") {
+  const id = typeof sessionId === "string" ? sessionId.trim() : "";
+  if (!id) {
+    return { ok: false, reason: "missing-session-id", sourcePath: null, archivedPath: null, queueLength: null };
+  }
+  const sourcePath = resolveSessionTranscriptPath(id);
+  const content = await vfsGetUtf8(sourcePath);
+  if (content === null) {
+    return { ok: false, reason: "not-found", sourcePath, archivedPath: null, queueLength: null };
+  }
+  if (!String(content || "").trim()) {
+    await deleteByKeys("vfs", [sourcePath]);
+    return { ok: false, reason: "empty", sourcePath, archivedPath: null, queueLength: null };
+  }
+  const archivedPath = resolveTranscriptArchivePath(sourcePath, reason, nowMs());
+  await vfsPutUtf8(archivedPath, content);
+  await deleteByKeys("vfs", [sourcePath]);
+  const queue = await readTranscriptDigestQueue();
+  const queueEntry = {
+    id: randomId("tdq"),
+    sessionId: id,
+    sourcePath,
+    archivedPath,
+    reason,
+    status: "pending",
+    queuedAtMs: nowMs()
+  };
+  queue.unshift(queueEntry);
+  const savedQueue = await writeTranscriptDigestQueue(queue);
+  return {
+    ok: true,
+    reason,
+    sourcePath,
+    archivedPath,
+    queueEntry,
+    queueLength: savedQueue.length
+  };
+}
 async function ensureSessionFiles() {
   if (!state.sessionId) {
     state.sessionId = randomId("sess");
@@ -48979,7 +49174,7 @@ async function ensureSessionFiles() {
   }
   store[MAIN_SESSION_KEY] = { sessionId: state.sessionId, updatedAt: nowMs() };
   await vfsPutUtf8(sessionsPath, JSON.stringify(store, null, 2));
-  const transcriptPath = `.openclaw/agents/${MAIN_AGENT_ID}/sessions/${state.sessionId}.jsonl`;
+  const transcriptPath = resolveSessionTranscriptPath(state.sessionId);
   const tExisting = await vfsGetUtf8(transcriptPath);
   if (tExisting === null) {
     await vfsPutUtf8(transcriptPath, "");
@@ -48988,7 +49183,7 @@ async function ensureSessionFiles() {
 async function persistTranscript() {
   await ensureSessionFiles();
   const sessionsPath = `.openclaw/agents/${MAIN_AGENT_ID}/sessions/sessions.json`;
-  const transcriptPath = `.openclaw/agents/${MAIN_AGENT_ID}/sessions/${state.sessionId}.jsonl`;
+  const transcriptPath = resolveSessionTranscriptPath(state.sessionId);
   const repairedInputs = repairToolCallInputs(state.transcript);
   const repairedTools = repairToolUseResultPairing(repairedInputs.messages);
   const repaired = repairedTools.messages;
@@ -49176,6 +49371,319 @@ function runWorkspaceEvents(toolName = "workspace_events") {
   const startedAtMs = nowMs();
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ events: state.workspaceEvents.slice(0, 100) }));
 }
+function normalizeVisitInputUrl(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) throw new Error("INVALID_ARGUMENTS");
+  if (raw === "test-local") {
+    const origin = safeOrigin() || "http://localhost";
+    return new URL("/skill.md", origin).toString();
+  }
+  const withScheme = /^[a-z][a-z0-9+\-.]*:\/\//i.test(raw) || raw.startsWith("/") ? raw : `https://${raw}`;
+  const parsed = new URL(withScheme, safeOrigin() || "http://localhost");
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("INVALID_ARGUMENTS");
+  }
+  parsed.hash = "";
+  return parsed.toString();
+}
+function buildVisitSkillCandidates(entryUrl) {
+  const parsed = new URL(entryUrl);
+  const pathname = String(parsed.pathname || "/");
+  if (/\.md$/i.test(pathname)) {
+    return [parsed.toString()];
+  }
+  const candidates = [];
+  const seen = /* @__PURE__ */ new Set();
+  const push = (url) => {
+    const normalized = String(url || "").trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    candidates.push(normalized);
+  };
+  const dirPath = pathname.endsWith("/") ? pathname : `${pathname}/`;
+  const scopedSkillPath = dirPath === "/" ? "/skill.md" : `${dirPath}skill.md`;
+  const scopedSkillUpperPath = dirPath === "/" ? "/SKILL.md" : `${dirPath}SKILL.md`;
+  push(new URL(scopedSkillPath, parsed.origin).toString());
+  push(new URL(scopedSkillUpperPath, parsed.origin).toString());
+  push(new URL("/skill.md", parsed.origin).toString());
+  push(new URL("/SKILL.md", parsed.origin).toString());
+  return candidates;
+}
+function normalizeCompanionCandidate(rawValue) {
+  const text = String(rawValue || "").trim();
+  if (!text) return "";
+  if (text.startsWith("#")) return "";
+  if (/^(javascript:|mailto:|tel:)/i.test(text)) return "";
+  return text.replace(/^<|>$/g, "").trim();
+}
+function collectSkillCompanionUrls(skillText, baseSkillUrl) {
+  const base = new URL(baseSkillUrl);
+  const out = /* @__PURE__ */ new Set([base.toString()]);
+  const candidates = [];
+  const markdownLinks = String(skillText || "").matchAll(/\[[^\]]*]\(([^)]+)\)/g);
+  for (const match of markdownLinks) {
+    if (match && match[1]) candidates.push(match[1]);
+  }
+  const bareReferences = String(skillText || "").matchAll(/(?:^|[\s`"'(])([A-Za-z0-9._/-]+\.(?:md|json))(?=$|[\s`"').,:;])/gi);
+  for (const match of bareReferences) {
+    if (match && match[1]) candidates.push(match[1]);
+  }
+  for (const rawCandidate of candidates) {
+    if (out.size >= VISIT_MAX_COMPANION_FILES) break;
+    const candidate = normalizeCompanionCandidate(rawCandidate);
+    if (!candidate) continue;
+    let resolved = null;
+    try {
+      resolved = new URL(candidate, base.toString());
+    } catch {
+      resolved = null;
+    }
+    if (!resolved) continue;
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:" || resolved.origin !== base.origin) continue;
+    if (!VISIT_COMPANION_EXT_RE.test(resolved.pathname || "")) continue;
+    resolved.hash = "";
+    out.add(resolved.toString());
+  }
+  return Array.from(out).slice(0, VISIT_MAX_COMPANION_FILES);
+}
+function normalizeSkillWorkspaceHost(host) {
+  const cleaned = String(host || "").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_");
+  return cleaned || "unknown-host";
+}
+function normalizeSkillWorkspaceRelativePath(skillUrl) {
+  const parsed = new URL(skillUrl);
+  let pathname = String(parsed.pathname || "/").replace(/\\/g, "/");
+  if (!pathname || pathname === "/") pathname = "/skill.md";
+  if (pathname.endsWith("/")) pathname = `${pathname}skill.md`;
+  return pathname.replace(/^\/+/, "");
+}
+function buildSkillWorkspaceImportPath(skillUrl) {
+  const parsed = new URL(skillUrl);
+  const host = normalizeSkillWorkspaceHost(parsed.host);
+  const relativePath = normalizeSkillWorkspaceRelativePath(skillUrl);
+  return `workspace/skills/${host}/${relativePath}`;
+}
+function buildSkillWorkspaceSiteRoot(skillUrl) {
+  const parsed = new URL(skillUrl);
+  const host = normalizeSkillWorkspaceHost(parsed.host);
+  return `workspace/skills/${host}/`;
+}
+function uppercaseMdCompatibilityName(baseName) {
+  const lower = String(baseName || "").toLowerCase();
+  if (!lower.endsWith(".md")) return null;
+  const stem = lower.slice(0, -3);
+  return `${stem.toUpperCase()}.md`;
+}
+async function resolveExperienceWorkspaceFiles(params = {}) {
+  const normalizeSiteRoot = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw.startsWith("workspace/skills/")) return "";
+    return raw.endsWith("/") ? raw : `${raw}/`;
+  };
+  const hintSiteRoot = normalizeSiteRoot(params?.siteRoot);
+  const activeSiteRoot = normalizeSiteRoot(state.skillImport.siteRoot);
+  const siteRoot = hintSiteRoot || activeSiteRoot;
+  const hasSiteRoot = siteRoot.startsWith("workspace/skills/");
+  const sitePath = (fileName) => hasSiteRoot ? `${siteRoot}${fileName}` : "";
+  const dedupePaths = (paths) => {
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const path4 of paths) {
+      const next = String(path4 || "").trim();
+      if (!next || seen.has(next)) continue;
+      seen.add(next);
+      out.push(next);
+    }
+    return out;
+  };
+  const candidates = {
+    skill: {
+      required: true,
+      paths: dedupePaths([sitePath("SKILL.md"), sitePath("skill.md"), "workspace/SKILL.md", "workspace/skill.md"])
+    },
+    heartbeat: {
+      required: false,
+      paths: dedupePaths([
+        sitePath("HEARTBEAT.md"),
+        sitePath("heartbeat.md"),
+        "workspace/HEARTBEAT.md",
+        "workspace/heartbeat.md"
+      ])
+    },
+    goals: {
+      required: false,
+      paths: dedupePaths([sitePath("GOALS.md"), sitePath("goals.md"), "workspace/GOALS.md", "workspace/goals.md"])
+    },
+    tools: {
+      required: false,
+      paths: dedupePaths([sitePath("TOOLS.md"), sitePath("tools.md"), "workspace/TOOLS.md", "workspace/tools.md"])
+    },
+    penalty: {
+      required: false,
+      paths: dedupePaths([
+        sitePath("PENALTY.md"),
+        sitePath("penalty.md"),
+        "workspace/PENALTY.md",
+        "workspace/penalty.md"
+      ])
+    }
+  };
+  const files = {};
+  const resolvedPaths = {};
+  const missingRequiredPaths = [];
+  const missingOptionalPaths = [];
+  for (const [key, descriptor] of Object.entries(candidates)) {
+    const paths = Array.isArray(descriptor?.paths) ? descriptor.paths : [];
+    let foundPath = null;
+    let foundContent = null;
+    for (const path4 of paths) {
+      const content = await vfsGetUtf8(path4);
+      if (content === null) continue;
+      foundPath = path4;
+      foundContent = content;
+      break;
+    }
+    if (!foundPath) {
+      const preferredPath = paths[0];
+      if (descriptor?.required === true) {
+        if (preferredPath) missingRequiredPaths.push(preferredPath);
+      } else if (preferredPath) {
+        missingOptionalPaths.push(preferredPath);
+      }
+      continue;
+    }
+    files[key] = foundContent;
+    resolvedPaths[key] = foundPath;
+  }
+  return { files, resolvedPaths, missingRequiredPaths, missingOptionalPaths, siteRoot: hasSiteRoot ? siteRoot : null };
+}
+async function runVisitImport(params, toolName = "visit_import") {
+  const startedAtMs = nowMs();
+  const rawUrl = typeof params === "string" ? params : params?.url;
+  let entryUrl;
+  try {
+    entryUrl = normalizeVisitInputUrl(rawUrl);
+  } catch {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Invalid visit url"));
+  }
+  state.skillImport.status = "loading";
+  state.skillImport.sourceUrl = entryUrl;
+  state.skillImport.lastError = null;
+  await persistSkillImportState();
+  updateGatewayState();
+  const skillCandidates = buildVisitSkillCandidates(entryUrl);
+  const attempted = [];
+  let primary = null;
+  for (const candidateUrl of skillCandidates) {
+    const fetched = await runWebFetch(
+      { url: candidateUrl, maxBytes: MAX_WEB_FETCH_MAX_BYTES, expectedMime: "any", followRedirects: true },
+      "skill_fetch"
+    );
+    attempted.push({
+      url: candidateUrl,
+      ok: fetched?.ok === true,
+      error: fetched?.ok === false ? fetched?.error?.message || fetched?.error?.code || "FETCH_FAILED" : null
+    });
+    if (fetched?.ok === true && typeof fetched?.data?.text === "string") {
+      primary = fetched;
+      break;
+    }
+  }
+  if (!primary || primary.ok !== true) {
+    state.skillImport.status = "failed";
+    state.skillImport.lastError = "SKILL_NOT_FOUND";
+    state.skillImport.importedPaths = [];
+    state.skillImport.siteRoot = null;
+    state.skillImport.activeSkillPath = null;
+    await persistSkillImportState();
+    updateGatewayState();
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("NOT_FOUND", "Skill file not found for visit target", { entryUrl, attempted })
+    );
+  }
+  const primaryUrl = String(primary.data?.finalUrl || primary.data?.url || skillCandidates[0] || entryUrl);
+  const primaryContent = String(primary.data?.text || "");
+  const companionUrls = collectSkillCompanionUrls(primaryContent, primaryUrl);
+  const siteRoot = buildSkillWorkspaceSiteRoot(primaryUrl);
+  const activeSkillPath = `${siteRoot}SKILL.md`;
+  const importedPaths = [];
+  const importedByBaseName = /* @__PURE__ */ new Map();
+  const failedUrls = [];
+  for (const url of companionUrls) {
+    const fetched = url === primaryUrl ? primary : await runWebFetch({ url, maxBytes: MAX_WEB_FETCH_MAX_BYTES, expectedMime: "any", followRedirects: true }, "skill_fetch");
+    if (!fetched || fetched.ok !== true || typeof fetched?.data?.text !== "string") {
+      failedUrls.push({
+        url,
+        error: fetched?.error?.message || fetched?.error?.code || "FETCH_FAILED"
+      });
+      continue;
+    }
+    const finalUrl = String(fetched.data?.finalUrl || fetched.data?.url || url);
+    const content = String(fetched.data?.text || "");
+    const importPath = buildSkillWorkspaceImportPath(finalUrl);
+    const writeResult = await runWorkspaceWriteFile({ path: importPath, content }, "workspace_write_file");
+    if (writeResult?.ok !== true) {
+      failedUrls.push({
+        url: finalUrl,
+        error: writeResult?.error?.message || writeResult?.error?.code || "WRITE_FAILED"
+      });
+      continue;
+    }
+    importedPaths.push(importPath);
+    const baseName = importPath.split("/").pop() || "";
+    if (baseName) importedByBaseName.set(baseName.toLowerCase(), content);
+  }
+  const compatibilityWrites = /* @__PURE__ */ new Map();
+  const siteCompatibilityWrites = /* @__PURE__ */ new Map();
+  compatibilityWrites.set("workspace/SKILL.md", primaryContent);
+  compatibilityWrites.set("workspace/skill.md", primaryContent);
+  siteCompatibilityWrites.set(`${siteRoot}SKILL.md`, primaryContent);
+  siteCompatibilityWrites.set(`${siteRoot}skill.md`, primaryContent);
+  for (const [baseName, content] of importedByBaseName.entries()) {
+    if (!VISIT_COMPAT_BASENAMES.has(baseName)) continue;
+    compatibilityWrites.set(`workspace/${baseName}`, content);
+    siteCompatibilityWrites.set(`${siteRoot}${baseName}`, content);
+    const upperName = uppercaseMdCompatibilityName(baseName);
+    if (upperName) {
+      compatibilityWrites.set(`workspace/${upperName}`, content);
+      siteCompatibilityWrites.set(`${siteRoot}${upperName}`, content);
+    }
+  }
+  const compatibilityAllWrites = new Map([...siteCompatibilityWrites.entries(), ...compatibilityWrites.entries()]);
+  for (const [path4, content] of compatibilityAllWrites.entries()) {
+    const writeResult = await runWorkspaceWriteFile({ path: path4, content }, "workspace_write_file");
+    if (writeResult?.ok === true && !importedPaths.includes(path4)) {
+      importedPaths.push(path4);
+    }
+  }
+  state.skillImport.status = "ready";
+  state.skillImport.sourceUrl = primaryUrl;
+  state.skillImport.lastImportedAtMs = nowMs();
+  state.skillImport.lastError = null;
+  state.skillImport.siteRoot = siteRoot;
+  state.skillImport.activeSkillPath = activeSkillPath;
+  state.skillImport.importedPaths = importedPaths.slice(0, 200);
+  await persistSkillImportState();
+  updateGatewayState();
+  const result = withToolMeta(
+    toolName,
+    startedAtMs,
+    makeToolSuccess({
+      entryUrl,
+      sourceUrl: primaryUrl,
+      siteRoot,
+      activeSkillPath,
+      importedPaths,
+      importedCount: importedPaths.length,
+      failedUrls,
+      attempted
+    })
+  );
+  log(`visit import ok source=${primaryUrl} files=${importedPaths.length} failed=${failedUrls.length}`);
+  return result;
+}
 async function runWebMcpDiscover(params, toolName = "webmcp_discover") {
   const startedAtMs = nowMs();
   const endpointRaw = typeof params?.endpoint === "string" ? params.endpoint.trim() : "/__test__/webmcp/discover";
@@ -49253,70 +49761,184 @@ async function runWebMcpCall(params, toolName = "webmcp_call") {
 }
 async function runExperienceEngineBaseline(params, toolName = "experience_engine_run") {
   const startedAtMs = nowMs();
-  const fileMap = {
-    skill: "workspace/skill.md",
-    heartbeat: "workspace/heartbeat.md",
-    goals: "workspace/goals.md",
-    tools: "workspace/tools.md",
-    penalty: "workspace/penalty.md"
+  const requestedDryRun = params?.dryRun === true;
+  const finishEnvelope = async (mode, envelope) => {
+    const wrapped = withToolMeta(toolName, startedAtMs, envelope);
+    await recordSkillRunDiagnostic({ mode, envelope: wrapped, startedAtMs });
+    return wrapped;
   };
-  const files = {};
-  const missingPaths = [];
-  for (const [key, path4] of Object.entries(fileMap)) {
-    const content = await vfsGetUtf8(path4);
-    if (content === null) {
-      missingPaths.push(path4);
-    } else {
-      files[key] = content;
-    }
-  }
-  if (missingPaths.length > 0) {
-    return withToolMeta(
-      toolName,
-      startedAtMs,
-      makeToolFailure("NOT_FOUND", "Missing experience workspace files", { missingPaths })
-    );
-  }
-  const origin = safeOrigin() || "http://localhost";
-  const defaultWsUrl = origin.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/__test__/experience/ws";
-  const wsUrl = typeof params?.wsUrl === "string" && params.wsUrl.trim() ? params.wsUrl.trim() : defaultWsUrl;
-  const opened = await runWsOpen({ url: wsUrl, connectTimeoutMs: 8e3 }, "ws_open");
-  if (!opened.ok) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure(opened.error?.code || "UNSUPPORTED", opened.error?.message || "WS_OPEN_FAILED"));
-  }
-  const sessionId = opened.data?.sessionId;
-  if (!sessionId) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", "Missing websocket session id"));
-  }
-  const sent = runWsSend(
-    {
-      sessionId,
-      json: {
-        type: "experience.run",
-        files
+  const finishFailure = async (mode, code, message, details = {}, retryable = false) => {
+    return finishEnvelope(mode, makeToolFailure(code, message, details, retryable));
+  };
+  const finishSuccess = async (mode, data) => {
+    return finishEnvelope(mode, makeToolSuccess(data));
+  };
+  const resolved = await resolveExperienceWorkspaceFiles(params || {});
+  if (resolved.missingRequiredPaths.length > 0) {
+    return finishFailure(
+      requestedDryRun ? "dry-run" : "resolve",
+      "NOT_FOUND",
+      "Missing required experience workspace files",
+      {
+        missingPaths: resolved.missingRequiredPaths,
+        missingRequiredPaths: resolved.missingRequiredPaths,
+        missingOptionalPaths: resolved.missingOptionalPaths
       }
-    },
-    "ws_send"
-  );
-  if (!sent.ok) {
-    runWsClose({ sessionId }, "ws_close");
-    return withToolMeta(toolName, startedAtMs, makeToolFailure(sent.error?.code || "UNSUPPORTED", sent.error?.message || "WS_SEND_FAILED"));
-  }
-  const received = await runWsRecv({ sessionId, maxMessages: 1, waitMs: 8e3 }, "ws_recv");
-  runWsClose({ sessionId }, "ws_close");
-  if (!received.ok) {
-    return withToolMeta(
-      toolName,
-      startedAtMs,
-      makeToolFailure(received.error?.code || "UNSUPPORTED", received.error?.message || "WS_RECV_FAILED")
     );
   }
-  const first = Array.isArray(received.data?.messages) && received.data.messages.length > 0 ? received.data.messages[0] : null;
-  const ack = first?.json || null;
-  if (!ack) {
-    return withToolMeta(toolName, startedAtMs, makeToolFailure("TIMEOUT", "No experience response received"));
+  if (requestedDryRun) {
+    return finishSuccess("dry-run", {
+      mode: "dry-run",
+      resolvedPaths: resolved.resolvedPaths,
+      siteRoot: resolved.siteRoot,
+      fileKeys: Object.keys(resolved.files),
+      missingRequiredPaths: resolved.missingRequiredPaths,
+      missingOptionalPaths: resolved.missingOptionalPaths
+    });
   }
-  return withToolMeta(toolName, startedAtMs, makeToolSuccess({ ack }));
+  const transportRaw = String(params?.transport || (params?.wsUrl ? "ws" : "agent-turn")).trim().toLowerCase();
+  const transport = transportRaw || "agent-turn";
+  if (transport === "ws") {
+    const origin = safeOrigin() || "http://localhost";
+    const defaultWsUrl = origin.replace(/^https:/, "wss:").replace(/^http:/, "ws:") + "/__test__/experience/ws";
+    const wsUrl = typeof params?.wsUrl === "string" && params.wsUrl.trim() ? params.wsUrl.trim() : defaultWsUrl;
+    const opened = await runWsOpen({ url: wsUrl, connectTimeoutMs: 8e3 }, "ws_open");
+    if (!opened.ok) {
+      return finishFailure("ws", opened.error?.code || "UNSUPPORTED", opened.error?.message || "WS_OPEN_FAILED");
+    }
+    const sessionId = opened.data?.sessionId;
+    if (!sessionId) {
+      return finishFailure("ws", "UNSUPPORTED", "Missing websocket session id");
+    }
+    const sent = runWsSend(
+      {
+        sessionId,
+        json: {
+          type: "experience.run",
+          files: resolved.files
+        }
+      },
+      "ws_send"
+    );
+    if (!sent.ok) {
+      runWsClose({ sessionId }, "ws_close");
+      return finishFailure("ws", sent.error?.code || "UNSUPPORTED", sent.error?.message || "WS_SEND_FAILED");
+    }
+    const received = await runWsRecv({ sessionId, maxMessages: 1, waitMs: 8e3 }, "ws_recv");
+    runWsClose({ sessionId }, "ws_close");
+    if (!received.ok) {
+      return finishFailure("ws", received.error?.code || "UNSUPPORTED", received.error?.message || "WS_RECV_FAILED");
+    }
+    const first = Array.isArray(received.data?.messages) && received.data.messages.length > 0 ? received.data.messages[0] : null;
+    const ack = first?.json || null;
+    if (!ack) {
+      return finishFailure("ws", "TIMEOUT", "No experience response received");
+    }
+    return finishSuccess("ws", {
+      mode: "ws",
+      ack,
+      resolvedPaths: resolved.resolvedPaths,
+      siteRoot: resolved.siteRoot,
+      fileKeys: Object.keys(resolved.files),
+      missingRequiredPaths: resolved.missingRequiredPaths,
+      missingOptionalPaths: resolved.missingOptionalPaths
+    });
+  }
+  const instruction = typeof params?.prompt === "string" && params.prompt.trim() ? params.prompt.trim() : "Read workspace/SKILL.md and execute the next safe step for this experience. Ask for human input only if required.";
+  let instructionForModel = instruction;
+  let runtimeContext = null;
+  try {
+    const appState = await apiJson("/api/state", { method: "GET" });
+    const runtimeOrigin = safeOrigin() || null;
+    const teamCode = typeof appState?.teamCode === "string" && appState.teamCode.trim() ? appState.teamCode.trim() : null;
+    const runtimeHouseId = typeof state.houseId === "string" && state.houseId.trim() ? state.houseId.trim() : null;
+    const stateHouseId = typeof appState?.houseId === "string" && appState.houseId.trim() ? appState.houseId.trim() : null;
+    const houseId = runtimeHouseId || stateHouseId || null;
+    const contextLines = [];
+    if (runtimeOrigin) contextLines.push(`- origin: ${runtimeOrigin}`);
+    if (teamCode) contextLines.push(`- teamCode: ${teamCode}`);
+    if (houseId) contextLines.push(`- houseId: ${houseId}`);
+    if (contextLines.length > 0) {
+      runtimeContext = { origin: runtimeOrigin, teamCode, houseId };
+      instructionForModel = `${instruction}
+
+Runtime session context (authoritative):
+${contextLines.join("\n")}
+Use these values directly when SKILL.md asks for origin/teamCode/houseId.
+Do not ask the human for them unless missing.
+Do not substitute another localhost port when origin is provided.`;
+    }
+  } catch {
+    runtimeContext = null;
+  }
+  const transcriptStart = state.transcript.length;
+  await runAgentTurn(instructionForModel);
+  const generated = state.transcript.slice(transcriptStart);
+  let assistantText = "";
+  let assistantMessageCount = 0;
+  let assistantStopReason = "";
+  let assistantErrorMessage = "";
+  for (const msg of generated) {
+    if (!msg || msg.role !== "assistant") continue;
+    assistantMessageCount += 1;
+    const text = textFromMessageContent(msg.content).trim();
+    if (text) assistantText = text;
+    const stopReason = String(msg.stopReason || "").trim().toLowerCase();
+    if (stopReason) assistantStopReason = stopReason;
+    const errorText = typeof msg.errorMessage === "string" ? msg.errorMessage.trim() : "";
+    if (errorText) assistantErrorMessage = errorText;
+  }
+  if (assistantText === LLM_NOT_CONFIGURED_MESSAGE) {
+    return finishFailure(
+      "agent-turn",
+      "LLM_NOT_CONFIGURED",
+      LLM_NOT_CONFIGURED_MESSAGE,
+      {
+        mode: "agent-turn",
+        prompt: instruction,
+        runtimeContext,
+        resolvedPaths: resolved.resolvedPaths,
+        siteRoot: resolved.siteRoot,
+        fileKeys: Object.keys(resolved.files),
+        missingRequiredPaths: resolved.missingRequiredPaths,
+        missingOptionalPaths: resolved.missingOptionalPaths
+      }
+    );
+  }
+  if (assistantErrorMessage || assistantStopReason === "error") {
+    const normalizedError = String(assistantErrorMessage || "").toUpperCase();
+    const errorCode = normalizedError.includes("HATCH_REQUIRED") ? "HATCH_REQUIRED" : normalizedError.includes("SESSION_REQUIRED") ? "SESSION_REQUIRED" : "LLM_RUN_FAILED";
+    return finishFailure(
+      "agent-turn",
+      errorCode,
+      assistantErrorMessage || "Assistant run failed",
+      {
+        mode: "agent-turn",
+        prompt: instruction,
+        runtimeContext,
+        stopReason: assistantStopReason || "error",
+        assistantMessageCount,
+        assistantText: assistantText || null,
+        resolvedPaths: resolved.resolvedPaths,
+        siteRoot: resolved.siteRoot,
+        fileKeys: Object.keys(resolved.files),
+        missingRequiredPaths: resolved.missingRequiredPaths,
+        missingOptionalPaths: resolved.missingOptionalPaths
+      }
+    );
+  }
+  return finishSuccess("agent-turn", {
+    mode: "agent-turn",
+    prompt: instruction,
+    runtimeContext,
+    assistantMessageCount,
+    assistantText: assistantText || null,
+    resolvedPaths: resolved.resolvedPaths,
+    siteRoot: resolved.siteRoot,
+    fileKeys: Object.keys(resolved.files),
+    missingRequiredPaths: resolved.missingRequiredPaths,
+    missingOptionalPaths: resolved.missingOptionalPaths
+  });
 }
 function buildHouseKeyWrapMessage({ houseId, origin }) {
   const parts = ["ElizaTown House Key Wrap", `houseId: ${houseId}`];
@@ -49648,8 +50270,26 @@ var state = {
   httpRateLimit: /* @__PURE__ */ new Map(),
   wsSessions: /* @__PURE__ */ new Map(),
   workspaceDirs: /* @__PURE__ */ new Set(["workspace/"]),
-  workspaceEvents: []
+  workspaceEvents: [],
+  skillImport: {
+    status: "idle",
+    sourceUrl: null,
+    siteRoot: null,
+    activeSkillPath: null,
+    lastImportedAtMs: null,
+    lastError: null,
+    lastRunAtMs: null,
+    lastRunMode: null,
+    lastRunOk: null,
+    lastRunErrorCode: null,
+    lastRunErrorMessage: null,
+    lastRunDurationMs: null,
+    importedPaths: []
+  }
 };
+async function persistSkillImportState() {
+  await metaSet("skillImportV1", skillImportSnapshot({ importedPathLimit: 500 }));
+}
 async function loadStateFromIdb() {
   state.houseId = await metaGet("houseId") || null;
   state.vaultLatestBackupId = await metaGet("vaultLatestBackupId") || null;
@@ -49693,6 +50333,22 @@ async function loadStateFromIdb() {
     state.kencBytes = keys.kencBytes;
     state.kauthBytes = keys.kauthBytes;
     state.kauthKey = keys.kauthKey;
+  }
+  const skillImportRaw = await metaGet("skillImportV1") || null;
+  if (skillImportRaw && typeof skillImportRaw === "object") {
+    state.skillImport.status = normalizeSkillImportStatus(skillImportRaw.status);
+    state.skillImport.sourceUrl = typeof skillImportRaw.sourceUrl === "string" && skillImportRaw.sourceUrl ? skillImportRaw.sourceUrl : null;
+    state.skillImport.siteRoot = typeof skillImportRaw.siteRoot === "string" && skillImportRaw.siteRoot.startsWith("workspace/skills/") ? skillImportRaw.siteRoot : null;
+    state.skillImport.activeSkillPath = typeof skillImportRaw.activeSkillPath === "string" && skillImportRaw.activeSkillPath.startsWith("workspace/") ? skillImportRaw.activeSkillPath : null;
+    state.skillImport.lastImportedAtMs = Number.isFinite(Number(skillImportRaw.lastImportedAtMs)) ? Number(skillImportRaw.lastImportedAtMs) : null;
+    state.skillImport.lastError = typeof skillImportRaw.lastError === "string" && skillImportRaw.lastError ? skillImportRaw.lastError : null;
+    state.skillImport.lastRunAtMs = Number.isFinite(Number(skillImportRaw.lastRunAtMs)) ? Number(skillImportRaw.lastRunAtMs) : null;
+    state.skillImport.lastRunMode = normalizeSkillRunMode(skillImportRaw.lastRunMode);
+    state.skillImport.lastRunOk = typeof skillImportRaw.lastRunOk === "boolean" ? skillImportRaw.lastRunOk : null;
+    state.skillImport.lastRunErrorCode = typeof skillImportRaw.lastRunErrorCode === "string" && skillImportRaw.lastRunErrorCode ? skillImportRaw.lastRunErrorCode : null;
+    state.skillImport.lastRunErrorMessage = typeof skillImportRaw.lastRunErrorMessage === "string" && skillImportRaw.lastRunErrorMessage ? skillImportRaw.lastRunErrorMessage : null;
+    state.skillImport.lastRunDurationMs = Number.isFinite(Number(skillImportRaw.lastRunDurationMs)) ? Number(skillImportRaw.lastRunDurationMs) : null;
+    state.skillImport.importedPaths = Array.isArray(skillImportRaw.importedPaths) ? skillImportRaw.importedPaths.map((p) => typeof p === "string" ? p : "").filter(Boolean).slice(0, 500) : [];
   }
   await ensureWorkspaceFiles();
   await ensureSessionFiles();
@@ -49822,6 +50478,16 @@ self.addEventListener("message", async (ev) => {
       await exportZip();
       return;
     }
+    if (msg.type === "gateway.command.visit") {
+      const result = await runVisitImport({ url: msg.url || msg?.params?.url || "" }, "visit_import");
+      post({
+        type: "worker.visit",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
     if (msg.type === "gateway.command.tools.registry") {
       post({
         type: "worker.tools.registry",
@@ -49908,6 +50574,56 @@ self.addEventListener("message", async (ev) => {
         requestId: String(msg.requestId || ""),
         ok: true,
         dump: JSON.stringify(state.transcript || [])
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.transcriptReset") {
+      const params = msg.params && typeof msg.params === "object" ? msg.params : {};
+      const keepBootMessage = params.keepBootMessage === true;
+      const rotateSession = params.rotateSession === true;
+      const previousLength = Array.isArray(state.transcript) ? state.transcript.length : 0;
+      const previousSessionId = state.sessionId || null;
+      let archivedTranscript = null;
+      if (rotateSession && previousSessionId) {
+        archivedTranscript = await archiveSessionTranscriptForDigest(previousSessionId, "new-session");
+      }
+      state.transcript = [];
+      if (rotateSession) {
+        state.sessionId = randomId("sess");
+        await metaSet("sessionId", state.sessionId);
+      }
+      if (keepBootMessage) {
+        state.transcript.push(makeAssistant("openclaw-lite boot"));
+      }
+      await persistTranscript();
+      post({
+        type: "worker.tools.transcriptReset",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: {
+          previousLength,
+          currentLength: state.transcript.length,
+          previousSessionId,
+          sessionId: state.sessionId || null,
+          rotatedSession: rotateSession,
+          keptBootMessage: keepBootMessage,
+          archivedTranscriptPath: archivedTranscript?.archivedPath || null,
+          archivedTranscriptSourcePath: archivedTranscript?.sourcePath || null,
+          queuedForMemoryDigest: archivedTranscript?.ok === true,
+          memoryDigestQueueLength: Number.isFinite(Number(archivedTranscript?.queueLength)) ? Number(archivedTranscript.queueLength) : null,
+          memoryDigestQueueEntryId: archivedTranscript?.queueEntry?.id || null,
+          archiveStatus: archivedTranscript?.reason || null
+        }
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.transcriptDigestQueue") {
+      const queue = await readTranscriptDigestQueue();
+      post({
+        type: "worker.tools.transcriptDigestQueue",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        queue
       });
       return;
     }
@@ -50085,6 +50801,15 @@ self.addEventListener("message", async (ev) => {
             houseId: state.houseId || null
           }
         }
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.skill.state") {
+      post({
+        type: "worker.skill.state",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess(skillImportSnapshot({ importedPathLimit: 500 }))
       });
       return;
     }

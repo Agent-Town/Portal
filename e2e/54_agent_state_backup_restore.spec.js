@@ -161,6 +161,42 @@ async function readLocalMetaValue(page, key) {
   }, key);
 }
 
+async function readLocalVfsRecord(page, pathValue) {
+  return page.evaluate(async (lookupPath) => {
+    const openDb = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open('openclaw-lite', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('checkpoints')) {
+          const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+          s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+        }
+        if (!db.objectStoreNames.contains('vfs')) db.createObjectStore('vfs', { keyPath: 'path' });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+    });
+    const txDone = (tx) => new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+      tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+    });
+    const reqToPromise = (req) => new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
+    });
+
+    const db = await openDb();
+    const tx = db.transaction(['vfs'], 'readonly');
+    const req = tx.objectStore('vfs').get(String(lookupPath || ''));
+    const rec = await reqToPromise(req);
+    await txDone(tx);
+    db.close();
+    return rec || null;
+  }, pathValue);
+}
+
 async function readDownloadToBuffer(download) {
   const stream = await download.createReadStream();
   if (!stream) throw new Error('DOWNLOAD_STREAM_UNAVAILABLE');
@@ -260,25 +296,29 @@ test('house backup stores encrypted state and supports ZIP download/upload resto
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#downloadAgentStateBtn').click();
   const download = await downloadPromise;
-  await expect(page.locator('#agentStateStatus')).toContainText('Downloaded local backup ZIP', { timeout: 5000 });
-  expect(download.suggestedFilename()).toMatch(/agent-town-state-.*\.zip$/);
+  await expect(page.locator('#agentStateStatus')).toContainText('Downloaded OpenClaw-compatible ZIP from local runtime.', { timeout: 5000 });
+  expect(download.suggestedFilename()).toBe('openclaw-lite-export.zip');
   const zipBytes = await readDownloadToBuffer(download);
   expect(zipBytes.length).toBeGreaterThan(128);
 
   const zipEntries = parseStoredZipEntries(zipBytes);
-  const manifest = parseZipJson(zipEntries, 'agent-state-manifest.json');
-  expect(manifest.kind).toBe('openclaw-lite-state-zip');
-  expect(manifest.schema).toBe('openclaw-lite-state-zip@1');
-  expect(manifest.houseId).toBe(houseId);
-  const meta = parseZipJson(zipEntries, 'meta.json');
-  const llmMeta = meta.find((entry) => entry && entry.key === 'llmApiKey');
-  expect(llmMeta?.value).toBe(replacementToken);
-  const vfsIndex = parseZipJson(zipEntries, 'vfs-index.json');
-  expect(Array.isArray(vfsIndex)).toBeTruthy();
-  expect(vfsIndex.length).toBeGreaterThan(0);
-  const firstPath = vfsIndex[0] && vfsIndex[0].path;
-  expect(firstPath).toBeTruthy();
-  expect(zipEntries.has(`vfs/${firstPath}`)).toBeTruthy();
+  const manifest = parseZipJson(zipEntries, 'manifest.json');
+  expect(manifest.kind).toBe('openclaw-lite-export');
+  expect(manifest.v).toBe(1);
+  expect(manifest.openclaw?.agentId).toBe('main');
+  expect(manifest.openclaw?.mainSessionKey).toBe('agent:main:main');
+  expect(zipEntries.has('workspace/AGENTS.md')).toBeTruthy();
+  expect(zipEntries.has('workspace/SOUL.md')).toBeTruthy();
+  expect(zipEntries.has('workspace/USER.md')).toBeTruthy();
+  expect(zipEntries.has('workspace/IDENTITY.md')).toBeTruthy();
+  expect(zipEntries.has('workspace/TOOLS.md')).toBeTruthy();
+  const sessionsStore = parseZipJson(zipEntries, '.openclaw/agents/main/sessions/sessions.json');
+  const mainSession = sessionsStore && sessionsStore['agent:main:main'];
+  expect(mainSession).toBeTruthy();
+  expect(typeof mainSession?.sessionId).toBe('string');
+  expect(mainSession.sessionId.length).toBeGreaterThan(0);
+  expect(mainSession?.sessionFile).toBeUndefined();
+  expect(zipEntries.has(`.openclaw/agents/main/sessions/${mainSession.sessionId}.jsonl`)).toBeTruthy();
 
   await clearLocalAgentState(page);
   await expect.poll(() => readLocalMetaValue(page, 'llmApiKey')).toBeNull();
@@ -289,8 +329,10 @@ test('house backup stores encrypted state and supports ZIP download/upload resto
     buffer: zipBytes
   });
   await expect(page.locator('#agentStateStatus')).toContainText('Uploaded and replaced agent state', { timeout: 5000 });
-  await expect.poll(() => readLocalMetaValue(page, 'llmApiKey'), { timeout: 8000 }).toBe(replacementToken);
-  await expect(page.locator('#llmKeyInput')).toHaveValue(replacementToken);
+  await expect.poll(() => readLocalMetaValue(page, 'houseId'), { timeout: 8000 }).toBe(houseId);
+  await expect.poll(() => readLocalMetaValue(page, 'llmApiKey'), { timeout: 8000 }).toBeNull();
+  await expect.poll(() => readLocalVfsRecord(page, 'workspace/AGENTS.md'), { timeout: 8000 }).not.toBeNull();
+  await expect(page.locator('#llmKeyInput')).toHaveValue('');
 
   const keyB64 = await page.evaluate((id) => sessionStorage.getItem(`agentTownHouseAuth:${id}`), houseId);
   expect(keyB64).toBeTruthy();

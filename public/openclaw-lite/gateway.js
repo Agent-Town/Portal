@@ -97,6 +97,7 @@ async function init() {
   const walletLine = byId("walletLine");
   const houseId = byId("houseId");
   const vaultStatus = byId("vaultStatus");
+  const approvalsPanel = byId("approvalsPanel");
   const approvals = byId("approvals");
   const runtimeLogs = byId("runtimeLogs");
   const workspaceEvents = byId("workspaceEvents");
@@ -124,6 +125,11 @@ async function init() {
   const chatSend = byId("chatSend");
   const llmSaveBtn = byId("llmSaveBtn");
   const approvalNodes = /* @__PURE__ */ new Map();
+  function refreshApprovalsVisibility() {
+    if (!approvalsPanel || !approvals) return;
+    const hasRows = approvals.childElementCount > 0;
+    approvalsPanel.classList.toggle("is-hidden", !hasRows);
+  }
   function updateWalletLine(addr) {
     if (!walletLine) return;
     walletLine.textContent = addr ? `Wallet: ${addr}` : "";
@@ -167,11 +173,13 @@ async function init() {
   }
   const testRequests = /* @__PURE__ */ new Map();
   let testReqCounter = 0;
+  const DEFAULT_WORKER_REQUEST_TIMEOUT_MS = 3e4;
+  const EXPERIENCE_RUN_REQUEST_TIMEOUT_MS = 18e4;
   function nextTestRequestId(prefix = "t") {
     testReqCounter += 1;
     return `${prefix}_${Date.now()}_${testReqCounter}`;
   }
-  function sendWorkerRequest({ requestType, responseType, payload, timeoutMs = 1e4 }) {
+  function sendWorkerRequest({ requestType, responseType, payload, timeoutMs = DEFAULT_WORKER_REQUEST_TIMEOUT_MS }) {
     const requestId = nextTestRequestId("req");
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -536,7 +544,15 @@ async function init() {
     if (msg.type === "worker.approval.request") {
       const approval = msg.approval || {};
       const id = String(approval.id || "");
-      if (!id || !approvals) return;
+      if (!id) return;
+      if (!approvals) {
+        sendToWorker({ type: "gateway.approval.respond", id, decision: "reject" });
+        gatewayEvents.emit("log", {
+          level: "warn",
+          message: `approval auto-rejected: ${approval.title || "Approval"} (missing approvals UI surface)`
+        });
+        return;
+      }
       if (approvalNodes.has(id)) return;
       const wrap = document.createElement("div");
       wrap.className = "kv";
@@ -562,6 +578,7 @@ async function init() {
       wrap.appendChild(noBtn);
       approvals.appendChild(wrap);
       approvalNodes.set(id, wrap);
+      refreshApprovalsVisibility();
       return;
     }
     if (msg.type === "worker.approval.clear") {
@@ -569,6 +586,7 @@ async function init() {
       const node = approvalNodes.get(id);
       if (node) node.remove();
       approvalNodes.delete(id);
+      refreshApprovalsVisibility();
       return;
     }
     if (msg.type === "worker.wallet.request") {
@@ -748,6 +766,23 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "TRANSCRIPT_DUMP_FAILED"));
       return typeof res.dump === "string" ? res.dump : "";
     },
+    async getTranscriptDigestQueue() {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.transcriptDigestQueue",
+        responseType: "worker.tools.transcriptDigestQueue"
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "TRANSCRIPT_DIGEST_QUEUE_FAILED"));
+      return Array.isArray(res.queue) ? res.queue : [];
+    },
+    async clearTranscript(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.transcriptReset",
+        responseType: "worker.tools.transcriptReset",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "TRANSCRIPT_RESET_FAILED"));
+      return res.result || null;
+    },
     async wsOpen(params = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.tools.ws.open",
@@ -899,6 +934,14 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "RUNTIME_KEY_STATUS_FAILED"));
       return res.result || null;
     },
+    async skillState() {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.skill.state",
+        responseType: "worker.skill.state"
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "SKILL_STATE_FAILED"));
+      return res.result || null;
+    },
     async webmcpDiscover(params = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.webmcp.discover",
@@ -918,12 +961,24 @@ async function init() {
       return res.result || null;
     },
     async experienceRun(params = {}) {
+      const requestedTimeoutMs = Number(params?.timeoutMs);
+      const timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0 ? Math.max(1e4, requestedTimeoutMs) : EXPERIENCE_RUN_REQUEST_TIMEOUT_MS;
       const res = await sendWorkerRequest({
         requestType: "gateway.command.experience.run",
         responseType: "worker.experience.run",
-        payload: { params }
+        payload: { params },
+        timeoutMs
       });
       if (!res?.ok) throw new Error(String(res?.error || "EXPERIENCE_RUN_FAILED"));
+      return res.result || null;
+    },
+    async visitExperience({ url } = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.visit",
+        responseType: "worker.visit",
+        payload: { url: String(url || "") }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "VISIT_FAILED"));
       return res.result || null;
     },
     async checkOriginAccess({ url, capability = "web_fetch", method = "GET", consume = true } = {}) {
@@ -958,8 +1013,18 @@ async function init() {
       return;
     }
     if (msg && msg.type === "command" && msg.command === "visit") {
-      console.warn("gateway: visit command not supported by worker, ignoring");
-      return;
+      return sendWorkerRequest({
+        requestType: "gateway.command.visit",
+        responseType: "worker.visit",
+        payload: { url: String(msg.url || "") }
+      }).then((res) => {
+        if (!res?.ok) throw new Error(String(res?.error || "VISIT_FAILED"));
+        if (!res?.result?.ok) {
+          const message = String(res?.result?.error?.message || res?.result?.error?.code || "VISIT_FAILED");
+          throw new Error(message);
+        }
+        return res.result;
+      });
     }
     sendToWorker(msg);
   };

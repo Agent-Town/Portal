@@ -6,7 +6,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('reset clears progress and /api/state exposes phase1 hatch defaults', async ({ request }) => {
+test('reset clears progress and /api/state exposes phase1 setup defaults', async ({ request }) => {
   const beforeResp = await request.get('/api/state');
   expect(beforeResp.ok()).toBeTruthy();
   const before = await beforeResp.json();

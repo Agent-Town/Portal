@@ -14,15 +14,6 @@ test('external agent API flow remains compatible (runtime fallback params are ig
   const teamCode = initial.teamCode;
   expect(teamCode).toMatch(/^TEAM-/);
 
-  await page.evaluate(async () => {
-    await fetch('/api/hatch/complete', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({})
-    });
-  });
-
   const connectResp = await request.post('/api/agent/connect', {
     data: { teamCode, agentName: 'CompatExternal' }
   });
