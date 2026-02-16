@@ -35,24 +35,95 @@ let palette = [];
 let pixels = [];
 let selectedColor = 1;
 let liteDriver = 'vendor';
-let runtimeTeamCode = '';
-let runtimeBridgeReady = false;
-const runtimeBridge = window.OpenClawLiteRuntimeBridge || null;
+let liteGatewayPromise = null;
 
 function isVendorLiteDriver() {
   return liteDriver === 'vendor';
 }
 
-async function ensureVendorRuntimeBridge() {
-  if (!isVendorLiteDriver()) return;
-  if (!runtimeTeamCode) throw new Error('MISSING_TEAM_CODE');
-  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
-  if (runtimeBridgeReady) return;
-  await runtimeBridge.init({
-    driver: 'vendor',
-    teamCode: runtimeTeamCode
+async function loadLiteGateway() {
+  if (liteGatewayPromise) return liteGatewayPromise;
+  liteGatewayPromise = import('/openclaw-lite/gateway.js')
+    .then((mod) => mod?.default || mod)
+    .then(async (gatewayOrPromise) => {
+      if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+        return await gatewayOrPromise;
+      }
+      return gatewayOrPromise;
+    })
+    .catch(() => null);
+  return liteGatewayPromise;
+}
+
+async function ensureCreateSkillImported() {
+  if (!isVendorLiteDriver()) return null;
+  const gateway = await loadLiteGateway();
+  if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
+
+  if (typeof gateway.skillState === 'function') {
+    const skillState = await gateway.skillState().catch(() => null);
+    const status = String(skillState?.data?.status || skillState?.status || '').trim().toLowerCase();
+    const activePath = String(skillState?.data?.activeSkillPath || skillState?.activeSkillPath || '').trim();
+    if (status === 'ready' && activePath) return gateway;
+  }
+
+  if (typeof gateway.visitExperience === 'function') {
+    const visit = await gateway.visitExperience({ url: '/skill.md' });
+    if (visit?.ok !== true) {
+      const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
+      throw new Error(msg);
+    }
+  }
+  return gateway;
+}
+
+async function runCreateSkillTurn({ goal = '' } = {}) {
+  if (!isVendorLiteDriver()) return null;
+  const gateway = await ensureCreateSkillImported();
+  if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
+  const goalLine = String(goal || '').trim();
+  const prompt = [
+    'Read SKILL.md and execute exactly the next required safe step for this /create ceremony flow.',
+    goalLine ? `Goal: ${goalLine}` : '',
+    'Use runtime session context values directly and avoid asking for teamCode/houseId when already provided.',
+    'If waiting for human action, stop after one safe check/action.'
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const run = await gateway.experienceRun({
+    prompt,
+    timeoutMs: 60_000
   });
-  runtimeBridgeReady = true;
+  if (run?.ok === false) {
+    const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
+    throw new Error(msg);
+  }
+  return run;
+}
+
+async function driveAgentCeremonyStep({ needReveal = false } = {}) {
+  let material = await api('/api/human/house/material');
+  const isReady = () => (needReveal
+    ? !!material?.agentRevealSealed
+    : !!(material?.agentCommit && material?.agentRevealPub));
+  if (isReady()) return material;
+  if (!isVendorLiteDriver()) return material;
+
+  const goal = needReveal
+    ? 'Publish the agent ceremony reveal payload (`sealedForHuman`) for the current team session.'
+    : 'Publish the agent ceremony commit and reveal public key for the current team session.';
+
+  for (let i = 0; i < 10; i += 1) {
+    try {
+      await runCreateSkillTurn({ goal });
+    } catch {
+      // Keep polling material; the next run can recover.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    material = await api('/api/human/house/material');
+    if (isReady()) return material;
+  }
+  return material;
 }
 
 function applyLocalPixel(x, y, color, w = 16) {
@@ -116,18 +187,6 @@ function renderCanvas(w, h) {
           });
           // Optimistically update local human paint first.
           applyLocalPixel(x, y, selectedColor, w);
-
-          if (isVendorLiteDriver() && runtimeTeamCode) {
-            await ensureVendorRuntimeBridge();
-            const contribution = await runtimeBridge.contributeCanvas({
-              teamCode: runtimeTeamCode,
-              humanX: x,
-              humanY: y,
-              humanColor: selectedColor
-            });
-            const agentPaint = contribution?.paint || null;
-            if (agentPaint) applyLocalPixel(agentPaint.x, agentPaint.y, agentPaint.color, w);
-          }
           updateLockState();
         } catch (e) {
           el('err').textContent = e.message;
@@ -171,11 +230,6 @@ async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
   liteDriver = typeof st?.lite?.driver === 'string' ? st.lite.driver : 'vendor';
-  runtimeTeamCode = typeof st?.teamCode === 'string' ? st.teamCode : '';
-  runtimeBridgeReady = false;
-  if (isVendorLiteDriver() && runtimeTeamCode && runtimeBridge) {
-    ensureVendorRuntimeBridge().catch(() => {});
-  }
   setHouseNavLink(st.houseId || null);
   const params = new URLSearchParams(window.location.search);
   const requestedToken = params.get('mode') === 'token';
@@ -554,15 +608,8 @@ async function init() {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {
-        if (isVendorLiteDriver() && runtimeTeamCode) {
-          await ensureVendorRuntimeBridge();
-          await runtimeBridge.ceremonyCommit({
-            teamCode: runtimeTeamCode
-          });
-        }
-
         // 2) Exchange sealed reveals and derive Kroot locally once agent payload is available.
-        const mat = await api('/api/human/house/material');
+        const mat = await driveAgentCeremonyStep({ needReveal: false });
         if (!mat.agentCommit || !mat.agentRevealPub) {
           throw new Error('WAITING_AGENT_REVEAL');
         }
@@ -578,19 +625,7 @@ async function init() {
           body: JSON.stringify({ sealedForAgent })
         });
 
-        let matAfter = await api('/api/human/house/material');
-        if (isVendorLiteDriver() && runtimeTeamCode && matAfter.humanRevealPub) {
-          await ensureVendorRuntimeBridge();
-          await runtimeBridge.ceremonyReveal({
-            teamCode: runtimeTeamCode,
-            humanRevealPub: matAfter.humanRevealPub
-          });
-          matAfter = await api('/api/human/house/material');
-        }
-        for (let i = 0; i < 10 && !matAfter.agentRevealSealed; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          matAfter = await api('/api/human/house/material');
-        }
+        const matAfter = await driveAgentCeremonyStep({ needReveal: true });
         if (!matAfter.agentRevealSealed) throw new Error('WAITING_AGENT_REVEAL');
         const Ra = await decryptCeremonyReveal({
           sealed: matAfter.agentRevealSealed,

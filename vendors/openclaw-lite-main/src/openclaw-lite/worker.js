@@ -62,6 +62,7 @@ const VISIT_COMPAT_BASENAMES = new Set([
   "messaging.md",
   "skill.json",
 ]);
+const CEREMONY_E2EE_P256_AESGCM_V1 = "CEREMONY_E2EE_P256_AESGCM_V1";
 
 function post(msg) {
   self.postMessage(msg);
@@ -332,6 +333,282 @@ async function apiJson(url, opts = {}) {
     throw new Error(err);
   }
   return data;
+}
+
+function normalizeToolErrorCode(message, fallback = "UNSUPPORTED") {
+  const raw = String(message || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, "_");
+  if (!raw) return String(fallback || "UNSUPPORTED");
+  return raw;
+}
+
+function isRetryableAgentTownErrorCode(code) {
+  const normalized = String(code || "").trim().toUpperCase();
+  return normalized.startsWith("WAITING_");
+}
+
+function ensureAgentTownCeremonyStore() {
+  if (!state.agentTownCeremonyByTeam || typeof state.agentTownCeremonyByTeam !== "object") {
+    state.agentTownCeremonyByTeam = {};
+  }
+  return state.agentTownCeremonyByTeam;
+}
+
+async function resolveAgentTownTeamCode(rawTeamCode) {
+  const explicit = typeof rawTeamCode === "string" ? rawTeamCode.trim() : "";
+  if (explicit) return explicit;
+  const appState = await apiJson("/api/state", { method: "GET" });
+  const inferred = typeof appState?.teamCode === "string" ? appState.teamCode.trim() : "";
+  if (!inferred) throw new Error("MISSING_TEAM_CODE");
+  return inferred;
+}
+
+function makeCeremonyRevealKeyInfo({ direction = "", teamCode = "" }) {
+  return `elizatown-ceremony-reveal-v1|dir=${direction}|team=${teamCode || ""}`;
+}
+
+async function deriveCeremonyRevealKey({ sharedSecret, direction, teamCode, usages = ["encrypt"] }) {
+  const baseKey = await crypto.subtle.importKey("raw", sharedSecret, "HKDF", false, ["deriveKey"]);
+  const info = utf8ToBytes(makeCeremonyRevealKeyInfo({ direction, teamCode }));
+  return crypto.subtle.deriveKey(
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array([]), info },
+    baseKey,
+    { name: "AES-GCM", length: 256 },
+    false,
+    usages,
+  );
+}
+
+async function encryptCeremonyRevealForHouse({ revealBytes, recipientRevealPub, direction, teamCode }) {
+  let recipientBytes;
+  try {
+    recipientBytes = b64ToBytes(recipientRevealPub || "");
+  } catch {
+    recipientBytes = null;
+  }
+  if (!recipientBytes || recipientBytes.length === 0) throw new Error("INVALID_REVEAL_PUB");
+
+  let recipientPub;
+  try {
+    recipientPub = await crypto.subtle.importKey(
+      "spki",
+      recipientBytes,
+      { name: "ECDH", namedCurve: "P-256" },
+      false,
+      [],
+    );
+  } catch {
+    throw new Error("INVALID_REVEAL_PUB");
+  }
+
+  const eph = await crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveBits"],
+  );
+  const sharedBits = await crypto.subtle.deriveBits(
+    { name: "ECDH", public: recipientPub },
+    eph.privateKey,
+    256,
+  );
+  const sharedSecret = new Uint8Array(sharedBits);
+  const key = await deriveCeremonyRevealKey({
+    sharedSecret,
+    direction,
+    teamCode,
+    usages: ["encrypt"],
+  });
+
+  const aadBytes = utf8ToBytes(JSON.stringify({ v: 1, direction, teamCode: teamCode || null }));
+  const plaintext = utf8ToBytes(JSON.stringify({ v: 1, reveal: bytesToB64(revealBytes) }));
+  const iv = randomBytes(12);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: aadBytes },
+    key,
+    plaintext,
+  );
+  const epk = new Uint8Array(await crypto.subtle.exportKey("spki", eph.publicKey));
+
+  return {
+    alg: CEREMONY_E2EE_P256_AESGCM_V1,
+    epk: bytesToB64(epk),
+    iv: bytesToB64(iv),
+    ct: bytesToB64(new Uint8Array(ciphertext)),
+    aad: bytesToB64(aadBytes),
+  };
+}
+
+async function runAgentTownCeremonyCommit(params, toolName = "agent_town_ceremony_commit") {
+  const startedAtMs = nowMs();
+  let teamCode = "";
+  try {
+    teamCode = await resolveAgentTownTeamCode(params?.teamCode);
+  } catch (e) {
+    const message = String(e?.message || "MISSING_TEAM_CODE");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("MISSING_TEAM_CODE", message));
+  }
+
+  const store = ensureAgentTownCeremonyStore();
+  let entry = store[teamCode] || null;
+  if (!entry || !entry.raBytes || !entry.revealPrivateKey || !entry.commit || !entry.revealPub) {
+    try {
+      const raBytes = randomBytes(32);
+      const commit = bytesToB64(await sha256(raBytes));
+      const revealPair = await crypto.subtle.generateKey(
+        { name: "ECDH", namedCurve: "P-256" },
+        true,
+        ["deriveBits"],
+      );
+      const revealPub = bytesToB64(new Uint8Array(await crypto.subtle.exportKey("spki", revealPair.publicKey)));
+      entry = {
+        teamCode,
+        raBytes,
+        revealPrivateKey: revealPair.privateKey,
+        commit,
+        revealPub,
+        createdAtMs: nowMs(),
+        revealedAtMs: null,
+      };
+      store[teamCode] = entry;
+    } catch (e) {
+      const message = String(e?.message || "CEREMONY_COMMIT_PREP_FAILED");
+      const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+      return withToolMeta(
+        toolName,
+        startedAtMs,
+        makeToolFailure(code, message, { teamCode }),
+      );
+    }
+  }
+
+  try {
+    const response = await apiJson("/api/agent/house/commit", {
+      method: "POST",
+      body: JSON.stringify({
+        teamCode,
+        commit: entry.commit,
+        revealPub: entry.revealPub,
+      }),
+    });
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolSuccess({
+        teamCode,
+        commit: entry.commit,
+        revealPub: entry.revealPub,
+        response,
+      }),
+    );
+  } catch (e) {
+    const message = String(e?.message || "CEREMONY_COMMIT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(code, message, { teamCode }, isRetryableAgentTownErrorCode(code)),
+    );
+  }
+}
+
+async function runAgentTownCeremonyReveal(params, toolName = "agent_town_ceremony_reveal") {
+  const startedAtMs = nowMs();
+  let teamCode = "";
+  try {
+    teamCode = await resolveAgentTownTeamCode(params?.teamCode);
+  } catch (e) {
+    const message = String(e?.message || "MISSING_TEAM_CODE");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("MISSING_TEAM_CODE", message));
+  }
+
+  const store = ensureAgentTownCeremonyStore();
+  const entry = store[teamCode] || null;
+  if (!entry || !entry.raBytes || !entry.revealPrivateKey || !entry.commit || !entry.revealPub) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("CEREMONY_NOT_COMMITTED", "Run ceremony commit first", { teamCode }),
+    );
+  }
+
+  let humanRevealPub = typeof params?.humanRevealPub === "string" ? params.humanRevealPub.trim() : "";
+  if (!humanRevealPub) {
+    try {
+      const material = await apiJson(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`, {
+        method: "GET",
+      });
+      humanRevealPub = typeof material?.humanRevealPub === "string" ? material.humanRevealPub.trim() : "";
+    } catch (e) {
+      const message = String(e?.message || "HOUSE_MATERIAL_FETCH_FAILED");
+      const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+      return withToolMeta(
+        toolName,
+        startedAtMs,
+        makeToolFailure(code, message, { teamCode }, isRetryableAgentTownErrorCode(code)),
+      );
+    }
+  }
+  if (!humanRevealPub) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(
+        "WAITING_HUMAN_REVEAL_PUB",
+        "Waiting for human reveal public key",
+        { teamCode },
+        true,
+      ),
+    );
+  }
+
+  let sealedForHuman;
+  try {
+    sealedForHuman = await encryptCeremonyRevealForHouse({
+      revealBytes: entry.raBytes,
+      recipientRevealPub: humanRevealPub,
+      direction: "agent_to_human",
+      teamCode,
+    });
+  } catch (e) {
+    const message = String(e?.message || "CEREMONY_REVEAL_ENCRYPT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(code, message, { teamCode }),
+    );
+  }
+
+  try {
+    const response = await apiJson("/api/agent/house/reveal", {
+      method: "POST",
+      body: JSON.stringify({
+        teamCode,
+        sealedForHuman,
+      }),
+    });
+    entry.revealedAtMs = nowMs();
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolSuccess({
+        teamCode,
+        revealed: true,
+        houseId: response?.houseId || null,
+        response,
+      }),
+    );
+  } catch (e) {
+    const message = String(e?.message || "CEREMONY_REVEAL_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(code, message, { teamCode }, isRetryableAgentTownErrorCode(code)),
+    );
+  }
 }
 
 function makeToolSuccess(data) {
@@ -1505,6 +1782,12 @@ const LITE_TOOL_SPECS = [
     sampleArgs: {},
   },
   {
+    name: "lite_sleep",
+    label: "Lite Sleep",
+    description: "Waits for a bounded number of milliseconds.",
+    sampleArgs: { ms: 1000 },
+  },
+  {
     name: "lite_sha256",
     label: "Lite SHA256",
     description: "Returns SHA-256 digest of input text (base64).",
@@ -1527,6 +1810,18 @@ const LITE_TOOL_SPECS = [
     label: "HTTP Request",
     description: "Browser-native curl pendant for API workflows.",
     sampleArgs: { method: "GET", url: "https://example.com/api" },
+  },
+  {
+    name: "agent_town_ceremony_commit",
+    label: "Agent Town Ceremony Commit",
+    description: "Generates agent ceremony entropy/keys and posts /api/agent/house/commit.",
+    sampleArgs: { teamCode: "TEAM-ABCD-EFGH" },
+  },
+  {
+    name: "agent_town_ceremony_reveal",
+    label: "Agent Town Ceremony Reveal",
+    description: "Encrypts agent reveal for human and posts /api/agent/house/reveal.",
+    sampleArgs: { teamCode: "TEAM-ABCD-EFGH" },
   },
   {
     name: "secret_set",
@@ -1667,6 +1962,12 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate) {
       const ts = nowMs();
       return liteToolResult(String(ts), { dispatchPath: LITE_TOOL_DISPATCH_PATH, ts });
     }
+    case "lite_sleep": {
+      const rawMs = Number(params?.ms);
+      const ms = Number.isFinite(rawMs) ? Math.max(0, Math.min(10_000, Math.floor(rawMs))) : 0;
+      if (ms > 0) await new Promise((resolve) => setTimeout(resolve, ms));
+      return liteToolResult(`slept ${ms}ms`, { dispatchPath: LITE_TOOL_DISPATCH_PATH, ms });
+    }
     case "lite_sha256": {
       const text = typeof params?.text === "string" ? params.text : "";
       const digest = bytesToB64(await sha256(utf8ToBytes(text)));
@@ -1683,6 +1984,14 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate) {
     case "http_request": {
       const envelope = await runHttpRequest(params || {}, "http_request");
       return envelopeToToolResult(envelope, "http_request");
+    }
+    case "agent_town_ceremony_commit": {
+      const envelope = await runAgentTownCeremonyCommit(params || {}, "agent_town_ceremony_commit");
+      return envelopeToToolResult(envelope, "agent_town_ceremony_commit");
+    }
+    case "agent_town_ceremony_reveal": {
+      const envelope = await runAgentTownCeremonyReveal(params || {}, "agent_town_ceremony_reveal");
+      return envelopeToToolResult(envelope, "agent_town_ceremony_reveal");
     }
     case "secret_set": {
       const envelope = await runSecretSet(params || {}, "secret_set");
@@ -3925,6 +4234,7 @@ const state = {
   llmUseProxy: true,
   llmApiKey: null,
   secretStore: {},
+  agentTownCeremonyByTeam: {},
   originGrants: [],
   httpRateLimit: new Map(),
   wsSessions: new Map(),
@@ -4265,6 +4575,28 @@ self.addEventListener("message", async (ev) => {
       const result = await runHttpRequest(msg.params || {}, "http_request");
       post({
         type: "worker.tools.httpRequest",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result,
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.tools.agentTownCeremonyCommit") {
+      const result = await runAgentTownCeremonyCommit(msg.params || {}, "agent_town_ceremony_commit");
+      post({
+        type: "worker.tools.agentTownCeremonyCommit",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result,
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.tools.agentTownCeremonyReveal") {
+      const result = await runAgentTownCeremonyReveal(msg.params || {}, "agent_town_ceremony_reveal");
+      post({
+        type: "worker.tools.agentTownCeremonyReveal",
         requestId: String(msg.requestId || ""),
         ok: true,
         result,

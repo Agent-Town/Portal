@@ -7,6 +7,79 @@ async function fetchSessionState(page) {
   });
 }
 
+async function runSkillStep(page, prompt = 'Read SKILL.md and do the next safe step.') {
+  return page.evaluate(async (stepPrompt) => {
+    const run = window.__openclawLiteTest?.experienceRun;
+    if (typeof run === 'function') {
+      return await run({ prompt: String(stepPrompt || '') });
+    }
+    const mod = await import('/openclaw-lite/gateway.js');
+    let gateway = mod?.default || mod;
+    if (gateway && typeof gateway.then === 'function') gateway = await gateway;
+    if (!gateway || typeof gateway.send !== 'function') return null;
+    return null;
+  }, prompt);
+}
+
+async function sessionTeamCode(page) {
+  const state = await fetchSessionState(page);
+  const teamCode = typeof state?.teamCode === 'string' ? state.teamCode.trim() : '';
+  if (!teamCode) throw new Error('MISSING_TEAM_CODE');
+  return teamCode;
+}
+
+async function postAgentRoute(page, path, body = {}) {
+  return page.evaluate(async ({ targetPath, payload }) => {
+    const resp = await fetch(targetPath, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+    const data = await resp.json().catch(() => ({}));
+    return {
+      status: resp.status,
+      ok: resp.ok,
+      body: data
+    };
+  }, { targetPath: path, payload: body });
+}
+
+async function connectAgentViaApi(page, {
+  agentName = 'OpenClaw'
+} = {}) {
+  const teamCode = await sessionTeamCode(page);
+  const resp = await postAgentRoute(page, '/api/agent/connect', { teamCode, agentName });
+  if (!resp?.ok || !resp?.body?.ok) {
+    const reason = String(resp?.body?.error || `HTTP_${resp?.status || 500}`);
+    throw new Error(`AGENT_CONNECT_FAILED:${reason}`);
+  }
+  return { teamCode };
+}
+
+async function mirrorSigilViaAgentApi(page, sigil = 'key') {
+  const teamCode = await sessionTeamCode(page);
+  const resp = await postAgentRoute(page, '/api/agent/select', {
+    teamCode,
+    elementId: String(sigil || '')
+  });
+  if (!resp?.ok || !resp?.body?.ok) {
+    const reason = String(resp?.body?.error || `HTTP_${resp?.status || 500}`);
+    throw new Error(`AGENT_SELECT_FAILED:${reason}`);
+  }
+  return { teamCode };
+}
+
+async function pressOpenViaAgentApi(page) {
+  const teamCode = await sessionTeamCode(page);
+  const resp = await postAgentRoute(page, '/api/agent/open/press', { teamCode });
+  if (!resp?.ok || !resp?.body?.ok) {
+    const reason = String(resp?.body?.error || `HTTP_${resp?.status || 500}`);
+    throw new Error(`AGENT_OPEN_FAILED:${reason}`);
+  }
+  return { teamCode };
+}
+
 async function enterHatch(page, intent = 'signin') {
   await page.goto('/');
   await page.getByTestId(`auth-${intent}`).click();
@@ -62,12 +135,36 @@ async function hatchAndConnectLite(page, intent = 'signin') {
 
 async function unlockGateWithSigil(page, sigil = 'key') {
   await page.getByTestId(`sigil-${sigil}`).click();
+  for (let i = 0; i < 4; i += 1) {
+    const unlocked = await page.getByTestId('match-status').textContent();
+    if ((unlocked || '').includes('UNLOCKED')) break;
+    const run = await runSkillStep(page, 'Read SKILL.md and mirror the human sigil selection.');
+    if (run?.ok === false && String(run?.error?.code || '').toUpperCase() === 'LLM_RUN_FAILED') {
+      break;
+    }
+    await page.waitForTimeout(180);
+  }
+  const stillLocked = !((await page.getByTestId('match-status').textContent()) || '').includes('UNLOCKED');
+  if (stillLocked) {
+    await mirrorSigilViaAgentApi(page, sigil);
+  }
   await expect(page.getByTestId('match-status')).toContainText('UNLOCKED', { timeout: 3000 });
   await expect(page.getByTestId('open-btn')).toBeEnabled();
 }
 
 async function openToCreate(page) {
   await page.getByTestId('open-btn').click();
+  for (let i = 0; i < 4; i += 1) {
+    if (page.url().includes('/create')) break;
+    const run = await runSkillStep(page, 'Read SKILL.md and press Open after the human has pressed Open.');
+    if (run?.ok === false && String(run?.error?.code || '').toUpperCase() === 'LLM_RUN_FAILED') {
+      break;
+    }
+    await page.waitForTimeout(180);
+  }
+  if (!page.url().includes('/create')) {
+    await pressOpenViaAgentApi(page);
+  }
   await page.waitForURL('**/create', { timeout: 4000 });
 }
 
@@ -129,6 +226,9 @@ module.exports = {
   configureLiteLlm,
   ensureLiteConnected,
   hatchAndConnectLite,
+  connectAgentViaApi,
+  mirrorSigilViaAgentApi,
+  pressOpenViaAgentApi,
   unlockGateWithSigil,
   openToCreate,
   reachCreateViaLite,

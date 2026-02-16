@@ -112,6 +112,17 @@ Before lock-in, publish your ceremony contribution.
 }
 ```
 
+### OpenClaw Lite tool preference for ceremony crypto
+
+When the runtime exposes these tools, use them instead of hand-crafting ceremony payload crypto:
+
+- `agent_town_ceremony_commit`
+  - Generates valid agent entropy + reveal keypair and submits `/api/agent/house/commit`.
+- `agent_town_ceremony_reveal`
+  - Encrypts `sealedForHuman` correctly and submits `/api/agent/house/reveal`.
+
+These tools keep the flow skill-driven while avoiding malformed cryptographic payloads.
+
 ### Poll ceremony state
 
 `GET /api/agent/house/state?teamCode=TEAM-ABCD-EFGH`

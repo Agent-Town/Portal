@@ -520,6 +520,7 @@ async function init() {
       if (houseId) houseId.textContent = msg.state?.houseId || "\u2014";
       const latest = msg.state?.vault?.latestBackupId || null;
       if (vaultStatus) vaultStatus.textContent = latest ? `latest ${latest}` : "\u2014";
+      gatewayEvents.emit("state", msg.state || {});
       return;
     }
     if (msg.type === "worker.log.append") {
@@ -730,6 +731,24 @@ async function init() {
         payload: { params }
       });
       if (!res?.ok) throw new Error(String(res?.error || "HTTP_REQUEST_FAILED"));
+      return res.result || null;
+    },
+    async agentTownCeremonyCommit(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.agentTownCeremonyCommit",
+        responseType: "worker.tools.agentTownCeremonyCommit",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "AGENT_TOWN_CEREMONY_COMMIT_FAILED"));
+      return res.result || null;
+    },
+    async agentTownCeremonyReveal(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.agentTownCeremonyReveal",
+        responseType: "worker.tools.agentTownCeremonyReveal",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "AGENT_TOWN_CEREMONY_REVEAL_FAILED"));
       return res.result || null;
     },
     async setSecret({ name, value } = {}) {

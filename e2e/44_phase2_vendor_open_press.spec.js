@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { hatchAndConnectLite, unlockGateWithSigil, fetchSessionState } = require('./helpers/phase2');
+const { hatchAndConnectLite, unlockGateWithSigil, fetchSessionState, pressOpenViaAgentApi } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -7,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('open transition is completed by vendor runtime agent open-press', async ({ page }) => {
+test('open transition is completed by co-op agent open-press action', async ({ page }) => {
   await hatchAndConnectLite(page, 'signin');
   await unlockGateWithSigil(page, 'key');
 
@@ -19,16 +19,17 @@ test('open transition is completed by vendor runtime agent open-press', async ({
   });
 
   await page.getByTestId('open-btn').click();
+  const agentOpen = pressOpenViaAgentApi(page);
 
   await page.waitForTimeout(250);
   expect(page.url()).not.toContain('/create');
   await expect(page.getByTestId('open-waiting')).toBeVisible();
 
   await expect.poll(() => agentOpenSeen, { timeout: 2000 }).toBe(true);
+  await agentOpen;
   await page.waitForURL('**/create', { timeout: 5000 });
 
   const state = await fetchSessionState(page);
   expect(state.signup?.complete).toBe(true);
   expect(state.signup?.mode).toBe('agent');
 });
-

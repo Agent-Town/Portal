@@ -28,6 +28,17 @@ This document does not define final UX copy or marketing docs.
     - existing typed `{ kind: ... }` body still supported
   - Server `/api/tools/http_request` proxy now accepts the same shorthand body forms.
   - This unblocks `POST /api/agent/connect` in cases where the model emits raw-string JSON.
+- Ceremony crypto execution is now tool-addressable in the worker (no server shortcuts):
+  - Added `agent_town_ceremony_commit` tool:
+    - generates agent reveal entropy + ECDH keypair
+    - posts valid `/api/agent/house/commit` payload
+  - Added `agent_town_ceremony_reveal` tool:
+    - encrypts `sealedForHuman` envelope (`CEREMONY_E2EE_P256_AESGCM_V1`)
+    - posts valid `/api/agent/house/reveal` payload
+  - Added deterministic worker-tool coverage:
+    - `e2e/56_phase3_skill_visit_worker.spec.js`
+    - Test: `agent-town ceremony tools drive commit/reveal payloads without server-side shortcuts`
+    - Test: `agent-town ceremony commit is idempotent per team and random across team reset`
 - Test coverage added for the connect-body issue:
   - `e2e/56_phase3_skill_visit_worker.spec.js`
   - Test: `http_request accepts raw JSON string/object body for /api/agent/connect`
@@ -64,6 +75,17 @@ This document does not define final UX copy or marketing docs.
   - Upload parser accepts both legacy house backup ZIPs and OpenClaw export ZIPs.
   - `Store in house` / `Restore from house` remains the persisted encrypted path for full local-first continuity.
   - Test: `e2e/54_agent_state_backup_restore.spec.js` (`house backup stores encrypted state and supports ZIP download/upload restore`)
+- Agent-active readiness is now tied to skill import state:
+  - Index status now treats OpenClaw Lite as not-ready when worker skill state is explicitly `failed`.
+  - App auto-imports `/skill.md` after local connect (one-shot per team session) so users do not need a manual visit step.
+  - Import failures now surface explicitly in UI status (`skill import failed`) until recovery.
+  - Test: `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js` (`agent readiness status tracks skill import failure and recovery`)
+- Deterministic phase2 test shims were removed from helper flow (`e2e/helpers/phase2.js`):
+  - no runtime monkeypatch that auto-selects/auto-opens/auto-ceremony via test bridge
+  - helper loops now try real `experienceRun` turns first, then fall back to explicit co-op `/api/agent/*` actions for deterministic coverage when external LLM execution is unavailable
+- Legacy phase unlock/open/create regressions were rewritten to the non-shimmed co-op contract:
+  - updated tests: `e2e/02_match_unlock.spec.js`, `e2e/36_phase1_lite_agent_sigil_match.spec.js`, `e2e/37_phase1_lite_agent_open_press.spec.js`, `e2e/38_phase1_create_ceremony_regression.spec.js`, `e2e/43_phase2_vendor_sigil_match.spec.js`, `e2e/44_phase2_vendor_open_press.spec.js`
+  - create flow regression now drives agent ceremony commit/reveal with valid browser-crypto payloads through real API routes (no deterministic bridge shortcut)
 - Existing Phase 3 tests remain green after this update.
 
 ## Baseline Snapshot (Previous Analysis)
@@ -203,15 +225,15 @@ This section captures the earlier analysis verbatim in normalized form, then map
   - Deterministic Playwright coverage in `e2e/56_phase3_skill_visit_worker.spec.js`.
 - Impact: Approval requests are now explicit and resolvable in index flow; missing-surface deadlock is removed.
 
-## G-008: “Agent active” status is not tied to successful skill readiness
+## G-008: “Agent active” status now reflects skill readiness (addressed)
 
-- Type: Observability gap
-- Severity: Medium
-- Problem: Connected/ready status can be true even if no skill has been imported/parsed/executed.
+- Type: Observability hardening
+- Severity: Low
+- Problem: Previously, connected/ready status could be true even when no skill was imported.
 - Evidence:
-  - Session connect gate is session/hatch based and no longer tied to server runtime boot state: `server/index.js` `/api/agent/lite/connect`
-  - UI status derives from connection source/runtime state.
-- Impact: False confidence for users; hard to debug “active but not working”.
+  - Index readiness now reads worker skill state and blocks “ready” while skill state is failed.
+  - Automatic default import uses `/skill.md` after local connection and surfaces failure state.
+- Impact: UI now avoids false “ready” when skill import is broken and exposes clear recovery feedback.
 
 ## G-009: Browser panel/iframe path does not solve integration for most external sites
 
@@ -256,7 +278,6 @@ This section captures the earlier analysis verbatim in normalized form, then map
 - D-002: Skill import destination structure (`workspace/skills/<host>/...`) and conflict rules.
 - D-003: Minimal required file set for “skill ready” state.
 - D-004: Whether to emulate OpenClaw prompt semantics exactly (skills list + mandatory on-demand read) or intentionally diverge.
-- D-005: Exact definition of “agent active” for UX (connected vs skill-loaded vs first successful run).
 
 ## Implementation-Readiness Checklist
 

@@ -41,6 +41,8 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('POST /api/agent/open/press');
   expect(txt).toContain('POST /api/agent/house/commit');
   expect(txt).toContain('POST /api/agent/house/reveal');
+  expect(txt).toContain('agent_town_ceremony_commit');
+  expect(txt).toContain('agent_town_ceremony_reveal');
   expect(txt).toContain('GET /api/agent/house/state?teamCode=');
   expect(txt).toContain('GET /api/agent/house/material?teamCode=');
   expect(txt).toContain('POST /api/agent/house/connect');

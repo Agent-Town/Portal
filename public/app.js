@@ -52,6 +52,23 @@ const DEFAULT_LOCAL_LITE_LLM = Object.freeze({
   apiKeySet: false
 });
 let localLiteLlm = { ...DEFAULT_LOCAL_LITE_LLM };
+const DEFAULT_LITE_SKILL_STATE = Object.freeze({
+  status: 'idle',
+  sourceUrl: null,
+  activeSkillPath: null,
+  lastError: null,
+  lastImportedAtMs: null
+});
+let liteSkillState = { ...DEFAULT_LITE_SKILL_STATE };
+let liteSkillSyncPromise = null;
+let liteSkillLastSyncAtMs = 0;
+let liteSkillAutoImportPromise = null;
+let liteSkillAutoImportTeamCode = '';
+let liteSkillLoopTimer = null;
+let liteSkillLoopInFlight = false;
+let liteSkillLoopBackoffMs = 1000;
+let liteSkillLoopLastRunAtMs = 0;
+let liteSkillLoopTeamCode = '';
 
 function b64(bytes) {
   let bin = '';
@@ -187,6 +204,52 @@ function getLocalLiteLlm() {
 
 function isLocalLiteLlmConfigured() {
   return !!getLocalLiteLlm().configured;
+}
+
+function normalizeLiteSkillStatus(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'loading' || raw === 'ready' || raw === 'failed') return raw;
+  return 'idle';
+}
+
+function normalizeLiteSkillState(raw) {
+  const src = raw && typeof raw === 'object'
+    ? (raw.data && typeof raw.data === 'object' ? raw.data : raw)
+    : {};
+  const status = normalizeLiteSkillStatus(src.status);
+  const sourceUrl = typeof src.sourceUrl === 'string' && src.sourceUrl ? src.sourceUrl : null;
+  const activeSkillPath = typeof src.activeSkillPath === 'string' && src.activeSkillPath ? src.activeSkillPath : null;
+  const lastError = typeof src.lastError === 'string' && src.lastError ? src.lastError : null;
+  const lastImportedAtMs = Number.isFinite(Number(src.lastImportedAtMs))
+    ? Number(src.lastImportedAtMs)
+    : null;
+  return {
+    status,
+    sourceUrl,
+    activeSkillPath,
+    lastError,
+    lastImportedAtMs
+  };
+}
+
+function setLiteSkillState(next) {
+  liteSkillState = normalizeLiteSkillState(next);
+  return liteSkillState;
+}
+
+function getLiteSkillState() {
+  return liteSkillState;
+}
+
+function isLiteSkillReady() {
+  const skill = getLiteSkillState();
+  return skill.status === 'ready' && !!skill.activeSkillPath;
+}
+
+function isLiteAgentActive(state) {
+  if (!isLiteConnected(state)) return false;
+  if (!isVendorLite(state)) return true;
+  return getLiteSkillState().status !== 'failed';
 }
 
 function liteState(state) {
@@ -803,6 +866,150 @@ async function applyGatewayLlmConfig(config) {
   gatewayApi.send(buildGatewayLlmPayload(config));
 }
 
+async function refreshLiteSkillState({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - liteSkillLastSyncAtMs < 1200) return getLiteSkillState();
+  if (liteSkillSyncPromise) return liteSkillSyncPromise;
+
+  liteSkillSyncPromise = (async () => {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.skillState !== 'function') {
+      return getLiteSkillState();
+    }
+    const snapshot = await gatewayApi.skillState();
+    liteSkillLastSyncAtMs = Date.now();
+    return setLiteSkillState(snapshot);
+  })();
+
+  try {
+    return await liteSkillSyncPromise;
+  } catch {
+    return getLiteSkillState();
+  } finally {
+    liteSkillSyncPromise = null;
+  }
+}
+
+async function ensureDefaultLiteSkillImported(state) {
+  if (!isVendorLite(state)) return;
+  if (!isLiteConnected(state)) return;
+  const teamCode = String(state?.teamCode || '').trim();
+  if (!teamCode) return;
+
+  const skill = await refreshLiteSkillState({ force: false });
+  if (skill.status === 'ready' && skill.activeSkillPath) {
+    liteSkillAutoImportTeamCode = teamCode;
+    return;
+  }
+  if (skill.status === 'loading') return;
+  if (liteSkillAutoImportTeamCode === teamCode) return;
+  if (liteSkillAutoImportPromise) return;
+
+  liteSkillAutoImportTeamCode = teamCode;
+  liteSkillAutoImportPromise = (async () => {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.visitExperience !== 'function') return;
+    const visit = await gatewayApi.visitExperience({ url: '/skill.md' });
+    if (visit?.ok !== true) {
+      const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
+      appendAgentLog(`Default skill import failed: ${msg}`);
+      await refreshLiteSkillState({ force: true });
+      return;
+    }
+    appendAgentLog('Default skill imported: /skill.md');
+    await refreshLiteSkillState({ force: true });
+  })()
+    .catch((err) => {
+      appendAgentLog(`Default skill import failed: ${err?.message || 'VISIT_FAILED'}`);
+    })
+    .finally(() => {
+      liteSkillAutoImportPromise = null;
+    });
+
+  return liteSkillAutoImportPromise;
+}
+
+function clearLiteSkillLoopTimer() {
+  if (!liteSkillLoopTimer) return;
+  clearTimeout(liteSkillLoopTimer);
+  liteSkillLoopTimer = null;
+}
+
+function shouldRunHomeSkillLoop(state) {
+  if (window.location.pathname !== '/') return false;
+  if (!isVendorLite(state)) return false;
+  if (!isLiteConnected(state)) return false;
+  if (state?.signup?.complete && state?.signup?.mode === 'agent') return false;
+  return true;
+}
+
+function homeSkillPrompt() {
+  return [
+    'Read SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
+    'Primary goal: complete signup by mirroring human sigil selection and pressing Open after the human.',
+    'Use runtime session context values for origin/teamCode/houseId exactly as provided.',
+    'Use tools only; avoid asking the human for teamCode/houseId when already provided in runtime context.',
+    'If waiting for the human, stop after one safe check/action.'
+  ].join('\n');
+}
+
+function requestHomeSkillStep(reason = 'state') {
+  if (!shouldRunHomeSkillLoop(lastState)) {
+    clearLiteSkillLoopTimer();
+    return;
+  }
+  if (liteSkillLoopTimer) return;
+  const minGapMs = 900;
+  const elapsed = Date.now() - liteSkillLoopLastRunAtMs;
+  const waitMs = Math.max(0, minGapMs - elapsed, reason === 'human-action' ? 0 : liteSkillLoopBackoffMs);
+  liteSkillLoopTimer = setTimeout(() => {
+    liteSkillLoopTimer = null;
+    runHomeSkillStep(reason).catch(() => { });
+  }, waitMs);
+}
+
+async function runHomeSkillStep(reason = 'state') {
+  if (liteSkillLoopInFlight) return;
+  if (!shouldRunHomeSkillLoop(lastState)) return;
+
+  liteSkillLoopInFlight = true;
+  liteSkillLoopLastRunAtMs = Date.now();
+  try {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.experienceRun !== 'function') {
+      throw new Error('GATEWAY_NOT_READY');
+    }
+
+    await ensureDefaultLiteSkillImported(lastState);
+    const skill = await refreshLiteSkillState({ force: false });
+    if (skill.status !== 'ready' || !skill.activeSkillPath) {
+      liteSkillLoopBackoffMs = Math.min(5000, Math.max(1200, liteSkillLoopBackoffMs + 300));
+      return;
+    }
+
+    const run = await gatewayApi.experienceRun({
+      prompt: homeSkillPrompt(),
+      timeoutMs: 60_000
+    });
+    if (run?.ok === false) {
+      const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
+      throw new Error(msg);
+    }
+    liteSkillLoopBackoffMs = 1000;
+  } catch (err) {
+    const msg = String(err?.message || 'EXPERIENCE_RUN_FAILED');
+    appendAgentLog(`Home skill step failed (${reason}): ${msg}`);
+    liteSkillLoopBackoffMs = Math.min(5000, Math.max(1500, liteSkillLoopBackoffMs + 700));
+  } finally {
+    liteSkillLoopInFlight = false;
+    if (shouldRunHomeSkillLoop(lastState)) {
+      requestHomeSkillStep('loop');
+    } else {
+      clearLiteSkillLoopTimer();
+    }
+  }
+}
+
 function updateLiteAgentStatus(state) {
   const dot = el('liteAgentDot');
   const text = el('liteAgentStatus');
@@ -810,11 +1017,15 @@ function updateLiteAgentStatus(state) {
   const lite = liteState(state);
   const failed = typeof lite.lastError === 'string' && lite.lastError;
   const liteConnected = isLiteConnected(state);
-  dot.className = `dot ${liteConnected ? 'good' : ''}`;
+  const liteActive = isLiteAgentActive(state);
+  dot.className = `dot ${liteActive ? 'good' : ''}`;
+  const skill = getLiteSkillState();
   if (failed) {
     text.textContent = `OpenClaw Lite error: ${lite.lastError}`;
   } else if (isAnyAgentConnected(state) && state?.agent?.source === 'external') {
     text.textContent = 'External agent connected';
+  } else if (liteConnected && isVendorLite(state) && !liteActive) {
+    text.textContent = 'Agent connected: OpenClaw Lite (skill import failed)';
   } else {
     text.textContent = liteConnected ? 'Agent connected: OpenClaw Lite' : 'Agent offline';
   }
@@ -1016,7 +1227,7 @@ async function connectLiteAgent() {
       method: 'POST',
       body: JSON.stringify({})
     });
-    statusOverride = 'OpenClaw Lite connected.';
+    statusOverride = '';
   } catch (e) {
     statusOverride = `Agent connect failed: ${e.message}`;
   } finally {
@@ -1377,26 +1588,6 @@ async function clearLiteLlmConfig() {
   }
 }
 
-async function triggerVendorAgentSelect(elementId) {
-  if (!isVendorLite(lastState)) return;
-  if (!isLiteConnected(lastState)) return;
-  const teamCode = String(lastState?.teamCode || '').trim();
-  if (!teamCode) return;
-  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
-  await ensureVendorRuntimeBridge(lastState);
-  await runtimeBridge.selectSigil({ teamCode, elementId });
-}
-
-async function triggerVendorAgentOpenPress() {
-  if (!isVendorLite(lastState)) return null;
-  if (!isLiteConnected(lastState)) return null;
-  const teamCode = String(lastState?.teamCode || '').trim();
-  if (!teamCode) return null;
-  if (!runtimeBridge) throw new Error('RUNTIME_BRIDGE_MISSING');
-  await ensureVendorRuntimeBridge(lastState);
-  return runtimeBridge.pressOpen({ teamCode });
-}
-
 function renderSigils(state) {
   const grid = el('sigilGrid');
   if (!grid) return;
@@ -1446,11 +1637,7 @@ function renderSigils(state) {
           method: 'POST',
           body: JSON.stringify({ elementId: item.id })
         });
-        if (isVendorLite(lastState)) {
-          triggerVendorAgentSelect(item.id).catch((e) => {
-            setOpenError(`Agent select failed: ${e.message}`);
-          });
-        }
+        requestHomeSkillStep('human-action');
       } catch (e) {
         setOpenError(`Select failed: ${e.message}`);
       }
@@ -1619,6 +1806,26 @@ function updateUI(state) {
   const agentConnected = isAnyAgentConnected(state);
   const lite = liteState(state);
   const vendor = isVendorLite(state);
+  if (vendor) {
+    refreshLiteSkillState().catch(() => { });
+    if (agentConnected) {
+      ensureDefaultLiteSkillImported(state).catch(() => { });
+      requestHomeSkillStep('state');
+    }
+  }
+  if (!shouldRunHomeSkillLoop(state)) {
+    clearLiteSkillLoopTimer();
+    liteSkillLoopTeamCode = '';
+  } else {
+    const currentTeamCode = String(state?.teamCode || '').trim();
+    if (currentTeamCode && currentTeamCode !== liteSkillLoopTeamCode) {
+      liteSkillLoopTeamCode = currentTeamCode;
+      liteSkillLoopBackoffMs = 1000;
+      clearLiteSkillLoopTimer();
+      requestHomeSkillStep('team-change');
+    }
+  }
+  const liteActive = isLiteAgentActive(state);
 
     if (step1) {
       if (agentConnected || walletAddr || localLlm.configured) {
@@ -1685,6 +1892,8 @@ function updateUI(state) {
     setHatchStatus('Configure LLM to continue.');
   } else if (vendor && localLlm.configured && !agentConnected) {
     setHatchStatus(runtimeBootstrapDone ? 'Brain saved. Connecting agent…' : 'Starting local runtime…');
+  } else if (vendor && agentConnected && !liteActive) {
+    setHatchStatus('Agent connected. Skill import failed.');
   } else if (agentConnected) {
     setHatchStatus('Agent ready.');
   } else if (walletAddr) {
@@ -1753,6 +1962,15 @@ async function initGateway() {
       const elStatus = el('agentStatus');
       if (elStatus) elStatus.textContent = status;
     });
+    gateway.on('state', (runtimeState) => {
+      if (runtimeState && typeof runtimeState === 'object' && runtimeState.skill) {
+        setLiteSkillState(runtimeState.skill);
+        updateLiteAgentStatus(lastState);
+        if (!statusOverride && isVendorLite(lastState) && isAnyAgentConnected(lastState)) {
+          setHatchStatus(isLiteAgentActive(lastState) ? 'Agent ready.' : 'Agent connected. Skill import failed.');
+        }
+      }
+    });
 
     return gateway;
   } catch (e) {
@@ -1800,8 +2018,10 @@ async function handleVisit() {
     // For now, we ask the agent to "visit" it.
     await gateway.send({ type: 'command', command: 'visit', url });
     appendAgentLog(`Sent visit command for ${url}`);
+    await refreshLiteSkillState({ force: true });
   } catch (e) {
     appendAgentLog(`Visit failed: ${e.message}`);
+    await refreshLiteSkillState({ force: true });
   }
 }
 
@@ -1978,12 +2198,7 @@ async function init() {
           return;
         }
         if (openWaiting) openWaiting.style.display = 'inline-flex';
-        if (isVendorLite(lastState)) {
-          const agentResult = await triggerVendorAgentOpenPress();
-          if (agentResult?.nextUrl) {
-            window.location.href = agentResult.nextUrl;
-          }
-        }
+        requestHomeSkillStep('human-action');
       } catch (e) {
         setOpenError(`Open failed: ${e.message}`);
       }

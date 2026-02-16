@@ -65,6 +65,12 @@ test('returning user auto-connects with saved brain without repeating wallet/bra
     const state = await stateRes.json();
     return state?.agent?.connected === true && state?.agent?.source === 'openclaw-lite';
   }, null, { timeout: 10000 });
+  await page.waitForFunction(async () => {
+    if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.skillState !== 'function') return false;
+    const skill = await window.__openclawLiteTest.skillState().catch(() => null);
+    const status = String(skill?.data?.status || skill?.status || '').trim().toLowerCase();
+    return status === 'ready';
+  }, null, { timeout: 10000 });
 
   await page.evaluate(() => {
     try {
@@ -148,6 +154,49 @@ test('session reset reboots runtime and reconnects OpenClaw Lite with local LLM 
 
   await expect(page.locator('#liteAgentStatus')).toContainText('Agent connected: OpenClaw Lite', { timeout: 5000 });
   await expect(page.locator('#hatchStatus')).not.toContainText('OpenClaw Lite runtime is starting…', { timeout: 5000 });
+});
+
+test('agent readiness status tracks skill import failure and recovery', async ({ page }) => {
+  await installMockSolanaWallet(page);
+
+  await page.goto('/');
+  await page.getByTestId('auth-signup').click();
+  await page.getByTestId('hatch-wallet-check').click();
+  await expect(page.locator('#walletStatus')).toContainText('Wallet verified. Configure brain.', { timeout: 2000 });
+
+  await page.getByTestId('lite-llm-provider').selectOption('openai');
+  await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');
+  await page.getByTestId('lite-llm-api-key').fill('local-test-key');
+  await page.getByTestId('lite-llm-save').click();
+  await expect(page.getByTestId('lite-llm-status')).toContainText('Brain configured.', { timeout: 2000 });
+
+  await page.waitForFunction(async () => {
+    const stateRes = await fetch('/api/state', { credentials: 'include' });
+    const state = await stateRes.json();
+    return state?.agent?.connected === true && state?.agent?.source === 'openclaw-lite';
+  }, null, { timeout: 10000 });
+  await expect(page.locator('#hatchStatus')).toContainText('Agent ready.', { timeout: 10000 });
+
+  await page.waitForFunction(() => {
+    return !!(window.__openclawLiteTest && typeof window.__openclawLiteTest.visitExperience === 'function');
+  }, null, { timeout: 5000 });
+
+  const failedVisit = await page.evaluate(async () => {
+    return await window.__openclawLiteTest.visitExperience({ url: 'https://example.invalid/skill.md' });
+  });
+  expect(failedVisit?.ok).toBe(false);
+  expect(failedVisit?.error?.code).toBe('NOT_FOUND');
+
+  await expect(page.locator('#liteAgentStatus')).toContainText('skill import failed', { timeout: 5000 });
+  await expect(page.locator('#hatchStatus')).toContainText('Skill import failed.', { timeout: 5000 });
+
+  const recoveredVisit = await page.evaluate(async () => {
+    return await window.__openclawLiteTest.visitExperience({ url: '/skill.md' });
+  });
+  expect(recoveredVisit?.ok).toBe(true);
+
+  await expect(page.locator('#liteAgentStatus')).toContainText('Agent connected: OpenClaw Lite', { timeout: 5000 });
+  await expect(page.locator('#hatchStatus')).toContainText('Agent ready.', { timeout: 5000 });
 });
 
 test('wallet lookup/signature failure does not block brain setup for new onboarding', async ({ page }) => {

@@ -295,6 +295,132 @@ test('http_request accepts raw JSON string/object body for /api/agent/connect', 
   expect(result?.connectWithObject?.ok).toBe(true);
 });
 
+test('agent-town ceremony tools drive commit/reveal payloads without server-side shortcuts', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    const stateResp = await fetch('/api/state', { credentials: 'include' });
+    const state = await stateResp.json().catch(() => ({}));
+    const teamCode = String(state?.teamCode || '').trim();
+
+    const revealBeforeCommit = await api.agentTownCeremonyReveal({ teamCode });
+    const commitTool = await api.agentTownCeremonyCommit({ teamCode });
+
+    const bytesToB64 = (bytes) => {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    };
+
+    const humanReveal = crypto.getRandomValues(new Uint8Array(32));
+    const humanCommitBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', humanReveal));
+    const humanCommit = bytesToB64(humanCommitBytes);
+    const revealPair = await crypto.subtle.generateKey(
+      { name: 'ECDH', namedCurve: 'P-256' },
+      true,
+      ['deriveBits']
+    );
+    const humanRevealPub = bytesToB64(new Uint8Array(await crypto.subtle.exportKey('spki', revealPair.publicKey)));
+    const humanCommitResp = await fetch('/api/human/house/commit', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ commit: humanCommit, revealPub: humanRevealPub })
+    });
+    const humanCommitBody = await humanCommitResp.json().catch(() => ({}));
+
+    const revealTool = await api.agentTownCeremonyReveal({ teamCode });
+    const materialResp = await fetch(`/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`, {
+      credentials: 'include'
+    });
+    const agentMaterial = await materialResp.json().catch(() => ({}));
+    const humanMaterialResp = await fetch('/api/human/house/material', {
+      credentials: 'include'
+    });
+    const humanMaterial = await humanMaterialResp.json().catch(() => ({}));
+
+    return {
+      teamCode,
+      revealBeforeCommit,
+      commitTool,
+      humanCommitBody,
+      revealTool,
+      agentMaterial,
+      humanMaterial
+    };
+  });
+
+  expect(summary?.teamCode).toMatch(/^TEAM-/);
+  expect(summary?.revealBeforeCommit?.ok).toBe(false);
+  expect(summary?.revealBeforeCommit?.error?.code).toBe('CEREMONY_NOT_COMMITTED');
+
+  expect(summary?.commitTool?.ok).toBe(true);
+  expect(summary?.commitTool?.data?.commit || '').toMatch(/^[A-Za-z0-9+/=]+$/);
+  expect(summary?.commitTool?.data?.revealPub || '').toMatch(/^[A-Za-z0-9+/=]+$/);
+
+  expect(summary?.humanCommitBody?.ok).toBe(true);
+  expect(summary?.revealTool?.ok).toBe(true);
+  expect(summary?.agentMaterial?.ok).toBe(true);
+  expect(summary?.agentMaterial?.agentCommit).toBe(summary?.commitTool?.data?.commit);
+  expect(summary?.humanMaterial?.ok).toBe(true);
+  expect(summary?.humanMaterial?.agentRevealSealed?.alg).toBe('CEREMONY_E2EE_P256_AESGCM_V1');
+});
+
+test('agent-town ceremony commit is idempotent per team and random across team reset', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    const stateAResp = await fetch('/api/state', { credentials: 'include' });
+    const stateA = await stateAResp.json().catch(() => ({}));
+    const teamA = String(stateA?.teamCode || '').trim();
+
+    const first = await api.agentTownCeremonyCommit({ teamCode: teamA });
+    const second = await api.agentTownCeremonyCommit({ teamCode: teamA });
+
+    const resetResp = await fetch('/api/session/reset', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const reset = await resetResp.json().catch(() => ({}));
+    const teamB = String(reset?.teamCode || '').trim();
+
+    const third = await api.agentTownCeremonyCommit({ teamCode: teamB });
+    return { teamA, teamB, first, second, third };
+  });
+
+  expect(summary?.teamA).toMatch(/^TEAM-/);
+  expect(summary?.teamB).toMatch(/^TEAM-/);
+  expect(summary?.teamB).not.toBe(summary?.teamA);
+
+  expect(summary?.first?.ok).toBe(true);
+  expect(summary?.second?.ok).toBe(true);
+  expect(summary?.third?.ok).toBe(true);
+
+  const firstCommit = summary?.first?.data?.commit || '';
+  const secondCommit = summary?.second?.data?.commit || '';
+  const thirdCommit = summary?.third?.data?.commit || '';
+  const firstRevealPub = summary?.first?.data?.revealPub || '';
+  const secondRevealPub = summary?.second?.data?.revealPub || '';
+  const thirdRevealPub = summary?.third?.data?.revealPub || '';
+
+  expect(firstCommit).toMatch(/^[A-Za-z0-9+/=]+$/);
+  expect(firstRevealPub).toMatch(/^[A-Za-z0-9+/=]+$/);
+
+  // Same team: idempotent commit/reveal identity.
+  expect(secondCommit).toBe(firstCommit);
+  expect(secondRevealPub).toBe(firstRevealPub);
+
+  // New team: fresh random ceremony material.
+  expect(thirdCommit).not.toBe(firstCommit);
+  expect(thirdRevealPub).not.toBe(firstRevealPub);
+});
+
 test('approval requests render in index flow and can be rejected', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('agentTown:panel:minimized', '0');
