@@ -23,7 +23,7 @@
 
   <div class="row two" style="gap:10px;">
     <div>
-      <label class="small" for="townhallHumanPrompt">Human avatar prompt</label>
+      <label class="small" for="townhallHumanPrompt">Human avatar prompt (required, exact prompt used)</label>
       <textarea id="townhallHumanPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the human avatar"></textarea>
       <label class="small" for="townhallHumanImage" style="margin-top:8px; display:block;">Human avatar image (optional upload)</label>
       <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
@@ -33,7 +33,7 @@
       </div>
     </div>
     <div>
-      <label class="small" for="townhallAgentPrompt">Agent avatar prompt</label>
+      <label class="small" for="townhallAgentPrompt">Agent avatar prompt (required, exact prompt used)</label>
       <textarea id="townhallAgentPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the agent avatar"></textarea>
       <label class="small" for="townhallAgentImage" style="margin-top:8px; display:block;">Agent avatar image (optional upload)</label>
       <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
@@ -46,23 +46,27 @@
 
   <div class="divider"></div>
 
-  <div class="row two" style="gap:10px;">
-    <div>
-      <label class="small" for="townhallEvmErcId">ERC-8004 ID (Sepolia)</label>
-      <input id="townhallEvmErcId" type="text" maxlength="160" placeholder="11155111:123" />
-      <label class="small" for="townhallEvmTxHash" style="margin-top:8px; display:block;">Sepolia tx hash (optional)</label>
-      <input id="townhallEvmTxHash" type="text" maxlength="200" placeholder="0x..." />
+  <div class="townhallMintChecklist" id="townhallMintChecklist">
+    <div class="townhallMintChecklistRow">
+      <span>User is registering on Ethereum</span>
+      <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
     </div>
-    <div>
-      <label class="small" for="townhallSolanaErcId">ERC-8004 ID (Solana devnet)</label>
-      <input id="townhallSolanaErcId" type="text" maxlength="160" placeholder="solana:asset" />
-      <label class="small" for="townhallSolanaTxSig" style="margin-top:8px; display:block;">Solana tx signature (optional)</label>
-      <input id="townhallSolanaTxSig" type="text" maxlength="200" placeholder="signature..." />
+    <div class="townhallMintChecklistRow">
+      <span>User is registering on Solana</span>
+      <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
+    </div>
+    <div class="townhallMintChecklistRow">
+      <span>Agent is registering on Ethereum</span>
+      <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
+    </div>
+    <div class="townhallMintChecklistRow">
+      <span>Agent is registering on Solana</span>
+      <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
     </div>
   </div>
 
   <div class="kv" style="margin-top:10px;">
-    <button class="btn primary" id="townhallRegisterBtn" data-testid="townhall-register-btn">Save registration</button>
+    <button class="btn primary" id="townhallRegisterBtn" data-testid="townhall-register-btn">Mint all 4 ERC-8004 identities</button>
     <span class="pill" id="townhallRegisterState">Not registered</span>
   </div>
   <div class="small" id="townhallRegisterStatus" style="margin-top:8px; color: var(--muted);"></div>

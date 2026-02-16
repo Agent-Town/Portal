@@ -13,6 +13,9 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "8004-solana": "github:QuantuLabs/8004-solana-ts",
+    "agent0-sdk": "^1.5.3",
     "ethers": "^6.16.0",
     "express": "^4.19.2"
   },

@@ -781,6 +781,22 @@ const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/elizaos-sheriff.png';
 const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/openclaw-sheriff.png';
 const DEFAULT_TOWNHALL_HUMAN_PROMPT = "Stylized 3D third-person game character concept: a gender-neutral, race-neutral wild west wizard known as a 'Promptmancer' with a friendly, approachable silhouette and expressive eyes.";
 const DEFAULT_TOWNHALL_AGENT_PROMPT = 'Stylized 3D prairie pup avatar doing a cute hat-tip emote with a wholesome mascot vibe in a cozy wild west frontier style.';
+const PINATA_JWT = String(process.env.PINATA_JWT || process.env.ERC8004_PINATA_JWT || '').trim();
+const INFURA_PROJECT_ID = String(process.env.INFURA_ID || process.env.INFURA_PROJECT_ID || '').trim();
+const EVM_ERC8004_CHAIN_ID_RAW = Number(process.env.EVM_ERC8004_CHAIN_ID || 11155111);
+const EVM_ERC8004_CHAIN_ID = Number.isFinite(EVM_ERC8004_CHAIN_ID_RAW) && EVM_ERC8004_CHAIN_ID_RAW > 0
+  ? Math.floor(EVM_ERC8004_CHAIN_ID_RAW)
+  : 11155111;
+const EVM_ERC8004_RPC_URL = String(
+  process.env.EVM_ERC8004_RPC_URL
+  || (INFURA_PROJECT_ID ? `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}` : '')
+).trim();
+const EVM_ERC8004_NETWORK = String(process.env.EVM_ERC8004_NETWORK || 'sepolia').trim().toLowerCase();
+const SOLANA_ERC8004_CLUSTER = String(process.env.SOLANA_ERC8004_CLUSTER || 'devnet').trim().toLowerCase();
+const SOLANA_ERC8004_RPC_URL = String(process.env.SOLANA_ERC8004_RPC_URL || 'https://api.devnet.solana.com').trim();
+const TOWNHALL_MINT_ENABLED = parseBoolEnv(process.env.TOWNHALL_MINT_ENABLED, true);
+const AG0_SDK_MODULE_URL = String(process.env.AG0_SDK_MODULE_URL || 'https://esm.sh/agent0-sdk@1.5.3?bundle').trim();
+const SOLANA_WEB3_MODULE_URL = String(process.env.SOLANA_WEB3_MODULE_URL || 'https://esm.sh/@solana/web3.js@1.98.4?bundle').trim();
 
 const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
 const PRIVY_SCRIPT_SRC_DEFAULT = [
@@ -1219,6 +1235,66 @@ function normalizeTownhallPrompt(value) {
   return trimmed.slice(0, MAX_TOWNHALL_PROMPT_CHARS);
 }
 
+function normalizeTownhallMintSubject(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.trim().toLowerCase();
+  if (cleaned === 'human' || cleaned === 'user') return 'human';
+  if (cleaned === 'agent') return 'agent';
+  return null;
+}
+
+function normalizeTownhallEvmIdentityState(raw, fallback = null) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const fb = fallback && typeof fallback === 'object' ? fallback : {};
+  const id = typeof input.id === 'string'
+    ? input.id
+    : typeof fb.id === 'string'
+      ? fb.id
+      : null;
+  const chain = typeof input.chain === 'string' && input.chain.trim()
+    ? input.chain
+    : typeof fb.chain === 'string' && fb.chain.trim()
+      ? fb.chain
+      : 'sepolia';
+  const txHash = typeof input.txHash === 'string'
+    ? input.txHash
+    : typeof fb.txHash === 'string'
+      ? fb.txHash
+      : null;
+  const updatedAt = typeof input.updatedAt === 'string'
+    ? input.updatedAt
+    : typeof fb.updatedAt === 'string'
+      ? fb.updatedAt
+      : null;
+  return { id, chain, txHash, updatedAt };
+}
+
+function normalizeTownhallSolanaIdentityState(raw, fallback = null) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const fb = fallback && typeof fallback === 'object' ? fallback : {};
+  const id = typeof input.id === 'string'
+    ? input.id
+    : typeof fb.id === 'string'
+      ? fb.id
+      : null;
+  const cluster = typeof input.cluster === 'string' && input.cluster.trim()
+    ? input.cluster
+    : typeof fb.cluster === 'string' && fb.cluster.trim()
+      ? fb.cluster
+      : 'devnet';
+  const txSig = typeof input.txSig === 'string'
+    ? input.txSig
+    : typeof fb.txSig === 'string'
+      ? fb.txSig
+      : null;
+  const updatedAt = typeof input.updatedAt === 'string'
+    ? input.updatedAt
+    : typeof fb.updatedAt === 'string'
+      ? fb.updatedAt
+      : null;
+  return { id, cluster, txSig, updatedAt };
+}
+
 function parseTownhallImageDataUrl(dataUrl) {
   if (dataUrl == null || dataUrl === '') return { dataUrl: null };
   if (typeof dataUrl !== 'string') return { error: 'INVALID_TOWNHALL_IMAGE' };
@@ -1234,6 +1310,224 @@ function parseTownhallImageDataUrl(dataUrl) {
   if (!bytes || bytes.length === 0) return { error: 'INVALID_TOWNHALL_IMAGE' };
   if (bytes.length > MAX_TOWNHALL_IMAGE_BYTES) return { error: 'TOWNHALL_IMAGE_TOO_LARGE' };
   return { dataUrl };
+}
+
+function inferDataUrlMime(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp));base64,/);
+  return match ? match[1] : null;
+}
+
+function townhallMintCapabilities() {
+  const pinataEnabled = !!PINATA_JWT;
+  const evmEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!EVM_ERC8004_RPC_URL;
+  const solanaEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!SOLANA_ERC8004_RPC_URL;
+  return {
+    enabled: TOWNHALL_MINT_ENABLED,
+    pinataEnabled,
+    evmEnabled,
+    solanaEnabled
+  };
+}
+
+function normalizeTownhallMintProfile(profileInput, onboarding) {
+  const profile = profileInput && typeof profileInput === 'object' ? profileInput : {};
+  const existingProfile = onboarding?.profile && typeof onboarding.profile === 'object' ? onboarding.profile : {};
+  const existingHumanAvatar = existingProfile.humanAvatar && typeof existingProfile.humanAvatar === 'object'
+    ? existingProfile.humanAvatar
+    : {};
+  const existingAgentAvatar = existingProfile.agentAvatar && typeof existingProfile.agentAvatar === 'object'
+    ? existingProfile.agentAvatar
+    : {};
+
+  const humanName = normalizeTownhallName(profile.humanName || existingProfile.humanName || '');
+  const agentName = normalizeTownhallName(profile.agentName || existingProfile.agentName || '');
+  if (!humanName) return { error: 'MISSING_HUMAN_NAME' };
+  if (!agentName) return { error: 'MISSING_AGENT_NAME' };
+
+  const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
+  const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
+
+  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt || existingHumanAvatar.prompt || '');
+  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt || existingAgentAvatar.prompt || '');
+  if (!humanPrompt) return { error: 'MISSING_HUMAN_AVATAR_PROMPT' };
+  if (!agentPrompt) return { error: 'MISSING_AGENT_AVATAR_PROMPT' };
+
+  let humanImage = existingHumanAvatar.image || DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  let agentImage = existingAgentAvatar.image || DEFAULT_TOWNHALL_AGENT_IMAGE;
+  let humanSource = existingHumanAvatar.source === 'upload' ? 'upload' : 'default';
+  let agentSource = existingAgentAvatar.source === 'upload' ? 'upload' : 'default';
+
+  if (Object.prototype.hasOwnProperty.call(humanAvatarInput, 'image')) {
+    const parsedHuman = parseTownhallImageDataUrl(humanAvatarInput.image);
+    if (parsedHuman.error) return { error: parsedHuman.error };
+    if (parsedHuman.dataUrl) {
+      humanImage = parsedHuman.dataUrl;
+      humanSource = 'upload';
+    } else {
+      humanImage = DEFAULT_TOWNHALL_HUMAN_IMAGE;
+      humanSource = 'default';
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(agentAvatarInput, 'image')) {
+    const parsedAgent = parseTownhallImageDataUrl(agentAvatarInput.image);
+    if (parsedAgent.error) return { error: parsedAgent.error };
+    if (parsedAgent.dataUrl) {
+      agentImage = parsedAgent.dataUrl;
+      agentSource = 'upload';
+    } else {
+      agentImage = DEFAULT_TOWNHALL_AGENT_IMAGE;
+      agentSource = 'default';
+    }
+  }
+
+  return {
+    profile: {
+      humanName,
+      agentName,
+      humanAvatar: {
+        image: humanImage,
+        prompt: humanPrompt,
+        source: humanSource
+      },
+      agentAvatar: {
+        image: agentImage,
+        prompt: agentPrompt,
+        source: agentSource
+      }
+    }
+  };
+}
+
+function buildTownhallMintMetadata({
+  profile,
+  chain,
+  walletAddress,
+  origin,
+  subject = 'agent'
+}) {
+  const mintSubject = normalizeTownhallMintSubject(subject) || 'agent';
+  const isHumanSubject = mintSubject === 'human';
+  const humanAvatar = profile?.humanAvatar || {};
+  const agentAvatar = profile?.agentAvatar || {};
+  const humanImage = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
+    ? humanAvatar.image
+    : DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  const agentImage = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
+    ? agentAvatar.image
+    : DEFAULT_TOWNHALL_AGENT_IMAGE;
+  const subjectImage = isHumanSubject ? humanImage : agentImage;
+  const subjectName = isHumanSubject ? profile.humanName : profile.agentName;
+  const subjectPrompt = isHumanSubject ? humanAvatar.prompt : agentAvatar.prompt;
+  const subjectLabel = isHumanSubject ? 'human' : 'agent';
+
+  const attributes = [
+    { trait_type: 'subject', value: subjectLabel },
+    { trait_type: 'subject_name', value: subjectName },
+    { trait_type: 'human_name', value: profile.humanName },
+    { trait_type: 'agent_name', value: profile.agentName },
+    { trait_type: 'chain', value: chain },
+    ...(walletAddress ? [{ trait_type: 'wallet', value: walletAddress }] : [])
+  ];
+
+  return {
+    name: `${subjectName} (${subjectLabel})`,
+    description: `Agent Town ${subjectLabel} onboarding identity record.`,
+    image: subjectImage,
+    external_url: `${origin}/app`,
+    attributes,
+    properties: {
+      version: 2,
+      kind: 'agent-town-onboarding',
+      subject: subjectLabel,
+      subjectName,
+      subjectPrompt: subjectPrompt || null,
+      chain,
+      avatars: {
+        human: {
+          image: humanImage,
+          mime: inferDataUrlMime(humanImage) || null,
+          prompt: humanAvatar.prompt || null,
+          source: humanAvatar.source || 'default'
+        },
+        agent: {
+          image: agentImage,
+          mime: inferDataUrlMime(agentImage) || null,
+          prompt: agentAvatar.prompt || null,
+          source: agentAvatar.source || 'default'
+        }
+      },
+      walletAddress: walletAddress || null,
+      createdAt: nowIso()
+    }
+  };
+}
+
+async function pinJsonToIpfs(content, { name = 'agent-town-registration' } = {}) {
+  if (!PINATA_JWT) {
+    const err = new Error('PINATA_NOT_CONFIGURED');
+    err.code = 'PINATA_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const resp = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${PINATA_JWT}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      pinataOptions: { cidVersion: 1 },
+      pinataMetadata: { name },
+      pinataContent: content
+    })
+  });
+
+  let payload = null;
+  try {
+    payload = await resp.json();
+  } catch {
+    payload = null;
+  }
+  if (!resp.ok) {
+    const err = new Error('PINATA_UPLOAD_FAILED');
+    err.code = 'PINATA_UPLOAD_FAILED';
+    err.status = resp.status;
+    err.detail = payload;
+    throw err;
+  }
+  const cid = typeof payload?.IpfsHash === 'string' ? payload.IpfsHash.trim() : '';
+  if (!cid) {
+    const err = new Error('PINATA_UPLOAD_FAILED');
+    err.code = 'PINATA_UPLOAD_FAILED';
+    throw err;
+  }
+  return cid;
+}
+
+let cachedSolanaSdkModulePromise = null;
+function loadSolanaSdkModule() {
+  if (!cachedSolanaSdkModulePromise) {
+    cachedSolanaSdkModulePromise = import('8004-solana')
+      .catch((err) => {
+        cachedSolanaSdkModulePromise = null;
+        throw err;
+      });
+  }
+  return cachedSolanaSdkModulePromise;
+}
+
+let cachedSolanaWeb3ModulePromise = null;
+function loadSolanaWeb3Module() {
+  if (!cachedSolanaWeb3ModulePromise) {
+    cachedSolanaWeb3ModulePromise = import('@solana/web3.js')
+      .catch((err) => {
+        cachedSolanaWeb3ModulePromise = null;
+        throw err;
+      });
+  }
+  return cachedSolanaWeb3ModulePromise;
 }
 
 function ensureSessionOnboarding(session) {
@@ -1276,20 +1570,35 @@ function ensureSessionOnboarding(session) {
   agentAvatar.updatedAt = typeof agentAvatar.updatedAt === 'string' ? agentAvatar.updatedAt : null;
 
   if (!onboarding.erc8004 || typeof onboarding.erc8004 !== 'object') onboarding.erc8004 = {};
-  if (!onboarding.erc8004.evm || typeof onboarding.erc8004.evm !== 'object') onboarding.erc8004.evm = {};
-  if (!onboarding.erc8004.solana || typeof onboarding.erc8004.solana !== 'object') onboarding.erc8004.solana = {};
+  const erc8004 = onboarding.erc8004;
 
-  const evm = onboarding.erc8004.evm;
-  const solana = onboarding.erc8004.solana;
-  evm.id = typeof evm.id === 'string' ? evm.id : null;
-  evm.chain = typeof evm.chain === 'string' && evm.chain.trim() ? evm.chain : 'sepolia';
-  evm.txHash = typeof evm.txHash === 'string' ? evm.txHash : null;
-  evm.updatedAt = typeof evm.updatedAt === 'string' ? evm.updatedAt : null;
+  const legacyEvm = normalizeTownhallEvmIdentityState(erc8004.evm);
+  const legacySolana = normalizeTownhallSolanaIdentityState(erc8004.solana);
 
-  solana.id = typeof solana.id === 'string' ? solana.id : null;
-  solana.cluster = typeof solana.cluster === 'string' && solana.cluster.trim() ? solana.cluster : 'devnet';
-  solana.txSig = typeof solana.txSig === 'string' ? solana.txSig : null;
-  solana.updatedAt = typeof solana.updatedAt === 'string' ? solana.updatedAt : null;
+  if (!erc8004.user || typeof erc8004.user !== 'object') erc8004.user = {};
+  if (!erc8004.agent || typeof erc8004.agent !== 'object') erc8004.agent = {};
+
+  let userEvm = normalizeTownhallEvmIdentityState(erc8004.user.evm);
+  let userSolana = normalizeTownhallSolanaIdentityState(erc8004.user.solana);
+  let agentEvm = normalizeTownhallEvmIdentityState(erc8004.agent.evm);
+  let agentSolana = normalizeTownhallSolanaIdentityState(erc8004.agent.solana);
+
+  if (!agentEvm.id && legacyEvm.id) {
+    agentEvm = normalizeTownhallEvmIdentityState(agentEvm, legacyEvm);
+  }
+  if (!agentSolana.id && legacySolana.id) {
+    agentSolana = normalizeTownhallSolanaIdentityState(agentSolana, legacySolana);
+  }
+
+  erc8004.user.evm = userEvm;
+  erc8004.user.solana = userSolana;
+  erc8004.agent.evm = agentEvm;
+  erc8004.agent.solana = agentSolana;
+
+  const summaryEvm = agentEvm.id ? agentEvm : userEvm;
+  const summarySolana = agentSolana.id ? agentSolana : userSolana;
+  erc8004.evm = normalizeTownhallEvmIdentityState(summaryEvm);
+  erc8004.solana = normalizeTownhallSolanaIdentityState(summarySolana);
 
   return onboarding;
 }
@@ -1635,6 +1944,183 @@ app.get('/api/townhall/state', (req, res) => {
   });
 });
 
+app.get('/api/townhall/mint/config', (_req, res) => {
+  const caps = townhallMintCapabilities();
+  res.json({
+    ok: true,
+    mint: {
+      enabled: caps.enabled,
+      pinataEnabled: caps.pinataEnabled,
+      evm: {
+        enabled: caps.evmEnabled,
+        chainId: EVM_ERC8004_CHAIN_ID,
+        network: EVM_ERC8004_NETWORK,
+        rpcUrl: EVM_ERC8004_RPC_URL || null,
+        sdkModuleUrl: AG0_SDK_MODULE_URL || null
+      },
+      solana: {
+        enabled: caps.solanaEnabled,
+        cluster: SOLANA_ERC8004_CLUSTER,
+        rpcUrl: SOLANA_ERC8004_RPC_URL || null,
+        web3ModuleUrl: SOLANA_WEB3_MODULE_URL || null
+      }
+    }
+  });
+});
+
+app.post('/api/townhall/mint/evm/prepare', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.pinataEnabled) return res.status(503).json({ ok: false, error: 'PINATA_NOT_CONFIGURED' });
+  if (!caps.evmEnabled) return res.status(503).json({ ok: false, error: 'MINT_EVM_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = walletInput ? normalizeEvmAddress(walletInput) : null;
+  if (walletInput && !walletAddress) return res.status(400).json({ ok: false, error: 'INVALID_EVM_ADDRESS' });
+
+  const normalized = normalizeTownhallMintProfile(req.body?.profile, onboarding);
+  if (normalized.error) return res.status(400).json({ ok: false, error: normalized.error });
+  const subject = normalizeTownhallMintSubject(req.body?.subject || 'agent');
+  if (!subject) return res.status(400).json({ ok: false, error: 'INVALID_MINT_SUBJECT' });
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const metadata = buildTownhallMintMetadata({
+    profile: normalized.profile,
+    chain: `evm:${EVM_ERC8004_NETWORK}`,
+    walletAddress,
+    origin,
+    subject
+  });
+  const subjectName = subject === 'human' ? normalized.profile.humanName : normalized.profile.agentName;
+  const subjectSlug = subjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || subject;
+
+  try {
+    const cid = await pinJsonToIpfs(metadata, {
+      name: `agent-town-evm-${subject}-${subjectSlug}`
+    });
+    return res.json({
+      ok: true,
+      tokenUri: `ipfs://${cid}`,
+      metadataCid: cid,
+      subject,
+      evm: {
+        chainId: EVM_ERC8004_CHAIN_ID,
+        network: EVM_ERC8004_NETWORK,
+        rpcUrl: EVM_ERC8004_RPC_URL || null
+      }
+    });
+  } catch (err) {
+    const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
+    const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
+    return res.status(status).json({ ok: false, error: code });
+  }
+});
+
+app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.pinataEnabled) return res.status(503).json({ ok: false, error: 'PINATA_NOT_CONFIGURED' });
+  if (!caps.solanaEnabled) return res.status(503).json({ ok: false, error: 'MINT_SOLANA_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = normalizeSolanaAddress(walletInput);
+  if (!walletAddress) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ADDRESS' });
+
+  const assetInput = typeof req.body?.assetPubkey === 'string' ? req.body.assetPubkey.trim() : '';
+  const assetPubkey = normalizeSolanaAddress(assetInput);
+  if (!assetPubkey) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ASSET_PUBKEY' });
+
+  const normalized = normalizeTownhallMintProfile(req.body?.profile, onboarding);
+  if (normalized.error) return res.status(400).json({ ok: false, error: normalized.error });
+  const subject = normalizeTownhallMintSubject(req.body?.subject || 'agent');
+  if (!subject) return res.status(400).json({ ok: false, error: 'INVALID_MINT_SUBJECT' });
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const metadata = buildTownhallMintMetadata({
+    profile: normalized.profile,
+    chain: `solana:${SOLANA_ERC8004_CLUSTER}`,
+    walletAddress,
+    origin,
+    subject
+  });
+  const subjectName = subject === 'human' ? normalized.profile.humanName : normalized.profile.agentName;
+  const subjectSlug = subjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || subject;
+
+  let tokenUri = '';
+  let metadataCid = '';
+  try {
+    metadataCid = await pinJsonToIpfs(metadata, {
+      name: `agent-town-solana-${subject}-${subjectSlug}`
+    });
+    tokenUri = `ipfs://${metadataCid}`;
+  } catch (err) {
+    const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
+    const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
+    return res.status(status).json({ ok: false, error: code });
+  }
+
+  try {
+    const [{ SolanaSDK }, { PublicKey }] = await Promise.all([
+      loadSolanaSdkModule(),
+      loadSolanaWeb3Module()
+    ]);
+    const sdk = new SolanaSDK({
+      cluster: SOLANA_ERC8004_CLUSTER,
+      rpcUrl: SOLANA_ERC8004_RPC_URL
+    });
+    const prepared = await sdk.registerAgent(
+      tokenUri,
+      undefined,
+      {
+        skipSend: true,
+        signer: new PublicKey(walletAddress),
+        assetPubkey: new PublicKey(assetPubkey),
+        atomEnabled: false
+      }
+    );
+
+    if (!prepared || typeof prepared !== 'object') {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+    if ('success' in prepared && prepared.success === false) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED', detail: prepared.error || null });
+    }
+    if (typeof prepared.transaction !== 'string' || !prepared.transaction.trim()) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+
+    const preparedAsset = prepared.asset && typeof prepared.asset.toBase58 === 'function'
+      ? prepared.asset.toBase58()
+      : assetPubkey;
+
+    return res.json({
+      ok: true,
+      tokenUri,
+      metadataCid,
+      subject,
+      erc8004Id: `solana:${preparedAsset}`,
+      prepared: {
+        transaction: prepared.transaction,
+        blockhash: prepared.blockhash,
+        lastValidBlockHeight: prepared.lastValidBlockHeight,
+        signer: prepared.signer,
+        signed: prepared.signed === true
+      },
+      solana: {
+        cluster: SOLANA_ERC8004_CLUSTER,
+        rpcUrl: SOLANA_ERC8004_RPC_URL,
+        assetPubkey: preparedAsset
+      }
+    });
+  } catch (err) {
+    return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED', detail: String(err?.message || err) });
+  }
+});
+
 app.post('/api/townhall/register', (req, res) => {
   const s = ensureHumanSession(req, res);
   const onboarding = ensureSessionOnboarding(s);
@@ -1683,17 +2169,31 @@ app.post('/api/townhall/register', (req, res) => {
     }
   }
 
-  const evmId = normalizeTownhallErcId(erc?.evm?.id);
-  const solanaId = normalizeTownhallErcId(erc?.solana?.id);
-  if (!evmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_EVM_ID' });
-  if (!solanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_SOLANA_ID' });
+  const userEvmId = normalizeTownhallErcId(erc?.user?.evm?.id);
+  const userSolanaId = normalizeTownhallErcId(erc?.user?.solana?.id);
+  const agentEvmId = normalizeTownhallErcId(erc?.agent?.evm?.id || erc?.evm?.id);
+  const agentSolanaId = normalizeTownhallErcId(erc?.agent?.solana?.id || erc?.solana?.id);
+  if (!userEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_EVM_ID' });
+  if (!userSolanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_SOLANA_ID' });
+  if (!agentEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_AGENT_EVM_ID' });
+  if (!agentSolanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_AGENT_SOLANA_ID' });
 
-  const evmChain = typeof erc?.evm?.chain === 'string' && erc.evm.chain.trim()
-    ? erc.evm.chain.trim().toLowerCase()
+  const userEvmChain = typeof erc?.user?.evm?.chain === 'string' && erc.user.evm.chain.trim()
+    ? erc.user.evm.chain.trim().toLowerCase()
     : 'sepolia';
-  const solanaCluster = typeof erc?.solana?.cluster === 'string' && erc.solana.cluster.trim()
-    ? erc.solana.cluster.trim().toLowerCase()
+  const userSolanaCluster = typeof erc?.user?.solana?.cluster === 'string' && erc.user.solana.cluster.trim()
+    ? erc.user.solana.cluster.trim().toLowerCase()
     : 'devnet';
+  const agentEvmChain = typeof erc?.agent?.evm?.chain === 'string' && erc.agent.evm.chain.trim()
+    ? erc.agent.evm.chain.trim().toLowerCase()
+    : typeof erc?.evm?.chain === 'string' && erc.evm.chain.trim()
+      ? erc.evm.chain.trim().toLowerCase()
+      : 'sepolia';
+  const agentSolanaCluster = typeof erc?.agent?.solana?.cluster === 'string' && erc.agent.solana.cluster.trim()
+    ? erc.agent.solana.cluster.trim().toLowerCase()
+    : typeof erc?.solana?.cluster === 'string' && erc.solana.cluster.trim()
+      ? erc.solana.cluster.trim().toLowerCase()
+      : 'devnet';
 
   onboarding.profile = onboarding.profile || {};
   onboarding.profile.humanName = humanName;
@@ -1711,18 +2211,48 @@ app.post('/api/townhall/register', (req, res) => {
     updatedAt: nowIso()
   };
 
+  const updatedAt = nowIso();
   onboarding.erc8004 = onboarding.erc8004 || {};
+  onboarding.erc8004.user = {
+    evm: {
+      id: userEvmId,
+      chain: userEvmChain,
+      txHash: normalizeTownhallTxRef(erc?.user?.evm?.txHash),
+      updatedAt
+    },
+    solana: {
+      id: userSolanaId,
+      cluster: userSolanaCluster,
+      txSig: normalizeTownhallTxRef(erc?.user?.solana?.txSig),
+      updatedAt
+    }
+  };
+  onboarding.erc8004.agent = {
+    evm: {
+      id: agentEvmId,
+      chain: agentEvmChain,
+      txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash || erc?.evm?.txHash),
+      updatedAt
+    },
+    solana: {
+      id: agentSolanaId,
+      cluster: agentSolanaCluster,
+      txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig || erc?.solana?.txSig),
+      updatedAt
+    }
+  };
+  // Legacy compatibility: keep summary fields for older clients.
   onboarding.erc8004.evm = {
-    id: evmId,
-    chain: evmChain,
-    txHash: normalizeTownhallTxRef(erc?.evm?.txHash),
-    updatedAt: nowIso()
+    id: agentEvmId,
+    chain: agentEvmChain,
+    txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash || erc?.evm?.txHash),
+    updatedAt
   };
   onboarding.erc8004.solana = {
-    id: solanaId,
-    cluster: solanaCluster,
-    txSig: normalizeTownhallTxRef(erc?.solana?.txSig),
-    updatedAt: nowIso()
+    id: agentSolanaId,
+    cluster: agentSolanaCluster,
+    txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig || erc?.solana?.txSig),
+    updatedAt
   };
 
   onboarding.registrationComplete = true;

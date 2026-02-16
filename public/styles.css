@@ -969,6 +969,27 @@ body.district-modal-open {
   gap: 10px;
 }
 
+.townhallMintChecklist {
+  display: grid;
+  gap: 8px;
+}
+
+.townhallMintChecklistRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 2px solid rgba(44, 69, 99, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 248, 230, 0.72);
+}
+
+.townhallMintChecklistRow .pill {
+  min-width: 128px;
+  text-align: center;
+}
+
 .card {
   border: 3px solid var(--border);
   border-radius: 12px;
@@ -1392,6 +1413,15 @@ footer::before {
 
   .kv {
     gap: 6px;
+  }
+
+  .townhallMintChecklistRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .townhallMintChecklistRow .pill {
+    min-width: 0;
   }
 
   .topbar .kv,

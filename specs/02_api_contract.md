@@ -112,8 +112,11 @@ Includes:
   - `registrationComplete` (boolean)
   - `profile.humanName`, `profile.agentName`
   - `profile.humanAvatar` / `profile.agentAvatar` (`image`, `prompt`, `source`, `updatedAt`)
-  - `erc8004.evm` (`id`, `chain`, `txHash`, `updatedAt`)
-  - `erc8004.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+  - `erc8004.user.evm` (`id`, `chain`, `txHash`, `updatedAt`)
+  - `erc8004.user.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+  - `erc8004.agent.evm` (`id`, `chain`, `txHash`, `updatedAt`)
+  - `erc8004.agent.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+  - `erc8004.evm` / `erc8004.solana` (legacy summary aliases; mirrors agent entries)
 
 ### GET `/api/townhall/state` (human)
 Returns Town Hall onboarding state for the current session.
@@ -131,6 +134,126 @@ Response shape:
 }
 ```
 
+### GET `/api/townhall/mint/config` (human)
+Returns live-mint feature/config flags for Town Hall.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "mint": {
+    "enabled": true,
+    "pinataEnabled": true,
+    "evm": {
+      "enabled": true,
+      "chainId": 11155111,
+      "network": "sepolia",
+      "rpcUrl": "https://sepolia.infura.io/v3/...",
+      "sdkModuleUrl": "https://esm.sh/agent0-sdk@1.5.3?bundle"
+    },
+    "solana": {
+      "enabled": true,
+      "cluster": "devnet",
+      "rpcUrl": "https://api.devnet.solana.com",
+      "web3ModuleUrl": "https://esm.sh/@solana/web3.js@1.98.4?bundle"
+    }
+  }
+}
+```
+
+### POST `/api/townhall/mint/evm/prepare` (human)
+Pins Town Hall metadata to IPFS and returns `tokenUri` + EVM mint settings.
+Frontend wallet performs the actual Sepolia transaction and remains owner.
+
+Body:
+```json
+{
+  "walletAddress": "0x...",
+  "subject": "human",
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  }
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "tokenUri": "ipfs://bafy...",
+  "metadataCid": "bafy...",
+  "subject": "human",
+  "evm": {
+    "chainId": 11155111,
+    "network": "sepolia",
+    "rpcUrl": "https://sepolia.infura.io/v3/..."
+  }
+}
+```
+
+### POST `/api/townhall/mint/solana/prepare` (human)
+Pins Town Hall metadata to IPFS and returns an unsigned prepared Solana transaction.
+Frontend wallet signs/sends the transaction and remains owner.
+
+Body:
+```json
+{
+  "walletAddress": "<solana base58>",
+  "assetPubkey": "<solana base58>",
+  "subject": "agent",
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  }
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "tokenUri": "ipfs://bafy...",
+  "metadataCid": "bafy...",
+  "subject": "agent",
+  "erc8004Id": "solana:<asset>",
+  "prepared": {
+    "transaction": "<base64 unsigned tx>",
+    "blockhash": "...",
+    "lastValidBlockHeight": 12345,
+    "signer": "<solana base58>",
+    "signed": false
+  },
+  "solana": {
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "assetPubkey": "<solana base58>"
+  }
+}
+```
+
+Errors (prepare endpoints):
+- `MINT_DISABLED`
+- `PINATA_NOT_CONFIGURED`
+- `MINT_EVM_NOT_CONFIGURED`
+- `MINT_SOLANA_NOT_CONFIGURED`
+- `MISSING_HUMAN_NAME`
+- `MISSING_AGENT_NAME`
+- `MISSING_HUMAN_AVATAR_PROMPT`
+- `MISSING_AGENT_AVATAR_PROMPT`
+- `INVALID_TOWNHALL_IMAGE`
+- `TOWNHALL_IMAGE_TOO_LARGE`
+- `INVALID_EVM_ADDRESS` (EVM prepare only)
+- `INVALID_MINT_SUBJECT`
+- `MISSING_SOLANA_ADDRESS` (Solana prepare only)
+- `MISSING_SOLANA_ASSET_PUBKEY` (Solana prepare only)
+- `PINATA_UPLOAD_FAILED`
+- `SOLANA_PREPARE_FAILED` (Solana prepare only)
+
 ### POST `/api/townhall/register` (human)
 Saves Town Hall registration metadata and marks registration complete.
 
@@ -144,8 +267,14 @@ Body:
     "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
   },
   "erc8004": {
-    "evm": { "id": "11155111:123", "chain": "sepolia", "txHash": "0x..." },
-    "solana": { "id": "solana:asset...", "cluster": "devnet", "txSig": "..." }
+    "user": {
+      "evm": { "id": "11155111:123", "chain": "sepolia", "txHash": "0x..." },
+      "solana": { "id": "solana:userAsset...", "cluster": "devnet", "txSig": "..." }
+    },
+    "agent": {
+      "evm": { "id": "11155111:124", "chain": "sepolia", "txHash": "0x..." },
+      "solana": { "id": "solana:agentAsset...", "cluster": "devnet", "txSig": "..." }
+    }
   }
 }
 ```
@@ -155,8 +284,10 @@ Errors:
 - `MISSING_AGENT_NAME`
 - `MISSING_HUMAN_AVATAR_PROMPT`
 - `MISSING_AGENT_AVATAR_PROMPT`
-- `MISSING_ERC8004_EVM_ID`
-- `MISSING_ERC8004_SOLANA_ID`
+- `MISSING_ERC8004_USER_EVM_ID`
+- `MISSING_ERC8004_USER_SOLANA_ID`
+- `MISSING_ERC8004_AGENT_EVM_ID`
+- `MISSING_ERC8004_AGENT_SOLANA_ID`
 - `INVALID_TOWNHALL_IMAGE`
 - `TOWNHALL_IMAGE_TOO_LARGE`
 

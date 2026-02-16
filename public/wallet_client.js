@@ -213,6 +213,7 @@
     }
 
     getProvider({ chain = CHAIN_EVM } = {}) {
+      if (chain === CHAIN_SOLANA) return this.solanaProvider || null;
       if (chain !== CHAIN_EVM) throw new Error('UNSUPPORTED_CHAIN');
       if (this.evmProvider) return this.evmProvider;
       const bridge = this._bridge();
