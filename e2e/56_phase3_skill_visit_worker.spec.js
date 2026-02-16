@@ -12,6 +12,20 @@ async function waitForLiteTestApi(page) {
   });
 }
 
+function sortSkillImportPaths(paths = []) {
+  return [...(Array.isArray(paths) ? paths : [])].sort((a, b) => {
+    const left = String(a || '');
+    const right = String(b || '');
+    const leftFolded = left.toLowerCase();
+    const rightFolded = right.toLowerCase();
+    if (leftFolded < rightFolded) return -1;
+    if (leftFolded > rightFolded) return 1;
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  });
+}
+
 test('visit imports portal skill and writes compatibility mirrors', async ({ page }) => {
   await page.goto('/?liteDriver=phase1');
   await waitForLiteTestApi(page);
@@ -52,6 +66,32 @@ test('visit imports portal skill and writes compatibility mirrors', async ({ pag
   expect(files.lower.data?.content || '').toBe(files.upper.data?.content || '');
   expect(files.siteUpper.data?.content || '').toBe(files.upper.data?.content || '');
   expect(files.siteLower.data?.content || '').toBe(files.upper.data?.content || '');
+});
+
+test('system prompt exposes available_skills without inline SKILL context injection', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const preview = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    await api.visitExperience({ url: '/skill.md' });
+    return await api.systemPromptPreview();
+  });
+
+  expect(preview?.ok).toBe(true);
+  const systemPrompt = String(preview?.data?.systemPrompt || '');
+  const skillsPrompt = String(preview?.data?.skillsPrompt || '');
+  const contextFilePaths = Array.isArray(preview?.data?.contextFilePaths)
+    ? preview.data.contextFilePaths.map((path) => String(path || '').toLowerCase())
+    : [];
+
+  expect(systemPrompt).toContain('## Skills (mandatory)');
+  expect(systemPrompt).toContain('<available_skills>');
+  expect(skillsPrompt).toContain('<available_skills>');
+  expect(skillsPrompt).toContain('<location>');
+  expect(systemPrompt).not.toContain('## SKILL.md');
+  expect(systemPrompt).not.toContain('## skill.md');
+  expect(contextFilePaths).not.toContain('skill.md');
 });
 
 test('visit imports same-origin companion files for a skill package', async ({ page }) => {
@@ -109,6 +149,50 @@ test('visit imports same-origin companion files for a skill package', async ({ p
   expect(summary?.skillState?.data?.status).toBe('ready');
   expect(summary?.skillState?.data?.sourceUrl || '').toContain('/fixtures/skill-pack/skill.md');
   expect(Number(summary?.skillState?.data?.lastImportedAtMs || 0)).toBeGreaterThan(0);
+});
+
+test('repeat visit keeps deterministic imported metadata ordering', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    const first = await api.visitExperience({ url: '/fixtures/skill-pack/skill.md' });
+    const second = await api.visitExperience({ url: '/fixtures/skill-pack/skill.md' });
+    const skillState = await api.skillState();
+    const siteKey = String(window.location.host || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+    const expectedSkillPath = `workspace/skills/${siteKey}/fixtures/skill-pack/skill.md`;
+    return { first, second, skillState, expectedSkillPath };
+  });
+
+  expect(summary?.first?.ok).toBe(true);
+  expect(summary?.second?.ok).toBe(true);
+  expect(summary?.skillState?.ok).toBe(true);
+
+  const firstPaths = Array.isArray(summary?.first?.data?.importedPaths) ? summary.first.data.importedPaths : [];
+  const secondPaths = Array.isArray(summary?.second?.data?.importedPaths) ? summary.second.data.importedPaths : [];
+  const sortedSecondPaths = sortSkillImportPaths(secondPaths);
+  expect(secondPaths).toEqual(firstPaths);
+  expect(secondPaths).toEqual(sortedSecondPaths);
+
+  const stateFiles = Array.isArray(summary?.skillState?.data?.importedFiles) ? summary.skillState.data.importedFiles : [];
+  const secondFiles = Array.isArray(summary?.second?.data?.importedFiles) ? summary.second.data.importedFiles : [];
+  expect(stateFiles.length).toBeGreaterThan(0);
+  expect(secondFiles.map((entry) => String(entry?.path || ''))).toEqual(
+    stateFiles.map((entry) => String(entry?.path || ''))
+  );
+
+  const statePaths = stateFiles.map((entry) => String(entry?.path || ''));
+  const sortedStatePaths = sortSkillImportPaths(statePaths);
+  expect(statePaths).toEqual(sortedStatePaths);
+  expect(stateFiles.every((entry) => Object.prototype.hasOwnProperty.call(entry || {}, 'etag'))).toBe(true);
+  expect(stateFiles.every((entry) => Object.prototype.hasOwnProperty.call(entry || {}, 'lastModified'))).toBe(true);
+  expect(stateFiles.every((entry) => typeof entry?.sha256B64 === 'string' && entry.sha256B64.length > 0)).toBe(true);
+
+  const skillEntry = stateFiles.find((entry) => String(entry?.path || '') === String(summary?.expectedSkillPath || ''));
+  expect(skillEntry).toBeTruthy();
+  expect(String(skillEntry?.finalUrl || '')).toContain('/fixtures/skill-pack/skill.md');
+  expect(String(skillEntry?.sha256B64 || '')).toMatch(/^[A-Za-z0-9+/=]+$/);
 });
 
 test('experience dry-run resolves uppercase workspace files', async ({ page }) => {

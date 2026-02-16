@@ -83,8 +83,82 @@ function normalizeSkillRunMode(value) {
   return raw || null;
 }
 
-function skillImportSnapshot({ importedPathLimit = 200 } = {}) {
+function normalizeSkillImportPath(value) {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\\/g, "/");
+  if (!normalized.startsWith("workspace/")) return "";
+  return normalized;
+}
+
+function skillImportPathSort(a, b) {
+  const aFolded = String(a || "").toLowerCase();
+  const bFolded = String(b || "").toLowerCase();
+  if (aFolded < bFolded) return -1;
+  if (aFolded > bFolded) return 1;
+  const aRaw = String(a || "");
+  const bRaw = String(b || "");
+  if (aRaw < bRaw) return -1;
+  if (aRaw > bRaw) return 1;
+  return 0;
+}
+
+function normalizeSkillImportPaths(values, { limit = 500 } = {}) {
+  const max = Math.max(0, Math.floor(Number(limit) || 0));
+  const byPath = new Map();
+  for (const value of Array.isArray(values) ? values : []) {
+    const path = normalizeSkillImportPath(value);
+    if (!path) continue;
+    byPath.set(path, path);
+  }
+  return Array.from(byPath.values()).sort(skillImportPathSort).slice(0, max);
+}
+
+function normalizeSkillImportMetadataText(value) {
+  const raw = String(value || "").trim();
+  return raw || null;
+}
+
+function normalizeSkillImportHash(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  return /^[A-Za-z0-9+/=]+$/.test(raw) ? raw : null;
+}
+
+function normalizeSkillImportFileEntry(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const path = normalizeSkillImportPath(value.path);
+  if (!path) return null;
+  return {
+    path,
+    sourceUrl: normalizeSkillImportMetadataText(value.sourceUrl),
+    finalUrl: normalizeSkillImportMetadataText(value.finalUrl),
+    etag: normalizeSkillImportMetadataText(value.etag),
+    lastModified: normalizeSkillImportMetadataText(value.lastModified),
+    sha256B64: normalizeSkillImportHash(value.sha256B64),
+  };
+}
+
+function normalizeSkillImportFiles(values, { limit = 500 } = {}) {
+  const max = Math.max(0, Math.floor(Number(limit) || 0));
+  const byPath = new Map();
+  for (const value of Array.isArray(values) ? values : []) {
+    const normalized = normalizeSkillImportFileEntry(value);
+    if (!normalized) continue;
+    byPath.set(normalized.path, normalized);
+  }
+  return Array.from(byPath.values())
+    .sort((a, b) => skillImportPathSort(a.path, b.path))
+    .slice(0, max);
+}
+
+function skillImportSnapshot({ importedPathLimit = 200, importedFileLimit = importedPathLimit } = {}) {
   const pathLimit = Math.max(0, Math.floor(Number(importedPathLimit) || 0));
+  const fileLimit = Math.max(0, Math.floor(Number(importedFileLimit) || 0));
+  const normalizedFiles = normalizeSkillImportFiles(state.skillImport.importedFiles, { limit: Math.max(fileLimit, pathLimit) });
+  const importedPaths = normalizedFiles.length > 0
+    ? normalizedFiles.map((entry) => entry.path).slice(0, pathLimit)
+    : normalizeSkillImportPaths(state.skillImport.importedPaths, { limit: pathLimit });
   return {
     status: normalizeSkillImportStatus(state.skillImport.status),
     sourceUrl:
@@ -122,12 +196,8 @@ function skillImportSnapshot({ importedPathLimit = 200 } = {}) {
     lastRunDurationMs: Number.isFinite(Number(state.skillImport.lastRunDurationMs))
       ? Number(state.skillImport.lastRunDurationMs)
       : null,
-    importedPaths: Array.isArray(state.skillImport.importedPaths)
-      ? state.skillImport.importedPaths
-        .map((p) => (typeof p === "string" ? p : ""))
-        .filter(Boolean)
-        .slice(0, pathLimit)
-      : [],
+    importedPaths,
+    importedFiles: normalizedFiles.slice(0, fileLimit),
   };
 }
 
@@ -2207,8 +2277,6 @@ const WORKSPACE_CONTEXT_FILE_ORDER = Object.freeze([
   "workspace/BOOTSTRAP.md",
   "workspace/MEMORY.md",
   "workspace/memory.md",
-  "workspace/SKILL.md",
-  "workspace/skill.md",
   "workspace/GOALS.md",
   "workspace/PENALTY.md",
 ]);
@@ -2257,6 +2325,112 @@ function trimWorkspaceContextContent(content, fileName, maxChars = WORKSPACE_CON
     originalLength: trimmed.length,
     maxChars,
   };
+}
+
+function escapeXmlForPrompt(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+function normalizeSkillPromptCandidatePath(path) {
+  const raw = String(path || "").trim().replace(/\\/g, "/");
+  if (!raw || !raw.startsWith("workspace/")) return "";
+  if (!/\/skill\.md$/i.test(raw)) return "";
+  return raw;
+}
+
+function parseSkillFrontmatterValue(content, key) {
+  const text = String(content || "");
+  const frontmatterMatch = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!frontmatterMatch) return "";
+  const frontmatter = String(frontmatterMatch[1] || "");
+  const lineMatch = frontmatter.match(new RegExp(`^\\s*${key}\\s*:\\s*(.+)$`, "im"));
+  if (!lineMatch || typeof lineMatch[1] !== "string") return "";
+  const raw = lineMatch[1].trim();
+  if (!raw) return "";
+  if (
+    (raw.startsWith("\"") && raw.endsWith("\"") && raw.length >= 2)
+    || (raw.startsWith("'") && raw.endsWith("'") && raw.length >= 2)
+  ) {
+    return raw.slice(1, -1).trim();
+  }
+  return raw;
+}
+
+function inferSkillNameFromPath(path) {
+  const normalized = String(path || "").trim().replace(/\\/g, "/");
+  if (!normalized) return "skill";
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length === 0) return "skill";
+  const last = String(parts[parts.length - 1] || "").trim().toLowerCase();
+  if (last === "skill.md" || last === "skill") {
+    const parent = String(parts[parts.length - 2] || "").trim();
+    return parent || "skill";
+  }
+  return String(parts[parts.length - 1] || "skill").trim() || "skill";
+}
+
+function collectSkillPromptCandidatePaths() {
+  const out = [];
+  const seen = new Set();
+  const pushPath = (value) => {
+    const next = normalizeSkillPromptCandidatePath(value);
+    if (!next) return;
+    const folded = next.toLowerCase();
+    if (seen.has(folded)) return;
+    seen.add(folded);
+    out.push(next);
+  };
+
+  pushPath(state.skillImport.activeSkillPath);
+  for (const file of Array.isArray(state.skillImport.importedFiles) ? state.skillImport.importedFiles : []) {
+    pushPath(file?.path);
+  }
+  for (const path of Array.isArray(state.skillImport.importedPaths) ? state.skillImport.importedPaths : []) {
+    pushPath(path);
+  }
+  pushPath("workspace/SKILL.md");
+  pushPath("workspace/skill.md");
+  return out;
+}
+
+async function buildLiteSkillsPrompt() {
+  const candidates = collectSkillPromptCandidatePaths();
+  if (!candidates.length) return "";
+
+  const entries = [];
+  for (const path of candidates) {
+    const content = await vfsGetUtf8(path);
+    if (content === null) continue;
+    const rawName = parseSkillFrontmatterValue(content, "name");
+    const rawDescription = parseSkillFrontmatterValue(content, "description");
+    const name = (rawName || inferSkillNameFromPath(path)).trim() || "skill";
+    const description = (rawDescription || `Skill instructions at ${path}`).trim() || `Skill instructions at ${path}`;
+    entries.push({ name, description, location: path });
+    if (entries.length >= 16) break;
+  }
+
+  if (!entries.length) return "";
+  const lines = [
+    "The following skills provide specialized instructions for specific tasks.",
+    "Use the workspace_read_file tool to load a skill's file when the task matches its description.",
+    "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md).",
+    "",
+    "<available_skills>",
+  ];
+  for (const entry of entries) {
+    lines.push("  <skill>");
+    lines.push(`    <name>${escapeXmlForPrompt(entry.name)}</name>`);
+    lines.push(`    <description>${escapeXmlForPrompt(entry.description)}</description>`);
+    lines.push(`    <location>${escapeXmlForPrompt(entry.location)}</location>`);
+    lines.push("  </skill>");
+  }
+  lines.push("</available_skills>");
+  return lines.join("\n");
 }
 
 async function buildWorkspaceContextFiles() {
@@ -2456,6 +2630,7 @@ function buildLiteAgentSystemPrompt(params) {
     ? runtimeInfo.capabilities.map((cap) => String(cap || "").trim()).filter(Boolean)
     : [];
   const contextFiles = Array.isArray(params.contextFiles) ? params.contextFiles : [];
+  const skillsPrompt = String(params.skillsPrompt || "").trim();
   const validContextFiles = contextFiles.filter(
     (file) => file && typeof file.path === "string" && String(file.path).trim().length > 0,
   );
@@ -2483,6 +2658,18 @@ function buildLiteAgentSystemPrompt(params) {
     "Keep narration brief and value-dense; avoid repeating obvious steps.",
     "Use plain human language for narration unless in a technical context.",
     "",
+    ...(skillsPrompt
+      ? [
+        "## Skills (mandatory)",
+        "Before replying: scan <available_skills> <description> entries.",
+        "- If exactly one skill clearly applies: read its SKILL.md at <location> with `workspace_read_file`, then follow it.",
+        "- If multiple could apply: choose the most specific one, then read/follow it.",
+        "- If none clearly apply: do not read any SKILL.md.",
+        "Constraints: never read more than one skill up front; only read after selecting.",
+        skillsPrompt,
+        "",
+      ]
+      : []),
     "## Safety",
     "You have no independent goals: do not pursue self-preservation, replication, resource acquisition, or power-seeking; avoid long-term plans beyond the user's request.",
     "Prioritize safety and human oversight over completion; if instructions conflict, pause and ask; comply with stop/pause/audit requests and never bypass safeguards. (Inspired by Anthropic's constitution.)",
@@ -2540,7 +2727,7 @@ function buildLiteAgentSystemPrompt(params) {
   return lines.filter(Boolean).join("\n");
 }
 
-function buildLiteSystemPrompt({ model, tools, contextFiles }) {
+function buildLiteSystemPrompt({ model, tools, contextFiles, skillsPrompt = "" }) {
   return buildLiteAgentSystemPrompt({
     workspaceDir: "workspace/",
     defaultThinkLevel: state.llmReasoning || "off",
@@ -2550,7 +2737,29 @@ function buildLiteSystemPrompt({ model, tools, contextFiles }) {
     userTimezone: resolveWorkerTimezone(),
     runtimeInfo: buildLiteRuntimeInfo(model),
     contextFiles: Array.isArray(contextFiles) ? contextFiles : [],
+    skillsPrompt: String(skillsPrompt || ""),
   });
+}
+
+async function buildLitePromptPreview({ model, tools } = {}) {
+  const resolvedModel = model || getConfiguredModel();
+  const resolvedTools = Array.isArray(tools) ? tools : getLiteTools();
+  const workspacePrompt = await buildWorkspaceContextFiles();
+  const skillsPrompt = await buildLiteSkillsPrompt();
+  const systemPrompt = buildLiteSystemPrompt({
+    model: resolvedModel,
+    tools: resolvedTools,
+    contextFiles: workspacePrompt.contextFiles,
+    skillsPrompt,
+  });
+  return {
+    systemPrompt,
+    skillsPrompt,
+    contextFiles: workspacePrompt.contextFiles,
+    contextFilePaths: workspacePrompt.contextFiles.map((file) => String(file?.path || "")).filter(Boolean),
+    usedFiles: workspacePrompt.usedFiles,
+    truncatedFiles: workspacePrompt.truncatedFiles,
+  };
 }
 
 async function runAgentTurn(userText) {
@@ -2573,20 +2782,15 @@ async function runAgentTurn(userText) {
   }
 
   const tools = getLiteTools();
-  const workspacePrompt = await buildWorkspaceContextFiles();
-  if (workspacePrompt.usedFiles.length) {
+  const promptPreview = await buildLitePromptPreview({ model, tools });
+  if (promptPreview.usedFiles.length) {
     log(
-      `workspace prompt loaded files=${workspacePrompt.usedFiles.join(",")} truncated=${workspacePrompt.truncatedFiles.length > 0 ? "1" : "0"}`,
+      `workspace prompt loaded files=${promptPreview.usedFiles.join(",")} truncated=${promptPreview.truncatedFiles.length > 0 ? "1" : "0"}`,
     );
   } else {
     log("workspace prompt loaded no files");
   }
-
-  const systemPrompt = buildLiteSystemPrompt({
-    model,
-    tools,
-    contextFiles: workspacePrompt.contextFiles,
-  });
+  const systemPrompt = promptPreview.systemPrompt;
 
   const context = {
     systemPrompt,
@@ -3454,6 +3658,7 @@ async function runVisitImport(params, toolName = "visit_import") {
     state.skillImport.status = "failed";
     state.skillImport.lastError = "SKILL_NOT_FOUND";
     state.skillImport.importedPaths = [];
+    state.skillImport.importedFiles = [];
     state.skillImport.siteRoot = null;
     state.skillImport.activeSkillPath = null;
     await persistSkillImportState();
@@ -3471,9 +3676,29 @@ async function runVisitImport(params, toolName = "visit_import") {
   const siteRoot = buildSkillWorkspaceSiteRoot(primaryUrl);
   const activeSkillPath = `${siteRoot}SKILL.md`;
 
-  const importedPaths = [];
+  const importedFileByPath = new Map();
   const importedByBaseName = new Map();
   const failedUrls = [];
+  const normalizeFetchedImportMetadata = async ({ fetched, sourceUrl, finalUrl, content }) => ({
+    sourceUrl: normalizeSkillImportMetadataText(sourceUrl),
+    finalUrl: normalizeSkillImportMetadataText(finalUrl),
+    etag: normalizeSkillImportMetadataText(fetched?.data?.etag),
+    lastModified: normalizeSkillImportMetadataText(fetched?.data?.lastModified),
+    sha256B64: normalizeSkillImportHash(fetched?.data?.sha256B64) || (await sha256B64FromUtf8(content || "")),
+  });
+  const recordImportedFile = (path, metadata = {}) => {
+    const normalized = normalizeSkillImportFileEntry({ path, ...(metadata || {}) });
+    if (!normalized) return;
+    importedFileByPath.set(normalized.path, normalized);
+  };
+
+  const primaryMetadata = await normalizeFetchedImportMetadata({
+    fetched: primary,
+    sourceUrl: primaryUrl,
+    finalUrl: primaryUrl,
+    content: primaryContent,
+  });
+
   for (const url of companionUrls) {
     const fetched = url === primaryUrl
       ? primary
@@ -3489,6 +3714,12 @@ async function runVisitImport(params, toolName = "visit_import") {
     const finalUrl = String(fetched.data?.finalUrl || fetched.data?.url || url);
     const content = String(fetched.data?.text || "");
     const importPath = buildSkillWorkspaceImportPath(finalUrl);
+    const importMetadata = await normalizeFetchedImportMetadata({
+      fetched,
+      sourceUrl: url,
+      finalUrl,
+      content,
+    });
     const writeResult = await runWorkspaceWriteFile({ path: importPath, content }, "workspace_write_file");
     if (writeResult?.ok !== true) {
       failedUrls.push({
@@ -3498,35 +3729,44 @@ async function runVisitImport(params, toolName = "visit_import") {
       continue;
     }
 
-    importedPaths.push(importPath);
+    recordImportedFile(importPath, importMetadata);
     const baseName = importPath.split("/").pop() || "";
-    if (baseName) importedByBaseName.set(baseName.toLowerCase(), content);
+    if (baseName) importedByBaseName.set(baseName.toLowerCase(), { content, metadata: importMetadata });
   }
 
   const compatibilityWrites = new Map();
   const siteCompatibilityWrites = new Map();
-  compatibilityWrites.set("workspace/SKILL.md", primaryContent);
-  compatibilityWrites.set("workspace/skill.md", primaryContent);
-  siteCompatibilityWrites.set(`${siteRoot}SKILL.md`, primaryContent);
-  siteCompatibilityWrites.set(`${siteRoot}skill.md`, primaryContent);
-  for (const [baseName, content] of importedByBaseName.entries()) {
+  compatibilityWrites.set("workspace/SKILL.md", { content: primaryContent, metadata: primaryMetadata });
+  compatibilityWrites.set("workspace/skill.md", { content: primaryContent, metadata: primaryMetadata });
+  siteCompatibilityWrites.set(`${siteRoot}SKILL.md`, { content: primaryContent, metadata: primaryMetadata });
+  siteCompatibilityWrites.set(`${siteRoot}skill.md`, { content: primaryContent, metadata: primaryMetadata });
+  for (const [baseName, descriptor] of importedByBaseName.entries()) {
     if (!VISIT_COMPAT_BASENAMES.has(baseName)) continue;
-    compatibilityWrites.set(`workspace/${baseName}`, content);
-    siteCompatibilityWrites.set(`${siteRoot}${baseName}`, content);
+    compatibilityWrites.set(`workspace/${baseName}`, descriptor);
+    siteCompatibilityWrites.set(`${siteRoot}${baseName}`, descriptor);
     const upperName = uppercaseMdCompatibilityName(baseName);
     if (upperName) {
-      compatibilityWrites.set(`workspace/${upperName}`, content);
-      siteCompatibilityWrites.set(`${siteRoot}${upperName}`, content);
+      compatibilityWrites.set(`workspace/${upperName}`, descriptor);
+      siteCompatibilityWrites.set(`${siteRoot}${upperName}`, descriptor);
     }
   }
 
   const compatibilityAllWrites = new Map([...siteCompatibilityWrites.entries(), ...compatibilityWrites.entries()]);
-  for (const [path, content] of compatibilityAllWrites.entries()) {
+  for (const [path, descriptor] of compatibilityAllWrites.entries()) {
+    const content = typeof descriptor?.content === "string" ? descriptor.content : String(descriptor?.content || "");
+    const metadata = descriptor?.metadata || null;
     const writeResult = await runWorkspaceWriteFile({ path, content }, "workspace_write_file");
-    if (writeResult?.ok === true && !importedPaths.includes(path)) {
-      importedPaths.push(path);
+    if (writeResult?.ok === true) {
+      if (metadata) {
+        recordImportedFile(path, metadata);
+      } else {
+        recordImportedFile(path, { sha256B64: await sha256B64FromUtf8(content) });
+      }
     }
   }
+
+  const importedFiles = normalizeSkillImportFiles(Array.from(importedFileByPath.values()), { limit: 500 });
+  const importedPaths = importedFiles.map((entry) => entry.path);
 
   state.skillImport.status = "ready";
   state.skillImport.sourceUrl = primaryUrl;
@@ -3534,7 +3774,8 @@ async function runVisitImport(params, toolName = "visit_import") {
   state.skillImport.lastError = null;
   state.skillImport.siteRoot = siteRoot;
   state.skillImport.activeSkillPath = activeSkillPath;
-  state.skillImport.importedPaths = importedPaths.slice(0, 200);
+  state.skillImport.importedFiles = importedFiles;
+  state.skillImport.importedPaths = importedPaths.slice(0, 500);
   await persistSkillImportState();
   updateGatewayState();
 
@@ -3547,6 +3788,7 @@ async function runVisitImport(params, toolName = "visit_import") {
       siteRoot,
       activeSkillPath,
       importedPaths,
+      importedFiles,
       importedCount: importedPaths.length,
       failedUrls,
       attempted,
@@ -4254,6 +4496,7 @@ const state = {
     lastRunErrorMessage: null,
     lastRunDurationMs: null,
     importedPaths: [],
+    importedFiles: [],
   },
 };
 
@@ -4349,12 +4592,18 @@ async function loadStateFromIdb() {
     state.skillImport.lastRunDurationMs = Number.isFinite(Number(skillImportRaw.lastRunDurationMs))
       ? Number(skillImportRaw.lastRunDurationMs)
       : null;
-    state.skillImport.importedPaths = Array.isArray(skillImportRaw.importedPaths)
-      ? skillImportRaw.importedPaths
-        .map((p) => (typeof p === "string" ? p : ""))
-        .filter(Boolean)
-        .slice(0, 500)
-      : [];
+    const importedFiles = normalizeSkillImportFiles(skillImportRaw.importedFiles, { limit: 500 });
+    const importedPaths = normalizeSkillImportPaths(skillImportRaw.importedPaths, { limit: 500 });
+    if (importedFiles.length > 0) {
+      state.skillImport.importedFiles = importedFiles;
+      state.skillImport.importedPaths = importedFiles.map((entry) => entry.path).slice(0, 500);
+    } else {
+      state.skillImport.importedPaths = importedPaths;
+      state.skillImport.importedFiles = normalizeSkillImportFiles(
+        importedPaths.map((path) => ({ path })),
+        { limit: 500 },
+      );
+    }
   }
 
   await ensureWorkspaceFiles();
@@ -4904,6 +5153,26 @@ self.addEventListener("message", async (ev) => {
         requestId: String(msg.requestId || ""),
         ok: true,
         result: makeToolSuccess(skillImportSnapshot({ importedPathLimit: 500 })),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.systemPrompt.preview") {
+      const model = getConfiguredModel();
+      const tools = getLiteTools();
+      const preview = await buildLitePromptPreview({ model, tools });
+      post({
+        type: "worker.systemPrompt.preview",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess({
+          systemPrompt: preview.systemPrompt,
+          skillsPrompt: preview.skillsPrompt,
+          contextFiles: preview.contextFiles,
+          contextFilePaths: preview.contextFilePaths,
+          usedFiles: preview.usedFiles,
+          truncatedFiles: preview.truncatedFiles,
+        }),
       });
       return;
     }

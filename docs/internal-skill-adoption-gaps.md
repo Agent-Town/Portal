@@ -75,6 +75,16 @@ This document does not define final UX copy or marketing docs.
   - Upload parser accepts both legacy house backup ZIPs and OpenClaw export ZIPs.
   - `Store in house` / `Restore from house` remains the persisted encrypted path for full local-first continuity.
   - Test: `e2e/54_agent_state_backup_restore.spec.js` (`house backup stores encrypted state and supports ZIP download/upload restore`)
+- OpenClaw-style skills registry prompting is now wired in the Lite worker:
+  - Workspace context injection no longer inlines `workspace/SKILL.md` / `workspace/skill.md`.
+  - Worker builds `<available_skills>` prompt metadata from imported/default skill files.
+  - Added deterministic prompt preview bridge:
+    - `gateway.command.systemPrompt.preview` -> `worker.systemPrompt.preview`
+  - Test: `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`)
+- Skill import refresh/version metadata is now normalized and persisted:
+  - `skillImportV1` now stores deterministic `importedFiles` entries (`path`, `sourceUrl`, `finalUrl`, `etag`, `lastModified`, `sha256B64`) alongside `importedPaths`.
+  - Repeat visit imports produce stable path ordering and metadata snapshots.
+  - Test: `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat visit keeps deterministic imported metadata ordering`)
 - Agent-active readiness is now tied to skill import state:
   - Index status now treats OpenClaw Lite as not-ready when worker skill state is explicitly `failed`.
   - App auto-imports `/skill.md` after local connect (one-shot per team session) so users do not need a manual visit step.
@@ -194,25 +204,27 @@ This section captures the earlier analysis verbatim in normalized form, then map
   - Test websocket endpoint served only under `NODE_ENV=test`.
 - Impact: Production path remains `agent-turn` by design; ws mode is currently a harness-only compatibility lane.
 
-## G-005: No OpenClaw-like skills registry prompt behavior
+## G-005: OpenClaw-like skills registry prompt behavior (baseline addressed)
 
 - Type: Behavioral drift
 - Severity: Medium
-- Problem: Current Lite prompt injects workspace files directly; it does not provide a compact skills list and on-demand read flow equivalent to OpenClaw.
+- Problem: Historical behavior injected workspace files directly; baseline parity now uses `<available_skills>` metadata with on-demand skill reads.
 - Evidence:
-  - Lite context file injection path: `vendors/openclaw-lite-main/src/openclaw-lite/worker.js:1762`
-  - OpenClaw docs expect available-skills metadata and read-on-demand behavior.
-- Impact: Diverges from internet-standard OpenClaw skill behavior and scaling model.
+  - Lite prompt builder now emits `## Skills (mandatory)` with `<available_skills>` entries.
+  - Deterministic preview route exposes final prompt (`gateway.command.systemPrompt.preview`).
+  - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`).
+- Impact: Baseline OpenClaw prompting model is aligned; remaining work is edge-case parity for more complex multi-skill repos.
 
-## G-006: Remote skill multi-file conventions are not normalized
+## G-006: Remote skill multi-file conventions normalization (partially addressed)
 
 - Type: Missing feature
 - Severity: Medium
-- Problem: Discovery/import for linked `.md`/`.json` companions is implemented, but refresh/versioning and domain-specific conventions are not fully standardized yet.
+- Problem: Discovery/import for linked `.md`/`.json` companions is implemented and refresh metadata is now normalized, but domain-specific conventions are still evolving.
 - Evidence:
   - Companion parsing/import in worker (`collectSkillCompanionUrls`, `runVisitImport`).
-  - Fixture-backed coverage for `skill.md`, `heartbeat.md`, `rules.md`, `messaging.md`, `skill.json`.
-- Impact: Partial compatibility and brittle execution on third-party sites.
+  - Persisted `skillImportV1` now includes deterministic `importedFiles` metadata (`etag`/`lastModified`/`sha256B64`) and stable ordering across repeat imports.
+  - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat visit keeps deterministic imported metadata ordering`).
+- Impact: Refresh/version normalization baseline is in place; remaining compatibility risk is mainly external-domain convention variance.
 
 ## G-007: Approval UI dependency addressed in index flow
 

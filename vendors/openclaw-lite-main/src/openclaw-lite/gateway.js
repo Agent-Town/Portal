@@ -1075,6 +1075,14 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "SKILL_STATE_FAILED"));
       return res.result || null;
     },
+    async systemPromptPreview() {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.systemPrompt.preview",
+        responseType: "worker.systemPrompt.preview",
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "SYSTEM_PROMPT_PREVIEW_FAILED"));
+      return res.result || null;
+    },
     async webmcpDiscover(params = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.webmcp.discover",

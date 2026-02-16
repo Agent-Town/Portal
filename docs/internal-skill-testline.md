@@ -34,6 +34,7 @@ Keep `skill.md` evolution testable as we:
 | Home-page co-op unlock/open contract without deterministic shims | `e2e/helpers/phase2.js`, `server/index.js` | helper attempts real `experienceRun` turns first, then uses explicit `/api/agent/select` + `/api/agent/open/press` actions for deterministic contract coverage when external LLM runs are unavailable | `e2e/02_match_unlock.spec.js` (`agent can connect and match the human sigil via co-op API`), `e2e/36_phase1_lite_agent_sigil_match.spec.js` (`human sigil choice is matched by co-op agent action and unlocks open button`), `e2e/37_phase1_lite_agent_open_press.spec.js` (`open press completes signup with co-op agent action and navigates to /create`), `e2e/43_phase2_vendor_sigil_match.spec.js` (`sigil unlock is driven by co-op agent-select action`), `e2e/44_phase2_vendor_open_press.spec.js` (`open transition is completed by co-op agent open-press action`) |
 | Visit imports real skill package | `public/app.js`, `public/skill.md` | `gateway.command.visit` -> worker import pipeline | `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports portal skill and writes compatibility mirrors`) |
 | Website-scoped skill workspace layout | worker visit importer | canonical storage under `workspace/skills/<site>/...` plus active-site resolution | `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports portal skill and writes compatibility mirrors`) |
+| OpenClaw-style skills registry prompt contract | worker prompt builder + gateway/worker preview bridge | `runAgentTurn` prompt path emits `<available_skills>` metadata and no longer injects `SKILL.md` as workspace context; test API uses `gateway.command.systemPrompt.preview` | `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`) |
 | `SKILL.md` / `skill.md` compatibility resolution | worker experience resolver | dry-run resolution path for uppercase/lowercase files | `e2e/56_phase3_skill_visit_worker.spec.js` (`experience dry-run resolves uppercase workspace files`) |
 | Skill-only experience compatibility | worker experience resolver | `SKILL.md` is required, `HEARTBEAT/GOALS/TOOLS/PENALTY` are optional | `e2e/56_phase3_skill_visit_worker.spec.js` (`experience dry-run succeeds with SKILL-only workspace`) |
 | Non-dry-run experience execution path | worker experience resolver | default run path is local `agent-turn` (not test websocket) | `e2e/56_phase3_skill_visit_worker.spec.js` (`experience run defaults to local agent-turn path (no test ws dependency)`) |
@@ -43,6 +44,7 @@ Keep `skill.md` evolution testable as we:
 | Agent Town ceremony randomness + idempotency contract | worker ceremony state keyed by `teamCode` | repeated commit on same team is idempotent; session-rotated/new team commit yields fresh random entropy and key material | `e2e/56_phase3_skill_visit_worker.spec.js` (`agent-town ceremony commit is idempotent per team and random across team reset`) |
 | Create-page ceremony completion under real co-op API routes | `public/create.js`, `server/index.js` | regression path drives human+agent commit/reveal through `/api/human/house/*` + `/api/agent/house/*` without deterministic runtime bridge shortcuts | `e2e/38_phase1_create_ceremony_regression.spec.js` (`create flow preserves ceremony + house generation and keeps house-auth meta access`) |
 | Same-origin multi-file companion import | worker visit importer (`collectSkillCompanionUrls`) | imports linked `.md`/`.json` files into `workspace/skills/<site>/...` and compatibility mirrors | `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports same-origin companion files for a skill package`) |
+| Skill import refresh/version metadata normalization | worker visit importer + persisted `skillImportV1` snapshot | stores deterministic per-file metadata (`path`, `sourceUrl`, `finalUrl`, `etag`, `lastModified`, `sha256B64`) and stable ordering across repeat imports | `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat visit keeps deterministic imported metadata ordering`) |
 | `web_fetch` cross-origin proxy fallback | worker `runWebFetch` + server `/api/tools/web_fetch` | direct browser fetch failure falls back to session-gated proxy | `e2e/56_phase3_skill_visit_worker.spec.js` (`web_fetch falls back to proxy for cross-origin loopback alias`) |
 | Skill run diagnostics (`lastRun*`) | worker `experience_engine_run` + persisted `skillImportV1` metadata | stores `lastRunMode`, `lastRunOk`, `lastRunErrorCode`, `lastRunErrorMessage`, timing metadata | `e2e/56_phase3_skill_visit_worker.spec.js` (`skill diagnostics persist last experience run failure details`) |
 | Index approval UX compatibility | `public/index.html` + gateway approval bridge | index flow renders approval queue and allows deterministic approve/reject without worker deadlock | `e2e/56_phase3_skill_visit_worker.spec.js` (`approval requests render in index flow and can be rejected`) |
@@ -62,6 +64,8 @@ Keep `skill.md` evolution testable as we:
 - Added deterministic contract coverage for ceremony idempotency vs randomness boundaries (stable per team, fresh across team/session reset).
 - Removed deterministic phase2 runtime monkeypatch helper (`e2e/helpers/phase2.js`) and completed the legacy regression rewrite onto explicit co-op API contracts (`e2e/02`, `e2e/36`, `e2e/37`, `e2e/38`, `e2e/43`, `e2e/44`).
 - Added fixture-driven multi-file import coverage (`skill.md` + linked `heartbeat.md`, `rules.md`, `messaging.md`, `skill.json`).
+- Added OpenClaw-style prompt contract coverage for `<available_skills>` with deterministic prompt-preview assertions (no inline `SKILL.md` context injection).
+- Added repeat-import metadata normalization coverage for persisted `importedFiles` ordering/hash/header metadata (`etag`/`lastModified`/`sha256B64`).
 - Added deterministic coverage for `web_fetch` direct-to-proxy fallback under cross-origin loopback alias.
 - Added persisted skill run diagnostics coverage via `skillState` test API.
 - Added deterministic websocket workflow coverage for `experienceRun({ transport: 'ws' })`.
@@ -74,8 +78,8 @@ Keep `skill.md` evolution testable as we:
 ## Next Planned Expansions
 
 1. Portal skill/worker parity:
-- Add tests for `SKILL.md` vs `skill.md` workspace resolution.
-- Add tests for real import/visit activation and truthful “agent active” state.
+- Add multi-skill selection tests (most-specific skill selection and single upfront skill read constraint).
+- Add prompt-preview regression checks for imported-skill ordering when multiple skill files are present.
 
 2. Moltbook multi-file package:
 - Expand fixture coverage to a Moltbook-shaped package contract (naming + required action semantics).
