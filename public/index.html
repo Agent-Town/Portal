@@ -274,22 +274,49 @@
       </div>
 
       <div class="sidebar-content">
-        <div id="chatTranscript" class="chat-box sidebar-chat"></div>
+        <div class="agent-split">
+          <section class="agent-pane agent-pane-left" data-testid="agent-chat-pane">
+            <div id="chatTranscript" class="chat-box sidebar-chat"></div>
 
-        <div class="chat-input-area">
-          <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
-          <button id="sendChatBtn" class="btn primary small">Send</button>
-          <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
+            <div class="chat-input-area">
+              <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
+              <button id="sendChatBtn" class="btn primary small">Send</button>
+              <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
+            </div>
+
+            <div id="approvalsPanel" class="agent-approvals is-hidden" data-testid="approvals-panel">
+              <div class="approvals-header">Approvals</div>
+              <div id="approvals" class="approvals-box" data-testid="approvals"></div>
+            </div>
+          </section>
+
+          <section class="agent-pane agent-pane-right" data-testid="agent-debug-pane">
+            <div class="agent-debug-toolbar">
+              <div class="agent-debug-tabs" role="tablist" aria-label="Agent debug views">
+                <button class="btn small agent-debug-tab is-active" id="agentDebugTabTools" type="button" data-debug-tab="tools" data-testid="agent-debug-tab-tools">Worker Tools</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabSkill" type="button" data-debug-tab="skill" data-testid="agent-debug-tab-skill">Skill Context</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabTraffic" type="button" data-debug-tab="traffic" data-testid="agent-debug-tab-traffic">Worker Traffic</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabSession" type="button" data-debug-tab="session" data-testid="agent-debug-tab-session">Session Context</button>
+              </div>
+              <button class="btn small" id="agentDebugRefreshBtn" type="button">Refresh</button>
+            </div>
+
+            <div class="agent-debug-panels">
+              <div class="agent-debug-panel" id="agentDebugPanelTools" data-debug-panel="tools" data-testid="agent-debug-panel-tools">
+                <pre class="agent-debug-content" id="agentDebugTools" data-testid="agent-debug-tools"></pre>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelSkill" data-debug-panel="skill" data-testid="agent-debug-panel-skill">
+                <pre class="agent-debug-content" id="agentDebugSkill" data-testid="agent-debug-skill"></pre>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelTraffic" data-debug-panel="traffic" data-testid="agent-debug-panel-traffic">
+                <pre class="agent-debug-content" id="agentDebugTraffic" data-testid="agent-debug-traffic"></pre>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelSession" data-debug-panel="session" data-testid="agent-debug-panel-session">
+                <pre class="agent-debug-content" id="agentDebugSession" data-testid="agent-debug-session"></pre>
+              </div>
+            </div>
+          </section>
         </div>
-
-        <div id="approvalsPanel" class="agent-approvals is-hidden" data-testid="approvals-panel">
-          <div class="approvals-header">Approvals</div>
-          <div id="approvals" class="approvals-box" data-testid="approvals"></div>
-        </div>
-
-        <div class="divider"></div>
-        <div class="logs-header">System Logs</div>
-        <div id="agentLogs" class="logs-box sidebar-logs"></div>
       </div>
     </div>
   </div>

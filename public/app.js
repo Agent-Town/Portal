@@ -1,11 +1,42 @@
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -69,6 +100,19 @@ let liteSkillLoopInFlight = false;
 let liteSkillLoopBackoffMs = 1000;
 let liteSkillLoopLastRunAtMs = 0;
 let liteSkillLoopTeamCode = '';
+let townPanelUnlocked = false;
+let pendingHumanSigilSelection = null;
+const AGENT_DEBUG_REFRESH_MS = 2200;
+const AGENT_DEBUG_EVENT_LIMIT = 160;
+const AGENT_DEBUG_TRAFFIC_LIMIT = 220;
+const AGENT_DEBUG_TRAFFIC_LINE_MAX = 1600;
+let agentDebugActiveTab = 'tools';
+let agentDebugRefreshTimer = null;
+let agentDebugRefreshInFlight = false;
+let agentDebugRefreshQueued = false;
+const agentDebugEvents = [];
+const agentDebugTraffic = [];
+let agentDebugTrafficMuteDepth = 0;
 
 function b64(bytes) {
   let bin = '';
@@ -177,6 +221,385 @@ function setLiteLlmStatus(text) {
   node.textContent = text || '';
 }
 
+function safeJsonParse(raw, fallback = null) {
+  try {
+    return JSON.parse(String(raw || ''));
+  } catch {
+    return fallback;
+  }
+}
+
+function decodePromptXml(text) {
+  return String(text || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, '\'')
+    .replace(/&amp;/g, '&');
+}
+
+function parseAvailableSkills(skillsPrompt) {
+  const prompt = String(skillsPrompt || '');
+  if (!prompt) return [];
+  const out = [];
+  const skillRegex = /<skill>\s*<name>([\s\S]*?)<\/name>\s*<description>([\s\S]*?)<\/description>\s*<location>([\s\S]*?)<\/location>\s*<\/skill>/gi;
+  let match = null;
+  while ((match = skillRegex.exec(prompt)) !== null) {
+    const name = decodePromptXml(match[1]).trim();
+    const description = decodePromptXml(match[2]).trim();
+    const location = decodePromptXml(match[3]).trim();
+    out.push({ name, description, location });
+  }
+  return out;
+}
+
+function pushAgentDebugEvent(text) {
+  const line = String(text || '').trim();
+  if (!line) return;
+  const stamp = new Date().toISOString();
+  agentDebugEvents.push(`[${stamp}] ${line}`);
+  if (agentDebugEvents.length > AGENT_DEBUG_EVENT_LIMIT) {
+    agentDebugEvents.splice(0, agentDebugEvents.length - AGENT_DEBUG_EVENT_LIMIT);
+  }
+}
+
+function agentDebugEventsTail(max = 20) {
+  return agentDebugEvents.slice(Math.max(0, agentDebugEvents.length - max));
+}
+
+function maskTrafficSecret(raw) {
+  const text = String(raw || '');
+  if (!text) return '[redacted]';
+  if (text.length <= 8) return '[redacted]';
+  return `${text.slice(0, 4)}…${text.slice(-3)} [redacted]`;
+}
+
+function sanitizeAgentTrafficValue(value, depth = 0, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value;
+  if (depth > 4) return '[max-depth]';
+
+  const type = typeof value;
+  if (type === 'string') {
+    if (value.length <= 360) return value;
+    return `${value.slice(0, 360)}…(truncated ${value.length - 360} chars)`;
+  }
+  if (type === 'number' || type === 'boolean') return value;
+  if (type === 'bigint') return String(value);
+
+  if (Array.isArray(value)) {
+    const slice = value.slice(0, 30).map((entry) => sanitizeAgentTrafficValue(entry, depth + 1, seen));
+    if (value.length > slice.length) {
+      slice.push(`[${value.length - slice.length} more]`);
+    }
+    return slice;
+  }
+
+  if (type === 'object') {
+    if (value instanceof Error) {
+      return {
+        name: String(value.name || 'Error'),
+        message: String(value.message || ''),
+      };
+    }
+    if (seen.has(value)) return '[circular]';
+    seen.add(value);
+
+    const out = {};
+    const entries = Object.entries(value);
+    const maxKeys = Math.min(entries.length, 40);
+    for (let i = 0; i < maxKeys; i += 1) {
+      const [rawKey, rawVal] = entries[i];
+      const key = String(rawKey || '');
+      if (!key) continue;
+      if (/(api[_-]?key|token|secret|password|credential|authorization)/i.test(key)) {
+        out[key] = maskTrafficSecret(rawVal);
+        continue;
+      }
+      out[key] = sanitizeAgentTrafficValue(rawVal, depth + 1, seen);
+    }
+    if (entries.length > maxKeys) {
+      out.__truncatedKeys = entries.length - maxKeys;
+    }
+    return out;
+  }
+
+  return String(value);
+}
+
+function pushAgentDebugTraffic(direction, channel, payload) {
+  if (agentDebugTrafficMuteDepth > 0) return;
+  const dir = String(direction || '').trim().toLowerCase() === 'in' ? 'IN' : 'OUT';
+  const target = String(channel || '').trim() || 'unknown';
+  const stamp = new Date().toISOString();
+  let suffix = '';
+  if (payload !== undefined) {
+    try {
+      suffix = ` ${JSON.stringify(sanitizeAgentTrafficValue(payload))}`;
+    } catch {
+      suffix = ` ${String(payload)}`;
+    }
+  }
+  let line = `[${stamp}] ${dir} ${target}${suffix}`;
+  if (line.length > AGENT_DEBUG_TRAFFIC_LINE_MAX) {
+    line = `${line.slice(0, AGENT_DEBUG_TRAFFIC_LINE_MAX)}…`;
+  }
+  agentDebugTraffic.push(line);
+  if (agentDebugTraffic.length > AGENT_DEBUG_TRAFFIC_LIMIT) {
+    agentDebugTraffic.splice(0, agentDebugTraffic.length - AGENT_DEBUG_TRAFFIC_LIMIT);
+  }
+}
+
+function agentDebugTrafficTail(max = 60) {
+  return agentDebugTraffic.slice(Math.max(0, agentDebugTraffic.length - max));
+}
+
+async function withAgentTrafficMuted(task) {
+  agentDebugTrafficMuteDepth += 1;
+  try {
+    return await task();
+  } finally {
+    agentDebugTrafficMuteDepth = Math.max(0, agentDebugTrafficMuteDepth - 1);
+  }
+}
+
+function setAgentDebugText(id, text) {
+  const node = el(id);
+  if (!node) return;
+  node.textContent = String(text || '');
+}
+
+function instrumentGatewayTraffic(gatewayApi) {
+  if (!gatewayApi || typeof gatewayApi !== 'object') return gatewayApi;
+  if (gatewayApi.__agentDebugTrafficInstrumented === true) return gatewayApi;
+  Object.defineProperty(gatewayApi, '__agentDebugTrafficInstrumented', {
+    value: true,
+    writable: false,
+    configurable: false,
+    enumerable: false,
+  });
+
+  const wrapCall = (channel, fn) => {
+    return (...args) => {
+      pushAgentDebugTraffic('out', channel, args.length <= 1 ? args[0] : { args });
+      try {
+        const value = fn(...args);
+        if (value && typeof value.then === 'function') {
+          return value.then((result) => {
+            pushAgentDebugTraffic('in', `${channel}.result`, result);
+            return result;
+          }).catch((error) => {
+            pushAgentDebugTraffic('in', `${channel}.error`, {
+              message: String(error?.message || error || 'UNKNOWN_ERROR'),
+            });
+            throw error;
+          });
+        }
+        pushAgentDebugTraffic('in', `${channel}.result`, value);
+        return value;
+      } catch (error) {
+        pushAgentDebugTraffic('in', `${channel}.error`, {
+          message: String(error?.message || error || 'UNKNOWN_ERROR'),
+        });
+        throw error;
+      }
+    };
+  };
+
+  if (typeof gatewayApi.send === 'function') {
+    gatewayApi.send = wrapCall('gateway.send', gatewayApi.send.bind(gatewayApi));
+  }
+
+  for (const [name, value] of Object.entries(gatewayApi)) {
+    if (name === 'send' || name === 'on') continue;
+    if (name.startsWith('__')) continue;
+    if (typeof value !== 'function') continue;
+    gatewayApi[name] = wrapCall(`gateway.${name}`, value.bind(gatewayApi));
+  }
+
+  return gatewayApi;
+}
+
+function setAgentDebugTab(tab) {
+  const next = ['tools', 'skill', 'session', 'traffic'].includes(String(tab || '')) ? String(tab) : 'tools';
+  agentDebugActiveTab = next;
+
+  const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
+  for (const btn of tabs) {
+    const active = String(btn?.dataset?.debugTab || '') === next;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+
+  const panels = Array.from(document.querySelectorAll('[data-debug-panel]'));
+  for (const panel of panels) {
+    const active = String(panel?.dataset?.debugPanel || '') === next;
+    panel.classList.toggle('is-hidden', !active);
+  }
+}
+
+function formatDebugList(prefix, values) {
+  const items = Array.isArray(values) ? values : [];
+  if (!items.length) return `${prefix}: (none)`;
+  return `${prefix}:\n${items.map((item) => `- ${item}`).join('\n')}`;
+}
+
+async function refreshAgentDebugPanels(reason = 'poll') {
+  const toolsPane = el('agentDebugTools');
+  const skillPane = el('agentDebugSkill');
+  const sessionPane = el('agentDebugSession');
+  const trafficPane = el('agentDebugTraffic');
+  if (!toolsPane && !skillPane && !sessionPane && !trafficPane) return;
+
+  if (agentDebugRefreshInFlight) {
+    agentDebugRefreshQueued = true;
+    return;
+  }
+  agentDebugRefreshInFlight = true;
+
+  try {
+    const gatewayApi = await initGateway();
+    const debugApi = window.__openclawLiteTest || null;
+    const nowIso = new Date().toISOString();
+
+    let toolRegistry = null;
+    if (debugApi && typeof debugApi.getToolRegistryInfo === 'function') {
+      toolRegistry = await withAgentTrafficMuted(async () => {
+        return await debugApi.getToolRegistryInfo().catch(() => null);
+      });
+    }
+
+    let skillSnapshot = null;
+    if (gatewayApi && typeof gatewayApi.skillState === 'function') {
+      const snapshot = await withAgentTrafficMuted(async () => {
+        return await gatewayApi.skillState().catch(() => null);
+      });
+      skillSnapshot = snapshot?.data || snapshot || null;
+    }
+
+    let promptPreview = null;
+    if (gatewayApi && typeof gatewayApi.systemPromptPreview === 'function') {
+      const preview = await withAgentTrafficMuted(async () => {
+        return await gatewayApi.systemPromptPreview().catch(() => null);
+      });
+      promptPreview = preview?.data || preview || null;
+    }
+
+    const availableSkills = parseAvailableSkills(promptPreview?.skillsPrompt || '');
+    const contextPaths = Array.isArray(promptPreview?.contextFilePaths) ? promptPreview.contextFilePaths : [];
+    const importedPaths = Array.isArray(skillSnapshot?.importedPaths) ? skillSnapshot.importedPaths : [];
+    const importedFiles = Array.isArray(skillSnapshot?.importedFiles) ? skillSnapshot.importedFiles : [];
+
+    const toolsLines = [
+      `Refreshed: ${nowIso}`,
+      `Reason: ${reason}`,
+      `Worker tools count: ${Number(toolRegistry?.count || (Array.isArray(toolRegistry?.names) ? toolRegistry.names.length : 0))}`,
+      formatDebugList('Tools', Array.isArray(toolRegistry?.names) ? toolRegistry.names : []),
+      '',
+      `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
+      `Active tab: ${agentDebugActiveTab}`,
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(20),
+    ];
+    setAgentDebugText('agentDebugTools', toolsLines.filter(Boolean).join('\n'));
+
+    const skillLines = [
+      `Refreshed: ${nowIso}`,
+      `Skill import status: ${String(skillSnapshot?.status || 'unknown')}`,
+      `Source URL: ${String(skillSnapshot?.sourceUrl || '(none)')}`,
+      `Active skill path: ${String(skillSnapshot?.activeSkillPath || '(none)')}`,
+      `Last error: ${String(skillSnapshot?.lastError || '(none)')}`,
+      `Imported paths: ${importedPaths.length}`,
+      `Imported files: ${importedFiles.length}`,
+      '',
+      formatDebugList('Imported paths', importedPaths.slice(0, 40)),
+      '',
+      `Skills extracted from prompt: ${availableSkills.length}`,
+      ...availableSkills.map((entry, idx) => `${idx + 1}. ${entry.name} @ ${entry.location}\n   ${entry.description}`),
+      '',
+      formatDebugList('Prompt context files', contextPaths),
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(16),
+    ];
+    setAgentDebugText('agentDebugSkill', skillLines.filter(Boolean).join('\n'));
+
+    const shouldLoadSession =
+      reason === 'manual'
+      || reason === 'tab-session'
+      || agentDebugActiveTab === 'session'
+      || !sessionPane?.textContent;
+
+    let transcript = null;
+    if (shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function') {
+      const dumpRaw = await withAgentTrafficMuted(async () => {
+        return await debugApi.getTranscriptDump().catch(() => '[]');
+      });
+      transcript = safeJsonParse(dumpRaw, []);
+    }
+
+    const sessionHeader = {
+      refreshedAt: nowIso,
+      reason,
+      runtimeState: {
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || ''),
+        step: String(lastState?.experience?.step || ''),
+        nextAgentAction: String(lastState?.experience?.nextAgentAction || ''),
+      },
+      skillState: {
+        status: String(skillSnapshot?.status || ''),
+        sourceUrl: String(skillSnapshot?.sourceUrl || ''),
+        activeSkillPath: String(skillSnapshot?.activeSkillPath || ''),
+      },
+      promptContextFiles: contextPaths,
+      promptSkillsCount: availableSkills.length,
+      transcriptItems: Array.isArray(transcript) ? transcript.length : null,
+    };
+
+    const sessionLines = [
+      JSON.stringify(sessionHeader, null, 2),
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(25),
+      '',
+      'Transcript dump:',
+      Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
+      '',
+      'System prompt preview:',
+      String(promptPreview?.systemPrompt || '(unavailable)'),
+    ];
+    setAgentDebugText('agentDebugSession', sessionLines.join('\n'));
+
+    const trafficLines = [
+      `Refreshed: ${nowIso}`,
+      `Traffic entries: ${agentDebugTraffic.length} (showing last ${Math.min(agentDebugTraffic.length, 90)})`,
+      'Legend: OUT = page/gateway -> worker, IN = worker/gateway -> page',
+      '',
+      ...agentDebugTrafficTail(90),
+    ];
+    setAgentDebugText('agentDebugTraffic', trafficLines.join('\n'));
+  } finally {
+    agentDebugRefreshInFlight = false;
+    if (agentDebugRefreshQueued) {
+      agentDebugRefreshQueued = false;
+      refreshAgentDebugPanels('queued').catch(() => { });
+    }
+  }
+}
+
+function scheduleAgentDebugRefresh(reason = 'event') {
+  refreshAgentDebugPanels(reason).catch(() => { });
+}
+
+function startAgentDebugRefreshLoop() {
+  if (agentDebugRefreshTimer) return;
+  agentDebugRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
+    refreshAgentDebugPanels('poll').catch(() => { });
+  }, AGENT_DEBUG_REFRESH_MS);
+}
+
 function setLocalLiteLlm(config) {
   const provider = typeof config?.provider === 'string' ? config.provider.trim() : '';
   const model = typeof config?.model === 'string' ? config.model.trim() : '';
@@ -247,8 +670,9 @@ function isLiteSkillReady() {
 }
 
 function isLiteAgentActive(state) {
-  if (!isLiteConnected(state)) return false;
+  if (!isAnyAgentConnected(state)) return false;
   if (!isVendorLite(state)) return true;
+  if (!isLocalLiteLlmConfigured()) return false;
   return getLiteSkillState().status !== 'failed';
 }
 
@@ -892,7 +1316,7 @@ async function refreshLiteSkillState({ force = false } = {}) {
 
 async function ensureDefaultLiteSkillImported(state) {
   if (!isVendorLite(state)) return;
-  if (!isLiteConnected(state)) return;
+  if (!isAnyAgentConnected(state)) return;
   const teamCode = String(state?.teamCode || '').trim();
   if (!teamCode) return;
 
@@ -938,14 +1362,15 @@ function clearLiteSkillLoopTimer() {
 function shouldRunHomeSkillLoop(state) {
   if (window.location.pathname !== '/') return false;
   if (!isVendorLite(state)) return false;
-  if (!isLiteConnected(state)) return false;
+  if (!isLocalLiteLlmConfigured()) return false;
+  if (!isAnyAgentConnected(state)) return false;
   if (state?.signup?.complete && state?.signup?.mode === 'agent') return false;
   return true;
 }
 
 function homeSkillPrompt() {
   return [
-    'Read SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
+    'Read workspace/SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
     'Primary goal: complete signup by mirroring human sigil selection and pressing Open after the human.',
     'Use runtime session context values for origin/teamCode/houseId exactly as provided.',
     'Use tools only; avoid asking the human for teamCode/houseId when already provided in runtime context.',
@@ -1019,9 +1444,14 @@ function updateLiteAgentStatus(state) {
   const liteConnected = isLiteConnected(state);
   const liteActive = isLiteAgentActive(state);
   dot.className = `dot ${liteActive ? 'good' : ''}`;
-  const skill = getLiteSkillState();
   if (failed) {
     text.textContent = `OpenClaw Lite error: ${lite.lastError}`;
+  } else if (isVendorLite(state) && isAnyAgentConnected(state) && !isLocalLiteLlmConfigured()) {
+    text.textContent = 'Agent connected. Configure brain.';
+  } else if (isVendorLite(state) && isAnyAgentConnected(state)) {
+    text.textContent = liteActive
+      ? 'Agent connected: OpenClaw Lite'
+      : 'Agent connected: OpenClaw Lite (skill import failed)';
   } else if (isAnyAgentConnected(state) && state?.agent?.source === 'external') {
     text.textContent = 'External agent connected';
   } else if (liteConnected && isVendorLite(state) && !liteActive) {
@@ -1039,8 +1469,31 @@ function applyVisibility(state) {
   const sidebar = el('agentSidebar');
   const visible = loadHatchVisible();
   const vendor = isVendorLite(state);
-  const liteConnected = isLiteConnected(state);
-  const vendorNeedsSetup = vendor && (!isLocalLiteLlmConfigured() || !liteConnected);
+  const experienceStep = typeof state?.experience?.step === 'string'
+    ? state.experience.step.trim()
+    : '';
+  const hasExperienceProgress = !!experienceStep
+    && experienceStep !== 'wait_connect'
+    && experienceStep !== 'connect_agent';
+  const hasFlowProgress = !!(
+    hasExperienceProgress ||
+    state?.human?.selected ||
+    state?.agent?.selected ||
+    state?.match?.matched ||
+    state?.human?.openPressed ||
+    state?.agent?.openPressed ||
+    state?.signup?.complete
+  );
+  if (!vendor) {
+    townPanelUnlocked = false;
+  } else if (hasFlowProgress) {
+    townPanelUnlocked = true;
+  } else if (!isLocalLiteLlmConfigured() && localLiteLlm.loaded) {
+    townPanelUnlocked = false;
+  } else if (isAnyAgentConnected(state) || !!state?.signup?.complete) {
+    townPanelUnlocked = true;
+  }
+  const vendorNeedsSetup = vendor && !townPanelUnlocked;
   const onboardingComplete = vendor
     ? !vendorNeedsSetup
     : isAnyAgentConnected(state);
@@ -1592,7 +2045,11 @@ function renderSigils(state) {
   const grid = el('sigilGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  const humanSel = state?.human?.selected || null;
+  const confirmedHumanSel = typeof state?.human?.selected === 'string' && state.human.selected
+    ? state.human.selected
+    : null;
+  if (confirmedHumanSel) pendingHumanSigilSelection = null;
+  const humanSel = confirmedHumanSel || pendingHumanSigilSelection || null;
   const agentSel = state?.agent?.selected || null;
 
   for (const item of elements) {
@@ -1632,13 +2089,29 @@ function renderSigils(state) {
 
     btn.addEventListener('click', async () => {
       setOpenError('');
+      pendingHumanSigilSelection = item.id;
+      if (lastState) renderSigils(lastState);
       try {
-        await api('/api/human/select', {
+        const resp = await api('/api/human/select', {
           method: 'POST',
           body: JSON.stringify({ elementId: item.id })
         });
+        if (resp?.humanSelected && lastState) {
+          lastState = {
+            ...lastState,
+            human: { ...(lastState.human || {}), selected: resp.humanSelected },
+            match: resp.match || lastState.match
+          };
+        }
+        pendingHumanSigilSelection = null;
+        if (lastState) {
+          renderSigils(lastState);
+          updateMatchUi(lastState);
+        }
         requestHomeSkillStep('human-action');
       } catch (e) {
+        pendingHumanSigilSelection = null;
+        if (lastState) renderSigils(lastState);
         setOpenError(`Select failed: ${e.message}`);
       }
     });
@@ -1902,7 +2375,9 @@ function updateUI(state) {
     setHatchStatus('Choose sign in or sign up to continue.');
   }
 
-  if (agentConnected || !!state?.signup?.complete) {
+  const townNode = el('townPanel');
+  const townVisible = !!townNode && !townNode.classList.contains('is-hidden');
+  if (townVisible || agentConnected || !!state?.signup?.complete) {
     renderSigils(state);
     renderCanvas(state);
     renderCeremony(state);
@@ -1946,9 +2421,14 @@ async function initGateway() {
     if (gateway instanceof Promise) {
       gateway = await gateway;
     }
+    instrumentGatewayTraffic(gateway);
 
     // Subscribe to agent events
     gateway.on('message', (msg) => {
+      pushAgentDebugTraffic('in', 'worker.chat.append', {
+        role: String(msg?.role || ''),
+        text: String(msg?.text || ''),
+      });
       const role = String(msg?.role || '').toLowerCase();
       if (role && role !== 'assistant') return;
       // Logic fix: accept empty strings as valid content/thinking
@@ -1956,13 +2436,25 @@ async function initGateway() {
       appendChatMessage('agent', text);
     });
     gateway.on('log', (entry) => {
+      pushAgentDebugTraffic('in', 'worker.log.append', entry || {});
       appendAgentLog(`[${entry.level}] ${entry.message}`);
     });
     gateway.on('status', (status) => {
       const elStatus = el('agentStatus');
       if (elStatus) elStatus.textContent = status;
+      pushAgentDebugTraffic('in', 'worker.runtime.status', { status: String(status || '') });
+      pushAgentDebugEvent(`status: ${status}`);
+      scheduleAgentDebugRefresh('status');
     });
     gateway.on('state', (runtimeState) => {
+      const snapshot = runtimeState && typeof runtimeState === 'object' ? runtimeState : {};
+      pushAgentDebugTraffic('in', 'worker.state.update', {
+        step: String(snapshot?.experience?.step || ''),
+        nextAgentAction: String(snapshot?.experience?.nextAgentAction || ''),
+        humanSelected: String(snapshot?.human?.selected || ''),
+        agentSelected: String(snapshot?.agent?.selected || ''),
+        matched: !!snapshot?.match?.matched,
+      });
       if (runtimeState && typeof runtimeState === 'object' && runtimeState.skill) {
         setLiteSkillState(runtimeState.skill);
         updateLiteAgentStatus(lastState);
@@ -1970,6 +2462,7 @@ async function initGateway() {
           setHatchStatus(isLiteAgentActive(lastState) ? 'Agent ready.' : 'Agent connected. Skill import failed.');
         }
       }
+      scheduleAgentDebugRefresh('state');
     });
 
     return gateway;
@@ -1982,23 +2475,32 @@ async function initGateway() {
 
 function appendChatMessage(role, text) {
   const box = el('chatTranscript');
-  if (!box) return;
+  if (!box) {
+    scheduleAgentDebugRefresh('chat');
+    return;
+  }
 
   const div = document.createElement('div');
   div.className = `chat-message ${role}`;
   div.textContent = text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  scheduleAgentDebugRefresh('chat');
 }
 
 function appendAgentLog(text) {
+  pushAgentDebugEvent(text);
   const box = el('agentLogs');
-  if (!box) return;
+  if (!box) {
+    scheduleAgentDebugRefresh('log');
+    return;
+  }
 
   const div = document.createElement('div');
   div.textContent = `> ${text}`;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  scheduleAgentDebugRefresh('log');
 }
 
 async function handleVisit() {
@@ -2036,6 +2538,10 @@ async function handleChat() {
 
   if (!gateway) await initGateway();
   try {
+    if (isVendorLite(lastState)) {
+      await ensureDefaultLiteSkillImported(lastState);
+      await refreshLiteSkillState({ force: false });
+    }
     await gateway.send({ type: 'chat', text });
   } catch (e) {
     appendChatMessage('system', `Failed to send: ${e.message}`);
@@ -2071,6 +2577,33 @@ async function handleNewSession() {
   }
 }
 
+function setupAgentDebugInterface() {
+  const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
+  if (!tabs.length) return;
+
+  for (const btn of tabs) {
+    if (btn.dataset.bound === '1') continue;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const tab = String(btn.dataset.debugTab || '').trim();
+      setAgentDebugTab(tab || 'tools');
+      scheduleAgentDebugRefresh(tab === 'session' ? 'tab-session' : 'tab-change');
+    });
+  }
+
+  const refreshBtn = el('agentDebugRefreshBtn');
+  if (refreshBtn && refreshBtn.dataset.bound !== '1') {
+    refreshBtn.dataset.bound = '1';
+    refreshBtn.addEventListener('click', () => {
+      scheduleAgentDebugRefresh('manual');
+    });
+  }
+
+  setAgentDebugTab(agentDebugActiveTab);
+  startAgentDebugRefreshLoop();
+  scheduleAgentDebugRefresh('init');
+}
+
 function setupAgentInterface() {
   const visitBtn = el('visitBtn');
   const sendBtn = el('sendChatBtn');
@@ -2087,6 +2620,8 @@ function setupAgentInterface() {
       if (e.key === 'Enter') handleChat();
     });
   }
+
+  setupAgentDebugInterface();
 }
 
 // --------------------------
