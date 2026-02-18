@@ -46869,7 +46869,6 @@ var MAX_CHECKPOINTS_PER_HOUSE = 50;
 var VISIT_MAX_COMPANION_FILES = 12;
 var VISIT_COMPANION_EXT_RE = /\.(md|json)$/i;
 var VISIT_COMPAT_BASENAMES = /* @__PURE__ */ new Set([
-  "skill.md",
   "heartbeat.md",
   "goals.md",
   "tools.md",
@@ -47025,6 +47024,11 @@ function safeOrigin() {
     return "";
   }
 }
+function normalizeTeamCodeHint(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  if (!raw) return "";
+  return /^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw) ? raw : "";
+}
 function assertAllowlistedUrl(url) {
   const u = new URL(url, safeOrigin() || "http://localhost");
   const origin = safeOrigin();
@@ -47137,15 +47141,26 @@ function revokeOriginGrant(grantId) {
 }
 async function apiJson(url, opts = {}) {
   assertAllowlistedUrl(url);
+  const headers = {
+    "content-type": "application/json",
+    ...opts.headers || {}
+  };
+  const hintedTeamCode = normalizeTeamCodeHint(state?.teamCodeHint);
+  if (hintedTeamCode && headers["x-team-code-hint"] === void 0 && headers["X-Team-Code-Hint"] === void 0) {
+    headers["x-team-code-hint"] = hintedTeamCode;
+  }
   const res = await fetch(url, {
     ...opts,
     credentials: "include",
-    headers: {
-      "content-type": "application/json",
-      ...opts.headers || {}
-    }
+    headers
   });
   const data = await res.json().catch(() => ({}));
+  const responseTeamCode = normalizeTeamCodeHint(data?.teamCode);
+  if (responseTeamCode && responseTeamCode !== state?.teamCodeHint) {
+    state.teamCodeHint = responseTeamCode;
+    metaSet("teamCodeHint", responseTeamCode).catch(() => {
+    });
+  }
   if (!res.ok) {
     const err2 = data?.error || `HTTP_${res.status}`;
     throw new Error(err2);
@@ -47403,6 +47418,66 @@ async function runAgentTownCeremonyReveal(params, toolName = "agent_town_ceremon
       toolName,
       startedAtMs,
       makeToolFailure(code, message, { teamCode }, isRetryableAgentTownErrorCode(code))
+    );
+  }
+}
+async function runAgentTownHouseRecover(_params, toolName = "agent_town_house_recover") {
+  const startedAtMs = nowMs();
+  try {
+    await recoverHouse();
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolSuccess({
+        houseId: state.houseId || null,
+        ready: !!(state.houseId && state.krootBytes && state.kencBytes && state.kauthKey)
+      })
+    );
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_RECOVER_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(code, message, {}, isRetryableAgentTownErrorCode(code))
+    );
+  }
+}
+async function runAgentTownHouseAppendNote(params, toolName = "agent_town_house_append_note") {
+  const startedAtMs = nowMs();
+  const text = typeof params?.text === "string" ? params.text.trim() : "";
+  if (!text) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("INVALID_ARGUMENTS", "Missing note text")
+    );
+  }
+  try {
+    const result = await appendE2eeEntry(text, { requireApproval: false, author: "lite" });
+    if (!result || !result.houseId) {
+      return withToolMeta(
+        toolName,
+        startedAtMs,
+        makeToolFailure("HOUSE_APPEND_REJECTED", "House append was not completed")
+      );
+    }
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolSuccess({
+        houseId: result.houseId,
+        entryId: result.entryId || null,
+        author: result.author || "lite"
+      })
+    );
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_APPEND_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(code, message, {}, isRetryableAgentTownErrorCode(code))
     );
   }
 }
@@ -48472,6 +48547,18 @@ var LITE_TOOL_SPECS = [
     sampleArgs: { teamCode: "TEAM-ABCD-EFGH" }
   },
   {
+    name: "agent_town_house_recover",
+    label: "Agent Town House Recover",
+    description: "Recovers unlocked house key context from wallet flow for vault operations.",
+    sampleArgs: {}
+  },
+  {
+    name: "agent_town_house_append_note",
+    label: "Agent Town House Append Note",
+    description: "Encrypts/appends a note entry to /api/house/:id/append using recovered house keys.",
+    sampleArgs: { text: "hello from agent" }
+  },
+  {
     name: "secret_set",
     label: "Secret Set",
     description: "Store/update a secret value by reference name.",
@@ -48637,6 +48724,14 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate) {
     case "agent_town_ceremony_reveal": {
       const envelope = await runAgentTownCeremonyReveal(params || {}, "agent_town_ceremony_reveal");
       return envelopeToToolResult(envelope, "agent_town_ceremony_reveal");
+    }
+    case "agent_town_house_recover": {
+      const envelope = await runAgentTownHouseRecover(params || {}, "agent_town_house_recover");
+      return envelopeToToolResult(envelope, "agent_town_house_recover");
+    }
+    case "agent_town_house_append_note": {
+      const envelope = await runAgentTownHouseAppendNote(params || {}, "agent_town_house_append_note");
+      return envelopeToToolResult(envelope, "agent_town_house_append_note");
     }
     case "secret_set": {
       const envelope = await runSecretSet(params || {}, "secret_set");
@@ -48918,33 +49013,97 @@ function inferSkillNameFromPath(path4) {
   }
   return String(parts[parts.length - 1] || "skill").trim() || "skill";
 }
-function collectSkillPromptCandidatePaths() {
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  const pushPath = (value) => {
-    const next = normalizeSkillPromptCandidatePath(value);
-    if (!next) return;
-    const folded = next.toLowerCase();
-    if (seen.has(folded)) return;
-    seen.add(folded);
-    out.push(next);
+function isSkillCompatibilityMirrorPath(path4) {
+  const normalized = String(path4 || "").trim().replace(/\\/g, "/");
+  if (!normalized) return false;
+  const folded = normalized.toLowerCase();
+  if (folded === "workspace/skill.md") return true;
+  return /^workspace\/skills\/[^/]+\/skill\.md$/i.test(normalized);
+}
+function skillPromptPathSpecificity(path4) {
+  const normalized = String(path4 || "").trim().replace(/\\/g, "/");
+  if (!normalized) return 0;
+  const segments = normalized.split("/").filter(Boolean);
+  const depthScore = segments.length * 1e3;
+  const lengthScore = normalized.length;
+  const compatibilityPenalty = isSkillCompatibilityMirrorPath(normalized) ? 5e5 : 0;
+  return depthScore + lengthScore - compatibilityPenalty;
+}
+function normalizeSkillPromptSourceUrl(value) {
+  const raw = String(value || "").trim();
+  return raw || null;
+}
+function buildSkillPromptCandidate(path4, metadata = {}) {
+  const normalizedPath = normalizeSkillPromptCandidatePath(path4);
+  if (!normalizedPath) return null;
+  return {
+    path: normalizedPath,
+    sourceUrl: normalizeSkillPromptSourceUrl(metadata?.sourceUrl),
+    finalUrl: normalizeSkillPromptSourceUrl(metadata?.finalUrl),
+    specificity: skillPromptPathSpecificity(normalizedPath)
   };
-  pushPath(state.skillImport.activeSkillPath);
+}
+function skillPromptCandidateIdentity(candidate) {
+  const finalUrl = String(candidate?.finalUrl || "").trim();
+  if (finalUrl) return `final:${finalUrl}`;
+  const sourceUrl = String(candidate?.sourceUrl || "").trim();
+  if (sourceUrl) return `source:${sourceUrl}`;
+  return `path:${String(candidate?.path || "").toLowerCase()}`;
+}
+function skillPromptCandidateSort(a, b) {
+  const specificityDiff = Number(b?.specificity || 0) - Number(a?.specificity || 0);
+  if (specificityDiff !== 0) return specificityDiff;
+  const pathDiff = skillImportPathSort(a?.path || "", b?.path || "");
+  if (pathDiff !== 0) return pathDiff;
+  const aSource = String(a?.finalUrl || a?.sourceUrl || "");
+  const bSource = String(b?.finalUrl || b?.sourceUrl || "");
+  return skillImportPathSort(aSource, bSource);
+}
+function collectSkillPromptCandidates() {
+  const out = [];
+  const seenByPath = /* @__PURE__ */ new Set();
+  const pushCandidate = (path4, metadata = {}) => {
+    const candidate = buildSkillPromptCandidate(path4, metadata);
+    if (!candidate) return;
+    const folded = candidate.path.toLowerCase();
+    if (seenByPath.has(folded)) return;
+    seenByPath.add(folded);
+    out.push(candidate);
+  };
+  pushCandidate(state.skillImport.activeSkillPath, {
+    sourceUrl: state.skillImport.sourceUrl,
+    finalUrl: state.skillImport.sourceUrl
+  });
   for (const file of Array.isArray(state.skillImport.importedFiles) ? state.skillImport.importedFiles : []) {
-    pushPath(file?.path);
+    pushCandidate(file?.path, file);
   }
   for (const path4 of Array.isArray(state.skillImport.importedPaths) ? state.skillImport.importedPaths : []) {
-    pushPath(path4);
+    pushCandidate(path4);
   }
-  pushPath("workspace/SKILL.md");
-  pushPath("workspace/skill.md");
+  pushCandidate("workspace/SKILL.md");
+  pushCandidate("workspace/skill.md");
   return out;
 }
+function selectSkillPromptCandidates(candidates, { limit: limit2 = 32 } = {}) {
+  const max = Math.max(0, Math.floor(Number(limit2) || 0));
+  const byIdentity = /* @__PURE__ */ new Map();
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const key = skillPromptCandidateIdentity(candidate);
+    const current = byIdentity.get(key);
+    if (!current || skillPromptCandidateSort(candidate, current) < 0) {
+      byIdentity.set(key, candidate);
+    }
+  }
+  return Array.from(byIdentity.values()).sort(skillPromptCandidateSort).slice(0, max);
+}
 async function buildLiteSkillsPrompt() {
-  const candidates = collectSkillPromptCandidatePaths();
+  const candidates = selectSkillPromptCandidates(collectSkillPromptCandidates(), { limit: 64 });
   if (!candidates.length) return "";
   const entries = [];
-  for (const path4 of candidates) {
+  for (const candidate of candidates) {
+    const path4 = String(candidate?.path || "");
+    if (!path4) continue;
     const content = await vfsGetUtf8(path4);
     if (content === null) continue;
     const rawName = parseSkillFrontmatterValue(content, "name");
@@ -48957,6 +49116,7 @@ async function buildLiteSkillsPrompt() {
   if (!entries.length) return "";
   const lines = [
     "The following skills provide specialized instructions for specific tasks.",
+    "Skills are listed from most specific to least specific paths.",
     "Use the workspace_read_file tool to load a skill's file when the task matches its description.",
     "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md).",
     "",
@@ -49265,22 +49425,185 @@ async function buildLitePromptPreview({ model, tools } = {}) {
     truncatedFiles: workspacePrompt.truncatedFiles
   };
 }
-async function runAgentTurn(userText) {
+async function resolveRuntimeSessionSnapshot() {
+  try {
+    const appState = await apiJson("/api/state", { method: "GET" });
+    const runtimeOrigin = safeOrigin() || null;
+    const teamCode = typeof appState?.teamCode === "string" && appState.teamCode.trim() ? appState.teamCode.trim() : null;
+    const runtimeHouseId = typeof state.houseId === "string" && state.houseId.trim() ? state.houseId.trim() : null;
+    const stateHouseId = typeof appState?.houseId === "string" && appState.houseId.trim() ? appState.houseId.trim() : null;
+    const houseId = runtimeHouseId || stateHouseId || null;
+    const normalizedTeamCode = normalizeTeamCodeHint(teamCode);
+    if (normalizedTeamCode && normalizedTeamCode !== state.teamCodeHint) {
+      state.teamCodeHint = normalizedTeamCode;
+      metaSet("teamCodeHint", normalizedTeamCode).catch(() => {
+      });
+    }
+    const context = runtimeOrigin || teamCode || houseId ? { origin: runtimeOrigin, teamCode, houseId } : null;
+    return { context, appState };
+  } catch {
+    return { context: null, appState: null };
+  }
+}
+function buildRuntimeSessionContextPrompt(context) {
+  if (!context || typeof context !== "object") return "";
+  const lines = [];
+  if (context.origin) lines.push(`- origin: ${context.origin}`);
+  if (context.teamCode) lines.push(`- teamCode: ${context.teamCode}`);
+  if (context.houseId) lines.push(`- houseId: ${context.houseId}`);
+  if (!lines.length) return "";
+  return `Runtime session context (authoritative):
+${lines.join("\n")}
+Use these values directly when SKILL.md asks for origin/teamCode/houseId.
+Do not ask the human for them unless missing.
+Do not substitute another localhost port when origin is provided.`;
+}
+function buildRuntimeExperienceStatePrompt(appState) {
+  const stateObj = appState && typeof appState === "object" ? appState : null;
+  if (!stateObj) return "";
+  const experienceId = typeof stateObj?.experience?.id === "string" ? stateObj.experience.id.trim() : "";
+  const experienceStep = typeof stateObj?.experience?.step === "string" ? stateObj.experience.step.trim() : "";
+  const nextAgentAction = typeof stateObj?.experience?.nextAgentAction === "string" ? stateObj.experience.nextAgentAction.trim() : "";
+  const humanSelected = typeof stateObj?.human?.selected === "string" ? stateObj.human.selected.trim() : "";
+  const agentSelected = typeof stateObj?.agent?.selected === "string" ? stateObj.agent.selected.trim() : "";
+  const matchState = typeof stateObj?.match?.matched === "boolean" ? stateObj.match.matched : null;
+  const humanOpenPressed = !!stateObj?.human?.openPressed;
+  const agentOpenPressed = !!stateObj?.agent?.openPressed;
+  const lines = [];
+  if (experienceId) lines.push(`- experience.id: ${experienceId}`);
+  if (experienceStep) lines.push(`- experience.step: ${experienceStep}`);
+  if (nextAgentAction) lines.push(`- experience.nextAgentAction: ${nextAgentAction}`);
+  if (humanSelected) lines.push(`- human.selected: ${humanSelected}`);
+  if (agentSelected) lines.push(`- agent.selected: ${agentSelected}`);
+  if (matchState !== null) lines.push(`- match.matched: ${matchState ? "true" : "false"}`);
+  lines.push(`- human.openPressed: ${humanOpenPressed ? "true" : "false"}`);
+  lines.push(`- agent.openPressed: ${agentOpenPressed ? "true" : "false"}`);
+  if (!lines.length) return "";
+  return `Runtime experience state (authoritative):
+${lines.join("\n")}
+Use this state directly for status questions before asking the human to repeat values.`;
+}
+function buildActiveSkillGuidancePrompt() {
+  const activeSkillPath = typeof state.skillImport?.activeSkillPath === "string" ? state.skillImport.activeSkillPath.trim() : "";
+  const sourceUrl = typeof state.skillImport?.sourceUrl === "string" ? state.skillImport.sourceUrl.trim() : "";
+  const skillStatus = typeof state.skillImport?.status === "string" ? state.skillImport.status.trim() : "";
+  if (!activeSkillPath || skillStatus !== "ready") return "";
+  const lines = [
+    "Active imported skill package (authoritative for this experience):",
+    `- activeSkillPath: ${activeSkillPath}`
+  ];
+  if (sourceUrl) lines.push(`- sourceUrl: ${sourceUrl}`);
+  lines.push(
+    "Treat this active skill as the default applicable skill for this chat unless the user explicitly switches experiences.",
+    "Do not claim SKILL.md is missing while this path exists.",
+    "Read activeSkillPath with workspace_read_file first; if needed, use workspace/SKILL.md as fallback."
+  );
+  return lines.join("\n");
+}
+function buildAgentTownCoopChatGuidancePrompt(appState) {
+  const stateObj = appState && typeof appState === "object" ? appState : null;
+  if (!stateObj) return "";
+  const experienceId = typeof stateObj?.experience?.id === "string" ? stateObj.experience.id.trim() : "";
+  if (experienceId !== "agent_town_coop_v1") return "";
+  const step = typeof stateObj?.experience?.step === "string" ? stateObj.experience.step.trim() : "";
+  if (!step) return "";
+  const hasHumanSignals = !!stateObj?.human?.selected || !!stateObj?.human?.openPressed || !!stateObj?.match?.matched;
+  return [
+    "Agent Town co-op guidance:",
+    "- This is an active co-op session (`agent_town_coop_v1`): follow the co-op playbook at activeSkillPath (skill.md).",
+    ...hasHumanSignals ? [
+      "- Human co-op signals are present in runtime state; do not switch to `skill_agent_solo.md` for this turn."
+    ] : [],
+    "- Only use `skill_agent_solo.md` when the user explicitly asks for solo mode and co-op runtime signals are absent.",
+    "- Use the active imported skill and runtime context for this message.",
+    "- Treat runtime teamCode/houseId as already provided input.",
+    "- Do not ask the human for teamCode/houseId/skill-path when runtime context already provides them.",
+    "- If user asks status (e.g. chosen sigil / next step), answer from runtime state first, then do the next safe co-op action."
+  ].join("\n");
+}
+function normalizeRuntimeContextInput(input, fallbackState = null) {
+  const contextObj = input && typeof input === "object" && !Array.isArray(input) ? input : null;
+  const stateObj = fallbackState && typeof fallbackState === "object" && !Array.isArray(fallbackState) ? fallbackState : null;
+  const originRaw = typeof contextObj?.origin === "string" && contextObj.origin.trim() ? contextObj.origin.trim() : safeOrigin() || "";
+  const teamCodeRaw = typeof contextObj?.teamCode === "string" && contextObj.teamCode.trim() ? contextObj.teamCode.trim() : typeof stateObj?.teamCode === "string" && stateObj.teamCode.trim() ? stateObj.teamCode.trim() : "";
+  const stateHouseId = typeof stateObj?.houseId === "string" && stateObj.houseId.trim() ? stateObj.houseId.trim() : "";
+  const runtimeHouseId = typeof state?.houseId === "string" && state.houseId.trim() ? state.houseId.trim() : "";
+  const houseIdRaw = typeof contextObj?.houseId === "string" && contextObj.houseId.trim() ? contextObj.houseId.trim() : stateHouseId || runtimeHouseId || "";
+  const origin = originRaw || null;
+  const teamCode = teamCodeRaw || null;
+  const houseId = houseIdRaw || null;
+  if (!origin && !teamCode && !houseId) return null;
+  return { origin, teamCode, houseId };
+}
+async function resolveRuntimeSnapshotFromInput({ runtimeContext = null, runtimeState = null } = {}) {
+  const runtimeStateInput = runtimeState && typeof runtimeState === "object" && !Array.isArray(runtimeState) ? runtimeState : null;
+  const hasRuntimeContextInput = runtimeContext && typeof runtimeContext === "object" && !Array.isArray(runtimeContext);
+  const runtimeContextInput = hasRuntimeContextInput || runtimeStateInput ? normalizeRuntimeContextInput(runtimeContext, runtimeStateInput) : null;
+  if (runtimeStateInput && runtimeContextInput) {
+    return { context: runtimeContextInput, appState: runtimeStateInput };
+  }
+  const resolved = await resolveRuntimeSessionSnapshot();
+  return {
+    context: runtimeContextInput || resolved?.context || null,
+    appState: runtimeStateInput || resolved?.appState || null
+  };
+}
+async function preflightChatSkillImports(userText) {
+  const urls = extractSkillVisitUrlsFromText(userText);
+  if (!urls.length) {
+    return { urls: [], imported: [], failed: [] };
+  }
+  const imported = [];
+  const failed = [];
+  for (const url of urls) {
+    const result = await runVisitImport({ url }, "visit_import");
+    if (result?.ok === true) {
+      imported.push({
+        url,
+        sourceUrl: typeof result?.data?.sourceUrl === "string" ? result.data.sourceUrl : null,
+        activeSkillPath: typeof result?.data?.activeSkillPath === "string" ? result.data.activeSkillPath : null
+      });
+      continue;
+    }
+    failed.push({
+      url,
+      code: result?.error?.code || "VISIT_FAILED",
+      message: result?.error?.message || "Skill import failed"
+    });
+  }
+  return { urls, imported, failed };
+}
+async function runAgentTurn(userText, opts = {}) {
+  const displayUserText = typeof opts?.displayUserText === "string" ? opts.displayUserText : String(userText || "");
+  const extraContext = typeof opts?.extraContext === "string" ? opts.extraContext.trim() : "";
+  const persistToTranscript = opts?.persistToTranscript !== false;
+  const emitChat = opts?.emitChat !== false;
+  const promptText = extraContext ? `${String(userText || "")}
+
+${extraContext}` : String(userText || "");
   const prompt = {
     role: "user",
-    content: String(userText || ""),
+    content: promptText,
     timestamp: nowMs()
   };
+  const generatedMessages = [];
   const model = getConfiguredModel();
   const apiKey = state.llmApiKey || "";
   if (!apiKey) {
     const m = makeAssistant(LLM_NOT_CONFIGURED_MESSAGE, { stopReason: "error" });
-    state.transcript.push(prompt);
-    state.transcript.push(m);
-    post({ type: "worker.chat.append", role: "user", text: String(userText || "") });
-    post({ type: "worker.chat.append", role: "assistant", text: LLM_NOT_CONFIGURED_MESSAGE });
-    await persistTranscript();
-    return;
+    generatedMessages.push(prompt, m);
+    if (persistToTranscript) {
+      state.transcript.push(prompt);
+      state.transcript.push(m);
+    }
+    if (emitChat) {
+      post({ type: "worker.chat.append", role: "user", text: displayUserText });
+      post({ type: "worker.chat.append", role: "assistant", text: LLM_NOT_CONFIGURED_MESSAGE });
+    }
+    if (persistToTranscript) {
+      await persistTranscript();
+    }
+    return { messages: generatedMessages, persisted: persistToTranscript };
   }
   const tools = getLiteTools();
   const promptPreview = await buildLitePromptPreview({ model, tools });
@@ -49309,15 +49632,21 @@ async function runAgentTurn(userText) {
     if (event.type === "message_end") {
       const m = event.message;
       if (!m || typeof m !== "object" || typeof m.role !== "string") continue;
-      state.transcript.push(m);
-      if (m.role === "user") post({ type: "worker.chat.append", role: "user", text: userText });
-      if (m.role === "assistant") {
+      generatedMessages.push(m);
+      if (persistToTranscript) {
+        state.transcript.push(m);
+      }
+      if (emitChat && m.role === "user") post({ type: "worker.chat.append", role: "user", text: displayUserText });
+      if (emitChat && m.role === "assistant") {
         const t = textFromMessageContent(m.content);
         post({ type: "worker.chat.append", role: "assistant", text: t });
       }
-      await persistTranscript();
+      if (persistToTranscript) {
+        await persistTranscript();
+      }
     }
   }
+  return { messages: generatedMessages, persisted: persistToTranscript };
 }
 var approvals = /* @__PURE__ */ new Map();
 function requestApproval({ title, body }) {
@@ -49850,6 +50179,37 @@ function normalizeVisitInputUrl(rawValue) {
   parsed.hash = "";
   return parsed.toString();
 }
+var CHAT_SKILL_URL_RE = /(?:https?:\/\/[^\s<>"'`]+|\/[^\s<>"'`]*skill\.md[^\s<>"'`]*)/gi;
+function trimChatUrlToken(rawValue) {
+  let text = String(rawValue || "").trim();
+  while (text && /[),.;!?'"`>\]]$/.test(text)) {
+    text = text.slice(0, -1);
+  }
+  return text;
+}
+function extractSkillVisitUrlsFromText(text) {
+  const source = String(text || "");
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const matches = source.match(CHAT_SKILL_URL_RE) || [];
+  for (const candidateRaw of matches) {
+    const candidate = trimChatUrlToken(candidateRaw);
+    if (!candidate) continue;
+    if (!/skill\.md/i.test(candidate)) continue;
+    try {
+      const normalized = normalizeVisitInputUrl(candidate);
+      const parsed = new URL(normalized);
+      if (!/\/skill\.md$/i.test(parsed.pathname || "")) continue;
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(normalized);
+      if (out.length >= 3) break;
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
 function buildVisitSkillCandidates(entryUrl) {
   const parsed = new URL(entryUrl);
   const pathname = String(parsed.pathname || "/");
@@ -50345,34 +50705,36 @@ async function runExperienceEngineBaseline(params, toolName = "experience_engine
   }
   const instruction = typeof params?.prompt === "string" && params.prompt.trim() ? params.prompt.trim() : "Read workspace/SKILL.md and execute the next safe step for this experience. Ask for human input only if required.";
   let instructionForModel = instruction;
-  let runtimeContext = null;
-  try {
-    const appState = await apiJson("/api/state", { method: "GET" });
-    const runtimeOrigin = safeOrigin() || null;
-    const teamCode = typeof appState?.teamCode === "string" && appState.teamCode.trim() ? appState.teamCode.trim() : null;
-    const runtimeHouseId = typeof state.houseId === "string" && state.houseId.trim() ? state.houseId.trim() : null;
-    const stateHouseId = typeof appState?.houseId === "string" && appState.houseId.trim() ? appState.houseId.trim() : null;
-    const houseId = runtimeHouseId || stateHouseId || null;
-    const contextLines = [];
-    if (runtimeOrigin) contextLines.push(`- origin: ${runtimeOrigin}`);
-    if (teamCode) contextLines.push(`- teamCode: ${teamCode}`);
-    if (houseId) contextLines.push(`- houseId: ${houseId}`);
-    if (contextLines.length > 0) {
-      runtimeContext = { origin: runtimeOrigin, teamCode, houseId };
-      instructionForModel = `${instruction}
-
-Runtime session context (authoritative):
-${contextLines.join("\n")}
-Use these values directly when SKILL.md asks for origin/teamCode/houseId.
-Do not ask the human for them unless missing.
-Do not substitute another localhost port when origin is provided.`;
-    }
-  } catch {
-    runtimeContext = null;
+  const runtimeSnapshot = await resolveRuntimeSnapshotFromInput({
+    runtimeContext: params?.runtimeContext || null,
+    runtimeState: params?.runtimeState || null
+  });
+  const runtimeContext = runtimeSnapshot?.context || null;
+  const runtimeAppState = runtimeSnapshot?.appState || null;
+  const hintedTeamCode = normalizeTeamCodeHint(runtimeContext?.teamCode || runtimeAppState?.teamCode);
+  if (hintedTeamCode && hintedTeamCode !== state.teamCodeHint) {
+    state.teamCodeHint = hintedTeamCode;
+    metaSet("teamCodeHint", hintedTeamCode).catch(() => {
+    });
   }
+  const runtimeContextPrompt = buildRuntimeSessionContextPrompt(runtimeContext);
+  const runtimeExperiencePrompt = buildRuntimeExperienceStatePrompt(runtimeAppState);
+  const activeSkillPrompt = buildActiveSkillGuidancePrompt();
+  const coopGuidancePrompt = buildAgentTownCoopChatGuidancePrompt(runtimeAppState);
+  const contextSections = [runtimeContextPrompt, runtimeExperiencePrompt, activeSkillPrompt, coopGuidancePrompt].filter(Boolean);
+  if (contextSections.length > 0) {
+    instructionForModel = `${instruction}
+
+${contextSections.join("\n\n")}`;
+  }
+  const recordToTranscript = params?.recordToTranscript !== false;
+  const emitChat = params?.emitChat === true ? true : params?.emitChat === false ? false : recordToTranscript;
   const transcriptStart = state.transcript.length;
-  await runAgentTurn(instructionForModel);
-  const generated = state.transcript.slice(transcriptStart);
+  const turn = await runAgentTurn(instructionForModel, {
+    persistToTranscript: recordToTranscript,
+    emitChat
+  });
+  const generated = Array.isArray(turn?.messages) ? turn.messages : state.transcript.slice(transcriptStart);
   let assistantText = "";
   let assistantMessageCount = 0;
   let assistantStopReason = "";
@@ -50721,18 +51083,22 @@ async function recoverHouse() {
   updateGatewayState();
   log(`house recovered ${houseId}`);
 }
-async function appendE2eeEntry(text) {
+async function appendE2eeEntry(text, opts = {}) {
   if (!state.houseId || !state.krootBytes || !state.kencBytes) throw new Error("HOUSE_NOT_READY");
-  const decision = await requestApproval({ title: "Approval", body: "Append entry" });
-  if (decision !== "approve") {
-    log("append rejected");
-    return;
+  const requireApproval = opts?.requireApproval !== false;
+  const author = typeof opts?.author === "string" && opts.author.trim() ? opts.author.trim() : "lite";
+  if (requireApproval) {
+    const decision = await requestApproval({ title: "Approval", body: "Append entry" });
+    if (decision !== "approve") {
+      log("append rejected");
+      return null;
+    }
   }
   const payload = {
     v: 1,
     id: randomId("e"),
     ts: nowMs(),
-    author: "lite",
+    author,
     type: "note",
     body: { text: String(text || "") }
   };
@@ -50741,13 +51107,15 @@ async function appendE2eeEntry(text) {
   const enc = await aesGcmEncryptRaw(state.kencBytes, pt, aad);
   const ciphertext = { alg: "AES-GCM", iv: bytesToB64(enc.iv), ct: bytesToB64(enc.ct) };
   const urlPath = `/api/house/${encodeURIComponent(state.houseId)}/append`;
-  const body = JSON.stringify({ ciphertext, author: "lite" });
+  const body = JSON.stringify({ ciphertext, author });
   const headers = await houseAuthHeaders({ houseId: state.houseId, method: "POST", urlPath, body });
   await apiJson(urlPath, { method: "POST", body, headers });
   log("append ok");
+  return { houseId: state.houseId, entryId: payload.id, author };
 }
 var state = {
   houseId: null,
+  teamCodeHint: null,
   krootBytes: null,
   kencBytes: null,
   kauthBytes: null,
@@ -50793,6 +51161,7 @@ async function persistSkillImportState() {
 }
 async function loadStateFromIdb() {
   state.houseId = await metaGet("houseId") || null;
+  state.teamCodeHint = normalizeTeamCodeHint(await metaGet("teamCodeHint")) || null;
   state.vaultLatestBackupId = await metaGet("vaultLatestBackupId") || null;
   state.secretMarker = await metaGet("secretMarker") || null;
   state.sessionId = await metaGet("sessionId") || null;
@@ -50892,8 +51261,6 @@ async function boot() {
     post({ type: "worker.chat.append", role: "assistant", text: "openclaw-lite boot" });
     await persistTranscript();
   }
-  const decision = await requestApproval({ title: "Approval", body: "Demo approval request" });
-  log(`demo approval: ${decision === "approve" ? "approved" : "rejected"}`);
 }
 self.addEventListener("message", async (ev) => {
   const msg = ev.data;
@@ -50912,7 +51279,43 @@ self.addEventListener("message", async (ev) => {
     }
     if (msg.type === "gateway.chat.send") {
       const text = String(msg.text || "");
-      await runAgentTurn(text);
+      const extraSections = [];
+      const preflight = await preflightChatSkillImports(text);
+      if (preflight.imported.length > 0) {
+        const importedLines = preflight.imported.map((entry) => {
+          const source = entry.sourceUrl || entry.url;
+          const skillPath = entry.activeSkillPath ? ` -> ${entry.activeSkillPath}` : "";
+          return `- imported ${source}${skillPath}`;
+        });
+        extraSections.push(`Skill import preflight (already completed):
+${importedLines.join("\n")}`);
+      } else if (preflight.failed.length > 0) {
+        const failedLines = preflight.failed.map((entry) => `- failed ${entry.url} (${entry.code})`);
+        extraSections.push(`Skill import preflight errors:
+${failedLines.join("\n")}`);
+      }
+      const runtimeSnapshot = await resolveRuntimeSnapshotFromInput({
+        runtimeContext: msg?.runtimeContext || null,
+        runtimeState: msg?.runtimeState || null
+      });
+      const hintedTeamCode = normalizeTeamCodeHint(runtimeSnapshot?.context?.teamCode || runtimeSnapshot?.appState?.teamCode);
+      if (hintedTeamCode && hintedTeamCode !== state.teamCodeHint) {
+        state.teamCodeHint = hintedTeamCode;
+        metaSet("teamCodeHint", hintedTeamCode).catch(() => {
+        });
+      }
+      const runtimeContextPrompt = buildRuntimeSessionContextPrompt(runtimeSnapshot.context);
+      if (runtimeContextPrompt) extraSections.push(runtimeContextPrompt);
+      const runtimeExperiencePrompt = buildRuntimeExperienceStatePrompt(runtimeSnapshot.appState);
+      if (runtimeExperiencePrompt) extraSections.push(runtimeExperiencePrompt);
+      const activeSkillPrompt = buildActiveSkillGuidancePrompt();
+      if (activeSkillPrompt) extraSections.push(activeSkillPrompt);
+      const coopChatPrompt = buildAgentTownCoopChatGuidancePrompt(runtimeSnapshot.appState);
+      if (coopChatPrompt) extraSections.push(coopChatPrompt);
+      await runAgentTurn(text, {
+        displayUserText: text,
+        extraContext: extraSections.join("\n\n")
+      });
       await writeCheckpoint("observation");
       if (text.startsWith("append:")) {
         const body = text.slice("append:".length).trim();

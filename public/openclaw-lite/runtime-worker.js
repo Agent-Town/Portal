@@ -29,6 +29,9 @@ function normalizeTeamCode(input) {
 
 async function api(url, { method = 'GET', body } = {}) {
   const headers = {};
+  if (runtime.teamCode) {
+    headers['x-team-code-hint'] = String(runtime.teamCode);
+  }
   const opts = {
     method,
     credentials: 'include',

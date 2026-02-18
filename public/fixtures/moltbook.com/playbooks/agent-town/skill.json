@@ -1,0 +1,9 @@
+{
+  "name": "moltbook-agent-town",
+  "kind": "moltbook-playbook",
+  "requiredActions": [
+    "connect_agent",
+    "sync_thread_state",
+    "send_thread_reply"
+  ]
+}

@@ -1,11 +1,42 @@
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -36,9 +67,26 @@ let pixels = [];
 let selectedColor = 1;
 let liteDriver = 'vendor';
 let liteGatewayPromise = null;
+let createSkillTurnPromise = null;
+let createSkillLoopEnabled = false;
+let createSkillLoopBusy = false;
+let createSkillLoopTimer = null;
+let createSkillLoopBackoffMs = 900;
+let createTeamCode = '';
+let createTokenMode = false;
+let createRuntimeBridge = null;
+
+const CREATE_SKILL_COMMIT_GOAL = 'Publish the agent ceremony commit and reveal public key for the current team session.';
+const CREATE_SKILL_REVEAL_GOAL = 'Publish the agent ceremony reveal payload (`sealedForHuman`) for the current team session.';
+const CREATE_SKILL_MIN_POLL_MS = 650;
+const CREATE_SKILL_MAX_POLL_MS = 5_000;
 
 function isVendorLiteDriver() {
   return liteDriver === 'vendor';
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function loadLiteGateway() {
@@ -50,6 +98,25 @@ async function loadLiteGateway() {
         return await gatewayOrPromise;
       }
       return gatewayOrPromise;
+    })
+    .then((gateway) => {
+      if (!gateway || typeof gateway !== 'object') return null;
+      const fallback = window.__openclawLiteTest;
+      if (!fallback || typeof fallback !== 'object') return gateway;
+
+      if (typeof gateway.skillState !== 'function' && typeof fallback.skillState === 'function') {
+        gateway.skillState = (...args) => fallback.skillState(...args);
+      }
+      if (typeof gateway.systemPromptPreview !== 'function' && typeof fallback.systemPromptPreview === 'function') {
+        gateway.systemPromptPreview = (...args) => fallback.systemPromptPreview(...args);
+      }
+      if (typeof gateway.experienceRun !== 'function' && typeof fallback.experienceRun === 'function') {
+        gateway.experienceRun = (...args) => fallback.experienceRun(...args);
+      }
+      if (typeof gateway.visitExperience !== 'function' && typeof fallback.visitExperience === 'function') {
+        gateway.visitExperience = (...args) => fallback.visitExperience(...args);
+      }
+      return gateway;
     })
     .catch(() => null);
   return liteGatewayPromise;
@@ -77,28 +144,127 @@ async function ensureCreateSkillImported() {
   return gateway;
 }
 
-async function runCreateSkillTurn({ goal = '' } = {}) {
+async function runCreateSkillTurn({ goal = '', runtimeState = null } = {}) {
   if (!isVendorLiteDriver()) return null;
-  const gateway = await ensureCreateSkillImported();
-  if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
-  const goalLine = String(goal || '').trim();
-  const prompt = [
-    'Read SKILL.md and execute exactly the next required safe step for this /create ceremony flow.',
-    goalLine ? `Goal: ${goalLine}` : '',
-    'Use runtime session context values directly and avoid asking for teamCode/houseId when already provided.',
-    'If waiting for human action, stop after one safe check/action.'
-  ]
-    .filter(Boolean)
-    .join('\n');
-  const run = await gateway.experienceRun({
-    prompt,
-    timeoutMs: 60_000
-  });
-  if (run?.ok === false) {
-    const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
-    throw new Error(msg);
+  if (createSkillTurnPromise) return createSkillTurnPromise;
+  createSkillTurnPromise = (async () => {
+    const gateway = await ensureCreateSkillImported();
+    if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
+    const goalLine = String(goal || '').trim();
+    const prompt = [
+      'Read SKILL.md and execute exactly the next required safe step for this /create ceremony flow.',
+      goalLine ? `Goal: ${goalLine}` : '',
+      'Use runtime session context values directly and avoid asking for teamCode/houseId when already provided.',
+      'If waiting for human action, stop after one safe check/action.'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const run = await gateway.experienceRun({
+      prompt,
+      timeoutMs: 60_000,
+      recordToTranscript: false,
+      emitChat: false,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(runtimeState?.teamCode || createTeamCode || ''),
+        houseId: String(runtimeState?.houseId || '')
+      },
+      runtimeState: runtimeState && typeof runtimeState === 'object' ? runtimeState : undefined
+    });
+    if (run?.ok === false) {
+      const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
+      throw new Error(msg);
+    }
+    return run;
+  })();
+  try {
+    return await createSkillTurnPromise;
+  } finally {
+    createSkillTurnPromise = null;
   }
-  return run;
+}
+
+function resolveCreateSkillGoal(ceremony = {}) {
+  if (!ceremony || typeof ceremony !== 'object') return '';
+  if (ceremony.humanReveal && !ceremony.agentReveal) return CREATE_SKILL_REVEAL_GOAL;
+  if (ceremony.humanCommit && (!ceremony.agentCommit || !ceremony.agentRevealPub)) return CREATE_SKILL_COMMIT_GOAL;
+  return '';
+}
+
+function resolveCreateSkillGoalFromState(state = {}) {
+  const nextAgentAction = String(state?.experience?.nextAgentAction || '').trim();
+  if (nextAgentAction === 'agent_town_ceremony_reveal') return CREATE_SKILL_REVEAL_GOAL;
+  if (nextAgentAction === 'agent_town_ceremony_commit') return CREATE_SKILL_COMMIT_GOAL;
+  return resolveCreateSkillGoal(state?.ceremony || {});
+}
+
+function resolveCreateSkillPollDelay(state = {}) {
+  const n = Number(state?.experience?.pollMs);
+  if (!Number.isFinite(n) || n <= 0) return 1_200;
+  return Math.max(CREATE_SKILL_MIN_POLL_MS, Math.min(CREATE_SKILL_MAX_POLL_MS, Math.round(n)));
+}
+
+function clearCreateSkillLoopTimer() {
+  if (!createSkillLoopTimer) return;
+  clearTimeout(createSkillLoopTimer);
+  createSkillLoopTimer = null;
+}
+
+function scheduleCreateSkillLoop(delayMs = createSkillLoopBackoffMs) {
+  if (!createSkillLoopEnabled) return;
+  clearCreateSkillLoopTimer();
+  const wait = Math.max(CREATE_SKILL_MIN_POLL_MS, Number(delayMs) || CREATE_SKILL_MIN_POLL_MS);
+  createSkillLoopTimer = setTimeout(() => {
+    createSkillLoopTimer = null;
+    runCreateSkillLoopTick().catch(() => { });
+  }, wait);
+}
+
+function nudgeCreateSkillLoop(delayMs = 120) {
+  if (!createSkillLoopEnabled) return;
+  scheduleCreateSkillLoop(delayMs);
+}
+
+function startCreateSkillLoop({ enabled = false } = {}) {
+  createSkillLoopEnabled = enabled && isVendorLiteDriver();
+  createSkillLoopBackoffMs = 900;
+  clearCreateSkillLoopTimer();
+  if (!createSkillLoopEnabled) return;
+  scheduleCreateSkillLoop(300);
+}
+
+window.addEventListener('beforeunload', () => {
+  createSkillLoopEnabled = false;
+  clearCreateSkillLoopTimer();
+});
+
+async function runCreateSkillLoopTick() {
+  if (!createSkillLoopEnabled || createSkillLoopBusy || !isVendorLiteDriver()) return;
+  createSkillLoopBusy = true;
+  try {
+    const state = await api('/api/state').catch(() => null);
+    if (!state?.agent?.connected || state?.signup?.mode === 'token') {
+      createSkillLoopBackoffMs = resolveCreateSkillPollDelay(state);
+      return;
+    }
+
+    const goal = resolveCreateSkillGoalFromState(state);
+    if (!goal) {
+      createSkillLoopBackoffMs = resolveCreateSkillPollDelay(state);
+      return;
+    }
+
+    await runCreateSkillTurn({ goal, runtimeState: state });
+    createSkillLoopBackoffMs = CREATE_SKILL_MIN_POLL_MS;
+  } catch {
+    createSkillLoopBackoffMs = Math.min(
+      CREATE_SKILL_MAX_POLL_MS,
+      Math.max(1_000, Math.round(createSkillLoopBackoffMs * 1.6))
+    );
+  } finally {
+    createSkillLoopBusy = false;
+    scheduleCreateSkillLoop(createSkillLoopBackoffMs);
+  }
 }
 
 async function driveAgentCeremonyStep({ needReveal = false } = {}) {
@@ -109,19 +275,24 @@ async function driveAgentCeremonyStep({ needReveal = false } = {}) {
   if (isReady()) return material;
   if (!isVendorLiteDriver()) return material;
 
-  const goal = needReveal
-    ? 'Publish the agent ceremony reveal payload (`sealedForHuman`) for the current team session.'
-    : 'Publish the agent ceremony commit and reveal public key for the current team session.';
+  const goal = needReveal ? CREATE_SKILL_REVEAL_GOAL : CREATE_SKILL_COMMIT_GOAL;
+  const startedAt = Date.now();
+  let attempt = 0;
 
-  for (let i = 0; i < 10; i += 1) {
-    try {
-      await runCreateSkillTurn({ goal });
-    } catch {
-      // Keep polling material; the next run can recover.
+  while (Date.now() - startedAt < 20_000) {
+    if (attempt === 0 || attempt % 4 === 0) {
+      try {
+        await runCreateSkillTurn({ goal });
+      } catch {
+        // Keep polling material; the loop can recover on later turns.
+      }
+    } else {
+      nudgeCreateSkillLoop(120);
     }
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await delay(350);
     material = await api('/api/human/house/material');
     if (isReady()) return material;
+    attempt += 1;
   }
   return material;
 }
@@ -163,6 +334,26 @@ function updateLockState() {
   el('shareBtn').disabled = !hasInk();
 }
 
+async function contributeCanvasViaRuntime({ x, y, color }) {
+  if (createTokenMode) return;
+  if (!createTeamCode) return;
+  if (!createRuntimeBridge || typeof createRuntimeBridge.contributeCanvas !== 'function') return;
+  try {
+    const result = await createRuntimeBridge.contributeCanvas({
+      teamCode: createTeamCode,
+      humanX: x,
+      humanY: y,
+      humanColor: color
+    });
+    const paint = result?.paint || null;
+    if (!paint || !Number.isInteger(paint.x) || !Number.isInteger(paint.y) || !Number.isInteger(paint.color)) return;
+    applyLocalPixel(paint.x, paint.y, paint.color);
+    updateLockState();
+  } catch {
+    // Runtime contribution is best-effort; polling will reconcile state.
+  }
+}
+
 function renderCanvas(w, h) {
   const c = el('canvas');
   c.innerHTML = '';
@@ -181,13 +372,15 @@ function renderCanvas(w, h) {
       b.setAttribute('data-testid', `px-${x}-${y}`);
       b.addEventListener('click', async () => {
         try {
+          const humanColor = selectedColor;
           await api('/api/human/canvas/paint', {
             method: 'POST',
-            body: JSON.stringify({ x, y, color: selectedColor })
+            body: JSON.stringify({ x, y, color: humanColor })
           });
           // Optimistically update local human paint first.
-          applyLocalPixel(x, y, selectedColor, w);
+          applyLocalPixel(x, y, humanColor, w);
           updateLockState();
+          contributeCanvasViaRuntime({ x, y, color: humanColor }).catch(() => { });
         } catch (e) {
           el('err').textContent = e.message;
         }
@@ -235,7 +428,13 @@ async function init() {
   const requestedToken = params.get('mode') === 'token';
   const signupMode = st.signup?.mode || (st.signup?.complete ? 'agent' : null);
   const tokenMode = signupMode === 'token';
+  createTokenMode = tokenMode;
   const tokenAddress = st.signup?.address || null;
+  createTeamCode = typeof st?.teamCode === 'string' ? st.teamCode.trim() : '';
+  createRuntimeBridge = window.OpenClawLiteRuntimeBridge || null;
+  if (createRuntimeBridge && isVendorLiteDriver()) {
+    createRuntimeBridge.init({ driver: liteDriver, teamCode: createTeamCode || st.teamCode || '' }).catch(() => { });
+  }
   if (st.signup?.complete && st.signup?.createdAt) {
     try {
       localStorage.setItem('agentTownSignupCompleteAt', st.signup.createdAt);
@@ -269,6 +468,7 @@ async function init() {
       ? 'Next: unlock the house with a Solana wallet signature. You can invite an agent later.'
       : 'Next: unlock the house with a Solana wallet signature. Then you and the agent can read/write encrypted entries.';
   }
+  startCreateSkillLoop({ enabled: !tokenMode });
 
   const state = await api('/api/canvas/state');
   palette = state.palette;
@@ -602,6 +802,7 @@ async function init() {
           revealPub: tokenMode ? undefined : ceremonyRevealPub
         })
       });
+      nudgeCreateSkillLoop(80);
 
       let Kroot = null;
       if (tokenMode) {
@@ -624,6 +825,7 @@ async function init() {
           method: 'POST',
           body: JSON.stringify({ sealedForAgent })
         });
+        nudgeCreateSkillLoop(80);
 
         const matAfter = await driveAgentCeremonyStep({ needReveal: true });
         if (!matAfter.agentRevealSealed) throw new Error('WAITING_AGENT_REVEAL');

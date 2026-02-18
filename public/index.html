@@ -118,10 +118,11 @@
                         <option value="oauth-json">OpenAI OAuth Profile / Token</option>
                       </select>
 
-                      <label class="small-label">OAuth callback URL / profile JSON / token</label>
-                      <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste callback URL from Sign in with ChatGPT, auth.json profile JSON, or raw access token." style="display: none;"></textarea>
+                      <label class="small-label">OAuth profile JSON / token</label>
+                      <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
                       <div class="small" id="llmOauthProfileHint"></div>
                       <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
+                      <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-complete">Complete OAuth</button>
 
                       <label class="small-label">API Key</label>
                       <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
@@ -139,6 +140,7 @@
                           <option value="">Default</option>
                           <option value="low">Low</option>
                           <option value="high">High</option>
+                          <option value="xhigh">XHigh</option>
                         </select>
 
                         <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
@@ -278,6 +280,11 @@
           <section class="agent-pane agent-pane-left" data-testid="agent-chat-pane">
             <div id="chatTranscript" class="chat-box sidebar-chat"></div>
 
+            <div class="agent-teamcode-row is-hidden" id="agentTeamCodeRow" data-testid="agent-team-code-row">
+              <div class="small">Team: <strong id="agentTeamCodeText" data-testid="agent-team-code-text">TEAM-....-....</strong></div>
+              <button id="agentTeamCodeSendBtn" class="btn small" type="button" data-testid="agent-team-code-send">Send code</button>
+            </div>
+
             <div class="chat-input-area">
               <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
               <button id="sendChatBtn" class="btn primary small">Send</button>
@@ -296,6 +303,7 @@
                 <button class="btn small agent-debug-tab is-active" id="agentDebugTabTools" type="button" data-debug-tab="tools" data-testid="agent-debug-tab-tools">Worker Tools</button>
                 <button class="btn small agent-debug-tab" id="agentDebugTabSkill" type="button" data-debug-tab="skill" data-testid="agent-debug-tab-skill">Skill Context</button>
                 <button class="btn small agent-debug-tab" id="agentDebugTabTraffic" type="button" data-debug-tab="traffic" data-testid="agent-debug-tab-traffic">Worker Traffic</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabBrain" type="button" data-debug-tab="brain" data-testid="agent-debug-tab-brain">Brain</button>
                 <button class="btn small agent-debug-tab" id="agentDebugTabSession" type="button" data-debug-tab="session" data-testid="agent-debug-tab-session">Session Context</button>
               </div>
               <button class="btn small" id="agentDebugRefreshBtn" type="button">Refresh</button>
@@ -309,7 +317,58 @@
                 <pre class="agent-debug-content" id="agentDebugSkill" data-testid="agent-debug-skill"></pre>
               </div>
               <div class="agent-debug-panel is-hidden" id="agentDebugPanelTraffic" data-debug-panel="traffic" data-testid="agent-debug-panel-traffic">
-                <pre class="agent-debug-content" id="agentDebugTraffic" data-testid="agent-debug-traffic"></pre>
+                <div class="agent-traffic-toolbar">
+                  <div class="agent-traffic-filters" role="group" aria-label="Traffic direction filters">
+                    <button class="btn small agent-traffic-filter is-active" id="agentTrafficFilterAllBtn" type="button" data-traffic-filter="all" data-testid="agent-traffic-filter-all">All</button>
+                    <button class="btn small agent-traffic-filter" id="agentTrafficFilterInBtn" type="button" data-traffic-filter="in" data-testid="agent-traffic-filter-in">Incoming</button>
+                    <button class="btn small agent-traffic-filter" id="agentTrafficFilterOutBtn" type="button" data-traffic-filter="out" data-testid="agent-traffic-filter-out">Outgoing</button>
+                  </div>
+                  <div class="small" id="agentDebugTrafficMeta" data-testid="agent-debug-traffic-meta"></div>
+                </div>
+                <div class="agent-traffic-list" id="agentDebugTraffic" data-testid="agent-debug-traffic"></div>
+              </div>
+              <div class="agent-debug-panel agent-debug-panel-brain is-hidden" id="agentDebugPanelBrain" data-debug-panel="brain" data-testid="agent-debug-panel-brain">
+                <div class="agent-mind-panel" id="agentMindPanel" data-testid="agent-mind-panel">
+                  <div class="agent-mind-title">Brain</div>
+                  <div class="agent-mind-grid">
+                    <label class="small-label" for="agentLlmProviderSelect">Provider</label>
+                    <select class="input" id="agentLlmProviderSelect" data-testid="agent-llm-provider">
+                      <option value="openai">openai</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmModelIdInput">Model</label>
+                    <select class="input" id="agentLlmModelIdInput" data-testid="agent-llm-model">
+                      <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmThinkingInput">Thinking</label>
+                    <select class="input" id="agentLlmThinkingInput" data-testid="agent-llm-thinking">
+                      <option value="">Default</option>
+                      <option value="low">Low</option>
+                      <option value="high">High</option>
+                      <option value="xhigh">XHigh</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmAuthModeSelect">Auth</label>
+                    <select class="input" id="agentLlmAuthModeSelect" data-testid="agent-llm-auth">
+                      <option value="api-key">API Key</option>
+                      <option value="oauth-json">OAuth Profile / Token</option>
+                    </select>
+
+                    <label class="small-label agent-mind-full" for="agentLlmOauthProfileInput">OAuth callback/profile/token</label>
+                    <textarea class="input agent-mind-full" id="agentLlmOauthProfileInput" rows="2" style="display:none"></textarea>
+                    <button class="btn small agent-mind-full" id="agentLlmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
+                    <button class="btn small agent-mind-full" id="agentLlmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="agent-llm-oauth-complete">Complete OAuth</button>
+
+                    <label class="small-label agent-mind-full" for="agentLlmKeyInput">API Key</label>
+                    <input class="input agent-mind-full" id="agentLlmKeyInput" type="password" placeholder="sk-..." data-testid="agent-llm-api-key" />
+                  </div>
+                  <div class="agent-mind-actions">
+                    <button class="btn primary small" id="agentLlmSaveBtn" type="button" data-testid="agent-llm-save">Connect Brain</button>
+                    <button class="btn small" id="agentLlmClearBtn" type="button" data-testid="agent-llm-clear">Clear Brain</button>
+                    <div class="small status-text" id="agentLlmLine" data-testid="agent-llm-status"></div>
+                  </div>
+                </div>
               </div>
               <div class="agent-debug-panel is-hidden" id="agentDebugPanelSession" data-debug-panel="session" data-testid="agent-debug-panel-session">
                 <pre class="agent-debug-content" id="agentDebugSession" data-testid="agent-debug-session"></pre>

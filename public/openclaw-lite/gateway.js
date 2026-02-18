@@ -661,6 +661,43 @@ async function init() {
     }
   });
   sendToWorker({ type: "gateway.boot" });
+  async function skillStateRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.skill.state",
+      responseType: "worker.skill.state"
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "SKILL_STATE_FAILED"));
+    return res.result || null;
+  }
+  async function systemPromptPreviewRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.systemPrompt.preview",
+      responseType: "worker.systemPrompt.preview"
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "SYSTEM_PROMPT_PREVIEW_FAILED"));
+    return res.result || null;
+  }
+  async function experienceRunRequest(params = {}) {
+    const requestedTimeoutMs = Number(params?.timeoutMs);
+    const timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0 ? Math.max(1e4, requestedTimeoutMs) : EXPERIENCE_RUN_REQUEST_TIMEOUT_MS;
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.experience.run",
+      responseType: "worker.experience.run",
+      payload: { params },
+      timeoutMs
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "EXPERIENCE_RUN_FAILED"));
+    return res.result || null;
+  }
+  async function visitExperienceRequest({ url } = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.visit",
+      responseType: "worker.visit",
+      payload: { url: String(url || "") }
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "VISIT_FAILED"));
+    return res.result || null;
+  }
   window.__openclawLiteTest = {
     async countCheckpoints() {
       const req = indexedDB.open("openclaw-lite", 1);
@@ -954,20 +991,10 @@ async function init() {
       return res.result || null;
     },
     async skillState() {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.skill.state",
-        responseType: "worker.skill.state"
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "SKILL_STATE_FAILED"));
-      return res.result || null;
+      return skillStateRequest();
     },
     async systemPromptPreview() {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.systemPrompt.preview",
-        responseType: "worker.systemPrompt.preview"
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "SYSTEM_PROMPT_PREVIEW_FAILED"));
-      return res.result || null;
+      return systemPromptPreviewRequest();
     },
     async webmcpDiscover(params = {}) {
       const res = await sendWorkerRequest({
@@ -988,25 +1015,10 @@ async function init() {
       return res.result || null;
     },
     async experienceRun(params = {}) {
-      const requestedTimeoutMs = Number(params?.timeoutMs);
-      const timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0 ? Math.max(1e4, requestedTimeoutMs) : EXPERIENCE_RUN_REQUEST_TIMEOUT_MS;
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.experience.run",
-        responseType: "worker.experience.run",
-        payload: { params },
-        timeoutMs
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "EXPERIENCE_RUN_FAILED"));
-      return res.result || null;
+      return experienceRunRequest(params);
     },
     async visitExperience({ url } = {}) {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.visit",
-        responseType: "worker.visit",
-        payload: { url: String(url || "") }
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "VISIT_FAILED"));
-      return res.result || null;
+      return visitExperienceRequest({ url });
     },
     async checkOriginAccess({ url, capability = "web_fetch", method = "GET", consume = true } = {}) {
       const res = await sendWorkerRequest({
@@ -1034,9 +1046,18 @@ async function init() {
       return res || null;
     }
   };
+  gatewayEvents.skillState = skillStateRequest;
+  gatewayEvents.systemPromptPreview = systemPromptPreviewRequest;
+  gatewayEvents.experienceRun = experienceRunRequest;
+  gatewayEvents.visitExperience = visitExperienceRequest;
   gatewayEvents.send = (msg) => {
     if (msg && msg.type === "chat") {
-      sendToWorker({ type: "gateway.chat.send", text: String(msg.text || "") || "" });
+      sendToWorker({
+        type: "gateway.chat.send",
+        text: String(msg.text || "") || "",
+        runtimeContext: msg.runtimeContext || null,
+        runtimeState: msg.runtimeState || null
+      });
       return;
     }
     if (msg && msg.type === "command" && msg.command === "visit") {

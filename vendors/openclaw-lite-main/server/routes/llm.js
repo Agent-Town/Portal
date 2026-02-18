@@ -47,6 +47,91 @@ function registerLlmRoutes(app) {
     res.end();
   }
 
+  function textFromOpenAiMessageContent(content) {
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return "";
+    return content
+      .map((part) => {
+        if (!part || typeof part !== "object") return "";
+        if (typeof part.text === "string") return part.text;
+        if (part.type === "text" && typeof part.text === "string") return part.text;
+        return "";
+      })
+      .join("\n");
+  }
+
+  function lastUserPrompt(messages = []) {
+    const rows = Array.isArray(messages) ? messages : [];
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const row = rows[i];
+      if (String(row?.role || "").toLowerCase() !== "user") continue;
+      return {
+        index: i,
+        text: textFromOpenAiMessageContent(row?.content || ""),
+      };
+    }
+    return { index: -1, text: "" };
+  }
+
+  function hasToolResultAfter(messages = [], index = -1) {
+    if (!Array.isArray(messages) || index < 0) return false;
+    const after = messages.slice(index + 1);
+    return after.some((row) => String(row?.role || "").toLowerCase() === "tool");
+  }
+
+  function buildToolCallChunks({ id, created, model, callId, toolName, args = {} }) {
+    return [
+      {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{
+          index: 0,
+          delta: {
+            role: "assistant",
+            tool_calls: [{
+              index: 0,
+              id: callId,
+              type: "function",
+              function: {
+                name: String(toolName || "").trim(),
+                arguments: JSON.stringify(args || {}),
+              },
+            }],
+          },
+          finish_reason: null,
+        }],
+      },
+      {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: "tool_calls" }],
+      },
+    ];
+  }
+
+  function buildTextChunks({ id, created, model, text = "pi-ai ok" }) {
+    return [
+      {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{ index: 0, delta: { role: "assistant", content: String(text || "pi-ai ok") }, finish_reason: null }],
+      },
+      {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model,
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      },
+    ];
+  }
+
   function handleTestOpenAiChatCompletions(req, res) {
     llmTestStats.chatCompletions += 1;
     llmTestStats.lastPath = "/api/llm/openai/v1/chat/completions";
@@ -54,24 +139,36 @@ function registerLlmRoutes(app) {
     const id = `chatcmpl_test_${llmTestSeq}`;
     const model = typeof req.body?.model === "string" && req.body.model.trim() ? req.body.model.trim() : "test-model";
     const created = Math.floor(Date.now() / 1000);
-    const content = "pi-ai ok";
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const prompt = lastUserPrompt(messages);
+    const userText = String(prompt.text || "").toLowerCase();
+    const seenToolResult = hasToolResultAfter(messages, prompt.index);
 
-    const chunk1 = {
-      id,
-      object: "chat.completion.chunk",
-      created,
-      model,
-      choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }],
-    };
-    const chunk2 = {
-      id,
-      object: "chat.completion.chunk",
-      created,
-      model,
-      choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
-    };
+    let chunks = null;
+    if (!seenToolResult && userText.includes("publish the agent ceremony reveal payload")) {
+      chunks = buildToolCallChunks({
+        id,
+        created,
+        model,
+        callId: `call_test_${llmTestSeq}`,
+        toolName: "agent_town_ceremony_reveal",
+      });
+    } else if (!seenToolResult && userText.includes("publish the agent ceremony commit and reveal public key")) {
+      chunks = buildToolCallChunks({
+        id,
+        created,
+        model,
+        callId: `call_test_${llmTestSeq}`,
+        toolName: "agent_town_ceremony_commit",
+      });
+    } else {
+      chunks = buildTextChunks({ id, created, model, text: "pi-ai ok" });
+    }
 
-    respondSse(res, [`data: ${JSON.stringify(chunk1)}\n\n`, `data: ${JSON.stringify(chunk2)}\n\n`, "data: [DONE]\n\n"]);
+    respondSse(
+      res,
+      chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).concat("data: [DONE]\n\n"),
+    );
   }
 
   function handleTestOpenAiResponses(req, res) {

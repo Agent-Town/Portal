@@ -26,6 +26,58 @@ function sortSkillImportPaths(paths = []) {
   });
 }
 
+function decodePromptXmlEntities(value = '') {
+  return String(value || '')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&apos;', "'")
+    .replaceAll('&amp;', '&');
+}
+
+function parseAvailableSkills(skillsPrompt = '') {
+  const text = String(skillsPrompt || '');
+  const entries = [];
+  const blockRe = /<skill>\s*<name>([\s\S]*?)<\/name>\s*<description>([\s\S]*?)<\/description>\s*<location>([\s\S]*?)<\/location>\s*<\/skill>/g;
+  for (const match of text.matchAll(blockRe)) {
+    entries.push({
+      name: decodePromptXmlEntities(match?.[1] || '').trim(),
+      description: decodePromptXmlEntities(match?.[2] || '').trim(),
+      location: decodePromptXmlEntities(match?.[3] || '').trim(),
+    });
+  }
+  return entries;
+}
+
+test('gateway default exposes skill runtime methods for page integrations', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const mod = await import('/openclaw-lite/gateway.js');
+    let gateway = mod?.default || mod;
+    if (gateway && typeof gateway.then === 'function') gateway = await gateway;
+    const hasMethods = {
+      visitExperience: !!(gateway && typeof gateway.visitExperience === 'function'),
+      experienceRun: !!(gateway && typeof gateway.experienceRun === 'function'),
+      skillState: !!(gateway && typeof gateway.skillState === 'function'),
+      systemPromptPreview: !!(gateway && typeof gateway.systemPromptPreview === 'function')
+    };
+    let visitOk = false;
+    if (hasMethods.visitExperience) {
+      const visit = await gateway.visitExperience({ url: '/skill.md' });
+      visitOk = visit?.ok === true;
+    }
+    return { hasMethods, visitOk };
+  });
+
+  expect(summary?.hasMethods?.visitExperience).toBe(true);
+  expect(summary?.hasMethods?.experienceRun).toBe(true);
+  expect(summary?.hasMethods?.skillState).toBe(true);
+  expect(summary?.hasMethods?.systemPromptPreview).toBe(true);
+  expect(summary?.visitOk).toBe(true);
+});
+
 test('visit imports portal skill and writes compatibility mirrors', async ({ page }) => {
   await page.goto('/?liteDriver=phase1');
   await waitForLiteTestApi(page);
@@ -92,6 +144,151 @@ test('system prompt exposes available_skills without inline SKILL context inject
   expect(systemPrompt).not.toContain('## SKILL.md');
   expect(systemPrompt).not.toContain('## skill.md');
   expect(contextFilePaths).not.toContain('skill.md');
+});
+
+test('chat prompt carries runtime team context and active skill guidance after skill import', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    await api.visitExperience({ url: '/skill.md' });
+    await api.clearTranscript({ rotateSession: false, keepBootMessage: false });
+
+    const stateResp = await fetch('/api/state', { credentials: 'include' });
+    const appState = await stateResp.json().catch(() => ({}));
+    const teamCode = String(appState?.teamCode || '');
+    const experienceStep = String(appState?.experience?.step || '');
+
+    const skillState = await api.skillState();
+    const activeSkillPath = String(skillState?.data?.activeSkillPath || '');
+
+    const mod = await import('/openclaw-lite/gateway.js');
+    let gateway = mod?.default || mod;
+    if (gateway && typeof gateway.then === 'function') gateway = await gateway;
+    await gateway.send({ type: 'chat', text: 'Can you check which sigil I picked?' });
+
+    let dumpRaw = '[]';
+    let dump = [];
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      dumpRaw = await api.getTranscriptDump();
+      try {
+        dump = JSON.parse(String(dumpRaw || '[]'));
+      } catch {
+        dump = [];
+      }
+      const hasUserPrompt = dump.some((msg) => msg && msg.role === 'user');
+      if (hasUserPrompt) break;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    const lastUserMessage = [...dump].reverse().find((msg) => msg && msg.role === 'user') || null;
+    let lastUserText = '';
+    if (typeof lastUserMessage?.content === 'string') {
+      lastUserText = lastUserMessage.content;
+    } else if (lastUserMessage?.content && typeof lastUserMessage.content === 'object' && !Array.isArray(lastUserMessage.content)) {
+      if (typeof lastUserMessage.content.text === 'string') {
+        lastUserText = lastUserMessage.content.text;
+      } else if (typeof lastUserMessage.content.value === 'string') {
+        lastUserText = lastUserMessage.content.value;
+      } else if (typeof lastUserMessage.content.content === 'string') {
+        lastUserText = lastUserMessage.content.content;
+      }
+    } else if (Array.isArray(lastUserMessage?.content)) {
+      lastUserText = lastUserMessage.content.map((entry) => {
+        if (!entry) return '';
+        if (typeof entry === 'string') return entry;
+        if (typeof entry?.text === 'string') return entry.text;
+        if (typeof entry?.content === 'string') return entry.content;
+        if (typeof entry?.value === 'string') return entry.value;
+        return '';
+      }).filter(Boolean).join('\n');
+    }
+
+    return {
+      teamCode,
+      activeSkillPath,
+      experienceStep,
+      lastUserText
+    };
+  });
+
+  expect(summary?.teamCode || '').toMatch(/^TEAM-/);
+  expect(summary?.activeSkillPath || '').toMatch(/^workspace\/skills\/[a-z0-9._-]+\/SKILL\.md$/);
+  expect(summary?.lastUserText || '').toContain('Runtime session context (authoritative):');
+  expect(summary?.lastUserText || '').toContain(`- teamCode: ${summary.teamCode}`);
+  expect(summary?.lastUserText || '').toContain('Runtime experience state (authoritative):');
+  expect(summary?.lastUserText || '').toContain(`- experience.step: ${summary.experienceStep}`);
+  expect(summary?.lastUserText || '').toContain('Active imported skill package (authoritative for this experience):');
+  expect(summary?.lastUserText || '').toContain(`- activeSkillPath: ${summary.activeSkillPath}`);
+  expect(summary?.lastUserText || '').toContain('This is an active co-op session (`agent_town_coop_v1`): follow the co-op playbook at activeSkillPath (skill.md).');
+  expect(summary?.lastUserText || '').toContain('Only use `skill_agent_solo.md` when the user explicitly asks for solo mode and co-op runtime signals are absent.');
+  expect(summary?.lastUserText || '').toContain('Do not ask the human for teamCode/houseId/skill-path');
+});
+
+test('multi-skill prompt preview prefers most-specific imported skill and keeps single upfront read constraint', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    const visit = await api.visitExperience({ url: '/fixtures/multi-skill-pack/skill.md' });
+    const preview = await api.systemPromptPreview();
+    const siteKey = String(window.location.host || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+    const base = `workspace/skills/${siteKey}/fixtures/multi-skill-pack`;
+    return {
+      visit,
+      preview,
+      expectedLocations: {
+        ceremony: `${base}/skills/co-op/ceremony/skill.md`,
+        coop: `${base}/skills/co-op/skill.md`,
+        router: `${base}/skill.md`,
+      },
+    };
+  });
+
+  expect(summary?.visit?.ok).toBe(true);
+  expect(summary?.preview?.ok).toBe(true);
+
+  const systemPrompt = String(summary?.preview?.data?.systemPrompt || '');
+  const skillsPrompt = String(summary?.preview?.data?.skillsPrompt || '');
+  const skills = parseAvailableSkills(skillsPrompt);
+  const locations = skills.map((entry) => String(entry?.location || ''));
+
+  const ceremonyIdx = locations.indexOf(summary?.expectedLocations?.ceremony || '');
+  const coopIdx = locations.indexOf(summary?.expectedLocations?.coop || '');
+  const routerIdx = locations.indexOf(summary?.expectedLocations?.router || '');
+  expect(ceremonyIdx).toBeGreaterThanOrEqual(0);
+  expect(coopIdx).toBeGreaterThanOrEqual(0);
+  expect(routerIdx).toBeGreaterThanOrEqual(0);
+  expect(ceremonyIdx).toBeLessThan(coopIdx);
+  expect(coopIdx).toBeLessThan(routerIdx);
+
+  expect(systemPrompt).toContain('Before replying: scan <available_skills> <description> entries.');
+  expect(systemPrompt).toContain('- If multiple could apply: choose the most specific one, then read/follow it.');
+  expect(systemPrompt).toContain('Constraints: never read more than one skill up front; only read after selecting.');
+});
+
+test('repeat multi-skill prompt preview keeps deterministic available_skills ordering', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    await api.visitExperience({ url: '/fixtures/multi-skill-pack/skill.md' });
+    const firstPreview = await api.systemPromptPreview();
+    await api.visitExperience({ url: '/fixtures/multi-skill-pack/skill.md' });
+    const secondPreview = await api.systemPromptPreview();
+    return {
+      firstSkillsPrompt: String(firstPreview?.data?.skillsPrompt || ''),
+      secondSkillsPrompt: String(secondPreview?.data?.skillsPrompt || ''),
+    };
+  });
+
+  const first = parseAvailableSkills(summary?.firstSkillsPrompt || '').map((entry) => entry.location);
+  const second = parseAvailableSkills(summary?.secondSkillsPrompt || '').map((entry) => entry.location);
+  expect(first.length).toBeGreaterThan(0);
+  expect(second).toEqual(first);
 });
 
 test('visit imports same-origin companion files for a skill package', async ({ page }) => {
@@ -195,6 +392,56 @@ test('repeat visit keeps deterministic imported metadata ordering', async ({ pag
   expect(String(skillEntry?.sha256B64 || '')).toMatch(/^[A-Za-z0-9+/=]+$/);
 });
 
+test('visit imports Moltbook-shaped package files and preserves domain-like path conventions', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    const fixtureUrl = '/fixtures/moltbook.com/playbooks/agent-town/skill.md';
+    const visit = await api.visitExperience({ url: fixtureUrl });
+    const preview = await api.systemPromptPreview();
+    const skillState = await api.skillState();
+    const siteKey = String(window.location.host || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+    const base = `workspace/skills/${siteKey}/fixtures/moltbook.com/playbooks/agent-town`;
+    const files = {
+      skill: await api.workspaceReadFile({ path: `${base}/skill.md` }),
+      heartbeat: await api.workspaceReadFile({ path: `${base}/heartbeat.md` }),
+      messaging: await api.workspaceReadFile({ path: `${base}/messaging.md` }),
+      rules: await api.workspaceReadFile({ path: `${base}/rules.md` }),
+      skillJson: await api.workspaceReadFile({ path: `${base}/skill.json` }),
+    };
+    return { visit, preview, skillState, files, base, fixtureUrl };
+  });
+
+  expect(summary?.visit?.ok).toBe(true);
+  expect(summary?.preview?.ok).toBe(true);
+  expect(summary?.skillState?.ok).toBe(true);
+  expect(summary?.visit?.data?.failedUrls || []).toEqual([]);
+  expect(summary?.visit?.data?.importedPaths || []).toContain(`${summary.base}/skill.md`);
+  expect(summary?.visit?.data?.importedPaths || []).toContain(`${summary.base}/heartbeat.md`);
+  expect(summary?.visit?.data?.importedPaths || []).toContain(`${summary.base}/messaging.md`);
+  expect(summary?.visit?.data?.importedPaths || []).toContain(`${summary.base}/rules.md`);
+  expect(summary?.visit?.data?.importedPaths || []).toContain(`${summary.base}/skill.json`);
+
+  expect(summary?.files?.skill?.ok).toBe(true);
+  expect(summary?.files?.heartbeat?.ok).toBe(true);
+  expect(summary?.files?.messaging?.ok).toBe(true);
+  expect(summary?.files?.rules?.ok).toBe(true);
+  expect(summary?.files?.skillJson?.ok).toBe(true);
+  expect(summary?.files?.skill?.data?.content || '').toContain('Required actions');
+  expect(summary?.files?.skill?.data?.content || '').toContain('send_thread_reply');
+  expect(summary?.files?.skillJson?.data?.content || '').toContain('"requiredActions"');
+  expect(summary?.files?.skillJson?.data?.content || '').toContain('"sync_thread_state"');
+
+  const previewLocations = parseAvailableSkills(String(summary?.preview?.data?.skillsPrompt || ''))
+    .map((entry) => String(entry?.location || ''));
+  expect(previewLocations).toContain(`${summary.base}/skill.md`);
+
+  expect(summary?.skillState?.data?.sourceUrl || '').toContain(summary?.fixtureUrl || '');
+  expect(summary?.skillState?.data?.status).toBe('ready');
+});
+
 test('experience dry-run resolves uppercase workspace files', async ({ page }) => {
   await page.goto('/?liteDriver=phase1');
   await waitForLiteTestApi(page);
@@ -268,6 +515,56 @@ test('experience run defaults to local agent-turn path (no test ws dependency)',
   expect(run?.error?.details?.mode).toBe('agent-turn');
   expect((run?.error?.details?.runtimeContext?.teamCode || '')).toMatch(/^TEAM-/);
   expect(run?.error?.details?.resolvedPaths?.skill).toBe('workspace/SKILL.md');
+});
+
+test('experience run can skip transcript persistence for polling turns', async ({ page }) => {
+  await page.goto('/?liteDriver=phase1');
+  await waitForLiteTestApi(page);
+
+  const summary = await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    await api.clearTranscript({ rotateSession: false, keepBootMessage: false });
+    const beforeRaw = await api.getTranscriptDump();
+    let before = [];
+    try {
+      before = JSON.parse(beforeRaw || '[]');
+    } catch {
+      before = [];
+    }
+    await api.workspaceWriteFile({ path: 'workspace/SKILL.md', content: '# Skill\n\nPoll once.\n' });
+    const run = await api.experienceRun({
+      prompt: 'Run the experience once.',
+      recordToTranscript: false,
+      emitChat: false
+    });
+    const dumpRaw = await api.getTranscriptDump();
+    let dump = [];
+    try {
+      dump = JSON.parse(dumpRaw || '[]');
+    } catch {
+      dump = [];
+    }
+    const hasPollPrompt = (Array.isArray(dump) ? dump : []).some((msg) => {
+      if (!msg || msg.role !== 'user') return false;
+      return JSON.stringify(msg?.content || '').includes('Run the experience once.');
+    });
+    const hasLlmConfigErrorReply = (Array.isArray(dump) ? dump : []).some((msg) => {
+      if (!msg || msg.role !== 'assistant') return false;
+      return JSON.stringify(msg?.content || '').includes('LLM not configured');
+    });
+    return {
+      run,
+      transcriptLengthBefore: Array.isArray(before) ? before.length : -1,
+      transcriptLengthAfter: Array.isArray(dump) ? dump.length : -1,
+      hasPollPrompt,
+      hasLlmConfigErrorReply
+    };
+  });
+
+  expect(summary?.run?.ok).toBe(false);
+  expect(summary?.run?.error?.code).toBe('LLM_NOT_CONFIGURED');
+  expect(summary?.hasPollPrompt).toBe(false);
+  expect(summary?.hasLlmConfigErrorReply).toBe(false);
 });
 
 test('experience run supports ws transport via local test websocket endpoint', async ({ page }) => {
@@ -513,12 +810,21 @@ test('approval requests render in index flow and can be rejected', async ({ page
   await page.goto('/?liteDriver=phase1');
   await waitForLiteTestApi(page);
 
+  await expect(page.getByTestId('approvals-panel')).toHaveClass(/is-hidden/, { timeout: 2500 });
+
+  await page.evaluate(() => {
+    window.__approvalProbePromise = window.__openclawLiteTest.setSecret({
+      name: 'approval_probe',
+      value: 'demo-value'
+    });
+  });
+
   await expect(page.getByTestId('approvals-panel')).toBeVisible({ timeout: 2500 });
   const rejectBtn = page.locator('#approvals button', { hasText: 'Reject' }).first();
   await expect(rejectBtn).toBeVisible({ timeout: 5000 });
 
   const pendingText = await page.locator('#approvals').innerText();
-  expect(pendingText).toContain('Demo approval request');
+  expect(pendingText).toContain('Secret set: approval_probe');
 
   await rejectBtn.click();
 
@@ -527,6 +833,12 @@ test('approval requests render in index flow and can be rejected', async ({ page
   }, null, { timeout: 3000 });
 
   await expect(page.getByTestId('approvals-panel')).toHaveClass(/is-hidden/, { timeout: 3000 });
+
+  const approvalResult = await page.evaluate(async () => {
+    return await window.__approvalProbePromise;
+  });
+  expect(approvalResult?.ok).toBe(false);
+  expect(approvalResult?.error?.code).toBe('APPROVAL_REJECTED');
 
   const workspace = await page.evaluate(async () => {
     return await window.__openclawLiteTest.workspaceList({ path: 'workspace/' });
