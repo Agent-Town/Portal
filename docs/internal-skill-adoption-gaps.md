@@ -3,7 +3,7 @@
 Status: Active tracker  
 Audience: Engineering only (not public docs)  
 Goal: Track shortcomings, blockers, and missing pieces for OpenClaw-style skill adoption in Agent Town Portal.
-Last updated: 2026-02-16
+Last updated: 2026-02-18
 
 ## Scope
 
@@ -15,12 +15,103 @@ This document covers:
 
 This document does not define final UX copy or marketing docs.
 
-## Progress Update (2026-02-16)
+## Progress Update (2026-02-18)
+
+- OAuth brain setup is now fully PKCE-based for OpenAI Codex on both `/` and `/house`:
+  - API contract: `POST /api/agent/lite/llm/oauth/openai-codex/start`, `GET .../status`, `POST .../exchange`.
+  - Callback capture server on `http://localhost:1455/auth/callback` remains active for local flow.
+  - `id_token` callback URLs remain explicitly unsupported for model calls.
+- OAuth retry reliability is improved:
+  - Exchange now resolves attempts by callback `state` when callback input is provided, even if UI sends a stale `attemptId`.
+  - This fixes repeated `STATE_MISMATCH` failures after multiple OAuth starts/retries.
+  - Deterministic regression added: `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js` (`OpenAI Codex exchange resolves callback state even when attemptId is stale`).
+- Agent panel observability and control surface is now split and stable:
+  - Left panel: chat + actions.
+  - Right tabs: `Worker Tools`, `Skill Context`, `Worker Traffic`, `Brain`, `Session Context`.
+  - `Brain` tab uses the same pipeline as the primary Brain form (no backend shortcut path).
+- Worker Traffic UX is now easier to follow for live debugging:
+  - traffic entries render as cards instead of one long text block,
+  - newest entries appear first,
+  - filter controls allow `All`, `Incoming`, `Outgoing`.
+  - Deterministic regression coverage in `e2e/53_agent_panel_global_presence.spec.js`.
+- Session continuity hardening is now part of baseline:
+  - clients send `x-team-code-hint` automatically when available,
+  - server can restore session identity when cookie is missing.
+  - Deterministic coverage in `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js`.
+
+## Progress Update (2026-02-17)
 
 - In-browser worker flow is now copy/paste-free for session matching:
   - `teamCode` is still used internally as the session key.
   - `teamCode` is intentionally hidden in UI to avoid user confusion.
   - Runtime context is injected automatically for experience runs.
+- Skill playbook route behavior coverage is now expanded beyond JSON route-shape checks:
+  - New suite: `e2e/58_phase3_skill_playbook_behavior.spec.js`
+  - Coverage now runs worker-first (skill + LLM + tool calls), not direct test-side `/api/agent/*` route driving.
+  - Added deterministic worker+LLM co-op loop assertions for repeated `/api/agent/state` semantics (`connect` -> `select` -> `open` -> signup done).
+  - Added deterministic worker+LLM canvas collaboration assertions for `/api/agent/canvas/paint` + `/api/agent/canvas/image` with human-visible `/api/canvas/state` verification.
+  - Added deterministic worker+LLM single-endpoint `/api/agent/state` progression coverage and `/api/agent/house/connect` reconnect coverage.
+  - Added deterministic worker+LLM `/api/agent/share/instructions` readiness/actionable payload coverage.
+  - Added deterministic worker+LLM share-create readiness coverage (`/api/share/create` + `/api/agent/share/instructions`) with session + leaderboard propagation checks.
+  - Deferred Moltbook post persistence as optional follow-up; current required baseline is share creation only.
+  - Worker chat path now auto-imports referenced remote `skill.md` URLs before LLM execution (via worker `visit_import`) and appends authoritative runtime session context (`origin`/`teamCode`/`houseId`) so the model does not re-ask for known values.
+  - Worker chat path now also appends authoritative runtime experience state (`experience.step` / selected sigils / open flags) and active imported skill-path guidance to prevent false "missing SKILL.md" or repeated teamCode prompts.
+  - Chat runtime alignment is now page-authoritative:
+    - page chat sends pass explicit `runtimeContext` + `runtimeState` through gateway to worker (`gateway.chat.send`) so co-op turns do not depend on a separate worker-side `/api/state` snapshot.
+  - Worker `experienceRun` path now appends the same authoritative runtime context + runtime experience state + active-skill guidance as chat turns, and accepts page-provided runtime context/state hints for deterministic same-session execution.
+  - Poll-turn noise reduction is now active for background loops:
+    - home `/` and `/create` loops call `experienceRun` with `recordToTranscript=false` + `emitChat=false`, so periodic poll turns do not bloat session transcript/context.
+  - Worker co-op guidance now hard-blocks solo playbook drift:
+    - in active `agent_town_coop_v1` turns with human co-op signals present, prompt guidance explicitly prevents switching to `skill_agent_solo.md`.
+  - Home-page co-op loop scheduling now prioritizes human-action/team-change nudges (without timer starvation), so mirror/open actions trigger promptly from the worker+LLM path.
+  - `/create` ceremony turns now pass runtime context/state into `experienceRun` so commit/reveal actions stay aligned to the active session.
+  - Added deterministic regression:
+    - `e2e/58_phase3_skill_playbook_behavior.spec.js`
+    - Test: `chat auto-imports referenced skill.md URL and injects runtime context into llm turn`
+  - Added deterministic regression:
+    - `e2e/58_phase3_skill_playbook_behavior.spec.js`
+    - Test: `experience run injects runtime context/state hints and active skill guidance into llm turn`
+  - Added deterministic regression:
+    - `e2e/56_phase3_skill_visit_worker.spec.js`
+    - Test: `chat prompt carries runtime team context and active skill guidance after skill import`
+  - Added deterministic regression:
+    - `e2e/58_phase3_skill_playbook_behavior.spec.js`
+    - Test: `chat honors explicit runtime context/state payload from gateway sender`
+  - Added deterministic regression:
+    - `e2e/56_phase3_skill_visit_worker.spec.js`
+    - Test: `experience run can skip transcript persistence for polling turns`
+  - Added in-app observability panel split for debugging worker/skill behavior:
+    - Left: chat + action controls.
+    - Right tabs: `Worker Tools`, `Skill Context`, `Worker Traffic`, `Session Context`.
+    - Tabs are hydrated from runtime APIs (`getToolRegistryInfo`, `skillState`, `systemPromptPreview`, transcript dump) so worker behavior is inspectable without manual devtools tracing.
+  - Added deterministic UI regression:
+    - `e2e/53_agent_panel_global_presence.spec.js`
+    - Test: `agent panel debug tabs expose tools, skill context, and session context`
+  - Fixed home-page panel flicker (`Setup Station` <-> sigil town panel) by adding a sticky town unlock latch after successful local-brain + agent connect, preventing re-gating on transient agent source-label transitions (`openclaw-lite`/`external`) until brain config is explicitly cleared.
+  - Added deterministic regression:
+    - `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js`
+    - Test: `onboarding visibility stays stable when agent source changes to external after local runtime connect`
+  - Hardened refresh-state gating on the home screen:
+    - Panel unlock now treats `experience.step=connect_agent` as initial setup (not progress), while preserving unlock for later persisted flow steps.
+    - Added deterministic regression:
+      - `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js`
+      - Test: `refresh keeps team session, town panel visibility, and selected sigil`
+  - Added stricter `public/skill.md` line checks for:
+    - required-input exclusivity (`teamCode` vs `houseId`),
+    - canvas collaboration endpoint guidance (`/api/agent/canvas/paint` + `/api/agent/canvas/image`),
+    - runtime-context no-reask wording,
+    - practical polling/backoff guidance,
+    - minimal curl-loop semantics.
+- Gateway runtime surface now matches page integration needs:
+  - Default `import('/openclaw-lite/gateway.js')` object now exposes `visitExperience`, `experienceRun`, `skillState`, and `systemPromptPreview` (previously only test helper surface exposed these).
+  - This unblocks real `/create` page skill orchestration without falling back to deterministic runtime bridge shortcuts.
+- `/create` ceremony flow now follows state-machine polling semantics:
+  - Worker loop continuously polls one experience state endpoint (`/api/state`) with bounded delay/backoff.
+  - Human actions update state (`/api/human/house/commit`, `/api/human/house/reveal`), worker observes and reacts via SKILL-driven `experienceRun` turns.
+  - Deterministic coverage updated in `e2e/03_create_share_leaderboard.spec.js` with scripted LLM tool-call responses for `agent_town_ceremony_commit` / `agent_town_ceremony_reveal`.
+- `/create` canvas contribution is again worker-owned on human paint:
+  - Human pixel paint now triggers runtime bridge `contributeCanvas`, preserving `/api/agent/canvas/paint` attribution in vendor-runtime ownership checks.
+  - Coverage: `e2e/45_phase2_vendor_canvas.spec.js` and `e2e/51_phase2_runtime_action_ownership.spec.js`.
 - `http_request` compatibility improved for OpenClaw-style agent behavior:
   - Worker now accepts shorthand request bodies:
     - raw JSON string body
@@ -81,10 +172,20 @@ This document does not define final UX copy or marketing docs.
   - Added deterministic prompt preview bridge:
     - `gateway.command.systemPrompt.preview` -> `worker.systemPrompt.preview`
   - Test: `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`)
+- Multi-skill prompt selection baselines are now covered:
+  - Worker canonicalizes skills registry candidates by import metadata (`finalUrl` / `sourceUrl`) so compatibility mirrors do not duplicate prompt entries.
+  - Skills prompt ordering is now most-specific-first for imported skill paths.
+  - System prompt keeps explicit single-upfront-read constraint language for skill selection.
+  - Tests:
+    - `multi-skill prompt preview prefers most-specific imported skill and keeps single upfront read constraint`
+    - `repeat multi-skill prompt preview keeps deterministic available_skills ordering`
 - Skill import refresh/version metadata is now normalized and persisted:
   - `skillImportV1` now stores deterministic `importedFiles` entries (`path`, `sourceUrl`, `finalUrl`, `etag`, `lastModified`, `sha256B64`) alongside `importedPaths`.
   - Repeat visit imports produce stable path ordering and metadata snapshots.
   - Test: `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat visit keeps deterministic imported metadata ordering`)
+- Moltbook-shaped multi-file fixture compatibility now has deterministic coverage:
+  - Added fixture package under `public/fixtures/moltbook.com/playbooks/agent-town/` (`skill.md`, `heartbeat.md`, `messaging.md`, `rules.md`, `skill.json`).
+  - Test: `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports Moltbook-shaped package files and preserves domain-like path conventions`)
 - Agent-active readiness is now tied to skill import state:
   - Index status now treats OpenClaw Lite as not-ready when worker skill state is explicitly `failed`.
   - App auto-imports `/skill.md` after local connect (one-shot per team session) so users do not need a manual visit step.
@@ -212,8 +313,11 @@ This section captures the earlier analysis verbatim in normalized form, then map
 - Evidence:
   - Lite prompt builder now emits `## Skills (mandatory)` with `<available_skills>` entries.
   - Deterministic preview route exposes final prompt (`gateway.command.systemPrompt.preview`).
+  - Registry candidate selection de-duplicates compatibility mirrors using persisted import metadata and sorts skill entries by specificity.
   - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`).
-- Impact: Baseline OpenClaw prompting model is aligned; remaining work is edge-case parity for more complex multi-skill repos.
+  - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`multi-skill prompt preview prefers most-specific imported skill and keeps single upfront read constraint`).
+  - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat multi-skill prompt preview keeps deterministic available_skills ordering`).
+- Impact: Baseline OpenClaw prompting model is aligned for multi-skill imports; remaining work is runtime tie-break behavior when descriptions are equally specific.
 
 ## G-006: Remote skill multi-file conventions normalization (partially addressed)
 
@@ -224,7 +328,8 @@ This section captures the earlier analysis verbatim in normalized form, then map
   - Companion parsing/import in worker (`collectSkillCompanionUrls`, `runVisitImport`).
   - Persisted `skillImportV1` now includes deterministic `importedFiles` metadata (`etag`/`lastModified`/`sha256B64`) and stable ordering across repeat imports.
   - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`repeat visit keeps deterministic imported metadata ordering`).
-- Impact: Refresh/version normalization baseline is in place; remaining compatibility risk is mainly external-domain convention variance.
+  - Coverage: `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports Moltbook-shaped package files and preserves domain-like path conventions`).
+- Impact: Refresh/version normalization and Moltbook-shaped package baseline are in place; remaining compatibility risk is mainly cross-origin/domain policy variance.
 
 ## G-007: Approval UI dependency addressed in index flow
 
