@@ -55,8 +55,17 @@ const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const TOWNHALL_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const TOWNHALL_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-const DEFAULT_AG0_SDK_MODULE_URL = 'https://esm.sh/agent0-sdk@1.5.3?bundle';
+const DEFAULT_EVM_ERC8004_IDENTITY_REGISTRY = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+const ERC8004_REGISTER_SELECTOR = '8ea42286';
+const ERC721_TRANSFER_TOPIC0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const DEFAULT_SOLANA_WEB3_MODULE_URL = 'https://esm.sh/@solana/web3.js@1.98.4?bundle';
+const SPONSORED_EVM_TX_TIMEOUT_MS = 180000;
+const SPONSORED_EVM_TX_POLL_MS = 1800;
+const SOLANA_WEB3_MODULE_FALLBACK_URLS = [
+  DEFAULT_SOLANA_WEB3_MODULE_URL,
+  'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.4/+esm',
+  'https://cdn.skypack.dev/@solana/web3.js@1.98.4'
+];
 // startRole: 'human' | 'coop' | 'agent'
 let pathMode = 'coop';
 let activeDistrict = 'house';
@@ -682,8 +691,6 @@ function cloneTownhallMintDraft(value) {
 function normalizeTownhallMintDraftFromOnboarding(onboarding) {
   const out = createEmptyTownhallMintDraft();
   const erc = onboarding?.erc8004 && typeof onboarding.erc8004 === 'object' ? onboarding.erc8004 : {};
-  const legacyEvm = erc?.evm && typeof erc.evm === 'object' ? erc.evm : {};
-  const legacySolana = erc?.solana && typeof erc.solana === 'object' ? erc.solana : {};
   const userEvm = erc?.user?.evm && typeof erc.user.evm === 'object' ? erc.user.evm : {};
   const userSolana = erc?.user?.solana && typeof erc.user.solana === 'object' ? erc.user.solana : {};
   const agentEvm = erc?.agent?.evm && typeof erc.agent.evm === 'object' ? erc.agent.evm : {};
@@ -698,37 +705,17 @@ function normalizeTownhallMintDraftFromOnboarding(onboarding) {
     : 'devnet';
   out.user.solana.txSig = typeof userSolana.txSig === 'string' ? userSolana.txSig : '';
 
-  out.agent.evm.id = typeof agentEvm.id === 'string' && agentEvm.id
-    ? agentEvm.id
-    : typeof legacyEvm.id === 'string'
-      ? legacyEvm.id
-      : '';
+  out.agent.evm.id = typeof agentEvm.id === 'string' ? agentEvm.id : '';
   out.agent.evm.chain = typeof agentEvm.chain === 'string' && agentEvm.chain.trim()
     ? agentEvm.chain
-    : typeof legacyEvm.chain === 'string' && legacyEvm.chain.trim()
-      ? legacyEvm.chain
-      : 'sepolia';
-  out.agent.evm.txHash = typeof agentEvm.txHash === 'string'
-    ? agentEvm.txHash
-    : typeof legacyEvm.txHash === 'string'
-      ? legacyEvm.txHash
-      : '';
+    : 'sepolia';
+  out.agent.evm.txHash = typeof agentEvm.txHash === 'string' ? agentEvm.txHash : '';
 
-  out.agent.solana.id = typeof agentSolana.id === 'string' && agentSolana.id
-    ? agentSolana.id
-    : typeof legacySolana.id === 'string'
-      ? legacySolana.id
-      : '';
+  out.agent.solana.id = typeof agentSolana.id === 'string' ? agentSolana.id : '';
   out.agent.solana.cluster = typeof agentSolana.cluster === 'string' && agentSolana.cluster.trim()
     ? agentSolana.cluster
-    : typeof legacySolana.cluster === 'string' && legacySolana.cluster.trim()
-      ? legacySolana.cluster
-      : 'devnet';
-  out.agent.solana.txSig = typeof agentSolana.txSig === 'string'
-    ? agentSolana.txSig
-    : typeof legacySolana.txSig === 'string'
-      ? legacySolana.txSig
-      : '';
+    : 'devnet';
+  out.agent.solana.txSig = typeof agentSolana.txSig === 'string' ? agentSolana.txSig : '';
 
   return out;
 }
@@ -780,6 +767,38 @@ let townhallMintDraft = createEmptyTownhallMintDraft();
 let townhallMintDraftDirty = false;
 let townhallMintInFlight = false;
 let townhallMintLastErrorStep = null;
+let townhallStoryStep = 'human';
+let townhallHumanCustomizeOpen = false;
+let townhallAgentCustomizeOpen = false;
+let townhallAwaitingContinue = false;
+let townhallSigilUnlockedByContinue = false;
+
+function setTownhallStoryStep(step) {
+  const next = step === 'agent' || step === 'processing' ? step : 'human';
+  townhallStoryStep = next;
+  const humanStep = el('townhallStepHuman');
+  const agentStep = el('townhallStepAgent');
+  const processingStep = el('townhallStepProcessing');
+  if (humanStep) humanStep.classList.toggle('is-hidden', next !== 'human');
+  if (agentStep) agentStep.classList.toggle('is-hidden', next !== 'agent');
+  if (processingStep) processingStep.classList.toggle('is-hidden', next !== 'processing');
+}
+
+function setTownhallCustomizeOpen(kind, open) {
+  const isHuman = kind === 'human';
+  const panel = el(isHuman ? 'townhallHumanCustomize' : 'townhallAgentCustomize');
+  const btn = el(isHuman ? 'townhallHumanCustomizeBtn' : 'townhallAgentCustomizeBtn');
+  if (panel) panel.classList.toggle('is-hidden', !open);
+  if (btn) {
+    btn.textContent = open ? 'Hide customization' : 'Customize';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  if (isHuman) {
+    townhallHumanCustomizeOpen = open;
+  } else {
+    townhallAgentCustomizeOpen = open;
+  }
+}
 
 function getTownhallDraftFieldNodes() {
   return townhallDraftFieldIds
@@ -822,6 +841,7 @@ function normalizeTownhallMintConfig(payload) {
   const evm = mint.evm && typeof mint.evm === 'object' ? mint.evm : {};
   const solana = mint.solana && typeof mint.solana === 'object' ? mint.solana : {};
   const chainId = Number(evm.chainId || 11155111);
+  const contractAddress = normalizeEvmAddress(evm.contractAddress || DEFAULT_EVM_ERC8004_IDENTITY_REGISTRY);
   return {
     enabled: mint.enabled === true,
     pinataEnabled: mint.pinataEnabled === true,
@@ -830,9 +850,7 @@ function normalizeTownhallMintConfig(payload) {
       chainId: Number.isFinite(chainId) && chainId > 0 ? Math.floor(chainId) : 11155111,
       network: typeof evm.network === 'string' && evm.network.trim() ? evm.network.trim() : 'sepolia',
       rpcUrl: typeof evm.rpcUrl === 'string' && evm.rpcUrl.trim() ? evm.rpcUrl.trim() : '',
-      sdkModuleUrl: typeof evm.sdkModuleUrl === 'string' && evm.sdkModuleUrl.trim()
-        ? evm.sdkModuleUrl.trim()
-        : DEFAULT_AG0_SDK_MODULE_URL
+      contractAddress: contractAddress || DEFAULT_EVM_ERC8004_IDENTITY_REGISTRY
     },
     solana: {
       enabled: solana.enabled === true,
@@ -840,7 +858,14 @@ function normalizeTownhallMintConfig(payload) {
       rpcUrl: typeof solana.rpcUrl === 'string' && solana.rpcUrl.trim() ? solana.rpcUrl.trim() : 'https://api.devnet.solana.com',
       web3ModuleUrl: typeof solana.web3ModuleUrl === 'string' && solana.web3ModuleUrl.trim()
         ? solana.web3ModuleUrl.trim()
-        : DEFAULT_SOLANA_WEB3_MODULE_URL
+        : DEFAULT_SOLANA_WEB3_MODULE_URL,
+      sponsorSendEnabled: solana.sponsorSendEnabled === true,
+      sponsorFeePayer: typeof solana.sponsorFeePayer === 'string' && solana.sponsorFeePayer.trim()
+        ? solana.sponsorFeePayer.trim()
+        : null,
+      sponsorSendError: typeof solana.sponsorSendError === 'string' && solana.sponsorSendError.trim()
+        ? solana.sponsorSendError.trim()
+        : null
     }
   };
 }
@@ -871,10 +896,14 @@ async function ensureTownhallMintConfig({ force = false } = {}) {
 function applyTownhallMintConfig(config) {
   const cfg = config || fallbackTownhallMintConfig();
   const registerBtn = el('townhallRegisterBtn');
-  if (!registerBtn) return;
   const allChainsReady = cfg.evm.enabled && cfg.solana.enabled;
-  registerBtn.disabled = townhallMintInFlight || !allChainsReady;
-  registerBtn.title = allChainsReady ? '' : 'Both Sepolia and Solana mint must be configured.';
+  if (registerBtn) {
+    registerBtn.disabled = townhallMintInFlight || !allChainsReady;
+    registerBtn.title = allChainsReady ? '' : 'Both Sepolia and Solana mint must be configured.';
+    registerBtn.textContent = townhallMintInFlight ? 'Processing registration...' : 'Retry registration';
+  }
+  const continueBtn = el('townhallContinueBtn');
+  if (continueBtn && townhallMintInFlight) continueBtn.disabled = true;
 }
 
 function collectTownhallProfilePayload() {
@@ -896,16 +925,32 @@ function collectTownhallProfilePayload() {
 function knownMintErrorMessage(err, chain = 'evm') {
   const code = String(err?.message || err || '').trim();
   if (!code) return chain === 'evm' ? 'Sepolia mint failed.' : 'Solana mint failed.';
-  if (code.toLowerCase().includes('wallet proxy not initialized')) {
-    return 'Privy wallet is still initializing. Retry in a moment.';
+  const lowerCode = code.toLowerCase();
+  if (
+    lowerCode.includes('wallet proxy not initialized')
+    || lowerCode.includes('embedded_wallet_proxy_not_initialized')
+    || lowerCode.includes('wallet_proxy_not_initialized')
+  ) {
+    return 'Privy embedded wallet proxy did not initialize. Check third-party cookie blocking and Privy app origin allowlist, then retry.';
   }
   if (code === 'MINT_ALL_CHAINS_NOT_ENABLED') return 'Both Sepolia and Solana mint must be configured on this server.';
   if (code === 'INVALID_MINT_SUBJECT') return 'Mint subject is invalid. Please refresh and try again.';
   if (code === 'MINT_DISABLED') return 'Live mint is disabled on this server.';
   if (code === 'PINATA_NOT_CONFIGURED') return 'Server is missing Pinata configuration.';
-  if (code === 'PINATA_UPLOAD_FAILED') return 'IPFS upload failed on the server.';
+  if (code === 'PINATA_UPLOAD_FAILED') {
+    const detailRaw = String(err?.data?.detail || err?.detail || '').trim();
+    const detail = detailRaw.toUpperCase();
+    if (detail.includes('NO_SCOPES_FOUND')) {
+      return 'Pinata JWT is missing required pinning scopes. Update PINATA_JWT permissions.';
+    }
+    if (detail.includes('UNAUTHORIZED') || detail.includes('FORBIDDEN') || err?.status === 401 || err?.status === 403) {
+      return 'Pinata rejected the JWT. Verify PINATA_JWT permissions and retry.';
+    }
+    return detailRaw ? `IPFS upload failed: ${detailRaw}` : 'IPFS upload failed on the server.';
+  }
   if (code === 'MINT_EVM_NOT_CONFIGURED') return 'Sepolia mint is not configured on this server.';
   if (code === 'MINT_SOLANA_NOT_CONFIGURED') return 'Solana mint is not configured on this server.';
+  if (code === 'MINT_EVM_CONTRACT_NOT_CONFIGURED') return 'Sepolia ERC-8004 contract address is not configured on this server.';
   if (code === 'INVALID_EVM_ADDRESS') return 'Privy EVM wallet address is invalid.';
   if (code === 'MISSING_HUMAN_NAME') return 'Enter your human name first.';
   if (code === 'MISSING_AGENT_NAME') return 'Enter your agent name first.';
@@ -921,17 +966,152 @@ function knownMintErrorMessage(err, chain = 'evm') {
   if (code === 'NO_SOLANA_WALLET' || code === 'NO_SOLANA_PUBKEY') return 'Connect your Privy Solana wallet first.';
   if (code === 'MISSING_SOLANA_ADDRESS') return 'Connect your Solana wallet first.';
   if (code === 'MISSING_SOLANA_ASSET_PUBKEY') return 'Could not prepare Solana asset key.';
+  if (code === 'INVALID_SOLANA_ASSET_PUBKEY') return 'Solana asset key is invalid.';
   if (code === 'SOLANA_SIGNER_MISMATCH') return 'Prepared Solana signer does not match your connected wallet.';
   if (code === 'SOLANA_PREPARE_SIGNED') return 'Prepared Solana tx must be unsigned; refusing to send.';
-  if (code === 'SOLANA_PREPARE_FAILED') return 'Could not prepare Solana mint transaction.';
+  if (code === 'SOLANA_PREPARE_FAILED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw ? `Could not prepare Solana mint transaction: ${detailRaw}` : 'Could not prepare Solana mint transaction.';
+  }
+  if (code === 'SOLANA_SPONSOR_NOT_CONFIGURED') {
+    return 'Server-side Solana sponsorship is not configured. Add SOLANA_ERC8004_FEE_PAYER_SECRET on the server.';
+  }
+  if (code === 'SOLANA_SPONSOR_SECRET_INVALID') {
+    return 'Server-side Solana sponsor key is invalid. Fix SOLANA_ERC8004_FEE_PAYER_SECRET and retry.';
+  }
+  if (code === 'INVALID_SOLANA_SPONSORED_TX') return 'Could not build the Solana sponsored transaction payload.';
+  if (code === 'SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING') {
+    return 'Privy wallet signature was missing on the Solana transaction.';
+  }
+  if (code === 'SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING') {
+    return 'Asset signature was missing on the Solana transaction.';
+  }
+  if (code === 'SOLANA_SPONSORED_TX_NOT_PREPARED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw
+      ? `Solana sponsored transaction did not match the latest prepared registration. ${detailRaw}`
+      : 'Solana sponsored transaction did not match the latest prepared registration. Retry registration.';
+  }
+  if (code === 'SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw || 'Prepared Solana transaction is missing the sponsor fee payer signer.';
+  }
+  if (code === 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET') {
+    return 'Server sponsor fee payer is set to the user wallet. Configure a separate funded devnet fee payer key.';
+  }
+  if (code === 'SOLANA_SPONSOR_FEEPAYER_UNFUNDED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw || 'Server sponsor fee payer does not have enough SOL to sponsor this Solana registration.';
+  }
+  if (code === 'SOLANA_SPONSORED_OWNER_UNFUNDED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw || 'User Solana wallet needs temporary lamports for account creation and sponsor top-up failed.';
+  }
+  if (code === 'SOLANA_SIGN_TX_UNSUPPORTED') {
+    return 'This Privy Solana wallet cannot sign transactions in the current session.';
+  }
+  if (code === 'SOLANA_SPONSOR_SEND_FAILED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    return detailRaw ? `Solana sponsored send failed: ${detailRaw}` : 'Solana sponsored send failed.';
+  }
   if (code === 'SOLANA_WEB3_UNAVAILABLE') return 'Solana web3 module could not be loaded.';
   if (code === 'SOLANA_TX_SEND_FAILED' || code === 'SOLANA_TX_SEND_UNSUPPORTED') {
     return 'Could not sign/send the Solana transaction with Privy wallet.';
   }
   if (code === 'MINT_EVM_FAILED') return 'Could not prepare Sepolia mint transaction.';
+  if (code === 'PRIVY_SOLANA_SPONSORED_TX_UNAVAILABLE') {
+    return 'Privy sponsored Solana send is unavailable for this wallet/session. Check Privy gas sponsorship settings for Solana Devnet.';
+  }
+  if (code === 'PRIVY_SPONSORED_TX_UNAVAILABLE') {
+    return 'Privy sponsored Sepolia send is unavailable for this wallet/session. Check Privy gas sponsorship settings.';
+  }
+  if (code === 'INVALID_PRIVY_WALLET_ID') {
+    return chain === 'solana'
+      ? 'Could not determine the Privy wallet id for sponsored Solana send.'
+      : 'Could not determine the Privy wallet id for sponsored Sepolia send.';
+  }
+  if (code === 'PRIVY_WALLET_RPC_SIGN_UNAVAILABLE') {
+    return chain === 'solana'
+      ? 'Privy signer is unavailable for sponsored Solana send.'
+      : 'Privy signer is unavailable for sponsored Sepolia send.';
+  }
+  if (code === 'PRIVY_WALLET_RPC_SIGNING_PAYLOAD_MISSING') {
+    return 'Server did not return a valid sponsored transaction payload.';
+  }
+  if (code === 'PRIVY_WALLET_RPC_SIGN_FAILED') {
+    const detail = String(err?.detail || err?.cause?.message || '').trim();
+    if (chain === 'solana') {
+      return detail
+        ? `Privy could not authorize the sponsored Solana transaction: ${detail}`
+        : 'Privy could not authorize the sponsored Solana transaction.';
+    }
+    return detail
+      ? `Privy could not authorize the sponsored Sepolia transaction: ${detail}`
+      : 'Privy could not authorize the sponsored Sepolia transaction.';
+  }
+  if (code === 'PRIVY_WALLET_RPC_RELAY_FAILED') {
+    const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
+    const detail = detailRaw.toLowerCase();
+    if (detail.includes('does not support the method')) {
+      return chain === 'solana'
+        ? 'This Privy wallet cannot run sponsored Solana signAndSendTransaction in the current execution mode.'
+        : 'This Privy wallet cannot run sponsored eth_sendTransaction in the current execution mode.';
+    }
+    if (
+      detail.includes('insufficient funds')
+      || detail.includes('exceeds the balance of the account')
+      || detail.includes('total cost (gas * gas fee + value)')
+    ) {
+      return chain === 'solana'
+        ? 'Privy gas sponsorship did not apply; this Solana wallet has insufficient SOL.'
+        : 'Privy gas sponsorship did not apply; this Sepolia wallet has insufficient ETH.';
+    }
+    return detailRaw ? `Privy sponsorship relay failed: ${detailRaw}` : 'Privy sponsorship relay failed.';
+  }
+  if (code.startsWith('INVALID_PRIVY_WALLET_RPC_')) {
+    return chain === 'solana'
+      ? 'Sponsored Solana transaction payload is invalid.'
+      : 'Sponsored Sepolia transaction payload is invalid.';
+  }
+  if (code === 'PRIVY_SOLANA_SPONSORED_TX_NO_RESULT') {
+    return 'Privy sponsored Solana send did not return a transaction handle. Retry once.';
+  }
+  if (code === 'PRIVY_SPONSORED_TX_NO_RESULT') {
+    return 'Privy sponsored Sepolia send did not return a transaction handle. Retry once.';
+  }
+  if (code === 'MINT_EVM_SPONSORED_NO_HANDLE') {
+    return 'Privy sponsored Sepolia transaction handle was missing.';
+  }
+  if (code === 'PRIVY_SERVER_AUTH_NOT_CONFIGURED') {
+    return 'Server is missing PRIVY_APP_SECRET to track sponsored Sepolia transactions.';
+  }
+  if (code === 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE') {
+    return 'Could not read Privy sponsored transaction status.';
+  }
+  if (code === 'MINT_EVM_SPONSORED_FAILED') {
+    return 'Privy sponsored Sepolia transaction failed before confirmation.';
+  }
+  if (code === 'MINT_EVM_SPONSORED_TIMEOUT') {
+    return 'Privy sponsored Sepolia transaction timed out before confirmation.';
+  }
+  if (code === 'MINT_EVM_REVERTED') return 'Sepolia registration transaction reverted on-chain.';
+  if (code === 'MINT_EVM_RECEIPT_TIMEOUT') return 'Sepolia registration transaction timed out before confirmation.';
   if (code === 'MINT_EVM_NO_AGENT_ID') return 'Sepolia tx succeeded but no ERC-8004 ID was returned.';
   if (code === 'MINT_SOLANA_NO_SIGNATURE') return 'Solana tx sent but no signature was returned.';
   const lower = code.toLowerCase();
+  if (
+    lower.includes('attempt to debit an account but found no record of a prior credit')
+    || lower.includes('did not pass signature verification')
+  ) {
+    return 'Solana registration failed before execution. Confirm Privy Solana Devnet gas sponsorship is enabled and retry.';
+  }
+  if (
+    lower.includes('insufficient funds')
+    || lower.includes('exceeds the balance of the account')
+    || lower.includes('total cost (gas * gas fee + value)')
+  ) {
+    return 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
+  }
   if (lower.includes('user rejected') || lower.includes('rejected') || lower.includes('denied')) {
     return 'Wallet action was rejected.';
   }
@@ -940,28 +1120,95 @@ function knownMintErrorMessage(err, chain = 'evm') {
 
 function isPrivyWalletProxyInitError(err) {
   const msg = String(err?.message || err || '').toLowerCase();
-  return msg.includes('wallet proxy not initialized') || msg.includes('embedded wallet proxy not initialized');
+  return msg.includes('wallet proxy not initialized')
+    || msg.includes('embedded wallet proxy not initialized')
+    || msg.includes('embedded_wallet_proxy_not_initialized')
+    || msg.includes('wallet_proxy_not_initialized');
 }
 
-async function forcePrivyWalletReady() {
+function inferMintErrorChain(err, fallback = 'evm') {
+  const lower = String(err?.message || err || '').toLowerCase();
+  if (lower.includes('solana')) return 'solana';
+  if (lower.includes('sepolia') || lower.includes('evm') || lower.includes('ethereum')) return 'evm';
+  return fallback === 'solana' ? 'solana' : 'evm';
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function forcePrivyWalletReady({ interactive = true } = {}) {
   if (typeof window.ensurePrivyWalletLogin === 'function') {
     try {
-      await window.ensurePrivyWalletLogin({ interactive: true });
+      await window.ensurePrivyWalletLogin({ interactive: !!interactive });
     } catch {
       // ignore and let caller retry/throw
     }
   }
-  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const bridge = window.__PRIVY_WALLET_BRIDGE__;
+  if (bridge && typeof bridge.resetWalletProxies === 'function') {
+    try {
+      await bridge.resetWalletProxies({ refreshUserState: false });
+    } catch {
+      // ignore and continue; reconnect calls below can still succeed
+    }
+  }
+  if (bridge && typeof bridge.ensureLoggedIn === 'function') {
+    try {
+      await bridge.ensureLoggedIn({ interactive: false, preferred: 'solana' });
+    } catch {
+      // ignore and continue; wallet methods below may still succeed
+    }
+  }
+  if (bridge && typeof bridge.connectSolana === 'function') {
+    try {
+      await bridge.connectSolana({ silent: !interactive });
+    } catch {
+      // ignore and let caller retry/throw
+    }
+  }
+  if (bridge && typeof bridge.connectEvm === 'function') {
+    try {
+      await bridge.connectEvm();
+    } catch {
+      // ignore and let caller retry/throw
+    }
+  }
+
+  await sleep(220);
 }
 
-async function withPrivyProxyRetry(task) {
-  try {
-    return await task();
-  } catch (err) {
-    if (!isPrivyWalletProxyInitError(err)) throw err;
-    await forcePrivyWalletReady();
-    return task();
+async function withPrivyProxyRetry(task, { maxAttempts = 4, onRetry = null } = {}) {
+  const attempts = Number.isFinite(Number(maxAttempts)) ? Math.max(1, Math.floor(maxAttempts)) : 4;
+  let lastErr = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await task();
+    } catch (err) {
+      lastErr = err;
+      if (!isPrivyWalletProxyInitError(err)) throw err;
+      await forcePrivyWalletReady({ interactive: i === 0 });
+      if (i >= 1 && typeof window.resetPrivyBridge === 'function') {
+        try {
+          await window.resetPrivyBridge({ hard: i >= 2 });
+        } catch {
+          // ignore reset failures and continue retry flow
+        }
+      }
+      if (typeof onRetry === 'function') {
+        try {
+          await onRetry({ attempt: i + 1, error: err });
+        } catch {
+          // ignore retry hook errors and continue retrying
+        }
+      }
+      if (i < attempts - 1) {
+        await sleep(180 * (i + 1));
+      }
+    }
   }
+  throw lastErr || new Error('PRIVY_WALLET_PROXY_NOT_READY');
 }
 
 async function loadTownhallModule(url) {
@@ -979,24 +1226,31 @@ async function loadTownhallModule(url) {
   return townhallModuleCache.get(key);
 }
 
-async function loadAg0SdkCtor(moduleUrl) {
-  if (window.__AG0_SDK_MOCK && typeof window.__AG0_SDK_MOCK === 'object' && typeof window.__AG0_SDK_MOCK.SDK === 'function') {
-    return window.__AG0_SDK_MOCK.SDK;
-  }
-  if (typeof window.__AG0_SDK_MOCK === 'function') {
-    return window.__AG0_SDK_MOCK;
-  }
-  const mod = await loadTownhallModule(moduleUrl || DEFAULT_AG0_SDK_MODULE_URL);
-  const ctor = mod?.SDK || mod?.default?.SDK || mod?.default || null;
-  if (typeof ctor !== 'function') throw new Error('AG0_SDK_UNAVAILABLE');
-  return ctor;
+function townhallModuleMocksEnabled() {
+  const host = typeof window.location?.hostname === 'string' ? window.location.hostname : '';
+  const localHost = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/i.test(host);
+  return localHost && window.__TOWNHALL_TEST_MOCKS_ENABLED__ === true;
 }
 
 async function loadSolanaWeb3(moduleUrl) {
-  if (window.__SOLANA_WEB3_MOCK && typeof window.__SOLANA_WEB3_MOCK === 'object') {
+  if (townhallModuleMocksEnabled() && window.__SOLANA_WEB3_MOCK && typeof window.__SOLANA_WEB3_MOCK === 'object') {
     return window.__SOLANA_WEB3_MOCK;
   }
-  return loadTownhallModule(moduleUrl || DEFAULT_SOLANA_WEB3_MODULE_URL);
+  const configured = typeof moduleUrl === 'string' && moduleUrl.trim() ? moduleUrl.trim() : '';
+  const candidates = [...new Set([configured, ...SOLANA_WEB3_MODULE_FALLBACK_URLS].filter(Boolean))];
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const mod = await loadTownhallModule(url);
+      if (mod && typeof mod === 'object') return mod;
+      lastErr = new Error('SOLANA_WEB3_INVALID_MODULE');
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  const out = new Error('SOLANA_WEB3_UNAVAILABLE');
+  if (lastErr) out.detail = String(lastErr?.message || lastErr);
+  throw out;
 }
 
 async function ensureEvmMintWallet(config) {
@@ -1005,21 +1259,36 @@ async function ensureEvmMintWallet(config) {
   const address = connected?.address || appWalletClient.getAddress({ chain: 'evm' }) || null;
   const normalizedAddress = normalizeEvmAddress(address || '');
   if (!normalizedAddress) throw new Error('NO_EVM_ACCOUNT');
+  let provider = connected?.provider || appWalletClient.getProvider({ chain: 'evm' });
+  const refreshProvider = async () => {
+    const refreshed = await appWalletClient.connect({ chain: 'evm' });
+    const next = refreshed?.provider || appWalletClient.getProvider({ chain: 'evm' });
+    if (next) provider = next;
+    return provider;
+  };
   const targetChainId = Number(config?.evm?.chainId || 11155111);
   if (Number.isFinite(targetChainId) && targetChainId > 0) {
     try {
-      const currentChainId = await appWalletClient.getChainId({ chain: 'evm' });
+      const currentChainId = await withPrivyProxyRetry(
+        () => appWalletClient.getChainId({ chain: 'evm' }),
+        { onRetry: refreshProvider }
+      );
       if (currentChainId !== targetChainId) {
-        await appWalletClient.switchChain({ chain: 'evm', chainId: targetChainId });
+        await withPrivyProxyRetry(
+          () => appWalletClient.switchChain({ chain: 'evm', chainId: targetChainId }),
+          { onRetry: refreshProvider }
+        );
       }
     } catch {
       throw new Error('EVM_CHAIN_SWITCH_FAILED');
     }
   }
-  const provider = appWalletClient.getProvider({ chain: 'evm' });
   if (!provider) throw new Error('NO_EVM_PROVIDER');
   try {
-    const accounts = await withPrivyProxyRetry(() => provider.request({ method: 'eth_requestAccounts' }));
+    const accounts = await withPrivyProxyRetry(
+      () => provider.request({ method: 'eth_requestAccounts' }),
+      { onRetry: refreshProvider }
+    );
     const primary = Array.isArray(accounts) && accounts.length ? normalizeEvmAddress(accounts[0]) : null;
     if (!primary || primary !== normalizedAddress) {
       throw new Error('EVM_ACCOUNT_MISMATCH');
@@ -1028,7 +1297,7 @@ async function ensureEvmMintWallet(config) {
     if (String(err?.message || '') === 'EVM_ACCOUNT_MISMATCH') throw err;
     throw new Error('EVM_ACCOUNT_MISMATCH');
   }
-  return { address: normalizedAddress, provider };
+  return { address: normalizedAddress, provider, refreshProvider };
 }
 
 async function ensureSolanaMintWallet(config) {
@@ -1044,7 +1313,13 @@ async function ensureSolanaMintWallet(config) {
     saveWalletCache();
   }
 
-  let provider = appWalletClient.getProvider({ chain: 'solana' });
+  let provider = connected?.provider || appWalletClient.getProvider({ chain: 'solana' });
+  const refreshProvider = async () => {
+    const refreshed = await appWalletClient.connect({ chain: 'solana', silent: false });
+    const next = refreshed?.provider || appWalletClient.getProvider({ chain: 'solana' });
+    if (next) provider = next;
+    return provider;
+  };
   if (!provider && window.__PRIVY_WALLET_BRIDGE__ && typeof window.__PRIVY_WALLET_BRIDGE__.connectSolana === 'function') {
     const out = await withPrivyProxyRetry(() => window.__PRIVY_WALLET_BRIDGE__.connectSolana({ silent: false }));
     provider = out?.provider || out?.wallet || null;
@@ -1055,7 +1330,7 @@ async function ensureSolanaMintWallet(config) {
   if (!web3?.Keypair || !web3?.Transaction || !web3?.Connection) {
     throw new Error('SOLANA_WEB3_UNAVAILABLE');
   }
-  return { address: normalizedAddress, provider, web3 };
+  return { address: normalizedAddress, provider, web3, refreshProvider };
 }
 
 function base58Encode(bytes) {
@@ -1078,9 +1353,26 @@ function base58Encode(bytes) {
 }
 
 function normalizeSolanaTxSignature(value) {
+  const normalizeRef = (raw) => {
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed || /\s/.test(trimmed)) return null;
+    if (trimmed.length > 256) return null;
+    return trimmed;
+  };
   if (!value) return null;
-  if (typeof value === 'string') return value.trim() || null;
-  if (typeof value.signature === 'string' && value.signature.trim()) return value.signature.trim();
+  if (typeof value === 'string') return normalizeRef(value);
+  const direct = normalizeRef(
+    value.signature
+    || value.hash
+    || value.transactionSignature
+    || value.txSig
+    || value.txHash
+    || value?.data?.signature
+    || value?.data?.hash
+    || value?.data?.transactionSignature
+  );
+  if (direct) return direct;
   if (value.signature instanceof Uint8Array) return base58Encode(value.signature);
   if (value instanceof Uint8Array) return base58Encode(value);
   if (Array.isArray(value)) return base58Encode(new Uint8Array(value));
@@ -1103,6 +1395,13 @@ function normalizeSolanaAddress(value) {
   return trimmed;
 }
 
+function bytesToBase64(bytes) {
+  if (!(bytes instanceof Uint8Array)) return '';
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 1) out += String.fromCharCode(bytes[i]);
+  return btoa(out);
+}
+
 function decodeBase64Bytes(value) {
   if (typeof value !== 'string' || !value.trim()) throw new Error('INVALID_PREPARED_TRANSACTION');
   const bin = atob(value);
@@ -1111,80 +1410,546 @@ function decodeBase64Bytes(value) {
   return out;
 }
 
-async function sendPreparedSolanaTransaction({ provider, preparedTx, rpcUrl, web3 }) {
-  if (typeof window.__TOWNHALL_SOLANA_SEND_MOCK === 'function') {
-    const mocked = await window.__TOWNHALL_SOLANA_SEND_MOCK({ provider, preparedTx, rpcUrl });
-    const mockSig = normalizeSolanaTxSignature(mocked);
-    if (!mockSig) throw new Error('MINT_SOLANA_NO_SIGNATURE');
-    return mockSig;
+function deserializePreparedSolanaTransactionBytes({ txBytes, web3 }) {
+  if (!web3?.Transaction || typeof web3.Transaction.from !== 'function') {
+    throw new Error('SOLANA_WEB3_TRANSACTION_UNAVAILABLE');
+  }
+  try {
+    const transaction = web3.Transaction.from(txBytes);
+    if (!transaction) throw new Error('INVALID_PREPARED_TRANSACTION');
+    return transaction;
+  } catch {
+    throw new Error('INVALID_PREPARED_TRANSACTION');
+  }
+}
+
+function decodePreparedSolanaTransaction({ preparedTx, web3 }) {
+  const txBytes = decodeBase64Bytes(preparedTx);
+  return {
+    tx: deserializePreparedSolanaTransactionBytes({ txBytes, web3 }),
+    txBytes
+  };
+}
+
+function prepareSolanaTransactionForClientSigning({ txBytes, web3, signerKeypairs = [] }) {
+  const tx = deserializePreparedSolanaTransactionBytes({ txBytes, web3 });
+  const signers = Array.isArray(signerKeypairs)
+    ? signerKeypairs.filter((entry) => entry && entry.publicKey && entry.secretKey)
+    : [];
+  if (!signers.length) return tx;
+  if (typeof tx.partialSign !== 'function') throw new Error('SOLANA_PARTIAL_SIGN_UNSUPPORTED');
+  tx.partialSign(...signers);
+  return tx;
+}
+
+function serializeSolanaTransactionForRpc(tx) {
+  if (!tx || typeof tx.serialize !== 'function') throw new Error('SOLANA_TX_SERIALIZE_FAILED');
+  const raw = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+  let bytes = null;
+  if (raw instanceof Uint8Array) bytes = raw;
+  else if (raw instanceof ArrayBuffer) bytes = new Uint8Array(raw);
+  else if (ArrayBuffer.isView(raw)) bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (!(bytes instanceof Uint8Array) || bytes.length === 0) throw new Error('SOLANA_TX_SERIALIZE_FAILED');
+  return bytesToBase64(bytes);
+}
+
+async function sendPreparedSolanaTransaction({
+  provider,
+  preparedTx,
+  rpcUrl,
+  web3,
+  refreshProvider = null,
+  signerKeypairs = [],
+  sponsorSendEnabled = false,
+  sponsorWalletAddress = null,
+  sponsorAssetPubkey = null
+}) {
+  let activeProvider = provider && typeof provider === 'object' ? provider : null;
+  const { txBytes } = decodePreparedSolanaTransaction({ preparedTx, web3 });
+  const conn = new web3.Connection(rpcUrl || 'https://api.devnet.solana.com', 'confirmed');
+  const makeTx = () => prepareSolanaTransactionForClientSigning({ txBytes, web3, signerKeypairs });
+  const tryRefreshProvider = async () => {
+    if (typeof refreshProvider === 'function') {
+      try {
+        const refreshed = await refreshProvider();
+        if (refreshed) activeProvider = refreshed;
+      } catch {
+        // ignore; fallback to bridge connect below
+      }
+    }
+    if ((!activeProvider || typeof activeProvider.request !== 'function')
+      && window.__PRIVY_WALLET_BRIDGE__
+      && typeof window.__PRIVY_WALLET_BRIDGE__.connectSolana === 'function') {
+      try {
+        const out = await window.__PRIVY_WALLET_BRIDGE__.connectSolana({ silent: false });
+        const refreshed = out?.provider || out?.wallet || null;
+        if (refreshed) activeProvider = refreshed;
+      } catch {
+        // ignore and continue; caller handles unsupported path
+      }
+    }
+    return activeProvider;
+  };
+
+  const normalizeSignedTx = (value) => {
+    if (!value || typeof value !== 'object') return null;
+    if (typeof value.serialize === 'function') return value;
+    if (value.signedTransaction && typeof value.signedTransaction.serialize === 'function') {
+      return value.signedTransaction;
+    }
+    if (value.transaction && typeof value.transaction.serialize === 'function') {
+      return value.transaction;
+    }
+    return null;
+  };
+
+  const signPreparedTxWithProvider = async () => {
+    if (activeProvider && typeof activeProvider.request === 'function') {
+      try {
+        const signTx = makeTx();
+        const signedOut = await withPrivyProxyRetry(
+          () => activeProvider.request({
+            method: 'signTransaction',
+            params: { transaction: signTx }
+          }),
+          { onRetry: tryRefreshProvider }
+        );
+        const signedTx = normalizeSignedTx(signedOut);
+        if (signedTx) return signedTx;
+      } catch {
+        // try next provider shape
+      }
+    }
+
+    if (activeProvider && typeof activeProvider.signTransaction === 'function') {
+      try {
+        const signTx = makeTx();
+        const signedOut = await withPrivyProxyRetry(
+          () => activeProvider.signTransaction(signTx),
+          { onRetry: tryRefreshProvider }
+        );
+        const signedTx = normalizeSignedTx(signedOut);
+        if (signedTx) return signedTx;
+      } catch {
+        // fall through
+      }
+    }
+    return null;
+  };
+
+  if (sponsorSendEnabled) {
+    const signedTx = await signPreparedTxWithProvider();
+    if (!signedTx) throw new Error('SOLANA_SIGN_TX_UNSUPPORTED');
+    const transaction = serializeSolanaTransactionForRpc(signedTx);
+    const relayOut = await api('/api/townhall/mint/solana/sponsor-send', {
+      method: 'POST',
+      body: JSON.stringify({
+        transaction,
+        ...(typeof sponsorWalletAddress === 'string' && sponsorWalletAddress.trim()
+          ? { walletAddress: sponsorWalletAddress.trim() }
+          : {}),
+        ...(typeof sponsorAssetPubkey === 'string' && sponsorAssetPubkey.trim()
+          ? { assetPubkey: sponsorAssetPubkey.trim() }
+          : {})
+      })
+    });
+    const sig = normalizeSolanaTxSignature(
+      relayOut?.signature
+      || relayOut?.txSig
+      || relayOut?.solana?.signature
+      || relayOut
+    );
+    if (sig) return sig;
+    throw new Error('SOLANA_SPONSOR_SEND_FAILED');
   }
 
-  if (provider && typeof provider.request === 'function') {
-    const attempts = [
-      { method: 'signAndSendTransaction', params: { transaction: preparedTx } },
-      { method: 'signAndSendTransaction', params: [preparedTx] },
-      { method: 'solana_signAndSendTransaction', params: { transaction: preparedTx } },
-      { method: 'solana_signAndSendTransaction', params: [preparedTx] }
+  if (activeProvider && typeof activeProvider.request === 'function') {
+    const signAndSendAttempts = [
+      { method: 'signAndSendTransaction', includeConnection: true, includeOptions: true },
+      { method: 'signAndSendTransaction', includeConnection: true, includeOptions: false },
+      { method: 'solana_signAndSendTransaction', includeConnection: true, includeOptions: true }
     ];
-    for (const attempt of attempts) {
+    for (const attempt of signAndSendAttempts) {
       try {
-        const out = await withPrivyProxyRetry(() => provider.request(attempt));
+        const params = { transaction: makeTx() };
+        if (attempt.includeConnection) params.connection = conn;
+        if (attempt.includeOptions) params.options = { skipPreflight: false };
+        const out = await withPrivyProxyRetry(
+          () => activeProvider.request({ method: attempt.method, params }),
+          { onRetry: tryRefreshProvider }
+        );
         const sig = normalizeSolanaTxSignature(out);
         if (sig) return sig;
       } catch {
-        // try the next request format
+        // try next shape
       }
+    }
+
+    try {
+      const signedTx = await signPreparedTxWithProvider();
+      if (signedTx && typeof signedTx.serialize === 'function') {
+        const raw = signedTx.serialize();
+        const sig = await conn.sendRawTransaction(raw, { skipPreflight: false });
+        await conn.confirmTransaction(sig, 'confirmed');
+        return sig;
+      }
+    } catch {
+      // fall through to non-request provider APIs
     }
   }
 
-  const txBytes = decodeBase64Bytes(preparedTx);
-  const tx = web3.Transaction.from(txBytes);
-
-  if (provider && typeof provider.signAndSendTransaction === 'function') {
-    const out = await withPrivyProxyRetry(() => provider.signAndSendTransaction(tx));
+  if (activeProvider && typeof activeProvider.signAndSendTransaction === 'function') {
+    const signAndSendTx = makeTx();
+    const out = await withPrivyProxyRetry(
+      () => activeProvider.signAndSendTransaction(signAndSendTx),
+      { onRetry: tryRefreshProvider }
+    );
     const sig = normalizeSolanaTxSignature(out);
     if (sig) return sig;
   }
 
-  if (provider && typeof provider.signTransaction === 'function') {
-    const signed = await withPrivyProxyRetry(() => provider.signTransaction(tx));
-    const conn = new web3.Connection(rpcUrl || 'https://api.devnet.solana.com', 'confirmed');
+  if (activeProvider && typeof activeProvider.signTransaction === 'function') {
+    const signTx = makeTx();
+    const signed = await withPrivyProxyRetry(
+      () => activeProvider.signTransaction(signTx),
+      { onRetry: tryRefreshProvider }
+    );
     const raw = signed && typeof signed.serialize === 'function' ? signed.serialize() : signed;
-    const sig = await conn.sendRawTransaction(raw, { skipPreflight: false });
-    await conn.confirmTransaction(sig, 'confirmed');
-    return sig;
+    if (raw) {
+      const sig = await conn.sendRawTransaction(raw, { skipPreflight: false });
+      await conn.confirmTransaction(sig, 'confirmed');
+      return sig;
+    }
   }
 
   throw new Error('SOLANA_TX_SEND_UNSUPPORTED');
 }
 
-async function resolveEvmMintResult(txHandle) {
-  if (!txHandle || typeof txHandle !== 'object') throw new Error('MINT_EVM_FAILED');
-  let txHash = typeof txHandle.hash === 'string' ? txHandle.hash : null;
-  let result = null;
+function normalizeEvmTxHash(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(trimmed)) return null;
+  return trimmed;
+}
 
-  if (typeof txHandle.waitConfirmed === 'function') {
-    const mined = await txHandle.waitConfirmed({ confirmations: 1, throwOnRevert: true });
-    result = mined?.result || null;
-    txHash = txHash || mined?.receipt?.transactionHash || mined?.receipt?.hash || null;
-  } else if (typeof txHandle.waitMined === 'function') {
-    const mined = await txHandle.waitMined({ confirmations: 1, throwOnRevert: true });
-    result = mined?.result || null;
-    txHash = txHash || mined?.receipt?.transactionHash || mined?.receipt?.hash || null;
-  } else {
-    result = txHandle.result || txHandle;
+function normalizePrivyTransactionId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parseSponsoredEvmSendResult(value) {
+  const hash = normalizeEvmTxHash(
+    value?.txHash
+    || value?.transactionHash
+    || value?.transaction_hash
+    || value?.hash
+    || value?.result?.txHash
+    || value?.result?.transactionHash
+    || value?.result?.transaction_hash
+    || value?.result?.hash
+    || value?.data?.txHash
+    || value?.data?.transactionHash
+    || value?.data?.transaction_hash
+    || value?.data?.hash
+    || value
+  );
+  const transactionId = normalizePrivyTransactionId(
+    value?.transactionId
+    || value?.transaction_id
+    || value?.result?.transactionId
+    || value?.result?.transaction_id
+    || value?.data?.transactionId
+    || value?.data?.transaction_id
+  );
+  const userOperationHash = normalizeEvmTxHash(
+    value?.userOperationHash
+    || value?.user_operation_hash
+    || value?.result?.userOperationHash
+    || value?.result?.user_operation_hash
+    || value?.data?.userOperationHash
+    || value?.data?.user_operation_hash
+  );
+  return { hash, transactionId, userOperationHash };
+}
+
+function isPrivySponsoredFailureStatus(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!normalized) return false;
+  return (
+    normalized.includes('fail')
+    || normalized.includes('revert')
+    || normalized.includes('cancel')
+    || normalized.includes('dropped')
+    || normalized.includes('expired')
+    || normalized.includes('error')
+    || normalized.includes('reject')
+  );
+}
+
+async function fetchPrivySponsoredEvmStatus(transactionId) {
+  const id = normalizePrivyTransactionId(transactionId);
+  if (!id) throw new Error('MINT_EVM_SPONSORED_NO_HANDLE');
+  const payload = await api(`/api/privy/transactions/${encodeURIComponent(id)}`, {
+    method: 'GET'
+  });
+  const tx = payload?.transaction && typeof payload.transaction === 'object'
+    ? payload.transaction
+    : payload;
+  const hash = normalizeEvmTxHash(
+    tx?.transactionHash
+    || tx?.transaction_hash
+    || tx?.hash
+    || tx?.txHash
+  );
+  const status = typeof tx?.status === 'string' ? tx.status.trim().toLowerCase() : '';
+  return { hash, status };
+}
+
+async function waitForSponsoredEvmTransactionHash({
+  wallet,
+  transactionId = null,
+  userOperationHash = null,
+  timeoutMs = SPONSORED_EVM_TX_TIMEOUT_MS,
+  pollMs = SPONSORED_EVM_TX_POLL_MS
+}) {
+  let activeProvider = wallet?.provider || null;
+  const txId = normalizePrivyTransactionId(transactionId);
+  const opHash = normalizeEvmTxHash(userOperationHash || '');
+  if (!txId && !opHash) throw new Error('MINT_EVM_SPONSORED_NO_HANDLE');
+
+  const refreshProvider = async () => {
+    if (typeof wallet?.refreshProvider === 'function') {
+      try {
+        const refreshed = await wallet.refreshProvider();
+        if (refreshed && typeof refreshed.request === 'function') {
+          activeProvider = refreshed;
+        }
+      } catch {
+        // ignore refresh errors; status polling can still continue
+      }
+    }
+    return activeProvider;
+  };
+
+  const startedAt = Date.now();
+  let lastStatus = '';
+  while (Date.now() - startedAt < timeoutMs) {
+    if (txId) {
+      try {
+        const status = await fetchPrivySponsoredEvmStatus(txId);
+        if (status.hash) return status.hash;
+        if (status.status) {
+          lastStatus = status.status;
+          if (isPrivySponsoredFailureStatus(status.status)) {
+            const failed = new Error('MINT_EVM_SPONSORED_FAILED');
+            failed.detail = status.status;
+            throw failed;
+          }
+        }
+      } catch (err) {
+        const code = String(err?.message || err || '');
+        if (code === 'PRIVY_SERVER_AUTH_NOT_CONFIGURED' && !opHash) throw err;
+        if (code === 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE' && !opHash) throw err;
+      }
+    }
+
+    if (opHash) {
+      if (!activeProvider || typeof activeProvider.request !== 'function') {
+        await refreshProvider();
+      }
+      if (activeProvider && typeof activeProvider.request === 'function') {
+        try {
+          const raw = await withPrivyProxyRetry(
+            () => activeProvider.request({
+              method: 'eth_getUserOperationReceipt',
+              params: [opHash]
+            }),
+            { onRetry: refreshProvider }
+          );
+          const receipt = raw?.result?.receipt || raw?.receipt || raw?.result || raw;
+          const hash = normalizeEvmTxHash(
+            receipt?.transactionHash
+            || receipt?.transaction_hash
+            || raw?.result?.transactionHash
+            || raw?.transactionHash
+          );
+          if (hash) return hash;
+        } catch {
+          // Some providers do not implement eth_getUserOperationReceipt.
+        }
+      }
+    }
+
+    await sleep(pollMs);
   }
 
-  const agentId = typeof result?.agentId === 'string'
-    ? result.agentId
-    : typeof result?.agentID === 'string'
-      ? result.agentID
-      : null;
+  const timeout = new Error('MINT_EVM_SPONSORED_TIMEOUT');
+  if (lastStatus) timeout.detail = lastStatus;
+  throw timeout;
+}
 
-  return {
-    agentId,
-    txHash: typeof txHash === 'string' ? txHash : null
+function uint256Hex(value) {
+  const big = BigInt(value);
+  if (big < 0n) throw new Error('MINT_EVM_FAILED');
+  return big.toString(16).padStart(64, '0');
+}
+
+function bytesToHex(bytes) {
+  if (!(bytes instanceof Uint8Array)) return '';
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    out += bytes[i].toString(16).padStart(2, '0');
+  }
+  return out;
+}
+
+function toEvmChainHex(chainId) {
+  const numeric = Number(chainId);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  return `0x${Math.floor(numeric).toString(16)}`;
+}
+
+function encodeEvmErc8004RegisterCall(tokenUri) {
+  const uri = String(tokenUri || '');
+  const uriBytes = new TextEncoder().encode(uri);
+  const paddedBytesLen = Math.ceil(uriBytes.length / 32) * 32;
+  const headTokenUriOffset = uint256Hex(64);
+  const headMetadataOffset = uint256Hex(64 + 32 + paddedBytesLen);
+  const uriLength = uint256Hex(uriBytes.length);
+  const uriData = bytesToHex(uriBytes).padEnd(paddedBytesLen * 2, '0');
+  const metadataEntriesLength = uint256Hex(0);
+  return `0x${ERC8004_REGISTER_SELECTOR}${headTokenUriOffset}${headMetadataOffset}${uriLength}${uriData}${metadataEntriesLength}`;
+}
+
+function parseErc8004AgentIdFromEvmReceipt({ receipt, chainId, contractAddress }) {
+  const logs = Array.isArray(receipt?.logs) ? receipt.logs : [];
+  const expectedContract = normalizeEvmAddress(contractAddress || '');
+  const resolvedChainId = Number.isFinite(Number(chainId)) && Number(chainId) > 0
+    ? Math.floor(Number(chainId))
+    : 11155111;
+
+  for (const log of logs) {
+    const logAddress = normalizeEvmAddress(log?.address || '');
+    if (expectedContract && logAddress && logAddress !== expectedContract) continue;
+    const topics = Array.isArray(log?.topics) ? log.topics : [];
+    if (topics.length < 4) continue;
+    if (String(topics[0] || '').toLowerCase() !== ERC721_TRANSFER_TOPIC0) continue;
+    const tokenTopic = String(topics[3] || '').trim();
+    if (!/^0x[a-fA-F0-9]{64}$/.test(tokenTopic)) continue;
+    const tokenId = BigInt(tokenTopic).toString(10);
+    return `${resolvedChainId}:${tokenId}`;
+  }
+
+  return null;
+}
+
+function isEvmReceiptSuccess(receipt) {
+  const status = receipt?.status;
+  if (status === null || status === undefined) return true;
+  if (typeof status === 'number') return status > 0;
+  if (typeof status === 'bigint') return status > 0n;
+  if (typeof status === 'string') {
+    const trimmed = status.trim().toLowerCase();
+    if (trimmed === '0x1' || trimmed === '0x01' || trimmed === '1') return true;
+    if (trimmed === '0x0' || trimmed === '0x00' || trimmed === '0') return false;
+    if (/^0x[0-9a-f]+$/.test(trimmed)) return BigInt(trimmed) > 0n;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return numeric > 0;
+  }
+  return true;
+}
+
+async function sendPreparedEvmTransaction({ wallet, chainId, to, data }) {
+  let activeProvider = wallet?.provider || null;
+  const numericChainId = Number(chainId);
+  const caip2 = Number.isFinite(numericChainId) && numericChainId > 0
+    ? `eip155:${Math.floor(numericChainId)}`
+    : null;
+  const tx = {
+    from: wallet.address,
+    to,
+    data
   };
+
+  const refreshProvider = async () => {
+    if (typeof wallet?.refreshProvider === 'function') {
+      try {
+        const refreshed = await wallet.refreshProvider();
+        if (refreshed && typeof refreshed.request === 'function') {
+          activeProvider = refreshed;
+        }
+      } catch {
+        // ignore refresh errors and keep retrying with existing provider
+      }
+    }
+    return activeProvider;
+  };
+
+  const bridge = window.__PRIVY_WALLET_BRIDGE__;
+  if (bridge && typeof bridge.sendEvmTransaction === 'function') {
+    const out = await withPrivyProxyRetry(
+      () => bridge.sendEvmTransaction({
+        transaction: tx,
+        sponsor: true,
+        ...(caip2 ? { caip2 } : {}),
+        ...(Number.isFinite(numericChainId) && numericChainId > 0 ? { chainId: Math.floor(numericChainId) } : {})
+      }),
+      { onRetry: refreshProvider }
+    );
+    const sponsored = parseSponsoredEvmSendResult(out);
+    if (sponsored.hash) return sponsored.hash;
+    if (sponsored.transactionId || sponsored.userOperationHash) {
+      return waitForSponsoredEvmTransactionHash({
+        wallet,
+        transactionId: sponsored.transactionId,
+        userOperationHash: sponsored.userOperationHash
+      });
+    }
+    throw new Error('PRIVY_SPONSORED_TX_NO_RESULT');
+  }
+
+  throw new Error('PRIVY_SPONSORED_TX_UNAVAILABLE');
+}
+
+async function waitForEvmTransactionReceipt({ wallet, txHash, timeoutMs = 120000, pollMs = 1500 }) {
+  let activeProvider = wallet?.provider || null;
+  const startedAt = Date.now();
+
+  const refreshProvider = async () => {
+    if (typeof wallet?.refreshProvider === 'function') {
+      try {
+        const refreshed = await wallet.refreshProvider();
+        if (refreshed && typeof refreshed.request === 'function') {
+          activeProvider = refreshed;
+        }
+      } catch {
+        // ignore refresh errors and keep retrying with existing provider
+      }
+    }
+    return activeProvider;
+  };
+
+  while (Date.now() - startedAt < timeoutMs) {
+    if (activeProvider && typeof activeProvider.request === 'function') {
+      const raw = await withPrivyProxyRetry(
+        () => activeProvider.request({
+          method: 'eth_getTransactionReceipt',
+          params: [txHash]
+        }),
+        { onRetry: refreshProvider }
+      );
+      const receipt = raw && typeof raw === 'object' && raw.result && typeof raw.result === 'object'
+        ? raw.result
+        : raw;
+      if (receipt && typeof receipt === 'object') return receipt;
+    } else {
+      await refreshProvider();
+    }
+    await sleep(pollMs);
+  }
+
+  throw new Error('MINT_EVM_RECEIPT_TIMEOUT');
 }
 
 function setTownhallMintDraftRecord(role, chain, record) {
@@ -1212,33 +1977,37 @@ async function mintTownhallEvmIdentity({ subject, profile, config, wallet }) {
     })
   });
   if (!prepared?.tokenUri) throw new Error('MINT_EVM_FAILED');
-
-  const SDKCtor = await loadAg0SdkCtor(config?.evm?.sdkModuleUrl);
-  const sdk = new SDKCtor({
-    chainId: Number(prepared?.evm?.chainId || config?.evm?.chainId || 11155111),
-    rpcUrl: prepared?.evm?.rpcUrl || config?.evm?.rpcUrl,
-    walletProvider: wallet.provider
+  const chainId = Number(prepared?.evm?.chainId || config?.evm?.chainId || 11155111);
+  const contractAddress = normalizeEvmAddress(
+    prepared?.evm?.contractAddress || config?.evm?.contractAddress || DEFAULT_EVM_ERC8004_IDENTITY_REGISTRY
+  );
+  if (!contractAddress) throw new Error('MINT_EVM_CONTRACT_NOT_CONFIGURED');
+  const data = encodeEvmErc8004RegisterCall(prepared.tokenUri);
+  const txHash = await sendPreparedEvmTransaction({
+    wallet,
+    chainId,
+    to: contractAddress,
+    data
   });
-
-  const isHuman = safeSubject === 'human';
-  const displayName = isHuman ? profile.humanName || 'Human' : profile.agentName || 'Agent';
-  const description = isHuman
-    ? `Agent Town human onboarding identity for ${profile.humanName || 'Human'}.`
-    : `Agent Town agent onboarding identity for ${profile.humanName || 'Human'}.`;
-  const image = isHuman ? profile?.humanAvatar?.image : profile?.agentAvatar?.image;
-  const agent = sdk.createAgent(displayName, description, image || undefined);
-  const txHandle = await agent.registerHTTP(prepared.tokenUri);
-  const minted = await resolveEvmMintResult(txHandle);
-  if (!minted.agentId) throw new Error('MINT_EVM_NO_AGENT_ID');
+  const receipt = await waitForEvmTransactionReceipt({ wallet, txHash });
+  if (!isEvmReceiptSuccess(receipt)) throw new Error('MINT_EVM_REVERTED');
+  const mintedAgentId = parseErc8004AgentIdFromEvmReceipt({
+    receipt,
+    chainId,
+    contractAddress
+  });
+  if (!mintedAgentId) throw new Error('MINT_EVM_NO_AGENT_ID');
+  const confirmedTxHash = normalizeEvmTxHash(receipt?.transactionHash || txHash) || txHash;
   return {
-    id: minted.agentId,
-    txHash: minted.txHash || null
+    id: mintedAgentId,
+    txHash: confirmedTxHash
   };
 }
 
 async function mintTownhallSolanaIdentity({ subject, profile, config, wallet }) {
   const safeSubject = subject === 'human' ? 'human' : 'agent';
-  const assetPubkey = wallet.web3.Keypair.generate().publicKey.toBase58();
+  const assetKeypair = wallet.web3.Keypair.generate();
+  const assetPubkey = assetKeypair.publicKey.toBase58();
   const prepared = await api('/api/townhall/mint/solana/prepare', {
     method: 'POST',
     body: JSON.stringify({
@@ -1259,17 +2028,27 @@ async function mintTownhallSolanaIdentity({ subject, profile, config, wallet }) 
   }
   const preparedTx = prepared?.prepared?.transaction;
   if (!preparedTx || typeof preparedTx !== 'string') throw new Error('SOLANA_PREPARE_FAILED');
+  const preparedAssetPubkey = normalizeSolanaAddress(prepared?.solana?.assetPubkey || assetPubkey) || assetPubkey;
+  const canUseMockFallback = townhallModuleMocksEnabled();
+  if (!canUseMockFallback && config?.solana?.sponsorSendEnabled !== true) {
+    throw new Error(config?.solana?.sponsorSendError || 'SOLANA_SPONSOR_NOT_CONFIGURED');
+  }
 
   const txSig = await sendPreparedSolanaTransaction({
     provider: wallet.provider,
+    refreshProvider: wallet.refreshProvider,
     preparedTx,
     rpcUrl: config?.solana?.rpcUrl,
-    web3: wallet.web3
+    web3: wallet.web3,
+    signerKeypairs: [assetKeypair],
+    sponsorSendEnabled: config?.solana?.sponsorSendEnabled === true,
+    sponsorWalletAddress: wallet.address,
+    sponsorAssetPubkey: preparedAssetPubkey
   });
   if (!txSig) throw new Error('MINT_SOLANA_NO_SIGNATURE');
 
   return {
-    id: prepared.erc8004Id || `solana:${prepared?.solana?.assetPubkey || assetPubkey}`,
+    id: prepared.erc8004Id || `solana:${preparedAssetPubkey}`,
     txSig
   };
 }
@@ -1439,6 +2218,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
   if (townhallMintInFlight) return;
   townhallMintInFlight = true;
   townhallMintLastErrorStep = null;
+  setTownhallStoryStep('processing');
   const registerBtn = el('townhallRegisterBtn');
   if (registerBtn) registerBtn.disabled = true;
   setTownhallRegisterFeedback('Checking mint configuration...');
@@ -1450,9 +2230,17 @@ async function mintAllTownhallIdentitiesAndRegister() {
     if (!config?.evm?.enabled || !config?.solana?.enabled) throw new Error('MINT_ALL_CHAINS_NOT_ENABLED');
 
     const profile = collectTownhallProfilePayload();
-    await forcePrivyWalletReady();
-    const evmWallet = await ensureEvmMintWallet(config);
-    const solanaWallet = await ensureSolanaMintWallet(config);
+    setTownhallRegisterFeedback('Preparing Privy wallets...');
+    let evmWallet;
+    let solanaWallet;
+    try {
+      await forcePrivyWalletReady();
+      evmWallet = await ensureEvmMintWallet(config);
+      solanaWallet = await ensureSolanaMintWallet(config);
+    } catch (walletErr) {
+      const chain = inferMintErrorChain(walletErr, 'evm');
+      throw new Error(knownMintErrorMessage(walletErr, chain));
+    }
 
     setTownhallRegisterFeedback('User is registering on Ethereum...');
     const userEvm = await runTownhallMintStep('userEvm', () => mintTownhallEvmIdentity({
@@ -1513,9 +2301,14 @@ async function mintAllTownhallIdentitiesAndRegister() {
     setTownhallRegisterFeedback('Saving Town Hall registration...');
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
-    setTownhallRegisterFeedback('All four identities minted and registration saved.');
+    setTownhallRegisterFeedback('Registration complete. Click Continue to start the sigil test.');
   } catch (err) {
-    setTownhallRegisterFeedback(String(err?.message || err || 'Mint failed.'), true);
+    townhallSigilUnlockedByContinue = false;
+    const raw = String(err?.message || err || 'Mint failed.');
+    const msg = isPrivyWalletProxyInitError(err)
+      ? knownMintErrorMessage(err, inferMintErrorChain(err, 'evm'))
+      : raw;
+    setTownhallRegisterFeedback(msg, true);
   } finally {
     townhallMintInFlight = false;
     const cfg = townhallMintConfig || fallbackTownhallMintConfig();
@@ -1524,15 +2317,90 @@ async function mintAllTownhallIdentitiesAndRegister() {
 }
 
 function bindTownhallRegistrationControls() {
-  for (const input of getTownhallDraftFieldNodes()) {
-    bindTownhallDraftField(input);
+  for (const input of getTownhallDraftFieldNodes()) bindTownhallDraftField(input);
+
+  const requireName = (kind) => {
+    const isHuman = kind === 'human';
+    const input = el(isHuman ? 'townhallHumanName' : 'townhallAgentName');
+    const value = (input?.value || '').trim();
+    if (value) return true;
+    setTownhallRegisterFeedback(isHuman ? 'Enter your name to continue.' : 'Enter your agent name to continue.', true);
+    if (input) input.focus();
+    return false;
+  };
+
+  const humanSubmitBtn = el('townhallHumanSubmitBtn');
+  if (humanSubmitBtn && humanSubmitBtn.dataset.bound !== '1') {
+    humanSubmitBtn.dataset.bound = '1';
+    humanSubmitBtn.addEventListener('click', () => {
+      if (!requireName('human')) return;
+      setTownhallRegisterFeedback('');
+      setTownhallStoryStep('agent');
+    });
+  }
+
+  const agentBackBtn = el('townhallAgentBackBtn');
+  if (agentBackBtn && agentBackBtn.dataset.bound !== '1') {
+    agentBackBtn.dataset.bound = '1';
+    agentBackBtn.addEventListener('click', () => {
+      setTownhallRegisterFeedback('');
+      setTownhallStoryStep('human');
+    });
+  }
+
+  const agentSubmitBtn = el('townhallAgentSubmitBtn');
+  if (agentSubmitBtn && agentSubmitBtn.dataset.bound !== '1') {
+    agentSubmitBtn.dataset.bound = '1';
+    agentSubmitBtn.addEventListener('click', () => {
+      if (!requireName('human')) return;
+      if (!requireName('agent')) return;
+      townhallAwaitingContinue = true;
+      townhallSigilUnlockedByContinue = false;
+      setTownhallStoryStep('processing');
+      setTownhallRegisterFeedback('Welcome to Agent Town, processing your registration.');
+      mintAllTownhallIdentitiesAndRegister();
+    });
+  }
+
+  const continueBtn = el('townhallContinueBtn');
+  if (continueBtn && continueBtn.dataset.bound !== '1') {
+    continueBtn.dataset.bound = '1';
+    continueBtn.addEventListener('click', () => {
+      if (continueBtn.disabled) return;
+      townhallAwaitingContinue = false;
+      townhallSigilUnlockedByContinue = true;
+      setTownhallRegisterFeedback('Continue with the sigil test.');
+      if (lastState) syncTownhallRegistrationUI(lastState);
+      const sigilFlow = el('townhallSigilFlow');
+      if (sigilFlow && !sigilFlow.classList.contains('is-hidden')) {
+        sigilFlow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
   }
 
   const registerBtn = el('townhallRegisterBtn');
   if (registerBtn && registerBtn.dataset.bound !== '1') {
     registerBtn.dataset.bound = '1';
     registerBtn.addEventListener('click', () => {
+      townhallAwaitingContinue = true;
+      townhallSigilUnlockedByContinue = false;
       mintAllTownhallIdentitiesAndRegister();
+    });
+  }
+
+  const humanCustomizeBtn = el('townhallHumanCustomizeBtn');
+  if (humanCustomizeBtn && humanCustomizeBtn.dataset.bound !== '1') {
+    humanCustomizeBtn.dataset.bound = '1';
+    humanCustomizeBtn.addEventListener('click', () => {
+      setTownhallCustomizeOpen('human', !townhallHumanCustomizeOpen);
+    });
+  }
+
+  const agentCustomizeBtn = el('townhallAgentCustomizeBtn');
+  if (agentCustomizeBtn && agentCustomizeBtn.dataset.bound !== '1') {
+    agentCustomizeBtn.dataset.bound = '1';
+    agentCustomizeBtn.addEventListener('click', () => {
+      setTownhallCustomizeOpen('agent', !townhallAgentCustomizeOpen);
     });
   }
 
@@ -1573,6 +2441,9 @@ function syncTownhallRegistrationUI(state) {
   const profile = onboarding.profile || {};
   const humanAvatar = profile.humanAvatar || {};
   const agentAvatar = profile.agentAvatar || {};
+  const required = onboardingRequired(state);
+  const hasHouse = !!(state?.houseId || walletHouseId);
+  const registrationComplete = isTownhallRegistrationComplete(state);
 
   const humanNameInput = el('townhallHumanName');
   syncTownhallInputValue(humanNameInput, profile.humanName || '');
@@ -1585,12 +2456,12 @@ function syncTownhallRegistrationUI(state) {
   syncTownhallInputValue(agentPromptInput, agentAvatar.prompt || '');
 
   const onboardingMint = normalizeTownhallMintDraftFromOnboarding(onboarding);
-  if (!townhallMintDraftDirty || onboarding.registrationComplete) {
+  if (!townhallMintDraftDirty || registrationComplete) {
     townhallMintDraft = onboardingMint;
     townhallMintDraftDirty = false;
   }
   if (!townhallMintInFlight) {
-    if (townhallMintLastErrorStep && !onboarding.registrationComplete) {
+    if (townhallMintLastErrorStep && !registrationComplete) {
       syncTownhallMintChecklist(townhallMintDraft, { errorStep: townhallMintLastErrorStep });
     } else {
       syncTownhallMintChecklist(townhallMintDraft);
@@ -1601,27 +2472,53 @@ function syncTownhallRegistrationUI(state) {
   const agentImage = pendingTownhallAgentImage || agentAvatar.image || null;
   setTownhallAvatarPreview('human', humanImage);
   setTownhallAvatarPreview('agent', agentImage);
+  setTownhallCustomizeOpen('human', townhallHumanCustomizeOpen);
+  setTownhallCustomizeOpen('agent', townhallAgentCustomizeOpen);
+
+  if (hasHouse) {
+    townhallAwaitingContinue = false;
+    townhallSigilUnlockedByContinue = true;
+  } else if (registrationComplete && !townhallAwaitingContinue) {
+    townhallSigilUnlockedByContinue = true;
+  } else if (!registrationComplete && required && !townhallAwaitingContinue) {
+    townhallSigilUnlockedByContinue = false;
+  } else if (!required) {
+    townhallSigilUnlockedByContinue = true;
+  }
+
+  if (registrationComplete || hasHouse || townhallMintInFlight || townhallAwaitingContinue || townhallStoryStep === 'processing') {
+    setTownhallStoryStep('processing');
+  } else if (townhallStoryStep !== 'agent') {
+    setTownhallStoryStep('human');
+  }
 
   const registerState = el('townhallRegisterState');
-  if (registerState) registerState.textContent = onboarding.registrationComplete ? 'Registered' : 'Not registered';
+  if (registerState) registerState.textContent = registrationComplete ? 'Registered' : 'Not registered';
+
+  const continueBtn = el('townhallContinueBtn');
+  if (continueBtn) {
+    const canContinue = (registrationComplete || hasHouse) && !townhallMintInFlight;
+    continueBtn.disabled = !canContinue;
+  }
 
   const gateHint = el('townHallGateHint');
   if (gateHint) {
-    if (state?.houseId || walletHouseId) {
-      gateHint.textContent = 'House exists. You can use all districts.';
-    } else if (onboarding.required) {
-      gateHint.textContent = onboarding.registrationComplete
-        ? 'Registration complete. Continue with sigil unlock below.'
-        : 'Town Hall is required: complete registration to unlock the sigil steps.';
+    if (hasHouse) {
+      gateHint.textContent = 'House unlocked. Explore town freely.';
+    } else if (registrationComplete) {
+      gateHint.textContent = 'Registration complete.';
+    } else if (required) {
+      gateHint.textContent = 'Complete Town Hall onboarding to continue.';
     } else {
-      gateHint.textContent = 'Registration is optional in this environment.';
+      gateHint.textContent = 'Town Hall onboarding is optional here.';
     }
   }
 
+  const canUseSigil = canUseTownhallSigilFlow(state);
+  const showSigil = canUseSigil && (townhallSigilUnlockedByContinue || !required || hasHouse);
   const sigilFlow = el('townhallSigilFlow');
-  if (sigilFlow) {
-    sigilFlow.classList.toggle('is-hidden', !canUseTownhallSigilFlow(state));
-  }
+  if (sigilFlow) sigilFlow.classList.toggle('is-hidden', !showSigil);
+  panel.classList.toggle('is-hidden', required && registrationComplete && !hasHouse && showSigil);
 
   bindTownhallRegistrationControls();
 }

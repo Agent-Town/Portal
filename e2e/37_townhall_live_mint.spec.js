@@ -14,14 +14,54 @@ async function installTownhallWalletMocks(page, {
 }) {
   await page.addInitScript(
     ({ evmAddress: evmAddr, solAddress: solAddr, evmMints: evmMintResults, solSignatures: solSigs }) => {
+      window.__TOWNHALL_TEST_MOCKS_ENABLED__ = true;
+
       let evmMintIndex = 0;
       let solMintIndex = 0;
+      const evmReceipts = new Map();
+      const transferTopic0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+      const evmContract = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+
+      const addressTopic = (address) => `0x${String(address || '').replace(/^0x/i, '').padStart(64, '0')}`;
+      const tokenTopic = (agentId, fallbackIndex) => {
+        const suffix = String(agentId || '').split(':').pop() || '';
+        const numeric = /^[0-9]+$/.test(suffix) ? BigInt(suffix) : BigInt(fallbackIndex + 1);
+        return `0x${numeric.toString(16).padStart(64, '0')}`;
+      };
+      const saveReceipt = (result, fallbackIndex) => {
+        if (!result || typeof result !== 'object' || typeof result.txHash !== 'string') return;
+        evmReceipts.set(result.txHash.toLowerCase(), {
+          transactionHash: result.txHash,
+          status: '0x1',
+          logs: [{
+            address: evmContract,
+            topics: [
+              transferTopic0,
+              '0x0000000000000000000000000000000000000000000000000000000000000000',
+              addressTopic(evmAddr),
+              tokenTopic(result.agentId, fallbackIndex)
+            ],
+            data: '0x'
+          }]
+        });
+      };
 
       const evmProvider = {
-        request: async ({ method }) => {
+        request: async ({ method, params }) => {
           if (method === 'eth_requestAccounts') return [evmAddr];
           if (method === 'eth_chainId') return '0xaa36a7';
           if (method === 'wallet_switchEthereumChain') return null;
+          if (method === 'eth_getTransactionReceipt') {
+            const txHash = Array.isArray(params) && params[0] ? String(params[0]).toLowerCase() : '';
+            return evmReceipts.get(txHash) || null;
+          }
+          if (method === 'eth_sendTransaction') {
+            const idx = Math.min(evmMintIndex, evmMintResults.length - 1);
+            const result = evmMintResults[idx];
+            evmMintIndex += 1;
+            saveReceipt(result, idx);
+            return result.txHash;
+          }
           throw new Error(`unhandled EVM method ${method}`);
         }
       };
@@ -45,31 +85,16 @@ async function installTownhallWalletMocks(page, {
         signSolanaMessage: async () => ({ signature: new Uint8Array(64) }),
         connectEvm: async () => ({ address: evmAddr, provider: evmProvider }),
         disconnectEvm: async () => {},
+        sendEvmTransaction: async () => {
+          const idx = Math.min(evmMintIndex, evmMintResults.length - 1);
+          const result = evmMintResults[idx];
+          evmMintIndex += 1;
+          saveReceipt(result, idx);
+          return { hash: result.txHash };
+        },
         getEvmProvider: () => evmProvider,
         getEvmChainId: async () => 11155111,
         switchEvmChain: async () => null
-      };
-
-      window.__AG0_SDK_MOCK = {
-        SDK: class SDK {
-          constructor() {}
-          createAgent() {
-            return {
-              registerHTTP: async () => {
-                const idx = Math.min(evmMintIndex, evmMintResults.length - 1);
-                const result = evmMintResults[idx];
-                evmMintIndex += 1;
-                return {
-                  hash: result.txHash,
-                  waitConfirmed: async () => ({
-                    result: { agentId: result.agentId },
-                    receipt: { transactionHash: result.txHash }
-                  })
-                };
-              }
-            };
-          }
-        }
       };
 
       window.__SOLANA_WEB3_MOCK = {
@@ -99,6 +124,60 @@ async function installTownhallWalletMocks(page, {
       solSignatures
     }
   );
+}
+
+async function completeTownhallStory(page, {
+  humanName = 'Robin',
+  agentName = 'OpenClaw',
+  humanPrompt = 'Human image prompt used',
+  agentPrompt = 'Agent image prompt used'
+} = {}) {
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await page.locator('#townhallHumanName').fill(humanName);
+  await page.locator('#townhallHumanCustomizeBtn').click();
+  await page.locator('#townhallHumanPrompt').fill(humanPrompt);
+  await page.getByTestId('townhall-human-submit-btn').click();
+
+  await expect(page.locator('#townhallStepAgent')).toBeVisible();
+  await page.locator('#townhallAgentName').fill(agentName);
+  await page.locator('#townhallAgentCustomizeBtn').click();
+  await page.locator('#townhallAgentPrompt').fill(agentPrompt);
+  await page.getByTestId('townhall-agent-submit-btn').click();
+
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+}
+
+async function openTownhallPanel(page) {
+  const panel = page.locator('#townhallRegisterPanel');
+  const townhallVisible = async () => (
+    await panel.isVisible()
+    || await page.locator('#townhallStepHuman').isVisible()
+    || await page.locator('#townhallStepAgent').isVisible()
+    || await page.locator('#townhallStepProcessing').isVisible()
+  );
+  if (await townhallVisible()) return;
+
+  const backdrop = page.locator('#districtModalBackdrop');
+  if (await backdrop.isVisible()) {
+    const closeBtn = page.locator('#districtModalClose');
+    if (await closeBtn.isVisible()) {
+      await closeBtn.click();
+    } else {
+      // Locked onboarding can open Town Hall immediately without a visible close button.
+      await expect(page.locator('#townhallStepHuman')).toBeVisible();
+      return;
+    }
+  }
+
+  if (await townhallVisible()) return;
+  const closeBtn = page.locator('#districtModalClose');
+  if (await closeBtn.isVisible()) {
+    await closeBtn.click();
+  }
+  if (!(await townhallVisible())) {
+    await page.getByRole('button', { name: 'Open Town Hall' }).click();
+  }
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
 }
 
 test('town hall one-click flow mints all 4 identities and saves registration', async ({ page }) => {
@@ -141,7 +220,7 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
             chainId: 11155111,
             network: 'sepolia',
             rpcUrl: 'https://sepolia.infura.io/v3/test',
-            sdkModuleUrl: 'mock://ag0'
+            contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
           },
           solana: {
             enabled: true,
@@ -169,7 +248,12 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
         tokenUri: `ipfs://bafybeievmmock-${body.subject}`,
         metadataCid: `bafybeievmmock-${body.subject}`,
         subject: body.subject,
-        evm: { chainId: 11155111, network: 'sepolia', rpcUrl: 'https://sepolia.infura.io/v3/test' }
+        evm: {
+          chainId: 11155111,
+          network: 'sepolia',
+          rpcUrl: 'https://sepolia.infura.io/v3/test',
+          contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
+        }
       })
     });
   });
@@ -207,22 +291,17 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
   });
 
   await page.goto('/app');
-
-  await page.locator('#districtModalClose').click();
-  await page.getByRole('button', { name: 'Open Town Hall' }).click();
-  await expect(page.locator('#townhallRegisterPanel')).toBeVisible();
-  await page.locator('#townhallHumanName').fill('Robin');
-  await page.locator('#townhallAgentName').fill('OpenClaw');
-  await page.locator('#townhallHumanPrompt').fill('Human image prompt used');
-  await page.locator('#townhallAgentPrompt').fill('Agent image prompt used');
-
-  await page.getByTestId('townhall-register-btn').click();
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
 
   await expect(page.locator('#townhallMintUserEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintUserSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await page.getByTestId('townhall-continue-btn').click();
+  await expect(page.getByTestId('open-btn')).toBeVisible();
 
   expect(evmSubjects).toEqual(['human', 'agent']);
   expect(solSubjects).toEqual(['human', 'agent']);
@@ -268,7 +347,7 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
             chainId: 11155111,
             network: 'sepolia',
             rpcUrl: 'https://sepolia.infura.io/v3/test',
-            sdkModuleUrl: 'mock://ag0'
+            contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
           },
           solana: {
             enabled: true,
@@ -290,7 +369,12 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
         tokenUri: 'ipfs://bafybeievmmock-human',
         metadataCid: 'bafybeievmmock-human',
         subject: 'human',
-        evm: { chainId: 11155111, network: 'sepolia', rpcUrl: 'https://sepolia.infura.io/v3/test' }
+        evm: {
+          chainId: 11155111,
+          network: 'sepolia',
+          rpcUrl: 'https://sepolia.infura.io/v3/test',
+          contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
+        }
       })
     });
   });
@@ -322,16 +406,8 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
   });
 
   await page.goto('/app');
-  await page.locator('#districtModalClose').click();
-  await page.getByRole('button', { name: 'Open Town Hall' }).click();
-  await expect(page.locator('#townhallRegisterPanel')).toBeVisible();
-
-  await page.locator('#townhallHumanName').fill('Robin');
-  await page.locator('#townhallAgentName').fill('OpenClaw');
-  await page.locator('#townhallHumanPrompt').fill('Human image prompt used');
-  await page.locator('#townhallAgentPrompt').fill('Agent image prompt used');
-
-  await page.getByTestId('townhall-register-btn').click();
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
 
   await expect(page.locator('#townhallMintUserEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintUserSolanaStatus')).toContainText('Failed');
@@ -339,4 +415,5 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Pending');
   await expect(page.locator('#townhallRegisterError')).toContainText('does not match');
   await expect(page.locator('#townhallRegisterState')).toContainText('Not registered');
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
 });

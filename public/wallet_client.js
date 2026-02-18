@@ -235,7 +235,11 @@
         if (!address) throw new Error('NO_SOLANA_PUBKEY');
         this.solanaAddress = address;
         this._bindSolanaProvider(out?.wallet || out?.provider || null);
-        return { chain: CHAIN_SOLANA, address };
+        return {
+          chain: CHAIN_SOLANA,
+          address,
+          provider: this.solanaProvider || out?.wallet || out?.provider || null
+        };
       }
       throw new Error('NO_SOLANA_WALLET');
     }
@@ -280,7 +284,7 @@
         if (!address) throw new Error('NO_EVM_ACCOUNT');
         this.evmAddress = address;
         if (out?.provider) this.evmProvider = out.provider;
-        return { chain: CHAIN_EVM, address };
+        return { chain: CHAIN_EVM, address, provider: this.evmProvider || out?.provider || null };
       }
       throw new Error('NO_EVM_WALLET');
     }

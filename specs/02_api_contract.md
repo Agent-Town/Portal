@@ -59,7 +59,123 @@ Response (disabled):
 Notes:
 - Only public config is returned.
 - `PRIVY_APP_SECRET` is server-only and is never exposed by this endpoint.
+- `sdkScriptUrl` / `sdkModuleUrl` are omitted when unset or invalid (for example placeholder `*.example.com` values).
 - In `NODE_ENV=test`, this endpoint is disabled by default unless `ENABLE_PRIVY_IN_TEST=true`.
+- Browser CSP for this app allows Privy SDK module loading from `esm.sh`, `cdn.jsdelivr.net`, and `cdn.skypack.dev`.
+
+### GET `/api/privy/transactions/:transactionId`
+Returns server-side Privy transaction status for a client-submitted sponsored transaction.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "transaction": {
+    "id": "tx_...",
+    "status": "pending|confirmed|failed|...",
+    "transactionHash": "0x...|null",
+    "userOperationHash": "0x...|null"
+  }
+}
+```
+
+Notes:
+- Used by Town Hall EVM mint when Privy returns a sponsored `transactionId` before a chain tx hash is available.
+- Requires `PRIVY_APP_SECRET` on the server. If missing, returns `PRIVY_SERVER_AUTH_NOT_CONFIGURED`.
+- This endpoint never returns app secrets.
+- Errors: `MISSING_PRIVY_TRANSACTION_ID`, `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `PRIVY_TRANSACTION_STATUS_UNAVAILABLE`.
+
+### POST `/api/privy/wallet-rpc/prepare`
+Prepares a canonical signed payload for sponsored Privy wallet RPC relay.
+
+Request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": {
+    "method": "signAndSendTransaction",
+    "params": {
+      "transaction": "<base64 serialized tx>",
+      "encoding": "base64"
+    },
+    "sponsor": true,
+    "caip2": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+  }
+}
+```
+
+Alternate EVM request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": {
+    "chain_type": "ethereum",
+    "method": "eth_sendTransaction",
+    "params": {
+      "transaction": {
+        "from": "0x...",
+        "to": "0x...",
+        "data": "0x..."
+      }
+    },
+    "sponsor": true,
+    "caip2": "eip155:11155111"
+  }
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "walletId": "wallet_...",
+  "body": { "...normalized rpc body..." },
+  "signingPayload": {
+    "version": 1,
+    "url": "https://api.privy.io/v1/wallets/<walletId>/rpc",
+    "method": "POST",
+    "headers": { "privy-app-id": "<privy app id>" },
+    "body": { "...normalized rpc body..." }
+  }
+}
+```
+
+Notes:
+- Used by frontend to sign the exact payload with Privy user signer (`generateAuthorizationSignature`) before relay.
+- Server validates and normalizes sponsored wallet RPC bodies for:
+  - EVM `eth_sendTransaction`
+  - Solana `signAndSendTransaction` (base64-encoded transaction payload)
+- Errors include: `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `INVALID_PRIVY_WALLET_ID`, and `INVALID_PRIVY_WALLET_RPC_*`.
+
+### POST `/api/privy/wallet-rpc/relay`
+Relays a signed Privy wallet RPC request through server auth.
+
+Request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": { "...normalized rpc body from /prepare..." },
+  "signature": "<privy authorization signature>"
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "result": {
+    "transaction_id": "tx_...",
+    "transaction_hash": "0x... (optional, EVM)",
+    "user_operation_hash": "0x... (optional, EVM)",
+    "hash": "<base58 signature optional, Solana>"
+  }
+}
+```
+
+Notes:
+- Maintains user ownership: frontend wallet signs payload; server only relays with app auth.
+- Relay endpoint never exposes app secret.
+- Errors include: `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `INVALID_PRIVY_WALLET_ID`, `MISSING_PRIVY_AUTH_SIGNATURE`, `PRIVY_WALLET_RPC_RELAY_FAILED`.
 
 ---
 
@@ -116,7 +232,6 @@ Includes:
   - `erc8004.user.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
   - `erc8004.agent.evm` (`id`, `chain`, `txHash`, `updatedAt`)
   - `erc8004.agent.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
-  - `erc8004.evm` / `erc8004.solana` (legacy summary aliases; mirrors agent entries)
 
 ### GET `/api/townhall/state` (human)
 Returns Town Hall onboarding state for the current session.
@@ -149,13 +264,16 @@ Response shape:
       "chainId": 11155111,
       "network": "sepolia",
       "rpcUrl": "https://sepolia.infura.io/v3/...",
-      "sdkModuleUrl": "https://esm.sh/agent0-sdk@1.5.3?bundle"
+      "contractAddress": "0x8004a818bfb912233c491871b3d84c89a494bd9e"
     },
     "solana": {
       "enabled": true,
       "cluster": "devnet",
       "rpcUrl": "https://api.devnet.solana.com",
-      "web3ModuleUrl": "https://esm.sh/@solana/web3.js@1.98.4?bundle"
+      "web3ModuleUrl": "https://esm.sh/@solana/web3.js@1.98.4?bundle",
+      "sponsorSendEnabled": true,
+      "sponsorFeePayer": "<solana base58>|null",
+      "sponsorSendError": "SOLANA_SPONSOR_SECRET_INVALID|null"
     }
   }
 }
@@ -179,6 +297,10 @@ Body:
 }
 ```
 
+Notes:
+- Frontend sends `eth_sendTransaction` from the connected Privy EVM wallet to `evm.contractAddress` (`register(string,(string,bytes)[])`), then derives ERC-8004 ID from the confirmed receipt logs.
+- If Privy sponsorship returns a `transactionId` without an immediate tx hash, frontend polls `GET /api/privy/transactions/:transactionId` until `transactionHash` is available, then confirms receipt.
+
 Response:
 ```json
 {
@@ -189,14 +311,15 @@ Response:
   "evm": {
     "chainId": 11155111,
     "network": "sepolia",
-    "rpcUrl": "https://sepolia.infura.io/v3/..."
+    "rpcUrl": "https://sepolia.infura.io/v3/...",
+    "contractAddress": "0x8004a818bfb912233c491871b3d84c89a494bd9e"
   }
 }
 ```
 
 ### POST `/api/townhall/mint/solana/prepare` (human)
 Pins Town Hall metadata to IPFS and returns an unsigned prepared Solana transaction.
-Frontend wallet signs/sends the transaction and remains owner.
+Frontend wallet signs this transaction (user wallet + local asset keypair). If sponsorship is enabled, the server fee-payer signs and broadcasts in a second step.
 
 Body:
 ```json
@@ -231,7 +354,39 @@ Response:
   "solana": {
     "cluster": "devnet",
     "rpcUrl": "https://api.devnet.solana.com",
-    "assetPubkey": "<solana base58>"
+    "assetPubkey": "<solana base58>",
+    "sponsorSendEnabled": true,
+    "sponsorFeePayer": "<solana base58>|null"
+  }
+}
+```
+
+### POST `/api/townhall/mint/solana/sponsor-send` (human)
+Broadcasts a client-signed Solana registration transaction using the server fee payer.
+
+Body:
+```json
+{
+  "walletAddress": "<solana base58>",
+  "assetPubkey": "<solana base58>",
+  "transaction": "<base64 client-signed tx>"
+}
+```
+
+Behavior:
+- Server may auto-top-up the owner wallet from the sponsor fee payer before/while sending when `SOLANA_SPONSOR_AUTO_TOPUP=true`.
+- Default owner pre-fund target is `10,000,000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
+
+Response:
+```json
+{
+  "ok": true,
+  "signature": "<solana tx signature>",
+  "solana": {
+    "signature": "<solana tx signature>",
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "feePayer": "<solana base58>"
   }
 }
 ```
@@ -253,6 +408,21 @@ Errors (prepare endpoints):
 - `MISSING_SOLANA_ASSET_PUBKEY` (Solana prepare only)
 - `PINATA_UPLOAD_FAILED`
 - `SOLANA_PREPARE_FAILED` (Solana prepare only)
+- `SOLANA_SPONSOR_NOT_CONFIGURED`
+- `SOLANA_SPONSOR_SECRET_INVALID`
+- `INVALID_SOLANA_SPONSORED_TX`
+- `SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING`
+- `SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING`
+- `SOLANA_SPONSORED_TX_NOT_PREPARED`
+- `SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER`
+- `SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET`
+- `SOLANA_SPONSOR_FEEPAYER_UNFUNDED`
+- `SOLANA_SPONSORED_OWNER_UNFUNDED`
+- `SOLANA_SPONSOR_SEND_FAILED`
+
+Notes:
+- For `PINATA_UPLOAD_FAILED`, response may include optional `detail` with upstream Pinata reason (e.g. `NO_SCOPES_FOUND`).
+- For `SOLANA_SPONSORED_TX_NOT_PREPARED`, response may include optional `detail` describing wallet/asset/hash mismatch context.
 
 ### POST `/api/townhall/register` (human)
 Saves Town Hall registration metadata and marks registration complete.

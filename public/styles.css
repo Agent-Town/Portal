@@ -611,12 +611,26 @@ h3 {
   background: transparent;
 }
 
+.districtModal.is-district {
+  width: fit-content;
+  max-width: calc(100vw - 32px);
+  min-width: min(560px, calc(100vw - 32px));
+}
+
 .districtModal.is-district .districtModalHeader h2 {
   display: none;
 }
 
 .districtModal.is-district .districtModalBody {
   padding: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.districtModal.is-district .districtModalBody > * {
+  width: fit-content;
+  max-width: 100%;
 }
 
 .districtModalBody.is-loading {
@@ -967,6 +981,61 @@ body.district-modal-open {
 .stack {
   display: grid;
   gap: 10px;
+}
+
+.townhallStoryStep {
+  display: grid;
+  gap: 10px;
+  width: min(680px, 100%);
+}
+
+.townhallStoryShell {
+  justify-content: center;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  display: grid;
+  gap: 12px;
+}
+
+.townhallStoryStep textarea,
+.townhallStoryStep input[type="text"],
+.townhallStoryStep input[type="file"],
+.townhallStoryStep .townhallAvatarBlock,
+.townhallStoryStep .townhallCustomizeModal,
+.townhallStoryStep .townhallMintChecklist {
+  width: min(680px, 100%);
+}
+
+.townhallAvatarBlock {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid rgba(44, 69, 99, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 248, 230, 0.72);
+}
+
+.townhallAvatarBlock .public-media-preview {
+  margin-top: 0;
+}
+
+.townhallAvatarBlock .public-media-preview img {
+  max-width: 220px;
+  max-height: 320px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff8e8;
+}
+
+.townhallCustomizeModal {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid rgba(44, 69, 99, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 242, 214, 0.85);
 }
 
 .townhallMintChecklist {
@@ -1422,6 +1491,11 @@ footer::before {
 
   .townhallMintChecklistRow .pill {
     min-width: 0;
+  }
+
+  .townhallAvatarBlock .public-media-preview img {
+    max-width: 100%;
+    max-height: 180px;
   }
 
   .topbar .kv,

@@ -723,6 +723,18 @@ function splitCsvEnv(raw) {
     .filter(Boolean);
 }
 
+function uniqueStrings(values) {
+  const out = [];
+  const seen = new Set();
+  for (const value of Array.isArray(values) ? values : []) {
+    const item = String(value || '').trim();
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out;
+}
+
 function parseBoolEnv(raw, fallback = false) {
   if (raw === undefined || raw === null || String(raw).trim() === '') return !!fallback;
   const normalized = String(raw).trim().toLowerCase();
@@ -756,10 +768,49 @@ function sanitizePublicConfig(value) {
   return out;
 }
 
+function sanitizePublicUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    const protocol = String(parsed.protocol || '').toLowerCase();
+    const host = String(parsed.hostname || '').toLowerCase();
+    if (protocol !== 'https:' && protocol !== 'http:') return '';
+    if (host === 'example.com' || host.endsWith('.example.com')) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function toCspConnectSrcFromUrls(values) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const raw = String(value || '').trim();
+    if (!raw) continue;
+    try {
+      const parsed = new URL(raw);
+      const protocol = String(parsed.protocol || '').toLowerCase();
+      if (!['https:', 'http:', 'wss:', 'ws:'].includes(protocol)) continue;
+      const origin = `${protocol}//${parsed.host}`;
+      if (!origin || seen.has(origin)) continue;
+      seen.add(origin);
+      out.push(origin);
+    } catch {
+      // ignore malformed URLs in CSP derivation
+    }
+  }
+  return out;
+}
+
 const PRIVY_APP_ID = String(process.env.PRIVY_APP_ID || '').trim();
 const PRIVY_CLIENT_ID = String(process.env.PRIVY_CLIENT_ID || '').trim();
-const PRIVY_SDK_SCRIPT_URL = String(process.env.PRIVY_SDK_SCRIPT_URL || '').trim();
-const PRIVY_SDK_MODULE_URL = String(process.env.PRIVY_SDK_MODULE_URL || '').trim();
+const PRIVY_APP_SECRET = String(process.env.PRIVY_APP_SECRET || '').trim();
+const PRIVY_API_BASE_URL = String(process.env.PRIVY_API_BASE_URL || 'https://api.privy.io').trim().replace(/\/+$/, '');
+const PRIVY_SDK_SCRIPT_URL = sanitizePublicUrl(process.env.PRIVY_SDK_SCRIPT_URL || '');
+const PRIVY_SDK_MODULE_URL = sanitizePublicUrl(process.env.PRIVY_SDK_MODULE_URL || '');
 const PRIVY_LOGIN_METHOD = String(process.env.PRIVY_LOGIN_METHOD || 'email').trim().toLowerCase();
 const PRIVY_PUBLIC_CONFIG_JSON = sanitizePublicConfig(parseJsonObjectEnv(process.env.PRIVY_PUBLIC_CONFIG_JSON));
 const PRIVY_PUBLIC_CONFIG = {
@@ -777,8 +828,8 @@ const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_EN
 const HOME_ROUTE_FILE = 'start.html';
 const ONBOARDING_REQUIRED = PRIVY_ENABLED;
 
-const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/elizaos-sheriff.png';
-const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/openclaw-sheriff.png';
+const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/default_user_avatar.png';
+const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/default_agent_avatar.png';
 const DEFAULT_TOWNHALL_HUMAN_PROMPT = "Stylized 3D third-person game character concept: a gender-neutral, race-neutral wild west wizard known as a 'Promptmancer' with a friendly, approachable silhouette and expressive eyes.";
 const DEFAULT_TOWNHALL_AGENT_PROMPT = 'Stylized 3D prairie pup avatar doing a cute hat-tip emote with a wholesome mascot vibe in a cozy wild west frontier style.';
 const PINATA_JWT = String(process.env.PINATA_JWT || process.env.ERC8004_PINATA_JWT || '').trim();
@@ -792,15 +843,51 @@ const EVM_ERC8004_RPC_URL = String(
   || (INFURA_PROJECT_ID ? `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}` : '')
 ).trim();
 const EVM_ERC8004_NETWORK = String(process.env.EVM_ERC8004_NETWORK || 'sepolia').trim().toLowerCase();
+const EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+const EVM_ERC8004_IDENTITY_REGISTRY = normalizeEvmAddress(
+  String(
+    process.env.EVM_ERC8004_IDENTITY_REGISTRY
+    || process.env.EVM_ERC8004_CONTRACT_ADDRESS
+    || EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT
+  ).trim()
+) || EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT;
 const SOLANA_ERC8004_CLUSTER = String(process.env.SOLANA_ERC8004_CLUSTER || 'devnet').trim().toLowerCase();
 const SOLANA_ERC8004_RPC_URL = String(process.env.SOLANA_ERC8004_RPC_URL || 'https://api.devnet.solana.com').trim();
+const SOLANA_ERC8004_RPC_FALLBACKS = splitCsvEnv(process.env.SOLANA_ERC8004_RPC_FALLBACKS);
+const SOLANA_ERC8004_DEFAULT_RPC_BY_CLUSTER = {
+  devnet: 'https://api.devnet.solana.com',
+  testnet: 'https://api.testnet.solana.com',
+  mainnet: 'https://api.mainnet-beta.solana.com',
+  'mainnet-beta': 'https://api.mainnet-beta.solana.com'
+};
+const SOLANA_ERC8004_RPC_CANDIDATES = uniqueStrings([
+  SOLANA_ERC8004_RPC_URL,
+  ...SOLANA_ERC8004_RPC_FALLBACKS,
+  SOLANA_ERC8004_DEFAULT_RPC_BY_CLUSTER[SOLANA_ERC8004_CLUSTER] || ''
+]);
+const SOLANA_ERC8004_FEE_PAYER_SECRET = String(
+  process.env.SOLANA_ERC8004_FEE_PAYER_SECRET
+  || process.env.SOLANA_DEVNET_FEE_PAYER_SECRET
+  || ''
+).trim();
+const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW = Number(process.env.SOLANA_SPONSOR_OWNER_MIN_LAMPORTS || 10_000_000);
+const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS = Number.isFinite(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
+  && SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW > 0
+  ? Math.floor(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
+  : 10_000_000;
+const SOLANA_SPONSOR_AUTO_TOPUP = parseBoolEnv(
+  process.env.SOLANA_SPONSOR_AUTO_TOPUP,
+  SOLANA_ERC8004_CLUSTER === 'devnet' || SOLANA_ERC8004_CLUSTER === 'testnet'
+);
 const TOWNHALL_MINT_ENABLED = parseBoolEnv(process.env.TOWNHALL_MINT_ENABLED, true);
-const AG0_SDK_MODULE_URL = String(process.env.AG0_SDK_MODULE_URL || 'https://esm.sh/agent0-sdk@1.5.3?bundle').trim();
 const SOLANA_WEB3_MODULE_URL = String(process.env.SOLANA_WEB3_MODULE_URL || 'https://esm.sh/@solana/web3.js@1.98.4?bundle').trim();
+const SOLANA_CONNECT_SRC = toCspConnectSrcFromUrls([...SOLANA_ERC8004_RPC_CANDIDATES, ...SOLANA_RPC_URLS]);
 
 const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
 const PRIVY_SCRIPT_SRC_DEFAULT = [
   'https://esm.sh',
+  'https://cdn.jsdelivr.net',
+  'https://cdn.skypack.dev',
   'https://auth.privy.io',
   'https://*.privy.io',
   'https://*.privy.app',
@@ -819,14 +906,28 @@ const PRIVY_CONNECT_SRC_DEFAULT = [
   'https://*.privy.io',
   'https://*.privy.app',
   'https://*.privy.com',
+  'https://*.privy.systems',
+  'https://privy.systems',
+  // Embedded wallets can call chain-specific Privy RPC hosts (for example sepolia.rpc.privy.systems).
+  'https://*.rpc.privy.systems',
+  'https://rpc.privy.systems',
+  'https://sepolia.rpc.privy.systems',
   'wss://*.privy.io',
   'wss://*.privy.app',
-  'wss://*.privy.com'
+  'wss://*.privy.com',
+  'wss://*.privy.systems',
+  'wss://privy.systems',
+  'wss://*.rpc.privy.systems',
+  'wss://rpc.privy.systems'
 ];
 const connectSrc = [
   "'self'",
+  'https://esm.sh',
+  'https://cdn.jsdelivr.net',
+  'https://cdn.skypack.dev',
   'https://eth.llamarpc.com',
   'https://rpc.ankr.com',
+  ...SOLANA_CONNECT_SRC,
   ...(PRIVY_ENABLED ? PRIVY_CONNECT_SRC_DEFAULT : []),
   ...CSP_CONNECT_SRC_EXTRA
 ];
@@ -1243,55 +1344,25 @@ function normalizeTownhallMintSubject(value) {
   return null;
 }
 
-function normalizeTownhallEvmIdentityState(raw, fallback = null) {
+function normalizeTownhallEvmIdentityState(raw) {
   const input = raw && typeof raw === 'object' ? raw : {};
-  const fb = fallback && typeof fallback === 'object' ? fallback : {};
-  const id = typeof input.id === 'string'
-    ? input.id
-    : typeof fb.id === 'string'
-      ? fb.id
-      : null;
+  const id = typeof input.id === 'string' ? input.id : null;
   const chain = typeof input.chain === 'string' && input.chain.trim()
     ? input.chain
-    : typeof fb.chain === 'string' && fb.chain.trim()
-      ? fb.chain
-      : 'sepolia';
-  const txHash = typeof input.txHash === 'string'
-    ? input.txHash
-    : typeof fb.txHash === 'string'
-      ? fb.txHash
-      : null;
-  const updatedAt = typeof input.updatedAt === 'string'
-    ? input.updatedAt
-    : typeof fb.updatedAt === 'string'
-      ? fb.updatedAt
-      : null;
+    : 'sepolia';
+  const txHash = typeof input.txHash === 'string' ? input.txHash : null;
+  const updatedAt = typeof input.updatedAt === 'string' ? input.updatedAt : null;
   return { id, chain, txHash, updatedAt };
 }
 
-function normalizeTownhallSolanaIdentityState(raw, fallback = null) {
+function normalizeTownhallSolanaIdentityState(raw) {
   const input = raw && typeof raw === 'object' ? raw : {};
-  const fb = fallback && typeof fallback === 'object' ? fallback : {};
-  const id = typeof input.id === 'string'
-    ? input.id
-    : typeof fb.id === 'string'
-      ? fb.id
-      : null;
+  const id = typeof input.id === 'string' ? input.id : null;
   const cluster = typeof input.cluster === 'string' && input.cluster.trim()
     ? input.cluster
-    : typeof fb.cluster === 'string' && fb.cluster.trim()
-      ? fb.cluster
-      : 'devnet';
-  const txSig = typeof input.txSig === 'string'
-    ? input.txSig
-    : typeof fb.txSig === 'string'
-      ? fb.txSig
-      : null;
-  const updatedAt = typeof input.updatedAt === 'string'
-    ? input.updatedAt
-    : typeof fb.updatedAt === 'string'
-      ? fb.updatedAt
-      : null;
+    : 'devnet';
+  const txSig = typeof input.txSig === 'string' ? input.txSig : null;
+  const updatedAt = typeof input.updatedAt === 'string' ? input.updatedAt : null;
   return { id, cluster, txSig, updatedAt };
 }
 
@@ -1322,11 +1393,13 @@ function townhallMintCapabilities() {
   const pinataEnabled = !!PINATA_JWT;
   const evmEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!EVM_ERC8004_RPC_URL;
   const solanaEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!SOLANA_ERC8004_RPC_URL;
+  const solanaSponsorEnabled = solanaEnabled && !!SOLANA_ERC8004_FEE_PAYER_SECRET;
   return {
     enabled: TOWNHALL_MINT_ENABLED,
     pinataEnabled,
     evmEnabled,
-    solanaEnabled
+    solanaEnabled,
+    solanaSponsorEnabled
   };
 }
 
@@ -1506,6 +1579,22 @@ async function pinJsonToIpfs(content, { name = 'agent-town-registration' } = {})
   return cid;
 }
 
+function summarizePinataFailureDetail(detail) {
+  if (!detail) return null;
+  if (typeof detail === 'string') {
+    const text = detail.trim();
+    return text ? text.slice(0, 280) : null;
+  }
+  if (typeof detail === 'object') {
+    const reason = typeof detail?.error?.reason === 'string' ? detail.error.reason.trim() : '';
+    const text = typeof detail?.error?.details === 'string' ? detail.error.details.trim() : '';
+    if (reason && text) return `${reason}: ${text}`.slice(0, 280);
+    if (reason) return reason.slice(0, 280);
+    if (text) return text.slice(0, 280);
+  }
+  return null;
+}
+
 let cachedSolanaSdkModulePromise = null;
 function loadSolanaSdkModule() {
   if (!cachedSolanaSdkModulePromise) {
@@ -1528,6 +1617,215 @@ function loadSolanaWeb3Module() {
       });
   }
   return cachedSolanaWeb3ModulePromise;
+}
+
+function summarizeSolanaPrepareError(err) {
+  const text = String(err?.detail || err?.message || err || '').trim();
+  return text ? text.slice(0, 260) : 'unknown error';
+}
+
+function isRetryableSolanaPrepareError(err) {
+  const text = summarizeSolanaPrepareError(err).toLowerCase();
+  return (
+    text.includes('fetch failed')
+    || text.includes('failed to fetch')
+    || text.includes('network')
+    || text.includes('timed out')
+    || text.includes('timeout')
+    || text.includes('econnreset')
+    || text.includes('enotfound')
+    || text.includes('eai_again')
+  );
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function prepareSolanaRegistrationWithRpcFallback({
+  SolanaSDK,
+  cluster,
+  tokenUri,
+  signer,
+  assetPubkey,
+  feePayer
+}) {
+  const rpcCandidates = uniqueStrings(SOLANA_ERC8004_RPC_CANDIDATES);
+  if (!rpcCandidates.length) {
+    const err = new Error('SOLANA_PREPARE_FAILED');
+    err.detail = 'No Solana RPC endpoint configured for ERC-8004 prepare.';
+    throw err;
+  }
+  const failures = [];
+  for (const rpcUrl of rpcCandidates) {
+    const sdk = new SolanaSDK({ cluster, rpcUrl });
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const prepared = await sdk.registerAgent(
+          tokenUri,
+          undefined,
+          {
+            skipSend: true,
+            signer,
+            assetPubkey,
+            ...(feePayer ? { feePayer } : {}),
+            atomEnabled: false
+          }
+        );
+        return { prepared, rpcUrl };
+      } catch (err) {
+        const summary = summarizeSolanaPrepareError(err);
+        failures.push(`${rpcUrl} (attempt ${attempt}): ${summary}`);
+        if (!isRetryableSolanaPrepareError(err) || attempt >= 2) break;
+        await waitMs(250 * attempt);
+      }
+    }
+  }
+  const out = new Error('SOLANA_PREPARE_FAILED');
+  out.detail = failures.slice(0, 6).join(' | ');
+  throw out;
+}
+
+function parseSolanaFeePayerSecretKeyBytes(raw) {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return null;
+      if (!parsed.every((value) => Number.isFinite(value) && value >= 0 && value <= 255)) return null;
+      const bytes = Uint8Array.from(parsed.map((value) => Math.floor(Number(value))));
+      if (bytes.length === 64) return bytes;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length % 4 === 0) {
+    const decoded = decodeB64(trimmed);
+    if (decoded && decoded.length === 64) return new Uint8Array(decoded);
+  }
+
+  const base58 = base58Decode(trimmed);
+  if (base58 && base58.length === 64) return base58;
+  return null;
+}
+
+let cachedSolanaFeePayerPromise = null;
+async function loadSolanaFeePayerKeypair() {
+  if (!SOLANA_ERC8004_FEE_PAYER_SECRET) return null;
+  if (!cachedSolanaFeePayerPromise) {
+    cachedSolanaFeePayerPromise = (async () => {
+      const secret = parseSolanaFeePayerSecretKeyBytes(SOLANA_ERC8004_FEE_PAYER_SECRET);
+      if (!secret) throw new Error('SOLANA_SPONSOR_SECRET_INVALID');
+      const { Keypair } = await loadSolanaWeb3Module();
+      try {
+        return Keypair.fromSecretKey(secret);
+      } catch {
+        throw new Error('SOLANA_SPONSOR_SECRET_INVALID');
+      }
+    })().catch((err) => {
+      cachedSolanaFeePayerPromise = null;
+      throw err;
+    });
+  }
+  return cachedSolanaFeePayerPromise;
+}
+
+async function ensureSolanaOwnerLamportsForSponsoredMint({
+  connection,
+  web3,
+  ownerAddress,
+  feePayer,
+  minLamports
+}) {
+  const { PublicKey } = web3;
+  const ownerPubkey = new PublicKey(ownerAddress);
+  const targetLamports = Number.isFinite(minLamports) && minLamports > 0 ? Math.floor(minLamports) : 10_000_000;
+  const [ownerBalance, sponsorBalance] = await Promise.all([
+    connection.getBalance(ownerPubkey, 'confirmed'),
+    connection.getBalance(feePayer.publicKey, 'confirmed')
+  ]);
+  if (ownerBalance >= targetLamports) {
+    return { ownerBalance, sponsorBalance, topUpLamports: 0 };
+  }
+  if (!SOLANA_SPONSOR_AUTO_TOPUP) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Owner wallet has ${ownerBalance} lamports; requires at least ${targetLamports}.`;
+    throw err;
+  }
+
+  const topUpLamports = targetLamports - ownerBalance;
+  const minimumSponsorBalance = topUpLamports + 50_000;
+  if (sponsorBalance < minimumSponsorBalance) {
+    const err = new Error('SOLANA_SPONSOR_FEEPAYER_UNFUNDED');
+    err.detail = `Sponsor fee payer has ${sponsorBalance} lamports; at least ${minimumSponsorBalance} needed to top up owner wallet.`;
+    throw err;
+  }
+
+  await topUpSolanaOwnerLamports({
+    connection,
+    web3,
+    ownerAddress,
+    feePayer,
+    lamports: topUpLamports
+  });
+
+  const ownerBalanceAfter = await connection.getBalance(ownerPubkey, 'confirmed');
+  if (ownerBalanceAfter < targetLamports) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Owner wallet still underfunded after top-up (${ownerBalanceAfter} lamports).`;
+    throw err;
+  }
+  return {
+    ownerBalance: ownerBalanceAfter,
+    sponsorBalance,
+    topUpLamports
+  };
+}
+
+async function topUpSolanaOwnerLamports({
+  connection,
+  web3,
+  ownerAddress,
+  feePayer,
+  lamports
+}) {
+  const { PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } = web3;
+  const ownerPubkey = new PublicKey(ownerAddress);
+  const amount = Number.isFinite(lamports) && lamports > 0 ? Math.floor(lamports) : 0;
+  if (amount < 1) return;
+  try {
+    const tx = new Transaction().add(SystemProgram.transfer({
+      fromPubkey: feePayer.publicKey,
+      toPubkey: ownerPubkey,
+      lamports: amount
+    }));
+    await sendAndConfirmTransaction(connection, tx, [feePayer], {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed'
+    });
+  } catch (cause) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Could not top up owner wallet: ${String(cause?.message || cause)}`;
+    throw err;
+  }
+}
+
+function parseSolanaLamportShortfall(detailText) {
+  const text = String(detailText || '');
+  const match = text.match(/insufficient lamports\s+(\d+)\s*,\s*need\s+(\d+)/i);
+  if (!match) return null;
+  const have = Number(match[1]);
+  const need = Number(match[2]);
+  if (!Number.isFinite(have) || !Number.isFinite(need) || need <= have) return null;
+  return {
+    have,
+    need,
+    shortfall: need - have
+  };
 }
 
 function ensureSessionOnboarding(session) {
@@ -1572,33 +1870,29 @@ function ensureSessionOnboarding(session) {
   if (!onboarding.erc8004 || typeof onboarding.erc8004 !== 'object') onboarding.erc8004 = {};
   const erc8004 = onboarding.erc8004;
 
-  const legacyEvm = normalizeTownhallEvmIdentityState(erc8004.evm);
-  const legacySolana = normalizeTownhallSolanaIdentityState(erc8004.solana);
-
   if (!erc8004.user || typeof erc8004.user !== 'object') erc8004.user = {};
   if (!erc8004.agent || typeof erc8004.agent !== 'object') erc8004.agent = {};
 
-  let userEvm = normalizeTownhallEvmIdentityState(erc8004.user.evm);
-  let userSolana = normalizeTownhallSolanaIdentityState(erc8004.user.solana);
-  let agentEvm = normalizeTownhallEvmIdentityState(erc8004.agent.evm);
-  let agentSolana = normalizeTownhallSolanaIdentityState(erc8004.agent.solana);
+  erc8004.user.evm = normalizeTownhallEvmIdentityState(erc8004.user.evm);
+  erc8004.user.solana = normalizeTownhallSolanaIdentityState(erc8004.user.solana);
+  erc8004.agent.evm = normalizeTownhallEvmIdentityState(erc8004.agent.evm);
+  erc8004.agent.solana = normalizeTownhallSolanaIdentityState(erc8004.agent.solana);
 
-  if (!agentEvm.id && legacyEvm.id) {
-    agentEvm = normalizeTownhallEvmIdentityState(agentEvm, legacyEvm);
+  const nowMs = Date.now();
+  if (!Array.isArray(onboarding.pendingSolanaMints)) {
+    onboarding.pendingSolanaMints = [];
+  } else {
+    onboarding.pendingSolanaMints = onboarding.pendingSolanaMints.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const messageHash = typeof entry.messageHash === 'string' ? entry.messageHash.trim() : '';
+      const walletAddress = typeof entry.walletAddress === 'string' ? entry.walletAddress.trim() : '';
+      const assetPubkey = typeof entry.assetPubkey === 'string' ? entry.assetPubkey.trim() : '';
+      const createdAtMs = Number(entry.createdAtMs || 0);
+      if (!messageHash || !walletAddress || !assetPubkey) return false;
+      if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return false;
+      return nowMs - createdAtMs <= 10 * 60 * 1000;
+    });
   }
-  if (!agentSolana.id && legacySolana.id) {
-    agentSolana = normalizeTownhallSolanaIdentityState(agentSolana, legacySolana);
-  }
-
-  erc8004.user.evm = userEvm;
-  erc8004.user.solana = userSolana;
-  erc8004.agent.evm = agentEvm;
-  erc8004.agent.solana = agentSolana;
-
-  const summaryEvm = agentEvm.id ? agentEvm : userEvm;
-  const summarySolana = agentSolana.id ? agentSolana : userSolana;
-  erc8004.evm = normalizeTownhallEvmIdentityState(summaryEvm);
-  erc8004.solana = normalizeTownhallSolanaIdentityState(summarySolana);
 
   return onboarding;
 }
@@ -1831,6 +2125,341 @@ function verifyHouseAuth(req, house) {
   return { ok: true };
 }
 
+function normalizePrivyTransactionId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizePrivyTransactionHash(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function normalizePrivyWalletId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 256) return null;
+  if (!/^[A-Za-z0-9._:-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function toRpcHexNumber(value) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0 || Math.floor(value) !== value) return null;
+    return `0x${BigInt(value).toString(16)}`;
+  }
+  if (typeof value === 'bigint') {
+    if (value < 0n) return null;
+    return `0x${value.toString(16)}`;
+  }
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return trimmed;
+  if (/^[0-9]+$/.test(trimmed)) {
+    try {
+      return `0x${BigInt(trimmed).toString(16)}`;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function normalizePrivyCaip2(value, fallbackChainHex = null) {
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (/^eip155:[0-9]+$/.test(trimmed)) return trimmed;
+    throw new Error('INVALID_PRIVY_WALLET_RPC_CAIP2');
+  }
+  const chainHex = toRpcHexNumber(fallbackChainHex);
+  if (!chainHex) return null;
+  try {
+    const chainId = BigInt(chainHex);
+    if (chainId <= 0n) return null;
+    return `eip155:${chainId.toString(10)}`;
+  } catch {
+    return null;
+  }
+}
+
+function normalizePrivyWalletRpcEvmTx(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_TX');
+  }
+  const from = typeof input.from === 'string' ? input.from.trim() : '';
+  const to = typeof input.to === 'string' ? input.to.trim() : '';
+  const data = typeof input.data === 'string' ? input.data.trim() : '';
+  if (!/^0x[a-fA-F0-9]{40}$/.test(from)) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_FROM');
+  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_TO');
+  if (!/^0x[a-fA-F0-9]*$/.test(data) || data.length % 2 !== 0 || data.length < 2) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_TX_DATA');
+  }
+
+  const out = { from, to, data };
+  const optionalHexFields = [
+    ['nonce', input.nonce],
+    ['chain_id', input.chain_id != null ? input.chain_id : input.chainId],
+    ['value', input.value],
+    ['gas_limit', input.gas_limit != null ? input.gas_limit : input.gasLimit != null ? input.gasLimit : input.gas],
+    ['gas_price', input.gas_price != null ? input.gas_price : input.gasPrice],
+    ['max_fee_per_gas', input.max_fee_per_gas != null ? input.max_fee_per_gas : input.maxFeePerGas],
+    ['max_priority_fee_per_gas', input.max_priority_fee_per_gas != null ? input.max_priority_fee_per_gas : input.maxPriorityFeePerGas]
+  ];
+  for (const [key, raw] of optionalHexFields) {
+    const normalized = toRpcHexNumber(raw);
+    if (normalized) out[key] = normalized;
+  }
+
+  if (input.type != null) {
+    const typeHex = toRpcHexNumber(input.type);
+    if (!typeHex) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_TYPE');
+    out.type = typeHex;
+  }
+
+  return out;
+}
+
+function normalizePrivyWalletRpcSolanaTransaction(value) {
+  if (typeof value !== 'string') throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(trimmed)) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  const normalized = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4;
+  const padded = pad === 0 ? normalized : `${normalized}${'='.repeat(4 - pad)}`;
+  try {
+    const decoded = Buffer.from(padded, 'base64');
+    if (!decoded.length) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+    return padded;
+  } catch {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  }
+}
+
+function normalizePrivyWalletRpcSolanaEncoding(value) {
+  if (value == null) return 'base64';
+  const trimmed = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!trimmed) return 'base64';
+  if (trimmed !== 'base64') throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_ENCODING');
+  return trimmed;
+}
+
+function normalizePrivySolanaCaip2(value) {
+  if (value == null || (typeof value === 'string' && !value.trim())) return null;
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return null;
+  if (!/^solana:[1-9A-HJ-NP-Za-km-z]{16,64}$/.test(trimmed)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_CAIP2');
+  }
+  return trimmed;
+}
+
+function normalizePrivyWalletRpcBody(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_BODY');
+  }
+
+  const method = typeof input.method === 'string' ? input.method.trim() : '';
+  if (method === 'eth_sendTransaction') {
+    const chainTypeRaw = typeof input.chain_type === 'string'
+      ? input.chain_type
+      : typeof input.chainType === 'string'
+        ? input.chainType
+        : '';
+    const chainType = chainTypeRaw.trim().toLowerCase();
+    if (chainType !== 'ethereum') throw new Error('INVALID_PRIVY_WALLET_RPC_CHAIN');
+
+    if (input.sponsor !== true) throw new Error('INVALID_PRIVY_WALLET_RPC_SPONSOR');
+    const params = input.params && typeof input.params === 'object' ? input.params : null;
+    if (!params || Array.isArray(params)) throw new Error('INVALID_PRIVY_WALLET_RPC_PARAMS');
+
+    const transaction = normalizePrivyWalletRpcEvmTx(params.transaction);
+    const caip2 = normalizePrivyCaip2(input.caip2, transaction.chain_id || null);
+
+    return {
+      chain_type: 'ethereum',
+      method: 'eth_sendTransaction',
+      params: { transaction },
+      sponsor: true,
+      ...(caip2 ? { caip2 } : {})
+    };
+  }
+
+  if (method === 'signAndSendTransaction') {
+    const chainTypeRaw = typeof input.chain_type === 'string'
+      ? input.chain_type
+      : typeof input.chainType === 'string'
+        ? input.chainType
+        : '';
+    const chainType = chainTypeRaw.trim().toLowerCase();
+    if (chainType && chainType !== 'solana') throw new Error('INVALID_PRIVY_WALLET_RPC_CHAIN');
+
+    if (input.sponsor !== true) throw new Error('INVALID_PRIVY_WALLET_RPC_SPONSOR');
+    const params = input.params && typeof input.params === 'object' ? input.params : null;
+    if (!params || Array.isArray(params)) throw new Error('INVALID_PRIVY_WALLET_RPC_PARAMS');
+
+    const transaction = normalizePrivyWalletRpcSolanaTransaction(params.transaction);
+    const encoding = normalizePrivyWalletRpcSolanaEncoding(params.encoding);
+    const caip2 = normalizePrivySolanaCaip2(input.caip2);
+
+    return {
+      method: 'signAndSendTransaction',
+      params: { transaction, encoding },
+      sponsor: true,
+      ...(caip2 ? { caip2 } : {})
+    };
+  }
+
+  throw new Error('INVALID_PRIVY_WALLET_RPC_METHOD');
+}
+
+function buildPrivyWalletRpcSigningPayload(walletId, body) {
+  return {
+    version: 1,
+    url: `${PRIVY_API_BASE_URL}/v1/wallets/${encodeURIComponent(walletId)}/rpc`,
+    method: 'POST',
+    headers: {
+      'privy-app-id': PRIVY_APP_ID
+    },
+    body
+  };
+}
+
+function hasPrivyServerAuth() {
+  return !!(PRIVY_APP_ID && PRIVY_APP_SECRET);
+}
+
+function getPrivyBasicAuthHeader() {
+  if (!hasPrivyServerAuth()) return '';
+  return `Basic ${Buffer.from(`${PRIVY_APP_ID}:${PRIVY_APP_SECRET}`).toString('base64')}`;
+}
+
+async function fetchPrivyTransactionStatus(transactionId) {
+  const id = normalizePrivyTransactionId(transactionId);
+  if (!id) {
+    const err = new Error('MISSING_PRIVY_TRANSACTION_ID');
+    err.status = 400;
+    throw err;
+  }
+  if (!hasPrivyServerAuth()) {
+    const err = new Error('PRIVY_SERVER_AUTH_NOT_CONFIGURED');
+    err.status = 503;
+    throw err;
+  }
+
+  const endpoint = `${PRIVY_API_BASE_URL}/v1/transactions/${encodeURIComponent(id)}`;
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      authorization: getPrivyBasicAuthHeader(),
+      'privy-app-id': PRIVY_APP_ID
+    }
+  });
+  const rawBody = await response.text();
+  let payload = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
+  }
+
+  if (!response.ok) {
+    const err = new Error('PRIVY_TRANSACTION_STATUS_UNAVAILABLE');
+    err.status = response.status >= 400 ? response.status : 502;
+    const detail = payload?.error?.message || payload?.message || rawBody;
+    if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
+    throw err;
+  }
+
+  const tx = payload?.data && typeof payload.data === 'object'
+    ? payload.data
+    : payload?.transaction && typeof payload.transaction === 'object'
+      ? payload.transaction
+      : payload;
+  const status = typeof tx?.status === 'string' && tx.status.trim()
+    ? tx.status.trim()
+    : typeof tx?.state === 'string' && tx.state.trim()
+      ? tx.state.trim()
+      : '';
+  const transactionHash = normalizePrivyTransactionHash(
+    tx?.hash
+    || tx?.transaction_hash
+    || tx?.transactionHash
+    || tx?.txHash
+  );
+  const userOperationHash = normalizePrivyTransactionHash(
+    tx?.user_operation_hash
+    || tx?.userOperationHash
+  );
+
+  return {
+    id,
+    status,
+    transactionHash,
+    userOperationHash
+  };
+}
+
+async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
+  const normalizedWalletId = normalizePrivyWalletId(walletId);
+  if (!normalizedWalletId) {
+    const err = new Error('INVALID_PRIVY_WALLET_ID');
+    err.status = 400;
+    throw err;
+  }
+  const signature = typeof authorizationSignature === 'string' ? authorizationSignature.trim() : '';
+  if (!signature) {
+    const err = new Error('MISSING_PRIVY_AUTH_SIGNATURE');
+    err.status = 400;
+    throw err;
+  }
+  if (!hasPrivyServerAuth()) {
+    const err = new Error('PRIVY_SERVER_AUTH_NOT_CONFIGURED');
+    err.status = 503;
+    throw err;
+  }
+
+  const endpoint = `${PRIVY_API_BASE_URL}/v1/wallets/${encodeURIComponent(normalizedWalletId)}/rpc`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      authorization: getPrivyBasicAuthHeader(),
+      'privy-app-id': PRIVY_APP_ID,
+      'privy-authorization-signature': signature
+    },
+    body: JSON.stringify(body)
+  });
+
+  const rawBody = await response.text();
+  let payload = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
+  }
+
+  if (!response.ok) {
+    const err = new Error('PRIVY_WALLET_RPC_RELAY_FAILED');
+    err.status = response.status >= 400 ? response.status : 502;
+    const detail = payload?.error?.message || payload?.message || rawBody;
+    if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
+    throw err;
+  }
+
+  return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+}
+
 // --- API ---
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
@@ -1844,6 +2473,79 @@ app.get('/api/privy/config', (_req, res) => {
     startPageEnabled: START_PAGE_ENABLED,
     appPath: '/app'
   });
+});
+
+app.get('/api/privy/transactions/:transactionId', async (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+  const transactionId = normalizePrivyTransactionId(req.params?.transactionId || '');
+  if (!transactionId) return res.status(400).json({ ok: false, error: 'MISSING_PRIVY_TRANSACTION_ID' });
+
+  try {
+    const status = await fetchPrivyTransactionStatus(transactionId);
+    return res.json({
+      ok: true,
+      transaction: {
+        id: status.id,
+        status: status.status,
+        transactionHash: status.transactionHash,
+        userOperationHash: status.userOperationHash
+      }
+    });
+  } catch (err) {
+    const status = Number(err?.status || 0) || (String(err?.message || '').includes('MISSING_') ? 400 : 502);
+    const detail = typeof err?.detail === 'string' && err.detail.trim() ? err.detail.trim() : null;
+    return res.status(status).json({
+      ok: false,
+      error: String(err?.message || 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE'),
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+app.post('/api/privy/wallet-rpc/prepare', (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+  if (!hasPrivyServerAuth()) return res.status(503).json({ ok: false, error: 'PRIVY_SERVER_AUTH_NOT_CONFIGURED' });
+
+  try {
+    const walletId = normalizePrivyWalletId(req.body?.walletId);
+    if (!walletId) return res.status(400).json({ ok: false, error: 'INVALID_PRIVY_WALLET_ID' });
+    const body = normalizePrivyWalletRpcBody(req.body?.body);
+    const signingPayload = buildPrivyWalletRpcSigningPayload(walletId, body);
+    return res.json({ ok: true, walletId, body, signingPayload });
+  } catch (err) {
+    const code = String(err?.message || 'PRIVY_WALLET_RPC_PREPARE_FAILED');
+    const status = code.startsWith('INVALID_') || code.startsWith('MISSING_') ? 400 : 502;
+    return res.status(status).json({ ok: false, error: code });
+  }
+});
+
+app.post('/api/privy/wallet-rpc/relay', async (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+
+  try {
+    const walletId = normalizePrivyWalletId(req.body?.walletId);
+    if (!walletId) return res.status(400).json({ ok: false, error: 'INVALID_PRIVY_WALLET_ID' });
+    const body = normalizePrivyWalletRpcBody(req.body?.body);
+    const signature = typeof req.body?.signature === 'string'
+      ? req.body.signature
+      : typeof req.body?.authorizationSignature === 'string'
+        ? req.body.authorizationSignature
+        : '';
+    const result = await relayPrivyWalletRpc({
+      walletId,
+      body,
+      authorizationSignature: signature
+    });
+    return res.json({ ok: true, result });
+  } catch (err) {
+    const status = Number(err?.status || 0) || (String(err?.message || '').startsWith('MISSING_') ? 400 : 502);
+    const detail = typeof err?.detail === 'string' && err.detail.trim() ? err.detail.trim() : null;
+    return res.status(status).json({
+      ok: false,
+      error: String(err?.message || 'PRIVY_WALLET_RPC_RELAY_FAILED'),
+      ...(detail ? { detail } : {})
+    });
+  }
 });
 
 app.get('/api/session', (req, res) => {
@@ -1944,8 +2646,23 @@ app.get('/api/townhall/state', (req, res) => {
   });
 });
 
-app.get('/api/townhall/mint/config', (_req, res) => {
+app.get('/api/townhall/mint/config', async (_req, res) => {
   const caps = townhallMintCapabilities();
+  let sponsorSendEnabled = false;
+  let sponsorFeePayer = null;
+  let sponsorSendError = null;
+  if (caps.solanaSponsorEnabled) {
+    try {
+      const feePayer = await loadSolanaFeePayerKeypair();
+      if (feePayer) {
+        sponsorSendEnabled = true;
+        sponsorFeePayer = feePayer.publicKey.toBase58();
+      }
+    } catch (err) {
+      sponsorSendEnabled = false;
+      sponsorSendError = String(err?.message || 'SOLANA_SPONSOR_NOT_CONFIGURED');
+    }
+  }
   res.json({
     ok: true,
     mint: {
@@ -1956,13 +2673,16 @@ app.get('/api/townhall/mint/config', (_req, res) => {
         chainId: EVM_ERC8004_CHAIN_ID,
         network: EVM_ERC8004_NETWORK,
         rpcUrl: EVM_ERC8004_RPC_URL || null,
-        sdkModuleUrl: AG0_SDK_MODULE_URL || null
+        contractAddress: EVM_ERC8004_IDENTITY_REGISTRY
       },
       solana: {
         enabled: caps.solanaEnabled,
         cluster: SOLANA_ERC8004_CLUSTER,
         rpcUrl: SOLANA_ERC8004_RPC_URL || null,
-        web3ModuleUrl: SOLANA_WEB3_MODULE_URL || null
+        web3ModuleUrl: SOLANA_WEB3_MODULE_URL || null,
+        sponsorSendEnabled,
+        sponsorFeePayer,
+        sponsorSendError
       }
     }
   });
@@ -2008,13 +2728,15 @@ app.post('/api/townhall/mint/evm/prepare', async (req, res) => {
       evm: {
         chainId: EVM_ERC8004_CHAIN_ID,
         network: EVM_ERC8004_NETWORK,
-        rpcUrl: EVM_ERC8004_RPC_URL || null
+        rpcUrl: EVM_ERC8004_RPC_URL || null,
+        contractAddress: EVM_ERC8004_IDENTITY_REGISTRY
       }
     });
   } catch (err) {
     const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
     const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
-    return res.status(status).json({ ok: false, error: code });
+    const detail = summarizePinataFailureDetail(err?.detail || err?.message);
+    return res.status(status).json({ ok: false, error: code, ...(detail ? { detail } : {}) });
   }
 });
 
@@ -2060,28 +2782,43 @@ app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
   } catch (err) {
     const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
     const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
-    return res.status(status).json({ ok: false, error: code });
+    const detail = summarizePinataFailureDetail(err?.detail || err?.message);
+    return res.status(status).json({ ok: false, error: code, ...(detail ? { detail } : {}) });
   }
 
   try {
-    const [{ SolanaSDK }, { PublicKey }] = await Promise.all([
+    const [sdkModule, web3] = await Promise.all([
       loadSolanaSdkModule(),
       loadSolanaWeb3Module()
     ]);
-    const sdk = new SolanaSDK({
-      cluster: SOLANA_ERC8004_CLUSTER,
-      rpcUrl: SOLANA_ERC8004_RPC_URL
-    });
-    const prepared = await sdk.registerAgent(
-      tokenUri,
-      undefined,
-      {
-        skipSend: true,
-        signer: new PublicKey(walletAddress),
-        assetPubkey: new PublicKey(assetPubkey),
-        atomEnabled: false
+    const { SolanaSDK } = sdkModule;
+    const { PublicKey } = web3;
+    let feePayerKey = null;
+    if (caps.solanaSponsorEnabled) {
+      try {
+        const feePayer = await loadSolanaFeePayerKeypair();
+        feePayerKey = feePayer?.publicKey || null;
+      } catch (err) {
+        const code = String(err?.message || 'SOLANA_SPONSOR_NOT_CONFIGURED');
+        const status = code === 'SOLANA_SPONSOR_SECRET_INVALID' ? 500 : 503;
+        return res.status(status).json({ ok: false, error: code });
       }
-    );
+    }
+    if (feePayerKey && typeof feePayerKey.toBase58 === 'function' && feePayerKey.toBase58() === walletAddress) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET',
+        detail: 'Server sponsor fee payer must be a separate funded keypair, not the user wallet.'
+      });
+    }
+    const { prepared, rpcUrl: solanaPrepareRpcUrl } = await prepareSolanaRegistrationWithRpcFallback({
+      SolanaSDK,
+      cluster: SOLANA_ERC8004_CLUSTER,
+      tokenUri,
+      signer: new PublicKey(walletAddress),
+      assetPubkey: new PublicKey(assetPubkey),
+      feePayer: feePayerKey || undefined
+    });
 
     if (!prepared || typeof prepared !== 'object') {
       return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
@@ -2096,6 +2833,50 @@ app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
     const preparedAsset = prepared.asset && typeof prepared.asset.toBase58 === 'function'
       ? prepared.asset.toBase58()
       : assetPubkey;
+    let preparedTransactionBase64 = prepared.transaction;
+    let preparedTx = null;
+    if (feePayerKey) {
+      const adjusted = applyFeePayerToPreparedSolanaTransaction({
+        preparedTransaction: preparedTransactionBase64,
+        feePayerPubkey: feePayerKey,
+        web3
+      });
+      if (!adjusted || !adjusted.serialized || adjusted.signerSlotPresent !== true) {
+        return res.status(502).json({
+          ok: false,
+          error: 'SOLANA_PREPARE_FAILED',
+          detail: 'Prepared Solana transaction could not be adjusted for sponsor fee payer.'
+        });
+      }
+      preparedTransactionBase64 = adjusted.serialized;
+      preparedTx = adjusted.transaction;
+    } else {
+      const preparedBytes = decodeTownhallSponsoredSolanaTransaction(preparedTransactionBase64);
+      preparedTx = preparedBytes
+        ? deserializeTownhallSponsoredSolanaTransaction({ txBytes: preparedBytes, web3 })
+        : null;
+    }
+    const messageHash = hashTownhallSolanaTransactionMessage(preparedTx);
+    if (!messageHash) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+
+    const nowMs = Date.now();
+    const pending = Array.isArray(onboarding.pendingSolanaMints) ? onboarding.pendingSolanaMints : [];
+    const filteredPending = pending.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const createdAtMs = Number(entry.createdAtMs || 0);
+      if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return false;
+      return nowMs - createdAtMs <= 10 * 60 * 1000;
+    });
+    filteredPending.push({
+      subject,
+      walletAddress,
+      assetPubkey: preparedAsset,
+      messageHash,
+      createdAtMs: nowMs
+    });
+    onboarding.pendingSolanaMints = filteredPending.slice(-16);
 
     return res.json({
       ok: true,
@@ -2104,7 +2885,7 @@ app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
       subject,
       erc8004Id: `solana:${preparedAsset}`,
       prepared: {
-        transaction: prepared.transaction,
+        transaction: preparedTransactionBase64,
         blockhash: prepared.blockhash,
         lastValidBlockHeight: prepared.lastValidBlockHeight,
         signer: prepared.signer,
@@ -2112,19 +2893,345 @@ app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
       },
       solana: {
         cluster: SOLANA_ERC8004_CLUSTER,
-        rpcUrl: SOLANA_ERC8004_RPC_URL,
-        assetPubkey: preparedAsset
+        rpcUrl: solanaPrepareRpcUrl || SOLANA_ERC8004_RPC_URL,
+        assetPubkey: preparedAsset,
+        sponsorSendEnabled: !!feePayerKey,
+        sponsorFeePayer: feePayerKey ? feePayerKey.toBase58() : null
       }
     });
   } catch (err) {
-    return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED', detail: String(err?.message || err) });
+    const detail = String(err?.detail || err?.message || err || '').trim();
+    return res.status(502).json({
+      ok: false,
+      error: 'SOLANA_PREPARE_FAILED',
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+function normalizeTownhallSponsoredSolanaTransaction(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(trimmed)) return null;
+  const normalized = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4;
+  const padded = pad === 0 ? normalized : `${normalized}${'='.repeat(4 - pad)}`;
+  const decoded = decodeB64(padded);
+  if (!decoded || !decoded.length) return null;
+  return padded;
+}
+
+function decodeTownhallSponsoredSolanaTransaction(value) {
+  const normalized = normalizeTownhallSponsoredSolanaTransaction(value);
+  if (!normalized) return null;
+  const decoded = decodeB64(normalized);
+  if (!decoded || !decoded.length) return null;
+  return new Uint8Array(decoded);
+}
+
+function deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 }) {
+  if (!(txBytes instanceof Uint8Array) || !txBytes.length) return null;
+  if (!web3?.Transaction || typeof web3.Transaction.from !== 'function') return null;
+  try {
+    const transaction = web3.Transaction.from(txBytes);
+    return transaction || null;
+  } catch {
+    return null;
+  }
+}
+
+function hashTownhallSolanaTransactionMessage(transaction) {
+  if (!transaction || typeof transaction !== 'object') return null;
+  let raw = null;
+  if (transaction.message && typeof transaction.message.serialize === 'function') {
+    raw = transaction.message.serialize();
+  } else if (typeof transaction.serializeMessage === 'function') {
+    raw = transaction.serializeMessage();
+  }
+  let bytes = null;
+  if (raw instanceof Uint8Array) bytes = raw;
+  else if (Buffer.isBuffer(raw)) bytes = new Uint8Array(raw);
+  else if (raw instanceof ArrayBuffer) bytes = new Uint8Array(raw);
+  else if (ArrayBuffer.isView(raw)) bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (!(bytes instanceof Uint8Array) || !bytes.length) return null;
+  return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+}
+
+function transactionHasSolanaSignerSlot({ transaction, signerAddress }) {
+  if (!transaction || !signerAddress) return false;
+  const message = transaction?.message;
+  const signatures = Array.isArray(transaction?.signatures) ? transaction.signatures : null;
+  const staticKeys = Array.isArray(message?.staticAccountKeys) ? message.staticAccountKeys : null;
+  const required = Number(message?.header?.numRequiredSignatures || 0);
+  if (signatures && staticKeys && Number.isFinite(required) && required > 0) {
+    const max = Math.min(required, staticKeys.length, signatures.length);
+    for (let i = 0; i < max; i += 1) {
+      const key = staticKeys[i];
+      const keyBase58 = key && typeof key.toBase58 === 'function' ? key.toBase58() : '';
+      if (keyBase58 === signerAddress) return true;
+    }
+    return false;
+  }
+
+  if (Array.isArray(transaction.signatures)) {
+    const found = transaction.signatures.find((entry) => {
+      if (!entry || !entry.publicKey || typeof entry.publicKey.toBase58 !== 'function') return false;
+      return entry.publicKey.toBase58() === signerAddress;
+    });
+    if (found) return true;
+  }
+  const payer = transaction?.feePayer;
+  return !!(payer && typeof payer.toBase58 === 'function' && payer.toBase58() === signerAddress);
+}
+
+function serializeTownhallPreparedSolanaTransaction(transaction) {
+  if (!transaction || typeof transaction.serialize !== 'function') return null;
+  try {
+    const raw = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+    if (raw instanceof Uint8Array) return Buffer.from(raw).toString('base64');
+    if (Buffer.isBuffer(raw)) return raw.toString('base64');
+    if (raw instanceof ArrayBuffer) return Buffer.from(new Uint8Array(raw)).toString('base64');
+    if (ArrayBuffer.isView(raw)) {
+      return Buffer.from(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)).toString('base64');
+    }
+  } catch {
+    // no-op
+  }
+  return null;
+}
+
+function applyFeePayerToPreparedSolanaTransaction({ preparedTransaction, feePayerPubkey, web3 }) {
+  if (!feePayerPubkey || typeof feePayerPubkey.toBase58 !== 'function') return null;
+  const txBytes = decodeTownhallSponsoredSolanaTransaction(preparedTransaction);
+  if (!txBytes) return null;
+  const transaction = deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 });
+  if (!transaction || typeof transaction !== 'object') return null;
+  if (typeof transaction.compileMessage !== 'function') return null;
+  transaction.feePayer = feePayerPubkey;
+  const serialized = serializeTownhallPreparedSolanaTransaction(transaction);
+  if (!serialized) return null;
+  const signerSlotPresent = transactionHasSolanaSignerSlot({
+    transaction,
+    signerAddress: feePayerPubkey.toBase58()
+  });
+  return { transaction, serialized, signerSlotPresent };
+}
+
+function hasNonZeroSolanaSignature(signature) {
+  let bytes = null;
+  if (signature instanceof Uint8Array) bytes = signature;
+  else if (Buffer.isBuffer(signature)) bytes = new Uint8Array(signature);
+  else if (Array.isArray(signature)) bytes = Uint8Array.from(signature);
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 64) return false;
+  return bytes.some((value) => value !== 0);
+}
+
+function hasSignedLegacySolanaSignature({ transaction, signerAddress }) {
+  if (!transaction || !Array.isArray(transaction.signatures)) return false;
+  const signer = transaction.signatures.find((entry) => {
+    if (!entry || !entry.publicKey || typeof entry.publicKey.toBase58 !== 'function') return false;
+    return entry.publicKey.toBase58() === signerAddress;
+  });
+  if (!signer) return false;
+  return hasNonZeroSolanaSignature(signer.signature);
+}
+
+function transactionHasSignedSolanaSignature({ transaction, signerAddress }) {
+  if (!transaction || !signerAddress) return false;
+  return hasSignedLegacySolanaSignature({ transaction, signerAddress });
+}
+
+function signTownhallSponsoredSolanaTransaction({ transaction, feePayer }) {
+  if (!transaction || !feePayer) throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  if (typeof transaction.partialSign !== 'function') throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  transaction.partialSign(feePayer);
+}
+
+function serializeTownhallSponsoredSolanaTransaction(transaction) {
+  if (!transaction || typeof transaction.serialize !== 'function') {
+    throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  }
+  const raw = transaction.serialize();
+  if (raw instanceof Uint8Array) return raw;
+  if (Buffer.isBuffer(raw)) return new Uint8Array(raw);
+  if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+  if (ArrayBuffer.isView(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  throw new Error('SOLANA_SPONSORED_TX_INVALID');
+}
+
+app.post('/api/townhall/mint/solana/sponsor-send', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.solanaEnabled) return res.status(503).json({ ok: false, error: 'MINT_SOLANA_NOT_CONFIGURED' });
+  if (!caps.solanaSponsorEnabled) return res.status(503).json({ ok: false, error: 'SOLANA_SPONSOR_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = normalizeSolanaAddress(walletInput);
+  if (!walletAddress) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ADDRESS' });
+
+  const assetInput = typeof req.body?.assetPubkey === 'string' ? req.body.assetPubkey.trim() : '';
+  const assetPubkey = assetInput ? normalizeSolanaAddress(assetInput) : null;
+  if (assetInput && !assetPubkey) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_ASSET_PUBKEY' });
+
+  const txBytes = decodeTownhallSponsoredSolanaTransaction(req.body?.transaction);
+  if (!txBytes) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+
+  try {
+    const web3 = await loadSolanaWeb3Module();
+    const { Connection } = web3;
+    const feePayer = await loadSolanaFeePayerKeypair();
+    if (!feePayer) return res.status(503).json({ ok: false, error: 'SOLANA_SPONSOR_NOT_CONFIGURED' });
+
+    const transaction = deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 });
+    if (!transaction) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+    const messageHash = hashTownhallSolanaTransactionMessage(transaction);
+    if (!messageHash) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+    const feePayerAddress = feePayer.publicKey.toBase58();
+    if (feePayerAddress === walletAddress) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET',
+        detail: 'Server sponsor fee payer must be a separate funded keypair, not the user wallet.'
+      });
+    }
+    if (!transactionHasSolanaSignerSlot({ transaction, signerAddress: feePayerAddress })) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER',
+        detail: `Prepared transaction is missing sponsor fee payer signer ${feePayerAddress}.`
+      });
+    }
+
+    if (!transactionHasSignedSolanaSignature({ transaction, signerAddress: walletAddress })) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING' });
+    }
+
+    const pending = Array.isArray(onboarding.pendingSolanaMints) ? onboarding.pendingSolanaMints : [];
+    const normalizedPending = pending
+      .map((entry, index) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const pendingWallet = typeof entry.walletAddress === 'string' ? entry.walletAddress.trim() : '';
+        const pendingAsset = typeof entry.assetPubkey === 'string' ? entry.assetPubkey.trim() : '';
+        const pendingHash = typeof entry.messageHash === 'string' ? entry.messageHash.trim() : '';
+        const createdAtMs = Number(entry.createdAtMs || 0);
+        if (!pendingWallet || !pendingAsset || !pendingHash) return null;
+        if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return null;
+        return { index, pendingWallet, pendingAsset, pendingHash, createdAtMs };
+      })
+      .filter(Boolean);
+    const walletCandidates = normalizedPending.filter((entry) => entry.pendingWallet === walletAddress);
+    const pickNewest = (entries) => entries.reduce(
+      (best, entry) => (!best || entry.createdAtMs > best.createdAtMs ? entry : best),
+      null
+    );
+    let matchedEntry = pickNewest(
+      walletCandidates.filter((entry) => {
+        if (entry.pendingHash !== messageHash) return false;
+        if (assetPubkey && entry.pendingAsset !== assetPubkey) return false;
+        return true;
+      })
+    );
+    if (!matchedEntry && assetPubkey) {
+      // Some wallet providers refresh blockhashes during signing, which can alter message hash.
+      // Accept an asset+wallet match when there is only one pending candidate for that pair.
+      const assetCandidates = walletCandidates.filter((entry) => entry.pendingAsset === assetPubkey);
+      if (assetCandidates.length === 1) {
+        matchedEntry = assetCandidates[0];
+      }
+    }
+    if (!matchedEntry) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSORED_TX_NOT_PREPARED',
+        detail: `No pending prepared transaction matched wallet=${walletAddress} asset=${assetPubkey || '-'} hash=${messageHash.slice(0, 12)}...`
+      });
+    }
+    const pendingIndex = matchedEntry.index;
+    const pendingEntry = pending[pendingIndex];
+    const expectedAssetPubkey = typeof pendingEntry?.assetPubkey === 'string'
+      ? pendingEntry.assetPubkey.trim()
+      : assetPubkey;
+    if (!expectedAssetPubkey) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_TX_NOT_PREPARED' });
+    }
+    if (!transactionHasSignedSolanaSignature({ transaction, signerAddress: expectedAssetPubkey })) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING' });
+    }
+
+    signTownhallSponsoredSolanaTransaction({ transaction, feePayer });
+    const serialized = serializeTownhallSponsoredSolanaTransaction(transaction);
+
+    const sponsorRpcUrl = SOLANA_ERC8004_RPC_CANDIDATES[0] || SOLANA_ERC8004_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(sponsorRpcUrl, 'confirmed');
+    await ensureSolanaOwnerLamportsForSponsoredMint({
+      connection,
+      web3,
+      ownerAddress: walletAddress,
+      feePayer,
+      minLamports: SOLANA_SPONSOR_OWNER_MIN_LAMPORTS
+    });
+    const sendSponsored = async () => {
+      const signature = await connection.sendRawTransaction(serialized, { skipPreflight: false, maxRetries: 3 });
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      if (confirmation?.value?.err) {
+        const err = new Error('SOLANA_SPONSOR_SEND_FAILED');
+        err.detail = JSON.stringify(confirmation.value.err);
+        throw err;
+      }
+      return signature;
+    };
+
+    let signature = '';
+    try {
+      signature = await sendSponsored();
+    } catch (sendErr) {
+      const detailText = String(sendErr?.detail || sendErr?.cause?.message || sendErr?.message || '');
+      const shortfall = parseSolanaLamportShortfall(detailText);
+      const canRetryAfterTopUp = SOLANA_SPONSOR_AUTO_TOPUP && shortfall && Number.isFinite(shortfall.shortfall);
+      if (!canRetryAfterTopUp) throw sendErr;
+      const topUpLamports = Math.max(1, Math.floor(shortfall.shortfall + 250_000));
+      await topUpSolanaOwnerLamports({
+        connection,
+        web3,
+        ownerAddress: walletAddress,
+        feePayer,
+        lamports: topUpLamports
+      });
+      signature = await sendSponsored();
+    }
+    onboarding.pendingSolanaMints.splice(pendingIndex, 1);
+
+      return res.json({
+        ok: true,
+        signature,
+        solana: {
+          signature,
+          cluster: SOLANA_ERC8004_CLUSTER,
+          rpcUrl: sponsorRpcUrl,
+          feePayer: feePayerAddress
+        }
+      });
+  } catch (err) {
+    const code = String(err?.message || 'SOLANA_SPONSOR_SEND_FAILED');
+    const status = code === 'SOLANA_SPONSOR_SECRET_INVALID' ? 500 : 502;
+    const detail = typeof err?.detail === 'string' && err.detail.trim()
+      ? err.detail.trim()
+      : String(err?.cause?.message || err?.message || '').trim();
+    return res.status(status).json({
+      ok: false,
+      error: code || 'SOLANA_SPONSOR_SEND_FAILED',
+      ...(detail ? { detail } : {})
+    });
   }
 });
 
 app.post('/api/townhall/register', (req, res) => {
   const s = ensureHumanSession(req, res);
   const onboarding = ensureSessionOnboarding(s);
-  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : req.body || {};
+  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
   const erc = req.body?.erc8004 && typeof req.body.erc8004 === 'object' ? req.body.erc8004 : {};
 
   const humanName = normalizeTownhallName(profile.humanName);
@@ -2171,8 +3278,8 @@ app.post('/api/townhall/register', (req, res) => {
 
   const userEvmId = normalizeTownhallErcId(erc?.user?.evm?.id);
   const userSolanaId = normalizeTownhallErcId(erc?.user?.solana?.id);
-  const agentEvmId = normalizeTownhallErcId(erc?.agent?.evm?.id || erc?.evm?.id);
-  const agentSolanaId = normalizeTownhallErcId(erc?.agent?.solana?.id || erc?.solana?.id);
+  const agentEvmId = normalizeTownhallErcId(erc?.agent?.evm?.id);
+  const agentSolanaId = normalizeTownhallErcId(erc?.agent?.solana?.id);
   if (!userEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_EVM_ID' });
   if (!userSolanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_SOLANA_ID' });
   if (!agentEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_AGENT_EVM_ID' });
@@ -2186,14 +3293,10 @@ app.post('/api/townhall/register', (req, res) => {
     : 'devnet';
   const agentEvmChain = typeof erc?.agent?.evm?.chain === 'string' && erc.agent.evm.chain.trim()
     ? erc.agent.evm.chain.trim().toLowerCase()
-    : typeof erc?.evm?.chain === 'string' && erc.evm.chain.trim()
-      ? erc.evm.chain.trim().toLowerCase()
-      : 'sepolia';
+    : 'sepolia';
   const agentSolanaCluster = typeof erc?.agent?.solana?.cluster === 'string' && erc.agent.solana.cluster.trim()
     ? erc.agent.solana.cluster.trim().toLowerCase()
-    : typeof erc?.solana?.cluster === 'string' && erc.solana.cluster.trim()
-      ? erc.solana.cluster.trim().toLowerCase()
-      : 'devnet';
+    : 'devnet';
 
   onboarding.profile = onboarding.profile || {};
   onboarding.profile.humanName = humanName;
@@ -2231,28 +3334,15 @@ app.post('/api/townhall/register', (req, res) => {
     evm: {
       id: agentEvmId,
       chain: agentEvmChain,
-      txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash || erc?.evm?.txHash),
+      txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash),
       updatedAt
     },
     solana: {
       id: agentSolanaId,
       cluster: agentSolanaCluster,
-      txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig || erc?.solana?.txSig),
+      txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig),
       updatedAt
     }
-  };
-  // Legacy compatibility: keep summary fields for older clients.
-  onboarding.erc8004.evm = {
-    id: agentEvmId,
-    chain: agentEvmChain,
-    txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash || erc?.evm?.txHash),
-    updatedAt
-  };
-  onboarding.erc8004.solana = {
-    id: agentSolanaId,
-    cluster: agentSolanaCluster,
-    txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig || erc?.solana?.txSig),
-    updatedAt
   };
 
   onboarding.registrationComplete = true;
@@ -4838,15 +5928,20 @@ app.use(
   })
 );
 
-app.get('/', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, HOME_ROUTE_FILE)));
-app.get('/start', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'start.html')));
-app.get('/app', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
-app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
-app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
+function sendHtmlNoStore(res, fileName) {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(PUBLIC_DIR, fileName));
+}
+
+app.get('/', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
+app.get('/start', (_req, res) => sendHtmlNoStore(res, 'start.html'));
+app.get('/app', (_req, res) => sendHtmlNoStore(res, 'index.html'));
+app.get('/create', (_req, res) => sendHtmlNoStore(res, 'create.html'));
+app.get('/inbox/:houseId', (_req, res) => sendHtmlNoStore(res, 'inbox.html'));
 app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
-app.get('/claim-wallet', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'claim-wallet.html')));
-app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
-app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
+app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
+app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
+app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;
@@ -4864,7 +5959,7 @@ app.get('/s/:id', (req, res) => {
 });
 
 // Default route
-app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, HOME_ROUTE_FILE)));
+app.get('*', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 
 const port = Number(process.env.PORT || 4173);
 app.listen(port, () => {

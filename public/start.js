@@ -5,18 +5,6 @@ function setStatus(msg, isError = false) {
   statusNode.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
 }
 
-function setTeamCode(value) {
-  const node = document.getElementById('startTeamCode');
-  if (!node) return;
-  node.textContent = value || '…';
-}
-
-function setStateHint(value) {
-  const node = document.getElementById('startStateHint');
-  if (!node) return;
-  node.textContent = value || '';
-}
-
 let cachedPrivyConfig = null;
 let autoRedirecting = false;
 const walletClient = window.initWalletClient ? window.initWalletClient() : null;
@@ -35,6 +23,9 @@ function explainPrivyError(err) {
   }
   if ((code === 'PRIVY_EMAIL_SEND_FAILED' || code === 'PRIVY_EMAIL_CODE_FAILED') && status === 403) {
     return 'Privy rejected this request (403). Check App ID/Client ID, allowed domain, and enabled email auth.';
+  }
+  if (code === 'PRIVY_BRIDGE_INIT_FAILED' || code === 'PRIVY_BRIDGE_MISSING') {
+    return 'Privy SDK failed to initialize. Disable blockers, allow third-party cookies for auth.privy.io, and reload.';
   }
   if (code === 'PRIVY_EMAIL_SEND_FAILED') return 'Could not send the Privy code email. Check your Privy email auth setup.';
   if (code === 'PRIVY_EMAIL_CODE_FAILED') return 'Could not verify the code. Please try again.';
@@ -59,29 +50,6 @@ async function getCachedPrivyConfig() {
   return cachedPrivyConfig;
 }
 
-async function fetchStartSessionContext() {
-  const [sessionResp, stateResp] = await Promise.all([
-    fetch('/api/session', { method: 'GET', credentials: 'include', cache: 'no-store' }).catch(() => null),
-    fetch('/api/state', { method: 'GET', credentials: 'include', cache: 'no-store' }).catch(() => null)
-  ]);
-
-  let teamCode = null;
-  let houseId = null;
-  let signupComplete = false;
-
-  if (sessionResp && sessionResp.ok) {
-    const payload = await sessionResp.json().catch(() => ({}));
-    teamCode = payload?.teamCode || null;
-  }
-  if (stateResp && stateResp.ok) {
-    const payload = await stateResp.json().catch(() => ({}));
-    houseId = payload?.houseId || null;
-    signupComplete = !!payload?.signup?.complete;
-  }
-
-  return { teamCode, houseId, signupComplete };
-}
-
 function createLoginUi() {
   const box = document.getElementById('privyAuthBox');
   const help = document.getElementById('privyAuthHelp');
@@ -94,6 +62,17 @@ function createLoginUi() {
   if (!box || !help || !emailForm || !emailInput || !codeForm || !codeInput || !cancelBtn) {
     return null;
   }
+
+  if (emailForm.dataset.preventNativeSubmit !== '1') {
+    const preventNativeSubmit = (evt) => evt.preventDefault();
+    emailForm.addEventListener('submit', preventNativeSubmit);
+    codeForm.addEventListener('submit', preventNativeSubmit);
+    emailForm.dataset.preventNativeSubmit = '1';
+  }
+
+  const pendingRejecters = new Set();
+  let emailPromise = null;
+  let codePromise = null;
 
   function showEmailStep(message) {
     box.classList.remove('is-hidden');
@@ -123,51 +102,106 @@ function createLoginUi() {
     codeInput.value = '';
   }
 
+  function cancelPending(reason = 'PRIVY_LOGIN_CANCELLED') {
+    const err = new Error(reason);
+    for (const rejecter of [...pendingRejecters]) {
+      rejecter(err);
+    }
+    pendingRejecters.clear();
+  }
+
   function waitForFormSubmit(form, input, { onShow, onResolve }) {
     return new Promise((resolve, reject) => {
-      const onCancel = () => {
+      let settled = false;
+
+      const finishResolve = (value) => {
+        if (settled) return;
+        settled = true;
         cleanup();
-        reject(new Error('PRIVY_LOGIN_CANCELLED'));
+        resolve(value);
+      };
+
+      const finishReject = (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err);
+      };
+
+      const rejecter = (err) => {
+        finishReject(err instanceof Error ? err : new Error('PRIVY_LOGIN_CANCELLED'));
+      };
+
+      const onCancel = () => {
+        rejecter(new Error('PRIVY_LOGIN_CANCELLED'));
       };
 
       const onSubmit = (evt) => {
         evt.preventDefault();
         const value = String(input.value || '').trim();
         if (!value) return;
-        cleanup();
-        resolve(onResolve(value));
+        try {
+          finishResolve(onResolve(value));
+        } catch (err) {
+          rejecter(err);
+        }
       };
 
       const cleanup = () => {
         form.removeEventListener('submit', onSubmit);
         cancelBtn.removeEventListener('click', onCancel);
+        pendingRejecters.delete(rejecter);
       };
 
+      pendingRejecters.add(rejecter);
       cancelBtn.addEventListener('click', onCancel);
       form.addEventListener('submit', onSubmit);
       onShow();
     });
   }
 
+  function requestEmail() {
+    if (emailPromise) return emailPromise;
+    emailPromise = waitForFormSubmit(emailForm, emailInput, {
+      onShow: () => showEmailStep(),
+      onResolve: (email) => {
+        emailInput.value = email;
+        return email;
+      }
+    });
+    return emailPromise;
+  }
+
+  function requestCode(email) {
+    if (codePromise) return codePromise;
+    codePromise = waitForFormSubmit(codeForm, codeInput, {
+      onShow: () => showCodeStep(email),
+      onResolve: (code) => code
+    });
+    return codePromise;
+  }
+
   return {
-    requestEmail: () =>
-      waitForFormSubmit(emailForm, emailInput, {
-        onShow: () => showEmailStep(),
-        onResolve: (email) => {
-          emailInput.value = email;
-          return email;
-        }
-      }),
-    requestCode: ({ email }) =>
-      waitForFormSubmit(codeForm, codeInput, {
-        onShow: () => showCodeStep(email),
-        onResolve: (code) => code
-      }),
+    primeEmailStep: () => {
+      requestEmail().catch(() => {});
+    },
+    requestEmail: () => requestEmail(),
+    requestCode: ({ email }) => requestCode(email),
     notifyCodeSent: ({ email }) => {
+      codePromise = null;
       showCodeStep(email, `Code sent to ${email}. Enter it below.`);
     },
     close: () => {
+      cancelPending();
+      emailPromise = null;
+      codePromise = null;
       hide();
+    },
+    resetForRetry: () => {
+      cancelPending();
+      emailPromise = null;
+      codePromise = null;
+      requestEmail().catch(() => {});
     }
   };
 }
@@ -177,17 +211,32 @@ function setEntryButtonsDisabled(disabled) {
   if (enterBtn) enterBtn.disabled = !!disabled;
 }
 
-function privyBridgeSupportsSolanaConnect() {
+function getPrivyBridge() {
   const bridge = window.__PRIVY_WALLET_BRIDGE__;
+  return bridge && typeof bridge === 'object' ? bridge : null;
+}
+
+function privyBridgeSupportsSolanaConnect() {
+  const bridge = getPrivyBridge();
   return !!(bridge && typeof bridge.connectSolana === 'function');
 }
 
 async function ensurePrivyWallet({ silent = true } = {}) {
-  if (!walletClient) return false;
-  if (!privyBridgeSupportsSolanaConnect()) return false;
+  if (walletClient && typeof walletClient.connect === 'function') {
+    try {
+      const connected = await walletClient.connect({ chain: 'solana', silent: !!silent });
+      const addr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+      if (addr) return true;
+    } catch {
+      // Fall through to direct Privy bridge connect.
+    }
+  }
+
+  const bridge = getPrivyBridge();
+  if (!bridge || typeof bridge.connectSolana !== 'function') return false;
   try {
-    const connected = await walletClient.connect({ chain: 'solana', silent: !!silent });
-    const addr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+    const connected = await bridge.connectSolana({ silent: !!silent });
+    const addr = connected?.address || null;
     return !!addr;
   } catch {
     return false;
@@ -219,8 +268,6 @@ async function maybeAutoSkipStart() {
   try {
     const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
     if (!alreadySignedIn) return;
-    const walletReady = await ensurePrivyWallet({ silent: true });
-    if (!walletReady) return;
     autoRedirecting = true;
     window.location.replace(appPath);
   } catch {
@@ -241,52 +288,99 @@ async function handleEnter() {
       return;
     }
 
-    setStatus('Connecting to Privy...');
-    const ok = typeof window.ensurePrivyLogin === 'function'
-      ? await window.ensurePrivyLogin({ interactive: true, loginUi })
-      : false;
-
-    if (!ok) throw new Error('PRIVY_LOGIN_FAILED');
-
-    if (privyBridgeSupportsSolanaConnect()) {
-      setStatus('Preparing wallet...');
-      const walletReady = await ensurePrivyWallet({ silent: false });
-      if (!walletReady) throw new Error('PRIVY_WALLET_CREATE_FAILED');
+    const hasEnsurePrivy = typeof window.ensurePrivyLogin === 'function';
+    if (!hasEnsurePrivy) {
+      const out = new Error('PRIVY_BRIDGE_INIT_FAILED');
+      out.code = 'PRIVY_BRIDGE_INIT_FAILED';
+      throw out;
     }
 
-    if (loginUi && typeof loginUi.close === 'function') loginUi.close();
-    setStatus('Success. Entering Agent Town...');
-    window.location.assign(appPath);
+    setStatus('Connecting to Privy...');
+    let alreadySignedIn = false;
+    try {
+      alreadySignedIn = !!(await window.ensurePrivyLogin({ interactive: false }));
+    } catch (err) {
+      // Silent check should never block interactive login.
+      console.warn('silent privy login check failed; falling back to interactive login', err);
+      alreadySignedIn = false;
+    }
+    if (alreadySignedIn) {
+      if (privyBridgeSupportsSolanaConnect()) {
+        ensurePrivyWallet({ silent: true }).catch(() => false);
+      }
+      if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+      setStatus('Success. Entering Agent Town...');
+      window.location.assign(appPath);
+      return;
+    }
+
+    if (loginUi && typeof loginUi.primeEmailStep === 'function') {
+      loginUi.primeEmailStep();
+    }
+
+    let transientFailures = 0;
+    while (true) {
+      try {
+        setStatus('Connecting to Privy...');
+        const ok = await window.ensurePrivyLogin({ interactive: true, loginUi });
+        if (!ok) {
+          const out = new Error('PRIVY_LOGIN_FAILED');
+          out.code = 'PRIVY_LOGIN_FAILED';
+          throw out;
+        }
+
+        // Wallet provisioning can lag/fail transiently; do not block app entry on /start.
+        if (privyBridgeSupportsSolanaConnect()) {
+          ensurePrivyWallet({ silent: true }).catch(() => false);
+        }
+
+        if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+        setStatus('Success. Entering Agent Town...');
+        window.location.assign(appPath);
+        return;
+      } catch (err) {
+        console.error('Privy login failed', err);
+        const errCode = (err && typeof err.code === 'string' && err.code)
+          || (err && typeof err.message === 'string' && err.message)
+          || '';
+        if (errCode === 'PRIVY_LOGIN_CANCELLED') {
+          if (loginUi && typeof loginUi.close === 'function') loginUi.close();
+          setStatus(explainPrivyError(err), true);
+          break;
+        }
+
+        setStatus(explainPrivyError(err), true);
+        if (loginUi && typeof loginUi.resetForRetry === 'function') {
+          loginUi.resetForRetry();
+        }
+
+        const retryable = errCode === 'PRIVY_EMAIL_SEND_FAILED'
+          || errCode === 'PRIVY_EMAIL_CODE_FAILED'
+          || errCode === 'PRIVY_LOGIN_FAILED';
+        if (!retryable) break;
+        transientFailures += 1;
+        if (transientFailures >= 3) break;
+      }
+    }
   } catch (err) {
     console.error('Privy login failed', err);
-    if (loginUi && typeof loginUi.close === 'function') loginUi.close();
     setStatus(explainPrivyError(err), true);
+  } finally {
     setEntryButtonsDisabled(false);
   }
 }
 
-async function hydrateStartSessionContext() {
-  try {
-    const context = await fetchStartSessionContext();
-    setTeamCode(context.teamCode || '…');
-
-    if (context.houseId) {
-      setStateHint(`Returning house detected: ${context.houseId}`);
-      return;
-    }
-    if (context.signupComplete) {
-      setStateHint('Session already completed onboarding. Enter town to continue.');
-      return;
-    }
-    setStateHint('Use this session to continue your co-op unlock flow.');
-  } catch {
-    setTeamCode('…');
-    setStateHint('Session state unavailable. You can still enter town.');
-  }
+function maybeCanonicalizePrivyLoopbackHost() {
+  const host = String(window.location.hostname || '').trim().toLowerCase();
+  if (host !== '127.0.0.1' && host !== '::1' && host !== '[::1]') return false;
+  const port = window.location.port ? `:${window.location.port}` : '';
+  const next = `http://localhost${port}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  window.location.replace(next);
+  return true;
 }
 
 function boot() {
-  hydrateStartSessionContext().catch(() => {});
+  if (maybeCanonicalizePrivyLoopbackHost()) return;
   maybeAutoSkipStart().catch(() => {});
 
   const enterBtn = document.getElementById('enterBtn');

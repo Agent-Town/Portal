@@ -1,76 +1,97 @@
 <div class="panel" id="townhallRegisterPanel">
-  <h2 style="margin:0 0 6px">Town Hall Registration</h2>
-  <p class="small" style="margin-top:0">
-    Register your team identity before entering the rest of town. Names, avatars, prompts, and ERC-8004 IDs are saved to your session and house.
-  </p>
-
-  <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
-    Complete this form to unlock the sigil steps.
-  </div>
-
-  <div class="row two" style="gap:10px;">
-    <div>
-      <label class="small" for="townhallHumanName">Human name</label>
-      <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
+  <div class="townhallStoryShell">
+    <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
+      Complete onboarding to unlock the sigil test.
     </div>
-    <div>
+
+    <div class="townhallStoryStep" id="townhallStepHuman">
+      <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
+      <p class="small" style="margin-top:0">How should we call you?</p>
+
+      <label class="small" for="townhallHumanName">Your name</label>
+      <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
+
+      <div class="townhallAvatarBlock">
+        <div class="small">Your avatar</div>
+        <div class="public-media-preview is-hidden" id="townhallHumanPreview">
+          <img id="townhallHumanPreviewImg" alt="Human avatar preview" />
+        </div>
+        <button class="btn" id="townhallHumanCustomizeBtn" type="button">Customize</button>
+      </div>
+
+      <div class="townhallCustomizeModal is-hidden" id="townhallHumanCustomize">
+        <label class="small" for="townhallHumanPrompt">Prompt</label>
+        <div class="small">To help AI understand your image.</div>
+        <textarea id="townhallHumanPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
+        <label class="small" for="townhallHumanImage" style="margin-top:8px; display:block;">Upload image</label>
+        <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn primary" id="townhallHumanSubmitBtn" data-testid="townhall-human-submit-btn">Submit</button>
+      </div>
+    </div>
+
+    <div class="townhallStoryStep is-hidden" id="townhallStepAgent">
+      <h2 style="margin:0 0 6px">This is your agent - you rescued it!</h2>
+      <p class="small" style="margin-top:0">What should we call it?</p>
+
       <label class="small" for="townhallAgentName">Agent name</label>
       <input id="townhallAgentName" type="text" maxlength="48" placeholder="OpenClaw" />
-    </div>
-  </div>
 
-  <div class="divider"></div>
+      <div class="townhallAvatarBlock">
+        <div class="small">Agent avatar</div>
+        <div class="public-media-preview is-hidden" id="townhallAgentPreview">
+          <img id="townhallAgentPreviewImg" alt="Agent avatar preview" />
+        </div>
+        <button class="btn" id="townhallAgentCustomizeBtn" type="button">Customize</button>
+      </div>
 
-  <div class="row two" style="gap:10px;">
-    <div>
-      <label class="small" for="townhallHumanPrompt">Human avatar prompt (required, exact prompt used)</label>
-      <textarea id="townhallHumanPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the human avatar"></textarea>
-      <label class="small" for="townhallHumanImage" style="margin-top:8px; display:block;">Human avatar image (optional upload)</label>
-      <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
-      <div class="public-media-preview is-hidden" id="townhallHumanPreview" style="margin-top:8px;">
-        <div class="small">Human avatar preview</div>
-        <img id="townhallHumanPreviewImg" alt="Human avatar preview" />
+      <div class="townhallCustomizeModal is-hidden" id="townhallAgentCustomize">
+        <label class="small" for="townhallAgentPrompt">Prompt</label>
+        <div class="small">To help AI understand your image.</div>
+        <textarea id="townhallAgentPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
+        <label class="small" for="townhallAgentImage" style="margin-top:8px; display:block;">Upload image</label>
+        <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn" id="townhallAgentBackBtn" type="button">Back</button>
+        <button class="btn primary" id="townhallAgentSubmitBtn" data-testid="townhall-agent-submit-btn">Submit</button>
       </div>
     </div>
-    <div>
-      <label class="small" for="townhallAgentPrompt">Agent avatar prompt (required, exact prompt used)</label>
-      <textarea id="townhallAgentPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the agent avatar"></textarea>
-      <label class="small" for="townhallAgentImage" style="margin-top:8px; display:block;">Agent avatar image (optional upload)</label>
-      <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
-      <div class="public-media-preview is-hidden" id="townhallAgentPreview" style="margin-top:8px;">
-        <div class="small">Agent avatar preview</div>
-        <img id="townhallAgentPreviewImg" alt="Agent avatar preview" />
+
+    <div class="townhallStoryStep is-hidden" id="townhallStepProcessing">
+      <h2 style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
+
+      <div class="townhallMintChecklist" id="townhallMintChecklist">
+        <div class="townhallMintChecklistRow">
+          <span>User is registering on Ethereum</span>
+          <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>User is registering on Solana</span>
+          <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>Agent is registering on Ethereum</span>
+          <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>Agent is registering on Solana</span>
+          <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
+        </div>
       </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn" id="townhallRegisterBtn" data-testid="townhall-register-btn">Retry registration</button>
+        <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue to sigil test</button>
+        <span class="pill" id="townhallRegisterState">Not registered</span>
+      </div>
+      <div class="small" id="townhallRegisterStatus" style="margin-top:8px; color: var(--muted);"></div>
+      <div class="small" id="townhallRegisterError" style="margin-top:6px; color: var(--bad);"></div>
     </div>
   </div>
-
-  <div class="divider"></div>
-
-  <div class="townhallMintChecklist" id="townhallMintChecklist">
-    <div class="townhallMintChecklistRow">
-      <span>User is registering on Ethereum</span>
-      <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
-    </div>
-    <div class="townhallMintChecklistRow">
-      <span>User is registering on Solana</span>
-      <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
-    </div>
-    <div class="townhallMintChecklistRow">
-      <span>Agent is registering on Ethereum</span>
-      <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
-    </div>
-    <div class="townhallMintChecklistRow">
-      <span>Agent is registering on Solana</span>
-      <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
-    </div>
-  </div>
-
-  <div class="kv" style="margin-top:10px;">
-    <button class="btn primary" id="townhallRegisterBtn" data-testid="townhall-register-btn">Mint all 4 ERC-8004 identities</button>
-    <span class="pill" id="townhallRegisterState">Not registered</span>
-  </div>
-  <div class="small" id="townhallRegisterStatus" style="margin-top:8px; color: var(--muted);"></div>
-  <div class="small" id="townhallRegisterError" style="margin-top:6px; color: var(--bad);"></div>
 </div>
 
 <div id="townhallSigilFlow">
