@@ -100,18 +100,27 @@ let liteSkillLoopInFlight = false;
 let liteSkillLoopBackoffMs = 1000;
 let liteSkillLoopLastRunAtMs = 0;
 let liteSkillLoopTeamCode = '';
+let liteSkillLoopPauseReason = '';
+let liteSkillLoopLastErrorFingerprint = '';
+let liteSkillLoopLastErrorAtMs = 0;
 let townPanelUnlocked = false;
 let pendingHumanSigilSelection = null;
+let openAiCodexOAuthAttempt = null;
+let openAiCodexOAuthPollTimer = null;
+let openAiCodexOAuthExchangeInFlight = false;
+let openAiCodexOAuthMessageListenerBound = false;
 const AGENT_DEBUG_REFRESH_MS = 2200;
 const AGENT_DEBUG_EVENT_LIMIT = 160;
 const AGENT_DEBUG_TRAFFIC_LIMIT = 220;
 const AGENT_DEBUG_TRAFFIC_LINE_MAX = 1600;
+const AGENT_DEBUG_TRAFFIC_RENDER_LIMIT = 90;
 let agentDebugActiveTab = 'tools';
 let agentDebugRefreshTimer = null;
 let agentDebugRefreshInFlight = false;
 let agentDebugRefreshQueued = false;
 const agentDebugEvents = [];
 const agentDebugTraffic = [];
+let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
 
 function b64(bytes) {
@@ -216,9 +225,11 @@ function setOpenError(text) {
 }
 
 function setLiteLlmStatus(text) {
-  const node = el('liteLlmStatus');
-  if (!node) return;
-  node.textContent = text || '';
+  const value = text || '';
+  const legacy = el('liteLlmStatus');
+  if (legacy) legacy.textContent = value;
+  const agent = el('agentLlmLine');
+  if (agent) agent.textContent = value;
 }
 
 function safeJsonParse(raw, fallback = null) {
@@ -331,19 +342,32 @@ function pushAgentDebugTraffic(direction, channel, payload) {
   const dir = String(direction || '').trim().toLowerCase() === 'in' ? 'IN' : 'OUT';
   const target = String(channel || '').trim() || 'unknown';
   const stamp = new Date().toISOString();
-  let suffix = '';
+  let payloadValue = null;
+  let payloadText = '';
   if (payload !== undefined) {
     try {
-      suffix = ` ${JSON.stringify(sanitizeAgentTrafficValue(payload))}`;
+      payloadValue = sanitizeAgentTrafficValue(payload);
+      payloadText = JSON.stringify(payloadValue);
     } catch {
-      suffix = ` ${String(payload)}`;
+      payloadValue = String(payload);
+      payloadText = String(payload);
+    }
+    if (payloadText.length > AGENT_DEBUG_TRAFFIC_LINE_MAX) {
+      payloadText = `${payloadText.slice(0, AGENT_DEBUG_TRAFFIC_LINE_MAX)}…`;
     }
   }
-  let line = `[${stamp}] ${dir} ${target}${suffix}`;
+  let line = `[${stamp}] ${dir} ${target}${payloadText ? ` ${payloadText}` : ''}`;
   if (line.length > AGENT_DEBUG_TRAFFIC_LINE_MAX) {
     line = `${line.slice(0, AGENT_DEBUG_TRAFFIC_LINE_MAX)}…`;
   }
-  agentDebugTraffic.push(line);
+  agentDebugTraffic.push({
+    stamp,
+    direction: dir,
+    channel: target,
+    payload: payloadValue,
+    payloadText,
+    line,
+  });
   if (agentDebugTraffic.length > AGENT_DEBUG_TRAFFIC_LIMIT) {
     agentDebugTraffic.splice(0, agentDebugTraffic.length - AGENT_DEBUG_TRAFFIC_LIMIT);
   }
@@ -351,6 +375,108 @@ function pushAgentDebugTraffic(direction, channel, payload) {
 
 function agentDebugTrafficTail(max = 60) {
   return agentDebugTraffic.slice(Math.max(0, agentDebugTraffic.length - max));
+}
+
+function normalizeAgentTrafficFilter(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'in' || raw === 'out') return raw;
+  return 'all';
+}
+
+function setAgentTrafficFilter(value) {
+  agentDebugTrafficFilter = normalizeAgentTrafficFilter(value);
+  const buttons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
+  for (const btn of buttons) {
+    const current = normalizeAgentTrafficFilter(btn?.dataset?.trafficFilter || '');
+    const active = current === agentDebugTrafficFilter;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+}
+
+function matchesAgentTrafficFilter(entry) {
+  const mode = normalizeAgentTrafficFilter(agentDebugTrafficFilter);
+  if (mode === 'all') return true;
+  const dir = String(entry?.direction || '').trim().toLowerCase();
+  return dir === mode;
+}
+
+function renderAgentTrafficCards(nowIso) {
+  const list = el('agentDebugTraffic');
+  const meta = el('agentDebugTrafficMeta');
+  if (!list) return;
+
+  const filtered = agentDebugTraffic.filter((entry) => matchesAgentTrafficFilter(entry));
+  const tail = filtered.slice(Math.max(0, filtered.length - AGENT_DEBUG_TRAFFIC_RENDER_LIMIT));
+  const visible = tail.slice().reverse();
+  const modeLabel = normalizeAgentTrafficFilter(agentDebugTrafficFilter).toUpperCase();
+
+  if (meta) {
+    meta.textContent = `Refreshed: ${nowIso} | Filter: ${modeLabel} | Showing ${visible.length}/${filtered.length}`;
+  }
+
+  list.innerHTML = '';
+  if (!visible.length) {
+    const empty = document.createElement('div');
+    empty.className = 'agent-traffic-empty';
+    empty.textContent = 'No traffic entries for this filter yet.';
+    list.appendChild(empty);
+    return;
+  }
+
+  for (const entry of visible) {
+    const stamp = String(entry?.stamp || '');
+    const direction = String(entry?.direction || 'OUT').trim().toUpperCase() === 'IN' ? 'IN' : 'OUT';
+    const channel = String(entry?.channel || 'unknown');
+    const payloadText = String(entry?.payloadText || '').trim();
+    const summary = `${direction} ${channel}`;
+
+    const card = document.createElement('article');
+    card.className = 'agent-traffic-card';
+    card.dataset.direction = direction;
+    card.dataset.stamp = stamp;
+    card.dataset.epochMs = String(Date.parse(stamp) || 0);
+
+    const header = document.createElement('div');
+    header.className = 'agent-traffic-card-header';
+
+    const badges = document.createElement('div');
+    badges.className = 'agent-traffic-card-badges';
+
+    const dirNode = document.createElement('span');
+    dirNode.className = `agent-traffic-dir ${direction.toLowerCase()}`;
+    dirNode.textContent = direction;
+
+    const channelNode = document.createElement('span');
+    channelNode.className = 'agent-traffic-channel';
+    channelNode.textContent = channel;
+
+    badges.appendChild(dirNode);
+    badges.appendChild(channelNode);
+
+    const timeNode = document.createElement('span');
+    timeNode.className = 'agent-traffic-time';
+    timeNode.textContent = stamp;
+
+    header.appendChild(badges);
+    header.appendChild(timeNode);
+
+    const summaryNode = document.createElement('div');
+    summaryNode.className = 'agent-traffic-summary';
+    summaryNode.textContent = summary;
+
+    card.appendChild(header);
+    card.appendChild(summaryNode);
+
+    if (payloadText) {
+      const payloadNode = document.createElement('pre');
+      payloadNode.className = 'agent-traffic-payload';
+      payloadNode.textContent = payloadText;
+      card.appendChild(payloadNode);
+    }
+
+    list.appendChild(card);
+  }
 }
 
 async function withAgentTrafficMuted(task) {
@@ -420,7 +546,7 @@ function instrumentGatewayTraffic(gatewayApi) {
 }
 
 function setAgentDebugTab(tab) {
-  const next = ['tools', 'skill', 'session', 'traffic'].includes(String(tab || '')) ? String(tab) : 'tools';
+  const next = ['tools', 'skill', 'session', 'traffic', 'brain'].includes(String(tab || '')) ? String(tab) : 'tools';
   agentDebugActiveTab = next;
 
   const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
@@ -571,14 +697,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     ];
     setAgentDebugText('agentDebugSession', sessionLines.join('\n'));
 
-    const trafficLines = [
-      `Refreshed: ${nowIso}`,
-      `Traffic entries: ${agentDebugTraffic.length} (showing last ${Math.min(agentDebugTraffic.length, 90)})`,
-      'Legend: OUT = page/gateway -> worker, IN = worker/gateway -> page',
-      '',
-      ...agentDebugTrafficTail(90),
-    ];
-    setAgentDebugText('agentDebugTraffic', trafficLines.join('\n'));
+    renderAgentTrafficCards(nowIso);
   } finally {
     agentDebugRefreshInFlight = false;
     if (agentDebugRefreshQueued) {
@@ -717,10 +836,8 @@ const LLM_PROVIDER_ALIASES = Object.freeze({
   qwen: 'qwen-portal'
 });
 
-const OAUTH_START_URL_BY_PROVIDER = Object.freeze({
-  openai: 'https://chatgpt.com/auth/login',
-  'openai-codex': 'https://chatgpt.com/auth/login'
-});
+const OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
+const OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
 
 function getSupportedLlmModels(provider) {
   const raw = String(provider || '').trim();
@@ -797,38 +914,182 @@ function applyLlmProviderModelSelection(provider, model) {
   return { provider: selectedProvider, model: selectedModel };
 }
 
-function getLlmOauthLaunchUrl(provider) {
-  const key = String(provider || '').trim().toLowerCase();
-  return OAUTH_START_URL_BY_PROVIDER[key] || '';
-}
-
 function updateLlmOauthLaunchUi() {
   const launchBtn = el('llmOauthLaunchBtn');
+  const completeBtn = el('llmOauthCompleteBtn');
   if (!launchBtn) return;
   const provider = String(el('llmProviderSelect')?.value || 'openai').trim() || 'openai';
   const mode = readLlmAuthMode();
-  const url = getLlmOauthLaunchUrl(provider);
-  launchBtn.dataset.oauthUrl = url;
+  const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
   launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
-  launchBtn.disabled = !url;
-  launchBtn.title = url
-    ? 'Open OAuth sign-in in a new tab.'
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
     : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
 }
 
-function launchLlmOauthInNewTab() {
-  const launchBtn = el('llmOauthLaunchBtn');
-  if (!launchBtn) return;
-  const url = String(launchBtn.dataset.oauthUrl || '').trim();
-  const status = el('llmLine');
-  if (!url) {
-    if (status) status.textContent = 'OAuth launch is available for OpenAI providers only.';
+function stopOpenAiCodexOAuthPoll() {
+  if (!openAiCodexOAuthPollTimer) return;
+  clearInterval(openAiCodexOAuthPollTimer);
+  openAiCodexOAuthPollTimer = null;
+}
+
+function bindOpenAiCodexOAuthMessageListener() {
+  if (openAiCodexOAuthMessageListenerBound) return;
+  openAiCodexOAuthMessageListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== OPENAI_CODEX_OAUTH_MESSAGE_TYPE) return;
+    const incomingState = String(payload.state || '').trim();
+    const incomingCode = String(payload.code || '').trim();
+    const incomingError = String(payload.error || '').trim();
+    if (!incomingState || incomingError) return;
+    const activeState = String(openAiCodexOAuthAttempt?.state || '').trim();
+    if (activeState && incomingState === activeState) {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: '' });
+      return;
+    }
+    if (incomingCode) {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: `${incomingCode}#${incomingState}` });
+    }
+  });
+}
+
+async function exchangeOpenAiCodexOAuthAttempt({ attemptId, callbackInput = '' }) {
+  const payload = {};
+  if (attemptId) payload.attemptId = String(attemptId).trim();
+  if (callbackInput) payload.callbackInput = callbackInput;
+  const result = await api('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return result;
+}
+
+async function hydrateUiFromOpenAiCodexCredential(credential) {
+  const access = String(credential?.access || '').trim();
+  if (!access) throw new Error('TOKEN_RESPONSE_INVALID');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const authModeSel = el('llmAuthModeSelect');
+  if (authModeSel) {
+    authModeSel.value = 'oauth-json';
+    setLlmAuthModeUI('oauth-json');
+  }
+  if (keyInput) keyInput.value = access;
+  if (oauthInput) {
+    oauthInput.value = JSON.stringify({
+      provider: 'openai-codex',
+      access: access,
+      refresh: String(credential?.refresh || ''),
+      expires: Number(credential?.expires || 0),
+      accountId: String(credential?.accountId || '')
+    }, null, 2);
+  }
+  syncModelRefFromInputs();
+  syncAgentLlmUiFromPrimary();
+}
+
+async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
+  if (openAiCodexOAuthExchangeInFlight) return;
+  openAiCodexOAuthExchangeInFlight = true;
+  try {
+    const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+    if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+      throw new Error('OAuth completion is available for OpenAI providers only.');
+    }
+    const normalizedInput = String(callbackInput || '').trim();
+    const attemptId = String(openAiCodexOAuthAttempt?.attemptId || '').trim();
+    if (!attemptId && !normalizedInput) {
+      throw new Error('Start OAuth first.');
+    }
+    const result = await exchangeOpenAiCodexOAuthAttempt({
+      attemptId,
+      callbackInput: normalizedInput
+    });
+    const returnedAttemptId = String(result?.attempt?.id || '').trim();
+    const returnedState = String(result?.attempt?.state || '').trim();
+    if (returnedAttemptId) {
+      openAiCodexOAuthAttempt = {
+        attemptId: returnedAttemptId,
+        state: returnedState || String(openAiCodexOAuthAttempt?.state || '').trim(),
+        startedAtMs: Date.now()
+      };
+    }
+    const credential = result?.credential || result?.oauthProfile || null;
+    if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+    await hydrateUiFromOpenAiCodexCredential(credential);
+    stopOpenAiCodexOAuthPoll();
+    setLiteLlmStatus('OAuth exchange complete. Click Connect Brain.');
+    setAgentLlmStatus('OAuth exchange complete. Click Connect Brain.');
+    openAiCodexOAuthAttempt = null;
+  } catch (err) {
+    const code = String(err?.message || '').trim();
+    if (code === 'CODE_PENDING') {
+      setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+      setAgentLlmStatus('Waiting for OAuth callback.');
+      return;
+    }
+    const msg = code || 'OAuth exchange failed.';
+    setLiteLlmStatus(`OAuth exchange failed: ${msg}`);
+    setAgentLlmStatus(`OAuth exchange failed: ${msg}`);
+    if (code !== 'CODE_PENDING') {
+      appendAgentLog(`OAuth exchange failed: ${msg}`);
+    }
+    throw err;
+  } finally {
+    openAiCodexOAuthExchangeInFlight = false;
+  }
+}
+
+function startOpenAiCodexOAuthPoll() {
+  stopOpenAiCodexOAuthPoll();
+  openAiCodexOAuthPollTimer = setInterval(async () => {
+    try {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: '' });
+    } catch (err) {
+      const code = String(err?.message || '').trim();
+      if (code === 'CODE_PENDING') return;
+      stopOpenAiCodexOAuthPoll();
+    }
+  }, 1500);
+}
+
+async function launchLlmOauthInNewTab() {
+  const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+  if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+    setLiteLlmStatus('OAuth launch is available for OpenAI providers only.');
     return;
   }
-  const popup = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!popup && status) {
-    status.textContent = 'Popup blocked. Allow popups and retry OAuth launch.';
+  bindOpenAiCodexOAuthMessageListener();
+
+  const started = await api('/api/agent/lite/llm/oauth/openai-codex/start', {
+    method: 'POST',
+    body: JSON.stringify({ provider, originator: 'portal-claw-lite' })
+  });
+  const authorizeUrl = String(started?.authorizeUrl || '').trim();
+  const attemptId = String(started?.attemptId || '').trim();
+  const state = String(started?.state || '').trim();
+  if (!authorizeUrl || !attemptId || !state) {
+    throw new Error('OAUTH_START_FAILED');
   }
+
+  openAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    throw new Error('POPUP_BLOCKED');
+  }
+  setLiteLlmStatus('OAuth started. Complete sign-in in the popup. If needed, paste callback URL and click Complete OAuth.');
+  setAgentLlmStatus('OAuth started. Complete sign-in in the popup.');
+  startOpenAiCodexOAuthPoll();
 }
 
 function getDefaultLlmModelForProvider(provider) {
@@ -879,7 +1140,7 @@ function setLlmAuthModeUI(mode) {
   }
   if (oauthHint) {
     oauthHint.textContent = authMode === 'oauth-json'
-      ? 'Use "Sign in with ChatGPT" (subscription) and paste callback URL, auth JSON, or token here.'
+      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
       : '';
   }
   updateLlmOauthLaunchUi();
@@ -930,7 +1191,9 @@ function getAccessTokenFromProfileValue(value) {
   if (!value || typeof value !== 'object') return '';
   const direct = typeof value.access === 'string' ? value.access.trim()
     : typeof value.access_token === 'string' ? value.access_token.trim()
-      : typeof value.accessToken === 'string' ? value.accessToken.trim() : '';
+      : typeof value.accessToken === 'string' ? value.accessToken.trim()
+        : typeof value.id_token === 'string' ? value.id_token.trim()
+          : typeof value.idToken === 'string' ? value.idToken.trim() : '';
   return direct;
 }
 
@@ -981,6 +1244,39 @@ function isLikelyJwtToken(value) {
 
 function isLikelyOpaqueOAuthToken(value) {
   return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function parseJwtPayloadUnsafe(token) {
+  const raw = String(token || '').trim();
+  if (!isLikelyJwtToken(raw)) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyOpenAiIdToken(token) {
+  const payload = parseJwtPayloadUnsafe(token);
+  if (!payload || typeof payload !== 'object') return false;
+  const issuer = String(payload.iss || '').trim();
+  const hasAtHash = typeof payload.at_hash === 'string' && payload.at_hash.length > 0;
+  return issuer === 'https://auth.openai.com' && hasAtHash;
+}
+
+function validateOAuthCredentialForProvider({ provider, credential }) {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const token = String(credential || '').trim();
+  if (!token || !isLikelyJwtToken(token)) return '';
+  if (!isLikelyOpenAiIdToken(token)) return '';
+  if (normalizedProvider === 'openai' || normalizedProvider === 'openai-codex') {
+    return 'Detected OpenAI id_token callback URL. This token type is not usable for model calls. Use an OpenAI API key or an OAuth profile with an access token.';
+  }
+  return '';
 }
 
 function collectOAuthCandidatesFromUrl(rawUrl) {
@@ -1160,7 +1456,11 @@ function resolveLlmConfigFromUi() {
   const mode = readLlmAuthMode();
 
   const parsedModel = resolveLlmModelRefFromInputs(provider, modelText);
-  const manualCredential = String(keyInput?.value || '').trim();
+  const manualRaw = String(keyInput?.value || '').trim();
+  const manualParsed = extractOAuthAccessToken(manualRaw, provider);
+  const manualCredential = manualParsed.ok
+    ? String(manualParsed.token || '').trim()
+    : manualRaw;
   let credential = manualCredential;
   let oauthError = '';
 
@@ -1170,6 +1470,14 @@ function resolveLlmConfigFromUi() {
     oauthError = oauthText && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
     const parsedCredential = token.ok ? String(token.token || '').trim() : '';
     credential = manualCredential || parsedCredential;
+  } else if (!credential) {
+    const oauthText = String(oauthInput?.value || '').trim();
+    if (oauthText) {
+      const token = extractOAuthAccessToken(oauthText, provider);
+      if (token.ok) {
+        credential = String(token.token || '').trim();
+      }
+    }
   }
 
   if (!credential) {
@@ -1177,6 +1485,14 @@ function resolveLlmConfigFromUi() {
       ? (oauthError || 'No access token found in OAuth profile JSON.')
       : `Missing ${provider === 'openai-codex' ? 'API key or OAuth token' : 'API key'} for ${parsedModel.provider}/${parsedModel.modelId}.`;
     throw new Error(msg);
+  }
+
+  const tokenValidationError = validateOAuthCredentialForProvider({
+    provider: parsedModel.provider,
+    credential,
+  });
+  if (tokenValidationError) {
+    throw new Error(tokenValidationError);
   }
 
   return {
@@ -1359,23 +1675,59 @@ function clearLiteSkillLoopTimer() {
   liteSkillLoopTimer = null;
 }
 
+function clearLiteSkillLoopPause() {
+  liteSkillLoopPauseReason = '';
+  liteSkillLoopLastErrorFingerprint = '';
+  liteSkillLoopLastErrorAtMs = 0;
+}
+
+function pauseLiteSkillLoop(reason, message) {
+  const nextReason = String(reason || '').trim();
+  if (!nextReason) return;
+  liteSkillLoopPauseReason = nextReason;
+  clearLiteSkillLoopTimer();
+  appendAgentLog(`Home skill loop paused: ${String(message || 'update brain config to continue')}`);
+}
+
+function appendHomeSkillLoopError(reason, message) {
+  const stamp = Date.now();
+  const normalizedReason = String(reason || '').trim();
+  const normalizedMessage = String(message || '').trim() || 'EXPERIENCE_RUN_FAILED';
+  const fingerprint = `${normalizedReason}|${normalizedMessage}`;
+  if (fingerprint === liteSkillLoopLastErrorFingerprint && stamp - liteSkillLoopLastErrorAtMs < 20_000) {
+    return;
+  }
+  liteSkillLoopLastErrorFingerprint = fingerprint;
+  liteSkillLoopLastErrorAtMs = stamp;
+  appendAgentLog(`Home skill step failed (${normalizedReason || 'state'}): ${normalizedMessage}`);
+}
+
 function shouldRunHomeSkillLoop(state) {
   if (window.location.pathname !== '/') return false;
   if (!isVendorLite(state)) return false;
   if (!isLocalLiteLlmConfigured()) return false;
   if (!isAnyAgentConnected(state)) return false;
+  if (liteSkillLoopPauseReason) return false;
   if (state?.signup?.complete && state?.signup?.mode === 'agent') return false;
   return true;
 }
 
-function homeSkillPrompt() {
-  return [
+function homeSkillPrompt(state = {}) {
+  const step = String(state?.experience?.step || '').trim();
+  const nextAgentAction = String(state?.experience?.nextAgentAction || '').trim();
+  const prompt = [
     'Read workspace/SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
     'Primary goal: complete signup by mirroring human sigil selection and pressing Open after the human.',
     'Use runtime session context values for origin/teamCode/houseId exactly as provided.',
+    'Start from the current experience state and perform at most one safe step per turn.',
+    'If experience.step is "mirror_sigil", mirror human.selected via /api/agent/select.',
+    'If experience.step is "press_open", call /api/agent/open/press exactly once.',
     'Use tools only; avoid asking the human for teamCode/houseId when already provided in runtime context.',
     'If waiting for the human, stop after one safe check/action.'
-  ].join('\n');
+  ];
+  if (step) prompt.push(`Runtime hint: experience.step=${step}`);
+  if (nextAgentAction) prompt.push(`Runtime hint: experience.nextAgentAction=${nextAgentAction}`);
+  return prompt.join('\n');
 }
 
 function requestHomeSkillStep(reason = 'state') {
@@ -1383,10 +1735,16 @@ function requestHomeSkillStep(reason = 'state') {
     clearLiteSkillLoopTimer();
     return;
   }
-  if (liteSkillLoopTimer) return;
+  const urgent = reason === 'human-action' || reason === 'team-change';
+  if (liteSkillLoopTimer && !urgent) return;
+  if (liteSkillLoopTimer && urgent) {
+    clearLiteSkillLoopTimer();
+  }
   const minGapMs = 900;
   const elapsed = Date.now() - liteSkillLoopLastRunAtMs;
-  const waitMs = Math.max(0, minGapMs - elapsed, reason === 'human-action' ? 0 : liteSkillLoopBackoffMs);
+  const waitMs = urgent
+    ? Math.max(0, minGapMs - elapsed)
+    : Math.max(0, minGapMs - elapsed, liteSkillLoopBackoffMs);
   liteSkillLoopTimer = setTimeout(() => {
     liteSkillLoopTimer = null;
     runHomeSkillStep(reason).catch(() => { });
@@ -1413,17 +1771,32 @@ async function runHomeSkillStep(reason = 'state') {
     }
 
     const run = await gatewayApi.experienceRun({
-      prompt: homeSkillPrompt(),
-      timeoutMs: 60_000
+      prompt: homeSkillPrompt(lastState),
+      timeoutMs: 60_000,
+      recordToTranscript: false,
+      emitChat: false,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || '')
+      },
+      runtimeState: lastState
     });
     if (run?.ok === false) {
       const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
       throw new Error(msg);
     }
     liteSkillLoopBackoffMs = 1000;
+    liteSkillLoopLastErrorFingerprint = '';
+    liteSkillLoopLastErrorAtMs = 0;
   } catch (err) {
     const msg = String(err?.message || 'EXPERIENCE_RUN_FAILED');
-    appendAgentLog(`Home skill step failed (${reason}): ${msg}`);
+    if (/could not parse your authentication token/i.test(msg) || /failed to extract accountid from token/i.test(msg)) {
+      pauseLiteSkillLoop('llm-auth', 'Brain token rejected by provider. Update Brain credentials and save again.');
+      setLiteLlmStatus('Brain token rejected by provider. Update OAuth/API key and save Brain again.');
+      return;
+    }
+    appendHomeSkillLoopError(reason, msg);
     liteSkillLoopBackoffMs = Math.min(5000, Math.max(1500, liteSkillLoopBackoffMs + 700));
   } finally {
     liteSkillLoopInFlight = false;
@@ -1776,7 +2149,33 @@ function initAdvancedLlmUi() {
   }
   if (oauthLaunchBtn && !oauthLaunchBtn.dataset.listening) {
     oauthLaunchBtn.dataset.listening = 'true';
-    oauthLaunchBtn.addEventListener('click', () => launchLlmOauthInNewTab());
+    oauthLaunchBtn.addEventListener('click', async () => {
+      try {
+        await launchLlmOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setLiteLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setLiteLlmStatus(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  const oauthCompleteBtn = el('llmOauthCompleteBtn');
+  if (oauthCompleteBtn && !oauthCompleteBtn.dataset.listening) {
+    oauthCompleteBtn.dataset.listening = 'true';
+    oauthCompleteBtn.addEventListener('click', async () => {
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
+        if (msg === 'CODE_PENDING') {
+          setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+        }
+      }
+    });
   }
   setLlmAuthModeUI(readLlmAuthMode());
   syncModelRefFromInputs();
@@ -1791,6 +2190,260 @@ function syncModelRefFromInputs() {
   const m = String(modelInput.value || '').trim();
   const resolved = resolveLlmModelRefFromInputs(p, m);
   refInput.value = m ? resolved.modelRef : '';
+}
+
+function copySelectOptions(fromSelect, toSelect) {
+  if (!fromSelect || !toSelect) return;
+  if (fromSelect.tagName !== 'SELECT' || toSelect.tagName !== 'SELECT') return;
+  const current = String(toSelect.value || '').trim();
+  toSelect.innerHTML = '';
+  for (const opt of Array.from(fromSelect.options || [])) {
+    const next = document.createElement('option');
+    next.value = String(opt.value || '');
+    next.textContent = String(opt.textContent || opt.value || '');
+    toSelect.appendChild(next);
+  }
+  if (current) {
+    ensureSelectOption(toSelect, current, current);
+    toSelect.value = current;
+  }
+}
+
+function setAgentLlmStatus(text) {
+  const node = el('agentLlmLine');
+  if (!node) return;
+  node.textContent = text || '';
+}
+
+function readAgentLlmAuthMode() {
+  const raw = String(el('agentLlmAuthModeSelect')?.value || '').trim();
+  return raw === 'oauth-json' ? 'oauth-json' : 'api-key';
+}
+
+function updateAgentLlmOauthLaunchUi() {
+  const launchBtn = el('agentLlmOauthLaunchBtn');
+  const completeBtn = el('agentLlmOauthCompleteBtn');
+  if (!launchBtn) return;
+  const provider = String(el('agentLlmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const mode = readAgentLlmAuthMode();
+  const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
+  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
+}
+
+function setAgentLlmAuthModeUI(mode) {
+  const authMode = mode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const authModeSelect = el('agentLlmAuthModeSelect');
+  const oauthInput = el('agentLlmOauthProfileInput');
+  const keyInput = el('agentLlmKeyInput');
+  if (authModeSelect) authModeSelect.value = authMode;
+  if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
+  if (keyInput) {
+    keyInput.placeholder = authMode === 'oauth-json'
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
+  }
+  updateAgentLlmOauthLaunchUi();
+}
+
+function syncAgentLlmUiFromPrimary() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const thinkingInput = el('llmThinkingInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const status = el('llmLine');
+
+  const agentProviderSel = el('agentLlmProviderSelect');
+  const agentModelInput = el('agentLlmModelIdInput');
+  const agentAuthModeSel = el('agentLlmAuthModeSelect');
+  const agentThinkingInput = el('agentLlmThinkingInput');
+  const agentKeyInput = el('agentLlmKeyInput');
+  const agentOauthInput = el('agentLlmOauthProfileInput');
+
+  copySelectOptions(providerSel, agentProviderSel);
+  copySelectOptions(modelInput, agentModelInput);
+  copySelectOptions(authModeSel, agentAuthModeSel);
+  copySelectOptions(thinkingInput, agentThinkingInput);
+
+  if (agentProviderSel && providerSel) {
+    ensureSelectOption(agentProviderSel, providerSel.value, providerSel.value);
+    agentProviderSel.value = providerSel.value;
+  }
+  if (agentModelInput && modelInput) {
+    ensureSelectOption(agentModelInput, modelInput.value, modelInput.value);
+    agentModelInput.value = modelInput.value;
+  }
+  if (agentAuthModeSel && authModeSel) {
+    ensureSelectOption(agentAuthModeSel, authModeSel.value, authModeSel.value);
+    agentAuthModeSel.value = authModeSel.value;
+  }
+  if (agentThinkingInput && thinkingInput) {
+    ensureSelectOption(agentThinkingInput, thinkingInput.value, thinkingInput.value);
+    agentThinkingInput.value = thinkingInput.value;
+  }
+  if (agentKeyInput && keyInput) agentKeyInput.value = keyInput.value || '';
+  if (agentOauthInput && oauthInput) agentOauthInput.value = oauthInput.value || '';
+  setAgentLlmAuthModeUI(readAgentLlmAuthMode());
+  setAgentLlmStatus(status?.textContent || el('liteLlmStatus')?.textContent || '');
+}
+
+function syncPrimaryLlmUiFromAgent() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const thinkingInput = el('llmThinkingInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+
+  const agentProviderSel = el('agentLlmProviderSelect');
+  const agentModelInput = el('agentLlmModelIdInput');
+  const agentAuthModeSel = el('agentLlmAuthModeSelect');
+  const agentThinkingInput = el('agentLlmThinkingInput');
+  const agentKeyInput = el('agentLlmKeyInput');
+  const agentOauthInput = el('agentLlmOauthProfileInput');
+
+  if (providerSel && agentProviderSel) {
+    const nextProvider = String(agentProviderSel.value || '').trim();
+    if (nextProvider) {
+      ensureSelectOption(providerSel, nextProvider, nextProvider);
+      providerSel.value = nextProvider;
+      providerSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+  if (modelInput && agentModelInput) {
+    const nextModel = String(agentModelInput.value || '').trim();
+    if (nextModel) {
+      ensureSelectOption(modelInput, nextModel, nextModel);
+      modelInput.value = nextModel;
+      if (modelInput.tagName === 'SELECT') {
+        modelInput.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        modelInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  }
+  if (authModeSel && agentAuthModeSel) {
+    authModeSel.value = readAgentLlmAuthMode();
+    authModeSel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (thinkingInput && agentThinkingInput) {
+    ensureSelectOption(thinkingInput, agentThinkingInput.value, agentThinkingInput.value);
+    thinkingInput.value = agentThinkingInput.value;
+  }
+  if (keyInput && agentKeyInput) keyInput.value = agentKeyInput.value || '';
+  if (oauthInput && agentOauthInput) oauthInput.value = agentOauthInput.value || '';
+  syncModelRefFromInputs();
+}
+
+function initAgentLlmUi() {
+  const panel = el('agentMindPanel');
+  if (!panel || panel.dataset.listening === '1') return;
+  panel.dataset.listening = '1';
+
+  const providerSel = el('agentLlmProviderSelect');
+  const modelInput = el('agentLlmModelIdInput');
+  const authModeSel = el('agentLlmAuthModeSelect');
+  const thinkingInput = el('agentLlmThinkingInput');
+  const keyInput = el('agentLlmKeyInput');
+  const oauthInput = el('agentLlmOauthProfileInput');
+  const oauthLaunchBtn = el('agentLlmOauthLaunchBtn');
+  const oauthCompleteBtn = el('agentLlmOauthCompleteBtn');
+  const saveBtn = el('agentLlmSaveBtn');
+  const clearBtn = el('agentLlmClearBtn');
+
+  const syncBoth = () => {
+    syncPrimaryLlmUiFromAgent();
+    syncAgentLlmUiFromPrimary();
+  };
+
+  if (providerSel) {
+    providerSel.addEventListener('change', () => {
+      syncBoth();
+      updateAgentLlmOauthLaunchUi();
+    });
+  }
+  if (modelInput) {
+    const event = modelInput.tagName === 'SELECT' ? 'change' : 'input';
+    modelInput.addEventListener(event, () => syncBoth());
+  }
+  if (authModeSel) {
+    authModeSel.addEventListener('change', () => {
+      setAgentLlmAuthModeUI(readAgentLlmAuthMode());
+      syncBoth();
+    });
+  }
+  if (thinkingInput) {
+    thinkingInput.addEventListener('change', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (keyInput) {
+    keyInput.addEventListener('input', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (oauthInput) {
+    oauthInput.addEventListener('input', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (oauthLaunchBtn) {
+    oauthLaunchBtn.addEventListener('click', async () => {
+      syncPrimaryLlmUiFromAgent();
+      try {
+        await launchLlmOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setAgentLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setAgentLlmStatus(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  if (oauthCompleteBtn) {
+    oauthCompleteBtn.addEventListener('click', async () => {
+      syncPrimaryLlmUiFromAgent();
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
+        if (msg === 'CODE_PENDING') {
+          setAgentLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+        }
+      }
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      syncPrimaryLlmUiFromAgent();
+      const primarySave = el('llmSaveBtn');
+      if (!primarySave) {
+        setAgentLlmStatus('Brain form unavailable.');
+        return;
+      }
+      setLiteLlmStatus('Configuring brain...');
+      primarySave.click();
+      setTimeout(() => syncAgentLlmUiFromPrimary(), 80);
+      setTimeout(() => syncAgentLlmUiFromPrimary(), 600);
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await clearLiteLlmConfig();
+      syncAgentLlmUiFromPrimary();
+    });
+  }
+
+  syncAgentLlmUiFromPrimary();
 }
 
 async function readLocalLiteLlmConfig() {
@@ -1902,6 +2555,7 @@ function initStep2Listener() {
     }
 
     if (status) status.textContent = 'Configuring brain...';
+    setAgentLlmStatus('Configuring brain...');
     if (clearBtn) clearBtn.disabled = true;
     btn.disabled = true;
 
@@ -1931,6 +2585,7 @@ function initStep2Listener() {
         authMode: config.authMode,
         apiKeySet: true
       });
+      clearLiteSkillLoopPause();
       await applyGatewayLlmConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
@@ -1948,7 +2603,8 @@ function initStep2Listener() {
       }
 
       await new Promise(r => setTimeout(r, 300));
-      status.textContent = 'Brain configured.';
+      if (status) status.textContent = 'Brain configured.';
+      setAgentLlmStatus('Brain configured.');
       setLiteLlmStatus(`Brain saved locally: ${config.provider}/${config.model}. Auto-restored on return.`);
       if (lastState) updateUI(lastState);
 
@@ -1968,6 +2624,7 @@ function initStep2Listener() {
       }
     } catch (e) {
       if (status) status.textContent = `Brain config failed: ${e.message}`;
+      setAgentLlmStatus(`Brain config failed: ${e.message}`);
       setHatchStatus(`Brain config failed: ${e.message}`);
       if (e) console.error('LLM config failed', e);
     } finally {
@@ -1993,6 +2650,8 @@ async function clearLiteLlmConfig() {
   if (!clearBtn) return;
 
   pendingLlmClear = true;
+  openAiCodexOAuthAttempt = null;
+  stopOpenAiCodexOAuthPoll();
   clearBtn.disabled = true;
   setLiteLlmStatus('Clearing LLM configuration…');
   try {
@@ -2008,6 +2667,7 @@ async function clearLiteLlmConfig() {
       authMode: 'api-key',
       apiKeySet: false
     });
+    clearLiteSkillLoopPause();
     await applyGatewayLlmConfig({ configured: false });
     if (authModeSel) {
       authModeSel.value = 'api-key';
@@ -2264,12 +2924,27 @@ function updateUI(state) {
   if (teamCodeNode) teamCodeNode.textContent = teamCode;
   const teamCodeResult = el('teamCodeResult');
   if (teamCodeResult) teamCodeResult.classList.add('is-hidden');
+  const teamCodeRow = el('agentTeamCodeRow');
+  const teamCodeText = el('agentTeamCodeText');
+  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
+  const normalizedTeamCode = readCurrentTeamCodeFromState();
+  if (teamCodeText) {
+    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
+  }
+  if (teamCodeRow) {
+    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
+  }
+  if (teamCodeSendBtn) {
+    teamCodeSendBtn.disabled = !normalizedTeamCode;
+  }
   const localLlm = getLocalLiteLlm();
 
   applyVisibility(state);
   updateLiteAgentStatus(state);
   initStep2Listener();
   initAdvancedLlmUi();
+  initAgentLlmUi();
+  syncAgentLlmUiFromPrimary();
 
   // --- New Flow UI Updates ---
   // --- New Flow UI Updates ---
@@ -2294,7 +2969,6 @@ function updateUI(state) {
     if (currentTeamCode && currentTeamCode !== liteSkillLoopTeamCode) {
       liteSkillLoopTeamCode = currentTeamCode;
       liteSkillLoopBackoffMs = 1000;
-      clearLiteSkillLoopTimer();
       requestHomeSkillStep('team-change');
     }
   }
@@ -2542,10 +3216,37 @@ async function handleChat() {
       await ensureDefaultLiteSkillImported(lastState);
       await refreshLiteSkillState({ force: false });
     }
-    await gateway.send({ type: 'chat', text });
+    await gateway.send({
+      type: 'chat',
+      text,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || '')
+      },
+      runtimeState: lastState && typeof lastState === 'object' ? lastState : null
+    });
   } catch (e) {
     appendChatMessage('system', `Failed to send: ${e.message}`);
   }
+}
+
+function readCurrentTeamCodeFromState() {
+  const value = String(lastState?.teamCode || '').trim();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(value)) return '';
+  return value;
+}
+
+async function sendCurrentTeamCodeToAgent() {
+  const teamCode = readCurrentTeamCodeFromState();
+  if (!teamCode) {
+    appendChatMessage('system', 'Team code is not available yet.');
+    return;
+  }
+  const input = el('chatInput');
+  if (!input) return;
+  input.value = teamCode;
+  await handleChat();
 }
 
 async function handleNewSession() {
@@ -2599,6 +3300,18 @@ function setupAgentDebugInterface() {
     });
   }
 
+  const filterButtons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
+  for (const btn of filterButtons) {
+    if (btn.dataset.bound === '1') continue;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const value = String(btn?.dataset?.trafficFilter || '').trim();
+      setAgentTrafficFilter(value);
+      scheduleAgentDebugRefresh('traffic-filter');
+    });
+  }
+
+  setAgentTrafficFilter(agentDebugTrafficFilter);
   setAgentDebugTab(agentDebugActiveTab);
   startAgentDebugRefreshLoop();
   scheduleAgentDebugRefresh('init');
@@ -2608,6 +3321,7 @@ function setupAgentInterface() {
   const visitBtn = el('visitBtn');
   const sendBtn = el('sendChatBtn');
   const newSessionBtn = el('newSessionBtn');
+  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
   const chatInput = el('chatInput');
 
   if (visitBtn) visitBtn.addEventListener('click', handleVisit);
@@ -2615,6 +3329,11 @@ function setupAgentInterface() {
   if (newSessionBtn) newSessionBtn.addEventListener('click', () => {
     handleNewSession().catch(() => { });
   });
+  if (teamCodeSendBtn) {
+    teamCodeSendBtn.addEventListener('click', () => {
+      sendCurrentTeamCodeToAgent().catch(() => { });
+    });
+  }
   if (chatInput) {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') handleChat();

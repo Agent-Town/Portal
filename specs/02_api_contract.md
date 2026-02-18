@@ -69,6 +69,19 @@ Includes:
 - `houseId` (string | null) — present after the house ceremony completes for this session.
 - `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.
+- `ceremony` — boolean ceremony-state snapshot:
+  - `ceremony.humanCommit`
+  - `ceremony.agentCommit`
+  - `ceremony.humanReveal`
+  - `ceremony.agentReveal`
+  - `ceremony.humanRevealPub`
+  - `ceremony.agentRevealPub`
+  - `ceremony.houseId`
+- `experience` — single polling state machine snapshot:
+  - `experience.id` (`"agent_town_coop_v1"`)
+  - `experience.step` (for example: `connect_agent`, `mirror_sigil`, `press_open`, `wait_human_commit`, `agent_commit`, `wait_human_reveal`, `agent_reveal`, `ready_for_house_init`, `house_ready`)
+  - `experience.nextAgentAction` (`"agent_town_ceremony_commit"` | `"agent_town_ceremony_reveal"` | null)
+  - `experience.pollMs` (recommended polling interval in milliseconds)
 - `hatch` — Phase 1 single-path hatch state:
   - `hatch.complete` (boolean)
   - `hatch.createdAt` (ISO string | null)
@@ -170,6 +183,87 @@ Behavior:
 - keeps API key secret material server-hidden
 - disconnects `agent.source="openclaw-lite"` until configuration is saved again
 
+### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
+Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
+
+Behavior:
+- creates deterministic in-memory attempt state (`attemptId`, `state`, `code_verifier`, expiry)
+- returns the OpenAI authorization URL with PKCE challenge
+- binds localhost callback capture on `http://localhost:1455/auth/callback` when available
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attemptId": "ocx_...",
+  "state": "hex-state",
+  "authorizeUrl": "https://auth.openai.com/oauth/authorize?...",
+  "redirectUri": "http://localhost:1455/auth/callback",
+  "expiresAtMs": 1770000000000,
+  "callbackServer": { "ready": true, "error": "", "host": "127.0.0.1", "port": 1455 }
+}
+```
+
+### GET `/api/agent/lite/llm/oauth/openai-codex/status?attemptId=...` (human)
+Reads current PKCE attempt status for polling/debug.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attempt": {
+    "id": "ocx_...",
+    "state": "hex-state",
+    "status": "pending",
+    "hasCode": false
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+
+### POST `/api/agent/lite/llm/oauth/openai-codex/exchange` (human)
+Exchanges the PKCE authorization code for access/refresh tokens.
+
+Body:
+```json
+{
+  "attemptId": "ocx_...",
+  "callbackInput": "http://localhost:1455/auth/callback?code=...&state=..."
+}
+```
+
+`callbackInput` is optional if callback capture already received the code.
+`attemptId` is required for poll-only completion (`callbackInput` omitted), but can be omitted when `callbackInput` includes a valid `state`; in that case the backend resolves the matching live attempt by state for the same session.
+
+Success response shape:
+```json
+{
+  "ok": true,
+  "credential": {
+    "provider": "openai-codex",
+    "access": "eyJ...",
+    "refresh": "...",
+    "expires": 1770000000000,
+    "accountId": "acct_..."
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+- `STATE_MISMATCH`
+- `CODE_PENDING`
+- `TOKEN_EXCHANGE_FAILED`
+- `TOKEN_EXCHANGE_UNAVAILABLE`
+- `TOKEN_RESPONSE_INVALID`
+- `ACCOUNT_ID_MISSING`
+
 ---
 
 ## Match mechanic
@@ -196,6 +290,12 @@ Body:
 
 ### GET `/api/agent/state?teamCode=TEAM-ABCD-EFGH`
 Agent-friendly state snapshot.
+
+Includes:
+- `agent`, `human`, `match`, `signup` (co-op/open progress)
+- `ceremony` (same booleans as human `/api/state`)
+- `experience` (single experience polling contract with `step`, `nextAgentAction`, `pollMs`)
+- `houseId` shortcut (same as `ceremony.houseId`)
 
 ---
 

@@ -1,13 +1,44 @@
 /* eslint-disable no-console */
 
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -178,10 +209,12 @@ const MIND_PROVIDER_ALIASES = Object.freeze({
   glm: 'zai',
   qwen: 'qwen-portal'
 });
-const MIND_OAUTH_START_URL_BY_PROVIDER = Object.freeze({
-  openai: 'https://chatgpt.com/auth/login',
-  'openai-codex': 'https://chatgpt.com/auth/login'
-});
+const MIND_OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
+const MIND_OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
+let mindOpenAiCodexOAuthAttempt = null;
+let mindOpenAiCodexOAuthPollTimer = null;
+let mindOpenAiCodexOAuthExchangeInFlight = false;
+let mindOpenAiCodexOAuthMessageListenerBound = false;
 
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
@@ -267,6 +300,7 @@ function setAgentStateControlsEnabled(enabled) {
   const llmThinking = el('llmThinkingInput');
   const llmUseProxy = el('llmUseProxyInput');
   const llmOauthLaunch = el('llmOauthLaunchBtn');
+  const llmOauthComplete = el('llmOauthCompleteBtn');
   const llmSave = el('llmSaveBtn');
   const llmClear = el('llmClearBtn');
   if (saveBtn) saveBtn.disabled = !canUse;
@@ -283,6 +317,7 @@ function setAgentStateControlsEnabled(enabled) {
   if (llmThinking) llmThinking.disabled = !canUse;
   if (llmUseProxy) llmUseProxy.disabled = !canUse;
   if (llmOauthLaunch) llmOauthLaunch.disabled = !canUse;
+  if (llmOauthComplete) llmOauthComplete.disabled = !canUse;
   if (llmSave) llmSave.disabled = !canUse;
   if (llmClear) llmClear.disabled = !canUse;
   if (!enabled && !agentStateBusy) {
@@ -558,37 +593,170 @@ function applyMindProviderModelSelection(provider, model) {
   return { provider: selectedProvider, model: selectedModel };
 }
 
-function getMindOauthLaunchUrl(provider) {
-  const key = String(provider || '').trim().toLowerCase();
-  return MIND_OAUTH_START_URL_BY_PROVIDER[key] || '';
-}
-
 function updateMindOauthLaunchUi() {
   const launchBtn = el('llmOauthLaunchBtn');
+  const completeBtn = el('llmOauthCompleteBtn');
   if (!launchBtn) return;
   const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
   const mode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
-  const url = getMindOauthLaunchUrl(provider);
-  launchBtn.dataset.oauthUrl = url;
+  const supported = MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
   launchBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
-  launchBtn.disabled = !url;
-  launchBtn.title = url
-    ? 'Open OAuth sign-in in a new tab.'
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
     : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
 }
 
-function launchMindOauthInNewTab() {
-  const launchBtn = el('llmOauthLaunchBtn');
-  if (!launchBtn) return;
-  const url = String(launchBtn.dataset.oauthUrl || '').trim();
-  if (!url) {
+function stopMindOpenAiCodexOAuthPoll() {
+  if (!mindOpenAiCodexOAuthPollTimer) return;
+  clearInterval(mindOpenAiCodexOAuthPollTimer);
+  mindOpenAiCodexOAuthPollTimer = null;
+}
+
+function bindMindOpenAiCodexOAuthMessageListener() {
+  if (mindOpenAiCodexOAuthMessageListenerBound) return;
+  mindOpenAiCodexOAuthMessageListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== MIND_OPENAI_CODEX_OAUTH_MESSAGE_TYPE) return;
+    const incomingState = String(payload.state || '').trim();
+    const incomingCode = String(payload.code || '').trim();
+    const incomingError = String(payload.error || '').trim();
+    if (!incomingState || incomingError) return;
+    const activeState = String(mindOpenAiCodexOAuthAttempt?.state || '').trim();
+    if (activeState && incomingState === activeState) {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: '' });
+      return;
+    }
+    if (incomingCode) {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: `${incomingCode}#${incomingState}` });
+    }
+  });
+}
+
+async function exchangeMindOpenAiCodexOAuthAttempt({ attemptId, callbackInput = '' }) {
+  const payload = {};
+  if (attemptId) payload.attemptId = String(attemptId).trim();
+  if (callbackInput) payload.callbackInput = callbackInput;
+  return await api('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+function hydrateMindUiFromOAuthCredential(credential) {
+  const access = String(credential?.access || '').trim();
+  if (!access) throw new Error('TOKEN_RESPONSE_INVALID');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const authMode = el('llmAuthModeSelect');
+  if (authMode) {
+    authMode.value = MIND_AUTH_OAUTH;
+    setMindAuthModeUi(MIND_AUTH_OAUTH);
+  }
+  if (keyInput) keyInput.value = access;
+  if (oauthInput) {
+    oauthInput.value = JSON.stringify({
+      provider: 'openai-codex',
+      access,
+      refresh: String(credential?.refresh || ''),
+      expires: Number(credential?.expires || 0),
+      accountId: String(credential?.accountId || '')
+    }, null, 2);
+  }
+  syncMindModelRefFromInputs();
+}
+
+async function completeMindOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
+  if (mindOpenAiCodexOAuthExchangeInFlight) return;
+  mindOpenAiCodexOAuthExchangeInFlight = true;
+  try {
+    const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+    if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+      throw new Error('OAuth completion is available for OpenAI providers only.');
+    }
+    const normalizedInput = String(callbackInput || '').trim();
+    const attemptId = String(mindOpenAiCodexOAuthAttempt?.attemptId || '').trim();
+    if (!attemptId && !normalizedInput) {
+      throw new Error('Start OAuth first.');
+    }
+    const result = await exchangeMindOpenAiCodexOAuthAttempt({
+      attemptId,
+      callbackInput: normalizedInput
+    });
+    const returnedAttemptId = String(result?.attempt?.id || '').trim();
+    const returnedState = String(result?.attempt?.state || '').trim();
+    if (returnedAttemptId) {
+      mindOpenAiCodexOAuthAttempt = {
+        attemptId: returnedAttemptId,
+        state: returnedState || String(mindOpenAiCodexOAuthAttempt?.state || '').trim(),
+        startedAtMs: Date.now()
+      };
+    }
+    const credential = result?.credential || result?.oauthProfile || null;
+    if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+    hydrateMindUiFromOAuthCredential(credential);
+    stopMindOpenAiCodexOAuthPoll();
+    mindOpenAiCodexOAuthAttempt = null;
+    setMindConfigStatus('OAuth exchange complete. Click Connect Brain.');
+    setMindConfigError('');
+  } catch (err) {
+    const code = String(err?.message || '').trim();
+    if (code === 'CODE_PENDING') {
+      setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+      setMindConfigError('');
+      return;
+    }
+    setMindConfigError(`OAuth exchange failed: ${code || 'OAUTH_EXCHANGE_FAILED'}`);
+    throw err;
+  } finally {
+    mindOpenAiCodexOAuthExchangeInFlight = false;
+  }
+}
+
+function startMindOpenAiCodexOAuthPoll() {
+  stopMindOpenAiCodexOAuthPoll();
+  mindOpenAiCodexOAuthPollTimer = setInterval(async () => {
+    try {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: '' });
+    } catch (err) {
+      if (String(err?.message || '').trim() === 'CODE_PENDING') return;
+      stopMindOpenAiCodexOAuthPoll();
+    }
+  }, 1500);
+}
+
+async function launchMindOauthInNewTab() {
+  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+  if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
     setMindConfigError('OAuth launch is available for OpenAI providers only.');
     return;
   }
-  const popup = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!popup) {
-    setMindConfigError('Popup blocked. Allow popups and retry OAuth launch.');
+  bindMindOpenAiCodexOAuthMessageListener();
+  const started = await api('/api/agent/lite/llm/oauth/openai-codex/start', {
+    method: 'POST',
+    body: JSON.stringify({ provider, originator: 'portal-claw-lite-house' })
+  });
+  const authorizeUrl = String(started?.authorizeUrl || '').trim();
+  const attemptId = String(started?.attemptId || '').trim();
+  const state = String(started?.state || '').trim();
+  if (!authorizeUrl || !attemptId || !state) {
+    throw new Error('OAUTH_START_FAILED');
   }
+  mindOpenAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) throw new Error('POPUP_BLOCKED');
+  setMindConfigStatus('OAuth started. Complete sign-in in the popup. Then use Complete OAuth if needed.');
+  setMindConfigError('');
+  startMindOpenAiCodexOAuthPoll();
 }
 
 function getDefaultLlmModelForProvider(provider) {
@@ -602,9 +770,12 @@ function mapMindConfigError(error) {
   if (msg === 'MISSING_LLM_PROVIDER') return 'Enter a provider.';
   if (msg === 'MISSING_LLM_MODEL') return 'Enter a model.';
   if (msg === 'MISSING_LLM_CREDENTIAL') return 'Enter an API key or OAuth token.';
-  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return 'Paste an OAuth profile JSON, callback URL, or token.';
+  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return 'Paste an OAuth profile JSON or token.';
   if (msg === 'INVALID_OAUTH_PROFILE_JSON') return 'Invalid OAuth profile/token format.';
   if (msg === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return 'No access token found in OAuth profile JSON.';
+  if (msg === 'UNSUPPORTED_OPENAI_ID_TOKEN') {
+    return 'OpenAI id_token callback URLs are not valid model credentials. Use an API key or OAuth profile with an access token.';
+  }
   if (msg === 'IDB_OPEN_FAILED') return 'Local OpenClaw state is unavailable.';
   return msg || 'Mind configuration failed.';
 }
@@ -624,7 +795,7 @@ function setMindAuthModeUi(mode) {
   }
   if (oauthHint) {
     oauthHint.textContent = normalized === MIND_AUTH_OAUTH
-      ? 'Use "Sign in with ChatGPT" (subscription) and paste callback URL, auth JSON, or token here.'
+      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
       : '';
   }
   updateMindOauthLaunchUi();
@@ -649,7 +820,11 @@ function getAccessTokenFromProfileValue(value) {
       ? value.access_token.trim()
       : typeof value.accessToken === 'string'
         ? value.accessToken.trim()
-        : '';
+        : typeof value.id_token === 'string'
+          ? value.id_token.trim()
+          : typeof value.idToken === 'string'
+            ? value.idToken.trim()
+            : '';
   return direct;
 }
 
@@ -700,6 +875,39 @@ function isLikelyJwtToken(value) {
 
 function isLikelyOpaqueOAuthToken(value) {
   return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function parseJwtPayloadUnsafe(token) {
+  const raw = String(token || '').trim();
+  if (!isLikelyJwtToken(raw)) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyOpenAiIdToken(token) {
+  const payload = parseJwtPayloadUnsafe(token);
+  if (!payload || typeof payload !== 'object') return false;
+  const issuer = String(payload.iss || '').trim();
+  const hasAtHash = typeof payload.at_hash === 'string' && payload.at_hash.length > 0;
+  return issuer === 'https://auth.openai.com' && hasAtHash;
+}
+
+function validateOAuthCredentialForProvider({ provider, credential }) {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const token = String(credential || '').trim();
+  if (!token || !isLikelyJwtToken(token)) return '';
+  if (!isLikelyOpenAiIdToken(token)) return '';
+  if (normalizedProvider === 'openai' || normalizedProvider === 'openai-codex') {
+    return 'UNSUPPORTED_OPENAI_ID_TOKEN';
+  }
+  return '';
 }
 
 function collectOAuthCandidatesFromUrl(rawUrl) {
@@ -941,7 +1149,7 @@ function resolveMindConfigFromInputs() {
   const providerInput = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
   const modelInput = String(el('llmModelIdInput')?.value || '').trim();
   const authMode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
-  const keyInput = String(el('llmKeyInput')?.value || '').trim();
+  const keyRaw = String(el('llmKeyInput')?.value || '').trim();
   const oauthInput = String(el('llmOauthProfileInput')?.value || '').trim();
   if (!providerInput) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelInput) throw new Error('MISSING_LLM_MODEL');
@@ -951,15 +1159,26 @@ function resolveMindConfigFromInputs() {
     modelInput || getDefaultLlmModelForProvider(providerInput)
   );
 
-  let credential = keyInput;
+  const keyParsed = extractOAuthAccessToken(keyRaw, providerInput);
+  const keyCredential = keyParsed.ok ? String(keyParsed.token || '').trim() : keyRaw;
+  let credential = keyCredential;
   let oauthError = '';
   if (authMode === MIND_AUTH_OAUTH) {
     const token = extractOAuthAccessToken(oauthInput, providerInput);
     oauthError = oauthInput && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
     const parsedCredential = token.ok ? String(token.token || '').trim() : '';
-    credential = keyInput || parsedCredential;
+    credential = keyCredential || parsedCredential;
+  } else if (!credential && oauthInput) {
+    const token = extractOAuthAccessToken(oauthInput, providerInput);
+    if (token.ok) credential = String(token.token || '').trim();
   }
   if (!credential) throw new Error(oauthError || 'MISSING_LLM_CREDENTIAL');
+
+  const tokenValidationError = validateOAuthCredentialForProvider({
+    provider: parsed.provider,
+    credential,
+  });
+  if (tokenValidationError) throw new Error(tokenValidationError);
 
   const modelRefInput = el('llmModelRefInput');
   if (modelRefInput) modelRefInput.value = parsed.modelRef;
@@ -1000,6 +1219,8 @@ async function persistMindConfigDraftIfPresent() {
 }
 
 async function clearMindConfigFromLocal() {
+  mindOpenAiCodexOAuthAttempt = null;
+  stopMindOpenAiCodexOAuthPoll();
   const lib = await loadLiteLlmLibrary();
   await lib.clearLlmConfig();
   applyMindConfigToInputs({
@@ -3418,6 +3639,7 @@ async function init() {
   const llmAuthModeInput = el('llmAuthModeSelect');
   const llmOauthInput = el('llmOauthProfileInput');
   const llmOauthLaunchBtn = el('llmOauthLaunchBtn');
+  const llmOauthCompleteBtn = el('llmOauthCompleteBtn');
   if (llmProviderInput && llmModelInput) {
     const selected = applyMindProviderModelSelection(
       llmProviderInput.value || MIND_DEFAULT_PROVIDER,
@@ -3451,7 +3673,32 @@ async function init() {
     llmOauthInput.addEventListener('input', () => syncMindModelRefFromInputs());
   }
   if (llmOauthLaunchBtn) {
-    llmOauthLaunchBtn.addEventListener('click', () => launchMindOauthInNewTab());
+    llmOauthLaunchBtn.addEventListener('click', async () => {
+      try {
+        await launchMindOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setMindConfigError('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setMindConfigError(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  if (llmOauthCompleteBtn) {
+    llmOauthCompleteBtn.addEventListener('click', async () => {
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeMindOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || '').trim();
+        if (msg === 'CODE_PENDING') {
+          setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+          setMindConfigError('');
+        }
+      }
+    });
   }
   setMindAuthModeUi(llmAuthModeInput?.value);
   syncMindModelRefFromInputs();

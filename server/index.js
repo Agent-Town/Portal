@@ -703,6 +703,30 @@ const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
 const VENDOR_LITE_ROOT = path.join(process.cwd(), 'vendors', 'openclaw-lite-main');
 const VENDOR_LITE_BUILD_DIR = path.join(PUBLIC_DIR, 'openclaw-lite');
+const OPENAI_CODEX_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const OPENAI_CODEX_OAUTH_AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
+const OPENAI_CODEX_OAUTH_TOKEN_URL = 'https://auth.openai.com/oauth/token';
+const OPENAI_CODEX_OAUTH_SCOPE = 'openid profile email offline_access';
+const OPENAI_CODEX_OAUTH_CLAIM_PATH = 'https://api.openai.com/auth';
+const OPENAI_CODEX_OAUTH_CALLBACK_PORT = Number(process.env.OPENAI_CODEX_OAUTH_CALLBACK_PORT || 1455);
+const OPENAI_CODEX_OAUTH_CALLBACK_HOST = String(process.env.OPENAI_CODEX_OAUTH_CALLBACK_HOST || '127.0.0.1').trim() || '127.0.0.1';
+const OPENAI_CODEX_OAUTH_CALLBACK_PATH = '/auth/callback';
+const OPENAI_CODEX_OAUTH_REDIRECT_URI = String(
+  process.env.OPENAI_CODEX_OAUTH_REDIRECT_URI || `http://localhost:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}${OPENAI_CODEX_OAUTH_CALLBACK_PATH}`
+).trim();
+const OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS = 10 * 60 * 1000;
+const OPENAI_CODEX_OAUTH_MAX_ATTEMPTS = 200;
+
+const openAiCodexOAuthAttemptsById = new Map();
+const openAiCodexOAuthAttemptsByState = new Map();
+let openAiCodexOAuthCallbackServer = null;
+let openAiCodexOAuthCallbackServerStarting = null;
+let openAiCodexOAuthCallbackServerState = {
+  ready: false,
+  error: 'NOT_STARTED',
+  host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+  port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+};
 
 function safeReadJson(filePath) {
   try {
@@ -844,6 +868,368 @@ function normalizeLiteLlmPayload(body) {
     authMode: normalizedAuthMode,
     hasCredential
   };
+}
+
+function toBase64Url(input) {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function createOpenAiCodexPkce() {
+  const verifier = toBase64Url(crypto.randomBytes(32));
+  const challenge = toBase64Url(crypto.createHash('sha256').update(verifier, 'utf8').digest());
+  return { verifier, challenge };
+}
+
+function createOpenAiCodexOAuthState() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function decodeJwtPayloadUnsafe(token) {
+  const raw = typeof token === 'string' ? token.trim() : '';
+  if (!raw) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function extractOpenAiCodexAccountId(accessToken) {
+  const payload = decodeJwtPayloadUnsafe(accessToken);
+  if (!payload || typeof payload !== 'object') return '';
+  const auth = payload?.[OPENAI_CODEX_OAUTH_CLAIM_PATH];
+  const accountId = typeof auth?.chatgpt_account_id === 'string' ? auth.chatgpt_account_id.trim() : '';
+  return accountId;
+}
+
+function buildTestJwt(payload) {
+  const headerB64 = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' }), 'utf8').toString('base64url');
+  const payloadB64 = Buffer.from(JSON.stringify(payload || {}), 'utf8').toString('base64url');
+  return `${headerB64}.${payloadB64}.signature`;
+}
+
+function parseOpenAiCodexAuthorizationInput(input) {
+  const value = typeof input === 'string' ? input.trim() : '';
+  if (!value) return {};
+
+  try {
+    const url = new URL(value);
+    return {
+      code: url.searchParams.get('code') || undefined,
+      state: url.searchParams.get('state') || undefined,
+      error: url.searchParams.get('error') || undefined,
+      errorDescription: url.searchParams.get('error_description') || undefined
+    };
+  } catch {
+    // Not a URL.
+  }
+
+  if (value.includes('#')) {
+    const [code, state] = value.split('#', 2);
+    return { code: code || undefined, state: state || undefined };
+  }
+
+  if (value.includes('code=')) {
+    const params = new URLSearchParams(value);
+    return {
+      code: params.get('code') || undefined,
+      state: params.get('state') || undefined,
+      error: params.get('error') || undefined,
+      errorDescription: params.get('error_description') || undefined
+    };
+  }
+
+  return { code: value };
+}
+
+function cleanupOpenAiCodexOAuthAttempts() {
+  const now = Date.now();
+  for (const [attemptId, attempt] of openAiCodexOAuthAttemptsById.entries()) {
+    if (!attempt || typeof attempt !== 'object') {
+      openAiCodexOAuthAttemptsById.delete(attemptId);
+      continue;
+    }
+    if (!Number.isFinite(Number(attempt.expiresAtMs)) || Number(attempt.expiresAtMs) < now) {
+      if (attempt.state) openAiCodexOAuthAttemptsByState.delete(attempt.state);
+      openAiCodexOAuthAttemptsById.delete(attemptId);
+    }
+  }
+}
+
+function registerOpenAiCodexOAuthAttempt(attempt) {
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const id = String(attempt?.id || '').trim();
+  const state = String(attempt?.state || '').trim();
+  if (!id || !state) return;
+
+  openAiCodexOAuthAttemptsById.set(id, attempt);
+  openAiCodexOAuthAttemptsByState.set(state, id);
+
+  if (openAiCodexOAuthAttemptsById.size <= OPENAI_CODEX_OAUTH_MAX_ATTEMPTS) return;
+  const ordered = Array.from(openAiCodexOAuthAttemptsById.values())
+    .sort((a, b) => Number(a?.createdAtMs || 0) - Number(b?.createdAtMs || 0));
+  while (openAiCodexOAuthAttemptsById.size > OPENAI_CODEX_OAUTH_MAX_ATTEMPTS && ordered.length > 0) {
+    const stale = ordered.shift();
+    const staleId = String(stale?.id || '').trim();
+    const staleState = String(stale?.state || '').trim();
+    if (staleId) openAiCodexOAuthAttemptsById.delete(staleId);
+    if (staleState) openAiCodexOAuthAttemptsByState.delete(staleState);
+  }
+}
+
+function openAiCodexOAuthAttemptSummary(attempt) {
+  return {
+    id: attempt.id,
+    state: attempt.state,
+    status: attempt.status,
+    createdAtMs: attempt.createdAtMs,
+    expiresAtMs: attempt.expiresAtMs,
+    codeReceivedAtMs: attempt.codeReceivedAtMs || null,
+    exchangedAtMs: attempt.exchangedAtMs || null,
+    lastError: attempt.lastError || null,
+    hasCode: !!attempt.code
+  };
+}
+
+function buildOpenAiCodexOAuthCallbackPage({ ok, state, code, error, message }) {
+  const payload = {
+    type: 'agenttown:openai-codex-oauth-callback',
+    ok: !!ok,
+    state: state || '',
+    code: code || '',
+    error: error || ''
+  };
+  const payloadJson = JSON.stringify(payload).replace(/</g, '\\u003c');
+  const heading = ok ? 'Authentication successful' : 'Authentication failed';
+  const bodyMessage = ok
+    ? (message || 'You can return to Agent Town.')
+    : (message || 'OAuth callback failed. Return to Agent Town to retry.');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtmlAttr(heading)}</title>
+</head>
+<body style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; padding: 20px; background: #f7f2df; color: #2b2418;">
+  <h2 style="margin: 0 0 8px;">${escapeHtmlAttr(heading)}</h2>
+  <p style="margin: 0;">${escapeHtmlAttr(bodyMessage)}</p>
+  <script>
+  (() => {
+    const payload = ${payloadJson};
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*');
+      }
+    } catch {}
+    setTimeout(() => { try { window.close(); } catch {} }, 200);
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+async function ensureOpenAiCodexOAuthCallbackServer() {
+  if (openAiCodexOAuthCallbackServer) return { ...openAiCodexOAuthCallbackServerState };
+  if (openAiCodexOAuthCallbackServerStarting) return await openAiCodexOAuthCallbackServerStarting;
+
+  openAiCodexOAuthCallbackServerStarting = new Promise((resolve) => {
+    const callbackServer = http.createServer((req, res) => {
+      let url = null;
+      try {
+        url = new URL(
+          String(req.url || '/'),
+          `http://${OPENAI_CODEX_OAUTH_CALLBACK_HOST}:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}`
+        );
+      } catch {
+        res.statusCode = 400;
+        res.end('Invalid callback URL');
+        return;
+      }
+
+      if (url.pathname !== OPENAI_CODEX_OAUTH_CALLBACK_PATH) {
+        res.statusCode = 404;
+        res.end('Not found');
+        return;
+      }
+
+      cleanupOpenAiCodexOAuthAttempts();
+
+      const state = String(url.searchParams.get('state') || '').trim();
+      const code = String(url.searchParams.get('code') || '').trim();
+      const oauthError = String(url.searchParams.get('error') || '').trim();
+      const oauthErrorDesc = String(url.searchParams.get('error_description') || '').trim();
+      const attemptId = state ? openAiCodexOAuthAttemptsByState.get(state) : '';
+      const attempt = attemptId ? openAiCodexOAuthAttemptsById.get(attemptId) : null;
+
+      if (!state || !attempt) {
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: oauthError || 'UNKNOWN_STATE',
+          message: 'Unknown or expired OAuth state. Start OAuth again from Agent Town.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      if (oauthError) {
+        attempt.status = 'failed';
+        attempt.lastError = oauthErrorDesc || oauthError;
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: oauthError,
+          message: oauthErrorDesc || 'OAuth authorization was not completed.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      if (!code) {
+        attempt.status = 'failed';
+        attempt.lastError = 'MISSING_CODE';
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: 'MISSING_CODE',
+          message: 'Missing authorization code in callback URL.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      attempt.code = code;
+      attempt.status = 'code_received';
+      attempt.codeReceivedAtMs = Date.now();
+      attempt.lastError = '';
+
+      const html = buildOpenAiCodexOAuthCallbackPage({
+        ok: true,
+        state,
+        code,
+        message: 'Authorization code received. Return to Agent Town.'
+      });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.end(html);
+    });
+
+    callbackServer.once('error', (err) => {
+      const code = typeof err?.code === 'string' ? err.code : 'CALLBACK_SERVER_FAILED';
+      openAiCodexOAuthCallbackServer = null;
+      openAiCodexOAuthCallbackServerState = {
+        ready: false,
+        error: code,
+        host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+        port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+      };
+      resolve({ ...openAiCodexOAuthCallbackServerState });
+    });
+
+    callbackServer.listen(OPENAI_CODEX_OAUTH_CALLBACK_PORT, OPENAI_CODEX_OAUTH_CALLBACK_HOST, () => {
+      openAiCodexOAuthCallbackServer = callbackServer;
+      openAiCodexOAuthCallbackServerState = {
+        ready: true,
+        error: '',
+        host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+        port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+      };
+      resolve({ ...openAiCodexOAuthCallbackServerState });
+    });
+  }).finally(() => {
+    openAiCodexOAuthCallbackServerStarting = null;
+  });
+
+  return await openAiCodexOAuthCallbackServerStarting;
+}
+
+async function exchangeOpenAiCodexAuthorizationCode({ code, verifier, redirectUri }) {
+  if (process.env.NODE_ENV === 'test') {
+    const codeText = String(code || '').trim();
+    if (!codeText.startsWith('test-code')) {
+      return { ok: false, error: 'TOKEN_EXCHANGE_FAILED', message: 'invalid_grant', status: 400 };
+    }
+    const accountId = 'acct_test';
+    const accessToken = buildTestJwt({
+      iss: 'https://auth.openai.com',
+      [OPENAI_CODEX_OAUTH_CLAIM_PATH]: { chatgpt_account_id: accountId }
+    });
+    return {
+      ok: true,
+      accessToken,
+      refreshToken: 'refresh_test_token',
+      expiresAtMs: Date.now() + 60 * 60 * 1000
+    };
+  }
+
+  try {
+    const response = await fetch(OPENAI_CODEX_OAUTH_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: OPENAI_CODEX_OAUTH_CLIENT_ID,
+        code: String(code || '').trim(),
+        code_verifier: String(verifier || '').trim(),
+        redirect_uri: String(redirectUri || '').trim() || OPENAI_CODEX_OAUTH_REDIRECT_URI
+      })
+    });
+
+    const text = await response.text().catch(() => '');
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: 'TOKEN_EXCHANGE_FAILED',
+        status: response.status,
+        message: text || response.statusText || 'token exchange failed'
+      };
+    }
+
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    const accessToken = typeof json?.access_token === 'string' ? json.access_token.trim() : '';
+    const refreshToken = typeof json?.refresh_token === 'string' ? json.refresh_token.trim() : '';
+    const expiresIn = Number(json?.expires_in);
+    if (!accessToken || !refreshToken || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      return { ok: false, error: 'TOKEN_RESPONSE_INVALID', message: 'OAuth token response missing required fields' };
+    }
+    return {
+      ok: true,
+      accessToken,
+      refreshToken,
+      expiresAtMs: Date.now() + expiresIn * 1000
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: 'TOKEN_EXCHANGE_UNAVAILABLE',
+      message: String(err?.message || 'token endpoint unavailable')
+    };
+  }
 }
 
 function setSecurityHeaders(req, res, next) {
@@ -994,15 +1380,36 @@ app.use(
 
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
-  let sid = cookies.et_session;
+  const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
+  let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
+
+  if (!session) {
+    const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
+      ? req.header('x-team-code-hint').trim()
+      : '';
+    if (hintedTeamCode) {
+      const hintedSession = getSessionByTeamCode(hintedTeamCode);
+      if (hintedSession) {
+        session = hintedSession;
+        sid = hintedSession.sessionId;
+      }
+    }
+  }
+
   if (!session) {
     session = createSession();
     sid = session.sessionId;
-    // Cookie is the only "identity". No external auth required.
-    const secureFlag = isProd || req.secure ? '; Secure' : '';
+  }
+
+  if (!cookieSid || cookieSid !== sid) {
+    // Cookie is the primary "identity" token.
+    // In local dev we intentionally avoid Secure cookies so localhost HTTP
+    // sessions remain stable even when reverse-proxy headers mark req.secure.
+    const secureFlag = isProd ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
+
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
@@ -1312,6 +1719,67 @@ function recordSignup(session, { mode, agentName = null, matchedElement = null, 
   session.signup.address = address || null;
 
   return { complete: true, already: false, createdAt: record.createdAt };
+}
+
+function buildCeremonyStateSnapshot(session) {
+  return {
+    humanCommit: !!session?.houseCeremony?.humanCommit,
+    agentCommit: !!session?.houseCeremony?.agentCommit,
+    humanReveal: !!session?.houseCeremony?.humanRevealSealed,
+    agentReveal: !!session?.houseCeremony?.agentRevealSealed,
+    humanRevealPub: !!session?.houseCeremony?.humanRevealPub,
+    agentRevealPub: !!session?.houseCeremony?.agentRevealPub,
+    houseId: session?.houseCeremony?.houseId || null
+  };
+}
+
+function buildExperienceStateSnapshot(session, ceremony = buildCeremonyStateSnapshot(session)) {
+  let step = 'connect_agent';
+  let nextAgentAction = null;
+
+  if (session?.signup?.mode === 'token') {
+    step = ceremony.houseId ? 'house_ready' : 'token_human_only';
+  } else if (!session?.agent?.connected) {
+    step = 'connect_agent';
+  } else if (!session?.match?.matched) {
+    step = 'mirror_sigil';
+  } else if (!session?.signup?.complete) {
+    if (!session?.human?.openPressed) {
+      step = 'wait_human_open';
+    } else if (!session?.agent?.openPressed) {
+      step = 'press_open';
+    } else {
+      step = 'wait_signup_complete';
+    }
+  } else if (ceremony.houseId) {
+    step = 'house_ready';
+  } else if (!ceremony.humanCommit) {
+    step = 'wait_human_commit';
+  } else if (!ceremony.agentCommit || !ceremony.agentRevealPub) {
+    step = 'agent_commit';
+    nextAgentAction = 'agent_town_ceremony_commit';
+  } else if (!ceremony.humanReveal) {
+    step = 'wait_human_reveal';
+  } else if (!ceremony.agentReveal) {
+    step = 'agent_reveal';
+    nextAgentAction = 'agent_town_ceremony_reveal';
+  } else {
+    step = 'ready_for_house_init';
+  }
+
+  const waitSteps = new Set([
+    'wait_human_open',
+    'wait_signup_complete',
+    'wait_human_commit',
+    'wait_human_reveal'
+  ]);
+
+  return {
+    id: 'agent_town_coop_v1',
+    step,
+    nextAgentAction,
+    pollMs: waitSteps.has(step) ? 1000 : 700
+  };
 }
 
 function decodeB64(input) {
@@ -1671,7 +2139,7 @@ app.post('/api/session/reset', (req, res) => {
   // Ensure we still have a valid response cookie context (Secure flag in prod).
   const store = readStore();
   const next = createSession();
-  const secureFlag = isProd || req.secure ? '; Secure' : '';
+  const secureFlag = isProd ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
     `et_session=${encodeURIComponent(next.sessionId)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`
@@ -1692,6 +2160,8 @@ app.get('/api/state', (req, res) => {
   const lite = ensureLiteState(s);
   updateLiteRuntimeReady(s);
   const store = readStore();
+  const ceremony = buildCeremonyStateSnapshot(s);
+  const experience = buildExperienceStateSnapshot(s, ceremony);
   res.json({
     ok: true,
     teamCode: s.teamCode,
@@ -1729,9 +2199,11 @@ app.get('/api/state', (req, res) => {
       runtimeVersion: lite.runtimeVersion || null,
       lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
     },
+    ceremony,
+    experience,
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
-    houseId: s.houseCeremony?.houseId || null,
+    houseId: ceremony.houseId,
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -1830,6 +2302,210 @@ app.post('/api/agent/lite/runtime/error', (req, res) => {
       runtimeReady: !!lite.runtimeReady,
       lastError: lite.lastError || null
     }
+  });
+});
+
+app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const callbackServer = await ensureOpenAiCodexOAuthCallbackServer().catch(() => ({
+    ready: false,
+    error: 'CALLBACK_SERVER_FAILED',
+    host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+    port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+  }));
+
+  const { verifier, challenge } = createOpenAiCodexPkce();
+  const state = createOpenAiCodexOAuthState();
+  const attemptId = `ocx_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const createdAtMs = Date.now();
+  const originatorRaw = typeof req.body?.originator === 'string' ? req.body.originator.trim() : '';
+  const originator = /^[a-z0-9_-]{1,48}$/i.test(originatorRaw) ? originatorRaw : 'portal-claw-lite';
+
+  const authUrl = new URL(OPENAI_CODEX_OAUTH_AUTHORIZE_URL);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('client_id', OPENAI_CODEX_OAUTH_CLIENT_ID);
+  authUrl.searchParams.set('redirect_uri', OPENAI_CODEX_OAUTH_REDIRECT_URI);
+  authUrl.searchParams.set('scope', OPENAI_CODEX_OAUTH_SCOPE);
+  authUrl.searchParams.set('code_challenge', challenge);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('id_token_add_organizations', 'true');
+  authUrl.searchParams.set('codex_cli_simplified_flow', 'true');
+  authUrl.searchParams.set('originator', originator);
+
+  registerOpenAiCodexOAuthAttempt({
+    id: attemptId,
+    state,
+    verifier,
+    redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
+    createdAtMs,
+    expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
+    sessionId: s.sessionId,
+    teamCode: s.teamCode,
+    status: 'pending',
+    code: '',
+    lastError: '',
+    codeReceivedAtMs: 0,
+    exchangedAtMs: 0,
+    credential: null
+  });
+
+  res.json({
+    ok: true,
+    attemptId,
+    state,
+    authorizeUrl: authUrl.toString(),
+    redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
+    expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
+    callbackServer
+  });
+});
+
+app.get('/api/agent/lite/llm/oauth/openai-codex/status', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+  const attemptId = typeof req.query?.attemptId === 'string' ? req.query.attemptId.trim() : '';
+  if (!attemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+  const attempt = openAiCodexOAuthAttemptsById.get(attemptId);
+  if (!attempt) return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  if (attempt.sessionId !== s.sessionId) return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+  return res.json({
+    ok: true,
+    attempt: openAiCodexOAuthAttemptSummary(attempt),
+    callbackServer: { ...openAiCodexOAuthCallbackServerState }
+  });
+});
+
+app.post('/api/agent/lite/llm/oauth/openai-codex/exchange', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const callbackInput = typeof req.body?.callbackInput === 'string' ? req.body.callbackInput.trim() : '';
+  const parsed = callbackInput ? parseOpenAiCodexAuthorizationInput(callbackInput) : {};
+  const requestedAttemptId = typeof req.body?.attemptId === 'string' ? req.body.attemptId.trim() : '';
+
+  let attempt = requestedAttemptId ? openAiCodexOAuthAttemptsById.get(requestedAttemptId) : null;
+  if (attempt && attempt.sessionId !== s.sessionId) {
+    return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+  }
+
+  // Prefer callback state when available so pasted callback URLs still work
+  // even if the UI currently points at a stale/replaced attempt id.
+  const parsedState = typeof parsed.state === 'string' ? parsed.state.trim() : '';
+  if (parsedState) {
+    const stateAttemptId = openAiCodexOAuthAttemptsByState.get(parsedState);
+    const stateAttempt = stateAttemptId ? openAiCodexOAuthAttemptsById.get(stateAttemptId) : null;
+    if (stateAttempt) {
+      if (stateAttempt.sessionId !== s.sessionId) {
+        return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+      }
+      attempt = stateAttempt;
+    } else if (attempt && parsedState !== String(attempt.state || '').trim() && !attempt.code) {
+      attempt.status = 'failed';
+      attempt.lastError = 'STATE_MISMATCH';
+      return res.status(400).json({
+        ok: false,
+        error: 'STATE_MISMATCH',
+        attempt: openAiCodexOAuthAttemptSummary(attempt)
+      });
+    } else if (!attempt) {
+      return res.status(400).json({ ok: false, error: 'STATE_MISMATCH' });
+    }
+  }
+
+  if (!attempt) {
+    if (!requestedAttemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+    return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  }
+
+  if (callbackInput) {
+    if (parsed.state && String(parsed.state || '').trim() !== String(attempt.state || '').trim() && !attempt.code) {
+      attempt.status = 'failed';
+      attempt.lastError = 'STATE_MISMATCH';
+      return res.status(400).json({
+        ok: false,
+        error: 'STATE_MISMATCH',
+        attempt: openAiCodexOAuthAttemptSummary(attempt)
+      });
+    }
+    if (parsed.error) {
+      attempt.status = 'failed';
+      attempt.lastError = parsed.errorDescription || parsed.error;
+      return res.status(400).json({ ok: false, error: parsed.error });
+    }
+    if (parsed.code) {
+      attempt.code = parsed.code;
+      attempt.status = 'code_received';
+      attempt.codeReceivedAtMs = Date.now();
+      attempt.lastError = '';
+    }
+  }
+
+  if (!attempt.code) {
+    return res.status(409).json({
+      ok: false,
+      error: 'CODE_PENDING',
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  if (attempt.credential && attempt.status === 'exchanged') {
+    return res.json({
+      ok: true,
+      credential: attempt.credential,
+      oauthProfile: attempt.credential,
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  const exchanged = await exchangeOpenAiCodexAuthorizationCode({
+    code: attempt.code,
+    verifier: attempt.verifier,
+    redirectUri: attempt.redirectUri || OPENAI_CODEX_OAUTH_REDIRECT_URI
+  });
+
+  if (!exchanged.ok) {
+    attempt.status = 'failed';
+    attempt.lastError = exchanged.message || exchanged.error || 'TOKEN_EXCHANGE_FAILED';
+    return res.status(502).json({
+      ok: false,
+      error: exchanged.error || 'TOKEN_EXCHANGE_FAILED',
+      message: exchanged.message || '',
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  const accountId = extractOpenAiCodexAccountId(exchanged.accessToken);
+  if (!accountId) {
+    attempt.status = 'failed';
+    attempt.lastError = 'ACCOUNT_ID_MISSING';
+    return res.status(400).json({
+      ok: false,
+      error: 'ACCOUNT_ID_MISSING',
+      message: 'Failed to extract accountId from access token.'
+    });
+  }
+
+  attempt.status = 'exchanged';
+  attempt.exchangedAtMs = Date.now();
+  attempt.lastError = '';
+  attempt.credential = {
+    provider: 'openai-codex',
+    access: exchanged.accessToken,
+    refresh: exchanged.refreshToken,
+    expires: exchanged.expiresAtMs,
+    accountId
+  };
+  attempt.code = '';
+  attempt.verifier = '';
+
+  return res.json({
+    ok: true,
+    credential: attempt.credential,
+    oauthProfile: attempt.credential,
+    attempt: openAiCodexOAuthAttemptSummary(attempt)
   });
 });
 
@@ -1984,6 +2660,8 @@ app.get('/api/agent/state', (req, res) => {
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const ceremony = buildCeremonyStateSnapshot(s);
+  const experience = buildExperienceStateSnapshot(s, ceremony);
   res.json({
     ok: true,
     flow: s.flow,
@@ -1996,9 +2674,11 @@ app.get('/api/agent/state', (req, res) => {
     },
     match: s.match,
     signup: s.signup,
+    ceremony,
+    experience,
     share: s.share,
     canvas: { w: s.canvas.w, h: s.canvas.h },
-    houseId: s.houseCeremony?.houseId || null
+    houseId: ceremony.houseId
   });
 });
 
@@ -2102,18 +2782,11 @@ app.get('/api/agent/house/state', (req, res) => {
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const ceremony = buildCeremonyStateSnapshot(s);
   res.json({
     ok: true,
     teamCode: s.teamCode,
-    ceremony: {
-      humanCommit: !!s.houseCeremony?.humanCommit,
-      agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanRevealSealed,
-      agentReveal: !!s.houseCeremony?.agentRevealSealed,
-      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
-      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
-      houseId: s.houseCeremony?.houseId || null
-    }
+    ceremony
   });
 });
 
@@ -2202,17 +2875,10 @@ app.post('/api/human/house/reveal', (req, res) => {
 
 app.get('/api/human/house/state', (req, res) => {
   const s = ensureHumanSession(req, res);
+  const ceremony = buildCeremonyStateSnapshot(s);
   res.json({
     ok: true,
-    ceremony: {
-      humanCommit: !!s.houseCeremony?.humanCommit,
-      agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanRevealSealed,
-      agentReveal: !!s.houseCeremony?.agentRevealSealed,
-      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
-      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
-      houseId: s.houseCeremony?.houseId || null
-    }
+    ceremony
   });
 });
 
