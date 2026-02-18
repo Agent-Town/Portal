@@ -1,31 +1,15 @@
 @font-face {
-  font-family: "Press Start 2P";
-  src: url("/brand-kit/fonts/press-start-2p-400.ttf") format("truetype");
+  font-family: "Wellfleet";
+  src: url("/brand-kit/fonts/Wellfleet-Regular.ttf") format("truetype");
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Silkscreen";
-  src: url("/brand-kit/fonts/silkscreen-400.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Silkscreen";
-  src: url("/brand-kit/fonts/silkscreen-700.ttf") format("truetype");
-  font-style: normal;
-  font-weight: 700;
   font-display: swap;
 }
 
 :root {
-  --font-display: "Silkscreen", "Press Start 2P", monospace;
-  --font-ui: "Silkscreen", "Press Start 2P", monospace;
-  --font-accent: "Press Start 2P", "Silkscreen", monospace;
+  --font-display: "Wellfleet", serif;
+  --font-ui: "Wellfleet", serif;
+  --font-accent: "Wellfleet", serif;
   --sky-50: #e6f4ff;
   --sky-100: #b3dfff;
   --sky-200: #80caff;
