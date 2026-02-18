@@ -2242,61 +2242,88 @@ async function mintAllTownhallIdentitiesAndRegister() {
       throw new Error(knownMintErrorMessage(walletErr, chain));
     }
 
-    setTownhallRegisterFeedback('User is registering on Ethereum...');
-    const userEvm = await runTownhallMintStep('userEvm', () => mintTownhallEvmIdentity({
-      subject: 'human',
-      profile,
-      config,
-      wallet: evmWallet
-    }));
-    setTownhallMintDraftRecord('user', 'evm', {
-      id: userEvm.id,
-      chain: config?.evm?.network || 'sepolia',
-      txHash: userEvm.txHash || ''
-    });
-    syncTownhallMintChecklist(townhallMintDraft);
+    const firstRejected = (results) => {
+      for (const result of results) {
+        if (result?.status !== 'rejected') continue;
+        const reason = result.reason;
+        return reason instanceof Error ? reason : new Error(String(reason || 'Mint failed.'));
+      }
+      return null;
+    };
 
-    setTownhallRegisterFeedback('User is registering on Solana...');
-    const userSolana = await runTownhallMintStep('userSolana', () => mintTownhallSolanaIdentity({
-      subject: 'human',
-      profile,
-      config,
-      wallet: solanaWallet
-    }));
-    setTownhallMintDraftRecord('user', 'solana', {
-      id: userSolana.id,
-      cluster: config?.solana?.cluster || 'devnet',
-      txSig: userSolana.txSig || ''
-    });
-    syncTownhallMintChecklist(townhallMintDraft);
+    const mintUserEvm = async () => {
+      const userEvm = await runTownhallMintStep('userEvm', () => mintTownhallEvmIdentity({
+        subject: 'human',
+        profile,
+        config,
+        wallet: evmWallet
+      }));
+      setTownhallMintDraftRecord('user', 'evm', {
+        id: userEvm.id,
+        chain: config?.evm?.network || 'sepolia',
+        txHash: userEvm.txHash || ''
+      });
+      syncTownhallMintChecklist(townhallMintDraft);
+      return userEvm;
+    };
 
-    setTownhallRegisterFeedback('Agent is registering on Ethereum...');
-    const agentEvm = await runTownhallMintStep('agentEvm', () => mintTownhallEvmIdentity({
-      subject: 'agent',
-      profile,
-      config,
-      wallet: evmWallet
-    }));
-    setTownhallMintDraftRecord('agent', 'evm', {
-      id: agentEvm.id,
-      chain: config?.evm?.network || 'sepolia',
-      txHash: agentEvm.txHash || ''
-    });
-    syncTownhallMintChecklist(townhallMintDraft);
+    const mintUserSolana = async () => {
+      const userSolana = await runTownhallMintStep('userSolana', () => mintTownhallSolanaIdentity({
+        subject: 'human',
+        profile,
+        config,
+        wallet: solanaWallet
+      }));
+      setTownhallMintDraftRecord('user', 'solana', {
+        id: userSolana.id,
+        cluster: config?.solana?.cluster || 'devnet',
+        txSig: userSolana.txSig || ''
+      });
+      syncTownhallMintChecklist(townhallMintDraft);
+      return userSolana;
+    };
 
-    setTownhallRegisterFeedback('Agent is registering on Solana...');
-    const agentSolana = await runTownhallMintStep('agentSolana', () => mintTownhallSolanaIdentity({
-      subject: 'agent',
-      profile,
-      config,
-      wallet: solanaWallet
-    }));
-    setTownhallMintDraftRecord('agent', 'solana', {
-      id: agentSolana.id,
-      cluster: config?.solana?.cluster || 'devnet',
-      txSig: agentSolana.txSig || ''
-    });
-    syncTownhallMintChecklist(townhallMintDraft);
+    const mintAgentEvm = async () => {
+      const agentEvm = await runTownhallMintStep('agentEvm', () => mintTownhallEvmIdentity({
+        subject: 'agent',
+        profile,
+        config,
+        wallet: evmWallet
+      }));
+      setTownhallMintDraftRecord('agent', 'evm', {
+        id: agentEvm.id,
+        chain: config?.evm?.network || 'sepolia',
+        txHash: agentEvm.txHash || ''
+      });
+      syncTownhallMintChecklist(townhallMintDraft);
+      return agentEvm;
+    };
+
+    const mintAgentSolana = async () => {
+      const agentSolana = await runTownhallMintStep('agentSolana', () => mintTownhallSolanaIdentity({
+        subject: 'agent',
+        profile,
+        config,
+        wallet: solanaWallet
+      }));
+      setTownhallMintDraftRecord('agent', 'solana', {
+        id: agentSolana.id,
+        cluster: config?.solana?.cluster || 'devnet',
+        txSig: agentSolana.txSig || ''
+      });
+      syncTownhallMintChecklist(townhallMintDraft);
+      return agentSolana;
+    };
+
+    setTownhallRegisterFeedback('User is registering on Ethereum and Solana...');
+    const userMintResults = await Promise.allSettled([mintUserEvm(), mintUserSolana()]);
+    const userMintError = firstRejected(userMintResults);
+    if (userMintError) throw userMintError;
+
+    setTownhallRegisterFeedback('Agent is registering on Ethereum and Solana...');
+    const agentMintResults = await Promise.allSettled([mintAgentEvm(), mintAgentSolana()]);
+    const agentMintError = firstRejected(agentMintResults);
+    if (agentMintError) throw agentMintError;
 
     setTownhallRegisterFeedback('Saving Town Hall registration...');
     await submitTownhallRegistration();
