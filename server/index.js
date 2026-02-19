@@ -13,11 +13,17 @@ try {
   WebSocketServer = null;
 }
 
+const { loadDotEnv } = require('./env');
+
+loadDotEnv();
+
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
 const { createPostageVerifier } = require('./postageVerifier');
+const { emitMilestone } = require('./milestones');
+const { computeRewardsSummary } = require('./rewards');
 const {
   createSession,
   getSessionById,
@@ -210,7 +216,6 @@ function normalizeHouseList(values) {
 
 function getHousePonyPolicy(house) {
   const policy = house?.ponyPolicy || {};
-  const hasPonyInbox = !!getHousePonyInboxKey(house);
   return {
     allowlist: normalizeHouseList(policy.allowlist),
     blocklist: normalizeHouseList(policy.blocklist),
@@ -220,7 +225,7 @@ function getHousePonyPolicy(house) {
     requireReceiptAnonymous: policy.requireReceiptAnonymous === true,
     allowLegacyPlaintext: typeof policy.allowLegacyPlaintext === 'boolean'
       ? policy.allowLegacyPlaintext
-      : !hasPonyInbox
+      : false
   };
 }
 
@@ -596,6 +601,12 @@ function sha256Base64(input) {
   return crypto.createHash('sha256').update(input).digest('base64');
 }
 
+function reservedHouseId(kind, key) {
+  const seed = `agenttown:reserved:${kind}:${key}`;
+  const bytes = crypto.createHash('sha256').update(seed).digest();
+  return base58Encode(bytes);
+}
+
 function base58Encode(bytes) {
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   let x = BigInt('0x' + Buffer.from(bytes).toString('hex'));
@@ -645,6 +656,18 @@ function buildHouseKeyWrapMessage({ houseId }) {
 
 function buildTokenCheckMessage({ address, nonce, ca }) {
   return ['ElizaTown Token Check', `address: ${address}`, `CA: ${ca}`, `nonce: ${nonce}`].join('\n');
+}
+
+function unlockAddressForLookup(unlock) {
+  if (!unlock || typeof unlock !== 'object') return null;
+  const address = typeof unlock.address === 'string' ? unlock.address.trim() : '';
+  if (!address) return null;
+  if (unlock.kind === 'solana-wallet-signature') return address;
+  if (unlock.kind === 'wallet-signature') {
+    const chain = typeof unlock.chain === 'string' ? unlock.chain.trim().toLowerCase() : '';
+    if (chain === 'solana') return address;
+  }
+  return null;
 }
 
 function verifySolanaSignature(address, message, signatureB64) {
@@ -1232,13 +1255,256 @@ async function exchangeOpenAiCodexAuthorizationCode({ code, verifier, redirectUr
   }
 }
 
+function splitCsvEnv(raw) {
+  return String(raw || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function uniqueStrings(values) {
+  const out = [];
+  const seen = new Set();
+  for (const value of Array.isArray(values) ? values : []) {
+    const item = String(value || '').trim();
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out;
+}
+
+function parseBoolEnv(raw, fallback = false) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return !!fallback;
+  const normalized = String(raw).trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return !!fallback;
+}
+
+function parseJsonObjectEnv(raw) {
+  const src = String(raw || '').trim();
+  if (!src) return {};
+  try {
+    const parsed = JSON.parse(src);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function sanitizePublicConfig(value) {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((item) => sanitizePublicConfig(item));
+
+  const out = {};
+  for (const [key, val] of Object.entries(value)) {
+    const lower = key.toLowerCase();
+    if (lower.includes('secret') || lower.includes('private') || lower.includes('api_key')) continue;
+    out[key] = sanitizePublicConfig(val);
+  }
+  return out;
+}
+
+function sanitizePublicUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    const protocol = String(parsed.protocol || '').toLowerCase();
+    const host = String(parsed.hostname || '').toLowerCase();
+    if (protocol !== 'https:' && protocol !== 'http:') return '';
+    if (host === 'example.com' || host.endsWith('.example.com')) return '';
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+function toCspConnectSrcFromUrls(values) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const raw = String(value || '').trim();
+    if (!raw) continue;
+    try {
+      const parsed = new URL(raw);
+      const protocol = String(parsed.protocol || '').toLowerCase();
+      if (!['https:', 'http:', 'wss:', 'ws:'].includes(protocol)) continue;
+      const origin = `${protocol}//${parsed.host}`;
+      if (!origin || seen.has(origin)) continue;
+      seen.add(origin);
+      out.push(origin);
+    } catch {
+      // ignore malformed URLs in CSP derivation
+    }
+  }
+  return out;
+}
+
+const PRIVY_APP_ID = String(process.env.PRIVY_APP_ID || '').trim();
+const PRIVY_CLIENT_ID = String(process.env.PRIVY_CLIENT_ID || '').trim();
+const PRIVY_APP_SECRET = String(process.env.PRIVY_APP_SECRET || '').trim();
+const PRIVY_API_BASE_URL = String(process.env.PRIVY_API_BASE_URL || 'https://api.privy.io').trim().replace(/\/+$/, '');
+const PRIVY_SDK_SCRIPT_URL = sanitizePublicUrl(process.env.PRIVY_SDK_SCRIPT_URL || '');
+const PRIVY_SDK_MODULE_URL = sanitizePublicUrl(process.env.PRIVY_SDK_MODULE_URL || '');
+const PRIVY_LOGIN_METHOD = String(process.env.PRIVY_LOGIN_METHOD || 'email').trim().toLowerCase();
+const PRIVY_PUBLIC_CONFIG_JSON = sanitizePublicConfig(parseJsonObjectEnv(process.env.PRIVY_PUBLIC_CONFIG_JSON));
+const PRIVY_PUBLIC_CONFIG = {
+  ...PRIVY_PUBLIC_CONFIG_JSON,
+  ...(PRIVY_APP_ID ? { appId: PRIVY_APP_ID } : {}),
+  ...(PRIVY_CLIENT_ID ? { clientId: PRIVY_CLIENT_ID } : {}),
+  ...(PRIVY_SDK_SCRIPT_URL ? { sdkScriptUrl: PRIVY_SDK_SCRIPT_URL } : {}),
+  ...(PRIVY_SDK_MODULE_URL ? { sdkModuleUrl: PRIVY_SDK_MODULE_URL } : {}),
+  ...(PRIVY_LOGIN_METHOD ? { loginMethod: PRIVY_LOGIN_METHOD } : {})
+};
+const PRIVY_ENABLED_RAW = !!PRIVY_PUBLIC_CONFIG.appId;
+const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, false);
+const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
+const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
+const HOME_ROUTE_FILE = 'start.html';
+const ONBOARDING_REQUIRED = PRIVY_ENABLED;
+
+const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/default_user_avatar.png';
+const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/default_agent_avatar.png';
+const DEFAULT_TOWNHALL_HUMAN_PROMPT = "Stylized 3D third-person game character concept: a gender-neutral, race-neutral wild west wizard known as a 'Promptmancer' with a friendly, approachable silhouette and expressive eyes.";
+const DEFAULT_TOWNHALL_AGENT_PROMPT = 'Stylized 3D prairie pup avatar doing a cute hat-tip emote with a wholesome mascot vibe in a cozy wild west frontier style.';
+const PINATA_JWT = String(process.env.PINATA_JWT || process.env.ERC8004_PINATA_JWT || '').trim();
+const INFURA_PROJECT_ID = String(process.env.INFURA_ID || process.env.INFURA_PROJECT_ID || '').trim();
+const EVM_ERC8004_CHAIN_ID_RAW = Number(process.env.EVM_ERC8004_CHAIN_ID || 11155111);
+const EVM_ERC8004_CHAIN_ID = Number.isFinite(EVM_ERC8004_CHAIN_ID_RAW) && EVM_ERC8004_CHAIN_ID_RAW > 0
+  ? Math.floor(EVM_ERC8004_CHAIN_ID_RAW)
+  : 11155111;
+const EVM_ERC8004_RPC_URL = String(
+  process.env.EVM_ERC8004_RPC_URL
+  || (INFURA_PROJECT_ID ? `https://sepolia.infura.io/v3/${INFURA_PROJECT_ID}` : '')
+).trim();
+const EVM_ERC8004_NETWORK = String(process.env.EVM_ERC8004_NETWORK || 'sepolia').trim().toLowerCase();
+const EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+const EVM_ERC8004_IDENTITY_REGISTRY = normalizeEvmAddress(
+  String(
+    process.env.EVM_ERC8004_IDENTITY_REGISTRY
+    || process.env.EVM_ERC8004_CONTRACT_ADDRESS
+    || EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT
+  ).trim()
+) || EVM_ERC8004_IDENTITY_REGISTRY_DEFAULT;
+const SOLANA_ERC8004_CLUSTER = String(process.env.SOLANA_ERC8004_CLUSTER || 'devnet').trim().toLowerCase();
+const SOLANA_ERC8004_RPC_URL = String(process.env.SOLANA_ERC8004_RPC_URL || 'https://api.devnet.solana.com').trim();
+const SOLANA_ERC8004_RPC_FALLBACKS = splitCsvEnv(process.env.SOLANA_ERC8004_RPC_FALLBACKS);
+const SOLANA_ERC8004_DEFAULT_RPC_BY_CLUSTER = {
+  devnet: 'https://api.devnet.solana.com',
+  testnet: 'https://api.testnet.solana.com',
+  mainnet: 'https://api.mainnet-beta.solana.com',
+  'mainnet-beta': 'https://api.mainnet-beta.solana.com'
+};
+const SOLANA_ERC8004_RPC_CANDIDATES = uniqueStrings([
+  SOLANA_ERC8004_RPC_URL,
+  ...SOLANA_ERC8004_RPC_FALLBACKS,
+  SOLANA_ERC8004_DEFAULT_RPC_BY_CLUSTER[SOLANA_ERC8004_CLUSTER] || ''
+]);
+const SOLANA_ERC8004_FEE_PAYER_SECRET = String(
+  process.env.SOLANA_ERC8004_FEE_PAYER_SECRET
+  || process.env.SOLANA_DEVNET_FEE_PAYER_SECRET
+  || ''
+).trim();
+const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW = Number(process.env.SOLANA_SPONSOR_OWNER_MIN_LAMPORTS || 10_000_000);
+const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS = Number.isFinite(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
+  && SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW > 0
+  ? Math.floor(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
+  : 10_000_000;
+const SOLANA_SPONSOR_AUTO_TOPUP = parseBoolEnv(
+  process.env.SOLANA_SPONSOR_AUTO_TOPUP,
+  SOLANA_ERC8004_CLUSTER === 'devnet' || SOLANA_ERC8004_CLUSTER === 'testnet'
+);
+const TOWNHALL_MINT_ENABLED = parseBoolEnv(process.env.TOWNHALL_MINT_ENABLED, true);
+const SOLANA_WEB3_MODULE_URL = String(process.env.SOLANA_WEB3_MODULE_URL || 'https://esm.sh/@solana/web3.js@1.98.4?bundle').trim();
+const SOLANA_CONNECT_SRC = toCspConnectSrcFromUrls([...SOLANA_ERC8004_RPC_CANDIDATES, ...SOLANA_RPC_URLS]);
+
+const CSP_SCRIPT_SRC_EXTRA = splitCsvEnv(process.env.CSP_SCRIPT_SRC_EXTRA);
+const PRIVY_SCRIPT_SRC_DEFAULT = [
+  'https://esm.sh',
+  'https://cdn.jsdelivr.net',
+  'https://cdn.skypack.dev',
+  'https://auth.privy.io',
+  'https://*.privy.io',
+  'https://*.privy.app',
+  'https://*.privy.com'
+];
+const scriptSrc = [
+  "'self'",
+  ...(PRIVY_ENABLED ? PRIVY_SCRIPT_SRC_DEFAULT : []),
+  ...CSP_SCRIPT_SRC_EXTRA
+];
+const SCRIPT_SRC = [...new Set(scriptSrc)];
+const CSP_CONNECT_SRC_EXTRA = splitCsvEnv(process.env.CSP_CONNECT_SRC_EXTRA);
+const PRIVY_CONNECT_SRC_DEFAULT = [
+  'https://auth.privy.io',
+  'https://api.privy.io',
+  'https://*.privy.io',
+  'https://*.privy.app',
+  'https://*.privy.com',
+  'https://*.privy.systems',
+  'https://privy.systems',
+  // Embedded wallets can call chain-specific Privy RPC hosts (for example sepolia.rpc.privy.systems).
+  'https://*.rpc.privy.systems',
+  'https://rpc.privy.systems',
+  'https://sepolia.rpc.privy.systems',
+  'wss://*.privy.io',
+  'wss://*.privy.app',
+  'wss://*.privy.com',
+  'wss://*.privy.systems',
+  'wss://privy.systems',
+  'wss://*.rpc.privy.systems',
+  'wss://rpc.privy.systems'
+];
+const connectSrc = [
+  "'self'",
+  'https://esm.sh',
+  'https://cdn.jsdelivr.net',
+  'https://cdn.skypack.dev',
+  'https://eth.llamarpc.com',
+  'https://rpc.ankr.com',
+  ...SOLANA_CONNECT_SRC,
+  ...(PRIVY_ENABLED ? PRIVY_CONNECT_SRC_DEFAULT : []),
+  ...CSP_CONNECT_SRC_EXTRA
+];
+const CONNECT_SRC = [...new Set(connectSrc)];
+const CSP_FRAME_SRC_EXTRA = splitCsvEnv(process.env.CSP_FRAME_SRC_EXTRA);
+const frameSrc = [
+  "'self'",
+  'https://www.youtube.com',
+  'https://www.youtube-nocookie.com',
+  ...(PRIVY_ENABLED ? ['https://auth.privy.io', 'https://*.privy.io', 'https://*.privy.app', 'https://*.privy.com'] : []),
+  ...CSP_FRAME_SRC_EXTRA
+];
+const FRAME_SRC = [...new Set(frameSrc)];
+ 
+function isAdmin(req) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return false;
+  const header = req.header('x-admin-token');
+  if (!header) return false;
+  return header === token;
+}
+
+function normalizeXHandle(input) {
+  if (typeof input !== 'string') return null;
+  const handle = input.trim().replace(/^@/, '').toLowerCase();
+  if (!handle) return null;
+  if (!/^[a-z0-9_]{1,15}$/.test(handle)) return null;
+  return handle;
+}
+
 function setSecurityHeaders(req, res, next) {
+  const allowSameOriginFrame = typeof req.path === 'string' && req.path.startsWith('/s/');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
 
   const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
   if (!isProd) {
@@ -1254,15 +1520,19 @@ function setSecurityHeaders(req, res, next) {
       'wss://127.0.0.1:*'
     );
   }
+
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src ${SCRIPT_SRC.join(' ')}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data:",
-    `connect-src ${connectSrc.join(' ')}`,
+    "media-src 'self'",
+    "worker-src 'self' blob:",
+    `frame-src ${FRAME_SRC.join(' ')}`,
+    `connect-src ${CONNECT_SRC.join(' ')}`,
     "object-src 'none'",
     "base-uri 'none'",
-    "frame-ancestors 'none'"
+    `frame-ancestors ${allowSameOriginFrame ? "'self'" : "'none'"}`
   ].join('; ');
   res.setHeader('Content-Security-Policy', csp);
 
@@ -1590,6 +1860,10 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
+const MAX_TOWNHALL_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_TOWNHALL_PROMPT_CHARS = 4096;
+const MAX_TOWNHALL_NAME_CHARS = 48;
+const MAX_TOWNHALL_ERC_ID_CHARS = 160;
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
 const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
@@ -1681,6 +1955,601 @@ function normalizeAgentName(name) {
   if (!trimmed) return null;
   const cleaned = trimmed.replace(/[^A-Za-z0-9 _().-]/g, '').slice(0, 40);
   return cleaned || null;
+}
+
+function normalizeTownhallName(name) {
+  if (typeof name !== 'string') return null;
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/[^A-Za-z0-9 _().-]/g, '').slice(0, MAX_TOWNHALL_NAME_CHARS);
+  return cleaned || null;
+}
+
+function normalizeTownhallErcId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TOWNHALL_ERC_ID_CHARS);
+}
+
+function normalizeTownhallTxRef(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 200);
+}
+
+function normalizeTownhallPrompt(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TOWNHALL_PROMPT_CHARS);
+}
+
+function normalizeTownhallMintSubject(value) {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.trim().toLowerCase();
+  if (cleaned === 'human' || cleaned === 'user') return 'human';
+  if (cleaned === 'agent') return 'agent';
+  return null;
+}
+
+function normalizeTownhallEvmIdentityState(raw) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const id = typeof input.id === 'string' ? input.id : null;
+  const chain = typeof input.chain === 'string' && input.chain.trim()
+    ? input.chain
+    : 'sepolia';
+  const txHash = typeof input.txHash === 'string' ? input.txHash : null;
+  const updatedAt = typeof input.updatedAt === 'string' ? input.updatedAt : null;
+  return { id, chain, txHash, updatedAt };
+}
+
+function normalizeTownhallSolanaIdentityState(raw) {
+  const input = raw && typeof raw === 'object' ? raw : {};
+  const id = typeof input.id === 'string' ? input.id : null;
+  const cluster = typeof input.cluster === 'string' && input.cluster.trim()
+    ? input.cluster
+    : 'devnet';
+  const txSig = typeof input.txSig === 'string' ? input.txSig : null;
+  const updatedAt = typeof input.updatedAt === 'string' ? input.updatedAt : null;
+  return { id, cluster, txSig, updatedAt };
+}
+
+function parseTownhallImageDataUrl(dataUrl) {
+  if (dataUrl == null || dataUrl === '') return { dataUrl: null };
+  if (typeof dataUrl !== 'string') return { error: 'INVALID_TOWNHALL_IMAGE' };
+  const match = dataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return { error: 'INVALID_TOWNHALL_IMAGE' };
+  const payload = match[2];
+  let bytes;
+  try {
+    bytes = Buffer.from(payload, 'base64');
+  } catch {
+    return { error: 'INVALID_TOWNHALL_IMAGE' };
+  }
+  if (!bytes || bytes.length === 0) return { error: 'INVALID_TOWNHALL_IMAGE' };
+  if (bytes.length > MAX_TOWNHALL_IMAGE_BYTES) return { error: 'TOWNHALL_IMAGE_TOO_LARGE' };
+  return { dataUrl };
+}
+
+function inferDataUrlMime(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^data:(image\/(?:png|jpeg|webp));base64,/);
+  return match ? match[1] : null;
+}
+
+function townhallMintCapabilities() {
+  const pinataEnabled = !!PINATA_JWT;
+  const evmEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!EVM_ERC8004_RPC_URL;
+  const solanaEnabled = TOWNHALL_MINT_ENABLED && pinataEnabled && !!SOLANA_ERC8004_RPC_URL;
+  const solanaSponsorEnabled = solanaEnabled && !!SOLANA_ERC8004_FEE_PAYER_SECRET;
+  return {
+    enabled: TOWNHALL_MINT_ENABLED,
+    pinataEnabled,
+    evmEnabled,
+    solanaEnabled,
+    solanaSponsorEnabled
+  };
+}
+
+function normalizeTownhallMintProfile(profileInput, onboarding) {
+  const profile = profileInput && typeof profileInput === 'object' ? profileInput : {};
+  const existingProfile = onboarding?.profile && typeof onboarding.profile === 'object' ? onboarding.profile : {};
+  const existingHumanAvatar = existingProfile.humanAvatar && typeof existingProfile.humanAvatar === 'object'
+    ? existingProfile.humanAvatar
+    : {};
+  const existingAgentAvatar = existingProfile.agentAvatar && typeof existingProfile.agentAvatar === 'object'
+    ? existingProfile.agentAvatar
+    : {};
+
+  const humanName = normalizeTownhallName(profile.humanName || existingProfile.humanName || '');
+  const agentName = normalizeTownhallName(profile.agentName || existingProfile.agentName || '');
+  if (!humanName) return { error: 'MISSING_HUMAN_NAME' };
+  if (!agentName) return { error: 'MISSING_AGENT_NAME' };
+
+  const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
+  const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
+
+  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt || existingHumanAvatar.prompt || '');
+  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt || existingAgentAvatar.prompt || '');
+  if (!humanPrompt) return { error: 'MISSING_HUMAN_AVATAR_PROMPT' };
+  if (!agentPrompt) return { error: 'MISSING_AGENT_AVATAR_PROMPT' };
+
+  let humanImage = existingHumanAvatar.image || DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  let agentImage = existingAgentAvatar.image || DEFAULT_TOWNHALL_AGENT_IMAGE;
+  let humanSource = existingHumanAvatar.source === 'upload' ? 'upload' : 'default';
+  let agentSource = existingAgentAvatar.source === 'upload' ? 'upload' : 'default';
+
+  if (Object.prototype.hasOwnProperty.call(humanAvatarInput, 'image')) {
+    const parsedHuman = parseTownhallImageDataUrl(humanAvatarInput.image);
+    if (parsedHuman.error) return { error: parsedHuman.error };
+    if (parsedHuman.dataUrl) {
+      humanImage = parsedHuman.dataUrl;
+      humanSource = 'upload';
+    } else {
+      humanImage = DEFAULT_TOWNHALL_HUMAN_IMAGE;
+      humanSource = 'default';
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(agentAvatarInput, 'image')) {
+    const parsedAgent = parseTownhallImageDataUrl(agentAvatarInput.image);
+    if (parsedAgent.error) return { error: parsedAgent.error };
+    if (parsedAgent.dataUrl) {
+      agentImage = parsedAgent.dataUrl;
+      agentSource = 'upload';
+    } else {
+      agentImage = DEFAULT_TOWNHALL_AGENT_IMAGE;
+      agentSource = 'default';
+    }
+  }
+
+  return {
+    profile: {
+      humanName,
+      agentName,
+      humanAvatar: {
+        image: humanImage,
+        prompt: humanPrompt,
+        source: humanSource
+      },
+      agentAvatar: {
+        image: agentImage,
+        prompt: agentPrompt,
+        source: agentSource
+      }
+    }
+  };
+}
+
+function buildTownhallMintMetadata({
+  profile,
+  chain,
+  walletAddress,
+  origin,
+  subject = 'agent'
+}) {
+  const mintSubject = normalizeTownhallMintSubject(subject) || 'agent';
+  const isHumanSubject = mintSubject === 'human';
+  const humanAvatar = profile?.humanAvatar || {};
+  const agentAvatar = profile?.agentAvatar || {};
+  const humanImage = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
+    ? humanAvatar.image
+    : DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  const agentImage = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
+    ? agentAvatar.image
+    : DEFAULT_TOWNHALL_AGENT_IMAGE;
+  const subjectImage = isHumanSubject ? humanImage : agentImage;
+  const subjectName = isHumanSubject ? profile.humanName : profile.agentName;
+  const subjectPrompt = isHumanSubject ? humanAvatar.prompt : agentAvatar.prompt;
+  const subjectLabel = isHumanSubject ? 'human' : 'agent';
+
+  const attributes = [
+    { trait_type: 'subject', value: subjectLabel },
+    { trait_type: 'subject_name', value: subjectName },
+    { trait_type: 'human_name', value: profile.humanName },
+    { trait_type: 'agent_name', value: profile.agentName },
+    { trait_type: 'chain', value: chain },
+    ...(walletAddress ? [{ trait_type: 'wallet', value: walletAddress }] : [])
+  ];
+
+  return {
+    name: `${subjectName} (${subjectLabel})`,
+    description: `Agent Town ${subjectLabel} onboarding identity record.`,
+    image: subjectImage,
+    external_url: `${origin}/app`,
+    attributes,
+    properties: {
+      version: 2,
+      kind: 'agent-town-onboarding',
+      subject: subjectLabel,
+      subjectName,
+      subjectPrompt: subjectPrompt || null,
+      chain,
+      avatars: {
+        human: {
+          image: humanImage,
+          mime: inferDataUrlMime(humanImage) || null,
+          prompt: humanAvatar.prompt || null,
+          source: humanAvatar.source || 'default'
+        },
+        agent: {
+          image: agentImage,
+          mime: inferDataUrlMime(agentImage) || null,
+          prompt: agentAvatar.prompt || null,
+          source: agentAvatar.source || 'default'
+        }
+      },
+      walletAddress: walletAddress || null,
+      createdAt: nowIso()
+    }
+  };
+}
+
+async function pinJsonToIpfs(content, { name = 'agent-town-registration' } = {}) {
+  if (!PINATA_JWT) {
+    const err = new Error('PINATA_NOT_CONFIGURED');
+    err.code = 'PINATA_NOT_CONFIGURED';
+    throw err;
+  }
+
+  const resp = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${PINATA_JWT}`,
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({
+      pinataOptions: { cidVersion: 1 },
+      pinataMetadata: { name },
+      pinataContent: content
+    })
+  });
+
+  let payload = null;
+  try {
+    payload = await resp.json();
+  } catch {
+    payload = null;
+  }
+  if (!resp.ok) {
+    const err = new Error('PINATA_UPLOAD_FAILED');
+    err.code = 'PINATA_UPLOAD_FAILED';
+    err.status = resp.status;
+    err.detail = payload;
+    throw err;
+  }
+  const cid = typeof payload?.IpfsHash === 'string' ? payload.IpfsHash.trim() : '';
+  if (!cid) {
+    const err = new Error('PINATA_UPLOAD_FAILED');
+    err.code = 'PINATA_UPLOAD_FAILED';
+    throw err;
+  }
+  return cid;
+}
+
+function summarizePinataFailureDetail(detail) {
+  if (!detail) return null;
+  if (typeof detail === 'string') {
+    const text = detail.trim();
+    return text ? text.slice(0, 280) : null;
+  }
+  if (typeof detail === 'object') {
+    const reason = typeof detail?.error?.reason === 'string' ? detail.error.reason.trim() : '';
+    const text = typeof detail?.error?.details === 'string' ? detail.error.details.trim() : '';
+    if (reason && text) return `${reason}: ${text}`.slice(0, 280);
+    if (reason) return reason.slice(0, 280);
+    if (text) return text.slice(0, 280);
+  }
+  return null;
+}
+
+let cachedSolanaSdkModulePromise = null;
+function loadSolanaSdkModule() {
+  if (!cachedSolanaSdkModulePromise) {
+    cachedSolanaSdkModulePromise = import('8004-solana')
+      .catch((err) => {
+        cachedSolanaSdkModulePromise = null;
+        throw err;
+      });
+  }
+  return cachedSolanaSdkModulePromise;
+}
+
+let cachedSolanaWeb3ModulePromise = null;
+function loadSolanaWeb3Module() {
+  if (!cachedSolanaWeb3ModulePromise) {
+    cachedSolanaWeb3ModulePromise = import('@solana/web3.js')
+      .catch((err) => {
+        cachedSolanaWeb3ModulePromise = null;
+        throw err;
+      });
+  }
+  return cachedSolanaWeb3ModulePromise;
+}
+
+function summarizeSolanaPrepareError(err) {
+  const text = String(err?.detail || err?.message || err || '').trim();
+  return text ? text.slice(0, 260) : 'unknown error';
+}
+
+function isRetryableSolanaPrepareError(err) {
+  const text = summarizeSolanaPrepareError(err).toLowerCase();
+  return (
+    text.includes('fetch failed')
+    || text.includes('failed to fetch')
+    || text.includes('network')
+    || text.includes('timed out')
+    || text.includes('timeout')
+    || text.includes('econnreset')
+    || text.includes('enotfound')
+    || text.includes('eai_again')
+  );
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function prepareSolanaRegistrationWithRpcFallback({
+  SolanaSDK,
+  cluster,
+  tokenUri,
+  signer,
+  assetPubkey,
+  feePayer
+}) {
+  const rpcCandidates = uniqueStrings(SOLANA_ERC8004_RPC_CANDIDATES);
+  if (!rpcCandidates.length) {
+    const err = new Error('SOLANA_PREPARE_FAILED');
+    err.detail = 'No Solana RPC endpoint configured for ERC-8004 prepare.';
+    throw err;
+  }
+  const failures = [];
+  for (const rpcUrl of rpcCandidates) {
+    const sdk = new SolanaSDK({ cluster, rpcUrl });
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const prepared = await sdk.registerAgent(
+          tokenUri,
+          undefined,
+          {
+            skipSend: true,
+            signer,
+            assetPubkey,
+            ...(feePayer ? { feePayer } : {}),
+            atomEnabled: false
+          }
+        );
+        return { prepared, rpcUrl };
+      } catch (err) {
+        const summary = summarizeSolanaPrepareError(err);
+        failures.push(`${rpcUrl} (attempt ${attempt}): ${summary}`);
+        if (!isRetryableSolanaPrepareError(err) || attempt >= 2) break;
+        await waitMs(250 * attempt);
+      }
+    }
+  }
+  const out = new Error('SOLANA_PREPARE_FAILED');
+  out.detail = failures.slice(0, 6).join(' | ');
+  throw out;
+}
+
+function parseSolanaFeePayerSecretKeyBytes(raw) {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) return null;
+      if (!parsed.every((value) => Number.isFinite(value) && value >= 0 && value <= 255)) return null;
+      const bytes = Uint8Array.from(parsed.map((value) => Math.floor(Number(value))));
+      if (bytes.length === 64) return bytes;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (/^[A-Za-z0-9+/=]+$/.test(trimmed) && trimmed.length % 4 === 0) {
+    const decoded = decodeB64(trimmed);
+    if (decoded && decoded.length === 64) return new Uint8Array(decoded);
+  }
+
+  const base58 = base58Decode(trimmed);
+  if (base58 && base58.length === 64) return base58;
+  return null;
+}
+
+let cachedSolanaFeePayerPromise = null;
+async function loadSolanaFeePayerKeypair() {
+  if (!SOLANA_ERC8004_FEE_PAYER_SECRET) return null;
+  if (!cachedSolanaFeePayerPromise) {
+    cachedSolanaFeePayerPromise = (async () => {
+      const secret = parseSolanaFeePayerSecretKeyBytes(SOLANA_ERC8004_FEE_PAYER_SECRET);
+      if (!secret) throw new Error('SOLANA_SPONSOR_SECRET_INVALID');
+      const { Keypair } = await loadSolanaWeb3Module();
+      try {
+        return Keypair.fromSecretKey(secret);
+      } catch {
+        throw new Error('SOLANA_SPONSOR_SECRET_INVALID');
+      }
+    })().catch((err) => {
+      cachedSolanaFeePayerPromise = null;
+      throw err;
+    });
+  }
+  return cachedSolanaFeePayerPromise;
+}
+
+async function ensureSolanaOwnerLamportsForSponsoredMint({
+  connection,
+  web3,
+  ownerAddress,
+  feePayer,
+  minLamports
+}) {
+  const { PublicKey } = web3;
+  const ownerPubkey = new PublicKey(ownerAddress);
+  const targetLamports = Number.isFinite(minLamports) && minLamports > 0 ? Math.floor(minLamports) : 10_000_000;
+  const [ownerBalance, sponsorBalance] = await Promise.all([
+    connection.getBalance(ownerPubkey, 'confirmed'),
+    connection.getBalance(feePayer.publicKey, 'confirmed')
+  ]);
+  if (ownerBalance >= targetLamports) {
+    return { ownerBalance, sponsorBalance, topUpLamports: 0 };
+  }
+  if (!SOLANA_SPONSOR_AUTO_TOPUP) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Owner wallet has ${ownerBalance} lamports; requires at least ${targetLamports}.`;
+    throw err;
+  }
+
+  const topUpLamports = targetLamports - ownerBalance;
+  const minimumSponsorBalance = topUpLamports + 50_000;
+  if (sponsorBalance < minimumSponsorBalance) {
+    const err = new Error('SOLANA_SPONSOR_FEEPAYER_UNFUNDED');
+    err.detail = `Sponsor fee payer has ${sponsorBalance} lamports; at least ${minimumSponsorBalance} needed to top up owner wallet.`;
+    throw err;
+  }
+
+  await topUpSolanaOwnerLamports({
+    connection,
+    web3,
+    ownerAddress,
+    feePayer,
+    lamports: topUpLamports
+  });
+
+  const ownerBalanceAfter = await connection.getBalance(ownerPubkey, 'confirmed');
+  if (ownerBalanceAfter < targetLamports) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Owner wallet still underfunded after top-up (${ownerBalanceAfter} lamports).`;
+    throw err;
+  }
+  return {
+    ownerBalance: ownerBalanceAfter,
+    sponsorBalance,
+    topUpLamports
+  };
+}
+
+async function topUpSolanaOwnerLamports({
+  connection,
+  web3,
+  ownerAddress,
+  feePayer,
+  lamports
+}) {
+  const { PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } = web3;
+  const ownerPubkey = new PublicKey(ownerAddress);
+  const amount = Number.isFinite(lamports) && lamports > 0 ? Math.floor(lamports) : 0;
+  if (amount < 1) return;
+  try {
+    const tx = new Transaction().add(SystemProgram.transfer({
+      fromPubkey: feePayer.publicKey,
+      toPubkey: ownerPubkey,
+      lamports: amount
+    }));
+    await sendAndConfirmTransaction(connection, tx, [feePayer], {
+      commitment: 'confirmed',
+      preflightCommitment: 'confirmed'
+    });
+  } catch (cause) {
+    const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+    err.detail = `Could not top up owner wallet: ${String(cause?.message || cause)}`;
+    throw err;
+  }
+}
+
+function parseSolanaLamportShortfall(detailText) {
+  const text = String(detailText || '');
+  const match = text.match(/insufficient lamports\s+(\d+)\s*,\s*need\s+(\d+)/i);
+  if (!match) return null;
+  const have = Number(match[1]);
+  const need = Number(match[2]);
+  if (!Number.isFinite(have) || !Number.isFinite(need) || need <= have) return null;
+  return {
+    have,
+    need,
+    shortfall: need - have
+  };
+}
+
+function ensureSessionOnboarding(session) {
+  if (!session || typeof session !== 'object') return null;
+  if (!session.onboarding || typeof session.onboarding !== 'object') session.onboarding = {};
+  const onboarding = session.onboarding;
+  onboarding.required = ONBOARDING_REQUIRED;
+  onboarding.registrationComplete = onboarding.registrationComplete === true;
+  onboarding.registeredAt = typeof onboarding.registeredAt === 'string' ? onboarding.registeredAt : null;
+
+  if (!onboarding.profile || typeof onboarding.profile !== 'object') onboarding.profile = {};
+  onboarding.profile.humanName = typeof onboarding.profile.humanName === 'string' ? onboarding.profile.humanName : null;
+  onboarding.profile.agentName = typeof onboarding.profile.agentName === 'string' ? onboarding.profile.agentName : null;
+  if (!onboarding.profile.humanAvatar || typeof onboarding.profile.humanAvatar !== 'object') {
+    onboarding.profile.humanAvatar = {};
+  }
+  if (!onboarding.profile.agentAvatar || typeof onboarding.profile.agentAvatar !== 'object') {
+    onboarding.profile.agentAvatar = {};
+  }
+
+  const humanAvatar = onboarding.profile.humanAvatar;
+  const agentAvatar = onboarding.profile.agentAvatar;
+
+  humanAvatar.image = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
+    ? humanAvatar.image
+    : DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' && humanAvatar.prompt.trim()
+    ? humanAvatar.prompt
+    : DEFAULT_TOWNHALL_HUMAN_PROMPT;
+  humanAvatar.source = humanAvatar.source === 'upload' ? 'upload' : 'default';
+  humanAvatar.updatedAt = typeof humanAvatar.updatedAt === 'string' ? humanAvatar.updatedAt : null;
+
+  agentAvatar.image = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
+    ? agentAvatar.image
+    : DEFAULT_TOWNHALL_AGENT_IMAGE;
+  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' && agentAvatar.prompt.trim()
+    ? agentAvatar.prompt
+    : DEFAULT_TOWNHALL_AGENT_PROMPT;
+  agentAvatar.source = agentAvatar.source === 'upload' ? 'upload' : 'default';
+  agentAvatar.updatedAt = typeof agentAvatar.updatedAt === 'string' ? agentAvatar.updatedAt : null;
+
+  if (!onboarding.erc8004 || typeof onboarding.erc8004 !== 'object') onboarding.erc8004 = {};
+  const erc8004 = onboarding.erc8004;
+
+  if (!erc8004.user || typeof erc8004.user !== 'object') erc8004.user = {};
+  if (!erc8004.agent || typeof erc8004.agent !== 'object') erc8004.agent = {};
+
+  erc8004.user.evm = normalizeTownhallEvmIdentityState(erc8004.user.evm);
+  erc8004.user.solana = normalizeTownhallSolanaIdentityState(erc8004.user.solana);
+  erc8004.agent.evm = normalizeTownhallEvmIdentityState(erc8004.agent.evm);
+  erc8004.agent.solana = normalizeTownhallSolanaIdentityState(erc8004.agent.solana);
+
+  const nowMs = Date.now();
+  if (!Array.isArray(onboarding.pendingSolanaMints)) {
+    onboarding.pendingSolanaMints = [];
+  } else {
+    onboarding.pendingSolanaMints = onboarding.pendingSolanaMints.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const messageHash = typeof entry.messageHash === 'string' ? entry.messageHash.trim() : '';
+      const walletAddress = typeof entry.walletAddress === 'string' ? entry.walletAddress.trim() : '';
+      const assetPubkey = typeof entry.assetPubkey === 'string' ? entry.assetPubkey.trim() : '';
+      const createdAtMs = Number(entry.createdAtMs || 0);
+      if (!messageHash || !walletAddress || !assetPubkey) return false;
+      if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return false;
+      return nowMs - createdAtMs <= 10 * 60 * 1000;
+    });
+  }
+
+  return onboarding;
+}
+
+function cloneOnboarding(onboarding) {
+  if (!onboarding || typeof onboarding !== 'object') return null;
+  return JSON.parse(JSON.stringify(onboarding));
 }
 
 function recordSignup(session, { mode, agentName = null, matchedElement = null, address = null } = {}) {
@@ -2596,6 +3465,504 @@ app.delete('/api/agent/lite/llm/config', (req, res) => {
   });
 });
 
+function normalizePrivyTransactionId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizePrivyTransactionHash(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^0x[a-fA-F0-9]{64}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function normalizePrivyWalletId(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 256) return null;
+  if (!/^[A-Za-z0-9._:-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function toRpcHexNumber(value) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0 || Math.floor(value) !== value) return null;
+    return `0x${BigInt(value).toString(16)}`;
+  }
+  if (typeof value === 'bigint') {
+    if (value < 0n) return null;
+    return `0x${value.toString(16)}`;
+  }
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^0x[0-9a-fA-F]+$/.test(trimmed)) return trimmed;
+  if (/^[0-9]+$/.test(trimmed)) {
+    try {
+      return `0x${BigInt(trimmed).toString(16)}`;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function normalizePrivyCaip2(value, fallbackChainHex = null) {
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim();
+    if (/^eip155:[0-9]+$/.test(trimmed)) return trimmed;
+    throw new Error('INVALID_PRIVY_WALLET_RPC_CAIP2');
+  }
+  const chainHex = toRpcHexNumber(fallbackChainHex);
+  if (!chainHex) return null;
+  try {
+    const chainId = BigInt(chainHex);
+    if (chainId <= 0n) return null;
+    return `eip155:${chainId.toString(10)}`;
+  } catch {
+    return null;
+  }
+} 
+
+function normalizePrivyWalletRpcEvmTx(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_TX');
+  }
+  const from = typeof input.from === 'string' ? input.from.trim() : '';
+  const to = typeof input.to === 'string' ? input.to.trim() : '';
+  const data = typeof input.data === 'string' ? input.data.trim() : '';
+  if (!/^0x[a-fA-F0-9]{40}$/.test(from)) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_FROM');
+  if (!/^0x[a-fA-F0-9]{40}$/.test(to)) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_TO');
+  if (!/^0x[a-fA-F0-9]*$/.test(data) || data.length % 2 !== 0 || data.length < 2) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_TX_DATA');
+  }
+
+  const out = { from, to, data };
+  const optionalHexFields = [
+    ['nonce', input.nonce],
+    ['chain_id', input.chain_id != null ? input.chain_id : input.chainId],
+    ['value', input.value],
+    ['gas_limit', input.gas_limit != null ? input.gas_limit : input.gasLimit != null ? input.gasLimit : input.gas],
+    ['gas_price', input.gas_price != null ? input.gas_price : input.gasPrice],
+    ['max_fee_per_gas', input.max_fee_per_gas != null ? input.max_fee_per_gas : input.maxFeePerGas],
+    ['max_priority_fee_per_gas', input.max_priority_fee_per_gas != null ? input.max_priority_fee_per_gas : input.maxPriorityFeePerGas]
+  ];
+  for (const [key, raw] of optionalHexFields) {
+    const normalized = toRpcHexNumber(raw);
+    if (normalized) out[key] = normalized;
+  }
+
+  if (input.type != null) {
+    const typeHex = toRpcHexNumber(input.type);
+    if (!typeHex) throw new Error('INVALID_PRIVY_WALLET_RPC_TX_TYPE');
+    out.type = typeHex;
+  }
+
+  return out;
+}
+
+function normalizePrivyWalletRpcSolanaTransaction(value) {
+  if (typeof value !== 'string') throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(trimmed)) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  const normalized = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4;
+  const padded = pad === 0 ? normalized : `${normalized}${'='.repeat(4 - pad)}`;
+  try {
+    const decoded = Buffer.from(padded, 'base64');
+    if (!decoded.length) throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+    return padded;
+  } catch {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_TX');
+  }
+}
+
+function normalizePrivyWalletRpcSolanaEncoding(value) {
+  if (value == null) return 'base64';
+  const trimmed = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!trimmed) return 'base64';
+  if (trimmed !== 'base64') throw new Error('INVALID_PRIVY_WALLET_RPC_SOLANA_ENCODING');
+  return trimmed;
+}
+
+function normalizePrivySolanaCaip2(value) {
+  if (value == null || (typeof value === 'string' && !value.trim())) return null;
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed) return null;
+  if (!/^solana:[1-9A-HJ-NP-Za-km-z]{16,64}$/.test(trimmed)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_CAIP2');
+  }
+  return trimmed;
+}
+
+function normalizePrivyWalletRpcBody(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('INVALID_PRIVY_WALLET_RPC_BODY');
+  }
+
+  const method = typeof input.method === 'string' ? input.method.trim() : '';
+  if (method === 'eth_sendTransaction') {
+    const chainTypeRaw = typeof input.chain_type === 'string'
+      ? input.chain_type
+      : typeof input.chainType === 'string'
+        ? input.chainType
+        : '';
+    const chainType = chainTypeRaw.trim().toLowerCase();
+    if (chainType !== 'ethereum') throw new Error('INVALID_PRIVY_WALLET_RPC_CHAIN');
+
+    if (input.sponsor !== true) throw new Error('INVALID_PRIVY_WALLET_RPC_SPONSOR');
+    const params = input.params && typeof input.params === 'object' ? input.params : null;
+    if (!params || Array.isArray(params)) throw new Error('INVALID_PRIVY_WALLET_RPC_PARAMS');
+
+    const transaction = normalizePrivyWalletRpcEvmTx(params.transaction);
+    const caip2 = normalizePrivyCaip2(input.caip2, transaction.chain_id || null);
+
+    return {
+      chain_type: 'ethereum',
+      method: 'eth_sendTransaction',
+      params: { transaction },
+      sponsor: true,
+      ...(caip2 ? { caip2 } : {})
+    };
+  }
+
+  if (method === 'signAndSendTransaction') {
+    const chainTypeRaw = typeof input.chain_type === 'string'
+      ? input.chain_type
+      : typeof input.chainType === 'string'
+        ? input.chainType
+        : '';
+    const chainType = chainTypeRaw.trim().toLowerCase();
+    if (chainType && chainType !== 'solana') throw new Error('INVALID_PRIVY_WALLET_RPC_CHAIN');
+
+    if (input.sponsor !== true) throw new Error('INVALID_PRIVY_WALLET_RPC_SPONSOR');
+    const params = input.params && typeof input.params === 'object' ? input.params : null;
+    if (!params || Array.isArray(params)) throw new Error('INVALID_PRIVY_WALLET_RPC_PARAMS');
+
+    const transaction = normalizePrivyWalletRpcSolanaTransaction(params.transaction);
+    const encoding = normalizePrivyWalletRpcSolanaEncoding(params.encoding);
+    const caip2 = normalizePrivySolanaCaip2(input.caip2);
+
+    return {
+      method: 'signAndSendTransaction',
+      params: { transaction, encoding },
+      sponsor: true,
+      ...(caip2 ? { caip2 } : {})
+    };
+  }
+
+  throw new Error('INVALID_PRIVY_WALLET_RPC_METHOD');
+}
+
+function buildPrivyWalletRpcSigningPayload(walletId, body) {
+  return {
+    version: 1,
+    url: `${PRIVY_API_BASE_URL}/v1/wallets/${encodeURIComponent(walletId)}/rpc`,
+    method: 'POST',
+    headers: {
+      'privy-app-id': PRIVY_APP_ID
+    },
+    body
+  };
+}
+
+function hasPrivyServerAuth() {
+  return !!(PRIVY_APP_ID && PRIVY_APP_SECRET);
+}
+
+function getPrivyBasicAuthHeader() {
+  if (!hasPrivyServerAuth()) return '';
+  return `Basic ${Buffer.from(`${PRIVY_APP_ID}:${PRIVY_APP_SECRET}`).toString('base64')}`;
+}
+
+async function fetchPrivyTransactionStatus(transactionId) {
+  const id = normalizePrivyTransactionId(transactionId);
+  if (!id) {
+    const err = new Error('MISSING_PRIVY_TRANSACTION_ID');
+    err.status = 400;
+    throw err;
+  }
+  if (!hasPrivyServerAuth()) {
+    const err = new Error('PRIVY_SERVER_AUTH_NOT_CONFIGURED');
+    err.status = 503;
+    throw err;
+  }
+
+  const endpoint = `${PRIVY_API_BASE_URL}/v1/transactions/${encodeURIComponent(id)}`;
+  const response = await fetch(endpoint, {
+    method: 'GET',
+    headers: {
+      accept: 'application/json',
+      authorization: getPrivyBasicAuthHeader(),
+      'privy-app-id': PRIVY_APP_ID
+    }
+  });
+  const rawBody = await response.text();
+  let payload = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
+  }
+
+  if (!response.ok) {
+    const err = new Error('PRIVY_TRANSACTION_STATUS_UNAVAILABLE');
+    err.status = response.status >= 400 ? response.status : 502;
+    const detail = payload?.error?.message || payload?.message || rawBody;
+    if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
+    throw err;
+  }
+
+  const tx = payload?.data && typeof payload.data === 'object'
+    ? payload.data
+    : payload?.transaction && typeof payload.transaction === 'object'
+      ? payload.transaction
+      : payload;
+  const status = typeof tx?.status === 'string' && tx.status.trim()
+    ? tx.status.trim()
+    : typeof tx?.state === 'string' && tx.state.trim()
+      ? tx.state.trim()
+      : '';
+  const transactionHash = normalizePrivyTransactionHash(
+    tx?.hash
+    || tx?.transaction_hash
+    || tx?.transactionHash
+    || tx?.txHash
+  );
+  const userOperationHash = normalizePrivyTransactionHash(
+    tx?.user_operation_hash
+    || tx?.userOperationHash
+  );
+
+  return {
+    id,
+    status,
+    transactionHash,
+    userOperationHash
+  };
+}
+
+async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
+  const normalizedWalletId = normalizePrivyWalletId(walletId);
+  if (!normalizedWalletId) {
+    const err = new Error('INVALID_PRIVY_WALLET_ID');
+    err.status = 400;
+    throw err;
+  }
+  const signature = typeof authorizationSignature === 'string' ? authorizationSignature.trim() : '';
+  if (!signature) {
+    const err = new Error('MISSING_PRIVY_AUTH_SIGNATURE');
+    err.status = 400;
+    throw err;
+  }
+  if (!hasPrivyServerAuth()) {
+    const err = new Error('PRIVY_SERVER_AUTH_NOT_CONFIGURED');
+    err.status = 503;
+    throw err;
+  }
+
+  const endpoint = `${PRIVY_API_BASE_URL}/v1/wallets/${encodeURIComponent(normalizedWalletId)}/rpc`;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      authorization: getPrivyBasicAuthHeader(),
+      'privy-app-id': PRIVY_APP_ID,
+      'privy-authorization-signature': signature
+    },
+    body: JSON.stringify(body)
+  });
+
+  const rawBody = await response.text();
+  let payload = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      payload = {};
+    }
+  }
+
+  if (!response.ok) {
+    const err = new Error('PRIVY_WALLET_RPC_RELAY_FAILED');
+    err.status = response.status >= 400 ? response.status : 502;
+    const detail = payload?.error?.message || payload?.message || rawBody;
+    if (typeof detail === 'string' && detail.trim()) err.detail = detail.trim();
+    throw err;
+  }
+
+  return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
+}
+
+// --- API ---
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, time: nowIso() });
+});
+
+app.get('/api/privy/config', (_req, res) => {
+  res.json({
+    ok: true,
+    enabled: PRIVY_ENABLED,
+    config: PRIVY_ENABLED ? PRIVY_PUBLIC_CONFIG : null,
+    startPageEnabled: START_PAGE_ENABLED,
+    appPath: '/app'
+  });
+});
+
+app.get('/api/privy/transactions/:transactionId', async (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+  const transactionId = normalizePrivyTransactionId(req.params?.transactionId || '');
+  if (!transactionId) return res.status(400).json({ ok: false, error: 'MISSING_PRIVY_TRANSACTION_ID' });
+
+  try {
+    const status = await fetchPrivyTransactionStatus(transactionId);
+    return res.json({
+      ok: true,
+      transaction: {
+        id: status.id,
+        status: status.status,
+        transactionHash: status.transactionHash,
+        userOperationHash: status.userOperationHash
+      }
+    });
+  } catch (err) {
+    const status = Number(err?.status || 0) || (String(err?.message || '').includes('MISSING_') ? 400 : 502);
+    const detail = typeof err?.detail === 'string' && err.detail.trim() ? err.detail.trim() : null;
+    return res.status(status).json({
+      ok: false,
+      error: String(err?.message || 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE'),
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+app.post('/api/privy/wallet-rpc/prepare', (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+  if (!hasPrivyServerAuth()) return res.status(503).json({ ok: false, error: 'PRIVY_SERVER_AUTH_NOT_CONFIGURED' });
+
+  try {
+    const walletId = normalizePrivyWalletId(req.body?.walletId);
+    if (!walletId) return res.status(400).json({ ok: false, error: 'INVALID_PRIVY_WALLET_ID' });
+    const body = normalizePrivyWalletRpcBody(req.body?.body);
+    const signingPayload = buildPrivyWalletRpcSigningPayload(walletId, body);
+    return res.json({ ok: true, walletId, body, signingPayload });
+  } catch (err) {
+    const code = String(err?.message || 'PRIVY_WALLET_RPC_PREPARE_FAILED');
+    const status = code.startsWith('INVALID_') || code.startsWith('MISSING_') ? 400 : 502;
+    return res.status(status).json({ ok: false, error: code });
+  }
+});
+
+app.post('/api/privy/wallet-rpc/relay', async (req, res) => {
+  if (!PRIVY_ENABLED) return res.status(503).json({ ok: false, error: 'PRIVY_DISABLED' });
+
+  try {
+    const walletId = normalizePrivyWalletId(req.body?.walletId);
+    if (!walletId) return res.status(400).json({ ok: false, error: 'INVALID_PRIVY_WALLET_ID' });
+    const body = normalizePrivyWalletRpcBody(req.body?.body);
+    const signature = typeof req.body?.signature === 'string'
+      ? req.body.signature
+      : typeof req.body?.authorizationSignature === 'string'
+        ? req.body.authorizationSignature
+        : '';
+    const result = await relayPrivyWalletRpc({
+      walletId,
+      body,
+      authorizationSignature: signature
+    });
+    return res.json({ ok: true, result });
+  } catch (err) {
+    const status = Number(err?.status || 0) || (String(err?.message || '').startsWith('MISSING_') ? 400 : 502);
+    const detail = typeof err?.detail === 'string' && err.detail.trim() ? err.detail.trim() : null;
+    return res.status(status).json({
+      ok: false,
+      error: String(err?.message || 'PRIVY_WALLET_RPC_RELAY_FAILED'),
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+app.get('/api/session', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const store = readStore();
+  const onboarding = ensureSessionOnboarding(s);
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
+// Rotates the human session cookie to a fresh session/team code.
+// Useful for shared devices where multiple people onboard sequentially.
+app.post('/api/session/reset', (req, res) => {
+  // Ensure we still have a valid response cookie context (Secure flag in prod).
+  const store = readStore();
+  const next = createSession();
+  const onboarding = ensureSessionOnboarding(next);
+  const secureFlag = isProd || req.secure ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `et_session=${encodeURIComponent(next.sessionId)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`
+  );
+  res.json({
+    ok: true,
+    teamCode: next.teamCode,
+    elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
+app.get('/api/state', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const store = readStore();
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    elements: listElements(),
+    agent: {
+      connected: s.agent.connected,
+      name: s.agent.name,
+      selected: s.agent.selected,
+      openPressed: s.agent.openPressed,
+      optIn: s.agent.optIn,
+      posts: s.agent.posts
+    },
+    human: {
+      selected: s.human.selected,
+      openPressed: s.human.openPressed,
+      optIn: s.human.optIn,
+      xPostUrl: s.human.xPostUrl
+    },
+    match: s.match,
+    signup: s.signup,
+    share: s.share,
+    shareApproval: s.shareApproval || { human: false, agent: false },
+    houseId: s.houseCeremony?.houseId || null,
+    onboarding: cloneOnboarding(onboarding),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
 app.post('/api/referral', (req, res) => {
   const s = ensureHumanSession(req, res);
   const shareId = typeof req.body?.shareId === 'string' ? req.body.shareId.trim() : '';
@@ -2605,6 +3972,845 @@ app.post('/api/referral', (req, res) => {
   if (!share) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   s.referral.shareId = shareId;
   res.json({ ok: true });
+});
+
+app.get('/api/townhall/state', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const houseId = s.houseCeremony?.houseId || null;
+  res.json({
+    ok: true,
+    houseId,
+    locked: onboarding.required === true && !houseId,
+    onboarding: cloneOnboarding(onboarding)
+  });
+});
+
+app.get('/api/townhall/mint/config', async (_req, res) => {
+  const caps = townhallMintCapabilities();
+  let sponsorSendEnabled = false;
+  let sponsorFeePayer = null;
+  let sponsorSendError = null;
+  if (caps.solanaSponsorEnabled) {
+    try {
+      const feePayer = await loadSolanaFeePayerKeypair();
+      if (feePayer) {
+        sponsorSendEnabled = true;
+        sponsorFeePayer = feePayer.publicKey.toBase58();
+      }
+    } catch (err) {
+      sponsorSendEnabled = false;
+      sponsorSendError = String(err?.message || 'SOLANA_SPONSOR_NOT_CONFIGURED');
+    }
+  }
+  res.json({
+    ok: true,
+    mint: {
+      enabled: caps.enabled,
+      pinataEnabled: caps.pinataEnabled,
+      evm: {
+        enabled: caps.evmEnabled,
+        chainId: EVM_ERC8004_CHAIN_ID,
+        network: EVM_ERC8004_NETWORK,
+        rpcUrl: EVM_ERC8004_RPC_URL || null,
+        contractAddress: EVM_ERC8004_IDENTITY_REGISTRY
+      },
+      solana: {
+        enabled: caps.solanaEnabled,
+        cluster: SOLANA_ERC8004_CLUSTER,
+        rpcUrl: SOLANA_ERC8004_RPC_URL || null,
+        web3ModuleUrl: SOLANA_WEB3_MODULE_URL || null,
+        sponsorSendEnabled,
+        sponsorFeePayer,
+        sponsorSendError
+      }
+    }
+  });
+});
+
+app.post('/api/townhall/mint/evm/prepare', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.pinataEnabled) return res.status(503).json({ ok: false, error: 'PINATA_NOT_CONFIGURED' });
+  if (!caps.evmEnabled) return res.status(503).json({ ok: false, error: 'MINT_EVM_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = walletInput ? normalizeEvmAddress(walletInput) : null;
+  if (walletInput && !walletAddress) return res.status(400).json({ ok: false, error: 'INVALID_EVM_ADDRESS' });
+
+  const normalized = normalizeTownhallMintProfile(req.body?.profile, onboarding);
+  if (normalized.error) return res.status(400).json({ ok: false, error: normalized.error });
+  const subject = normalizeTownhallMintSubject(req.body?.subject || 'agent');
+  if (!subject) return res.status(400).json({ ok: false, error: 'INVALID_MINT_SUBJECT' });
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const metadata = buildTownhallMintMetadata({
+    profile: normalized.profile,
+    chain: `evm:${EVM_ERC8004_NETWORK}`,
+    walletAddress,
+    origin,
+    subject
+  });
+  const subjectName = subject === 'human' ? normalized.profile.humanName : normalized.profile.agentName;
+  const subjectSlug = subjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || subject;
+
+  try {
+    const cid = await pinJsonToIpfs(metadata, {
+      name: `agent-town-evm-${subject}-${subjectSlug}`
+    });
+    return res.json({
+      ok: true,
+      tokenUri: `ipfs://${cid}`,
+      metadataCid: cid,
+      subject,
+      evm: {
+        chainId: EVM_ERC8004_CHAIN_ID,
+        network: EVM_ERC8004_NETWORK,
+        rpcUrl: EVM_ERC8004_RPC_URL || null,
+        contractAddress: EVM_ERC8004_IDENTITY_REGISTRY
+      }
+    });
+  } catch (err) {
+    const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
+    const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
+    const detail = summarizePinataFailureDetail(err?.detail || err?.message);
+    return res.status(status).json({ ok: false, error: code, ...(detail ? { detail } : {}) });
+  }
+});
+
+app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.pinataEnabled) return res.status(503).json({ ok: false, error: 'PINATA_NOT_CONFIGURED' });
+  if (!caps.solanaEnabled) return res.status(503).json({ ok: false, error: 'MINT_SOLANA_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = normalizeSolanaAddress(walletInput);
+  if (!walletAddress) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ADDRESS' });
+
+  const assetInput = typeof req.body?.assetPubkey === 'string' ? req.body.assetPubkey.trim() : '';
+  const assetPubkey = normalizeSolanaAddress(assetInput);
+  if (!assetPubkey) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ASSET_PUBKEY' });
+
+  const normalized = normalizeTownhallMintProfile(req.body?.profile, onboarding);
+  if (normalized.error) return res.status(400).json({ ok: false, error: normalized.error });
+  const subject = normalizeTownhallMintSubject(req.body?.subject || 'agent');
+  if (!subject) return res.status(400).json({ ok: false, error: 'INVALID_MINT_SUBJECT' });
+
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const metadata = buildTownhallMintMetadata({
+    profile: normalized.profile,
+    chain: `solana:${SOLANA_ERC8004_CLUSTER}`,
+    walletAddress,
+    origin,
+    subject
+  });
+  const subjectName = subject === 'human' ? normalized.profile.humanName : normalized.profile.agentName;
+  const subjectSlug = subjectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || subject;
+
+  let tokenUri = '';
+  let metadataCid = '';
+  try {
+    metadataCid = await pinJsonToIpfs(metadata, {
+      name: `agent-town-solana-${subject}-${subjectSlug}`
+    });
+    tokenUri = `ipfs://${metadataCid}`;
+  } catch (err) {
+    const code = String(err?.code || err?.message || 'PINATA_UPLOAD_FAILED');
+    const status = code === 'PINATA_NOT_CONFIGURED' ? 503 : 502;
+    const detail = summarizePinataFailureDetail(err?.detail || err?.message);
+    return res.status(status).json({ ok: false, error: code, ...(detail ? { detail } : {}) });
+  }
+
+  try {
+    const [sdkModule, web3] = await Promise.all([
+      loadSolanaSdkModule(),
+      loadSolanaWeb3Module()
+    ]);
+    const { SolanaSDK } = sdkModule;
+    const { PublicKey } = web3;
+    let feePayerKey = null;
+    if (caps.solanaSponsorEnabled) {
+      try {
+        const feePayer = await loadSolanaFeePayerKeypair();
+        feePayerKey = feePayer?.publicKey || null;
+      } catch (err) {
+        const code = String(err?.message || 'SOLANA_SPONSOR_NOT_CONFIGURED');
+        const status = code === 'SOLANA_SPONSOR_SECRET_INVALID' ? 500 : 503;
+        return res.status(status).json({ ok: false, error: code });
+      }
+    }
+    if (feePayerKey && typeof feePayerKey.toBase58 === 'function' && feePayerKey.toBase58() === walletAddress) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET',
+        detail: 'Server sponsor fee payer must be a separate funded keypair, not the user wallet.'
+      });
+    }
+    const { prepared, rpcUrl: solanaPrepareRpcUrl } = await prepareSolanaRegistrationWithRpcFallback({
+      SolanaSDK,
+      cluster: SOLANA_ERC8004_CLUSTER,
+      tokenUri,
+      signer: new PublicKey(walletAddress),
+      assetPubkey: new PublicKey(assetPubkey),
+      feePayer: feePayerKey || undefined
+    });
+
+    if (!prepared || typeof prepared !== 'object') {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+    if ('success' in prepared && prepared.success === false) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED', detail: prepared.error || null });
+    }
+    if (typeof prepared.transaction !== 'string' || !prepared.transaction.trim()) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+
+    const preparedAsset = prepared.asset && typeof prepared.asset.toBase58 === 'function'
+      ? prepared.asset.toBase58()
+      : assetPubkey;
+    let preparedTransactionBase64 = prepared.transaction;
+    let preparedTx = null;
+    if (feePayerKey) {
+      const adjusted = applyFeePayerToPreparedSolanaTransaction({
+        preparedTransaction: preparedTransactionBase64,
+        feePayerPubkey: feePayerKey,
+        web3
+      });
+      if (!adjusted || !adjusted.serialized || adjusted.signerSlotPresent !== true) {
+        return res.status(502).json({
+          ok: false,
+          error: 'SOLANA_PREPARE_FAILED',
+          detail: 'Prepared Solana transaction could not be adjusted for sponsor fee payer.'
+        });
+      }
+      preparedTransactionBase64 = adjusted.serialized;
+      preparedTx = adjusted.transaction;
+    } else {
+      const preparedBytes = decodeTownhallSponsoredSolanaTransaction(preparedTransactionBase64);
+      preparedTx = preparedBytes
+        ? deserializeTownhallSponsoredSolanaTransaction({ txBytes: preparedBytes, web3 })
+        : null;
+    }
+    const messageHash = hashTownhallSolanaTransactionMessage(preparedTx);
+    if (!messageHash) {
+      return res.status(502).json({ ok: false, error: 'SOLANA_PREPARE_FAILED' });
+    }
+
+    const nowMs = Date.now();
+    const pending = Array.isArray(onboarding.pendingSolanaMints) ? onboarding.pendingSolanaMints : [];
+    const filteredPending = pending.filter((entry) => {
+      if (!entry || typeof entry !== 'object') return false;
+      const createdAtMs = Number(entry.createdAtMs || 0);
+      if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return false;
+      return nowMs - createdAtMs <= 10 * 60 * 1000;
+    });
+    filteredPending.push({
+      subject,
+      walletAddress,
+      assetPubkey: preparedAsset,
+      messageHash,
+      createdAtMs: nowMs
+    });
+    onboarding.pendingSolanaMints = filteredPending.slice(-16);
+
+    return res.json({
+      ok: true,
+      tokenUri,
+      metadataCid,
+      subject,
+      erc8004Id: `solana:${preparedAsset}`,
+      prepared: {
+        transaction: preparedTransactionBase64,
+        blockhash: prepared.blockhash,
+        lastValidBlockHeight: prepared.lastValidBlockHeight,
+        signer: prepared.signer,
+        signed: prepared.signed === true
+      },
+      solana: {
+        cluster: SOLANA_ERC8004_CLUSTER,
+        rpcUrl: solanaPrepareRpcUrl || SOLANA_ERC8004_RPC_URL,
+        assetPubkey: preparedAsset,
+        sponsorSendEnabled: !!feePayerKey,
+        sponsorFeePayer: feePayerKey ? feePayerKey.toBase58() : null
+      }
+    });
+  } catch (err) {
+    const detail = String(err?.detail || err?.message || err || '').trim();
+    return res.status(502).json({
+      ok: false,
+      error: 'SOLANA_PREPARE_FAILED',
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+function normalizeTownhallSponsoredSolanaTransaction(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(trimmed)) return null;
+  const normalized = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4;
+  const padded = pad === 0 ? normalized : `${normalized}${'='.repeat(4 - pad)}`;
+  const decoded = decodeB64(padded);
+  if (!decoded || !decoded.length) return null;
+  return padded;
+}
+
+function decodeTownhallSponsoredSolanaTransaction(value) {
+  const normalized = normalizeTownhallSponsoredSolanaTransaction(value);
+  if (!normalized) return null;
+  const decoded = decodeB64(normalized);
+  if (!decoded || !decoded.length) return null;
+  return new Uint8Array(decoded);
+}
+
+function deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 }) {
+  if (!(txBytes instanceof Uint8Array) || !txBytes.length) return null;
+  if (!web3?.Transaction || typeof web3.Transaction.from !== 'function') return null;
+  try {
+    const transaction = web3.Transaction.from(txBytes);
+    return transaction || null;
+  } catch {
+    return null;
+  }
+}
+
+function hashTownhallSolanaTransactionMessage(transaction) {
+  if (!transaction || typeof transaction !== 'object') return null;
+  let raw = null;
+  if (transaction.message && typeof transaction.message.serialize === 'function') {
+    raw = transaction.message.serialize();
+  } else if (typeof transaction.serializeMessage === 'function') {
+    raw = transaction.serializeMessage();
+  }
+  let bytes = null;
+  if (raw instanceof Uint8Array) bytes = raw;
+  else if (Buffer.isBuffer(raw)) bytes = new Uint8Array(raw);
+  else if (raw instanceof ArrayBuffer) bytes = new Uint8Array(raw);
+  else if (ArrayBuffer.isView(raw)) bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  if (!(bytes instanceof Uint8Array) || !bytes.length) return null;
+  return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+}
+
+function transactionHasSolanaSignerSlot({ transaction, signerAddress }) {
+  if (!transaction || !signerAddress) return false;
+  const message = transaction?.message;
+  const signatures = Array.isArray(transaction?.signatures) ? transaction.signatures : null;
+  const staticKeys = Array.isArray(message?.staticAccountKeys) ? message.staticAccountKeys : null;
+  const required = Number(message?.header?.numRequiredSignatures || 0);
+  if (signatures && staticKeys && Number.isFinite(required) && required > 0) {
+    const max = Math.min(required, staticKeys.length, signatures.length);
+    for (let i = 0; i < max; i += 1) {
+      const key = staticKeys[i];
+      const keyBase58 = key && typeof key.toBase58 === 'function' ? key.toBase58() : '';
+      if (keyBase58 === signerAddress) return true;
+    }
+    return false;
+  }
+
+  if (Array.isArray(transaction.signatures)) {
+    const found = transaction.signatures.find((entry) => {
+      if (!entry || !entry.publicKey || typeof entry.publicKey.toBase58 !== 'function') return false;
+      return entry.publicKey.toBase58() === signerAddress;
+    });
+    if (found) return true;
+  }
+  const payer = transaction?.feePayer;
+  return !!(payer && typeof payer.toBase58 === 'function' && payer.toBase58() === signerAddress);
+}
+
+function serializeTownhallPreparedSolanaTransaction(transaction) {
+  if (!transaction || typeof transaction.serialize !== 'function') return null;
+  try {
+    const raw = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+    if (raw instanceof Uint8Array) return Buffer.from(raw).toString('base64');
+    if (Buffer.isBuffer(raw)) return raw.toString('base64');
+    if (raw instanceof ArrayBuffer) return Buffer.from(new Uint8Array(raw)).toString('base64');
+    if (ArrayBuffer.isView(raw)) {
+      return Buffer.from(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength)).toString('base64');
+    }
+  } catch {
+    // no-op
+  }
+  return null;
+}
+
+function applyFeePayerToPreparedSolanaTransaction({ preparedTransaction, feePayerPubkey, web3 }) {
+  if (!feePayerPubkey || typeof feePayerPubkey.toBase58 !== 'function') return null;
+  const txBytes = decodeTownhallSponsoredSolanaTransaction(preparedTransaction);
+  if (!txBytes) return null;
+  const transaction = deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 });
+  if (!transaction || typeof transaction !== 'object') return null;
+  if (typeof transaction.compileMessage !== 'function') return null;
+  transaction.feePayer = feePayerPubkey;
+  const serialized = serializeTownhallPreparedSolanaTransaction(transaction);
+  if (!serialized) return null;
+  const signerSlotPresent = transactionHasSolanaSignerSlot({
+    transaction,
+    signerAddress: feePayerPubkey.toBase58()
+  });
+  return { transaction, serialized, signerSlotPresent };
+}
+
+function hasNonZeroSolanaSignature(signature) {
+  let bytes = null;
+  if (signature instanceof Uint8Array) bytes = signature;
+  else if (Buffer.isBuffer(signature)) bytes = new Uint8Array(signature);
+  else if (Array.isArray(signature)) bytes = Uint8Array.from(signature);
+  if (!(bytes instanceof Uint8Array) || bytes.length !== 64) return false;
+  return bytes.some((value) => value !== 0);
+}
+
+function hasSignedLegacySolanaSignature({ transaction, signerAddress }) {
+  if (!transaction || !Array.isArray(transaction.signatures)) return false;
+  const signer = transaction.signatures.find((entry) => {
+    if (!entry || !entry.publicKey || typeof entry.publicKey.toBase58 !== 'function') return false;
+    return entry.publicKey.toBase58() === signerAddress;
+  });
+  if (!signer) return false;
+  return hasNonZeroSolanaSignature(signer.signature);
+}
+
+function transactionHasSignedSolanaSignature({ transaction, signerAddress }) {
+  if (!transaction || !signerAddress) return false;
+  return hasSignedLegacySolanaSignature({ transaction, signerAddress });
+}
+
+function signTownhallSponsoredSolanaTransaction({ transaction, feePayer }) {
+  if (!transaction || !feePayer) throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  if (typeof transaction.partialSign !== 'function') throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  transaction.partialSign(feePayer);
+}
+
+function serializeTownhallSponsoredSolanaTransaction(transaction) {
+  if (!transaction || typeof transaction.serialize !== 'function') {
+    throw new Error('SOLANA_SPONSORED_TX_INVALID');
+  }
+  const raw = transaction.serialize();
+  if (raw instanceof Uint8Array) return raw;
+  if (Buffer.isBuffer(raw)) return new Uint8Array(raw);
+  if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+  if (ArrayBuffer.isView(raw)) return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+  throw new Error('SOLANA_SPONSORED_TX_INVALID');
+}
+
+app.post('/api/townhall/mint/solana/sponsor-send', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const caps = townhallMintCapabilities();
+  if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
+  if (!caps.solanaEnabled) return res.status(503).json({ ok: false, error: 'MINT_SOLANA_NOT_CONFIGURED' });
+  if (!caps.solanaSponsorEnabled) return res.status(503).json({ ok: false, error: 'SOLANA_SPONSOR_NOT_CONFIGURED' });
+
+  const walletInput = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+  const walletAddress = normalizeSolanaAddress(walletInput);
+  if (!walletAddress) return res.status(400).json({ ok: false, error: 'MISSING_SOLANA_ADDRESS' });
+
+  const assetInput = typeof req.body?.assetPubkey === 'string' ? req.body.assetPubkey.trim() : '';
+  const assetPubkey = assetInput ? normalizeSolanaAddress(assetInput) : null;
+  if (assetInput && !assetPubkey) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_ASSET_PUBKEY' });
+
+  const txBytes = decodeTownhallSponsoredSolanaTransaction(req.body?.transaction);
+  if (!txBytes) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+
+  try {
+    const web3 = await loadSolanaWeb3Module();
+    const { Connection } = web3;
+    const feePayer = await loadSolanaFeePayerKeypair();
+    if (!feePayer) return res.status(503).json({ ok: false, error: 'SOLANA_SPONSOR_NOT_CONFIGURED' });
+
+    const transaction = deserializeTownhallSponsoredSolanaTransaction({ txBytes, web3 });
+    if (!transaction) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+    const messageHash = hashTownhallSolanaTransactionMessage(transaction);
+    if (!messageHash) return res.status(400).json({ ok: false, error: 'INVALID_SOLANA_SPONSORED_TX' });
+    const feePayerAddress = feePayer.publicKey.toBase58();
+    if (feePayerAddress === walletAddress) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET',
+        detail: 'Server sponsor fee payer must be a separate funded keypair, not the user wallet.'
+      });
+    }
+    if (!transactionHasSolanaSignerSlot({ transaction, signerAddress: feePayerAddress })) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER',
+        detail: `Prepared transaction is missing sponsor fee payer signer ${feePayerAddress}.`
+      });
+    }
+
+    if (!transactionHasSignedSolanaSignature({ transaction, signerAddress: walletAddress })) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING' });
+    }
+
+    const pending = Array.isArray(onboarding.pendingSolanaMints) ? onboarding.pendingSolanaMints : [];
+    const normalizedPending = pending
+      .map((entry, index) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const pendingWallet = typeof entry.walletAddress === 'string' ? entry.walletAddress.trim() : '';
+        const pendingAsset = typeof entry.assetPubkey === 'string' ? entry.assetPubkey.trim() : '';
+        const pendingHash = typeof entry.messageHash === 'string' ? entry.messageHash.trim() : '';
+        const createdAtMs = Number(entry.createdAtMs || 0);
+        if (!pendingWallet || !pendingAsset || !pendingHash) return null;
+        if (!Number.isFinite(createdAtMs) || createdAtMs < 1) return null;
+        return { index, pendingWallet, pendingAsset, pendingHash, createdAtMs };
+      })
+      .filter(Boolean);
+    const walletCandidates = normalizedPending.filter((entry) => entry.pendingWallet === walletAddress);
+    const pickNewest = (entries) => entries.reduce(
+      (best, entry) => (!best || entry.createdAtMs > best.createdAtMs ? entry : best),
+      null
+    );
+    let matchedEntry = pickNewest(
+      walletCandidates.filter((entry) => {
+        if (entry.pendingHash !== messageHash) return false;
+        if (assetPubkey && entry.pendingAsset !== assetPubkey) return false;
+        return true;
+      })
+    );
+    if (!matchedEntry && assetPubkey) {
+      // Some wallet providers refresh blockhashes during signing, which can alter message hash.
+      // Accept an asset+wallet match when there is only one pending candidate for that pair.
+      const assetCandidates = walletCandidates.filter((entry) => entry.pendingAsset === assetPubkey);
+      if (assetCandidates.length === 1) {
+        matchedEntry = assetCandidates[0];
+      }
+    }
+    if (!matchedEntry) {
+      return res.status(400).json({
+        ok: false,
+        error: 'SOLANA_SPONSORED_TX_NOT_PREPARED',
+        detail: `No pending prepared transaction matched wallet=${walletAddress} asset=${assetPubkey || '-'} hash=${messageHash.slice(0, 12)}...`
+      });
+    }
+    const pendingIndex = matchedEntry.index;
+    const pendingEntry = pending[pendingIndex];
+    const expectedAssetPubkey = typeof pendingEntry?.assetPubkey === 'string'
+      ? pendingEntry.assetPubkey.trim()
+      : assetPubkey;
+    if (!expectedAssetPubkey) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_TX_NOT_PREPARED' });
+    }
+    if (!transactionHasSignedSolanaSignature({ transaction, signerAddress: expectedAssetPubkey })) {
+      return res.status(400).json({ ok: false, error: 'SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING' });
+    }
+
+    signTownhallSponsoredSolanaTransaction({ transaction, feePayer });
+    const serialized = serializeTownhallSponsoredSolanaTransaction(transaction);
+
+    const sponsorRpcUrl = SOLANA_ERC8004_RPC_CANDIDATES[0] || SOLANA_ERC8004_RPC_URL || 'https://api.devnet.solana.com';
+    const connection = new Connection(sponsorRpcUrl, 'confirmed');
+    await ensureSolanaOwnerLamportsForSponsoredMint({
+      connection,
+      web3,
+      ownerAddress: walletAddress,
+      feePayer,
+      minLamports: SOLANA_SPONSOR_OWNER_MIN_LAMPORTS
+    });
+    const sendSponsored = async () => {
+      const signature = await connection.sendRawTransaction(serialized, { skipPreflight: false, maxRetries: 3 });
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      if (confirmation?.value?.err) {
+        const err = new Error('SOLANA_SPONSOR_SEND_FAILED');
+        err.detail = JSON.stringify(confirmation.value.err);
+        throw err;
+      }
+      return signature;
+    };
+
+    let signature = '';
+    try {
+      signature = await sendSponsored();
+    } catch (sendErr) {
+      const detailText = String(sendErr?.detail || sendErr?.cause?.message || sendErr?.message || '');
+      const shortfall = parseSolanaLamportShortfall(detailText);
+      const canRetryAfterTopUp = SOLANA_SPONSOR_AUTO_TOPUP && shortfall && Number.isFinite(shortfall.shortfall);
+      if (!canRetryAfterTopUp) throw sendErr;
+      const topUpLamports = Math.max(1, Math.floor(shortfall.shortfall + 250_000));
+      await topUpSolanaOwnerLamports({
+        connection,
+        web3,
+        ownerAddress: walletAddress,
+        feePayer,
+        lamports: topUpLamports
+      });
+      signature = await sendSponsored();
+    }
+    onboarding.pendingSolanaMints.splice(pendingIndex, 1);
+
+      return res.json({
+        ok: true,
+        signature,
+        solana: {
+          signature,
+          cluster: SOLANA_ERC8004_CLUSTER,
+          rpcUrl: sponsorRpcUrl,
+          feePayer: feePayerAddress
+        }
+      });
+  } catch (err) {
+    const code = String(err?.message || 'SOLANA_SPONSOR_SEND_FAILED');
+    const status = code === 'SOLANA_SPONSOR_SECRET_INVALID' ? 500 : 502;
+    const detail = typeof err?.detail === 'string' && err.detail.trim()
+      ? err.detail.trim()
+      : String(err?.cause?.message || err?.message || '').trim();
+    return res.status(status).json({
+      ok: false,
+      error: code || 'SOLANA_SPONSOR_SEND_FAILED',
+      ...(detail ? { detail } : {})
+    });
+  }
+});
+
+app.post('/api/townhall/register', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const profile = req.body?.profile && typeof req.body.profile === 'object' ? req.body.profile : {};
+  const erc = req.body?.erc8004 && typeof req.body.erc8004 === 'object' ? req.body.erc8004 : {};
+
+  const humanName = normalizeTownhallName(profile.humanName);
+  const agentName = normalizeTownhallName(profile.agentName);
+  if (!humanName) return res.status(400).json({ ok: false, error: 'MISSING_HUMAN_NAME' });
+  if (!agentName) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_NAME' });
+
+  const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
+  const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
+
+  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt);
+  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt);
+  if (!humanPrompt) return res.status(400).json({ ok: false, error: 'MISSING_HUMAN_AVATAR_PROMPT' });
+  if (!agentPrompt) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_AVATAR_PROMPT' });
+
+  let humanImage = onboarding.profile?.humanAvatar?.image || DEFAULT_TOWNHALL_HUMAN_IMAGE;
+  let agentImage = onboarding.profile?.agentAvatar?.image || DEFAULT_TOWNHALL_AGENT_IMAGE;
+  let humanSource = onboarding.profile?.humanAvatar?.source === 'upload' ? 'upload' : 'default';
+  let agentSource = onboarding.profile?.agentAvatar?.source === 'upload' ? 'upload' : 'default';
+
+  if (Object.prototype.hasOwnProperty.call(humanAvatarInput, 'image')) {
+    const parsedHuman = parseTownhallImageDataUrl(humanAvatarInput.image);
+    if (parsedHuman.error) return res.status(400).json({ ok: false, error: parsedHuman.error });
+    if (parsedHuman.dataUrl) {
+      humanImage = parsedHuman.dataUrl;
+      humanSource = 'upload';
+    } else {
+      humanImage = DEFAULT_TOWNHALL_HUMAN_IMAGE;
+      humanSource = 'default';
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(agentAvatarInput, 'image')) {
+    const parsedAgent = parseTownhallImageDataUrl(agentAvatarInput.image);
+    if (parsedAgent.error) return res.status(400).json({ ok: false, error: parsedAgent.error });
+    if (parsedAgent.dataUrl) {
+      agentImage = parsedAgent.dataUrl;
+      agentSource = 'upload';
+    } else {
+      agentImage = DEFAULT_TOWNHALL_AGENT_IMAGE;
+      agentSource = 'default';
+    }
+  }
+
+  const userEvmId = normalizeTownhallErcId(erc?.user?.evm?.id);
+  const userSolanaId = normalizeTownhallErcId(erc?.user?.solana?.id);
+  const agentEvmId = normalizeTownhallErcId(erc?.agent?.evm?.id);
+  const agentSolanaId = normalizeTownhallErcId(erc?.agent?.solana?.id);
+  if (!userEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_EVM_ID' });
+  if (!userSolanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_USER_SOLANA_ID' });
+  if (!agentEvmId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_AGENT_EVM_ID' });
+  if (!agentSolanaId) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_AGENT_SOLANA_ID' });
+
+  const userEvmChain = typeof erc?.user?.evm?.chain === 'string' && erc.user.evm.chain.trim()
+    ? erc.user.evm.chain.trim().toLowerCase()
+    : 'sepolia';
+  const userSolanaCluster = typeof erc?.user?.solana?.cluster === 'string' && erc.user.solana.cluster.trim()
+    ? erc.user.solana.cluster.trim().toLowerCase()
+    : 'devnet';
+  const agentEvmChain = typeof erc?.agent?.evm?.chain === 'string' && erc.agent.evm.chain.trim()
+    ? erc.agent.evm.chain.trim().toLowerCase()
+    : 'sepolia';
+  const agentSolanaCluster = typeof erc?.agent?.solana?.cluster === 'string' && erc.agent.solana.cluster.trim()
+    ? erc.agent.solana.cluster.trim().toLowerCase()
+    : 'devnet';
+
+  onboarding.profile = onboarding.profile || {};
+  onboarding.profile.humanName = humanName;
+  onboarding.profile.agentName = agentName;
+  onboarding.profile.humanAvatar = {
+    image: humanImage,
+    prompt: humanPrompt,
+    source: humanSource,
+    updatedAt: nowIso()
+  };
+  onboarding.profile.agentAvatar = {
+    image: agentImage,
+    prompt: agentPrompt,
+    source: agentSource,
+    updatedAt: nowIso()
+  };
+
+  const updatedAt = nowIso();
+  onboarding.erc8004 = onboarding.erc8004 || {};
+  onboarding.erc8004.user = {
+    evm: {
+      id: userEvmId,
+      chain: userEvmChain,
+      txHash: normalizeTownhallTxRef(erc?.user?.evm?.txHash),
+      updatedAt
+    },
+    solana: {
+      id: userSolanaId,
+      cluster: userSolanaCluster,
+      txSig: normalizeTownhallTxRef(erc?.user?.solana?.txSig),
+      updatedAt
+    }
+  };
+  onboarding.erc8004.agent = {
+    evm: {
+      id: agentEvmId,
+      chain: agentEvmChain,
+      txHash: normalizeTownhallTxRef(erc?.agent?.evm?.txHash),
+      updatedAt
+    },
+    solana: {
+      id: agentSolanaId,
+      cluster: agentSolanaCluster,
+      txSig: normalizeTownhallTxRef(erc?.agent?.solana?.txSig),
+      updatedAt
+    }
+  };
+
+  onboarding.registrationComplete = true;
+  onboarding.registeredAt = nowIso();
+
+  res.json({ ok: true, onboarding: cloneOnboarding(onboarding) });
+});
+
+// --- Reservations (admin-only for MVP) ---
+app.post('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  const handle = normalizeXHandle(req.body?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
+  const key = `@${handle}`;
+  const existing = store.reservations.find((r) => r && r.kind === 'x' && r.key === key);
+  if (existing) {
+    return res.json({ ok: true, already: true, houseId: existing.houseId, status: existing.status || 'reserved' });
+  }
+
+  const houseId = reservedHouseId('x', key);
+  const record = {
+    id: `rv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    key,
+    houseId,
+    status: 'reserved',
+    verifiedAt: null,
+    claimedAt: null,
+    meta: {}
+  };
+  store.reservations.push(record);
+  writeStore(store);
+
+  res.json({ ok: true, houseId, status: record.status });
+});
+
+app.get('/api/reservations/x', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+  const store = readStore();
+  const key = `@${handle}`;
+  const rec = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!rec) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, houseId: rec.houseId, status: rec.status || 'reserved' });
+});
+
+app.post('/api/reservations/erc8004', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+  const agentIdRaw = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : '';
+  if (!agentIdRaw) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+
+  const claimChainRaw = typeof req.body?.claimChain === 'string' ? req.body.claimChain.trim().toLowerCase() : '';
+  const claimChain = claimChainRaw || guessClaimChain(agentIdRaw) || 'evm';
+  if (claimChain !== 'evm' && claimChain !== 'solana') {
+    return res.status(400).json({ ok: false, error: 'INVALID_CLAIM_CHAIN' });
+  }
+
+  const ownerAddressRaw = typeof req.body?.ownerAddress === 'string' ? req.body.ownerAddress.trim() : '';
+  const ownerAddress = claimChain === 'evm'
+    ? normalizeEvmAddress(ownerAddressRaw)
+    : normalizeSolanaAddress(ownerAddressRaw);
+  if (!ownerAddress) return res.status(400).json({ ok: false, error: 'INVALID_OWNER_ADDRESS' });
+
+  const aliasesRaw = Array.isArray(req.body?.aliases) ? req.body.aliases : [];
+  const aliases = [];
+  for (const alias of aliasesRaw) {
+    if (typeof alias !== 'string') continue;
+    const clean = alias.trim();
+    if (!clean) continue;
+    aliases.push(clean);
+  }
+  const agentId = claimChain === 'evm' ? agentIdRaw.toLowerCase() : agentIdRaw;
+  const claimAliases = [...new Set([agentId, ...aliases.map((a) => (claimChain === 'evm' ? a.toLowerCase() : a))])];
+
+  const store = readStore();
+  store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
+  const existing = store.reservations.find((r) =>
+    r
+      && r.kind === 'erc8004'
+      && listErc8004ClaimAliases(r).some((alias) => reservationAliasMatchesInput(alias, agentId)),
+  );
+  if (existing) {
+    return res.json({
+      ok: true,
+      already: true,
+      reservationId: existing.id,
+      houseId: existing.houseId,
+      status: existing.status || 'reserved'
+    });
+  }
+
+  const houseId = reservedHouseId('erc8004', agentId);
+  const record = {
+    id: `rv_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'erc8004',
+    key: agentId,
+    houseId,
+    status: 'reserved',
+    verifiedAt: null,
+    claimedAt: null,
+    meta: {
+      source: 'manual_admin',
+      claimChain,
+      ownerAddress,
+      agentId,
+      claimAliases
+    }
+  };
+
+  store.reservations.push(record);
+  writeStore(store);
+
+  res.json({
+    ok: true,
+    reservationId: record.id,
+    houseId: record.houseId,
+    status: record.status,
+    claimChain,
+    agentId
+  });
 });
 
 app.post('/api/human/select', (req, res) => {
@@ -2915,22 +5121,24 @@ app.get('/api/agent/house/material', (req, res) => {
 app.post('/api/share/create', (req, res) => {
   const s = ensureHumanSession(req, res);
   const tokenMode = s.signup?.mode === 'token';
+  const claimMode = s.signup?.mode === 'claim';
+  const soloMode = tokenMode || claimMode;
   const tokenVerifiedAt = s.token?.verifiedAt || null;
   const tokenVerifiedAddress = s.token?.address || null;
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.human = true;
-  if (tokenMode) {
+  if (soloMode) {
     s.shareApproval.agent = true;
     if (!s.agent.name) s.agent.name = '$ELIZATOWN';
   }
   if (!s.houseCeremony?.houseId) return res.status(403).json({ ok: false, error: 'HOUSE_NOT_READY' });
-  if (!tokenMode) {
+  if (!soloMode) {
     if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
       || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
     }
     if (!s.agent?.connected) return res.status(403).json({ ok: false, error: 'AGENT_REQUIRED' });
-  } else {
+  } else if (tokenMode) {
     const now = Date.now();
     if (!tokenVerifiedAt || now - tokenVerifiedAt > TOKEN_VERIFY_TTL_MS) {
       return res.status(403).json({ ok: false, error: 'TOKEN_CHECK_REQUIRED' });
@@ -2951,9 +5159,9 @@ app.post('/api/share/create', (req, res) => {
   const record = {
     id: shareId,
     createdAt: nowIso(),
-    matchedElement: tokenMode ? null : s.match.elementId,
-    agentName: tokenMode ? (s.agent.name || '$ELIZATOWN') : s.agent.name,
-    mode: tokenMode ? 'token' : 'agent',
+    matchedElement: soloMode ? null : s.match.elementId,
+    agentName: soloMode ? (s.agent.name || '$ELIZATOWN') : s.agent.name,
+    mode: soloMode ? 'token' : 'agent',
     houseId: s.houseCeremony?.houseId || null,
     // These are optionally added later:
     xPostUrl: s.human.xPostUrl,
@@ -3001,9 +5209,6 @@ app.post('/api/share/create', (req, res) => {
       } catch {
         mayorCiphertext = null;
       }
-    } else {
-      // Migration fallback for old houses that do not publish Pony inbox keys.
-      mayorCiphertext = { alg: 'PLAINTEXT', iv: '', ct: mayorBody };
     }
 
     if (mayorCiphertext) {
@@ -3907,6 +6112,116 @@ function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs
   ].join('\n');
 }
 
+function buildErc8004ClaimMessage({ agentId, nonce }) {
+  return [
+    'Agent Town ERC-8004 Claim',
+    `agentId: ${agentId}`,
+    `nonce: ${nonce}`
+  ].join('\n');
+}
+
+function normalizeEvmAddress(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(v)) return null;
+  return v;
+}
+
+function normalizeSolanaAddress(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (!v) return null;
+  const bytes = base58Decode(v);
+  if (!bytes || bytes.length !== 32) return null;
+  return v;
+}
+
+function guessClaimChain(value) {
+  const v = typeof value === 'string' ? value.trim() : '';
+  if (!v) return null;
+  if (/^solana:/i.test(v)) return 'solana';
+  if (/^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(v)) return 'solana';
+  return 'evm';
+}
+
+function listErc8004ClaimAliases(reservation) {
+  if (!reservation || typeof reservation !== 'object') return [];
+  const aliases = new Set();
+  if (typeof reservation.key === 'string' && reservation.key.trim()) aliases.add(reservation.key.trim());
+  const claimAliases = reservation.meta?.claimAliases;
+  if (Array.isArray(claimAliases)) {
+    for (const alias of claimAliases) {
+      if (typeof alias !== 'string') continue;
+      const clean = alias.trim();
+      if (!clean) continue;
+      aliases.add(clean);
+    }
+  }
+  if (typeof reservation.meta?.agentId === 'string' && reservation.meta.agentId.trim()) {
+    aliases.add(reservation.meta.agentId.trim());
+  }
+  return [...aliases];
+}
+
+function reservationAliasMatchesInput(alias, input) {
+  if (alias === input) return true;
+
+  // EVM IDs are case-insensitive; Solana asset IDs remain case-sensitive.
+  const evmLike = alias.startsWith('evm:')
+    || /^\d+:/.test(alias)
+    || alias.includes('0x')
+    || input.startsWith('evm:')
+    || /^\d+:/.test(input)
+    || input.includes('0x');
+  if (!evmLike) return false;
+  return alias.toLowerCase() === input.toLowerCase();
+}
+
+function resolveErc8004ClaimReservation(store, inputAgentId) {
+  const cleanInput = typeof inputAgentId === 'string' ? inputAgentId.trim() : '';
+  if (!cleanInput) return null;
+
+  const candidates = (store.reservations || []).filter(
+    (r) => r && r.kind === 'erc8004' && (r.status || 'reserved') !== 'deleted',
+  );
+
+  for (const reservation of candidates) {
+    const aliases = listErc8004ClaimAliases(reservation);
+    if (aliases.some((alias) => reservationAliasMatchesInput(alias, cleanInput))) {
+      const chain = reservation.meta?.claimChain || guessClaimChain(reservation.key);
+      const ownerRaw = reservation.meta?.ownerAddress;
+      const ownerAddress = chain === 'evm'
+        ? normalizeEvmAddress(ownerRaw)
+        : chain === 'solana'
+          ? normalizeSolanaAddress(ownerRaw)
+          : null;
+      if (!ownerAddress) return null;
+      const canonicalAgentId = typeof reservation.meta?.agentId === 'string' && reservation.meta.agentId.trim()
+        ? reservation.meta.agentId.trim()
+        : reservation.key;
+      return {
+        reservation,
+        claimChain: chain,
+        ownerAddress,
+        canonicalAgentId
+      };
+    }
+  }
+  return null;
+}
+
+function verifyEvmClaimSignature({ message, signature, address }) {
+  const expected = normalizeEvmAddress(address);
+  if (!expected) return false;
+  let recovered = '';
+  try {
+    recovered = verifyMessage(message, signature) || '';
+  } catch {
+    return false;
+  }
+  return recovered.toLowerCase() === expected;
+}
+
 app.get('/api/anchors/nonce', (req, res) => {
   const s = ensureHumanSession(req, res);
   const nonce = makeAnchorNonce();
@@ -4000,7 +6315,18 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = _req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-    writeStore({ signups: [], shares: [], publicTeams: [], houses: [], anchors: [], inbox: [] });
+    writeStore({
+      signups: [],
+      shares: [],
+      publicTeams: [],
+      houses: [],
+      claims: [],
+      reservations: [],
+      milestones: [],
+      rewardsLedger: [],
+      anchors: [],
+      inbox: []
+    });
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();
@@ -4050,7 +6376,7 @@ app.post('/api/wallet/lookup', (req, res) => {
 
   const store = readStore();
   let matches = store.houses.filter(
-    (r) => r && r.unlock && r.unlock.kind === 'solana-wallet-signature' && r.unlock.address === address
+    (r) => r && unlockAddressForLookup(r.unlock) === address
   );
   if (houseId) {
     matches = matches.filter((r) => r.id === houseId);
@@ -4122,6 +6448,331 @@ app.post('/api/token/verify', async (req, res) => {
   res.json({ ok: true, eligible: true, status });
 });
 
+app.get('/api/claim/erc8004/nonce', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.query?.agentId === 'string' ? req.query.agentId.trim() : '';
+  const forceRealInTest = String(req.query?.real || '').trim() === '1';
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+
+  const nonce = randomHex(16);
+  const testBypass = process.env.NODE_ENV === 'test'
+    && !forceRealInTest
+    && String(process.env.ENABLE_REAL_ERC8004_CLAIMS_IN_TEST || '').trim() !== 'true';
+
+  if (testBypass) {
+    const message = buildErc8004ClaimMessage({ agentId, nonce });
+    s.claim = s.claim || {};
+    s.claim.erc8004 = {
+      agentId,
+      nonce,
+      message,
+      claimChain: null,
+      ownerAddress: null,
+      reservedHouseId: null,
+      reservationId: null,
+      createdAt: Date.now(),
+      testBypass: true
+    };
+    return res.json({ ok: true, nonce, message, claimChain: null, agentId });
+  }
+
+  const store = readStore();
+  const resolved = resolveErc8004ClaimReservation(store, agentId);
+  if (!resolved || !resolved.reservation) {
+    return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+  }
+  const reservationStatus = resolved.reservation.status || 'reserved';
+  if (reservationStatus === 'claimed') {
+    return res.status(409).json({ ok: false, error: 'CLAIM_UNAVAILABLE' });
+  }
+
+  const message = buildErc8004ClaimMessage({
+    agentId: resolved.canonicalAgentId,
+    nonce
+  });
+
+  s.claim = s.claim || {};
+  s.claim.erc8004 = {
+    agentId: resolved.canonicalAgentId,
+    nonce,
+    message,
+    claimChain: resolved.claimChain,
+    ownerAddress: resolved.ownerAddress,
+    reservedHouseId: resolved.reservation.houseId || null,
+    reservationId: resolved.reservation.id || null,
+    createdAt: Date.now(),
+    testBypass: false
+  };
+
+  res.json({
+    ok: true,
+    nonce,
+    message,
+    agentId: resolved.canonicalAgentId,
+    claimChain: resolved.claimChain
+  });
+});
+
+app.post('/api/claim/erc8004/verify', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const agentId = typeof req.body?.agentId === 'string' ? req.body.agentId.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+
+  if (!agentId) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_ID' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+
+  const expected = s.claim?.erc8004;
+  if (!expected) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (!reservationAliasMatchesInput(expected.agentId || '', agentId)) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (expected.nonce !== nonce) {
+    return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  }
+
+  const message = typeof expected.message === 'string' && expected.message
+    ? expected.message
+    : buildErc8004ClaimMessage({ agentId, nonce });
+  const claimedAddress = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+  const claimChain = expected.claimChain;
+
+  if (expected.testBypass === true) {
+    s.signup = s.signup || {};
+    s.signup.complete = true;
+    s.signup.mode = 'claim';
+    s.signup.address = null;
+    s.claim.erc8004.address = claimedAddress || null;
+    s.claim.erc8004.claimChain = null;
+    s.claim.erc8004.verifiedAt = Date.now();
+    return res.json({ ok: true, verified: true, nextUrl: '/create' });
+  }
+
+  if (!claimChain || !expected.ownerAddress) {
+    return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  }
+  if (!claimedAddress) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+
+  let verified = false;
+  if (claimChain === 'evm') {
+    const owner = normalizeEvmAddress(expected.ownerAddress);
+    const address = normalizeEvmAddress(claimedAddress);
+    if (!owner || !address || owner !== address) {
+      return res.status(401).json({ ok: false, error: 'OWNER_MISMATCH' });
+    }
+    verified = verifyEvmClaimSignature({ message, signature, address });
+  } else if (claimChain === 'solana') {
+    const owner = normalizeSolanaAddress(expected.ownerAddress);
+    const address = normalizeSolanaAddress(claimedAddress);
+    if (!owner || !address || owner !== address) {
+      return res.status(401).json({ ok: false, error: 'OWNER_MISMATCH' });
+    }
+    verified = verifySolanaSignature(address, message, signature);
+  } else {
+    return res.status(400).json({ ok: false, error: 'UNSUPPORTED_CLAIM_CHAIN' });
+  }
+  if (!verified) return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  if (s.signup.complete && s.signup.mode && s.signup.mode !== 'claim') {
+    return res.status(409).json({ ok: false, error: 'ALREADY_SIGNED_UP' });
+  }
+
+  const store = readStore();
+  const reservation = (store.reservations || []).find(
+    (r) => r && r.kind === 'erc8004' && r.id === expected.reservationId,
+  );
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+  if ((reservation.status || 'reserved') === 'claimed') {
+    return res.status(409).json({ ok: false, error: 'CLAIM_UNAVAILABLE' });
+  }
+
+  const now = nowIso();
+  reservation.status = 'verified';
+  reservation.verifiedAt = now;
+
+  store.claims = Array.isArray(store.claims) ? store.claims : [];
+  const claimAddressCmp = claimChain === 'evm' ? claimedAddress.toLowerCase() : claimedAddress;
+  const existingClaim = store.claims.find((c) =>
+    c
+      && c.kind === 'erc8004'
+      && c.reservationId === reservation.id
+      && typeof c.address === 'string'
+      && (claimChain === 'evm' ? c.address.toLowerCase() : c.address) === claimAddressCmp,
+  );
+  if (!existingClaim) {
+    store.claims.push({
+      id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+      createdAt: now,
+      kind: 'erc8004',
+      claimChain,
+      agentId: expected.agentId,
+      address: claimedAddress,
+      reservationId: reservation.id,
+      houseId: reservation.houseId
+    });
+  }
+  writeStore(store);
+
+  // Bind this session to the reserved house from the verified claim.
+  s.reservedHouseId = reservation.houseId;
+
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'claim';
+  s.signup.address = null;
+  s.claim.erc8004.address = claimedAddress;
+  s.claim.erc8004.claimChain = claimChain;
+  s.claim.erc8004.reservedHouseId = reservation.houseId;
+
+  s.claim.erc8004.verifiedAt = Date.now();
+  res.json({
+    ok: true,
+    verified: true,
+    claimChain,
+    houseId: reservation.houseId,
+    nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}`
+  });
+});
+
+// --- X claim (public post challenge) ---
+app.get('/api/claim/x/challenge', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const handle = normalizeXHandle(req.query?.handle);
+  if (!handle) return res.status(400).json({ ok: false, error: 'INVALID_HANDLE' });
+
+  const store = readStore();
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+
+  const nonce = randomHex(12);
+  const challenge = `AgentTown X Claim\nhandle: @${handle}\nnonce: ${nonce}`;
+  const ttlMs = 30 * 60 * 1000;
+  s.claim = s.claim || {};
+  s.claim.x = {
+    handle,
+    nonce,
+    challenge,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + ttlMs,
+    reservedHouseId: reservation.houseId
+  };
+  res.json({ ok: true, handle, nonce, challenge, expiresInMs: ttlMs });
+});
+
+app.post('/api/claim/x/verify', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const raw = typeof req.body?.handle === 'string' ? req.body.handle.trim() : '';
+  const handle = raw.replace(/^@/, '').toLowerCase();
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const tweetUrl = typeof req.body?.tweetUrl === 'string' ? req.body.tweetUrl.trim() : '';
+
+  if (!handle) return res.status(400).json({ ok: false, error: 'MISSING_HANDLE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (!tweetUrl) return res.status(400).json({ ok: false, error: 'MISSING_TWEET_URL' });
+
+  const pending = s.claim?.x;
+  if (!pending || pending.handle !== handle) return res.status(400).json({ ok: false, error: 'NO_PENDING_CLAIM' });
+  if (pending.nonce !== nonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
+  if (pending.expiresAt && Date.now() > pending.expiresAt) return res.status(400).json({ ok: false, error: 'CHALLENGE_EXPIRED' });
+
+  let u;
+  try {
+    u = new URL(tweetUrl);
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+  if (!/^https?:$/.test(u.protocol)) return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  if (!/(^|\.)x\.com$/.test(u.hostname) && !/(^|\.)twitter\.com$/.test(u.hostname)) {
+    return res.status(400).json({ ok: false, error: 'INVALID_TWEET_URL' });
+  }
+
+  const html = await new Promise((resolve, reject) => {
+    const getter = u.protocol === 'https:' ? https.get : http.get;
+    const req2 = getter(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AgentTownBot/1.0; +https://github.com/Agent-Town)'
+        },
+        timeout: 10_000
+      },
+      (r) => {
+        let buf = '';
+        r.setEncoding('utf8');
+        r.on('data', (chunk) => (buf += chunk));
+        r.on('end', () => resolve({ status: r.statusCode || 0, body: buf }));
+      }
+    );
+    req2.on('error', reject);
+    req2.on('timeout', () => {
+      req2.destroy(new Error('timeout'));
+    });
+  }).catch(() => null);
+
+  if (!html || html.status < 200 || html.status >= 400) {
+    return res.status(502).json({ ok: false, error: 'TWEET_FETCH_FAILED' });
+  }
+
+  const body = html.body || '';
+  const challenge = pending.challenge;
+  if (!body.includes(challenge)) {
+    return res.status(401).json({ ok: false, error: 'CHALLENGE_NOT_FOUND' });
+  }
+
+  // Best-effort author check: require the handle to appear in the URL path.
+  // (This is not perfect; can be tightened later with API/oEmbed.)
+  const pathLower = u.pathname.toLowerCase();
+  if (!pathLower.includes(`/${handle}/status/`)) {
+    return res.status(401).json({ ok: false, error: 'HANDLE_MISMATCH' });
+  }
+
+  const store = readStore();
+
+  const key = `@${handle}`;
+  const reservation = (store.reservations || []).find((r) => r && r.kind === 'x' && r.key === key);
+  if (!reservation) return res.status(404).json({ ok: false, error: 'RESERVATION_REQUIRED' });
+
+  // Record durable claim (no expiry).
+  store.claims = Array.isArray(store.claims) ? store.claims : [];
+  store.claims.push({
+    id: `cl_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    createdAt: nowIso(),
+    kind: 'x',
+    handle,
+    tweetUrl,
+    challenge
+  });
+
+  // Update reservation
+  reservation.status = 'verified';
+  reservation.verifiedAt = nowIso();
+
+  // Session binds this verification to a reserved house id.
+  s.reservedHouseId = reservation.houseId;
+
+  emitMilestone(store, {
+    houseId: reservation.houseId,
+    event: 'CLAIM_VERIFIED',
+    source: 'human',
+    value: 1,
+    meta: { kind: 'x', handle }
+  });
+
+  writeStore(store);
+
+  s.signup = s.signup || {};
+  s.signup.complete = true;
+  s.signup.mode = 'x';
+  s.signup.handle = handle;
+
+  s.claim.x.verifiedAt = Date.now();
+  res.json({ ok: true, verified: true, houseId: reservation.houseId, nextUrl: `/create?reserved=${encodeURIComponent(reservation.houseId)}` });
+});
+
 app.post('/api/house/init', (req, res) => {
   const s = ensureHumanSession(req, res);
   const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
@@ -4142,10 +6793,24 @@ app.post('/api/house/init', (req, res) => {
     return res.status(400).json({ ok: false, error: 'INVALID_HOUSE_AUTH' });
   }
   const tokenMode = s.signup?.mode === 'token';
-  if (!tokenMode) {
+  const claimMode = s.signup?.mode === 'claim';
+  const soloMode = tokenMode || claimMode;
+  if (!soloMode) {
     if (!s.houseCeremony?.humanCommit || !s.houseCeremony?.agentCommit
       || !s.houseCeremony?.humanRevealSealed || !s.houseCeremony?.agentRevealSealed) {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
+    }
+  }
+ 
+  const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
+  if (enforcedReserved && enforcedReserved !== houseId) {
+    return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
+  }
+  if (claimMode && s.claim?.erc8004?.claimChain === 'solana' && typeof s.claim?.erc8004?.address === 'string') {
+    const expectedAddress = normalizeSolanaAddress(s.claim.erc8004.address);
+    const unlockAddress = normalizeSolanaAddress(unlockAddressForLookup(unlock));
+    if (expectedAddress && unlockAddress !== expectedAddress) {
+      return res.status(403).json({ ok: false, error: 'CLAIM_ADDRESS_MISMATCH' });
     }
   }
   if (s.houseCeremony?.houseId && s.houseCeremony.houseId !== houseId) {
@@ -4185,6 +6850,7 @@ app.post('/api/house/init', (req, res) => {
   }
   const exists = store.houses.find((r) => r.id === houseId);
   if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+  const onboardingSnapshot = cloneOnboarding(ensureSessionOnboarding(s));
 
   store.houses.push({
     id: houseId,
@@ -4195,6 +6861,7 @@ app.post('/api/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
+    onboarding: onboardingSnapshot,
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
@@ -4206,6 +6873,24 @@ app.post('/api/house/init', (req, res) => {
       }
       : null
   });
+
+  if (enforcedReserved) {
+    const reservation = (store.reservations || []).find((r) => r && r.houseId === houseId);
+    if (reservation) {
+      reservation.status = 'claimed';
+      reservation.verifiedAt = reservation.verifiedAt || nowIso();
+      reservation.claimedAt = nowIso();
+    }
+  }
+
+  emitMilestone(store, {
+    houseId,
+    event: 'CEREMONY_COMPLETED',
+    source: 'human',
+    value: 1,
+    meta: { reserved: !!enforcedReserved }
+  });
+
   writeStore(store);
 
   if (s && s.houseCeremony) {
@@ -4287,6 +6972,7 @@ app.post('/api/agent/house/init', (req, res) => {
   }
   const exists = store.houses.find((r) => r.id === houseId);
   if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
+  const onboardingSnapshot = cloneOnboarding(ensureSessionOnboarding(s));
 
   store.houses.push({
     id: houseId,
@@ -4297,6 +6983,7 @@ app.post('/api/agent/house/init', (req, res) => {
     unlock,
     keyWrap: normalizedKeyWrap,
     authKey: houseAuthKey,
+    onboarding: onboardingSnapshot,
     entries: [],
     ponyInbox: ponyInboxRegistration
       ? {
@@ -4342,6 +7029,22 @@ app.get('/api/house/:id/meta', (req, res) => {
     housePubKey: house.housePubKey,
     nonce: house.nonce,
     keyMode: 'ceremony'
+  });
+});
+
+app.get('/api/house/:id/onboarding', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  res.json({
+    ok: true,
+    houseId,
+    onboarding: cloneOnboarding(house.onboarding || null)
   });
 });
 
@@ -4404,6 +7107,19 @@ app.get('/api/house/:id/public-media', (req, res) => {
   const house = store.houses.find((r) => r.id === houseId);
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
   res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+});
+
+app.get('/api/house/:id/rewards', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const summary = computeRewardsSummary(store, houseId);
+  res.json({ ok: true, ...summary });
 });
 
 app.get('/api/house/:id/public-media/image', (req, res) => {
@@ -4557,6 +7273,17 @@ app.post('/api/house/:id/append', (req, res) => {
     if (msg === 'HOUSE_FULL') return res.status(403).json({ ok: false, error: 'HOUSE_FULL' });
     return res.status(500).json({ ok: false, error: 'HOUSE_APPEND_FAILED' });
   }
+
+  const ctLen = typeof ciphertext.ct === 'string' ? ciphertext.ct.length : 0;
+  if (ctLen >= 32) {
+    emitMilestone(store, {
+      houseId,
+      event: 'HOUSE_APPEND',
+      source: 'human',
+      value: 1,
+      meta: { ctLen }
+    });
+  }
   writeStore(store);
   res.json({ ok: true });
 });
@@ -4579,6 +7306,7 @@ app.get('/openclaw-lite/manifest.json', (_req, res) => {
 
 app.use(
   express.static(PUBLIC_DIR, {
+    index: false,
     etag: true,
     maxAge: isProd ? '1h' : 0,
     setHeaders: (res) => {
@@ -4602,10 +7330,20 @@ app.use(
   })
 );
 
-app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
-app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
-app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
-app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
+function sendHtmlNoStore(res, fileName) {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.sendFile(path.join(PUBLIC_DIR, fileName));
+}
+
+app.get('/', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
+app.get('/start', (_req, res) => sendHtmlNoStore(res, 'start.html'));
+app.get('/app', (_req, res) => sendHtmlNoStore(res, 'index.html'));
+app.get('/create', (_req, res) => sendHtmlNoStore(res, 'create.html'));
+app.get('/inbox/:houseId', (_req, res) => sendHtmlNoStore(res, 'inbox.html'));
+app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
+app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
+app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
+app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;
@@ -4623,7 +7361,7 @@ app.get('/s/:id', (req, res) => {
 });
 
 // Default route
-app.get('*', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+app.get('*', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 
 // --- OpenClaw Lite Tool Proxies ---
 

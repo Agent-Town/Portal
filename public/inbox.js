@@ -3,9 +3,14 @@ const PONY_E2EE_P256_AESGCM_V1 = 'PONY_E2EE_P256_AESGCM_V1';
 const PONY_INBOX_WRAP_INFO = 'elizatown-pony-inbox-wrap-v1';
 const INBOX_AUTO_REFRESH_MS = 3000;
 const houseKrootMemory = new Map();
+const ponyUpgradeInFlight = new Map();
+const ponyUpgradeDone = new Set();
+const ponyUpgradeFailed = new Set();
+const ponyUpgradeFailureMsg = new Map();
 let lastFriends = [];
 let loadInFlight = null;
 let refreshTimer = null;
+const inboxWalletClient = window.initWalletClient ? window.initWalletClient() : null;
 
 function getHouseId() {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -113,22 +118,17 @@ function normalizeSignatureBytes(sig) {
   return null;
 }
 
-async function signWalletMessageBytes(wallet, message) {
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sig = resp?.signature || resp;
-  const bytes = normalizeSignatureBytes(sig);
-  if (!bytes) throw new Error('SIGNATURE_FORMAT');
-  return bytes;
+async function signWalletMessageBytes(message) {
+  if (!inboxWalletClient) throw new Error('NO_SOLANA_WALLET');
+  return inboxWalletClient.signMessage({ chain: 'solana', message });
 }
 
 async function connectWalletOrThrow() {
-  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-  const resp = await window.solana.connect();
-  const address = resp?.publicKey?.toString?.() || window.solana?.publicKey?.toString?.();
+  if (!inboxWalletClient) throw new Error('NO_SOLANA_WALLET');
+  const connected = await inboxWalletClient.connect({ chain: 'solana', silent: false });
+  const address = connected?.address || inboxWalletClient.getAddress({ chain: 'solana' }) || null;
   if (!address) throw new Error('WALLET_NOT_CONNECTED');
-  return { wallet: window.solana, address };
+  return { address };
 }
 
 async function aesGcmDecrypt(key, iv, ct) {
@@ -143,9 +143,9 @@ async function aesGcmDecrypt(key, iv, ct) {
 async function recoverHouseKrootWithWallet(houseId) {
   if (houseKrootMemory.has(houseId)) return houseKrootMemory.get(houseId);
 
-  const { wallet, address } = await connectWalletOrThrow();
+  const { address } = await connectWalletOrThrow();
   const primaryMsg = buildKeyWrapMessage({ houseId });
-  const primarySig = await signWalletMessageBytes(wallet, primaryMsg);
+  const primarySig = await signWalletMessageBytes(primaryMsg);
 
   const lookup = await api('/api/wallet/lookup', {
     method: 'POST',
@@ -168,7 +168,7 @@ async function recoverHouseKrootWithWallet(houseId) {
   }
 
   async function decryptWithMessage(msg) {
-    const sig = await signWalletMessageBytes(wallet, msg);
+    const sig = await signWalletMessageBytes(msg);
     return decryptWithSig(sig);
   }
 
@@ -259,6 +259,16 @@ async function derivePonyMessageKey({ sharedSecret, fromHouseId, toHouseId, usag
   );
 }
 
+async function aesGcmEncrypt(key, plaintextBytes) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, additionalData: new Uint8Array([]) },
+    key,
+    plaintextBytes
+  );
+  return { iv, ct: new Uint8Array(ciphertext) };
+}
+
 async function encryptPonyMessage({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
   const recipientBytes = unb64(recipientPonyInboxPub);
   if (!recipientBytes || !recipientBytes.length) throw new Error('RECEIVER_KEY_UNAVAILABLE');
@@ -327,7 +337,7 @@ function messageCiphertext(msg) {
   return { alg: 'UNKNOWN', ct: '', iv: '' };
 }
 
-async function derivePonyInboxWrapKey(krootBytes) {
+async function derivePonyInboxWrapKey(krootBytes, { usages = ['decrypt'] } = {}) {
   const info = new TextEncoder().encode(PONY_INBOX_WRAP_INFO);
   const baseKey = await crypto.subtle.importKey('raw', krootBytes, 'HKDF', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
@@ -335,8 +345,87 @@ async function derivePonyInboxWrapKey(krootBytes) {
     baseKey,
     { name: 'AES-GCM', length: 256 },
     false,
-    ['decrypt']
+    usages
   );
+}
+
+async function makePonyInboxRegistration(krootBytes) {
+  const pair = await crypto.subtle.generateKey(
+    { name: 'ECDH', namedCurve: 'P-256' },
+    true,
+    ['deriveBits']
+  );
+  const pub = new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey));
+  const priv = new Uint8Array(await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+
+  const wrapKey = await derivePonyInboxWrapKey(krootBytes, { usages: ['encrypt'] });
+  const wrapped = await aesGcmEncrypt(wrapKey, priv);
+  return {
+    ponyInboxPub: b64(pub),
+    ponyInboxPrivWrap: {
+      alg: 'AES-GCM',
+      iv: b64(wrapped.iv),
+      ct: b64(wrapped.ct)
+    }
+  };
+}
+
+function legacyPonyUpgradeErrorMsg(err) {
+  if (err?.message === 'NO_SOLANA_WALLET') {
+    return 'Legacy house needs a one-time inbox key upgrade. Install/connect a Solana wallet, then reload.';
+  }
+  if (err?.message === 'NO_SOLANA_SIGN') {
+    return 'Legacy house needs a one-time inbox key upgrade. Wallet must support message signing.';
+  }
+  if (err?.message === 'WALLET_NOT_CONNECTED') {
+    return 'Legacy house needs a one-time inbox key upgrade. Connect the house wallet and reload.';
+  }
+  if (err?.message === 'KEY_WRAP_UNAVAILABLE') {
+    return 'Legacy house needs a one-time inbox key upgrade. No key-wrap found for this house wallet.';
+  }
+  if (err?.message === 'HOUSE_ID_MISMATCH') {
+    return 'Legacy house needs a one-time inbox key upgrade. Connected wallet does not match this house.';
+  }
+  if (err?.message === 'SIGNATURE_FORMAT') {
+    return 'Legacy house needs a one-time inbox key upgrade. Wallet signature format is unsupported.';
+  }
+  return `Legacy house key upgrade failed: ${err?.message || 'UNKNOWN_ERROR'}`;
+}
+
+async function ensureLegacyPonyInboxRegistered(houseId) {
+  if (!houseId) return false;
+  if (ponyUpgradeDone.has(houseId)) return false;
+  if (ponyUpgradeFailed.has(houseId)) return false;
+  if (ponyUpgradeInFlight.has(houseId)) return ponyUpgradeInFlight.get(houseId);
+
+  const run = (async () => {
+    const krootBytes = await recoverHouseKrootWithWallet(houseId);
+    const registration = await makePonyInboxRegistration(krootBytes);
+    await authedApi({
+      houseId,
+      url: '/api/pony/keys/register',
+      method: 'POST',
+      json: {
+        houseId,
+        ponyInboxPub: registration.ponyInboxPub,
+        ponyInboxPrivWrap: registration.ponyInboxPrivWrap
+      }
+    });
+    ponyUpgradeDone.add(houseId);
+    ponyUpgradeFailed.delete(houseId);
+    ponyUpgradeFailureMsg.delete(houseId);
+    return true;
+  })().catch((err) => {
+    ponyUpgradeFailed.add(houseId);
+    const msg = legacyPonyUpgradeErrorMsg(err);
+    ponyUpgradeFailureMsg.set(houseId, msg);
+    throw err;
+  }).finally(() => {
+    ponyUpgradeInFlight.delete(houseId);
+  });
+
+  ponyUpgradeInFlight.set(houseId, run);
+  return run;
 }
 
 async function loadInboxPrivateKey({ houseId, ponyInboxPrivWrap }) {
@@ -618,6 +707,19 @@ async function loadInternal() {
       setInboxError(`Error: ${e.message}`);
     }
     return;
+  }
+
+  if (!data.ponyInboxPrivWrap && !ponyUpgradeDone.has(houseId) && !ponyUpgradeFailed.has(houseId)) {
+    try {
+      const upgraded = await ensureLegacyPonyInboxRegistered(houseId);
+      if (upgraded) {
+        data = await authedApi({ houseId, url: `/api/pony/inbox?houseId=${encodeURIComponent(houseId)}` });
+      }
+    } catch (e) {
+      setInboxError(ponyUpgradeFailureMsg.get(houseId) || legacyPonyUpgradeErrorMsg(e));
+    }
+  } else if (ponyUpgradeFailureMsg.has(houseId)) {
+    setInboxError(ponyUpgradeFailureMsg.get(houseId));
   }
 
   const items = data.inbox || [];

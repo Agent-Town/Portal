@@ -9,7 +9,16 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('token holder can create a house without an agent', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await page.addInitScript(() => {
+    const sig = new Uint8Array(64);
+    for (let i = 0; i < sig.length; i++) sig[i] = (i * 7) & 0xff;
+    const address = 'So1anaMockToken1111111111111111111111111111';
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
+    };
+  });
   await page.goto('/');
 
   // Product cut: no solo path controls on landing.

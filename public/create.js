@@ -65,6 +65,7 @@ function setHouseNavLink(houseId) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
+
 let liteDriver = 'vendor';
 let liteGatewayPromise = null;
 let createSkillTurnPromise = null;
@@ -308,6 +309,8 @@ function applyLocalPixel(x, y, color, w = 16) {
   cell.style.background = palette[color] || '#000';
 }
 
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
+
 function renderPalette() {
   const c = el('palette');
   c.innerHTML = '';
@@ -429,6 +432,8 @@ async function init() {
   const signupMode = st.signup?.mode || (st.signup?.complete ? 'agent' : null);
   const tokenMode = signupMode === 'token';
   createTokenMode = tokenMode;
+  const claimMode = signupMode === 'claim';
+  const soloMode = tokenMode || claimMode;
   const tokenAddress = st.signup?.address || null;
   createTeamCode = typeof st?.teamCode === 'string' ? st.teamCode.trim() : '';
   createRuntimeBridge = window.OpenClawLiteRuntimeBridge || null;
@@ -446,7 +451,7 @@ async function init() {
     window.location.href = '/';
     return;
   }
-  if (requestedToken && signupMode !== 'token') {
+  if (requestedToken && !soloMode) {
     try {
       localStorage.setItem('agentTownPathMode', 'token');
       localStorage.setItem('agentTownTokenError', 'Verify your wallet to create a token-gated house.');
@@ -458,15 +463,15 @@ async function init() {
   }
   const intro = el('createIntro');
   if (intro) {
-    intro.textContent = tokenMode
+    intro.textContent = soloMode
       ? 'Solo flow: paint a few pixels to seed your house key, then lock it in.'
       : 'Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.';
   }
   const nextNote = el('createNextNote');
   if (nextNote) {
-    nextNote.textContent = tokenMode
-      ? 'Next: unlock the house with a Solana wallet signature. You can invite an agent later.'
-      : 'Next: unlock the house with a Solana wallet signature. Then you and the agent can read/write encrypted entries.';
+    nextNote.textContent = soloMode
+      ? 'Next: unlock the house with a wallet signature. You can invite an agent later.'
+      : 'Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.';
   }
   startCreateSkillLoop({ enabled: !tokenMode });
 
@@ -485,10 +490,11 @@ async function init() {
   updateLockState();
 
   async function connectWalletOrThrow() {
-    if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-    if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-    const resp = await window.solana.connect();
-    return { wallet: window.solana, address: resp.publicKey.toString() };
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    const connected = await walletClient.connect({ chain: 'solana', silent: false });
+    const address = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+    if (!address) throw new Error('NO_SOLANA_PUBKEY');
+    return { address };
   }
 
   async function sha256(bytes) {
@@ -728,13 +734,9 @@ async function init() {
     return parts.join('\n');
   }
 
-  async function signMessageBytes(wallet, message) {
-    const msgBytes = new TextEncoder().encode(message);
-    const resp = await wallet.signMessage(msgBytes, 'utf8');
-    const sigBytes = resp?.signature || resp;
-    const sigArr = normalizeSignatureBytes(sigBytes);
-    if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-    return sigArr;
+  async function signMessageBytes(message) {
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    return walletClient.signMessage({ chain: 'solana', message });
   }
 
   // (Ceremony houses) We store only a wallet-wrapped K_root (never raw).
@@ -778,7 +780,7 @@ async function init() {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
     try {
-      const { wallet, address } = await connectWalletOrThrow();
+      const { address } = await connectWalletOrThrow();
       if (tokenMode && tokenAddress && address !== tokenAddress) {
         throw new Error('WALLET_MISMATCH');
       }
@@ -786,7 +788,7 @@ async function init() {
       // 1) Human computes Rh from canvas and commits with a reveal-exchange pubkey.
       const Rh = await deriveRhFromCanvas(pixels);
       const humanCommit = b64(await sha256(Rh));
-      if (!tokenMode && !ceremonyRevealPair) {
+      if (!soloMode && !ceremonyRevealPair) {
         ceremonyRevealPair = await crypto.subtle.generateKey(
           { name: 'ECDH', namedCurve: 'P-256' },
           true,
@@ -799,13 +801,13 @@ async function init() {
         method: 'POST',
         body: JSON.stringify({
           commit: humanCommit,
-          revealPub: tokenMode ? undefined : ceremonyRevealPub
+          revealPub: soloMode ? undefined : ceremonyRevealPub
         })
       });
       nudgeCreateSkillLoop(80);
 
       let Kroot = null;
-      if (tokenMode) {
+      if (soloMode) {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {
@@ -854,7 +856,7 @@ async function init() {
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
       const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
-      const wrapSig = await signMessageBytes(wallet, wrapMsg);
+      const wrapSig = await signMessageBytes(wrapMsg);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
       const wrapped = await aesGcmEncrypt(wrapKey, Kroot);
@@ -873,7 +875,12 @@ async function init() {
           housePubKey,
           nonce,
           keyMode: 'ceremony',
-          unlock: { kind: 'solana-wallet-signature', address },
+          unlock: {
+            kind: 'wallet-signature',
+            provider: 'privy',
+            chain: 'solana',
+            address
+          },
           keyWrap,
           houseAuthKey,
           ponyInboxPub: ponyInbox.ponyInboxPub,

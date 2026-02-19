@@ -48,6 +48,8 @@ module.exports = defineConfig({
       NODE_ENV: 'test',
       PORT: String(PORT),
       TEST_RESET_TOKEN: 'test-reset',
+      ADMIN_TOKEN: 'test-admin',
+      START_PAGE_ENABLED: '0',
       // Avoid modifying tracked data/store.json during e2e runs.
       STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.sqlite')
     }

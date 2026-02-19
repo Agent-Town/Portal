@@ -174,10 +174,10 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
       const bin = atob(walletSigB64);
       const sig = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
-      window.solana = {
-        isPhantom: true,
-        connect: async () => ({ publicKey: { toString: () => walletAddress } }),
-        signMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
+      window.__PRIVY_WALLET_BRIDGE__ = {
+        connectSolana: async () => ({ address: walletAddress }),
+        disconnectSolana: async () => {},
+        signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
       };
     },
     { walletAddress: houseA.walletAddress, walletSigB64: houseA.walletSigB64 }

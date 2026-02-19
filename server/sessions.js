@@ -99,6 +99,42 @@ function createSession({ flow } = {}) {
       verifiedAt: null,
       address: null
     },
+    onboarding: {
+      required: false,
+      registrationComplete: false,
+      registeredAt: null,
+      profile: {
+        humanName: null,
+        agentName: null,
+        humanAvatar: {
+          image: null,
+          prompt: null,
+          source: 'default',
+          updatedAt: null
+        },
+        agentAvatar: {
+          image: null,
+          prompt: null,
+          source: 'default',
+          updatedAt: null
+        }
+      },
+      erc8004: {
+        evm: {
+          id: null,
+          chain: 'sepolia',
+          txHash: null,
+          updatedAt: null
+        },
+        solana: {
+          id: null,
+          cluster: 'devnet',
+          txSig: null,
+          updatedAt: null
+        }
+      }
+    },
+    reservedHouseId: null,
     houseCeremony: {
       humanCommit: null,
       agentCommit: null,

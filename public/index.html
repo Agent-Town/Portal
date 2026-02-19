@@ -13,258 +13,32 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 
-<body>
-  <div class="app-layout">
-    <!-- Main Content Area (User View) -->
-    <div class="main-content">
-      <div class="wrap">
-        <div class="topbar">
-          <div class="brand">
-            <a class="logoLink" href="/" aria-label="Agent Town home">
-              <img class="logoImg" src="/logo.jpg" alt="" />
-            </a>
-            <strong>Agent Town</strong>
-            <span class="badge">OpenClaw Lite</span>
-          </div>
-          <div class="kv">
-            <div id="teamCodeResult" class="pill is-hidden">Team: <strong id="teamCode" data-testid="team-code">...</strong></div>
-            <a class="btn" href="/skill.md" data-testid="skill-link">Skill</a>
-            <button class="btn" id="authSigninBtn" data-testid="auth-signin">Sign in</button>
-            <button class="btn primary" id="authSignupBtn" data-testid="auth-signup">Sign up</button>
-          </div>
-        </div>
+<body class="town-hub-page">
+  <div class="wrap townWrap">
+    <section class="townOverview" id="townScenePanel">
+      <div class="townScene" role="navigation" aria-label="Town menu map" id="districtMap">
+        <button class="townDistrictHotspot townDistrict-fountain" type="button" data-district="leaderboard" aria-label="Open Town Board">
+          <span class="townDistrictLabel">Town Board</span>
+        </button>
+        <button class="townDistrictHotspot townDistrict-pony" type="button" data-district="pony" aria-label="Open Pony Express"></button>
+        <button class="townDistrictHotspot townDistrict-townhall" type="button" data-district="townhall" aria-label="Open Town Hall"></button>
+        <button class="townDistrictHotspot townDistrict-saloon" type="button" data-district="saloon" aria-label="Open Saloon"></button>
+        <button class="townDistrictHotspot townDistrict-wagons is-active" type="button" data-district="house" aria-label="Open Plan Wagons">
+          <span class="townDistrictLabel">Plan Wagons</span>
+        </button>
+      </div>
+      <div class="small" id="townSceneStatus">Plan Wagons selected: unlock and enter your house flow.</div>
+    </section>
 
-        <!-- Landing / Welcome -->
-        <div class="panel hero" id="welcomePanel">
-          <h1 data-testid="landing-title">Welcome to the Wild West!</h1>
-          <p style="margin-bottom: 24px;">
-            Set up your AI agent, explore the town, and unlock secrets together.
-          </p>
-          <div class="row two">
-            <button class="btn primary" id="enterBtn">Enter Agent Town</button>
-            <button class="btn" id="connectWalletHeroBtn">Connect wallet instead</button>
-          </div>
-        </div>
-
-        <!-- Setup Station -->
-        <div class="panel spaced is-hidden" id="hatchPanel" data-testid="hatch-panel">
-          <div class="hatch-header">
-            <h2>Setup Station (One-Time)</h2>
-            <div class="status-indicator" id="hatchStatus" data-testid="hatch-status">Ready.</div>
-            <div class="small" style="display:flex; align-items:center; gap:8px;">
-              <span class="dot" id="liteAgentDot"></span>
-              <span id="liteAgentStatus" data-testid="lite-agent-status">Agent offline</span>
-            </div>
-          </div>
-          <div class="hatch-grid">
-            <div class="hatch-steps">
-              <div class="step-item active" id="step1">
-                <div class="step-num">1</div>
-                <div class="step-content">
-                  <h3>Verify Wallet (one-time)</h3>
-                  <button class="btn small" id="hatchWalletCheckBtn" data-testid="hatch-wallet-check">Verify Wallet</button>
-                  <div class="small status-text" id="walletStatus"></div>
-                </div>
-              </div>
-              <!-- STEP 2: Brain -->
-              <div class="step-item disabled" id="step2" data-testid="lite-llm-panel">
-                <div class="step-num">2</div>
-                <div class="step-content">
-                  <h3>Connect Brain (saved locally)</h3>
-                  <p class="small">Do this once per browser. It auto-restores on return.</p>
-                  <div class="brain-config">
-                      <div class="kv dense">
-                      <label class="small-label">Provider</label>
-                      <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
-                        <option value="openai">openai</option>
-                        <option value="ollama">ollama</option>
-                        <option value="openai-codex">openai-codex</option>
-                        <option value="anthropic">anthropic</option>
-                        <option value="openrouter">openrouter</option>
-                        <option value="litellm">litellm</option>
-                        <option value="amazon-bedrock">amazon-bedrock</option>
-                        <option value="vercel-ai-gateway">vercel-ai-gateway</option>
-                        <option value="moonshot">moonshot</option>
-                        <option value="kimi-coding">kimi-coding</option>
-                        <option value="minimax">minimax</option>
-                        <option value="opencode">opencode</option>
-                        <option value="zai">zai</option>
-                        <option value="glm">glm</option>
-                        <option value="synthetic">synthetic</option>
-                        <option value="qianfan">qianfan</option>
-                        <option value="qwen-portal">qwen-portal</option>
-                        <option value="qwen">qwen</option>
-                        <option value="together">together</option>
-                        <option value="cloudflare-ai-gateway">cloudflare-ai-gateway</option>
-                        <option value="xiaomi">xiaomi</option>
-                        <option value="venice">venice</option>
-                        <option value="huggingface">huggingface</option>
-                        <option value="vllm">vllm</option>
-                        <option value="nvidia">nvidia</option>
-                        <option value="google">google</option>
-                        <option value="groq">groq</option>
-                        <option value="test-local">test-local</option>
-                      </select>
-
-                      <label class="small-label">Model ID</label>
-                      <select class="input" id="llmModelIdInput" data-testid="lite-llm-model">
-                        <option value="gpt-4o">gpt-4o</option>
-                        <option value="gpt-4o-mini">gpt-4o-mini</option>
-                      </select>
-
-                      <label class="small-label">Auth mode</label>
-                      <select class="input" id="llmAuthModeSelect">
-                        <option value="api-key">API Key</option>
-                        <option value="oauth-json">OpenAI OAuth Profile / Token</option>
-                      </select>
-
-                      <label class="small-label">OAuth profile JSON / token</label>
-                      <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
-                      <div class="small" id="llmOauthProfileHint"></div>
-                      <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
-                      <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-complete">Complete OAuth</button>
-
-                      <label class="small-label">API Key</label>
-                      <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
-                    </div>
-
-                    <!-- Advanced Settings -->
-                    <details style="margin-top: 8px; border: 1px solid #444; border-radius: 4px; padding: 4px;">
-                      <summary class="small" style="cursor: pointer; padding: 4px;">Advanced Settings</summary>
-                      <div class="kv dense" style="margin-top: 8px; padding: 4px;">
-                        <label class="small-label">Base URL (Optional)</label>
-                        <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
-
-                        <label class="small-label">Thinking Level</label>
-                        <select class="input" id="llmThinkingInput">
-                          <option value="">Default</option>
-                          <option value="low">Low</option>
-                          <option value="high">High</option>
-                          <option value="xhigh">XHigh</option>
-                        </select>
-
-                        <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                          <input id="llmUseProxyInput" type="checkbox" checked />
-                          Use Proxy (Recommended)
-                        </label>
-                      </div>
-                    </details>
-
-                    <!-- Hidden inputs for gateway sync -->
-                    <input id="llmModelRefInput" type="hidden" />
-                    <input id="llmApiInput" type="hidden" />
-
-                    <div class="kv" style="margin-top: 12px;">
-                      <button class="btn primary small" id="llmSaveBtn" data-testid="lite-llm-save">Connect Brain</button>
-                      <button class="btn small" id="llmClearBtn">Clear Brain</button>
-                      <div class="small status-text" id="llmLine" data-testid="lite-llm-status"></div>
-                    </div>
-
-                    <!-- Core Data Portability -->
-                    <div style="margin-top: 16px; border-top: 1px dashed #3d2d1f; padding-top: 12px;">
-                      <h4 style="margin: 0 0 8px; font-size: 13px;">Core Data</h4>
-                      <div class="kv">
-                        <button class="btn small" id="downloadCoreBtn">Download Brain</button>
-                        <button class="btn small" id="uploadCoreBtn">Upload Brain</button>
-                        <input type="file" id="coreUploadInput" style="display:none" accept=".json" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div id="agentReveal" class="agent-reveal is-hidden"></div>
-            </div>
-          </div>
-
-          <!-- Legacy LLM Config for Vendor Mode -->
-          <div class="panel is-hidden" id="liteLlmPanel" style="margin-top:20px;">
-            <h3>Agent Brain (Optional)</h3>
-            <div class="kv">
-              <input class="input" id="liteLlmProviderInput" placeholder="Provider" />
-              <input class="input" id="liteLlmModelInput" placeholder="Model" />
-              <input class="input" id="liteLlmApiKeyInput" type="password" placeholder="API Key" />
-              <button class="btn primary" id="liteLlmSaveBtn">Save</button>
-            </div>
-            <div class="small" id="liteLlmStatus"></div>
-            <button class="btn is-hidden" id="liteAgentConnectBtn">Connect Legacy</button>
-          </div>
-        </div>
-
-        <!-- AGENT TOWN INTERFACE (Restored) -->
-        <div class="panel spaced is-hidden" id="townPanel">
-          <div class="town-header">
-            <h2>Agent Town</h2>
-            <div class="status-indicator">Live</div>
-          </div>
-
-          <div class="town-grid">
-            <!-- Sigils -->
-            <div class="section">
-              <h3>Sigil Synchronization</h3>
-              <p class="small">You and your agent must choose the same sigil.</p>
-              <div class="sigil-grid" id="sigilGrid"></div>
-              <div class="small status-text" id="matchState" data-testid="match-status">LOCKED</div>
-              <div class="small" id="matchDetail">Pick the same sigil to unlock.</div>
-              <div class="open-status">
-                <button class="btn primary" id="openBtn" data-testid="open-btn">OPEN LOCK</button>
-                <span class="small status-text" id="openWaiting" data-testid="open-waiting" style="display:none">Waiting for agent...</span>
-                <div class="small error-text" id="openError"></div>
-              </div>
-            </div>
-
-            <!-- Canvas -->
-            <div class="section">
-              <h3>Shared Canvas</h3>
-              <p class="small">Paint together. 16x16.</p>
-              <div class="canvas-container" id="canvasContainer">
-                <canvas id="mainCanvas" width="16" height="16"></canvas>
-              </div>
-              <div class="palette" id="palette"></div>
-              <div class="controls">
-                <button class="btn" id="lockInBtn">Lock in + Generate House</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- House Ceremony Status -->
-          <div class="section is-hidden" id="ceremonyStatus">
-            <h3>House Ceremony</h3>
-            <div class="kv dense" id="ceremonyKv"></div>
-          </div>
-        </div>
-
-        <!-- DUO BROWSER PANEL (New) -->
-        <div class="panel spaced is-hidden" id="browserPanel">
-          <div class="browser-header">
-            <div class="browser-controls">
-              <button class="btn small" id="browserBackBtn" disabled>←</button>
-              <button class="btn small" id="browserRefreshBtn">↻</button>
-              <div class="address-bar">
-                <span class="lock-icon">🔒</span>
-                <select id="experienceSelector" class="pixel-select">
-                  <option value="">-- Select Destination --</option>
-                  <option value="https://moltbook.com">Moltbook.com (Social)</option>
-                  <option value="https://agent.town/wiki">Town Wiki</option>
-                  <option value="https://google.com">Google.com (Search)</option>
-                  <option value="https://wikipedia.org">Wikipedia.org</option>
-                </select>
-              </div>
-              <button id="visitBtn" class="btn primary small">Go</button>
-            </div>
-            <div class="browser-status" id="browserStatus">Ready</div>
-          </div>
-          <div class="browser-frame-container">
-            <iframe id="mainView" class="browser-frame" src="about:blank"></iframe>
-          </div>
-        </div>
-
-        <footer>
-          Agent Town &copy; 2026 &bull; Duo Browser Integration
-        </footer>
+    <div id="districtModalBackdrop" class="districtBackdrop is-hidden" aria-hidden="true">
+      <div class="districtModal" role="dialog" aria-labelledby="districtModalTitle" aria-modal="true">
+        <header class="districtModalHeader">
+          <h2 id="districtModalTitle">Plan Wagons</h2>
+          <button class="btn districtModalClose" id="districtModalClose" type="button" aria-label="Close building">Close</button>
+        </header>
+        <div id="districtModalBody" class="districtModalBody is-loading">Loading district...</div>
       </div>
     </div>
-
     <!-- PERSISTENT AGENT SIDEBAR (New) -->
     <div id="agentSidebar" class="agent-sidebar minimized" data-testid="agent-panel">
       <div class="sidebar-header">
@@ -382,7 +156,9 @@
 
   <script type="module" src="/openclaw-lite/gateway.js"></script>
   <script src="/openclaw-lite/runtime-bridge.js?v=20260213"></script>
-  <script src="/app.js?v=20260213"></script>
+  <script src="/wallet_client.js?v=20260217h"></script>
+  <script src="/privy_bridge.js?v=20260218a"></script>
+  <script src="/app.js?v=20260218i"></script>
 </body>
 
 </html>

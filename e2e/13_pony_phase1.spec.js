@@ -9,9 +9,30 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('pony inbox uses canonical house ids and house-auth on protected actions', async ({ page, request }) => {
-  await installMockSolanaWallet(page, {
-    address: 'So1anaMockPony1111111111111111111111111111111',
-    multiplier: 29
+  await page.addInitScript(() => {
+    const sig = new Uint8Array(64);
+    for (let i = 0; i < sig.length; i++) sig[i] = (i * 23) & 0xff;
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So1anaMockPony1111111111111111111111111111111' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } })
+    };
+  });
+
+  await page.goto('/');
+  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
+
+  await request.post('/api/agent/connect', { data: { teamCode, agentName: 'ClawTest' } });
+  await page.getByTestId('sigil-key').click();
+  await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
+  await page.getByTestId('open-btn').click();
+  await request.post('/api/agent/open/press', { data: { teamCode } });
+  await page.waitForURL('**/create');
+
+  const ra = crypto.randomBytes(32);
+  const agentRevealPair = makeCeremonyRevealPair();
+  const commitResp = await request.post('/api/agent/house/commit', {
+    data: { teamCode, commit: sha256(ra).toString('base64'), revealPub: agentRevealPair.publicKeyB64 }
   });
   await reachCreateViaLite(page);
 

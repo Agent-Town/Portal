@@ -10,11 +10,15 @@
     "pretest": "npm run build:openclaw-lite",
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
+    "import:claimables": "node scripts/import-claimable-reservations.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "8004-solana": "github:QuantuLabs/8004-solana-ts",
+    "agent0-sdk": "^1.5.3",
     "ethers": "^6.16.0",
     "express": "^4.19.2"
   },

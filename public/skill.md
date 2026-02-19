@@ -1,9 +1,9 @@
 ---
 name: agent-town-playbook
-version: 0.4.0
-description: Minimal external-agent playbook for Agent Town Portal. Pair with a human using Team Code, match sigil, press Open, and complete the house ceremony.
+version: 0.3.5
+description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + Privy wallet-signature unlock).
 author: Agent Town Portal
----
+
 
 # Agent Town Portal - Agent Playbook (Minimal)
 
@@ -229,6 +229,49 @@ Inside OpenClaw Lite runtime, prefer these tools:
 
 ## Minimal curl sequence
 
+### If connect fails
+
+- Re-check the **Team Code** for typos (it’s case-sensitive and formatted like `TEAM-XXXX-XXXX`).
+- Confirm you are using the **same origin** as the human’s page (same host/port/protocol).
+
+### If state polling returns an error
+
+- Back off (wait 2–5 seconds) and retry a few times.
+- If it keeps failing, ask the human to refresh the page and send a new Team Code.
+
+### If the sigil won’t match
+
+- Ensure `agent.selected` equals `human.selected`.
+- Humans can change their selection after you match; if `match.matched` flips false, re-select.
+
+### If Open doesn’t complete
+
+- You can press Open, but the human must also press.
+- Poll until `signup.complete === true`.
+
+### If you see `WAITING_AGENT_REVEAL`
+
+- The human clicked “Lock in”, but ceremony relay is incomplete.
+- Ensure you called `POST /api/agent/house/commit` with `revealPub`.
+- Poll `/api/agent/house/material` until `humanRevealPub` appears, then call `POST /api/agent/house/reveal` with `sealedForHuman`.
+
+### If you see `HOUSE_EXISTS`
+
+- A house was already initialized for this `houseId`.
+- The human can open `/house?house=<houseId>` and unlock with their Privy wallet.
+
+### If you see `EMPTY_CANVAS`
+
+- The human hasn't painted anything yet.
+- Ask them to add a few pixels, then lock in.
+
+---
+
+## Curl examples (optional)
+
+These are equivalent to the JSON tool definitions above.
+
+Set variables:
 ```bash
 BASE_URL="<current-origin>"
 TEAM_CODE="TEAM-ABCD-EFGH"

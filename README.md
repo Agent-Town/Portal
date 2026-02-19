@@ -11,7 +11,7 @@ The only identity is a session cookie for the human and a Team Code for the agen
 2. Agent connects via API, matches the same sigil, and both press Open.
 3. `/create` opens a 16x16 co-op pixel canvas to generate entropy.
 4. House ceremony combines human + agent entropy to derive a `houseId` and shared keys.
-5. `/house?house=...` unlocks with a Solana wallet signature and shows a descriptor QR, ERC-8004 statement, and optional ERC-8004 mint (Agent0 SDK).
+5. `/house?house=...` unlocks with a Privy-backed Solana wallet signature and shows a descriptor QR, ERC-8004 statement, and optional ERC-8004 mint (Agent0 SDK).
 6. Create a public share link and show up on the leaderboard; referrals are counted.
 
 Token-holder path:
@@ -30,6 +30,29 @@ Open http://localhost:4173
 - Getting started: `docs/getting-started.md`
 - Which provider should I pick?: `docs/which-provider.md`
 - Provider reference: `docs/providers/README.md`
+
+When Privy is configured (`PRIVY_APP_ID` set), `/` serves the start page:
+- logo + hero video + "Welcome to the Wild West!"
+- `Enter` triggers Privy login
+- successful login redirects to `/app` (current landing/index experience)
+
+## Privy credentials (.env)
+Use a local `.env` file for Privy credentials.
+
+1. Copy `.env.example` to `.env`.
+2. Set:
+   - `PRIVY_APP_ID` (public)
+   - `PRIVY_CLIENT_ID` (optional/public)
+   - `PRIVY_APP_SECRET` (private/server-only)
+3. Restart the dev server.
+
+Server-side loading order:
+- `.env`
+- `.env.<NODE_ENV>`
+- `.env.local`
+- `.env.<NODE_ENV>.local`
+
+Browser-safe config is exposed at `GET /api/privy/config` (public fields only). `PRIVY_APP_SECRET` is never returned.
 
 ## Tests
 ```bash
@@ -73,6 +96,8 @@ npm run setup:sepolia-wallet -- --no-faucet
 
 ## Key routes
 - `/` — onboarding, Team Code, token check, reconnect.
+- `/start` — start page (logo/video/welcome + Enter -> Privy login).
+- `/app` — current landing/onboarding page after start/login.
 - `/create` — co-op canvas + house generation.
 - `/house` — house unlock, descriptor QR, ERC-8004, encrypted log.
 - `/s/:id` — public share page.
@@ -97,13 +122,25 @@ What the server does not store:
 - Any unencrypted house content.
 - The `keyWrapSig` (clients re-sign the wrap message during recovery).
 
-Unlocking a house in the UI is gated by a Solana wallet signature. Decryption happens client-side after deriving keys from the ceremony materials.
+Unlocking a house in the UI is gated by a Privy-backed Solana wallet signature. Decryption happens client-side after deriving keys from the ceremony materials.
 
 ## Environment variables
 - `PORT` (default `4173`)
 - `NODE_ENV` (`production` enables HTTPS redirect + HSTS; `test` enables reset endpoint)
 - `STORE_PATH` (override store file)
 - `SOLANA_RPC_URL` (token check RPC, default mainnet-beta)
+- `PRIVY_APP_ID` (public Privy app id for browser wallet bridge bootstrap)
+- `PRIVY_CLIENT_ID` (optional public Privy client id)
+- `PRIVY_APP_SECRET` (private Privy server credential; never exposed by this app)
+- `PRIVY_PUBLIC_CONFIG_JSON` (optional JSON object merged into public Privy config)
+- `PRIVY_SDK_SCRIPT_URL` (optional browser SDK script URL loaded by `public/privy_bridge.js`)
+- `PRIVY_SDK_MODULE_URL` (optional ESM module URL for Privy JS SDK, default `https://esm.sh/@privy-io/js-sdk-core@0.60.0?bundle`)
+- `PRIVY_LOGIN_METHOD` (`email` or `guest`, default `email`)
+- `START_PAGE_ENABLED` (default: enabled when `PRIVY_APP_ID` is set)
+- `ENABLE_PRIVY_IN_TEST` (default `false`; test env disables Privy bridge unless this is explicitly enabled)
+- `CSP_SCRIPT_SRC_EXTRA` (optional comma-separated extra `script-src` entries)
+- `CSP_CONNECT_SRC_EXTRA` (optional comma-separated extra `connect-src` entries)
+- `CSP_FRAME_SRC_EXTRA` (optional comma-separated extra `frame-src` entries)
 - `TEST_RESET_TOKEN` (required for `/__test__/reset` in tests)
 - `TEST_TOKEN_ADDRESS` (test-only override for token-holder flow)
 

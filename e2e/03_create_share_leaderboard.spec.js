@@ -12,6 +12,23 @@ function ssePayload(chunks) {
   return chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('') + 'data: [DONE]\n\n';
 }
 
+test('co-op open -> co-create -> generate house -> unlock with wallet signature', async ({ page, request }) => {
+  // Mock a Solana wallet (Phantom-style) for Playwright.
+  await page.addInitScript(() => {
+    // Minimal mock matching usage in create.js/house.js
+    const sig = new Uint8Array(64);
+    // Deterministic but non-zero
+    for (let i = 0; i < sig.length; i++) sig[i] = (i * 13) & 0xff;
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So1anaMock111111111111111111111111111111111' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMock111111111111111111111111111111111' } })
+    };
+  });
+
+  await page.goto('/');
+  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
+
 function makeToolChunks({ id, model, toolName, args = {}, callId }) {
   const created = Math.floor(Date.now() / 1000);
   return [

@@ -9,7 +9,16 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('disconnecting wallet after unlocking resets to a fresh session (shared device)', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await page.addInitScript(() => {
+    const sig = new Uint8Array(64);
+    for (let i = 0; i < sig.length; i++) sig[i] = (i * 11) & 0xff;
+    const address = 'So1anaMockToken1111111111111111111111111111';
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
+    };
+  });
   await page.goto('/');
 
   const before = await page.evaluate(async () => {
