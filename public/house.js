@@ -1,13 +1,44 @@
 /* eslint-disable no-console */
 
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -68,6 +99,30 @@ function setPublicMediaEnabled(enabled) {
   }
 }
 
+function setAgentStateStatus(msg) {
+  const node = el('agentStateStatus');
+  if (node) node.textContent = msg || '';
+}
+
+function setAgentStateError(msg) {
+  const node = el('agentStateError');
+  if (node) node.textContent = msg || '';
+}
+
+function setMindConfigStatus(msg) {
+  const node = el('llmLine');
+  if (!node) return;
+  node.textContent = msg || '';
+  node.style.color = 'var(--muted)';
+}
+
+function setMindConfigError(msg) {
+  const node = el('llmLine');
+  if (!node) return;
+  node.textContent = msg || '';
+  node.style.color = msg ? 'var(--bad)' : 'var(--muted)';
+}
+
 function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
   const preview = el('publicPreview');
   const img = el('publicPreviewImg');
@@ -103,6 +158,63 @@ const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const AUTO_LOCK_MS = null;
 const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
 const AGENT0_SDK_CDN_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+const OPENCLAW_DB_NAME = 'openclaw-lite';
+const OPENCLAW_DB_VERSION = 1;
+const AGENT_STATE_KIND = 'openclaw-lite-state';
+const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_OPENCLAW_EXPORT_KIND = 'openclaw-lite-export';
+const AGENT_STATE_SEALED_KIND = 'openclaw-lite-state-sealed';
+const AGENT_STATE_SEALED_SCHEMA = 'openclaw-lite-state-sealed@1';
+const AGENT_STATE_ZIP_KIND = 'openclaw-lite-state-zip';
+const AGENT_STATE_ZIP_SCHEMA = 'openclaw-lite-state-zip@1';
+const AGENT_STATE_MAX_BYTES = 8 * 1024 * 1024;
+const AGENT_STATE_MAX_META_RECORDS = 2048;
+const AGENT_STATE_MAX_VFS_RECORDS = 20000;
+const AGENT_STATE_MAX_CHECKPOINT_RECORDS = 5000;
+const MIND_DEFAULT_PROVIDER = 'openai';
+const MIND_DEFAULT_MODEL = 'gpt-4o-mini';
+const MIND_AUTH_API_KEY = 'api-key';
+const MIND_AUTH_OAUTH = 'oauth-json';
+const MIND_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
+  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
+  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
+  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
+  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
+  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
+  litellm: Object.freeze(['claude-opus-4-6']),
+  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
+  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
+  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
+  'kimi-coding': Object.freeze(['k2p5']),
+  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
+  opencode: Object.freeze(['claude-opus-4-6']),
+  zai: Object.freeze(['glm-5']),
+  glm: Object.freeze(['glm-5']),
+  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
+  qianfan: Object.freeze(['model-id']),
+  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
+  qwen: Object.freeze(['coder-model', 'vision-model']),
+  together: Object.freeze(['moonshotai/Kimi-K2.5']),
+  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
+  xiaomi: Object.freeze(['mimo-v2-flash']),
+  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
+  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
+  vllm: Object.freeze(['your-model-id']),
+  nvidia: Object.freeze(['model-id']),
+  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
+  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
+  'test-local': Object.freeze(['deterministic'])
+});
+const MIND_PROVIDER_ALIASES = Object.freeze({
+  glm: 'zai',
+  qwen: 'qwen-portal'
+});
+const MIND_OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
+const MIND_OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
+let mindOpenAiCodexOAuthAttempt = null;
+let mindOpenAiCodexOAuthPollTimer = null;
+let mindOpenAiCodexOAuthExchangeInFlight = false;
+let mindOpenAiCodexOAuthMessageListenerBound = false;
 
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
@@ -137,6 +249,14 @@ function unb64(str) {
   return out;
 }
 
+function unb64Safe(str) {
+  try {
+    return unb64(str);
+  } catch {
+    return null;
+  }
+}
+
 function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
@@ -157,6 +277,1433 @@ function clearHouseAuthCache(houseId) {
   } catch {
     // ignore storage errors
   }
+}
+
+let openClawDbPromise = null;
+let llmConfigLibraryPromise = null;
+let agentStateBusy = false;
+let liteGatewayPromise = null;
+
+function setAgentStateControlsEnabled(enabled) {
+  const canUse = !!enabled && !agentStateBusy;
+  const saveBtn = el('saveAgentStateBtn');
+  const restoreBtn = el('restoreAgentStateBtn');
+  const downloadBtn = el('downloadAgentStateBtn');
+  const uploadBtn = el('uploadAgentStateBtn');
+  const uploadInput = el('uploadAgentStateInput');
+  const llmProvider = el('llmProviderSelect');
+  const llmModel = el('llmModelIdInput');
+  const llmAuthMode = el('llmAuthModeSelect');
+  const llmOauth = el('llmOauthProfileInput');
+  const llmCredential = el('llmKeyInput');
+  const llmBaseUrl = el('llmBaseUrlInput');
+  const llmThinking = el('llmThinkingInput');
+  const llmUseProxy = el('llmUseProxyInput');
+  const llmOauthLaunch = el('llmOauthLaunchBtn');
+  const llmOauthComplete = el('llmOauthCompleteBtn');
+  const llmSave = el('llmSaveBtn');
+  const llmClear = el('llmClearBtn');
+  if (saveBtn) saveBtn.disabled = !canUse;
+  if (restoreBtn) restoreBtn.disabled = !canUse;
+  if (downloadBtn) downloadBtn.disabled = !canUse;
+  if (uploadBtn) uploadBtn.disabled = !canUse;
+  if (uploadInput) uploadInput.disabled = !canUse;
+  if (llmProvider) llmProvider.disabled = !canUse;
+  if (llmModel) llmModel.disabled = !canUse;
+  if (llmAuthMode) llmAuthMode.disabled = !canUse;
+  if (llmOauth) llmOauth.disabled = !canUse;
+  if (llmCredential) llmCredential.disabled = !canUse;
+  if (llmBaseUrl) llmBaseUrl.disabled = !canUse;
+  if (llmThinking) llmThinking.disabled = !canUse;
+  if (llmUseProxy) llmUseProxy.disabled = !canUse;
+  if (llmOauthLaunch) llmOauthLaunch.disabled = !canUse;
+  if (llmOauthComplete) llmOauthComplete.disabled = !canUse;
+  if (llmSave) llmSave.disabled = !canUse;
+  if (llmClear) llmClear.disabled = !canUse;
+  if (!enabled && !agentStateBusy) {
+    setAgentStateStatus('');
+    setAgentStateError('');
+    setMindConfigStatus('');
+    setMindConfigError('');
+  }
+}
+
+function setAgentStateBusy(busy) {
+  agentStateBusy = !!busy;
+  setAgentStateControlsEnabled(unlocked);
+}
+
+async function loadLiteLlmLibrary() {
+  if (!llmConfigLibraryPromise) {
+    llmConfigLibraryPromise = import('/openclaw-lite/llm-config-library.js');
+  }
+  return llmConfigLibraryPromise;
+}
+
+async function loadLiteGateway() {
+  if (!liteGatewayPromise) {
+    liteGatewayPromise = import('/openclaw-lite/gateway.js')
+      .then((mod) => mod?.default || mod)
+      .then(async (gatewayOrPromise) => {
+        if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+          return await gatewayOrPromise;
+        }
+        return gatewayOrPromise;
+      })
+      .catch(() => null);
+  }
+  return liteGatewayPromise;
+}
+
+function defaultProviderApi(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  return '';
+}
+
+function defaultProviderBaseUrl(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  return '';
+}
+
+function normalizeThinkingLevel(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return '';
+  if (v === 'minimal' || v === 'low' || v === 'medium' || v === 'high' || v === 'xhigh') return v;
+  return '';
+}
+
+function buildGatewayLlmPayload(config) {
+  const provider = String(config?.provider || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const model = String(config?.model || MIND_DEFAULT_MODEL).trim() || MIND_DEFAULT_MODEL;
+  const modelRef = String(config?.modelRef || `${provider}/${model}`).trim() || `${provider}/${model}`;
+  const credential = String(config?.credential || '').trim();
+  const overrideApi = String(el('llmApiInput')?.value || '').trim();
+  const overrideBaseUrl = String(el('llmBaseUrlInput')?.value || '').trim();
+  const useProxy = el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true;
+  return {
+    type: 'gateway.command.setLlmConfig',
+    apiKey: credential,
+    api: overrideApi || defaultProviderApi(provider),
+    provider,
+    modelRef,
+    modelId: model,
+    baseUrl: overrideBaseUrl || defaultProviderBaseUrl(provider),
+    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    useProxy
+  };
+}
+
+async function activateMindConfig(config) {
+  const provider = String(config?.provider || '').trim();
+  const model = String(config?.model || '').trim();
+  const modelRef = String(config?.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+  const credential = String(config?.credential || '').trim();
+  if (!provider || !model || !modelRef || !credential) return;
+
+  const gateway = await loadLiteGateway();
+  if (gateway && typeof gateway.send === 'function') {
+    gateway.send(buildGatewayLlmPayload({
+      provider,
+      model,
+      modelRef,
+      credential
+    }));
+  }
+}
+
+async function deactivateMindConfig() {
+  const gateway = await loadLiteGateway();
+  if (gateway && typeof gateway.send === 'function') {
+    gateway.send({
+      type: 'gateway.command.setLlmConfig',
+      apiKey: '',
+      api: '',
+      provider: '',
+      modelRef: '',
+      modelId: '',
+      baseUrl: '',
+      reasoning: '',
+      useProxy: true
+    });
+  }
+}
+
+function idbReqToPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
+  });
+}
+
+function idbTxDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+    tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+  });
+}
+
+function openOpenClawDb() {
+  if (openClawDbPromise) return openClawDbPromise;
+  openClawDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(OPENCLAW_DB_NAME, OPENCLAW_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('checkpoints')) {
+        const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+        s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+      }
+      if (!db.objectStoreNames.contains('vfs')) {
+        db.createObjectStore('vfs', { keyPath: 'path' });
+      }
+      if (!db.objectStoreNames.contains('meta')) {
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+  });
+  return openClawDbPromise;
+}
+
+async function idbGetAll(storeName) {
+  const db = await openOpenClawDb();
+  const tx = db.transaction([storeName], 'readonly');
+  const req = tx.objectStore(storeName).getAll();
+  const rows = await idbReqToPromise(req);
+  await idbTxDone(tx);
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function idbPutMetaRecords(entries) {
+  const db = await openOpenClawDb();
+  const tx = db.transaction(['meta'], 'readwrite');
+  const store = tx.objectStore('meta');
+  for (const entry of entries || []) {
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    const key = typeof entry[0] === 'string' ? entry[0].trim() : '';
+    if (!key) continue;
+    store.put({ key, value: cloneJsonSafe(entry[1]) });
+  }
+  await idbTxDone(tx);
+}
+
+function parseModelRef(modelRef, fallbackProvider = MIND_DEFAULT_PROVIDER, fallbackModelId = MIND_DEFAULT_MODEL) {
+  const ref = String(modelRef || '').trim();
+  if (!ref) {
+    return {
+      provider: fallbackProvider,
+      modelId: fallbackModelId,
+      modelRef: `${fallbackProvider}/${fallbackModelId}`
+    };
+  }
+  const slash = ref.indexOf('/');
+  if (slash > 0) {
+    const provider = ref.slice(0, slash).trim();
+    const modelId = ref.slice(slash + 1).trim();
+    if (provider && modelId) {
+      return { provider, modelId, modelRef: `${provider}/${modelId}` };
+    }
+  }
+  return {
+    provider: fallbackProvider,
+    modelId: ref,
+    modelRef: `${fallbackProvider}/${ref}`
+  };
+}
+
+function normalizeMindAuthMode(mode) {
+  return String(mode || '').trim() === MIND_AUTH_OAUTH ? MIND_AUTH_OAUTH : MIND_AUTH_API_KEY;
+}
+
+function getSupportedMindModels(provider) {
+  const raw = String(provider || '').trim();
+  const key = MIND_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (MIND_PROVIDER_ALIASES[raw] || raw);
+  const options = MIND_MODEL_OPTIONS_BY_PROVIDER[key];
+  return Array.isArray(options) ? [...options] : [];
+}
+
+function replaceSelectOptions(select, values) {
+  if (!select || select.tagName !== 'SELECT') return;
+  select.innerHTML = '';
+  for (const value of values || []) {
+    const next = String(value || '').trim();
+    if (!next) continue;
+    const option = document.createElement('option');
+    option.value = next;
+    option.textContent = next;
+    select.appendChild(option);
+  }
+}
+
+function ensureSelectOption(select, value, label) {
+  if (!select || select.tagName !== 'SELECT') return;
+  const next = String(value || '').trim();
+  if (!next) return;
+  const exists = Array.from(select.options).some((opt) => String(opt.value || '').trim() === next);
+  if (exists) return;
+  const option = document.createElement('option');
+  option.value = next;
+  option.textContent = String(label || next);
+  option.dataset.injected = 'true';
+  select.appendChild(option);
+}
+
+function applyMindProviderSelection(preferredProvider) {
+  const providerSelect = el('llmProviderSelect');
+  const selected = String(preferredProvider || providerSelect?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  if (!providerSelect) return selected;
+  if (providerSelect.tagName === 'SELECT') {
+    const providers = Object.keys(MIND_MODEL_OPTIONS_BY_PROVIDER);
+    replaceSelectOptions(providerSelect, providers);
+    providerSelect.value = providers.includes(selected) ? selected : MIND_DEFAULT_PROVIDER;
+    return String(providerSelect.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  }
+  providerSelect.value = selected;
+  return selected;
+}
+
+function applyMindModelSelection(provider, preferredModel) {
+  const modelSelect = el('llmModelIdInput');
+  const fallbackModel = getDefaultLlmModelForProvider(provider);
+  const selected = String(preferredModel || modelSelect?.value || '').trim();
+  if (!modelSelect) return selected || fallbackModel;
+  if (modelSelect.tagName === 'SELECT') {
+    const models = getSupportedMindModels(provider);
+    const baseOptions = models.length ? models : [fallbackModel];
+    replaceSelectOptions(modelSelect, baseOptions);
+    const resolved = baseOptions.includes(selected) ? selected : (baseOptions[0] || fallbackModel);
+    modelSelect.value = resolved;
+    return String(modelSelect.value || fallbackModel).trim() || fallbackModel;
+  }
+  if (selected) {
+    modelSelect.value = selected;
+    return selected;
+  }
+  modelSelect.value = fallbackModel;
+  return fallbackModel;
+}
+
+function applyMindProviderModelSelection(provider, model) {
+  const selectedProvider = applyMindProviderSelection(provider);
+  const selectedModel = applyMindModelSelection(selectedProvider, model);
+  return { provider: selectedProvider, model: selectedModel };
+}
+
+function updateMindOauthLaunchUi() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  const completeBtn = el('llmOauthCompleteBtn');
+  if (!launchBtn) return;
+  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const mode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
+  const supported = MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
+  launchBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
+}
+
+function stopMindOpenAiCodexOAuthPoll() {
+  if (!mindOpenAiCodexOAuthPollTimer) return;
+  clearInterval(mindOpenAiCodexOAuthPollTimer);
+  mindOpenAiCodexOAuthPollTimer = null;
+}
+
+function bindMindOpenAiCodexOAuthMessageListener() {
+  if (mindOpenAiCodexOAuthMessageListenerBound) return;
+  mindOpenAiCodexOAuthMessageListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== MIND_OPENAI_CODEX_OAUTH_MESSAGE_TYPE) return;
+    const incomingState = String(payload.state || '').trim();
+    const incomingCode = String(payload.code || '').trim();
+    const incomingError = String(payload.error || '').trim();
+    if (!incomingState || incomingError) return;
+    const activeState = String(mindOpenAiCodexOAuthAttempt?.state || '').trim();
+    if (activeState && incomingState === activeState) {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: '' });
+      return;
+    }
+    if (incomingCode) {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: `${incomingCode}#${incomingState}` });
+    }
+  });
+}
+
+async function exchangeMindOpenAiCodexOAuthAttempt({ attemptId, callbackInput = '' }) {
+  const payload = {};
+  if (attemptId) payload.attemptId = String(attemptId).trim();
+  if (callbackInput) payload.callbackInput = callbackInput;
+  return await api('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+}
+
+function hydrateMindUiFromOAuthCredential(credential) {
+  const access = String(credential?.access || '').trim();
+  if (!access) throw new Error('TOKEN_RESPONSE_INVALID');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const authMode = el('llmAuthModeSelect');
+  if (authMode) {
+    authMode.value = MIND_AUTH_OAUTH;
+    setMindAuthModeUi(MIND_AUTH_OAUTH);
+  }
+  if (keyInput) keyInput.value = access;
+  if (oauthInput) {
+    oauthInput.value = JSON.stringify({
+      provider: 'openai-codex',
+      access,
+      refresh: String(credential?.refresh || ''),
+      expires: Number(credential?.expires || 0),
+      accountId: String(credential?.accountId || '')
+    }, null, 2);
+  }
+  syncMindModelRefFromInputs();
+}
+
+async function completeMindOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
+  if (mindOpenAiCodexOAuthExchangeInFlight) return;
+  mindOpenAiCodexOAuthExchangeInFlight = true;
+  try {
+    const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+    if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+      throw new Error('OAuth completion is available for OpenAI providers only.');
+    }
+    const normalizedInput = String(callbackInput || '').trim();
+    const attemptId = String(mindOpenAiCodexOAuthAttempt?.attemptId || '').trim();
+    if (!attemptId && !normalizedInput) {
+      throw new Error('Start OAuth first.');
+    }
+    const result = await exchangeMindOpenAiCodexOAuthAttempt({
+      attemptId,
+      callbackInput: normalizedInput
+    });
+    const returnedAttemptId = String(result?.attempt?.id || '').trim();
+    const returnedState = String(result?.attempt?.state || '').trim();
+    if (returnedAttemptId) {
+      mindOpenAiCodexOAuthAttempt = {
+        attemptId: returnedAttemptId,
+        state: returnedState || String(mindOpenAiCodexOAuthAttempt?.state || '').trim(),
+        startedAtMs: Date.now()
+      };
+    }
+    const credential = result?.credential || result?.oauthProfile || null;
+    if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+    hydrateMindUiFromOAuthCredential(credential);
+    stopMindOpenAiCodexOAuthPoll();
+    mindOpenAiCodexOAuthAttempt = null;
+    setMindConfigStatus('OAuth exchange complete. Click Connect Brain.');
+    setMindConfigError('');
+  } catch (err) {
+    const code = String(err?.message || '').trim();
+    if (code === 'CODE_PENDING') {
+      setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+      setMindConfigError('');
+      return;
+    }
+    setMindConfigError(`OAuth exchange failed: ${code || 'OAUTH_EXCHANGE_FAILED'}`);
+    throw err;
+  } finally {
+    mindOpenAiCodexOAuthExchangeInFlight = false;
+  }
+}
+
+function startMindOpenAiCodexOAuthPoll() {
+  stopMindOpenAiCodexOAuthPoll();
+  mindOpenAiCodexOAuthPollTimer = setInterval(async () => {
+    try {
+      await completeMindOpenAiCodexOAuthFromUi({ callbackInput: '' });
+    } catch (err) {
+      if (String(err?.message || '').trim() === 'CODE_PENDING') return;
+      stopMindOpenAiCodexOAuthPoll();
+    }
+  }, 1500);
+}
+
+async function launchMindOauthInNewTab() {
+  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+  if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+    setMindConfigError('OAuth launch is available for OpenAI providers only.');
+    return;
+  }
+  bindMindOpenAiCodexOAuthMessageListener();
+  const started = await api('/api/agent/lite/llm/oauth/openai-codex/start', {
+    method: 'POST',
+    body: JSON.stringify({ provider, originator: 'portal-claw-lite-house' })
+  });
+  const authorizeUrl = String(started?.authorizeUrl || '').trim();
+  const attemptId = String(started?.attemptId || '').trim();
+  const state = String(started?.state || '').trim();
+  if (!authorizeUrl || !attemptId || !state) {
+    throw new Error('OAUTH_START_FAILED');
+  }
+  mindOpenAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) throw new Error('POPUP_BLOCKED');
+  setMindConfigStatus('OAuth started. Complete sign-in in the popup. Then use Complete OAuth if needed.');
+  setMindConfigError('');
+  startMindOpenAiCodexOAuthPoll();
+}
+
+function getDefaultLlmModelForProvider(provider) {
+  const supported = getSupportedMindModels(provider);
+  if (supported.length > 0) return supported[0];
+  return MIND_DEFAULT_MODEL;
+}
+
+function mapMindConfigError(error) {
+  const msg = String(error?.message || error || '');
+  if (msg === 'MISSING_LLM_PROVIDER') return 'Enter a provider.';
+  if (msg === 'MISSING_LLM_MODEL') return 'Enter a model.';
+  if (msg === 'MISSING_LLM_CREDENTIAL') return 'Enter an API key or OAuth token.';
+  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return 'Paste an OAuth profile JSON or token.';
+  if (msg === 'INVALID_OAUTH_PROFILE_JSON') return 'Invalid OAuth profile/token format.';
+  if (msg === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return 'No access token found in OAuth profile JSON.';
+  if (msg === 'UNSUPPORTED_OPENAI_ID_TOKEN') {
+    return 'OpenAI id_token callback URLs are not valid model credentials. Use an API key or OAuth profile with an access token.';
+  }
+  if (msg === 'IDB_OPEN_FAILED') return 'Local OpenClaw state is unavailable.';
+  return msg || 'Mind configuration failed.';
+}
+
+function setMindAuthModeUi(mode) {
+  const normalized = normalizeMindAuthMode(mode);
+  const authMode = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const oauthHint = el('llmOauthProfileHint');
+  const keyInput = el('llmKeyInput');
+  if (authMode) authMode.value = normalized;
+  if (oauthInput) oauthInput.style.display = normalized === MIND_AUTH_OAUTH ? 'block' : 'none';
+  if (keyInput) {
+    keyInput.placeholder = normalized === MIND_AUTH_OAUTH
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
+  }
+  if (oauthHint) {
+    oauthHint.textContent = normalized === MIND_AUTH_OAUTH
+      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
+      : '';
+  }
+  updateMindOauthLaunchUi();
+}
+
+function syncMindModelRefFromInputs() {
+  const providerInput = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const modelRefInput = el('llmModelRefInput');
+  if (!providerInput || !modelInput || !modelRefInput) return;
+  const providerRaw = String(providerInput.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const provider = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const model = String(modelInput.value || '').trim();
+  modelRefInput.value = model ? `${provider}/${model}` : '';
+}
+
+function getAccessTokenFromProfileValue(value) {
+  if (!value || typeof value !== 'object') return '';
+  const direct = typeof value.access === 'string'
+    ? value.access.trim()
+    : typeof value.access_token === 'string'
+      ? value.access_token.trim()
+      : typeof value.accessToken === 'string'
+        ? value.accessToken.trim()
+        : typeof value.id_token === 'string'
+          ? value.id_token.trim()
+          : typeof value.idToken === 'string'
+            ? value.idToken.trim()
+            : '';
+  return direct;
+}
+
+function getOAuthProviderAliases(providerHint) {
+  const normalized = String(providerHint || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const aliases = new Set([normalized]);
+  if (normalized === 'openai-codex') {
+    aliases.add('openai');
+    aliases.add('chatgpt');
+  }
+  if (normalized === 'openai') {
+    aliases.add('openai-codex');
+    aliases.add('chatgpt');
+  }
+  return [...aliases];
+}
+
+function providerAliasMatches(aliasSet, rawName) {
+  if (!aliasSet || !aliasSet.size) return true;
+  const normalized = String(rawName || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (aliasSet.has(normalized)) return true;
+  const prefix = normalized.match(/^[a-z0-9_-]+/);
+  if (prefix && aliasSet.has(prefix[0])) return true;
+  return false;
+}
+
+function decodeMaybeUriComponent(value) {
+  const text = String(value || '').trim();
+  if (!text || !text.includes('%')) return text;
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizeTokenCandidate(value) {
+  const text = String(value || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!text) return '';
+  return text.replace(/^bearer\s+/i, '').trim();
+}
+
+function isLikelyJwtToken(value) {
+  return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || ''));
+}
+
+function isLikelyOpaqueOAuthToken(value) {
+  return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function parseJwtPayloadUnsafe(token) {
+  const raw = String(token || '').trim();
+  if (!isLikelyJwtToken(raw)) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyOpenAiIdToken(token) {
+  const payload = parseJwtPayloadUnsafe(token);
+  if (!payload || typeof payload !== 'object') return false;
+  const issuer = String(payload.iss || '').trim();
+  const hasAtHash = typeof payload.at_hash === 'string' && payload.at_hash.length > 0;
+  return issuer === 'https://auth.openai.com' && hasAtHash;
+}
+
+function validateOAuthCredentialForProvider({ provider, credential }) {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const token = String(credential || '').trim();
+  if (!token || !isLikelyJwtToken(token)) return '';
+  if (!isLikelyOpenAiIdToken(token)) return '';
+  if (normalizedProvider === 'openai' || normalizedProvider === 'openai-codex') {
+    return 'UNSUPPORTED_OPENAI_ID_TOKEN';
+  }
+  return '';
+}
+
+function collectOAuthCandidatesFromUrl(rawUrl) {
+  let parsed = null;
+  try {
+    parsed = new URL(String(rawUrl || '').trim());
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  const seen = new Set();
+  const pushCandidate = (value) => {
+    const normalized = normalizeTokenCandidate(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+    const decoded = decodeMaybeUriComponent(normalized);
+    if (decoded && decoded !== normalized && !seen.has(decoded)) {
+      seen.add(decoded);
+      out.push(decoded);
+    }
+  };
+
+  const readParams = (params) => {
+    for (const [rawKey, rawValue] of params.entries()) {
+      const key = String(rawKey || '').trim().toLowerCase();
+      const value = String(rawValue || '').trim();
+      if (!key || !value) continue;
+      const include = key === 'access'
+        || key === 'access_token'
+        || key === 'token'
+        || key === 'oauth_token'
+        || key === 'id_token'
+        || key === 'auth'
+        || key === 'profile'
+        || key === 'credentials'
+        || key.includes('token');
+      if (!include) continue;
+      pushCandidate(value);
+    }
+  };
+
+  readParams(parsed.searchParams);
+
+  const hashRaw = String(parsed.hash || '').replace(/^#/, '').trim();
+  if (hashRaw) {
+    const hashQuery = hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw;
+    readParams(new URLSearchParams(hashQuery));
+  }
+
+  return out;
+}
+
+function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
+  if (!profileMap || typeof profileMap !== 'object') return '';
+  if (Array.isArray(profileMap)) {
+    for (const item of profileMap) {
+      const token = extractOAuthTokenFromProfileMap(item, providerHint);
+      if (token) return token;
+    }
+    return '';
+  }
+  const aliasSet = new Set(getOAuthProviderAliases(providerHint));
+  const direct = getAccessTokenFromProfileValue(profileMap);
+  if (direct) return direct;
+
+  for (const alias of aliasSet) {
+    if (!alias) continue;
+    if (profileMap[alias]) {
+      const directProfile = getAccessTokenFromProfileValue(profileMap[alias]);
+      if (directProfile) return directProfile;
+    }
+  }
+
+  for (const key of Object.keys(profileMap)) {
+    const profile = profileMap[key];
+    const profileToken = getAccessTokenFromProfileValue(profile);
+    const profileProvider = String(profile?.provider || profile?.type || key || '').trim().toLowerCase();
+    if (!profileToken) continue;
+    if (providerAliasMatches(aliasSet, profileProvider) || providerAliasMatches(aliasSet, key)) {
+      return profileToken;
+    }
+  }
+  return '';
+}
+
+function extractOAuthAccessTokenFromObject(parsed, providerHint) {
+  const candidates = [];
+  if (parsed && typeof parsed === 'object') {
+    candidates.push(parsed);
+    if (parsed.profiles && typeof parsed.profiles === 'object') candidates.push(parsed.profiles);
+    if (parsed.auth && parsed.auth.profiles && typeof parsed.auth.profiles === 'object') candidates.push(parsed.auth.profiles);
+    if (parsed.profile && typeof parsed.profile === 'object') candidates.push(parsed.profile);
+    if (parsed.providerProfiles && typeof parsed.providerProfiles === 'object') candidates.push(parsed.providerProfiles);
+  }
+  for (const candidate of candidates) {
+    const token = extractOAuthTokenFromProfileMap(candidate, providerHint);
+    if (token) return token;
+  }
+  const direct = getAccessTokenFromProfileValue(parsed);
+  if (direct) return direct;
+  return '';
+}
+
+function extractOAuthAccessToken(raw, providerHint) {
+  const text = String(raw || '').trim();
+  if (!text) return { ok: false, error: 'MISSING_OAUTH_PROFILE_JSON' };
+
+  const directToken = normalizeTokenCandidate(text);
+  if (isLikelyJwtToken(directToken) || isLikelyOpaqueOAuthToken(directToken)) {
+    return { ok: true, token: directToken };
+  }
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+      return token
+        ? { ok: true, token }
+        : { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+    } catch {
+      return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+    }
+  }
+
+  const decodedText = decodeMaybeUriComponent(text);
+  if (decodedText && decodedText !== text) {
+    const decodedDirectToken = normalizeTokenCandidate(decodedText);
+    if (isLikelyJwtToken(decodedDirectToken) || isLikelyOpaqueOAuthToken(decodedDirectToken)) {
+      return { ok: true, token: decodedDirectToken };
+    }
+    if (decodedText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(decodedText);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  const urlCandidates = collectOAuthCandidatesFromUrl(text);
+  for (const candidate of urlCandidates) {
+    if (isLikelyJwtToken(candidate) || isLikelyOpaqueOAuthToken(candidate)) {
+      return { ok: true, token: candidate };
+    }
+    if (candidate.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(text)) {
+    return { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+  }
+  return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+}
+
+function applyMindConfigToInputs(config) {
+  const providerInput = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const modelRefInput = el('llmModelRefInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const selected = applyMindProviderModelSelection(
+    config?.provider || MIND_DEFAULT_PROVIDER,
+    config?.model || MIND_DEFAULT_MODEL
+  );
+  if (providerInput) providerInput.value = selected.provider;
+  if (modelInput) modelInput.value = selected.model;
+  setMindAuthModeUi(config?.authMode || MIND_AUTH_API_KEY);
+  if (modelRefInput) {
+    const resolved = parseModelRef(
+      config?.modelRef || `${selected.provider}/${selected.model}`,
+      selected.provider,
+      selected.model
+    );
+    modelRefInput.value = resolved.modelRef;
+  }
+  if (keyInput) keyInput.value = config?.authMode === MIND_AUTH_OAUTH ? '' : (config?.credential || '');
+  if (oauthInput) oauthInput.value = config?.authMode === MIND_AUTH_OAUTH ? (config?.credential || '') : '';
+  syncMindModelRefFromInputs();
+}
+
+async function readLocalMindConfig() {
+  const lib = await loadLiteLlmLibrary();
+  const localCfg = await lib.loadLlmConfig();
+  const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
+  const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
+  const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
+  const credential = typeof localCfg?.apiKey === 'string' ? localCfg.apiKey : '';
+  const authMode = normalizeMindAuthMode(localCfg?.authMode);
+  const parsed = parseModelRef(
+    modelRefRaw || `${providerRaw || MIND_DEFAULT_PROVIDER}/${modelRaw || MIND_DEFAULT_MODEL}`,
+    providerRaw || MIND_DEFAULT_PROVIDER,
+    modelRaw || MIND_DEFAULT_MODEL
+  );
+  const provider = providerRaw || parsed.provider || MIND_DEFAULT_PROVIDER;
+  const model = modelRaw || parsed.modelId || MIND_DEFAULT_MODEL;
+  const modelRef = modelRefRaw || parsed.modelRef;
+  return {
+    configured: !!(provider && model && credential && localCfg?.configured),
+    provider,
+    model,
+    modelRef,
+    credential,
+    authMode
+  };
+}
+
+async function hydrateMindConfigFromLocal({ silent = false } = {}) {
+  const config = await readLocalMindConfig();
+  applyMindConfigToInputs(config);
+  if (config.configured) {
+    await activateMindConfig(config);
+  } else {
+    await deactivateMindConfig();
+  }
+  if (!silent) {
+    if (config.configured) {
+      setMindConfigStatus(`Mind loaded: ${config.provider}/${config.model}.`);
+    } else {
+      setMindConfigStatus('Mind not configured yet.');
+    }
+  }
+  setMindConfigError('');
+  return config;
+}
+
+function resolveMindConfigFromInputs() {
+  const providerRaw = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const providerInput = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const modelInput = String(el('llmModelIdInput')?.value || '').trim();
+  const authMode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
+  const keyRaw = String(el('llmKeyInput')?.value || '').trim();
+  const oauthInput = String(el('llmOauthProfileInput')?.value || '').trim();
+  if (!providerInput) throw new Error('MISSING_LLM_PROVIDER');
+  if (!modelInput) throw new Error('MISSING_LLM_MODEL');
+  const parsed = parseModelRef(
+    `${providerInput}/${modelInput || getDefaultLlmModelForProvider(providerInput)}`,
+    providerInput,
+    modelInput || getDefaultLlmModelForProvider(providerInput)
+  );
+
+  const keyParsed = extractOAuthAccessToken(keyRaw, providerInput);
+  const keyCredential = keyParsed.ok ? String(keyParsed.token || '').trim() : keyRaw;
+  let credential = keyCredential;
+  let oauthError = '';
+  if (authMode === MIND_AUTH_OAUTH) {
+    const token = extractOAuthAccessToken(oauthInput, providerInput);
+    oauthError = oauthInput && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
+    const parsedCredential = token.ok ? String(token.token || '').trim() : '';
+    credential = keyCredential || parsedCredential;
+  } else if (!credential && oauthInput) {
+    const token = extractOAuthAccessToken(oauthInput, providerInput);
+    if (token.ok) credential = String(token.token || '').trim();
+  }
+  if (!credential) throw new Error(oauthError || 'MISSING_LLM_CREDENTIAL');
+
+  const tokenValidationError = validateOAuthCredentialForProvider({
+    provider: parsed.provider,
+    credential,
+  });
+  if (tokenValidationError) throw new Error(tokenValidationError);
+
+  const modelRefInput = el('llmModelRefInput');
+  if (modelRefInput) modelRefInput.value = parsed.modelRef;
+
+  return {
+    provider: parsed.provider,
+    model: parsed.modelId,
+    modelRef: parsed.modelRef,
+    credential,
+    authMode
+  };
+}
+
+async function saveMindConfigToLocal({ silent = false } = {}) {
+  const config = resolveMindConfigFromInputs();
+  const lib = await loadLiteLlmLibrary();
+  await lib.saveLlmConfig({
+    provider: config.provider,
+    model: config.model,
+    apiKey: config.credential,
+    authMode: config.authMode
+  });
+  if (house?.houseId) {
+    await idbPutMetaRecords([['houseId', house.houseId]]);
+  }
+  await activateMindConfig(config);
+  if (!silent) setMindConfigStatus(`Mind saved: ${config.provider}/${config.model}.`);
+  setMindConfigError('');
+  return config;
+}
+
+async function persistMindConfigDraftIfPresent() {
+  const credential = String(el('llmKeyInput')?.value || '').trim();
+  const oauth = String(el('llmOauthProfileInput')?.value || '').trim();
+  if (!credential && !oauth) return false;
+  await saveMindConfigToLocal({ silent: true });
+  return true;
+}
+
+async function clearMindConfigFromLocal() {
+  mindOpenAiCodexOAuthAttempt = null;
+  stopMindOpenAiCodexOAuthPoll();
+  const lib = await loadLiteLlmLibrary();
+  await lib.clearLlmConfig();
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
+  await deactivateMindConfig();
+  setMindConfigStatus('Mind config cleared.');
+  setMindConfigError('');
+}
+
+function isRecordObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneJsonSafe(value) {
+  if (value === undefined) return null;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) return null;
+    return JSON.parse(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAgentStateMetaRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_META_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const key = typeof item.key === 'string' ? item.key.trim() : '';
+    if (!key || key.length > 256 || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, value: cloneJsonSafe(item.value) });
+  }
+  return out;
+}
+
+function normalizeAgentStateVfsRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_VFS_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const path = typeof item.path === 'string' ? item.path.trim() : '';
+    const dataB64 = typeof item.dataB64 === 'string' ? item.dataB64.trim() : '';
+    if (!path || path.length > 1024 || !dataB64 || seen.has(path)) continue;
+    seen.add(path);
+    const updatedAtMs = Number(item.updatedAtMs);
+    out.push({
+      path,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateCheckpoints(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > AGENT_STATE_MAX_CHECKPOINT_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const checkpointId = typeof item.checkpointId === 'string' ? item.checkpointId.trim() : '';
+    if (!checkpointId || checkpointId.length > 256 || seen.has(checkpointId)) continue;
+    const cloned = cloneJsonSafe(item);
+    if (!isRecordObject(cloned)) continue;
+    cloned.checkpointId = checkpointId;
+    seen.add(checkpointId);
+    out.push(cloned);
+  }
+  return out;
+}
+
+function normalizeAgentStateSnapshot(raw) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const stores = raw.stores;
+  if (!isRecordObject(stores)) throw new Error('INVALID_AGENT_STATE');
+
+  return {
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : new Date().toISOString(),
+    stores: {
+      meta: normalizeAgentStateMetaRecords(stores.meta || []),
+      vfs: normalizeAgentStateVfsRecords(stores.vfs || []),
+      checkpoints: normalizeAgentStateCheckpoints(stores.checkpoints || [])
+    }
+  };
+}
+
+function normalizeSealedAgentStateSnapshot(raw) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const ciphertext = raw.ciphertext;
+  if (!isRecordObject(ciphertext)) throw new Error('INVALID_AGENT_STATE');
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : 'AES-GCM';
+  const houseId = typeof raw.houseId === 'string' ? raw.houseId.trim() : '';
+  if (!iv || !ct || alg !== 'AES-GCM') throw new Error('INVALID_AGENT_STATE');
+  if (!unb64Safe(iv) || !unb64Safe(ct)) throw new Error('INVALID_AGENT_STATE');
+  return {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : new Date().toISOString(),
+    houseId: houseId || null,
+    ciphertext: { alg: 'AES-GCM', iv, ct }
+  };
+}
+
+function isSealedAgentStateSnapshot(snapshot) {
+  return !!(snapshot && snapshot.kind === AGENT_STATE_SEALED_KIND && isRecordObject(snapshot.ciphertext));
+}
+
+async function deriveAgentStateSealKey(Kroot) {
+  const info = new TextEncoder().encode('elizatown-agent-state-seal-v1');
+  const salt = new Uint8Array([]);
+  const baseKey = await crypto.subtle.importKey('raw', Kroot, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt, info },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function sealAgentStateSnapshot(snapshot, expectedHouseId) {
+  if (!KrootBytes) throw new Error('HOUSE_KEY_NOT_READY');
+  const normalized = normalizeAgentStateSnapshot(snapshot);
+  assertSnapshotMatchesHouse(normalized, expectedHouseId);
+  const key = await deriveAgentStateSealKey(KrootBytes);
+  const aad = new TextEncoder().encode(`house=${expectedHouseId || ''}`);
+  const pt = new TextEncoder().encode(JSON.stringify(normalized));
+  const enc = await aesGcmEncrypt(key, pt, aad);
+  return {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: new Date().toISOString(),
+    houseId: expectedHouseId || null,
+    ciphertext: {
+      alg: 'AES-GCM',
+      iv: b64(enc.iv),
+      ct: b64(enc.ct)
+    }
+  };
+}
+
+async function resolveSnapshotForLocalImport(rawSnapshot, expectedHouseId) {
+  if (!isRecordObject(rawSnapshot)) throw new Error('INVALID_AGENT_STATE');
+  if (isSealedAgentStateSnapshot(rawSnapshot)) {
+    if (!KrootBytes) throw new Error('HOUSE_KEY_NOT_READY');
+    const sealed = normalizeSealedAgentStateSnapshot(rawSnapshot);
+    if (expectedHouseId && sealed.houseId && sealed.houseId !== expectedHouseId) {
+      throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+    }
+    const key = await deriveAgentStateSealKey(KrootBytes);
+    const aadHouseId = sealed.houseId || expectedHouseId || '';
+    const aad = new TextEncoder().encode(`house=${aadHouseId}`);
+    const iv = unb64Safe(sealed.ciphertext.iv);
+    const ct = unb64Safe(sealed.ciphertext.ct);
+    if (!iv || !ct) throw new Error('INVALID_AGENT_STATE');
+    let pt;
+    try {
+      pt = await aesGcmDecrypt(key, iv, ct, aad);
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(new TextDecoder().decode(pt));
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const normalized = normalizeAgentStateSnapshot(parsed);
+    assertSnapshotMatchesHouse(normalized, expectedHouseId);
+    return normalized;
+  }
+  const normalized = normalizeAgentStateSnapshot(rawSnapshot);
+  assertSnapshotMatchesHouse(normalized, expectedHouseId);
+  return normalized;
+}
+
+function snapshotByteLength(snapshot) {
+  return new TextEncoder().encode(JSON.stringify(snapshot)).length;
+}
+
+function sanitizeZipRelativePath(pathValue) {
+  const normalized = String(pathValue || '').replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!normalized || normalized.includes('\0')) return null;
+  const parts = normalized.split('/').filter(Boolean);
+  if (!parts.length) return null;
+  if (parts.some((part) => part === '.' || part === '..')) return null;
+  return parts.join('/');
+}
+
+async function parseStoredZip(bytes) {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array([]);
+  if (data.length < 22) throw new Error('INVALID_AGENT_STATE');
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+
+  let eocdOffset = -1;
+  const minOffset = Math.max(0, data.length - (22 + 0xffff));
+  for (let i = data.length - 22; i >= minOffset; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error('INVALID_AGENT_STATE');
+
+  const entryCount = view.getUint16(eocdOffset + 10, true);
+  const centralOffset = view.getUint32(eocdOffset + 16, true);
+  const decoder = new TextDecoder();
+  const out = new Map();
+  let cursor = centralOffset;
+
+  for (let i = 0; i < entryCount; i++) {
+    if (cursor + 46 > data.length || view.getUint32(cursor, true) !== 0x02014b50) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const compression = view.getUint16(cursor + 10, true);
+    const compressedSize = view.getUint32(cursor + 20, true);
+    const uncompressedSize = view.getUint32(cursor + 24, true);
+    const nameLen = view.getUint16(cursor + 28, true);
+    const extraLen = view.getUint16(cursor + 30, true);
+    const commentLen = view.getUint16(cursor + 32, true);
+    const localOffset = view.getUint32(cursor + 42, true);
+    const nameStart = cursor + 46;
+    const nameEnd = nameStart + nameLen;
+    if (nameEnd > data.length) throw new Error('INVALID_AGENT_STATE');
+    const name = decoder.decode(data.subarray(nameStart, nameEnd));
+
+    if (compression !== 0) throw new Error('UNSUPPORTED_ZIP_COMPRESSION');
+    if (localOffset + 30 > data.length || view.getUint32(localOffset, true) !== 0x04034b50) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const localNameLen = view.getUint16(localOffset + 26, true);
+    const localExtraLen = view.getUint16(localOffset + 28, true);
+    const fileStart = localOffset + 30 + localNameLen + localExtraLen;
+    const fileEnd = fileStart + compressedSize;
+    if (fileEnd > data.length) throw new Error('INVALID_AGENT_STATE');
+    const fileBytes = data.subarray(fileStart, fileEnd);
+    if (fileBytes.length !== uncompressedSize) throw new Error('INVALID_AGENT_STATE');
+    out.set(name, new Uint8Array(fileBytes));
+
+    cursor += 46 + nameLen + extraLen + commentLen;
+  }
+
+  return out;
+}
+
+function textBytes(text) {
+  return new TextEncoder().encode(String(text || ''));
+}
+
+function bytesToText(bytes) {
+  return new TextDecoder().decode(bytes || new Uint8Array([]));
+}
+
+function parseJsonBytes(bytes) {
+  try {
+    return JSON.parse(bytesToText(bytes));
+  } catch {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+}
+
+function isZipFile(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  return name.endsWith('.zip') || type === 'application/zip' || type === 'application/x-zip-compressed';
+}
+
+async function readFileAsBytes(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result || new ArrayBuffer(0)));
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function parseZipBackupToSnapshot(bytes, expectedHouseId = null) {
+  const files = await parseStoredZip(bytes);
+  const openClawManifestBytes = files.get('manifest.json');
+  if (openClawManifestBytes) {
+    const manifest = parseJsonBytes(openClawManifestBytes);
+    if (!isRecordObject(manifest)) throw new Error('INVALID_AGENT_STATE');
+    if (manifest.v !== 1 || manifest.kind !== AGENT_STATE_OPENCLAW_EXPORT_KIND) {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    const manifestCreatedAtMs = Number(manifest.createdAtMs);
+    const fallbackUpdatedAtMs = Number.isFinite(manifestCreatedAtMs)
+      ? Math.max(0, Math.floor(manifestCreatedAtMs))
+      : Date.now();
+    const vfs = [];
+    for (const [fileName, fileBytes] of files.entries()) {
+      const safePath = sanitizeZipRelativePath(fileName);
+      if (!safePath || safePath === 'manifest.json') continue;
+      vfs.push({
+        path: safePath,
+        updatedAtMs: fallbackUpdatedAtMs,
+        dataB64: b64(fileBytes)
+      });
+    }
+    return normalizeAgentStateSnapshot({
+      v: 1,
+      kind: AGENT_STATE_KIND,
+      schema: AGENT_STATE_SCHEMA,
+      createdAt: new Date().toISOString(),
+      stores: {
+        meta: expectedHouseId ? [{ key: 'houseId', value: expectedHouseId }] : [],
+        vfs,
+        checkpoints: []
+      }
+    });
+  }
+
+  const manifestBytes = files.get('agent-state-manifest.json');
+  const metaBytes = files.get('meta.json');
+  const checkpointsBytes = files.get('checkpoints.json');
+  const vfsIndexBytes = files.get('vfs-index.json');
+  if (!manifestBytes || !metaBytes || !checkpointsBytes || !vfsIndexBytes) throw new Error('INVALID_AGENT_STATE');
+
+  const manifest = parseJsonBytes(manifestBytes);
+  if (!isRecordObject(manifest)) throw new Error('INVALID_AGENT_STATE');
+  const manifestKind = typeof manifest.kind === 'string' ? manifest.kind.trim() : '';
+  const manifestSchema = typeof manifest.schema === 'string' ? manifest.schema.trim() : '';
+  if (manifestKind !== AGENT_STATE_ZIP_KIND || manifestSchema !== AGENT_STATE_ZIP_SCHEMA) {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+  const manifestHouseId = typeof manifest.houseId === 'string' ? manifest.houseId.trim() : '';
+  if (expectedHouseId && manifestHouseId && manifestHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+
+  const meta = parseJsonBytes(metaBytes);
+  const checkpoints = parseJsonBytes(checkpointsBytes);
+  const vfsIndex = parseJsonBytes(vfsIndexBytes);
+  if (!Array.isArray(vfsIndex)) throw new Error('INVALID_AGENT_STATE');
+
+  const vfs = [];
+  for (const row of vfsIndex) {
+    if (!isRecordObject(row)) continue;
+    const safePath = sanitizeZipRelativePath(row.path);
+    if (!safePath) continue;
+    const fileBytes = files.get(`vfs/${safePath}`);
+    if (!fileBytes) throw new Error('INVALID_AGENT_STATE');
+    const updatedAtMs = Number(row.updatedAtMs);
+    vfs.push({
+      path: safePath,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64: b64(fileBytes)
+    });
+  }
+
+  return normalizeAgentStateSnapshot({
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: new Date().toISOString(),
+    stores: {
+      meta: Array.isArray(meta) ? meta : [],
+      vfs,
+      checkpoints: Array.isArray(checkpoints) ? checkpoints : []
+    }
+  });
+}
+
+function extractSnapshotHouseId(snapshot) {
+  if (!isRecordObject(snapshot)) return null;
+  const list = Array.isArray(snapshot?.stores?.meta) ? snapshot.stores.meta : [];
+  const record = list.find((entry) => isRecordObject(entry) && entry.key === 'houseId');
+  const houseId = typeof record?.value === 'string' ? record.value.trim() : '';
+  return houseId || null;
+}
+
+function assertSnapshotMatchesHouse(snapshot, expectedHouseId) {
+  const snapshotHouseId = extractSnapshotHouseId(snapshot);
+  if (expectedHouseId && snapshotHouseId && snapshotHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+}
+
+async function exportLocalAgentStateSnapshot() {
+  const [metaRows, vfsRows, checkpointRows] = await Promise.all([
+    idbGetAll('meta'),
+    idbGetAll('vfs'),
+    idbGetAll('checkpoints')
+  ]);
+  const snapshot = normalizeAgentStateSnapshot({
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: new Date().toISOString(),
+    stores: {
+      meta: metaRows,
+      vfs: vfsRows,
+      checkpoints: checkpointRows
+    }
+  });
+  const sizeBytes = snapshotByteLength(snapshot);
+  if (sizeBytes > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+  return { snapshot, sizeBytes };
+}
+
+async function replaceLocalAgentStateSnapshot(snapshot) {
+  const normalized = normalizeAgentStateSnapshot(snapshot);
+  const sizeBytes = snapshotByteLength(normalized);
+  if (sizeBytes > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+
+  const db = await openOpenClawDb();
+  const tx = db.transaction(['meta', 'vfs', 'checkpoints'], 'readwrite');
+  tx.objectStore('meta').clear();
+  tx.objectStore('vfs').clear();
+  tx.objectStore('checkpoints').clear();
+  for (const row of normalized.stores.meta) tx.objectStore('meta').put(row);
+  for (const row of normalized.stores.vfs) tx.objectStore('vfs').put(row);
+  for (const row of normalized.stores.checkpoints) tx.objectStore('checkpoints').put(row);
+  await idbTxDone(tx);
+  return { snapshot: normalized, sizeBytes };
+}
+
+async function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('FILE_READ_FAILED'));
+    reader.readAsText(file);
+  });
+}
+
+function formatBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+  if (bytes < 1024) return `${Math.floor(bytes)} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function mapAgentStateError(error) {
+  const msg = String(error?.message || error || '');
+  if (!msg) return 'Agent state operation failed.';
+  if (msg === 'LOCKED') return 'Unlock the house first.';
+  if (msg === 'RUNTIME_NOT_READY') return 'Local OpenClaw runtime is not ready yet. Try again in a moment.';
+  if (msg === 'HOUSE_KEY_NOT_READY') return 'House key is not ready. Unlock again.';
+  if (msg === 'INVALID_AGENT_STATE') return 'Invalid agent backup format.';
+  if (msg === 'AGENT_STATE_TOO_LARGE') return 'Agent backup is too large.';
+  if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return 'Backup belongs to a different house.';
+  if (msg === 'UNSUPPORTED_ZIP_COMPRESSION') return 'Unsupported zip compression. Use a backup exported from this page.';
+  if (msg === 'NOT_FOUND') return 'House not found.';
+  if (msg === 'FILE_READ_FAILED') return 'Failed to read backup file.';
+  return msg;
+}
+
+async function getHouseAgentStateSnapshot(houseId) {
+  const data = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/agent-state`);
+  return {
+    snapshot: data?.agentState || null,
+    updatedAt: data?.updatedAt || null,
+    sizeBytes: Number(data?.sizeBytes || 0) || 0
+  };
+}
+
+async function putHouseAgentStateSnapshot(houseId, snapshot) {
+  const body = JSON.stringify({ snapshot });
+  return houseApi(
+    houseId,
+    `/api/house/${encodeURIComponent(houseId)}/agent-state`,
+    { method: 'POST', body }
+  );
 }
 
 
@@ -972,6 +2519,7 @@ function setHousePanelButtonsEnabled(enabled) {
   if (descBtn) descBtn.disabled = !enabled;
   if (ercBtn) ercBtn.disabled = !enabled;
   setPublicMediaEnabled(enabled);
+  setAgentStateControlsEnabled(enabled);
   if (!enabled) {
     setDescriptorOpen(false);
     setErc8004Open(false);
@@ -1077,6 +2625,12 @@ function wipeKeys() {
   publicMedia = null;
   pendingPublicImage = null;
   el('entries').textContent = '';
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
   clearDescriptorUI();
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
@@ -1133,6 +2687,86 @@ async function unlockExistingHouse(houseId) {
   setErc8004Open(false);
   await refreshEntries();
   await loadPublicMedia();
+  try {
+    await restoreAgentStateFromHouse({ silent: true });
+  } catch (err) {
+    setAgentStateError(mapAgentStateError(err));
+  }
+  try {
+    await hydrateMindConfigFromLocal({ silent: true });
+  } catch (err) {
+    setMindConfigError(mapMindConfigError(err));
+  }
+}
+
+async function restoreAgentStateFromHouse({ silent = false } = {}) {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  const { snapshot, sizeBytes, updatedAt } = await getHouseAgentStateSnapshot(house.houseId);
+  if (!snapshot) {
+    if (!silent) setAgentStateStatus('No saved agent state found in this house.');
+    return { restored: false, sizeBytes: 0 };
+  }
+  const plainSnapshot = await resolveSnapshotForLocalImport(snapshot, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(plainSnapshot);
+  await hydrateMindConfigFromLocal({ silent });
+  const label = updatedAt ? `from ${new Date(updatedAt).toLocaleString()}` : 'from house';
+  setAgentStateStatus(`Agent state restored ${label} (${formatBytes(sizeBytes || imported.sizeBytes)}).`);
+  setAgentStateError('');
+  return { restored: true, sizeBytes: sizeBytes || imported.sizeBytes };
+}
+
+async function saveAgentStateToHouse() {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  await persistMindConfigDraftIfPresent();
+  const exported = await exportLocalAgentStateSnapshot();
+  assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
+  const sealed = await sealAgentStateSnapshot(exported.snapshot, house.houseId);
+  const response = await putHouseAgentStateSnapshot(house.houseId, sealed);
+  const when = response?.updatedAt ? new Date(response.updatedAt).toLocaleString() : 'now';
+  setAgentStateStatus(`Saved encrypted agent state to house (${formatBytes(exported.sizeBytes)} at ${when}).`);
+  setAgentStateError('');
+  return exported;
+}
+
+async function downloadAgentStateBackup() {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  await persistMindConfigDraftIfPresent();
+  const exported = await exportLocalAgentStateSnapshot();
+  assertSnapshotMatchesHouse(exported.snapshot, house.houseId);
+  const gateway = await loadLiteGateway();
+  if (!gateway || typeof gateway.send !== 'function') throw new Error('RUNTIME_NOT_READY');
+  gateway.send({ type: 'gateway.command.exportZip' });
+  setAgentStateStatus('Downloaded OpenClaw-compatible ZIP from local runtime.');
+  setAgentStateError('');
+  return { format: AGENT_STATE_OPENCLAW_EXPORT_KIND };
+}
+
+async function uploadAgentStateBackup(file) {
+  if (!unlocked || !house) throw new Error('LOCKED');
+  if (!file) throw new Error('INVALID_AGENT_STATE');
+  if (file.size > AGENT_STATE_MAX_BYTES) throw new Error('AGENT_STATE_TOO_LARGE');
+  let sourceSnapshot;
+  if (isZipFile(file)) {
+    const bytes = await readFileAsBytes(file);
+    sourceSnapshot = await parseZipBackupToSnapshot(bytes, house.houseId);
+  } else {
+    const raw = await readTextFile(file);
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('INVALID_AGENT_STATE');
+    }
+    sourceSnapshot = parsed;
+  }
+  const plainSnapshot = await resolveSnapshotForLocalImport(sourceSnapshot, house.houseId);
+  const imported = await replaceLocalAgentStateSnapshot(plainSnapshot);
+  await hydrateMindConfigFromLocal({ silent: true });
+  const sealed = await sealAgentStateSnapshot(imported.snapshot, house.houseId);
+  await putHouseAgentStateSnapshot(house.houseId, sealed);
+  setAgentStateStatus(`Uploaded and replaced agent state (${formatBytes(imported.sizeBytes)}).`);
+  setAgentStateError('');
+  return imported;
 }
 
 async function appendEntry() {
@@ -1701,7 +3335,7 @@ async function initSharePanel() {
             body: JSON.stringify({ xPostUrl: humanUrl, shareId: shareIdForPosts })
           });
         }
-        if (shareAgentPost && !tokenMode) {
+        if (shareAgentPost && !tokenMode && agentUrl) {
           if (!teamCode) throw new Error('TEAM_CODE_MISSING');
           await api('/api/agent/posts', { method: 'POST', body: JSON.stringify({ teamCode, moltbookUrl: agentUrl }) });
         }
@@ -1905,6 +3539,173 @@ async function init() {
     setStatus('Locked (key wiped from memory).');
   });
 
+  const saveAgentStateBtn = el('saveAgentStateBtn');
+  if (saveAgentStateBtn) {
+    saveAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await saveAgentStateToHouse();
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const restoreAgentStateBtn = el('restoreAgentStateBtn');
+  if (restoreAgentStateBtn) {
+    restoreAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await restoreAgentStateFromHouse({ silent: false });
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const downloadAgentStateBtn = el('downloadAgentStateBtn');
+  if (downloadAgentStateBtn) {
+    downloadAgentStateBtn.addEventListener('click', async () => {
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await downloadAgentStateBackup();
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const uploadAgentStateBtn = el('uploadAgentStateBtn');
+  const uploadAgentStateInput = el('uploadAgentStateInput');
+  if (uploadAgentStateBtn && uploadAgentStateInput) {
+    uploadAgentStateBtn.addEventListener('click', () => {
+      if (uploadAgentStateBtn.disabled) return;
+      uploadAgentStateInput.click();
+    });
+    uploadAgentStateInput.addEventListener('change', async () => {
+      const file = uploadAgentStateInput.files && uploadAgentStateInput.files[0];
+      uploadAgentStateInput.value = '';
+      if (!file) return;
+      setAgentStateError('');
+      setAgentStateBusy(true);
+      try {
+        await uploadAgentStateBackup(file);
+      } catch (err) {
+        setAgentStateError(mapAgentStateError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const llmProviderInput = el('llmProviderSelect');
+  const llmModelInput = el('llmModelIdInput');
+  const llmAuthModeInput = el('llmAuthModeSelect');
+  const llmOauthInput = el('llmOauthProfileInput');
+  const llmOauthLaunchBtn = el('llmOauthLaunchBtn');
+  const llmOauthCompleteBtn = el('llmOauthCompleteBtn');
+  if (llmProviderInput && llmModelInput) {
+    const selected = applyMindProviderModelSelection(
+      llmProviderInput.value || MIND_DEFAULT_PROVIDER,
+      llmModelInput.value || MIND_DEFAULT_MODEL
+    );
+    llmProviderInput.value = selected.provider;
+    llmModelInput.value = selected.model;
+  }
+  if (llmProviderInput) {
+    llmProviderInput.addEventListener('change', () => {
+      const provider = applyMindProviderSelection(llmProviderInput.value || MIND_DEFAULT_PROVIDER);
+      if (llmModelInput) applyMindModelSelection(provider, llmModelInput.value || '');
+      syncMindModelRefFromInputs();
+      setMindAuthModeUi(llmAuthModeInput?.value);
+    });
+  }
+  if (llmModelInput) {
+    if (llmModelInput.tagName === 'SELECT') {
+      llmModelInput.addEventListener('change', () => syncMindModelRefFromInputs());
+    } else {
+      llmModelInput.addEventListener('input', () => syncMindModelRefFromInputs());
+    }
+  }
+  if (llmAuthModeInput) {
+    llmAuthModeInput.addEventListener('change', () => {
+      setMindAuthModeUi(llmAuthModeInput.value);
+      syncMindModelRefFromInputs();
+    });
+  }
+  if (llmOauthInput) {
+    llmOauthInput.addEventListener('input', () => syncMindModelRefFromInputs());
+  }
+  if (llmOauthLaunchBtn) {
+    llmOauthLaunchBtn.addEventListener('click', async () => {
+      try {
+        await launchMindOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setMindConfigError('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setMindConfigError(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  if (llmOauthCompleteBtn) {
+    llmOauthCompleteBtn.addEventListener('click', async () => {
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeMindOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || '').trim();
+        if (msg === 'CODE_PENDING') {
+          setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+          setMindConfigError('');
+        }
+      }
+    });
+  }
+  setMindAuthModeUi(llmAuthModeInput?.value);
+  syncMindModelRefFromInputs();
+
+  const saveMindConfigBtn = el('llmSaveBtn');
+  if (saveMindConfigBtn) {
+    saveMindConfigBtn.addEventListener('click', async () => {
+      setMindConfigError('');
+      setAgentStateBusy(true);
+      try {
+        await saveMindConfigToLocal();
+      } catch (err) {
+        setMindConfigError(mapMindConfigError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
+  const clearMindConfigBtn = el('llmClearBtn');
+  if (clearMindConfigBtn) {
+    clearMindConfigBtn.addEventListener('click', async () => {
+      setMindConfigError('');
+      setAgentStateBusy(true);
+      try {
+        await clearMindConfigFromLocal();
+      } catch (err) {
+        setMindConfigError(mapMindConfigError(err));
+      } finally {
+        setAgentStateBusy(false);
+      }
+    });
+  }
+
   el('copyDescriptorBtn').addEventListener('click', async () => {
     setError('');
     try {
@@ -2029,6 +3830,12 @@ async function init() {
 
   initSharePanel();
   updateWalletUI();
+  applyMindConfigToInputs({
+    provider: MIND_DEFAULT_PROVIDER,
+    model: MIND_DEFAULT_MODEL,
+    credential: '',
+    authMode: MIND_AUTH_API_KEY
+  });
   setHousePanelButtonsEnabled(false);
   syncInboxNavLink();
   setStatus('Ready. Connect wallet, then create or unlock a house.');

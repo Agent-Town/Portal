@@ -1,11 +1,42 @@
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -20,6 +51,77 @@ function el(id) {
   return document.getElementById(id);
 }
 
+const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
+const AGENT_PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
+
+let elements = [];
+let lastState = null;
+let wallet = null;
+let walletAddr = null;
+let redirecting = false;
+let pendingWalletCheck = false;
+let pendingLiteConnect = false;
+let pendingLlmSave = false;
+let pendingLlmClear = false;
+let pendingRuntimeBootstrap = false;
+let runtimeBootstrapPromise = null;
+let statusOverride = '';
+let runtimeBootstrapDone = false;
+let llmRestoreAttempted = false;
+let llmLibraryPromise = null;
+let runtimeBridgeInitKey = '';
+const runtimeBridge = window.OpenClawLiteRuntimeBridge || null;
+let liteGatewayPromise = null;
+const DEFAULT_LOCAL_LITE_LLM = Object.freeze({
+  loaded: false,
+  configured: false,
+  provider: null,
+  model: null,
+  modelRef: null,
+  authMode: 'api-key',
+  credential: '',
+  apiKeySet: false
+});
+let localLiteLlm = { ...DEFAULT_LOCAL_LITE_LLM };
+const DEFAULT_LITE_SKILL_STATE = Object.freeze({
+  status: 'idle',
+  sourceUrl: null,
+  activeSkillPath: null,
+  lastError: null,
+  lastImportedAtMs: null
+});
+let liteSkillState = { ...DEFAULT_LITE_SKILL_STATE };
+let liteSkillSyncPromise = null;
+let liteSkillLastSyncAtMs = 0;
+let liteSkillAutoImportPromise = null;
+let liteSkillAutoImportTeamCode = '';
+let liteSkillLoopTimer = null;
+let liteSkillLoopInFlight = false;
+let liteSkillLoopBackoffMs = 1000;
+let liteSkillLoopLastRunAtMs = 0;
+let liteSkillLoopTeamCode = '';
+let liteSkillLoopPauseReason = '';
+let liteSkillLoopLastErrorFingerprint = '';
+let liteSkillLoopLastErrorAtMs = 0;
+let townPanelUnlocked = false;
+let pendingHumanSigilSelection = null;
+let openAiCodexOAuthAttempt = null;
+let openAiCodexOAuthPollTimer = null;
+let openAiCodexOAuthExchangeInFlight = false;
+let openAiCodexOAuthMessageListenerBound = false;
+const AGENT_DEBUG_REFRESH_MS = 2200;
+const AGENT_DEBUG_EVENT_LIMIT = 160;
+const AGENT_DEBUG_TRAFFIC_LIMIT = 220;
+const AGENT_DEBUG_TRAFFIC_LINE_MAX = 1600;
+const AGENT_DEBUG_TRAFFIC_RENDER_LIMIT = 90;
+let agentDebugActiveTab = 'tools';
+let agentDebugRefreshTimer = null;
+let agentDebugRefreshInFlight = false;
+let agentDebugRefreshQueued = false;
+const agentDebugEvents = [];
+const agentDebugTraffic = [];
+let agentDebugTrafficFilter = 'all';
+let agentDebugTrafficMuteDepth = 0;
 function safeSetText(elementId, value, fallback = '') {
   const node = el(elementId);
   if (!node) return null;
@@ -186,6 +288,12 @@ function normalizeSignatureBytes(sig) {
     }
   }
   return null;
+}
+
+function buildWalletLookupMessage({ address, nonce, houseId }) {
+  const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
+  if (houseId) parts.push(`houseId: ${houseId}`);
+  return parts.join('\n');
 }
 
 function setWalletStatus(msg, isError = false) {
@@ -2701,8 +2809,19 @@ function resolveDistrictRoute(rawHref) {
   } catch {
     return null;
   }
+  applyVisibility(lastState);
 }
 
+function loadAgentPanelMinimized() {
+  try {
+    const raw = localStorage.getItem(AGENT_PANEL_MINIMIZED_KEY);
+    if (raw === null) return true;
+    return raw !== '0';
+  } catch {
+    return true;
+  }
+}
+    
 function routeToPopupMode(rawHref) {
   let parsed;
   try {
@@ -2759,6 +2878,70 @@ function routeToPopupMode(rawHref) {
     mode: 'leave',
     url: `${parsed.pathname}${parsed.search}${parsed.hash}`
   };
+}
+
+function saveAgentPanelMinimized(minimized) {
+  try {
+    localStorage.setItem(AGENT_PANEL_MINIMIZED_KEY, minimized ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function setOpenError(text) {
+  const node = el('openError');
+  if (!node) return;
+  node.textContent = text || '';
+}
+
+function setLiteLlmStatus(text) {
+  const value = text || '';
+  const legacy = el('liteLlmStatus');
+  if (legacy) legacy.textContent = value;
+  const agent = el('agentLlmLine');
+  if (agent) agent.textContent = value;
+}
+
+function safeJsonParse(raw, fallback = null) {
+  try {
+    return JSON.parse(String(raw || ''));
+  } catch {
+    return fallback;
+  }
+}
+
+function decodePromptXml(text) {
+  return String(text || '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, '\'')
+    .replace(/&amp;/g, '&');
+}
+
+function parseAvailableSkills(skillsPrompt) {
+  const prompt = String(skillsPrompt || '');
+  if (!prompt) return [];
+  const out = [];
+  const skillRegex = /<skill>\s*<name>([\s\S]*?)<\/name>\s*<description>([\s\S]*?)<\/description>\s*<location>([\s\S]*?)<\/location>\s*<\/skill>/gi;
+  let match = null;
+  while ((match = skillRegex.exec(prompt)) !== null) {
+    const name = decodePromptXml(match[1]).trim();
+    const description = decodePromptXml(match[2]).trim();
+    const location = decodePromptXml(match[3]).trim();
+    out.push({ name, description, location });
+  }
+  return out;
+}
+
+function pushAgentDebugEvent(text) {
+  const line = String(text || '').trim();
+  if (!line) return;
+  const stamp = new Date().toISOString();
+  agentDebugEvents.push(`[${stamp}] ${line}`);
+  if (agentDebugEvents.length > AGENT_DEBUG_EVENT_LIMIT) {
+    agentDebugEvents.splice(0, agentDebugEvents.length - AGENT_DEBUG_EVENT_LIMIT);
+  }
 }
 
 function extractSafeUrlFromEventTarget(linkEl) {
@@ -2942,20 +3125,25 @@ function updateTownHubLinks(houseId) {
   }
 }
 
-function toggleAgentOnly(show) {
-  document.querySelectorAll('.agent-only').forEach((el) => {
-    el.classList.toggle('is-hidden', !show);
-  });
+function agentDebugEventsTail(max = 20) {
+  return agentDebugEvents.slice(Math.max(0, agentDebugEvents.length - max));
 }
 
-function buildWalletLookupMessage({ address, nonce, houseId }) {
-  const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
-  if (houseId) parts.push(`houseId: ${houseId}`);
-  return parts.join('\n');
+function maskTrafficSecret(raw) {
+  const text = String(raw || '');
+  if (!text) return '[redacted]';
+  if (text.length <= 8) return '[redacted]';
+  return `${text.slice(0, 4)}…${text.slice(-3)} [redacted]`;
 }
 
-function buildTokenCheckMessage({ address, nonce }) {
-  return ['ElizaTown Token Check', `address: ${address}`, `CA: ${TOKEN_MINT}`, `nonce: ${nonce}`].join('\n');
+function sanitizeAgentTrafficValue(value, depth = 0, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value;
+  if (depth > 4) return '[max-depth]';
+  const type = typeof value;
+  if (type === 'string') {
+    if (value.length <= 360) return value;
+    return `${value.slice(0, 360)}…(truncated ${value.length - 360} chars)`;
+  }
 }
 
 async function connectWallet({ silent = false } = {}) {
@@ -2969,8 +3157,14 @@ async function connectWallet({ silent = false } = {}) {
     walletHouseId = null;
     walletRecovered = false;
   }
-  updateWalletUI();
-  saveWalletCache();
+  if (type === 'number' || type === 'boolean') return value;
+  if (type === 'bigint') return String(value);
+  if (Array.isArray(value)) {
+    const slice = value.slice(0, 30).map((entry) => sanitizeAgentTrafficValue(entry, depth + 1, seen));
+    if (value.length > slice.length) {
+      slice.push(`[${value.length - slice.length} more]`);
+    }
+  }
 }
 
 async function disconnectWallet({ fromProvider = false } = {}) {
@@ -2980,7 +3174,6 @@ async function disconnectWallet({ fromProvider = false } = {}) {
     } catch {
       // ignore disconnect errors; we still clear local state
     }
-  }
   unbindWalletEvents();
   walletAddr = null;
   walletHouseId = null;
@@ -2988,20 +3181,34 @@ async function disconnectWallet({ fromProvider = false } = {}) {
   updateWalletUI();
   clearWalletCache();
   if (lastState) updateUI(lastState);
-}
+  if (type === 'object') {
+    if (value instanceof Error) {
+      return {
+        name: String(value.name || 'Error'),
+        message: String(value.message || ''),
+      };
+    }
+    if (seen.has(value)) return '[circular]';
+    seen.add(value);
 
-function clearClientFlowState() {
-  try {
-    localStorage.removeItem(WALLET_STORAGE_KEY);
-    localStorage.removeItem(PATH_STORAGE_KEY);
-    localStorage.removeItem(LEGACY_PATH_STORAGE_KEY);
-    localStorage.removeItem(TOKEN_ERROR_KEY);
-    localStorage.removeItem(SIGNUP_COMPLETE_AT_KEY);
-    localStorage.removeItem(SHARE_CACHE_KEY);
-  } catch {
-    // ignore storage errors
+    const out = {};
+    const entries = Object.entries(value);
+    const maxKeys = Math.min(entries.length, 40);
+    for (let i = 0; i < maxKeys; i += 1) {
+      const [rawKey, rawVal] = entries[i];
+      const key = String(rawKey || '');
+      if (!key) continue;
+      if (/(api[_-]?key|token|secret|password|credential|authorization)/i.test(key)) {
+        out[key] = maskTrafficSecret(rawVal);
+        continue;
+      }
+      out[key] = sanitizeAgentTrafficValue(rawVal, depth + 1, seen);
+    }
+    if (entries.length > maxKeys) {
+      out.__truncatedKeys = entries.length - maxKeys;
+    }
+    return out;
   }
-}
 
 async function resetSessionAndReload() {
   try {
@@ -3026,18 +3233,39 @@ async function maybeResetAfterWalletDisconnect() {
     )
   );
 
-  if (shouldResetForState(lastState)) {
-    await resetSessionAndReload();
-    return;
-  }
-  try {
-    const st = await api('/api/state');
-    if (shouldResetForState(st)) {
-      await resetSessionAndReload();
+function pushAgentDebugTraffic(direction, channel, payload) {
+  if (agentDebugTrafficMuteDepth > 0) return;
+  const dir = String(direction || '').trim().toLowerCase() === 'in' ? 'IN' : 'OUT';
+  const target = String(channel || '').trim() || 'unknown';
+  const stamp = new Date().toISOString();
+  let payloadValue = null;
+  let payloadText = '';
+  if (payload !== undefined) {
+    try {
+      payloadValue = sanitizeAgentTrafficValue(payload);
+      payloadText = JSON.stringify(payloadValue);
+    } catch {
+      payloadValue = String(payload);
+      payloadText = String(payload);
     }
-  } catch {
-    // ignore
+    if (payloadText.length > AGENT_DEBUG_TRAFFIC_LINE_MAX) {
+      payloadText = `${payloadText.slice(0, AGENT_DEBUG_TRAFFIC_LINE_MAX)}…`;
+    }
   }
+  let line = `[${stamp}] ${dir} ${target}${payloadText ? ` ${payloadText}` : ''}`;
+  if (line.length > AGENT_DEBUG_TRAFFIC_LINE_MAX) {
+    line = `${line.slice(0, AGENT_DEBUG_TRAFFIC_LINE_MAX)}…`;
+  }
+  agentDebugTraffic.push({
+    stamp,
+    direction: dir,
+    channel: target,
+    payload: payloadValue,
+    payloadText,
+    line,
+  });
+  if (agentDebugTraffic.length > AGENT_DEBUG_TRAFFIC_LIMIT) {
+    agentDebugTraffic.splice(0, agentDebugTraffic.length - AGENT_DEBUG_TRAFFIC_LIMIT);
 }
 
 async function lookupWalletHouse(houseIdOverride = null) {
@@ -3076,26 +3304,10 @@ async function connectWalletAndLookup({ silent = false } = {}) {
     setWalletStatus('No houses found for this wallet yet.');
     if (lastState) updateUI({ ...lastState, houseId: null });
   }
-  saveWalletCache();
 }
 
-async function restoreWalletConnection() {
-  const cached = loadWalletCache();
-  if (!cached || !cached.address) return;
-  try {
-    await connectWallet({ silent: true });
-  } catch {
-    clearWalletCache();
-    updateWalletUI();
-    return;
-  }
-  if (cached.houseId) {
-    walletHouseId = cached.houseId;
-    walletRecovered = true;
-    if (lastState) updateUI({ ...lastState, houseId: cached.houseId });
-  }
-  setWalletStatus('Wallet connected.');
-  saveWalletCache();
+function agentDebugTrafficTail(max = 60) {
+  return agentDebugTraffic.slice(Math.max(0, agentDebugTraffic.length - max));
 }
 
 async function verifyTokenOwnership() {
@@ -3115,105 +3327,210 @@ async function verifyTokenOwnership() {
   return result;
 }
 
-function updateAgentStatus(dotId, textId, connected, name) {
-  const dot = el(dotId);
-  const text = el(textId);
-  if (!dot || !text) return;
-  dot.className = `dot ${connected ? 'good' : ''}`;
-  text.textContent = connected ? `Agent connected${name ? `: ${name}` : ''}` : 'Agent not connected';
+function setAgentTrafficFilter(value) {
+  agentDebugTrafficFilter = normalizeAgentTrafficFilter(value);
+  const buttons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
+  for (const btn of buttons) {
+    const current = normalizeAgentTrafficFilter(btn?.dataset?.trafficFilter || '');
+    const active = current === agentDebugTrafficFilter;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
 }
 
-function setTokenStatus({ active = false, good = false, text = '' } = {}) {
-  const pill = el('tokenStatus');
-  const dot = el('tokenDot');
-  const label = el('tokenStatusText');
-  if (!pill || !dot || !label) return;
-  pill.classList.toggle('is-hidden', !active);
-  dot.className = `dot ${good ? 'good' : ''}`;
-  label.textContent = text || '';
+function matchesAgentTrafficFilter(entry) {
+  const mode = normalizeAgentTrafficFilter(agentDebugTrafficFilter);
+  if (mode === 'all') return true;
+  const dir = String(entry?.direction || '').trim().toLowerCase();
+  return dir === mode;
 }
 
-function setReconnectMode({ houseReady, role }) {
-  const reconnect = el('reconnectPanel');
-  const step1 = el('step1Panel');
-  const step2 = el('step2Panel');
-  const divider = el('stepDivider');
-  const tokenPanel = el('tokenPanel');
+function renderAgentTrafficCards(nowIso) {
+  const list = el('agentDebugTraffic');
+  const meta = el('agentDebugTrafficMeta');
+  if (!list) return;
 
-  const showReconnect = !!houseReady;
+  const filtered = agentDebugTraffic.filter((entry) => matchesAgentTrafficFilter(entry));
+  const tail = filtered.slice(Math.max(0, filtered.length - AGENT_DEBUG_TRAFFIC_RENDER_LIMIT));
+  const visible = tail.slice().reverse();
+  const modeLabel = normalizeAgentTrafficFilter(agentDebugTrafficFilter).toUpperCase();
 
-  // role = human | coop | agent
-  const showToken = role === 'human' && !showReconnect;
-  const showStep1 = (role === 'coop' || role === 'agent') && !showReconnect;
-  const showStep2 = role === 'coop' && !showReconnect;
+  if (meta) {
+    meta.textContent = `Refreshed: ${nowIso} | Filter: ${modeLabel} | Showing ${visible.length}/${filtered.length}`;
+  }
 
-  if (reconnect) reconnect.classList.toggle('is-hidden', !showReconnect);
-  if (tokenPanel) tokenPanel.classList.toggle('is-hidden', !showToken);
+  list.innerHTML = '';
+  if (!visible.length) {
+    const empty = document.createElement('div');
+    empty.className = 'agent-traffic-empty';
+    empty.textContent = 'No traffic entries for this filter yet.';
+    list.appendChild(empty);
+    return;
+  }
 
-  if (step1) step1.classList.toggle('is-hidden', !showStep1);
-  if (step2) step2.classList.toggle('is-hidden', !showStep2);
-  if (divider) divider.classList.toggle('is-hidden', !(showStep1 || showStep2));
+  for (const entry of visible) {
+    const stamp = String(entry?.stamp || '');
+    const direction = String(entry?.direction || 'OUT').trim().toUpperCase() === 'IN' ? 'IN' : 'OUT';
+    const channel = String(entry?.channel || 'unknown');
+    const payloadText = String(entry?.payloadText || '').trim();
+    const summary = `${direction} ${channel}`;
+    const card = document.createElement('article');
+    card.className = 'agent-traffic-card';
+    card.dataset.direction = direction;
+    card.dataset.stamp = stamp;
+    card.dataset.epochMs = String(Date.parse(stamp) || 0);
+  }
 }
-
+    
 function renderSigils(state) {
   const grid = el('sigilGrid');
   if (!grid) return;
   grid.innerHTML = '';
 
-  const humanSel = state.human?.selected || null;
-  const agentSel = state.agent?.selected || null;
+    const header = document.createElement('div');
+    header.className = 'agent-traffic-card-header';
 
-  for (const item of elements) {
-    const btn = document.createElement('button');
-    btn.className = 'btn sigil';
-    btn.type = 'button';
-    btn.dataset.elementId = item.id;
-    btn.setAttribute('data-testid', `sigil-${item.id}`);
+    const badges = document.createElement('div');
+    badges.className = 'agent-traffic-card-badges';
 
-    const left = document.createElement('div');
-    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
-    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
+    const dirNode = document.createElement('span');
+    dirNode.className = `agent-traffic-dir ${direction.toLowerCase()}`;
+    dirNode.textContent = direction;
 
-    const right = document.createElement('div');
-    right.style.display = 'grid';
-    right.style.gap = '6px';
-    right.style.justifyItems = 'end';
+    const channelNode = document.createElement('span');
+    channelNode.className = 'agent-traffic-channel';
+    channelNode.textContent = channel;
 
-    const you = document.createElement('div');
-    you.className = 'pill';
-    you.style.padding = '4px 8px';
-    you.textContent = humanSel === item.id ? 'you' : '';
+    badges.appendChild(dirNode);
+    badges.appendChild(channelNode);
 
-    const agent = document.createElement('div');
-    agent.className = 'pill';
-    agent.style.padding = '4px 8px';
-    agent.textContent = agentSel === item.id ? 'agent' : '';
+    const timeNode = document.createElement('span');
+    timeNode.className = 'agent-traffic-time';
+    timeNode.textContent = stamp;
 
-    right.appendChild(you);
-    right.appendChild(agent);
+    header.appendChild(badges);
+    header.appendChild(timeNode);
 
-    btn.appendChild(left);
-    btn.appendChild(right);
+    const summaryNode = document.createElement('div');
+    summaryNode.className = 'agent-traffic-summary';
+    summaryNode.textContent = summary;
 
-    if (humanSel === item.id || agentSel === item.id) {
-      btn.classList.add('selected');
+    card.appendChild(header);
+    card.appendChild(summaryNode);
+
+    if (payloadText) {
+      const payloadNode = document.createElement('pre');
+      payloadNode.className = 'agent-traffic-payload';
+      payloadNode.textContent = payloadText;
+      card.appendChild(payloadNode);
     }
 
-    btn.addEventListener('click', async () => {
-      try {
-        await api('/api/human/select', {
-          method: 'POST',
-          body: JSON.stringify({ elementId: item.id })
-        });
-      } catch (e) {
-        console.warn(e);
-      }
-    });
-
-    grid.appendChild(btn);
+    list.appendChild(card);
   }
 }
 
+async function withAgentTrafficMuted(task) {
+  agentDebugTrafficMuteDepth += 1;
+  try {
+    return await task();
+  } finally {
+    agentDebugTrafficMuteDepth = Math.max(0, agentDebugTrafficMuteDepth - 1);
+  }
+}
+
+function setAgentDebugText(id, text) {
+  const node = el(id);
+  if (!node) return;
+  node.textContent = String(text || '');
+}
+
+function instrumentGatewayTraffic(gatewayApi) {
+  if (!gatewayApi || typeof gatewayApi !== 'object') return gatewayApi;
+  if (gatewayApi.__agentDebugTrafficInstrumented === true) return gatewayApi;
+  Object.defineProperty(gatewayApi, '__agentDebugTrafficInstrumented', {
+    value: true,
+    writable: false,
+    configurable: false,
+    enumerable: false,
+  });
+
+  const wrapCall = (channel, fn) => {
+    return (...args) => {
+      pushAgentDebugTraffic('out', channel, args.length <= 1 ? args[0] : { args });
+      try {
+        const value = fn(...args);
+        if (value && typeof value.then === 'function') {
+          return value.then((result) => {
+            pushAgentDebugTraffic('in', `${channel}.result`, result);
+            return result;
+          }).catch((error) => {
+            pushAgentDebugTraffic('in', `${channel}.error`, {
+              message: String(error?.message || error || 'UNKNOWN_ERROR'),
+            });
+            throw error;
+          });
+        }
+        pushAgentDebugTraffic('in', `${channel}.result`, value);
+        return value;
+      } catch (error) {
+        pushAgentDebugTraffic('in', `${channel}.error`, {
+          message: String(error?.message || error || 'UNKNOWN_ERROR'),
+        });
+        throw error;
+      }
+    };
+  };
+
+  if (typeof gatewayApi.send === 'function') {
+    gatewayApi.send = wrapCall('gateway.send', gatewayApi.send.bind(gatewayApi));
+  }
+
+  for (const [name, value] of Object.entries(gatewayApi)) {
+    if (name === 'send' || name === 'on') continue;
+    if (name.startsWith('__')) continue;
+    if (typeof value !== 'function') continue;
+    gatewayApi[name] = wrapCall(`gateway.${name}`, value.bind(gatewayApi));
+  }
+
+  return gatewayApi;
+}
+
+function setAgentDebugTab(tab) {
+  const next = ['tools', 'skill', 'session', 'traffic', 'brain'].includes(String(tab || '')) ? String(tab) : 'tools';
+  agentDebugActiveTab = next;
+
+  const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
+  for (const btn of tabs) {
+    const active = String(btn?.dataset?.debugTab || '') === next;
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+  }
+
+  const panels = Array.from(document.querySelectorAll('[data-debug-panel]'));
+  for (const panel of panels) {
+    const active = String(panel?.dataset?.debugPanel || '') === next;
+    panel.classList.toggle('is-hidden', !active);
+  }
+}
+
+function formatDebugList(prefix, values) {
+  const items = Array.isArray(values) ? values : [];
+  if (!items.length) return `${prefix}: (none)`;
+  return `${prefix}:\n${items.map((item) => `- ${item}`).join('\n')}`;
+}
+
+async function refreshAgentDebugPanels(reason = 'poll') {
+  const toolsPane = el('agentDebugTools');
+  const skillPane = el('agentDebugSkill');
+  const sessionPane = el('agentDebugSession');
+  const trafficPane = el('agentDebugTraffic');
+  if (!toolsPane && !skillPane && !sessionPane && !trafficPane) return;
+
+  if (agentDebugRefreshInFlight) {
+    agentDebugRefreshQueued = true;
+  }
+}
+  
 function syncTownhallGate(state) {
   if (!isTownHub) return;
   const gateLocked = isTownhallGateLocked(state);
@@ -3322,7 +3639,109 @@ function updateUI(state) {
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
     return;
   }
+  agentDebugRefreshInFlight = true;
 
+  try {
+    const gatewayApi = await initGateway();
+    const debugApi = window.__openclawLiteTest || null;
+    const nowIso = new Date().toISOString();
+
+    let toolRegistry = null;
+    if (debugApi && typeof debugApi.getToolRegistryInfo === 'function') {
+      toolRegistry = await withAgentTrafficMuted(async () => {
+        return await debugApi.getToolRegistryInfo().catch(() => null);
+      });
+    }
+
+    let skillSnapshot = null;
+    if (gatewayApi && typeof gatewayApi.skillState === 'function') {
+      const snapshot = await withAgentTrafficMuted(async () => {
+        return await gatewayApi.skillState().catch(() => null);
+      });
+      skillSnapshot = snapshot?.data || snapshot || null;
+    }
+
+    let promptPreview = null;
+    if (gatewayApi && typeof gatewayApi.systemPromptPreview === 'function') {
+      const preview = await withAgentTrafficMuted(async () => {
+        return await gatewayApi.systemPromptPreview().catch(() => null);
+      });
+      promptPreview = preview?.data || preview || null;
+    }
+
+    const availableSkills = parseAvailableSkills(promptPreview?.skillsPrompt || '');
+    const contextPaths = Array.isArray(promptPreview?.contextFilePaths) ? promptPreview.contextFilePaths : [];
+    const importedPaths = Array.isArray(skillSnapshot?.importedPaths) ? skillSnapshot.importedPaths : [];
+    const importedFiles = Array.isArray(skillSnapshot?.importedFiles) ? skillSnapshot.importedFiles : [];
+
+    const toolsLines = [
+      `Refreshed: ${nowIso}`,
+      `Reason: ${reason}`,
+      `Worker tools count: ${Number(toolRegistry?.count || (Array.isArray(toolRegistry?.names) ? toolRegistry.names.length : 0))}`,
+      formatDebugList('Tools', Array.isArray(toolRegistry?.names) ? toolRegistry.names : []),
+      '',
+      `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
+      `Active tab: ${agentDebugActiveTab}`,
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(20),
+    ];
+    setAgentDebugText('agentDebugTools', toolsLines.filter(Boolean).join('\n'));
+
+    const skillLines = [
+      `Refreshed: ${nowIso}`,
+      `Skill import status: ${String(skillSnapshot?.status || 'unknown')}`,
+      `Source URL: ${String(skillSnapshot?.sourceUrl || '(none)')}`,
+      `Active skill path: ${String(skillSnapshot?.activeSkillPath || '(none)')}`,
+      `Last error: ${String(skillSnapshot?.lastError || '(none)')}`,
+      `Imported paths: ${importedPaths.length}`,
+      `Imported files: ${importedFiles.length}`,
+      '',
+      formatDebugList('Imported paths', importedPaths.slice(0, 40)),
+      '',
+      `Skills extracted from prompt: ${availableSkills.length}`,
+      ...availableSkills.map((entry, idx) => `${idx + 1}. ${entry.name} @ ${entry.location}\n   ${entry.description}`),
+      '',
+      formatDebugList('Prompt context files', contextPaths),
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(16),
+    ];
+    setAgentDebugText('agentDebugSkill', skillLines.filter(Boolean).join('\n'));
+
+    const shouldLoadSession =
+      reason === 'manual'
+      || reason === 'tab-session'
+      || agentDebugActiveTab === 'session'
+      || !sessionPane?.textContent;
+
+    let transcript = null;
+    if (shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function') {
+      const dumpRaw = await withAgentTrafficMuted(async () => {
+        return await debugApi.getTranscriptDump().catch(() => '[]');
+      });
+      transcript = safeJsonParse(dumpRaw, []);
+    }
+
+    const sessionHeader = {
+      refreshedAt: nowIso,
+      reason,
+      runtimeState: {
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || ''),
+        step: String(lastState?.experience?.step || ''),
+        nextAgentAction: String(lastState?.experience?.nextAgentAction || ''),
+      },
+      skillState: {
+        status: String(skillSnapshot?.status || ''),
+        sourceUrl: String(skillSnapshot?.sourceUrl || ''),
+        activeSkillPath: String(skillSnapshot?.activeSkillPath || ''),
+      },
+      promptContextFiles: contextPaths,
+      promptSkillsCount: availableSkills.length,
+      transcriptItems: Array.isArray(transcript) ? transcript.length : null,
+    };
+    
   const matched = !!state.match?.matched;
   const matchState = el('matchState');
   if (matchState) {
@@ -3349,28 +3768,2667 @@ function updateUI(state) {
   // Sigils
   renderSigils(state);
 
-  // Auto-redirect only once per completed signup.
-  let freshComplete = false;
-  if (complete && state.signup?.createdAt) {
-    try {
-      const key = SIGNUP_COMPLETE_AT_KEY;
-      const last = localStorage.getItem(key);
-      if (last !== state.signup.createdAt) {
-        localStorage.setItem(key, state.signup.createdAt);
-        freshComplete = true;
-      }
-    } catch {
-      freshComplete = true;
+    const sessionLines = [
+      JSON.stringify(sessionHeader, null, 2),
+      '',
+      'Recent worker events:',
+      ...agentDebugEventsTail(25),
+      '',
+      'Transcript dump:',
+      Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
+      '',
+      'System prompt preview:',
+      String(promptPreview?.systemPrompt || '(unavailable)'),
+    ];
+    setAgentDebugText('agentDebugSession', sessionLines.join('\n'));
+
+    renderAgentTrafficCards(nowIso);
+  } finally {
+    agentDebugRefreshInFlight = false;
+    if (agentDebugRefreshQueued) {
+      agentDebugRefreshQueued = false;
+      refreshAgentDebugPanels('queued').catch(() => { });
     }
   }
-  if (complete && freshComplete && !redirecting) {
-    redirecting = true;
-    // small delay for perceived continuity
-    setTimeout(() => {
-      window.location.href = '/create';
-    }, 150);
+}
+
+function scheduleAgentDebugRefresh(reason = 'event') {
+  refreshAgentDebugPanels(reason).catch(() => { });
+}
+
+function startAgentDebugRefreshLoop() {
+  if (agentDebugRefreshTimer) return;
+  agentDebugRefreshTimer = setInterval(() => {
+    if (document.hidden) return;
+    refreshAgentDebugPanels('poll').catch(() => { });
+  }, AGENT_DEBUG_REFRESH_MS);
+}
+
+function setLocalLiteLlm(config) {
+  const provider = typeof config?.provider === 'string' ? config.provider.trim() : '';
+  const model = typeof config?.model === 'string' ? config.model.trim() : '';
+  const modelRef = typeof config?.modelRef === 'string' ? config.modelRef.trim() : '';
+  const authMode = String(config?.authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const credential = typeof config?.credential === 'string' ? config.credential : '';
+  const configured = !!(config?.configured && provider && model && credential);
+
+  localLiteLlm = {
+    loaded: config?.loaded === false ? false : true,
+    configured,
+    provider: provider || null,
+    model: model || null,
+    modelRef: modelRef || (provider && model ? `${provider}/${model}` : null),
+    authMode,
+    credential,
+    apiKeySet: !!(credential || config?.apiKeySet)
+  };
+  return localLiteLlm;
+}
+
+function getLocalLiteLlm() {
+  return localLiteLlm;
+}
+
+function isLocalLiteLlmConfigured() {
+  return !!getLocalLiteLlm().configured;
+}
+
+function normalizeLiteSkillStatus(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'loading' || raw === 'ready' || raw === 'failed') return raw;
+  return 'idle';
+}
+
+function normalizeLiteSkillState(raw) {
+  const src = raw && typeof raw === 'object'
+    ? (raw.data && typeof raw.data === 'object' ? raw.data : raw)
+    : {};
+  const status = normalizeLiteSkillStatus(src.status);
+  const sourceUrl = typeof src.sourceUrl === 'string' && src.sourceUrl ? src.sourceUrl : null;
+  const activeSkillPath = typeof src.activeSkillPath === 'string' && src.activeSkillPath ? src.activeSkillPath : null;
+  const lastError = typeof src.lastError === 'string' && src.lastError ? src.lastError : null;
+  const lastImportedAtMs = Number.isFinite(Number(src.lastImportedAtMs))
+    ? Number(src.lastImportedAtMs)
+    : null;
+  return {
+    status,
+    sourceUrl,
+    activeSkillPath,
+    lastError,
+    lastImportedAtMs
+  };
+}
+
+function setLiteSkillState(next) {
+  liteSkillState = normalizeLiteSkillState(next);
+  return liteSkillState;
+}
+
+function getLiteSkillState() {
+  return liteSkillState;
+}
+
+function isLiteSkillReady() {
+  const skill = getLiteSkillState();
+  return skill.status === 'ready' && !!skill.activeSkillPath;
+}
+
+function isLiteAgentActive(state) {
+  if (!isAnyAgentConnected(state)) return false;
+  if (!isVendorLite(state)) return true;
+  if (!isLocalLiteLlmConfigured()) return false;
+  return getLiteSkillState().status !== 'failed';
+}
+
+function liteState(state) {
+  if (!state || typeof state !== 'object' || !state.lite || typeof state.lite !== 'object') return {};
+  return state.lite;
+}
+
+const LLM_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
+  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
+  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
+  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
+  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
+  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
+  litellm: Object.freeze(['claude-opus-4-6']),
+  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
+  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
+  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
+  'kimi-coding': Object.freeze(['k2p5']),
+  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
+  opencode: Object.freeze(['claude-opus-4-6']),
+  zai: Object.freeze(['glm-5']),
+  glm: Object.freeze(['glm-5']),
+  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
+  qianfan: Object.freeze(['model-id']),
+  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
+  qwen: Object.freeze(['coder-model', 'vision-model']),
+  together: Object.freeze(['moonshotai/Kimi-K2.5']),
+  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
+  xiaomi: Object.freeze(['mimo-v2-flash']),
+  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
+  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
+  vllm: Object.freeze(['your-model-id']),
+  nvidia: Object.freeze(['model-id']),
+  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
+  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
+  'test-local': Object.freeze(['deterministic'])
+});
+
+const LLM_PROVIDER_ALIASES = Object.freeze({
+  glm: 'zai',
+  qwen: 'qwen-portal'
+});
+
+const OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
+const OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
+
+function getSupportedLlmModels(provider) {
+  const raw = String(provider || '').trim();
+  const key = LLM_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (LLM_PROVIDER_ALIASES[raw] || raw);
+  const options = LLM_MODEL_OPTIONS_BY_PROVIDER[key];
+  return Array.isArray(options) ? [...options] : [];
+}
+
+function replaceSelectOptions(select, values) {
+  if (!select || select.tagName !== 'SELECT') return;
+  select.innerHTML = '';
+  for (const value of values || []) {
+    const next = String(value || '').trim();
+    if (!next) continue;
+    const option = document.createElement('option');
+    option.value = next;
+    option.textContent = next;
+    select.appendChild(option);
   }
 }
+
+function ensureSelectOption(select, value, label) {
+  if (!select || select.tagName !== 'SELECT') return;
+  const next = String(value || '').trim();
+  if (!next) return;
+  const exists = Array.from(select.options).some((opt) => String(opt.value || '').trim() === next);
+  if (exists) return;
+  const option = document.createElement('option');
+  option.value = next;
+  option.textContent = String(label || next);
+  option.dataset.injected = 'true';
+  select.appendChild(option);
+}
+
+function applyLlmProviderSelection(preferredProvider) {
+  const providerSelect = el('llmProviderSelect');
+  const fallbackProvider = 'openai';
+  const selected = String(preferredProvider || providerSelect?.value || fallbackProvider).trim() || fallbackProvider;
+  if (!providerSelect) return selected;
+  if (providerSelect.tagName === 'SELECT') {
+    const providers = Object.keys(LLM_MODEL_OPTIONS_BY_PROVIDER);
+    replaceSelectOptions(providerSelect, providers);
+    providerSelect.value = providers.includes(selected) ? selected : fallbackProvider;
+    return String(providerSelect.value || fallbackProvider).trim() || fallbackProvider;
+  }
+  providerSelect.value = selected;
+  return selected;
+}
+
+function applyLlmModelSelection(provider, preferredModel) {
+  const modelSelect = el('llmModelIdInput');
+  const fallbackModel = getDefaultLlmModelForProvider(provider);
+  const selected = String(preferredModel || modelSelect?.value || '').trim();
+  if (!modelSelect) return selected || fallbackModel;
+  if (modelSelect.tagName === 'SELECT') {
+    const models = getSupportedLlmModels(provider);
+    const baseOptions = models.length ? models : [fallbackModel];
+    replaceSelectOptions(modelSelect, baseOptions);
+    const resolved = baseOptions.includes(selected) ? selected : (baseOptions[0] || fallbackModel);
+    modelSelect.value = resolved;
+    return String(modelSelect.value || fallbackModel).trim() || fallbackModel;
+  }
+  if (selected) {
+    modelSelect.value = selected;
+    return selected;
+  }
+  modelSelect.value = fallbackModel;
+  return fallbackModel;
+}
+
+function applyLlmProviderModelSelection(provider, model) {
+  const selectedProvider = applyLlmProviderSelection(provider);
+  const selectedModel = applyLlmModelSelection(selectedProvider, model);
+  return { provider: selectedProvider, model: selectedModel };
+}
+
+function updateLlmOauthLaunchUi() {
+  const launchBtn = el('llmOauthLaunchBtn');
+  const completeBtn = el('llmOauthCompleteBtn');
+  if (!launchBtn) return;
+  const provider = String(el('llmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const mode = readLlmAuthMode();
+  const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
+  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
+}
+
+function stopOpenAiCodexOAuthPoll() {
+  if (!openAiCodexOAuthPollTimer) return;
+  clearInterval(openAiCodexOAuthPollTimer);
+  openAiCodexOAuthPollTimer = null;
+}
+
+function bindOpenAiCodexOAuthMessageListener() {
+  if (openAiCodexOAuthMessageListenerBound) return;
+  openAiCodexOAuthMessageListenerBound = true;
+  window.addEventListener('message', async (event) => {
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '') !== OPENAI_CODEX_OAUTH_MESSAGE_TYPE) return;
+    const incomingState = String(payload.state || '').trim();
+    const incomingCode = String(payload.code || '').trim();
+    const incomingError = String(payload.error || '').trim();
+    if (!incomingState || incomingError) return;
+    const activeState = String(openAiCodexOAuthAttempt?.state || '').trim();
+    if (activeState && incomingState === activeState) {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: '' });
+      return;
+    }
+    if (incomingCode) {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: `${incomingCode}#${incomingState}` });
+    }
+  });
+}
+
+async function exchangeOpenAiCodexOAuthAttempt({ attemptId, callbackInput = '' }) {
+  const payload = {};
+  if (attemptId) payload.attemptId = String(attemptId).trim();
+  if (callbackInput) payload.callbackInput = callbackInput;
+  const result = await api('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return result;
+}
+
+async function hydrateUiFromOpenAiCodexCredential(credential) {
+  const access = String(credential?.access || '').trim();
+  if (!access) throw new Error('TOKEN_RESPONSE_INVALID');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const authModeSel = el('llmAuthModeSelect');
+  if (authModeSel) {
+    authModeSel.value = 'oauth-json';
+    setLlmAuthModeUI('oauth-json');
+  }
+  if (keyInput) keyInput.value = access;
+  if (oauthInput) {
+    oauthInput.value = JSON.stringify({
+      provider: 'openai-codex',
+      access: access,
+      refresh: String(credential?.refresh || ''),
+      expires: Number(credential?.expires || 0),
+      accountId: String(credential?.accountId || '')
+    }, null, 2);
+  }
+  syncModelRefFromInputs();
+  syncAgentLlmUiFromPrimary();
+}
+
+async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
+  if (openAiCodexOAuthExchangeInFlight) return;
+  openAiCodexOAuthExchangeInFlight = true;
+  try {
+    const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+    if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+      throw new Error('OAuth completion is available for OpenAI providers only.');
+    }
+    const normalizedInput = String(callbackInput || '').trim();
+    const attemptId = String(openAiCodexOAuthAttempt?.attemptId || '').trim();
+    if (!attemptId && !normalizedInput) {
+      throw new Error('Start OAuth first.');
+    }
+    const result = await exchangeOpenAiCodexOAuthAttempt({
+      attemptId,
+      callbackInput: normalizedInput
+    });
+    const returnedAttemptId = String(result?.attempt?.id || '').trim();
+    const returnedState = String(result?.attempt?.state || '').trim();
+    if (returnedAttemptId) {
+      openAiCodexOAuthAttempt = {
+        attemptId: returnedAttemptId,
+        state: returnedState || String(openAiCodexOAuthAttempt?.state || '').trim(),
+        startedAtMs: Date.now()
+      };
+    }
+    const credential = result?.credential || result?.oauthProfile || null;
+    if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
+    await hydrateUiFromOpenAiCodexCredential(credential);
+    stopOpenAiCodexOAuthPoll();
+    setLiteLlmStatus('OAuth exchange complete. Click Connect Brain.');
+    setAgentLlmStatus('OAuth exchange complete. Click Connect Brain.');
+    openAiCodexOAuthAttempt = null;
+  } catch (err) {
+    const code = String(err?.message || '').trim();
+    if (code === 'CODE_PENDING') {
+      setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+      setAgentLlmStatus('Waiting for OAuth callback.');
+      return;
+    }
+    const msg = code || 'OAuth exchange failed.';
+    setLiteLlmStatus(`OAuth exchange failed: ${msg}`);
+    setAgentLlmStatus(`OAuth exchange failed: ${msg}`);
+    if (code !== 'CODE_PENDING') {
+      appendAgentLog(`OAuth exchange failed: ${msg}`);
+    }
+    throw err;
+  } finally {
+    openAiCodexOAuthExchangeInFlight = false;
+  }
+}
+
+function startOpenAiCodexOAuthPoll() {
+  stopOpenAiCodexOAuthPoll();
+  openAiCodexOAuthPollTimer = setInterval(async () => {
+    try {
+      await completeOpenAiCodexOAuthFromUi({ callbackInput: '' });
+    } catch (err) {
+      const code = String(err?.message || '').trim();
+      if (code === 'CODE_PENDING') return;
+      stopOpenAiCodexOAuthPoll();
+    }
+  }, 1500);
+}
+
+async function launchLlmOauthInNewTab() {
+  const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+  if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
+    setLiteLlmStatus('OAuth launch is available for OpenAI providers only.');
+    return;
+  }
+  bindOpenAiCodexOAuthMessageListener();
+
+  const started = await api('/api/agent/lite/llm/oauth/openai-codex/start', {
+    method: 'POST',
+    body: JSON.stringify({ provider, originator: 'portal-claw-lite' })
+  });
+  const authorizeUrl = String(started?.authorizeUrl || '').trim();
+  const attemptId = String(started?.attemptId || '').trim();
+  const state = String(started?.state || '').trim();
+  if (!authorizeUrl || !attemptId || !state) {
+    throw new Error('OAUTH_START_FAILED');
+  }
+
+  openAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
+  if (!popup) {
+    throw new Error('POPUP_BLOCKED');
+  }
+  setLiteLlmStatus('OAuth started. Complete sign-in in the popup. If needed, paste callback URL and click Complete OAuth.');
+  setAgentLlmStatus('OAuth started. Complete sign-in in the popup.');
+  startOpenAiCodexOAuthPoll();
+}
+
+function getDefaultLlmModelForProvider(provider) {
+  const supported = getSupportedLlmModels(provider);
+  if (supported.length > 0) return supported[0];
+  return 'gpt-4o-mini';
+}
+
+function defaultProviderApi(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai' || p === 'ollama') return 'openai-completions';
+  return '';
+}
+
+function defaultProviderBaseUrl(provider) {
+  const p = String(provider || '').trim();
+  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  return '';
+}
+
+function normalizeThinkingLevel(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return '';
+  if (v === 'minimal' || v === 'low' || v === 'medium' || v === 'high' || v === 'xhigh') return v;
+  return '';
+}
+
+function readLlmAuthMode() {
+  const authModeSelect = el('llmAuthModeSelect');
+  const mode = String(authModeSelect?.value || '').trim();
+  return mode === 'oauth-json' ? 'oauth-json' : 'api-key';
+}
+
+function setLlmAuthModeUI(mode) {
+  const authMode = mode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const authModeSelect = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const oauthHint = el('llmOauthProfileHint');
+  const keyInput = el('llmKeyInput');
+
+  if (authModeSelect) authModeSelect.value = authMode;
+  if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
+  if (keyInput) {
+    keyInput.placeholder = authMode === 'oauth-json'
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
+  }
+  if (oauthHint) {
+    oauthHint.textContent = authMode === 'oauth-json'
+      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
+      : '';
+  }
+  updateLlmOauthLaunchUi();
+}
+
+function resolveLlmModelRefFromInputs(provider, model) {
+  const providerInput = String(provider || 'openai').trim();
+  const normalizedProvider = LLM_PROVIDER_ALIASES[providerInput] || providerInput || 'openai';
+  const modelTrim = String(model || '').trim();
+
+  if (normalizedProvider === 'custom') {
+    return parseModelRefFromText(modelTrim || 'gpt-4o-mini', 'openai', 'gpt-4o-mini');
+  }
+
+  const resolvedModel = modelTrim || getDefaultLlmModelForProvider(normalizedProvider);
+  return {
+    provider: normalizedProvider,
+    modelId: resolvedModel,
+    modelRef: `${normalizedProvider}/${resolvedModel}`
+  };
+}
+
+function parseModelRefFromText(text, fallbackProvider = 'openai', fallbackModelId = 'gpt-4o-mini') {
+  const ref = String(text || '').trim();
+  if (!ref) {
+    return {
+      provider: fallbackProvider,
+      modelId: fallbackModelId,
+      modelRef: `${fallbackProvider}/${fallbackModelId}`
+    };
+  }
+  const slash = ref.indexOf('/');
+  if (slash > 0) {
+    const provider = ref.slice(0, slash).trim();
+    const modelId = ref.slice(slash + 1).trim();
+    if (provider && modelId) {
+      return { provider, modelId, modelRef: `${provider}/${modelId}` };
+    }
+  }
+  return {
+    provider: fallbackProvider,
+    modelId: ref,
+    modelRef: `${fallbackProvider}/${ref}`
+  };
+}
+
+function getAccessTokenFromProfileValue(value) {
+  if (!value || typeof value !== 'object') return '';
+  const direct = typeof value.access === 'string' ? value.access.trim()
+    : typeof value.access_token === 'string' ? value.access_token.trim()
+      : typeof value.accessToken === 'string' ? value.accessToken.trim()
+        : typeof value.id_token === 'string' ? value.id_token.trim()
+          : typeof value.idToken === 'string' ? value.idToken.trim() : '';
+  return direct;
+}
+
+function getOAuthProviderAliases(providerHint) {
+  const normalized = String(providerHint || '').trim().toLowerCase();
+  if (!normalized) return [];
+  const aliases = new Set([normalized]);
+  if (normalized === 'openai-codex') {
+    aliases.add('openai');
+    aliases.add('chatgpt');
+  }
+  if (normalized === 'openai') {
+    aliases.add('openai-codex');
+    aliases.add('chatgpt');
+  }
+  return [...aliases];
+}
+
+function providerAliasMatches(aliasSet, rawName) {
+  if (!aliasSet || !aliasSet.size) return true;
+  const normalized = String(rawName || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (aliasSet.has(normalized)) return true;
+  const prefix = normalized.match(/^[a-z0-9_-]+/);
+  if (prefix && aliasSet.has(prefix[0])) return true;
+  return false;
+}
+
+function decodeMaybeUriComponent(value) {
+  const text = String(value || '').trim();
+  if (!text || !text.includes('%')) return text;
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizeTokenCandidate(value) {
+  const text = String(value || '').trim().replace(/^['"]+|['"]+$/g, '');
+  if (!text) return '';
+  return text.replace(/^bearer\s+/i, '').trim();
+}
+
+function isLikelyJwtToken(value) {
+  return /^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(String(value || ''));
+}
+
+function isLikelyOpaqueOAuthToken(value) {
+  return /^[A-Za-z0-9._~-]{24,}$/.test(String(value || ''));
+}
+
+function parseJwtPayloadUnsafe(token) {
+  const raw = String(token || '').trim();
+  if (!isLikelyJwtToken(raw)) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyOpenAiIdToken(token) {
+  const payload = parseJwtPayloadUnsafe(token);
+  if (!payload || typeof payload !== 'object') return false;
+  const issuer = String(payload.iss || '').trim();
+  const hasAtHash = typeof payload.at_hash === 'string' && payload.at_hash.length > 0;
+  return issuer === 'https://auth.openai.com' && hasAtHash;
+}
+
+function validateOAuthCredentialForProvider({ provider, credential }) {
+  const normalizedProvider = String(provider || '').trim().toLowerCase();
+  const token = String(credential || '').trim();
+  if (!token || !isLikelyJwtToken(token)) return '';
+  if (!isLikelyOpenAiIdToken(token)) return '';
+  if (normalizedProvider === 'openai' || normalizedProvider === 'openai-codex') {
+    return 'Detected OpenAI id_token callback URL. This token type is not usable for model calls. Use an OpenAI API key or an OAuth profile with an access token.';
+  }
+  return '';
+}
+
+function collectOAuthCandidatesFromUrl(rawUrl) {
+  let parsed = null;
+  try {
+    parsed = new URL(String(rawUrl || '').trim());
+  } catch {
+    return [];
+  }
+
+  const out = [];
+  const seen = new Set();
+  const pushCandidate = (value) => {
+    const normalized = normalizeTokenCandidate(value);
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+    const decoded = decodeMaybeUriComponent(normalized);
+    if (decoded && decoded !== normalized && !seen.has(decoded)) {
+      seen.add(decoded);
+      out.push(decoded);
+    }
+  };
+
+  const readParams = (params) => {
+    for (const [rawKey, rawValue] of params.entries()) {
+      const key = String(rawKey || '').trim().toLowerCase();
+      const value = String(rawValue || '').trim();
+      if (!key || !value) continue;
+      const include = key === 'access'
+        || key === 'access_token'
+        || key === 'token'
+        || key === 'oauth_token'
+        || key === 'id_token'
+        || key === 'auth'
+        || key === 'profile'
+        || key === 'credentials'
+        || key.includes('token');
+      if (!include) continue;
+      pushCandidate(value);
+    }
+  };
+
+  readParams(parsed.searchParams);
+
+  const hashRaw = String(parsed.hash || '').replace(/^#/, '').trim();
+  if (hashRaw) {
+    const hashQuery = hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw;
+    readParams(new URLSearchParams(hashQuery));
+  }
+
+  return out;
+}
+
+function extractOAuthTokenFromProfileMap(profileMap, providerHint) {
+  if (!profileMap || typeof profileMap !== 'object') return '';
+  if (Array.isArray(profileMap)) {
+    for (const item of profileMap) {
+      const token = extractOAuthTokenFromProfileMap(item, providerHint);
+      if (token) return token;
+    }
+    return '';
+  }
+  const aliasSet = new Set(getOAuthProviderAliases(providerHint));
+  const direct = getAccessTokenFromProfileValue(profileMap);
+  if (direct) return direct;
+
+  for (const alias of aliasSet) {
+    if (!alias) continue;
+    if (alias && profileMap[alias]) {
+      const directProfile = getAccessTokenFromProfileValue(profileMap[alias]);
+      if (directProfile) return directProfile;
+    }
+  }
+
+  for (const key of Object.keys(profileMap)) {
+    const profile = profileMap[key];
+    const profileToken = getAccessTokenFromProfileValue(profile);
+    const profileProvider = String(profile?.provider || profile?.type || key || '').trim().toLowerCase();
+    if (!profileToken) continue;
+    if (providerAliasMatches(aliasSet, profileProvider) || providerAliasMatches(aliasSet, key)) {
+      return profileToken;
+    }
+  }
+  return '';
+}
+
+function extractOAuthAccessTokenFromObject(parsed, providerHint) {
+  const candidates = [];
+  if (parsed && typeof parsed === 'object') {
+    candidates.push(parsed);
+    if (parsed.profiles && typeof parsed.profiles === 'object') candidates.push(parsed.profiles);
+    if (parsed.auth && parsed.auth.profiles && typeof parsed.auth.profiles === 'object') candidates.push(parsed.auth.profiles);
+    if (parsed.profile && typeof parsed.profile === 'object') candidates.push(parsed.profile);
+    if (parsed.providerProfiles && typeof parsed.providerProfiles === 'object') candidates.push(parsed.providerProfiles);
+  }
+  for (const candidate of candidates) {
+    const token = extractOAuthTokenFromProfileMap(candidate, providerHint);
+    if (token) return token;
+  }
+  const direct = getAccessTokenFromProfileValue(parsed);
+  if (direct) return direct;
+  return '';
+}
+
+function extractOAuthAccessToken(raw, providerHint) {
+  const text = String(raw || '').trim();
+  if (!text) {
+    return { ok: false, error: 'MISSING_OAUTH_PROFILE_JSON' };
+  }
+
+  const directToken = normalizeTokenCandidate(text);
+  if (isLikelyJwtToken(directToken) || isLikelyOpaqueOAuthToken(directToken)) {
+    return { ok: true, token: directToken };
+  }
+
+  if (text.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text);
+      const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+      return token
+        ? { ok: true, token }
+        : { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+    } catch {
+      return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+    }
+  }
+
+  const decodedText = decodeMaybeUriComponent(text);
+  if (decodedText && decodedText !== text) {
+    const decodedDirectToken = normalizeTokenCandidate(decodedText);
+    if (isLikelyJwtToken(decodedDirectToken) || isLikelyOpaqueOAuthToken(decodedDirectToken)) {
+      return { ok: true, token: decodedDirectToken };
+    }
+    if (decodedText.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(decodedText);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  const urlCandidates = collectOAuthCandidatesFromUrl(text);
+  for (const candidate of urlCandidates) {
+    if (isLikelyJwtToken(candidate) || isLikelyOpaqueOAuthToken(candidate)) {
+      return { ok: true, token: candidate };
+    }
+    if (candidate.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(candidate);
+        const token = extractOAuthAccessTokenFromObject(parsed, providerHint);
+        if (token) return { ok: true, token };
+      } catch {
+        // continue
+      }
+    }
+  }
+
+  if (/^[a-z][a-z0-9+\-.]*:\/\//i.test(text)) {
+    return { ok: false, error: 'NO_OAUTH_ACCESS_TOKEN_FOUND' };
+  }
+  return { ok: false, error: 'INVALID_OAUTH_PROFILE_JSON' };
+}
+
+function resolveLlmConfigFromUi() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const modelRefInput = el('llmModelRefInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+
+  const provider = String(providerSel?.value || 'openai').trim() || 'openai';
+  const modelText = String(modelInput?.value || '').trim();
+  const mode = readLlmAuthMode();
+
+  const parsedModel = resolveLlmModelRefFromInputs(provider, modelText);
+  const manualRaw = String(keyInput?.value || '').trim();
+  const manualParsed = extractOAuthAccessToken(manualRaw, provider);
+  const manualCredential = manualParsed.ok
+    ? String(manualParsed.token || '').trim()
+    : manualRaw;
+  let credential = manualCredential;
+  let oauthError = '';
+
+  if (mode === 'oauth-json') {
+    const oauthText = String(oauthInput?.value || '').trim();
+    const token = extractOAuthAccessToken(oauthText, provider);
+    oauthError = oauthText && !token.ok ? String(token.error || 'INVALID_OAUTH_PROFILE_JSON') : '';
+    const parsedCredential = token.ok ? String(token.token || '').trim() : '';
+    credential = manualCredential || parsedCredential;
+  } else if (!credential) {
+    const oauthText = String(oauthInput?.value || '').trim();
+    if (oauthText) {
+      const token = extractOAuthAccessToken(oauthText, provider);
+      if (token.ok) {
+        credential = String(token.token || '').trim();
+      }
+    }
+  }
+
+  if (!credential) {
+    const msg = mode === 'oauth-json'
+      ? (oauthError || 'No access token found in OAuth profile JSON.')
+      : `Missing ${provider === 'openai-codex' ? 'API key or OAuth token' : 'API key'} for ${parsedModel.provider}/${parsedModel.modelId}.`;
+    throw new Error(msg);
+  }
+
+  const tokenValidationError = validateOAuthCredentialForProvider({
+    provider: parsedModel.provider,
+    credential,
+  });
+  if (tokenValidationError) {
+    throw new Error(tokenValidationError);
+  }
+
+  return {
+    provider: parsedModel.provider,
+    model: parsedModel.modelId,
+    modelRef: parsedModel.modelRef,
+    authMode: mode,
+    credential
+  };
+}
+
+function isVendorLite(state) {
+  return liteState(state).driver === 'vendor';
+}
+
+function isLiteConnected(state) {
+  const connected = !!(state?.agent?.connected && state?.agent?.source === 'openclaw-lite');
+  if (!connected) return false;
+  if (isVendorLite(state) && !isLocalLiteLlmConfigured()) return false;
+  return true;
+}
+
+function isAnyAgentConnected(state) {
+  return !!state?.agent?.connected;
+}
+
+async function ensureVendorRuntimeBridge(state) {
+  if (!runtimeBridge) return;
+  if (!isVendorLite(state)) return;
+  const teamCode = String(state?.teamCode || '').trim();
+  if (!teamCode) return;
+
+  const nextKey = `${teamCode}:vendor`;
+  if (runtimeBridgeInitKey && runtimeBridgeInitKey !== nextKey) {
+    runtimeBridge.dispose();
+    runtimeBridgeInitKey = '';
+  }
+  if (runtimeBridgeInitKey === nextKey) return;
+
+  await runtimeBridge.init({
+    driver: 'vendor',
+    teamCode
+  });
+  runtimeBridgeInitKey = nextKey;
+}
+
+async function loadLiteLlmLibrary() {
+  if (!llmLibraryPromise) {
+    llmLibraryPromise = import('/openclaw-lite/llm-config-library.js');
+  }
+  return llmLibraryPromise;
+}
+
+async function loadLiteGateway() {
+  if (!liteGatewayPromise) {
+    liteGatewayPromise = import('/openclaw-lite/gateway.js')
+      .then((mod) => mod?.default || mod)
+      .then(async (gatewayOrPromise) => {
+        if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+          return await gatewayOrPromise;
+        }
+        return gatewayOrPromise;
+      })
+      .catch((err) => {
+        console.warn('failed to load lite gateway', err);
+        return null;
+      });
+  }
+  return liteGatewayPromise;
+}
+
+function buildGatewayLlmPayload(config) {
+  const provider = String(config?.provider || '').trim();
+  const model = String(config?.model || '').trim();
+  const modelRef = String(config?.modelRef || (provider && model ? `${provider}/${model}` : '')).trim();
+  const credential = String(config?.credential || '').trim();
+
+  if (!provider || !model || !modelRef || !credential) {
+    return {
+      type: 'gateway.command.setLlmConfig',
+      apiKey: '',
+      api: '',
+      provider: '',
+      modelRef: '',
+      modelId: '',
+      baseUrl: '',
+      reasoning: '',
+      useProxy: true
+    };
+  }
+
+  const apiOverride = String(el('llmApiInput')?.value || '').trim();
+  const baseUrlOverride = String(el('llmBaseUrlInput')?.value || '').trim();
+  const useProxy = el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true;
+  return {
+    type: 'gateway.command.setLlmConfig',
+    apiKey: credential,
+    api: apiOverride || defaultProviderApi(provider),
+    provider,
+    modelRef,
+    modelId: model,
+    baseUrl: baseUrlOverride || defaultProviderBaseUrl(provider),
+    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    useProxy
+  };
+}
+
+async function applyGatewayLlmConfig(config) {
+  const gatewayApi = await loadLiteGateway();
+  if (!gatewayApi || typeof gatewayApi.send !== 'function') return;
+  gatewayApi.send(buildGatewayLlmPayload(config));
+}
+
+async function refreshLiteSkillState({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - liteSkillLastSyncAtMs < 1200) return getLiteSkillState();
+  if (liteSkillSyncPromise) return liteSkillSyncPromise;
+
+  liteSkillSyncPromise = (async () => {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.skillState !== 'function') {
+      return getLiteSkillState();
+    }
+    const snapshot = await gatewayApi.skillState();
+    liteSkillLastSyncAtMs = Date.now();
+    return setLiteSkillState(snapshot);
+  })();
+
+  try {
+    return await liteSkillSyncPromise;
+  } catch {
+    return getLiteSkillState();
+  } finally {
+    liteSkillSyncPromise = null;
+  }
+}
+
+async function ensureDefaultLiteSkillImported(state) {
+  if (!isVendorLite(state)) return;
+  if (!isAnyAgentConnected(state)) return;
+  const teamCode = String(state?.teamCode || '').trim();
+  if (!teamCode) return;
+
+  const skill = await refreshLiteSkillState({ force: false });
+  if (skill.status === 'ready' && skill.activeSkillPath) {
+    liteSkillAutoImportTeamCode = teamCode;
+    return;
+  }
+  if (skill.status === 'loading') return;
+  if (liteSkillAutoImportTeamCode === teamCode) return;
+  if (liteSkillAutoImportPromise) return;
+
+  liteSkillAutoImportTeamCode = teamCode;
+  liteSkillAutoImportPromise = (async () => {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.visitExperience !== 'function') return;
+    const visit = await gatewayApi.visitExperience({ url: '/skill.md' });
+    if (visit?.ok !== true) {
+      const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
+      appendAgentLog(`Default skill import failed: ${msg}`);
+      await refreshLiteSkillState({ force: true });
+      return;
+    }
+    appendAgentLog('Default skill imported: /skill.md');
+    await refreshLiteSkillState({ force: true });
+  })()
+    .catch((err) => {
+      appendAgentLog(`Default skill import failed: ${err?.message || 'VISIT_FAILED'}`);
+    })
+    .finally(() => {
+      liteSkillAutoImportPromise = null;
+    });
+
+  return liteSkillAutoImportPromise;
+}
+
+function clearLiteSkillLoopTimer() {
+  if (!liteSkillLoopTimer) return;
+  clearTimeout(liteSkillLoopTimer);
+  liteSkillLoopTimer = null;
+}
+
+function clearLiteSkillLoopPause() {
+  liteSkillLoopPauseReason = '';
+  liteSkillLoopLastErrorFingerprint = '';
+  liteSkillLoopLastErrorAtMs = 0;
+}
+
+function pauseLiteSkillLoop(reason, message) {
+  const nextReason = String(reason || '').trim();
+  if (!nextReason) return;
+  liteSkillLoopPauseReason = nextReason;
+  clearLiteSkillLoopTimer();
+  appendAgentLog(`Home skill loop paused: ${String(message || 'update brain config to continue')}`);
+}
+
+function appendHomeSkillLoopError(reason, message) {
+  const stamp = Date.now();
+  const normalizedReason = String(reason || '').trim();
+  const normalizedMessage = String(message || '').trim() || 'EXPERIENCE_RUN_FAILED';
+  const fingerprint = `${normalizedReason}|${normalizedMessage}`;
+  if (fingerprint === liteSkillLoopLastErrorFingerprint && stamp - liteSkillLoopLastErrorAtMs < 20_000) {
+    return;
+  }
+  liteSkillLoopLastErrorFingerprint = fingerprint;
+  liteSkillLoopLastErrorAtMs = stamp;
+  appendAgentLog(`Home skill step failed (${normalizedReason || 'state'}): ${normalizedMessage}`);
+}
+
+function shouldRunHomeSkillLoop(state) {
+  if (window.location.pathname !== '/') return false;
+  if (!isVendorLite(state)) return false;
+  if (!isLocalLiteLlmConfigured()) return false;
+  if (!isAnyAgentConnected(state)) return false;
+  if (liteSkillLoopPauseReason) return false;
+  if (state?.signup?.complete && state?.signup?.mode === 'agent') return false;
+  return true;
+}
+
+function homeSkillPrompt(state = {}) {
+  const step = String(state?.experience?.step || '').trim();
+  const nextAgentAction = String(state?.experience?.nextAgentAction || '').trim();
+  const prompt = [
+    'Read workspace/SKILL.md and execute exactly the next required safe step for this Agent Town home-page co-op flow.',
+    'Primary goal: complete signup by mirroring human sigil selection and pressing Open after the human.',
+    'Use runtime session context values for origin/teamCode/houseId exactly as provided.',
+    'Start from the current experience state and perform at most one safe step per turn.',
+    'If experience.step is "mirror_sigil", mirror human.selected via /api/agent/select.',
+    'If experience.step is "press_open", call /api/agent/open/press exactly once.',
+    'Use tools only; avoid asking the human for teamCode/houseId when already provided in runtime context.',
+    'If waiting for the human, stop after one safe check/action.'
+  ];
+  if (step) prompt.push(`Runtime hint: experience.step=${step}`);
+  if (nextAgentAction) prompt.push(`Runtime hint: experience.nextAgentAction=${nextAgentAction}`);
+  return prompt.join('\n');
+}
+
+function requestHomeSkillStep(reason = 'state') {
+  if (!shouldRunHomeSkillLoop(lastState)) {
+    clearLiteSkillLoopTimer();
+    return;
+  }
+  const urgent = reason === 'human-action' || reason === 'team-change';
+  if (liteSkillLoopTimer && !urgent) return;
+  if (liteSkillLoopTimer && urgent) {
+    clearLiteSkillLoopTimer();
+  }
+  const minGapMs = 900;
+  const elapsed = Date.now() - liteSkillLoopLastRunAtMs;
+  const waitMs = urgent
+    ? Math.max(0, minGapMs - elapsed)
+    : Math.max(0, minGapMs - elapsed, liteSkillLoopBackoffMs);
+  liteSkillLoopTimer = setTimeout(() => {
+    liteSkillLoopTimer = null;
+    runHomeSkillStep(reason).catch(() => { });
+  }, waitMs);
+}
+
+async function runHomeSkillStep(reason = 'state') {
+  if (liteSkillLoopInFlight) return;
+  if (!shouldRunHomeSkillLoop(lastState)) return;
+
+  liteSkillLoopInFlight = true;
+  liteSkillLoopLastRunAtMs = Date.now();
+  try {
+    const gatewayApi = await initGateway();
+    if (!gatewayApi || typeof gatewayApi.experienceRun !== 'function') {
+      throw new Error('GATEWAY_NOT_READY');
+    }
+
+    await ensureDefaultLiteSkillImported(lastState);
+    const skill = await refreshLiteSkillState({ force: false });
+    if (skill.status !== 'ready' || !skill.activeSkillPath) {
+      liteSkillLoopBackoffMs = Math.min(5000, Math.max(1200, liteSkillLoopBackoffMs + 300));
+      return;
+    }
+
+    const run = await gatewayApi.experienceRun({
+      prompt: homeSkillPrompt(lastState),
+      timeoutMs: 60_000,
+      recordToTranscript: false,
+      emitChat: false,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || '')
+      },
+      runtimeState: lastState
+    });
+    if (run?.ok === false) {
+      const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
+      throw new Error(msg);
+    }
+    liteSkillLoopBackoffMs = 1000;
+    liteSkillLoopLastErrorFingerprint = '';
+    liteSkillLoopLastErrorAtMs = 0;
+  } catch (err) {
+    const msg = String(err?.message || 'EXPERIENCE_RUN_FAILED');
+    if (/could not parse your authentication token/i.test(msg) || /failed to extract accountid from token/i.test(msg)) {
+      pauseLiteSkillLoop('llm-auth', 'Brain token rejected by provider. Update Brain credentials and save again.');
+      setLiteLlmStatus('Brain token rejected by provider. Update OAuth/API key and save Brain again.');
+      return;
+    }
+    appendHomeSkillLoopError(reason, msg);
+    liteSkillLoopBackoffMs = Math.min(5000, Math.max(1500, liteSkillLoopBackoffMs + 700));
+  } finally {
+    liteSkillLoopInFlight = false;
+    if (shouldRunHomeSkillLoop(lastState)) {
+      requestHomeSkillStep('loop');
+    } else {
+      clearLiteSkillLoopTimer();
+    }
+  }
+}
+
+function updateLiteAgentStatus(state) {
+  const dot = el('liteAgentDot');
+  const text = el('liteAgentStatus');
+  if (!dot || !text) return;
+  const lite = liteState(state);
+  const failed = typeof lite.lastError === 'string' && lite.lastError;
+  const liteConnected = isLiteConnected(state);
+  const liteActive = isLiteAgentActive(state);
+  dot.className = `dot ${liteActive ? 'good' : ''}`;
+  if (failed) {
+    text.textContent = `OpenClaw Lite error: ${lite.lastError}`;
+  } else if (isVendorLite(state) && isAnyAgentConnected(state) && !isLocalLiteLlmConfigured()) {
+    text.textContent = 'Agent connected. Configure brain.';
+  } else if (isVendorLite(state) && isAnyAgentConnected(state)) {
+    text.textContent = liteActive
+      ? 'Agent connected: OpenClaw Lite'
+      : 'Agent connected: OpenClaw Lite (skill import failed)';
+  } else if (isAnyAgentConnected(state) && state?.agent?.source === 'external') {
+    text.textContent = 'External agent connected';
+  } else if (liteConnected && isVendorLite(state) && !liteActive) {
+    text.textContent = 'Agent connected: OpenClaw Lite (skill import failed)';
+  } else {
+    text.textContent = liteConnected ? 'Agent connected: OpenClaw Lite' : 'Agent offline';
+  }
+}
+
+// Replaced by new implementation below
+function applyVisibility(state) {
+  const welcomePanel = el('welcomePanel');
+  const hatchPanel = el('hatchPanel');
+  const townPanel = el('townPanel');
+  const sidebar = el('agentSidebar');
+  const visible = loadHatchVisible();
+  const vendor = isVendorLite(state);
+  const experienceStep = typeof state?.experience?.step === 'string'
+    ? state.experience.step.trim()
+    : '';
+  const hasExperienceProgress = !!experienceStep
+    && experienceStep !== 'wait_connect'
+    && experienceStep !== 'connect_agent';
+  const hasFlowProgress = !!(
+    hasExperienceProgress ||
+    state?.human?.selected ||
+    state?.agent?.selected ||
+    state?.match?.matched ||
+    state?.human?.openPressed ||
+    state?.agent?.openPressed ||
+    state?.signup?.complete
+  );
+  if (!vendor) {
+    townPanelUnlocked = false;
+  } else if (hasFlowProgress) {
+    townPanelUnlocked = true;
+  } else if (!isLocalLiteLlmConfigured() && localLiteLlm.loaded) {
+    townPanelUnlocked = false;
+  } else if (isAnyAgentConnected(state) || !!state?.signup?.complete) {
+    townPanelUnlocked = true;
+  }
+  const vendorNeedsSetup = vendor && !townPanelUnlocked;
+  const onboardingComplete = vendor
+    ? !vendorNeedsSetup
+    : isAnyAgentConnected(state);
+
+  const browserActive = el('browserPanel') && !el('browserPanel').classList.contains('is-hidden');
+
+  if (welcomePanel) {
+    const showWelcomePanel = !visible && !onboardingComplete;
+    welcomePanel.classList.toggle('is-hidden', !showWelcomePanel);
+  }
+
+  if (hatchPanel) {
+    const showHatchPanel = visible && !onboardingComplete;
+    hatchPanel.classList.toggle('is-hidden', !showHatchPanel);
+  }
+
+  if (townPanel) {
+    if (browserActive) {
+      townPanel.classList.add('is-hidden');
+    } else {
+      const showTownPanel = onboardingComplete;
+      townPanel.classList.toggle('is-hidden', !showTownPanel);
+    }
+  }
+
+  // Keep the Agent panel available on every page/state.
+  if (sidebar) sidebar.classList.remove('is-hidden');
+}
+
+async function connectWallet() {
+  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
+  if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
+  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
+
+  let resp = null;
+  if (window.solana.isConnected && window.solana.publicKey) {
+    wallet = window.solana;
+  } else {
+    resp = await window.solana.connect();
+    wallet = window.solana;
+  }
+  const pk = resp?.publicKey || wallet?.publicKey;
+  walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
+  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
+  return walletAddr;
+}
+
+async function signWalletMessage(message) {
+  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
+  const msgBytes = new TextEncoder().encode(message);
+  const resp = await wallet.signMessage(msgBytes, 'utf8');
+  const sigBytes = resp?.signature || resp;
+  const sigArr = normalizeSignatureBytes(sigBytes);
+  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
+  return b64(sigArr);
+}
+
+async function lookupWalletHouse() {
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  const nonceResp = await api('/api/wallet/nonce');
+  const msg = buildWalletLookupMessage({
+    address: walletAddr,
+    nonce: nonceResp.nonce,
+    houseId: null
+  });
+  const signature = await signWalletMessage(msg);
+  return api('/api/wallet/lookup', {
+    method: 'POST',
+    body: JSON.stringify({
+      address: walletAddr,
+      nonce: nonceResp.nonce,
+      signature
+    })
+  });
+}
+
+async function checkWalletStep() {
+  if (pendingWalletCheck) return;
+  const step1 = el('step1');
+  const step2 = el('step2');
+  const walletStatus = el('walletStatus');
+  const walletBtn = el('hatchWalletCheckBtn');
+
+  pendingWalletCheck = true;
+  if (walletBtn) walletBtn.disabled = true;
+  if (walletStatus) walletStatus.textContent = 'Checking wallet...';
+
+  const unlockStep2 = () => {
+    if (step1) step1.classList.add('done');
+    if (step2) {
+      step2.classList.remove('disabled');
+      step2.classList.add('active');
+    }
+    const providerInput = el('llmProviderSelect');
+    if (providerInput) setTimeout(() => providerInput.focus(), 100);
+  };
+
+  try {
+    await connectWallet();
+    let lookup = null;
+    try {
+      lookup = await lookupWalletHouse();
+    } catch (lookupErr) {
+      const code = String(lookupErr?.message || '').trim();
+      if (code === 'NONCE_MISMATCH') {
+        lookup = await lookupWalletHouse();
+      } else {
+        throw lookupErr;
+      }
+    }
+    if (lookup?.houseId) {
+      statusOverride = 'House found! Redirecting...';
+      if (walletStatus) walletStatus.textContent = statusOverride;
+      window.location.href = `/house?house=${encodeURIComponent(lookup.houseId)}`;
+      return;
+    }
+
+    // No house found - Proceed to Step 2 (LLM Config)
+    if (walletStatus) {
+      walletStatus.textContent = 'Wallet verified. Configure brain.';
+      walletStatus.style.color = 'var(--good)';
+    }
+    unlockStep2();
+
+    statusOverride = 'No existing house found. Continue setting up your OpenClaw Lite agent.';
+    setHatchStatus(statusOverride);
+
+  } catch (e) {
+    const raw = String(e?.message || '').trim();
+    const hasConnectedWallet = !!walletAddr;
+    const msg = raw === 'NO_SOLANA_WALLET'
+      ? 'No Solana wallet found.'
+      : raw === 'NO_SOLANA_SIGN'
+        ? 'Wallet cannot sign messages.'
+        : raw === 'USER_REJECTED'
+          ? 'Wallet signature was cancelled.'
+          : raw.includes('USER_REJECTED')
+            ? 'Wallet signature was cancelled.'
+            : hasConnectedWallet
+              ? 'Wallet connected. Lookup skipped. Configure brain to continue.'
+              : 'Wallet check failed.';
+    if (walletStatus) {
+      walletStatus.textContent = msg;
+      walletStatus.style.color = hasConnectedWallet ? 'var(--muted)' : 'var(--bad)';
+    }
+    if (hasConnectedWallet) {
+      unlockStep2();
+    }
+    statusOverride = msg;
+    setHatchStatus(statusOverride);
+  } finally {
+    pendingWalletCheck = false;
+    if (walletBtn) walletBtn.disabled = false;
+  }
+}
+
+// Kept for backward compat / direct calls if needed
+async function runWalletProfileCheck() {
+  await checkWalletStep();
+}
+
+async function connectLiteAgent() {
+  if (pendingLiteConnect) return;
+  if (isVendorLite(lastState) && !isLocalLiteLlmConfigured()) {
+    statusOverride = 'Configure your local brain settings before connecting OpenClaw Lite.';
+    setHatchStatus(statusOverride);
+    return;
+  }
+  if (isVendorLite(lastState)) {
+    const booted = await bootstrapVendorRuntime();
+    if (!booted) {
+      if (!String(statusOverride || '').startsWith('OpenClaw Lite runtime failed:')) {
+        statusOverride = 'OpenClaw Lite runtime is starting…';
+      }
+      setHatchStatus(statusOverride);
+      applyVisibility(lastState);
+      return;
+    }
+  }
+  pendingLiteConnect = true;
+  setHatchStatus('Connecting OpenClaw Lite…');
+  try {
+    await api('/api/agent/lite/connect', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    statusOverride = '';
+  } catch (e) {
+    statusOverride = `Agent connect failed: ${e.message}`;
+  } finally {
+    pendingLiteConnect = false;
+    setHatchStatus(statusOverride);
+    applyVisibility(lastState);
+  }
+}
+
+async function bootstrapVendorRuntime() {
+  if (runtimeBootstrapPromise) return runtimeBootstrapPromise;
+  if (!isVendorLite(lastState)) return false;
+  if (runtimeBootstrapDone) return true;
+
+  runtimeBootstrapPromise = (async () => {
+    pendingRuntimeBootstrap = true;
+    try {
+      const manifestResp = await fetch('/openclaw-lite/manifest.json', {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
+      const manifest = await manifestResp.json().catch(() => ({}));
+      const runtimeWorkerPath = String(manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      fetch(runtimeWorkerPath, {
+        credentials: 'include',
+        cache: 'no-store'
+      }).catch(() => null);
+      if (lastState) {
+        await ensureVendorRuntimeBridge(lastState);
+      }
+      runtimeBootstrapDone = true;
+      setLiteLlmStatus('Runtime ready. Configure provider, model, and API key.');
+      return true;
+    } catch (e) {
+      runtimeBootstrapDone = false;
+      const msg = e?.message || 'RUNTIME_BOOT_FAILED';
+      statusOverride = `OpenClaw Lite runtime failed: ${msg}`;
+      setHatchStatus(statusOverride);
+      setLiteLlmStatus(`Runtime failed: ${msg}`);
+      return false;
+    } finally {
+      pendingRuntimeBootstrap = false;
+      runtimeBootstrapPromise = null;
+    }
+  })();
+
+  return runtimeBootstrapPromise;
+}
+
+
+function initAdvancedLlmUi() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const refInput = el('llmModelRefInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const oauthLaunchBtn = el('llmOauthLaunchBtn');
+
+  if (!providerSel || !modelInput || !refInput) return;
+  if (providerSel.dataset.listening) return;
+  providerSel.dataset.listening = 'true';
+  const initialized = applyLlmProviderModelSelection(providerSel.value || 'openai', modelInput.value || '');
+  providerSel.value = initialized.provider;
+  modelInput.value = initialized.model;
+
+  const updateRef = () => {
+    syncModelRefFromInputs();
+  };
+
+  providerSel.addEventListener('change', () => {
+    const selectedProvider = applyLlmProviderSelection(providerSel.value || 'openai');
+    applyLlmModelSelection(selectedProvider, modelInput.value || '');
+    updateRef();
+    setLlmAuthModeUI(readLlmAuthMode());
+  });
+
+  if (modelInput.tagName === 'SELECT') {
+    modelInput.addEventListener('change', updateRef);
+  } else {
+    modelInput.addEventListener('input', updateRef);
+  }
+  if (authModeSel && !authModeSel.dataset.listening) {
+    authModeSel.dataset.listening = 'true';
+    authModeSel.addEventListener('change', () => {
+      setLlmAuthModeUI(readLlmAuthMode());
+      syncModelRefFromInputs();
+    });
+  }
+  if (oauthInput && !oauthInput.dataset.listening) {
+    oauthInput.dataset.listening = 'true';
+    oauthInput.addEventListener('input', () => syncModelRefFromInputs());
+  }
+  if (oauthLaunchBtn && !oauthLaunchBtn.dataset.listening) {
+    oauthLaunchBtn.dataset.listening = 'true';
+    oauthLaunchBtn.addEventListener('click', async () => {
+      try {
+        await launchLlmOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setLiteLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setLiteLlmStatus(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  const oauthCompleteBtn = el('llmOauthCompleteBtn');
+  if (oauthCompleteBtn && !oauthCompleteBtn.dataset.listening) {
+    oauthCompleteBtn.dataset.listening = 'true';
+    oauthCompleteBtn.addEventListener('click', async () => {
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
+        if (msg === 'CODE_PENDING') {
+          setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+        }
+      }
+    });
+  }
+  setLlmAuthModeUI(readLlmAuthMode());
+  syncModelRefFromInputs();
+}
+
+function syncModelRefFromInputs() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const refInput = el('llmModelRefInput');
+  if (!providerSel || !modelInput || !refInput) return;
+  const p = String(providerSel.value || 'openai').trim();
+  const m = String(modelInput.value || '').trim();
+  const resolved = resolveLlmModelRefFromInputs(p, m);
+  refInput.value = m ? resolved.modelRef : '';
+}
+
+function copySelectOptions(fromSelect, toSelect) {
+  if (!fromSelect || !toSelect) return;
+  if (fromSelect.tagName !== 'SELECT' || toSelect.tagName !== 'SELECT') return;
+  const current = String(toSelect.value || '').trim();
+  toSelect.innerHTML = '';
+  for (const opt of Array.from(fromSelect.options || [])) {
+    const next = document.createElement('option');
+    next.value = String(opt.value || '');
+    next.textContent = String(opt.textContent || opt.value || '');
+    toSelect.appendChild(next);
+  }
+  if (current) {
+    ensureSelectOption(toSelect, current, current);
+    toSelect.value = current;
+  }
+}
+
+function setAgentLlmStatus(text) {
+  const node = el('agentLlmLine');
+  if (!node) return;
+  node.textContent = text || '';
+}
+
+function readAgentLlmAuthMode() {
+  const raw = String(el('agentLlmAuthModeSelect')?.value || '').trim();
+  return raw === 'oauth-json' ? 'oauth-json' : 'api-key';
+}
+
+function updateAgentLlmOauthLaunchUi() {
+  const launchBtn = el('agentLlmOauthLaunchBtn');
+  const completeBtn = el('agentLlmOauthCompleteBtn');
+  if (!launchBtn) return;
+  const provider = String(el('agentLlmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const mode = readAgentLlmAuthMode();
+  const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
+  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  launchBtn.disabled = !supported;
+  launchBtn.title = supported
+    ? 'Start OpenAI PKCE OAuth in a new tab.'
+    : 'OAuth launch is available for OpenAI providers only.';
+  if (completeBtn) {
+    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    completeBtn.disabled = !supported;
+    completeBtn.title = supported
+      ? 'Complete OAuth using pasted callback URL/code.'
+      : 'OAuth completion is available for OpenAI providers only.';
+  }
+}
+
+function setAgentLlmAuthModeUI(mode) {
+  const authMode = mode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const authModeSelect = el('agentLlmAuthModeSelect');
+  const oauthInput = el('agentLlmOauthProfileInput');
+  const keyInput = el('agentLlmKeyInput');
+  if (authModeSelect) authModeSelect.value = authMode;
+  if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
+  if (keyInput) {
+    keyInput.placeholder = authMode === 'oauth-json'
+      ? 'Optional override token (usually auto-derived from OAuth input)'
+      : 'LLM API key (stored locally)';
+  }
+  updateAgentLlmOauthLaunchUi();
+}
+
+function syncAgentLlmUiFromPrimary() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const thinkingInput = el('llmThinkingInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+  const status = el('llmLine');
+
+  const agentProviderSel = el('agentLlmProviderSelect');
+  const agentModelInput = el('agentLlmModelIdInput');
+  const agentAuthModeSel = el('agentLlmAuthModeSelect');
+  const agentThinkingInput = el('agentLlmThinkingInput');
+  const agentKeyInput = el('agentLlmKeyInput');
+  const agentOauthInput = el('agentLlmOauthProfileInput');
+
+  copySelectOptions(providerSel, agentProviderSel);
+  copySelectOptions(modelInput, agentModelInput);
+  copySelectOptions(authModeSel, agentAuthModeSel);
+  copySelectOptions(thinkingInput, agentThinkingInput);
+
+  if (agentProviderSel && providerSel) {
+    ensureSelectOption(agentProviderSel, providerSel.value, providerSel.value);
+    agentProviderSel.value = providerSel.value;
+  }
+  if (agentModelInput && modelInput) {
+    ensureSelectOption(agentModelInput, modelInput.value, modelInput.value);
+    agentModelInput.value = modelInput.value;
+  }
+  if (agentAuthModeSel && authModeSel) {
+    ensureSelectOption(agentAuthModeSel, authModeSel.value, authModeSel.value);
+    agentAuthModeSel.value = authModeSel.value;
+  }
+  if (agentThinkingInput && thinkingInput) {
+    ensureSelectOption(agentThinkingInput, thinkingInput.value, thinkingInput.value);
+    agentThinkingInput.value = thinkingInput.value;
+  }
+  if (agentKeyInput && keyInput) agentKeyInput.value = keyInput.value || '';
+  if (agentOauthInput && oauthInput) agentOauthInput.value = oauthInput.value || '';
+  setAgentLlmAuthModeUI(readAgentLlmAuthMode());
+  setAgentLlmStatus(status?.textContent || el('liteLlmStatus')?.textContent || '');
+}
+
+function syncPrimaryLlmUiFromAgent() {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const thinkingInput = el('llmThinkingInput');
+  const keyInput = el('llmKeyInput');
+  const oauthInput = el('llmOauthProfileInput');
+
+  const agentProviderSel = el('agentLlmProviderSelect');
+  const agentModelInput = el('agentLlmModelIdInput');
+  const agentAuthModeSel = el('agentLlmAuthModeSelect');
+  const agentThinkingInput = el('agentLlmThinkingInput');
+  const agentKeyInput = el('agentLlmKeyInput');
+  const agentOauthInput = el('agentLlmOauthProfileInput');
+
+  if (providerSel && agentProviderSel) {
+    const nextProvider = String(agentProviderSel.value || '').trim();
+    if (nextProvider) {
+      ensureSelectOption(providerSel, nextProvider, nextProvider);
+      providerSel.value = nextProvider;
+      providerSel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+  if (modelInput && agentModelInput) {
+    const nextModel = String(agentModelInput.value || '').trim();
+    if (nextModel) {
+      ensureSelectOption(modelInput, nextModel, nextModel);
+      modelInput.value = nextModel;
+      if (modelInput.tagName === 'SELECT') {
+        modelInput.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        modelInput.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    }
+  }
+  if (authModeSel && agentAuthModeSel) {
+    authModeSel.value = readAgentLlmAuthMode();
+    authModeSel.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (thinkingInput && agentThinkingInput) {
+    ensureSelectOption(thinkingInput, agentThinkingInput.value, agentThinkingInput.value);
+    thinkingInput.value = agentThinkingInput.value;
+  }
+  if (keyInput && agentKeyInput) keyInput.value = agentKeyInput.value || '';
+  if (oauthInput && agentOauthInput) oauthInput.value = agentOauthInput.value || '';
+  syncModelRefFromInputs();
+}
+
+function initAgentLlmUi() {
+  const panel = el('agentMindPanel');
+  if (!panel || panel.dataset.listening === '1') return;
+  panel.dataset.listening = '1';
+
+  const providerSel = el('agentLlmProviderSelect');
+  const modelInput = el('agentLlmModelIdInput');
+  const authModeSel = el('agentLlmAuthModeSelect');
+  const thinkingInput = el('agentLlmThinkingInput');
+  const keyInput = el('agentLlmKeyInput');
+  const oauthInput = el('agentLlmOauthProfileInput');
+  const oauthLaunchBtn = el('agentLlmOauthLaunchBtn');
+  const oauthCompleteBtn = el('agentLlmOauthCompleteBtn');
+  const saveBtn = el('agentLlmSaveBtn');
+  const clearBtn = el('agentLlmClearBtn');
+
+  const syncBoth = () => {
+    syncPrimaryLlmUiFromAgent();
+    syncAgentLlmUiFromPrimary();
+  };
+
+  if (providerSel) {
+    providerSel.addEventListener('change', () => {
+      syncBoth();
+      updateAgentLlmOauthLaunchUi();
+    });
+  }
+  if (modelInput) {
+    const event = modelInput.tagName === 'SELECT' ? 'change' : 'input';
+    modelInput.addEventListener(event, () => syncBoth());
+  }
+  if (authModeSel) {
+    authModeSel.addEventListener('change', () => {
+      setAgentLlmAuthModeUI(readAgentLlmAuthMode());
+      syncBoth();
+    });
+  }
+  if (thinkingInput) {
+    thinkingInput.addEventListener('change', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (keyInput) {
+    keyInput.addEventListener('input', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (oauthInput) {
+    oauthInput.addEventListener('input', () => syncPrimaryLlmUiFromAgent());
+  }
+  if (oauthLaunchBtn) {
+    oauthLaunchBtn.addEventListener('click', async () => {
+      syncPrimaryLlmUiFromAgent();
+      try {
+        await launchLlmOauthInNewTab();
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_START_FAILED');
+        if (msg === 'POPUP_BLOCKED') {
+          setAgentLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          return;
+        }
+        setAgentLlmStatus(`OAuth start failed: ${msg}`);
+      }
+    });
+  }
+  if (oauthCompleteBtn) {
+    oauthCompleteBtn.addEventListener('click', async () => {
+      syncPrimaryLlmUiFromAgent();
+      const callbackInput = String(el('llmOauthProfileInput')?.value || '').trim();
+      try {
+        await completeOpenAiCodexOAuthFromUi({ callbackInput });
+      } catch (err) {
+        const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
+        if (msg === 'CODE_PENDING') {
+          setAgentLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+        }
+      }
+    });
+  }
+  if (saveBtn) {
+    saveBtn.addEventListener('click', () => {
+      syncPrimaryLlmUiFromAgent();
+      const primarySave = el('llmSaveBtn');
+      if (!primarySave) {
+        setAgentLlmStatus('Brain form unavailable.');
+        return;
+      }
+      setLiteLlmStatus('Configuring brain...');
+      primarySave.click();
+      setTimeout(() => syncAgentLlmUiFromPrimary(), 80);
+      setTimeout(() => syncAgentLlmUiFromPrimary(), 600);
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      await clearLiteLlmConfig();
+      syncAgentLlmUiFromPrimary();
+    });
+  }
+
+  syncAgentLlmUiFromPrimary();
+}
+
+async function readLocalLiteLlmConfig() {
+  const lib = await loadLiteLlmLibrary();
+  const localCfg = await lib.loadLlmConfig();
+  const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
+  const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
+  const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
+  const defaultProvider = providerRaw || 'openai';
+  const defaultModel = modelRaw || getDefaultLlmModelForProvider(defaultProvider);
+  const parsed = parseModelRefFromText(
+    modelRefRaw || `${defaultProvider}/${defaultModel}`,
+    defaultProvider,
+    defaultModel
+  );
+  const provider = providerRaw || parsed.provider || defaultProvider;
+  const model = modelRaw || parsed.modelId || defaultModel;
+  const modelRef = modelRefRaw || parsed.modelRef || `${provider}/${model}`;
+  const credential = typeof localCfg?.apiKey === 'string' ? localCfg.apiKey : '';
+  const authMode = String(localCfg?.authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  return {
+    loaded: true,
+    configured: !!(localCfg?.configured && provider && model && credential),
+    provider,
+    model,
+    modelRef,
+    credential,
+    authMode,
+    apiKeySet: !!credential
+  };
+}
+
+function applyLocalLiteLlmToInputs(config) {
+  const providerSel = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const keyInput = el('llmKeyInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const mode = config?.authMode === 'oauth-json' ? 'oauth-json' : 'api-key';
+
+  if (providerSel && modelInput) {
+    const selected = applyLlmProviderModelSelection(config?.provider || 'openai', config?.model || '');
+    providerSel.value = selected.provider;
+    modelInput.value = selected.model;
+  }
+  if (keyInput) keyInput.value = mode === 'api-key' ? config?.credential || '' : '';
+  if (authModeSel) setLlmAuthModeUI(mode);
+  if (oauthInput) {
+    if (mode === 'oauth-json') {
+      oauthInput.value = config?.credential || '';
+      oauthInput.placeholder = 'OAuth profile JSON/token used to derive this session credential.';
+    } else {
+      oauthInput.value = '';
+      oauthInput.placeholder = 'Paste OpenAI/OAuth profile JSON (or raw token) for OAuth mode.';
+    }
+  }
+  syncModelRefFromInputs();
+}
+
+async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
+  if (!isVendorLite(state)) return;
+  if (llmRestoreAttempted) return;
+
+  llmRestoreAttempted = true;
+  try {
+    const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
+    applyLocalLiteLlmToInputs(localCfg);
+
+    await applyGatewayLlmConfig(localCfg);
+    if (runtimeBridge) {
+      await ensureVendorRuntimeBridge(state);
+      await runtimeBridge.setLlmConfig({
+        provider: localCfg.configured ? localCfg.provider : '',
+        model: localCfg.configured ? localCfg.model : '',
+        apiKey: localCfg.configured ? localCfg.credential || '' : ''
+      });
+    }
+    if (localCfg.configured) {
+      setLiteLlmStatus(`Brain saved locally: ${localCfg.provider}/${localCfg.model}. Auto-restored on return.`);
+    } else {
+      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    }
+    if (lastState) updateUI(lastState);
+  } catch (e) {
+    console.warn('local LLM restore skipped', e);
+  }
+}
+
+// Replaces legacy saveLiteLlmConfig with gateway supervision
+function initStep2Listener() {
+  const btn = el('llmSaveBtn');
+  if (!btn || btn.dataset.listening) return;
+  btn.dataset.listening = 'true';
+
+  btn.addEventListener('click', async () => {
+    // Persist the LLM mind config locally and apply it to active local runtimes.
+    const status = el('llmLine');
+    const providerSel = el('llmProviderSelect');
+    const modelInput = el('llmModelIdInput');
+    const modelRefInput = el('llmModelRefInput');
+    const keyInput = el('llmKeyInput');
+    const oauthInput = el('llmOauthProfileInput');
+    const authModeSel = el('llmAuthModeSelect');
+    const clearBtn = el('llmClearBtn');
+
+    if (!providerSel || !modelInput || !modelRefInput || !keyInput) {
+      if (status) status.textContent = 'LLM form missing fields.';
+      return;
+    }
+
+    if (status) status.textContent = 'Configuring brain...';
+    setAgentLlmStatus('Configuring brain...');
+    if (clearBtn) clearBtn.disabled = true;
+    btn.disabled = true;
+
+    try {
+      const config = resolveLlmConfigFromUi();
+      keyInput.value = config.credential;
+      if (modelRefInput) modelRefInput.value = config.modelRef;
+      if (authModeSel) setLlmAuthModeUI(config.authMode);
+      if (authModeSel) authModeSel.value = config.authMode;
+      if (oauthInput && config.authMode !== 'oauth-json') oauthInput.value = '';
+
+      const lib = await loadLiteLlmLibrary();
+      await lib.saveLlmConfig({
+        provider: config.provider,
+        model: config.model,
+        apiKey: config.credential,
+        authMode: config.authMode
+      });
+
+      const localCfg = setLocalLiteLlm({
+        loaded: true,
+        configured: true,
+        provider: config.provider,
+        model: config.model,
+        modelRef: config.modelRef,
+        credential: config.credential,
+        authMode: config.authMode,
+        apiKeySet: true
+      });
+      clearLiteSkillLoopPause();
+      await applyGatewayLlmConfig(localCfg);
+
+      // Ensure runtime worker inherits local config for the current tab session.
+      if (runtimeBridge && isVendorLite(lastState)) {
+        try {
+          await ensureVendorRuntimeBridge(lastState);
+          await runtimeBridge.setLlmConfig({
+            provider: config.provider,
+            model: config.model,
+            apiKey: config.credential
+          });
+        } catch (err) {
+          console.warn('runtime bridge llm sync failed', err);
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+      if (status) status.textContent = 'Brain configured.';
+      setAgentLlmStatus('Brain configured.');
+      setLiteLlmStatus(`Brain saved locally: ${config.provider}/${config.model}. Auto-restored on return.`);
+      if (lastState) updateUI(lastState);
+
+      const step2 = el('step2');
+      if (step2) {
+        step2.classList.add('done');
+        step2.classList.remove('active');
+      }
+      setHatchStatus('Brain connected. Connecting agent...');
+      if (isVendorLite(lastState)) {
+        const booted = await bootstrapVendorRuntime();
+        if (booted) {
+          await connectLiteAgent();
+        } else {
+          setHatchStatus('Brain configured locally. Runtime boot failed.');
+        }
+      }
+    } catch (e) {
+      if (status) status.textContent = `Brain config failed: ${e.message}`;
+      setAgentLlmStatus(`Brain config failed: ${e.message}`);
+      setHatchStatus(`Brain config failed: ${e.message}`);
+      if (e) console.error('LLM config failed', e);
+    } finally {
+      if (clearBtn) clearBtn.disabled = false;
+      btn.disabled = false;
+    }
+  });
+}
+
+function saveLiteLlmConfig() {
+  // No-op, managed by gateway.js + initStep2Listener
+}
+
+async function clearLiteLlmConfig() {
+  if (pendingLlmClear) return;
+  const providerInput = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  const keyInput = el('llmKeyInput');
+  const modelRefInput = el('llmModelRefInput');
+  const authModeSel = el('llmAuthModeSelect');
+  const oauthInput = el('llmOauthProfileInput');
+  const clearBtn = el('llmClearBtn');
+  if (!clearBtn) return;
+
+  pendingLlmClear = true;
+  openAiCodexOAuthAttempt = null;
+  stopOpenAiCodexOAuthPoll();
+  clearBtn.disabled = true;
+  setLiteLlmStatus('Clearing LLM configuration…');
+  try {
+    const lib = await loadLiteLlmLibrary();
+    await lib.clearLlmConfig();
+    setLocalLiteLlm({
+      loaded: true,
+      configured: false,
+      provider: null,
+      model: null,
+      modelRef: null,
+      credential: '',
+      authMode: 'api-key',
+      apiKeySet: false
+    });
+    clearLiteSkillLoopPause();
+    await applyGatewayLlmConfig({ configured: false });
+    if (authModeSel) {
+      authModeSel.value = 'api-key';
+      setLlmAuthModeUI('api-key');
+    }
+    if (providerInput && modelInput) {
+      const selected = applyLlmProviderModelSelection('openai', getDefaultLlmModelForProvider('openai'));
+      providerInput.value = selected.provider;
+      modelInput.value = selected.model;
+    }
+    if (keyInput) keyInput.value = '';
+    if (modelRefInput) {
+      const resolved = resolveLlmModelRefFromInputs(providerInput?.value || 'openai', modelInput?.value || '');
+      modelRefInput.value = resolved.modelRef;
+    }
+    if (oauthInput) oauthInput.value = '';
+    if (runtimeBridge && isVendorLite(lastState)) {
+      await ensureVendorRuntimeBridge(lastState);
+      await runtimeBridge.setLlmConfig({ provider: '', model: '', apiKey: '' });
+    }
+    statusOverride = 'OpenClaw Lite LLM config cleared.';
+    setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    if (lastState) updateUI(lastState);
+  } catch (e) {
+    statusOverride = `LLM clear failed: ${e.message}`;
+    setLiteLlmStatus(`LLM clear failed: ${e.message}`);
+  } finally {
+    pendingLlmClear = false;
+    clearBtn.disabled = false;
+    setHatchStatus(statusOverride);
+  }
+}
+
+function renderSigils(state) {
+  const grid = el('sigilGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  const confirmedHumanSel = typeof state?.human?.selected === 'string' && state.human.selected
+    ? state.human.selected
+    : null;
+  if (confirmedHumanSel) pendingHumanSigilSelection = null;
+  const humanSel = confirmedHumanSel || pendingHumanSigilSelection || null;
+  const agentSel = state?.agent?.selected || null;
+
+  for (const item of elements) {
+    const btn = document.createElement('button');
+    btn.className = 'btn sigil';
+    btn.type = 'button';
+    btn.setAttribute('data-testid', `sigil-${item.id}`);
+    btn.dataset.elementId = item.id;
+
+    const left = document.createElement('div');
+    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
+    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
+
+    const right = document.createElement('div');
+    right.style.display = 'grid';
+    right.style.gap = '6px';
+    right.style.justifyItems = 'end';
+
+    const you = document.createElement('div');
+    you.className = 'pill';
+    you.style.padding = '4px 8px';
+    you.textContent = humanSel === item.id ? 'you' : '';
+
+    const agent = document.createElement('div');
+    agent.className = 'pill';
+    agent.style.padding = '4px 8px';
+    agent.textContent = agentSel === item.id ? 'agent' : '';
+
+    right.appendChild(you);
+    right.appendChild(agent);
+    btn.appendChild(left);
+    btn.appendChild(right);
+
+    if (humanSel === item.id || agentSel === item.id) {
+      btn.classList.add('selected');
+    }
+
+    btn.addEventListener('click', async () => {
+      setOpenError('');
+      pendingHumanSigilSelection = item.id;
+      if (lastState) renderSigils(lastState);
+      try {
+        const resp = await api('/api/human/select', {
+          method: 'POST',
+          body: JSON.stringify({ elementId: item.id })
+        });
+        if (resp?.humanSelected && lastState) {
+          lastState = {
+            ...lastState,
+            human: { ...(lastState.human || {}), selected: resp.humanSelected },
+            match: resp.match || lastState.match
+          };
+        }
+        pendingHumanSigilSelection = null;
+        if (lastState) {
+          renderSigils(lastState);
+          updateMatchUi(lastState);
+        }
+        requestHomeSkillStep('human-action');
+      } catch (e) {
+        pendingHumanSigilSelection = null;
+        if (lastState) renderSigils(lastState);
+        setOpenError(`Select failed: ${e.message}`);
+      }
+    });
+
+    grid.appendChild(btn);
+  }
+}
+
+function updateMatchUi(state) {
+  const matched = !!state?.match?.matched;
+  const matchState = el('matchState');
+  const matchDetail = el('matchDetail');
+  const openBtn = el('openBtn');
+  const openWaiting = el('openWaiting');
+  const complete = !!state?.signup?.complete && state?.signup?.mode === 'agent';
+
+  if (matchState) {
+    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.className = `state ${matched ? 'good' : 'bad'}`;
+  }
+  if (matchDetail) {
+    matchDetail.textContent = matched
+      ? `Matched on "${state.match.elementId}". Press Open.`
+      : 'Pick the same sigil to unlock.';
+  }
+  if (openBtn) {
+    openBtn.disabled = !matched || complete;
+  }
+  if (openWaiting) {
+    const waiting = !!state?.human?.openPressed && !complete;
+    openWaiting.style.display = waiting ? 'inline-flex' : 'none';
+  }
+}
+
+function renderAgentReveal(state) {
+  const container = el('agentReveal');
+  if (!container) return;
+
+  // Clean container
+  container.innerHTML = '';
+
+  const agentId = state?.agent?.id || '???';
+  const name = state?.agent?.name || `Agent #${agentId}`;
+
+  // Create reveal card
+  const card = document.createElement('div');
+  card.className = 'agent-card';
+  card.style.textAlign = 'center';
+
+  // Use local placeholder to avoid CSP issues with external DiceBear API
+  // const imgUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${agentId}&backgroundColor=1a1a1a`;
+  const imgUrl = '/logo.jpg'; // Fallback to local logo
+
+  card.innerHTML = `
+    <div style="width: 120px; height: 120px; margin: 0 auto 16px; border-radius: 12px; overflow: hidden; border: 4px solid #f2c874; box-shadow: 0 0 20px rgba(242, 200, 116, 0.3);">
+      <img src="${imgUrl}" alt="${name}" style="width: 100%; height: 100%; object-fit: cover;">
+    </div>
+    <h3 style="margin: 0; color: var(--text); font-size: 20px;">${name}</h3>
+    ${agentId && agentId !== '???' ? `<div class="pill" style="margin-top: 8px;">ID: ${agentId}</div>` : ''}
+  `;
+
+  container.appendChild(card);
+}
+
+async function renderCanvas(state) {
+  const cvs = el('mainCanvas');
+  if (!cvs) return;
+  // Fetch image
+  try {
+    const res = await api(`/api/agent/canvas/image?teamCode=${state.teamCode}`);
+    if (res.image) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = cvs.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+      };
+      img.src = res.image;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // Paint listener
+  if (!cvs.dataset.listening) {
+    cvs.dataset.listening = 'true';
+    cvs.addEventListener('click', async (e) => {
+      const rect = cvs.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / (rect.width / 16));
+      const y = Math.floor((e.clientY - rect.top) / (rect.height / 16));
+      const color = 2; // red default
+      await api('/api/human/canvas/paint', {
+        method: 'POST',
+        body: JSON.stringify({ x, y, color })
+      });
+      renderCanvas(lastState);
+    });
+  }
+}
+
+function renderCeremony(state) {
+  const kv = el('ceremonyKv');
+  if (!kv) return;
+  const status = el('ceremonyStatus');
+  if (status) status.classList.remove('is-hidden');
+
+  if (!state.houseId) {
+    kv.innerHTML = `<div>Waiting for ceremony completion...</div>`;
+  } else {
+    kv.innerHTML = `<div>House Created: ${state.houseId}</div>`;
+  }
+}
+
+// --- Dock Minimize Logic ---
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.getElementById('minimizeChatBtn');
+  const dock = document.getElementById('agentSidebar');
+  const header = document.querySelector('.sidebar-header');
+
+  if (dock && header && btn) {
+    dock.classList.toggle('minimized', loadAgentPanelMinimized());
+    btn.textContent = dock.classList.contains('minimized') ? '□' : '_';
+
+    header.addEventListener('click', () => {
+      // Toggle minimize
+      dock.classList.toggle('minimized');
+      const isMin = dock.classList.contains('minimized');
+      saveAgentPanelMinimized(isMin);
+      btn.textContent = isMin ? '□' : '_';
+    });
+  }
+});
+
+function updateUI(state) {
+  lastState = state;
+  elements = Array.isArray(state?.elements) ? state.elements : elements;
+  if (!isVendorLite(state)) {
+    runtimeBootstrapDone = false;
+    runtimeBootstrapPromise = null;
+    pendingRuntimeBootstrap = false;
+    llmRestoreAttempted = false;
+    if (runtimeBridge && runtimeBridgeInitKey) {
+      runtimeBridge.dispose();
+      runtimeBridgeInitKey = '';
+    }
+  }
+
+  const teamCode = state?.teamCode || '…';
+  const teamCodeNode = el('teamCode');
+  if (teamCodeNode) teamCodeNode.textContent = teamCode;
+  const teamCodeResult = el('teamCodeResult');
+  if (teamCodeResult) teamCodeResult.classList.add('is-hidden');
+  const teamCodeRow = el('agentTeamCodeRow');
+  const teamCodeText = el('agentTeamCodeText');
+  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
+  const normalizedTeamCode = readCurrentTeamCodeFromState();
+  if (teamCodeText) {
+    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
+  }
+  if (teamCodeRow) {
+    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
+  }
+  if (teamCodeSendBtn) {
+    teamCodeSendBtn.disabled = !normalizedTeamCode;
+  }
+  const localLlm = getLocalLiteLlm();
+
+  applyVisibility(state);
+  updateLiteAgentStatus(state);
+  initStep2Listener();
+  initAdvancedLlmUi();
+  initAgentLlmUi();
+  syncAgentLlmUiFromPrimary();
+
+  // --- New Flow UI Updates ---
+  // --- New Flow UI Updates ---
+  const step1 = el('step1');
+  const step2 = el('step2');
+  const agentReveal = el('agentReveal');
+  const agentConnected = isAnyAgentConnected(state);
+  const lite = liteState(state);
+  const vendor = isVendorLite(state);
+  if (vendor) {
+    refreshLiteSkillState().catch(() => { });
+    if (agentConnected) {
+      ensureDefaultLiteSkillImported(state).catch(() => { });
+      requestHomeSkillStep('state');
+    }
+  }
+  if (!shouldRunHomeSkillLoop(state)) {
+    clearLiteSkillLoopTimer();
+    liteSkillLoopTeamCode = '';
+  } else {
+    const currentTeamCode = String(state?.teamCode || '').trim();
+    if (currentTeamCode && currentTeamCode !== liteSkillLoopTeamCode) {
+      liteSkillLoopTeamCode = currentTeamCode;
+      liteSkillLoopBackoffMs = 1000;
+      requestHomeSkillStep('team-change');
+    }
+  }
+  const liteActive = isLiteAgentActive(state);
+
+    if (step1) {
+      if (agentConnected || walletAddr || localLlm.configured) {
+        step1.classList.add('done');
+      } else {
+        step1.classList.remove('done');
+    }
+  }
+
+  if (agentConnected) {
+    if (step2) {
+      const needsBrainAfterConnect = vendor && !localLlm.configured;
+      step2.classList.remove('disabled');
+      if (needsBrainAfterConnect) {
+        step2.classList.add('active');
+        step2.classList.remove('done');
+      } else {
+        step2.classList.remove('active');
+        step2.classList.add('done');
+      }
+    }
+    if (agentReveal) {
+      agentReveal.classList.remove('is-hidden');
+      renderAgentReveal(state);
+    }
+  } else {
+    if (step2) {
+      step2.classList.remove('disabled');
+      if (localLlm.configured) {
+        step2.classList.add('done');
+        step2.classList.remove('active');
+      } else {
+        step2.classList.remove('done');
+        step2.classList.add('active');
+      }
+    }
+    if (agentReveal) {
+      agentReveal.classList.add('is-hidden');
+    }
+  }
+
+  if (vendor) {
+    ensureVendorRuntimeBridge(state).catch((e) => {
+      setOpenError(`Runtime bridge failed: ${e.message}`);
+    });
+    if (lite.lastError) {
+      setLiteLlmStatus(`Runtime failed: ${lite.lastError}`);
+    } else if (localLlm.configured) {
+      setLiteLlmStatus(`Brain saved locally: ${localLlm.provider || 'provider'}/${localLlm.model || 'model'}. Auto-restored on return.`);
+    } else {
+      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    }
+  }
+
+  if (statusOverride === 'OpenClaw Lite runtime is starting…' && runtimeBootstrapDone) {
+    statusOverride = '';
+  }
+
+  if (statusOverride) {
+    setHatchStatus(statusOverride);
+  } else if (vendor && lite.lastError) {
+    setHatchStatus(`OpenClaw Lite runtime failed: ${lite.lastError}`);
+  } else if (vendor && !localLlm.configured) {
+    setHatchStatus('Configure LLM to continue.');
+  } else if (vendor && localLlm.configured && !agentConnected) {
+    setHatchStatus(runtimeBootstrapDone ? 'Brain saved. Connecting agent…' : 'Starting local runtime…');
+  } else if (vendor && agentConnected && !liteActive) {
+    setHatchStatus('Agent connected. Skill import failed.');
+  } else if (agentConnected) {
+    setHatchStatus('Agent ready.');
+  } else if (walletAddr) {
+    setHatchStatus('Wallet connected. Continue setup.');
+  } else {
+    setHatchStatus('Choose sign in or sign up to continue.');
+  }
+
+  const townNode = el('townPanel');
+  const townVisible = !!townNode && !townNode.classList.contains('is-hidden');
+  if (townVisible || agentConnected || !!state?.signup?.complete) {
+    renderSigils(state);
+    renderCanvas(state);
+    renderCeremony(state);
+    updateMatchUi(state);
+  }
+
+  if (vendor && !runtimeBootstrapDone) {
+    bootstrapVendorRuntime().catch(() => { });
+  }
+  if (vendor && (!localLlm.loaded || !localLlm.configured)) {
+    restoreLiteLlmConfigFromLocalIfNeeded(state).catch(() => { });
+  }
+  if (!agentConnected && !pendingLiteConnect) {
+    if (vendor) {
+      if (localLlm.configured && runtimeBootstrapDone) {
+        connectLiteAgent().catch(() => { });
+      }
+    } else {
+      connectLiteAgent().catch(() => { });
+    }
+  }
+
+  const hasHouseId = typeof state?.houseId === 'string' && state.houseId.trim().length > 0;
+  const isHomePath = window.location.pathname === '/';
+  if (isHomePath && state?.signup?.complete && state?.signup?.mode === 'agent' && !hasHouseId && !redirecting) {
+    redirecting = true;
+    window.location.href = '/create';
+  }
+}
+
+// --- Agent Layout Logic ---
+
+let gateway = null;
+
+async function initGateway() {
+  if (gateway) return gateway;
+  try {
+    // Dynamic import of the gateway module
+    const module = await import('/openclaw-lite/gateway.js');
+    gateway = module.default || module;
+    if (gateway instanceof Promise) {
+      gateway = await gateway;
+    }
+    instrumentGatewayTraffic(gateway);
+
+    // Subscribe to agent events
+    gateway.on('message', (msg) => {
+      pushAgentDebugTraffic('in', 'worker.chat.append', {
+        role: String(msg?.role || ''),
+        text: String(msg?.text || ''),
+      });
+      const role = String(msg?.role || '').toLowerCase();
+      if (role && role !== 'assistant') return;
+      // Logic fix: accept empty strings as valid content/thinking
+      const text = (typeof msg.text === 'string') ? msg.text : JSON.stringify(msg);
+      appendChatMessage('agent', text);
+    });
+    gateway.on('log', (entry) => {
+      pushAgentDebugTraffic('in', 'worker.log.append', entry || {});
+      appendAgentLog(`[${entry.level}] ${entry.message}`);
+    });
+    gateway.on('status', (status) => {
+      const elStatus = el('agentStatus');
+      if (elStatus) elStatus.textContent = status;
+      pushAgentDebugTraffic('in', 'worker.runtime.status', { status: String(status || '') });
+      pushAgentDebugEvent(`status: ${status}`);
+      scheduleAgentDebugRefresh('status');
+    });
+    gateway.on('state', (runtimeState) => {
+      const snapshot = runtimeState && typeof runtimeState === 'object' ? runtimeState : {};
+      pushAgentDebugTraffic('in', 'worker.state.update', {
+        step: String(snapshot?.experience?.step || ''),
+        nextAgentAction: String(snapshot?.experience?.nextAgentAction || ''),
+        humanSelected: String(snapshot?.human?.selected || ''),
+        agentSelected: String(snapshot?.agent?.selected || ''),
+        matched: !!snapshot?.match?.matched,
+      });
+      if (runtimeState && typeof runtimeState === 'object' && runtimeState.skill) {
+        setLiteSkillState(runtimeState.skill);
+        updateLiteAgentStatus(lastState);
+        if (!statusOverride && isVendorLite(lastState) && isAnyAgentConnected(lastState)) {
+          setHatchStatus(isLiteAgentActive(lastState) ? 'Agent ready.' : 'Agent connected. Skill import failed.');
+        }
+      }
+      scheduleAgentDebugRefresh('state');
+    });
+
+    return gateway;
+  } catch (e) {
+    console.error('Failed to load gateway:', e);
+    appendAgentLog(`Error: Failed to load agent gateway. ${e.message}`);
+    return null;
+  }
+}
+
+function appendChatMessage(role, text) {
+  const box = el('chatTranscript');
+  if (!box) {
+    scheduleAgentDebugRefresh('chat');
+    return;
+  }
+
+  const div = document.createElement('div');
+  div.className = `chat-message ${role}`;
+  div.textContent = text;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  scheduleAgentDebugRefresh('chat');
+}
+
+function appendAgentLog(text) {
+  pushAgentDebugEvent(text);
+  const box = el('agentLogs');
+  if (!box) {
+    scheduleAgentDebugRefresh('log');
+    return;
+  }
+
+  const div = document.createElement('div');
+  div.textContent = `> ${text}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  scheduleAgentDebugRefresh('log');
+}
+
+async function handleVisit() {
+  const selector = el('experienceSelector');
+  const url = selector ? selector.value : '';
+  if (!url) {
+    appendAgentLog('Please select a valid experience.');
+    return;
+  }
+
+  appendChatMessage('system', `Navigating agent to ${url}...`);
+  if (!gateway) await initGateway();
+
+  try {
+    // Send navigation/fetch command to agent
+    // Depending on agent capability, this might be a 'tool' execution or a hard navigation
+    // For now, we ask the agent to "visit" it.
+    await gateway.send({ type: 'command', command: 'visit', url });
+    appendAgentLog(`Sent visit command for ${url}`);
+    await refreshLiteSkillState({ force: true });
+  } catch (e) {
+    appendAgentLog(`Visit failed: ${e.message}`);
+    await refreshLiteSkillState({ force: true });
+  }
+}
+
+async function handleChat() {
+  const input = el('chatInput');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  appendChatMessage('user', text);
+
+  if (!gateway) await initGateway();
+  try {
+    if (isVendorLite(lastState)) {
+      await ensureDefaultLiteSkillImported(lastState);
+      await refreshLiteSkillState({ force: false });
+    }
+    await gateway.send({
+      type: 'chat',
+      text,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(lastState?.teamCode || ''),
+        houseId: String(lastState?.houseId || '')
+      },
+      runtimeState: lastState && typeof lastState === 'object' ? lastState : null
+    });
+  } catch (e) {
+    appendChatMessage('system', `Failed to send: ${e.message}`);
+  }
+}
+
+function readCurrentTeamCodeFromState() {
+  const value = String(lastState?.teamCode || '').trim();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(value)) return '';
+  return value;
+}
+
+async function sendCurrentTeamCodeToAgent() {
+  const teamCode = readCurrentTeamCodeFromState();
+  if (!teamCode) {
+    appendChatMessage('system', 'Team code is not available yet.');
+    return;
+  }
+  const input = el('chatInput');
+  if (!input) return;
+  input.value = teamCode;
+  await handleChat();
+}
+
+async function handleNewSession() {
+  const btn = el('newSessionBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    if (!gateway) await initGateway();
+    if (!gateway) throw new Error('Gateway unavailable.');
+
+    if (typeof gateway.clearTranscript === 'function') {
+      await gateway.clearTranscript({ rotateSession: true, keepBootMessage: false });
+    } else if (window.__openclawLiteTest && typeof window.__openclawLiteTest.clearTranscript === 'function') {
+      await window.__openclawLiteTest.clearTranscript({ rotateSession: true, keepBootMessage: false });
+    } else {
+      throw new Error('Transcript reset is not available.');
+    }
+
+    const box = el('chatTranscript');
+    if (box) box.innerHTML = '';
+    appendChatMessage('system', 'New session started.');
+    appendAgentLog('Started new session (worker transcript cleared).');
+  } catch (e) {
+    const msg = e?.message || 'UNKNOWN';
+    appendChatMessage('system', `New session failed: ${msg}`);
+    appendAgentLog(`New session failed: ${msg}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function setupAgentDebugInterface() {
+  const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
+  if (!tabs.length) return;
+
+  for (const btn of tabs) {
+    if (btn.dataset.bound === '1') continue;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const tab = String(btn.dataset.debugTab || '').trim();
+      setAgentDebugTab(tab || 'tools');
+      scheduleAgentDebugRefresh(tab === 'session' ? 'tab-session' : 'tab-change');
+    });
+  }
+
+  const refreshBtn = el('agentDebugRefreshBtn');
+  if (refreshBtn && refreshBtn.dataset.bound !== '1') {
+    refreshBtn.dataset.bound = '1';
+    refreshBtn.addEventListener('click', () => {
+      scheduleAgentDebugRefresh('manual');
+    });
+  }
+
+  const filterButtons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
+  for (const btn of filterButtons) {
+    if (btn.dataset.bound === '1') continue;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', () => {
+      const value = String(btn?.dataset?.trafficFilter || '').trim();
+      setAgentTrafficFilter(value);
+      scheduleAgentDebugRefresh('traffic-filter');
+    });
+  }
+
+  setAgentTrafficFilter(agentDebugTrafficFilter);
+  setAgentDebugTab(agentDebugActiveTab);
+  startAgentDebugRefreshLoop();
+  scheduleAgentDebugRefresh('init');
+}
+
+function setupAgentInterface() {
+  const visitBtn = el('visitBtn');
+  const sendBtn = el('sendChatBtn');
+  const newSessionBtn = el('newSessionBtn');
+  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
+  const chatInput = el('chatInput');
+
+  if (visitBtn) visitBtn.addEventListener('click', handleVisit);
+  if (sendBtn) sendBtn.addEventListener('click', handleChat);
+  if (newSessionBtn) newSessionBtn.addEventListener('click', () => {
+    handleNewSession().catch(() => { });
+  });
+  if (teamCodeSendBtn) {
+    teamCodeSendBtn.addEventListener('click', () => {
+      sendCurrentTeamCodeToAgent().catch(() => { });
+    });
+  }
+  if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleChat();
+    });
+  }
+
+  setupAgentDebugInterface();
+}
+
+// --------------------------
 
 async function poll() {
   try {
@@ -3379,10 +6437,135 @@ async function poll() {
   } catch (e) {
     console.warn('state poll failed', e);
   } finally {
-    setTimeout(poll, 800);
+    setTimeout(poll, 700);
   }
 }
 
+async function init() {
+  const enterBtn = el('enterBtn');
+  const connectWalletHeroBtn = el('connectWalletHeroBtn');
+  const authSigninBtn = el('authSigninBtn');
+  const authSignupBtn = el('authSignupBtn');
+  const hatchWalletCheckBtn = el('hatchWalletCheckBtn');
+  const liteAgentConnectBtn = el('liteAgentConnectBtn');
+  const liteLlmSaveBtn = el('liteLlmSaveBtn');
+  const liteLlmClearBtn = el('liteLlmClearBtn');
+  const llmClearBtn = el('llmClearBtn');
+  const uploadCoreBtn = el('uploadCoreBtn');
+  const coreUploadInput = el('coreUploadInput');
+  const openBtn = el('openBtn');
+
+  if (enterBtn) {
+    enterBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Continue setup.';
+      setHatchStatus(statusOverride);
+    });
+  }
+
+  if (connectWalletHeroBtn) {
+    connectWalletHeroBtn.addEventListener('click', async () => {
+      setHatchVisible(true);
+      await runWalletProfileCheck();
+    });
+  }
+
+  if (authSigninBtn) {
+    authSigninBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Sign in selected. Continue setup.';
+      setHatchStatus(statusOverride);
+    });
+  }
+
+  if (authSignupBtn) {
+    authSignupBtn.addEventListener('click', () => {
+      setHatchVisible(true);
+      statusOverride = 'Sign up selected. Continue setup.';
+      setHatchStatus(statusOverride);
+    });
+  }
+
+  if (hatchWalletCheckBtn) {
+    hatchWalletCheckBtn.addEventListener('click', async () => {
+      setHatchVisible(true);
+      await runWalletProfileCheck();
+    });
+  }
+
+  if (liteAgentConnectBtn) {
+    liteAgentConnectBtn.addEventListener('click', async () => {
+      await connectLiteAgent();
+    });
+  }
+
+  if (liteLlmSaveBtn) {
+    liteLlmSaveBtn.addEventListener('click', async () => {
+      await saveLiteLlmConfig();
+    });
+  }
+
+  if (liteLlmClearBtn) {
+    liteLlmClearBtn.addEventListener('click', async () => {
+      await clearLiteLlmConfig();
+    });
+  }
+
+  if (llmClearBtn) {
+    llmClearBtn.addEventListener('click', async () => {
+      await clearLiteLlmConfig();
+    });
+  }
+
+  if (uploadCoreBtn && coreUploadInput) {
+    uploadCoreBtn.addEventListener('click', () => {
+      coreUploadInput.click();
+    });
+  }
+
+  if (openBtn) {
+    openBtn.addEventListener('click', async () => {
+      setOpenError('');
+      const openWaiting = el('openWaiting');
+      try {
+        const result = await api('/api/human/open/press', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        if (result?.nextUrl) {
+          window.location.href = result.nextUrl;
+          return;
+        }
+        if (openWaiting) openWaiting.style.display = 'inline-flex';
+        requestHomeSkillStep('human-action');
+      } catch (e) {
+        setOpenError(`Open failed: ${e.message}`);
+      }
+    });
+  }
+
+
+  const initial = await api('/api/state');
+  elements = Array.isArray(initial?.elements) ? initial.elements : [];
+  if (loadHatchVisible() || isAnyAgentConnected(initial) || isLocalLiteLlmConfigured()) {
+    setHatchVisible(true);
+  }
+  try {
+    const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
+    applyLocalLiteLlmToInputs(localCfg);
+  } catch (e) {
+    console.warn('local LLM preload failed', e);
+  }
+  updateUI(initial);
+  if (isVendorLite(initial)) {
+    await bootstrapVendorRuntime();
+    await restoreLiteLlmConfigFromLocalIfNeeded(initial);
+  }
+
+  // Do not auto-load server-side Codex profile credentials. Users configure LLM credentials themselves.
+
+  setupAgentInterface();
+=======
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref');
@@ -3465,4 +6648,5 @@ async function init() {
 
 init().catch((e) => {
   console.error(e);
+  setHatchStatus(`Init failed: ${e.message}`);
 });

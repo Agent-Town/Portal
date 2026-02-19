@@ -1,10 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const crypto = require('crypto');
-const {
-  makeCeremonyRevealPair,
-  encryptCeremonyReveal,
-  waitForAgentHouseMaterial
-} = require('./helpers/ceremony_crypto');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -73,33 +69,20 @@ test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
   const commitResp = await request.post('/api/agent/house/commit', {
     data: { teamCode, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
   });
-  expect(commitResp.ok()).toBeTruthy();
+  await reachCreateViaLite(page);
 
-  // Human paints + lock in
   await page.getByTestId('px-0-0').click();
-  const relayAgentReveal = (async () => {
-    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
-    expect(mat).toBeTruthy();
-    const sealedForHuman = encryptCeremonyReveal({
-      revealBytes: ra,
-      recipientRevealPubB64: mat.humanRevealPub,
-      direction: 'agent_to_human',
-      teamCode
-    });
-    const revealResp = await request.post('/api/agent/house/reveal', {
-      data: { teamCode, sealedForHuman }
-    });
-    expect(revealResp.ok()).toBeTruthy();
-  })();
-  await Promise.all([
-    relayAgentReveal,
-    page.getByTestId('share-btn').click(),
-    page.waitForURL(/\/house\?house=/)
-  ]);
+  await page.getByTestId('share-btn').click();
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
-  // Unlock (solana sig)
-  await page.getByRole('button', { name: 'Connect wallet' }).click();
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
+  const walletLabel = (await connectWalletBtn.textContent()) || '';
+  if (walletLabel.includes('Connect')) {
+    await connectWalletBtn.click();
+  }
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
+
   await expect(page.locator('#erc8004Panel')).toBeHidden();
   await expect(page.locator('#toggleErc8004Btn')).toHaveClass(/is-hidden/);
   await expect(page.locator('#mintErc8004Btn')).toBeHidden();

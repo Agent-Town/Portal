@@ -26,6 +26,27 @@ Follow `specs/04_tdd_milestones.md`.
 - Pixel-ish styling (no heavy frameworks)
 - Input validation + error messaging
 
+## Phase 3.5 — Skill Contract Line (required before skill/worker expansion)
+
+Lock in a stable, test-first skill workflow for future experience support:
+
+- Keep `public/skill.md` as the external-agent contract source.
+- Keep `e2e/55_phase3_skill_contract_line.spec.js` green as baseline contract coverage.
+- Track capability matrix and future rollout in `docs/internal-skill-testline.md`.
+
+For every skill or worker capability added:
+
+1. Add or update a Playwright test first (extend `e2e/55` or add `e2e/56+`).
+2. Implement the smallest change needed.
+3. Run targeted test(s), then run full suite (`npm test`).
+4. Record capability-to-test mapping in `docs/internal-skill-testline.md`.
+
+This phase is mandatory for:
+
+- `skill.md` / `SKILL.md` adoption and path-resolution work.
+- Moltbook multi-file skill support.
+- Future multi-experience support where each new domain must have deterministic regression coverage.
+
 ## Phase 4 — Hardening (optional)
 
 - Move from file store to database

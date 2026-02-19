@@ -20,6 +20,22 @@ function emptyCanvas() {
   return Array(CANVAS.w * CANVAS.h).fill(0);
 }
 
+function defaultLiteState() {
+  return {
+    driver: 'vendor',
+    runtimeBooted: false,
+    runtimeReady: false,
+    runtimeVersion: null,
+    lastError: null,
+    llmConfigured: false,
+    llmProvider: null,
+    llmModel: null,
+    llmApiKeySet: false,
+    llmAuthMode: null,
+    llmConfiguredAt: null
+  };
+}
+
 function createSession({ flow } = {}) {
   const sessionId = randomHex(16);
   const teamCode = createTeamCode();
@@ -30,6 +46,7 @@ function createSession({ flow } = {}) {
     createdAt: nowIso(),
     agent: {
       connected: false,
+      source: null,
       name: null,
       selected: null,
       openPressed: false,
@@ -56,6 +73,12 @@ function createSession({ flow } = {}) {
       mode: null,
       address: null
     },
+    hatch: {
+      complete: false,
+      createdAt: null,
+      agentKind: null
+    },
+    lite: defaultLiteState(),
     referral: {
       shareId: null
     },
@@ -119,6 +142,7 @@ function createSession({ flow } = {}) {
       agentRevealPub: null,
       humanRevealSealed: null,
       agentRevealSealed: null,
+      liteAgentReveal: null,
       houseId: null,
       createdAt: null
     }
@@ -192,5 +216,6 @@ module.exports = {
   listElements,
   evaluateMatch,
   resetAllSessions,
-  CANVAS
+  CANVAS,
+  defaultLiteState
 };

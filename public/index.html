@@ -1,16 +1,18 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Agent Town</title>
-  <meta name="description" content="Co-op onboarding for Agent Town" />
+  <meta name="description" content="OpenClaw Lite onboarding flow" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/logo.jpg" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
+
 <body class="town-hub-page">
   <div class="wrap townWrap">
     <section class="townOverview" id="townScenePanel">
@@ -37,11 +39,126 @@
         <div id="districtModalBody" class="districtModalBody is-loading">Loading district...</div>
       </div>
     </div>
+    <!-- PERSISTENT AGENT SIDEBAR (New) -->
+    <div id="agentSidebar" class="agent-sidebar minimized" data-testid="agent-panel">
+      <div class="sidebar-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h3>Agent Comms</h3>
+          <div class="status-indicator" id="agentStatus">Idle</div>
+        </div>
+        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">_</button>
+      </div>
 
+      <div class="sidebar-content">
+        <div class="agent-split">
+          <section class="agent-pane agent-pane-left" data-testid="agent-chat-pane">
+            <div id="chatTranscript" class="chat-box sidebar-chat"></div>
+
+            <div class="agent-teamcode-row is-hidden" id="agentTeamCodeRow" data-testid="agent-team-code-row">
+              <div class="small">Team: <strong id="agentTeamCodeText" data-testid="agent-team-code-text">TEAM-....-....</strong></div>
+              <button id="agentTeamCodeSendBtn" class="btn small" type="button" data-testid="agent-team-code-send">Send code</button>
+            </div>
+
+            <div class="chat-input-area">
+              <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
+              <button id="sendChatBtn" class="btn primary small">Send</button>
+              <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
+            </div>
+
+            <div id="approvalsPanel" class="agent-approvals is-hidden" data-testid="approvals-panel">
+              <div class="approvals-header">Approvals</div>
+              <div id="approvals" class="approvals-box" data-testid="approvals"></div>
+            </div>
+          </section>
+
+          <section class="agent-pane agent-pane-right" data-testid="agent-debug-pane">
+            <div class="agent-debug-toolbar">
+              <div class="agent-debug-tabs" role="tablist" aria-label="Agent debug views">
+                <button class="btn small agent-debug-tab is-active" id="agentDebugTabTools" type="button" data-debug-tab="tools" data-testid="agent-debug-tab-tools">Worker Tools</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabSkill" type="button" data-debug-tab="skill" data-testid="agent-debug-tab-skill">Skill Context</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabTraffic" type="button" data-debug-tab="traffic" data-testid="agent-debug-tab-traffic">Worker Traffic</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabBrain" type="button" data-debug-tab="brain" data-testid="agent-debug-tab-brain">Brain</button>
+                <button class="btn small agent-debug-tab" id="agentDebugTabSession" type="button" data-debug-tab="session" data-testid="agent-debug-tab-session">Session Context</button>
+              </div>
+              <button class="btn small" id="agentDebugRefreshBtn" type="button">Refresh</button>
+            </div>
+
+            <div class="agent-debug-panels">
+              <div class="agent-debug-panel" id="agentDebugPanelTools" data-debug-panel="tools" data-testid="agent-debug-panel-tools">
+                <pre class="agent-debug-content" id="agentDebugTools" data-testid="agent-debug-tools"></pre>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelSkill" data-debug-panel="skill" data-testid="agent-debug-panel-skill">
+                <pre class="agent-debug-content" id="agentDebugSkill" data-testid="agent-debug-skill"></pre>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelTraffic" data-debug-panel="traffic" data-testid="agent-debug-panel-traffic">
+                <div class="agent-traffic-toolbar">
+                  <div class="agent-traffic-filters" role="group" aria-label="Traffic direction filters">
+                    <button class="btn small agent-traffic-filter is-active" id="agentTrafficFilterAllBtn" type="button" data-traffic-filter="all" data-testid="agent-traffic-filter-all">All</button>
+                    <button class="btn small agent-traffic-filter" id="agentTrafficFilterInBtn" type="button" data-traffic-filter="in" data-testid="agent-traffic-filter-in">Incoming</button>
+                    <button class="btn small agent-traffic-filter" id="agentTrafficFilterOutBtn" type="button" data-traffic-filter="out" data-testid="agent-traffic-filter-out">Outgoing</button>
+                  </div>
+                  <div class="small" id="agentDebugTrafficMeta" data-testid="agent-debug-traffic-meta"></div>
+                </div>
+                <div class="agent-traffic-list" id="agentDebugTraffic" data-testid="agent-debug-traffic"></div>
+              </div>
+              <div class="agent-debug-panel agent-debug-panel-brain is-hidden" id="agentDebugPanelBrain" data-debug-panel="brain" data-testid="agent-debug-panel-brain">
+                <div class="agent-mind-panel" id="agentMindPanel" data-testid="agent-mind-panel">
+                  <div class="agent-mind-title">Brain</div>
+                  <div class="agent-mind-grid">
+                    <label class="small-label" for="agentLlmProviderSelect">Provider</label>
+                    <select class="input" id="agentLlmProviderSelect" data-testid="agent-llm-provider">
+                      <option value="openai">openai</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmModelIdInput">Model</label>
+                    <select class="input" id="agentLlmModelIdInput" data-testid="agent-llm-model">
+                      <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmThinkingInput">Thinking</label>
+                    <select class="input" id="agentLlmThinkingInput" data-testid="agent-llm-thinking">
+                      <option value="">Default</option>
+                      <option value="low">Low</option>
+                      <option value="high">High</option>
+                      <option value="xhigh">XHigh</option>
+                    </select>
+
+                    <label class="small-label" for="agentLlmAuthModeSelect">Auth</label>
+                    <select class="input" id="agentLlmAuthModeSelect" data-testid="agent-llm-auth">
+                      <option value="api-key">API Key</option>
+                      <option value="oauth-json">OAuth Profile / Token</option>
+                    </select>
+
+                    <label class="small-label agent-mind-full" for="agentLlmOauthProfileInput">OAuth callback/profile/token</label>
+                    <textarea class="input agent-mind-full" id="agentLlmOauthProfileInput" rows="2" style="display:none"></textarea>
+                    <button class="btn small agent-mind-full" id="agentLlmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
+                    <button class="btn small agent-mind-full" id="agentLlmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="agent-llm-oauth-complete">Complete OAuth</button>
+
+                    <label class="small-label agent-mind-full" for="agentLlmKeyInput">API Key</label>
+                    <input class="input agent-mind-full" id="agentLlmKeyInput" type="password" placeholder="sk-..." data-testid="agent-llm-api-key" />
+                  </div>
+                  <div class="agent-mind-actions">
+                    <button class="btn primary small" id="agentLlmSaveBtn" type="button" data-testid="agent-llm-save">Connect Brain</button>
+                    <button class="btn small" id="agentLlmClearBtn" type="button" data-testid="agent-llm-clear">Clear Brain</button>
+                    <div class="small status-text" id="agentLlmLine" data-testid="agent-llm-status"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="agent-debug-panel is-hidden" id="agentDebugPanelSession" data-debug-panel="session" data-testid="agent-debug-panel-session">
+                <pre class="agent-debug-content" id="agentDebugSession" data-testid="agent-debug-session"></pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <script type="module" src="/openclaw-lite/gateway.js"></script>
+  <script src="/openclaw-lite/runtime-bridge.js?v=20260213"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
   <script src="/app.js?v=20260218i"></script>
 </body>
+
 </html>

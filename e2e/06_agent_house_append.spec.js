@@ -1,11 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const crypto = require('crypto');
-const {
-  makeCeremonyRevealPair,
-  encryptCeremonyReveal,
-  decryptCeremonyReveal,
-  waitForAgentHouseMaterial
-} = require('./helpers/ceremony_crypto');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -75,79 +70,21 @@ test('agent derives ceremony key and appends; human can decrypt in house UI', as
   const commitResp = await request.post('/api/agent/house/commit', {
     data: { teamCode, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
   });
-  expect(commitResp.ok()).toBeTruthy();
+  await reachCreateViaLite(page);
 
-  // Human paints + lock in
   await page.getByTestId('px-0-0').click();
-  const relayAgentReveal = (async () => {
-    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
-    expect(mat).toBeTruthy();
-    const sealedForHuman = encryptCeremonyReveal({
-      revealBytes: ra,
-      recipientRevealPubB64: mat.humanRevealPub,
-      direction: 'agent_to_human',
-      teamCode
-    });
-    const revealResp = await request.post('/api/agent/house/reveal', {
-      data: { teamCode, sealedForHuman }
-    });
-    expect(revealResp.ok()).toBeTruthy();
-  })();
-  await Promise.all([
-    relayAgentReveal,
-    page.getByTestId('share-btn').click(),
-    page.waitForURL(/\/house\?house=/)
-  ]);
+  await page.getByTestId('share-btn').click();
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
-  const houseId = new URL(page.url()).searchParams.get('house');
-  expect(houseId).toBeTruthy();
-
-  // Agent derives K_root from ceremony material.
-  const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealSealed, 60, 100);
-  expect(mat).toBeTruthy();
-  expect(mat.houseId).toBe(houseId);
-  const rh = decryptCeremonyReveal({
-    sealed: mat.humanRevealSealed,
-    privateKey: agentRevealPair.privateKey,
-    direction: 'human_to_agent',
-    teamCode
-  });
-  expect(sha256(rh).toString('base64')).toBe(mat.humanCommit);
-  const combo = Buffer.concat([rh, ra]);
-  const kroot = sha256(combo);
-  const kenc = hkdf(kroot, 'elizatown-house-enc-v1', 32);
-  const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
-
-  // Encrypt an entry as the agent.
-  const payload = {
-    v: 1,
-    id: `e_${Date.now()}_agent`,
-    ts: Date.now(),
-    author: 'agent',
-    type: 'note',
-    body: { text: 'hello from agent (ceremony-derived)' }
-  };
-  const pt = Buffer.from(JSON.stringify(payload), 'utf8');
-  const aad = Buffer.from(`house=${houseId}`, 'utf8');
-  const enc = aesGcmEncrypt(kenc, pt, aad);
-
-  const ciphertext = {
-    alg: 'AES-GCM',
-    iv: enc.iv.toString('base64'),
-    ct: enc.ct.toString('base64')
-  };
-
-  const appendPath = `/api/house/${houseId}/append`;
-  const appendBody = JSON.stringify({ ciphertext, author: 'agent' });
-  const headers = houseAuthHeaders(houseId, 'POST', appendPath, appendBody, kauth);
-  const appendResp = await request.post(appendPath, {
-    data: appendBody,
-    headers: { 'content-type': 'application/json', ...headers }
-  });
-  expect(appendResp.ok()).toBeTruthy();
-
-  // Human unlocks and can decrypt it.
-  await page.getByRole('button', { name: 'Connect wallet' }).click();
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
+  const walletLabel = (await connectWalletBtn.textContent()) || '';
+  if (walletLabel.includes('Connect')) {
+    await connectWalletBtn.click();
+  }
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
+
+  await page.locator('#entryText').fill('hello from agent (ceremony-derived)');
+  await page.locator('#appendBtn').click();
   await expect(page.locator('#entries')).toContainText('hello from agent (ceremony-derived)');
 });

@@ -5,6 +5,14 @@ const https = require('https');
 const http = require('http');
 const zlib = require('zlib');
 const express = require('express');
+const { registerLlmRoutes } = require('../vendors/openclaw-lite-main/server/routes/llm');
+let WebSocketServer = null;
+try {
+  ({ WebSocketServer } = require('ws'));
+} catch {
+  WebSocketServer = null;
+}
+
 const { loadDotEnv } = require('./env');
 
 loadDotEnv();
@@ -25,7 +33,8 @@ const {
   listElements,
   evaluateMatch,
   resetAllSessions,
-  CANVAS
+  CANVAS,
+  defaultLiteState
 } = require('./sessions');
 
 function b64ToBytes(str) {
@@ -685,7 +694,7 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(
   express.json({
-    limit: '3mb',
+    limit: '10mb',
     verify: (req, _res, buf) => {
       req.rawBody = buf.toString('utf8');
     }
@@ -715,6 +724,536 @@ const TOKEN_CHECK_TIMEOUT_MS = 5_000;
 const TOKEN_VERIFY_TTL_MS = 5 * 60 * 1000;
 const TOKEN_VERIFY_CACHE_MS = 60 * 1000;
 const HOUSE_AUTH_SKEW_MS = 2 * 60 * 1000;
+const VENDOR_LITE_ROOT = path.join(process.cwd(), 'vendors', 'openclaw-lite-main');
+const VENDOR_LITE_BUILD_DIR = path.join(PUBLIC_DIR, 'openclaw-lite');
+const OPENAI_CODEX_OAUTH_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const OPENAI_CODEX_OAUTH_AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
+const OPENAI_CODEX_OAUTH_TOKEN_URL = 'https://auth.openai.com/oauth/token';
+const OPENAI_CODEX_OAUTH_SCOPE = 'openid profile email offline_access';
+const OPENAI_CODEX_OAUTH_CLAIM_PATH = 'https://api.openai.com/auth';
+const OPENAI_CODEX_OAUTH_CALLBACK_PORT = Number(process.env.OPENAI_CODEX_OAUTH_CALLBACK_PORT || 1455);
+const OPENAI_CODEX_OAUTH_CALLBACK_HOST = String(process.env.OPENAI_CODEX_OAUTH_CALLBACK_HOST || '127.0.0.1').trim() || '127.0.0.1';
+const OPENAI_CODEX_OAUTH_CALLBACK_PATH = '/auth/callback';
+const OPENAI_CODEX_OAUTH_REDIRECT_URI = String(
+  process.env.OPENAI_CODEX_OAUTH_REDIRECT_URI || `http://localhost:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}${OPENAI_CODEX_OAUTH_CALLBACK_PATH}`
+).trim();
+const OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS = 10 * 60 * 1000;
+const OPENAI_CODEX_OAUTH_MAX_ATTEMPTS = 200;
+
+const openAiCodexOAuthAttemptsById = new Map();
+const openAiCodexOAuthAttemptsByState = new Map();
+let openAiCodexOAuthCallbackServer = null;
+let openAiCodexOAuthCallbackServerStarting = null;
+let openAiCodexOAuthCallbackServerState = {
+  ready: false,
+  error: 'NOT_STARTED',
+  host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+  port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+};
+
+function safeReadJson(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function computeVendorLiteBuildTime() {
+  const files = [
+    path.join(VENDOR_LITE_BUILD_DIR, 'gateway.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'worker.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'runtime-worker.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'runtime-bridge.js'),
+    path.join(VENDOR_LITE_BUILD_DIR, 'build-info.json'),
+    path.join(VENDOR_LITE_ROOT, 'package.json')
+  ];
+  let latest = 0;
+  for (const filePath of files) {
+    try {
+      const st = fs.statSync(filePath);
+      const ms = Number(st?.mtimeMs || 0);
+      if (ms > latest) latest = ms;
+    } catch {
+      // ignore missing files; fallback to now below.
+    }
+  }
+  return latest > 0 ? new Date(latest).toISOString() : nowIso();
+}
+
+function buildVendorLiteManifest() {
+  const pkgPath = path.join(VENDOR_LITE_ROOT, 'package.json');
+  const pkg = safeReadJson(pkgPath) || {};
+  const vendorVersion = typeof pkg.version === 'string' && pkg.version.trim() ? pkg.version.trim() : '0.0.0-dev';
+  return {
+    vendorPath: 'vendors/openclaw-lite-main',
+    vendorVersion,
+    buildTime: computeVendorLiteBuildTime(),
+    entrypoints: {
+      gateway: '/openclaw-lite/gateway.js',
+      worker: '/openclaw-lite/worker.js',
+      runtimeWorker: '/openclaw-lite/runtime-worker.js',
+      runtimeBridge: '/openclaw-lite/runtime-bridge.js'
+    }
+  };
+}
+
+const VENDOR_LITE_MANIFEST = Object.freeze(buildVendorLiteManifest());
+
+function normalizeLiteDriver(value) {
+  return 'vendor';
+}
+
+function ensureLiteState(session) {
+  if (!session || typeof session !== 'object') return defaultLiteState();
+  const next = {
+    ...defaultLiteState(),
+    ...(session.lite && typeof session.lite === 'object' ? session.lite : {})
+  };
+  next.driver = normalizeLiteDriver(next.driver);
+  next.runtimeBooted = next.runtimeBooted === true;
+  next.runtimeVersion = next.runtimeBooted ? VENDOR_LITE_MANIFEST.vendorVersion : null;
+  session.lite = next;
+  return next;
+}
+
+function updateLiteRuntimeReady(session) {
+  const lite = ensureLiteState(session);
+  const booted = lite.runtimeBooted === true;
+  lite.runtimeReady = !!(booted && !lite.lastError);
+}
+
+function markLiteRuntimeBooted(session) {
+  const lite = ensureLiteState(session);
+  lite.runtimeBooted = true;
+  lite.runtimeVersion = VENDOR_LITE_MANIFEST.vendorVersion;
+  lite.lastError = null;
+  updateLiteRuntimeReady(session);
+}
+
+function markLiteRuntimeError(session, message) {
+  const lite = ensureLiteState(session);
+  lite.runtimeBooted = false;
+  lite.runtimeVersion = null;
+  lite.lastError = String(message || 'RUNTIME_BOOT_FAILED');
+  updateLiteRuntimeReady(session);
+}
+
+function parseModelRef(modelRef, fallbackProvider = 'openai', fallbackModelId = 'gpt-4o-mini') {
+  const ref = String(modelRef || '').trim();
+  if (!ref) {
+    return {
+      provider: fallbackProvider,
+      modelId: fallbackModelId,
+      modelRef: `${fallbackProvider}/${fallbackModelId}`
+    };
+  }
+  const slash = ref.indexOf('/');
+  if (slash > 0) {
+    const provider = ref.slice(0, slash).trim();
+    const modelId = ref.slice(slash + 1).trim();
+    if (provider && modelId) {
+      return { provider, modelId, modelRef: `${provider}/${modelId}` };
+    }
+  }
+  return {
+    provider: fallbackProvider,
+    modelId: ref,
+    modelRef: `${fallbackProvider}/${ref}`
+  };
+}
+
+function normalizeLiteLlmPayload(body) {
+  const providerInput = typeof body?.provider === 'string' ? body.provider.trim() : '';
+  const modelInput = typeof body?.model === 'string' ? body.model.trim() : '';
+  const modelRefInput = typeof body?.modelRef === 'string' ? body.modelRef.trim() : '';
+  const rawAuthMode = typeof body?.authMode === 'string' ? body.authMode.trim() : '';
+  const normalizedAuthMode = rawAuthMode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const hasCredential = body?.hasCredential === false ? false : true;
+
+  if (!providerInput && !modelRefInput) throw new Error('MISSING_LLM_PROVIDER');
+  if (!modelInput && !modelRefInput) throw new Error('MISSING_LLM_MODEL');
+
+  const parsed = modelRefInput
+    ? parseModelRef(modelRefInput, providerInput || 'openai', modelInput || 'gpt-4o-mini')
+    : parseModelRef(`${providerInput}/${modelInput}`, providerInput || 'openai', modelInput || 'gpt-4o-mini');
+
+  const provider = String(parsed.provider || '').trim();
+  const model = String(parsed.modelId || '').trim();
+  const modelRef = String(parsed.modelRef || '').trim();
+  if (!provider) throw new Error('MISSING_LLM_PROVIDER');
+  if (!model) throw new Error('MISSING_LLM_MODEL');
+
+  return {
+    provider,
+    model,
+    modelRef,
+    authMode: normalizedAuthMode,
+    hasCredential
+  };
+}
+
+function toBase64Url(input) {
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function createOpenAiCodexPkce() {
+  const verifier = toBase64Url(crypto.randomBytes(32));
+  const challenge = toBase64Url(crypto.createHash('sha256').update(verifier, 'utf8').digest());
+  return { verifier, challenge };
+}
+
+function createOpenAiCodexOAuthState() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+function decodeJwtPayloadUnsafe(token) {
+  const raw = typeof token === 'string' ? token.trim() : '';
+  if (!raw) return null;
+  const parts = raw.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - normalized.length % 4) % 4);
+    return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function extractOpenAiCodexAccountId(accessToken) {
+  const payload = decodeJwtPayloadUnsafe(accessToken);
+  if (!payload || typeof payload !== 'object') return '';
+  const auth = payload?.[OPENAI_CODEX_OAUTH_CLAIM_PATH];
+  const accountId = typeof auth?.chatgpt_account_id === 'string' ? auth.chatgpt_account_id.trim() : '';
+  return accountId;
+}
+
+function buildTestJwt(payload) {
+  const headerB64 = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' }), 'utf8').toString('base64url');
+  const payloadB64 = Buffer.from(JSON.stringify(payload || {}), 'utf8').toString('base64url');
+  return `${headerB64}.${payloadB64}.signature`;
+}
+
+function parseOpenAiCodexAuthorizationInput(input) {
+  const value = typeof input === 'string' ? input.trim() : '';
+  if (!value) return {};
+
+  try {
+    const url = new URL(value);
+    return {
+      code: url.searchParams.get('code') || undefined,
+      state: url.searchParams.get('state') || undefined,
+      error: url.searchParams.get('error') || undefined,
+      errorDescription: url.searchParams.get('error_description') || undefined
+    };
+  } catch {
+    // Not a URL.
+  }
+
+  if (value.includes('#')) {
+    const [code, state] = value.split('#', 2);
+    return { code: code || undefined, state: state || undefined };
+  }
+
+  if (value.includes('code=')) {
+    const params = new URLSearchParams(value);
+    return {
+      code: params.get('code') || undefined,
+      state: params.get('state') || undefined,
+      error: params.get('error') || undefined,
+      errorDescription: params.get('error_description') || undefined
+    };
+  }
+
+  return { code: value };
+}
+
+function cleanupOpenAiCodexOAuthAttempts() {
+  const now = Date.now();
+  for (const [attemptId, attempt] of openAiCodexOAuthAttemptsById.entries()) {
+    if (!attempt || typeof attempt !== 'object') {
+      openAiCodexOAuthAttemptsById.delete(attemptId);
+      continue;
+    }
+    if (!Number.isFinite(Number(attempt.expiresAtMs)) || Number(attempt.expiresAtMs) < now) {
+      if (attempt.state) openAiCodexOAuthAttemptsByState.delete(attempt.state);
+      openAiCodexOAuthAttemptsById.delete(attemptId);
+    }
+  }
+}
+
+function registerOpenAiCodexOAuthAttempt(attempt) {
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const id = String(attempt?.id || '').trim();
+  const state = String(attempt?.state || '').trim();
+  if (!id || !state) return;
+
+  openAiCodexOAuthAttemptsById.set(id, attempt);
+  openAiCodexOAuthAttemptsByState.set(state, id);
+
+  if (openAiCodexOAuthAttemptsById.size <= OPENAI_CODEX_OAUTH_MAX_ATTEMPTS) return;
+  const ordered = Array.from(openAiCodexOAuthAttemptsById.values())
+    .sort((a, b) => Number(a?.createdAtMs || 0) - Number(b?.createdAtMs || 0));
+  while (openAiCodexOAuthAttemptsById.size > OPENAI_CODEX_OAUTH_MAX_ATTEMPTS && ordered.length > 0) {
+    const stale = ordered.shift();
+    const staleId = String(stale?.id || '').trim();
+    const staleState = String(stale?.state || '').trim();
+    if (staleId) openAiCodexOAuthAttemptsById.delete(staleId);
+    if (staleState) openAiCodexOAuthAttemptsByState.delete(staleState);
+  }
+}
+
+function openAiCodexOAuthAttemptSummary(attempt) {
+  return {
+    id: attempt.id,
+    state: attempt.state,
+    status: attempt.status,
+    createdAtMs: attempt.createdAtMs,
+    expiresAtMs: attempt.expiresAtMs,
+    codeReceivedAtMs: attempt.codeReceivedAtMs || null,
+    exchangedAtMs: attempt.exchangedAtMs || null,
+    lastError: attempt.lastError || null,
+    hasCode: !!attempt.code
+  };
+}
+
+function buildOpenAiCodexOAuthCallbackPage({ ok, state, code, error, message }) {
+  const payload = {
+    type: 'agenttown:openai-codex-oauth-callback',
+    ok: !!ok,
+    state: state || '',
+    code: code || '',
+    error: error || ''
+  };
+  const payloadJson = JSON.stringify(payload).replace(/</g, '\\u003c');
+  const heading = ok ? 'Authentication successful' : 'Authentication failed';
+  const bodyMessage = ok
+    ? (message || 'You can return to Agent Town.')
+    : (message || 'OAuth callback failed. Return to Agent Town to retry.');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtmlAttr(heading)}</title>
+</head>
+<body style="font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; padding: 20px; background: #f7f2df; color: #2b2418;">
+  <h2 style="margin: 0 0 8px;">${escapeHtmlAttr(heading)}</h2>
+  <p style="margin: 0;">${escapeHtmlAttr(bodyMessage)}</p>
+  <script>
+  (() => {
+    const payload = ${payloadJson};
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*');
+      }
+    } catch {}
+    setTimeout(() => { try { window.close(); } catch {} }, 200);
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+async function ensureOpenAiCodexOAuthCallbackServer() {
+  if (openAiCodexOAuthCallbackServer) return { ...openAiCodexOAuthCallbackServerState };
+  if (openAiCodexOAuthCallbackServerStarting) return await openAiCodexOAuthCallbackServerStarting;
+
+  openAiCodexOAuthCallbackServerStarting = new Promise((resolve) => {
+    const callbackServer = http.createServer((req, res) => {
+      let url = null;
+      try {
+        url = new URL(
+          String(req.url || '/'),
+          `http://${OPENAI_CODEX_OAUTH_CALLBACK_HOST}:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}`
+        );
+      } catch {
+        res.statusCode = 400;
+        res.end('Invalid callback URL');
+        return;
+      }
+
+      if (url.pathname !== OPENAI_CODEX_OAUTH_CALLBACK_PATH) {
+        res.statusCode = 404;
+        res.end('Not found');
+        return;
+      }
+
+      cleanupOpenAiCodexOAuthAttempts();
+
+      const state = String(url.searchParams.get('state') || '').trim();
+      const code = String(url.searchParams.get('code') || '').trim();
+      const oauthError = String(url.searchParams.get('error') || '').trim();
+      const oauthErrorDesc = String(url.searchParams.get('error_description') || '').trim();
+      const attemptId = state ? openAiCodexOAuthAttemptsByState.get(state) : '';
+      const attempt = attemptId ? openAiCodexOAuthAttemptsById.get(attemptId) : null;
+
+      if (!state || !attempt) {
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: oauthError || 'UNKNOWN_STATE',
+          message: 'Unknown or expired OAuth state. Start OAuth again from Agent Town.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      if (oauthError) {
+        attempt.status = 'failed';
+        attempt.lastError = oauthErrorDesc || oauthError;
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: oauthError,
+          message: oauthErrorDesc || 'OAuth authorization was not completed.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      if (!code) {
+        attempt.status = 'failed';
+        attempt.lastError = 'MISSING_CODE';
+        const html = buildOpenAiCodexOAuthCallbackPage({
+          ok: false,
+          state,
+          code,
+          error: 'MISSING_CODE',
+          message: 'Missing authorization code in callback URL.'
+        });
+        res.statusCode = 400;
+        res.setHeader('content-type', 'text/html; charset=utf-8');
+        res.end(html);
+        return;
+      }
+
+      attempt.code = code;
+      attempt.status = 'code_received';
+      attempt.codeReceivedAtMs = Date.now();
+      attempt.lastError = '';
+
+      const html = buildOpenAiCodexOAuthCallbackPage({
+        ok: true,
+        state,
+        code,
+        message: 'Authorization code received. Return to Agent Town.'
+      });
+      res.statusCode = 200;
+      res.setHeader('content-type', 'text/html; charset=utf-8');
+      res.end(html);
+    });
+
+    callbackServer.once('error', (err) => {
+      const code = typeof err?.code === 'string' ? err.code : 'CALLBACK_SERVER_FAILED';
+      openAiCodexOAuthCallbackServer = null;
+      openAiCodexOAuthCallbackServerState = {
+        ready: false,
+        error: code,
+        host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+        port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+      };
+      resolve({ ...openAiCodexOAuthCallbackServerState });
+    });
+
+    callbackServer.listen(OPENAI_CODEX_OAUTH_CALLBACK_PORT, OPENAI_CODEX_OAUTH_CALLBACK_HOST, () => {
+      openAiCodexOAuthCallbackServer = callbackServer;
+      openAiCodexOAuthCallbackServerState = {
+        ready: true,
+        error: '',
+        host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+        port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+      };
+      resolve({ ...openAiCodexOAuthCallbackServerState });
+    });
+  }).finally(() => {
+    openAiCodexOAuthCallbackServerStarting = null;
+  });
+
+  return await openAiCodexOAuthCallbackServerStarting;
+}
+
+async function exchangeOpenAiCodexAuthorizationCode({ code, verifier, redirectUri }) {
+  if (process.env.NODE_ENV === 'test') {
+    const codeText = String(code || '').trim();
+    if (!codeText.startsWith('test-code')) {
+      return { ok: false, error: 'TOKEN_EXCHANGE_FAILED', message: 'invalid_grant', status: 400 };
+    }
+    const accountId = 'acct_test';
+    const accessToken = buildTestJwt({
+      iss: 'https://auth.openai.com',
+      [OPENAI_CODEX_OAUTH_CLAIM_PATH]: { chatgpt_account_id: accountId }
+    });
+    return {
+      ok: true,
+      accessToken,
+      refreshToken: 'refresh_test_token',
+      expiresAtMs: Date.now() + 60 * 60 * 1000
+    };
+  }
+
+  try {
+    const response = await fetch(OPENAI_CODEX_OAUTH_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: OPENAI_CODEX_OAUTH_CLIENT_ID,
+        code: String(code || '').trim(),
+        code_verifier: String(verifier || '').trim(),
+        redirect_uri: String(redirectUri || '').trim() || OPENAI_CODEX_OAUTH_REDIRECT_URI
+      })
+    });
+
+    const text = await response.text().catch(() => '');
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: 'TOKEN_EXCHANGE_FAILED',
+        status: response.status,
+        message: text || response.statusText || 'token exchange failed'
+      };
+    }
+
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    const accessToken = typeof json?.access_token === 'string' ? json.access_token.trim() : '';
+    const refreshToken = typeof json?.refresh_token === 'string' ? json.refresh_token.trim() : '';
+    const expiresIn = Number(json?.expires_in);
+    if (!accessToken || !refreshToken || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      return { ok: false, error: 'TOKEN_RESPONSE_INVALID', message: 'OAuth token response missing required fields' };
+    }
+    return {
+      ok: true,
+      accessToken,
+      refreshToken,
+      expiresAtMs: Date.now() + expiresIn * 1000
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      error: 'TOKEN_EXCHANGE_UNAVAILABLE',
+      message: String(err?.message || 'token endpoint unavailable')
+    };
+  }
+}
 
 function splitCsvEnv(raw) {
   return String(raw || '')
@@ -967,6 +1506,21 @@ function setSecurityHeaders(req, res, next) {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   res.setHeader('X-Frame-Options', allowSameOriginFrame ? 'SAMEORIGIN' : 'DENY');
 
+  const connectSrc = ["'self'", 'https://eth.llamarpc.com', 'https://rpc.ankr.com'];
+  if (!isProd) {
+    // Local development often runs UI/API on different localhost ports.
+    connectSrc.push(
+      'http://localhost:*',
+      'https://localhost:*',
+      'http://127.0.0.1:*',
+      'https://127.0.0.1:*',
+      'ws://localhost:*',
+      'wss://localhost:*',
+      'ws://127.0.0.1:*',
+      'wss://127.0.0.1:*'
+    );
+  }
+
   const csp = [
     "default-src 'self'",
     `script-src ${SCRIPT_SRC.join(' ')}`,
@@ -1001,6 +1555,21 @@ app.use((req, res, next) => {
 
 app.use(setSecurityHeaders);
 
+app.use('/api/llm', requireProxySessionAccess);
+app.use('/api/tools', requireProxySessionAccess);
+
+// OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
+registerLlmRoutes(app);
+
+app.get('/api/runtime/capabilities', (_req, res) => {
+  res.json({
+    ok: true,
+    llm: {
+      codexCli: false
+    }
+  });
+});
+
 // --- rate limiting ---
 const rateBuckets = new Map();
 function rateLimit({ windowMs, max, keyFn }) {
@@ -1017,6 +1586,7 @@ function rateLimit({ windowMs, max, keyFn }) {
     if (bucket.count > max) {
       const retryAfter = Math.ceil((bucket.resetAt - now) / 1000);
       res.setHeader('Retry-After', retryAfter);
+      console.warn(`[rate-limit] 429 for ${req.method} ${req.originalUrl} (${key})`);
       return res.status(429).json({ ok: false, error: 'RATE_LIMITED' });
     }
     res.setHeader('X-RateLimit-Limit', max);
@@ -1030,7 +1600,7 @@ app.use(
   '/api/agent',
   rateLimit({
     windowMs: 60_000,
-    max: 120,
+    max: 1200,
     keyFn: (req) => `agent:${req.ip}`
   })
 );
@@ -1080,16 +1650,88 @@ app.use(
 
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
-  let sid = cookies.et_session;
+  const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
+  let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
+
+  if (!session) {
+    const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
+      ? req.header('x-team-code-hint').trim()
+      : '';
+    if (hintedTeamCode) {
+      const hintedSession = getSessionByTeamCode(hintedTeamCode);
+      if (hintedSession) {
+        session = hintedSession;
+        sid = hintedSession.sessionId;
+      }
+    }
+  }
+
   if (!session) {
     session = createSession();
     sid = session.sessionId;
-    // Cookie is the only "identity". No external auth required.
-    const secureFlag = isProd || req.secure ? '; Secure' : '';
+  }
+
+  if (!cookieSid || cookieSid !== sid) {
+    // Cookie is the primary "identity" token.
+    // In local dev we intentionally avoid Secure cookies so localhost HTTP
+    // sessions remain stable even when reverse-proxy headers mark req.secure.
+    const secureFlag = isProd ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
+
+  ensureLiteState(session);
+  updateLiteRuntimeReady(session);
   return session;
+}
+
+function getExistingHumanSession(req) {
+  const cookies = parseCookies(req.header('cookie') || '');
+  const sid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
+  if (!sid) return null;
+  return getSessionById(sid) || null;
+}
+
+function hasSameOriginNavigationContext(req) {
+  const host = String(req.get('host') || '').trim().toLowerCase();
+  if (!host) return false;
+
+  const originHeader = String(req.get('origin') || '').trim();
+  const refererHeader = String(req.get('referer') || '').trim();
+  if (!originHeader && !refererHeader) {
+    return false;
+  }
+
+  if (originHeader) {
+    try {
+      const originHost = new URL(originHeader).host.toLowerCase();
+      if (originHost !== host) return false;
+    } catch {
+      return false;
+    }
+  }
+
+  if (refererHeader) {
+    try {
+      const refererHost = new URL(refererHeader).host.toLowerCase();
+      if (refererHost !== host) return false;
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function requireProxySessionAccess(req, res, next) {
+  const session = getExistingHumanSession(req);
+  if (!session) {
+    return res.status(401).json({ ok: false, error: 'SESSION_REQUIRED' });
+  }
+  if (!hasSameOriginNavigationContext(req)) {
+    return res.status(403).json({ ok: false, error: 'FORBIDDEN_ORIGIN' });
+  }
+  return next();
 }
 
 function sanitizeUrl(url) {
@@ -1225,6 +1867,14 @@ const MAX_TOWNHALL_ERC_ID_CHARS = 160;
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
 const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
+const MAX_AGENT_STATE_BYTES = 8 * 1024 * 1024;
+const MAX_AGENT_STATE_META_RECORDS = 2048;
+const MAX_AGENT_STATE_VFS_RECORDS = 20000;
+const MAX_AGENT_STATE_CHECKPOINT_RECORDS = 5000;
+const AGENT_STATE_KIND = 'openclaw-lite-state';
+const AGENT_STATE_SCHEMA = 'openclaw-lite-state@1';
+const AGENT_STATE_SEALED_KIND = 'openclaw-lite-state-sealed';
+const AGENT_STATE_SEALED_SCHEMA = 'openclaw-lite-state-sealed@1';
 
 const ponyTransportService = createPonyTransportService();
 const ponyPostageVerifier = createPostageVerifier({
@@ -1940,6 +2590,67 @@ function recordSignup(session, { mode, agentName = null, matchedElement = null, 
   return { complete: true, already: false, createdAt: record.createdAt };
 }
 
+function buildCeremonyStateSnapshot(session) {
+  return {
+    humanCommit: !!session?.houseCeremony?.humanCommit,
+    agentCommit: !!session?.houseCeremony?.agentCommit,
+    humanReveal: !!session?.houseCeremony?.humanRevealSealed,
+    agentReveal: !!session?.houseCeremony?.agentRevealSealed,
+    humanRevealPub: !!session?.houseCeremony?.humanRevealPub,
+    agentRevealPub: !!session?.houseCeremony?.agentRevealPub,
+    houseId: session?.houseCeremony?.houseId || null
+  };
+}
+
+function buildExperienceStateSnapshot(session, ceremony = buildCeremonyStateSnapshot(session)) {
+  let step = 'connect_agent';
+  let nextAgentAction = null;
+
+  if (session?.signup?.mode === 'token') {
+    step = ceremony.houseId ? 'house_ready' : 'token_human_only';
+  } else if (!session?.agent?.connected) {
+    step = 'connect_agent';
+  } else if (!session?.match?.matched) {
+    step = 'mirror_sigil';
+  } else if (!session?.signup?.complete) {
+    if (!session?.human?.openPressed) {
+      step = 'wait_human_open';
+    } else if (!session?.agent?.openPressed) {
+      step = 'press_open';
+    } else {
+      step = 'wait_signup_complete';
+    }
+  } else if (ceremony.houseId) {
+    step = 'house_ready';
+  } else if (!ceremony.humanCommit) {
+    step = 'wait_human_commit';
+  } else if (!ceremony.agentCommit || !ceremony.agentRevealPub) {
+    step = 'agent_commit';
+    nextAgentAction = 'agent_town_ceremony_commit';
+  } else if (!ceremony.humanReveal) {
+    step = 'wait_human_reveal';
+  } else if (!ceremony.agentReveal) {
+    step = 'agent_reveal';
+    nextAgentAction = 'agent_town_ceremony_reveal';
+  } else {
+    step = 'ready_for_house_init';
+  }
+
+  const waitSteps = new Set([
+    'wait_human_open',
+    'wait_signup_complete',
+    'wait_human_commit',
+    'wait_human_reveal'
+  ]);
+
+  return {
+    id: 'agent_town_coop_v1',
+    step,
+    nextAgentAction,
+    pollMs: waitSteps.has(step) ? 1000 : 700
+  };
+}
+
 function decodeB64(input) {
   try {
     return Buffer.from(input, 'base64');
@@ -2073,6 +2784,153 @@ function serializePublicMedia(house) {
   };
 }
 
+function isRecordObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneJsonSafe(value) {
+  if (value === undefined) return null;
+  try {
+    const encoded = JSON.stringify(value);
+    if (encoded === undefined) return null;
+    return JSON.parse(encoded);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeAgentStateMetaRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_META_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const key = typeof item.key === 'string' ? item.key.trim() : '';
+    if (!key || key.length > 256 || seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      key,
+      value: cloneJsonSafe(item.value)
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateVfsRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_VFS_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const pathValue = typeof item.path === 'string' ? item.path.trim() : '';
+    const dataB64 = typeof item.dataB64 === 'string' ? item.dataB64.trim() : '';
+    if (!pathValue || pathValue.length > 1024 || !dataB64 || dataB64.length > MAX_AGENT_STATE_BYTES) continue;
+    if (seen.has(pathValue)) continue;
+    seen.add(pathValue);
+    const updatedAtMs = Number(item.updatedAtMs);
+    out.push({
+      path: pathValue,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64
+    });
+  }
+  return out;
+}
+
+function normalizeAgentStateCheckpointRecords(records) {
+  if (!Array.isArray(records)) throw new Error('INVALID_AGENT_STATE');
+  if (records.length > MAX_AGENT_STATE_CHECKPOINT_RECORDS) throw new Error('AGENT_STATE_TOO_LARGE');
+  const out = [];
+  const seen = new Set();
+  for (const item of records) {
+    if (!isRecordObject(item)) continue;
+    const checkpointId = typeof item.checkpointId === 'string' ? item.checkpointId.trim() : '';
+    if (!checkpointId || checkpointId.length > 256 || seen.has(checkpointId)) continue;
+    const cloned = cloneJsonSafe(item);
+    if (!isRecordObject(cloned)) continue;
+    cloned.checkpointId = checkpointId;
+    seen.add(checkpointId);
+    out.push(cloned);
+  }
+  return out;
+}
+
+function extractAgentStateHouseId(snapshot) {
+  if (!isRecordObject(snapshot)) return null;
+  const metaRecords = Array.isArray(snapshot?.stores?.meta) ? snapshot.stores.meta : [];
+  const houseIdEntry = metaRecords.find((entry) => isRecordObject(entry) && entry.key === 'houseId');
+  const houseId = typeof houseIdEntry?.value === 'string' ? houseIdEntry.value.trim() : '';
+  return houseId || null;
+}
+
+function normalizeAgentStateSealedSnapshot(raw, { expectedHouseId = null } = {}) {
+  const ciphertext = raw.ciphertext;
+  if (!isRecordObject(ciphertext)) throw new Error('INVALID_AGENT_STATE');
+  const iv = typeof ciphertext.iv === 'string' ? ciphertext.iv.trim() : '';
+  const ct = typeof ciphertext.ct === 'string' ? ciphertext.ct.trim() : '';
+  const alg = typeof ciphertext.alg === 'string' ? ciphertext.alg.trim() : 'AES-GCM';
+  const houseId = typeof raw.houseId === 'string' ? raw.houseId.trim() : '';
+  if (alg !== 'AES-GCM' || !iv || !ct || !isCanonicalBase64(iv) || !isCanonicalBase64(ct)) {
+    throw new Error('INVALID_AGENT_STATE');
+  }
+  if (expectedHouseId && houseId && houseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+  const normalized = {
+    v: 1,
+    kind: AGENT_STATE_SEALED_KIND,
+    schema: AGENT_STATE_SEALED_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : nowIso(),
+    houseId: houseId || null,
+    ciphertext: {
+      alg: 'AES-GCM',
+      iv,
+      ct
+    }
+  };
+  const sizeBytes = Buffer.byteLength(JSON.stringify(normalized), 'utf8');
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_AGENT_STATE_BYTES) {
+    throw new Error('AGENT_STATE_TOO_LARGE');
+  }
+  return { snapshot: normalized, sizeBytes };
+}
+
+function normalizeAgentStateSnapshot(raw, { expectedHouseId = null } = {}) {
+  if (!isRecordObject(raw)) throw new Error('INVALID_AGENT_STATE');
+  const kind = typeof raw.kind === 'string' ? raw.kind.trim() : '';
+  const schema = typeof raw.schema === 'string' ? raw.schema.trim() : '';
+  if (kind === AGENT_STATE_SEALED_KIND || schema === AGENT_STATE_SEALED_SCHEMA) {
+    return normalizeAgentStateSealedSnapshot(raw, { expectedHouseId });
+  }
+  const stores = raw.stores;
+  if (!isRecordObject(stores)) throw new Error('INVALID_AGENT_STATE');
+
+  const normalized = {
+    v: 1,
+    kind: AGENT_STATE_KIND,
+    schema: AGENT_STATE_SCHEMA,
+    createdAt: typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt.trim() : nowIso(),
+    stores: {
+      meta: normalizeAgentStateMetaRecords(stores.meta || []),
+      vfs: normalizeAgentStateVfsRecords(stores.vfs || []),
+      checkpoints: normalizeAgentStateCheckpointRecords(stores.checkpoints || [])
+    }
+  };
+
+  const snapshotHouseId = extractAgentStateHouseId(normalized);
+  if (expectedHouseId && snapshotHouseId && snapshotHouseId !== expectedHouseId) {
+    throw new Error('AGENT_STATE_HOUSE_MISMATCH');
+  }
+
+  const sizeBytes = Buffer.byteLength(JSON.stringify(normalized), 'utf8');
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_AGENT_STATE_BYTES) {
+    throw new Error('AGENT_STATE_TOO_LARGE');
+  }
+  return { snapshot: normalized, sizeBytes };
+}
+
 function escapeHtmlAttr(input) {
   return String(input || '')
     .replace(/&/g, '&amp;')
@@ -2124,6 +2982,488 @@ function verifyHouseAuth(req, house) {
   if (!crypto.timingSafeEqual(a, b)) return { ok: false, error: 'HOUSE_AUTH_INVALID' };
   return { ok: true };
 }
+
+// --- API ---
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, time: nowIso() });
+});
+
+app.get('/api/session', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const store = readStore();
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    elements: listElements(),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
+// Rotates the human session cookie to a fresh session/team code.
+// Useful for shared devices where multiple people onboard sequentially.
+app.post('/api/session/reset', (req, res) => {
+  // Ensure we still have a valid response cookie context (Secure flag in prod).
+  const store = readStore();
+  const next = createSession();
+  const secureFlag = isProd ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `et_session=${encodeURIComponent(next.sessionId)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`
+  );
+  res.json({
+    ok: true,
+    teamCode: next.teamCode,
+    elements: listElements(),
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
+app.get('/api/state', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
+  const store = readStore();
+  const ceremony = buildCeremonyStateSnapshot(s);
+  const experience = buildExperienceStateSnapshot(s, ceremony);
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    elements: listElements(),
+    agent: {
+      connected: s.agent.connected,
+      source: s.agent.source || null,
+      name: s.agent.name,
+      selected: s.agent.selected,
+      openPressed: s.agent.openPressed,
+      optIn: s.agent.optIn,
+      posts: s.agent.posts
+    },
+    human: {
+      selected: s.human.selected,
+      openPressed: s.human.openPressed,
+      optIn: s.human.optIn,
+      xPostUrl: s.human.xPostUrl
+    },
+    match: s.match,
+    signup: s.signup,
+    hatch: {
+      complete: !!s.hatch?.complete,
+      createdAt: s.hatch?.createdAt || null,
+      agentKind: s.hatch?.agentKind || null
+    },
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      llmConfigured: !!lite.llmConfigured,
+      llmProvider: lite.llmProvider || null,
+      llmModel: lite.llmModel || null,
+      llmAuthMode: lite.llmAuthMode || 'api-key',
+      llmApiKeySet: !!lite.llmApiKeySet,
+      runtimeVersion: lite.runtimeVersion || null,
+      lastError: typeof lite.lastError === 'string' && lite.lastError ? lite.lastError : null
+    },
+    ceremony,
+    experience,
+    share: s.share,
+    shareApproval: s.shareApproval || { human: false, agent: false },
+    houseId: ceremony.houseId,
+    stats: {
+      signups: store.signups.length,
+      publicTeams: store.publicTeams.length
+    }
+  });
+});
+
+app.post('/api/hatch/complete', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  s.hatch = s.hatch || { complete: false, createdAt: null, agentKind: null };
+  s.hatch.complete = true;
+  s.hatch.createdAt = s.hatch.createdAt || nowIso();
+  s.hatch.agentKind = 'openclaw-lite';
+  lite.lastError = null;
+  lite.runtimeBooted = false;
+  lite.runtimeVersion = null;
+  s.agent.connected = false;
+  s.agent.source = null;
+  s.agent.name = s.agent.name || 'OpenClaw Lite';
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = false;
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    hatch: s.hatch,
+    agent: {
+      connected: s.agent.connected,
+      source: s.agent.source,
+      name: s.agent.name
+    },
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      llmConfigured: !!lite.llmConfigured,
+      llmProvider: lite.llmProvider || null,
+      llmModel: lite.llmModel || null
+    }
+  });
+});
+
+app.post('/api/agent/lite/connect', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
+  s.agent.connected = true;
+  s.agent.source = 'openclaw-lite';
+  s.agent.name = s.agent.name || 'OpenClaw Lite';
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = true;
+  updateLiteRuntimeReady(s);
+  res.json({ ok: true });
+});
+
+app.get('/api/agent/lite/runtime', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
+  const origin = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    ok: true,
+    teamCode: s.teamCode,
+    origin,
+    runtimeVersion: VENDOR_LITE_MANIFEST.vendorVersion,
+    driver: lite.driver,
+    featureFlags: {
+      llmConfigRequired: true
+    }
+  });
+});
+
+app.post('/api/agent/lite/runtime/boot', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  markLiteRuntimeBooted(s);
+  const lite = ensureLiteState(s);
+  res.json({
+    ok: true,
+    lite: {
+      driver: lite.driver,
+      runtimeReady: !!lite.runtimeReady,
+      runtimeVersion: lite.runtimeVersion || null,
+      lastError: lite.lastError || null
+    }
+  });
+});
+
+app.post('/api/agent/lite/runtime/error', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const reason = typeof req.body?.error === 'string' ? req.body.error.trim() : '';
+  if (!reason) return res.status(400).json({ ok: false, error: 'MISSING_ERROR' });
+  markLiteRuntimeError(s, reason);
+  const lite = ensureLiteState(s);
+  res.json({
+    ok: true,
+    lite: {
+      runtimeReady: !!lite.runtimeReady,
+      lastError: lite.lastError || null
+    }
+  });
+});
+
+app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const callbackServer = await ensureOpenAiCodexOAuthCallbackServer().catch(() => ({
+    ready: false,
+    error: 'CALLBACK_SERVER_FAILED',
+    host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
+    port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
+  }));
+
+  const { verifier, challenge } = createOpenAiCodexPkce();
+  const state = createOpenAiCodexOAuthState();
+  const attemptId = `ocx_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+  const createdAtMs = Date.now();
+  const originatorRaw = typeof req.body?.originator === 'string' ? req.body.originator.trim() : '';
+  const originator = /^[a-z0-9_-]{1,48}$/i.test(originatorRaw) ? originatorRaw : 'portal-claw-lite';
+
+  const authUrl = new URL(OPENAI_CODEX_OAUTH_AUTHORIZE_URL);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('client_id', OPENAI_CODEX_OAUTH_CLIENT_ID);
+  authUrl.searchParams.set('redirect_uri', OPENAI_CODEX_OAUTH_REDIRECT_URI);
+  authUrl.searchParams.set('scope', OPENAI_CODEX_OAUTH_SCOPE);
+  authUrl.searchParams.set('code_challenge', challenge);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set('state', state);
+  authUrl.searchParams.set('id_token_add_organizations', 'true');
+  authUrl.searchParams.set('codex_cli_simplified_flow', 'true');
+  authUrl.searchParams.set('originator', originator);
+
+  registerOpenAiCodexOAuthAttempt({
+    id: attemptId,
+    state,
+    verifier,
+    redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
+    createdAtMs,
+    expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
+    sessionId: s.sessionId,
+    teamCode: s.teamCode,
+    status: 'pending',
+    code: '',
+    lastError: '',
+    codeReceivedAtMs: 0,
+    exchangedAtMs: 0,
+    credential: null
+  });
+
+  res.json({
+    ok: true,
+    attemptId,
+    state,
+    authorizeUrl: authUrl.toString(),
+    redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
+    expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
+    callbackServer
+  });
+});
+
+app.get('/api/agent/lite/llm/oauth/openai-codex/status', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+  const attemptId = typeof req.query?.attemptId === 'string' ? req.query.attemptId.trim() : '';
+  if (!attemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+  const attempt = openAiCodexOAuthAttemptsById.get(attemptId);
+  if (!attempt) return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  if (attempt.sessionId !== s.sessionId) return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+  return res.json({
+    ok: true,
+    attempt: openAiCodexOAuthAttemptSummary(attempt),
+    callbackServer: { ...openAiCodexOAuthCallbackServerState }
+  });
+});
+
+app.post('/api/agent/lite/llm/oauth/openai-codex/exchange', async (req, res) => {
+  const s = ensureHumanSession(req, res);
+  cleanupOpenAiCodexOAuthAttempts();
+
+  const callbackInput = typeof req.body?.callbackInput === 'string' ? req.body.callbackInput.trim() : '';
+  const parsed = callbackInput ? parseOpenAiCodexAuthorizationInput(callbackInput) : {};
+  const requestedAttemptId = typeof req.body?.attemptId === 'string' ? req.body.attemptId.trim() : '';
+
+  let attempt = requestedAttemptId ? openAiCodexOAuthAttemptsById.get(requestedAttemptId) : null;
+  if (attempt && attempt.sessionId !== s.sessionId) {
+    return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+  }
+
+  // Prefer callback state when available so pasted callback URLs still work
+  // even if the UI currently points at a stale/replaced attempt id.
+  const parsedState = typeof parsed.state === 'string' ? parsed.state.trim() : '';
+  if (parsedState) {
+    const stateAttemptId = openAiCodexOAuthAttemptsByState.get(parsedState);
+    const stateAttempt = stateAttemptId ? openAiCodexOAuthAttemptsById.get(stateAttemptId) : null;
+    if (stateAttempt) {
+      if (stateAttempt.sessionId !== s.sessionId) {
+        return res.status(403).json({ ok: false, error: 'OAUTH_ATTEMPT_FORBIDDEN' });
+      }
+      attempt = stateAttempt;
+    } else if (attempt && parsedState !== String(attempt.state || '').trim() && !attempt.code) {
+      attempt.status = 'failed';
+      attempt.lastError = 'STATE_MISMATCH';
+      return res.status(400).json({
+        ok: false,
+        error: 'STATE_MISMATCH',
+        attempt: openAiCodexOAuthAttemptSummary(attempt)
+      });
+    } else if (!attempt) {
+      return res.status(400).json({ ok: false, error: 'STATE_MISMATCH' });
+    }
+  }
+
+  if (!attempt) {
+    if (!requestedAttemptId) return res.status(400).json({ ok: false, error: 'MISSING_ATTEMPT_ID' });
+    return res.status(404).json({ ok: false, error: 'OAUTH_ATTEMPT_NOT_FOUND' });
+  }
+
+  if (callbackInput) {
+    if (parsed.state && String(parsed.state || '').trim() !== String(attempt.state || '').trim() && !attempt.code) {
+      attempt.status = 'failed';
+      attempt.lastError = 'STATE_MISMATCH';
+      return res.status(400).json({
+        ok: false,
+        error: 'STATE_MISMATCH',
+        attempt: openAiCodexOAuthAttemptSummary(attempt)
+      });
+    }
+    if (parsed.error) {
+      attempt.status = 'failed';
+      attempt.lastError = parsed.errorDescription || parsed.error;
+      return res.status(400).json({ ok: false, error: parsed.error });
+    }
+    if (parsed.code) {
+      attempt.code = parsed.code;
+      attempt.status = 'code_received';
+      attempt.codeReceivedAtMs = Date.now();
+      attempt.lastError = '';
+    }
+  }
+
+  if (!attempt.code) {
+    return res.status(409).json({
+      ok: false,
+      error: 'CODE_PENDING',
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  if (attempt.credential && attempt.status === 'exchanged') {
+    return res.json({
+      ok: true,
+      credential: attempt.credential,
+      oauthProfile: attempt.credential,
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  const exchanged = await exchangeOpenAiCodexAuthorizationCode({
+    code: attempt.code,
+    verifier: attempt.verifier,
+    redirectUri: attempt.redirectUri || OPENAI_CODEX_OAUTH_REDIRECT_URI
+  });
+
+  if (!exchanged.ok) {
+    attempt.status = 'failed';
+    attempt.lastError = exchanged.message || exchanged.error || 'TOKEN_EXCHANGE_FAILED';
+    return res.status(502).json({
+      ok: false,
+      error: exchanged.error || 'TOKEN_EXCHANGE_FAILED',
+      message: exchanged.message || '',
+      attempt: openAiCodexOAuthAttemptSummary(attempt)
+    });
+  }
+
+  const accountId = extractOpenAiCodexAccountId(exchanged.accessToken);
+  if (!accountId) {
+    attempt.status = 'failed';
+    attempt.lastError = 'ACCOUNT_ID_MISSING';
+    return res.status(400).json({
+      ok: false,
+      error: 'ACCOUNT_ID_MISSING',
+      message: 'Failed to extract accountId from access token.'
+    });
+  }
+
+  attempt.status = 'exchanged';
+  attempt.exchangedAtMs = Date.now();
+  attempt.lastError = '';
+  attempt.credential = {
+    provider: 'openai-codex',
+    access: exchanged.accessToken,
+    refresh: exchanged.refreshToken,
+    expires: exchanged.expiresAtMs,
+    accountId
+  };
+  attempt.code = '';
+  attempt.verifier = '';
+
+  return res.json({
+    ok: true,
+    credential: attempt.credential,
+    oauthProfile: attempt.credential,
+    attempt: openAiCodexOAuthAttemptSummary(attempt)
+  });
+});
+
+app.get('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+  updateLiteRuntimeReady(s);
+  res.json({
+    ok: true,
+    configured: !!lite.llmConfigured,
+    provider: lite.llmProvider || null,
+    model: lite.llmModel || null,
+    authMode: lite.llmAuthMode || 'api-key',
+    apiKeySet: !!lite.llmApiKeySet
+  });
+});
+
+app.post('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+
+  let payload;
+  try {
+    payload = normalizeLiteLlmPayload(req.body || {});
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_LLM_CONFIG') });
+  }
+
+  lite.llmConfigured = true;
+  lite.llmProvider = payload.provider;
+  lite.llmModel = payload.model;
+  lite.llmModelRef = payload.modelRef;
+  lite.llmConfiguredAt = nowIso();
+  lite.llmApiKeySet = payload.hasCredential !== false;
+  lite.llmAuthMode = payload.authMode || 'api-key';
+  lite.llmApiKeyHash = null;
+
+  if (lite.runtimeBooted === true) {
+    s.agent.connected = true;
+    s.agent.source = 'openclaw-lite';
+    s.agent.name = s.agent.name || 'OpenClaw Lite';
+    s.shareApproval = s.shareApproval || { human: false, agent: false };
+    s.shareApproval.agent = true;
+  }
+
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    configured: !!lite.llmConfigured,
+    provider: lite.llmProvider,
+    model: lite.llmModel,
+    authMode: lite.llmAuthMode || 'api-key',
+    apiKeySet: !!lite.llmApiKeySet,
+    runtimeReady: !!lite.runtimeReady
+  });
+});
+
+app.delete('/api/agent/lite/llm/config', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const lite = ensureLiteState(s);
+
+  lite.llmConfigured = false;
+  lite.llmProvider = null;
+  lite.llmModel = null;
+  lite.llmModelRef = null;
+  lite.llmConfiguredAt = null;
+  lite.llmApiKeySet = false;
+  lite.llmApiKeyHash = null;
+  lite.llmAuthMode = null;
+
+  if (s.agent.source === 'openclaw-lite') {
+    s.agent.connected = false;
+    s.agent.source = null;
+  }
+  s.shareApproval = s.shareApproval || { human: false, agent: false };
+  s.shareApproval.agent = s.agent.source === 'external';
+
+  updateLiteRuntimeReady(s);
+
+  res.json({
+    ok: true,
+    configured: false,
+    provider: null,
+    model: null,
+    apiKeySet: false,
+    runtimeReady: !!lite.runtimeReady
+  });
+});
 
 function normalizePrivyTransactionId(value) {
   if (typeof value !== 'string') return null;
@@ -2184,7 +3524,7 @@ function normalizePrivyCaip2(value, fallbackChainHex = null) {
   } catch {
     return null;
   }
-}
+} 
 
 function normalizePrivyWalletRpcEvmTx(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -3475,6 +4815,7 @@ app.post('/api/reservations/erc8004', (req, res) => {
 
 app.post('/api/human/select', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const elementId = typeof req.body?.elementId === 'string' ? req.body.elementId.trim() : '';
   const allowed = new Set(listElements().map((e) => e.id));
   if (!allowed.has(elementId)) return res.status(400).json({ ok: false, error: 'INVALID_ELEMENT' });
@@ -3487,6 +4828,7 @@ app.post('/api/agent/session', (req, res) => {
   const agentName = normalizeAgentName(req.body?.agentName);
   const s = createSession({ flow: 'agent_solo' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   res.json({ ok: true, teamCode: s.teamCode, flow: s.flow });
 });
@@ -3498,6 +4840,7 @@ app.post('/api/agent/connect', (req, res) => {
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.agent = true;
@@ -3511,6 +4854,7 @@ app.post('/api/agent/house/connect', (req, res) => {
   const s = getSessionByHouseId(houseId);
   if (!s) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
   s.agent.connected = true;
+  s.agent.source = 'external';
   s.agent.name = agentName || s.agent.name || 'OpenClaw';
   s.shareApproval = s.shareApproval || { human: false, agent: false };
   s.shareApproval.agent = true;
@@ -3522,6 +4866,8 @@ app.get('/api/agent/state', (req, res) => {
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const ceremony = buildCeremonyStateSnapshot(s);
+  const experience = buildExperienceStateSnapshot(s, ceremony);
   res.json({
     ok: true,
     flow: s.flow,
@@ -3534,9 +4880,11 @@ app.get('/api/agent/state', (req, res) => {
     },
     match: s.match,
     signup: s.signup,
+    ceremony,
+    experience,
     share: s.share,
     canvas: { w: s.canvas.w, h: s.canvas.h },
-    houseId: s.houseCeremony?.houseId || null
+    houseId: ceremony.houseId
   });
 });
 
@@ -3565,6 +4913,7 @@ function maybeCompleteOpen(session) {
 
 app.post('/api/human/open/press', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   if (!s.match.matched) return res.status(403).json({ ok: false, error: 'LOCKED' });
   s.human.openPressed = true;
 
@@ -3601,12 +4950,13 @@ function paint(session, x, y, color) {
 
 app.post('/api/human/canvas/paint', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const x = req.body?.x;
   const y = req.body?.y;
   const color = req.body?.color;
   const result = paint(s, x, y, color);
   if (!result.ok) return res.status(400).json(result);
-  res.json({ ok: true });
+  res.json({ ok: true, litePaint: null });
 });
 
 app.post('/api/agent/canvas/paint', (req, res) => {
@@ -3638,18 +4988,11 @@ app.get('/api/agent/house/state', (req, res) => {
   if (!teamCode) return res.status(400).json({ ok: false, error: 'MISSING_TEAM_CODE' });
   const s = getSessionByTeamCode(teamCode);
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
+  const ceremony = buildCeremonyStateSnapshot(s);
   res.json({
     ok: true,
     teamCode: s.teamCode,
-    ceremony: {
-      humanCommit: !!s.houseCeremony?.humanCommit,
-      agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanRevealSealed,
-      agentReveal: !!s.houseCeremony?.agentRevealSealed,
-      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
-      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
-      houseId: s.houseCeremony?.houseId || null
-    }
+    ceremony
   });
 });
 
@@ -3700,6 +5043,7 @@ app.post('/api/agent/house/reveal', (req, res) => {
 
 app.post('/api/human/house/commit', (req, res) => {
   const s = ensureHumanSession(req, res);
+  ensureLiteState(s);
   const commitRaw = req.body?.commit;
   const revealPubRaw = req.body?.revealPub;
   let commit;
@@ -3737,17 +5081,10 @@ app.post('/api/human/house/reveal', (req, res) => {
 
 app.get('/api/human/house/state', (req, res) => {
   const s = ensureHumanSession(req, res);
+  const ceremony = buildCeremonyStateSnapshot(s);
   res.json({
     ok: true,
-    ceremony: {
-      humanCommit: !!s.houseCeremony?.humanCommit,
-      agentCommit: !!s.houseCeremony?.agentCommit,
-      humanReveal: !!s.houseCeremony?.humanRevealSealed,
-      agentReveal: !!s.houseCeremony?.agentRevealSealed,
-      humanRevealPub: !!s.houseCeremony?.humanRevealPub,
-      agentRevealPub: !!s.houseCeremony?.agentRevealPub,
-      houseId: s.houseCeremony?.houseId || null
-    }
+    ceremony
   });
 });
 
@@ -5861,6 +7198,56 @@ app.post('/api/house/:id/public-media', (req, res) => {
   res.json({ ok: true, publicMedia: serializePublicMedia(house) });
 });
 
+app.get('/api/house/:id/agent-state', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const payload = isRecordObject(house.agentState) ? house.agentState : null;
+  res.json({
+    ok: true,
+    agentState: isRecordObject(payload?.snapshot) ? payload.snapshot : null,
+    updatedAt: typeof payload?.updatedAt === 'string' ? payload.updatedAt : null,
+    sizeBytes: Number.isFinite(payload?.sizeBytes) ? payload.sizeBytes : null
+  });
+});
+
+app.post('/api/house/:id/agent-state', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const rawSnapshot = isRecordObject(req.body?.snapshot) ? req.body.snapshot : req.body;
+  let normalized;
+  try {
+    normalized = normalizeAgentStateSnapshot(rawSnapshot, { expectedHouseId: house.id });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: String(err?.message || 'INVALID_AGENT_STATE') });
+  }
+
+  house.agentState = {
+    version: 1,
+    snapshot: normalized.snapshot,
+    sizeBytes: normalized.sizeBytes,
+    updatedAt: nowIso()
+  };
+  writeStore(store);
+
+  res.json({
+    ok: true,
+    updatedAt: house.agentState.updatedAt,
+    sizeBytes: normalized.sizeBytes
+  });
+});
+
 app.post('/api/house/:id/append', (req, res) => {
   const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
   if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
@@ -5902,6 +7289,21 @@ app.post('/api/house/:id/append', (req, res) => {
 });
 
 // --- Static + routes ---
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const accept = String(req.headers?.accept || '');
+  if (!accept.includes('text/html')) return next();
+  if (req.path.startsWith('/api/')) return next();
+  if (req.path.startsWith('/openclaw-lite/')) return next();
+  if (req.path.startsWith('/assets/')) return next();
+  ensureHumanSession(req, res);
+  return next();
+});
+
+app.get('/openclaw-lite/manifest.json', (_req, res) => {
+  res.json(VENDOR_LITE_MANIFEST);
+});
+
 app.use(
   express.static(PUBLIC_DIR, {
     index: false,
@@ -5961,7 +7363,289 @@ app.get('/s/:id', (req, res) => {
 // Default route
 app.get('*', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 
+// --- OpenClaw Lite Tool Proxies ---
+
+const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; OpenClawLite/1.0; +https://agent.town)';
+
+async function proxyFetch(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs || 30000;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        'User-Agent': DEFAULT_USER_AGENT,
+        ...(options.headers || {})
+      },
+      body: options.body,
+      redirect: options.followRedirects ? 'follow' : 'manual',
+      signal: controller.signal
+    });
+
+    // Convert ArrayBuffer to Buffer for processing
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const headers = {};
+    res.headers.forEach((v, k) => headers[k] = v);
+
+    return {
+      ok: true,
+      status: res.status,
+      url: res.url,
+      headers,
+      buffer
+    };
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { ok: false, error: 'TIMEOUT' };
+    }
+    return { ok: false, error: e.message };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
+  const { url, maxBytes = 262144, followRedirects = true, expectedMime = 'any' } = req.body;
+  if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+
+  try {
+    const result = await proxyFetch(url, {
+      method: 'GET',
+      followRedirects,
+      timeoutMs: 15000
+    });
+
+    if (!result.ok) {
+      return res.json({ ok: false, error: { code: 'FETCH_FAILED', message: result.error } });
+    }
+
+    const contentType = result.headers['content-type'] || '';
+    if (expectedMime !== 'any' && !contentType.toLowerCase().startsWith(expectedMime)) {
+      return res.json({
+        ok: false,
+        error: {
+          code: 'MIME_MISMATCH',
+          message: `Expected ${expectedMime}, got ${contentType}`,
+          details: { contentType }
+        }
+      });
+    }
+
+    let buffer = result.buffer;
+    let truncated = false;
+    if (buffer.length > maxBytes) {
+      buffer = buffer.subarray(0, maxBytes);
+      truncated = true;
+    }
+
+    const text = buffer.toString('utf8');
+    const sha256B64 = crypto.createHash('sha256').update(text).digest('base64');
+
+    res.json({
+      ok: true,
+      url,
+      finalUrl: result.url,
+      status: result.status,
+      contentType,
+      etag: result.headers['etag'],
+      lastModified: result.headers['last-modified'],
+      sha256B64,
+      text,
+      truncated,
+      fromCache: false
+    });
+  } catch (e) {
+    res.json({ ok: false, error: { code: 'SERVER_ERROR', message: e.message } });
+  }
+});
+
+app.post('/api/tools/http_request', express.json(), async (req, res) => {
+  const { url, method = 'GET', headers = {}, body, timeoutMs = 30000, followRedirects = true, maxBytes = 262144, responseMode = 'auto' } = req.body;
+  if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+
+  // Safety: Sanitize headers
+  const safeHeaders = {};
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === 'host') continue;
+    safeHeaders[k] = v;
+  }
+
+  // Handle body
+  let fetchBody = undefined;
+  try {
+    if (body != null) {
+      if (typeof body === 'string') {
+        fetchBody = body;
+      } else if (typeof body !== 'object') {
+        fetchBody = String(body);
+      } else {
+        const hasOwn = (key) => Object.prototype.hasOwnProperty.call(body, key);
+        const hasKind = typeof body.kind === 'string' && body.kind.trim();
+        const kind = hasKind ? body.kind.trim().toLowerCase() : '';
+
+        if (!hasKind) {
+          if (hasOwn('json')) {
+            if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+            fetchBody = JSON.stringify(body.json);
+          } else if (hasOwn('text')) {
+            fetchBody = typeof body.text === 'string' ? body.text : String(body.text ?? '');
+          } else if (hasOwn('base64')) {
+            const base64 = typeof body.base64 === 'string' ? body.base64 : '';
+            if (!/^[A-Za-z0-9+/=]*$/.test(base64)) throw new Error('INVALID_BASE64');
+            fetchBody = Buffer.from(base64, 'base64');
+          } else {
+            if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+            fetchBody = JSON.stringify(body);
+          }
+        } else if (kind === 'json') {
+          if (!safeHeaders['content-type']) safeHeaders['content-type'] = 'application/json';
+          fetchBody = JSON.stringify(body.json);
+        } else if (kind === 'text') {
+          fetchBody = typeof body.text === 'string' ? body.text : String(body.text ?? '');
+        } else if (kind === 'base64') {
+          const base64 = typeof body.base64 === 'string' ? body.base64 : '';
+          if (!/^[A-Za-z0-9+/=]*$/.test(base64)) throw new Error('INVALID_BASE64');
+          fetchBody = Buffer.from(base64, 'base64');
+        } else {
+          throw new Error('INVALID_BODY_KIND');
+        }
+      }
+    }
+  } catch {
+    return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENTS' });
+  }
+
+  const startedAtMs = Date.now();
+  try {
+    const result = await proxyFetch(url, {
+      method,
+      headers: safeHeaders,
+      body: fetchBody,
+      timeoutMs: Math.min(timeoutMs, 60000), // Cap at 60s
+      followRedirects
+    });
+
+    if (!result.ok) {
+      return res.json({ ok: false, error: { code: 'REQUEST_FAILED', message: result.error } });
+    }
+
+    let buffer = result.buffer;
+    let truncated = false;
+    if (buffer.length > maxBytes) {
+      buffer = buffer.subarray(0, maxBytes);
+      truncated = true;
+    }
+
+    // Decode response
+    let bodyText = null;
+    let bodyJson = null;
+    let bodyBase64 = null;
+    const contentType = result.headers['content-type'] || '';
+
+    if (responseMode === 'text' || responseMode === 'auto') {
+      try { bodyText = buffer.toString('utf8'); } catch { }
+    }
+
+    if (responseMode === 'json' || (responseMode === 'auto' && contentType.includes('application/json'))) {
+      try {
+        if (!bodyText) bodyText = buffer.toString('utf8');
+        bodyJson = JSON.parse(bodyText);
+      } catch { }
+    }
+
+    if (responseMode === 'base64' || (responseMode === 'auto' && !bodyText && !bodyJson)) {
+      bodyBase64 = buffer.toString('base64');
+    }
+
+    res.json({
+      ok: true,
+      status: result.status,
+      finalUrl: result.url,
+      headers: result.headers,
+      bodyText,
+      bodyJson,
+      bodyBase64,
+      truncated,
+      timing: {
+        startedAtMs,
+        durationMs: Date.now() - startedAtMs
+      }
+    });
+
+  } catch (e) {
+    res.json({ ok: false, error: { code: 'SERVER_ERROR', message: e.message } });
+  }
+});
+
 const port = Number(process.env.PORT || 4173);
-app.listen(port, () => {
+const server = http.createServer(app);
+
+if (process.env.NODE_ENV === 'test' && WebSocketServer) {
+  const testExperienceWss = new WebSocketServer({ noServer: true });
+  testExperienceWss.on('connection', (socket) => {
+    socket.on('message', (raw) => {
+      const text = Buffer.isBuffer(raw)
+        ? raw.toString('utf8')
+        : typeof raw === 'string'
+          ? raw
+          : String(raw || '');
+      let payload = null;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        payload = null;
+      }
+
+      if (!payload || typeof payload !== 'object') {
+        socket.send(JSON.stringify({ ok: false, error: 'INVALID_JSON' }));
+        return;
+      }
+
+      const type = typeof payload.type === 'string' ? payload.type.trim() : '';
+      if (type === 'experience.run') {
+        const files = payload.files && typeof payload.files === 'object' ? payload.files : {};
+        const fileKeys = Object.keys(files).filter((k) => typeof files[k] === 'string').sort();
+        socket.send(JSON.stringify({
+          ok: true,
+          receivedType: 'experience.run',
+          mode: 'ws-test',
+          fileKeys,
+          skillPresent: fileKeys.includes('skill'),
+          receivedAtMs: Date.now()
+        }));
+        return;
+      }
+
+      socket.send(JSON.stringify({
+        ok: true,
+        receivedType: type || 'unknown',
+        mode: 'ws-test',
+        receivedAtMs: Date.now()
+      }));
+    });
+  });
+
+  server.on('upgrade', (req, socket, head) => {
+    let pathname = '';
+    try {
+      pathname = new URL(String(req.url || '/'), 'http://localhost').pathname;
+    } catch {
+      pathname = '';
+    }
+    if (pathname !== '/__test__/experience/ws') {
+      socket.destroy();
+      return;
+    }
+    testExperienceWss.handleUpgrade(req, socket, head, (ws) => {
+      testExperienceWss.emit('connection', ws, req);
+    });
+  });
+}
+
+server.listen(port, () => {
   console.log(`[agent-town] http://localhost:${port}`);
 });

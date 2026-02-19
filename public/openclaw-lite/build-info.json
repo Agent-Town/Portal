@@ -1,0 +1,20 @@
+{
+  "vendorPath": "vendors/openclaw-lite-main",
+  "vendorVersion": "1.2.0",
+  "builtAt": "2026-02-18T10:48:18.333Z",
+  "copiedArtifacts": [
+    "gateway.js",
+    "gateway.js.map",
+    "town.js",
+    "town.js.map",
+    "worker.js",
+    "worker.js.map"
+  ],
+  "copiedShared": [
+    "base58.js",
+    "crypto.js",
+    "encoding.js",
+    "idb.js",
+    "vfs.js"
+  ]
+}

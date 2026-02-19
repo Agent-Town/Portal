@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Lite</title>
+    <meta name="description" content="OpenClaw Lite Gateway Panel" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="wrap" data-testid="gateway">
+      <div class="topbar">
+        <div class="brand">
+          <a class="logoLink" href="/" aria-label="Agent Town home">
+            <img class="logoImg" src="/logo.jpg" alt="" />
+          </a>
+          <strong>OpenClaw Lite</strong>
+          <span class="badge">gateway</span>
+        </div>
+        <div class="kv">
+          <a class="btn" href="/town">Town</a>
+        </div>
+      </div>
+
+      <div class="panel spaced">
+        <div class="kv">
+          <span class="pill status">Runtime: <strong data-testid="runtime-status" id="runtimeStatus">booting</strong></span>
+          <span class="pill">House: <strong data-testid="house-id" id="houseId">—</strong></span>
+          <span class="pill">Vault: <strong data-testid="vault-backup-status" id="vaultStatus">—</strong></span>
+        </div>
+        <div class="kv" style="margin-top: 10px">
+          <button class="btn" id="connectWalletBtn">Connect wallet</button>
+          <button class="btn primary" id="createHouseBtn">Create house</button>
+          <button class="btn" id="recoverHouseBtn">Recover house</button>
+          <button class="btn" id="backupBtn">Lock + backup</button>
+          <button class="btn" id="restoreBtn">Restore</button>
+          <button class="btn" id="publishBtn">Publish profile</button>
+          <button class="btn" id="freezeBtn">Freeze now</button>
+          <button class="btn" id="exportBtn">Export</button>
+        </div>
+        <div class="small" id="walletLine" style="margin-top: 8px; color: var(--muted)"></div>
+
+        <div class="kv" style="margin-top: 10px; flex-wrap: wrap;">
+          <select id="llmAuthModeSelect" class="input" style="min-width: 220px;">
+            <option value="api-key">API Key</option>
+            <option value="oauth-json">OpenAI OAuth Profile / Token</option>
+          </select>
+          <input data-testid="llm-key-input" id="llmKeyInput" class="input" type="password" placeholder="LLM API key (stored locally)" style="min-width: 260px; flex: 1;" />
+          <button data-testid="llm-key-save" class="btn" id="llmSaveBtn">Save LLM config</button>
+        </div>
+        <div class="kv" style="margin-top: 8px; flex-wrap: wrap;">
+          <textarea id="llmOauthProfileInput" class="input" rows="3" placeholder="Paste OpenClaw OAuth profile JSON (or raw token)." style="min-width: 320px; flex: 1; display: none;"></textarea>
+          <div id="llmOauthProfileHint" class="small" style="min-width: 320px; color: var(--muted)"></div>
+        </div>
+        <div class="kv" style="margin-top: 8px; flex-wrap: wrap;">
+          <input id="llmModelRefInput" class="input" placeholder="provider/model (e.g. openai-codex/gpt-5.3-codex)" style="min-width: 320px; flex: 1;" />
+          <input id="llmApiInput" class="input" placeholder="api override (optional)" style="min-width: 220px; flex: 1;" />
+        </div>
+        <div class="kv" style="margin-top: 8px; flex-wrap: wrap;">
+          <input id="llmBaseUrlInput" class="input" placeholder="provider base URL override (optional)" style="min-width: 320px; flex: 1;" />
+          <select id="llmThinkingInput" class="input" style="min-width: 220px;">
+            <option value="">Thinking level (default)</option>
+            <option value="minimal">Thinking: minimal</option>
+            <option value="low">Thinking: low</option>
+            <option value="medium">Thinking: medium</option>
+            <option value="high">Thinking: high</option>
+            <option value="xhigh">Thinking: xhigh</option>
+          </select>
+          <label class="small" style="display:flex; align-items:center; gap:6px;">
+            <input id="llmUseProxyInput" type="checkbox" checked />
+            Use same-origin LLM proxy
+          </label>
+        </div>
+        <div class="small" data-testid="llm-status" id="llmLine" style="margin-top: 8px; color: var(--muted)"></div>
+      </div>
+
+      <div class="row two">
+        <div class="panel">
+          <h2 style="margin: 0 0 8px">Approvals</h2>
+          <div data-testid="approvals" id="approvals" class="small" style="color: var(--muted)"></div>
+        </div>
+        <div class="panel">
+          <h2 style="margin: 0 0 8px">Logs</h2>
+          <pre data-testid="runtime-logs" id="runtimeLogs" class="small" style="white-space: pre-wrap; margin: 0; color: var(--muted)"></pre>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin: 0 0 8px">Workspace</h2>
+        <pre data-testid="workspace-events" id="workspaceEvents" class="small" style="white-space: pre-wrap; margin: 0; color: var(--muted)"></pre>
+      </div>
+
+      <div class="panel spaced">
+        <h2 style="margin: 0 0 8px">Chat</h2>
+        <pre data-testid="chat-transcript" id="chatTranscript" class="small" style="white-space: pre-wrap; margin: 0 0 10px; color: var(--muted)"></pre>
+        <div class="kv">
+          <input data-testid="chat-input" id="chatInput" class="input" placeholder="Message…" />
+          <button data-testid="chat-send" id="chatSend" class="btn primary">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/openclaw-wallet.js"></script>
+    <script type="module" src="/openclaw-lite/gateway.js"></script>
+  </body>
+</html>

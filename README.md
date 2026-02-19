@@ -25,6 +25,12 @@ npm run dev
 
 Open http://localhost:4173
 
+## Docs
+- Docs home: `docs/README.md`
+- Getting started: `docs/getting-started.md`
+- Which provider should I pick?: `docs/which-provider.md`
+- Provider reference: `docs/providers/README.md`
+
 When Privy is configured (`PRIVY_APP_ID` set), `/` serves the start page:
 - logo + hero video + "Welcome to the Wild West!"
 - `Enter` triggers Privy login
