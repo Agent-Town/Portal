@@ -105,3 +105,4 @@ Unlocking a house in the UI is gated by a Solana wallet signature. Decryption ha
 - API contract: `specs/02_api_contract.md`
 - Experience flow: `specs/01_experience_flow.md`
 - TDD milestones: `specs/04_tdd_milestones.md`
+- District map + storefront: `specs/11_district_map_storefront_spec.md`

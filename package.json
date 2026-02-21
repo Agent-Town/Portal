@@ -7,6 +7,11 @@
   "scripts": {
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
+    "prefetch:erc8004-images": "node scripts/import_erc8004_preregister_houses.js --download-images-only --with-images",
+    "import:erc8004-preregister": "node scripts/import_erc8004_preregister_houses.js",
+    "import:erc8004-preregister:apply": "node scripts/import_erc8004_preregister_houses.js --apply",
+    "import:erc8004-preregister:apply:images": "node scripts/import_erc8004_preregister_houses.js --apply --with-images",
+    "import:erc8004-preregister:apply:images:cache-only": "node scripts/import_erc8004_preregister_houses.js --apply --with-images --use-image-cache-only",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"

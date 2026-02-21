@@ -8,6 +8,7 @@ const express = require('express');
 
 const { parseCookies, nowIso, randomHex } = require('./util');
 const { readStore, writeStore } = require('./store');
+const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
 const { createPostageVerifier } = require('./postageVerifier');
@@ -951,6 +952,16 @@ const MAX_SIGNUPS = 5000;
 const MAX_PUBLIC_TEAMS = 2000;
 const MAX_PUBLIC_IMAGE_BYTES = 1024 * 1024;
 const MAX_PUBLIC_PROMPT_CHARS = 280;
+const MEDIA_SLOT_PATH_TO_KEY = Object.freeze({
+  'share-hero': 'shareHero',
+  'agent-avatar': 'agentAvatar',
+  'human-avatar': 'humanAvatar'
+});
+const MEDIA_SLOT_KEY_TO_PATH = Object.freeze({
+  shareHero: 'share-hero',
+  agentAvatar: 'agent-avatar',
+  humanAvatar: 'human-avatar'
+});
 const MIN_AGENT_SOLO_PIXELS = 20;
 const PONY_ANON_POSTAGE_MIN_DIFFICULTY = 8;
 const MAX_VAULT_REF_BYTES = 1024 * 1024 * 1024;
@@ -975,6 +986,14 @@ const houseVaultBackend = createServerHouseVaultBackend({
   maxEntries: MAX_HOUSE_ENTRIES,
   nowIso
 });
+
+function countUserHouses(store) {
+  if (!store || !Array.isArray(store.houses)) return 0;
+  return store.houses.reduce((sum, house) => {
+    if (!house || typeof house !== 'object') return sum;
+    return house.preRegistered === true ? sum : sum + 1;
+  }, 0);
+}
 
 function extractXHandle(url) {
   if (typeof url !== 'string') return null;
@@ -1108,6 +1127,134 @@ function normalizePublicPrompt(value) {
   return trimmed.slice(0, MAX_PUBLIC_PROMPT_CHARS);
 }
 
+function normalizeMediaSource(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 80);
+}
+
+function normalizeMediaVersion(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 40);
+}
+
+function mediaSlotKeyFromPath(slotPath) {
+  const raw = typeof slotPath === 'string' ? slotPath.trim().toLowerCase() : '';
+  return MEDIA_SLOT_PATH_TO_KEY[raw] || null;
+}
+
+function mediaSlotPathFromKey(slotKey) {
+  return MEDIA_SLOT_KEY_TO_PATH[slotKey] || null;
+}
+
+function sanitizeHouseMediaSlot(slot) {
+  if (!slot || typeof slot !== 'object') return null;
+  const image = typeof slot.image === 'string' ? slot.image : null;
+  const prompt = typeof slot.prompt === 'string' ? normalizePublicPrompt(slot.prompt) : null;
+  const source = normalizeMediaSource(slot.source);
+  const version = normalizeMediaVersion(slot.version);
+  const updatedAt = typeof slot.updatedAt === 'string' ? slot.updatedAt : null;
+  if (!image && !prompt && !source && !version) return null;
+  return {
+    image,
+    prompt,
+    source,
+    version,
+    updatedAt
+  };
+}
+
+function readLegacyShareHeroSlot(house) {
+  const media = house?.publicMedia;
+  if (!media || typeof media !== 'object') return null;
+  const image = typeof media.image === 'string' ? media.image : null;
+  const prompt = normalizePublicPrompt(media.prompt);
+  if (!image && !prompt) return null;
+  return {
+    image,
+    prompt,
+    source: 'legacy-public-media',
+    version: 'v0',
+    updatedAt: typeof media.updatedAt === 'string' ? media.updatedAt : null
+  };
+}
+
+function readHouseMediaSlot(house, slotKey) {
+  const mediaObj = house?.media;
+  if (mediaObj && typeof mediaObj === 'object' && Object.prototype.hasOwnProperty.call(mediaObj, slotKey)) {
+    return sanitizeHouseMediaSlot(mediaObj[slotKey]);
+  }
+  if (slotKey === 'shareHero') return readLegacyShareHeroSlot(house);
+  return null;
+}
+
+function ensureHouseMediaContainer(house) {
+  if (!house || typeof house !== 'object') return {};
+  if (!house.media || typeof house.media !== 'object' || Array.isArray(house.media)) house.media = {};
+  return house.media;
+}
+
+function upsertHouseMediaSlot(house, slotKey, slotData) {
+  const media = ensureHouseMediaContainer(house);
+  if (!slotData) {
+    delete media[slotKey];
+  } else {
+    media[slotKey] = slotData;
+  }
+
+  if (slotKey === 'shareHero') {
+    if (slotData && slotData.image && slotData.prompt) {
+      house.publicMedia = {
+        image: slotData.image,
+        prompt: slotData.prompt,
+        updatedAt: slotData.updatedAt || nowIso()
+      };
+    } else {
+      house.publicMedia = null;
+    }
+  }
+}
+
+function serializeMediaSlot(house, slotKey) {
+  const slot = readHouseMediaSlot(house, slotKey);
+  const slotPath = mediaSlotPathFromKey(slotKey);
+  const imageUrl = slot?.image
+    ? `/api/house/${encodeURIComponent(house.id)}/media/${encodeURIComponent(slotPath)}/image${slot.updatedAt ? `?v=${encodeURIComponent(slot.updatedAt)}` : ''}`
+    : null;
+  return {
+    imageUrl,
+    prompt: slot?.prompt || null,
+    source: slot?.source || null,
+    version: slot?.version || null,
+    updatedAt: slot?.updatedAt || null
+  };
+}
+
+function serializeHouseMedia(house) {
+  if (!house || typeof house !== 'object') return null;
+  const media = house?.media && typeof house.media === 'object' && !Array.isArray(house.media)
+    ? house.media
+    : {};
+  const storefrontRaw = media.storefront && typeof media.storefront === 'object' && !Array.isArray(media.storefront)
+    ? media.storefront
+    : null;
+
+  return {
+    shareHero: serializeMediaSlot(house, 'shareHero'),
+    agentAvatar: serializeMediaSlot(house, 'agentAvatar'),
+    humanAvatar: serializeMediaSlot(house, 'humanAvatar'),
+    storefront: {
+      gallery: Array.isArray(storefrontRaw?.gallery) ? storefrontRaw.gallery : [],
+      cards: Array.isArray(storefrontRaw?.cards) ? storefrontRaw.cards : []
+    }
+  };
+}
+
 const CRC32_TABLE = (() => {
   const table = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -1192,18 +1339,15 @@ function canvasToPngDataUrl(canvas, paletteHex) {
 }
 
 function serializePublicMedia(house) {
-  const media = house?.publicMedia;
-  if (!media) return null;
-  const prompt = typeof media.prompt === 'string' ? media.prompt : null;
-  const image = typeof media.image === 'string' ? media.image : null;
-  if (!prompt && !image) return null;
-  const imageUrl = image
-    ? `/api/house/${encodeURIComponent(house.id)}/public-media/image${media.updatedAt ? `?v=${encodeURIComponent(media.updatedAt)}` : ''}`
+  const slot = readHouseMediaSlot(house, 'shareHero');
+  if (!slot) return null;
+  const imageUrl = slot.image
+    ? `/api/house/${encodeURIComponent(house.id)}/public-media/image${slot.updatedAt ? `?v=${encodeURIComponent(slot.updatedAt)}` : ''}`
     : null;
   return {
-    prompt,
+    prompt: slot.prompt || null,
     imageUrl,
-    updatedAt: media.updatedAt || null
+    updatedAt: slot.updatedAt || null
   };
 }
 
@@ -1215,15 +1359,16 @@ function escapeHtmlAttr(input) {
     .replace(/>/g, '&gt;');
 }
 
-function buildShareMeta({ shareId, publicMedia, origin }) {
+function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
+  const hero = shareHero || publicMedia || null;
   const title = 'Agent Town — House Share';
-  const description = publicMedia?.prompt || 'Human + agent co-op house in Agent Town.';
+  const description = hero?.prompt || 'Human + agent co-op house in Agent Town.';
   const url = `${origin}/s/${encodeURIComponent(shareId)}`;
-  const imagePath = publicMedia?.imageUrl || '/logo.jpg';
+  const imagePath = hero?.imageUrl || '/logo.jpg';
   const imageUrl = imagePath.startsWith('http')
     ? imagePath
     : `${origin}${imagePath.startsWith('/') ? '' : '/'}${imagePath}`;
-  const card = publicMedia?.imageUrl ? 'summary_large_image' : 'summary';
+  const card = hero?.imageUrl ? 'summary_large_image' : 'summary';
 
   return [
     `<meta property="og:title" content="${escapeHtmlAttr(title)}" />`,
@@ -2348,7 +2493,9 @@ app.get('/api/share/:id', (req, res) => {
     rest.agentPosts = { moltbookUrl: rest.agentPosts.moltbookUrl || null };
   }
   const house = houseId ? store.houses.find((h) => h.id === houseId) : null;
+  const media = house ? serializeHouseMedia(house) : null;
   const publicMedia = house ? serializePublicMedia(house) : null;
+  rest.media = media;
   rest.publicMedia = publicMedia;
   res.json({ ok: true, share: rest });
 });
@@ -2609,12 +2756,84 @@ function buildLeaderboard(store) {
       humanHandle: p.humanHandle || extractXHandle(p.xPostUrl),
       referrals: referralsByShare.get(p.shareId) || 0,
       agentPosts: p.agentPosts ? { moltbookUrl: p.agentPosts.moltbookUrl || null } : null,
+      media: house ? serializeHouseMedia(house) : null,
       publicMedia: house ? serializePublicMedia(house) : null
     };
   });
   teams.sort((a, b) => (b.referrals || 0) - (a.referrals || 0));
   const referralsTotal = teams.reduce((sum, t) => sum + (t.referrals || 0), 0);
   return { teams, referralsTotal };
+}
+
+function buildAtlasMediaByErc8004Id(store) {
+  const out = new Map();
+  const housesById = new Map();
+  for (const house of store.houses || []) {
+    if (!house || typeof house !== 'object') continue;
+    const houseId = typeof house.id === 'string' ? house.id.trim() : '';
+    if (!houseId || housesById.has(houseId)) continue;
+    housesById.set(houseId, house);
+  }
+
+  for (const anchor of store.anchors || []) {
+    if (!anchor || typeof anchor !== 'object') continue;
+    const erc8004Id = typeof anchor.erc8004Id === 'string' ? anchor.erc8004Id.trim() : '';
+    const houseId = typeof anchor.houseId === 'string' ? anchor.houseId.trim() : '';
+    if (!erc8004Id || !houseId || out.has(erc8004Id)) continue;
+    const house = housesById.get(houseId);
+    if (!house) continue;
+    out.set(erc8004Id, serializeHouseMedia(house));
+  }
+  return out;
+}
+
+function withAtlasAgentMedia(agent, mediaByErcId) {
+  if (!agent || typeof agent !== 'object') return agent;
+  const media = mediaByErcId.get(agent.erc8004Id) || null;
+  return { ...agent, media };
+}
+
+function isOptedOutRegistryRow(row) {
+  if (!row || typeof row !== 'object') return false;
+  const state = typeof row.state === 'string' ? row.state.trim().toLowerCase() : '';
+  return row.optedOut === true || state === 'opted_out' || state === 'deleted';
+}
+
+function buildOptedOutErc8004Set(store) {
+  const ids = new Set();
+  for (const row of store.erc8004OptOut || []) {
+    if (!isOptedOutRegistryRow(row)) continue;
+    const erc8004Id = typeof row.erc8004Id === 'string' ? row.erc8004Id.trim() : '';
+    if (!erc8004Id) continue;
+    ids.add(erc8004Id);
+  }
+  return ids;
+}
+
+function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
+  const visibleAgents = (snapshot.agents || []).filter((a) => !optedOutSet.has(a.erc8004Id));
+  const byDistrict = new Map();
+  for (const agent of visibleAgents) {
+    const key = typeof agent?.districtKey === 'string' ? agent.districtKey : '';
+    if (!key) continue;
+    if (!byDistrict.has(key)) byDistrict.set(key, []);
+    byDistrict.get(key).push(agent);
+  }
+  for (const list of byDistrict.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name) || a.erc8004Id.localeCompare(b.erc8004Id));
+  }
+  return (snapshot.districts || []).map((district) => {
+    const list = byDistrict.get(district.key) || [];
+    return {
+      ...district,
+      agentCount: list.length,
+      previewAgents: list.slice(0, 3).map((agent) => ({
+        erc8004Id: agent.erc8004Id,
+        name: agent.name,
+        sharePath: agent.sharePath || null
+      }))
+    };
+  });
 }
 
 app.get('/api/leaderboard', (_req, res) => {
@@ -2629,11 +2848,120 @@ app.get('/api/wall', (_req, res) => {
   res.json({ ok: true, signups: store.signups.length, referralsTotal, teams });
 });
 
+app.get('/api/atlas/districts', (_req, res) => {
+  const snapshot = getAtlasSnapshot();
+  const store = readStore();
+  const optedOutSet = buildOptedOutErc8004Set(store);
+  const districts = buildVisibleAtlasDistricts(snapshot, optedOutSet);
+  res.json({
+    ok: true,
+    meta: snapshot.meta,
+    districts
+  });
+});
+
+app.get('/api/atlas/district/:key', (req, res) => {
+  const key = typeof req.params?.key === 'string' ? req.params.key.trim() : '';
+  if (!key) return res.status(400).json({ ok: false, error: 'MISSING_KEY' });
+  const snapshot = getAtlasSnapshot();
+  const store = readStore();
+  const optedOutSet = buildOptedOutErc8004Set(store);
+  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
+  const district = snapshot.districts.find((d) => d.key === key) || null;
+  if (!district) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const agents = (snapshot.agents || [])
+    .filter((a) => a.districtKey === key)
+    .filter((a) => !optedOutSet.has(a.erc8004Id))
+    .map((a) => withAtlasAgentMedia(a, mediaByErcId));
+  return res.json({ ok: true, meta: snapshot.meta, district, agents });
+});
+
+app.get('/api/atlas/agent/:erc8004Id', (req, res) => {
+  const erc8004Id = typeof req.params?.erc8004Id === 'string' ? req.params.erc8004Id.trim() : '';
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  const snapshot = getAtlasSnapshot();
+  const store = readStore();
+  const optedOutSet = buildOptedOutErc8004Set(store);
+  if (optedOutSet.has(erc8004Id)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
+  const agentRow = (snapshot.agents || []).find((a) => a.erc8004Id === erc8004Id) || null;
+  const agent = withAtlasAgentMedia(agentRow, mediaByErcId);
+  if (!agent) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const district = snapshot.districts.find((d) => d.key === agent.districtKey) || null;
+  return res.json({ ok: true, meta: snapshot.meta, agent, district });
+});
+
+app.get('/api/atlas/search', (req, res) => {
+  const q = typeof req.query?.q === 'string' ? req.query.q : '';
+  const familyRaw = typeof req.query?.family === 'string'
+    ? req.query.family
+    : (typeof req.query?.chainFamily === 'string' ? req.query.chainFamily : '');
+  const limitRaw = Number.parseInt(String(req.query?.limit || ''), 10);
+  const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
+  const snapshot = getAtlasSnapshot();
+  const store = readStore();
+  const optedOutSet = buildOptedOutErc8004Set(store);
+  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
+  const search = searchAtlasAgents(snapshot, { q, family: familyRaw, limit });
+  const visibleResults = search.results.filter((row) => !optedOutSet.has(row.erc8004Id));
+  return res.json({
+    ok: true,
+    meta: snapshot.meta,
+    query: {
+      q: search.query,
+      family: search.family,
+      limit: search.limit,
+      total: visibleResults.length
+    },
+    results: visibleResults.map((row) => ({
+      ...row,
+      media: mediaByErcId.get(row.erc8004Id) || null
+    }))
+  });
+});
+
 // --- Anchors (ERC-8004 routing directory) ---
 const { verifyMessage } = require('ethers');
+const ERC8004_OPTOUT_NONCE_TTL_MS = 10 * 60 * 1000;
+const erc8004OptOutNonces = new Map();
 
 function makeAnchorNonce() {
   return `an_${randomHex(16)}`;
+}
+
+function makeErc8004OptOutNonce() {
+  return `eo_${randomHex(16)}`;
+}
+
+function normalizeEvmAddress(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!/^0x[0-9a-fA-F]{40}$/.test(raw)) return null;
+  return raw.toLowerCase();
+}
+
+function normalizeOptOutReason(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 280);
+}
+
+function buildErc8004OptOutMessage({ erc8004Id, nonce, mode = 'delete' }) {
+  return [
+    'AgentTown ERC-8004 Opt-Out',
+    `erc8004Id: ${erc8004Id}`,
+    `nonce: ${nonce}`,
+    `mode: ${mode}`
+  ].join('\n');
+}
+
+function pruneExpiredErc8004OptOutNonces(nowMs = Date.now()) {
+  for (const [nonce, rec] of erc8004OptOutNonces.entries()) {
+    if (!rec || typeof rec.createdAtMs !== 'number' || nowMs - rec.createdAtMs > ERC8004_OPTOUT_NONCE_TTL_MS) {
+      erc8004OptOutNonces.delete(nonce);
+    }
+  }
 }
 
 function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs }) {
@@ -2646,6 +2974,122 @@ function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs
     `createdAtMs: ${createdAtMs}`
   ].join('\n');
 }
+
+app.get('/api/erc8004/optout/nonce', (req, res) => {
+  const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  const nowMs = Date.now();
+  pruneExpiredErc8004OptOutNonces(nowMs);
+  const nonce = makeErc8004OptOutNonce();
+  erc8004OptOutNonces.set(nonce, { erc8004Id, createdAtMs: nowMs });
+  const message = buildErc8004OptOutMessage({ erc8004Id, nonce, mode: 'delete' });
+  res.json({ ok: true, erc8004Id, nonce, mode: 'delete', message });
+});
+
+app.post('/api/erc8004/optout', (req, res) => {
+  const erc8004Id = typeof req.body?.erc8004Id === 'string' ? req.body.erc8004Id.trim() : '';
+  const ownerAddress = typeof req.body?.ownerAddress === 'string' ? req.body.ownerAddress.trim() : '';
+  const chainType = typeof req.body?.chainType === 'string' ? req.body.chainType.trim().toLowerCase() : '';
+  const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+  const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
+  const reason = normalizeOptOutReason(req.body?.reason);
+  const modeRaw = typeof req.body?.mode === 'string' ? req.body.mode.trim().toLowerCase() : 'delete';
+  const mode = modeRaw || 'delete';
+
+  if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
+  if (!ownerAddress) return res.status(400).json({ ok: false, error: 'MISSING_OWNER_ADDRESS' });
+  if (!chainType) return res.status(400).json({ ok: false, error: 'MISSING_CHAIN_TYPE' });
+  if (!signature) return res.status(400).json({ ok: false, error: 'MISSING_SIGNATURE' });
+  if (!nonce) return res.status(400).json({ ok: false, error: 'MISSING_NONCE' });
+  if (mode !== 'delete') return res.status(400).json({ ok: false, error: 'INVALID_MODE' });
+
+  const nonceRec = erc8004OptOutNonces.get(nonce);
+  if (!nonceRec || nonceRec.erc8004Id !== erc8004Id) {
+    return res.status(400).json({ ok: false, error: 'NONCE_INVALID' });
+  }
+  if (Date.now() - nonceRec.createdAtMs > ERC8004_OPTOUT_NONCE_TTL_MS) {
+    erc8004OptOutNonces.delete(nonce);
+    return res.status(400).json({ ok: false, error: 'NONCE_EXPIRED' });
+  }
+
+  let normalizedOwner = null;
+  let signatureType = null;
+  const message = buildErc8004OptOutMessage({ erc8004Id, nonce, mode: 'delete' });
+  if (chainType === 'evm') {
+    normalizedOwner = normalizeEvmAddress(ownerAddress);
+    if (!normalizedOwner) return res.status(400).json({ ok: false, error: 'INVALID_OWNER_ADDRESS' });
+    let recovered = '';
+    try {
+      recovered = verifyMessage(message, signature) || '';
+    } catch {
+      return res.status(401).json({ ok: false, error: 'AUTH_INVALID_SIGNATURE' });
+    }
+    if (normalizeEvmAddress(recovered) !== normalizedOwner) {
+      return res.status(401).json({ ok: false, error: 'AUTH_INVALID_SIGNATURE' });
+    }
+    signatureType = 'eip191';
+  } else if (chainType === 'solana') {
+    return res.status(400).json({ ok: false, error: 'CHAIN_TYPE_UNSUPPORTED' });
+  } else {
+    return res.status(400).json({ ok: false, error: 'CHAIN_TYPE_UNSUPPORTED' });
+  }
+
+  // Consume nonce after successful auth proof.
+  erc8004OptOutNonces.delete(nonce);
+
+  const store = readStore();
+  store.houses = Array.isArray(store.houses) ? store.houses : [];
+  store.shares = Array.isArray(store.shares) ? store.shares : [];
+  store.publicTeams = Array.isArray(store.publicTeams) ? store.publicTeams : [];
+  store.anchors = Array.isArray(store.anchors) ? store.anchors : [];
+  store.erc8004OptOut = Array.isArray(store.erc8004OptOut) ? store.erc8004OptOut : [];
+
+  const anchor = store.anchors.find((a) => a && a.erc8004Id === erc8004Id) || null;
+  if (!anchor) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const signer = normalizeEvmAddress(anchor.signer);
+  if (!signer || signer !== normalizedOwner) {
+    return res.status(403).json({ ok: false, error: 'OWNERSHIP_MISMATCH' });
+  }
+
+  const houseId = typeof anchor.houseId === 'string' ? anchor.houseId.trim() : '';
+  let removedShareIds = new Set();
+  if (houseId) {
+    removedShareIds = new Set(
+      store.shares.filter((s) => s && s.houseId === houseId).map((s) => s.id)
+    );
+    store.houses = store.houses.filter((h) => !h || h.id !== houseId);
+    store.shares = store.shares.filter((s) => !s || s.houseId !== houseId);
+    store.publicTeams = store.publicTeams.filter((p) => {
+      if (!p || typeof p !== 'object') return false;
+      if (p.houseId === houseId) return false;
+      if (removedShareIds.has(p.shareId)) return false;
+      return true;
+    });
+  }
+  store.anchors = store.anchors.filter((a) => !a || a.erc8004Id !== erc8004Id);
+
+  const optedOutAt = nowIso();
+  store.erc8004OptOut = store.erc8004OptOut.filter((row) => {
+    if (!row || typeof row !== 'object') return false;
+    return row.erc8004Id !== erc8004Id;
+  });
+  store.erc8004OptOut.unshift({
+    erc8004Id,
+    state: 'opted_out',
+    optedOut: true,
+    at: optedOutAt,
+    ownerAddress: normalizedOwner,
+    reason,
+    mode: 'delete',
+    signatureType,
+    chainType,
+    updatedAt: optedOutAt
+  });
+
+  writeStore(store);
+  res.json({ ok: true, optedOut: true, erc8004Id });
+});
 
 app.get('/api/anchors/nonce', (req, res) => {
   const s = ensureHumanSession(req, res);
@@ -2744,6 +3188,7 @@ if (process.env.NODE_ENV === 'test') {
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();
+    erc8004OptOutNonces.clear();
     res.json({ ok: true });
   });
 }
@@ -2920,7 +3365,7 @@ app.post('/api/house/init', (req, res) => {
   }
 
   const store = readStore();
-  if (store.houses.length >= MAX_HOUSES) {
+  if (countUserHouses(store) >= MAX_HOUSES) {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
   }
   const exists = store.houses.find((r) => r.id === houseId);
@@ -3019,7 +3464,7 @@ app.post('/api/agent/house/init', (req, res) => {
   }
 
   const store = readStore();
-  if (store.houses.length >= MAX_HOUSES) {
+  if (countUserHouses(store) >= MAX_HOUSES) {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
   }
   if (store.signups.length >= MAX_SIGNUPS) {
@@ -3137,13 +3582,136 @@ app.get('/api/house/:id/log', (req, res) => {
   res.json({ ok: true, entries });
 });
 
+app.get('/api/house/:id/media', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  res.json({ ok: true, media: serializeHouseMedia(house), publicMedia: serializePublicMedia(house) });
+});
+
+app.get('/api/house/:id/media/:slot/image', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  const slotPath = typeof req.params?.slot === 'string' ? req.params.slot.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const slotKey = mediaSlotKeyFromPath(slotPath);
+  if (!slotKey) return res.status(400).json({ ok: false, error: 'INVALID_MEDIA_SLOT' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  const slot = house ? readHouseMediaSlot(house, slotKey) : null;
+  if (!house || !slot?.image) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const parsed = parsePublicImageDataUrl(slot.image);
+  if (parsed.error || !parsed.bytes) return res.status(500).json({ ok: false, error: 'INVALID_MEDIA_IMAGE' });
+  res.setHeader('Content-Type', parsed.mime || 'application/octet-stream');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.end(parsed.bytes);
+});
+
+app.post('/api/house/:id/media', (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const body = req.body || {};
+  const slotPath = typeof body.slot === 'string' ? body.slot : 'share-hero';
+  const slotKey = mediaSlotKeyFromPath(slotPath);
+  if (!slotKey) return res.status(400).json({ ok: false, error: 'INVALID_MEDIA_SLOT' });
+
+  const hasImage = Object.prototype.hasOwnProperty.call(body, 'image');
+  const hasPrompt = Object.prototype.hasOwnProperty.call(body, 'prompt');
+  const hasSource = Object.prototype.hasOwnProperty.call(body, 'source');
+  const hasVersion = Object.prototype.hasOwnProperty.call(body, 'version');
+  const clear = body?.clear === true;
+  if (!clear && !hasImage && !hasPrompt && !hasSource && !hasVersion) {
+    return res.status(400).json({ ok: false, error: 'MISSING_MEDIA' });
+  }
+
+  const current = readHouseMediaSlot(house, slotKey) || null;
+  let nextImage = current?.image || null;
+  let nextPrompt = current?.prompt || null;
+  let nextSource = current?.source || null;
+  let nextVersion = current?.version || null;
+
+  if (clear) {
+    nextImage = null;
+    nextPrompt = null;
+    nextSource = null;
+    nextVersion = null;
+  }
+
+  if (hasImage) {
+    if (body.image == null || body.image === '') {
+      nextImage = null;
+    } else {
+      const parsed = parsePublicImageDataUrl(body.image);
+      if (parsed.error) return res.status(400).json({ ok: false, error: parsed.error });
+      nextImage = parsed.dataUrl;
+    }
+  }
+
+  if (hasPrompt) {
+    if (body.prompt != null && typeof body.prompt !== 'string') {
+      return res.status(400).json({ ok: false, error: 'INVALID_MEDIA_PROMPT' });
+    }
+    nextPrompt = normalizePublicPrompt(body.prompt);
+  }
+
+  if (hasSource) {
+    if (body.source != null && typeof body.source !== 'string') {
+      return res.status(400).json({ ok: false, error: 'INVALID_MEDIA_SOURCE' });
+    }
+    nextSource = normalizeMediaSource(body.source);
+  }
+
+  if (hasVersion) {
+    if (body.version != null && typeof body.version !== 'string') {
+      return res.status(400).json({ ok: false, error: 'INVALID_MEDIA_VERSION' });
+    }
+    nextVersion = normalizeMediaVersion(body.version);
+  }
+
+  if (slotKey !== 'shareHero') {
+    if (nextPrompt) return res.status(400).json({ ok: false, error: 'MEDIA_PROMPT_UNSUPPORTED' });
+    nextPrompt = null;
+  }
+
+  if (slotKey === 'shareHero') {
+    if (nextImage && !nextPrompt) {
+      return res.status(400).json({ ok: false, error: 'MEDIA_PROMPT_REQUIRED' });
+    }
+    if (nextPrompt && !nextImage) {
+      return res.status(400).json({ ok: false, error: 'MEDIA_IMAGE_REQUIRED' });
+    }
+  }
+
+  const nextSlot = (nextImage || nextPrompt || nextSource || nextVersion)
+    ? {
+        image: nextImage,
+        prompt: nextPrompt,
+        source: nextSource || null,
+        version: nextVersion || null,
+        updatedAt: nowIso()
+      }
+    : null;
+
+  upsertHouseMediaSlot(house, slotKey, nextSlot);
+  writeStore(store);
+  res.json({ ok: true, media: serializeHouseMedia(house), publicMedia: serializePublicMedia(house) });
+});
+
+// Backward-compat alias for the previous public-media API (share-hero slot only).
 app.get('/api/house/:id/public-media', (req, res) => {
   const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
   if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const store = readStore();
   const house = store.houses.find((r) => r.id === houseId);
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+  res.json({ ok: true, publicMedia: serializePublicMedia(house), media: serializeHouseMedia(house) });
 });
 
 app.get('/api/house/:id/public-media/image', (req, res) => {
@@ -3151,8 +3719,9 @@ app.get('/api/house/:id/public-media/image', (req, res) => {
   if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
   const store = readStore();
   const house = store.houses.find((r) => r.id === houseId);
-  if (!house || !house.publicMedia?.image) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const parsed = parsePublicImageDataUrl(house.publicMedia.image);
+  const slot = house ? readHouseMediaSlot(house, 'shareHero') : null;
+  if (!house || !slot?.image) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const parsed = parsePublicImageDataUrl(slot.image);
   if (parsed.error || !parsed.bytes) return res.status(500).json({ ok: false, error: 'INVALID_PUBLIC_IMAGE' });
   res.setHeader('Content-Type', parsed.mime || 'application/octet-stream');
   res.setHeader('Cache-Control', 'public, max-age=300');
@@ -3176,8 +3745,11 @@ app.post('/api/house/:id/public-media', (req, res) => {
     return res.status(400).json({ ok: false, error: 'MISSING_PUBLIC_MEDIA' });
   }
 
-  let nextImage = house.publicMedia?.image || null;
-  let nextPrompt = house.publicMedia?.prompt || null;
+  const current = readHouseMediaSlot(house, 'shareHero') || null;
+  let nextImage = current?.image || null;
+  let nextPrompt = current?.prompt || null;
+  const nextSource = current?.source || 'legacy-public-media';
+  const nextVersion = current?.version || 'v0';
 
   if (clear) {
     nextImage = null;
@@ -3208,18 +3780,19 @@ app.post('/api/house/:id/public-media', (req, res) => {
     return res.status(400).json({ ok: false, error: 'PUBLIC_IMAGE_REQUIRED' });
   }
 
-  if (!nextImage && !nextPrompt) {
-    house.publicMedia = null;
-  } else {
-    house.publicMedia = {
-      image: nextImage,
-      prompt: nextPrompt,
-      updatedAt: nowIso()
-    };
-  }
+  const nextSlot = (!nextImage && !nextPrompt)
+    ? null
+    : {
+        image: nextImage,
+        prompt: nextPrompt,
+        source: nextSource,
+        version: nextVersion,
+        updatedAt: nowIso()
+      };
 
+  upsertHouseMediaSlot(house, 'shareHero', nextSlot);
   writeStore(store);
-  res.json({ ok: true, publicMedia: serializePublicMedia(house) });
+  res.json({ ok: true, publicMedia: serializePublicMedia(house), media: serializeHouseMedia(house) });
 });
 
 app.post('/api/house/:id/append', (req, res) => {
@@ -3280,6 +3853,7 @@ app.use(
 app.get('/create', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'create.html')));
 app.get('/inbox/:houseId', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'inbox.html')));
 app.get('/house', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'house.html')));
+app.get('/atlas', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'atlas.html')));
 app.get('/leaderboard', (_req, res) => res.sendFile(path.join(PUBLIC_DIR, 'leaderboard.html')));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
@@ -3287,9 +3861,11 @@ app.get('/s/:id', (req, res) => {
   const store = readStore();
   const share = store.shares.find((x) => x.id === shareId) || null;
   const house = share?.houseId ? store.houses.find((h) => h.id === share.houseId) : null;
+  const media = house ? serializeHouseMedia(house) : null;
   const publicMedia = house ? serializePublicMedia(house) : null;
+  const shareHero = media?.shareHero?.imageUrl ? media.shareHero : publicMedia;
   const origin = `${req.protocol}://${req.get('host')}`;
-  const meta = buildShareMeta({ shareId, publicMedia, origin });
+  const meta = buildShareMeta({ shareId, shareHero, origin });
   const template = fs.readFileSync(path.join(PUBLIC_DIR, 'share.html'), 'utf8');
   const html = template.replace('</head>', `  ${meta}\n</head>`);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');

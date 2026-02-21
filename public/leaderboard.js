@@ -167,6 +167,12 @@ function formatHuman(handle) {
   return `@${handle}`;
 }
 
+function resolveShareHeroMedia(team) {
+  if (team?.media?.shareHero?.imageUrl) return team.media.shareHero;
+  if (team?.publicMedia?.imageUrl) return team.publicMedia;
+  return null;
+}
+
 function render(teams) {
   const list = el('list');
   list.innerHTML = '';
@@ -274,18 +280,20 @@ function render(teams) {
 
     card.appendChild(title);
     card.appendChild(meta);
-    if (p.publicMedia && p.publicMedia.imageUrl) {
+    const shareHero = resolveShareHeroMedia(p);
+    if (shareHero && shareHero.imageUrl) {
       const media = document.createElement('div');
       media.className = 'public-media';
       const img = document.createElement('img');
-      img.src = p.publicMedia.imageUrl;
-      img.alt = p.publicMedia.prompt ? `Public image: ${p.publicMedia.prompt}` : 'Public house image';
+      img.src = shareHero.imageUrl;
+      img.alt = shareHero.prompt ? `Public image: ${shareHero.prompt}` : 'Public house image';
+      if (p.shareId) img.dataset.testid = `leaderboard-share-hero-${p.shareId}`;
       img.loading = 'lazy';
       media.appendChild(img);
-      if (p.publicMedia.prompt) {
+      if (shareHero.prompt) {
         const prompt = document.createElement('div');
         prompt.className = 'small';
-        prompt.textContent = p.publicMedia.prompt;
+        prompt.textContent = shareHero.prompt;
         media.appendChild(prompt);
       }
       card.appendChild(media);

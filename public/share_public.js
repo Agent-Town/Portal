@@ -200,6 +200,12 @@ function setPublicMedia(media) {
   prompt.textContent = media.prompt || '';
 }
 
+function resolveShareHero(share) {
+  const hero = share?.media?.shareHero;
+  if (hero && typeof hero.imageUrl === 'string' && hero.imageUrl) return hero;
+  return share?.publicMedia || null;
+}
+
 function setFriendAddStatus(msg, isError = false) {
   const status = el('friendAddStatus');
   if (!status) return;
@@ -259,7 +265,7 @@ async function init() {
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
   setTeamLine(r.share);
   setLinks(r.share);
-  setPublicMedia(r.share.publicMedia || null);
+  setPublicMedia(resolveShareHero(r.share));
 }
 
 init().catch((e) => {
