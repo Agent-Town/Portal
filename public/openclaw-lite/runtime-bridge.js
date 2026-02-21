@@ -23,6 +23,22 @@
     }
   }
 
+  function normalizeWorkerPath(candidate, fallback) {
+    if (typeof candidate !== 'string') return fallback;
+    const trimmed = candidate.trim();
+    if (!trimmed) return fallback;
+    if (trimmed.startsWith('node:')) return fallback;
+
+    try {
+      const target = new URL(trimmed, window.location.href);
+      if (target.origin !== window.location.origin) return fallback;
+      if (!target.pathname.startsWith('/openclaw-lite/')) return fallback;
+      return target.pathname + target.search;
+    } catch {
+      return fallback;
+    }
+  }
+
   async function fetchManifest() {
     const resp = await fetch('/openclaw-lite/manifest.json', {
       credentials: 'include',
@@ -81,9 +97,9 @@
 
     state.initPromise = (async () => {
       state.manifest = await fetchManifest();
-      const workerPath = String(state.manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
-      const gatewayWorkerPath = String(state.manifest?.entrypoints?.worker || '/openclaw-lite/worker.js');
-      const runtimeWorkerPath = String(state.manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      const workerPath = normalizeWorkerPath(state.manifest?.entrypoints?.runtimeWorker, '/openclaw-lite/runtime-worker.js');
+      const gatewayWorkerPath = normalizeWorkerPath(state.manifest?.entrypoints?.worker, '/openclaw-lite/worker.js');
+      const runtimeWorkerPath = normalizeWorkerPath(state.manifest?.entrypoints?.runtimeWorker, '/openclaw-lite/runtime-worker.js');
       fetch(gatewayWorkerPath, {
         credentials: 'include',
         cache: 'no-store'
@@ -127,18 +143,6 @@
     if (state.driver !== 'vendor') return null;
     await bootstrapWorker();
     return request('agentOpenPress', { teamCode: state.teamCode });
-  }
-
-  async function contributeCanvas({ humanX, humanY, humanColor, teamCode } = {}) {
-    if (teamCode) state.teamCode = String(teamCode);
-    if (state.driver !== 'vendor') return { paint: null };
-    await bootstrapWorker();
-    return request('canvasContribute', {
-      teamCode: state.teamCode,
-      humanX,
-      humanY,
-      humanColor
-    });
   }
 
   async function ceremonyCommit({ teamCode } = {}) {
@@ -195,7 +199,6 @@
     dispose,
     selectSigil,
     pressOpen,
-    contributeCanvas,
     ceremonyCommit,
     ceremonyReveal,
     setLlmConfig,

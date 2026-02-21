@@ -309,6 +309,20 @@ async function openTownhallPanel(page) {
   await expect(page.locator('#townhallStepHuman')).toBeVisible();
 }
 
+async function configureBrain(page, {
+  provider = 'openai',
+  model = 'gpt-4o-mini'
+} = {}) {
+  const response = await page.request.post('/api/agent/lite/llm/config', {
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify({ provider, model })
+  });
+  expect(response.ok()).toBeTruthy();
+  const payload = await response.json().catch(() => ({}));
+  expect(payload.ok).toBe(true);
+  expect(payload.configured).toBe(true);
+}
+
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
@@ -325,6 +339,8 @@ test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to s
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  await configureBrain(page);
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   await page.getByTestId('townhall-continue-btn').click();
   await expect(page.getByTestId('open-btn')).toBeVisible();
@@ -341,6 +357,279 @@ test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to s
   expect(state.onboarding?.erc8004?.user?.solana?.id).toBe(MINT_IDS.userSolana);
   expect(state.onboarding?.erc8004?.agent?.evm?.id).toBe(MINT_IDS.agentEvm);
   expect(state.onboarding?.erc8004?.agent?.solana?.id).toBe(MINT_IDS.agentSolana);
+});
+
+test('town hall completion persists across repeated refreshes and does not re-run registration steps', async ({ page }) => {
+  await mockTownhallMintFlow(page);
+
+  const requestCounts = {
+    register: 0,
+    evmPrepare: 0,
+    solanaPrepare: 0
+  };
+  const recordTownhallRequests = (req) => {
+    if (req.method() !== 'POST' && req.method() !== 'GET') return;
+    const url = req.url();
+    if (url.includes('/api/townhall/register') && req.method() === 'POST') {
+      requestCounts.register += 1;
+    }
+    if (url.includes('/api/townhall/mint/evm/prepare')) {
+      requestCounts.evmPrepare += 1;
+    }
+    if (url.includes('/api/townhall/mint/solana/prepare')) {
+      requestCounts.solanaPrepare += 1;
+    }
+  };
+  page.on('request', recordTownhallRequests);
+
+  await page.goto('/app');
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+
+  const requestsAfterSetup = { ...requestCounts };
+
+  const cookiesBefore = await page.context().cookies();
+  const sessionCookieBefore = cookiesBefore.find((cookie) => cookie.name === 'et_session');
+  expect(sessionCookieBefore?.value).toBeTruthy();
+
+  const stateBefore = await page.request.get('/api/state');
+  expect(stateBefore.ok()).toBeTruthy();
+  const stateBeforeBody = await stateBefore.json();
+  const teamCodeBefore = String(stateBeforeBody?.teamCode || '');
+  expect(teamCodeBefore).toMatch(/^TEAM-/);
+
+  const teamCodeHint = await page.evaluate(() => {
+    try {
+      return localStorage.getItem('agentTown:teamCodeHint') || '';
+    } catch {
+      return '';
+    }
+  });
+  expect(teamCodeHint).toBe(teamCodeBefore);
+
+  for (let i = 0; i < 3; i += 1) {
+    if (i > 0) {
+      await page.context().clearCookies();
+    }
+
+    await page.reload();
+
+    await page.waitForFunction(() => {
+      const townhallRegisterState = document.querySelector('#townhallRegisterState');
+      return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
+    }, null, { timeout: 12000 });
+
+    const cookiesAfter = await page.context().cookies();
+    const sessionCookieAfter = cookiesAfter.find((cookie) => cookie.name === 'et_session');
+    expect(sessionCookieAfter?.value).toBeTruthy();
+    if (i === 0) {
+      expect(sessionCookieAfter.value).toBe(sessionCookieBefore.value);
+    }
+
+    const stateResp = await page.request.get('/api/state');
+    expect(stateResp.ok()).toBeTruthy();
+    const state = await stateResp.json();
+    expect(state.teamCode).toBe(teamCodeBefore);
+    expect(state.onboarding?.registrationComplete).toBe(true);
+    expect(state.onboarding?.profile?.humanName).toBe('Robin');
+    expect(state.onboarding?.profile?.agentName).toBe('OpenClaw');
+    expect(state.onboarding?.erc8004?.user?.evm?.id).toBe(MINT_IDS.userEvm);
+    expect(state.onboarding?.erc8004?.user?.solana?.id).toBe(MINT_IDS.userSolana);
+    expect(state.onboarding?.erc8004?.agent?.evm?.id).toBe(MINT_IDS.agentEvm);
+    expect(state.onboarding?.erc8004?.agent?.solana?.id).toBe(MINT_IDS.agentSolana);
+    expect(state.teamCode).toBe(teamCodeBefore);
+
+    await openTownhallPanel(page);
+    await expect(page.locator('#townhallStepHuman')).toBeHidden();
+    await expect(page.locator('#townhallStepAgent')).toBeHidden();
+    await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+    await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+  }
+
+  page.off('request', recordTownhallRequests);
+  expect(requestCounts.register).toBe(requestsAfterSetup.register);
+  expect(requestCounts.evmPrepare).toBe(requestsAfterSetup.evmPrepare);
+  expect(requestCounts.solanaPrepare).toBe(requestsAfterSetup.solanaPrepare);
+});
+
+test('town hall completion is restored by wallet identity after cookie and hint reset', async ({ page }) => {
+  await mockTownhallMintFlow(page);
+
+  const requestCounts = {
+    register: 0,
+    evmPrepare: 0,
+    solanaPrepare: 0
+  };
+  const recordTownhallRequests = (req) => {
+    if (req.method() !== 'POST' && req.method() !== 'GET') return;
+    const url = req.url();
+    if (url.includes('/api/townhall/register') && req.method() === 'POST') {
+      requestCounts.register += 1;
+    }
+    if (url.includes('/api/townhall/mint/evm/prepare')) {
+      requestCounts.evmPrepare += 1;
+    }
+    if (url.includes('/api/townhall/mint/solana/prepare')) {
+      requestCounts.solanaPrepare += 1;
+    }
+  };
+  page.on('request', recordTownhallRequests);
+
+  await page.goto('/app');
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+
+  const stateBefore = await page.request.get('/api/state');
+  expect(stateBefore.ok()).toBeTruthy();
+  const stateBeforeBody = await stateBefore.json();
+  const teamCode = String(stateBeforeBody?.teamCode || '');
+  expect(teamCode).toMatch(/^TEAM-/);
+  const requestsAfterSetup = { ...requestCounts };
+
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('agentTown:teamCodeHint');
+    } catch {
+      // ignore localStorage errors
+    }
+  });
+
+  await page.reload();
+
+  await page.waitForFunction(() => {
+    const townhallRegisterState = document.querySelector('#townhallRegisterState');
+    return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
+  }, null, { timeout: 12000 });
+
+  const reopenedStateResp = await page.request.get('/api/state');
+  expect(reopenedStateResp.ok()).toBeTruthy();
+  const reopenedState = await reopenedStateResp.json();
+  expect(String(reopenedState?.teamCode || '')).toBe(teamCode);
+  expect(reopenedState?.onboarding?.registrationComplete).toBe(true);
+  expect(reopenedState?.onboarding?.profile?.humanName).toBe('Robin');
+  expect(reopenedState?.onboarding?.profile?.agentName).toBe('OpenClaw');
+  expect(reopenedState?.onboarding?.erc8004?.user?.evm?.id).toBe(MINT_IDS.userEvm);
+  expect(reopenedState?.onboarding?.erc8004?.user?.solana?.id).toBe(MINT_IDS.userSolana);
+  expect(reopenedState?.onboarding?.erc8004?.agent?.evm?.id).toBe(MINT_IDS.agentEvm);
+  expect(reopenedState?.onboarding?.erc8004?.agent?.solana?.id).toBe(MINT_IDS.agentSolana);
+
+  await openTownhallPanel(page);
+  await expect(page.locator('#townhallStepHuman')).toBeHidden();
+  await expect(page.locator('#townhallStepAgent')).toBeHidden();
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+
+  page.off('request', recordTownhallRequests);
+  expect(requestCounts.register).toBe(requestsAfterSetup.register);
+  expect(requestCounts.evmPrepare).toBe(requestsAfterSetup.evmPrepare);
+  expect(requestCounts.solanaPrepare).toBe(requestsAfterSetup.solanaPrepare);
+});
+
+test('town hall completion recovers even if first session request misses wallet identity', async ({ page }) => {
+  await mockTownhallMintFlow(page);
+
+  const requestCounts = {
+    register: 0,
+    evmPrepare: 0,
+    solanaPrepare: 0
+  };
+  const recordTownhallRequests = (req) => {
+    if (req.method() !== 'POST' && req.method() !== 'GET') return;
+    const url = req.url();
+    if (url.includes('/api/townhall/register') && req.method() === 'POST') {
+      requestCounts.register += 1;
+    }
+    if (url.includes('/api/townhall/mint/evm/prepare')) {
+      requestCounts.evmPrepare += 1;
+    }
+    if (url.includes('/api/townhall/mint/solana/prepare')) {
+      requestCounts.solanaPrepare += 1;
+    }
+  };
+  page.on('request', recordTownhallRequests);
+
+  await page.goto('/app');
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+
+  const requestsAfterSetup = { ...requestCounts };
+  const stateBefore = await page.request.get('/api/state');
+  expect(stateBefore.ok()).toBeTruthy();
+  const stateBeforeBody = await stateBefore.json();
+  const teamCode = String(stateBeforeBody?.teamCode || '');
+  expect(teamCode).toMatch(/^TEAM-/);
+
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('agentTown:teamCodeHint');
+    } catch {
+      // ignore localStorage errors
+    }
+  });
+
+  let strippedFirstSession = false;
+  await page.route('**/api/session', async (route) => {
+    if (route.request().method() !== 'GET' || strippedFirstSession) {
+      await route.continue();
+      return;
+    }
+
+    strippedFirstSession = true;
+    const headers = route.request().headers();
+    const sanitizedHeaders = {};
+    for (const [name, value] of Object.entries(headers)) {
+      const lower = String(name || '').toLowerCase();
+      if ([
+        'x-wallet-chain',
+        'x-wallet-address',
+        'x-wallet-evm-address',
+        'x-wallet-solana-address'
+      ].includes(lower)) {
+        continue;
+      }
+      sanitizedHeaders[name] = value;
+    }
+    await route.continue({ headers: sanitizedHeaders });
+  });
+
+  await page.reload();
+
+  await page.waitForFunction(() => {
+    const townhallRegisterState = document.querySelector('#townhallRegisterState');
+    return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
+  }, null, { timeout: 12000 });
+
+  const reopenedStateResp = await page.request.get('/api/state');
+  expect(reopenedStateResp.ok()).toBeTruthy();
+  const reopenedState = await reopenedStateResp.json();
+  expect(String(reopenedState?.teamCode || '')).toBe(teamCode);
+  expect(reopenedState?.onboarding?.registrationComplete).toBe(true);
+  expect(reopenedState?.onboarding?.profile?.humanName).toBe('Robin');
+  expect(reopenedState?.onboarding?.profile?.agentName).toBe('OpenClaw');
+  expect(reopenedState?.onboarding?.erc8004?.user?.evm?.id).toBe(MINT_IDS.userEvm);
+  expect(reopenedState?.onboarding?.erc8004?.user?.solana?.id).toBe(MINT_IDS.userSolana);
+  expect(reopenedState?.onboarding?.erc8004?.agent?.evm?.id).toBe(MINT_IDS.agentEvm);
+  expect(reopenedState?.onboarding?.erc8004?.agent?.solana?.id).toBe(MINT_IDS.agentSolana);
+
+  await openTownhallPanel(page);
+  await expect(page.locator('#townhallStepHuman')).toBeHidden();
+  await expect(page.locator('#townhallStepAgent')).toBeHidden();
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
+
+  page.off('request', recordTownhallRequests);
+  await page.unroute('**/api/session');
+  expect(requestCounts.register).toBe(requestsAfterSetup.register);
+  expect(requestCounts.evmPrepare).toBe(requestsAfterSetup.evmPrepare);
+  expect(requestCounts.solanaPrepare).toBe(requestsAfterSetup.solanaPrepare);
 });
 
 test('town hall draft fields persist after blur before save', async ({ page }) => {
@@ -377,6 +666,11 @@ test('required town hall onboarding locks district switching until registration 
     const upstream = await route.fetch();
     const body = await upstream.json().catch(() => ({}));
     body.onboarding = deepClone(mockedOnboarding);
+    body.lite = {
+      ...(body.lite || {}),
+      driver: 'vendor',
+      llmConfigured: false
+    };
     await route.fulfill({
       status: upstream.status(),
       contentType: 'application/json',
@@ -389,6 +683,11 @@ test('required town hall onboarding locks district switching until registration 
     const body = await upstream.json().catch(() => ({}));
     body.houseId = null;
     body.onboarding = deepClone(mockedOnboarding);
+    body.lite = {
+      ...(body.lite || {}),
+      driver: 'vendor',
+      llmConfigured: false
+    };
     await route.fulfill({
       status: upstream.status(),
       contentType: 'application/json',
@@ -414,10 +713,10 @@ test('required town hall onboarding locks district switching until registration 
   await completeTownhallStory(page, { humanPrompt: 'Human prompt', agentPrompt: 'Agent prompt' });
 
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
-  await expect(page.getByTestId('open-btn')).toBeHidden();
-  await page.getByTestId('townhall-continue-btn').click();
-  await expect(page.getByTestId('open-btn')).toBeVisible();
-  await expect(page.locator('#townhallRegisterPanel')).toBeHidden();
-  await expect(page.locator('#districtModalClose')).toBeHidden();
+  await expect(page.locator('#districtModalBackdrop')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
+  await configureBrain(page);
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
+  await page.getByRole('button', { name: 'Open Saloon' }).click();
+  await expect(page.locator('#districtModalBackdrop')).toBeVisible();
 });

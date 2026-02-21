@@ -220,5 +220,5 @@ test('town hall registration retries Privy embedded wallet proxy initialization'
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
 });

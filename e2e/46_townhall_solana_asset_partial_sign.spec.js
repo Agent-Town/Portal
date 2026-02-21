@@ -297,7 +297,7 @@ test('town hall solana prepare flow partial-signs tx with local asset keypair be
 
   await expect(page.locator('#townhallMintUserSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
 
   const signCount = await page.evaluate(() => window.__SOLANA_ASSET_SIGN_COUNT || 0);
   expect(signCount).toBeGreaterThanOrEqual(2);

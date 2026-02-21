@@ -1,7 +1,481 @@
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet } = require('./helpers/phase1');
+const crypto = require('crypto');
+const {
+  makeCeremonyRevealPair,
+  encryptCeremonyReveal
+} = require('./helpers/ceremony_crypto');
+const {
+  unlockGateWithSigil,
+  attachPathRecorder
+} = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
+const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockToken1111111111111111111111111111';
+
+const MINT_IDS = {
+  userEvm: '11155111:456',
+  userSolana: 'solana:user-asset-789',
+  agentEvm: '11155111:457',
+  agentSolana: 'solana:agent-asset-790'
+};
+
+function sha256(value) {
+  return crypto.createHash('sha256').update(value).digest();
+}
+
+function hkdf(value, info, len = 32) {
+  return Buffer.from(crypto.hkdfSync('sha256', value, Buffer.alloc(0), Buffer.from(info, 'utf8'), len));
+}
+
+function base58Encode(bytes) {
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let num = BigInt(`0x${Buffer.from(bytes).toString('hex')}`);
+  let out = '';
+  while (num > 0n) {
+    const mod = num % 58n;
+    out = alphabet[Number(mod)] + out;
+    num /= 58n;
+  }
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i += 1) {
+    out = `1${out}`;
+  }
+  return out || '1';
+}
+
+function aesGcmEncrypt(key, plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    alg: 'AES-GCM',
+    iv: iv.toString('base64'),
+    ct: Buffer.concat([enc, tag]).toString('base64')
+  };
+}
+
+function countCalls(calls, pathname) {
+  return calls.filter((entry) => entry.pathname === pathname).length;
+}
+
+function snapshotPathCounts(calls, paths) {
+  const snapshot = {};
+  for (const pathname of paths) {
+    snapshot[pathname] = countCalls(calls, pathname);
+  }
+  return snapshot;
+}
+
+async function postJson(page, path, body = {}) {
+  return page.evaluate(async ({ targetPath, payload }) => {
+    const resp = await fetch(targetPath, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload || {})
+    });
+    const data = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      body: data
+    };
+  }, { targetPath: path, payload: body });
+}
+
+async function getJson(page, path) {
+  return page.evaluate(async ({ targetPath }) => {
+    const resp = await fetch(targetPath, { credentials: 'include' });
+    const data = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      body: data
+    };
+  }, { targetPath: path });
+}
+
+async function mockTownhallMintFlow(page) {
+  const evmAddress = '0x000000000000000000000000000000000000dEaD';
+  const solAddress = TEST_SOLANA_WALLET_ADDRESS;
+
+  await page.addInitScript(({ evmAddress: evmAddr, solAddress: solAddr, ids }) => {
+    window.__TOWNHALL_TEST_MOCKS_ENABLED__ = true;
+
+    let evmMintIndex = 0;
+    let solMintIndex = 0;
+    const evmReceipts = new Map();
+    const transferTopic0 = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+    const evmContract = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+
+    const addressTopic = (address) => `0x${String(address || '').replace(/^0x/i, '').padStart(64, '0')}`;
+    const tokenTopic = (agentId, fallbackIndex) => {
+      const suffix = String(agentId || '').split(':').pop() || '';
+      const numeric = /^[0-9]+$/.test(suffix) ? BigInt(suffix) : BigInt(fallbackIndex + 1);
+      return `0x${numeric.toString(16).padStart(64, '0')}`;
+    };
+    const saveReceipt = (result, fallbackIndex) => {
+      if (!result || typeof result !== 'object' || typeof result.txHash !== 'string') return;
+      evmReceipts.set(result.txHash.toLowerCase(), {
+        transactionHash: result.txHash,
+        status: '0x1',
+        logs: [{
+          address: evmContract,
+          topics: [
+            transferTopic0,
+            '0x0000000000000000000000000000000000000000000000000000000000000000',
+            addressTopic(evmAddr),
+            tokenTopic(result.agentId, fallbackIndex)
+          ],
+          data: '0x'
+        }]
+      });
+    };
+
+    const evmProvider = {
+      request: async ({ method, params }) => {
+        if (method === 'eth_requestAccounts') return [evmAddr];
+        if (method === 'eth_chainId') return '0xaa36a7';
+        if (method === 'wallet_switchEthereumChain') return null;
+        if (method === 'eth_getTransactionReceipt') {
+          const txHash = Array.isArray(params) && params[0] ? String(params[0]).toLowerCase() : '';
+          return evmReceipts.get(txHash) || null;
+        }
+        if (method === 'eth_sendTransaction') {
+          const out = evmMintIndex === 0
+            ? { agentId: ids.userEvm, txHash: '0x0000000000000000000000000000000000000000000000000000000000001001' }
+            : { agentId: ids.agentEvm, txHash: '0x0000000000000000000000000000000000000000000000000000000000001002' };
+          const idx = evmMintIndex;
+          evmMintIndex += 1;
+          saveReceipt(out, idx);
+          return out.txHash;
+        }
+        throw new Error(`unhandled EVM method ${method}`);
+      }
+    };
+
+    const solProvider = {
+      request: async ({ method }) => {
+        if (method === 'signAndSendTransaction' || method === 'solana_signAndSendTransaction') {
+          const sig = solMintIndex === 0 ? 'sol-user-signature' : 'sol-agent-signature';
+          solMintIndex += 1;
+          return { signature: sig };
+        }
+        throw new Error(`unhandled Solana method ${method}`);
+      },
+      on: () => {},
+      off: () => {}
+    };
+
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: solAddr, provider: solProvider, wallet: solProvider }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: new Uint8Array(64) }),
+      connectEvm: async () => ({ address: evmAddr, provider: evmProvider }),
+      disconnectEvm: async () => {},
+      sendEvmTransaction: async () => {
+        const out = evmMintIndex === 0
+          ? { agentId: ids.userEvm, txHash: '0x0000000000000000000000000000000000000000000000000000000000001001' }
+          : { agentId: ids.agentEvm, txHash: '0x0000000000000000000000000000000000000000000000000000000000001002' };
+        const idx = evmMintIndex;
+        evmMintIndex += 1;
+        saveReceipt(out, idx);
+        return { hash: out.txHash };
+      },
+      getEvmProvider: () => evmProvider,
+      getEvmChainId: async () => 11155111,
+      switchEvmChain: async () => null
+    };
+
+    window.__SOLANA_WEB3_MOCK = {
+      Keypair: {
+        generate: () => ({ publicKey: { toBase58: () => 'AssetPubkeyMock1111111111111111111111111111111' } })
+      },
+      Transaction: { from: () => ({}) },
+      Connection: class {}
+    };
+  }, { evmAddress, solAddress, ids: MINT_IDS });
+
+  await page.route('**/api/townhall/mint/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        mint: {
+          enabled: true,
+          pinataEnabled: true,
+          evm: {
+            enabled: true,
+            chainId: 11155111,
+            network: 'sepolia',
+            rpcUrl: 'https://sepolia.infura.io/v3/test',
+            contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
+          },
+          solana: {
+            enabled: true,
+            cluster: 'devnet',
+            rpcUrl: 'https://api.devnet.solana.com',
+            web3ModuleUrl: 'mock://solana-web3'
+          }
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/townhall/mint/evm/prepare', async (route) => {
+    const body = route.request().postDataJSON();
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        tokenUri: `ipfs://bafybeievm-${body.subject}`,
+        metadataCid: `bafybeievm-${body.subject}`,
+        subject: body.subject,
+        evm: {
+          chainId: 11155111,
+          network: 'sepolia',
+          rpcUrl: 'https://sepolia.infura.io/v3/test',
+          contractAddress: '0x8004a818bfb912233c491871b3d84c89a494bd9e'
+        }
+      })
+    });
+  });
+
+  await page.route('**/api/townhall/mint/solana/prepare', async (route) => {
+    const body = route.request().postDataJSON();
+    const isHuman = body.subject === 'human';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        tokenUri: `ipfs://bafybeisol-${body.subject}`,
+        metadataCid: `bafybeisol-${body.subject}`,
+        subject: body.subject,
+        erc8004Id: isHuman ? MINT_IDS.userSolana : MINT_IDS.agentSolana,
+        prepared: {
+          transaction: 'AQID',
+          blockhash: 'mock-blockhash',
+          lastValidBlockHeight: 12345,
+          signer: solAddress,
+          signed: false
+        },
+        solana: {
+          cluster: 'devnet',
+          rpcUrl: 'https://api.devnet.solana.com',
+          assetPubkey: isHuman ? 'UserAssetPubkey' : 'AgentAssetPubkey'
+        }
+      })
+    });
+  });
+}
+
+async function openTownhallPanel(page) {
+  const panel = page.locator('#townhallRegisterPanel');
+  const townhallVisible = async () => (
+    (await panel.isVisible())
+    || await page.locator('#townhallStepHuman').isVisible()
+    || await page.locator('#townhallStepAgent').isVisible()
+    || await page.locator('#townhallStepProcessing').isVisible()
+  );
+  if (await townhallVisible()) return;
+
+  const backdrop = page.locator('#districtModalBackdrop');
+  if (await backdrop.isVisible()) {
+    const closeBtn = page.locator('#districtModalClose');
+    if (await closeBtn.isVisible()) {
+      await closeBtn.click();
+    } else {
+      await expect(page.locator('#townhallStepHuman')).toBeVisible();
+      return;
+    }
+  }
+
+  if (await townhallVisible()) return;
+  const closeBtn = page.locator('#districtModalClose');
+  if (await closeBtn.isVisible()) {
+    await closeBtn.click();
+  }
+  if (!(await townhallVisible())) {
+    await page.getByRole('button', { name: 'Open Town Hall' }).click();
+  }
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+}
+
+async function completeTownhallStory(page, {
+  humanName = 'Robin',
+  agentName = 'OpenClaw',
+  humanPrompt = 'Human prompt text',
+  agentPrompt = 'Agent prompt text'
+} = {}) {
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await page.locator('#townhallHumanName').fill(humanName);
+  await page.locator('#townhallHumanCustomizeBtn').click();
+  await page.locator('#townhallHumanPrompt').fill(humanPrompt);
+  await page.getByTestId('townhall-human-submit-btn').click();
+
+  await expect(page.locator('#townhallStepAgent')).toBeVisible();
+  await page.locator('#townhallAgentName').fill(agentName);
+  await page.locator('#townhallAgentCustomizeBtn').click();
+  await page.locator('#townhallAgentPrompt').fill(agentPrompt);
+  await page.getByTestId('townhall-agent-submit-btn').click();
+
+  await expect(page.locator('#townhallStepProcessing')).toBeVisible();
+}
+
+async function completeCeremonyAndInitHouse(page) {
+  const stateResp = await getJson(page, '/api/state');
+  if (!stateResp.ok || !stateResp.body) {
+    return {
+      ok: false,
+      error: 'STATE_FETCH_FAILED',
+      status: stateResp.status,
+      stateBody: stateResp.body || {}
+    };
+  }
+
+  const teamCode = String(stateResp.body?.teamCode || '');
+  if (!teamCode) {
+    return {
+      ok: false,
+      error: 'MISSING_TEAM_CODE',
+      stateBody: stateResp.body
+    };
+  }
+
+  const humanReveal = crypto.randomBytes(32);
+  const agentReveal = crypto.randomBytes(32);
+  const humanCommit = sha256(humanReveal).toString('base64');
+  const agentCommit = sha256(agentReveal).toString('base64');
+  const humanPair = makeCeremonyRevealPair();
+  const agentPair = makeCeremonyRevealPair();
+
+  const humanCommitResp = await postJson(page, '/api/human/house/commit', {
+    commit: humanCommit,
+    revealPub: humanPair.publicKeyB64
+  });
+  if (!humanCommitResp.ok || !humanCommitResp.body?.ok) {
+    return {
+      ok: false,
+      error: 'HUMAN_COMMIT_FAILED',
+      detail: humanCommitResp.body
+    };
+  }
+
+  const agentCommitResp = await postJson(page, '/api/agent/house/commit', {
+    teamCode,
+    commit: agentCommit,
+    revealPub: agentPair.publicKeyB64
+  });
+  if (!agentCommitResp.ok || !agentCommitResp.body?.ok) {
+    return {
+      ok: false,
+      error: 'AGENT_COMMIT_FAILED',
+      detail: agentCommitResp.body
+    };
+  }
+
+  const materialResp = await getJson(
+    page,
+    `/api/agent/house/material?teamCode=${encodeURIComponent(teamCode)}`
+  );
+  if (!materialResp.ok || !materialResp.body) {
+    return {
+      ok: false,
+      error: 'MATERIAL_FETCH_FAILED',
+      detail: materialResp.body
+    };
+  }
+  if (!materialResp.body?.agentRevealPub || !materialResp.body?.humanRevealPub) {
+    return {
+      ok: false,
+      error: 'MATERIAL_MISSING_KEYS',
+      detail: materialResp.body
+    };
+  }
+
+  const humanRevealForAgent = encryptCeremonyReveal({
+    revealBytes: humanReveal,
+    recipientRevealPubB64: String(materialResp.body.agentRevealPub),
+    direction: 'human_to_agent',
+    teamCode
+  });
+  const humanRevealResp = await postJson(page, '/api/human/house/reveal', {
+    sealedForAgent: humanRevealForAgent
+  });
+  if (!humanRevealResp.ok || !humanRevealResp.body?.ok) {
+    return {
+      ok: false,
+      error: 'HUMAN_REVEAL_FAILED',
+      detail: humanRevealResp.body
+    };
+  }
+
+  const agentRevealForHuman = encryptCeremonyReveal({
+    revealBytes: agentReveal,
+    recipientRevealPubB64: String(materialResp.body.humanRevealPub),
+    direction: 'agent_to_human',
+    teamCode
+  });
+  const agentRevealResp = await postJson(page, '/api/agent/house/reveal', {
+    teamCode,
+    sealedForHuman: agentRevealForHuman
+  });
+  if (!agentRevealResp.ok || !agentRevealResp.body?.ok) {
+    return {
+      ok: false,
+      error: 'AGENT_REVEAL_FAILED',
+      detail: agentRevealResp.body
+    };
+  }
+
+  const nonceResp = await getJson(page, '/api/house/nonce');
+  if (!nonceResp.ok || !nonceResp.body?.nonce) {
+    return {
+      ok: false,
+      error: 'MISSING_HOUSE_NONCE',
+      detail: nonceResp.body
+    };
+  }
+
+  const kroot = sha256(humanReveal);
+  const houseId = base58Encode(kroot);
+  const houseAuthKey = hkdf(kroot, 'elizatown-house-auth-v1', 32).toString('base64');
+  const keyWrapSig = crypto.randomBytes(64);
+  const keyWrap = aesGcmEncrypt(sha256(keyWrapSig), kroot);
+
+  const initResp = await postJson(page, '/api/house/init', {
+    houseId,
+    housePubKey: houseId,
+    nonce: String(nonceResp.body.nonce),
+    keyMode: 'ceremony',
+    unlock: {
+      kind: 'solana-wallet-signature',
+      address: String(stateResp.body?.signup?.address || TEST_SOLANA_WALLET_ADDRESS)
+    },
+    keyWrap,
+    houseAuthKey
+  });
+  if (!initResp.ok || !initResp.body?.ok) {
+    return {
+      ok: false,
+      error: 'HOUSE_INIT_FAILED',
+      detail: initResp.body
+    };
+  }
+
+  return {
+    ok: true,
+    teamCode,
+    houseId,
+    houseAuthKey,
+    keyWrapSig: keyWrapSig.toString('base64')
+  };
+}
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
@@ -129,6 +603,97 @@ test('hero wallet onboarding path opens setup and runs wallet profile check', as
   await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 1000 });
   await expect(page.locator('#walletStatus')).toContainText('Wallet verified. Configure brain.', { timeout: 2000 });
   await expect(page.locator('#step2')).not.toHaveClass(/disabled/);
+});
+
+test('full onboarding flow stores once-per-wallet completion and skips townhall/ceremony on reload', async ({ page }) => {
+  await installMockSolanaWallet(page);
+  await mockTownhallMintFlow(page);
+
+  const pathsToTrack = [
+    '/api/townhall/register',
+    '/api/townhall/mint/evm/prepare',
+    '/api/townhall/mint/solana/prepare',
+    '/api/agent/connect',
+    '/api/human/house/commit',
+    '/api/agent/house/commit',
+    '/api/human/house/reveal',
+    '/api/agent/house/reveal',
+    '/api/house/nonce',
+    '/api/house/init'
+  ];
+  const calls = attachPathRecorder(page, pathsToTrack);
+
+  await page.goto('/');
+  await page.getByTestId('auth-signup').click();
+  await page.getByTestId('hatch-wallet-check').click();
+  await expect(page.locator('#walletStatus')).toContainText('Wallet verified. Configure brain.', { timeout: 2000 });
+
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
+
+  await page.getByTestId('lite-llm-provider').selectOption('openai');
+  await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');
+  await page.getByTestId('lite-llm-api-key').fill('local-test-key');
+  await page.getByTestId('lite-llm-save').click();
+  await expect(page.getByTestId('lite-llm-status')).toContainText('Brain configured.', { timeout: 2000 });
+
+  const stateWithTeam = await getJson(page, '/api/state');
+  expect(stateWithTeam.ok).toBe(true);
+  const teamCode = String(stateWithTeam.body?.teamCode || '');
+  expect(teamCode).toMatch(/^TEAM-/);
+  const connectResp = await postJson(page, '/api/agent/connect', {
+    teamCode,
+    agentName: 'OpenClaw'
+  });
+  expect(connectResp.ok).toBe(true);
+  expect(connectResp.body?.ok).toBe(true);
+
+  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled({ timeout: 10000 });
+  await page.getByTestId('townhall-continue-btn').click();
+  await expect(page.getByTestId('open-btn')).toBeVisible({ timeout: 8000 });
+  await unlockGateWithSigil(page, 'key');
+
+  const ceremonyResult = await completeCeremonyAndInitHouse(page);
+  expect(ceremonyResult.ok).toBe(true);
+  await expect.poll(async () => {
+    const doneState = await getJson(page, '/api/state');
+    return String(doneState.body?.onboarding?.step || '');
+  }, { timeout: 12000 }).toBe('done');
+
+  const doneState = await getJson(page, '/api/state');
+  expect(doneState.ok).toBe(true);
+  expect(doneState.body?.onboarding?.step).toBe('done');
+  expect(doneState.body?.signup?.complete).toBe(true);
+  expect(doneState.body?.houseId).toBe(ceremonyResult.houseId);
+  const preservedTeamCode = String(doneState.body?.teamCode || '');
+  expect(preservedTeamCode).toBe(teamCode);
+
+  const endpointCountsAfterFlow = snapshotPathCounts(calls, pathsToTrack);
+  await page.waitForTimeout(500);
+  const stableEndpointCountsAfterFlow = snapshotPathCounts(calls, pathsToTrack);
+  expect(stableEndpointCountsAfterFlow).toEqual(endpointCountsAfterFlow);
+
+  await page.context().clearCookies();
+  await page.evaluate(() => {
+    try {
+      localStorage.removeItem('agentTown:teamCodeHint');
+    } catch {
+      // ignore localStorage access errors
+    }
+  });
+
+  await page.reload();
+
+  const rehydratedState = await getJson(page, '/api/state');
+  expect(rehydratedState.ok).toBe(true);
+  expect(rehydratedState.body?.teamCode).toBe(preservedTeamCode);
+  expect(rehydratedState.body?.onboarding?.step).toBe('done');
+  expect(rehydratedState.body?.signup?.complete).toBe(true);
+  expect(rehydratedState.body?.houseId).toBe(ceremonyResult.houseId);
+
+  const endpointCountsAfterReload = snapshotPathCounts(calls, pathsToTrack);
+  expect(endpointCountsAfterReload).toEqual(stableEndpointCountsAfterFlow);
 });
 
 test('llm mind config is stored locally and restored after reload', async ({ page }) => {

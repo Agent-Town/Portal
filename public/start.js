@@ -183,7 +183,7 @@ function createLoginUi() {
 
   return {
     primeEmailStep: () => {
-      requestEmail().catch(() => {});
+      requestEmail().catch(() => { });
     },
     requestEmail: () => requestEmail(),
     requestCode: ({ email }) => requestCode(email),
@@ -201,7 +201,7 @@ function createLoginUi() {
       cancelPending();
       emailPromise = null;
       codePromise = null;
-      requestEmail().catch(() => {});
+      requestEmail().catch(() => { });
     }
   };
 }
@@ -268,8 +268,21 @@ async function maybeAutoSkipStart() {
   try {
     const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
     if (!alreadySignedIn) return;
-    autoRedirecting = true;
-    window.location.replace(appPath);
+
+    // Check onboarding status before redirecting
+    const res = await fetch('/api/onboarding/status', {
+      method: 'GET',
+      credentials: 'same-origin',
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const { step } = await res.json();
+      // If step > 1, the user has completed the first step (wallet/login)
+      if (step > 1) {
+        autoRedirecting = true;
+        window.location.replace(appPath);
+      }
+    }
   } catch {
     // no-op; allow manual entry
   }
@@ -381,7 +394,7 @@ function maybeCanonicalizePrivyLoopbackHost() {
 
 function boot() {
   if (maybeCanonicalizePrivyLoopbackHost()) return;
-  maybeAutoSkipStart().catch(() => {});
+  maybeAutoSkipStart().catch(() => { });
 
   const enterBtn = document.getElementById('enterBtn');
   if (enterBtn) {

@@ -792,6 +792,16 @@ async function init() {
     return res.result || null;
   }
 
+  async function runtimeSessionContextRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.runtime.sessionContext",
+      responseType: "worker.runtime.sessionContext",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "RUNTIME_SESSION_CONTEXT_FAILED"));
+    return res.result || null;
+  }
+
   async function experienceRunRequest(params = {}) {
     const requestedTimeoutMs = Number(params?.timeoutMs);
     const timeoutMs =
@@ -1111,6 +1121,9 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "RUNTIME_KEY_STATUS_FAILED"));
       return res.result || null;
     },
+    async runtimeSessionContext(params = {}) {
+      return runtimeSessionContextRequest(params);
+    },
     async skillState() {
       return skillStateRequest();
     },
@@ -1171,6 +1184,7 @@ async function init() {
   // Public runtime surface for page scripts (not test-only).
   gatewayEvents.skillState = skillStateRequest;
   gatewayEvents.systemPromptPreview = systemPromptPreviewRequest;
+  gatewayEvents.runtimeSessionContext = runtimeSessionContextRequest;
   gatewayEvents.experienceRun = experienceRunRequest;
   gatewayEvents.visitExperience = visitExperienceRequest;
 

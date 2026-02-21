@@ -8,13 +8,12 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('vendor runtime bridge owns sigil, open, canvas, and ceremony agent actions', async ({ page }) => {
+test('vendor runtime bridge owns sigil, open, and ceremony agent actions', async ({ page }) => {
   await installMockSolanaWallet(page, { withDisconnect: true, multiplier: 21 });
 
   const calls = attachPathRecorder(page, [
     '/api/agent/select',
     '/api/agent/open/press',
-    '/api/agent/canvas/paint',
     '/api/agent/house/commit',
     '/api/agent/house/reveal'
   ]);
@@ -34,7 +33,6 @@ test('vendor runtime bridge owns sigil, open, canvas, and ceremony agent actions
   const byPath = (pathname) => calls.filter((entry) => entry.pathname === pathname);
   expect(byPath('/api/agent/select').length).toBeGreaterThan(0);
   expect(byPath('/api/agent/open/press').length).toBeGreaterThan(0);
-  expect(byPath('/api/agent/canvas/paint').length).toBeGreaterThan(0);
   expect(byPath('/api/agent/house/commit').length).toBeGreaterThan(0);
   expect(byPath('/api/agent/house/reveal').length).toBeGreaterThan(0);
 

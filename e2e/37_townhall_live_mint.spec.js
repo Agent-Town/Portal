@@ -180,6 +180,20 @@ async function openTownhallPanel(page) {
   await expect(page.locator('#townhallStepHuman')).toBeVisible();
 }
 
+async function configureBrain(page, {
+  provider = 'openai',
+  model = 'gpt-4o-mini'
+} = {}) {
+  const response = await page.request.post('/api/agent/lite/llm/config', {
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify({ provider, model })
+  });
+  expect(response.ok()).toBeTruthy();
+  const payload = await response.json().catch(() => ({}));
+  expect(payload.ok).toBe(true);
+  expect(payload.configured).toBe(true);
+}
+
 test('town hall one-click flow mints all 4 identities and saves registration', async ({ page }) => {
   const evmAddress = '0x000000000000000000000000000000000000dEaD';
   const solAddress = 'So1anaWalletMint11111111111111111111111111111';
@@ -299,9 +313,12 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
-  await page.getByTestId('townhall-continue-btn').click();
-  await expect(page.getByTestId('open-btn')).toBeVisible();
+  await expect(page.locator('#districtModalBackdrop')).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
+  await configureBrain(page);
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
+  await page.getByRole('button', { name: 'Open Saloon' }).click();
+  await expect(page.locator('#districtModalBackdrop')).toBeVisible();
 
   expect(evmSubjects).toEqual(['human', 'agent']);
   expect(solSubjects).toEqual(['human', 'agent']);

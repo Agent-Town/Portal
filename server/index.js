@@ -29,6 +29,8 @@ const {
   getSessionById,
   getSessionByTeamCode,
   getSessionByHouseId,
+  bindSessionWallet,
+  getSessionByWallet,
   indexHouseId,
   listElements,
   evaluateMatch,
@@ -1366,6 +1368,40 @@ const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || P
 const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
 const HOME_ROUTE_FILE = 'start.html';
 const ONBOARDING_REQUIRED = PRIVY_ENABLED;
+const ONBOARDING_STEP_TOWNHALL = 'townhall_profile';
+const ONBOARDING_STEP_BRAIN = 'brain';
+const ONBOARDING_STEP_SIGIL = 'sigil';
+const ONBOARDING_STEP_CEREMONY = 'ceremony';
+const ONBOARDING_STEP_DONE = 'done';
+
+function normalizeOnboardingStep(value) {
+  switch (String(value || '').trim()) {
+    case ONBOARDING_STEP_TOWNHALL:
+    case ONBOARDING_STEP_BRAIN:
+    case ONBOARDING_STEP_SIGIL:
+    case ONBOARDING_STEP_CEREMONY:
+    case ONBOARDING_STEP_DONE:
+      return String(value).trim();
+    default:
+      return '';
+  }
+}
+
+function isOnboardingBrainConfigured(session) {
+  if (!session || typeof session !== 'object') return false;
+  if (session.flow === 'agent_solo') return true;
+  return !!session?.lite?.llmConfigured;
+}
+
+function getOnboardingStepFromSession(session) {
+  const onboarding = session?.onboarding && typeof session.onboarding === 'object' ? session.onboarding : {};
+  if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
+  if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
+  if (!isOnboardingBrainConfigured(session)) return ONBOARDING_STEP_BRAIN;
+  if (session?.signup?.complete !== true) return ONBOARDING_STEP_SIGIL;
+  if (session?.houseCeremony?.houseId) return ONBOARDING_STEP_DONE;
+  return ONBOARDING_STEP_CEREMONY;
+}
 
 const DEFAULT_TOWNHALL_HUMAN_IMAGE = '/brand-kit/default_user_avatar.png';
 const DEFAULT_TOWNHALL_AGENT_IMAGE = '/brand-kit/default_agent_avatar.png';
@@ -1480,7 +1516,7 @@ const frameSrc = [
   ...CSP_FRAME_SRC_EXTRA
 ];
 const FRAME_SRC = [...new Set(frameSrc)];
- 
+
 function isAdmin(req) {
   const token = process.env.ADMIN_TOKEN;
   if (!token) return false;
@@ -1498,7 +1534,16 @@ function normalizeXHandle(input) {
 }
 
 function setSecurityHeaders(req, res, next) {
-  const allowSameOriginFrame = typeof req.path === 'string' && req.path.startsWith('/s/');
+  const reqPath = typeof req.path === 'string' ? req.path : '';
+  const allowSameOriginFrame = (
+    reqPath.startsWith('/s/')
+    || reqPath === '/create'
+    || reqPath === '/house'
+    || reqPath === '/inbox'
+    || reqPath.startsWith('/inbox/')
+    || reqPath === '/claim'
+    || reqPath === '/claim-wallet'
+  );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
@@ -1554,6 +1599,17 @@ app.use((req, res, next) => {
 });
 
 app.use(setSecurityHeaders);
+app.use('/api', (req, res, next) => {
+  // Prevent cache validators from collapsing API reads into 304 responses.
+  // Without this, stale conditional responses can arrive as empty payloads and
+  // cause onboarding state to appear incomplete after a refresh.
+  delete req.headers['if-none-match'];
+  delete req.headers['if-modified-since'];
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return next();
+});
 
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
@@ -1653,6 +1709,20 @@ function ensureHumanSession(req, res) {
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
   let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
+  const walletCandidates = collectWalletCandidatesFromRequest(req);
+
+  const pickCompletedWalletSession = () => {
+    for (const candidate of walletCandidates) {
+      const walletSession = getSessionByWallet(candidate?.chain, candidate?.address);
+      if (!walletSession) continue;
+      const walletOnboarding = ensureSessionOnboarding(walletSession);
+      if (!walletOnboarding) continue;
+      if (walletOnboarding.required !== true || walletOnboarding.step === ONBOARDING_STEP_DONE) {
+        return walletSession;
+      }
+    }
+    return null;
+  };
 
   if (!session) {
     const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
@@ -1668,8 +1738,27 @@ function ensureHumanSession(req, res) {
   }
 
   if (!session) {
+    for (const candidate of walletCandidates) {
+      const walletSession = getSessionByWallet(candidate?.chain, candidate?.address);
+      if (walletSession) {
+        session = walletSession;
+        sid = walletSession.sessionId;
+        break;
+      }
+    }
+  }
+
+  if (!session) {
     session = createSession();
     sid = session.sessionId;
+  }
+
+  if (session && session.onboarding?.registrationComplete !== true) {
+    const completedWalletSession = pickCompletedWalletSession();
+    if (completedWalletSession && completedWalletSession.sessionId !== session.sessionId) {
+      session = completedWalletSession;
+      sid = completedWalletSession.sessionId;
+    }
   }
 
   if (!cookieSid || cookieSid !== sid) {
@@ -1683,6 +1772,56 @@ function ensureHumanSession(req, res) {
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
+}
+
+function normalizeWalletChainInput(rawChain) {
+  const chain = typeof rawChain === 'string' ? rawChain.trim().toLowerCase() : '';
+  return chain === 'evm' || chain === 'solana' ? chain : '';
+}
+
+function collectWalletCandidatesFromPayload(payload, append) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
+  if (typeof payload.chain === 'string' && typeof payload.address === 'string') {
+    append(payload.chain, payload.address);
+  }
+  if (typeof payload.evm === 'string') {
+    append('evm', payload.evm);
+  }
+  if (typeof payload.solana === 'string') {
+    append('solana', payload.solana);
+  }
+  if (typeof payload.evmAddress === 'string') {
+    append('evm', payload.evmAddress);
+  }
+  if (typeof payload.solanaAddress === 'string') {
+    append('solana', payload.solanaAddress);
+  }
+}
+
+function collectWalletCandidatesFromRequest(req) {
+  const out = [];
+  const seen = new Set();
+  const add = (chain, address) => {
+    const normalizedChain = normalizeWalletChainInput(chain);
+    if (!normalizedChain) return;
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeSolanaAddress(address);
+    if (!normalizedAddress) return;
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ chain: normalizedChain, address: normalizedAddress });
+  };
+
+  const hintedChain = req.header('x-wallet-chain');
+  const hintedAddress = req.header('x-wallet-address');
+  add(hintedChain, hintedAddress);
+  add('evm', req.header('x-wallet-evm-address'));
+  add('solana', req.header('x-wallet-solana-address'));
+  collectWalletCandidatesFromPayload(req.body?.wallet, add);
+  collectWalletCandidatesFromPayload(req.body?.wallets, add);
+  return out;
 }
 
 function getExistingHumanSession(req) {
@@ -2484,6 +2623,10 @@ function ensureSessionOnboarding(session) {
   const onboarding = session.onboarding;
   onboarding.required = ONBOARDING_REQUIRED;
   onboarding.registrationComplete = onboarding.registrationComplete === true;
+  onboarding.step = normalizeOnboardingStep(onboarding.step);
+  if (!onboarding.step) {
+    onboarding.step = getOnboardingStepFromSession(session);
+  }
   onboarding.registeredAt = typeof onboarding.registeredAt === 'string' ? onboarding.registeredAt : null;
 
   if (!onboarding.profile || typeof onboarding.profile !== 'object') onboarding.profile = {};
@@ -2991,10 +3134,12 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/session', (req, res) => {
   const s = ensureHumanSession(req, res);
   const store = readStore();
+  const onboarding = ensureSessionOnboarding(s);
   res.json({
     ok: true,
     teamCode: s.teamCode,
     elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -3008,6 +3153,7 @@ app.post('/api/session/reset', (req, res) => {
   // Ensure we still have a valid response cookie context (Secure flag in prod).
   const store = readStore();
   const next = createSession();
+  const onboarding = ensureSessionOnboarding(next);
   const secureFlag = isProd ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
@@ -3017,6 +3163,7 @@ app.post('/api/session/reset', (req, res) => {
     ok: true,
     teamCode: next.teamCode,
     elements: listElements(),
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -3029,6 +3176,7 @@ app.get('/api/state', (req, res) => {
   const lite = ensureLiteState(s);
   updateLiteRuntimeReady(s);
   const store = readStore();
+  const onboarding = ensureSessionOnboarding(s);
   const ceremony = buildCeremonyStateSnapshot(s);
   const experience = buildExperienceStateSnapshot(s, ceremony);
   res.json({
@@ -3073,6 +3221,7 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: ceremony.houseId,
+    onboarding: cloneOnboarding(onboarding),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -3395,6 +3544,7 @@ app.get('/api/agent/lite/llm/config', (req, res) => {
 app.post('/api/agent/lite/llm/config', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
+  const onboarding = ensureSessionOnboarding(s);
 
   let payload;
   try {
@@ -3421,6 +3571,13 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   }
 
   updateLiteRuntimeReady(s);
+  if (
+    onboarding.required && onboarding.registrationComplete
+    && onboarding.step !== ONBOARDING_STEP_CEREMONY
+    && onboarding.step !== ONBOARDING_STEP_DONE
+  ) {
+    onboarding.step = ONBOARDING_STEP_SIGIL;
+  }
 
   res.json({
     ok: true,
@@ -3524,7 +3681,7 @@ function normalizePrivyCaip2(value, fallbackChainHex = null) {
   } catch {
     return null;
   }
-} 
+}
 
 function normalizePrivyWalletRpcEvmTx(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -3803,6 +3960,55 @@ async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
 // --- API ---
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, time: nowIso() });
+});
+
+app.get('/api/onboarding/status', (req, res) => {
+  const store = readStore();
+  const cookies = parseCookies(req.headers.cookie);
+  const sid = cookies.get('agenttown_sid') || '';
+  const session = getSessionById(store, sid);
+
+  if (!session || !session.wallet) {
+    return res.json({ ok: true, step: 1, done: false });
+  }
+
+  // Determine current step based on session/profile completeness
+  // Steps:
+  // 1: Login (done if wallet exists)
+  // 2: Profile (name/avatar)
+  // 3: ERC-8004 (Sepolia/Solana IDs)
+  // 4: Brain config
+  // 5: Sigil test
+  // 6: House ceremony (wrapped kroot)
+  // 7: Done
+
+  const isProfileComplete = session.onboarding?.profile?.humanName
+    && session.onboarding?.profile?.agentName
+    && session.onboarding?.profile?.humanAvatar?.image
+    && session.onboarding?.profile?.agentAvatar?.image;
+
+  if (!isProfileComplete) return res.json({ ok: true, step: 2, done: false });
+
+  const isErc8004Complete = session.onboarding?.mint?.user?.evm?.id
+    && session.onboarding?.mint?.user?.solana?.id
+    && session.onboarding?.mint?.agent?.evm?.id
+    && session.onboarding?.mint?.agent?.solana?.id;
+
+  if (!isErc8004Complete) return res.json({ ok: true, step: 3, done: false });
+
+  const house = session.houseId ? store.houses.find(h => h.id === session.houseId) : null;
+  const isBrainComplete = house?.worker?.url && house?.worker?.state?.active;
+
+  if (!isBrainComplete) return res.json({ ok: true, step: 4, done: false });
+
+  // Add the remaining checks for steps 5-7 based on application state
+  const isSigilComplete = house?.sigilTestComplete;
+  if (!isSigilComplete) return res.json({ ok: true, step: 5, done: false });
+
+  const isCeremonyComplete = house?.ceremonyComplete;
+  if (!isCeremonyComplete) return res.json({ ok: true, step: 6, done: false });
+
+  return res.json({ ok: true, step: 7, done: true });
 });
 
 app.get('/api/privy/config', (_req, res) => {
@@ -4544,16 +4750,16 @@ app.post('/api/townhall/mint/solana/sponsor-send', async (req, res) => {
     }
     onboarding.pendingSolanaMints.splice(pendingIndex, 1);
 
-      return res.json({
-        ok: true,
+    return res.json({
+      ok: true,
+      signature,
+      solana: {
         signature,
-        solana: {
-          signature,
-          cluster: SOLANA_ERC8004_CLUSTER,
-          rpcUrl: sponsorRpcUrl,
-          feePayer: feePayerAddress
-        }
-      });
+        cluster: SOLANA_ERC8004_CLUSTER,
+        rpcUrl: sponsorRpcUrl,
+        feePayer: feePayerAddress
+      }
+    });
   } catch (err) {
     const code = String(err?.message || 'SOLANA_SPONSOR_SEND_FAILED');
     const status = code === 'SOLANA_SPONSOR_SECRET_INVALID' ? 500 : 502;
@@ -4687,6 +4893,11 @@ app.post('/api/townhall/register', (req, res) => {
 
   onboarding.registrationComplete = true;
   onboarding.registeredAt = nowIso();
+  const walletCandidates = collectWalletCandidatesFromRequest(req);
+  for (const candidate of walletCandidates) {
+    bindSessionWallet(s, candidate?.chain, candidate?.address);
+  }
+  onboarding.step = ONBOARDING_STEP_BRAIN;
 
   res.json({ ok: true, onboarding: cloneOnboarding(onboarding) });
 });
@@ -4768,8 +4979,8 @@ app.post('/api/reservations/erc8004', (req, res) => {
   store.reservations = Array.isArray(store.reservations) ? store.reservations : [];
   const existing = store.reservations.find((r) =>
     r
-      && r.kind === 'erc8004'
-      && listErc8004ClaimAliases(r).some((alias) => reservationAliasMatchesInput(alias, agentId)),
+    && r.kind === 'erc8004'
+    && listErc8004ClaimAliases(r).some((alias) => reservationAliasMatchesInput(alias, agentId)),
   );
   if (existing) {
     return res.json({
@@ -4914,10 +5125,14 @@ function maybeCompleteOpen(session) {
 app.post('/api/human/open/press', (req, res) => {
   const s = ensureHumanSession(req, res);
   ensureLiteState(s);
+  const onboarding = ensureSessionOnboarding(s);
   if (!s.match.matched) return res.status(403).json({ ok: false, error: 'LOCKED' });
   s.human.openPressed = true;
 
   const status = maybeCompleteOpen(s);
+  if (status?.complete && onboarding.required && onboarding.step !== ONBOARDING_STEP_DONE) {
+    onboarding.step = ONBOARDING_STEP_CEREMONY;
+  }
   res.json({ ok: true, status, nextUrl: status.complete ? '/create' : null });
 });
 
@@ -4928,8 +5143,12 @@ app.post('/api/agent/open/press', (req, res) => {
   if (!s) return res.status(404).json({ ok: false, error: 'TEAM_NOT_FOUND' });
   if (!s.match.matched) return res.status(403).json({ ok: false, error: 'LOCKED' });
   s.agent.openPressed = true;
+  const onboarding = ensureSessionOnboarding(s);
 
   const status = maybeCompleteOpen(s);
+  if (status?.complete && onboarding.required && onboarding.step !== ONBOARDING_STEP_DONE) {
+    onboarding.step = ONBOARDING_STEP_CEREMONY;
+  }
   res.json({ ok: true, status, nextUrl: status.complete ? '/create' : null });
 });
 
@@ -6596,10 +6815,10 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
   const claimAddressCmp = claimChain === 'evm' ? claimedAddress.toLowerCase() : claimedAddress;
   const existingClaim = store.claims.find((c) =>
     c
-      && c.kind === 'erc8004'
-      && c.reservationId === reservation.id
-      && typeof c.address === 'string'
-      && (claimChain === 'evm' ? c.address.toLowerCase() : c.address) === claimAddressCmp,
+    && c.kind === 'erc8004'
+    && c.reservationId === reservation.id
+    && typeof c.address === 'string'
+    && (claimChain === 'evm' ? c.address.toLowerCase() : c.address) === claimAddressCmp,
   );
   if (!existingClaim) {
     store.claims.push({
@@ -6801,7 +7020,7 @@ app.post('/api/house/init', (req, res) => {
       return res.status(403).json({ ok: false, error: 'CEREMONY_INCOMPLETE' });
     }
   }
- 
+
   const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
   if (enforcedReserved && enforcedReserved !== houseId) {
     return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
@@ -6850,7 +7069,9 @@ app.post('/api/house/init', (req, res) => {
   }
   const exists = store.houses.find((r) => r.id === houseId);
   if (exists) return res.status(409).json({ ok: false, error: 'HOUSE_EXISTS' });
-  const onboardingSnapshot = cloneOnboarding(ensureSessionOnboarding(s));
+  const onboarding = ensureSessionOnboarding(s);
+  onboarding.step = ONBOARDING_STEP_DONE;
+  const onboardingSnapshot = cloneOnboarding(onboarding);
 
   store.houses.push({
     id: houseId,

@@ -75,7 +75,6 @@ let createSkillLoopTimer = null;
 let createSkillLoopBackoffMs = 900;
 let createTeamCode = '';
 let createTokenMode = false;
-let createRuntimeBridge = null;
 
 const CREATE_SKILL_COMMIT_GOAL = 'Publish the agent ceremony commit and reveal public key for the current team session.';
 const CREATE_SKILL_REVEAL_GOAL = 'Publish the agent ceremony reveal payload (`sealedForHuman`) for the current team session.';
@@ -337,26 +336,6 @@ function updateLockState() {
   el('shareBtn').disabled = !hasInk();
 }
 
-async function contributeCanvasViaRuntime({ x, y, color }) {
-  if (createTokenMode) return;
-  if (!createTeamCode) return;
-  if (!createRuntimeBridge || typeof createRuntimeBridge.contributeCanvas !== 'function') return;
-  try {
-    const result = await createRuntimeBridge.contributeCanvas({
-      teamCode: createTeamCode,
-      humanX: x,
-      humanY: y,
-      humanColor: color
-    });
-    const paint = result?.paint || null;
-    if (!paint || !Number.isInteger(paint.x) || !Number.isInteger(paint.y) || !Number.isInteger(paint.color)) return;
-    applyLocalPixel(paint.x, paint.y, paint.color);
-    updateLockState();
-  } catch {
-    // Runtime contribution is best-effort; polling will reconcile state.
-  }
-}
-
 function renderCanvas(w, h) {
   const c = el('canvas');
   c.innerHTML = '';
@@ -383,7 +362,6 @@ function renderCanvas(w, h) {
           // Optimistically update local human paint first.
           applyLocalPixel(x, y, humanColor, w);
           updateLockState();
-          contributeCanvasViaRuntime({ x, y, color: humanColor }).catch(() => { });
         } catch (e) {
           el('err').textContent = e.message;
         }
@@ -436,10 +414,6 @@ async function init() {
   const soloMode = tokenMode || claimMode;
   const tokenAddress = st.signup?.address || null;
   createTeamCode = typeof st?.teamCode === 'string' ? st.teamCode.trim() : '';
-  createRuntimeBridge = window.OpenClawLiteRuntimeBridge || null;
-  if (createRuntimeBridge && isVendorLiteDriver()) {
-    createRuntimeBridge.init({ driver: liteDriver, teamCode: createTeamCode || st.teamCode || '' }).catch(() => { });
-  }
   if (st.signup?.complete && st.signup?.createdAt) {
     try {
       localStorage.setItem('agentTownSignupCompleteAt', st.signup.createdAt);

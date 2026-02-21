@@ -3,6 +3,8 @@
   let gateway = null;
   let gatewayInitPromise = null;
   let gatewayListenersBound = false;
+  let panelLayoutObserver = null;
+  let panelLayoutResizeBound = false;
 
   function el(id) {
     return document.getElementById(id);
@@ -30,6 +32,42 @@
     const node = el('agentStatus');
     if (!node) return;
     node.textContent = text || 'Idle';
+  }
+
+  function syncPanelLayout(panel = null) {
+    const root = document.documentElement;
+    const body = document.body;
+    const dock = panel || el('agentSidebar');
+    if (!root || !body) return;
+    if (!dock || dock.classList.contains('is-hidden')) {
+      root.style.setProperty('--agent-panel-page-inset', '0px');
+      body.classList.remove('agent-panel-expanded');
+      return;
+    }
+    const insetPx = Math.max(0, Math.round(dock.getBoundingClientRect().height || 0));
+    root.style.setProperty('--agent-panel-page-inset', `${insetPx}px`);
+    body.classList.toggle('agent-panel-expanded', !dock.classList.contains('minimized'));
+  }
+
+  function bindPanelLayout(panel) {
+    if (!panel) return;
+    syncPanelLayout(panel);
+    if (typeof ResizeObserver === 'function') {
+      if (!panelLayoutObserver) {
+        panelLayoutObserver = new ResizeObserver(() => {
+          syncPanelLayout(panel);
+        });
+      } else {
+        panelLayoutObserver.disconnect();
+      }
+      panelLayoutObserver.observe(panel);
+    }
+    if (!panelLayoutResizeBound) {
+      panelLayoutResizeBound = true;
+      window.addEventListener('resize', () => {
+        syncPanelLayout(panel);
+      });
+    }
   }
 
   function appendChatMessage(role, text) {
@@ -99,6 +137,7 @@
     panel.classList.toggle('minimized', !!minimized);
     syncMinimizeLabel();
     saveMinimizedPreference(!!minimized);
+    syncPanelLayout(panel);
   }
 
   async function initGateway() {
@@ -207,6 +246,7 @@
     panel.dataset.bound = '1';
 
     setMinimized(loadMinimizedPreference());
+    bindPanelLayout(panel);
     setStatus('Idle');
 
     const header = panel.querySelector('.sidebar-header');

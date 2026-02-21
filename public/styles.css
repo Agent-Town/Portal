@@ -10,6 +10,7 @@
   --font-display: "Wellfleet", serif;
   --font-ui: "Wellfleet", serif;
   --font-accent: "Wellfleet", serif;
+  --agent-panel-page-inset: 0px;
   --sky-50: #e6f4ff;
   --sky-100: #b3dfff;
   --sky-200: #80caff;
@@ -58,10 +59,15 @@ body {
   color: var(--text-strong);
   font-family: var(--font-ui);
   letter-spacing: 0.2px;
+  padding-bottom: var(--agent-panel-page-inset, 0px);
   background:
     radial-gradient(circle at 15% 12%, rgba(255, 255, 255, 0.7) 0, rgba(255, 255, 255, 0) 30%),
     radial-gradient(circle at 78% 22%, rgba(255, 255, 255, 0.58) 0, rgba(255, 255, 255, 0) 28%),
     linear-gradient(180deg, #9ad8ff 0%, #6bb8e5 52%, #5ba8d5 100%);
+}
+
+body.town-hub-page {
+  padding-bottom: 0;
 }
 
 body.town-hub-page {
@@ -142,9 +148,9 @@ h3 {
   width: 100%;
   max-width: 100%;
   min-height: 100vh;
-  height: 100vh;
+  height: auto;
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--agent-panel-page-inset, 0px);
 }
 
 .wrap::before {
@@ -262,11 +268,12 @@ h3 {
   width: 100%;
   max-width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--agent-panel-page-inset, 0px);
   display: flex;
   flex-direction: column;
   z-index: 1;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .townOverview {
@@ -532,7 +539,7 @@ h3 {
 
 .districtBackdrop {
   position: fixed;
-  inset: 0;
+  inset: 0 0 var(--agent-panel-page-inset, 0px) 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -549,7 +556,7 @@ h3 {
   display: flex;
   flex-direction: column;
   width: min(1360px, calc(100vw - 16px));
-  height: min(96vh, 980px);
+  height: min(calc(96vh - var(--agent-panel-page-inset, 0px)), 980px);
   overflow: auto;
   border: 3px solid var(--border);
   border-radius: 18px;
@@ -1415,7 +1422,7 @@ footer::before {
 
   .districtModal {
     width: calc(100vw - 12px);
-    height: min(97vh, 940px);
+    height: min(calc(97vh - var(--agent-panel-page-inset, 0px)), 940px);
     border-radius: 14px;
   }
 

@@ -1,7 +1,7 @@
 <div class="panel" id="townhallRegisterPanel">
   <div class="townhallStoryShell">
     <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
-      Complete onboarding to unlock the sigil test.
+      Complete onboarding and configure your brain to unlock the sigil flow.
     </div>
 
     <div class="townhallStoryStep" id="townhallStepHuman">
@@ -97,52 +97,25 @@
 <div id="townhallSigilFlow">
   <div class="divider"></div>
 
-  <div class="panel spaced" id="pathPanel">
-    <h2 style="margin:0 0 6px">Step 1 — Path</h2>
+  <div class="panel spaced" data-testid="townhall-single-path-note">
+    <h2 style="margin:0 0 6px">Single Worker Path</h2>
     <p class="small" style="margin-top:0">
-      Choose your mode, then continue into the sigil unlock flow.
+      Every session now uses the in-browser worker agent. Keep this tab open and complete onboarding here.
     </p>
-    <div class="kv" style="margin-bottom:8px;">
-      <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
-      <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
-    </div>
-    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
-    <div class="kv" id="pathChoices">
-      <button class="btn" id="pathHumanBtn" data-testid="path-human">Human</button>
-      <button class="btn primary" id="pathCoopBtn" data-testid="path-coop">Human &amp; Agent</button>
-      <button class="btn" id="pathAgentBtn" data-testid="path-agent">Agent</button>
-    </div>
-    <div class="small" id="pathNote" style="color: var(--muted)"></div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="panel is-hidden" id="tokenPanel" data-testid="token-panel">
-    <h2 style="margin:0 0 6px">Human: solo house (token)</h2>
-    <p class="small" style="margin-top:0">
-      Verify that your connected wallet holds <strong>$ELIZATOWN</strong> (CA: <code>CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS</code>).
-      If it does, you can create a house without an agent.
-    </p>
-    <div class="kv">
-      <button class="btn primary" id="tokenVerifyBtn">Check wallet</button>
-      <span class="pill status is-hidden" id="tokenStatus" data-testid="token-status"><span class="dot" id="tokenDot"></span><span id="tokenStatusText">Waiting</span></span>
-      <a class="btn" id="tokenCreateLink" href="/create?mode=token" style="display:none">Create house</a>
-    </div>
-    <div class="small" id="tokenError" style="color: var(--bad);"></div>
   </div>
 
   <div class="panel is-hidden" id="reconnectPanel" data-testid="reconnect-panel">
     <h2 style="margin:0 0 6px" id="reconnectTitle">Reconnect to House</h2>
     <p class="small" style="margin-top:0" id="reconnectIntro">
-      Your house is ready. Share this reconnect message with your agent if needed.
+      Your house is ready. Re-open it in this town session.
     </p>
     <div class="kv agent-only">
-      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link-reconnect">Read the OpenClaw skill</a>
+      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link-reconnect">View worker playbook</a>
       <button class="btn" id="copyHouse" data-testid="copy-house">Copy house message</button>
       <span class="pill status" data-testid="agent-status-house"><span class="dot" id="agentDotHouse"></span><span id="agentStatusTextHouse">Agent not connected</span></span>
     </div>
     <div class="kv stack agent-only">
-      <code class="pill" data-testid="house-snippet" id="houseSnippet">Read /skill.md and reconnect to your house.</code>
+      <code class="pill" data-testid="house-snippet" id="houseSnippet">Reconnect the worker to this house session.</code>
     </div>
     <div class="kv">
       <a class="btn" id="openHouseLink" href="/house">Open house</a>
@@ -150,27 +123,29 @@
   </div>
 
   <div class="panel" id="step1Panel">
-    <h2 style="margin:0 0 6px">Step 2 — Agent connection</h2>
+    <h2 style="margin:0 0 6px">Step 1 — Worker Agent</h2>
     <p class="small" style="margin-top:0" id="step1Intro">
-      If you are a <strong>human</strong>, send your agent the <code>skill.md</code> link, then paste the team code.
-      If you are an <strong>agent</strong>, you will need the team code from a human.
+      Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
     </p>
     <div class="kv">
-      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">Read the OpenClaw skill</a>
-      <button class="btn" id="copyTeam" data-testid="copy-team">Copy team message</button>
-      <span class="pill">Team code: <strong data-testid="team-code" id="teamCode">…</strong></span>
+      <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
+      <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
+      <button class="btn" id="workerReconnectBtn" data-testid="worker-reconnect-btn" type="button">Reconnect worker</button>
+      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">View worker playbook</a>
+      <span class="pill">Session: <strong data-testid="team-code" id="teamCode">…</strong></span>
       <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
     </div>
+    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
     <div class="kv stack">
-      <code class="pill" data-testid="team-snippet" id="teamSnippet">Read /skill.md and team with code: …</code>
+      <code class="pill" data-testid="team-snippet" id="teamSnippet">Worker session: …</code>
     </div>
   </div>
 
   <div class="divider" id="stepDivider"></div>
 
   <div class="panel" id="step2Panel">
-    <h2 style="margin:0 0 6px">Step 3 — Match the same sigil</h2>
-    <p class="small" style="margin-top:0">Human clicks. Agent calls the skill. If you match, the lock opens.</p>
+    <h2 style="margin:0 0 6px">Step 2 — Sigil Test</h2>
+    <p class="small" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.</p>
 
     <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
 
@@ -181,7 +156,7 @@
     <div class="kv" style="margin-top:10px">
       <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
       <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
-      <span class="pill" id="openReady" style="display:none">Open → <a href="/create">Create</a> · <a href="/house">House</a></span>
+      <span class="pill" id="openReady" style="display:none">Continue → <a href="/create">Ceremony</a> · <a href="/house">House</a></span>
     </div>
     <div class="small" id="openError" style="color: var(--bad);"></div>
   </div>

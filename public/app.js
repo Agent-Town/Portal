@@ -1,4 +1,39 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
+const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
+
+const ONBOARDING_STEP_TOWNHALL = 'townhall_profile';
+const ONBOARDING_STEP_BRAIN = 'brain';
+const ONBOARDING_STEP_SIGIL = 'sigil';
+const ONBOARDING_STEP_CEREMONY = 'ceremony';
+const ONBOARDING_STEP_DONE = 'done';
+
+function normalizeOnboardingStep(value) {
+  switch (String(value || '').trim()) {
+    case ONBOARDING_STEP_TOWNHALL:
+    case ONBOARDING_STEP_BRAIN:
+    case ONBOARDING_STEP_SIGIL:
+    case ONBOARDING_STEP_CEREMONY:
+    case ONBOARDING_STEP_DONE:
+      return String(value).trim();
+    default:
+      return '';
+  }
+}
+
+function getOnboardingStep(state) {
+  const onboarding = state?.onboarding || {};
+  if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
+
+  const explicitStep = normalizeOnboardingStep(onboarding.step);
+  if (explicitStep) return explicitStep;
+
+  if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
+  if (!isTownhallBrainConfigured(state)) return ONBOARDING_STEP_BRAIN;
+  if (!state?.signup?.complete) return ONBOARDING_STEP_SIGIL;
+  if (state?.houseId) return ONBOARDING_STEP_DONE;
+  return ONBOARDING_STEP_CEREMONY;
+}
 
 function readTeamCodeHint() {
   try {
@@ -20,6 +55,16 @@ function saveTeamCodeHint(value) {
 
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const walletIdentities = getWalletIdentitiesForHeaders();
+  for (const { chain, address } of walletIdentities) {
+    if (chain === 'evm' && headers[WALLET_IDENTITY_EVM_HEADER] === undefined) {
+      headers[WALLET_IDENTITY_EVM_HEADER] = address;
+      continue;
+    }
+    if (chain === 'solana' && headers[WALLET_IDENTITY_SOLANA_HEADER] === undefined) {
+      headers[WALLET_IDENTITY_SOLANA_HEADER] = address;
+    }
+  }
   const teamCodeHint = readTeamCodeHint();
   if (
     teamCodeHint
@@ -30,6 +75,7 @@ async function api(url, opts = {}) {
   }
   const res = await fetch(url, {
     credentials: 'include',
+    cache: 'no-store',
     ...opts,
     headers
   });
@@ -47,7 +93,67 @@ async function api(url, opts = {}) {
   return data;
 }
 
+function collectWalletIdentitiesFromClient() {
+  const out = [];
+  const seen = new Set();
+
+  const add = (chain, address) => {
+    const normalizedChain = chain === 'evm' ? 'evm' : chain === 'solana' ? 'solana' : '';
+    if (!normalizedChain) return;
+
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeSolanaAddress(address);
+    if (!normalizedAddress) return;
+
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ chain: normalizedChain, address: normalizedAddress });
+  };
+
+  if (walletAddr) add('solana', walletAddr);
+
+  const cachedWallet = loadWalletCache();
+  if (cachedWallet && typeof cachedWallet.address === 'string') {
+    add('solana', cachedWallet.address);
+  }
+
+  if (appWalletClient && typeof appWalletClient.getAddress === 'function') {
+    try {
+      add('solana', appWalletClient.getAddress({ chain: 'solana' }));
+    } catch {
+      // ignore malformed wallet state
+    }
+    try {
+      add('evm', appWalletClient.getAddress({ chain: 'evm' }));
+    } catch {
+      // ignore malformed wallet state
+    }
+  }
+
+  return out;
+}
+
+function getWalletIdentitiesForHeaders() {
+  return collectWalletIdentitiesFromClient();
+}
+
+function getWalletIdentitiesForTownhallRegistration() {
+  const identities = collectWalletIdentitiesFromClient();
+  const out = {};
+  for (const { chain, address } of identities) {
+    out[chain] = address;
+  }
+  return out;
+}
+
 function el(id) {
+  const modal = document.getElementById('districtModalBody');
+  if (modal && !modal.closest('.is-hidden')) {
+    const internal = modal.querySelector('#' + id);
+    if (internal) return internal;
+  }
   return document.getElementById(id);
 }
 
@@ -122,6 +228,8 @@ const agentDebugEvents = [];
 const agentDebugTraffic = [];
 let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
+let agentPanelLayoutObserver = null;
+let agentPanelLayoutResizeBound = false;
 function safeSetText(elementId, value, fallback = '') {
   const node = el(elementId);
   if (!node) return null;
@@ -141,11 +249,7 @@ function safeSetClassList(node, className, add) {
 
 let appPrivyConfig = null;
 
-let elements = [];
-let lastState = null;
-let redirecting = false;
 const appWalletClient = window.initWalletClient ? window.initWalletClient() : null;
-let walletAddr = null;
 let walletHouseId = null;
 let walletRecovered = false;
 const WALLET_STORAGE_KEY = 'agentTownWallet';
@@ -153,7 +257,6 @@ const PATH_STORAGE_KEY = 'agentTownStartRole';
 const TOKEN_ERROR_KEY = 'agentTownTokenError';
 const SIGNUP_COMPLETE_AT_KEY = 'agentTownSignupCompleteAt';
 const SHARE_CACHE_KEY = 'agentTownShareCache';
-const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const TOWNHALL_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 const TOWNHALL_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -168,7 +271,7 @@ const SOLANA_WEB3_MODULE_FALLBACK_URLS = [
   'https://cdn.jsdelivr.net/npm/@solana/web3.js@1.98.4/+esm',
   'https://cdn.skypack.dev/@solana/web3.js@1.98.4'
 ];
-// startRole: 'human' | 'coop' | 'agent'
+// Single path: every session uses the in-browser worker agent.
 let pathMode = 'coop';
 let activeDistrict = 'house';
 const districtViews = {
@@ -176,7 +279,9 @@ const districtViews = {
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
-  leaderboard: { title: 'Town Board', viewPath: '/views/leaderboard.html' }
+  leaderboard: { title: 'Town Board', viewPath: '/views/leaderboard.html' },
+  brain: { title: 'Connect Brain', viewPath: '/views/brain.html' },
+  sigil: { title: 'Sigil Test', viewPath: '/views/sigil.html' }
 };
 const districtViewCache = new Map();
 let currentDistrict = null;
@@ -236,12 +341,21 @@ async function ensurePrivyAuthenticatedForHub() {
 
   const cfg = await loadPrivyConfigForApp();
   if (!cfg || cfg.enabled !== true) return true;
-  if (!appWalletClient) return true;
+  if (typeof window.ensurePrivyLogin !== 'function') return false;
 
   try {
-    await connectWallet({ silent: true });
+    const isLoggedIn = await window.ensurePrivyLogin({ interactive: false });
+    if (!isLoggedIn) return false;
   } catch {
-    // no-op; wallet actions will surface specific errors when needed.
+    return false;
+  }
+
+  if (appWalletClient) {
+    try {
+      await connectWallet({ silent: true });
+    } catch {
+      // no-op; wallet actions will surface specific errors when needed.
+    }
   }
 
   updateWalletUI();
@@ -309,6 +423,30 @@ function setWalletStatus(msg, isError = false) {
   elStatus.style.color = 'var(--bad)';
 }
 
+function loadHatchVisible() {
+  try {
+    return localStorage.getItem(HATCH_VISIBILITY_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setHatchVisible(value) {
+  const on = !!value;
+  try {
+    localStorage.setItem(HATCH_VISIBILITY_KEY, on ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+  applyVisibility(lastState);
+}
+
+function setHatchStatus(text) {
+  const status = el('hatchStatus');
+  if (!status) return;
+  status.textContent = text || '';
+}
+
 function updateWalletUI() {
   const btn = el('connectWalletBtn');
   if (btn) {
@@ -342,12 +480,12 @@ function bindWalletEvents() {
     // Wallet disconnected outside the app.
     disconnectWallet({ fromProvider: true })
       .then(() => maybeResetAfterWalletDisconnect())
-      .catch(() => {});
+      .catch(() => { });
   };
   const onAccountChanged = (next) => {
     const nextAddr = walletAddressFromEvent(next);
     if (!nextAddr) {
-      disconnectWallet({ fromProvider: true }).catch(() => {});
+      disconnectWallet({ fromProvider: true }).catch(() => { });
       return;
     }
     if (walletAddr && walletAddr !== nextAddr) {
@@ -412,17 +550,12 @@ function clearWalletCache() {
 }
 
 function loadPathMode() {
-  try {
-    const raw = localStorage.getItem(PATH_STORAGE_KEY);
-    return raw === 'human' || raw === 'coop' || raw === 'agent' ? raw : 'coop';
-  } catch {
-    return 'coop';
-  }
+  return 'coop';
 }
 
-function savePathMode(mode) {
+function savePathMode(_mode) {
   try {
-    localStorage.setItem(PATH_STORAGE_KEY, mode);
+    localStorage.setItem(PATH_STORAGE_KEY, 'coop');
   } catch {
     // ignore storage errors
   }
@@ -444,30 +577,12 @@ function setTokenError(msg) {
 }
 
 function updatePathButtons() {
-  const humanBtn = el('pathHumanBtn');
-  const coopBtn = el('pathCoopBtn');
-  const agentBtn = el('pathAgentBtn');
-  if (humanBtn) {
-    const active = pathMode === 'human';
-    humanBtn.classList.toggle('primary', active);
-    humanBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
-  if (coopBtn) {
-    const active = pathMode === 'coop';
-    coopBtn.classList.toggle('primary', active);
-    coopBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
-  if (agentBtn) {
-    const active = pathMode === 'agent';
-    agentBtn.classList.toggle('primary', active);
-    agentBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
-  }
+  pathMode = 'coop';
 }
 
-function setPathMode(mode, { persist = true, refresh = true } = {}) {
-  const next = mode === 'human' || mode === 'agent' || mode === 'coop' ? mode : 'coop';
-  pathMode = next;
-  if (persist) savePathMode(next);
+function setPathMode(_mode, { persist = true, refresh = true } = {}) {
+  pathMode = 'coop';
+  if (persist) savePathMode('coop');
   updatePathButtons();
   if (refresh && lastState) updateUI(lastState);
 }
@@ -477,25 +592,53 @@ function onboardingRequired(state) {
 }
 
 function isTownhallRegistrationComplete(state) {
-  return !!state?.onboarding?.registrationComplete;
+  return getOnboardingStep(state) !== ONBOARDING_STEP_TOWNHALL;
 }
 
 function isTownhallGateLocked(state) {
   if (!isTownHub) return false;
   if (!state) return false;
-  const hasHouse = !!(state.houseId || walletHouseId);
-  return onboardingRequired(state) && !hasHouse;
+  return onboardingRequired(state) && getOnboardingStep(state) === ONBOARDING_STEP_TOWNHALL;
+}
+
+function isTownhallBrainConfigured(state) {
+  return !!(state?.lite?.llmConfigured || isLocalLiteLlmConfigured());
+}
+
+function getTownHubDistrictGateReason(state) {
+  if (!isTownHub) return null;
+  const step = getOnboardingStep(state);
+  if (step === ONBOARDING_STEP_TOWNHALL) return 'onboarding';
+  if (step === ONBOARDING_STEP_BRAIN) return 'brain';
+  if (step === ONBOARDING_STEP_SIGIL) return 'sigil';
+  return null;
+}
+
+function isTownHubDistrictGateLocked(state) {
+  return !!getTownHubDistrictGateReason(state);
+}
+
+function getTownHubDistrictGateStatusText() {
+  const reason = getTownHubDistrictGateReason(lastState);
+  if (reason === 'onboarding') return 'Town Hall is required until onboarding is complete.';
+  if (reason === 'brain') return 'A brain must be configured before continuing.';
+  if (reason === 'sigil') return 'Complete your sigil test before continuing.';
+  return '';
 }
 
 function canUseTownhallSigilFlow(state) {
   if (!onboardingRequired(state)) return true;
-  if (state?.houseId || walletHouseId) return true;
-  return isTownhallRegistrationComplete(state);
+  const step = getOnboardingStep(state);
+  return (
+    (step === ONBOARDING_STEP_SIGIL || step === ONBOARDING_STEP_CEREMONY || step === ONBOARDING_STEP_DONE)
+    && isAnyAgentConnected(state)
+    && isTownhallBrainConfigured(state)
+  );
 }
 
 function applyDistrictHotspotLocks(state) {
   if (!isTownHub) return;
-  const gateLocked = isTownhallGateLocked(state);
+  const gateLocked = isTownHubDistrictGateLocked(state);
   document.querySelectorAll('.townDistrictHotspot[data-district]').forEach((hotspot) => {
     const district = normalizeDistrict(hotspot.getAttribute('data-district') || 'house');
     const blocked = gateLocked && district !== 'townhall';
@@ -505,9 +648,9 @@ function applyDistrictHotspotLocks(state) {
 }
 
 function districtStatusText(district) {
-  if (isTownhallGateLocked(lastState)) {
-    if (district === 'townhall') return 'Town Hall is required until you complete onboarding and generate a house.';
-    return 'Locked: finish Town Hall onboarding first.';
+  const statusText = getTownHubDistrictGateStatusText();
+  if (statusText) {
+    return `Locked: ${statusText}`;
   }
   if (!district) return 'Select a district on the map.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
@@ -537,6 +680,12 @@ function normalizeDistrict(district) {
   return district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : 'house';
+}
+
+function explicitDistrictFromInput(district) {
+  return district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+    ? district
+    : null;
 }
 
 function clearTouchDistrictPrime() {
@@ -571,7 +720,7 @@ function bindDistrictMapInteractions() {
         return;
       }
 
-      if (isTownhallGateLocked(lastState) && district !== 'townhall') {
+      if (isTownHubDistrictGateLocked(lastState) && district !== 'townhall') {
         setActiveDistrict('townhall');
         ev.preventDefault();
         return;
@@ -595,7 +744,7 @@ function bindDistrictMapInteractions() {
     });
 
     hotspot.addEventListener('click', () => {
-      if (isTownhallGateLocked(lastState) && district !== 'townhall') {
+      if (isTownHubDistrictGateLocked(lastState) && district !== 'townhall') {
         setActiveDistrict('townhall');
         return;
       }
@@ -880,6 +1029,7 @@ let townhallHumanCustomizeOpen = false;
 let townhallAgentCustomizeOpen = false;
 let townhallAwaitingContinue = false;
 let townhallSigilUnlockedByContinue = false;
+let townhallRegistrationCompletedOnce = false;
 
 function setTownhallStoryStep(step) {
   const next = step === 'agent' || step === 'processing' ? step : 'human';
@@ -2272,6 +2422,10 @@ async function submitTownhallRegistration() {
   if (pendingTownhallAgentImage) {
     payload.profile.agentAvatar.image = pendingTownhallAgentImage;
   }
+  const walletIdentity = getWalletIdentitiesForTownhallRegistration();
+  if (walletIdentity && (walletIdentity.evm || walletIdentity.solana)) {
+    payload.wallet = walletIdentity;
+  }
 
   setTownhallRegisterFeedback('Saving Town Hall registration...');
 
@@ -2309,11 +2463,11 @@ async function submitTownhallRegistration() {
                   ? 'Agent Sepolia mint ID is missing.'
                   : e?.message === 'MISSING_ERC8004_AGENT_SOLANA_ID'
                     ? 'Agent Solana mint ID is missing.'
-                : e?.message === 'TOWNHALL_IMAGE_TOO_LARGE'
-                  ? 'Avatar image is too large (max 2 MB).'
-                  : e?.message === 'INVALID_TOWNHALL_IMAGE'
-                    ? 'Avatar upload must be PNG, JPG, or WebP.'
-                    : `Registration failed: ${e.message}`;
+                    : e?.message === 'TOWNHALL_IMAGE_TOO_LARGE'
+                      ? 'Avatar image is too large (max 2 MB).'
+                      : e?.message === 'INVALID_TOWNHALL_IMAGE'
+                        ? 'Avatar upload must be PNG, JPG, or WebP.'
+                        : `Registration failed: ${e.message}`;
     setTownhallRegisterFeedback(message, true);
     throw new Error(message);
   } finally {
@@ -2436,7 +2590,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
     setTownhallRegisterFeedback('Saving Town Hall registration...');
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
-    setTownhallRegisterFeedback('Registration complete. Click Continue to start the sigil test.');
+    setTownhallRegisterFeedback('Registration complete. Configure your brain to continue.');
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -2576,9 +2730,21 @@ function syncTownhallRegistrationUI(state) {
   const profile = onboarding.profile || {};
   const humanAvatar = profile.humanAvatar || {};
   const agentAvatar = profile.agentAvatar || {};
+  const onboardingStep = getOnboardingStep(state);
   const required = onboardingRequired(state);
-  const hasHouse = !!(state?.houseId || walletHouseId);
   const registrationComplete = isTownhallRegistrationComplete(state);
+  const isBrainConfigured = isTownhallBrainConfigured(state);
+  const isWorkerConnected = isAnyAgentConnected(state);
+  const canShowRegistrationPanel = !required || onboardingStep === ONBOARDING_STEP_TOWNHALL || onboardingStep === ONBOARDING_STEP_BRAIN;
+  const shouldShowSigilForOnboarding = onboardingStep === ONBOARDING_STEP_SIGIL
+    || onboardingStep === ONBOARDING_STEP_CEREMONY
+    || onboardingStep === ONBOARDING_STEP_DONE;
+  const justCompletedRegistration = required && onboardingStep === ONBOARDING_STEP_BRAIN && !townhallRegistrationCompletedOnce;
+  if (!required || onboardingStep === ONBOARDING_STEP_TOWNHALL) {
+    townhallRegistrationCompletedOnce = false;
+  } else {
+    townhallRegistrationCompletedOnce = true;
+  }
 
   const humanNameInput = el('townhallHumanName');
   syncTownhallInputValue(humanNameInput, profile.humanName || '');
@@ -2610,18 +2776,13 @@ function syncTownhallRegistrationUI(state) {
   setTownhallCustomizeOpen('human', townhallHumanCustomizeOpen);
   setTownhallCustomizeOpen('agent', townhallAgentCustomizeOpen);
 
-  if (hasHouse) {
-    townhallAwaitingContinue = false;
+  if (!required || shouldShowSigilForOnboarding) {
     townhallSigilUnlockedByContinue = true;
-  } else if (registrationComplete && !townhallAwaitingContinue) {
-    townhallSigilUnlockedByContinue = true;
-  } else if (!registrationComplete && required && !townhallAwaitingContinue) {
+  } else if (!registrationComplete || !isBrainConfigured || !isWorkerConnected || townhallAwaitingContinue) {
     townhallSigilUnlockedByContinue = false;
-  } else if (!required) {
-    townhallSigilUnlockedByContinue = true;
   }
 
-  if (registrationComplete || hasHouse || townhallMintInFlight || townhallAwaitingContinue || townhallStoryStep === 'processing') {
+  if (registrationComplete || townhallMintInFlight || townhallAwaitingContinue || townhallStoryStep === 'processing') {
     setTownhallStoryStep('processing');
   } else if (townhallStoryStep !== 'agent') {
     setTownhallStoryStep('human');
@@ -2632,14 +2793,25 @@ function syncTownhallRegistrationUI(state) {
 
   const continueBtn = el('townhallContinueBtn');
   if (continueBtn) {
-    const canContinue = (registrationComplete || hasHouse) && !townhallMintInFlight;
+    const canContinue = (!required || (
+      (
+        onboardingStep === ONBOARDING_STEP_BRAIN
+        || onboardingStep === ONBOARDING_STEP_SIGIL
+      )
+      && isBrainConfigured
+      && isWorkerConnected
+    )) && !townhallMintInFlight;
     continueBtn.disabled = !canContinue;
   }
 
   const gateHint = el('townHallGateHint');
   if (gateHint) {
-    if (hasHouse) {
-      gateHint.textContent = 'House unlocked. Explore town freely.';
+    if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
+      gateHint.textContent = 'Registration complete. Configure your brain to continue.';
+    } else if (onboardingStep === ONBOARDING_STEP_BRAIN && isBrainConfigured && !isWorkerConnected) {
+      gateHint.textContent = 'Brain configured. Waiting for your worker agent to connect.';
+    } else if (onboardingStep === ONBOARDING_STEP_BRAIN) {
+      gateHint.textContent = 'Registration complete. Open the sigil screen to continue.';
     } else if (registrationComplete) {
       gateHint.textContent = 'Registration complete.';
     } else if (required) {
@@ -2650,16 +2822,41 @@ function syncTownhallRegistrationUI(state) {
   }
 
   const canUseSigil = canUseTownhallSigilFlow(state);
-  const showSigil = canUseSigil && (townhallSigilUnlockedByContinue || !required || hasHouse);
+  const showSigil = shouldShowSigilForOnboarding
+    || (canUseSigil && (townhallSigilUnlockedByContinue || !required));
   const sigilFlow = el('townhallSigilFlow');
   if (sigilFlow) sigilFlow.classList.toggle('is-hidden', !showSigil);
-  panel.classList.toggle('is-hidden', required && registrationComplete && !hasHouse && showSigil);
+  panel.classList.toggle('is-hidden', required && !canShowRegistrationPanel && showSigil);
+
+  if (justCompletedRegistration && !townhallMintInFlight) {
+    townhallAwaitingContinue = false;
+    townhallSigilUnlockedByContinue = false;
+    hideDistrict();
+  }
 
   bindTownhallRegistrationControls();
 }
 
+function bindBrainDistrictControls() {
+  const continueBtn = el('brainContinueBtn');
+  if (continueBtn) {
+    const isReady =
+      isBrainConfigured &&
+      isWorkerConnected;
+
+    continueBtn.disabled = !isReady;
+    continueBtn.onclick = () => {
+      hideDistrict();
+      if (typeof syncTownhallGate === 'function' && lastState) {
+        syncTownhallGate(lastState);
+      }
+    };
+  }
+}
+
 function bindTownDistrictControls() {
   if (lastState) syncTownhallRegistrationUI(lastState);
+  bindBrainDistrictControls();
 
   const connectWalletBtn = el('connectWalletBtn');
   if (connectWalletBtn) {
@@ -2689,19 +2886,20 @@ function bindTownDistrictControls() {
     };
   }
 
-  const pathHumanBtn = el('pathHumanBtn');
-  if (pathHumanBtn) {
-    pathHumanBtn.onclick = () => setPathMode('human');
-  }
-
-  const pathCoopBtn = el('pathCoopBtn');
-  if (pathCoopBtn) {
-    pathCoopBtn.onclick = () => setPathMode('coop');
-  }
-
-  const pathAgentBtn = el('pathAgentBtn');
-  if (pathAgentBtn) {
-    pathAgentBtn.onclick = () => setPathMode('agent');
+  const workerReconnectBtn = el('workerReconnectBtn');
+  if (workerReconnectBtn) {
+    workerReconnectBtn.onclick = async () => {
+      workerReconnectBtn.disabled = true;
+      setTownhallRegisterFeedback('Reconnecting worker agent...');
+      try {
+        await connectLiteAgent();
+        requestHomeSkillStep('worker-reconnect');
+      } catch (e) {
+        setTownhallRegisterFeedback(`Worker reconnect failed: ${String(e?.message || e || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        workerReconnectBtn.disabled = false;
+      }
+    };
   }
 
   const tokenVerifyBtn = el('tokenVerifyBtn');
@@ -2771,12 +2969,28 @@ function bindTownDistrictControls() {
   if (openBtn) {
     openBtn.onclick = async () => {
       const openError = safeSetText('openError');
+      const openWaiting = el('openWaiting');
       if (openError) openError.textContent = '';
       try {
-        await api('/api/human/open/press', {
+        const result = await api('/api/human/open/press', {
           method: 'POST',
           body: JSON.stringify({})
         });
+        if (result?.nextUrl) {
+          const resolved = routeToPopupMode(result.nextUrl);
+          if (resolved?.mode === 'district') {
+            await showDistrict(resolved.district);
+            return;
+          }
+          if (resolved?.mode === 'frame') {
+            openRouteInModalFrame(resolved.url, resolved.title || 'Ceremony');
+            return;
+          }
+          window.location.assign(resolved?.url || result.nextUrl);
+          return;
+        }
+        if (openWaiting) openWaiting.style.display = 'inline-flex';
+        requestHomeSkillStep('human-action');
       } catch (e) {
         if (openError) openError.textContent = `Error: ${e.message}`;
       }
@@ -2821,7 +3035,7 @@ function loadAgentPanelMinimized() {
     return true;
   }
 }
-    
+
 function routeToPopupMode(rawHref) {
   let parsed;
   try {
@@ -2843,20 +3057,23 @@ function routeToPopupMode(rawHref) {
   }
   if (path === '/inbox' || path.startsWith('/inbox/')) {
     return {
-      mode: 'leave',
-      url: `${parsed.pathname}${parsed.search}${parsed.hash}`
+      mode: 'frame',
+      url: `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      title: 'Inbox'
     };
   }
   if (path === '/create') {
     return {
-      mode: 'leave',
-      url: `${parsed.pathname}${parsed.search}${parsed.hash}`
+      mode: 'frame',
+      url: `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      title: 'Ceremony'
     };
   }
   if (path === '/claim-wallet' || path === '/claim') {
     return {
-      mode: 'leave',
-      url: path === '/claim' ? '/claim' : '/claim-wallet'
+      mode: 'frame',
+      url: path === '/claim' ? '/claim' : '/claim-wallet',
+      title: 'Claim'
     };
   }
   if (path === '/wall') {
@@ -2885,6 +3102,42 @@ function saveAgentPanelMinimized(minimized) {
     localStorage.setItem(AGENT_PANEL_MINIMIZED_KEY, minimized ? '1' : '0');
   } catch {
     // ignore storage errors
+  }
+}
+
+function syncAgentPanelLayout(panel = null) {
+  const root = document.documentElement;
+  const body = document.body;
+  const dock = panel || el('agentSidebar');
+  if (!root || !body) return;
+  if (!dock || dock.classList.contains('is-hidden')) {
+    root.style.setProperty('--agent-panel-page-inset', '0px');
+    body.classList.remove('agent-panel-expanded');
+    return;
+  }
+  const insetPx = Math.max(0, Math.round(dock.getBoundingClientRect().height || 0));
+  root.style.setProperty('--agent-panel-page-inset', `${insetPx}px`);
+  body.classList.toggle('agent-panel-expanded', !dock.classList.contains('minimized'));
+}
+
+function bindAgentPanelLayout(panel) {
+  if (!panel) return;
+  syncAgentPanelLayout(panel);
+  if (typeof ResizeObserver === 'function') {
+    if (!agentPanelLayoutObserver) {
+      agentPanelLayoutObserver = new ResizeObserver(() => {
+        syncAgentPanelLayout(panel);
+      });
+    } else {
+      agentPanelLayoutObserver.disconnect();
+    }
+    agentPanelLayoutObserver.observe(panel);
+  }
+  if (!agentPanelLayoutResizeBound) {
+    agentPanelLayoutResizeBound = true;
+    window.addEventListener('resize', () => {
+      syncAgentPanelLayout(panel);
+    });
   }
 }
 
@@ -3030,10 +3283,11 @@ async function showDistrict(district) {
   if (!isTownHub) return;
 
   const safeDistrict = normalizeDistrict(district);
-  if (isTownhallGateLocked(lastState) && safeDistrict !== 'townhall') {
+  if (isTownHubDistrictGateLocked(lastState) && safeDistrict !== 'townhall') {
     setActiveDistrict('townhall');
+    const statusText = getTownHubDistrictGateStatusText();
     const status = el('townSceneStatus');
-    if (status) status.textContent = 'Locked: complete Town Hall onboarding first.';
+    if (status && statusText) status.textContent = `Locked: ${statusText}`;
     return;
   }
   const currentLoad = ++lastDistrictLoad;
@@ -3144,50 +3398,20 @@ function sanitizeAgentTrafficValue(value, depth = 0, seen = new WeakSet()) {
     if (value.length <= 360) return value;
     return `${value.slice(0, 360)}…(truncated ${value.length - 360} chars)`;
   }
-}
-
-async function connectWallet({ silent = false } = {}) {
-  if (!appWalletClient) throw new Error('NO_SOLANA_WALLET');
-  const previousAddr = walletAddr;
-  const connected = await appWalletClient.connect({ chain: 'solana', silent: !!silent });
-  bindWalletEvents();
-  walletAddr = connected?.address || appWalletClient.getAddress({ chain: 'solana' }) || null;
-  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
-  if (previousAddr && previousAddr !== walletAddr) {
-    walletHouseId = null;
-    walletRecovered = false;
-  }
   if (type === 'number' || type === 'boolean') return value;
   if (type === 'bigint') return String(value);
+  if (type === 'function' || type === 'symbol' || type === 'undefined') return String(value);
+
   if (Array.isArray(value)) {
     const slice = value.slice(0, 30).map((entry) => sanitizeAgentTrafficValue(entry, depth + 1, seen));
     if (value.length > slice.length) {
       slice.push(`[${value.length - slice.length} more]`);
     }
+    return slice;
   }
-}
 
-async function disconnectWallet({ fromProvider = false } = {}) {
-  if (!fromProvider && appWalletClient) {
-    try {
-      await appWalletClient.disconnect({ chain: 'solana' });
-    } catch {
-      // ignore disconnect errors; we still clear local state
-    }
-  unbindWalletEvents();
-  walletAddr = null;
-  walletHouseId = null;
-  walletRecovered = false;
-  updateWalletUI();
-  clearWalletCache();
-  if (lastState) updateUI(lastState);
   if (type === 'object') {
-    if (value instanceof Error) {
-      return {
-        name: String(value.name || 'Error'),
-        message: String(value.message || ''),
-      };
-    }
+    if (value instanceof Date) return value.toISOString();
     if (seen.has(value)) return '[circular]';
     seen.add(value);
 
@@ -3209,6 +3433,60 @@ async function disconnectWallet({ fromProvider = false } = {}) {
     }
     return out;
   }
+
+  return `[${type}]`;
+}
+
+function normalizeAgentTrafficFilter(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'in' || raw === 'incoming') return 'in';
+  if (raw === 'out' || raw === 'outgoing') return 'out';
+  return 'all';
+}
+
+async function connectWallet({ silent = false } = {}) {
+  if (!appWalletClient) throw new Error('NO_SOLANA_WALLET');
+  const previousAddr = walletAddr;
+  const connected = await appWalletClient.connect({ chain: 'solana', silent: !!silent });
+  bindWalletEvents();
+  walletAddr = connected?.address || appWalletClient.getAddress({ chain: 'solana' }) || null;
+  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
+  if (previousAddr && previousAddr !== walletAddr) {
+    walletHouseId = null;
+    walletRecovered = false;
+  }
+  if (!walletHouseId) {
+    const cached = loadWalletCache();
+    if (cached && cached.address === walletAddr && cached.houseId) {
+      walletHouseId = cached.houseId;
+    }
+  }
+  updateWalletUI();
+  saveWalletCache();
+  if (lastState) {
+    updateUI(lastState);
+  }
+}
+
+async function disconnectWallet({ fromProvider = false } = {}) {
+  if (!fromProvider && appWalletClient) {
+    try {
+      await appWalletClient.disconnect({ chain: 'solana' });
+    } catch {
+      // ignore disconnect errors; we still clear local state
+    }
+  }
+  unbindWalletEvents();
+  walletAddr = null;
+  walletHouseId = null;
+  walletRecovered = false;
+  updateWalletUI();
+  clearWalletCache();
+  if (lastState) updateUI(lastState);
+  if (fromProvider) {
+    return;
+  }
+}
 
 async function resetSessionAndReload() {
   try {
@@ -3232,6 +3510,9 @@ async function maybeResetAfterWalletDisconnect() {
       || (st.signup?.complete && (st.signup?.mode === 'token' || st.signup?.mode === 'claim'))
     )
   );
+  if (!shouldResetForState(lastState)) return;
+  await resetSessionAndReload();
+}
 
 function pushAgentDebugTraffic(direction, channel, payload) {
   if (agentDebugTrafficMuteDepth > 0) return;
@@ -3266,6 +3547,7 @@ function pushAgentDebugTraffic(direction, channel, payload) {
   });
   if (agentDebugTraffic.length > AGENT_DEBUG_TRAFFIC_LIMIT) {
     agentDebugTraffic.splice(0, agentDebugTraffic.length - AGENT_DEBUG_TRAFFIC_LIMIT);
+  }
 }
 
 async function lookupWalletHouse(houseIdOverride = null) {
@@ -3327,6 +3609,33 @@ async function verifyTokenOwnership() {
   return result;
 }
 
+function updateAgentStatus(dotId, textId, connected, name) {
+  const dot = el(dotId);
+  const text = el(textId);
+  if (!dot || !text) return;
+  dot.className = `dot ${connected ? 'good' : ''}`;
+  text.textContent = connected ? `Agent connected${name ? `: ${name}` : ''}` : 'Agent not connected';
+}
+
+async function restoreWalletConnection() {
+  const cached = loadWalletCache();
+  if (!cached || !cached.address) return;
+  try {
+    await connectWallet({ silent: true });
+  } catch {
+    clearWalletCache();
+    updateWalletUI();
+    return;
+  }
+  if (cached.houseId) {
+    walletHouseId = cached.houseId;
+    walletRecovered = true;
+    if (lastState) updateUI({ ...lastState, houseId: cached.houseId });
+  }
+  setWalletStatus('Wallet connected.');
+  saveWalletCache();
+}
+
 function setAgentTrafficFilter(value) {
   agentDebugTrafficFilter = normalizeAgentTrafficFilter(value);
   const buttons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
@@ -3379,13 +3688,6 @@ function renderAgentTrafficCards(nowIso) {
     card.dataset.direction = direction;
     card.dataset.stamp = stamp;
     card.dataset.epochMs = String(Date.parse(stamp) || 0);
-  }
-}
-    
-function renderSigils(state) {
-  const grid = el('sigilGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
 
     const header = document.createElement('div');
     header.className = 'agent-traffic-card-header';
@@ -3426,6 +3728,86 @@ function renderSigils(state) {
     }
 
     list.appendChild(card);
+  }
+}
+
+function renderSigils(state) {
+  const grid = el('sigilGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const confirmedHumanSel = typeof state?.human?.selected === 'string' && state.human.selected
+    ? state.human.selected
+    : null;
+  if (confirmedHumanSel) pendingHumanSigilSelection = null;
+  const humanSel = confirmedHumanSel || pendingHumanSigilSelection || null;
+  const agentSel = state?.agent?.selected || null;
+
+  for (const item of elements) {
+    const btn = document.createElement('button');
+    btn.className = 'btn sigil';
+    btn.type = 'button';
+    btn.setAttribute('data-testid', `sigil-${item.id}`);
+    btn.dataset.elementId = item.id;
+
+    const left = document.createElement('div');
+    const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
+    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
+
+    const right = document.createElement('div');
+    right.style.display = 'grid';
+    right.style.gap = '6px';
+    right.style.justifyItems = 'end';
+
+    const you = document.createElement('div');
+    you.className = 'pill';
+    you.style.padding = '4px 8px';
+    you.textContent = humanSel === item.id ? 'you' : '';
+
+    const agent = document.createElement('div');
+    agent.className = 'pill';
+    agent.style.padding = '4px 8px';
+    agent.textContent = agentSel === item.id ? 'agent' : '';
+
+    right.appendChild(you);
+    right.appendChild(agent);
+    btn.appendChild(left);
+    btn.appendChild(right);
+
+    if (humanSel === item.id || agentSel === item.id) {
+      btn.classList.add('selected');
+    }
+
+    btn.addEventListener('click', async () => {
+      setOpenError('');
+      pendingHumanSigilSelection = item.id;
+      if (lastState) renderSigils(lastState);
+      try {
+        const resp = await api('/api/human/select', {
+          method: 'POST',
+          body: JSON.stringify({ elementId: item.id })
+        });
+        if (resp?.humanSelected && lastState) {
+          lastState = {
+            ...lastState,
+            human: { ...(lastState.human || {}), selected: resp.humanSelected },
+            match: resp.match || lastState.match
+          };
+        }
+        pendingHumanSigilSelection = null;
+        if (lastState) {
+          renderSigils(lastState);
+          updateMatchUi(lastState);
+        }
+        requestHomeSkillStep('human-action');
+      } catch (e) {
+        pendingHumanSigilSelection = null;
+        if (lastState) renderSigils(lastState);
+        setOpenError(`Select failed: ${e.message}`);
+      }
+    });
+
+    grid.appendChild(btn);
   }
 }
 
@@ -3528,115 +3910,6 @@ async function refreshAgentDebugPanels(reason = 'poll') {
 
   if (agentDebugRefreshInFlight) {
     agentDebugRefreshQueued = true;
-  }
-}
-  
-function syncTownhallGate(state) {
-  if (!isTownHub) return;
-  const gateLocked = isTownhallGateLocked(state);
-  applyDistrictHotspotLocks(state);
-
-  const closeBtn = el('districtModalClose');
-  if (closeBtn) {
-    closeBtn.classList.toggle('is-hidden', gateLocked);
-    closeBtn.disabled = gateLocked;
-  }
-
-  if (!gateLocked) return;
-
-  const status = el('townSceneStatus');
-  if (status) status.textContent = 'Town Hall is required until you complete onboarding and generate a house.';
-
-  const backdrop = el('districtModalBackdrop');
-  const modalHidden = !backdrop || backdrop.classList.contains('is-hidden');
-  if (currentDistrict !== 'townhall' || modalHidden) {
-    showDistrict('townhall');
-  }
-}
-
-function updateUI(state) {
-  lastState = state;
-
-  const houseId = state.houseId || walletHouseId || null;
-  const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
-  if ((signupMode === 'token' || signupMode === 'claim') && pathMode !== 'human') {
-    setPathMode('human', { persist: true, refresh: false });
-  }
-  const tokenMode = pathMode === 'human' || signupMode === 'token' || signupMode === 'claim';
-
-  // Counts (optional on index)
-  safeSetText('signupCount', String(state.stats?.signups ?? '—'));
-
-  // Team code (fallback for older servers that still send pairCode)
-  const teamCode = state.teamCode || state.pairCode || '…';
-  safeSetText('teamCode', teamCode);
-
-  const origin = window.location.origin;
-  safeSetText(
-    'teamSnippet',
-    pathMode === 'agent'
-      ? `Use this base URL (${origin}) and connect with team code: ${teamCode}`
-      : `Read ${origin}/skill.md and team with code: ${teamCode}`
-  );
-
-  const houseNavLink = el('houseNavLink');
-  if (houseNavLink) {
-    if (houseId) {
-      houseNavLink.classList.remove('is-hidden');
-      houseNavLink.href = `/house?house=${encodeURIComponent(houseId)}`;
-    } else {
-      houseNavLink.classList.add('is-hidden');
-      houseNavLink.href = '/house';
-    }
-  }
-  updateTownHubLinks(houseId);
-  syncTownhallRegistrationUI(state);
-  syncTownhallGate(state);
-
-  updatePathButtons();
-  safeSetText(
-    'pathNote',
-    pathMode === 'human'
-      ? 'Human mode: solo house (token) + wallet reconnect.'
-      : pathMode === 'agent'
-        ? 'Agent mode: read skill.md and connect using a team code from a human.'
-        : 'Co-op mode: human + agent unlock together.'
-  );
-
-  // Agent status
-  const connected = !!state.agent?.connected;
-  updateAgentStatus('agentDot', 'agentStatusText', connected, state.agent?.name || null);
-  updateAgentStatus('agentDotHouse', 'agentStatusTextHouse', connected, state.agent?.name || null);
-
-  setReconnectMode({ houseReady: !!houseId, role: pathMode });
-  toggleAgentOnly(pathMode !== 'human');
-
-  const tokenComplete = !!state.signup?.complete && (signupMode === 'token' || signupMode === 'claim');
-  const tokenCreateLink = el('tokenCreateLink');
-  if (tokenCreateLink) {
-    tokenCreateLink.style.display = tokenComplete ? 'inline-flex' : 'none';
-    if (tokenComplete) tokenCreateLink.href = '/create?mode=token';
-  }
-  if (tokenComplete) {
-    setTokenStatus({ active: true, good: true, text: 'Verified' });
-  } else if (!tokenMode) {
-    setTokenStatus({ active: false });
-  }
-
-  if (houseId) {
-    if (tokenMode) {
-      safeSetText('reconnectTitle', 'House ready');
-      safeSetText('reconnectIntro', 'Your house is ready. Open it to unlock with your wallet.');
-    } else if (walletRecovered) {
-      safeSetText('reconnectTitle', 'Welcome back');
-      safeSetText('reconnectIntro', 'We found a house for this wallet. Share this reconnect message with your agent if needed.');
-    } else {
-      safeSetText('reconnectTitle', 'Reconnect to House');
-      safeSetText('reconnectIntro', 'Your house is ready. Share this reconnect message with your agent if needed.');
-    }
-    safeSetText('houseSnippet', `Read ${origin}/skill.md and reconnect to your house.`);
-    const openHouseLink = el('openHouseLink');
-    if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
     return;
   }
   agentDebugRefreshInFlight = true;
@@ -3715,6 +3988,30 @@ function updateUI(state) {
       || agentDebugActiveTab === 'session'
       || !sessionPane?.textContent;
 
+    let workerSessionContext = null;
+    let workerSessionContextError = null;
+    if (gatewayApi && typeof gatewayApi.runtimeSessionContext === 'function') {
+      try {
+        const runtimeStateInput = lastState && typeof lastState === 'object' ? lastState : null;
+        const runtimeContextInput = {
+          origin: window.location.origin,
+          teamCode: String(lastState?.teamCode || ''),
+          houseId: String(lastState?.houseId || ''),
+        };
+        const snapshot = await withAgentTrafficMuted(async () => {
+          return await gatewayApi.runtimeSessionContext({
+            runtimeContext: runtimeContextInput,
+            runtimeState: runtimeStateInput,
+          });
+        });
+        workerSessionContext = snapshot?.data || snapshot || null;
+      } catch (err) {
+        workerSessionContextError = String(err?.message || err || 'RUNTIME_SESSION_CONTEXT_FAILED');
+      }
+    } else {
+      workerSessionContextError = 'RUNTIME_SESSION_CONTEXT_UNAVAILABLE';
+    }
+
     let transcript = null;
     if (shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function') {
       const dumpRaw = await withAgentTrafficMuted(async () => {
@@ -3740,39 +4037,28 @@ function updateUI(state) {
       promptContextFiles: contextPaths,
       promptSkillsCount: availableSkills.length,
       transcriptItems: Array.isArray(transcript) ? transcript.length : null,
+      workerSessionContext: {
+        sessionId: String(workerSessionContext?.sessionId || ''),
+        generatedAtMs: Number.isFinite(Number(workerSessionContext?.generatedAtMs))
+          ? Number(workerSessionContext.generatedAtMs)
+          : null,
+        lastLlmSource: String(workerSessionContext?.lastLlmInput?.source || ''),
+        promptTextChars: Number.isFinite(Number(workerSessionContext?.lastLlmInput?.promptTextChars))
+          ? Number(workerSessionContext.lastLlmInput.promptTextChars)
+          : 0,
+      },
+      workerSessionContextError: workerSessionContextError || null,
     };
-    
-  const matched = !!state.match?.matched;
-  const matchState = el('matchState');
-  if (matchState) {
-    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
-    matchState.className = `state ${matched ? 'good' : 'bad'}`;
-  }
-
-  safeSetText('matchDetail', matched
-    ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
-    : 'Pick the same sigil to unlock.'
-  );
-
-  const openBtn = el('openBtn');
-  if (openBtn) openBtn.disabled = !matched;
-
-  const complete = !!state.signup?.complete && signupMode === 'agent';
-  const openReady = el('openReady');
-  if (openReady) openReady.style.display = complete ? 'inline-flex' : 'none';
-
-  const waiting = !!state.human?.openPressed && !complete;
-  const waitingNode = el('openWaiting');
-  if (waitingNode) waitingNode.style.display = waiting ? 'inline-flex' : 'none';
-
-  // Sigils
-  renderSigils(state);
 
     const sessionLines = [
       JSON.stringify(sessionHeader, null, 2),
       '',
       'Recent worker events:',
       ...agentDebugEventsTail(25),
+      '',
+      'Worker session context (authoritative for LLM input):',
+      workerSessionContext ? JSON.stringify(workerSessionContext, null, 2) : '(unavailable)',
+      workerSessionContextError ? `\nWorker session context warning: ${workerSessionContextError}` : '',
       '',
       'Transcript dump:',
       Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
@@ -3790,6 +4076,163 @@ function updateUI(state) {
       refreshAgentDebugPanels('queued').catch(() => { });
     }
   }
+}
+
+function syncTownhallGate(state) {
+  if (!isTownHub) return;
+  const gateReason = getTownHubDistrictGateReason(state);
+  const gateLocked = !!gateReason;
+  const onboardingLocked = gateReason === 'onboarding';
+  applyDistrictHotspotLocks(state);
+
+  const closeBtn = el('districtModalClose');
+  if (closeBtn) {
+    closeBtn.classList.toggle('is-hidden', onboardingLocked);
+    closeBtn.disabled = onboardingLocked;
+  }
+
+  if (!gateLocked) return;
+
+  const statusText = getTownHubDistrictGateStatusText();
+  const status = el('townSceneStatus');
+  if (status && statusText) status.textContent = statusText;
+
+  const backdrop = el('districtModalBackdrop');
+  const modalHidden = !backdrop || backdrop.classList.contains('is-hidden');
+  if (onboardingLocked && (currentDistrict !== 'townhall' || modalHidden)) {
+    showDistrict('townhall');
+  } else if (gateReason === 'brain' && (currentDistrict !== 'brain' || modalHidden)) {
+    showDistrict('brain');
+  } else if (gateReason === 'sigil' && (currentDistrict !== 'sigil' || modalHidden)) {
+    showDistrict('sigil');
+  }
+}
+
+function toggleAgentOnly(showAgentOnly) {
+  const agentMode = !!showAgentOnly;
+  const nodes = Array.from(document.querySelectorAll('.agent-only'));
+  for (const node of nodes) {
+    node.classList.toggle('is-hidden', !agentMode);
+  }
+}
+
+function setReconnectMode({ houseReady = false, role = 'human' } = {}) {
+  const hasHouse = !!houseReady;
+  const roleMode = String(role || '').trim().toLowerCase();
+  const isAgentMode = roleMode === 'agent' || roleMode === 'coop';
+  const showCoopPanels = !hasHouse;
+
+  const reconnectPanel = el('reconnectPanel');
+  const step1Panel = el('step1Panel');
+  const step2Panel = el('step2Panel');
+  const stepDivider = el('stepDivider');
+
+  if (reconnectPanel) reconnectPanel.classList.toggle('is-hidden', !hasHouse);
+  if (step1Panel) step1Panel.classList.toggle('is-hidden', !showCoopPanels);
+  if (step2Panel) step2Panel.classList.toggle('is-hidden', !showCoopPanels);
+  if (stepDivider) stepDivider.classList.toggle('is-hidden', !showCoopPanels);
+  toggleAgentOnly(isAgentMode);
+}
+
+async function updateUI(state) {
+  lastState = state;
+
+  const houseId = state.houseId || walletHouseId || null;
+  const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
+
+  // Counts (optional on index)
+  safeSetText('signupCount', String(state.stats?.signups ?? '—'));
+
+  // Team code (fallback for older servers that still send pairCode)
+  const teamCode = state.teamCode || state.pairCode || '…';
+  safeSetText('teamCode', teamCode);
+  const teamCodeRow = el('agentTeamCodeRow');
+  const teamCodeText = el('agentTeamCodeText');
+  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
+  const normalizedTeamCode = readCurrentTeamCodeFromState();
+  if (teamCodeText) {
+    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
+  }
+  if (teamCodeRow) {
+    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
+  }
+  if (teamCodeSendBtn) {
+    teamCodeSendBtn.disabled = !normalizedTeamCode;
+  }
+
+  const origin = window.location.origin;
+  safeSetText(
+    'teamSnippet',
+    `Worker session code: ${teamCode}`
+  );
+
+  const houseNavLink = el('houseNavLink');
+  if (houseNavLink) {
+    if (houseId) {
+      houseNavLink.classList.remove('is-hidden');
+      houseNavLink.href = `/house?house=${encodeURIComponent(houseId)}`;
+    } else {
+      houseNavLink.classList.add('is-hidden');
+      houseNavLink.href = '/house';
+    }
+  }
+  updateTownHubLinks(houseId);
+  syncTownhallRegistrationUI(state);
+  syncTownhallGate(state);
+
+  updatePathButtons();
+
+  // Agent status
+  const connected = !!state.agent?.connected;
+  updateAgentStatus('agentDot', 'agentStatusText', connected, state.agent?.name || null);
+  updateAgentStatus('agentDotHouse', 'agentStatusTextHouse', connected, state.agent?.name || null);
+
+  setReconnectMode({ houseReady: !!houseId, role: 'coop' });
+  toggleAgentOnly(true);
+  updateLiteAgentStatus(state);
+  initStep2Listener();
+  initAdvancedLlmUi();
+  initAgentLlmUi();
+  syncAgentLlmUiFromPrimary();
+
+  if (houseId) {
+    if (walletRecovered) {
+      safeSetText('reconnectTitle', 'Welcome back');
+      safeSetText('reconnectIntro', 'We found a house for this wallet. Continue with your worker in this session.');
+    } else {
+      safeSetText('reconnectTitle', 'Reconnect to House');
+      safeSetText('reconnectIntro', 'Your house is ready. Continue in this town session.');
+    }
+    safeSetText('houseSnippet', `Reconnect worker session ${teamCode} to your house.`);
+    const openHouseLink = el('openHouseLink');
+    if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
+  }
+  const matched = !!state.match?.matched;
+  const matchState = el('matchState');
+  if (matchState) {
+    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.className = `state ${matched ? 'good' : 'bad'}`;
+  }
+
+  safeSetText('matchDetail', matched
+    ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
+    : 'Pick the same sigil to unlock.'
+  );
+
+  const openBtn = el('openBtn');
+  if (openBtn) openBtn.disabled = !matched || (!!state.signup?.complete && signupMode === 'agent');
+
+  const complete = !!state.signup?.complete && signupMode === 'agent';
+  const openReady = el('openReady');
+  if (openReady) openReady.style.display = complete ? 'inline-flex' : 'none';
+
+  const waiting = !!state.human?.openPressed && !complete;
+  const waitingNode = el('openWaiting');
+  if (waitingNode) waitingNode.style.display = waiting ? 'inline-flex' : 'none';
+
+  // Sigils
+  renderSigils(state);
+  scheduleAgentDebugRefresh('state');
 }
 
 function scheduleAgentDebugRefresh(reason = 'event') {
@@ -4979,53 +5422,7 @@ function applyVisibility(state) {
 
   // Keep the Agent panel available on every page/state.
   if (sidebar) sidebar.classList.remove('is-hidden');
-}
-
-async function connectWallet() {
-  if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.connect !== 'function') throw new Error('NO_SOLANA_WALLET');
-  if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-
-  let resp = null;
-  if (window.solana.isConnected && window.solana.publicKey) {
-    wallet = window.solana;
-  } else {
-    resp = await window.solana.connect();
-    wallet = window.solana;
-  }
-  const pk = resp?.publicKey || wallet?.publicKey;
-  walletAddr = pk && typeof pk.toString === 'function' ? pk.toString() : null;
-  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
-  return walletAddr;
-}
-
-async function signWalletMessage(message) {
-  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  const sigBytes = resp?.signature || resp;
-  const sigArr = normalizeSignatureBytes(sigBytes);
-  if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-  return b64(sigArr);
-}
-
-async function lookupWalletHouse() {
-  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
-  const nonceResp = await api('/api/wallet/nonce');
-  const msg = buildWalletLookupMessage({
-    address: walletAddr,
-    nonce: nonceResp.nonce,
-    houseId: null
-  });
-  const signature = await signWalletMessage(msg);
-  return api('/api/wallet/lookup', {
-    method: 'POST',
-    body: JSON.stringify({
-      address: walletAddr,
-      nonce: nonceResp.nonce,
-      signature
-    })
-  });
+  syncAgentPanelLayout(sidebar);
 }
 
 async function checkWalletStep() {
@@ -5162,7 +5559,13 @@ async function bootstrapVendorRuntime() {
       });
       if (!manifestResp.ok) throw new Error(`MANIFEST_HTTP_${manifestResp.status}`);
       const manifest = await manifestResp.json().catch(() => ({}));
-      const runtimeWorkerPath = String(manifest?.entrypoints?.runtimeWorker || '/openclaw-lite/runtime-worker.js');
+      const runtimeWorkerRaw = manifest?.entrypoints?.runtimeWorker;
+      const runtimeWorkerPath =
+        typeof runtimeWorkerRaw === 'string' &&
+          runtimeWorkerRaw.startsWith('/openclaw-lite/') &&
+          !runtimeWorkerRaw.startsWith('node:')
+          ? runtimeWorkerRaw
+          : '/openclaw-lite/runtime-worker.js';
       fetch(runtimeWorkerPath, {
         credentials: 'include',
         cache: 'no-store'
@@ -5786,7 +6189,7 @@ async function clearLiteLlmConfig() {
   }
 }
 
-function renderSigils(state) {
+function renderSigilsLegacy(state) {
   const grid = el('sigilGrid');
   if (!grid) return;
   grid.innerHTML = '';
@@ -5979,6 +6382,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dock && header && btn) {
     dock.classList.toggle('minimized', loadAgentPanelMinimized());
     btn.textContent = dock.classList.contains('minimized') ? '□' : '_';
+    bindAgentPanelLayout(dock);
 
     header.addEventListener('click', () => {
       // Toggle minimize
@@ -5986,11 +6390,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const isMin = dock.classList.contains('minimized');
       saveAgentPanelMinimized(isMin);
       btn.textContent = isMin ? '□' : '_';
+      syncAgentPanelLayout(dock);
     });
   }
 });
 
-function updateUI(state) {
+function updateUILegacy(state) {
   lastState = state;
   elements = Array.isArray(state?.elements) ? state.elements : elements;
   if (!isVendorLite(state)) {
@@ -6059,11 +6464,11 @@ function updateUI(state) {
   }
   const liteActive = isLiteAgentActive(state);
 
-    if (step1) {
-      if (agentConnected || walletAddr || localLlm.configured) {
-        step1.classList.add('done');
-      } else {
-        step1.classList.remove('done');
+  if (step1) {
+    if (agentConnected || walletAddr || localLlm.configured) {
+      step1.classList.add('done');
+    } else {
+      step1.classList.remove('done');
     }
   }
 
@@ -6441,7 +6846,98 @@ async function poll() {
   }
 }
 
+async function bootstrapInitialRouteState() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (ref) {
+    try {
+      await api('/api/referral', { method: 'POST', body: JSON.stringify({ shareId: ref }) });
+    } catch {
+      // ignore invalid referral
+    }
+    params.delete('ref');
+    const qs = params.toString();
+    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
+    window.history.replaceState({}, '', nextUrl);
+  }
+
+  const tokenErr = loadTokenError();
+  const districtParam = params.get('district');
+  const pathDistrict = popupDistrictByPath[window.location.pathname] || null;
+  const explicitDistrict = explicitDistrictFromInput(districtParam) || explicitDistrictFromInput(pathDistrict);
+  pathMode = loadPathMode();
+  const initialDistrict = explicitDistrict;
+  activeDistrict = initialDistrict;
+  updatePathButtons();
+  setActiveDistrict(initialDistrict);
+
+  if (isTownHub) {
+    bindDistrictMapInteractions();
+
+    const closeBtn = el('districtModalClose');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => hideDistrict());
+    }
+
+    const backdrop = el('districtModalBackdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', (ev) => {
+        if (ev.target === backdrop) hideDistrict();
+      });
+    }
+
+    const modalBody = el('districtModalBody');
+    if (modalBody) {
+      modalBody.addEventListener('click', onDistrictModalLinkClick);
+    }
+  }
+
+  const canRun = await ensurePrivyAuthenticatedForHub();
+  if (!canRun) {
+    if (window.location.pathname === '/app') {
+      window.location.replace('/start');
+    }
+    return;
+  }
+
+  await restoreWalletConnection();
+
+  try {
+    const session = await api('/api/session');
+    elements = Array.isArray(session?.elements) ? session.elements : [];
+    updateUI({
+      teamCode: session.teamCode,
+      elements,
+      agent: { connected: false },
+      human: {},
+      match: { matched: false },
+      signup: { complete: false, mode: null },
+      share: { id: null },
+      onboarding: session.onboarding || {
+        required: false,
+        registrationComplete: true,
+        step: ONBOARDING_STEP_DONE
+      },
+      stats: session.stats
+    });
+  } catch {
+    // continue with the full /api/state load below
+  }
+
+  if (isTownHub && initialDistrict) {
+    await showDistrict(activeDistrict);
+  }
+
+  if (tokenErr) {
+    setTokenError(tokenErr);
+  }
+
+  updateWalletUI();
+}
+
 async function init() {
+  await bootstrapInitialRouteState();
+
   const enterBtn = el('enterBtn');
   const connectWalletHeroBtn = el('connectWalletHeroBtn');
   const authSigninBtn = el('authSigninBtn');
@@ -6565,84 +7061,6 @@ async function init() {
   // Do not auto-load server-side Codex profile credentials. Users configure LLM credentials themselves.
 
   setupAgentInterface();
-=======
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  const ref = params.get('ref');
-  if (ref) {
-    try {
-      await api('/api/referral', { method: 'POST', body: JSON.stringify({ shareId: ref }) });
-    } catch {
-      // ignore invalid referral
-    }
-    params.delete('ref');
-    const qs = params.toString();
-    const nextUrl = `${window.location.pathname}${qs ? `?${qs}` : ''}`;
-    window.history.replaceState({}, '', nextUrl);
-  }
-
-  const tokenErr = loadTokenError();
-  const modeParam = params.get('mode');
-  const districtParam = params.get('district');
-  pathMode = (modeParam === 'human' || modeParam === 'coop' || modeParam === 'agent')
-    ? modeParam
-    : loadPathMode();
-  const initialDistrict = normalizeDistrict(districtParam || 'house');
-  activeDistrict = initialDistrict;
-  updatePathButtons();
-  setActiveDistrict(initialDistrict);
-
-  if (isTownHub) {
-    bindDistrictMapInteractions();
-
-    const closeBtn = el('districtModalClose');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => hideDistrict());
-    }
-
-    const backdrop = el('districtModalBackdrop');
-    if (backdrop) {
-      backdrop.addEventListener('click', (ev) => {
-        if (ev.target === backdrop) hideDistrict();
-      });
-    }
-
-    const modalBody = el('districtModalBody');
-    if (modalBody) {
-      modalBody.addEventListener('click', onDistrictModalLinkClick);
-    }
-  }
-
-  const canRun = await ensurePrivyAuthenticatedForHub();
-  if (!canRun) return;
-
-  const session = await api('/api/session');
-  elements = session.elements || [];
-  // Update UI quickly using /api/state next.
-  updateUI({
-    teamCode: session.teamCode,
-    elements,
-    agent: { connected: false },
-    human: {},
-    match: { matched: false },
-    signup: { complete: false, mode: null },
-    share: { id: null },
-    onboarding: session.onboarding || { required: false, registrationComplete: true },
-    stats: session.stats
-  });
-
-  if (isTownHub) {
-    await showDistrict(activeDistrict);
-  }
-
-  if (tokenErr) {
-    setPathMode('human', { persist: true, refresh: true });
-    setTokenError(tokenErr);
-    setTokenStatus({ active: true, good: false, text: 'Verify wallet to continue' });
-  }
-
-  updateWalletUI();
-  restoreWalletConnection();
   poll();
 }
 

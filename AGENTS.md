@@ -8,6 +8,7 @@ This repo is a **minimal** Agent Town landing page.
 2. **Human + agent co-op** — the unlock flow requires both participants.
 3. **Session-token identity** — do not add external identity providers.
 4. **Deterministic testability** — every milestone must be verifiable with Playwright.
+5. **Wallet-first identity** — each user is represented by their connected wallet; wallet continuity drives session continuity.
 
 ## Non-goals / constraints
 
@@ -110,6 +111,7 @@ When changing worker behavior required by skill files (`skill.md` / `SKILL.md`):
 
 ### 6) Session and identity guardrails
 
+- The user identity is the connected wallet (or wallets), not a transient browser credential.
 - Team Code is a session token/routing token and should stay hidden from cluttered UX surfaces.
 - Team/session identity should be stable across polling/refresh for a live session; avoid regressions that rotate it unexpectedly.
 

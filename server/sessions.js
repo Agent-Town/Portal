@@ -4,6 +4,7 @@ const { createTeamCode, nowIso, randomHex } = require('./util');
 const sessionsById = new Map();
 const sessionIdByTeamCode = new Map();
 const sessionIdByHouseId = new Map();
+const sessionIdByWalletAddress = new Map();
 
 const ELEMENTS = [
   { id: 'key', label: 'Key', icon: '🔑' },
@@ -15,6 +16,30 @@ const ELEMENTS = [
 ];
 
 const CANVAS = { w: 16, h: 16 };
+
+function makeWalletSessionKey(chain, address) {
+  const rawChain = typeof chain === 'string' ? chain.trim().toLowerCase() : '';
+  const normalizedChain = rawChain === 'evm' || rawChain === 'solana' ? rawChain : '';
+  const rawAddress = typeof address === 'string' ? address.trim() : '';
+  if (!normalizedChain || !rawAddress) return null;
+  return `${normalizedChain}:${rawAddress}`;
+}
+
+function bindSessionWallet(session, chain, address) {
+  if (!session || typeof session !== 'object' || !session.sessionId) return;
+  if (typeof address !== 'string' || !address.trim()) return;
+  const key = makeWalletSessionKey(chain, address);
+  if (!key) return;
+  sessionIdByWalletAddress.set(key, session.sessionId);
+}
+
+function getSessionByWallet(chain, address) {
+  const key = makeWalletSessionKey(chain, address);
+  if (!key) return null;
+  const sessionId = sessionIdByWalletAddress.get(key);
+  if (!sessionId) return null;
+  return getSessionById(sessionId);
+}
 
 function emptyCanvas() {
   return Array(CANVAS.w * CANVAS.h).fill(0);
@@ -102,6 +127,7 @@ function createSession({ flow } = {}) {
     onboarding: {
       required: false,
       registrationComplete: false,
+      step: 'townhall_profile',
       registeredAt: null,
       profile: {
         humanName: null,
@@ -205,6 +231,7 @@ function resetAllSessions() {
   sessionsById.clear();
   sessionIdByTeamCode.clear();
   sessionIdByHouseId.clear();
+  sessionIdByWalletAddress.clear();
 }
 
 module.exports = {
@@ -212,6 +239,8 @@ module.exports = {
   getSessionById,
   getSessionByTeamCode,
   getSessionByHouseId,
+  bindSessionWallet,
+  getSessionByWallet,
   indexHouseId,
   listElements,
   evaluateMatch,

@@ -242,5 +242,5 @@ test('town hall registration rebinds wallet provider after proxy reset', async (
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
 });

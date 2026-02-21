@@ -258,7 +258,6 @@ test('town hall registration resolves sponsored Sepolia transaction ids to hashe
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
   expect(txPolls['tx-user-1']).toBeGreaterThanOrEqual(2);
 });
-

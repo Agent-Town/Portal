@@ -49,33 +49,6 @@ async function api(url, { method = 'GET', body } = {}) {
   return data;
 }
 
-function chooseAgentPaint({ pixels, width, height, humanX, humanY, humanColor, paletteLength }) {
-  const total = width * height;
-  if (!Array.isArray(pixels) || pixels.length !== total) return null;
-  if (!Number.isInteger(humanX) || !Number.isInteger(humanY)) return null;
-  const start = ((humanY * width + humanX) % total + total) % total;
-
-  let target = -1;
-  for (let step = 1; step < total; step += 1) {
-    const idx = (start + step) % total;
-    if (pixels[idx] === 0) {
-      target = idx;
-      break;
-    }
-  }
-  if (target < 0) return null;
-
-  const maxColor = Math.max(1, Number(paletteLength || 0) - 1);
-  const baseColor = Number.isInteger(humanColor) && humanColor > 0 ? humanColor : 1;
-  const nextColor = maxColor > 0 ? (baseColor % maxColor) + 1 : 1;
-
-  return {
-    x: target % width,
-    y: Math.floor(target / width),
-    color: nextColor
-  };
-}
-
 function makeCeremonyRevealKeyInfo({ direction = '', teamCode = '' }) {
   return `elizatown-ceremony-reveal-v1|dir=${direction}|team=${teamCode || ''}`;
 }
@@ -170,37 +143,6 @@ async function handleCommand(command, payload) {
         method: 'POST',
         body: { teamCode }
       });
-    }
-    case 'canvasContribute': {
-      const teamCode = normalizeTeamCode(payload?.teamCode);
-      const state = await api('/api/canvas/state');
-      const width = Number(state?.canvas?.w || 0);
-      const height = Number(state?.canvas?.h || 0);
-      if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) {
-        throw new Error('INVALID_CANVAS_STATE');
-      }
-      const paint = chooseAgentPaint({
-        pixels: state.canvas.pixels || [],
-        width,
-        height,
-        humanX: Number(payload?.humanX),
-        humanY: Number(payload?.humanY),
-        humanColor: Number(payload?.humanColor),
-        paletteLength: Array.isArray(state?.palette) ? state.palette.length : 0
-      });
-      if (!paint) {
-        return { paint: null };
-      }
-      await api('/api/agent/canvas/paint', {
-        method: 'POST',
-        body: {
-          teamCode,
-          x: paint.x,
-          y: paint.y,
-          color: paint.color
-        }
-      });
-      return { paint };
     }
     case 'ceremonyCommit': {
       const teamCode = normalizeTeamCode(payload?.teamCode);

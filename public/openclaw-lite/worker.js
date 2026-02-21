@@ -33,7 +33,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 var define_PI_VERSIONS_default;
 var init_define_PI_VERSIONS = __esm({
   "<define:__PI_VERSIONS__>"() {
-    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.52.10", "@mariozechner/pi-ai": "0.52.10", "@mariozechner/pi-coding-agent": "0.52.10", "@mariozechner/pi-tui": "0.52.10" };
+    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.53.0", "@mariozechner/pi-ai": "0.53.0", "@mariozechner/pi-coding-agent": "0.53.0", "@mariozechner/pi-tui": "0.53.0" };
   }
 });
 
@@ -46383,6 +46383,9 @@ function zipSync(data, opts) {
 
 // vendor/openclaw-main/src/agents/session-transcript-repair.ts
 init_define_PI_VERSIONS();
+
+// vendor/openclaw-main/src/agents/tool-call-id.ts
+init_define_PI_VERSIONS();
 var TOOL_CALL_TYPES = /* @__PURE__ */ new Set(["toolCall", "toolUse", "functionCall"]);
 function extractToolCallsFromAssistant(msg) {
   const content = msg.content;
@@ -46398,7 +46401,7 @@ function extractToolCallsFromAssistant(msg) {
     if (typeof rec.id !== "string" || !rec.id) {
       continue;
     }
-    if (rec.type === "toolCall" || rec.type === "toolUse" || rec.type === "functionCall") {
+    if (typeof rec.type === "string" && TOOL_CALL_TYPES.has(rec.type)) {
       toolCalls.push({
         id: rec.id,
         name: typeof rec.name === "string" ? rec.name : void 0
@@ -46406,18 +46409,6 @@ function extractToolCallsFromAssistant(msg) {
     }
   }
   return toolCalls;
-}
-function isToolCallBlock(block) {
-  if (!block || typeof block !== "object") {
-    return false;
-  }
-  const type = block.type;
-  return typeof type === "string" && TOOL_CALL_TYPES.has(type);
-}
-function hasToolCallInput(block) {
-  const hasInput = "input" in block ? block.input !== void 0 && block.input !== null : false;
-  const hasArguments = "arguments" in block ? block.arguments !== void 0 && block.arguments !== null : false;
-  return hasInput || hasArguments;
 }
 function extractToolResultId(msg) {
   const toolCallId = msg.toolCallId;
@@ -46429,6 +46420,29 @@ function extractToolResultId(msg) {
     return toolUseId;
   }
   return null;
+}
+
+// vendor/openclaw-main/src/agents/session-transcript-repair.ts
+function isToolCallBlock(block) {
+  if (!block || typeof block !== "object") {
+    return false;
+  }
+  const type = block.type;
+  return typeof type === "string" && (type === "toolCall" || type === "toolUse" || type === "functionCall");
+}
+function hasToolCallInput(block) {
+  const hasInput = "input" in block ? block.input !== void 0 && block.input !== null : false;
+  const hasArguments = "arguments" in block ? block.arguments !== void 0 && block.arguments !== null : false;
+  return hasInput || hasArguments;
+}
+function hasNonEmptyStringField(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+function hasToolCallId(block) {
+  return hasNonEmptyStringField(block.id);
+}
+function hasToolCallName(block) {
+  return hasNonEmptyStringField(block.name);
 }
 function makeMissingToolResult(params) {
   return {
@@ -46462,7 +46476,7 @@ function repairToolCallInputs(messages) {
     const nextContent = [];
     let droppedInMessage = 0;
     for (const block of msg.content) {
-      if (isToolCallBlock(block) && !hasToolCallInput(block)) {
+      if (isToolCallBlock(block) && (!hasToolCallInput(block) || !hasToolCallId(block) || !hasToolCallName(block))) {
         droppedToolCalls += 1;
         droppedInMessage += 1;
         changed = true;
@@ -46842,7 +46856,7 @@ async function vfsReadAllBytes(prefix = "") {
 }
 
 // src/openclaw-lite/worker.js
-var OPENCLAW_VERSION = "2026.2.12";
+var OPENCLAW_VERSION = "2026.2.18";
 var PI_VERSIONS = define_PI_VERSIONS_default;
 var MAIN_AGENT_ID = "main";
 var MAIN_SESSION_KEY = "agent:main:main";
@@ -49521,6 +49535,83 @@ function buildAgentTownCoopChatGuidancePrompt(appState) {
     "- If user asks status (e.g. chosen sigil / next step), answer from runtime state first, then do the next safe co-op action."
   ].join("\n");
 }
+function summarizeRuntimeAppStateForDebug(appState) {
+  const stateObj = appState && typeof appState === "object" ? appState : null;
+  if (!stateObj) return null;
+  const teamCode = typeof stateObj?.teamCode === "string" && stateObj.teamCode.trim() ? stateObj.teamCode.trim() : null;
+  const houseId = typeof stateObj?.houseId === "string" && stateObj.houseId.trim() ? stateObj.houseId.trim() : null;
+  const experienceId = typeof stateObj?.experience?.id === "string" && stateObj.experience.id.trim() ? stateObj.experience.id.trim() : null;
+  const experienceStep = typeof stateObj?.experience?.step === "string" && stateObj.experience.step.trim() ? stateObj.experience.step.trim() : null;
+  const nextAgentAction = typeof stateObj?.experience?.nextAgentAction === "string" && stateObj.experience.nextAgentAction.trim() ? stateObj.experience.nextAgentAction.trim() : null;
+  const humanSelected = typeof stateObj?.human?.selected === "string" && stateObj.human.selected.trim() ? stateObj.human.selected.trim() : null;
+  const agentSelected = typeof stateObj?.agent?.selected === "string" && stateObj.agent.selected.trim() ? stateObj.agent.selected.trim() : null;
+  const matchMatched = typeof stateObj?.match?.matched === "boolean" ? stateObj.match.matched : null;
+  const humanOpenPressed = !!stateObj?.human?.openPressed;
+  const agentOpenPressed = !!stateObj?.agent?.openPressed;
+  return {
+    teamCode,
+    houseId,
+    experience: {
+      id: experienceId,
+      step: experienceStep,
+      nextAgentAction
+    },
+    human: {
+      selected: humanSelected,
+      openPressed: humanOpenPressed
+    },
+    agent: {
+      selected: agentSelected,
+      openPressed: agentOpenPressed
+    },
+    match: {
+      matched: matchMatched
+    }
+  };
+}
+function buildRuntimeContextSections(runtimeSnapshot) {
+  const runtimeContext = runtimeSnapshot?.context || null;
+  const runtimeAppState = runtimeSnapshot?.appState || null;
+  const runtimeContextPrompt = buildRuntimeSessionContextPrompt(runtimeContext);
+  const runtimeExperiencePrompt = buildRuntimeExperienceStatePrompt(runtimeAppState);
+  const activeSkillPrompt = buildActiveSkillGuidancePrompt();
+  const coopChatPrompt = buildAgentTownCoopChatGuidancePrompt(runtimeAppState);
+  const contextSections = [runtimeContextPrompt, runtimeExperiencePrompt, activeSkillPrompt, coopChatPrompt].filter(Boolean);
+  return {
+    runtimeContext,
+    runtimeAppState,
+    runtimeAppStateSummary: summarizeRuntimeAppStateForDebug(runtimeAppState),
+    runtimeContextPrompt,
+    runtimeExperiencePrompt,
+    activeSkillPrompt,
+    coopChatPrompt,
+    contextSections,
+    combinedContext: contextSections.join("\n\n")
+  };
+}
+function recordLastLlmInputDebug(payload = {}) {
+  const promptText = typeof payload.promptText === "string" ? payload.promptText : "";
+  const extraContext = typeof payload.extraContext === "string" ? payload.extraContext : "";
+  const source = typeof payload.source === "string" && payload.source.trim() ? payload.source.trim() : "unknown";
+  state.lastLlmInput = {
+    source,
+    atMs: nowMs(),
+    sessionId: state.sessionId || null,
+    userText: typeof payload.userText === "string" ? payload.userText : "",
+    displayUserText: typeof payload.displayUserText === "string" ? payload.displayUserText : "",
+    promptText,
+    promptTextChars: promptText.length,
+    extraContext,
+    extraContextChars: extraContext.length,
+    extraContextSections: Array.isArray(payload.extraContextSections) ? payload.extraContextSections : [],
+    runtimeContext: payload.runtimeContext || null,
+    runtimeAppState: payload.runtimeAppState || null,
+    runtimeContextPrompt: typeof payload.runtimeContextPrompt === "string" && payload.runtimeContextPrompt ? payload.runtimeContextPrompt : null,
+    runtimeExperiencePrompt: typeof payload.runtimeExperiencePrompt === "string" && payload.runtimeExperiencePrompt ? payload.runtimeExperiencePrompt : null,
+    activeSkillPrompt: typeof payload.activeSkillPrompt === "string" && payload.activeSkillPrompt ? payload.activeSkillPrompt : null,
+    coopChatPrompt: typeof payload.coopChatPrompt === "string" && payload.coopChatPrompt ? payload.coopChatPrompt : null
+  };
+}
 function normalizeRuntimeContextInput(input, fallbackState = null) {
   const contextObj = input && typeof input === "object" && !Array.isArray(input) ? input : null;
   const stateObj = fallbackState && typeof fallbackState === "object" && !Array.isArray(fallbackState) ? fallbackState : null;
@@ -50709,26 +50800,36 @@ async function runExperienceEngineBaseline(params, toolName = "experience_engine
     runtimeContext: params?.runtimeContext || null,
     runtimeState: params?.runtimeState || null
   });
-  const runtimeContext = runtimeSnapshot?.context || null;
-  const runtimeAppState = runtimeSnapshot?.appState || null;
+  const runtimeSections = buildRuntimeContextSections(runtimeSnapshot);
+  const runtimeContext = runtimeSections.runtimeContext;
+  const runtimeAppState = runtimeSections.runtimeAppState;
   const hintedTeamCode = normalizeTeamCodeHint(runtimeContext?.teamCode || runtimeAppState?.teamCode);
   if (hintedTeamCode && hintedTeamCode !== state.teamCodeHint) {
     state.teamCodeHint = hintedTeamCode;
     metaSet("teamCodeHint", hintedTeamCode).catch(() => {
     });
   }
-  const runtimeContextPrompt = buildRuntimeSessionContextPrompt(runtimeContext);
-  const runtimeExperiencePrompt = buildRuntimeExperienceStatePrompt(runtimeAppState);
-  const activeSkillPrompt = buildActiveSkillGuidancePrompt();
-  const coopGuidancePrompt = buildAgentTownCoopChatGuidancePrompt(runtimeAppState);
-  const contextSections = [runtimeContextPrompt, runtimeExperiencePrompt, activeSkillPrompt, coopGuidancePrompt].filter(Boolean);
-  if (contextSections.length > 0) {
+  if (runtimeSections.contextSections.length > 0) {
     instructionForModel = `${instruction}
 
-${contextSections.join("\n\n")}`;
+${runtimeSections.combinedContext}`;
   }
   const recordToTranscript = params?.recordToTranscript !== false;
   const emitChat = params?.emitChat === true ? true : params?.emitChat === false ? false : recordToTranscript;
+  recordLastLlmInputDebug({
+    source: "gateway.command.experience.run",
+    userText: instruction,
+    displayUserText: instruction,
+    promptText: instructionForModel,
+    extraContext: runtimeSections.combinedContext,
+    extraContextSections: runtimeSections.contextSections,
+    runtimeContext: runtimeSections.runtimeContext,
+    runtimeAppState: runtimeSections.runtimeAppStateSummary,
+    runtimeContextPrompt: runtimeSections.runtimeContextPrompt,
+    runtimeExperiencePrompt: runtimeSections.runtimeExperiencePrompt,
+    activeSkillPrompt: runtimeSections.activeSkillPrompt,
+    coopChatPrompt: runtimeSections.coopChatPrompt
+  });
   const transcriptStart = state.transcript.length;
   const turn = await runAgentTurn(instructionForModel, {
     persistToTranscript: recordToTranscript,
@@ -51132,6 +51233,7 @@ var state = {
   llmReasoning: null,
   llmUseProxy: true,
   llmApiKey: null,
+  lastLlmInput: null,
   secretStore: {},
   agentTownCeremonyByTeam: {},
   originGrants: [],
@@ -51298,23 +51400,37 @@ ${failedLines.join("\n")}`);
         runtimeContext: msg?.runtimeContext || null,
         runtimeState: msg?.runtimeState || null
       });
+      const runtimeSections = buildRuntimeContextSections(runtimeSnapshot);
       const hintedTeamCode = normalizeTeamCodeHint(runtimeSnapshot?.context?.teamCode || runtimeSnapshot?.appState?.teamCode);
       if (hintedTeamCode && hintedTeamCode !== state.teamCodeHint) {
         state.teamCodeHint = hintedTeamCode;
         metaSet("teamCodeHint", hintedTeamCode).catch(() => {
         });
       }
-      const runtimeContextPrompt = buildRuntimeSessionContextPrompt(runtimeSnapshot.context);
-      if (runtimeContextPrompt) extraSections.push(runtimeContextPrompt);
-      const runtimeExperiencePrompt = buildRuntimeExperienceStatePrompt(runtimeSnapshot.appState);
-      if (runtimeExperiencePrompt) extraSections.push(runtimeExperiencePrompt);
-      const activeSkillPrompt = buildActiveSkillGuidancePrompt();
-      if (activeSkillPrompt) extraSections.push(activeSkillPrompt);
-      const coopChatPrompt = buildAgentTownCoopChatGuidancePrompt(runtimeSnapshot.appState);
-      if (coopChatPrompt) extraSections.push(coopChatPrompt);
+      if (runtimeSections.contextSections.length > 0) {
+        extraSections.push(...runtimeSections.contextSections);
+      }
+      const extraContext = extraSections.join("\n\n");
+      const promptText = extraContext ? `${text}
+
+${extraContext}` : text;
+      recordLastLlmInputDebug({
+        source: "gateway.chat.send",
+        userText: text,
+        displayUserText: text,
+        promptText,
+        extraContext,
+        extraContextSections: extraSections,
+        runtimeContext: runtimeSections.runtimeContext,
+        runtimeAppState: runtimeSections.runtimeAppStateSummary,
+        runtimeContextPrompt: runtimeSections.runtimeContextPrompt,
+        runtimeExperiencePrompt: runtimeSections.runtimeExperiencePrompt,
+        activeSkillPrompt: runtimeSections.activeSkillPrompt,
+        coopChatPrompt: runtimeSections.coopChatPrompt
+      });
       await runAgentTurn(text, {
         displayUserText: text,
-        extraContext: extraSections.join("\n\n")
+        extraContext
       });
       await writeCheckpoint("observation");
       if (text.startsWith("append:")) {
@@ -51719,6 +51835,33 @@ ${failedLines.join("\n")}`);
         requestId: String(msg.requestId || ""),
         ok: true,
         result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.runtime.sessionContext") {
+      const params = msg.params && typeof msg.params === "object" ? msg.params : {};
+      const runtimeSnapshot = await resolveRuntimeSnapshotFromInput({
+        runtimeContext: params.runtimeContext || null,
+        runtimeState: params.runtimeState || null
+      });
+      const runtimeSections = buildRuntimeContextSections(runtimeSnapshot);
+      post({
+        type: "worker.runtime.sessionContext",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess({
+          sessionId: state.sessionId || null,
+          generatedAtMs: nowMs(),
+          runtimeContext: runtimeSections.runtimeContext,
+          runtimeAppState: runtimeSections.runtimeAppStateSummary,
+          runtimeContextPrompt: runtimeSections.runtimeContextPrompt || null,
+          runtimeExperiencePrompt: runtimeSections.runtimeExperiencePrompt || null,
+          activeSkillPrompt: runtimeSections.activeSkillPrompt || null,
+          coopChatPrompt: runtimeSections.coopChatPrompt || null,
+          contextSections: runtimeSections.contextSections,
+          combinedContext: runtimeSections.combinedContext || "",
+          lastLlmInput: state.lastLlmInput || null
+        })
       });
       return;
     }
