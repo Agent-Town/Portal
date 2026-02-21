@@ -12,6 +12,9 @@
     "import:erc8004-preregister:apply": "node scripts/import_erc8004_preregister_houses.js --apply",
     "import:erc8004-preregister:apply:images": "node scripts/import_erc8004_preregister_houses.js --apply --with-images",
     "import:erc8004-preregister:apply:images:cache-only": "node scripts/import_erc8004_preregister_houses.js --apply --with-images --use-image-cache-only",
+    "gen:erc8004-images:nano": "node scripts/generate_nano_banana_images.js",
+    "gen:erc8004-images:nano:api-key": "node scripts/generate_nano_banana_images_api_key.js",
+    "gen:erc8004-images:nano:oauth": "node scripts/generate_nano_banana_images_oauth.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
