@@ -6,6 +6,28 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
+async function openTownhallPanel(page) {
+  const panel = page.locator('#townhallRegisterPanel');
+  const townhallVisible = async () => (
+    await panel.isVisible()
+    || await page.locator('#townhallStepHuman').isVisible()
+    || await page.locator('#townhallStepAgent').isVisible()
+    || await page.locator('#townhallStepProcessing').isVisible()
+  );
+  if (await townhallVisible()) return;
+
+  const backdrop = page.locator('#districtModalBackdrop');
+  if (await backdrop.isVisible()) {
+    const closeBtn = page.locator('#districtModalClose');
+    if (await closeBtn.isVisible()) await closeBtn.click();
+  }
+
+  if (!(await townhallVisible())) {
+    await page.getByRole('button', { name: 'Open Town Hall' }).click();
+  }
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+}
+
 test('town hall registration resolves sponsored Sepolia transaction ids to hashes', async ({ page }) => {
   const evmAddress = '0x000000000000000000000000000000000000dEaD';
   const solAddress = 'So1anaWalletMint11111111111111111111111111111';
@@ -240,7 +262,7 @@ test('town hall registration resolves sponsored Sepolia transaction ids to hashe
   });
 
   await page.goto('/app');
-  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await openTownhallPanel(page);
 
   await page.locator('#townhallHumanName').fill('Robin');
   await page.locator('#townhallHumanCustomizeBtn').click();
@@ -258,6 +280,6 @@ test('town hall registration resolves sponsored Sepolia transaction ids to hashe
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   expect(txPolls['tx-user-1']).toBeGreaterThanOrEqual(2);
 });

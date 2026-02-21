@@ -8,12 +8,31 @@ test.beforeEach(async ({ request }) => {
 
 test('start page opens auth modal immediately while Privy bridge login is still initializing', async ({ page }) => {
   await page.addInitScript(() => {
+    const readLoggedInEmail = () => {
+      try {
+        return localStorage.getItem('mockPrivyLoggedInEmail') || '';
+      } catch {
+        return '';
+      }
+    };
+    const saveLoggedInEmail = (email) => {
+      try {
+        localStorage.setItem('mockPrivyLoggedInEmail', String(email || 'fast@example.com'));
+      } catch {
+        // ignore storage errors in tests
+      }
+    };
     window.__PRIVY_BRIDGE_FACTORY__ = async () => ({
       ensureLoggedIn: async ({ interactive, loginUi } = {}) => {
+        if (!interactive) {
+          const email = readLoggedInEmail();
+          return email ? { id: 'mock-user', email } : null;
+        }
         if (!interactive || !loginUi) return null;
         await new Promise((resolve) => setTimeout(resolve, 1200));
         const email = await loginUi.requestEmail();
         if (!email) return null;
+        saveLoggedInEmail(email);
         return { id: 'mock-user', email };
       }
     });

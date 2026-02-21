@@ -33,7 +33,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 var define_PI_VERSIONS_default;
 var init_define_PI_VERSIONS = __esm({
   "<define:__PI_VERSIONS__>"() {
-    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.53.0", "@mariozechner/pi-ai": "0.53.0", "@mariozechner/pi-coding-agent": "0.53.0", "@mariozechner/pi-tui": "0.53.0" };
+    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.54.0", "@mariozechner/pi-ai": "0.54.0", "@mariozechner/pi-coding-agent": "0.54.0", "@mariozechner/pi-tui": "0.54.0" };
   }
 });
 
@@ -46381,48 +46381,8 @@ function zipSync(data, opts) {
   return out;
 }
 
-// vendor/openclaw-main/src/agents/session-transcript-repair.ts
+// src/openclaw-lite/shared/session-transcript-repair-lite.js
 init_define_PI_VERSIONS();
-
-// vendor/openclaw-main/src/agents/tool-call-id.ts
-init_define_PI_VERSIONS();
-var TOOL_CALL_TYPES = /* @__PURE__ */ new Set(["toolCall", "toolUse", "functionCall"]);
-function extractToolCallsFromAssistant(msg) {
-  const content = msg.content;
-  if (!Array.isArray(content)) {
-    return [];
-  }
-  const toolCalls = [];
-  for (const block of content) {
-    if (!block || typeof block !== "object") {
-      continue;
-    }
-    const rec = block;
-    if (typeof rec.id !== "string" || !rec.id) {
-      continue;
-    }
-    if (typeof rec.type === "string" && TOOL_CALL_TYPES.has(rec.type)) {
-      toolCalls.push({
-        id: rec.id,
-        name: typeof rec.name === "string" ? rec.name : void 0
-      });
-    }
-  }
-  return toolCalls;
-}
-function extractToolResultId(msg) {
-  const toolCallId = msg.toolCallId;
-  if (typeof toolCallId === "string" && toolCallId) {
-    return toolCallId;
-  }
-  const toolUseId = msg.toolUseId;
-  if (typeof toolUseId === "string" && toolUseId) {
-    return toolUseId;
-  }
-  return null;
-}
-
-// vendor/openclaw-main/src/agents/session-transcript-repair.ts
 function isToolCallBlock(block) {
   if (!block || typeof block !== "object") {
     return false;
@@ -46444,11 +46404,11 @@ function hasToolCallId(block) {
 function hasToolCallName(block) {
   return hasNonEmptyStringField(block.name);
 }
-function makeMissingToolResult(params) {
+function makeMissingToolResult({ toolCallId, toolName }) {
   return {
     role: "toolResult",
-    toolCallId: params.toolCallId,
-    toolName: params.toolName ?? "unknown",
+    toolCallId,
+    toolName: toolName || "unknown",
     content: [
       {
         type: "text",
@@ -46459,12 +46419,45 @@ function makeMissingToolResult(params) {
     timestamp: Date.now()
   };
 }
+function extractToolCallsFromAssistant(msg) {
+  const content = msg?.content;
+  if (!Array.isArray(content)) {
+    return [];
+  }
+  const toolCalls = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    if (typeof block.id !== "string" || !block.id) {
+      continue;
+    }
+    if (typeof block.type === "string" && (block.type === "toolCall" || block.type === "toolUse" || block.type === "functionCall")) {
+      toolCalls.push({
+        id: block.id,
+        name: typeof block.name === "string" ? block.name : void 0
+      });
+    }
+  }
+  return toolCalls;
+}
+function extractToolResultId(msg) {
+  const toolCallId = msg?.toolCallId;
+  if (typeof toolCallId === "string" && toolCallId) {
+    return toolCallId;
+  }
+  const toolUseId = msg?.toolUseId;
+  if (typeof toolUseId === "string" && toolUseId) {
+    return toolUseId;
+  }
+  return null;
+}
 function repairToolCallInputs(messages) {
   let droppedToolCalls = 0;
   let droppedAssistantMessages = 0;
   let changed = false;
   const out = [];
-  for (const msg of messages) {
+  for (const msg of Array.isArray(messages) ? messages : []) {
     if (!msg || typeof msg !== "object") {
       out.push(msg);
       continue;
@@ -46509,6 +46502,7 @@ function repairToolUseResultPairing(messages) {
   let droppedOrphanCount = 0;
   let moved = false;
   let changed = false;
+  const source = Array.isArray(messages) ? messages : [];
   const pushToolResult = (msg) => {
     const id = extractToolResultId(msg);
     if (id && seenToolResultIds.has(id)) {
@@ -46521,8 +46515,8 @@ function repairToolUseResultPairing(messages) {
     }
     out.push(msg);
   };
-  for (let i = 0; i < messages.length; i += 1) {
-    const msg = messages[i];
+  for (let i = 0; i < source.length; i += 1) {
+    const msg = source[i];
     if (!msg || typeof msg !== "object") {
       out.push(msg);
       continue;
@@ -46548,12 +46542,12 @@ function repairToolUseResultPairing(messages) {
       out.push(msg);
       continue;
     }
-    const toolCallIds = new Set(toolCalls.map((t) => t.id));
+    const toolCallIds = new Set(toolCalls.map((toolCall) => toolCall.id));
     const spanResultsById = /* @__PURE__ */ new Map();
     const remainder = [];
     let j = i + 1;
-    for (; j < messages.length; j += 1) {
-      const next = messages[j];
+    for (; j < source.length; j += 1) {
+      const next = source[j];
       if (!next || typeof next !== "object") {
         remainder.push(next);
         continue;
@@ -46563,8 +46557,7 @@ function repairToolUseResultPairing(messages) {
         break;
       }
       if (nextRole === "toolResult") {
-        const toolResult = next;
-        const id = extractToolResultId(toolResult);
+        const id = extractToolResultId(next);
         if (id && toolCallIds.has(id)) {
           if (seenToolResultIds.has(id)) {
             droppedDuplicateCount += 1;
@@ -46572,7 +46565,7 @@ function repairToolUseResultPairing(messages) {
             continue;
           }
           if (!spanResultsById.has(id)) {
-            spanResultsById.set(id, toolResult);
+            spanResultsById.set(id, next);
           }
           continue;
         }
@@ -46604,10 +46597,6 @@ function repairToolUseResultPairing(messages) {
       }
     }
     for (const rem of remainder) {
-      if (!rem || typeof rem !== "object") {
-        out.push(rem);
-        continue;
-      }
       out.push(rem);
     }
     i = j - 1;
@@ -46856,7 +46845,7 @@ async function vfsReadAllBytes(prefix = "") {
 }
 
 // src/openclaw-lite/worker.js
-var OPENCLAW_VERSION = "2026.2.18";
+var OPENCLAW_VERSION = "2026.2.22";
 var PI_VERSIONS = define_PI_VERSIONS_default;
 var MAIN_AGENT_ID = "main";
 var MAIN_SESSION_KEY = "agent:main:main";
@@ -46879,6 +46868,13 @@ var WS_MAX_CONNECT_TIMEOUT_MS = 3e4;
 var WS_DEFAULT_RECV_WAIT_MS = 5e3;
 var WS_MAX_RECV_WAIT_MS = 3e4;
 var WS_MAX_RECV_MESSAGES = 50;
+var TRAINER_ROOT_PATH = "lite/experience-trainer/v1";
+var TRAINER_VERSION = 1;
+var TRAINER_DEFAULT_QUEST_ID = "portal_onboarding_v1";
+var TRAINER_ACTIVE_LOADOUT_META_KEY_PREFIX = "trainerActiveLoadoutV1:";
+var TRAINER_COACHING_META_KEY = "trainerCoachingV1";
+var TRAINER_PERSONAL_BACKUP_KIND = "agent-town-personal-backup";
+var TRAINER_BACKUP_MAX_BYTES = 16 * 1024 * 1024;
 var MAX_CHECKPOINTS_PER_HOUSE = 50;
 var VISIT_MAX_COMPANION_FILES = 12;
 var VISIT_COMPANION_EXT_RE = /\.(md|json)$/i;
@@ -47042,6 +47038,108 @@ function normalizeTeamCodeHint(value) {
   const raw = String(value || "").trim().toUpperCase();
   if (!raw) return "";
   return /^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw) ? raw : "";
+}
+function bytesToHex(bytes) {
+  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array([]);
+  let out = "";
+  for (let i = 0; i < view.length; i += 1) {
+    out += view[i].toString(16).padStart(2, "0");
+  }
+  return out;
+}
+function isPlainObject(value) {
+  return !!(value && typeof value === "object" && !Array.isArray(value));
+}
+function stableJsonStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((entry) => stableJsonStringify(entry)).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  const body = keys.map((key) => `${JSON.stringify(key)}:${stableJsonStringify(value[key])}`).join(",");
+  return `{${body}}`;
+}
+async function sha256HexFromUtf8(text) {
+  return bytesToHex(await sha256(utf8ToBytes(String(text || ""))));
+}
+async function sha256HexFromJson(value) {
+  return sha256HexFromUtf8(stableJsonStringify(value));
+}
+function trainerQuestRoot(questId) {
+  return `${TRAINER_ROOT_PATH}/quests/${questId}`;
+}
+function trainerAttemptsRoot(questId) {
+  return `${trainerQuestRoot(questId)}/attempts`;
+}
+function trainerLoadoutsRoot(questId) {
+  return `${trainerQuestRoot(questId)}/loadouts`;
+}
+function trainerAttemptRoot(questId, attemptId) {
+  return `${trainerAttemptsRoot(questId)}/${attemptId}`;
+}
+function trainerLoadoutRoot(questId, loadoutId) {
+  return `${trainerLoadoutsRoot(questId)}/${loadoutId}`;
+}
+function trainerActiveLoadoutMetaKey(questId) {
+  return `${TRAINER_ACTIVE_LOADOUT_META_KEY_PREFIX}${questId}`;
+}
+function trainerQuestId(value) {
+  const raw = String(value || "").trim();
+  return raw || TRAINER_DEFAULT_QUEST_ID;
+}
+function trainerParseJsonSafe(raw, fallback = null) {
+  if (typeof raw !== "string" || !raw.trim()) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+function trainerNormalizeCoachingMode(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "manual" || raw === "reject") return raw;
+  return "approve";
+}
+function trainerNormalizeCoachingState(value) {
+  const source = isPlainObject(value) ? value : {};
+  return {
+    enabled: source.enabled === true,
+    mode: trainerNormalizeCoachingMode(source.mode)
+  };
+}
+function trainerDocRoleFromPath(pathValue) {
+  const path4 = String(pathValue || "");
+  const base = path4.split("/").pop() || "";
+  const lowered = base.toLowerCase();
+  if (lowered === "skill.md") return "skill";
+  if (lowered === "tools.md" || lowered === "tool.md") return "tools";
+  if (lowered === "heartbeat.md") return "heartbeat";
+  if (lowered === "goals.md" || lowered === "goal.md") return "goals";
+  if (lowered === "penalty.md") return "penalty";
+  return "other";
+}
+async function idbReqToPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("IDB_REQUEST_FAILED"));
+  });
+}
+async function idbTxDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("IDB_TX_FAILED"));
+    tx.onabort = () => reject(tx.error || new Error("IDB_TX_ABORTED"));
+  });
+}
+async function idbGetAll(storeName) {
+  const db = await openDb();
+  const tx = db.transaction([storeName], "readonly");
+  const req = tx.objectStore(storeName).getAll();
+  const rows = await idbReqToPromise(req);
+  await idbTxDone(tx);
+  return Array.isArray(rows) ? rows : [];
 }
 function assertAllowlistedUrl(url) {
   const u = new URL(url, safeOrigin() || "http://localhost");
@@ -48688,8 +48786,63 @@ function liteToolResult(text, details = {}) {
     details
   };
 }
-async function dispatchLiteTool(name, params, _signal, _onUpdate) {
-  switch (String(name || "")) {
+async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = null) {
+  const normalizedName = String(name || "");
+  const capture = state.trainer?.activeCapture || null;
+  const coaching = trainerNormalizeCoachingState(state.trainer?.coaching);
+  if (capture && coaching.enabled) {
+    const normalizedToolCallId2 = typeof toolCallId === "string" && toolCallId.trim() ? toolCallId.trim() : randomId("tc");
+    const pendingEvent = await trainerAppendEvent(
+      capture,
+      "tool.call.pending",
+      "human",
+      {
+        turnId: capture.turnId || null,
+        toolCallId: normalizedToolCallId2,
+        name: normalizedName,
+        args: isPlainObject(params) ? params : {},
+        status: "pending"
+      },
+      { parentSpanId: capture.turnSpanId || null }
+    );
+    let decision = coaching.mode === "reject" ? "reject" : "approve";
+    if (coaching.mode === "manual") {
+      try {
+        const asked = await requestApproval({
+          title: "Coach",
+          body: `Allow tool call ${normalizedName}?`
+        });
+        decision = asked === "approve" ? "approve" : "reject";
+      } catch {
+        decision = "reject";
+      }
+    }
+    await trainerAppendEvent(
+      capture,
+      "human.intervention",
+      "human",
+      {
+        action: decision === "approve" ? "tool.approve" : "tool.reject",
+        toolCallId: normalizedToolCallId2,
+        name: normalizedName,
+        pendingSeq: pendingEvent?.seq || null
+      },
+      { parentSpanId: pendingEvent?.spanId || capture.turnSpanId || null }
+    );
+    if (decision !== "approve") {
+      const startedAtMs = nowMs();
+      const envelope = withToolMeta(
+        normalizedName,
+        startedAtMs,
+        makeToolFailure("APPROVAL_REJECTED", "Tool call rejected by coach", {
+          toolCallId: normalizedToolCallId2,
+          tool: normalizedName
+        })
+      );
+      return envelopeToToolResult(envelope, normalizedName);
+    }
+  }
+  switch (normalizedName) {
     case "lite_echo": {
       const text = typeof params?.text === "string" ? params.text : "";
       return liteToolResult(text, { dispatchPath: LITE_TOOL_DISPATCH_PATH });
@@ -48816,8 +48969,18 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate) {
       const envelope = await runWalletSignMessageTool(params || {}, "wallet_sign_message");
       return envelopeToToolResult(envelope, "wallet_sign_message");
     }
-    default:
-      throw new Error(`TOOL_NOT_FOUND:${name}`);
+    default: {
+      const startedAtMs = nowMs();
+      const envelope = withToolMeta(
+        normalizedName,
+        startedAtMs,
+        makeToolFailure("TOOL_NOT_FOUND", `Tool ${normalizedName} not found`, {
+          toolCallId: normalizedToolCallId,
+          tool: normalizedName
+        })
+      );
+      return envelopeToToolResult(envelope, normalizedName);
+    }
   }
 }
 function getLiteTools() {
@@ -48826,7 +48989,7 @@ function getLiteTools() {
     label: spec.label,
     description: spec.description,
     parameters: makeLiteToolSchema(),
-    execute: async (_toolCallId, params, signal, onUpdate) => dispatchLiteTool(spec.name, params, signal, onUpdate)
+    execute: async (toolCallId, params, signal, onUpdate) => dispatchLiteTool(spec.name, params, signal, onUpdate, toolCallId)
   }));
 }
 function getToolRegistryInfo() {
@@ -48835,6 +48998,712 @@ function getToolRegistryInfo() {
     count: tools.length,
     names: tools.map((t) => t.name),
     dispatchPath: LITE_TOOL_DISPATCH_PATH
+  };
+}
+async function trainerBuildRegistrySnapshot() {
+  const tools = getLiteTools();
+  const rows = [];
+  for (const tool of tools) {
+    const schemaSha256 = await sha256HexFromJson(tool?.parameters || {});
+    rows.push({
+      name: String(tool?.name || ""),
+      schemaSha256,
+      version: null
+    });
+  }
+  rows.sort((a, b) => {
+    if (a.name < b.name) return -1;
+    if (a.name > b.name) return 1;
+    return 0;
+  });
+  const registrySha256 = await sha256HexFromJson(rows.map((row) => ({
+    name: row.name,
+    schemaSha256: row.schemaSha256,
+    version: row.version
+  })));
+  return { registrySha256, tools: rows };
+}
+function trainerResolveLlmFingerprint() {
+  const parsed = parseConfiguredModelRef();
+  return {
+    provider: String(state.llmProvider || parsed.provider || "").trim() || null,
+    modelId: String(state.llmModelId || parsed.modelId || "").trim() || null,
+    modelRef: String(state.llmModelRef || "").trim() || null,
+    api: String(state.llmApi || "").trim() || null,
+    baseUrl: String(state.llmBaseUrl || "").trim() || null,
+    reasoning: String(state.llmReasoning || "").trim() || null,
+    useProxy: state.llmUseProxy !== false
+  };
+}
+async function trainerCollectExperienceDocs(resolved = null) {
+  const docsByPath = /* @__PURE__ */ new Map();
+  const imported = Array.isArray(state.skillImport?.importedFiles) ? state.skillImport.importedFiles : [];
+  for (const row of imported) {
+    if (!isPlainObject(row)) continue;
+    const path4 = normalizeSkillImportPath(row.path);
+    if (!path4) continue;
+    let sha2562 = "";
+    const hashB64 = String(row.sha256B64 || "").trim();
+    if (hashB64) {
+      try {
+        sha2562 = bytesToHex(b64ToBytes(hashB64));
+      } catch {
+        sha2562 = "";
+      }
+    }
+    let bytes = 0;
+    const content = await vfsGetUtf8(path4);
+    if (typeof content === "string") {
+      bytes = utf8ToBytes(content).length;
+      if (!sha2562) {
+        sha2562 = await sha256HexFromUtf8(content);
+      }
+    }
+    if (!sha2562) continue;
+    docsByPath.set(path4, {
+      role: trainerDocRoleFromPath(path4),
+      path: path4,
+      sha256: sha2562,
+      bytes
+    });
+  }
+  if (docsByPath.size === 0 && isPlainObject(resolved)) {
+    const fileMap = isPlainObject(resolved.files) ? resolved.files : {};
+    const pathMap = isPlainObject(resolved.resolvedPaths) ? resolved.resolvedPaths : {};
+    for (const [key, value] of Object.entries(pathMap)) {
+      const path4 = normalizeSkillImportPath(value);
+      if (!path4 || docsByPath.has(path4)) continue;
+      const content = typeof fileMap[key] === "string" ? fileMap[key] : "";
+      const sha2562 = await sha256HexFromUtf8(content);
+      docsByPath.set(path4, {
+        role: trainerDocRoleFromPath(path4),
+        path: path4,
+        sha256: sha2562,
+        bytes: utf8ToBytes(content).length
+      });
+    }
+  }
+  return Array.from(docsByPath.values()).sort((a, b) => {
+    if (a.path < b.path) return -1;
+    if (a.path > b.path) return 1;
+    return 0;
+  });
+}
+async function trainerGetActiveLoadoutId(questId) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const fromState = String(state.trainer?.activeLoadoutByQuest?.[normalizedQuestId] || "").trim();
+  if (fromState) return fromState;
+  const stored = await metaGet(trainerActiveLoadoutMetaKey(normalizedQuestId));
+  return typeof stored === "string" && stored.trim() ? stored.trim() : null;
+}
+async function trainerSetActiveLoadoutId(questId, loadoutId) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const normalizedLoadoutId = typeof loadoutId === "string" && loadoutId.trim() ? loadoutId.trim() : null;
+  if (!isPlainObject(state.trainer.activeLoadoutByQuest)) {
+    state.trainer.activeLoadoutByQuest = {};
+  }
+  state.trainer.activeLoadoutByQuest[normalizedQuestId] = normalizedLoadoutId;
+  await metaSet(trainerActiveLoadoutMetaKey(normalizedQuestId), normalizedLoadoutId);
+  return normalizedLoadoutId;
+}
+async function trainerEnsureLoadoutManifest({
+  questId = TRAINER_DEFAULT_QUEST_ID,
+  experienceDocs = [],
+  registrySnapshot = null,
+  reason = "capture"
+} = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const normalizedDocs = Array.isArray(experienceDocs) ? experienceDocs.map((doc) => ({
+    role: String(doc?.role || "other"),
+    path: String(doc?.path || ""),
+    sha256: String(doc?.sha256 || "")
+  })).filter((doc) => doc.path && doc.sha256) : [];
+  const registrySha256 = String(registrySnapshot?.registrySha256 || "").trim();
+  const llmConfigFingerprint = trainerResolveLlmFingerprint();
+  const runtime = {
+    openclawLiteVersion: OPENCLAW_VERSION,
+    piVersions: PI_VERSIONS,
+    buildHash: null
+  };
+  const loadoutHashInput = {
+    docs: normalizedDocs,
+    registrySha256,
+    llmConfigFingerprint,
+    runtime
+  };
+  const loadoutId = `loadout_${await sha256HexFromJson(loadoutHashInput)}`;
+  const root = trainerLoadoutRoot(normalizedQuestId, loadoutId);
+  const manifestPath = `${root}/manifest.json`;
+  const existing = trainerParseJsonSafe(await vfsGetUtf8(manifestPath), null);
+  const previousLoadoutId = await trainerGetActiveLoadoutId(normalizedQuestId);
+  let manifest = existing;
+  let created = false;
+  if (!isPlainObject(existing)) {
+    manifest = {
+      v: TRAINER_VERSION,
+      questId: normalizedQuestId,
+      loadoutId,
+      createdAtMs: nowMs(),
+      previousLoadoutId: previousLoadoutId && previousLoadoutId !== loadoutId ? previousLoadoutId : null,
+      reason: String(reason || "capture"),
+      registrySha256,
+      experienceDocs: normalizedDocs,
+      llmConfigFingerprint,
+      runtime,
+      active: true
+    };
+    await vfsPutUtf8(manifestPath, JSON.stringify(manifest, null, 2));
+    created = true;
+  }
+  await trainerSetActiveLoadoutId(normalizedQuestId, loadoutId);
+  return { loadoutId, manifestPath, manifest, created };
+}
+function trainerIsLoadoutSensitiveWorkspacePath(pathValue) {
+  const path4 = String(pathValue || "").trim().toLowerCase();
+  if (!path4.startsWith("workspace/")) return false;
+  const base = path4.split("/").pop() || "";
+  return base === "skill.md" || base === "tools.md" || base === "tool.md" || base === "heartbeat.md" || base === "goals.md" || base === "goal.md" || base === "penalty.md";
+}
+async function trainerCheckpointForConfigChange(reason = "config-change") {
+  let resolved = null;
+  try {
+    resolved = await resolveExperienceWorkspaceFiles({});
+  } catch {
+    resolved = null;
+  }
+  const docs = await trainerCollectExperienceDocs(resolved);
+  if (!docs.length) return null;
+  const registrySnapshot = await trainerBuildRegistrySnapshot();
+  return trainerEnsureLoadoutManifest({
+    questId: TRAINER_DEFAULT_QUEST_ID,
+    experienceDocs: docs,
+    registrySnapshot,
+    reason
+  });
+}
+async function trainerAppendEvent(capture, type, actor, data = {}, options = {}) {
+  if (!capture) return null;
+  capture.seq += 1;
+  const event = {
+    v: TRAINER_VERSION,
+    attemptId: capture.attemptId,
+    seq: capture.seq,
+    tsMs: nowMs(),
+    type: String(type || ""),
+    actor: String(actor || "system"),
+    spanId: String(options?.spanId || randomId("span")),
+    parentSpanId: typeof options?.parentSpanId === "string" && options.parentSpanId.trim() ? options.parentSpanId.trim() : null,
+    data: isPlainObject(data) ? data : {}
+  };
+  const line = JSON.stringify(event);
+  capture.events.push(event);
+  capture.eventLines.push(line);
+  capture.bytesWritten += line.length + 1;
+  await vfsPutUtf8(capture.eventsPath, `${capture.eventLines.join("\n")}
+`);
+  return event;
+}
+async function trainerPersistManifest(capture) {
+  if (!capture) return null;
+  const manifest = {
+    ...capture.manifest,
+    stats: {
+      llmTurns: Number(capture.stats?.llmTurns || 0),
+      toolCalls: Number(capture.stats?.toolCalls || 0),
+      toolFailures: Number(capture.stats?.toolFailures || 0),
+      durationMs: Number(capture.stats?.durationMs || 0),
+      bytesWritten: Number(capture.stats?.bytesWritten || 0)
+    }
+  };
+  let text = JSON.stringify(manifest, null, 2);
+  const totalBytesWritten = capture.bytesWritten + text.length;
+  manifest.stats.bytesWritten = totalBytesWritten;
+  text = JSON.stringify(manifest, null, 2);
+  capture.manifest = manifest;
+  capture.stats.bytesWritten = totalBytesWritten;
+  await vfsPutUtf8(capture.manifestPath, text);
+  return manifest;
+}
+async function trainerWriteContextReceipt(capture, turnId, payload = {}) {
+  if (!capture) return null;
+  const contextPath = `${capture.contextRoot}/${turnId}.json`;
+  const receipt = {
+    v: TRAINER_VERSION,
+    turnId,
+    llmRequest: {
+      system: String(payload?.systemPrompt || ""),
+      messages: Array.isArray(payload?.messages) ? payload.messages : [],
+      tools: Array.isArray(payload?.tools) ? payload.tools : []
+    },
+    receipt: {
+      sections: Array.isArray(payload?.sections) ? payload.sections : []
+    }
+  };
+  await vfsPutUtf8(contextPath, JSON.stringify(receipt, null, 2));
+  return contextPath;
+}
+async function trainerStartAttemptCapture({
+  questId = TRAINER_DEFAULT_QUEST_ID,
+  entryPrompt = "",
+  resolved = null,
+  runtimeSnapshot = null,
+  registrySnapshot = null
+} = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const attemptId = randomId("attempt");
+  const createdAtMs = nowMs();
+  const attemptRoot = trainerAttemptRoot(normalizedQuestId, attemptId);
+  const eventsPath = `${attemptRoot}/events.jsonl`;
+  const manifestPath = `${attemptRoot}/manifest.json`;
+  const contextRoot = `${attemptRoot}/context`;
+  const experienceDocs = await trainerCollectExperienceDocs(resolved);
+  const loadout = await trainerEnsureLoadoutManifest({
+    questId: normalizedQuestId,
+    experienceDocs,
+    registrySnapshot,
+    reason: "attempt-start"
+  });
+  const runtimeContext = runtimeSnapshot?.context && typeof runtimeSnapshot.context === "object" ? runtimeSnapshot.context : null;
+  const runtimeState = runtimeSnapshot?.appState && typeof runtimeSnapshot.appState === "object" ? runtimeSnapshot.appState : null;
+  const llmConfigFingerprint = trainerResolveLlmFingerprint();
+  const capture = {
+    questId: normalizedQuestId,
+    attemptId,
+    createdAtMs,
+    manifestPath,
+    eventsPath,
+    contextRoot,
+    seq: 0,
+    bytesWritten: 0,
+    events: [],
+    eventLines: [],
+    stats: {
+      llmTurns: 0,
+      toolCalls: 0,
+      toolFailures: 0,
+      durationMs: 0,
+      bytesWritten: 0
+    },
+    manifest: {
+      v: TRAINER_VERSION,
+      attemptId,
+      questId: normalizedQuestId,
+      createdAtMs,
+      endedAtMs: null,
+      result: "unknown",
+      successSignals: {
+        isSuccess: false,
+        houseId: null,
+        experienceStep: null
+      },
+      loadoutId: loadout.loadoutId,
+      experienceDocs,
+      runtime: {
+        openclawLiteVersion: OPENCLAW_VERSION,
+        piVersions: PI_VERSIONS,
+        buildHash: null
+      },
+      llmConfigFingerprint,
+      stats: {
+        llmTurns: 0,
+        toolCalls: 0,
+        toolFailures: 0,
+        durationMs: 0,
+        bytesWritten: 0
+      }
+    },
+    turnId: null,
+    turnSpanId: null,
+    llmStartEvent: null,
+    registryEvent: null,
+    registrySnapshot,
+    runtimeBefore: runtimeState,
+    coachingDecisions: []
+  };
+  await vfsPutUtf8(eventsPath, "");
+  await trainerAppendEvent(capture, "attempt.start", "system", {
+    questId: normalizedQuestId,
+    attemptLabel: null,
+    loadoutId: loadout.loadoutId,
+    entry: {
+      source: "trainer",
+      prompt: String(entryPrompt || "")
+    },
+    runtime: {
+      agentId: MAIN_AGENT_ID,
+      sessionKey: MAIN_SESSION_KEY,
+      openclawLiteVersion: OPENCLAW_VERSION
+    }
+  });
+  await trainerAppendEvent(capture, "experience.imported", "system", {
+    siteRoot: String(state.skillImport?.siteRoot || "workspace/"),
+    activeSkillPath: String(state.skillImport?.activeSkillPath || "workspace/SKILL.md"),
+    docs: experienceDocs.map((doc) => ({
+      role: doc.role,
+      path: doc.path,
+      sha256: doc.sha256,
+      bytes: Number(doc.bytes || 0)
+    }))
+  });
+  if (runtimeContext || runtimeState) {
+    await trainerAppendEvent(capture, "context.injected", "system", {
+      teamCode: typeof runtimeContext?.teamCode === "string" ? runtimeContext.teamCode : null,
+      runtimeContext: runtimeContext || null,
+      runtimeStateSummary: summarizeRuntimeAppStateForDebug(runtimeState)
+    });
+  }
+  await trainerPersistManifest(capture);
+  return capture;
+}
+function trainerResolveSuccessSignals(runtimeSnapshot = null) {
+  const appState = runtimeSnapshot?.appState && typeof runtimeSnapshot.appState === "object" ? runtimeSnapshot.appState : null;
+  const houseId = typeof appState?.houseId === "string" && appState.houseId.trim() ? appState.houseId.trim() : null;
+  const experienceStep = typeof appState?.experience?.step === "string" && appState.experience.step.trim() ? appState.experience.step.trim() : null;
+  const isSuccess = !!houseId || experienceStep === "house_ready";
+  return { houseId, experienceStep, isSuccess };
+}
+function trainerNormalizeToolCallArgs(rawArgs) {
+  if (isPlainObject(rawArgs)) return rawArgs;
+  if (typeof rawArgs === "string") {
+    try {
+      const parsed = JSON.parse(rawArgs);
+      return isPlainObject(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+function trainerExtractToolCalls(messages = []) {
+  const out = [];
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (!isPlainObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
+    for (const part of message.content) {
+      if (!isPlainObject(part) || part.type !== "toolCall") continue;
+      const toolCallId = typeof part.id === "string" && part.id.trim() ? part.id.trim() : randomId("toolcall");
+      const name = typeof part.name === "string" ? part.name.trim() : "";
+      const args = trainerNormalizeToolCallArgs(part.arguments);
+      out.push({
+        toolCallId,
+        name,
+        args,
+        argsJson: stableJsonStringify(args)
+      });
+    }
+  }
+  return out;
+}
+function trainerExtractToolResults(messages = []) {
+  const out = /* @__PURE__ */ new Map();
+  for (const message of Array.isArray(messages) ? messages : []) {
+    if (!isPlainObject(message) || message.role !== "toolResult") continue;
+    const toolCallId = typeof message.toolCallId === "string" && message.toolCallId.trim() ? message.toolCallId.trim() : typeof message.toolUseId === "string" && message.toolUseId.trim() ? message.toolUseId.trim() : "";
+    if (!toolCallId) continue;
+    const name = typeof message.toolName === "string" ? message.toolName.trim() : "";
+    const text = textFromMessageContent(message.content || []);
+    const parsed = trainerParseJsonSafe(text, null);
+    let ok = message.isError !== true;
+    let durationMs = 0;
+    let normalizedResult = null;
+    let normalizedError = null;
+    if (isPlainObject(parsed) && typeof parsed.ok === "boolean") {
+      ok = parsed.ok === true;
+      const durationRaw = Number(parsed?.meta?.durationMs || 0);
+      durationMs = Number.isFinite(durationRaw) && durationRaw >= 0 ? Math.floor(durationRaw) : 0;
+      if (ok) {
+        normalizedResult = parsed?.data ?? parsed?.result ?? null;
+      } else {
+        normalizedError = {
+          code: String(parsed?.error?.code || "UNSUPPORTED"),
+          message: String(parsed?.error?.message || "Tool execution failed"),
+          details: isPlainObject(parsed?.error?.details) ? parsed.error.details : null
+        };
+      }
+    } else if (!ok) {
+      normalizedError = {
+        code: "UNSUPPORTED",
+        message: text || "Tool execution failed",
+        details: null
+      };
+    } else {
+      normalizedResult = text || null;
+    }
+    out.set(toolCallId, {
+      toolCallId,
+      name,
+      ok,
+      durationMs,
+      result: normalizedResult,
+      error: normalizedError
+    });
+  }
+  return out;
+}
+async function trainerListAttemptManifests(questId = TRAINER_DEFAULT_QUEST_ID) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const prefix = `${trainerAttemptsRoot(normalizedQuestId)}/`;
+  const paths = await vfsListPaths(prefix);
+  const manifestPaths = paths.filter((path4) => path4.endsWith("/manifest.json"));
+  const out = [];
+  for (const manifestPath of manifestPaths) {
+    const parsed = trainerParseJsonSafe(await vfsGetUtf8(manifestPath), null);
+    if (!isPlainObject(parsed)) continue;
+    out.push({ ...parsed, manifestPath });
+  }
+  out.sort((a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0));
+  return out;
+}
+async function trainerListLoadoutManifests(questId = TRAINER_DEFAULT_QUEST_ID) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const activeLoadoutId = await trainerGetActiveLoadoutId(normalizedQuestId);
+  const prefix = `${trainerLoadoutsRoot(normalizedQuestId)}/`;
+  const paths = await vfsListPaths(prefix);
+  const manifestPaths = paths.filter((path4) => path4.endsWith("/manifest.json"));
+  const out = [];
+  for (const manifestPath of manifestPaths) {
+    const parsed = trainerParseJsonSafe(await vfsGetUtf8(manifestPath), null);
+    if (!isPlainObject(parsed)) continue;
+    const loadoutId = String(parsed.loadoutId || "").trim();
+    out.push({
+      ...parsed,
+      manifestPath,
+      active: !!(loadoutId && loadoutId === activeLoadoutId)
+    });
+  }
+  out.sort((a, b) => Number(b.createdAtMs || 0) - Number(a.createdAtMs || 0));
+  return { activeLoadoutId, loadouts: out };
+}
+async function trainerReadAttemptBundle({ questId = TRAINER_DEFAULT_QUEST_ID, attemptId = "" } = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const normalizedAttemptId = String(attemptId || "").trim();
+  if (!normalizedAttemptId) {
+    throw new Error("MISSING_ATTEMPT_ID");
+  }
+  const root = trainerAttemptRoot(normalizedQuestId, normalizedAttemptId);
+  const manifestPath = `${root}/manifest.json`;
+  const eventsPath = `${root}/events.jsonl`;
+  const manifest = trainerParseJsonSafe(await vfsGetUtf8(manifestPath), null);
+  if (!isPlainObject(manifest)) {
+    throw new Error("ATTEMPT_NOT_FOUND");
+  }
+  const lines = String(await vfsGetUtf8(eventsPath) || "").split(/\r?\n/).filter((line) => line.trim());
+  const events = [];
+  for (const line of lines) {
+    const parsed = trainerParseJsonSafe(line, null);
+    if (!isPlainObject(parsed)) continue;
+    events.push(parsed);
+  }
+  return { manifest, events, manifestPath, eventsPath };
+}
+function trainerMedian(values = []) {
+  const nums = values.map((value) => Number(value)).filter((value) => Number.isFinite(value) && value >= 0).sort((a, b) => a - b);
+  if (nums.length === 0) return 0;
+  const mid = Math.floor(nums.length / 2);
+  if (nums.length % 2 === 0) return Math.round((nums[mid - 1] + nums[mid]) / 2);
+  return nums[mid];
+}
+async function trainerCompareAttempts({ questId = TRAINER_DEFAULT_QUEST_ID, limit: limit2 = 3 } = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const count = Math.max(1, Math.floor(Number(limit2) || 1));
+  const manifests = (await trainerListAttemptManifests(normalizedQuestId)).slice(0, count);
+  const attempts = [];
+  const failureByTool = /* @__PURE__ */ new Map();
+  const fingerprintMap = /* @__PURE__ */ new Map();
+  for (const manifest of manifests) {
+    let events = [];
+    try {
+      const bundle = await trainerReadAttemptBundle({ questId: normalizedQuestId, attemptId: manifest.attemptId });
+      events = Array.isArray(bundle.events) ? bundle.events : [];
+    } catch {
+      events = [];
+    }
+    let firstError = null;
+    for (const event of events) {
+      if (!isPlainObject(event)) continue;
+      if (event.type === "tool.call.executed") {
+        const toolName = String(event?.data?.name || "").trim() || "(unknown)";
+        const entry = failureByTool.get(toolName) || { toolName, failures: 0, total: 0 };
+        entry.total += 1;
+        if (event?.data?.ok !== true) entry.failures += 1;
+        failureByTool.set(toolName, entry);
+      }
+      if (!firstError && event.type === "error") {
+        firstError = event;
+      }
+    }
+    if (!firstError) {
+      firstError = events.find((event) => isPlainObject(event) && event.type === "tool.call.executed" && event?.data?.ok !== true) || null;
+    }
+    if (firstError) {
+      const requestedToolName = String(firstError?.data?.requestedToolName || firstError?.data?.name || "").trim();
+      const kind = String(firstError?.data?.kind || firstError?.data?.error?.code || "").trim();
+      const step = String(manifest?.successSignals?.experienceStep || "").trim();
+      const base = `${String(firstError.type || "")}|${requestedToolName}|${kind}|${step}`;
+      const fingerprint = (await sha256HexFromUtf8(base)).slice(0, 16);
+      const entry = fingerprintMap.get(fingerprint) || {
+        fingerprint,
+        count: 0,
+        type: String(firstError.type || ""),
+        requestedToolName: requestedToolName || null,
+        kind: kind || null,
+        experienceStep: step || null
+      };
+      entry.count += 1;
+      fingerprintMap.set(fingerprint, entry);
+    }
+    attempts.push(manifest);
+  }
+  const successCount = attempts.filter((attempt) => String(attempt?.result || "") === "success").length;
+  const successRate = attempts.length > 0 ? successCount / attempts.length : 0;
+  const medianDurationMs = trainerMedian(attempts.map((attempt) => attempt?.stats?.durationMs || 0));
+  const toolFailureRates = Array.from(failureByTool.values()).map((entry) => ({
+    toolName: entry.toolName,
+    failures: entry.failures,
+    total: entry.total,
+    rate: entry.total > 0 ? entry.failures / entry.total : 0
+  })).sort((a, b) => {
+    if (b.failures !== a.failures) return b.failures - a.failures;
+    if (b.total !== a.total) return b.total - a.total;
+    return a.toolName.localeCompare(b.toolName);
+  });
+  const divergence = Array.from(fingerprintMap.values()).sort((a, b) => b.count - a.count);
+  return {
+    questId: normalizedQuestId,
+    attemptsCount: attempts.length,
+    successCount,
+    successRate,
+    medianDurationMs,
+    toolFailureRates,
+    divergence
+  };
+}
+function trainerClone(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return null;
+  }
+}
+function trainerNormalizeBackupMetaRows(rows) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!isPlainObject(row)) continue;
+    const key = typeof row.key === "string" ? row.key.trim() : "";
+    if (!key || key === "krootB64" || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, value: trainerClone(row.value) });
+  }
+  return out;
+}
+function trainerNormalizeBackupVfsRows(rows) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!isPlainObject(row)) continue;
+    const path4 = typeof row.path === "string" ? row.path.trim() : "";
+    const dataB64 = typeof row.dataB64 === "string" ? row.dataB64.trim() : "";
+    if (!path4 || !dataB64 || seen.has(path4)) continue;
+    seen.add(path4);
+    const updatedAtMsRaw = Number(row.updatedAtMs);
+    out.push({
+      path: path4,
+      updatedAtMs: Number.isFinite(updatedAtMsRaw) && updatedAtMsRaw >= 0 ? Math.floor(updatedAtMsRaw) : nowMs(),
+      dataB64
+    });
+  }
+  return out;
+}
+function trainerNormalizeBackupCheckpointRows(rows) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (!isPlainObject(row)) continue;
+    const checkpointId = typeof row.checkpointId === "string" ? row.checkpointId.trim() : "";
+    if (!checkpointId || seen.has(checkpointId)) continue;
+    const cloned = trainerClone(row);
+    if (!isPlainObject(cloned)) continue;
+    cloned.checkpointId = checkpointId;
+    seen.add(checkpointId);
+    out.push(cloned);
+  }
+  return out;
+}
+async function trainerExportPersonalBackup() {
+  const [metaRows, vfsRows, checkpointRows] = await Promise.all([
+    idbGetAll("meta"),
+    idbGetAll("vfs"),
+    idbGetAll("checkpoints")
+  ]);
+  const backup = {
+    v: TRAINER_VERSION,
+    kind: TRAINER_PERSONAL_BACKUP_KIND,
+    createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+    stores: {
+      meta: trainerNormalizeBackupMetaRows(metaRows),
+      vfs: trainerNormalizeBackupVfsRows(vfsRows),
+      checkpoints: trainerNormalizeBackupCheckpointRows(checkpointRows)
+    }
+  };
+  const sizeBytes = utf8ToBytes(JSON.stringify(backup)).length;
+  if (sizeBytes > TRAINER_BACKUP_MAX_BYTES) {
+    throw new Error("BACKUP_TOO_LARGE");
+  }
+  return {
+    backup,
+    sizeBytes,
+    counts: {
+      meta: backup.stores.meta.length,
+      vfs: backup.stores.vfs.length,
+      checkpoints: backup.stores.checkpoints.length
+    }
+  };
+}
+function trainerNormalizeBackupPayload(raw) {
+  if (!isPlainObject(raw)) throw new Error("INVALID_BACKUP");
+  if (Number(raw.v) !== TRAINER_VERSION) throw new Error("INVALID_BACKUP");
+  if (String(raw.kind || "").trim() !== TRAINER_PERSONAL_BACKUP_KIND) throw new Error("INVALID_BACKUP");
+  const stores = isPlainObject(raw.stores) ? raw.stores : null;
+  if (!stores) throw new Error("INVALID_BACKUP");
+  return {
+    v: TRAINER_VERSION,
+    kind: TRAINER_PERSONAL_BACKUP_KIND,
+    createdAt: typeof raw.createdAt === "string" && raw.createdAt.trim() ? raw.createdAt.trim() : (/* @__PURE__ */ new Date()).toISOString(),
+    stores: {
+      meta: trainerNormalizeBackupMetaRows(stores.meta),
+      vfs: trainerNormalizeBackupVfsRows(stores.vfs),
+      checkpoints: trainerNormalizeBackupCheckpointRows(stores.checkpoints)
+    }
+  };
+}
+async function trainerImportPersonalBackup(rawBackup) {
+  const normalized = trainerNormalizeBackupPayload(rawBackup);
+  const sizeBytes = utf8ToBytes(JSON.stringify(normalized)).length;
+  if (sizeBytes > TRAINER_BACKUP_MAX_BYTES) {
+    throw new Error("BACKUP_TOO_LARGE");
+  }
+  const db = await openDb();
+  const tx = db.transaction(["meta", "vfs", "checkpoints"], "readwrite");
+  const meta = tx.objectStore("meta");
+  const vfs = tx.objectStore("vfs");
+  const checkpoints = tx.objectStore("checkpoints");
+  meta.clear();
+  vfs.clear();
+  checkpoints.clear();
+  for (const row of normalized.stores.meta) meta.put(row);
+  for (const row of normalized.stores.vfs) vfs.put(row);
+  for (const row of normalized.stores.checkpoints) checkpoints.put(row);
+  await idbTxDone(tx);
+  await loadStateFromIdb();
+  updateGatewayState();
+  return {
+    imported: true,
+    sizeBytes,
+    counts: {
+      meta: normalized.stores.meta.length,
+      vfs: normalized.stores.vfs.length,
+      checkpoints: normalized.stores.checkpoints.length
+    }
   };
 }
 function buildSyntheticToolCalls(count) {
@@ -50143,6 +51012,10 @@ async function runWorkspaceWriteFile(params, toolName = "workspace_write_file") 
   if (parent) state.workspaceDirs.add(parent);
   await persistWorkspaceDirs();
   pushWorkspaceEvent({ actor: "agent", action: existing === null ? "create" : "update", path: path4 });
+  if (trainerIsLoadoutSensitiveWorkspacePath(path4)) {
+    trainerCheckpointForConfigChange("workspace-write").catch(() => {
+    });
+  }
   return withToolMeta(
     toolName,
     startedAtMs,
@@ -50187,6 +51060,10 @@ async function runWorkspaceEditFile(params, toolName = "workspace_edit_file") {
   if (replacements > 0) {
     await vfsPutUtf8(path4, next);
     pushWorkspaceEvent({ actor: "agent", action: "update", path: path4 });
+    if (trainerIsLoadoutSensitiveWorkspacePath(path4)) {
+      trainerCheckpointForConfigChange("workspace-edit").catch(() => {
+      });
+    }
   }
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ path: path4, replacements }));
 }
@@ -50229,6 +51106,10 @@ async function runWorkspaceDelete(params, toolName = "workspace_delete") {
     }
     await persistWorkspaceDirs();
     pushWorkspaceEvent({ actor: "agent", action: "delete", path: dirPath });
+    if (files.some((path4) => trainerIsLoadoutSensitiveWorkspacePath(path4))) {
+      trainerCheckpointForConfigChange("workspace-delete").catch(() => {
+      });
+    }
     return withToolMeta(
       toolName,
       startedAtMs,
@@ -50244,6 +51125,10 @@ async function runWorkspaceDelete(params, toolName = "workspace_delete") {
   }
   await deleteByKeys("vfs", [filePath]);
   pushWorkspaceEvent({ actor: "agent", action: "delete", path: filePath });
+  if (trainerIsLoadoutSensitiveWorkspacePath(filePath)) {
+    trainerCheckpointForConfigChange("workspace-delete").catch(() => {
+    });
+  }
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ path: filePath, deleted: true }));
 }
 async function runWorkspaceBootstrap(toolName = "workspace_bootstrap") {
@@ -50803,6 +51688,7 @@ async function runExperienceEngineBaseline(params, toolName = "experience_engine
   const runtimeSections = buildRuntimeContextSections(runtimeSnapshot);
   const runtimeContext = runtimeSections.runtimeContext;
   const runtimeAppState = runtimeSections.runtimeAppState;
+  const runtimeBeforeSummary = summarizeRuntimeAppStateForDebug(runtimeAppState);
   const hintedTeamCode = normalizeTeamCodeHint(runtimeContext?.teamCode || runtimeAppState?.teamCode);
   if (hintedTeamCode && hintedTeamCode !== state.teamCodeHint) {
     state.teamCodeHint = hintedTeamCode;
@@ -50816,6 +51702,128 @@ ${runtimeSections.combinedContext}`;
   }
   const recordToTranscript = params?.recordToTranscript !== false;
   const emitChat = params?.emitChat === true ? true : params?.emitChat === false ? false : recordToTranscript;
+  const registrySnapshot = await trainerBuildRegistrySnapshot();
+  const tools = getLiteTools();
+  const preview = await buildLitePromptPreview({ model: getConfiguredModel(), tools });
+  const llmRequestMessages = state.transcript.slice().map((entry) => ({
+    role: String(entry?.role || ""),
+    content: textFromMessageContent(entry?.content || [])
+  })).concat([{ role: "user", content: instructionForModel }]);
+  const llmToolSpecs = tools.map((tool) => ({
+    name: String(tool?.name || ""),
+    description: String(tool?.description || ""),
+    parameters: tool?.parameters || {}
+  }));
+  const questId = trainerQuestId(params?.questId || TRAINER_DEFAULT_QUEST_ID);
+  let capture = null;
+  let captureClosed = false;
+  const closeCapture = async (result = "unknown", successSignals2 = null) => {
+    if (!capture || captureClosed) return;
+    captureClosed = true;
+    const endedAtMs = nowMs();
+    capture.stats.durationMs = Math.max(0, endedAtMs - capture.createdAtMs);
+    capture.manifest.endedAtMs = endedAtMs;
+    capture.manifest.result = result;
+    capture.manifest.successSignals = successSignals2 || {
+      isSuccess: false,
+      houseId: null,
+      experienceStep: null
+    };
+    await trainerAppendEvent(capture, "attempt.end", "system", {
+      result: capture.manifest.result,
+      successSignals: capture.manifest.successSignals
+    });
+    await trainerPersistManifest(capture);
+  };
+  try {
+    capture = await trainerStartAttemptCapture({
+      questId,
+      entryPrompt: instruction,
+      resolved,
+      runtimeSnapshot,
+      registrySnapshot
+    });
+    state.trainer.activeCapture = capture;
+    capture.registryEvent = await trainerAppendEvent(capture, "tool.registry.snapshot", "system", {
+      registrySha256: registrySnapshot.registrySha256,
+      tools: registrySnapshot.tools
+    });
+    capture.turnId = randomId("turn");
+    const activeSkillPath = typeof state.skillImport?.activeSkillPath === "string" && state.skillImport.activeSkillPath.trim() ? state.skillImport.activeSkillPath.trim() : "workspace/SKILL.md";
+    const skillDoc = capture.manifest.experienceDocs.find((doc) => doc.path === activeSkillPath) || null;
+    const sections = [
+      {
+        id: "runtime-context",
+        title: "Runtime context",
+        sourceType: "runtimeState",
+        sourceRef: "/api/state",
+        sha256: await sha256HexFromUtf8(stableJsonStringify(runtimeSections.runtimeAppStateSummary || {})),
+        chars: utf8ToBytes(stableJsonStringify(runtimeSections.runtimeAppStateSummary || {})).length,
+        truncated: false
+      },
+      {
+        id: "active-skill",
+        title: "Active skill path",
+        sourceType: "experienceDoc",
+        sourceRef: activeSkillPath,
+        sha256: skillDoc?.sha256 || null,
+        chars: activeSkillPath.length,
+        truncated: false
+      },
+      {
+        id: "tool-registry",
+        title: "Tool registry",
+        sourceType: "harness",
+        sourceRef: "tool.registry.snapshot",
+        sha256: registrySnapshot.registrySha256,
+        chars: utf8ToBytes(stableJsonStringify(registrySnapshot.tools)).length,
+        truncated: false
+      },
+      {
+        id: "user-input",
+        title: "Run prompt",
+        sourceType: "userInput",
+        sourceRef: "gateway.command.experience.run",
+        sha256: await sha256HexFromUtf8(instructionForModel),
+        chars: instructionForModel.length,
+        truncated: false
+      }
+    ];
+    const contextReceiptPath = await trainerWriteContextReceipt(capture, capture.turnId, {
+      systemPrompt: preview.systemPrompt,
+      messages: llmRequestMessages,
+      tools: llmToolSpecs,
+      sections
+    });
+    capture.llmStartEvent = await trainerAppendEvent(
+      capture,
+      "llm.turn.start",
+      "agent",
+      {
+        turnId: capture.turnId,
+        provider: String(state.llmProvider || getConfiguredModel()?.provider || "openai"),
+        modelId: String(state.llmModelId || getConfiguredModel()?.id || "unknown"),
+        modelRef: String(state.llmModelRef || ""),
+        api: String(state.llmApi || getConfiguredModel()?.api || ""),
+        reasoning: String(state.llmReasoning || ""),
+        baseUrl: String(state.llmBaseUrl || ""),
+        useProxy: state.llmUseProxy !== false,
+        contextReceiptPath,
+        toolRegistrySha256: registrySnapshot.registrySha256,
+        truncation: {
+          applied: preview.truncatedFiles.length > 0,
+          reason: preview.truncatedFiles.length > 0 ? "workspace_context_file_limit" : null,
+          maxChars: null
+        }
+      },
+      { parentSpanId: capture.registryEvent?.spanId || null }
+    );
+    capture.turnSpanId = capture.llmStartEvent?.spanId || null;
+  } catch (err2) {
+    capture = null;
+    state.trainer.activeCapture = null;
+    log(`trainer capture init failed: ${err2?.message || String(err2)}`);
+  }
   recordLastLlmInputDebug({
     source: "gateway.command.experience.run",
     userText: instruction,
@@ -50850,7 +51858,144 @@ ${runtimeSections.combinedContext}`;
     const errorText = typeof msg.errorMessage === "string" ? msg.errorMessage.trim() : "";
     if (errorText) assistantErrorMessage = errorText;
   }
+  const requestedToolCalls = trainerExtractToolCalls(generated);
+  if (capture) {
+    capture.stats.llmTurns += 1;
+    await trainerAppendEvent(
+      capture,
+      "llm.turn.end",
+      "agent",
+      {
+        turnId: capture.turnId,
+        outputText: assistantText || "",
+        toolCalls: requestedToolCalls.map((call) => ({
+          toolCallId: call.toolCallId,
+          name: call.name,
+          argsJson: call.argsJson
+        })),
+        finishReason: assistantStopReason || "stop",
+        usage: null
+      },
+      { parentSpanId: capture.turnSpanId || null }
+    );
+    const requestedById = /* @__PURE__ */ new Map();
+    for (const call of requestedToolCalls) {
+      capture.stats.toolCalls += 1;
+      const reqEvent = await trainerAppendEvent(
+        capture,
+        "tool.call.requested",
+        "agent",
+        {
+          turnId: capture.turnId,
+          toolCallId: call.toolCallId,
+          name: call.name,
+          args: call.args,
+          argsJson: call.argsJson
+        },
+        { parentSpanId: capture.turnSpanId || null }
+      );
+      requestedById.set(call.toolCallId, reqEvent);
+    }
+    const resultsById = trainerExtractToolResults(generated);
+    const knownRegistryTools = new Set((registrySnapshot.tools || []).map((tool) => String(tool?.name || "")));
+    for (const call of requestedToolCalls) {
+      const result = resultsById.get(call.toolCallId) || null;
+      const missing = !result;
+      const inferredToolMissing = missing && !knownRegistryTools.has(call.name);
+      const rawResultErrorCode = String(result?.error?.code || "").trim().toUpperCase();
+      const rawResultErrorMessage = String(result?.error?.message || "");
+      const resultReportsToolMissing = !missing && (rawResultErrorCode === "TOOL_NOT_FOUND" || rawResultErrorCode === "UNSUPPORTED" && /not found/i.test(rawResultErrorMessage));
+      const errorCode = inferredToolMissing ? "TOOL_NOT_FOUND" : missing ? "UNSUPPORTED" : resultReportsToolMissing ? "TOOL_NOT_FOUND" : rawResultErrorCode;
+      const errorMessage = inferredToolMissing ? `Tool ${call.name} is not registered` : missing ? `Tool ${call.name} result was not emitted` : rawResultErrorMessage;
+      const execEvent = await trainerAppendEvent(
+        capture,
+        "tool.call.executed",
+        "system",
+        {
+          toolCallId: call.toolCallId,
+          name: call.name,
+          ok: missing ? false : result.ok === true,
+          durationMs: missing ? 0 : Number(result.durationMs || 0),
+          retries: 0,
+          result: missing ? null : result.result,
+          error: missing || result.ok !== true ? {
+            code: errorCode || "UNSUPPORTED",
+            message: errorMessage || "Tool execution failed",
+            details: missing ? { toolCallId: call.toolCallId, requestedTool: call.name } : result?.error?.details || null
+          } : null
+        },
+        { parentSpanId: requestedById.get(call.toolCallId)?.spanId || capture.turnSpanId || null }
+      );
+      if (execEvent?.data?.ok !== true) {
+        capture.stats.toolFailures += 1;
+      }
+      if ((execEvent?.data?.error?.code || "") === "TOOL_NOT_FOUND") {
+        await trainerAppendEvent(
+          capture,
+          "error",
+          "system",
+          {
+            kind: "TOOL_NOT_FOUND",
+            message: execEvent?.data?.error?.message || `Tool ${call.name} not found`,
+            toolCallId: call.toolCallId,
+            turnId: capture.turnId,
+            toolRegistrySha256: registrySnapshot.registrySha256,
+            requestedToolName: call.name,
+            requestedEventSeq: requestedById.get(call.toolCallId)?.seq || null,
+            registryEventSeq: capture.registryEvent?.seq || null,
+            llmTurnEventSeq: capture.llmStartEvent?.seq || null
+          },
+          { parentSpanId: execEvent?.spanId || capture.turnSpanId || null }
+        );
+      }
+      if ((execEvent?.data?.error?.code || "") === "APPROVAL_REJECTED") {
+        await trainerAppendEvent(
+          capture,
+          "error",
+          "system",
+          {
+            kind: "APPROVAL_REJECTED",
+            message: execEvent?.data?.error?.message || "Tool call rejected by coach",
+            toolCallId: call.toolCallId,
+            turnId: capture.turnId,
+            toolRegistrySha256: registrySnapshot.registrySha256,
+            requestedToolName: call.name
+          },
+          { parentSpanId: execEvent?.spanId || capture.turnSpanId || null }
+        );
+      }
+    }
+  }
+  const runtimeAfterSnapshot = await resolveRuntimeSessionSnapshot();
+  const runtimeAfterSummary = summarizeRuntimeAppStateForDebug(runtimeAfterSnapshot?.appState || null);
+  const successSignals = trainerResolveSuccessSignals(runtimeAfterSnapshot);
+  if (capture) {
+    await trainerAppendEvent(
+      capture,
+      "state.transition",
+      "system",
+      {
+        source: "api:/api/state",
+        prev: runtimeBeforeSummary || null,
+        next: runtimeAfterSummary || null,
+        keys: [
+          "experience.id",
+          "experience.step",
+          "experience.nextAgentAction",
+          "houseId",
+          "human.selected",
+          "agent.selected",
+          "match.matched",
+          "human.openPressed",
+          "agent.openPressed"
+        ]
+      },
+      { parentSpanId: capture.turnSpanId || null }
+    );
+  }
   if (assistantText === LLM_NOT_CONFIGURED_MESSAGE) {
+    await closeCapture("fail", successSignals);
+    state.trainer.activeCapture = null;
     return finishFailure(
       "agent-turn",
       "LLM_NOT_CONFIGURED",
@@ -50859,6 +52004,7 @@ ${runtimeSections.combinedContext}`;
         mode: "agent-turn",
         prompt: instruction,
         runtimeContext,
+        successSignals,
         resolvedPaths: resolved.resolvedPaths,
         siteRoot: resolved.siteRoot,
         fileKeys: Object.keys(resolved.files),
@@ -50870,6 +52016,8 @@ ${runtimeSections.combinedContext}`;
   if (assistantErrorMessage || assistantStopReason === "error") {
     const normalizedError = String(assistantErrorMessage || "").toUpperCase();
     const errorCode = normalizedError.includes("HATCH_REQUIRED") ? "HATCH_REQUIRED" : normalizedError.includes("SESSION_REQUIRED") ? "SESSION_REQUIRED" : "LLM_RUN_FAILED";
+    await closeCapture("fail", successSignals);
+    state.trainer.activeCapture = null;
     return finishFailure(
       "agent-turn",
       errorCode,
@@ -50878,6 +52026,7 @@ ${runtimeSections.combinedContext}`;
         mode: "agent-turn",
         prompt: instruction,
         runtimeContext,
+        successSignals,
         stopReason: assistantStopReason || "error",
         assistantMessageCount,
         assistantText: assistantText || null,
@@ -50889,10 +52038,15 @@ ${runtimeSections.combinedContext}`;
       }
     );
   }
+  const attemptResult = successSignals.isSuccess ? "success" : "unknown";
+  await closeCapture(attemptResult, successSignals);
+  state.trainer.activeCapture = null;
   return finishSuccess("agent-turn", {
     mode: "agent-turn",
     prompt: instruction,
     runtimeContext,
+    successSignals,
+    trainerAttemptId: capture?.attemptId || null,
     assistantMessageCount,
     assistantText: assistantText || null,
     resolvedPaths: resolved.resolvedPaths,
@@ -51241,6 +52395,14 @@ var state = {
   wsSessions: /* @__PURE__ */ new Map(),
   workspaceDirs: /* @__PURE__ */ new Set(["workspace/"]),
   workspaceEvents: [],
+  trainer: {
+    activeCapture: null,
+    activeLoadoutByQuest: {},
+    coaching: {
+      enabled: false,
+      mode: "approve"
+    }
+  },
   skillImport: {
     status: "idle",
     sourceUrl: null,
@@ -51285,6 +52447,10 @@ async function loadStateFromIdb() {
       state.secretStore[k] = v;
     }
   }
+  state.trainer.activeLoadoutByQuest = {};
+  state.trainer.activeLoadoutByQuest[TRAINER_DEFAULT_QUEST_ID] = await trainerGetActiveLoadoutId(TRAINER_DEFAULT_QUEST_ID) || null;
+  state.trainer.coaching = trainerNormalizeCoachingState(await metaGet(TRAINER_COACHING_META_KEY));
+  state.trainer.activeCapture = null;
   state.workspaceDirs = /* @__PURE__ */ new Set(["workspace/"]);
   const workspaceDirsRaw = await metaGet("workspaceDirsV1") || [];
   if (Array.isArray(workspaceDirsRaw)) {
@@ -51299,12 +52465,20 @@ async function loadStateFromIdb() {
   }
   const krootB64 = await metaGet("krootB64") || null;
   if (typeof krootB64 === "string" && krootB64) {
-    const kroot = b64ToBytes(krootB64);
-    const keys = await deriveHouseKeysFromKroot(kroot);
-    state.krootBytes = kroot;
-    state.kencBytes = keys.kencBytes;
-    state.kauthBytes = keys.kauthBytes;
-    state.kauthKey = keys.kauthKey;
+    try {
+      const kroot = b64ToBytes(krootB64);
+      const keys = await deriveHouseKeysFromKroot(kroot);
+      state.krootBytes = kroot;
+      state.kencBytes = keys.kencBytes;
+      state.kauthBytes = keys.kauthBytes;
+      state.kauthKey = keys.kauthKey;
+    } catch {
+      state.krootBytes = null;
+      state.kencBytes = null;
+      state.kauthBytes = null;
+      state.kauthKey = null;
+      log("invalid krootB64 ignored during boot");
+    }
   }
   const skillImportRaw = await metaGet("skillImportV1") || null;
   if (skillImportRaw && typeof skillImportRaw === "object") {
@@ -51364,6 +52538,7 @@ async function boot() {
     await persistTranscript();
   }
 }
+var bootReady = boot();
 self.addEventListener("message", async (ev) => {
   const msg = ev.data;
   if (!msg || typeof msg.type !== "string") return;
@@ -51371,6 +52546,7 @@ self.addEventListener("message", async (ev) => {
     if (msg.type === "gateway.boot") {
       return;
     }
+    await bootReady;
     if (msg.type === "gateway.wallet.response") {
       resolveWalletResponse(msg);
       return;
@@ -51500,9 +52676,27 @@ ${extraContext}` : text;
       await metaSet("llmBaseUrl", state.llmBaseUrl);
       await metaSet("llmReasoning", state.llmReasoning);
       await metaSet("llmUseProxy", state.llmUseProxy);
+      trainerCheckpointForConfigChange("llm-config").catch(() => {
+      });
       log(
         `llm configured api=${state.llmApi || "default"} provider=${state.llmProvider || "default"} model=${state.llmModelRef || state.llmModelId || "default"} proxy=${state.llmUseProxy ? "1" : "0"} thinking=${state.llmReasoning || "default"}`
       );
+      if (msg.requestId) {
+        post({
+          type: "worker.llm.config.set",
+          requestId: String(msg.requestId || ""),
+          ok: true,
+          result: makeToolSuccess({
+            api: state.llmApi || null,
+            provider: state.llmProvider || null,
+            modelRef: state.llmModelRef || null,
+            modelId: state.llmModelId || null,
+            baseUrl: state.llmBaseUrl || null,
+            reasoning: state.llmReasoning || null,
+            useProxy: state.llmUseProxy !== false
+          })
+        });
+      }
       return;
     }
     if (msg.type === "gateway.command.exportZip") {
@@ -51940,6 +53134,144 @@ ${extraContext}` : text;
       });
       return;
     }
+    if (msg.type === "gateway.command.trainer.attempts.list") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      const questId = trainerQuestId(params.questId || TRAINER_DEFAULT_QUEST_ID);
+      const attempts = await trainerListAttemptManifests(questId);
+      post({
+        type: "worker.trainer.attempts.list",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess({ questId, attempts })
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.attempt.get") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      let result;
+      try {
+        const bundle = await trainerReadAttemptBundle({
+          questId: trainerQuestId(params.questId || TRAINER_DEFAULT_QUEST_ID),
+          attemptId: params.attemptId || ""
+        });
+        result = makeToolSuccess(bundle);
+      } catch (err2) {
+        result = makeToolFailure("NOT_FOUND", err2?.message || "ATTEMPT_NOT_FOUND");
+      }
+      post({
+        type: "worker.trainer.attempt.get",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.compare") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      const result = makeToolSuccess(await trainerCompareAttempts({
+        questId: trainerQuestId(params.questId || TRAINER_DEFAULT_QUEST_ID),
+        limit: params.limit
+      }));
+      post({
+        type: "worker.trainer.compare",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.loadouts.list") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      const questId = trainerQuestId(params.questId || TRAINER_DEFAULT_QUEST_ID);
+      const result = makeToolSuccess(await trainerListLoadoutManifests(questId));
+      post({
+        type: "worker.trainer.loadouts.list",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.loadouts.activate") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      const questId = trainerQuestId(params.questId || TRAINER_DEFAULT_QUEST_ID);
+      const loadoutId = typeof params.loadoutId === "string" ? params.loadoutId.trim() : "";
+      let result;
+      if (!loadoutId) {
+        result = makeToolFailure("INVALID_ARGUMENTS", "Missing loadoutId");
+      } else {
+        const manifestPath = `${trainerLoadoutRoot(questId, loadoutId)}/manifest.json`;
+        const manifest = trainerParseJsonSafe(await vfsGetUtf8(manifestPath), null);
+        if (!isPlainObject(manifest)) {
+          result = makeToolFailure("NOT_FOUND", "Loadout not found");
+        } else {
+          await trainerSetActiveLoadoutId(questId, loadoutId);
+          result = makeToolSuccess({ questId, loadoutId });
+        }
+      }
+      post({
+        type: "worker.trainer.loadouts.activate",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.coaching.get") {
+      post({
+        type: "worker.trainer.coaching.get",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess(trainerNormalizeCoachingState(state.trainer.coaching))
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.coaching.set") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      state.trainer.coaching = trainerNormalizeCoachingState({
+        enabled: params.enabled === true,
+        mode: params.mode
+      });
+      await metaSet(TRAINER_COACHING_META_KEY, state.trainer.coaching);
+      post({
+        type: "worker.trainer.coaching.set",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess(state.trainer.coaching)
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.backup.export") {
+      let result;
+      try {
+        result = makeToolSuccess(await trainerExportPersonalBackup());
+      } catch (err2) {
+        result = makeToolFailure("UNSUPPORTED", err2?.message || "BACKUP_EXPORT_FAILED");
+      }
+      post({
+        type: "worker.trainer.backup.export",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.trainer.backup.import") {
+      const params = isPlainObject(msg.params) ? msg.params : {};
+      let result;
+      try {
+        result = makeToolSuccess(await trainerImportPersonalBackup(params.backup));
+      } catch (err2) {
+        result = makeToolFailure("INVALID_BACKUP", err2?.message || "BACKUP_IMPORT_FAILED");
+      }
+      post({
+        type: "worker.trainer.backup.import",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
     if (msg.type === "gateway.command.origin.check") {
       try {
         const result = evaluateOriginAccess({
@@ -52000,7 +53332,7 @@ ${extraContext}` : text;
     log(`error: ${e.message || String(e)}`);
   }
 });
-boot().catch((e) => {
+bootReady.catch((e) => {
   log(`boot failed: ${e.message || String(e)}`);
 });
 /*! Bundled license information:

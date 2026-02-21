@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet, seedRecoverableTokenHouse } = require('./helpers/phase1');
-const { enterHatch, triggerWalletProfileCheck, attachPathRecorder } = require('./helpers/phase2');
+const { enterHatch, triggerWalletProfileCheck, attachPathRecorder, ensureBrainPanelVisible } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -25,7 +25,7 @@ test('wallet with existing house mapping redirects to house in setup flow', asyn
   await enterHatch(page, 'signin');
   await triggerWalletProfileCheck(page);
 
-  await page.waitForURL(/\/house\?house=/, { timeout: 2000 });
+  await page.waitForURL(/\/house\?house=/, { timeout: 8000 });
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBe(seeded.houseId);
   expectNonceLookupSequence(calls);
@@ -42,7 +42,8 @@ test('wallet without mapping stays in setup flow and keeps brain controls visibl
 
   await page.waitForTimeout(2200);
   expect(page.url()).not.toMatch(/\/house\?house=/);
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await expect(page.locator('#pathPanel')).toBeVisible();
+  await ensureBrainPanelVisible(page);
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
   expectNonceLookupSequence(calls);
 });

@@ -8,7 +8,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
+test('ERC-8004 UI stays hidden on house page', async ({ page }) => {
   // Mock Solana wallet + EVM wallet + ag0 SDK
   await page.addInitScript(() => {
     // Solana mock
@@ -47,28 +47,6 @@ test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
   });
 
   await page.goto('/');
-  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
-
-  // Connect agent
-  await request.post('/api/agent/connect', { data: { teamCode, agentName: 'ClawTest' } });
-
-  // Match
-  await page.getByTestId('sigil-key').click();
-  await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
-
-  // Press open
-  await page.getByTestId('open-btn').click();
-  await request.post('/api/agent/open/press', { data: { teamCode } });
-  await page.waitForURL('**/create');
-
-  // Agent ceremony
-  // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
-  const ra = crypto.randomBytes(32);
-  const agentRevealPair = makeCeremonyRevealPair();
-  const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
-  const commitResp = await request.post('/api/agent/house/commit', {
-    data: { teamCode, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
-  });
   await reachCreateViaLite(page);
 
   await page.getByTestId('px-0-0').click();

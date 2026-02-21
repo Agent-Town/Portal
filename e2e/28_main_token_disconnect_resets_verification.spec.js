@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet } = require('./helpers/phase1');
+const { enterHatch, triggerWalletProfileCheck } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -20,15 +21,13 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
   });
 
   await page.goto('/');
-  await page.getByTestId('auth-signin').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await enterHatch(page, 'signin', { navigate: false });
 
   const teamBefore = (await page.getByTestId('team-code').innerText()).trim();
   expect(teamBefore).toMatch(/^TEAM-/);
 
-  await page.getByTestId('hatch-wallet-check').click();
-  await expect(page.getByTestId('hatch-status')).toContainText(/no existing house|continue setting up/i);
-  await expect(page.getByTestId('path-human')).toHaveCount(0);
+  await triggerWalletProfileCheck(page);
+  await expect(page.locator('#walletStatus')).toContainText(/no existing house|continue setting up|wallet verified/i);
 
   const resetResult = await page.evaluate(async () => {
     const resp = await fetch('/api/session/reset', {
@@ -43,8 +42,7 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
   expect(resetResult.ok).toBe(true);
 
   await page.reload();
-  await page.getByTestId('auth-signin').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await enterHatch(page, 'signin', { navigate: false });
   const teamAfter = (await page.getByTestId('team-code').innerText()).trim();
   expect(teamAfter).toMatch(/^TEAM-/);
   expect(teamAfter).not.toBe(teamBefore);

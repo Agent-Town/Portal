@@ -261,6 +261,14 @@ async function completeTownhallStory(page, {
   humanPrompt = 'Human prompt text',
   agentPrompt = 'Agent prompt text'
 } = {}) {
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/i });
+  if (await connectWalletBtn.isVisible().catch(() => false)) {
+    const label = String((await connectWalletBtn.textContent()) || '');
+    if (/connect/i.test(label)) {
+      await connectWalletBtn.click();
+    }
+  }
+
   await expect(page.locator('#townhallStepHuman')).toBeVisible();
   await page.locator('#townhallHumanName').fill(humanName);
   await page.locator('#townhallHumanCustomizeBtn').click();
@@ -306,7 +314,12 @@ async function openTownhallPanel(page) {
   if (!(await townhallVisible())) {
     await page.getByRole('button', { name: 'Open Town Hall' }).click();
   }
-  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await expect.poll(async () => {
+    const human = await page.locator('#townhallStepHuman').isVisible().catch(() => false);
+    const agent = await page.locator('#townhallStepAgent').isVisible().catch(() => false);
+    const processing = await page.locator('#townhallStepProcessing').isVisible().catch(() => false);
+    return human || agent || processing;
+  }, { timeout: 8000 }).toBe(true);
 }
 
 async function configureBrain(page, {
@@ -415,11 +428,8 @@ test('town hall completion persists across repeated refreshes and does not re-ru
     }
 
     await page.reload();
-
-    await page.waitForFunction(() => {
-      const townhallRegisterState = document.querySelector('#townhallRegisterState');
-      return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
-    }, null, { timeout: 12000 });
+    await openTownhallPanel(page);
+    await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
 
     const cookiesAfter = await page.context().cookies();
     const sessionCookieAfter = cookiesAfter.find((cookie) => cookie.name === 'et_session');
@@ -500,11 +510,8 @@ test('town hall completion is restored by wallet identity after cookie and hint 
   });
 
   await page.reload();
-
-  await page.waitForFunction(() => {
-    const townhallRegisterState = document.querySelector('#townhallRegisterState');
-    return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
-  }, null, { timeout: 12000 });
+  await openTownhallPanel(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
 
   const reopenedStateResp = await page.request.get('/api/state');
   expect(reopenedStateResp.ok()).toBeTruthy();
@@ -601,11 +608,8 @@ test('town hall completion recovers even if first session request misses wallet 
   });
 
   await page.reload();
-
-  await page.waitForFunction(() => {
-    const townhallRegisterState = document.querySelector('#townhallRegisterState');
-    return townhallRegisterState && /Registered/i.test(townhallRegisterState.textContent || '');
-  }, null, { timeout: 12000 });
+  await openTownhallPanel(page);
+  await expect(page.locator('#townhallRegisterState')).toContainText('Registered', { timeout: 12000 });
 
   const reopenedStateResp = await page.request.get('/api/state');
   expect(reopenedStateResp.ok()).toBeTruthy();
@@ -713,10 +717,9 @@ test('required town hall onboarding locks district switching until registration 
   await completeTownhallStory(page, { humanPrompt: 'Human prompt', agentPrompt: 'Agent prompt' });
 
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
-  await expect(page.locator('#districtModalBackdrop')).toBeHidden();
+  await expect(page.locator('#districtModalBackdrop')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
   await configureBrain(page);
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
-  await page.getByRole('button', { name: 'Open Saloon' }).click();
-  await expect(page.locator('#districtModalBackdrop')).toBeVisible();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
 });

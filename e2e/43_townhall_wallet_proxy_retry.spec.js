@@ -208,11 +208,33 @@ async function completeTownhallStory(page) {
   await page.getByTestId('townhall-agent-submit-btn').click();
 }
 
+async function openTownhallPanel(page) {
+  const panel = page.locator('#townhallRegisterPanel');
+  const townhallVisible = async () => (
+    await panel.isVisible()
+    || await page.locator('#townhallStepHuman').isVisible()
+    || await page.locator('#townhallStepAgent').isVisible()
+    || await page.locator('#townhallStepProcessing').isVisible()
+  );
+  if (await townhallVisible()) return;
+
+  const backdrop = page.locator('#districtModalBackdrop');
+  if (await backdrop.isVisible()) {
+    const closeBtn = page.locator('#districtModalClose');
+    if (await closeBtn.isVisible()) await closeBtn.click();
+  }
+
+  if (!(await townhallVisible())) {
+    await page.getByRole('button', { name: 'Open Town Hall' }).click();
+  }
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+}
+
 test('town hall registration retries Privy embedded wallet proxy initialization', async ({ page }) => {
   await installWalletProxyRetryMocks(page);
   await page.goto('/app');
 
-  await expect(page.locator('#townhallRegisterPanel')).toBeVisible({ timeout: 8000 });
+  await openTownhallPanel(page);
   await completeTownhallStory(page);
 
   await expect(page.locator('#townhallMintUserEvmStatus')).toContainText('Done', { timeout: 15000 });

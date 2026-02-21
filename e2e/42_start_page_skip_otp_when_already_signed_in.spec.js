@@ -36,6 +36,18 @@ test('start page skips OTP modal when Privy session already exists', async ({ pa
     });
   });
 
+  await page.route('**/api/onboarding/status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        step: 2,
+        hasWallet: true
+      })
+    });
+  });
+
   await page.goto('/start');
   await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
 });

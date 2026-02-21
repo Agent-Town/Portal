@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet } = require('./helpers/phase1');
-const { reachCreateViaLite } = require('./helpers/phase2');
+const { reachCreateViaLite, enterHatch } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -42,8 +42,7 @@ test('disconnecting wallet after unlocking resets to a fresh session (shared dev
   await page.getByRole('button', { name: 'Disconnect wallet' }).click();
   await page.waitForURL('**/');
 
-  await page.getByTestId('auth-signin').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await enterHatch(page, 'signin', { navigate: false });
   const teamAfter = (await page.getByTestId('team-code').innerText()).trim();
   expect(teamAfter).toMatch(/^TEAM-/);
   expect(teamAfter).not.toBe(teamBefore);

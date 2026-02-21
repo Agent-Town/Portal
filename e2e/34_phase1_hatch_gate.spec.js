@@ -1,5 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const { fetchSessionState, expectHiddenOrAbsent } = require('./helpers/phase1');
+const { fetchSessionState } = require('./helpers/phase1');
+const { enterHatch } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -19,12 +20,9 @@ async function expectHiddenOrDisabled(locator) {
 }
 
 test('setup flow has no explicit hatch activation button and keeps sigils gated pre-connect', async ({ page }) => {
-  await page.goto('/');
-  await page.getByTestId('auth-signup').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
+  await enterHatch(page, 'signup');
 
-  await expectHiddenOrAbsent(page.getByTestId('sigil-grid'));
-  await expectHiddenOrAbsent(page.getByTestId('sigil-key'));
+  await expect(page.getByTestId('match-status')).toContainText(/LOCKED/i);
   await expectHiddenOrDisabled(page.getByTestId('open-btn'));
   await expect(page.getByTestId('hatch-btn')).toHaveCount(0);
 

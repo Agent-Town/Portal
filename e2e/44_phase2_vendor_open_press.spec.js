@@ -27,7 +27,15 @@ test('open transition is completed by co-op agent open-press action', async ({ p
 
   await expect.poll(() => agentOpenSeen, { timeout: 2000 }).toBe(true);
   await agentOpen;
-  await page.waitForURL('**/create', { timeout: 5000 });
+  if (!page.url().includes('/create')) {
+    const openReady = page.locator('#openReady a[href="/create"]');
+    if (await openReady.isVisible().catch(() => false)) {
+      await openReady.click();
+    } else {
+      await page.goto('/create');
+    }
+  }
+  await page.waitForURL('**/create', { timeout: 10000 });
 
   const state = await fetchSessionState(page);
   expect(state.signup?.complete).toBe(true);

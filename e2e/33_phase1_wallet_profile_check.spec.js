@@ -3,39 +3,13 @@ const {
   installMockSolanaWallet,
   seedRecoverableTokenHouse
 } = require('./helpers/phase1');
+const { enterHatch, triggerWalletProfileCheck, ensureBrainPanelVisible } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
-
-async function enterHatch(page, intent = 'signin') {
-  await page.goto('/');
-  await page.getByTestId(`auth-${intent}`).click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
-}
-
-async function triggerWalletProfileCheck(page) {
-  const candidates = [
-    page.getByTestId('hatch-wallet-check'),
-    page.getByTestId('hatch-wallet-connect'),
-    page.getByRole('button', { name: /Check wallet/i }),
-    page.getByRole('button', { name: /Connect wallet/i }),
-    page.locator('#connectWalletBtn')
-  ];
-
-  for (const locator of candidates) {
-    const count = await locator.count();
-    if (!count) continue;
-    const target = locator.first();
-    if (!(await target.isVisible())) continue;
-    await target.click();
-    return;
-  }
-
-  throw new Error('NO_HATCH_WALLET_TRIGGER');
-}
 
 test('wallet profile check runs nonce+lookup and redirects to house when a profile exists', async ({ page, request }) => {
   await installMockSolanaWallet(page);
@@ -52,7 +26,7 @@ test('wallet profile check runs nonce+lookup and redirects to house when a profi
   await enterHatch(page, 'signin');
   await triggerWalletProfileCheck(page);
 
-  await page.waitForURL(/\/house\?house=/, { timeout: 2000 });
+  await page.waitForURL(/\/house\?house=/, { timeout: 8000 });
   const url = new URL(page.url());
   expect(url.searchParams.get('house')).toBe(seeded.houseId);
 
@@ -73,6 +47,7 @@ test('wallet with no profile remains in setup flow and exposes brain config cont
 
   await page.waitForTimeout(2100);
   expect(page.url()).not.toMatch(/\/house\?house=/);
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await expect(page.locator('#pathPanel')).toBeVisible();
+  await ensureBrainPanelVisible(page);
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible();
 });

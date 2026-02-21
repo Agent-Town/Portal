@@ -313,12 +313,11 @@ test('town hall one-click flow mints all 4 identities and saves registration', a
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
-  await expect(page.locator('#districtModalBackdrop')).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'true');
-  await configureBrain(page);
-  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
-  await page.getByRole('button', { name: 'Open Saloon' }).click();
   await expect(page.locator('#districtModalBackdrop')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
+  await configureBrain(page);
+  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Open Saloon' })).toHaveAttribute('aria-disabled', 'false');
 
   expect(evmSubjects).toEqual(['human', 'agent']);
   expect(solSubjects).toEqual(['human', 'agent']);
@@ -432,5 +431,5 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Pending');
   await expect(page.locator('#townhallRegisterError')).toContainText('does not match');
   await expect(page.locator('#townhallRegisterState')).toContainText('Not registered');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
 });

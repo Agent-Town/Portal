@@ -1366,7 +1366,7 @@ const PRIVY_ENABLED_RAW = !!PRIVY_PUBLIC_CONFIG.appId;
 const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, false);
 const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
 const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
-const HOME_ROUTE_FILE = 'start.html';
+const HOME_ROUTE_FILE = START_PAGE_ENABLED ? 'start.html' : 'index.html';
 const ONBOARDING_REQUIRED = PRIVY_ENABLED;
 const ONBOARDING_STEP_TOWNHALL = 'townhall_profile';
 const ONBOARDING_STEP_BRAIN = 'brain';
@@ -1710,31 +1710,41 @@ function ensureHumanSession(req, res) {
   let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
   const walletCandidates = collectWalletCandidatesFromRequest(req);
+  const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
+    ? req.header('x-team-code-hint').trim()
+    : '';
+  const hintedSession = hintedTeamCode ? getSessionByTeamCode(hintedTeamCode) : null;
 
-  const pickCompletedWalletSession = () => {
+  const sessionRecoveryScore = (candidateSession) => {
+    if (!candidateSession) return 0;
+    const candidateOnboarding = ensureSessionOnboarding(candidateSession);
+    if (!candidateOnboarding) return 0;
+    let score = 0;
+    if (candidateOnboarding.registrationComplete === true) score += 4;
+    if (candidateOnboarding.step === ONBOARDING_STEP_DONE) score += 3;
+    if (candidateSession?.houseCeremony?.houseId) score += 2;
+    if (candidateSession?.signup?.complete) score += 1;
+    return score;
+  };
+
+  const pickBestWalletSession = () => {
+    let bestSession = null;
+    let bestScore = 0;
     for (const candidate of walletCandidates) {
       const walletSession = getSessionByWallet(candidate?.chain, candidate?.address);
       if (!walletSession) continue;
-      const walletOnboarding = ensureSessionOnboarding(walletSession);
-      if (!walletOnboarding) continue;
-      if (walletOnboarding.required !== true || walletOnboarding.step === ONBOARDING_STEP_DONE) {
-        return walletSession;
+      const score = sessionRecoveryScore(walletSession);
+      if (score > bestScore) {
+        bestSession = walletSession;
+        bestScore = score;
       }
     }
-    return null;
+    return bestSession;
   };
 
-  if (!session) {
-    const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
-      ? req.header('x-team-code-hint').trim()
-      : '';
-    if (hintedTeamCode) {
-      const hintedSession = getSessionByTeamCode(hintedTeamCode);
-      if (hintedSession) {
-        session = hintedSession;
-        sid = hintedSession.sessionId;
-      }
-    }
+  if (!session && hintedSession) {
+    session = hintedSession;
+    sid = hintedSession.sessionId;
   }
 
   if (!session) {
@@ -1753,11 +1763,23 @@ function ensureHumanSession(req, res) {
     sid = session.sessionId;
   }
 
-  if (session && session.onboarding?.registrationComplete !== true) {
-    const completedWalletSession = pickCompletedWalletSession();
-    if (completedWalletSession && completedWalletSession.sessionId !== session.sessionId) {
-      session = completedWalletSession;
-      sid = completedWalletSession.sessionId;
+  let currentScore = sessionRecoveryScore(session);
+
+  if (session && hintedSession && hintedSession.sessionId !== session.sessionId) {
+    const hintedScore = sessionRecoveryScore(hintedSession);
+    if (hintedScore > currentScore) {
+      session = hintedSession;
+      sid = hintedSession.sessionId;
+      currentScore = hintedScore;
+    }
+  }
+
+  if (session) {
+    const walletSession = pickBestWalletSession();
+    const walletScore = sessionRecoveryScore(walletSession);
+    if (walletSession && walletSession.sessionId !== session.sessionId && walletScore > currentScore) {
+      session = walletSession;
+      sid = walletSession.sessionId;
     }
   }
 
@@ -1767,6 +1789,10 @@ function ensureHumanSession(req, res) {
     // sessions remain stable even when reverse-proxy headers mark req.secure.
     const secureFlag = isProd ? '; Secure' : '';
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
+  }
+
+  for (const candidate of walletCandidates) {
+    bindSessionWallet(session, candidate?.chain, candidate?.address);
   }
 
   ensureLiteState(session);
@@ -1806,7 +1832,7 @@ function collectWalletCandidatesFromRequest(req) {
     if (!normalizedChain) return;
     const normalizedAddress = normalizedChain === 'evm'
       ? normalizeEvmAddress(address)
-      : normalizeSolanaAddress(address);
+      : normalizeWalletSessionSolanaAddress(address);
     if (!normalizedAddress) return;
     const key = `${normalizedChain}:${normalizedAddress}`;
     if (seen.has(key)) return;
@@ -6355,6 +6381,16 @@ function normalizeSolanaAddress(value) {
   return v;
 }
 
+function normalizeWalletSessionSolanaAddress(value) {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  if (!v) return null;
+  if (v.length < 16 || v.length > 128) return null;
+  if (/\s/.test(v)) return null;
+  if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(v)) return null;
+  return v;
+}
+
 function guessClaimChain(value) {
   const v = typeof value === 'string' ? value.trim() : '';
   if (!v) return null;
@@ -7565,6 +7601,7 @@ app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
+app.get('/trainer', (_req, res) => sendHtmlNoStore(res, 'trainer.html'));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;

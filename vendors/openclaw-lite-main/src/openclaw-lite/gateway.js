@@ -186,6 +186,19 @@ async function init() {
   });
 
   const worker = new Worker("/openclaw-lite/worker.js", { type: "module" });
+  worker.addEventListener("error", (event) => {
+    const message = String(event?.message || "WORKER_ERROR");
+    const file = String(event?.filename || "");
+    const line = Number(event?.lineno || 0);
+    const col = Number(event?.colno || 0);
+    const stack = event?.error?.stack ? String(event.error.stack) : "";
+    console.error("openclaw-lite worker error:", { message, file, line, col, stack });
+    gatewayEvents.emit("status", "worker-error");
+  });
+  worker.addEventListener("messageerror", () => {
+    console.error("openclaw-lite worker messageerror");
+    gatewayEvents.emit("status", "worker-error");
+  });
 
   function sendToWorker(msg) {
     worker.postMessage(msg);
@@ -828,8 +841,134 @@ async function init() {
     return res.result || null;
   }
 
+  async function trainerListAttemptsRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.attempts.list",
+      responseType: "worker.trainer.attempts.list",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_ATTEMPTS_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerGetAttemptRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.attempt.get",
+      responseType: "worker.trainer.attempt.get",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_ATTEMPT_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerCompareRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.compare",
+      responseType: "worker.trainer.compare",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_COMPARE_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerListLoadoutsRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.loadouts.list",
+      responseType: "worker.trainer.loadouts.list",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_LOADOUTS_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerActivateLoadoutRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.loadouts.activate",
+      responseType: "worker.trainer.loadouts.activate",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_LOADOUT_ACTIVATE_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerGetCoachingRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.coaching.get",
+      responseType: "worker.trainer.coaching.get",
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_COACHING_GET_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerSetCoachingRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.coaching.set",
+      responseType: "worker.trainer.coaching.set",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_COACHING_SET_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerBackupExportRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.backup.export",
+      responseType: "worker.trainer.backup.export",
+      timeoutMs: 30_000,
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_BACKUP_EXPORT_FAILED"));
+    return res.result || null;
+  }
+
+  async function trainerBackupImportRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.trainer.backup.import",
+      responseType: "worker.trainer.backup.import",
+      payload: { params },
+      timeoutMs: 30_000,
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TRAINER_BACKUP_IMPORT_FAILED"));
+    return res.result || null;
+  }
+
   // Test-only helpers (stable surface for Playwright).
   window.__openclawLiteTest = {
+    async setLlmConfig(params = {}) {
+      const payload = params && typeof params === "object" ? params : {};
+      const normalized = {
+        apiKey: typeof payload.apiKey === "string" ? payload.apiKey : "",
+        api: typeof payload.api === "string" ? payload.api : "",
+        provider: typeof payload.provider === "string" ? payload.provider : "",
+        modelRef: typeof payload.modelRef === "string" ? payload.modelRef : "",
+        modelId: typeof payload.modelId === "string" ? payload.modelId : "",
+        baseUrl: typeof payload.baseUrl === "string" ? payload.baseUrl : "",
+        reasoning: typeof payload.reasoning === "string" ? payload.reasoning : "",
+        useProxy: payload.useProxy !== false,
+      };
+
+      const matchesExpected = (resultEnvelope) => {
+        const applied = resultEnvelope?.data && typeof resultEnvelope.data === "object" ? resultEnvelope.data : {};
+        if (normalized.provider && String(applied.provider || "") !== normalized.provider) return false;
+        if (normalized.api && String(applied.api || "") !== normalized.api) return false;
+        if (normalized.modelRef && String(applied.modelRef || "") !== normalized.modelRef) return false;
+        if (normalized.modelId && String(applied.modelId || "") !== normalized.modelId) return false;
+        return true;
+      };
+
+      let lastResult = null;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const res = await sendWorkerRequest({
+          requestType: "gateway.command.setLlmConfig",
+          responseType: "worker.llm.config.set",
+          payload: normalized,
+        });
+        if (!res?.ok) throw new Error(String(res?.error || "LLM_CONFIG_SET_FAILED"));
+        lastResult = res.result || null;
+        if (matchesExpected(lastResult)) return lastResult;
+        await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+      }
+      return lastResult;
+    },
     async countCheckpoints() {
       const req = indexedDB.open("openclaw-lite", 1);
       const db = await new Promise((resolve, reject) => {
@@ -1154,6 +1293,33 @@ async function init() {
     async visitExperience({ url } = {}) {
       return visitExperienceRequest({ url });
     },
+    async trainerListAttempts(params = {}) {
+      return trainerListAttemptsRequest(params);
+    },
+    async trainerGetAttempt(params = {}) {
+      return trainerGetAttemptRequest(params);
+    },
+    async trainerCompare(params = {}) {
+      return trainerCompareRequest(params);
+    },
+    async trainerListLoadouts(params = {}) {
+      return trainerListLoadoutsRequest(params);
+    },
+    async trainerActivateLoadout(params = {}) {
+      return trainerActivateLoadoutRequest(params);
+    },
+    async trainerGetCoaching() {
+      return trainerGetCoachingRequest();
+    },
+    async trainerSetCoaching(params = {}) {
+      return trainerSetCoachingRequest(params);
+    },
+    async trainerBackupExport() {
+      return trainerBackupExportRequest();
+    },
+    async trainerBackupImport(params = {}) {
+      return trainerBackupImportRequest(params);
+    },
     async checkOriginAccess({ url, capability = "web_fetch", method = "GET", consume = true } = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.origin.check",
@@ -1187,6 +1353,15 @@ async function init() {
   gatewayEvents.runtimeSessionContext = runtimeSessionContextRequest;
   gatewayEvents.experienceRun = experienceRunRequest;
   gatewayEvents.visitExperience = visitExperienceRequest;
+  gatewayEvents.trainerListAttempts = trainerListAttemptsRequest;
+  gatewayEvents.trainerGetAttempt = trainerGetAttemptRequest;
+  gatewayEvents.trainerCompare = trainerCompareRequest;
+  gatewayEvents.trainerListLoadouts = trainerListLoadoutsRequest;
+  gatewayEvents.trainerActivateLoadout = trainerActivateLoadoutRequest;
+  gatewayEvents.trainerGetCoaching = trainerGetCoachingRequest;
+  gatewayEvents.trainerSetCoaching = trainerSetCoachingRequest;
+  gatewayEvents.trainerBackupExport = trainerBackupExportRequest;
+  gatewayEvents.trainerBackupImport = trainerBackupImportRequest;
 
   gatewayEvents.send = (msg) => {
     if (msg && msg.type === 'chat') {

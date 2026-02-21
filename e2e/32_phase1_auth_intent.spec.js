@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterHatch, ensureAppShell, ensureBrainPanelVisible } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -6,19 +7,20 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-async function openHatchVia(page, intentTestId) {
-  await page.getByTestId(intentTestId).click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
-  await expect(page.getByTestId('hatch-status')).toBeVisible({ timeout: 500 });
+async function openHatchVia(page, intent = 'signin', { navigate = false } = {}) {
+  await enterHatch(page, intent, { navigate });
+  await ensureBrainPanelVisible(page);
+  await expect(page.getByTestId('lite-llm-panel')).toBeVisible({ timeout: 1500 });
 }
 
 async function captureVisibleHatchControls(page) {
-  const controls = page.locator('[data-testid="hatch-panel"] [data-testid]');
-  const ids = await controls.evaluateAll((nodes) => {
-    return nodes
-      .map((n) => n.getAttribute('data-testid'))
-      .filter((id) => !!id && id !== 'hatch-panel');
-  });
+  const candidateIds = ['path-human', 'path-coop', 'path-agent', 'team-code', 'skill-link', 'lite-llm-panel'];
+  const ids = [];
+  for (const id of candidateIds) {
+    const locator = page.getByTestId(id);
+    if (!(await locator.count())) continue;
+    if (await locator.first().isVisible()) ids.push(id);
+  }
   ids.sort();
   return ids;
 }
@@ -37,22 +39,22 @@ async function resetSessionFromBrowser(page) {
 }
 
 test('sign in and sign up both transition to the same setup flow and reload keeps setup visible', async ({ page }) => {
-  await page.goto('/');
+  await ensureAppShell(page);
 
-  await openHatchVia(page, 'auth-signin');
+  await openHatchVia(page, 'signin');
   const signinControls = await captureVisibleHatchControls(page);
   expect(signinControls.length).toBeGreaterThanOrEqual(2);
   expect(signinControls).toContain('lite-llm-panel');
-  expect(signinControls).toContain('hatch-status');
+  expect(signinControls).toContain('team-code');
 
   await page.reload();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 500 });
+  await openHatchVia(page, 'signin');
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible({ timeout: 500 });
 
   await resetSessionFromBrowser(page);
-  await page.goto('/');
+  await ensureAppShell(page);
 
-  await openHatchVia(page, 'auth-signup');
+  await openHatchVia(page, 'signup');
   const signupControls = await captureVisibleHatchControls(page);
   expect(signupControls).toEqual(signinControls);
 });

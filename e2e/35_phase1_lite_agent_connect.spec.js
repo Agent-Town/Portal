@@ -10,8 +10,10 @@ test.beforeEach(async ({ request }) => {
 
 test('after setup, the in-browser OpenClaw Lite agent is connected in state', async ({ page }) => {
   await hatchAndConnectLite(page, 'signin');
-
-  await expect(page.getByTestId('lite-agent-status')).toContainText(/connected/i, { timeout: 2000 });
+  await expect.poll(async () => {
+    const state = await fetchSessionState(page);
+    return !!state?.agent?.connected;
+  }, { timeout: 10000 }).toBe(true);
 
   const state = await fetchSessionState(page);
   expect(state.agent?.connected).toBe(true);

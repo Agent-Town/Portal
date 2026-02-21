@@ -1,4 +1,5 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const WALLET_IDENTITY_HINT_STORAGE_KEY = 'agentTown:walletIdentityHint';
 const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
 const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
 
@@ -48,6 +49,45 @@ function saveTeamCodeHint(value) {
   if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
   try {
     localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function readWalletIdentityHint() {
+  try {
+    const raw = localStorage.getItem(WALLET_IDENTITY_HINT_STORAGE_KEY);
+    if (!raw) return { evm: '', solana: '' };
+    const parsed = JSON.parse(raw);
+    const evm = normalizeEvmAddress(parsed?.evm || parsed?.evmAddress || '') || '';
+    const solana = normalizeSolanaAddress(parsed?.solana || parsed?.solanaAddress || '') || '';
+    return { evm, solana };
+  } catch {
+    return { evm: '', solana: '' };
+  }
+}
+
+function saveWalletIdentityHint(identity = {}) {
+  const current = readWalletIdentityHint();
+  const evm = normalizeEvmAddress(identity?.evm || identity?.evmAddress || current.evm || '') || '';
+  const solana = normalizeSolanaAddress(identity?.solana || identity?.solanaAddress || current.solana || '') || '';
+  try {
+    if (!evm && !solana) {
+      localStorage.removeItem(WALLET_IDENTITY_HINT_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(WALLET_IDENTITY_HINT_STORAGE_KEY, JSON.stringify({
+      evm: evm || null,
+      solana: solana || null
+    }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearWalletIdentityHint() {
+  try {
+    localStorage.removeItem(WALLET_IDENTITY_HINT_STORAGE_KEY);
   } catch {
     // ignore storage errors
   }
@@ -118,6 +158,10 @@ function collectWalletIdentitiesFromClient() {
   if (cachedWallet && typeof cachedWallet.address === 'string') {
     add('solana', cachedWallet.address);
   }
+
+  const walletIdentityHint = readWalletIdentityHint();
+  if (walletIdentityHint.solana) add('solana', walletIdentityHint.solana);
+  if (walletIdentityHint.evm) add('evm', walletIdentityHint.evm);
 
   if (appWalletClient && typeof appWalletClient.getAddress === 'function') {
     try {
@@ -592,7 +636,7 @@ function onboardingRequired(state) {
 }
 
 function isTownhallRegistrationComplete(state) {
-  return getOnboardingStep(state) !== ONBOARDING_STEP_TOWNHALL;
+  return state?.onboarding?.registrationComplete === true;
 }
 
 function isTownhallGateLocked(state) {
@@ -1517,6 +1561,7 @@ async function ensureEvmMintWallet(config) {
   const address = connected?.address || appWalletClient.getAddress({ chain: 'evm' }) || null;
   const normalizedAddress = normalizeEvmAddress(address || '');
   if (!normalizedAddress) throw new Error('NO_EVM_ACCOUNT');
+  saveWalletIdentityHint({ evm: normalizedAddress });
   let provider = connected?.provider || appWalletClient.getProvider({ chain: 'evm' });
   const refreshProvider = async () => {
     const refreshed = await appWalletClient.connect({ chain: 'evm' });
@@ -1570,6 +1615,7 @@ async function ensureSolanaMintWallet(config) {
     updateWalletUI();
     saveWalletCache();
   }
+  saveWalletIdentityHint({ solana: normalizedAddress });
 
   let provider = connected?.provider || appWalletClient.getProvider({ chain: 'solana' });
   const refreshProvider = async () => {
@@ -2886,6 +2932,19 @@ function bindTownDistrictControls() {
     };
   }
 
+  const hatchWalletCheckBtn = el('hatchWalletCheckBtn');
+  if (hatchWalletCheckBtn) {
+    hatchWalletCheckBtn.onclick = async () => {
+      hatchWalletCheckBtn.disabled = true;
+      try {
+        await runWalletProfileCheck();
+      } finally {
+        hatchWalletCheckBtn.disabled = false;
+        updateWalletUI();
+      }
+    };
+  }
+
   const workerReconnectBtn = el('workerReconnectBtn');
   if (workerReconnectBtn) {
     workerReconnectBtn.onclick = async () => {
@@ -3482,6 +3541,7 @@ async function disconnectWallet({ fromProvider = false } = {}) {
   walletRecovered = false;
   updateWalletUI();
   clearWalletCache();
+  clearWalletIdentityHint();
   if (lastState) updateUI(lastState);
   if (fromProvider) {
     return;
@@ -6811,6 +6871,7 @@ function setupAgentInterface() {
   const visitBtn = el('visitBtn');
   const sendBtn = el('sendChatBtn');
   const newSessionBtn = el('newSessionBtn');
+  const openTrainerBtn = el('agentOpenTrainerBtn');
   const teamCodeSendBtn = el('agentTeamCodeSendBtn');
   const chatInput = el('chatInput');
 
@@ -6819,6 +6880,11 @@ function setupAgentInterface() {
   if (newSessionBtn) newSessionBtn.addEventListener('click', () => {
     handleNewSession().catch(() => { });
   });
+  if (openTrainerBtn) {
+    openTrainerBtn.addEventListener('click', () => {
+      window.location.assign('/trainer');
+    });
+  }
   if (teamCodeSendBtn) {
     teamCodeSendBtn.addEventListener('click', () => {
       sendCurrentTeamCodeToAgent().catch(() => { });

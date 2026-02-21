@@ -113,6 +113,7 @@
           <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
           <button id="sendChatBtn" class="btn primary small">Send</button>
           <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
+          <button id="agentOpenTrainerBtn" class="btn small" type="button" data-testid="agent-open-trainer">Trainer</button>
         </div>
 
         <div class="divider"></div>
@@ -268,6 +269,13 @@
     if (newSessionBtn) {
       newSessionBtn.addEventListener('click', () => {
         handleNewSession().catch(() => {});
+      });
+    }
+
+    const openTrainerBtn = el('agentOpenTrainerBtn');
+    if (openTrainerBtn) {
+      openTrainerBtn.addEventListener('click', () => {
+        window.location.assign('/trainer');
       });
     }
 

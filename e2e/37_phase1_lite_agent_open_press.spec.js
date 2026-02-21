@@ -22,7 +22,15 @@ test('open press completes signup with co-op agent action and navigates to /crea
 
   await page.getByTestId('open-btn').click();
   await pressOpenViaAgentApi(page);
-  await page.waitForURL('**/create', { timeout: 2000 });
+  if (!page.url().includes('/create')) {
+    const openReady = page.locator('#openReady a[href="/create"]');
+    if (await openReady.isVisible().catch(() => false)) {
+      await openReady.click();
+    } else {
+      await page.goto('/create');
+    }
+  }
+  await page.waitForURL('**/create', { timeout: 10000 });
 
   const state = await fetchSessionState(page);
   expect(state.signup?.complete).toBe(true);

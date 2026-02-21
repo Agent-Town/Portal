@@ -17,11 +17,28 @@ async function installMockSolanaWallet(page, {
   const signature = Array.from(makeSignatureBytes(multiplier));
   await page.addInitScript(({ addr, sig, includeDisconnect }) => {
     const signatureBytes = Uint8Array.from(sig);
+    const signResult = { signature: signatureBytes, publicKey: { toString: () => addr } };
+    const walletProvider = {
+      request: async ({ method }) => {
+        if (method === 'signMessage' || method === 'solana_signMessage') return signResult;
+        if (method === 'signAndSendTransaction' || method === 'solana_signAndSendTransaction') {
+          return { signature: 'mock-solana-signature' };
+        }
+        return null;
+      },
+      on: () => {},
+      off: () => {}
+    };
     window.solana = {
       isPhantom: true,
       connect: async () => ({ publicKey: { toString: () => addr } }),
-      signMessage: async () => ({ signature: signatureBytes, publicKey: { toString: () => addr } }),
+      signMessage: async () => signResult,
       ...(includeDisconnect ? { disconnect: async () => {} } : {})
+    };
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: addr, provider: walletProvider, wallet: walletProvider }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => signResult
     };
   }, { addr: address, sig: signature, includeDisconnect: withDisconnect });
 }

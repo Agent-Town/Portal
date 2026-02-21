@@ -8,13 +8,32 @@ test.beforeEach(async ({ request }) => {
 
 test('start page uses email+code auth box for Privy login before entering app', async ({ page }) => {
   await page.addInitScript(() => {
+    const readLoggedInEmail = () => {
+      try {
+        return localStorage.getItem('mockPrivyLoggedInEmail') || '';
+      } catch {
+        return '';
+      }
+    };
+    const saveLoggedInEmail = (email) => {
+      try {
+        localStorage.setItem('mockPrivyLoggedInEmail', String(email || 'tester@example.com'));
+      } catch {
+        // ignore storage errors in tests
+      }
+    };
     window.__PRIVY_BRIDGE_FACTORY__ = async () => ({
       ensureLoggedIn: async ({ interactive, loginUi } = {}) => {
+        if (!interactive) {
+          const email = readLoggedInEmail();
+          return email ? { id: 'mock-user', email } : null;
+        }
         if (!interactive || !loginUi) return null;
         const email = await loginUi.requestEmail();
         loginUi.notifyCodeSent({ email });
         const code = await loginUi.requestCode({ email });
         if (!code) return null;
+        saveLoggedInEmail(email);
         return { id: 'mock-user', email };
       }
     });
@@ -54,5 +73,5 @@ test('start page uses email+code auth box for Privy login before entering app', 
   await page.locator('#privyCodeForm').getByRole('button', { name: 'Verify code' }).click();
 
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByTestId('open-btn')).toBeVisible();
+  await expect(page.locator('#districtMap')).toBeVisible();
 });

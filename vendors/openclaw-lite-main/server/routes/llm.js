@@ -145,7 +145,25 @@ function registerLlmRoutes(app) {
     const seenToolResult = hasToolResultAfter(messages, prompt.index);
 
     let chunks = null;
-    if (!seenToolResult && userText.includes("publish the agent ceremony reveal payload")) {
+    if (!seenToolResult && userText.includes("trainer probe: missing tool")) {
+      chunks = buildToolCallChunks({
+        id,
+        created,
+        model,
+        callId: `call_test_${llmTestSeq}`,
+        toolName: "trainer_missing_tool_probe",
+        args: { probe: "missing-tool" },
+      });
+    } else if (!seenToolResult && userText.includes("trainer probe: lite echo")) {
+      chunks = buildToolCallChunks({
+        id,
+        created,
+        model,
+        callId: `call_test_${llmTestSeq}`,
+        toolName: "lite_echo",
+        args: { text: "trainer probe ok" },
+      });
+    } else if (!seenToolResult && userText.includes("publish the agent ceremony reveal payload")) {
       chunks = buildToolCallChunks({
         id,
         created,

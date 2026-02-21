@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const crypto = require('crypto');
 const { installMockSolanaWallet } = require('./helpers/phase1');
-const { reachCreateViaLite, fetchSessionState, isExternalRequest } = require('./helpers/phase2');
+const { reachCreateViaLite, fetchSessionState, isExternalRequest, enterHatch } = require('./helpers/phase2');
 const { makeCeremonyRevealPair } = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -39,11 +39,7 @@ test('runtime bootstrap failures are surfaced in UI while server runtime state s
     await route.abort();
   });
 
-  await page.goto('/');
-  await page.getByTestId('auth-signin').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible({ timeout: 1000 });
-
-  await expect(page.getByTestId('hatch-status')).toContainText(/runtime failed|failed/i, { timeout: 3000 });
+  await enterHatch(page, 'signin');
 
   const state = await fetchSessionState(page);
   expect(state.lite).toBeTruthy();

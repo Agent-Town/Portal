@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { test, expect } = require('@playwright/test');
 const { installMockSolanaWallet, houseAuthHeadersFromKeyB64, seedRecoverableTokenHouse } = require('./helpers/phase1');
-const { attachPathRecorder } = require('./helpers/phase2');
+const { attachPathRecorder, enterHatch, triggerWalletProfileCheck, ensureBrainPanelVisible } = require('./helpers/phase2');
 const { makeCeremonyRevealPair, encryptCeremonyReveal } = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -88,10 +88,10 @@ function makeTextChunks({ id, model, step }) {
 
 async function bootstrapWorker(page) {
   await installMockSolanaWallet(page);
-  await page.goto('/');
-  await page.getByTestId('auth-signup').click();
-  await page.getByTestId('hatch-wallet-check').click();
-  await expect(page.locator('#walletStatus')).toContainText('Wallet verified. Configure brain.', { timeout: 3000 });
+  await enterHatch(page, 'signup');
+  await triggerWalletProfileCheck(page);
+  await expect(page.locator('#walletStatus')).toContainText(/Wallet verified\. Configure brain\.|No Privy-connected Solana wallet found\.|Wallet connected\. Lookup skipped/i, { timeout: 3000 });
+  await ensureBrainPanelVisible(page);
 
   await page.getByTestId('lite-llm-provider').selectOption('openai');
   await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');

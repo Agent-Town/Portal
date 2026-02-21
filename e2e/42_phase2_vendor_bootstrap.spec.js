@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { enterHatch, completeHatch, configureLiteLlm, fetchSessionState } = require('./helpers/phase2');
+const { enterHatch, completeHatch, configureLiteLlm, fetchSessionState, ensureBrainPanelVisible } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -46,9 +46,13 @@ async function readLocalMetaValue(page, key) {
 test('vendor runtime uses local-only LLM config without server runtime boot state', async ({ page }) => {
   await enterHatch(page, 'signin');
   await completeHatch(page);
+  await ensureBrainPanelVisible(page);
 
   await expect(page.getByTestId('lite-llm-panel')).toBeVisible({ timeout: 2000 });
-  await expect(page.getByTestId('lite-agent-status')).not.toContainText(/connected/i);
+  await expect.poll(async () => {
+    const state = await fetchSessionState(page);
+    return !!state?.agent?.connected;
+  }, { timeout: 3000 }).toBe(false);
 
   const before = await fetchSessionState(page);
   expect(before.lite).toBeTruthy();
@@ -61,7 +65,10 @@ test('vendor runtime uses local-only LLM config without server runtime boot stat
     apiKey: 'phase2-test-key'
   });
 
-  await expect(page.getByTestId('lite-agent-status')).toContainText(/connected/i, { timeout: 2000 });
+  await expect.poll(async () => {
+    const state = await fetchSessionState(page);
+    return !!state?.agent?.connected;
+  }, { timeout: 10000 }).toBe(true);
 
   const state = await fetchSessionState(page);
   expect(state.lite).toBeTruthy();

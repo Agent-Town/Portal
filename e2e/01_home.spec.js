@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { enterHatch } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -7,9 +8,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('home loads, shows team code and skill link', async ({ page, request }) => {
-  await page.goto('/');
-  await page.getByTestId('auth-signin').click();
-  await expect(page.getByTestId('hatch-panel')).toBeVisible();
+  await enterHatch(page, 'signin');
 
   await expect(page.getByTestId('team-code')).toHaveText(/TEAM-[A-Z0-9]{4}-[A-Z0-9]{4}/);
   await expect(page.getByTestId('skill-link')).toBeVisible();
