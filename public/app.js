@@ -275,6 +275,14 @@ let agentDebugTrafficMuteDepth = 0;
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
 let trainerScriptLoadPromise = null;
+let skillActionPluginCache = {
+  activeSkillPath: '',
+  sourceUrl: '',
+  parserVersion: '',
+  actions: [],
+  usage: null,
+  loadedAtMs: 0,
+};
 function safeSetText(elementId, value, fallback = '') {
   const node = el(elementId);
   if (!node) return null;
@@ -3119,7 +3127,7 @@ async function ensureTrainerScriptLoaded() {
   if (!trainerScriptLoadPromise) {
     trainerScriptLoadPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '/trainer.js?v=20260222a';
+      script.src = '/trainer.js?v=20260222b';
       script.async = true;
       script.dataset.agentTownTrainer = '1';
       script.addEventListener('load', () => {
@@ -3350,6 +3358,92 @@ function parseAvailableSkills(skillsPrompt) {
     out.push({ name, description, location });
   }
   return out;
+}
+
+function getSkillActionsPlugin() {
+  return window.AgentTownSkillActionsPlugin || null;
+}
+
+async function readActiveSkillTextForPlugin(gatewayApi, debugApi, skillSnapshot) {
+  if (!debugApi || typeof debugApi.workspaceReadFile !== 'function') return '';
+  const activeSkillPath = String(skillSnapshot?.activeSkillPath || '').trim();
+  if (!activeSkillPath) return '';
+  const readEnvelope = await debugApi.workspaceReadFile({ path: activeSkillPath }).catch(() => null);
+  const readData = readEnvelope?.ok === true ? (readEnvelope.data || null) : null;
+  return typeof readData?.content === 'string' ? readData.content : '';
+}
+
+function getRuntimeContextForPlugin(runtimeState = null) {
+  const stateObj = runtimeState && typeof runtimeState === 'object' ? runtimeState : lastState;
+  return {
+    origin: window.location.origin,
+    teamCode: String(stateObj?.teamCode || '').trim() || null,
+    houseId: String(stateObj?.houseId || '').trim() || null,
+  };
+}
+
+function parseTranscriptDumpForPlugin(rawDump) {
+  const parsed = safeJsonParse(rawDump, null);
+  if (Array.isArray(parsed)) return parsed;
+  const lines = String(rawDump || '').split(/\r?\n/).filter((line) => line.trim().length > 0);
+  const out = [];
+  for (const line of lines) {
+    const row = safeJsonParse(line, null);
+    if (row && typeof row === 'object') out.push(row);
+  }
+  return out;
+}
+
+async function refreshSkillActionPluginCache(gatewayApi, debugApi, skillSnapshot = null) {
+  const plugin = getSkillActionsPlugin();
+  if (!plugin || typeof plugin.compileSkillActions !== 'function') {
+    skillActionPluginCache = {
+      activeSkillPath: '',
+      sourceUrl: '',
+      parserVersion: '',
+      actions: [],
+      usage: null,
+      loadedAtMs: Date.now(),
+    };
+    return skillActionPluginCache;
+  }
+
+  const snapshotEnvelope = skillSnapshot || (gatewayApi && typeof gatewayApi.skillState === 'function'
+    ? await gatewayApi.skillState().catch(() => null)
+    : null);
+  const snapshot = snapshotEnvelope?.data || snapshotEnvelope || null;
+  const activeSkillPath = String(snapshot?.activeSkillPath || '').trim();
+  const sourceUrl = String(snapshot?.sourceUrl || '').trim();
+  const skillText = await readActiveSkillTextForPlugin(gatewayApi, debugApi, snapshot);
+  const compiled = plugin.compileSkillActions(skillText || '', { source: 'agent-debug-plugin' }) || { actions: [] };
+  const actions = Array.isArray(compiled?.actions) ? compiled.actions : [];
+
+  let usage = null;
+  if (typeof plugin.summarizeTranscriptUsage === 'function' && debugApi && typeof debugApi.getTranscriptDump === 'function') {
+    const rawDump = await debugApi.getTranscriptDump().catch(() => '[]');
+    const transcript = parseTranscriptDumpForPlugin(rawDump);
+    usage = plugin.summarizeTranscriptUsage(transcript, actions, getRuntimeContextForPlugin(lastState));
+  }
+
+  skillActionPluginCache = {
+    activeSkillPath,
+    sourceUrl,
+    parserVersion: String(compiled?.parserVersion || ''),
+    source: String(compiled?.source || 'none'),
+    errors: Array.isArray(compiled?.errors) ? compiled.errors : [],
+    actions,
+    usage,
+    loadedAtMs: Date.now(),
+  };
+  return skillActionPluginCache;
+}
+
+function buildSkillActionQuickRefForChat(userText) {
+  const plugin = getSkillActionsPlugin();
+  if (!plugin || typeof plugin.buildActionQuickRef !== 'function') return '';
+  const actions = Array.isArray(skillActionPluginCache?.actions) ? skillActionPluginCache.actions : [];
+  if (!actions.length) return '';
+  return plugin.buildActionQuickRef(actions, userText, 6);
 }
 
 function pushAgentDebugEvent(text) {
@@ -4122,12 +4216,20 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const contextPaths = Array.isArray(promptPreview?.contextFilePaths) ? promptPreview.contextFilePaths : [];
     const importedPaths = Array.isArray(skillSnapshot?.importedPaths) ? skillSnapshot.importedPaths : [];
     const importedFiles = Array.isArray(skillSnapshot?.importedFiles) ? skillSnapshot.importedFiles : [];
+    const skillActionPluginState = await withAgentTrafficMuted(async () => {
+      return await refreshSkillActionPluginCache(gatewayApi, debugApi, skillSnapshot).catch(() => null);
+    });
+    const pluginActions = Array.isArray(skillActionPluginState?.actions) ? skillActionPluginState.actions : [];
+    const pluginActionToolNames = pluginActions.map((action) => `skill_action.${action.id}`);
+    const pluginUsage = skillActionPluginState?.usage || null;
 
     const toolsLines = [
       `Refreshed: ${nowIso}`,
       `Reason: ${reason}`,
       `Worker tools count: ${Number(toolRegistry?.count || (Array.isArray(toolRegistry?.names) ? toolRegistry.names.length : 0))}`,
+      `Skill action tools (plugin): ${pluginActionToolNames.length}`,
       formatDebugList('Tools', Array.isArray(toolRegistry?.names) ? toolRegistry.names : []),
+      formatDebugList('Skill action tools', pluginActionToolNames.slice(0, 60)),
       '',
       `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
       `Active tab: ${agentDebugActiveTab}`,
@@ -4150,6 +4252,17 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       '',
       `Skills extracted from prompt: ${availableSkills.length}`,
       ...availableSkills.map((entry, idx) => `${idx + 1}. ${entry.name} @ ${entry.location}\n   ${entry.description}`),
+      '',
+      `Skill actions extracted (plugin): ${pluginActions.length}`,
+      `Skill action parser: ${String(skillActionPluginState?.parserVersion || '(unknown)')}`,
+      `Skill action source: ${String(skillActionPluginState?.source || 'none')}`,
+      ...pluginActions.slice(0, 30).map((entry, idx) => {
+        const method = String(entry?.request?.method || 'GET');
+        const urlTemplate = String(entry?.request?.urlTemplate || '');
+        const source = String(entry?.source || 'inferred');
+        const confidence = Number(entry?.confidence || 0);
+        return `${idx + 1}. ${entry.id} [${source}, c=${confidence.toFixed(2)}] ${method} ${urlTemplate}`;
+      }),
       '',
       formatDebugList('Prompt context files', contextPaths),
       '',
@@ -4210,6 +4323,13 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         sourceUrl: String(skillSnapshot?.sourceUrl || ''),
         activeSkillPath: String(skillSnapshot?.activeSkillPath || ''),
       },
+      skillActionsPlugin: {
+        parserVersion: String(skillActionPluginState?.parserVersion || ''),
+        source: String(skillActionPluginState?.source || ''),
+        actionCount: pluginActions.length,
+        notUsedActions: Array.isArray(pluginUsage?.notUsedActions) ? pluginUsage.notUsedActions : [],
+        reasonCodes: Array.isArray(pluginUsage?.reasonCodes) ? pluginUsage.reasonCodes : [],
+      },
       promptContextFiles: contextPaths,
       promptSkillsCount: availableSkills.length,
       transcriptItems: Array.isArray(transcript) ? transcript.length : null,
@@ -4249,6 +4369,15 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       'Worker session context (authoritative for LLM input):',
       workerSessionContext ? JSON.stringify(workerSessionContext, null, 2) : '(unavailable)',
       workerSessionContextError ? `\nWorker session context warning: ${workerSessionContextError}` : '',
+      '',
+      'Skill action plugin diagnostics:',
+      JSON.stringify({
+        parserVersion: String(skillActionPluginState?.parserVersion || ''),
+        source: String(skillActionPluginState?.source || ''),
+        actionCount: pluginActions.length,
+        actionTools: pluginActionToolNames,
+        usage: pluginUsage,
+      }, null, 2),
       '',
       'Transcript dump:',
       Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
@@ -6906,13 +7035,19 @@ async function handleChat() {
 
   if (!gateway) await initGateway();
   try {
+    let outgoingText = text;
     if (isVendorLite(lastState)) {
       await ensureDefaultLiteSkillImported(lastState);
       await refreshLiteSkillState({ force: false });
+      await refreshSkillActionPluginCache(gateway, window.__openclawLiteTest || null).catch(() => null);
+      const quickRef = buildSkillActionQuickRefForChat(text);
+      if (quickRef) {
+        outgoingText = `${text}\n\n${quickRef}\nUse these action definitions when selecting http_request calls.`;
+      }
     }
     await gateway.send({
       type: 'chat',
-      text,
+      text: outgoingText,
       runtimeContext: {
         origin: window.location.origin,
         teamCode: String(lastState?.teamCode || ''),

@@ -51,6 +51,21 @@ async function openTrainerFromSidebar(page) {
   await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 5000 });
 }
 
+async function openTrainerToolsTab(page) {
+  await page.getByTestId('trainer-tab-tools').click();
+  await page.getByTestId('trainer-tool-name').waitFor({ state: 'visible', timeout: 5000 });
+}
+
+async function listTrainerToolNames(page) {
+  return await page.evaluate(() => {
+    const select = document.getElementById('trainerToolNameSelect');
+    if (!select) return [];
+    return Array.from(select.options || [])
+      .map((option) => String(option.value || '').trim())
+      .filter(Boolean);
+  });
+}
+
 async function readVfsText(page, path) {
   return await page.evaluate(async (targetPath) => {
     const openDb = () => new Promise((resolve, reject) => {
@@ -205,6 +220,8 @@ module.exports = {
   visitSkill,
   runExperience,
   openTrainerFromSidebar,
+  openTrainerToolsTab,
+  listTrainerToolNames,
   listTrainerAttemptIds,
   readTrainerManifest,
   readTrainerEvents,

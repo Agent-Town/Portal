@@ -1,9 +1,15 @@
 # Phase 3 Spec: Dynamic Skill Action Dictionary + Modal Experience Trainer (TDD)
 
 Status: Draft  
-Version: 1.0  
+Version: 1.1 (plugin-constrained)  
 Audience: runtime engineers, backend engineers, security engineers, UX engineers, QA automation engineers  
 Goal: make every `skill.md` dynamically executable, inspectable, and auditable in a minimal modal trainer without hardcoding one tool per skill file.
+
+Implementation constraint update:
+
+1. Do not modify OpenClaw core runtime source under `vendors/openclaw-lite-main/src/openclaw-lite/*`.
+2. Implement as a Portal-side plugin layer that composes existing runtime capabilities (`http_request`, `workspace_read_file`, transcript APIs).
+3. Preserve worker-first architecture by avoiding backend decision shortcuts.
 
 ## 1. Executive Summary
 
@@ -17,9 +23,9 @@ This phase addresses a repeated production blocker:
 This spec introduces a dynamic, per-skill action system:
 
 1. Parse `skill.md` into a machine-readable Skill Action Dictionary.
-2. Register ephemeral `skill_action.*` tools per imported skill.
+2. Register ephemeral `skill_action.*` entries in the plugin tool surface (trainer + debug), mapped to existing runtime tools.
 3. Capture action evidence with freshness windows (TTL).
-4. Gate verification-critical claims on evidence.
+4. Surface verification gaps deterministically in plugin diagnostics (claim hard-gating in core runtime is deferred).
 5. Expose all action availability, usage, failures, and transcript integrity in trainer + agent debug tabs.
 
 The design is generic and must work for future skill files without adding dedicated backend code for each one.
@@ -50,7 +56,7 @@ Architectural conclusion:
 In scope:
 
 1. Dynamic action extraction from `skill.md`.
-2. Ephemeral tool registration from extracted actions.
+2. Ephemeral plugin tool registration from extracted actions.
 3. Generic execution engine + response validation + evidence ledger.
 4. Trainer modal support for action invocation and diagnostics.
 5. Session Context and Worker Tabs observability upgrades.
@@ -77,7 +83,7 @@ Out of scope:
 
 ## 5.1 AI Agent and LLM Requirements
 
-1. Runtime must expose action-centric tools (`skill_action.*`) in addition to generic primitives.
+1. Plugin layer must expose action-centric tools (`skill_action.*`) in addition to generic runtime primitives.
 2. Assistant may only claim completion for verification-critical outcomes when evidence is fresh and valid.
 3. Runtime must expose deterministic reason codes when an available action was not used.
 4. Prompting must include a compact Skill Action Quick Reference for top relevant actions.
@@ -112,7 +118,7 @@ Out of scope:
 
 1. No per-skill hardcoded route adapters.
 2. Skill action extraction must be deterministic for identical input.
-3. Dynamic action tools must atomically replace previous skill tools on skill switch.
+3. Dynamic plugin action tools must atomically replace previous action set on skill switch.
 4. All action invocations must produce auditable records (request summary, result, evidence, diagnostics).
 
 ## 6. Target User Journeys

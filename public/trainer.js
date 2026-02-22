@@ -5,6 +5,7 @@
   const TRAINER_ROOT = `lite/experience-trainer/v1/quests/${QUEST_ID}`;
   const TRAINER_ATTEMPTS_ROOT = `${TRAINER_ROOT}/attempts`;
   const SYNTHETIC_TRANSCRIPT_REPAIR_TEXT = "[openclaw] missing tool result in session history; inserted synthetic error result for transcript repair.";
+  const SKILL_ACTION_TOOL_PREFIX = "skill_action.";
   const TOOL_METHOD_MAP = Object.freeze({
     web_fetch: "webFetch",
     skill_fetch: "skillFetch",
@@ -121,6 +122,12 @@
     activeTab: "trace",
     toolNames: [],
     skillCatalog: [],
+    skillActions: [],
+    skillActionCompile: null,
+    skillActionUsage: null,
+    runtimeSessionContext: null,
+    actionEvidenceByKey: new Map(),
+    actionStatsById: new Map(),
     transcriptIntegrity: null,
     toolDraftByName: new Map(),
     selectedToolName: "",
@@ -190,8 +197,83 @@
     return out;
   }
 
+  function skillActionsPlugin() {
+    return window.AgentTownSkillActionsPlugin || null;
+  }
+
+  function isSkillActionToolName(toolName) {
+    return String(toolName || "").startsWith(SKILL_ACTION_TOOL_PREFIX);
+  }
+
+  function actionIdFromToolName(toolName) {
+    const raw = String(toolName || "").trim();
+    if (!isSkillActionToolName(raw)) return "";
+    return raw.slice(SKILL_ACTION_TOOL_PREFIX.length).trim();
+  }
+
+  function findSkillActionByToolName(toolName) {
+    const actionId = actionIdFromToolName(toolName);
+    if (!actionId) return null;
+    return state.skillActions.find((action) => String(action?.id || "") === actionId) || null;
+  }
+
+  function buildSkillActionDraft(action) {
+    const out = {};
+    const params = Array.isArray(action?.params) ? action.params : [];
+    for (const row of params) {
+      const name = String(row?.name || "").trim();
+      if (!name) continue;
+      if (row?.default !== undefined && row?.default !== null) {
+        out[name] = row.default;
+      }
+    }
+    return JSON.stringify(out, null, 2);
+  }
+
+  function trackActionEvidence(evidenceRows = []) {
+    const now = Date.now();
+    for (const row of Array.isArray(evidenceRows) ? evidenceRows : []) {
+      const key = String(row?.evidenceKey || "").trim();
+      if (!key) continue;
+      state.actionEvidenceByKey.set(key, {
+        evidenceKey: key,
+        actionId: String(row?.actionId || "").trim() || null,
+        ok: row?.ok === true,
+        atMs: Number.isFinite(Number(row?.atMs)) ? Number(row.atMs) : now,
+        ttlMs: Number.isFinite(Number(row?.ttlMs)) ? Number(row.ttlMs) : 0,
+        summary: row?.summary && typeof row.summary === "object" ? row.summary : null,
+      });
+    }
+  }
+
+  function trackActionRun(actionId, runOk, code = "") {
+    const id = String(actionId || "").trim();
+    if (!id) return;
+    const current = state.actionStatsById.get(id) || {
+      actionId: id,
+      invocations: 0,
+      successes: 0,
+      failures: 0,
+      lastStatus: null,
+    };
+    current.invocations += 1;
+    if (runOk) {
+      current.successes += 1;
+      current.lastStatus = "ok";
+    } else {
+      current.failures += 1;
+      current.lastStatus = String(code || "UNSUPPORTED");
+    }
+    state.actionStatsById.set(id, current);
+  }
+
   function defaultToolDraft(toolName) {
-    const sample = TOOL_PARAM_SAMPLES[String(toolName || "").trim()];
+    const key = String(toolName || "").trim();
+    if (isSkillActionToolName(key)) {
+      const action = findSkillActionByToolName(key);
+      if (action) return buildSkillActionDraft(action);
+    }
+    const sample = TOOL_PARAM_SAMPLES[key];
     return JSON.stringify(sample || {}, null, 2);
   }
 
@@ -418,6 +500,9 @@
 
   function isToolCallable(gatewayApi, toolName) {
     if (!gatewayApi || !toolName) return false;
+    if (isSkillActionToolName(toolName)) {
+      return typeof gatewayApi.httpRequest === "function" && !!findSkillActionByToolName(toolName);
+    }
     if (typeof gatewayApi.runToolByName === "function") return true;
     const method = TOOL_METHOD_MAP[String(toolName || "").trim()];
     return !!(method && typeof gatewayApi[method] === "function");
@@ -439,15 +524,83 @@
     return await gatewayApi[method](isPlainObject(params) ? params : {});
   }
 
+  async function invokeSkillActionByName(gatewayApi, toolName, params) {
+    const plugin = skillActionsPlugin();
+    if (!plugin || typeof plugin.invokeSkillAction !== "function") {
+      throw new Error("SKILL_ACTION_PLUGIN_UNAVAILABLE");
+    }
+    const action = findSkillActionByToolName(toolName);
+    if (!action) {
+      throw new Error("SKILL_ACTION_NOT_FOUND");
+    }
+    if (typeof gatewayApi?.httpRequest !== "function") {
+      throw new Error("HTTP_REQUEST_UNAVAILABLE");
+    }
+    const runtimeContext = state.runtimeSessionContext?.runtimeContext || { origin: window.location.origin };
+    return await plugin.invokeSkillAction({
+      action,
+      runtimeContext,
+      params: isPlainObject(params) ? params : {},
+      httpRequest: async (request) => {
+        const body = request?.body;
+        const payload = {
+          method: String(request?.method || "GET"),
+          url: String(request?.url || ""),
+          headers: request?.headers && typeof request.headers === "object" ? request.headers : {},
+          timeoutMs: Number.isFinite(Number(request?.timeoutMs)) ? Number(request.timeoutMs) : 30000,
+        };
+        if (body !== null && body !== undefined) {
+          payload.body = body;
+        }
+        return await gatewayApi.httpRequest(payload);
+      },
+    });
+  }
+
+  function skillActionToolName(actionId) {
+    return `${SKILL_ACTION_TOOL_PREFIX}${String(actionId || "").trim()}`;
+  }
+
+  async function loadActiveSkillContent(gatewayApi, debugApi) {
+    let skillState = null;
+    if (gatewayApi && typeof gatewayApi.skillState === "function") {
+      const envelope = await gatewayApi.skillState().catch(() => null);
+      skillState = unwrapEnvelope(envelope) || envelope || null;
+    }
+    const activeSkillPath = String(skillState?.activeSkillPath || "").trim();
+    if (!activeSkillPath || !debugApi || typeof debugApi.workspaceReadFile !== "function") {
+      return { skillState, activeSkillPath, skillText: "" };
+    }
+    const readResult = await debugApi.workspaceReadFile({ path: activeSkillPath }).catch(() => null);
+    const readData = unwrapEnvelope(readResult) || readResult || null;
+    const skillText = typeof readData?.content === "string" ? readData.content : "";
+    return { skillState, activeSkillPath, skillText };
+  }
+
   async function refreshToolLab() {
     const g = await gateway();
     const debugApi = window.__openclawLiteTest || null;
+    const plugin = skillActionsPlugin();
     let toolNames = [];
     if (debugApi && typeof debugApi.getToolRegistryInfo === "function") {
       const info = await debugApi.getToolRegistryInfo().catch(() => null);
       toolNames = Array.isArray(info?.names) ? info.names.map((name) => String(name || "").trim()).filter(Boolean) : [];
     }
-    state.toolNames = Array.from(new Set(toolNames));
+    const { skillState, activeSkillPath, skillText } = await loadActiveSkillContent(g, debugApi);
+    let compiled = { ok: true, source: "none", actions: [], errors: [] };
+    if (plugin && typeof plugin.compileSkillActions === "function" && skillText) {
+      compiled = plugin.compileSkillActions(skillText, { source: "trainer-plugin" }) || compiled;
+    }
+    state.skillActionCompile = {
+      source: String(compiled?.source || "none"),
+      parserVersion: String(compiled?.parserVersion || ""),
+      activeSkillPath: activeSkillPath || null,
+      skillStatus: String(skillState?.status || ""),
+      errors: Array.isArray(compiled?.errors) ? compiled.errors : [],
+    };
+    state.skillActions = Array.isArray(compiled?.actions) ? compiled.actions : [];
+    const dynamicToolNames = state.skillActions.map((action) => skillActionToolName(action?.id)).filter(Boolean);
+    state.toolNames = Array.from(new Set(toolNames.concat(dynamicToolNames)));
     if (!state.selectedToolName || !state.toolNames.includes(state.selectedToolName)) {
       state.selectedToolName = state.toolNames[0] || "";
     }
@@ -456,6 +609,25 @@
       : null;
     const promptPreview = unwrapEnvelope(preview) || preview || null;
     state.skillCatalog = parseAvailableSkills(promptPreview?.skillsPrompt || "");
+    let runtimeSessionContext = null;
+    if (g && typeof g.runtimeSessionContext === "function") {
+      const runtimeEnvelope = await g.runtimeSessionContext({
+        runtimeContext: { origin: window.location.origin },
+      }).catch(() => null);
+      runtimeSessionContext = unwrapEnvelope(runtimeEnvelope) || runtimeEnvelope || null;
+    }
+    state.runtimeSessionContext = runtimeSessionContext;
+    if (plugin && typeof plugin.summarizeTranscriptUsage === "function" && debugApi && typeof debugApi.getTranscriptDump === "function") {
+      const rawDump = await debugApi.getTranscriptDump().catch(() => "[]");
+      const transcript = parseTranscriptDump(rawDump);
+      state.skillActionUsage = plugin.summarizeTranscriptUsage(
+        transcript,
+        state.skillActions,
+        runtimeSessionContext?.runtimeContext || { origin: window.location.origin },
+      );
+    } else {
+      state.skillActionUsage = null;
+    }
   }
 
   function isPlainObject(value) {
@@ -877,6 +1049,49 @@
         rows.push(`   ${entry.description || ""}`);
       }
     }
+    rows.push("");
+    rows.push(`Skill actions (plugin): ${state.skillActions.length}`);
+    if (state.skillActionCompile) {
+      rows.push(`Parser: ${state.skillActionCompile.parserVersion || "(unknown)"}`);
+      rows.push(`Source: ${state.skillActionCompile.source || "none"}`);
+      rows.push(`Active skill path: ${state.skillActionCompile.activeSkillPath || "(none)"}`);
+      rows.push(`Skill status: ${state.skillActionCompile.skillStatus || "(unknown)"}`);
+      const compileErrors = Array.isArray(state.skillActionCompile.errors) ? state.skillActionCompile.errors : [];
+      if (compileErrors.length) {
+        rows.push("Compile errors:");
+        for (const err of compileErrors) {
+          rows.push(`- ${err?.code || "PARSE_INVALID"}: ${err?.message || "Unknown parse error"}`);
+        }
+      }
+    }
+    if (!state.skillActions.length) {
+      rows.push("(none)");
+    } else {
+      for (const action of state.skillActions) {
+        const actionId = String(action?.id || "");
+        const method = String(action?.request?.method || "GET");
+        const urlTemplate = String(action?.request?.urlTemplate || "");
+        const confidence = Number(action?.confidence || 0);
+        const source = String(action?.source || "inferred");
+        const params = Array.isArray(action?.params) ? action.params.map((row) => row?.name).filter(Boolean) : [];
+        const stats = state.actionStatsById.get(actionId) || { invocations: 0, successes: 0, failures: 0, lastStatus: null };
+        rows.push(`- ${actionId} [${source}, c=${confidence.toFixed(2)}]`);
+        rows.push(`  ${method} ${urlTemplate}`);
+        rows.push(`  params: ${params.length ? params.join(", ") : "(none)"}`);
+        rows.push(`  runs: ${stats.invocations} (ok=${stats.successes}, fail=${stats.failures}, last=${stats.lastStatus || "n/a"})`);
+      }
+    }
+    if (state.skillActionUsage) {
+      rows.push("");
+      rows.push("Usage diagnostics:");
+      rows.push(`- HTTP request calls: ${Number(state.skillActionUsage.httpRequestCalls || 0)}`);
+      rows.push(`- Matched action calls: ${Number(state.skillActionUsage.httpRequestMatched || 0)}`);
+      rows.push(`- Missing tool results: ${Number(state.skillActionUsage.missingResults || 0)}`);
+      const notUsed = Array.isArray(state.skillActionUsage.notUsedActions) ? state.skillActionUsage.notUsedActions : [];
+      rows.push(`- Not used actions: ${notUsed.length ? notUsed.join(", ") : "(none)"}`);
+      const reasonCodes = Array.isArray(state.skillActionUsage.reasonCodes) ? state.skillActionUsage.reasonCodes : [];
+      rows.push(`- Reason codes: ${reasonCodes.length ? reasonCodes.join(", ") : "(none)"}`);
+    }
     root.textContent = rows.join("\n");
   }
 
@@ -942,6 +1157,12 @@
       `Duplicate tool results: ${Number(stats.duplicateToolResults || 0)}`,
       `Displaced tool results: ${Number(stats.displacedToolResults || 0)}`,
       `Synthetic repair rows: ${Number(integrity.syntheticCount || 0)}`,
+      `Skill action tools: ${Number(state.skillActions.length || 0)}`,
+      `Skill action reason codes: ${
+        Array.isArray(state.skillActionUsage?.reasonCodes) && state.skillActionUsage.reasonCodes.length
+          ? state.skillActionUsage.reasonCodes.join(", ")
+          : "(none)"
+      }`,
       "",
       "Recent synthetic rows:",
     ];
@@ -1027,18 +1248,47 @@
     const startedAt = Date.now();
     setStatus(`Running tool ${toolName}...`);
     try {
-      const result = await invokeToolByName(toolApi, toolName, params);
-      state.toolLastResult = {
-        ok: true,
-        tool: toolName,
-        durationMs: Date.now() - startedAt,
-        request: params,
-        response: normalizeToolInvocationResult(result),
-      };
+      const isSkillAction = isSkillActionToolName(toolName);
+      const result = isSkillAction
+        ? await invokeSkillActionByName(toolApi, toolName, params)
+        : await invokeToolByName(toolApi, toolName, params);
+      if (isSkillAction) {
+        const actionId = actionIdFromToolName(toolName);
+        trackActionRun(actionId, result?.ok === true, String(result?.code || ""));
+        trackActionEvidence(result?.evidence || []);
+      }
+      state.toolLastResult = isSkillAction
+        ? {
+          ok: result?.ok === true,
+          tool: toolName,
+          actionId: actionIdFromToolName(toolName),
+          durationMs: Date.now() - startedAt,
+          request: result?.request || params,
+          response: normalizeToolInvocationResult(result?.response || result),
+          validation: result?.validation || null,
+          evidence: Array.isArray(result?.evidence) ? result.evidence : [],
+          code: result?.code || null,
+          message: result?.message || null,
+        }
+        : {
+          ok: true,
+          tool: toolName,
+          durationMs: Date.now() - startedAt,
+          request: params,
+          response: normalizeToolInvocationResult(result),
+        };
+      await refreshToolLab().catch(() => {});
       await refreshTranscriptIntegrity().catch(() => {});
       await render();
-      setStatus(`Tool ${toolName} completed.`);
+      if (isSkillAction && result?.ok !== true) {
+        setStatus(`Skill action ${toolName} failed: ${result?.code || "UNSUPPORTED"}`, true);
+      } else {
+        setStatus(`Tool ${toolName} completed.`);
+      }
     } catch (err) {
+      if (isSkillActionToolName(toolName)) {
+        trackActionRun(actionIdFromToolName(toolName), false, "UNSUPPORTED");
+      }
       state.toolLastResult = {
         ok: false,
         tool: toolName,
@@ -1046,6 +1296,7 @@
         request: params,
         error: String(err?.message || err || "UNKNOWN"),
       };
+      await refreshToolLab().catch(() => {});
       await refreshTranscriptIntegrity().catch(() => {});
       await render();
       setStatus(`Tool ${toolName} failed: ${err?.message || "UNKNOWN"}`, true);
@@ -1230,6 +1481,10 @@
     } else {
       setStatus(`Loaded ${state.attempts.length} attempt(s).`);
     }
+    window.__agentTownTrainerRefresh = async () => {
+      await refreshBuilderDiagnostics();
+      await render();
+    };
   }
 
   boot().catch((err) => {
