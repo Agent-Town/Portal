@@ -552,6 +552,16 @@ h3 {
   pointer-events: all;
 }
 
+.trainerBackdrop {
+  z-index: 90;
+  align-items: flex-start;
+  padding-top: 14px;
+  padding-bottom: calc(var(--agent-panel-page-inset, 0px) + 14px);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 249, 233, 0.58) 0%, rgba(255, 249, 233, 0.1) 34%),
+    linear-gradient(180deg, rgba(8, 17, 31, 0.36) 0%, rgba(8, 17, 31, 0.62) 100%);
+}
+
 .districtModal {
   display: flex;
   flex-direction: column;
@@ -567,6 +577,11 @@ h3 {
     linear-gradient(155deg, rgba(255, 249, 236, 0.98) 0%, rgba(255, 241, 216, 0.98) 58%, rgba(255, 233, 190, 0.98) 100%);
   animation: panelRise 180ms ease;
   color: var(--text-strong);
+}
+
+.trainerModal {
+  width: min(1200px, calc(100vw - 20px));
+  height: min(calc(94vh - var(--agent-panel-page-inset, 0px)), 960px);
 }
 
 .districtModalHeader {
@@ -589,6 +604,19 @@ h3 {
   overflow: auto;
   background:
     linear-gradient(180deg, rgba(255, 249, 235, 0.62) 0%, rgba(255, 245, 224, 0.72) 100%);
+}
+
+.trainerModalBody {
+  padding: 10px;
+}
+
+.trainerPanel {
+  margin: 0;
+  min-height: 100%;
+}
+
+.trainerStack {
+  margin-top: 8px;
 }
 
 .districtModalClose {
@@ -655,6 +683,10 @@ h3 {
 }
 
 body.district-modal-open {
+  overflow: hidden;
+}
+
+body.trainer-modal-open {
   overflow: hidden;
 }
 
@@ -1420,13 +1452,27 @@ footer::before {
     padding: 6px;
   }
 
+  .trainerBackdrop {
+    padding: 6px;
+    padding-bottom: calc(var(--agent-panel-page-inset, 0px) + 8px);
+  }
+
   .districtModal {
     width: calc(100vw - 12px);
     height: min(calc(97vh - var(--agent-panel-page-inset, 0px)), 940px);
     border-radius: 14px;
   }
 
+  .trainerModal {
+    width: calc(100vw - 12px);
+    height: min(calc(96vh - var(--agent-panel-page-inset, 0px)), 940px);
+  }
+
   .districtModalBody {
+    padding: 6px;
+  }
+
+  .trainerModalBody {
     padding: 6px;
   }
 

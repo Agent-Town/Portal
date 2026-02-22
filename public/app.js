@@ -274,6 +274,7 @@ let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
+let trainerScriptLoadPromise = null;
 function safeSetText(elementId, value, fallback = '') {
   const node = el(elementId);
   if (!node) return null;
@@ -3095,6 +3096,103 @@ function loadAgentPanelMinimized() {
   }
 }
 
+function getTrainerModalBackdrop() {
+  return document.getElementById('trainerModalBackdrop');
+}
+
+function isTrainerModalOpen() {
+  const backdrop = getTrainerModalBackdrop();
+  return !!backdrop && !backdrop.classList.contains('is-hidden');
+}
+
+function setTrainerModalOpen(open) {
+  const backdrop = getTrainerModalBackdrop();
+  if (!backdrop) return;
+  const nextOpen = open === true;
+  backdrop.classList.toggle('is-hidden', !nextOpen);
+  backdrop.setAttribute('aria-hidden', nextOpen ? 'false' : 'true');
+  document.body.classList.toggle('trainer-modal-open', nextOpen);
+}
+
+async function ensureTrainerScriptLoaded() {
+  if (window.__agentTownTrainerScriptLoaded === true) return;
+  if (!trainerScriptLoadPromise) {
+    trainerScriptLoadPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/trainer.js?v=20260222a';
+      script.async = true;
+      script.dataset.agentTownTrainer = '1';
+      script.addEventListener('load', () => {
+        window.__agentTownTrainerScriptLoaded = true;
+        resolve();
+      }, { once: true });
+      script.addEventListener('error', () => {
+        trainerScriptLoadPromise = null;
+        reject(new Error('TRAINER_SCRIPT_LOAD_FAILED'));
+      }, { once: true });
+      document.body.appendChild(script);
+    });
+  }
+  return trainerScriptLoadPromise;
+}
+
+async function openTrainerModal() {
+  const backdrop = getTrainerModalBackdrop();
+  if (!isTownHub || !backdrop) {
+    window.location.assign('/trainer');
+    return;
+  }
+
+  setTrainerModalOpen(true);
+
+  const statusLine = document.getElementById('trainerStatusLine');
+  if (statusLine && statusLine.textContent.includes('failed')) {
+    statusLine.textContent = 'Trainer loading...';
+    statusLine.style.color = 'var(--muted)';
+  }
+
+  try {
+    await initGateway();
+    await ensureTrainerScriptLoaded();
+  } catch (err) {
+    if (statusLine) {
+      statusLine.textContent = `Trainer failed to initialize: ${err?.message || 'UNKNOWN'}`;
+      statusLine.style.color = 'var(--bad)';
+    }
+  }
+}
+
+function closeTrainerModal() {
+  setTrainerModalOpen(false);
+}
+
+function bindTrainerModalInteractions() {
+  const backdrop = getTrainerModalBackdrop();
+  if (!backdrop || backdrop.dataset.bound === '1') return;
+  backdrop.dataset.bound = '1';
+
+  const closeBtn = document.getElementById('trainerModalClose');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      closeTrainerModal();
+    });
+  }
+
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) closeTrainerModal();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    if (!isTrainerModalOpen()) return;
+    event.preventDefault();
+    closeTrainerModal();
+  });
+
+  window.openExperienceTrainerModal = () => openTrainerModal();
+  window.closeExperienceTrainerModal = () => closeTrainerModal();
+}
+
 function routeToPopupMode(rawHref) {
   let parsed;
   try {
@@ -3148,6 +3246,11 @@ function routeToPopupMode(rawHref) {
 
   if (path === '/house') {
     return { mode: 'district', district: 'house' };
+  }
+  if (path === '/trainer') {
+    return isTownHub
+      ? { mode: 'trainer' }
+      : { mode: 'leave', url: '/trainer' };
   }
 
   return {
@@ -3277,6 +3380,10 @@ function onDistrictModalLinkClick(ev) {
   ev.preventDefault();
   if (resolved.mode === 'district') {
     showDistrict(resolved.district);
+    return;
+  }
+  if (resolved.mode === 'trainer') {
+    openTrainerModal().catch(() => { });
     return;
   }
   if (resolved.mode === 'leave') {
@@ -6882,7 +6989,9 @@ function setupAgentInterface() {
   });
   if (openTrainerBtn) {
     openTrainerBtn.addEventListener('click', () => {
-      window.location.assign('/trainer');
+      openTrainerModal().catch(() => {
+        window.location.assign('/trainer');
+      });
     });
   }
   if (teamCodeSendBtn) {
@@ -6939,6 +7048,7 @@ async function bootstrapInitialRouteState() {
 
   if (isTownHub) {
     bindDistrictMapInteractions();
+    bindTrainerModalInteractions();
 
     const closeBtn = el('districtModalClose');
     if (closeBtn) {

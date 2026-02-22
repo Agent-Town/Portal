@@ -275,6 +275,12 @@
     const openTrainerBtn = el('agentOpenTrainerBtn');
     if (openTrainerBtn) {
       openTrainerBtn.addEventListener('click', () => {
+        if (typeof window.openExperienceTrainerModal === 'function') {
+          Promise.resolve(window.openExperienceTrainerModal()).catch(() => {
+            window.location.assign('/trainer');
+          });
+          return;
+        }
         window.location.assign('/trainer');
       });
     }

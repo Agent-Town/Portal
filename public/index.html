@@ -39,6 +39,67 @@
         <div id="districtModalBody" class="districtModalBody is-loading">Loading district...</div>
       </div>
     </div>
+
+    <div id="trainerModalBackdrop" class="districtBackdrop trainerBackdrop is-hidden" aria-hidden="true" data-testid="trainer-modal">
+      <div class="districtModal trainerModal" role="dialog" aria-labelledby="trainerModalTitle" aria-modal="true">
+        <header class="districtModalHeader">
+          <h2 id="trainerModalTitle">Experience Trainer</h2>
+          <button class="btn districtModalClose" id="trainerModalClose" type="button" aria-label="Close trainer">Close</button>
+        </header>
+        <div class="districtModalBody trainerModalBody">
+          <section class="panel trainerPanel" data-testid="trainer-root">
+            <h2 style="margin-top:0;">Quest: Portal Onboarding</h2>
+            <p class="muted" id="trainerStatusLine">Trainer ready.</p>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
+              <button class="btn small" id="trainerRunOnceBtn" type="button">Run 1</button>
+              <button class="btn small" id="trainerRun3Btn" type="button">Run 3</button>
+              <button class="btn small" id="trainerRun10Btn" type="button">Run 10</button>
+              <label class="small" for="trainerCoachingMode">Coaching</label>
+              <select id="trainerCoachingMode" class="input" style="max-width:120px;">
+                <option value="approve">Off</option>
+                <option value="reject">Reject tools</option>
+                <option value="manual">Manual</option>
+              </select>
+              <label class="small" style="display:flex; align-items:center; gap:6px;">
+                <input id="trainerAdvancedToggle" type="checkbox" />
+                Advanced
+              </label>
+            </div>
+
+            <div class="stack trainerStack">
+              <div class="panel">
+                <h3 style="margin-top:0;">Attempts</h3>
+                <div id="trainerAttempts" data-testid="trainer-attempts"></div>
+              </div>
+              <div class="panel">
+                <h3 style="margin-top:0;">Timeline</h3>
+                <div id="trainerTimeline" data-testid="trainer-timeline"></div>
+              </div>
+              <div class="panel">
+                <h3 style="margin-top:0;">Inspector</h3>
+                <pre id="trainerInspector" data-testid="trainer-inspector"></pre>
+              </div>
+              <div class="panel">
+                <h3 style="margin-top:0;">Compare</h3>
+                <div id="trainerCompare" data-testid="trainer-compare"></div>
+              </div>
+              <div class="panel">
+                <h3 style="margin-top:0;">Loadouts</h3>
+                <div id="trainerLoadouts" data-testid="trainer-loadouts"></div>
+              </div>
+              <div class="panel">
+                <h3 style="margin-top:0;">Personal Backup</h3>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                  <button class="btn small" id="trainerBackupDownloadBtn" type="button" data-testid="trainer-backup-download">Download backup</button>
+                  <input id="trainerBackupUploadInput" data-testid="trainer-backup-upload" type="file" accept="application/json,.json" />
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <!-- PERSISTENT AGENT SIDEBAR (New) -->
     <div id="agentSidebar" class="agent-sidebar minimized" data-testid="agent-panel">
       <div class="sidebar-header">

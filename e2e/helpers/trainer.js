@@ -41,9 +41,14 @@ async function runExperience(page, prompt = 'trainer probe: lite echo') {
 }
 
 async function openTrainerFromSidebar(page) {
-  await page.locator('#agentSidebar .sidebar-header').click();
+  const sidebar = page.locator('#agentSidebar');
+  const minimized = await sidebar.evaluate((node) => node.classList.contains('minimized'));
+  if (minimized) {
+    await page.locator('#agentSidebar .sidebar-header').click();
+  }
   await page.getByTestId('agent-open-trainer').click();
-  await page.waitForURL(/\/trainer$/, { timeout: 5000 });
+  await page.getByTestId('trainer-modal').waitFor({ state: 'visible', timeout: 5000 });
+  await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 5000 });
 }
 
 async function readVfsText(page, path) {
