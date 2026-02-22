@@ -3220,9 +3220,12 @@ function routeToPopupMode(rawHref) {
     };
   }
   if (path === '/create') {
+    const params = new URLSearchParams(parsed.search || '');
+    params.set('embed', '1');
+    const embedUrl = `${parsed.pathname}${params.toString() ? `?${params.toString()}` : ''}${parsed.hash}`;
     return {
       mode: 'frame',
-      url: `${parsed.pathname}${parsed.search}${parsed.hash}`,
+      url: embedUrl,
       title: 'Ceremony'
     };
   }

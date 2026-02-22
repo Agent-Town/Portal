@@ -90,6 +90,13 @@ Both human and agent must press Open.
 
 During `/create`, human and agent can paint the same 16x16 canvas.
 
+Practical rule:
+
+- Ask the human to click pixels in the `/create` canvas UI first.
+- The agent should then add paint strokes via API while the human continues drawing.
+- Do not claim lock-in is done until the human clicks **Generate house key**.
+- If lock-in fails with `EMPTY_CANVAS`, ask for more painted pixels and continue.
+
 ### Paint one agent pixel
 
 `POST /api/agent/canvas/paint`

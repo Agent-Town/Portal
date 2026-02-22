@@ -17,6 +17,49 @@ async function ensureTownhallVisible(page) {
   await expect(panel).toBeVisible({ timeout: 5000 });
 }
 
+async function completeSignupForCreateRoute(page) {
+  const sessionResp = await page.request.get('/api/session');
+  expect(sessionResp.ok()).toBeTruthy();
+  const session = await sessionResp.json();
+  const teamCode = String(session?.teamCode || '');
+  expect(teamCode).toMatch(/^TEAM-/);
+
+  const connectResp = await page.request.post('/api/agent/connect', {
+    headers: { 'content-type': 'application/json' },
+    data: { teamCode, agentName: 'ModalTester' }
+  });
+  expect(connectResp.ok()).toBeTruthy();
+
+  const humanSelectResp = await page.request.post('/api/human/select', {
+    headers: { 'content-type': 'application/json' },
+    data: { elementId: 'wolf' }
+  });
+  expect(humanSelectResp.ok()).toBeTruthy();
+
+  const agentSelectResp = await page.request.post('/api/agent/select', {
+    headers: { 'content-type': 'application/json' },
+    data: { teamCode, elementId: 'wolf' }
+  });
+  expect(agentSelectResp.ok()).toBeTruthy();
+
+  const humanOpenResp = await page.request.post('/api/human/open/press', {
+    headers: { 'content-type': 'application/json' },
+    data: {}
+  });
+  expect(humanOpenResp.ok()).toBeTruthy();
+
+  const agentOpenResp = await page.request.post('/api/agent/open/press', {
+    headers: { 'content-type': 'application/json' },
+    data: { teamCode }
+  });
+  expect(agentOpenResp.ok()).toBeTruthy();
+
+  const stateResp = await page.request.get('/api/state');
+  expect(stateResp.ok()).toBeTruthy();
+  const state = await stateResp.json();
+  expect(state?.signup?.complete).toBe(true);
+}
+
 test('town hall exposes only the single worker path controls', async ({ page }) => {
   await page.goto('/app');
   await ensureTownhallVisible(page);
@@ -32,6 +75,7 @@ test('town hall opens /create inside the district modal frame', async ({ page })
   expect(createResp.ok()).toBeTruthy();
   expect(String(createResp.headers()['x-frame-options'] || '').toUpperCase()).toContain('SAMEORIGIN');
 
+  await completeSignupForCreateRoute(page);
   await page.goto('/app');
   await ensureTownhallVisible(page);
 
@@ -45,5 +89,12 @@ test('town hall opens /create inside the district modal frame', async ({ page })
   await expect(page.locator('#districtModalTitle')).toHaveText('Ceremony');
   const frame = page.locator('#districtModalBody iframe.districtFrame');
   await expect(frame).toBeVisible({ timeout: 5000 });
-  await expect(frame).toHaveAttribute('src', /\/create/);
+  await expect(frame).toHaveAttribute('src', /\/create\?embed=1/);
+
+  const ceremonyFrame = page.frameLocator('#districtModalBody iframe.districtFrame');
+  await expect(ceremonyFrame.locator('#canvas')).toBeVisible();
+  await expect(ceremonyFrame.getByTestId('share-btn')).toBeVisible();
+  await expect(ceremonyFrame.locator('.topbar')).toBeHidden();
+  await expect(ceremonyFrame.locator('footer')).toBeHidden();
+  await expect(ceremonyFrame.getByTestId('agent-panel')).toHaveCount(0);
 });

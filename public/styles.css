@@ -107,6 +107,54 @@ body::after {
     repeating-linear-gradient(90deg, rgba(44, 69, 99, 0.28) 0 1px, transparent 1px 16px);
 }
 
+html.ceremony-embed,
+html.ceremony-embed body {
+  min-height: auto;
+  height: 100%;
+}
+
+html.ceremony-embed body {
+  padding-bottom: 0;
+  background: transparent;
+}
+
+html.ceremony-embed body::before,
+html.ceremony-embed body::after {
+  display: none;
+}
+
+html.ceremony-embed .wrap {
+  min-height: auto;
+  height: 100%;
+  padding: 0;
+}
+
+html.ceremony-embed .topbar,
+html.ceremony-embed footer,
+html.ceremony-embed #createIntro,
+html.ceremony-embed #createNextNote {
+  display: none !important;
+}
+
+html.ceremony-embed .panel {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  animation: none;
+  padding: 0;
+}
+
+html.ceremony-embed .panel::before,
+html.ceremony-embed .panel h1 {
+  display: none;
+}
+
+html.ceremony-embed .canvasWrap {
+  gap: 8px;
+}
+
 a {
   color: var(--accent-strong);
   text-decoration: none;

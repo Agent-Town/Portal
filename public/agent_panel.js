@@ -1,4 +1,10 @@
 (() => {
+  const isCeremonyEmbed = (
+    window.__agentTownCeremonyEmbed === true
+    || document.documentElement.classList.contains('ceremony-embed')
+  );
+  if (isCeremonyEmbed) return;
+
   const PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
   let gateway = null;
   let gatewayInitPromise = null;

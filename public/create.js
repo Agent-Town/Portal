@@ -1,4 +1,19 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const CREATE_EMBED_QUERY_KEY = 'embed';
+
+const isCeremonyEmbedMode = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(CREATE_EMBED_QUERY_KEY) === '1' || window.self !== window.top;
+  } catch {
+    return window.self !== window.top;
+  }
+})();
+
+if (isCeremonyEmbedMode) {
+  document.documentElement.classList.add('ceremony-embed');
+}
+window.__agentTownCeremonyEmbed = isCeremonyEmbedMode;
 
 function readTeamCodeHint() {
   try {

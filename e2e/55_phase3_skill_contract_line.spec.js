@@ -50,6 +50,8 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('## Canvas co-create (optional)');
   expect(txt).toContain('POST /api/agent/canvas/paint');
   expect(txt).toContain('GET /api/agent/canvas/image?teamCode=');
+  expect(txt).toContain('Ask the human to click pixels in the `/create` canvas UI first.');
+  expect(txt).toContain('Generate house key');
   expect(txt).toContain('## Share + Moltbook handoff (co-op)');
   expect(txt).toContain('POST /api/share/create');
   expect(txt).toContain('GET /api/agent/share/instructions?teamCode=');
