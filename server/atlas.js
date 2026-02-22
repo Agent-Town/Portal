@@ -171,12 +171,19 @@ function buildAgents(agentRows) {
     seen.add(erc8004Id);
     const chainId = Number(row.chainId);
     const family = getFamilyForChain({ chainId, chainName: '' });
+    const networkType = row.isTestnet === true ? 'testnet' : 'mainnet';
     out.push({
       erc8004Id,
       chainId,
       districtKey: family.key,
       name: String(row.name || '').trim() || `Agent ${erc8004Id}`,
       description: String(row.description || '').trim() || '',
+      chainName: String(row.chainName || '').trim() || null,
+      networkType,
+      ownerAddress: String(row.ownerAddress || '').trim() || null,
+      createdAt: row.createdAt ? String(row.createdAt) : null,
+      updatedAt: row.updatedAt ? String(row.updatedAt) : null,
+      source: String(row.source || '8004scan').trim() || '8004scan',
       imageUrl: row.imageUrl ? String(row.imageUrl) : null,
       sharePath: row.sharePath ? String(row.sharePath) : null
     });
@@ -296,10 +303,15 @@ function searchAtlasAgents(snapshot, opts = {}) {
   const results = ranked.slice(0, limit).map((entry) => ({
     erc8004Id: entry.agent.erc8004Id,
     chainId: entry.agent.chainId,
+    chainName: entry.agent.chainName || null,
+    networkType: entry.agent.networkType || null,
     districtKey: entry.agent.districtKey,
     districtLabel: entry.district?.label || entry.agent.districtKey,
     name: entry.agent.name,
     description: entry.agent.description,
+    ownerAddress: entry.agent.ownerAddress || null,
+    updatedAt: entry.agent.updatedAt || null,
+    source: entry.agent.source || '8004scan',
     imageUrl: entry.agent.imageUrl || null,
     sharePath: entry.agent.sharePath || null,
     lexicalScore: entry.lexicalScore
@@ -312,6 +324,30 @@ function searchAtlasAgents(snapshot, opts = {}) {
     total,
     results
   };
+}
+
+function hasSqliteTable(db, tableName) {
+  const table = String(tableName || '').trim();
+  if (!table || !/^[a-zA-Z0-9_]+$/.test(table)) return false;
+  try {
+    const row = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1"
+    ).get(table);
+    return !!row;
+  } catch {
+    return false;
+  }
+}
+
+function getSqliteTableColumns(db, tableName) {
+  const table = String(tableName || '').trim();
+  if (!table || !/^[a-zA-Z0-9_]+$/.test(table)) return new Set();
+  try {
+    const rows = db.prepare(`PRAGMA table_info(${table})`).all();
+    return new Set(rows.map((row) => String(row?.name || '').trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
 }
 
 function readChainRowsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH) {
@@ -355,6 +391,13 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
   let db;
   try {
     db = new DatabaseSync(sqlitePath, { readOnly: true });
+    const cols = getSqliteTableColumns(db, 'erc8004_agents');
+    const hasUpdatedAt = cols.has('updated_at');
+    const hasCreatedAt = cols.has('created_at');
+    const hasOwnerAddress = cols.has('owner_address');
+    const hasChainsTable = hasSqliteTable(db, 'erc8004_chains');
+    const orderBy = hasUpdatedAt ? 'a.updated_at DESC' : 'a.rowid DESC';
+
     const rows = db.prepare(
       [
         'SELECT',
@@ -362,10 +405,16 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
         '  a.chain_id AS chainId,',
         "  COALESCE(a.name, '') AS name,",
         "  COALESCE(a.description, '') AS description,",
-        "  COALESCE(a.image_url, '') AS imageUrl",
+        "  COALESCE(a.image_url, '') AS imageUrl,",
+        `  ${hasOwnerAddress ? "COALESCE(a.owner_address, '')" : "''"} AS ownerAddress,`,
+        `  ${hasCreatedAt ? "COALESCE(a.created_at, '')" : "''"} AS createdAt,`,
+        `  ${hasUpdatedAt ? "COALESCE(a.updated_at, '')" : "''"} AS updatedAt,`,
+        `  ${hasChainsTable ? "COALESCE(c.name, '')" : "''"} AS chainName,`,
+        `  ${hasChainsTable ? 'COALESCE(c.is_testnet, 0)' : '0'} AS isTestnet`,
         'FROM erc8004_agents a',
+        ...(hasChainsTable ? ['LEFT JOIN erc8004_chains c ON c.chain_id = a.chain_id'] : []),
         "WHERE a.agent_id IS NOT NULL AND TRIM(a.agent_id) <> ''",
-        'ORDER BY a.updated_at DESC',
+        `ORDER BY ${orderBy}`,
         'LIMIT ?'
       ].join('\n')
     ).all(limit);
@@ -374,6 +423,12 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
       chainId: Number(row.chainId),
       name: String(row.name || ''),
       description: String(row.description || ''),
+      chainName: String(row.chainName || ''),
+      isTestnet: Number(row.isTestnet) === 1,
+      ownerAddress: String(row.ownerAddress || ''),
+      createdAt: String(row.createdAt || ''),
+      updatedAt: String(row.updatedAt || ''),
+      source: '8004scan',
       imageUrl: String(row.imageUrl || ''),
       sharePath: null
     }));
