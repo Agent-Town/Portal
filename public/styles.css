@@ -704,6 +704,50 @@ h3 {
   outline: none;
 }
 
+.trainerTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trainerTab.is-active {
+  background: #7ac9b4;
+  border-color: #1d5e4f;
+  color: #173a32;
+}
+
+.trainerToolLabRow {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.trainerToolParamsInput {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+}
+
+#trainerSkillCatalog,
+#trainerToolResult,
+#trainerIntegrity {
+  margin: 0;
+  border: 2px solid #3d2d1f;
+  border-radius: 4px;
+  background: #fff;
+  padding: 8px;
+  min-height: 80px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .districtModalClose {
   min-width: 88px;
 }

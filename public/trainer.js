@@ -4,6 +4,108 @@
   const BACKUP_FILENAME = "agent-town-personal-backup.json";
   const TRAINER_ROOT = `lite/experience-trainer/v1/quests/${QUEST_ID}`;
   const TRAINER_ATTEMPTS_ROOT = `${TRAINER_ROOT}/attempts`;
+  const SYNTHETIC_TRANSCRIPT_REPAIR_TEXT = "[openclaw] missing tool result in session history; inserted synthetic error result for transcript repair.";
+  const TOOL_METHOD_MAP = Object.freeze({
+    web_fetch: "webFetch",
+    skill_fetch: "skillFetch",
+    http_request: "httpRequest",
+    agent_town_ceremony_commit: "agentTownCeremonyCommit",
+    agent_town_ceremony_reveal: "agentTownCeremonyReveal",
+    secret_set: "setSecret",
+    secret_list: "listSecrets",
+    secret_delete: "deleteSecret",
+    ws_open: "wsOpen",
+    ws_send: "wsSend",
+    ws_recv: "wsRecv",
+    ws_receive: "wsRecv",
+    ws_close: "wsClose",
+    ws_status: "wsStatus",
+    workspace_mkdir: "workspaceMkdir",
+    workspace_list: "workspaceList",
+    workspace_read_file: "workspaceReadFile",
+    workspace_write_file: "workspaceWriteFile",
+    workspace_edit_file: "workspaceEditFile",
+    workspace_delete: "workspaceDelete",
+    wallet_connect: "walletConnectTool",
+    wallet_get_accounts: "walletGetAccountsTool",
+    wallet_sign_message: "walletSignMessageTool",
+  });
+  const TOOL_PARAM_SAMPLES = Object.freeze({
+    http_request: {
+      method: "POST",
+      url: "http://localhost:4173/api/agent/canvas/paint",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        teamCode: "TEAM-ABCD-EFGH",
+        x: 0,
+        y: 0,
+        color: 2,
+      }),
+    },
+    web_fetch: {
+      url: "http://localhost:4173/skill.md",
+      maxBytes: 262144,
+    },
+    skill_fetch: {
+      url: "http://localhost:4173/skill.md",
+      maxBytes: 262144,
+    },
+    workspace_list: {
+      path: "workspace/",
+    },
+    workspace_read_file: {
+      path: "workspace/skill.md",
+    },
+    workspace_write_file: {
+      path: "workspace/NOTES.md",
+      content: "hello",
+    },
+    workspace_edit_file: {
+      path: "workspace/skill.md",
+      find: "Canvas Paint",
+      replace: "Canvas Paint",
+    },
+    ws_open: {
+      url: "wss://echo.websocket.events",
+      timeoutMs: 5000,
+    },
+    ws_send: {
+      sessionId: "ws_123",
+      text: "hello",
+    },
+    ws_recv: {
+      sessionId: "ws_123",
+      waitMs: 1000,
+    },
+    ws_close: {
+      sessionId: "ws_123",
+    },
+    secret_set: {
+      name: "API_TOKEN",
+      value: "token-value",
+    },
+    secret_delete: {
+      name: "API_TOKEN",
+    },
+    wallet_connect: {
+      chain: "solana",
+    },
+    wallet_get_accounts: {
+      chain: "solana",
+    },
+    wallet_sign_message: {
+      chain: "solana",
+      message: "sign me",
+    },
+    agent_town_ceremony_commit: {
+      teamCode: "TEAM-ABCD-EFGH",
+      payload: {},
+    },
+    agent_town_ceremony_reveal: {
+      teamCode: "TEAM-ABCD-EFGH",
+      payload: {},
+    },
+  });
 
   const state = {
     attempts: [],
@@ -16,6 +118,13 @@
     activeLoadoutId: null,
     advanced: false,
     backupCache: null,
+    activeTab: "trace",
+    toolNames: [],
+    skillCatalog: [],
+    transcriptIntegrity: null,
+    toolDraftByName: new Map(),
+    selectedToolName: "",
+    toolLastResult: null,
   };
 
   let gatewayPromise = null;
@@ -47,6 +156,52 @@
     } catch {
       return "";
     }
+  }
+
+  function safeJsonParse(raw, fallback = null) {
+    try {
+      return JSON.parse(String(raw || ""));
+    } catch {
+      return fallback;
+    }
+  }
+
+  function decodePromptXml(text) {
+    return String(text || "")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, "\"")
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, "&");
+  }
+
+  function parseAvailableSkills(skillsPrompt) {
+    const prompt = String(skillsPrompt || "");
+    if (!prompt) return [];
+    const out = [];
+    const skillRegex = /<skill>\s*<name>([\s\S]*?)<\/name>\s*<description>([\s\S]*?)<\/description>\s*<location>([\s\S]*?)<\/location>\s*<\/skill>/gi;
+    let match = null;
+    while ((match = skillRegex.exec(prompt)) !== null) {
+      const name = decodePromptXml(match[1]).trim();
+      const description = decodePromptXml(match[2]).trim();
+      const location = decodePromptXml(match[3]).trim();
+      out.push({ name, description, location });
+    }
+    return out;
+  }
+
+  function defaultToolDraft(toolName) {
+    const sample = TOOL_PARAM_SAMPLES[String(toolName || "").trim()];
+    return JSON.stringify(sample || {}, null, 2);
+  }
+
+  function getToolDraft(toolName) {
+    const key = String(toolName || "").trim();
+    if (!key) return "{}";
+    if (!state.toolDraftByName.has(key)) {
+      state.toolDraftByName.set(key, defaultToolDraft(key));
+    }
+    return state.toolDraftByName.get(key) || "{}";
   }
 
   async function openOpenClawDb() {
@@ -233,6 +388,139 @@
     return await getAttemptBundle(attempt.attemptId);
   }
 
+  function setTrainerTab(tab) {
+    const next = String(tab || "").trim() === "tools" ? "tools" : "trace";
+    state.activeTab = next;
+    const tabButtons = Array.from(document.querySelectorAll("[data-trainer-tab]"));
+    for (const btn of tabButtons) {
+      const isActive = String(btn?.dataset?.trainerTab || "") === next;
+      btn.classList.toggle("is-active", isActive);
+      btn.setAttribute("aria-selected", isActive ? "true" : "false");
+    }
+    const panels = Array.from(document.querySelectorAll("[data-trainer-panel]"));
+    for (const panel of panels) {
+      const isActive = String(panel?.dataset?.trainerPanel || "") === next;
+      panel.classList.toggle("is-hidden", !isActive);
+    }
+  }
+
+  function captureToolDraftFromInput() {
+    const toolName = String(state.selectedToolName || "").trim();
+    const input = el("trainerToolParamsInput");
+    if (!toolName || !input) return;
+    state.toolDraftByName.set(toolName, String(input.value || "{}"));
+  }
+
+  function normalizeToolInvocationResult(raw) {
+    if (raw && typeof raw === "object") return raw;
+    return { value: raw };
+  }
+
+  function isToolCallable(gatewayApi, toolName) {
+    if (!gatewayApi || !toolName) return false;
+    if (typeof gatewayApi.runToolByName === "function") return true;
+    const method = TOOL_METHOD_MAP[String(toolName || "").trim()];
+    return !!(method && typeof gatewayApi[method] === "function");
+  }
+
+  async function invokeToolByName(gatewayApi, toolName, params) {
+    const key = String(toolName || "").trim();
+    if (!key) throw new Error("MISSING_TOOL_NAME");
+    if (gatewayApi && typeof gatewayApi.runToolByName === "function") {
+      return await gatewayApi.runToolByName({ name: key, params });
+    }
+    const method = TOOL_METHOD_MAP[key];
+    if (!method || typeof gatewayApi?.[method] !== "function") {
+      throw new Error(`TOOL_INVOKE_UNAVAILABLE:${key}`);
+    }
+    if (method === "listSecrets") {
+      return await gatewayApi[method]();
+    }
+    return await gatewayApi[method](isPlainObject(params) ? params : {});
+  }
+
+  async function refreshToolLab() {
+    const g = await gateway();
+    const debugApi = window.__openclawLiteTest || null;
+    let toolNames = [];
+    if (debugApi && typeof debugApi.getToolRegistryInfo === "function") {
+      const info = await debugApi.getToolRegistryInfo().catch(() => null);
+      toolNames = Array.isArray(info?.names) ? info.names.map((name) => String(name || "").trim()).filter(Boolean) : [];
+    }
+    state.toolNames = Array.from(new Set(toolNames));
+    if (!state.selectedToolName || !state.toolNames.includes(state.selectedToolName)) {
+      state.selectedToolName = state.toolNames[0] || "";
+    }
+    const preview = g && typeof g.systemPromptPreview === "function"
+      ? await g.systemPromptPreview().catch(() => null)
+      : null;
+    const promptPreview = unwrapEnvelope(preview) || preview || null;
+    state.skillCatalog = parseAvailableSkills(promptPreview?.skillsPrompt || "");
+  }
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function parseTranscriptDump(rawDump) {
+    if (typeof rawDump !== "string" || !rawDump.trim()) return [];
+    const parsed = safeJsonParse(rawDump, null);
+    if (Array.isArray(parsed)) return parsed;
+    const lines = rawDump.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    const out = [];
+    for (const line of lines) {
+      const row = safeJsonParse(line, null);
+      if (row) out.push(row);
+    }
+    return out;
+  }
+
+  function readTranscriptTextBlocks(message) {
+    const content = message?.content;
+    if (typeof content === "string") return [content];
+    if (!Array.isArray(content)) return [];
+    const out = [];
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      if (typeof part.text === "string" && part.text.trim()) out.push(part.text);
+    }
+    return out;
+  }
+
+  async function refreshTranscriptIntegrity() {
+    const debugApi = window.__openclawLiteTest || null;
+    if (!debugApi) {
+      state.transcriptIntegrity = null;
+      return;
+    }
+    let stats = null;
+    if (typeof debugApi.getTranscriptToolStats === "function") {
+      stats = await debugApi.getTranscriptToolStats().catch(() => null);
+    }
+    let transcript = [];
+    if (typeof debugApi.getTranscriptDump === "function") {
+      const raw = await debugApi.getTranscriptDump().catch(() => "[]");
+      transcript = parseTranscriptDump(raw);
+    }
+    const synthetic = [];
+    for (const msg of transcript) {
+      if (!msg || msg.role !== "toolResult") continue;
+      const blocks = readTranscriptTextBlocks(msg);
+      if (!blocks.some((text) => String(text || "").includes(SYNTHETIC_TRANSCRIPT_REPAIR_TEXT))) continue;
+      synthetic.push({
+        toolCallId: String(msg.toolCallId || msg.toolUseId || ""),
+        toolName: String(msg.toolName || "unknown"),
+      });
+    }
+    state.transcriptIntegrity = {
+      refreshedAt: new Date().toISOString(),
+      stats: isPlainObject(stats) ? stats : null,
+      syntheticCount: synthetic.length,
+      syntheticRecent: synthetic.slice(Math.max(0, synthetic.length - 10)),
+      transcriptItems: transcript.length,
+    };
+  }
+
   function purgeAttemptReceiptCache(attemptId) {
     const key = String(attemptId || "").trim();
     if (!key) return;
@@ -257,6 +545,7 @@
     }
     await refreshAttempts();
     await refreshBackupCache().catch(() => {});
+    await refreshBuilderDiagnostics();
     await render();
     if (deletedFiles > 0) {
       setStatus(`Deleted trace for ${key}.`);
@@ -278,6 +567,7 @@
     state.receiptCache.clear();
     await refreshAttempts();
     await refreshBackupCache().catch(() => {});
+    await refreshBuilderDiagnostics();
     await render();
     setStatus(`Cleared ${attemptCount} attempt(s).`);
   }
@@ -573,12 +863,109 @@
     }
   }
 
+  function renderSkillCatalog() {
+    const root = el("trainerSkillCatalog");
+    if (!root) return;
+    const rows = [];
+    rows.push(`Skills extracted: ${state.skillCatalog.length}`);
+    if (!state.skillCatalog.length) {
+      rows.push("(none)");
+    } else {
+      for (let i = 0; i < state.skillCatalog.length; i += 1) {
+        const entry = state.skillCatalog[i] || {};
+        rows.push(`${i + 1}. ${entry.name || "(unnamed)"} @ ${entry.location || "(unknown)"}`);
+        rows.push(`   ${entry.description || ""}`);
+      }
+    }
+    root.textContent = rows.join("\n");
+  }
+
+  function renderToolLab() {
+    const select = el("trainerToolNameSelect");
+    const paramsInput = el("trainerToolParamsInput");
+    const output = el("trainerToolResult");
+    const invokeBtn = el("trainerToolInvokeBtn");
+    if (!select || !paramsInput || !output) return;
+
+    const currentDraftTool = String(state.selectedToolName || "").trim();
+    if (currentDraftTool) {
+      state.toolDraftByName.set(currentDraftTool, String(paramsInput.value || "{}"));
+    }
+
+    const currentSelected = String(state.selectedToolName || "").trim();
+    select.innerHTML = "";
+    if (!state.toolNames.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "(no tools)";
+      select.appendChild(option);
+      select.disabled = true;
+      paramsInput.value = "{}";
+      if (invokeBtn) invokeBtn.disabled = true;
+    } else {
+      select.disabled = false;
+      for (const name of state.toolNames) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+      }
+      const nextSelected = state.toolNames.includes(currentSelected) ? currentSelected : state.toolNames[0];
+      state.selectedToolName = nextSelected || "";
+      select.value = state.selectedToolName;
+      paramsInput.value = getToolDraft(state.selectedToolName);
+      if (invokeBtn) invokeBtn.disabled = false;
+    }
+
+    const result = state.toolLastResult;
+    if (!result) {
+      output.textContent = "Select a tool, set params JSON, and click Run tool.";
+      return;
+    }
+    output.textContent = JSON.stringify(result, null, 2);
+  }
+
+  function renderIntegrity() {
+    const root = el("trainerIntegrity");
+    if (!root) return;
+    const integrity = state.transcriptIntegrity;
+    if (!integrity) {
+      root.textContent = "Transcript integrity snapshot unavailable.";
+      return;
+    }
+    const stats = integrity.stats || {};
+    const lines = [
+      `Refreshed: ${integrity.refreshedAt}`,
+      `Transcript items: ${Number(integrity.transcriptItems || 0)}`,
+      `Tool results: ${Number(stats.toolResultCount || 0)}`,
+      `Orphan tool results: ${Number(stats.orphanToolResults || 0)}`,
+      `Duplicate tool results: ${Number(stats.duplicateToolResults || 0)}`,
+      `Displaced tool results: ${Number(stats.displacedToolResults || 0)}`,
+      `Synthetic repair rows: ${Number(integrity.syntheticCount || 0)}`,
+      "",
+      "Recent synthetic rows:",
+    ];
+    const recent = Array.isArray(integrity.syntheticRecent) ? integrity.syntheticRecent : [];
+    if (!recent.length) {
+      lines.push("(none)");
+    } else {
+      for (const row of recent) {
+        lines.push(`- ${row.toolCallId || "(no-call-id)"} :: ${row.toolName || "unknown"}`);
+      }
+    }
+    root.textContent = lines.join("\n");
+  }
+
   async function render() {
     renderAttempts();
     await renderTimeline();
     await renderInspector();
+    renderSkillCatalog();
+    renderToolLab();
+    renderIntegrity();
     renderCompare();
     renderLoadouts();
+    setTrainerTab(state.activeTab);
   }
 
   async function runAttempts(count) {
@@ -594,8 +981,75 @@
     }
     state.attemptBundles.clear();
     await refreshAttempts();
+    await refreshBuilderDiagnostics();
     await render();
     setStatus(`Completed ${total} attempt(s).`);
+  }
+
+  async function refreshBuilderDiagnostics() {
+    await refreshToolLab().catch(() => {});
+    await refreshTranscriptIntegrity().catch(() => {});
+  }
+
+  async function invokeSelectedToolFromUi() {
+    const g = await gateway();
+    const toolApi = window.__openclawLiteTest || g;
+    if (!toolApi) {
+      setStatus("Runtime gateway unavailable.", true);
+      return;
+    }
+    const toolName = String(state.selectedToolName || "").trim();
+    if (!toolName) {
+      setStatus("Select a tool first.", true);
+      return;
+    }
+    const paramsInput = el("trainerToolParamsInput");
+    const raw = String(paramsInput?.value || "{}").trim() || "{}";
+    let params = {};
+    try {
+      params = safeJsonParse(raw, null);
+      if (!isPlainObject(params)) throw new Error("INVALID_PARAMS_JSON");
+    } catch {
+      setStatus("Tool params must be valid JSON object.", true);
+      return;
+    }
+    state.toolDraftByName.set(toolName, JSON.stringify(params, null, 2));
+    if (!isToolCallable(toolApi, toolName)) {
+      state.toolLastResult = {
+        ok: false,
+        error: `Direct invoke unavailable for "${toolName}" in gateway API.`,
+        hint: "Use http_request for endpoint-level testing, or run through experience loop for agent-only tools.",
+      };
+      await render();
+      setStatus(`Tool ${toolName} is not directly invocable from Tool Lab.`, true);
+      return;
+    }
+    const startedAt = Date.now();
+    setStatus(`Running tool ${toolName}...`);
+    try {
+      const result = await invokeToolByName(toolApi, toolName, params);
+      state.toolLastResult = {
+        ok: true,
+        tool: toolName,
+        durationMs: Date.now() - startedAt,
+        request: params,
+        response: normalizeToolInvocationResult(result),
+      };
+      await refreshTranscriptIntegrity().catch(() => {});
+      await render();
+      setStatus(`Tool ${toolName} completed.`);
+    } catch (err) {
+      state.toolLastResult = {
+        ok: false,
+        tool: toolName,
+        durationMs: Date.now() - startedAt,
+        request: params,
+        error: String(err?.message || err || "UNKNOWN"),
+      };
+      await refreshTranscriptIntegrity().catch(() => {});
+      await render();
+      setStatus(`Tool ${toolName} failed: ${err?.message || "UNKNOWN"}`, true);
+    }
   }
 
   async function syncCoachingUi() {
@@ -670,11 +1124,25 @@
     state.receiptCache.clear();
     await refreshAttempts();
     await refreshBackupCache().catch(() => {});
+    await refreshBuilderDiagnostics();
     await render();
     setStatus("Backup restored.");
   }
 
   function bindUi() {
+    const traceTabBtn = el("trainerTabTraceBtn");
+    if (traceTabBtn) {
+      traceTabBtn.addEventListener("click", () => {
+        setTrainerTab("trace");
+      });
+    }
+    const toolsTabBtn = el("trainerTabToolsBtn");
+    if (toolsTabBtn) {
+      toolsTabBtn.addEventListener("click", () => {
+        setTrainerTab("tools");
+      });
+    }
+
     const run1 = el("trainerRunOnceBtn");
     if (run1) run1.addEventListener("click", () => runAttempts(1).catch(() => {}));
     const run3 = el("trainerRun3Btn");
@@ -686,6 +1154,30 @@
       clearBtn.addEventListener("click", () => {
         clearAllAttemptTraces().catch((err) => {
           setStatus(`Clear failed: ${err?.message || "UNKNOWN"}`, true);
+        });
+      });
+    }
+
+    const toolSelect = el("trainerToolNameSelect");
+    const paramsInput = el("trainerToolParamsInput");
+    const invokeBtn = el("trainerToolInvokeBtn");
+    if (toolSelect) {
+      toolSelect.addEventListener("change", () => {
+        captureToolDraftFromInput();
+        state.selectedToolName = String(toolSelect.value || "").trim();
+        const draft = getToolDraft(state.selectedToolName);
+        if (paramsInput) paramsInput.value = draft;
+      });
+    }
+    if (paramsInput) {
+      paramsInput.addEventListener("input", () => {
+        captureToolDraftFromInput();
+      });
+    }
+    if (invokeBtn) {
+      invokeBtn.addEventListener("click", () => {
+        invokeSelectedToolFromUi().catch((err) => {
+          setStatus(`Tool run failed: ${err?.message || "UNKNOWN"}`, true);
         });
       });
     }
@@ -727,9 +1219,11 @@
 
   async function boot() {
     bindUi();
+    setTrainerTab(state.activeTab);
     await syncCoachingUi();
     await refreshAttempts();
     await refreshBackupCache().catch(() => {});
+    await refreshBuilderDiagnostics();
     await render();
     if (!state.attempts.length) {
       setStatus("No attempts captured yet. Run the experience once to begin.");

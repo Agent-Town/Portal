@@ -47,12 +47,33 @@
           <div id="trainerAttempts" data-testid="trainer-attempts"></div>
         </div>
         <div class="panel">
-          <h3 style="margin-top:0;">Timeline</h3>
-          <div id="trainerTimeline" data-testid="trainer-timeline"></div>
+          <div class="trainerTabs" role="tablist" aria-label="Trainer views">
+            <button class="btn small trainerTab is-active" id="trainerTabTraceBtn" type="button" data-trainer-tab="trace" data-testid="trainer-tab-trace" role="tab" aria-selected="true">Trace</button>
+            <button class="btn small trainerTab" id="trainerTabToolsBtn" type="button" data-trainer-tab="tools" data-testid="trainer-tab-tools" role="tab" aria-selected="false">Tool Lab</button>
+          </div>
+          <div id="trainerTabPanelTrace" data-trainer-panel="trace" role="tabpanel" aria-labelledby="trainerTabTraceBtn">
+            <h3 style="margin-top:8px;">Timeline</h3>
+            <div id="trainerTimeline" data-testid="trainer-timeline"></div>
+            <h3>Inspector</h3>
+            <pre id="trainerInspector" data-testid="trainer-inspector"></pre>
+          </div>
+          <div id="trainerTabPanelTools" data-trainer-panel="tools" class="is-hidden" role="tabpanel" aria-labelledby="trainerTabToolsBtn">
+            <h3 style="margin-top:8px;">Skills Extracted From Prompt</h3>
+            <pre id="trainerSkillCatalog" data-testid="trainer-skill-catalog"></pre>
+            <h3>Tool Trigger</h3>
+            <div class="trainerToolLabRow">
+              <label class="small" for="trainerToolNameSelect">Tool</label>
+              <select id="trainerToolNameSelect" class="input" data-testid="trainer-tool-name"></select>
+              <button class="btn small" id="trainerToolInvokeBtn" type="button" data-testid="trainer-tool-invoke">Run tool</button>
+            </div>
+            <label class="small" for="trainerToolParamsInput">Params (JSON object)</label>
+            <textarea id="trainerToolParamsInput" class="input trainerToolParamsInput" data-testid="trainer-tool-params" spellcheck="false">{}</textarea>
+            <pre id="trainerToolResult" data-testid="trainer-tool-result"></pre>
+          </div>
         </div>
         <div class="panel">
-          <h3 style="margin-top:0;">Inspector</h3>
-          <pre id="trainerInspector" data-testid="trainer-inspector"></pre>
+          <h3 style="margin-top:0;">Transcript Integrity</h3>
+          <pre id="trainerIntegrity" data-testid="trainer-integrity"></pre>
         </div>
         <div class="panel">
           <h3 style="margin-top:0;">Compare</h3>

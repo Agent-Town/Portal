@@ -4088,6 +4088,12 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const gatewayApi = await initGateway();
     const debugApi = window.__openclawLiteTest || null;
     const nowIso = new Date().toISOString();
+    let transcriptToolStats = null;
+    if (debugApi && typeof debugApi.getTranscriptToolStats === 'function') {
+      transcriptToolStats = await withAgentTrafficMuted(async () => {
+        return await debugApi.getTranscriptToolStats().catch(() => null);
+      });
+    }
 
     let toolRegistry = null;
     if (debugApi && typeof debugApi.getToolRegistryInfo === 'function') {
@@ -4207,6 +4213,12 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       promptContextFiles: contextPaths,
       promptSkillsCount: availableSkills.length,
       transcriptItems: Array.isArray(transcript) ? transcript.length : null,
+      transcriptIntegrity: {
+        toolResultCount: Number(transcriptToolStats?.toolResultCount || 0),
+        orphanToolResults: Number(transcriptToolStats?.orphanToolResults || 0),
+        duplicateToolResults: Number(transcriptToolStats?.duplicateToolResults || 0),
+        displacedToolResults: Number(transcriptToolStats?.displacedToolResults || 0),
+      },
       workerSessionContext: {
         sessionId: String(workerSessionContext?.sessionId || ''),
         generatedAtMs: Number.isFinite(Number(workerSessionContext?.generatedAtMs))
@@ -4226,6 +4238,14 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       'Recent worker events:',
       ...agentDebugEventsTail(25),
       '',
+      'Transcript integrity (repair-sensitive):',
+      JSON.stringify({
+        toolResultCount: Number(transcriptToolStats?.toolResultCount || 0),
+        orphanToolResults: Number(transcriptToolStats?.orphanToolResults || 0),
+        duplicateToolResults: Number(transcriptToolStats?.duplicateToolResults || 0),
+        displacedToolResults: Number(transcriptToolStats?.displacedToolResults || 0),
+      }, null, 2),
+      '',
       'Worker session context (authoritative for LLM input):',
       workerSessionContext ? JSON.stringify(workerSessionContext, null, 2) : '(unavailable)',
       workerSessionContextError ? `\nWorker session context warning: ${workerSessionContextError}` : '',
@@ -4239,6 +4259,20 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     setAgentDebugText('agentDebugSession', sessionLines.join('\n'));
 
     renderAgentTrafficCards(nowIso);
+  } catch (err) {
+    const message = String(err?.message || err || 'DEBUG_REFRESH_FAILED');
+    const nowIso = new Date().toISOString();
+    const fallbackLines = [
+      `Refreshed: ${nowIso}`,
+      `Reason: ${reason}`,
+      '',
+      `Debug refresh failed: ${message}`,
+      '',
+      'If this persists, click Refresh in the debug toolbar.',
+    ];
+    setAgentDebugText('agentDebugTools', fallbackLines.join('\n'));
+    setAgentDebugText('agentDebugSkill', fallbackLines.join('\n'));
+    setAgentDebugText('agentDebugSession', fallbackLines.join('\n'));
   } finally {
     agentDebugRefreshInFlight = false;
     if (agentDebugRefreshQueued) {

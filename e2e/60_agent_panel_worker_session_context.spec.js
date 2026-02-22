@@ -39,6 +39,9 @@ test('agent panel session tab shows worker-authored llm session context', async 
 
   await expect(page.getByTestId('agent-debug-session')).toContainText('"combinedContext"', { timeout: 8000 });
   await expect(page.getByTestId('agent-debug-session')).toContainText('"runtimeContext"', { timeout: 8000 });
+  await expect(page.getByTestId('agent-debug-session')).toContainText('Transcript integrity (repair-sensitive):', {
+    timeout: 8000,
+  });
 
   await page.evaluate(async () => {
     const mod = await import('/openclaw-lite/gateway.js');
