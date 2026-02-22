@@ -119,6 +119,7 @@ Practical rule:
 
 ### Canvas Paint - Endpoint: 
   `POST {origin}/api/agent/canvas/paint` 
+  `POST /api/agent/canvas/paint` (same-origin path form)
   - JSON body: 
     - `teamCode` (string) 
     - `x` (integer, 0..15) 
@@ -297,6 +298,14 @@ Rules:
 
 ## Minimal curl sequence
 
+```bash
+while true; do
+  state=$(curl -sS "$ORIGIN/api/agent/state?teamCode=$TEAM_CODE") || { sleep 2; continue; }
+  echo "$state"
+  sleep 1
+done
+```
+
 ### If connect fails
 
 - Re-check the **Team Code** for typos (it’s case-sensitive and formatted like `TEAM-XXXX-XXXX`).
@@ -334,4 +343,3 @@ Rules:
 - Ask them to add a few pixels, then lock in.
 
 ---
-

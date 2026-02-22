@@ -5,8 +5,13 @@ async function waitForLiteApi(page, timeout = 10000) {
   await page.waitForFunction(() => !!window.__openclawLiteTest, null, { timeout });
 }
 
-async function gotoAppWithLite(page) {
-  await page.goto('/?liteDriver=phase1');
+async function gotoAppWithLite(page, options = {}) {
+  const params = new URLSearchParams();
+  params.set('liteDriver', 'phase1');
+  if (Object.prototype.hasOwnProperty.call(options || {}, 'trainerNamespace')) {
+    params.set('trainerNamespace', options?.trainerNamespace ? '1' : '0');
+  }
+  await page.goto(`/?${params.toString()}`);
   await waitForLiteApi(page);
 }
 

@@ -223,6 +223,24 @@
       .replace(/[),.;]+$/, "");
   }
 
+  function escapeRegexLiteral(value) {
+    return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function templateKnownQueryParams(urlTemplate, params) {
+    let out = sanitizeUrlTemplate(urlTemplate);
+    if (!out || out.indexOf("?") < 0) return out;
+    const rows = Array.isArray(params) ? params : [];
+    for (const row of rows) {
+      const name = String(row?.name || "").trim();
+      if (!name || name === "origin") continue;
+      if (out.includes(`{${name}}`)) continue;
+      const matcher = new RegExp(`([?&])${escapeRegexLiteral(name)}=[^&#\\s]*`, "i");
+      out = out.replace(matcher, `$1${name}={${name}}`);
+    }
+    return out;
+  }
+
   function splitPathSegments(urlTemplate) {
     let raw = String(urlTemplate || "").trim();
     raw = raw.replace(/^\{origin\}/i, "");
@@ -360,10 +378,11 @@
     for (let i = 0; i < candidates.length; i += 1) {
       const candidate = candidates[i];
       const method = normalizeMethod(candidate.method);
-      const urlTemplate = sanitizeUrlTemplate(candidate.urlTemplate);
+      const rawUrlTemplate = sanitizeUrlTemplate(candidate.urlTemplate);
+      const params = inferHeuristicParams(method, rawUrlTemplate);
+      const urlTemplate = templateKnownQueryParams(rawUrlTemplate, params);
       if (!urlTemplate) continue;
       const id = inferActionId(method, urlTemplate, i);
-      const params = inferHeuristicParams(method, urlTemplate);
       const requestBodyTemplate = method === "POST" || method === "PUT" || method === "PATCH"
         ? inferBodyTemplate(params)
         : null;

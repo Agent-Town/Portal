@@ -283,6 +283,12 @@ let skillActionPluginCache = {
   usage: null,
   loadedAtMs: 0,
 };
+let trainerNamespacePluginCache = {
+  enabled: false,
+  tools: [],
+  diagnostics: null,
+  loadedAtMs: 0,
+};
 function safeSetText(elementId, value, fallback = '') {
   const node = el(elementId);
   if (!node) return null;
@@ -3127,7 +3133,7 @@ async function ensureTrainerScriptLoaded() {
   if (!trainerScriptLoadPromise) {
     trainerScriptLoadPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '/trainer.js?v=20260222b';
+      script.src = '/trainer.js?v=20260222d';
       script.async = true;
       script.dataset.agentTownTrainer = '1';
       script.addEventListener('load', () => {
@@ -3364,6 +3370,10 @@ function getSkillActionsPlugin() {
   return window.AgentTownSkillActionsPlugin || null;
 }
 
+function getTrainerNamespacePlugin() {
+  return window.AgentTownTrainerNamespacePlugin || null;
+}
+
 async function readActiveSkillTextForPlugin(gatewayApi, debugApi, skillSnapshot) {
   if (!debugApi || typeof debugApi.workspaceReadFile !== 'function') return '';
   const activeSkillPath = String(skillSnapshot?.activeSkillPath || '').trim();
@@ -3444,6 +3454,46 @@ function buildSkillActionQuickRefForChat(userText) {
   const actions = Array.isArray(skillActionPluginCache?.actions) ? skillActionPluginCache.actions : [];
   if (!actions.length) return '';
   return plugin.buildActionQuickRef(actions, userText, 6);
+}
+
+async function refreshTrainerNamespacePluginCache(runtimeState = null) {
+  const plugin = getTrainerNamespacePlugin();
+  if (!plugin || typeof plugin.resolveEnabled !== 'function' || typeof plugin.listTools !== 'function') {
+    trainerNamespacePluginCache = {
+      enabled: false,
+      tools: [],
+      diagnostics: null,
+      loadedAtMs: Date.now(),
+    };
+    return trainerNamespacePluginCache;
+  }
+  const stateObj = runtimeState && typeof runtimeState === 'object' ? runtimeState : lastState;
+  const runtimeFlag = stateObj?.featureFlags && typeof stateObj.featureFlags === 'object'
+    ? stateObj.featureFlags.trainerNamespace
+    : null;
+  const enabled = plugin.resolveEnabled({
+    runtimeFeatureFlag: runtimeFlag,
+    locationSearch: window.location.search,
+  }) === true;
+  const tools = enabled ? plugin.listTools({ includeAliases: false }) : [];
+  const diagnostics = enabled && typeof plugin.getDiagnostics === 'function'
+    ? plugin.getDiagnostics({})
+    : null;
+  trainerNamespacePluginCache = {
+    enabled,
+    tools: Array.isArray(tools) ? tools : [],
+    diagnostics: diagnostics && typeof diagnostics === 'object' ? diagnostics : null,
+    loadedAtMs: Date.now(),
+  };
+  return trainerNamespacePluginCache;
+}
+
+function buildTrainerNamespaceQuickRefForChat(userText) {
+  const plugin = getTrainerNamespacePlugin();
+  if (!plugin || typeof plugin.buildQuickRef !== 'function') return '';
+  const tools = Array.isArray(trainerNamespacePluginCache?.tools) ? trainerNamespacePluginCache.tools : [];
+  if (!tools.length) return '';
+  return plugin.buildQuickRef(tools, userText, 6);
 }
 
 function pushAgentDebugEvent(text) {
@@ -3653,13 +3703,29 @@ function maskTrafficSecret(raw) {
   return `${text.slice(0, 4)}…${text.slice(-3)} [redacted]`;
 }
 
+function redactTrafficString(value) {
+  const text = String(value || '');
+  if (!text) return text;
+  if (/bearer\s+[A-Za-z0-9._~+/=-]{10,}/i.test(text)) {
+    return text.replace(/bearer\s+([A-Za-z0-9._~+/=-]{10,})/gi, (_m, token) => `Bearer ${maskTrafficSecret(token)}`);
+  }
+  if (/^ey[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(text.trim())) {
+    return maskTrafficSecret(text.trim());
+  }
+  if (/sk-[A-Za-z0-9_-]{10,}/i.test(text)) {
+    return text.replace(/sk-[A-Za-z0-9_-]{10,}/gi, (match) => maskTrafficSecret(match));
+  }
+  return text;
+}
+
 function sanitizeAgentTrafficValue(value, depth = 0, seen = new WeakSet()) {
   if (value === null || value === undefined) return value;
   if (depth > 4) return '[max-depth]';
   const type = typeof value;
   if (type === 'string') {
-    if (value.length <= 360) return value;
-    return `${value.slice(0, 360)}…(truncated ${value.length - 360} chars)`;
+    const redacted = redactTrafficString(value);
+    if (redacted.length <= 360) return redacted;
+    return `${redacted.slice(0, 360)}…(truncated ${redacted.length - 360} chars)`;
   }
   if (type === 'number' || type === 'boolean') return value;
   if (type === 'bigint') return String(value);
@@ -4222,14 +4288,36 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const pluginActions = Array.isArray(skillActionPluginState?.actions) ? skillActionPluginState.actions : [];
     const pluginActionToolNames = pluginActions.map((action) => `skill_action.${action.id}`);
     const pluginUsage = skillActionPluginState?.usage || null;
+    const trainerNamespaceState = await withAgentTrafficMuted(async () => {
+      return await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
+    });
+    const trainerNamespaceTools = Array.isArray(trainerNamespaceState?.tools) ? trainerNamespaceState.tools : [];
+    const trainerNamespaceToolNames = trainerNamespaceTools
+      .map((row) => String(row?.name || '').trim())
+      .filter(Boolean);
+    const trainerNamespaceDiagnostics = trainerNamespaceState?.diagnostics && typeof trainerNamespaceState.diagnostics === 'object'
+      ? trainerNamespaceState.diagnostics
+      : null;
+    const trainerBudgetPerTurnRemaining = trainerNamespaceDiagnostics?.budgetRemaining?.perTurn?.remaining;
+    const trainerBudgetPerMinuteRemaining = trainerNamespaceDiagnostics?.budgetRemaining?.perMinute?.remaining;
+    const trainerPendingApprovals = Array.isArray(trainerNamespaceDiagnostics?.pendingApprovals)
+      ? trainerNamespaceDiagnostics.pendingApprovals.length
+      : 0;
+    const trainerRecentBlockCodes = Array.isArray(trainerNamespaceDiagnostics?.recentBlockCodes)
+      ? trainerNamespaceDiagnostics.recentBlockCodes
+      : [];
 
     const toolsLines = [
       `Refreshed: ${nowIso}`,
       `Reason: ${reason}`,
       `Worker tools count: ${Number(toolRegistry?.count || (Array.isArray(toolRegistry?.names) ? toolRegistry.names.length : 0))}`,
       `Skill action tools (plugin): ${pluginActionToolNames.length}`,
+      `Trainer namespace tools (plugin): ${trainerNamespaceToolNames.length}`,
+      `Trainer budget per turn remaining: ${trainerBudgetPerTurnRemaining === null || trainerBudgetPerTurnRemaining === undefined ? '(n/a)' : trainerBudgetPerTurnRemaining}`,
+      `Trainer budget per minute remaining: ${trainerBudgetPerMinuteRemaining === null || trainerBudgetPerMinuteRemaining === undefined ? '(n/a)' : trainerBudgetPerMinuteRemaining}`,
       formatDebugList('Tools', Array.isArray(toolRegistry?.names) ? toolRegistry.names : []),
       formatDebugList('Skill action tools', pluginActionToolNames.slice(0, 60)),
+      formatDebugList('Trainer namespace tools', trainerNamespaceToolNames.slice(0, 60)),
       '',
       `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
       `Active tab: ${agentDebugActiveTab}`,
@@ -4263,6 +4351,17 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         const confidence = Number(entry?.confidence || 0);
         return `${idx + 1}. ${entry.id} [${source}, c=${confidence.toFixed(2)}] ${method} ${urlTemplate}`;
       }),
+      '',
+      `Trainer namespace enabled (plugin): ${trainerNamespaceState?.enabled === true ? 'yes' : 'no'}`,
+      `Trainer namespace tools: ${trainerNamespaceToolNames.length}`,
+      `Trainer pending approvals: ${trainerPendingApprovals}`,
+      `Trainer recent block codes: ${trainerRecentBlockCodes.length}`,
+      ...trainerNamespaceToolNames.map((name, idx) => `${idx + 1}. ${name}`),
+      ...(trainerRecentBlockCodes.slice(0, 8).map((row, idx) => {
+        const code = String(row?.code || '');
+        const tool = String(row?.tool || '');
+        return `Block ${idx + 1}: ${code || '(none)'} @ ${tool || '(unknown)'}`;
+      })),
       '',
       formatDebugList('Prompt context files', contextPaths),
       '',
@@ -4330,6 +4429,17 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         notUsedActions: Array.isArray(pluginUsage?.notUsedActions) ? pluginUsage.notUsedActions : [],
         reasonCodes: Array.isArray(pluginUsage?.reasonCodes) ? pluginUsage.reasonCodes : [],
       },
+      trainerNamespacePlugin: {
+        enabled: trainerNamespaceState?.enabled === true,
+        toolCount: trainerNamespaceToolNames.length,
+        tools: trainerNamespaceToolNames,
+        tierPolicy: trainerNamespaceDiagnostics?.tierPolicy || null,
+        budgetRemaining: trainerNamespaceDiagnostics?.budgetRemaining || null,
+        pendingApprovals: Array.isArray(trainerNamespaceDiagnostics?.pendingApprovals)
+          ? trainerNamespaceDiagnostics.pendingApprovals
+          : [],
+        recentBlockCodes: trainerRecentBlockCodes,
+      },
       promptContextFiles: contextPaths,
       promptSkillsCount: availableSkills.length,
       transcriptItems: Array.isArray(transcript) ? transcript.length : null,
@@ -4377,6 +4487,19 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         actionCount: pluginActions.length,
         actionTools: pluginActionToolNames,
         usage: pluginUsage,
+      }, null, 2),
+      '',
+      'Trainer namespace plugin diagnostics:',
+      JSON.stringify({
+        enabled: trainerNamespaceState?.enabled === true,
+        toolCount: trainerNamespaceToolNames.length,
+        tools: trainerNamespaceToolNames,
+        tierPolicy: trainerNamespaceDiagnostics?.tierPolicy || null,
+        budgetRemaining: trainerNamespaceDiagnostics?.budgetRemaining || null,
+        pendingApprovals: Array.isArray(trainerNamespaceDiagnostics?.pendingApprovals)
+          ? trainerNamespaceDiagnostics.pendingApprovals
+          : [],
+        recentBlockCodes: trainerRecentBlockCodes,
       }, null, 2),
       '',
       'Transcript dump:',
@@ -7040,9 +7163,14 @@ async function handleChat() {
       await ensureDefaultLiteSkillImported(lastState);
       await refreshLiteSkillState({ force: false });
       await refreshSkillActionPluginCache(gateway, window.__openclawLiteTest || null).catch(() => null);
+      await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
       const quickRef = buildSkillActionQuickRefForChat(text);
+      const trainerQuickRef = buildTrainerNamespaceQuickRefForChat(text);
       if (quickRef) {
         outgoingText = `${text}\n\n${quickRef}\nUse these action definitions when selecting http_request calls.`;
+      }
+      if (trainerQuickRef) {
+        outgoingText = `${outgoingText}\n\n${trainerQuickRef}\nUse trainer namespace tools for diagnostics before claiming completion.`;
       }
     }
     await gateway.send({

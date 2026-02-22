@@ -1366,6 +1366,7 @@ const PRIVY_ENABLED_RAW = !!PRIVY_PUBLIC_CONFIG.appId;
 const PRIVY_ENABLED_IN_TEST = parseBoolEnv(process.env.ENABLE_PRIVY_IN_TEST, false);
 const PRIVY_ENABLED = PRIVY_ENABLED_RAW && (process.env.NODE_ENV !== 'test' || PRIVY_ENABLED_IN_TEST);
 const START_PAGE_ENABLED = parseBoolEnv(process.env.START_PAGE_ENABLED, PRIVY_ENABLED);
+const ENABLE_TRAINER_NAMESPACE = parseBoolEnv(process.env.ENABLE_TRAINER_NAMESPACE, true);
 const HOME_ROUTE_FILE = START_PAGE_ENABLED ? 'start.html' : 'index.html';
 const ONBOARDING_REQUIRED = PRIVY_ENABLED;
 const ONBOARDING_STEP_TOWNHALL = 'townhall_profile';
@@ -3166,6 +3167,9 @@ app.get('/api/session', (req, res) => {
     teamCode: s.teamCode,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
+    featureFlags: {
+      trainerNamespace: ENABLE_TRAINER_NAMESPACE
+    },
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -3314,7 +3318,8 @@ app.get('/api/agent/lite/runtime', (req, res) => {
     runtimeVersion: VENDOR_LITE_MANIFEST.vendorVersion,
     driver: lite.driver,
     featureFlags: {
-      llmConfigRequired: true
+      llmConfigRequired: true,
+      trainerNamespace: ENABLE_TRAINER_NAMESPACE
     }
   });
 });
@@ -4188,6 +4193,9 @@ app.get('/api/state', (req, res) => {
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: s.houseCeremony?.houseId || null,
     onboarding: cloneOnboarding(onboarding),
+    featureFlags: {
+      trainerNamespace: ENABLE_TRAINER_NAMESPACE
+    },
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length

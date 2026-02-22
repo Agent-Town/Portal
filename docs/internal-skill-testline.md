@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-02-18
+Last updated: 2026-02-22
 
 ## Goal
 
@@ -77,8 +77,27 @@ Keep `skill.md` evolution testable as we:
 | Session restore path works when cookie is missing but `x-team-code-hint` is available | `public/app.js`, `public/house.js`, `server/index.js` | client auto-sends team-code hint header and server rebinds same team session identity | `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js` (`state endpoint restores session via team code hint when cookie is missing`) |
 | Truthful local “agent active” readiness | `public/app.js` + worker `skillState` bridge | OpenClaw Lite suppresses “ready” when skill import state is failed; `/skill.md` auto-import is attempted after local connect and failures are surfaced | `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js` (`agent readiness status tracks skill import failure and recovery`) |
 | House-page OpenClaw export compatibility | `public/house.js` | download delegates to local worker `gateway.command.exportZip` (`openclaw-lite-export.zip`); upload accepts OpenClaw export and legacy house backup zip formats | `e2e/54_agent_state_backup_restore.spec.js` (`house backup stores encrypted state and supports ZIP download/upload restore`) |
+| Trainer namespace discovery + feature flag gating | `public/trainer_namespace_plugin.js`, `public/trainer.js`, `public/app.js`, `server/index.js` | plugin-constrained `trainer.*` registry is visible only when `featureFlags.trainerNamespace` resolves true | `e2e/98_trainer_namespace_contract_harness.spec.js` (`trainer namespace tools are discoverable when enabled and hidden when disabled`) |
+| Trainer namespace read-only introspection tools | `public/trainer_namespace_plugin.js`, `public/trainer.js` | `trainer.list_runs`, `trainer.get_run`, `trainer.get_event`, `trainer.get_session_context` return deterministic payloads | `e2e/99_trainer_namespace_read_tools.spec.js` (`trainer namespace read tools return deterministic run, event, and session context payloads`) |
+| Trainer namespace dynamic action catalog bridge | `public/trainer_namespace_plugin.js`, `public/trainer.js`, `public/skill_actions_plugin.js` | `trainer.list_actions` reflects active skill action extraction and switches atomically across skill changes | `e2e/100_trainer_namespace_action_catalog.spec.js` (`trainer.list_actions reflects active skill and updates after skill switch`) |
+| Trainer namespace action invocation bridge | `public/trainer_namespace_plugin.js`, `public/trainer.js`, `public/skill_actions_plugin.js` | `trainer.invoke_action` executes skill action requests with provided params and deterministic failure codes | `e2e/101_trainer_namespace_invoke_action.spec.js` (`trainer.invoke_action validates inputs and executes action requests with provided params`) |
+| Trainer namespace evidence freshness + expiry loop | `public/trainer_namespace_plugin.js`, `public/trainer.js` | `trainer.list_evidence` supports deterministic freshness filtering and expiry-window evaluation | `e2e/102_trainer_namespace_evidence_loop.spec.js` (`trainer.list_evidence supports deterministic freshness and expiry windows after invoke_action`) |
+| Trainer namespace transcript integrity + not-used diagnostics | `public/trainer_namespace_plugin.js`, `public/trainer.js`, `public/app.js` | `trainer.get_transcript_integrity` and `trainer.explain_not_used` surface reason codes and align with Session Context diagnostics | `e2e/103_trainer_namespace_diagnostics.spec.js` (`trainer diagnostics tools expose transcript integrity + not-used reasons and align with Session Context diagnostics`) |
+| Trainer namespace approval-gated destructive tools | `public/trainer_namespace_plugin.js`, `public/trainer.js` | `trainer.delete_trace` / `trainer.clear_traces` require one-time approval tokens with TTL and deterministic failure paths | `e2e/104_trainer_namespace_approval_gate.spec.js` (`trainer destructive tools require approval token, allow one operation, and expire deterministically`) |
+| Trainer namespace budgets + recursion guards | `public/trainer_namespace_plugin.js` | per-turn/per-window budgets and recursion blocking enforce deterministic `TRAINER_RATE_LIMITED` and `TRAINER_RECURSION_BLOCKED` outcomes | `e2e/105_trainer_namespace_rate_limit_recursion.spec.js` (`trainer namespace enforces rate limits and blocks recursive dispatch attempts deterministically`) |
+| Trainer namespace redaction in diagnostics and debug panes | `public/trainer_namespace_plugin.js`, `public/app.js` | secret-like values are masked in trainer namespace outputs/audit snapshots and agent debug surfaces | `e2e/106_trainer_namespace_redaction.spec.js` (`trainer namespace redacts secret-like values from diagnostics and avoids leaking raw secrets into debug panes`) |
+| Trainer namespace human-agent coop verification loop | `public/trainer_namespace_plugin.js`, `public/trainer.js` | builder demonstration + repeat invocation + evidence-backed verification flow remains deterministic in trainer tooling | `e2e/107_trainer_namespace_coop_canvas.spec.js` (`trainer namespace supports a deterministic human-agent coop loop for canvas verification`) |
 
 ## Progress Log
+
+### 2026-02-22
+
+- Added plugin-constrained `trainer.*` namespace coverage for discovery, read tools, dynamic action catalogs, and action invocation (`e2e/98` to `e2e/101`).
+- Added deterministic trainer namespace evidence lifecycle coverage (`freshOnly` and expiry windows) via `e2e/102_trainer_namespace_evidence_loop.spec.js`.
+- Added transcript-integrity and not-used diagnostics parity coverage between trainer tools and Session Context tab (`e2e/103_trainer_namespace_diagnostics.spec.js`).
+- Added approval-gated destructive trainer tool coverage with one-time token + TTL semantics (`e2e/104_trainer_namespace_approval_gate.spec.js`).
+- Added trainer namespace policy guard coverage for per-turn/window rate limits and recursion blocks (`e2e/105_trainer_namespace_rate_limit_recursion.spec.js`).
+- Added redaction coverage for trainer diagnostics/debug panes and cooperative canvas verification loop coverage (`e2e/106_trainer_namespace_redaction.spec.js`, `e2e/107_trainer_namespace_coop_canvas.spec.js`).
 
 ### 2026-02-18
 

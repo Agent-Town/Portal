@@ -37,4 +37,6 @@ test('canvas plugin actions report missing params deterministically and allow di
   await page.getByTestId('trainer-tool-invoke').click();
   await expect(page.getByTestId('trainer-tool-result')).toContainText('"actionId": "canvas.image"', { timeout: 5000 });
   await expect(page.getByTestId('trainer-tool-result')).toContainText('"ok": true', { timeout: 5000 });
+  await expect(page.getByTestId('trainer-tool-result')).toContainText(`teamCode=${teamCode}`, { timeout: 5000 });
+  await expect(page.getByTestId('trainer-tool-result')).not.toContainText('TEAM-ABCD-EFGH');
 });

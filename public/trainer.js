@@ -6,6 +6,7 @@
   const TRAINER_ATTEMPTS_ROOT = `${TRAINER_ROOT}/attempts`;
   const SYNTHETIC_TRANSCRIPT_REPAIR_TEXT = "[openclaw] missing tool result in session history; inserted synthetic error result for transcript repair.";
   const SKILL_ACTION_TOOL_PREFIX = "skill_action.";
+  const TRAINER_NAMESPACE_TOOL_PREFIX = "trainer.";
   const TOOL_METHOD_MAP = Object.freeze({
     web_fetch: "webFetch",
     skill_fetch: "skillFetch",
@@ -106,6 +107,38 @@
       teamCode: "TEAM-ABCD-EFGH",
       payload: {},
     },
+    "trainer.list_runs": {
+      limit: 20,
+    },
+    "trainer.get_run": {
+      attemptId: "attempt_0001",
+    },
+    "trainer.get_event": {
+      attemptId: "attempt_0001",
+      seq: 1,
+    },
+    "trainer.invoke_action": {
+      actionId: "canvas.image",
+      params: {
+        teamCode: "TEAM-ABCD-EFGH",
+      },
+    },
+    "trainer.list_evidence": {
+      actionId: "canvas.image",
+      freshOnly: true,
+    },
+    "trainer.get_transcript_integrity": {},
+    "trainer.get_session_context": {},
+    "trainer.explain_not_used": {
+      actionId: "canvas.image",
+    },
+    "trainer.delete_trace": {
+      attemptId: "attempt_0001",
+      approvalToken: "appr_...",
+    },
+    "trainer.clear_traces": {
+      approvalToken: "appr_...",
+    },
   });
 
   const state = {
@@ -125,6 +158,9 @@
     skillActions: [],
     skillActionCompile: null,
     skillActionUsage: null,
+    trainerNamespaceEnabled: false,
+    trainerNamespaceTools: [],
+    trainerNamespaceDiagnostics: null,
     runtimeSessionContext: null,
     actionEvidenceByKey: new Map(),
     actionStatsById: new Map(),
@@ -201,6 +237,73 @@
     return window.AgentTownSkillActionsPlugin || null;
   }
 
+  function trainerNamespacePlugin() {
+    return window.AgentTownTrainerNamespacePlugin || null;
+  }
+
+  function normalizeTrainerNamespaceToolName(toolName) {
+    const plugin = trainerNamespacePlugin();
+    if (plugin && typeof plugin.normalizeToolName === "function") {
+      return String(plugin.normalizeToolName(toolName) || "").trim();
+    }
+    return String(toolName || "").trim();
+  }
+
+  function isTrainerNamespaceToolName(toolName) {
+    const canonical = normalizeTrainerNamespaceToolName(toolName);
+    return canonical.startsWith(TRAINER_NAMESPACE_TOOL_PREFIX);
+  }
+
+  function trainerNamespaceToolsMap() {
+    const map = new Map();
+    for (const row of Array.isArray(state.trainerNamespaceTools) ? state.trainerNamespaceTools : []) {
+      const name = String(row?.name || "").trim();
+      if (!name) continue;
+      map.set(name, row);
+    }
+    return map;
+  }
+
+  function findTrainerNamespaceTool(toolName) {
+    const map = trainerNamespaceToolsMap();
+    const canonical = normalizeTrainerNamespaceToolName(toolName);
+    if (!canonical) return null;
+    return map.get(canonical) || null;
+  }
+
+  function listTrackedEvidenceRows() {
+    const out = [];
+    for (const row of state.actionEvidenceByKey.values()) {
+      if (!row || typeof row !== "object") continue;
+      out.push({
+        evidenceKey: String(row.evidenceKey || "").trim(),
+        actionId: String(row.actionId || "").trim() || null,
+        ok: row.ok === true,
+        atMs: Number.isFinite(Number(row.atMs)) ? Number(row.atMs) : 0,
+        ttlMs: Number.isFinite(Number(row.ttlMs)) ? Number(row.ttlMs) : 0,
+        summary: row.summary && typeof row.summary === "object" ? row.summary : null,
+      });
+    }
+    out.sort((a, b) => Number(b.atMs || 0) - Number(a.atMs || 0));
+    return out;
+  }
+
+  function listActionStatsRows() {
+    const out = {};
+    for (const [actionId, row] of state.actionStatsById.entries()) {
+      const id = String(actionId || "").trim();
+      if (!id) continue;
+      out[id] = {
+        actionId: id,
+        invocations: Number.isFinite(Number(row?.invocations)) ? Number(row.invocations) : 0,
+        successes: Number.isFinite(Number(row?.successes)) ? Number(row.successes) : 0,
+        failures: Number.isFinite(Number(row?.failures)) ? Number(row.failures) : 0,
+        lastStatus: row?.lastStatus ? String(row.lastStatus) : null,
+      };
+    }
+    return out;
+  }
+
   function isSkillActionToolName(toolName) {
     return String(toolName || "").startsWith(SKILL_ACTION_TOOL_PREFIX);
   }
@@ -272,6 +375,11 @@
     if (isSkillActionToolName(key)) {
       const action = findSkillActionByToolName(key);
       if (action) return buildSkillActionDraft(action);
+    }
+    if (isTrainerNamespaceToolName(key)) {
+      const canonical = normalizeTrainerNamespaceToolName(key);
+      const sample = TOOL_PARAM_SAMPLES[canonical];
+      return JSON.stringify(sample || {}, null, 2);
     }
     const sample = TOOL_PARAM_SAMPLES[key];
     return JSON.stringify(sample || {}, null, 2);
@@ -500,6 +608,9 @@
 
   function isToolCallable(gatewayApi, toolName) {
     if (!gatewayApi || !toolName) return false;
+    if (isTrainerNamespaceToolName(toolName)) {
+      return !!findTrainerNamespaceTool(toolName);
+    }
     if (isSkillActionToolName(toolName)) {
       return typeof gatewayApi.httpRequest === "function" && !!findSkillActionByToolName(toolName);
     }
@@ -557,6 +668,39 @@
     });
   }
 
+  async function invokeTrainerNamespaceByName(gatewayApi, toolName, params) {
+    const plugin = trainerNamespacePlugin();
+    if (!plugin || typeof plugin.invokeTool !== "function") {
+      throw new Error("TRAINER_NAMESPACE_PLUGIN_UNAVAILABLE");
+    }
+    const toolDef = findTrainerNamespaceTool(toolName);
+    if (!toolDef) {
+      throw new Error("TRAINER_NAMESPACE_TOOL_NOT_FOUND");
+    }
+    return await plugin.invokeTool({
+      toolName: normalizeTrainerNamespaceToolName(toolName),
+      params: isPlainObject(params) ? params : {},
+      gatewayApi,
+      questId: QUEST_ID,
+      skillActions: state.skillActions,
+      actionStatsById: listActionStatsRows(),
+      runtimeSessionContext: state.runtimeSessionContext,
+      usageDiagnostics: state.skillActionUsage,
+      transcriptIntegrity: state.transcriptIntegrity,
+      evidenceRows: listTrackedEvidenceRows(),
+      invokeSkillAction: async (actionId, actionParams) => {
+        const targetTool = skillActionToolName(actionId);
+        return await invokeSkillActionByName(gatewayApi, targetTool, actionParams);
+      },
+      deleteTrace: async ({ attemptId }) => {
+        return await deleteAttemptTrace(attemptId, { silent: true });
+      },
+      clearTraces: async () => {
+        return await clearAllAttemptTraces({ silent: true });
+      },
+    });
+  }
+
   function skillActionToolName(actionId) {
     return `${SKILL_ACTION_TOOL_PREFIX}${String(actionId || "").trim()}`;
   }
@@ -600,10 +744,6 @@
     };
     state.skillActions = Array.isArray(compiled?.actions) ? compiled.actions : [];
     const dynamicToolNames = state.skillActions.map((action) => skillActionToolName(action?.id)).filter(Boolean);
-    state.toolNames = Array.from(new Set(toolNames.concat(dynamicToolNames)));
-    if (!state.selectedToolName || !state.toolNames.includes(state.selectedToolName)) {
-      state.selectedToolName = state.toolNames[0] || "";
-    }
     const preview = g && typeof g.systemPromptPreview === "function"
       ? await g.systemPromptPreview().catch(() => null)
       : null;
@@ -617,6 +757,35 @@
       runtimeSessionContext = unwrapEnvelope(runtimeEnvelope) || runtimeEnvelope || null;
     }
     state.runtimeSessionContext = runtimeSessionContext;
+    const trainerPlugin = trainerNamespacePlugin();
+    let trainerNamespaceEnabled = false;
+    let trainerNamespaceTools = [];
+    let trainerNamespaceDiagnostics = null;
+    if (trainerPlugin && typeof trainerPlugin.resolveEnabled === "function" && typeof trainerPlugin.listTools === "function") {
+      const runtimeFeatureFlag = runtimeSessionContext?.runtimeState?.featureFlags?.trainerNamespace;
+      trainerNamespaceEnabled = trainerPlugin.resolveEnabled({
+        runtimeFeatureFlag,
+        locationSearch: window.location.search,
+      }) === true;
+      trainerNamespaceTools = trainerNamespaceEnabled
+        ? trainerPlugin.listTools({ includeAliases: false })
+        : [];
+      if (trainerNamespaceEnabled && typeof trainerPlugin.getDiagnostics === "function") {
+        trainerNamespaceDiagnostics = trainerPlugin.getDiagnostics({
+          turnKey: runtimeSessionContext?.lastLlmInput?.turnId || null,
+        });
+      }
+    }
+    state.trainerNamespaceEnabled = trainerNamespaceEnabled;
+    state.trainerNamespaceTools = Array.isArray(trainerNamespaceTools) ? trainerNamespaceTools : [];
+    state.trainerNamespaceDiagnostics = trainerNamespaceDiagnostics;
+    const trainerNamespaceToolNames = state.trainerNamespaceTools
+      .map((row) => String(row?.name || "").trim())
+      .filter((name) => name && name.startsWith(TRAINER_NAMESPACE_TOOL_PREFIX));
+    state.toolNames = Array.from(new Set(toolNames.concat(dynamicToolNames, trainerNamespaceToolNames)));
+    if (!state.selectedToolName || !state.toolNames.includes(state.selectedToolName)) {
+      state.selectedToolName = state.toolNames[0] || "";
+    }
     if (plugin && typeof plugin.summarizeTranscriptUsage === "function" && debugApi && typeof debugApi.getTranscriptDump === "function") {
       const rawDump = await debugApi.getTranscriptDump().catch(() => "[]");
       const transcript = parseTranscriptDump(rawDump);
@@ -704,9 +873,16 @@
     }
   }
 
-  async function deleteAttemptTrace(attemptId) {
+  async function deleteAttemptTrace(attemptId, options = {}) {
     const key = String(attemptId || "").trim();
-    if (!key) return;
+    const silent = options?.silent === true;
+    if (!key) {
+      return {
+        ok: false,
+        code: "TRAINER_PARAM_INVALID",
+        message: "attemptId is required",
+      };
+    }
     const prefix = `${TRAINER_ATTEMPTS_ROOT}/${key}/`;
     const deletedFiles = await deleteVfsByPrefix(prefix);
     state.attemptBundles.delete(key);
@@ -719,20 +895,33 @@
     await refreshBackupCache().catch(() => {});
     await refreshBuilderDiagnostics();
     await render();
-    if (deletedFiles > 0) {
-      setStatus(`Deleted trace for ${key}.`);
-      return;
+    if (!silent) {
+      if (deletedFiles > 0) {
+        setStatus(`Deleted trace for ${key}.`);
+      } else {
+        setStatus(`No trace found for ${key}.`);
+      }
     }
-    setStatus(`No trace found for ${key}.`);
+    return {
+      ok: true,
+      attemptId: key,
+      deletedFiles,
+      deleted: deletedFiles > 0,
+    };
   }
 
-  async function clearAllAttemptTraces() {
+  async function clearAllAttemptTraces(options = {}) {
+    const silent = options?.silent === true;
     const attemptCount = state.attempts.length;
     if (!attemptCount) {
-      setStatus("No attempts to clear.");
-      return;
+      if (!silent) setStatus("No attempts to clear.");
+      return {
+        ok: true,
+        clearedAttempts: 0,
+        deletedFiles: 0,
+      };
     }
-    await deleteVfsByPrefix(`${TRAINER_ATTEMPTS_ROOT}/`);
+    const deletedFiles = await deleteVfsByPrefix(`${TRAINER_ATTEMPTS_ROOT}/`);
     state.selectedAttemptId = null;
     state.selectedEventSeq = null;
     state.attemptBundles.clear();
@@ -741,7 +930,12 @@
     await refreshBackupCache().catch(() => {});
     await refreshBuilderDiagnostics();
     await render();
-    setStatus(`Cleared ${attemptCount} attempt(s).`);
+    if (!silent) setStatus(`Cleared ${attemptCount} attempt(s).`);
+    return {
+      ok: true,
+      clearedAttempts: attemptCount,
+      deletedFiles,
+    };
   }
 
   function renderAttempts() {
@@ -1092,6 +1286,34 @@
       const reasonCodes = Array.isArray(state.skillActionUsage.reasonCodes) ? state.skillActionUsage.reasonCodes : [];
       rows.push(`- Reason codes: ${reasonCodes.length ? reasonCodes.join(", ") : "(none)"}`);
     }
+    rows.push("");
+    rows.push(`Trainer namespace enabled: ${state.trainerNamespaceEnabled ? "yes" : "no"}`);
+    rows.push(`Trainer namespace tools: ${state.trainerNamespaceTools.length}`);
+    if (state.trainerNamespaceTools.length) {
+      for (const row of state.trainerNamespaceTools) {
+        rows.push(`- ${row?.name || "(unknown)"} [tier=${row?.tier || "?"}]`);
+      }
+    }
+    const trainerDiag = state.trainerNamespaceDiagnostics && typeof state.trainerNamespaceDiagnostics === "object"
+      ? state.trainerNamespaceDiagnostics
+      : null;
+    if (trainerDiag) {
+      rows.push("");
+      rows.push("Trainer namespace diagnostics:");
+      const perTurnRemaining = trainerDiag?.budgetRemaining?.perTurn?.remaining;
+      const perMinuteRemaining = trainerDiag?.budgetRemaining?.perMinute?.remaining;
+      rows.push(`- Budget per turn remaining: ${perTurnRemaining === null || perTurnRemaining === undefined ? "(n/a)" : perTurnRemaining}`);
+      rows.push(`- Budget per minute remaining: ${perMinuteRemaining === null || perMinuteRemaining === undefined ? "(n/a)" : perMinuteRemaining}`);
+      const pendingApprovals = Array.isArray(trainerDiag.pendingApprovals) ? trainerDiag.pendingApprovals : [];
+      rows.push(`- Pending approvals: ${pendingApprovals.length}`);
+      const recentBlockCodes = Array.isArray(trainerDiag.recentBlockCodes) ? trainerDiag.recentBlockCodes : [];
+      rows.push(`- Recent block codes: ${recentBlockCodes.length}`);
+      if (recentBlockCodes.length) {
+        for (const row of recentBlockCodes.slice(0, 8)) {
+          rows.push(`  ${row?.code || "UNKNOWN"} @ ${row?.tool || "(unknown tool)"}`);
+        }
+      }
+    }
     root.textContent = rows.join("\n");
   }
 
@@ -1149,6 +1371,13 @@
       return;
     }
     const stats = integrity.stats || {};
+    const trainerDiag = state.trainerNamespaceDiagnostics && typeof state.trainerNamespaceDiagnostics === "object"
+      ? state.trainerNamespaceDiagnostics
+      : null;
+    const trainerBudgetPerTurn = trainerDiag?.budgetRemaining?.perTurn?.remaining;
+    const trainerBudgetPerMinute = trainerDiag?.budgetRemaining?.perMinute?.remaining;
+    const trainerPendingApprovals = Array.isArray(trainerDiag?.pendingApprovals) ? trainerDiag.pendingApprovals.length : 0;
+    const trainerRecentBlocks = Array.isArray(trainerDiag?.recentBlockCodes) ? trainerDiag.recentBlockCodes.length : 0;
     const lines = [
       `Refreshed: ${integrity.refreshedAt}`,
       `Transcript items: ${Number(integrity.transcriptItems || 0)}`,
@@ -1158,6 +1387,12 @@
       `Displaced tool results: ${Number(stats.displacedToolResults || 0)}`,
       `Synthetic repair rows: ${Number(integrity.syntheticCount || 0)}`,
       `Skill action tools: ${Number(state.skillActions.length || 0)}`,
+      `Trainer namespace enabled: ${state.trainerNamespaceEnabled ? "yes" : "no"}`,
+      `Trainer namespace tools: ${Number(state.trainerNamespaceTools.length || 0)}`,
+      `Trainer budget per turn remaining: ${trainerBudgetPerTurn === null || trainerBudgetPerTurn === undefined ? "(n/a)" : trainerBudgetPerTurn}`,
+      `Trainer budget per minute remaining: ${trainerBudgetPerMinute === null || trainerBudgetPerMinute === undefined ? "(n/a)" : trainerBudgetPerMinute}`,
+      `Trainer pending approvals: ${trainerPendingApprovals}`,
+      `Trainer recent block codes: ${trainerRecentBlocks}`,
       `Skill action reason codes: ${
         Array.isArray(state.skillActionUsage?.reasonCodes) && state.skillActionUsage.reasonCodes.length
           ? state.skillActionUsage.reasonCodes.join(", ")
@@ -1249,12 +1484,22 @@
     setStatus(`Running tool ${toolName}...`);
     try {
       const isSkillAction = isSkillActionToolName(toolName);
+      const isTrainerNamespace = isTrainerNamespaceToolName(toolName);
       const result = isSkillAction
         ? await invokeSkillActionByName(toolApi, toolName, params)
-        : await invokeToolByName(toolApi, toolName, params);
+        : isTrainerNamespace
+          ? await invokeTrainerNamespaceByName(toolApi, toolName, params)
+          : await invokeToolByName(toolApi, toolName, params);
       if (isSkillAction) {
         const actionId = actionIdFromToolName(toolName);
         trackActionRun(actionId, result?.ok === true, String(result?.code || ""));
+        trackActionEvidence(result?.evidence || []);
+      }
+      if (isTrainerNamespace && normalizeTrainerNamespaceToolName(toolName) === "trainer.invoke_action") {
+        const actionId = String(result?.actionId || "").trim();
+        if (actionId) {
+          trackActionRun(actionId, result?.ok === true, String(result?.code || ""));
+        }
         trackActionEvidence(result?.evidence || []);
       }
       state.toolLastResult = isSkillAction
@@ -1270,6 +1515,24 @@
           code: result?.code || null,
           message: result?.message || null,
         }
+        : isTrainerNamespace
+          ? {
+            ...(result && typeof result === "object" ? result : {}),
+            ok: result?.ok === true,
+            tool: normalizeTrainerNamespaceToolName(toolName),
+            durationMs: Number.isFinite(Number(result?.durationMs))
+              ? Number(result.durationMs)
+              : Date.now() - startedAt,
+            request: result?.request || params,
+            response: normalizeToolInvocationResult(result?.response || result),
+            code: result?.code || null,
+            message: result?.message || null,
+            ...(result && typeof result === "object" ? {
+              actionId: result.actionId || null,
+              evidence: Array.isArray(result.evidence) ? result.evidence : [],
+              validation: result.validation || null,
+            } : {}),
+          }
         : {
           ok: true,
           tool: toolName,
@@ -1282,12 +1545,18 @@
       await render();
       if (isSkillAction && result?.ok !== true) {
         setStatus(`Skill action ${toolName} failed: ${result?.code || "UNSUPPORTED"}`, true);
+      } else if (isTrainerNamespace && result?.ok !== true) {
+        setStatus(`Trainer tool ${toolName} failed: ${result?.code || "TRAINER_UNAVAILABLE"}`, true);
       } else {
         setStatus(`Tool ${toolName} completed.`);
       }
     } catch (err) {
       if (isSkillActionToolName(toolName)) {
         trackActionRun(actionIdFromToolName(toolName), false, "UNSUPPORTED");
+      }
+      if (isTrainerNamespaceToolName(toolName) && normalizeTrainerNamespaceToolName(toolName) === "trainer.invoke_action") {
+        const actionId = String(params?.actionId || "").trim();
+        if (actionId) trackActionRun(actionId, false, "TRAINER_UNAVAILABLE");
       }
       state.toolLastResult = {
         ok: false,

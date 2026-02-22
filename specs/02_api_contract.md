@@ -249,6 +249,8 @@ Includes:
   - `lite.llmModel` (string | null, legacy server metadata)
   - `lite.runtimeVersion` (string | null)
   - `lite.lastError` (string | null)
+- `featureFlags` — rollout switches for UI/runtime plugins:
+  - `featureFlags.trainerNamespace` (boolean)
 
 ### POST `/api/hatch/complete` (human)
 Marks hatch completion for the current browser session.
@@ -290,7 +292,7 @@ Response shape:
   "origin": "http://localhost:4173",
   "runtimeVersion": "1.2.0",
   "driver": "vendor",
-  "featureFlags": { "llmConfigRequired": true }
+  "featureFlags": { "llmConfigRequired": true, "trainerNamespace": true }
 }
 ```
 
@@ -688,7 +690,7 @@ Response shape:
   "origin": "http://localhost:4173",
   "runtimeVersion": "1.2.0",
   "driver": "vendor",
-  "featureFlags": { "llmConfigRequired": true }
+  "featureFlags": { "llmConfigRequired": true, "trainerNamespace": true }
 }
 ```
 
