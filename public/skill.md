@@ -25,6 +25,26 @@ If runtime/session context already includes one of these values, use it directly
 
 Do not ask for any other credential.
 
+Do not ask the human to repeat runtime-provided values.
+Do not substitute a different localhost port when `origin` is provided. 
+
+## Mandatory Honesty Rule 
+- Never claim an API action is complete unless tool/API response confirms success. 
+- If tool execution is unavailable, ambiguous, or unverified, explicitly say: 
+- `Execution unverified; cannot confirm API success in this runtime.` 
+- Do not simulate completion. 
+
+## Multi-Call Action Policy (e.g., pixel art) 
+For actions requiring many paint calls: 
+1. Attempt calls in deterministic order. 
+2. Stop immediately on first failure. 
+3. Report summary: - `attempted` - `succeeded` - `failed` - first failing request + response 
+4. Only claim completion if all calls succeeded. #
+
+## Optional Post-Write Verification 
+
+If snapshot endpoint exists, verify expected coordinates changed before claiming done. If snapshot endpoint is unavailable, state that final visual verification is pending human confirmation.
+
 ## Base URL
 
 Use the current page origin (same origin as this skill file).
@@ -97,13 +117,17 @@ Practical rule:
 - Do not claim lock-in is done until the human clicks **Generate house key**.
 - If lock-in fails with `EMPTY_CANVAS`, ask for more painted pixels and continue.
 
-### Paint one agent pixel
+### Canvas Paint - Endpoint: 
+  `POST {origin}/api/agent/canvas/paint` 
+  - JSON body: 
+    - `teamCode` (string) 
+    - `x` (integer, 0..15) 
+    - `y` (integer, 0..15) 
+    - `color` (integer palette index) 
+    - Success condition (required): 
+      - HTTP status is 2xx - and response indicates success (`ok: true` or equivalent success schema) 
+      - If success condition is not met, treat as failure. 
 
-`POST /api/agent/canvas/paint`
-
-```json
-{ "teamCode": "TEAM-ABCD-EFGH", "x": 1, "y": 0, "color": 2 }
-```
 
 ### Optional canvas snapshot check
 
@@ -234,6 +258,43 @@ Inside OpenClaw Lite runtime, prefer these tools:
 - Be explicit about each action you take.
 - Treat this playbook as API-first. UI layout can change.
 
+## Execution Guarantees (Critical) 
+### Act-first requirement 
+If a user request maps to a defined API action in this skill, execute the API call(s) in the same turn before replying. 
+Forbidden: 
+- Intent-only replies (e.g., “I’ll do it now”, “I can do that”) without tool/API execution. 
+Required: 
+1. Execute call(s) 
+2. Validate success criteria 
+3. Report concrete results 
+
+### No-stall policy Do not stop at planning language when the endpoint and payload are known. If actionable, act immediately. 
+### Runtime authority (must use as-is) 
+When runtime session context provides values, treat them as authoritative: - `origin` - `teamCode` - `houseId` 
+
+Rules: 
+- Do NOT ask the human for these when present. 
+- Do NOT substitute another localhost port when `origin` is provided. 
+- Use exact provided values in API calls.
+
+### Success criteria (strict) A paint operation is successful only if BOTH: 1. HTTP status is 2xx 2. Response indicates success (`ok: true` or equivalent success schema) If either fails, treat as failure. 
+### Retry policy On failure: - Retry same request up to 2 additional times - Wait 150–300ms between retries If still failing: - Report failure with: - endpoint - status code - short response snippet 
+
+--- 
+
+## Turn Completion Checklist (Must pass before final reply) Before sending the final user-facing response, verify all are true: 
+- [ ] I executed required API call(s) this turn (not just described them) 
+- [ ] I validated 2xx + `ok:true` (or equivalent) for each required call 
+- [ ] I reported actual outcomes (attempted/succeeded/failed), not intention text If any item is unchecked: do not finalize reply; continue execution. 
+--- 
+
+## Tool/Runtime Error Handling If a tool call returns missing/synthetic/error result: 
+1. Re-run the same call once immediately 
+2. If still failing, run a lightweight state-check endpoint to confirm server reachability 
+3. Report exact blocker and next precise recovery step Do not end with generic apology only. 
+
+--- 
+
 ## Minimal curl sequence
 
 ### If connect fails
@@ -274,43 +335,3 @@ Inside OpenClaw Lite runtime, prefer these tools:
 
 ---
 
-## Curl examples (optional)
-
-These are equivalent to the JSON tool definitions above.
-
-Set variables:
-```bash
-BASE_URL="<current-origin>"
-TEAM_CODE="TEAM-ABCD-EFGH"
-
-curl -sS -X POST "$BASE_URL/api/agent/connect" \
-  -H 'content-type: application/json' \
-  -d '{"teamCode":"'"$TEAM_CODE"'","agentName":"OpenClaw"}'
-
-while true; do
-  state=$(curl -sS "$BASE_URL/api/agent/state?teamCode=$TEAM_CODE") || { sleep 2; continue; }
-
-  human_sel=$(echo "$state" | jq -r '.human.selected')
-  human_open=$(echo "$state" | jq -r '.human.openPressed')
-  agent_open=$(echo "$state" | jq -r '.agent.openPressed')
-  done_flag=$(echo "$state" | jq -r '.signup.complete')
-
-  if [ "$human_sel" != "null" ]; then
-    curl -sS -X POST "$BASE_URL/api/agent/select" \
-      -H 'content-type: application/json' \
-      -d '{"teamCode":"'"$TEAM_CODE"'","elementId":"'"$human_sel"'"}' >/dev/null || true
-  fi
-
-  if [ "$human_open" = "true" ] && [ "$agent_open" != "true" ]; then
-    curl -sS -X POST "$BASE_URL/api/agent/open/press" \
-      -H 'content-type: application/json' \
-      -d '{"teamCode":"'"$TEAM_CODE"'"}' >/dev/null || true
-  fi
-
-  if [ "$done_flag" = "true" ]; then
-    break
-  fi
-
-  sleep 1
-done
-```
