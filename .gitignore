@@ -1,5 +1,6 @@
 .DS_Store
 
+data/
 data/store.e2e.json
 data/store.json
 data/store*.sqlite
