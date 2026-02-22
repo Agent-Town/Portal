@@ -2,6 +2,8 @@
   const QUEST_ID = "portal_onboarding_v1";
   const RUN_PROMPT = "trainer probe: lite echo";
   const BACKUP_FILENAME = "agent-town-personal-backup.json";
+  const TRAINER_ROOT = `lite/experience-trainer/v1/quests/${QUEST_ID}`;
+  const TRAINER_ATTEMPTS_ROOT = `${TRAINER_ROOT}/attempts`;
 
   const state = {
     attempts: [],
@@ -64,22 +66,73 @@
     });
   }
 
-  async function readVfsText(path) {
-    const db = await openOpenClawDb();
-    const tx = db.transaction(["vfs"], "readonly");
-    const req = tx.objectStore("vfs").get(String(path || ""));
-    const rec = await new Promise((resolve, reject) => {
+  function idbReqToPromise(req) {
+    return new Promise((resolve, reject) => {
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error || new Error("IDB_READ_FAILED"));
+      req.onerror = () => reject(req.error || new Error("IDB_REQUEST_FAILED"));
     });
-    await new Promise((resolve, reject) => {
+  }
+
+  function idbTxDone(tx) {
+    return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error || new Error("IDB_TX_FAILED"));
       tx.onabort = () => reject(tx.error || new Error("IDB_TX_ABORTED"));
     });
-    db.close();
-    if (!rec || typeof rec.dataB64 !== "string") return null;
-    return decodeB64Utf8(rec.dataB64);
+  }
+
+  async function readVfsText(path) {
+    const db = await openOpenClawDb();
+    try {
+      const tx = db.transaction(["vfs"], "readonly");
+      const req = tx.objectStore("vfs").get(String(path || ""));
+      const rec = await idbReqToPromise(req);
+      await idbTxDone(tx);
+      if (!rec || typeof rec.dataB64 !== "string") return null;
+      return decodeB64Utf8(rec.dataB64);
+    } finally {
+      db.close();
+    }
+  }
+
+  async function listVfsPaths(prefix = "") {
+    const db = await openOpenClawDb();
+    try {
+      const tx = db.transaction(["vfs"], "readonly");
+      const rows = await idbReqToPromise(tx.objectStore("vfs").getAll());
+      await idbTxDone(tx);
+      const normalizedPrefix = String(prefix || "");
+      return (Array.isArray(rows) ? rows : [])
+        .map((row) => (row && typeof row.path === "string" ? row.path : ""))
+        .filter((path) => !!path && (!normalizedPrefix || path.startsWith(normalizedPrefix)));
+    } finally {
+      db.close();
+    }
+  }
+
+  async function deleteVfsPaths(paths = []) {
+    const keys = (Array.isArray(paths) ? paths : [])
+      .map((path) => String(path || ""))
+      .filter(Boolean);
+    if (!keys.length) return 0;
+    const db = await openOpenClawDb();
+    try {
+      const tx = db.transaction(["vfs"], "readwrite");
+      const store = tx.objectStore("vfs");
+      for (const key of keys) {
+        store.delete(key);
+      }
+      await idbTxDone(tx);
+      return keys.length;
+    } finally {
+      db.close();
+    }
+  }
+
+  async function deleteVfsByPrefix(prefix) {
+    const paths = await listVfsPaths(prefix);
+    if (!paths.length) return 0;
+    return await deleteVfsPaths(paths);
   }
 
   async function gateway() {
@@ -180,6 +233,55 @@
     return await getAttemptBundle(attempt.attemptId);
   }
 
+  function purgeAttemptReceiptCache(attemptId) {
+    const key = String(attemptId || "").trim();
+    if (!key) return;
+    const prefix = `${TRAINER_ATTEMPTS_ROOT}/${key}/`;
+    for (const path of state.receiptCache.keys()) {
+      if (String(path || "").startsWith(prefix)) {
+        state.receiptCache.delete(path);
+      }
+    }
+  }
+
+  async function deleteAttemptTrace(attemptId) {
+    const key = String(attemptId || "").trim();
+    if (!key) return;
+    const prefix = `${TRAINER_ATTEMPTS_ROOT}/${key}/`;
+    const deletedFiles = await deleteVfsByPrefix(prefix);
+    state.attemptBundles.delete(key);
+    purgeAttemptReceiptCache(key);
+    if (state.selectedAttemptId === key) {
+      state.selectedAttemptId = null;
+      state.selectedEventSeq = null;
+    }
+    await refreshAttempts();
+    await refreshBackupCache().catch(() => {});
+    await render();
+    if (deletedFiles > 0) {
+      setStatus(`Deleted trace for ${key}.`);
+      return;
+    }
+    setStatus(`No trace found for ${key}.`);
+  }
+
+  async function clearAllAttemptTraces() {
+    const attemptCount = state.attempts.length;
+    if (!attemptCount) {
+      setStatus("No attempts to clear.");
+      return;
+    }
+    await deleteVfsByPrefix(`${TRAINER_ATTEMPTS_ROOT}/`);
+    state.selectedAttemptId = null;
+    state.selectedEventSeq = null;
+    state.attemptBundles.clear();
+    state.receiptCache.clear();
+    await refreshAttempts();
+    await refreshBackupCache().catch(() => {});
+    await render();
+    setStatus(`Cleared ${attemptCount} attempt(s).`);
+  }
+
   function renderAttempts() {
     const root = el("trainerAttempts");
     if (!root) return;
@@ -189,10 +291,11 @@
       return;
     }
     for (const attempt of state.attempts) {
+      const row = document.createElement("div");
+      row.className = "trainerAttemptRow";
       const btn = document.createElement("button");
-      btn.className = "btn small";
+      btn.className = "btn small trainerAttemptSelect";
       btn.type = "button";
-      btn.style.margin = "0 8px 8px 0";
       const result = String(attempt?.result || "unknown");
       const duration = formatMs(attempt?.stats?.durationMs || 0);
       const failures = Number(attempt?.stats?.toolFailures || 0);
@@ -205,7 +308,29 @@
         state.selectedEventSeq = null;
         render().catch(() => {});
       });
-      root.appendChild(btn);
+      row.appendChild(btn);
+
+      const remove = document.createElement("span");
+      remove.className = "trainerAttemptDelete";
+      remove.textContent = "[x]";
+      remove.title = `Delete trace ${attempt.attemptId || ""}`;
+      remove.setAttribute("data-testid", "trainer-attempt-delete");
+      remove.tabIndex = 0;
+      const onDelete = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteAttemptTrace(attempt.attemptId).catch((err) => {
+          setStatus(`Delete failed: ${err?.message || "UNKNOWN"}`, true);
+        });
+      };
+      remove.addEventListener("click", onDelete);
+      remove.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        onDelete(event);
+      });
+      row.appendChild(remove);
+
+      root.appendChild(row);
     }
   }
 
@@ -556,6 +681,14 @@
     if (run3) run3.addEventListener("click", () => runAttempts(3).catch(() => {}));
     const run10 = el("trainerRun10Btn");
     if (run10) run10.addEventListener("click", () => runAttempts(10).catch(() => {}));
+    const clearBtn = el("trainerClearAttemptsBtn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        clearAllAttemptTraces().catch((err) => {
+          setStatus(`Clear failed: ${err?.message || "UNKNOWN"}`, true);
+        });
+      });
+    }
 
     const advanced = el("trainerAdvancedToggle");
     if (advanced) {
