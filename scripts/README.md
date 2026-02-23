@@ -240,6 +240,54 @@ Prompt output includes stable mapping fields for post-generation ingest:
 - `outputFilename`
 - `prompt`
 
+### `export_auto_whisk_prompt_files.js`
+
+Exports one-prompt-per-line `.txt` files tailored for Auto Whisk style/scene generation flows.
+
+Worthy criteria:
+- `x402_supported=true` OR `is_endpoint_verified=true` (from 8004scan API)
+
+It joins those API rows against local pre-registered houses/anchors in the store and writes:
+- worthy prompts (all, by-chain, and fixed-size batches)
+- shared category prompts for non-worthy agents (one per chain family category)
+- category mapping CSV for deterministic ingest later
+
+Run:
+
+```bash
+node scripts/export_auto_whisk_prompt_files.js \
+  --out-dir ./data/erc8004-whisk-prompts \
+  --style-anchor-file ./scripts/style_anchor_agent_town_wild_west.txt \
+  --batch-size 200
+```
+
+Common flags:
+- `--store-path <path>`
+- `--out-dir <path>`
+- `--style-anchor-file <path>`
+- `--style-anchor <text>`
+- `--solana-prefix <prefix>`
+- `--batch-size <n>`
+- `--style-version <v>`
+- `--api-base-url <url>`
+- `--timeout-ms <n>`
+- `--delay-ms <n>`
+- `--include-existing-share-hero`
+- `--max-worthy <n>`
+
+Key outputs:
+- `./data/erc8004-whisk-prompts/worthy/worthy-all.txt`
+- `./data/erc8004-whisk-prompts/worthy/by-chain/*.txt`
+- `./data/erc8004-whisk-prompts/worthy/by-chain/maps/*.map.jsonl` (line-number mapping for by-chain files)
+- `./data/erc8004-whisk-prompts/worthy/batches/*.txt`
+- `./data/erc8004-whisk-prompts/worthy/batches/*.map.jsonl` (line-number to output filename/house mapping)
+- `./data/erc8004-whisk-prompts/worthy/worthy-manifest.jsonl`
+- `./data/erc8004-whisk-prompts/shared/category-prompts.txt`
+- `./data/erc8004-whisk-prompts/shared/by-category/*.txt`
+- `./data/erc8004-whisk-prompts/shared/category-map.csv`
+- `./data/erc8004-whisk-prompts/shared/shared-agent-manifest.jsonl` (expanded per-agent manifest for shared category images)
+- `./data/erc8004-whisk-prompts/summary.json`
+
 ### `generate_nano_banana_images.js`
 
 Generates image files from prompt manifests using Gemini image generation (Nano Banana compatible flow).
@@ -356,6 +404,24 @@ node scripts/ingest_generated_share_heroes.js \
 Image naming:
 - preferred: exact `outputFilename` from manifest
 - fallback: `<outputFileBase>.png|jpg|jpeg|webp`
+
+### `remap_whisk_downloads.js`
+
+Maps raw Auto Whisk download files into deterministic manifest filenames using batch/chain map files.
+
+Run:
+
+```bash
+node scripts/remap_whisk_downloads.js \
+  --map ./data/erc8004-whisk-prompts/worthy/batches/worthy-batch-0001.map.jsonl \
+  --downloads-dir ~/Downloads/Whisk\ Downloads \
+  --out-dir ./data/generated-share-heroes
+```
+
+Flags:
+- `--order <mtime|name>` (default `mtime`)
+- `--copy` (default is move)
+- `--allow-partial`
 
 ### `run_erc8004_refresh_pipeline.sh`
 
