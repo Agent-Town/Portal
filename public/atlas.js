@@ -657,7 +657,14 @@ async function openDistrictDetail(key, opts = {}) {
 
   let payload = state.districtDetailCache.get(key);
   if (!payload) {
-    payload = await api(`/api/atlas/district/${encodeURIComponent(key)}`);
+    try {
+      payload = await api(`/api/atlas/district/${encodeURIComponent(key)}`);
+    } catch (err) {
+      if (String(err?.message || '') === 'NOT_FOUND') {
+        throw new Error('DISTRICT_NOT_FOUND');
+      }
+      throw err;
+    }
     state.districtDetailCache.set(key, payload);
   }
 

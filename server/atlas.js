@@ -395,6 +395,7 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
     const hasUpdatedAt = cols.has('updated_at');
     const hasCreatedAt = cols.has('created_at');
     const hasOwnerAddress = cols.has('owner_address');
+    const hasAgentIsTestnet = cols.has('is_testnet');
     const hasChainsTable = hasSqliteTable(db, 'erc8004_chains');
     const orderBy = hasUpdatedAt ? 'a.updated_at DESC' : 'a.rowid DESC';
 
@@ -410,7 +411,7 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
         `  ${hasCreatedAt ? "COALESCE(a.created_at, '')" : "''"} AS createdAt,`,
         `  ${hasUpdatedAt ? "COALESCE(a.updated_at, '')" : "''"} AS updatedAt,`,
         `  ${hasChainsTable ? "COALESCE(c.name, '')" : "''"} AS chainName,`,
-        `  ${hasChainsTable ? 'COALESCE(c.is_testnet, 0)' : '0'} AS isTestnet`,
+        `  ${hasChainsTable ? 'COALESCE(c.is_testnet, 0)' : (hasAgentIsTestnet ? 'COALESCE(a.is_testnet, 0)' : '0')} AS isTestnet`,
         'FROM erc8004_agents a',
         ...(hasChainsTable ? ['LEFT JOIN erc8004_chains c ON c.chain_id = a.chain_id'] : []),
         "WHERE a.agent_id IS NOT NULL AND TRIM(a.agent_id) <> ''",
@@ -443,6 +444,30 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
   }
 }
 
+function buildChainRowsFromAgents(agentRows) {
+  const byChainAndNetwork = new Map();
+  for (const row of agentRows || []) {
+    const chainId = Number(row?.chainId);
+    if (!Number.isFinite(chainId)) continue;
+    const isTestnet = row?.isTestnet === true || Number(row?.isTestnet) === 1;
+    const key = `${chainId}:${isTestnet ? 1 : 0}`;
+    const fallbackName = `Chain ${chainId}`;
+    const rowName = String(row?.chainName || '').trim();
+    const existing = byChainAndNetwork.get(key) || {
+      chainId,
+      chainName: rowName || fallbackName,
+      isTestnet,
+      agents: 0
+    };
+    existing.agents += 1;
+    if ((!existing.chainName || existing.chainName === fallbackName) && rowName) {
+      existing.chainName = rowName;
+    }
+    byChainAndNetwork.set(key, existing);
+  }
+  return [...byChainAndNetwork.values()];
+}
+
 function getAtlasSnapshot({ env = process.env.NODE_ENV, sqlitePath = DEFAULT_SQLITE_PATH } = {}) {
   const formula = { ...ATLAS_FORMULA };
   if (env === 'test') {
@@ -458,9 +483,13 @@ function getAtlasSnapshot({ env = process.env.NODE_ENV, sqlitePath = DEFAULT_SQL
     };
   }
 
-  const chainRows = readChainRowsFromSqlite(sqlitePath);
-  const agents = buildAgents(readAgentsFromSqlite(sqlitePath));
-  const source = chainRows.length > 0
+  const agentRows = readAgentsFromSqlite(sqlitePath);
+  const agents = buildAgents(agentRows);
+  let chainRows = readChainRowsFromSqlite(sqlitePath);
+  if (!chainRows.length && agentRows.length) {
+    chainRows = buildChainRowsFromAgents(agentRows);
+  }
+  const source = (chainRows.length > 0 || agents.length > 0)
     ? `sqlite:${path.relative(process.cwd(), sqlitePath) || sqlitePath}`
     : 'empty';
   const districts = attachDistrictAgentViews(buildDistricts(chainRows, formula), agents);

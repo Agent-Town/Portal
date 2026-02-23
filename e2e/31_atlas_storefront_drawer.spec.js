@@ -24,3 +24,8 @@ test('atlas deep link opens storefront drawer by agent id', async ({ page }) => 
   await expect(page.getByTestId('storefront-drawer')).toBeVisible();
   await expect(page.getByTestId('storefront-agent-id')).toHaveText('1:1001');
 });
+
+test('atlas invalid district deep link shows district-specific error', async ({ page }) => {
+  await page.goto('/atlas?district=not-a-district');
+  await expect(page.locator('#atlasErr')).toContainText('District not found in current atlas source.');
+});
