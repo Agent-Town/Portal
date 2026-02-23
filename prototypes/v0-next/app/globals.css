@@ -1,0 +1,354 @@
+:root {
+  --bg: #efe7d2;
+  --panel: #fff8e8;
+  --ink: #2e241b;
+  --muted: #6e5a45;
+  --line: #3e2d1f;
+  --accent: #2e5f87;
+  --ok: #2f8e3b;
+  --warn: #b98018;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at 10% 10%, #fff3d3, var(--bg));
+  color: var(--ink);
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+body {
+  padding-bottom: 190px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  min-height: 100vh;
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.topbar {
+  border: 3px solid var(--line);
+  background: linear-gradient(180deg, #fff7df, #f3dfb6);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brandDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid var(--line);
+  background: linear-gradient(180deg, #4d88bf, #2d5f86);
+}
+
+.brandCopy {
+  display: grid;
+  gap: 2px;
+}
+
+.brandCopy strong {
+  font-size: 14px;
+  letter-spacing: 0.4px;
+}
+
+.small {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn {
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff2ce;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn.active {
+  background: #d6ecff;
+  border-color: var(--accent);
+}
+
+.btn.bad {
+  background: #ffdcdc;
+}
+
+.panel {
+  border: 3px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 12px;
+}
+
+.townGrid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 10px;
+  min-height: 520px;
+}
+
+.townMap {
+  position: relative;
+  border: 3px solid #2d5f86;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #83b8e2, #6390ba 55%, #456f98);
+  overflow: hidden;
+  min-height: 420px;
+}
+
+.districtHotspot {
+  position: absolute;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff8ea, #f0dfb4);
+  padding: 8px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.townSidePanel {
+  display: grid;
+  align-content: start;
+}
+
+.dock {
+  position: fixed;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 3px solid var(--line);
+  background: #fff8e3;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  z-index: 40;
+}
+
+.dockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dockBody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.logs,
+.chat {
+  min-height: 96px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.input {
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  width: 100%;
+}
+
+.atlasGrid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 10px;
+}
+
+.atlasMap {
+  position: relative;
+  border: 3px solid #2d5f86;
+  border-radius: 12px;
+  min-height: 420px;
+  background: linear-gradient(180deg, #3f6991, #2e5374);
+  overflow: hidden;
+}
+
+.atlasNode {
+  position: absolute;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff8ea, #e8d4a8);
+  padding: 8px;
+  min-width: 130px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market {
+  max-height: 520px;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.marketCard {
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 29, 39, 0.52);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  z-index: 50;
+}
+
+.modal {
+  width: min(980px, 100%);
+  max-height: calc(100vh - 20px);
+  overflow: auto;
+  border: 3px solid var(--line);
+  border-radius: 12px;
+  background: #fff8e8;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  background: #fff;
+}
+
+.listCompact {
+  display: grid;
+  gap: 6px;
+}
+
+.listRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid #cebfa1;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.gridTwo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tableLike {
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.tableHeader,
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 8px 10px;
+}
+
+.tableHeader {
+  background: #e6d8b9;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.tableRow:nth-child(even) {
+  background: #fff;
+}
+
+.tableRow:nth-child(odd) {
+  background: #fff8ea;
+}
+
+.imagePlaceholder {
+  min-height: 180px;
+  border: 2px dashed #b5a27f;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f9e6bf, #edd4a0);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: #5e4d36;
+}
+
+.codeBlock {
+  margin: 0;
+  border: 2px solid #ccb98f;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  overflow: auto;
+}
+
+@media (max-width: 980px) {
+  .townGrid,
+  .atlasGrid,
+  .dockBody,
+  .gridTwo,
+  .tableHeader,
+  .tableRow {
+    grid-template-columns: 1fr;
+  }
+
+  body {
+    padding-bottom: 250px;
+  }
+}

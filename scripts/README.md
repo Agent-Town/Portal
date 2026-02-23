@@ -153,6 +153,231 @@ Tables:
 - `erc8004_solana_validations`
 - `erc8004_solana_ingest_runs`
 
+### `import_erc8004_preregister_houses.js`
+
+Imports ERC-8004 identities into the app backend store as:
+- preregistered houses
+- anchor mappings (`erc8004Id -> houseId`)
+- initial media slots (`media.shareHero`, `media.agentAvatar` when image data exists)
+- respects `erc8004OptOut` tombstones (skips opted-out ERC-8004 IDs)
+
+This is **not** part of the `populate-*` scripts.  
+`populate-*` scripts only build cache/source databases (`erc8004.sqlite3`).  
+`import_erc8004_preregister_houses.js` consumes those DBs and writes to backend store tables.
+
+Run:
+
+```bash
+node scripts/import_erc8004_preregister_houses.js
+```
+
+Common flags:
+- `--dry-run` (default behavior unless `--apply`)
+- `--apply`
+- `--source-sqlite <path>`
+- `--store-path <path>`
+- `--limit <n>`
+- `--evm-only`
+- `--solana-only`
+- `--testnet-only`
+- `--mainnet-only`
+- `--solana-prefix <prefix>`
+- `--reset-preregister`
+
+Image flags:
+- `--with-images`
+- `--download-images-only` (prefetch/cache images only; no store writes)
+- `--use-image-cache-only` (no network image fetches during import)
+- `--image-cache-dir <path>`
+- `--image-base-url <url>`
+- `--image-timeout-ms <ms>`
+- `--image-max-bytes <n>`
+- `--image-concurrency <n>`
+- `--image-retries <n>`
+- `--dry-run` (explicit; default behavior unless `--apply`)
+
+Recommended two-step image flow:
+
+```bash
+node scripts/import_erc8004_preregister_houses.js --download-images-only --with-images --image-cache-dir ./data/erc8004-image-cache
+node scripts/import_erc8004_preregister_houses.js --with-images --use-image-cache-only --image-cache-dir ./data/erc8004-image-cache --apply
+```
+
+### `generate_erc8004_image_prompts.js`
+
+Generates deterministic prompt inventories for storefront/share-hero image creation.
+
+Outputs:
+- JSONL records
+- CSV table
+- summary JSON with distribution + estimated cost brackets
+
+Run:
+
+```bash
+node scripts/generate_erc8004_image_prompts.js \
+  --scope missing-share-hero \
+  --style-anchor-file ./scripts/style_anchor_agent_town_wild_west.txt \
+  --out-basename ./data/erc8004-image-prompts-missing-share-hero
+```
+
+Common flags:
+- `--sqlite-path <path>` source cache DB (default `./data/erc8004.sqlite3`)
+- `--store-path <path>` backend store sqlite
+- `--scope <all|missing-share-hero|missing-agent-avatar>`
+- `--style-version <v>`
+- `--style-anchor <text>`
+- `--style-anchor-file <path>`
+- `--solana-prefix <prefix>`
+- `--candidates-per-agent <n>`
+- `--estimated-unit-cost-usd <n>`
+- `--out-basename <path>`
+
+Prompt output includes stable mapping fields for post-generation ingest:
+- `erc8004Id`
+- `houseId`
+- `outputFileBase`
+- `outputFilename`
+- `prompt`
+
+### `generate_nano_banana_images.js`
+
+Generates image files from prompt manifests using Gemini image generation (Nano Banana compatible flow).
+
+It supports two auth paths:
+- `api-key` (Gemini API key)
+- `oauth` (access token, refresh-token backend flow, or ADC command fallback)
+
+Important:
+- Auth mode does **not** change per-image API pricing.
+- Use `--max-spend-usd` + `--unit-cost-usd` for budget guardrails.
+- Default output is compatible with `ingest_generated_share_heroes.js`.
+
+Run with API key:
+
+```bash
+export GEMINI_API_KEY='...'
+node scripts/generate_nano_banana_images_api_key.js \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl \
+  --images-dir ./data/generated-share-heroes \
+  --model gemini-2.5-flash-image \
+  --concurrency 2 \
+  --max-spend-usd 25
+```
+
+Run with OAuth refresh-token flow (backend-safe):
+
+```bash
+export GOOGLE_OAUTH_CLIENT_ID='...'
+export GOOGLE_OAUTH_CLIENT_SECRET='...'
+export GOOGLE_OAUTH_REFRESH_TOKEN='...'
+export GOOGLE_CLOUD_PROJECT='your-gcp-project-id'
+node scripts/generate_nano_banana_images_oauth.js \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl \
+  --images-dir ./data/generated-share-heroes \
+  --model gemini-2.5-flash-image \
+  --concurrency 2 \
+  --max-spend-usd 25
+```
+
+OAuth fallback (ADC via gcloud command):
+
+```bash
+node scripts/generate_nano_banana_images_oauth.js \
+  --oauth-token-command "gcloud auth application-default print-access-token" \
+  --google-cloud-project your-gcp-project-id \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl
+```
+
+Dry-run estimate:
+
+```bash
+node scripts/generate_nano_banana_images_oauth.js \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl \
+  --limit 100 \
+  --unit-cost-usd 0.039 \
+  --dry-run
+```
+
+Common flags:
+- `--manifest <path>`
+- `--images-dir <path>`
+- `--reports-dir <path>`
+- `--auth <api-key|oauth>`
+- `--model <name>`
+- `--aspect-ratio <1:1|3:4|4:3|9:16|16:9>`
+- `--concurrency <n>`
+- `--start-offset <n>`
+- `--limit <n>`
+- `--overwrite`
+- `--dry-run`
+- `--unit-cost-usd <n>`
+- `--max-spend-usd <n>`
+- `--timeout-ms <n>`
+- `--max-retries <n>`
+- `--retry-backoff-ms <n>`
+- `--resolved-manifest <path>`
+
+Auth-specific flags:
+- API key: `--api-key <key>` (or `GEMINI_API_KEY`)
+- OAuth direct token: `--oauth-access-token <token>`
+- OAuth refresh flow: `--oauth-client-id`, `--oauth-client-secret`, `--oauth-refresh-token`
+- OAuth command fallback: `--oauth-token-command <cmd>`
+- OAuth quota project: `--google-cloud-project <id>`
+
+Wrappers:
+- `generate_nano_banana_images_api_key.js` (forces `--auth api-key`)
+- `generate_nano_banana_images_oauth.js` (forces `--auth oauth`)
+
+### `ingest_generated_share_heroes.js`
+
+Applies generated images back into house media slots by mapping manifest `erc8004Id` -> house:
+- writes `media.shareHero` (`source: generated`)
+- mirrors legacy `publicMedia` for compatibility
+- optional: `--set-agent-avatar-if-missing`
+
+Run (dry-run):
+
+```bash
+node scripts/ingest_generated_share_heroes.js \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl \
+  --images-dir ./data/generated-share-heroes
+```
+
+Run (apply):
+
+```bash
+node scripts/ingest_generated_share_heroes.js \
+  --manifest ./data/erc8004-image-prompts-missing-share-hero.jsonl \
+  --images-dir ./data/generated-share-heroes \
+  --apply
+```
+
+Image naming:
+- preferred: exact `outputFilename` from manifest
+- fallback: `<outputFileBase>.png|jpg|jpeg|webp`
+
+### `run_erc8004_refresh_pipeline.sh`
+
+Background-ready orchestration script for the full update loop:
+1. refresh EVM source DB
+2. refresh Solana source DB
+3. checkpoint into `data/erc8004.sqlite3`
+4. prefetch images
+5. import preregistered houses
+6. generate prompt lists (`missing-share-hero` + `all`)
+
+Run:
+
+```bash
+./scripts/run_erc8004_refresh_pipeline.sh
+```
+
+Detailed runbook:
+- `scripts/PIPELINE_ERC8004_BACKGROUND.md`
+
+Default style anchor:
+- `scripts/style_anchor_agent_town_wild_west.txt`
 ### `import-claimable-reservations.js`
 
 Imports **claimable reservations** into the backend store from local cache DBs:

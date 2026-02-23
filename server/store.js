@@ -2,7 +2,19 @@ const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
-const TABLES = ['signups', 'shares', 'publicTeams', 'houses', 'claims', 'reservations', 'milestones', 'rewardsLedger', 'anchors', 'inbox'];
+const TABLES = [
+  'signups',
+  'shares',
+  'publicTeams',
+  'houses',
+  'claims',
+  'reservations',
+  'milestones',
+  'rewardsLedger',
+  'anchors',
+  'inbox',
+  'erc8004OptOut'
+];
 
 let db = null;
 let statements = null;
@@ -42,7 +54,8 @@ function ensureDb() {
       'CREATE TABLE IF NOT EXISTS milestones (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS rewardsLedger (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS anchors (pos INTEGER NOT NULL, data TEXT NOT NULL);',
-      'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);'
+      'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS erc8004OptOut (pos INTEGER NOT NULL, data TEXT NOT NULL);'
     ].join('\n')
   );
   statements = buildStatements(db);
@@ -90,7 +103,8 @@ function normalizeStore(next) {
     milestones: Array.isArray(next?.milestones) ? next.milestones : [],
     rewardsLedger: Array.isArray(next?.rewardsLedger) ? next.rewardsLedger : [],
     anchors: Array.isArray(next?.anchors) ? next.anchors : [],
-    inbox: Array.isArray(next?.inbox) ? next.inbox : []
+    inbox: Array.isArray(next?.inbox) ? next.inbox : [],
+    erc8004OptOut: Array.isArray(next?.erc8004OptOut) ? next.erc8004OptOut : []
   };
 }
 
@@ -106,7 +120,8 @@ function readStore() {
     milestones: [],
     rewardsLedger: [],
     anchors: [],
-    inbox: []
+    inbox: [],
+    erc8004OptOut: []
   };
   for (const table of TABLES) {
     const rows = statements[table].all.all();

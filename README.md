@@ -148,3 +148,4 @@ Unlocking a house in the UI is gated by a Privy-backed Solana wallet signature. 
 - API contract: `specs/02_api_contract.md`
 - Experience flow: `specs/01_experience_flow.md`
 - TDD milestones: `specs/04_tdd_milestones.md`
+- District map + storefront: `specs/11_district_map_storefront_spec.md`
