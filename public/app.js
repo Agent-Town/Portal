@@ -203,6 +203,7 @@ function el(id) {
 
 const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
 const AGENT_PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
+const AGENT_PANEL_DEBUG_VISIBLE_KEY = 'agentTown:panel:debugVisible';
 
 let elements = [];
 let lastState = null;
@@ -335,6 +336,7 @@ let pathMode = 'coop';
 let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
+  atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -712,6 +714,7 @@ function districtStatusText(district) {
     return `Locked: ${statusText}`;
   }
   if (!district) return 'Select a district on the map.';
+  if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
   if (district === 'saloon') return 'Saloon selected: reserved for future menu content.';
   if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
@@ -720,7 +723,7 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -736,13 +739,13 @@ function setActiveDistrict(district) {
 }
 
 function normalizeDistrict(district) {
-  return district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  return district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : 'house';
 }
 
 function explicitDistrictFromInput(district) {
-  return district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  return district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
 }
@@ -3110,6 +3113,16 @@ function loadAgentPanelMinimized() {
   }
 }
 
+function loadAgentPanelDebugVisible() {
+  try {
+    const raw = localStorage.getItem(AGENT_PANEL_DEBUG_VISIBLE_KEY);
+    if (raw === null) return false;
+    return raw === '1';
+  } catch {
+    return false;
+  }
+}
+
 function getTrainerModalBackdrop() {
   return document.getElementById('trainerModalBackdrop');
 }
@@ -3250,14 +3263,27 @@ function routeToPopupMode(rawHref) {
       title: 'Claim'
     };
   }
+  if (path === '/atlas') {
+    const params = new URLSearchParams(parsed.search || '');
+    params.set('embed', '1');
+    const embedUrl = `${parsed.pathname}${params.toString() ? `?${params.toString()}` : ''}${parsed.hash}`;
+    return {
+      mode: 'frame',
+      url: embedUrl,
+      title: 'Atlas Depot'
+    };
+  }
   if (path === '/wall') {
     return { mode: 'district', district: 'leaderboard' };
   }
   if (path.startsWith('/s/')) {
+    const params = new URLSearchParams(parsed.search || '');
+    params.set('embed', '1');
+    const embedUrl = `${parsed.pathname}${params.toString() ? `?${params.toString()}` : ''}${parsed.hash}`;
     return {
       mode: 'frame',
-      url: `${parsed.pathname}${parsed.search}${parsed.hash}`,
-      title: 'Share'
+      url: embedUrl,
+      title: 'Share Card'
     };
   }
 
@@ -3279,6 +3305,14 @@ function routeToPopupMode(rawHref) {
 function saveAgentPanelMinimized(minimized) {
   try {
     localStorage.setItem(AGENT_PANEL_MINIMIZED_KEY, minimized ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function saveAgentPanelDebugVisible(visible) {
+  try {
+    localStorage.setItem(AGENT_PANEL_DEBUG_VISIBLE_KEY, visible ? '1' : '0');
   } catch {
     // ignore storage errors
   }
@@ -3551,6 +3585,45 @@ function setDistrictModalMode(mode) {
   modal.classList.toggle('is-frame', mode === 'frame');
 }
 
+const districtModalThemeByDistrict = {
+  house: 'house',
+  atlas: 'atlas',
+  townhall: 'townhall',
+  saloon: 'saloon',
+  pony: 'pony',
+  leaderboard: 'leaderboard',
+  brain: 'trainer',
+  sigil: 'share'
+};
+
+function setDistrictModalTheme(theme) {
+  const modal = document.querySelector('#districtModalBackdrop .districtModal');
+  if (!modal) return;
+  if (!theme) {
+    modal.removeAttribute('data-theme');
+    return;
+  }
+  modal.setAttribute('data-theme', theme);
+}
+
+function inferDistrictModalThemeFromUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url, window.location.href);
+  } catch {
+    return 'house';
+  }
+  const path = parsed.pathname || '';
+  if (path === '/atlas') return 'atlas';
+  if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
+  if (path === '/house') return 'house';
+  if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
+  if (path === '/pony' || path === '/inbox' || path.startsWith('/inbox/')) return 'pony';
+  if (path === '/townhall') return 'townhall';
+  if (path.startsWith('/s/')) return 'share';
+  return 'house';
+}
+
 function openRouteInModalFrame(url, title) {
   if (!isTownHub) return;
 
@@ -3562,6 +3635,7 @@ function openRouteInModalFrame(url, title) {
   currentDistrict = null;
   clearTownBoardPoll();
   setDistrictModalMode('frame');
+  setDistrictModalTheme(inferDistrictModalThemeFromUrl(url));
 
   if (body) {
     if (modalTitle) modalTitle.textContent = safeTitle;
@@ -3607,11 +3681,17 @@ async function showDistrict(district) {
   currentDistrict = safeDistrict;
   setActiveDistrict(safeDistrict);
 
+  if (safeDistrict === 'atlas') {
+    openRouteInModalFrame('/atlas?embed=1', 'Atlas Depot');
+    return;
+  }
+
   const modal = el('districtModalBackdrop');
   const body = el('districtModalBody');
   const title = el('districtModalTitle');
   const cfg = districtViews[safeDistrict] || districtViews.house;
   setDistrictModalMode('district');
+  setDistrictModalTheme(districtModalThemeByDistrict[safeDistrict] || 'house');
 
   if (title) title.textContent = cfg.title;
   if (modal) modal.classList.remove('is-hidden');
@@ -3653,6 +3733,7 @@ function hideDistrict() {
   lastDistrictLoad += 1;
   clearTouchDistrictPrime();
   setDistrictModalMode('district');
+  setDistrictModalTheme(null);
   if (modal) modal.classList.add('is-hidden');
   if (modal) modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('district-modal-open');
@@ -6832,21 +6913,54 @@ function renderCeremony(state) {
 // --- Dock Minimize Logic ---
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('minimizeChatBtn');
+  const debugBtn = document.getElementById('agentDebugToggleBtn');
   const dock = document.getElementById('agentSidebar');
-  const header = document.querySelector('.sidebar-header');
+  const header = dock ? dock.querySelector('.sidebar-header') : null;
 
   if (dock && header && btn) {
-    dock.classList.toggle('minimized', loadAgentPanelMinimized());
-    btn.textContent = dock.classList.contains('minimized') ? '□' : '_';
+    const applyMinimized = (minimized) => {
+      dock.classList.toggle('minimized', minimized);
+      btn.textContent = minimized ? '□' : '_';
+      btn.title = minimized ? 'Expand panel' : 'Minimize panel';
+      saveAgentPanelMinimized(minimized);
+      syncAgentPanelLayout(dock);
+    };
+
+    const applyDebugVisible = (visible) => {
+      if (!debugBtn) return;
+      dock.classList.toggle('debug-collapsed', !visible);
+      debugBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+      debugBtn.title = visible ? 'Hide debug panel' : 'Show debug panel';
+      saveAgentPanelDebugVisible(visible);
+      syncAgentPanelLayout(dock);
+      if (visible) {
+        scheduleAgentDebugRefresh('debug-open');
+      }
+    };
+
+    applyMinimized(loadAgentPanelMinimized());
+    if (debugBtn) {
+      applyDebugVisible(loadAgentPanelDebugVisible());
+    }
     bindAgentPanelLayout(dock);
 
-    header.addEventListener('click', () => {
-      // Toggle minimize
-      dock.classList.toggle('minimized');
-      const isMin = dock.classList.contains('minimized');
-      saveAgentPanelMinimized(isMin);
-      btn.textContent = isMin ? '□' : '_';
-      syncAgentPanelLayout(dock);
+    btn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      applyMinimized(!dock.classList.contains('minimized'));
+    });
+
+    if (debugBtn) {
+      debugBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyDebugVisible(dock.classList.contains('debug-collapsed'));
+      });
+    }
+
+    header.addEventListener('click', (event) => {
+      if (event.target && event.target.closest('button')) return;
+      applyMinimized(!dock.classList.contains('minimized'));
     });
   }
 });

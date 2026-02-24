@@ -49,16 +49,76 @@
             </div>
           </header>
 
-          <section class="atlas-toolbar">
-            <div class="atlas-toolbar-field">
-              <label class="small" for="atlasSearch">Search districts</label>
-              <input id="atlasSearch" data-testid="atlas-search-input" type="search" placeholder="e.g. ethereum" />
-            </div>
-            <div class="atlas-toolbar-field">
-              <label class="small" for="atlasChainFamily">Chain family</label>
-              <select id="atlasChainFamily" data-testid="atlas-filter-chain-family">
-                <option value="">All families</option>
-              </select>
+          <section class="atlas-search-foldout is-collapsed" id="atlasSearchFoldout" data-testid="atlas-search-foldout">
+            <button
+              class="btn atlas-search-trigger"
+              id="atlasSearchToggle"
+              data-testid="atlas-search-toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="atlasSearchFoldoutBody"
+            >
+              <span class="atlas-search-trigger-label">Search + filters</span>
+              <span class="small atlas-search-trigger-summary" id="atlasSearchToggleSummary">all storefronts</span>
+              <span class="atlas-search-trigger-caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="atlas-search-foldout-body is-hidden" id="atlasSearchFoldoutBody">
+              <section class="atlas-toolbar">
+                <div class="atlas-toolbar-field">
+                  <label class="small" for="atlasSearch">Search districts</label>
+                  <input id="atlasSearch" data-testid="atlas-search-input" type="search" placeholder="e.g. ethereum, routing, mcp" />
+                </div>
+                <div class="atlas-toolbar-field">
+                  <label class="small" for="atlasChainFamily">Chain family</label>
+                  <select id="atlasChainFamily" data-testid="atlas-filter-chain-family">
+                    <option value="">All families</option>
+                  </select>
+                </div>
+              </section>
+              <section class="atlas-toolbar atlas-toolbar-advanced">
+                <div class="atlas-toolbar-field">
+                  <label class="small" for="atlasSearchType">Mode</label>
+                  <select id="atlasSearchType" data-testid="atlas-search-type">
+                    <option value="keyword">Keyword</option>
+                    <option value="semantic">Semantic</option>
+                  </select>
+                </div>
+                <div class="atlas-toolbar-field">
+                  <label class="small" for="atlasSortField">Sort</label>
+                  <select id="atlasSortField" data-testid="atlas-sort-field">
+                    <option value="relevance">Relevance</option>
+                    <option value="updatedAt">Updated</option>
+                    <option value="name">Name</option>
+                    <option value="score">Score</option>
+                  </select>
+                </div>
+                <div class="atlas-toolbar-field">
+                  <label class="small" for="atlasSortDirection">Order</label>
+                  <select id="atlasSortDirection" data-testid="atlas-sort-direction">
+                    <option value="desc">Desc</option>
+                    <option value="asc">Asc</option>
+                  </select>
+                </div>
+                <div class="atlas-toolbar-field atlas-toolbar-flags">
+                  <span class="small">Signals</span>
+                  <label class="small atlas-flag">
+                    <input id="atlasFilterHasWeb" type="checkbox" />
+                    has web
+                  </label>
+                  <label class="small atlas-flag">
+                    <input id="atlasFilterHasMcp" type="checkbox" />
+                    has MCP
+                  </label>
+                  <label class="small atlas-flag">
+                    <input id="atlasFilterHasA2a" type="checkbox" />
+                    has A2A
+                  </label>
+                  <label class="small atlas-flag">
+                    <input id="atlasFilterActive" type="checkbox" />
+                    active only
+                  </label>
+                </div>
+              </section>
             </div>
           </section>
 
@@ -91,7 +151,11 @@
         <div class="atlas-modal-backdrop is-hidden" id="atlasModalBackdrop" aria-hidden="true">
           <div class="atlas-modal-shell">
             <div class="atlas-modal-head">
-              <button class="btn" id="atlasModalCloseBtn" type="button">Close</button>
+              <div class="atlas-modal-title">
+                <span class="atlas-modal-title-icon" aria-hidden="true">🗺️</span>
+                <h2 id="atlasModalTitle">Atlas Depot</h2>
+              </div>
+              <button class="btn atlas-modal-close" id="atlasModalCloseBtn" type="button" aria-label="Close atlas modal">&times;</button>
             </div>
 
             <section class="panel atlas-detail-panel is-hidden" id="atlasDistrictDetail" data-testid="district-detail">

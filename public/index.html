@@ -15,13 +15,10 @@
 
 <body class="town-hub-page">
   <div class="wrap townWrap">
-    <div class="kv" style="justify-content:flex-end; margin:0 0 8px;">
-      <a class="btn" href="/atlas">Atlas</a>
-    </div>
     <section class="townOverview" id="townScenePanel">
       <div class="townScene" role="navigation" aria-label="Town menu map" id="districtMap">
-        <button class="townDistrictHotspot townDistrict-fountain" type="button" data-district="leaderboard" aria-label="Open Town Board">
-          <span class="townDistrictLabel">Town Board</span>
+        <button class="townDistrictHotspot townDistrict-fountain" type="button" data-district="atlas" aria-label="Open Atlas Depot">
+          <span class="townDistrictLabel">Atlas Depot</span>
         </button>
         <button class="townDistrictHotspot townDistrict-pony" type="button" data-district="pony" aria-label="Open Pony Express"></button>
         <button class="townDistrictHotspot townDistrict-townhall" type="button" data-district="townhall" aria-label="Open Town Hall"></button>
@@ -37,17 +34,17 @@
       <div class="districtModal" role="dialog" aria-labelledby="districtModalTitle" aria-modal="true">
         <header class="districtModalHeader">
           <h2 id="districtModalTitle">Plan Wagons</h2>
-          <button class="btn districtModalClose" id="districtModalClose" type="button" aria-label="Close building">Close</button>
+          <button class="btn districtModalClose" id="districtModalClose" type="button" aria-label="Close building">&times;</button>
         </header>
         <div id="districtModalBody" class="districtModalBody is-loading">Loading district...</div>
       </div>
     </div>
 
     <div id="trainerModalBackdrop" class="districtBackdrop trainerBackdrop is-hidden" aria-hidden="true" data-testid="trainer-modal">
-      <div class="districtModal trainerModal" role="dialog" aria-labelledby="trainerModalTitle" aria-modal="true">
+      <div class="districtModal trainerModal" role="dialog" aria-labelledby="trainerModalTitle" aria-modal="true" data-theme="trainer">
         <header class="districtModalHeader">
           <h2 id="trainerModalTitle">Experience Trainer</h2>
-          <button class="btn districtModalClose" id="trainerModalClose" type="button" aria-label="Close trainer">Close</button>
+          <button class="btn districtModalClose" id="trainerModalClose" type="button" aria-label="Close trainer">&times;</button>
         </header>
         <div class="districtModalBody trainerModalBody">
           <section class="panel trainerPanel" data-testid="trainer-root">
@@ -126,13 +123,25 @@
     </div>
 
     <!-- PERSISTENT AGENT SIDEBAR (New) -->
-    <div id="agentSidebar" class="agent-sidebar minimized" data-testid="agent-panel">
+    <div id="agentSidebar" class="agent-sidebar minimized debug-collapsed" data-testid="agent-panel">
       <div class="sidebar-header">
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div class="sidebar-header-main">
           <h3>Agent Comms</h3>
           <div class="status-indicator" id="agentStatus">Idle</div>
         </div>
-        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">_</button>
+        <div class="sidebar-header-actions">
+          <button
+            id="agentDebugToggleBtn"
+            class="btn small agent-debug-toggle"
+            type="button"
+            data-testid="agent-debug-toggle"
+            aria-label="Toggle debug panel"
+            aria-controls="agentDebugPane"
+            aria-expanded="false"
+            title="Toggle debug panel"
+          >⚙</button>
+          <button id="minimizeChatBtn" class="btn small agent-minimize-toggle" type="button" aria-label="Minimize agent panel">□</button>
+        </div>
       </div>
 
       <div class="sidebar-content">
@@ -158,7 +167,7 @@
             </div>
           </section>
 
-          <section class="agent-pane agent-pane-right" data-testid="agent-debug-pane">
+          <section class="agent-pane agent-pane-right" id="agentDebugPane" data-testid="agent-debug-pane">
             <div class="agent-debug-toolbar">
               <div class="agent-debug-tabs" role="tablist" aria-label="Agent debug views">
                 <button class="btn small agent-debug-tab is-active" id="agentDebugTabTools" type="button" data-debug-tab="tools" data-testid="agent-debug-tab-tools">Worker Tools</button>

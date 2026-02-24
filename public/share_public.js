@@ -16,6 +16,10 @@ async function api(url, opts = {}) {
 }
 
 function el(id) { return document.getElementById(id); }
+const EMBED_MODE = new URLSearchParams(window.location.search).get('embed') === '1';
+if (EMBED_MODE) {
+  document.body.classList.add('share-embed');
+}
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const houseAuthRecoveryInFlight = new Map();
 let cachedCurrentHouseId = null;

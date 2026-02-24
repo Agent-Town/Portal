@@ -36,8 +36,12 @@ test('atlas search API returns stable lexical results and chain-family filtering
 test('atlas UI search and family filter use API results deterministically', async ({ page }) => {
   await page.goto('/atlas');
 
+  const toggle = page.getByTestId('atlas-search-toggle');
   const input = page.getByTestId('atlas-search-input');
   const family = page.getByTestId('atlas-filter-chain-family');
+  await expect(toggle).toBeVisible();
+  await expect(input).toBeHidden();
+  await toggle.click();
   await expect(input).toBeVisible();
   await expect(family).toBeVisible();
 

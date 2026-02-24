@@ -10,6 +10,10 @@ async function api(url, opts = {}) {
 }
 
 function el(id) { return document.getElementById(id); }
+const EMBED_MODE = new URLSearchParams(window.location.search).get('embed') === '1';
+if (EMBED_MODE) {
+  document.body.classList.add('atlas-embed');
+}
 
 const DISTRICT_POSITION_PRESETS = Object.freeze({
   ethereum: [52, 42],
@@ -41,9 +45,40 @@ const state = {
   storefrontAgentId: null,
   currentQuery: '',
   currentFamily: '',
+  currentSearchOpts: {
+    searchType: 'keyword',
+    sortField: 'relevance',
+    sortDirection: 'desc',
+    hasWeb: null,
+    hasMcp: null,
+    hasA2a: null,
+    active: null
+  },
   selectedDistrictKey: null,
   workerPollTimer: null
 };
+
+function parseBoolQueryParam(raw) {
+  const text = String(raw ?? '').trim().toLowerCase();
+  if (!text) return null;
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  return null;
+}
+
+function normalizeSearchType(raw) {
+  return String(raw || '').trim().toLowerCase() === 'semantic' ? 'semantic' : 'keyword';
+}
+
+function normalizeSortField(raw) {
+  const value = String(raw || '').trim();
+  if (value === 'updatedAt' || value === 'name' || value === 'score') return value;
+  return 'relevance';
+}
+
+function normalizeSortDirection(raw) {
+  return String(raw || '').trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
+}
 
 function loadHouseIdFromCache() {
   try {
@@ -252,15 +287,117 @@ function hashText(value) {
   return h >>> 0;
 }
 
-function resolveDistrictPosition(district, index, total) {
-  const key = String(district?.key || '').trim().toLowerCase();
-  const preset = DISTRICT_POSITION_PRESETS[key];
-  if (Array.isArray(preset)) return preset;
+const DISTRICT_STYLE_BASE_BY_KEY = Object.freeze({
+  ethereum: 'Ethereum',
+  monad: 'Monad',
+  base: 'Base',
+  gnosis: 'gnosis',
+  bsc: 'bsc',
+  arbitrum: 'Arbitrum',
+  optimism: 'Optimism',
+  polygon: 'Polygon',
+  celo: 'Celo',
+  avalanche: 'Avalanche',
+  scroll: 'Scroll',
+  linea: 'linea',
+  mantle: 'Mantle',
+  metis: 'Metis',
+  taiko: 'Taiko',
+  abstract: 'Abstract',
+  megaeth: 'MegaETH',
+  'x-layer': 'XLayer',
+  solana: 'Solana'
+});
 
-  const h = hashText(`${key}|${index}|${total}`);
-  const x = 14 + (h % 72);
-  const y = 12 + (Math.floor(h / 131) % 74);
-  return [x, y];
+const DISTRICT_LOGO_FILE_BY_KEY = Object.freeze({
+  ethereum: 'Ethereum.png',
+  monad: 'Monad.ico',
+  base: 'Base.png',
+  gnosis: 'Gnosis.png',
+  bsc: 'BSC.png',
+  arbitrum: 'Arbitrum.png',
+  optimism: 'Optimism.png',
+  polygon: 'Polygon.png',
+  celo: 'Celo.png',
+  avalanche: 'Avalanche.png',
+  scroll: 'Scroll.png',
+  linea: 'Linea.png',
+  mantle: 'Mantle.png',
+  metis: 'Metis.png',
+  taiko: 'Taiko.png',
+  abstract: 'Abstract.jpg',
+  megaeth: 'MegaETH.jpeg',
+  'x-layer': 'X-layer.png',
+  solana: 'Solana.jpeg'
+});
+
+function districtStyleImagePath(district) {
+  const key = String(district?.key || '').trim().toLowerCase();
+  const base = DISTRICT_STYLE_BASE_BY_KEY[key];
+  if (!base) return null;
+  const variant = (hashText(`${key}|${district?.totalAgents || 0}`) % 2) + 1;
+  const file = `${base}_${variant}.png`;
+  return `url("/images/districts_style_images/${file}")`;
+}
+
+function districtLogoPath(district) {
+  const key = String(district?.key || '').trim().toLowerCase();
+  const file = DISTRICT_LOGO_FILE_BY_KEY[key];
+  if (!file) return null;
+  return `/images/districts_style_images/logos/${file}`;
+}
+
+function computeDistrictBaseSpan(totalAgents, minAgents, maxAgents) {
+  const min = Math.max(0, Number(minAgents) || 0);
+  const max = Math.max(min + 1, Number(maxAgents) || 1);
+  const value = Math.max(min, Number(totalAgents) || 0);
+  const minLog = Math.log1p(min);
+  const maxLog = Math.log1p(max);
+  const valueLog = Math.log1p(value);
+  const ratio = (valueLog - minLog) / Math.max(1e-9, maxLog - minLog);
+  const eased = Math.pow(Math.max(0, Math.min(1, ratio)), 0.68);
+
+  // Use equal spans for a square-like treemap tile system.
+  return 5 + Math.round(eased * 4); // 5..9
+}
+
+function computeDistrictTileSpan(totalAgents, minAgents, maxAgents, sizeScale = 1) {
+  const sideBase = computeDistrictBaseSpan(totalAgents, minAgents, maxAgents);
+  const sideSpan = Math.round(sideBase * Math.max(0.6, Number(sizeScale) || 1));
+  const side = Math.max(4, Math.min(12, sideSpan));
+
+  return {
+    colSpan: side,
+    rowSpan: side
+  };
+}
+
+function isMobileAtlasListLayout() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(max-width: 860px)').matches;
+}
+
+function readAtlasGridMetrics(stage) {
+  if (!stage || typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') return null;
+  const styles = window.getComputedStyle(stage);
+
+  let cols = Number(styles.getPropertyValue('--atlas-cols'));
+  if (!Number.isFinite(cols) || cols <= 0) {
+    const template = String(styles.gridTemplateColumns || '').trim();
+    cols = template ? template.split(/\s+/).length : 0;
+  }
+  if (!Number.isFinite(cols) || cols <= 0) cols = 24;
+
+  const rowHeight = parseFloat(String(styles.gridAutoRows || '')) || 16;
+  const gap = parseFloat(String(styles.rowGap || styles.gap || '')) || 0;
+  const visibleRows = Math.max(1, Math.floor((stage.clientHeight + gap) / Math.max(1, rowHeight + gap)));
+  return {
+    cols,
+    rowHeight,
+    gap,
+    visibleRows,
+    totalCells: cols * visibleRows
+  };
 }
 
 function setModalOpen(open) {
@@ -398,11 +535,20 @@ function renderSearchResults(payload) {
   const results = Array.isArray(payload?.results) ? payload.results : [];
   const q = payload?.query?.q || '';
   const family = payload?.query?.family || '';
+  const searchType = normalizeSearchType(payload?.query?.searchType || 'keyword');
+  const sortField = normalizeSortField(payload?.query?.sortField || 'relevance');
+  const sortDirection = normalizeSortDirection(payload?.query?.sortDirection || 'desc');
   const total = Number(payload?.query?.total || 0);
   const shown = results.length;
-  const filterNote = family ? ` • family: ${family}` : '';
+  const filterParts = [];
+  if (family) filterParts.push(`family: ${family}`);
+  if (payload?.query?.hasWeb === true) filterParts.push('has web');
+  if (payload?.query?.hasMcp === true) filterParts.push('has MCP');
+  if (payload?.query?.hasA2a === true) filterParts.push('has A2A');
+  if (payload?.query?.active === true) filterParts.push('active only');
+  const filterNote = filterParts.length ? ` • ${filterParts.join(' • ')}` : '';
   const queryNote = q ? `query: "${q}"` : 'query: all storefronts';
-  meta.textContent = `${queryNote}${filterNote} • showing ${shown} of ${total}`;
+  meta.textContent = `${queryNote}${filterNote} • ${searchType}/${sortField}/${sortDirection} • showing ${shown} of ${total}`;
 
   list.innerHTML = '';
   if (!results.length) {
@@ -492,13 +638,27 @@ function renderSearchResults(payload) {
   }
 }
 
-async function runSearch(query, family) {
+async function runSearch(query, family, opts = {}) {
   const seq = ++state.searchRequestSeq;
   const params = new URLSearchParams();
   const q = String(query || '').trim();
   const f = String(family || '').trim();
+  const searchType = normalizeSearchType(opts.searchType);
+  const sortField = normalizeSortField(opts.sortField);
+  const sortDirection = normalizeSortDirection(opts.sortDirection);
+  const hasWeb = opts.hasWeb === true ? true : opts.hasWeb === false ? false : null;
+  const hasMcp = opts.hasMcp === true ? true : opts.hasMcp === false ? false : null;
+  const hasA2a = opts.hasA2a === true ? true : opts.hasA2a === false ? false : null;
+  const active = opts.active === true ? true : opts.active === false ? false : null;
   if (q) params.set('q', q);
   if (f) params.set('family', f);
+  if (searchType !== 'keyword') params.set('searchType', searchType);
+  if (sortField !== 'relevance') params.set('sortField', sortField);
+  if (sortDirection !== 'desc') params.set('sortDirection', sortDirection);
+  if (hasWeb !== null) params.set('hasWeb', hasWeb ? '1' : '0');
+  if (hasMcp !== null) params.set('hasMcp', hasMcp ? '1' : '0');
+  if (hasA2a !== null) params.set('hasA2a', hasA2a ? '1' : '0');
+  if (active !== null) params.set('active', active ? '1' : '0');
   const searchPath = params.toString() ? `/api/atlas/search?${params.toString()}` : '/api/atlas/search';
   const payload = await api(searchPath);
   if (seq !== state.searchRequestSeq) return;
@@ -534,8 +694,12 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
 
   updateAtlasKpis(districts, { query, family });
   list.innerHTML = '';
+  list.classList.add('atlas-tile-map');
 
-  const filtered = districts.filter((d) => districtMatchesFilter(d, query, family));
+  const filtered = districts
+    .filter((d) => districtMatchesFilter(d, query, family))
+    .slice()
+    .sort((a, b) => Number(b?.totalAgents || 0) - Number(a?.totalAgents || 0) || String(a?.label || '').localeCompare(String(b?.label || '')));
   if (!filtered.length) {
     const empty = document.createElement('div');
     empty.className = 'small atlas-empty';
@@ -544,60 +708,76 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
     return;
   }
 
-  const points = filtered.map((district, index) => {
-    const [x, y] = resolveDistrictPosition(district, index, filtered.length);
-    return {
-      district,
-      x,
-      y,
-      weight: Number(district?.totalAgents || 0)
-    };
-  });
+  const allAgents = filtered.map((d) => Number(d?.totalAgents || 0));
+  const minAgents = allAgents.reduce((acc, n) => Math.min(acc, n), Number.POSITIVE_INFINITY);
+  const maxAgents = allAgents.reduce((acc, n) => Math.max(acc, n), 0);
+  const mobileListLayout = isMobileAtlasListLayout();
 
-  buildMapRoutes(list, points);
+  let tileScale = 1;
+  if (!mobileListLayout) {
+    const metrics = readAtlasGridMetrics(list);
+    if (metrics && metrics.totalCells > 0) {
+      const baseArea = filtered.reduce((sum, district) => {
+        const side = computeDistrictBaseSpan(district.totalAgents, minAgents, maxAgents);
+        return sum + side * side;
+      }, 0);
+      if (baseArea > 0) {
+        const fillTarget = filtered.length <= 6 ? 0.98 : filtered.length <= 10 ? 0.95 : 0.93;
+        tileScale = Math.sqrt((metrics.totalCells * fillTarget) / baseArea);
+        tileScale = Math.max(0.75, Math.min(2.6, tileScale));
+      }
+    }
+  }
 
-  points.forEach((point) => {
-    const district = point.district;
+  filtered.forEach((district) => {
     const card = document.createElement('article');
     card.className = 'card atlas-map-node';
     if (district.key === state.selectedDistrictKey) card.classList.add('is-selected');
     card.dataset.testid = `district-card-${district.key}`;
     card.setAttribute('data-testid', `district-card-${district.key}`);
 
-    const normalizedSize = Math.max(0.56, Math.min(1.15, Number(district.districtSize || 1) / 4.4));
-    card.style.left = `${point.x}%`;
-    card.style.top = `${point.y}%`;
-    card.style.setProperty('--district-scale', normalizedSize.toFixed(3));
+    const tile = computeDistrictTileSpan(district.totalAgents, minAgents, maxAgents, tileScale);
+    card.style.setProperty('--tile-col-span', String(tile.colSpan));
+    card.style.setProperty('--tile-row-span', String(tile.rowSpan));
+    const bgImage = districtStyleImagePath(district);
+    if (bgImage) card.style.setProperty('--district-style-image', bgImage);
+    else card.style.removeProperty('--district-style-image');
+    if (tile.colSpan <= 6) card.classList.add('is-compact');
+    if (tile.colSpan >= 8) card.classList.add('is-large');
 
     const split = districtNetworkSplit(district);
 
     const head = document.createElement('div');
     head.className = 'atlas-district-head';
 
+    const titleRow = document.createElement('div');
+    titleRow.className = 'atlas-district-title-row';
+
     const title = document.createElement('h3');
     title.textContent = district.label;
+
+    const logoPath = districtLogoPath(district);
+    if (logoPath) {
+      const logo = document.createElement('img');
+      logo.className = 'atlas-district-logo';
+      logo.src = logoPath;
+      logo.alt = '';
+      logo.loading = 'lazy';
+      logo.decoding = 'async';
+      logo.referrerPolicy = 'no-referrer';
+      logo.addEventListener('error', () => {
+        logo.remove();
+      });
+      titleRow.appendChild(logo);
+    }
+    titleRow.appendChild(title);
 
     const stats = document.createElement('div');
     stats.className = 'small';
     stats.textContent = `${formatNumber(district.totalAgents)} agents`;
 
-    head.appendChild(title);
+    head.appendChild(titleRow);
     head.appendChild(stats);
-
-    const splitBar = document.createElement('div');
-    splitBar.className = 'atlas-node-split';
-    const mainBar = document.createElement('span');
-    mainBar.className = 'is-mainnet';
-    mainBar.style.width = `${Math.max(8, split.mainnetPct)}%`;
-    const testBar = document.createElement('span');
-    testBar.className = 'is-testnet';
-    testBar.style.width = `${Math.max(8, split.testnetPct)}%`;
-    splitBar.appendChild(mainBar);
-    splitBar.appendChild(testBar);
-
-    const splitMeta = document.createElement('div');
-    splitMeta.className = 'small atlas-node-meta';
-    splitMeta.textContent = `${split.mainnetPct}% mainnet • ${split.testnetPct}% testnet`;
 
     const ctaRow = document.createElement('div');
     ctaRow.className = 'kv atlas-district-actions';
@@ -614,33 +794,28 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
     });
     ctaRow.appendChild(openBtn);
 
-    if (Array.isArray(district.previewAgents) && district.previewAgents.length) {
-      const previewStrip = document.createElement('div');
-      previewStrip.className = 'atlas-preview-strip';
-      for (const agent of district.previewAgents) {
-        if (!agent || !agent.erc8004Id) continue;
-        state.agentsById.set(agent.erc8004Id, { ...agent, districtKey: district.key });
+    const splitMeta = document.createElement('div');
+    splitMeta.className = 'small atlas-district-split-chip';
+    splitMeta.textContent = `${split.mainnetPct}% main • ${split.testnetPct}% test`;
 
-        const agentBtn = document.createElement('button');
-        agentBtn.className = 'atlas-preview-agent';
-        agentBtn.type = 'button';
-        agentBtn.textContent = initialsFromAgent(agent);
-        agentBtn.title = agent.name || agent.erc8004Id;
-        agentBtn.setAttribute('aria-label', `Open ${agent.name || agent.erc8004Id}`);
-        agentBtn.setAttribute('data-testid', `agent-preview-open-${agent.erc8004Id}`);
-        agentBtn.addEventListener('click', () => {
-          openAgentStorefront(agent.erc8004Id).catch((err) => {
-            setAtlasError(mapAgentError(err));
-          });
-        });
-        previewStrip.appendChild(agentBtn);
-      }
-      ctaRow.appendChild(previewStrip);
-    }
+    const splitBar = document.createElement('div');
+    splitBar.className = 'atlas-district-split-bar';
+    const splitMain = document.createElement('span');
+    splitMain.className = 'is-main';
+    splitMain.style.width = `${Math.max(8, split.mainnetPct)}%`;
+    const splitTest = document.createElement('span');
+    splitTest.className = 'is-test';
+    splitTest.style.width = `${Math.max(8, split.testnetPct)}%`;
+    splitBar.appendChild(splitMain);
+    splitBar.appendChild(splitTest);
+
+    const splitWrap = document.createElement('div');
+    splitWrap.className = 'atlas-district-split-wrap';
+    splitWrap.appendChild(splitBar);
+    splitWrap.appendChild(splitMeta);
+    ctaRow.appendChild(splitWrap);
 
     card.appendChild(head);
-    card.appendChild(splitBar);
-    card.appendChild(splitMeta);
     card.appendChild(ctaRow);
     list.appendChild(card);
   });
@@ -776,7 +951,32 @@ async function openAgentStorefront(erc8004Id) {
 function initFilters(districts) {
   const search = el('atlasSearch');
   const familySelect = el('atlasChainFamily');
-  if (!search || !familySelect) return;
+  const searchTypeSelect = el('atlasSearchType');
+  const sortFieldSelect = el('atlasSortField');
+  const sortDirectionSelect = el('atlasSortDirection');
+  const hasWebInput = el('atlasFilterHasWeb');
+  const hasMcpInput = el('atlasFilterHasMcp');
+  const hasA2aInput = el('atlasFilterHasA2a');
+  const activeInput = el('atlasFilterActive');
+  const foldout = el('atlasSearchFoldout');
+  const foldoutBody = el('atlasSearchFoldoutBody');
+  const toggleBtn = el('atlasSearchToggle');
+  const summaryEl = el('atlasSearchToggleSummary');
+  if (
+    !search
+    || !familySelect
+    || !searchTypeSelect
+    || !sortFieldSelect
+    || !sortDirectionSelect
+    || !hasWebInput
+    || !hasMcpInput
+    || !hasA2aInput
+    || !activeInput
+    || !foldout
+    || !foldoutBody
+    || !toggleBtn
+    || !summaryEl
+  ) return;
 
   for (const district of districts) {
     const option = document.createElement('option');
@@ -785,15 +985,99 @@ function initFilters(districts) {
     familySelect.appendChild(option);
   }
 
+  function collectSearchOpts() {
+    return {
+      searchType: normalizeSearchType(searchTypeSelect.value),
+      sortField: normalizeSortField(sortFieldSelect.value),
+      sortDirection: normalizeSortDirection(sortDirectionSelect.value),
+      hasWeb: hasWebInput.checked ? true : null,
+      hasMcp: hasMcpInput.checked ? true : null,
+      hasA2a: hasA2aInput.checked ? true : null,
+      active: activeInput.checked ? true : null
+    };
+  }
+
+  function countActiveSignals(opts) {
+    let count = 0;
+    if (opts.hasWeb === true) count += 1;
+    if (opts.hasMcp === true) count += 1;
+    if (opts.hasA2a === true) count += 1;
+    if (opts.active === true) count += 1;
+    if (opts.searchType !== 'keyword') count += 1;
+    if (opts.sortField !== 'relevance') count += 1;
+    if (opts.sortDirection !== 'desc') count += 1;
+    return count;
+  }
+
+  function setFoldoutOpen(open) {
+    const isOpen = open === true;
+    foldout.classList.toggle('is-collapsed', !isOpen);
+    foldoutBody.classList.toggle('is-hidden', !isOpen);
+    toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  }
+
+  function updateSummary(query, family, opts) {
+    const activeSignals = countActiveSignals(opts);
+    const parts = [];
+    if (query) parts.push(`q: ${query.length > 16 ? `${query.slice(0, 16)}…` : query}`);
+    if (family) parts.push(family);
+    if (activeSignals > 0) parts.push(`${activeSignals} advanced`);
+    summaryEl.textContent = parts.length ? parts.join(' • ') : 'all storefronts';
+  }
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialQuery = urlParams.get('q');
+  const initialFamily = urlParams.get('family') || urlParams.get('chainFamily');
+  const initialSearchType = normalizeSearchType(urlParams.get('searchType'));
+  const initialSortField = normalizeSortField(urlParams.get('sortField'));
+  const initialSortDirection = normalizeSortDirection(urlParams.get('sortDirection'));
+  const initialHasWeb = parseBoolQueryParam(urlParams.get('hasWeb'));
+  const initialHasMcp = parseBoolQueryParam(urlParams.get('hasMcp'));
+  const initialHasA2a = parseBoolQueryParam(urlParams.get('hasA2a'));
+  const initialActive = parseBoolQueryParam(urlParams.get('active'));
+
+  if (initialQuery) search.value = initialQuery;
+  if (initialFamily) familySelect.value = initialFamily;
+  searchTypeSelect.value = initialSearchType;
+  sortFieldSelect.value = initialSortField;
+  sortDirectionSelect.value = initialSortDirection;
+  hasWebInput.checked = initialHasWeb === true;
+  hasMcpInput.checked = initialHasMcp === true;
+  hasA2aInput.checked = initialHasA2a === true;
+  activeInput.checked = initialActive === true;
+
+  const hasInitialParams = !!(
+    initialQuery
+    || initialFamily
+    || initialSearchType !== 'keyword'
+    || initialSortField !== 'relevance'
+    || initialSortDirection !== 'desc'
+    || initialHasWeb === true
+    || initialHasMcp === true
+    || initialHasA2a === true
+    || initialActive === true
+  );
+  setFoldoutOpen(hasInitialParams);
+
+  if (toggleBtn.dataset.bound !== '1') {
+    toggleBtn.dataset.bound = '1';
+    toggleBtn.addEventListener('click', () => {
+      setFoldoutOpen(foldout.classList.contains('is-collapsed'));
+    });
+  }
+
   async function rerender() {
     const query = search.value || '';
     const family = familySelect.value || '';
+    const opts = collectSearchOpts();
     state.currentQuery = query;
     state.currentFamily = family;
+    state.currentSearchOpts = opts;
+    updateSummary(query, family, opts);
     clearAtlasError();
     renderDistricts(districts, { query, family });
     try {
-      await runSearch(query, family);
+      await runSearch(query, family, opts);
     } catch (err) {
       setAtlasError(mapAgentError(err));
     }
@@ -801,6 +1085,13 @@ function initFilters(districts) {
 
   search.addEventListener('input', () => { rerender(); });
   familySelect.addEventListener('change', () => { rerender(); });
+  searchTypeSelect.addEventListener('change', () => { rerender(); });
+  sortFieldSelect.addEventListener('change', () => { rerender(); });
+  sortDirectionSelect.addEventListener('change', () => { rerender(); });
+  hasWebInput.addEventListener('change', () => { rerender(); });
+  hasMcpInput.addEventListener('change', () => { rerender(); });
+  hasA2aInput.addEventListener('change', () => { rerender(); });
+  activeInput.addEventListener('change', () => { rerender(); });
   rerender();
 }
 
@@ -910,6 +1201,14 @@ async function init() {
       setAtlasError(mapAgentError(err));
     }
   }
+
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderDistricts(state.districts, { query: state.currentQuery, family: state.currentFamily });
+    }, 100);
+  });
 }
 
 init().catch((err) => {

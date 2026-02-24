@@ -33,7 +33,7 @@ var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "sy
 var define_PI_VERSIONS_default;
 var init_define_PI_VERSIONS = __esm({
   "<define:__PI_VERSIONS__>"() {
-    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.54.0", "@mariozechner/pi-ai": "0.54.0", "@mariozechner/pi-coding-agent": "0.54.0", "@mariozechner/pi-tui": "0.54.0" };
+    define_PI_VERSIONS_default = { "@mariozechner/pi-agent-core": "0.54.1", "@mariozechner/pi-ai": "0.54.1", "@mariozechner/pi-coding-agent": "0.54.1", "@mariozechner/pi-tui": "0.54.1" };
   }
 });
 
@@ -46845,7 +46845,7 @@ async function vfsReadAllBytes(prefix = "") {
 }
 
 // src/openclaw-lite/worker.js
-var OPENCLAW_VERSION = "2026.2.22";
+var OPENCLAW_VERSION = "2026.2.23";
 var PI_VERSIONS = define_PI_VERSIONS_default;
 var MAIN_AGENT_ID = "main";
 var MAIN_SESSION_KEY = "agent:main:main";

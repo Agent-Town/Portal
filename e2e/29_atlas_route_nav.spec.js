@@ -10,11 +10,17 @@ test('atlas route renders and nav exposes Atlas link across core pages', async (
   await page.goto('/atlas');
   await expect(page.getByTestId('atlas-root')).toBeVisible();
 
-  const pages = ['/', '/leaderboard', '/house', '/s/sh_missing'];
+  const pages = ['/leaderboard', '/house', '/s/sh_missing'];
   for (const path of pages) {
     await page.goto(path);
     const atlasLink = page.getByRole('link', { name: 'Atlas' });
     await expect(atlasLink).toBeVisible();
     await expect(atlasLink).toHaveAttribute('href', '/atlas');
   }
+
+  await page.goto('/');
+  await expect(page.locator('.townDistrictHotspot[data-district="atlas"] .townDistrictLabel')).toContainText('Atlas Depot');
+  await page.locator('.townDistrictHotspot[data-district="atlas"]').click();
+  await expect(page.locator('#districtModalTitle')).toHaveText('Atlas Depot');
+  await expect(page.locator('#districtModalBody iframe.districtFrame')).toBeVisible();
 });

@@ -1539,6 +1539,7 @@ function setSecurityHeaders(req, res, next) {
   const reqPath = typeof req.path === 'string' ? req.path : '';
   const allowSameOriginFrame = (
     reqPath.startsWith('/s/')
+    || reqPath === '/atlas'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -6610,17 +6611,46 @@ app.get('/api/atlas/agent/:erc8004Id', (req, res) => {
 });
 
 app.get('/api/atlas/search', (req, res) => {
+  const parseBooleanQuery = (value) => {
+    const text = String(value ?? '').trim().toLowerCase();
+    if (!text) return null;
+    if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+    if (['0', 'false', 'no', 'off'].includes(text)) return false;
+    return null;
+  };
   const q = typeof req.query?.q === 'string' ? req.query.q : '';
   const familyRaw = typeof req.query?.family === 'string'
     ? req.query.family
     : (typeof req.query?.chainFamily === 'string' ? req.query.chainFamily : '');
+  const searchType = typeof req.query?.searchType === 'string' ? req.query.searchType : '';
+  const sortField = typeof req.query?.sortField === 'string' ? req.query.sortField : '';
+  const sortDirection = typeof req.query?.sortDirection === 'string'
+    ? req.query.sortDirection
+    : (typeof req.query?.order === 'string' ? req.query.order : '');
+  const hasWeb = parseBooleanQuery(req.query?.hasWeb);
+  const hasMcp = parseBooleanQuery(req.query?.hasMcp);
+  const hasA2a = parseBooleanQuery(req.query?.hasA2a);
+  const active = parseBooleanQuery(req.query?.active);
+  const category = typeof req.query?.category === 'string' ? req.query.category : '';
   const limitRaw = Number.parseInt(String(req.query?.limit || ''), 10);
   const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
   const snapshot = getAtlasSnapshot();
   const store = readStore();
   const optedOutSet = buildOptedOutErc8004Set(store);
   const mediaByErcId = buildAtlasMediaByErc8004Id(store);
-  const search = searchAtlasAgents(snapshot, { q, family: familyRaw, limit });
+  const search = searchAtlasAgents(snapshot, {
+    q,
+    family: familyRaw,
+    limit,
+    searchType,
+    sortField,
+    sortDirection,
+    hasWeb,
+    hasMcp,
+    hasA2a,
+    active,
+    category
+  });
   const visibleResults = search.results.filter((row) => !optedOutSet.has(row.erc8004Id));
   return res.json({
     ok: true,
@@ -6628,6 +6658,14 @@ app.get('/api/atlas/search', (req, res) => {
     query: {
       q: search.query,
       family: search.family,
+      searchType: search.searchType,
+      sortField: search.sortField,
+      sortDirection: search.sortDirection,
+      hasWeb: search.filters.hasWeb,
+      hasMcp: search.filters.hasMcp,
+      hasA2a: search.filters.hasA2a,
+      active: search.filters.active,
+      category: search.filters.category,
       limit: search.limit,
       total: visibleResults.length
     },

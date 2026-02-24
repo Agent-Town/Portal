@@ -172,12 +172,38 @@ function buildAgents(agentRows) {
     const chainId = Number(row.chainId);
     const family = getFamilyForChain({ chainId, chainName: '' });
     const networkType = row.isTestnet === true ? 'testnet' : 'mainnet';
+    const name = String(row.name || '').trim() || `Agent ${erc8004Id}`;
+    const description = String(row.description || '').trim() || '';
+    const agentUrl = String(row.agentUrl || '').trim() || null;
+    const parsedData = safeParseJsonObject(row.dataJson);
+    const services = parsedData && typeof parsedData.services === 'object' && parsedData.services
+      ? parsedData.services
+      : null;
+    const mcpEndpoint = extractServiceEndpoint(services?.mcp);
+    const a2aEndpoint = extractServiceEndpoint(services?.a2a);
+    const oasfEndpoint = extractServiceEndpoint(services?.oasf);
+    const categories = normalizeCategoryList(parsedData?.categories);
+    const rawScore = Number(parsedData?.total_score);
+    const qualityScore = Number.isFinite(rawScore) ? rawScore : null;
+    const explicitActive = parseBooleanLike(row.isActive);
+    const inferredActive = parseBooleanLike(row.isEndpointVerified);
+    const active = explicitActive === null ? inferredActive : explicitActive;
+    const hasWeb = !!(
+      agentUrl
+      || mcpEndpoint
+      || a2aEndpoint
+      || oasfEndpoint
+      || textLooksLikeWeb(description)
+      || textLooksLikeWeb(name)
+    );
+    const hasMcp = !!mcpEndpoint;
+    const hasA2a = !!a2aEndpoint;
     out.push({
       erc8004Id,
       chainId,
       districtKey: family.key,
-      name: String(row.name || '').trim() || `Agent ${erc8004Id}`,
-      description: String(row.description || '').trim() || '',
+      name,
+      description,
       chainName: String(row.chainName || '').trim() || null,
       networkType,
       ownerAddress: String(row.ownerAddress || '').trim() || null,
@@ -185,7 +211,19 @@ function buildAgents(agentRows) {
       updatedAt: row.updatedAt ? String(row.updatedAt) : null,
       source: String(row.source || '8004scan').trim() || '8004scan',
       imageUrl: row.imageUrl ? String(row.imageUrl) : null,
-      sharePath: row.sharePath ? String(row.sharePath) : null
+      sharePath: row.sharePath ? String(row.sharePath) : null,
+      agentUrl,
+      isActive: active,
+      isEndpointVerified: parseBooleanLike(row.isEndpointVerified),
+      x402Supported: parseBooleanLike(row.x402Supported),
+      hasWeb,
+      hasMcp,
+      hasA2a,
+      categories,
+      qualityScore,
+      mcpEndpoint,
+      a2aEndpoint,
+      oasfEndpoint
     });
   }
   out.sort((a, b) => a.name.localeCompare(b.name) || a.erc8004Id.localeCompare(b.erc8004Id));
@@ -221,6 +259,89 @@ function attachDistrictAgentViews(districts, agents) {
 
 function normalizeAtlasSearchText(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function parseBooleanLike(value) {
+  if (value === true || value === false) return value;
+  if (value === null || value === undefined) return null;
+  const text = String(value || '').trim().toLowerCase();
+  if (!text) return null;
+  if (['1', 'true', 'yes', 'on'].includes(text)) return true;
+  if (['0', 'false', 'no', 'off'].includes(text)) return false;
+  const num = Number(value);
+  if (Number.isFinite(num)) {
+    if (num === 1) return true;
+    if (num === 0) return false;
+  }
+  return null;
+}
+
+function safeParseJsonObject(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractServiceEndpoint(service) {
+  if (!service || typeof service !== 'object') return null;
+  const endpoint = String(service.endpoint || '').trim();
+  return endpoint || null;
+}
+
+function textLooksLikeWeb(value) {
+  const text = normalizeAtlasSearchText(value);
+  if (!text) return false;
+  return text.includes('http://') || text.includes('https://') || text.includes('www.');
+}
+
+function normalizeCategoryList(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  for (const value of raw) {
+    const text = normalizeAtlasSearchText(value);
+    if (!text) continue;
+    if (out.includes(text)) continue;
+    out.push(text);
+  }
+  return out;
+}
+
+function normalizeSearchType(value) {
+  return normalizeAtlasSearchText(value) === 'semantic' ? 'semantic' : 'keyword';
+}
+
+function normalizeSortField(value) {
+  const key = String(value || '').trim();
+  if (key === 'updatedAt' || key === 'name' || key === 'score') return key;
+  return 'relevance';
+}
+
+function normalizeSortDirection(value) {
+  return normalizeAtlasSearchText(value) === 'asc' ? 'asc' : 'desc';
+}
+
+function normalizeCategoryFilter(value) {
+  if (Array.isArray(value)) {
+    return value.map((row) => normalizeAtlasSearchText(row)).filter(Boolean);
+  }
+  const text = String(value || '').trim();
+  if (!text) return [];
+  return text
+    .split(',')
+    .map((row) => normalizeAtlasSearchText(row))
+    .filter(Boolean);
+}
+
+function toEpochMs(value) {
+  const text = String(value || '').trim();
+  if (!text) return 0;
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms : 0;
 }
 
 function scoreAtlasAgent(agent, district, queryText) {
@@ -260,9 +381,58 @@ function scoreAtlasAgent(agent, district, queryText) {
   return score;
 }
 
+function scoreAtlasAgentSemantic(agent, district, queryText, lexicalScore = 0) {
+  const q = normalizeAtlasSearchText(queryText);
+  if (!q) return 0;
+
+  const districtLabel = normalizeAtlasSearchText(district?.label);
+  const districtKey = normalizeAtlasSearchText(agent?.districtKey);
+  const categories = Array.isArray(agent?.categories) ? agent.categories : [];
+  const terms = [
+    normalizeAtlasSearchText(agent?.name),
+    normalizeAtlasSearchText(agent?.description),
+    normalizeAtlasSearchText(agent?.agentUrl),
+    normalizeAtlasSearchText(agent?.mcpEndpoint),
+    normalizeAtlasSearchText(agent?.a2aEndpoint),
+    normalizeAtlasSearchText(agent?.oasfEndpoint),
+    districtLabel,
+    districtKey,
+    ...categories
+  ].filter(Boolean);
+  const haystack = terms.join(' ');
+  const tokens = q.split(/\s+/).filter((token) => token.length >= 2);
+
+  let score = Math.round(Math.max(0, lexicalScore) * 0.65);
+  for (const token of tokens) {
+    if (haystack.includes(token)) score += 110;
+    if (token === 'mcp' && agent?.hasMcp) score += 320;
+    if (token === 'a2a' && agent?.hasA2a) score += 320;
+    if ((token === 'web' || token === 'website' || token === 'site') && agent?.hasWeb) score += 180;
+    if ((token === 'active' || token === 'online') && agent?.isActive === true) score += 160;
+    if ((token === 'service' || token === 'services') && (agent?.hasMcp || agent?.hasA2a || agent?.isEndpointVerified)) score += 140;
+  }
+  if (q.includes('mcp') && agent?.hasMcp) score += 240;
+  if (q.includes('a2a') && agent?.hasA2a) score += 240;
+  if (q.includes('x402') && agent?.x402Supported === true) score += 210;
+  if (q.includes('verified') && agent?.isEndpointVerified === true) score += 200;
+  if (q.includes('category') && categories.length) score += 120;
+
+  return score;
+}
+
 function searchAtlasAgents(snapshot, opts = {}) {
   const q = normalizeAtlasSearchText(opts.q);
   const family = normalizeAtlasSearchText(opts.family);
+  const searchType = normalizeSearchType(opts.searchType);
+  const sortField = normalizeSortField(opts.sortField);
+  const sortDirection = normalizeSortDirection(opts.sortDirection);
+  const filters = {
+    hasWeb: parseBooleanLike(opts.hasWeb),
+    hasMcp: parseBooleanLike(opts.hasMcp),
+    hasA2a: parseBooleanLike(opts.hasA2a),
+    active: parseBooleanLike(opts.active),
+    category: normalizeCategoryFilter(opts.category)
+  };
   const limitRaw = Number(opts.limit);
   const limit = Number.isFinite(limitRaw)
     ? Math.min(100, Math.max(1, Math.trunc(limitRaw)))
@@ -276,21 +446,63 @@ function searchAtlasAgents(snapshot, opts = {}) {
   for (const agent of agents) {
     const districtKey = normalizeAtlasSearchText(agent?.districtKey);
     if (family && districtKey !== family) continue;
+    if (filters.hasWeb !== null && agent?.hasWeb !== filters.hasWeb) continue;
+    if (filters.hasMcp !== null && agent?.hasMcp !== filters.hasMcp) continue;
+    if (filters.hasA2a !== null && agent?.hasA2a !== filters.hasA2a) continue;
+    if (filters.active !== null && agent?.isActive !== filters.active) continue;
+    if (filters.category.length > 0) {
+      const categories = Array.isArray(agent?.categories) ? agent.categories : [];
+      const categoryMatch = filters.category.some((category) => categories.includes(category));
+      if (!categoryMatch) continue;
+    }
 
     const district = districtsByKey.get(agent?.districtKey) || null;
     const lexicalScore = scoreAtlasAgent(agent, district, q);
-    if (q && lexicalScore <= 0) continue;
+    const semanticScore = scoreAtlasAgentSemantic(agent, district, q, lexicalScore);
+    const relevanceScore = searchType === 'semantic' ? semanticScore : lexicalScore;
+    if (q && relevanceScore <= 0) continue;
 
     ranked.push({
       agent,
       district,
       lexicalScore,
+      semanticScore,
+      relevanceScore,
+      updatedAtMs: toEpochMs(agent?.updatedAt),
+      qualityScore: Number(agent?.qualityScore),
       districtAgents: Number(district?.totalAgents || 0)
     });
   }
 
+  const direction = sortDirection === 'asc' ? 1 : -1;
+  const compareText = (a, b) => String(a || '').localeCompare(String(b || ''));
+  const compareNumber = (a, b) => {
+    const left = Number(a);
+    const right = Number(b);
+    if (!Number.isFinite(left) && !Number.isFinite(right)) return 0;
+    if (!Number.isFinite(left)) return -1;
+    if (!Number.isFinite(right)) return 1;
+    if (left === right) return 0;
+    return left > right ? 1 : -1;
+  };
+
   ranked.sort((a, b) => {
-    if (b.lexicalScore !== a.lexicalScore) return b.lexicalScore - a.lexicalScore;
+    if (sortField === 'name') {
+      const byName = compareText(a.agent?.name, b.agent?.name) * direction;
+      if (byName !== 0) return byName;
+    } else if (sortField === 'updatedAt') {
+      const byUpdated = compareNumber(a.updatedAtMs, b.updatedAtMs) * direction;
+      if (byUpdated !== 0) return byUpdated;
+    } else if (sortField === 'score') {
+      const byScore = compareNumber(a.qualityScore, b.qualityScore) * direction;
+      if (byScore !== 0) return byScore;
+    } else {
+      const left = q ? a.relevanceScore : a.districtAgents;
+      const right = q ? b.relevanceScore : b.districtAgents;
+      const byRelevance = compareNumber(left, right) * direction;
+      if (byRelevance !== 0) return byRelevance;
+    }
+
     if (b.districtAgents !== a.districtAgents) return b.districtAgents - a.districtAgents;
     const aName = String(a.agent?.name || '');
     const bName = String(b.agent?.name || '');
@@ -314,12 +526,24 @@ function searchAtlasAgents(snapshot, opts = {}) {
     source: entry.agent.source || '8004scan',
     imageUrl: entry.agent.imageUrl || null,
     sharePath: entry.agent.sharePath || null,
-    lexicalScore: entry.lexicalScore
+    agentUrl: entry.agent.agentUrl || null,
+    isActive: entry.agent.isActive === true,
+    hasWeb: entry.agent.hasWeb === true,
+    hasMcp: entry.agent.hasMcp === true,
+    hasA2a: entry.agent.hasA2a === true,
+    categories: Array.isArray(entry.agent.categories) ? entry.agent.categories : [],
+    lexicalScore: entry.lexicalScore,
+    semanticScore: entry.semanticScore,
+    relevanceScore: entry.relevanceScore
   }));
 
   return {
     query: q,
     family,
+    searchType,
+    sortField,
+    sortDirection,
+    filters,
     limit,
     total,
     results
@@ -396,6 +620,11 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
     const hasCreatedAt = cols.has('created_at');
     const hasOwnerAddress = cols.has('owner_address');
     const hasAgentIsTestnet = cols.has('is_testnet');
+    const hasAgentUrl = cols.has('agent_url');
+    const hasIsActive = cols.has('is_active');
+    const hasEndpointVerified = cols.has('is_endpoint_verified');
+    const hasX402Supported = cols.has('x402_supported');
+    const hasDataJson = cols.has('data_json');
     const hasChainsTable = hasSqliteTable(db, 'erc8004_chains');
     const orderBy = hasUpdatedAt ? 'a.updated_at DESC' : 'a.rowid DESC';
 
@@ -407,6 +636,11 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
         "  COALESCE(a.name, '') AS name,",
         "  COALESCE(a.description, '') AS description,",
         "  COALESCE(a.image_url, '') AS imageUrl,",
+        `  ${hasAgentUrl ? "COALESCE(a.agent_url, '')" : "''"} AS agentUrl,`,
+        `  ${hasIsActive ? 'COALESCE(a.is_active, 0)' : '0'} AS isActive,`,
+        `  ${hasEndpointVerified ? 'COALESCE(a.is_endpoint_verified, 0)' : '0'} AS isEndpointVerified,`,
+        `  ${hasX402Supported ? 'COALESCE(a.x402_supported, 0)' : '0'} AS x402Supported,`,
+        `  ${hasDataJson ? "COALESCE(a.data_json, '')" : "''"} AS dataJson,`,
         `  ${hasOwnerAddress ? "COALESCE(a.owner_address, '')" : "''"} AS ownerAddress,`,
         `  ${hasCreatedAt ? "COALESCE(a.created_at, '')" : "''"} AS createdAt,`,
         `  ${hasUpdatedAt ? "COALESCE(a.updated_at, '')" : "''"} AS updatedAt,`,
@@ -426,6 +660,11 @@ function readAgentsFromSqlite(sqlitePath = DEFAULT_SQLITE_PATH, limit = 1500) {
       description: String(row.description || ''),
       chainName: String(row.chainName || ''),
       isTestnet: Number(row.isTestnet) === 1,
+      agentUrl: String(row.agentUrl || ''),
+      isActive: row.isActive,
+      isEndpointVerified: row.isEndpointVerified,
+      x402Supported: row.x402Supported,
+      dataJson: String(row.dataJson || ''),
       ownerAddress: String(row.ownerAddress || ''),
       createdAt: String(row.createdAt || ''),
       updatedAt: String(row.updatedAt || ''),
