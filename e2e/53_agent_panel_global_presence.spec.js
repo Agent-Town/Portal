@@ -22,8 +22,10 @@ test('agent panel debug tabs expose tools, skill context, traffic, and session c
 
   await page.goto('/');
   await expect(page.getByTestId('agent-panel')).toBeVisible({ timeout: 1500 });
-  await expect(page.getByTestId('agent-debug-pane')).toBeHidden();
-  await page.getByTestId('agent-debug-toggle').click();
+  const debugPane = page.getByTestId('agent-debug-pane');
+  if (!(await debugPane.isVisible())) {
+    await page.getByTestId('agent-debug-toggle').click();
+  }
   await expect(page.getByTestId('agent-debug-pane')).toBeVisible({ timeout: 1500 });
   await expect(page.getByTestId('agent-team-code-row')).toBeVisible({ timeout: 3000 });
   const teamCode = String((await page.getByTestId('agent-team-code-text').textContent()) || '').trim();

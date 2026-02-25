@@ -46862,7 +46862,7 @@ var MIN_HTTP_TIMEOUT_MS = 100;
 var DEFAULT_HTTP_MAX_BYTES = 262144;
 var MAX_HTTP_BODY_BYTES = 65536;
 var HTTP_RATE_LIMIT_WINDOW_MS = 1e3;
-var HTTP_RATE_LIMIT_MAX = 2;
+var HTTP_RATE_LIMIT_MAX = 50;
 var WS_DEFAULT_CONNECT_TIMEOUT_MS = 1e4;
 var WS_MAX_CONNECT_TIMEOUT_MS = 3e4;
 var WS_DEFAULT_RECV_WAIT_MS = 5e3;
@@ -50602,9 +50602,12 @@ ${extraContext}` : String(userText || "");
         post({ type: "worker.chat.append", role: "assistant", text: t });
       }
       if (persistToTranscript) {
-        await persistTranscript();
+        await persistTranscript({ repair: false });
       }
     }
+  }
+  if (persistToTranscript) {
+    await persistTranscript({ repair: true });
   }
   return { messages: generatedMessages, persisted: persistToTranscript };
 }
@@ -50933,15 +50936,19 @@ async function ensureSessionFiles() {
     await vfsPutUtf8(transcriptPath, "");
   }
 }
-async function persistTranscript() {
+async function persistTranscript(options = {}) {
+  const shouldRepair = options && options.repair === false ? false : true;
   await ensureSessionFiles();
   const sessionsPath = `.openclaw/agents/${MAIN_AGENT_ID}/sessions/sessions.json`;
   const transcriptPath = resolveSessionTranscriptPath(state.sessionId);
-  const repairedInputs = repairToolCallInputs(state.transcript);
-  const repairedTools = repairToolUseResultPairing(repairedInputs.messages);
-  const repaired = repairedTools.messages;
-  state.transcript = repaired;
-  const jsonl = repaired.map((m) => JSON.stringify(m)).join("\n") + "\n";
+  let transcriptToWrite = state.transcript;
+  if (shouldRepair) {
+    const repairedInputs = repairToolCallInputs(state.transcript);
+    const repairedTools = repairToolUseResultPairing(repairedInputs.messages);
+    transcriptToWrite = repairedTools.messages;
+    state.transcript = transcriptToWrite;
+  }
+  const jsonl = transcriptToWrite.map((m) => JSON.stringify(m)).join("\n") + "\n";
   await vfsPutUtf8(transcriptPath, jsonl);
   let store = {};
   try {

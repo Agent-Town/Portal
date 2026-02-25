@@ -345,6 +345,27 @@ async function openTownhallPanel(page) {
   return await townhallVisible();
 }
 
+async function openBrainDistrictPanel(page) {
+  await page.evaluate(async () => {
+    if (typeof window.showDistrict !== 'function') {
+      throw new Error('BRAIN_MODAL_UNAVAILABLE');
+    }
+    await window.showDistrict('brain');
+  });
+  await expect(page.locator('#districtModalBackdrop')).toBeVisible();
+  const inlineSave = page.locator('#districtModalBody #llmSaveBtn');
+  if (await inlineSave.count()) {
+    await expect(inlineSave.first()).toBeVisible();
+    return 'inline';
+  }
+  const frame = page.locator('#districtModalBody iframe.districtFrame');
+  if (await frame.count()) {
+    await expect(frame.first()).toBeVisible();
+    return 'frame';
+  }
+  throw new Error('BRAIN_PANEL_NOT_RENDERED');
+}
+
 async function completeTownhallStory(page, {
   humanName = 'Robin',
   agentName = 'OpenClaw',
@@ -674,6 +695,7 @@ test('full onboarding flow stores once-per-wallet completion and skips townhall/
 
   await page.getByTestId('lite-llm-provider').selectOption('openai');
   await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');
+  await page.locator('#llmThinkingInput').selectOption('high', { force: true });
   await page.getByTestId('lite-llm-api-key').fill('local-test-key');
   await page.getByTestId('lite-llm-save').click();
   await expect(page.getByTestId('lite-llm-status')).toContainText('Brain configured.', { timeout: 2000 });
@@ -745,6 +767,7 @@ test('llm mind config is stored locally and restored after reload', async ({ pag
 
   await page.getByTestId('lite-llm-provider').selectOption('openai');
   await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');
+  await page.locator('#llmThinkingInput').selectOption('high', { force: true });
   await page.getByTestId('lite-llm-api-key').fill('local-test-key');
   await page.getByTestId('lite-llm-save').click();
   await expect(page.getByTestId('lite-llm-status')).toContainText('Brain configured.', { timeout: 2000 });
@@ -754,7 +777,39 @@ test('llm mind config is stored locally and restored after reload', async ({ pag
   await openBrainTab(page);
   await expect(page.getByTestId('lite-llm-provider')).toHaveValue('openai');
   await expect(page.getByTestId('lite-llm-model')).toHaveValue('gpt-4o-mini');
+  await expect(page.locator('#llmThinkingInput')).toHaveValue('high');
   await expect(page.getByTestId('lite-llm-api-key')).toHaveValue('local-test-key');
+});
+
+test('brain district advanced thinking level restores from local brain config', async ({ page }) => {
+  await installMockSolanaWallet(page);
+
+  await page.goto('/');
+  await enterSignup(page, { navigate: false });
+  await walletCheck(page);
+  await expect(page.locator('#walletStatus')).toContainText(/Wallet verified. Configure brain.|No Solana wallet found.|No Privy-connected Solana wallet found.|Wallet connected. Lookup skipped/i, { timeout: 2000 });
+
+  await page.getByTestId('lite-llm-provider').selectOption('openai');
+  await page.getByTestId('lite-llm-model').selectOption('gpt-4o-mini');
+  await page.locator('#llmThinkingInput').selectOption('high', { force: true });
+  await page.getByTestId('lite-llm-api-key').fill('local-test-key');
+  await page.getByTestId('lite-llm-save').click();
+  await expect(page.getByTestId('lite-llm-status')).toContainText('Brain configured.', { timeout: 2000 });
+
+  const mode1 = await openBrainDistrictPanel(page);
+  const thinking1 = mode1 === 'frame'
+    ? page.frameLocator('#districtModalBody iframe.districtFrame').locator('#llmThinkingInput')
+    : page.locator('#districtModalBody #llmThinkingInput');
+  await expect(thinking1).toHaveValue('high');
+
+  await page.reload();
+  await enterSignup(page, { navigate: false });
+  await walletCheck(page);
+  const mode2 = await openBrainDistrictPanel(page);
+  const thinking2 = mode2 === 'frame'
+    ? page.frameLocator('#districtModalBody iframe.districtFrame').locator('#llmThinkingInput')
+    : page.locator('#districtModalBody #llmThinkingInput');
+  await expect(thinking2).toHaveValue('high');
 });
 
 test('agent panel brain controls configure provider/model/thinking via the same setup pipeline', async ({ page }) => {

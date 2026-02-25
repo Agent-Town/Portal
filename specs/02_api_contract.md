@@ -249,8 +249,6 @@ Includes:
   - `lite.llmModel` (string | null, legacy server metadata)
   - `lite.runtimeVersion` (string | null)
   - `lite.lastError` (string | null)
-- `featureFlags` — rollout switches for UI/runtime plugins:
-  - `featureFlags.trainerNamespace` (boolean)
 
 ### POST `/api/hatch/complete` (human)
 Marks hatch completion for the current browser session.

@@ -1168,13 +1168,6 @@ async function init() {
   state.districts = districts;
   state.districtMap = new Map(districts.map((d) => [d.key, d]));
 
-  const meta = el('atlasMeta');
-  if (meta) {
-    const source = data?.meta?.source || 'unknown';
-    const formula = data?.meta?.formula || {};
-    meta.textContent = `source: ${source} • district size: ${formula.base} + ${formula.scale} * log10(1 + agents)`;
-  }
-
   initFilters(districts);
 
   const closeBtn = el('storefrontCloseBtn');

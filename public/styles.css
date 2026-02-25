@@ -648,14 +648,14 @@ h3 {
   position: relative;
   flex: 1;
   min-height: 0;
-  padding: 8px;
+  padding: 0;
   overflow: auto;
   background:
     linear-gradient(180deg, rgba(255, 249, 235, 0.62) 0%, rgba(255, 245, 224, 0.72) 100%);
 }
 
 .trainerModalBody {
-  padding: 10px;
+  padding: 0;
 }
 
 .trainerPanel {
@@ -770,7 +770,7 @@ h3 {
 }
 
 .districtModal.is-district .districtModalBody {
-  padding: 4px;
+  padding: 0;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -783,14 +783,42 @@ h3 {
 
 .districtModalBody.is-loading {
   min-height: 90px;
-  display: grid;
-  place-items: center;
 }
 
 .districtBackdrop .districtModalBody.is-loading::before {
-  content: "Loading district...";
-  display: block;
-  color: var(--text-strong);
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: linear-gradient(180deg, rgba(255, 248, 232, 0.68), rgba(240, 223, 192, 0.74));
+  pointer-events: none;
+}
+
+.districtBackdrop .districtModalBody.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 999px;
+  border: 4px solid rgba(61, 42, 28, 0.22);
+  border-top-color: #3d2a1c;
+  border-right-color: #5b8a8a;
+  animation: districtModalSpinner 0.72s linear infinite;
+  z-index: 9;
+  pointer-events: none;
+}
+
+@keyframes districtModalSpinner {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .districtFrameWrap {
@@ -3586,27 +3614,7 @@ body.town-hub-page .districtModal {
 
 body.town-hub-page .districtModal::before,
 body.town-hub-page .districtModal::after {
-  content: "";
-  position: absolute;
-  top: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, var(--modal-rivet-core), var(--modal-rivet-mid) 52%, var(--modal-rivet-edge));
-  border: 1.5px solid rgba(46, 27, 14, 0.5);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    inset 0 1px 1px rgba(255, 228, 160, 0.42);
-  z-index: 3;
-  pointer-events: none;
-}
-
-body.town-hub-page .districtModal::before {
-  left: 10px;
-}
-
-body.town-hub-page .districtModal::after {
-  right: 10px;
+  content: none;
 }
 
 body.town-hub-page .districtModalHeader {
@@ -3621,20 +3629,7 @@ body.town-hub-page .districtModalHeader {
 }
 
 body.town-hub-page .districtModalHeader::after {
-  content: "";
-  position: absolute;
-  bottom: -7px;
-  left: 24px;
-  right: 24px;
-  height: 3px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--v0-ochre) 0px,
-    var(--v0-ochre) 8px,
-    transparent 8px,
-    transparent 14px
-  );
-  z-index: 1;
+  content: none;
 }
 
 body.town-hub-page .districtModalHeader h2 {
@@ -3648,31 +3643,14 @@ body.town-hub-page .districtModalHeader h2 {
 
 body.town-hub-page .districtModalBody {
   position: relative;
-  padding: 18px 16px;
+  padding: 0;
   background:
     linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(240, 223, 192, 0.92));
 }
 
-body.town-hub-page .districtModalBody::before,
-body.town-hub-page .districtModalBody::after {
-  content: "";
-  position: absolute;
-  bottom: 10px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, var(--modal-rivet-core), var(--modal-rivet-mid) 52%, var(--modal-rivet-edge));
-  border: 1.5px solid rgba(46, 27, 14, 0.4);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-}
-
-body.town-hub-page .districtModalBody::before {
-  left: 8px;
-}
-
-body.town-hub-page .districtModalBody::after {
-  right: 8px;
+body.town-hub-page .districtModalBody:not(.is-loading)::before,
+body.town-hub-page .districtModalBody:not(.is-loading)::after {
+  content: none;
 }
 
 body.town-hub-page .districtModalClose {
@@ -3879,7 +3857,7 @@ body.town-hub-page .districtModal.is-district .districtModalBody {
   display: block;
   align-items: initial;
   justify-content: initial;
-  padding: 18px 16px;
+  padding: 0;
 }
 
 body.town-hub-page .districtModal.is-district .districtModalBody > * {
@@ -3910,27 +3888,7 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 
 .atlas-page .atlas-modal-shell::before,
 .atlas-page .atlas-modal-shell::after {
-  content: "";
-  position: absolute;
-  top: 10px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, var(--atlas-modal-rivet-core), var(--atlas-modal-rivet-mid) 52%, var(--atlas-modal-rivet-edge));
-  border: 1.5px solid rgba(46, 27, 14, 0.5);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.4),
-    inset 0 1px 1px rgba(255, 228, 160, 0.42);
-  z-index: 3;
-  pointer-events: none;
-}
-
-.atlas-page .atlas-modal-shell::before {
-  left: 10px;
-}
-
-.atlas-page .atlas-modal-shell::after {
-  right: 10px;
+  content: none;
 }
 
 .atlas-page .atlas-modal-head {
@@ -3950,20 +3908,7 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 }
 
 .atlas-page .atlas-modal-head::after {
-  content: "";
-  position: absolute;
-  bottom: -7px;
-  left: 24px;
-  right: 24px;
-  height: 3px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--v0-ochre) 0px,
-    var(--v0-ochre) 8px,
-    transparent 8px,
-    transparent 14px
-  );
-  z-index: 1;
+  content: none;
 }
 
 .atlas-page .atlas-modal-title {
@@ -4010,9 +3955,10 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 
 .atlas-page .atlas-detail-panel,
 .atlas-page .atlas-storefront-drawer {
-  margin: 14px;
+  margin: 0;
+  padding: 0;
   border: 3px solid #3d2a1c;
-  border-radius: 16px;
+  border-radius: 0;
   background:
     linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(240, 223, 192, 0.92));
   box-shadow:
@@ -4028,13 +3974,22 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
   width: min(860px, calc(100vw - 16px));
   height: min(34vh, 318px);
   min-height: 200px;
-  border: 3px solid var(--v0-wood);
+  border: 4px solid #6d8eb0;
   border-radius: 20px;
-  background: linear-gradient(180deg, var(--v0-cream), #f0dfc0);
+  background:
+    linear-gradient(160deg, rgba(255, 248, 232, 0.96), rgba(240, 223, 192, 0.95)),
+    url("/images/parchment-bg.jpg") center/cover no-repeat;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    0 14px 42px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(196, 136, 58, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
   overflow: hidden;
+  position: fixed;
+}
+
+#agentSidebar.agent-sidebar::before,
+#agentSidebar.agent-sidebar::after {
+  content: none;
 }
 
 #agentSidebar.agent-sidebar:not(.debug-collapsed) {
@@ -4044,9 +3999,18 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 }
 
 #agentSidebar .sidebar-header {
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--v0-sand-dark);
-  background: linear-gradient(180deg, rgba(196, 136, 58, 0.14), transparent);
+  position: relative;
+  z-index: 3;
+  padding: 4px 8px;
+  border-bottom: 4px solid var(--v0-wood);
+  border-radius: 16px 16px 0 0;
+  background:
+    linear-gradient(180deg, rgba(46, 27, 14, 0.4), rgba(46, 27, 14, 0.2)),
+    url("/images/wood-header.jpg") center/cover no-repeat;
+}
+
+#agentSidebar .sidebar-header::after {
+  content: none;
 }
 
 #agentSidebar .sidebar-header-main {
@@ -4062,24 +4026,35 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 }
 
 #agentSidebar .sidebar-header h3 {
-  color: var(--v0-wood);
-  font-size: 12px;
-  letter-spacing: 0.3px;
+  color: var(--v0-sun);
+  font-family: "Rye", "Rock Salt", serif;
+  font-size: 18px;
+  letter-spacing: 0.35px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.56);
 }
 
 #agentSidebar .status-indicator {
   font-size: 10px;
   font-weight: 700;
-  color: var(--v0-wood);
-  border: 1px solid var(--v0-brass);
+  color: #4a3522;
+  border: 2px solid #8d7842;
   border-radius: 999px;
-  background: linear-gradient(180deg, var(--v0-sand), var(--v0-sand-dark));
+  background: linear-gradient(180deg, #f0e5c0 0%, #e7d8aa 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
   padding: 3px 8px;
 }
 
 #agentSidebar .sidebar-content {
-  padding: 8px 10px 10px;
+  position: relative;
+  z-index: 2;
+  padding: 0;
   gap: 7px;
+  background: linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(240, 223, 192, 0.92));
+}
+
+#agentSidebar .sidebar-content::before,
+#agentSidebar .sidebar-content::after {
+  content: none;
 }
 
 #agentSidebar .agent-split {
@@ -4099,6 +4074,11 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
   padding: 3px 8px;
   min-height: 28px;
   line-height: 1;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(46, 27, 14, 0.52);
+  color: var(--v0-sun);
+  box-shadow: none;
 }
 
 #agentSidebar .agent-debug-toggle {
@@ -4107,9 +4087,9 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 }
 
 #agentSidebar .agent-debug-toggle[aria-expanded="true"] {
-  background: linear-gradient(180deg, #d6ecff, #b9defc);
-  border-color: #2f5e82;
-  color: #1b3f5f;
+  background: rgba(160, 82, 45, 0.84);
+  border-color: #6c2f21;
+  color: var(--v0-cream);
 }
 
 #agentSidebar .agent-minimize-toggle {
@@ -4117,24 +4097,37 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
   font-size: 13px;
 }
 
+#agentSidebar .agent-minimize-toggle:hover,
+#agentSidebar .agent-debug-toggle:hover {
+  background: rgba(160, 82, 45, 0.82);
+  border-color: var(--v0-rust);
+  color: var(--v0-cream);
+}
+
 #agentSidebar .agent-pane-right,
 #agentSidebar .chat-box.sidebar-chat,
 #agentSidebar .agent-approvals,
 #agentSidebar .agent-mind-panel {
-  border: 2px solid var(--v0-wood);
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  border: 3px solid #3a281b;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 235, 0.96), rgba(240, 223, 192, 0.95)),
+    url("/images/parchment-bg.jpg") center/cover no-repeat;
+  box-shadow:
+    0 2px 0 rgba(67, 45, 28, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 #agentSidebar .chat-box.sidebar-chat {
-  background: linear-gradient(180deg, rgba(255, 248, 232, 0.95), rgba(240, 223, 192, 0.75));
+  background:
+    linear-gradient(180deg, rgba(255, 248, 232, 0.96), rgba(240, 223, 192, 0.8)),
+    url("/images/parchment-bg.jpg") center/cover no-repeat;
 }
 
 #agentSidebar .chat-message {
-  border: 1.5px solid rgba(46, 27, 14, 0.25);
+  border: 2px solid rgba(58, 40, 27, 0.24);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -4157,6 +4150,28 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 #agentSidebar .chat-input-area {
   padding-top: 2px;
   align-items: center;
+}
+
+#agentSidebar .btn:not(.agent-debug-toggle):not(.agent-minimize-toggle) {
+  border: 3px solid #3a281b;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d7a154 0%, #b7772e 100%);
+  color: #fdf3dd;
+  box-shadow:
+    0 2px 0 rgba(58, 40, 27, 0.95),
+    inset 0 1px 0 rgba(255, 240, 204, 0.35);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+#agentSidebar .btn:not(.agent-debug-toggle):not(.agent-minimize-toggle):hover {
+  filter: brightness(1.04) saturate(1.02);
+}
+
+#agentSidebar .btn.primary:not(.agent-debug-toggle):not(.agent-minimize-toggle) {
+  background: linear-gradient(180deg, #7eb8c1 0%, #5f98a2 100%);
+  color: #f5f6f0;
 }
 
 #agentSidebar .pixel-input,
@@ -4185,9 +4200,9 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 
 #agentSidebar .agent-debug-tab.is-active,
 #agentSidebar .agent-traffic-filter.is-active {
-  background: linear-gradient(180deg, #d6ecff, #b9defc);
-  border-color: #2f5e82;
-  color: #1b3f5f;
+  background: linear-gradient(180deg, #f0e5c0 0%, #e7d8aa 100%);
+  border-color: #8d7842;
+  color: #4a3522;
 }
 
 #agentSidebar .agent-debug-content {
@@ -4204,13 +4219,13 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
 }
 
 #agentSidebar .agent-teamcode-row {
-  border-color: var(--v0-brass);
-  border-radius: 8px;
+  border: 2px dashed #8a7545;
+  border-radius: 10px;
   background: #fff4dc;
 }
 
 #agentSidebar.agent-sidebar.minimized {
-  height: 44px !important;
+  height: 50px !important;
   min-height: 0 !important;
 }
 
@@ -4294,7 +4309,7 @@ body.share-page .shareModalNav .btn {
 }
 
 body.share-page .shareModalBody {
-  padding: 16px 18px 18px;
+  padding: 0;
 }
 
 body.share-page .shareLead {

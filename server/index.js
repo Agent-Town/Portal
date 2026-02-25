@@ -3351,7 +3351,6 @@ app.get('/api/state', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
   updateLiteRuntimeReady(s);
-  const store = readStore();
   const onboarding = ensureSessionOnboarding(s);
   const ceremony = buildCeremonyStateSnapshot(s);
   const experience = buildExperienceStateSnapshot(s, ceremony);
@@ -3397,11 +3396,7 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: ceremony.houseId,
-    onboarding: cloneOnboarding(onboarding),
-    stats: {
-      signups: store.signups.length,
-      publicTeams: store.publicTeams.length
-    }
+    onboarding: cloneOnboarding(onboarding)
   });
 });
 
@@ -4304,44 +4299,6 @@ app.post('/api/session/reset', (req, res) => {
     teamCode: next.teamCode,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
-    stats: {
-      signups: store.signups.length,
-      publicTeams: store.publicTeams.length
-    }
-  });
-});
-
-app.get('/api/state', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const onboarding = ensureSessionOnboarding(s);
-  const store = readStore();
-  res.json({
-    ok: true,
-    teamCode: s.teamCode,
-    elements: listElements(),
-    agent: {
-      connected: s.agent.connected,
-      name: s.agent.name,
-      selected: s.agent.selected,
-      openPressed: s.agent.openPressed,
-      optIn: s.agent.optIn,
-      posts: s.agent.posts
-    },
-    human: {
-      selected: s.human.selected,
-      openPressed: s.human.openPressed,
-      optIn: s.human.optIn,
-      xPostUrl: s.human.xPostUrl
-    },
-    match: s.match,
-    signup: s.signup,
-    share: s.share,
-    shareApproval: s.shareApproval || { human: false, agent: false },
-    houseId: s.houseCeremony?.houseId || null,
-    onboarding: cloneOnboarding(onboarding),
-    featureFlags: {
-      trainerNamespace: ENABLE_TRAINER_NAMESPACE
-    },
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length

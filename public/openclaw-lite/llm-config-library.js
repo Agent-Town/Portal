@@ -50,17 +50,25 @@ async function metaSet(key, value) {
   await putRecord('meta', { key, value });
 }
 
-export async function saveLlmConfig({ provider, model, apiKey, authMode }) {
+function normalizeReasoning(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  if (raw === 'minimal' || raw === 'low' || raw === 'medium' || raw === 'high' || raw === 'xhigh') return raw;
+  return '';
+}
+
+export async function saveLlmConfig({ provider, model, apiKey, authMode, reasoning, useProxy }) {
   const providerTrim = String(provider || '').trim();
   const modelTrim = String(model || '').trim();
   const keyTrim = String(apiKey || '').trim();
   const normalizedAuthMode = String(authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const normalizedReasoning = normalizeReasoning(reasoning);
+  const normalizedUseProxy = useProxy !== false;
   if (!providerTrim) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelTrim) throw new Error('MISSING_LLM_MODEL');
   if (!keyTrim) throw new Error('MISSING_LLM_API_KEY');
 
   const parsed = parseModelRef(`${providerTrim}/${modelTrim}`, providerTrim, modelTrim);
-  const useProxy = true;
   const api = defaultProviderApi(parsed.provider);
   const baseUrl = defaultProviderBaseUrl(parsed.provider);
 
@@ -71,8 +79,8 @@ export async function saveLlmConfig({ provider, model, apiKey, authMode }) {
   await metaSet('llmModelId', parsed.modelId || null);
   await metaSet('llmAuthMode', normalizedAuthMode);
   await metaSet('llmBaseUrl', baseUrl || null);
-  await metaSet('llmReasoning', null);
-  await metaSet('llmUseProxy', useProxy);
+  await metaSet('llmReasoning', normalizedReasoning || null);
+  await metaSet('llmUseProxy', normalizedUseProxy);
 
   return {
     configured: true,
@@ -80,6 +88,8 @@ export async function saveLlmConfig({ provider, model, apiKey, authMode }) {
     model: parsed.modelId,
     modelRef: parsed.modelRef,
     authMode: normalizedAuthMode,
+    reasoning: normalizedReasoning,
+    useProxy: normalizedUseProxy,
     apiKeySet: true
   };
 }
@@ -90,6 +100,8 @@ export async function loadLlmConfig() {
   const modelRef = await metaGet('llmModelRef');
   const apiKey = await metaGet('llmApiKey');
   const authMode = await metaGet('llmAuthMode');
+  const reasoning = await metaGet('llmReasoning');
+  const useProxy = await metaGet('llmUseProxy');
   return {
     configured: !!(provider && model && apiKey),
     provider: provider || null,
@@ -97,6 +109,8 @@ export async function loadLlmConfig() {
     modelRef: modelRef || null,
     apiKey: typeof apiKey === 'string' ? apiKey : '',
     authMode: authMode === 'oauth-json' ? 'oauth-json' : 'api-key',
+    reasoning: normalizeReasoning(reasoning),
+    useProxy: useProxy !== false,
     apiKeySet: !!apiKey
   };
 }

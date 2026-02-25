@@ -230,6 +230,8 @@ const DEFAULT_LOCAL_LITE_LLM = Object.freeze({
   model: null,
   modelRef: null,
   authMode: 'api-key',
+  reasoning: '',
+  useProxy: true,
   credential: '',
   apiKeySet: false
 });
@@ -739,13 +741,27 @@ function setActiveDistrict(district) {
 }
 
 function normalizeDistrict(district) {
-  return district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  return district === 'atlas'
+    || district === 'townhall'
+    || district === 'saloon'
+    || district === 'pony'
+    || district === 'leaderboard'
+    || district === 'brain'
+    || district === 'sigil'
+    || district === 'house'
     ? district
     : 'house';
 }
 
 function explicitDistrictFromInput(district) {
-  return district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  return district === 'atlas'
+    || district === 'townhall'
+    || district === 'saloon'
+    || district === 'pony'
+    || district === 'leaderboard'
+    || district === 'brain'
+    || district === 'sigil'
+    || district === 'house'
     ? district
     : null;
 }
@@ -839,6 +855,48 @@ function formatPublicHandle(value) {
   const trimmed = String(value).trim();
   if (!trimmed) return '—';
   return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+}
+
+function resolveSharePathFromState(state) {
+  const shareId = typeof state?.share?.id === 'string' ? state.share.id.trim() : '';
+  if (shareId) return `/s/${encodeURIComponent(shareId)}`;
+  const sharePath = typeof state?.share?.sharePath === 'string' ? state.share.sharePath.trim() : '';
+  if (sharePath.startsWith('/s/')) return sharePath;
+  return '';
+}
+
+async function lookupSharePathByHouse(houseId) {
+  const normalized = String(houseId || '').trim();
+  if (!normalized) return '';
+  try {
+    const response = await api(`/api/share/by-house/${encodeURIComponent(normalized)}`);
+    const sharePath = typeof response?.sharePath === 'string' ? response.sharePath.trim() : '';
+    return sharePath.startsWith('/s/') ? sharePath : '';
+  } catch (err) {
+    if (Number(err?.status || 0) === 404) return '';
+    throw err;
+  }
+}
+
+function routeToShareCard(sharePath) {
+  const normalized = String(sharePath || '').trim();
+  if (!normalized) return;
+  const resolved = routeToPopupMode(normalized);
+  if (resolved?.mode === 'frame') {
+    openRouteInModalFrame(resolved.url, resolved.title || 'Share Card');
+    return;
+  }
+  if (resolved?.mode === 'district') {
+    showDistrict(resolved.district);
+    return;
+  }
+  if (resolved?.mode === 'leave' && resolved.url) {
+    hideDistrict();
+    window.location.assign(resolved.url);
+    return;
+  }
+  hideDistrict();
+  window.location.assign(normalized);
 }
 
 function renderTownBoard(data) {
@@ -2904,6 +2962,9 @@ function syncTownhallRegistrationUI(state) {
 function bindBrainDistrictControls() {
   const continueBtn = el('brainContinueBtn');
   if (continueBtn) {
+    const state = lastState && typeof lastState === 'object' ? lastState : null;
+    const isBrainConfigured = state ? isTownhallBrainConfigured(state) : false;
+    const isWorkerConnected = state ? isAnyAgentConnected(state) : false;
     const isReady =
       isBrainConfigured &&
       isWorkerConnected;
@@ -3042,6 +3103,37 @@ function bindTownDistrictControls() {
     };
   }
 
+  const openShareCardBtn = el('openShareCardBtn');
+  const shareCardStatus = el('shareCardStatus');
+  if (openShareCardBtn) {
+    openShareCardBtn.onclick = async () => {
+      openShareCardBtn.disabled = true;
+      if (shareCardStatus) shareCardStatus.textContent = 'Resolving share card...';
+      try {
+        let sharePath = resolveSharePathFromState(lastState);
+        const houseId = String(lastState?.houseId || walletHouseId || '').trim();
+        if (!sharePath && houseId) {
+          sharePath = await lookupSharePathByHouse(houseId);
+        }
+        if (!sharePath) {
+          sharePath = '/s/sh_missing';
+          if (shareCardStatus) {
+            shareCardStatus.textContent = 'No share yet for this house. Opening placeholder card.';
+          }
+        } else if (shareCardStatus) {
+          shareCardStatus.textContent = '';
+        }
+        routeToShareCard(sharePath);
+      } catch (err) {
+        if (shareCardStatus) {
+          shareCardStatus.textContent = `Share card unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`;
+        }
+      } finally {
+        openShareCardBtn.disabled = false;
+      }
+    };
+  }
+
   const openBtn = el('openBtn');
   if (openBtn) {
     openBtn.onclick = async () => {
@@ -3116,10 +3208,10 @@ function loadAgentPanelMinimized() {
 function loadAgentPanelDebugVisible() {
   try {
     const raw = localStorage.getItem(AGENT_PANEL_DEBUG_VISIBLE_KEY);
-    if (raw === null) return false;
+    if (raw === null) return true;
     return raw === '1';
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -3706,6 +3798,17 @@ async function showDistrict(district) {
       body.innerHTML = html;
       if (body.classList.contains('is-loading')) body.classList.remove('is-loading');
     }
+    if (safeDistrict === 'brain') {
+      try {
+        let localCfg = getLocalLiteLlm();
+        if (!localCfg?.loaded) {
+          localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
+        }
+        applyLocalLiteLlmToInputs(localCfg);
+      } catch (err) {
+        console.warn('brain district llm hydrate skipped', err);
+      }
+    }
     if (lastState) {
       updateUI(lastState);
     }
@@ -3925,8 +4028,9 @@ async function maybeResetAfterWalletDisconnect() {
   await resetSessionAndReload();
 }
 
-function pushAgentDebugTraffic(direction, channel, payload) {
-  if (agentDebugTrafficMuteDepth > 0) return;
+function pushAgentDebugTraffic(direction, channel, payload, options = {}) {
+  const ignoreMute = options && options.ignoreMute === true;
+  if (!ignoreMute && agentDebugTrafficMuteDepth > 0) return;
   const dir = String(direction || '').trim().toLowerCase() === 'in' ? 'IN' : 'OUT';
   const target = String(channel || '').trim() || 'unknown';
   const stamp = new Date().toISOString();
@@ -4231,6 +4335,23 @@ async function withAgentTrafficMuted(task) {
   }
 }
 
+async function withDebugTimeout(task, fallback = null, timeoutMs = 8000) {
+  let timeoutId = null;
+  const wrappedTask = typeof task === 'function' ? task() : task;
+  try {
+    return await Promise.race([
+      Promise.resolve(wrappedTask),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallback), Math.max(1, Number(timeoutMs) || 8000));
+      }),
+    ]);
+  } catch {
+    return fallback;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 function setAgentDebugText(id, text) {
   const node = el(id);
   if (!node) return;
@@ -4248,27 +4369,28 @@ function instrumentGatewayTraffic(gatewayApi) {
   });
 
   const wrapCall = (channel, fn) => {
+    const forceRecord = channel === 'gateway.send';
     return (...args) => {
-      pushAgentDebugTraffic('out', channel, args.length <= 1 ? args[0] : { args });
+      pushAgentDebugTraffic('out', channel, args.length <= 1 ? args[0] : { args }, { ignoreMute: forceRecord });
       try {
         const value = fn(...args);
         if (value && typeof value.then === 'function') {
           return value.then((result) => {
-            pushAgentDebugTraffic('in', `${channel}.result`, result);
+            pushAgentDebugTraffic('in', `${channel}.result`, result, { ignoreMute: forceRecord });
             return result;
           }).catch((error) => {
             pushAgentDebugTraffic('in', `${channel}.error`, {
               message: String(error?.message || error || 'UNKNOWN_ERROR'),
-            });
+            }, { ignoreMute: forceRecord });
             throw error;
           });
         }
-        pushAgentDebugTraffic('in', `${channel}.result`, value);
+        pushAgentDebugTraffic('in', `${channel}.result`, value, { ignoreMute: forceRecord });
         return value;
       } catch (error) {
         pushAgentDebugTraffic('in', `${channel}.error`, {
           message: String(error?.message || error || 'UNKNOWN_ERROR'),
-        });
+        }, { ignoreMute: forceRecord });
         throw error;
       }
     };
@@ -4304,6 +4426,13 @@ function setAgentDebugTab(tab) {
     const active = String(panel?.dataset?.debugPanel || '') === next;
     panel.classList.toggle('is-hidden', !active);
   }
+
+  if (next === 'session') {
+    const node = el('agentDebugSession');
+    if (node && !String(node.textContent || '').trim()) {
+      node.textContent = 'Loading session context...';
+    }
+  }
 }
 
 function formatDebugList(prefix, values) {
@@ -4326,36 +4455,36 @@ async function refreshAgentDebugPanels(reason = 'poll') {
   agentDebugRefreshInFlight = true;
 
   try {
-    const gatewayApi = await initGateway();
+    const gatewayApi = await withDebugTimeout(() => initGateway(), null, 6000);
     const debugApi = window.__openclawLiteTest || null;
     const nowIso = new Date().toISOString();
     let transcriptToolStats = null;
     if (debugApi && typeof debugApi.getTranscriptToolStats === 'function') {
-      transcriptToolStats = await withAgentTrafficMuted(async () => {
+      transcriptToolStats = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await debugApi.getTranscriptToolStats().catch(() => null);
-      });
+      }), null, 5000);
     }
 
     let toolRegistry = null;
     if (debugApi && typeof debugApi.getToolRegistryInfo === 'function') {
-      toolRegistry = await withAgentTrafficMuted(async () => {
+      toolRegistry = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await debugApi.getToolRegistryInfo().catch(() => null);
-      });
+      }), null, 5000);
     }
 
     let skillSnapshot = null;
     if (gatewayApi && typeof gatewayApi.skillState === 'function') {
-      const snapshot = await withAgentTrafficMuted(async () => {
+      const snapshot = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await gatewayApi.skillState().catch(() => null);
-      });
+      }), null, 6000);
       skillSnapshot = snapshot?.data || snapshot || null;
     }
 
     let promptPreview = null;
     if (gatewayApi && typeof gatewayApi.systemPromptPreview === 'function') {
-      const preview = await withAgentTrafficMuted(async () => {
+      const preview = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await gatewayApi.systemPromptPreview().catch(() => null);
-      });
+      }), null, 6000);
       promptPreview = preview?.data || preview || null;
     }
 
@@ -4363,15 +4492,15 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const contextPaths = Array.isArray(promptPreview?.contextFilePaths) ? promptPreview.contextFilePaths : [];
     const importedPaths = Array.isArray(skillSnapshot?.importedPaths) ? skillSnapshot.importedPaths : [];
     const importedFiles = Array.isArray(skillSnapshot?.importedFiles) ? skillSnapshot.importedFiles : [];
-    const skillActionPluginState = await withAgentTrafficMuted(async () => {
+    const skillActionPluginState = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
       return await refreshSkillActionPluginCache(gatewayApi, debugApi, skillSnapshot).catch(() => null);
-    });
+    }), null, 7000);
     const pluginActions = Array.isArray(skillActionPluginState?.actions) ? skillActionPluginState.actions : [];
     const pluginActionToolNames = pluginActions.map((action) => `skill_action.${action.id}`);
     const pluginUsage = skillActionPluginState?.usage || null;
-    const trainerNamespaceState = await withAgentTrafficMuted(async () => {
+    const trainerNamespaceState = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
       return await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
-    });
+    }), null, 5000);
     const trainerNamespaceTools = Array.isArray(trainerNamespaceState?.tools) ? trainerNamespaceState.tools : [];
     const trainerNamespaceToolNames = trainerNamespaceTools
       .map((row) => String(row?.name || '').trim())
@@ -4467,13 +4596,16 @@ async function refreshAgentDebugPanels(reason = 'poll') {
           teamCode: String(lastState?.teamCode || ''),
           houseId: String(lastState?.houseId || ''),
         };
-        const snapshot = await withAgentTrafficMuted(async () => {
+        const snapshot = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
           return await gatewayApi.runtimeSessionContext({
             runtimeContext: runtimeContextInput,
             runtimeState: runtimeStateInput,
           });
-        });
+        }), null, 7000);
         workerSessionContext = snapshot?.data || snapshot || null;
+        if (!workerSessionContext) {
+          workerSessionContextError = workerSessionContextError || 'RUNTIME_SESSION_CONTEXT_TIMEOUT';
+        }
       } catch (err) {
         workerSessionContextError = String(err?.message || err || 'RUNTIME_SESSION_CONTEXT_FAILED');
       }
@@ -4483,9 +4615,9 @@ async function refreshAgentDebugPanels(reason = 'poll') {
 
     let transcript = null;
     if (shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function') {
-      const dumpRaw = await withAgentTrafficMuted(async () => {
+      const dumpRaw = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await debugApi.getTranscriptDump().catch(() => '[]');
-      });
+      }), '[]', 6000);
       transcript = safeJsonParse(dumpRaw, []);
     }
 
@@ -4744,6 +4876,17 @@ async function updateUI(state) {
     const openHouseLink = el('openHouseLink');
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
   }
+
+  const openShareCardBtn = el('openShareCardBtn');
+  const shareCardStatus = el('shareCardStatus');
+  if (openShareCardBtn) {
+    const sharePath = resolveSharePathFromState(state);
+    openShareCardBtn.textContent = sharePath ? 'Open share card' : 'Open share card (preview)';
+    openShareCardBtn.disabled = !houseId;
+  }
+  if (shareCardStatus && !houseId) {
+    shareCardStatus.textContent = '';
+  }
   const matched = !!state.match?.matched;
   const matchState = el('matchState');
   if (matchState) {
@@ -4789,6 +4932,8 @@ function setLocalLiteLlm(config) {
   const model = typeof config?.model === 'string' ? config.model.trim() : '';
   const modelRef = typeof config?.modelRef === 'string' ? config.modelRef.trim() : '';
   const authMode = String(config?.authMode || '').trim() === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const reasoning = normalizeThinkingLevel(config?.reasoning);
+  const useProxy = config?.useProxy !== false;
   const credential = typeof config?.credential === 'string' ? config.credential : '';
   const configured = !!(config?.configured && provider && model && credential);
 
@@ -4799,6 +4944,8 @@ function setLocalLiteLlm(config) {
     model: model || null,
     modelRef: modelRef || (provider && model ? `${provider}/${model}` : null),
     authMode,
+    reasoning,
+    useProxy,
     credential,
     apiKeySet: !!(credential || config?.apiKeySet)
   };
@@ -5565,6 +5712,8 @@ function resolveLlmConfigFromUi() {
     model: parsedModel.modelId,
     modelRef: parsedModel.modelRef,
     authMode: mode,
+    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    useProxy: el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true,
     credential
   };
 }
@@ -5651,7 +5800,10 @@ function buildGatewayLlmPayload(config) {
 
   const apiOverride = String(el('llmApiInput')?.value || '').trim();
   const baseUrlOverride = String(el('llmBaseUrlInput')?.value || '').trim();
-  const useProxy = el('llmUseProxyInput') ? el('llmUseProxyInput').checked !== false : true;
+  const useProxy = el('llmUseProxyInput')
+    ? el('llmUseProxyInput').checked !== false
+    : config?.useProxy !== false;
+  const reasoning = normalizeThinkingLevel(el('llmThinkingInput')?.value || config?.reasoning);
   return {
     type: 'gateway.command.setLlmConfig',
     apiKey: credential,
@@ -5660,7 +5812,7 @@ function buildGatewayLlmPayload(config) {
     modelRef,
     modelId: model,
     baseUrl: baseUrlOverride || defaultProviderBaseUrl(provider),
-    reasoning: normalizeThinkingLevel(el('llmThinkingInput')?.value),
+    reasoning,
     useProxy
   };
 }
@@ -6477,6 +6629,8 @@ async function readLocalLiteLlmConfig() {
   const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
   const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
   const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
+  const reasoning = normalizeThinkingLevel(localCfg?.reasoning);
+  const useProxy = localCfg?.useProxy !== false;
   const defaultProvider = providerRaw || 'openai';
   const defaultModel = modelRaw || getDefaultLlmModelForProvider(defaultProvider);
   const parsed = parseModelRefFromText(
@@ -6497,6 +6651,8 @@ async function readLocalLiteLlmConfig() {
     modelRef,
     credential,
     authMode,
+    reasoning,
+    useProxy,
     apiKeySet: !!credential
   };
 }
@@ -6507,13 +6663,21 @@ function applyLocalLiteLlmToInputs(config) {
   const keyInput = el('llmKeyInput');
   const authModeSel = el('llmAuthModeSelect');
   const oauthInput = el('llmOauthProfileInput');
+  const thinkingInput = el('llmThinkingInput');
+  const useProxyInput = el('llmUseProxyInput');
   const mode = config?.authMode === 'oauth-json' ? 'oauth-json' : 'api-key';
+  const reasoning = normalizeThinkingLevel(config?.reasoning);
 
   if (providerSel && modelInput) {
     const selected = applyLlmProviderModelSelection(config?.provider || 'openai', config?.model || '');
     providerSel.value = selected.provider;
     modelInput.value = selected.model;
   }
+  if (thinkingInput) {
+    if (reasoning) ensureSelectOption(thinkingInput, reasoning, reasoning);
+    thinkingInput.value = reasoning || '';
+  }
+  if (useProxyInput) useProxyInput.checked = config?.useProxy !== false;
   if (keyInput) keyInput.value = mode === 'api-key' ? config?.credential || '' : '';
   if (authModeSel) setLlmAuthModeUI(mode);
   if (oauthInput) {
@@ -6597,7 +6761,9 @@ function initStep2Listener() {
         provider: config.provider,
         model: config.model,
         apiKey: config.credential,
-        authMode: config.authMode
+        authMode: config.authMode,
+        reasoning: config.reasoning,
+        useProxy: config.useProxy
       });
 
       const localCfg = setLocalLiteLlm({
@@ -6608,6 +6774,8 @@ function initStep2Listener() {
         modelRef: config.modelRef,
         credential: config.credential,
         authMode: config.authMode,
+        reasoning: config.reasoning,
+        useProxy: config.useProxy,
         apiKeySet: true
       });
       clearLiteSkillLoopPause();
@@ -6688,6 +6856,8 @@ async function clearLiteLlmConfig() {
       provider: null,
       model: null,
       modelRef: null,
+      reasoning: '',
+      useProxy: true,
       credential: '',
       authMode: 'api-key',
       apiKeySet: false
@@ -6709,6 +6879,10 @@ async function clearLiteLlmConfig() {
       modelRefInput.value = resolved.modelRef;
     }
     if (oauthInput) oauthInput.value = '';
+    const thinkingInput = el('llmThinkingInput');
+    if (thinkingInput) thinkingInput.value = '';
+    const useProxyInput = el('llmUseProxyInput');
+    if (useProxyInput) useProxyInput.checked = true;
     if (runtimeBridge && isVendorLite(lastState)) {
       await ensureVendorRuntimeBridge(lastState);
       await runtimeBridge.setLlmConfig({ provider: '', model: '', apiKey: '' });
@@ -7528,6 +7702,9 @@ async function bootstrapInitialRouteState() {
 async function init() {
   await bootstrapInitialRouteState();
 
+  // Keep agent/debug controls interactive even if runtime bootstrap stalls.
+  setupAgentInterface();
+
   const enterBtn = el('enterBtn');
   const connectWalletHeroBtn = el('connectWalletHeroBtn');
   const authSigninBtn = el('authSigninBtn');
@@ -7644,13 +7821,14 @@ async function init() {
   }
   updateUI(initial);
   if (isVendorLite(initial)) {
-    await bootstrapVendorRuntime();
-    await restoreLiteLlmConfigFromLocalIfNeeded(initial);
+    bootstrapVendorRuntime()
+      .then(() => restoreLiteLlmConfigFromLocalIfNeeded(initial))
+      .catch((error) => {
+        console.warn('vendor runtime bootstrap failed during init', error);
+      });
   }
 
   // Do not auto-load server-side Codex profile credentials. Users configure LLM credentials themselves.
-
-  setupAgentInterface();
   poll();
 }
 

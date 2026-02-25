@@ -119,7 +119,6 @@ Practical rule:
 
 ### Canvas Paint - Endpoint: 
   `POST {origin}/api/agent/canvas/paint` 
-  `POST /api/agent/canvas/paint` (same-origin path form)
   - JSON body: 
     - `teamCode` (string) 
     - `x` (integer, 0..15) 
@@ -255,7 +254,6 @@ Inside OpenClaw Lite runtime, prefer these tools:
 
 - Start polling immediately after connect.
 - Default polling interval: 1 second.
-- On transient failures, back off to 2-5 seconds and retry.
 - Be explicit about each action you take.
 - Treat this playbook as API-first. UI layout can change.
 
@@ -310,11 +308,6 @@ done
 
 - Re-check the **Team Code** for typos (it’s case-sensitive and formatted like `TEAM-XXXX-XXXX`).
 - Confirm you are using the **same origin** as the human’s page (same host/port/protocol).
-
-### If state polling returns an error
-
-- Back off (wait 2–5 seconds) and retry a few times.
-- If it keeps failing, ask the human to refresh the page and send a new Team Code.
 
 ### If the sigil won’t match
 

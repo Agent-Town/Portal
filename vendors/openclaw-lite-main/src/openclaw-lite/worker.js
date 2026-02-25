@@ -42,7 +42,7 @@ const MIN_HTTP_TIMEOUT_MS = 100;
 const DEFAULT_HTTP_MAX_BYTES = 262_144;
 const MAX_HTTP_BODY_BYTES = 65_536;
 const HTTP_RATE_LIMIT_WINDOW_MS = 1000;
-const HTTP_RATE_LIMIT_MAX = 2;
+const HTTP_RATE_LIMIT_MAX = 50;
 const WS_DEFAULT_CONNECT_TIMEOUT_MS = 10_000;
 const WS_MAX_CONNECT_TIMEOUT_MS = 30_000;
 const WS_DEFAULT_RECV_WAIT_MS = 5_000;
@@ -4296,9 +4296,12 @@ async function runAgentTurn(userText, opts = {}) {
         post({ type: "worker.chat.append", role: "assistant", text: t });
       }
       if (persistToTranscript) {
-        await persistTranscript();
+        await persistTranscript({ repair: false });
       }
     }
+  }
+  if (persistToTranscript) {
+    await persistTranscript({ repair: true });
   }
   return { messages: generatedMessages, persisted: persistToTranscript };
 }
@@ -4674,18 +4677,22 @@ async function ensureSessionFiles() {
   }
 }
 
-async function persistTranscript() {
+async function persistTranscript(options = {}) {
+  const shouldRepair = options && options.repair === false ? false : true;
   await ensureSessionFiles();
   const sessionsPath = `.openclaw/agents/${MAIN_AGENT_ID}/sessions/sessions.json`;
   const transcriptPath = resolveSessionTranscriptPath(state.sessionId);
 
-  // Repair using OpenClaw source of truth before writing.
-  const repairedInputs = repairToolCallInputs(state.transcript);
-  const repairedTools = repairToolUseResultPairing(repairedInputs.messages);
-  const repaired = repairedTools.messages;
-  state.transcript = repaired;
+  let transcriptToWrite = state.transcript;
+  if (shouldRepair) {
+    // Repair only on finalized persistence boundaries, not per-message mid-turn.
+    const repairedInputs = repairToolCallInputs(state.transcript);
+    const repairedTools = repairToolUseResultPairing(repairedInputs.messages);
+    transcriptToWrite = repairedTools.messages;
+    state.transcript = transcriptToWrite;
+  }
 
-  const jsonl = repaired.map((m) => JSON.stringify(m)).join("\n") + "\n";
+  const jsonl = transcriptToWrite.map((m) => JSON.stringify(m)).join("\n") + "\n";
   await vfsPutUtf8(transcriptPath, jsonl);
 
   let store = {};
