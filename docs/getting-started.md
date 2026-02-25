@@ -65,6 +65,23 @@ Mind settings are included in agent state backup/restore in the house flow:
 - If you switched providers, verify `Model ID` updated to a model supported by that provider.
 - `test-local` is for deterministic tests and not real model inference.
 
+### Trainer namespace toggle
+
+Use either query params or localStorage:
+
+- URL: `?trainerNamespace=1` (enable) or `?trainerNamespace=0` (disable)
+- localStorage key: `agentTown:feature:trainerNamespace` with value `"true"` or `"false"`
+
+Console helper:
+
+```js
+localStorage.setItem('agentTown:feature:trainerNamespace', 'true');
+localStorage.setItem('agentTown:feature:trainerNamespace', 'false');
+localStorage.removeItem('agentTown:feature:trainerNamespace');
+```
+
+Precedence: localStorage override, then URL param, then default.
+
 ## Next
 
 - Decision guide: [Which Provider Should I Pick?](/docs/which-provider.md)

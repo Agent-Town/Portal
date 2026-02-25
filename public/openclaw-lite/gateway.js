@@ -24,6 +24,9 @@ var gatewayEvents = {
     console.warn("gateway not ready");
   }
 };
+var TRAINER_NAMESPACE_STORAGE_KEY = "agentTown:feature:trainerNamespace";
+var TRAINER_NAMESPACE_QUERY_KEYS = ["trainerNamespace", "trainer_namespace", "trainer-tools", "trainerTools"];
+var TRAINER_NAMESPACE_DEFAULT_ENABLED = true;
 function byId(id) {
   return document.getElementById(id);
 }
@@ -31,6 +34,44 @@ function appendLine(node, line) {
   if (!node) return;
   const next = `${node.textContent || ""}${node.textContent ? "\n" : ""}${line}`;
   node.textContent = next.slice(-2e4);
+}
+function parseBoolLike(value) {
+  if (value === true || value === false) return value;
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (!normalized) return null;
+  if (["1", "true", "yes", "on", "enable", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disable", "disabled"].includes(normalized)) return false;
+  return null;
+}
+function parseTrainerNamespaceQuery(search) {
+  const raw = String(search || "").trim();
+  if (!raw) return null;
+  const params = new URLSearchParams(raw.startsWith("?") ? raw.slice(1) : raw);
+  for (const key of TRAINER_NAMESPACE_QUERY_KEYS) {
+    if (!params.has(key)) continue;
+    const parsed = parseBoolLike(params.get(key));
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+function readTrainerNamespaceStorageOverride() {
+  try {
+    return parseBoolLike(window?.localStorage?.getItem(TRAINER_NAMESPACE_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+function resolveTrainerNamespaceEnabled({
+  locationSearch = "",
+  fallback = TRAINER_NAMESPACE_DEFAULT_ENABLED
+} = {}) {
+  let enabled = parseBoolLike(fallback);
+  if (enabled === null) enabled = TRAINER_NAMESPACE_DEFAULT_ENABLED;
+  const queryOverride = parseTrainerNamespaceQuery(locationSearch);
+  if (queryOverride !== null) enabled = queryOverride;
+  const storageOverride = readTrainerNamespaceStorageOverride();
+  if (storageOverride !== null) enabled = storageOverride;
+  return enabled;
 }
 function normalizeSignatureBytes(sig) {
   if (sig instanceof Uint8Array) return sig;
@@ -167,7 +208,10 @@ async function init() {
     } catch {
     }
   });
-  const worker = new Worker("/openclaw-lite/worker.js", { type: "module" });
+  const trainerNamespaceEnabled = resolveTrainerNamespaceEnabled({ locationSearch: window.location.search });
+  const workerUrl = new URL("/openclaw-lite/worker.js", window.location.href);
+  workerUrl.searchParams.set("trainerNamespace", trainerNamespaceEnabled ? "1" : "0");
+  const worker = new Worker(`${workerUrl.pathname}${workerUrl.search}`, { type: "module" });
   worker.addEventListener("error", (event) => {
     const message = String(event?.message || "WORKER_ERROR");
     const file = String(event?.filename || "");

@@ -94,6 +94,31 @@ npm run setup:sepolia-wallet -- --no-faucet
 - Co-op actions: `/api/agent/canvas/paint`, `/api/agent/house/*`.
 - House API auth and ceremony details are documented in `specs/02_api_contract.md`.
 
+## Trainer namespace toggle
+You can enable/disable `trainer.*` tools with either URL params or localStorage.
+
+- URL query param:
+  - `?trainerNamespace=1` enables
+  - `?trainerNamespace=0` disables
+  - aliases also supported: `trainer_namespace`, `trainer-tools`, `trainerTools`
+- localStorage override key: `agentTown:feature:trainerNamespace`
+  - set `"true"` to enable
+  - set `"false"` to disable
+  - remove the key to clear the override
+
+Browser console examples:
+
+```js
+localStorage.setItem('agentTown:feature:trainerNamespace', 'true');  // enable
+localStorage.setItem('agentTown:feature:trainerNamespace', 'false'); // disable
+localStorage.removeItem('agentTown:feature:trainerNamespace');       // clear override
+```
+
+Resolution precedence:
+- localStorage override
+- URL query param
+- default behavior
+
 ## Key routes
 - `/` — onboarding, Team Code, token check, reconnect.
 - `/start` — start page (logo/video/welcome + Enter -> Privy login).

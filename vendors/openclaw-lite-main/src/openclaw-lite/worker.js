@@ -69,6 +69,15 @@ const VISIT_COMPAT_BASENAMES = new Set([
   "skill.json",
 ]);
 const CEREMONY_E2EE_P256_AESGCM_V1 = "CEREMONY_E2EE_P256_AESGCM_V1";
+const TRAINER_TOOL_DEFAULT_RUN_LIMIT = 20;
+const TRAINER_TOOL_MAX_RUN_LIMIT = 200;
+const TRAINER_TOOL_DEFAULT_SCAN_LIMIT = 20;
+const TRAINER_TOOL_DEFAULT_EVIDENCE_LIMIT = 50;
+const TRAINER_TOOL_MAX_EVIDENCE_LIMIT = 500;
+const TRAINER_NAMESPACE_QUERY_KEYS = ["trainerNamespace", "trainer_namespace", "trainer-tools", "trainerTools"];
+const TRAINER_NAMESPACE_DEFAULT_ENABLED = true;
+const TRAINER_NAMESPACE_TOOL_PREFIX = "trainer.";
+const TRAINER_NAMESPACE_ENABLED = resolveTrainerNamespaceEnabledFromWorkerLocation();
 
 function post(msg) {
   self.postMessage(msg);
@@ -76,6 +85,43 @@ function post(msg) {
 
 function log(line) {
   post({ type: "worker.log.append", line: String(line || "") });
+}
+
+function parseBoolLike(value) {
+  if (value === true || value === false) return value;
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (!normalized) return null;
+  if (["1", "true", "yes", "on", "enable", "enabled"].includes(normalized)) return true;
+  if (["0", "false", "no", "off", "disable", "disabled"].includes(normalized)) return false;
+  return null;
+}
+
+function resolveTrainerNamespaceEnabledFromWorkerLocation() {
+  let enabled = TRAINER_NAMESPACE_DEFAULT_ENABLED;
+  try {
+    const rawSearch = String(self?.location?.search || "").trim();
+    if (!rawSearch) return enabled;
+    const params = new URLSearchParams(rawSearch.startsWith("?") ? rawSearch.slice(1) : rawSearch);
+    for (const key of TRAINER_NAMESPACE_QUERY_KEYS) {
+      if (!params.has(key)) continue;
+      const parsed = parseBoolLike(params.get(key));
+      if (parsed !== null) {
+        enabled = parsed;
+        break;
+      }
+    }
+  } catch {
+    // Keep default behavior if query parsing fails.
+  }
+  return enabled;
+}
+
+function isTrainerNamespaceToolName(toolName) {
+  return String(toolName || "").trim().startsWith(TRAINER_NAMESPACE_TOOL_PREFIX);
+}
+
+function trainerNamespaceEnabled() {
+  return TRAINER_NAMESPACE_ENABLED === true;
 }
 
 function normalizeSkillImportStatus(value) {
@@ -2093,6 +2139,72 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { method: "GET", url: "https://example.com/api" },
   },
   {
+    name: "trainer.list_runs",
+    label: "Trainer List Runs",
+    description: "List trainer run captures (newest-first).",
+    sampleArgs: { limit: 10 },
+  },
+  {
+    name: "trainer.get_run",
+    label: "Trainer Get Run",
+    description: "Read one trainer run bundle by attemptId.",
+    sampleArgs: { attemptId: "latest" },
+  },
+  {
+    name: "trainer.get_event",
+    label: "Trainer Get Event",
+    description: "Read one trainer event by attemptId + seq.",
+    sampleArgs: { attemptId: "latest", seq: 1 },
+  },
+  {
+    name: "trainer.list_actions",
+    label: "Trainer List Actions",
+    description: "List action-like tool calls extracted from trainer run traces.",
+    sampleArgs: { limit: 20 },
+  },
+  {
+    name: "trainer.invoke_action",
+    label: "Trainer Invoke Action",
+    description: "Invoke one existing non-trainer tool by actionId with params.",
+    sampleArgs: { actionId: "http_request", params: { method: "GET", url: "https://example.com" } },
+  },
+  {
+    name: "trainer.list_evidence",
+    label: "Trainer List Evidence",
+    description: "List executed tool-call evidence rows from trainer traces.",
+    sampleArgs: { limit: 20 },
+  },
+  {
+    name: "trainer.get_transcript_integrity",
+    label: "Trainer Transcript Integrity",
+    description: "Read transcript tool pairing/integrity diagnostics.",
+    sampleArgs: {},
+  },
+  {
+    name: "trainer.get_session_context",
+    label: "Trainer Session Context",
+    description: "Read runtime/session context snapshot with transcript diagnostics.",
+    sampleArgs: {},
+  },
+  {
+    name: "trainer.explain_not_used",
+    label: "Trainer Explain Not Used",
+    description: "Explain why a given actionId was not used in recent runs.",
+    sampleArgs: { actionId: "http_request" },
+  },
+  {
+    name: "trainer.delete_trace",
+    label: "Trainer Delete Trace",
+    description: "Delete one trainer run trace (approval required).",
+    sampleArgs: { attemptId: "latest" },
+  },
+  {
+    name: "trainer.clear_traces",
+    label: "Trainer Clear Traces",
+    description: "Delete all trainer run traces (approval required).",
+    sampleArgs: {},
+  },
+  {
     name: "agent_town_ceremony_commit",
     label: "Agent Town Ceremony Commit",
     description: "Generates agent ceremony entropy/keys and posts /api/agent/house/commit.",
@@ -2237,10 +2349,22 @@ function liteToolResult(text, details = {}) {
 
 async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = null) {
   const normalizedName = String(name || "");
+  const normalizedToolCallId = typeof toolCallId === "string" && toolCallId.trim() ? toolCallId.trim() : randomId("tc");
+  if (isTrainerNamespaceToolName(normalizedName) && !trainerNamespaceEnabled()) {
+    const startedAtMs = nowMs();
+    const envelope = withToolMeta(
+      normalizedName,
+      startedAtMs,
+      makeToolFailure("TOOL_NOT_FOUND", `Tool ${normalizedName} not found`, {
+        toolCallId: normalizedToolCallId,
+        tool: normalizedName,
+      }),
+    );
+    return envelopeToToolResult(envelope, normalizedName);
+  }
   const capture = state.trainer?.activeCapture || null;
   const coaching = trainerNormalizeCoachingState(state.trainer?.coaching);
   if (capture && coaching.enabled) {
-    const normalizedToolCallId = typeof toolCallId === "string" && toolCallId.trim() ? toolCallId.trim() : randomId("tc");
     const pendingEvent = await trainerAppendEvent(
       capture,
       "tool.call.pending",
@@ -2336,6 +2460,50 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "http_request": {
       const envelope = await runHttpRequest(params || {}, "http_request");
       return envelopeToToolResult(envelope, "http_request");
+    }
+    case "trainer.list_runs": {
+      const envelope = await runTrainerListRuns(params || {}, "trainer.list_runs");
+      return envelopeToToolResult(envelope, "trainer.list_runs");
+    }
+    case "trainer.get_run": {
+      const envelope = await runTrainerGetRun(params || {}, "trainer.get_run");
+      return envelopeToToolResult(envelope, "trainer.get_run");
+    }
+    case "trainer.get_event": {
+      const envelope = await runTrainerGetEvent(params || {}, "trainer.get_event");
+      return envelopeToToolResult(envelope, "trainer.get_event");
+    }
+    case "trainer.list_actions": {
+      const envelope = await runTrainerListActions(params || {}, "trainer.list_actions");
+      return envelopeToToolResult(envelope, "trainer.list_actions");
+    }
+    case "trainer.invoke_action": {
+      const envelope = await runTrainerInvokeAction(params || {}, "trainer.invoke_action", normalizedToolCallId);
+      return envelopeToToolResult(envelope, "trainer.invoke_action");
+    }
+    case "trainer.list_evidence": {
+      const envelope = await runTrainerListEvidence(params || {}, "trainer.list_evidence");
+      return envelopeToToolResult(envelope, "trainer.list_evidence");
+    }
+    case "trainer.get_transcript_integrity": {
+      const envelope = runTrainerGetTranscriptIntegrity(params || {}, "trainer.get_transcript_integrity");
+      return envelopeToToolResult(envelope, "trainer.get_transcript_integrity");
+    }
+    case "trainer.get_session_context": {
+      const envelope = await runTrainerGetSessionContext(params || {}, "trainer.get_session_context");
+      return envelopeToToolResult(envelope, "trainer.get_session_context");
+    }
+    case "trainer.explain_not_used": {
+      const envelope = await runTrainerExplainNotUsed(params || {}, "trainer.explain_not_used");
+      return envelopeToToolResult(envelope, "trainer.explain_not_used");
+    }
+    case "trainer.delete_trace": {
+      const envelope = await runTrainerDeleteTrace(params || {}, "trainer.delete_trace");
+      return envelopeToToolResult(envelope, "trainer.delete_trace");
+    }
+    case "trainer.clear_traces": {
+      const envelope = await runTrainerClearTraces(params || {}, "trainer.clear_traces");
+      return envelopeToToolResult(envelope, "trainer.clear_traces");
     }
     case "agent_town_ceremony_commit": {
       const envelope = await runAgentTownCeremonyCommit(params || {}, "agent_town_ceremony_commit");
@@ -2438,7 +2606,10 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
 }
 
 function getLiteTools() {
-  return LITE_TOOL_SPECS.map((spec) => ({
+  const specs = trainerNamespaceEnabled()
+    ? LITE_TOOL_SPECS
+    : LITE_TOOL_SPECS.filter((spec) => !isTrainerNamespaceToolName(spec?.name));
+  return specs.map((spec) => ({
     name: spec.name,
     label: spec.label,
     description: spec.description,
@@ -2451,6 +2622,7 @@ function getLiteTools() {
 function getToolRegistryInfo() {
   const tools = getLiteTools();
   return {
+    trainerNamespaceEnabled: trainerNamespaceEnabled(),
     count: tools.length,
     names: tools.map((t) => t.name),
     dispatchPath: LITE_TOOL_DISPATCH_PATH,
@@ -3101,6 +3273,510 @@ async function trainerCompareAttempts({ questId = TRAINER_DEFAULT_QUEST_ID, limi
     toolFailureRates,
     divergence,
   };
+}
+
+function trainerClampInt(value, fallback, min, max) {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function trainerSanitizeAttemptId(value) {
+  return String(value || "").trim();
+}
+
+async function trainerResolveAttemptIdForTool(questId, attemptIdRaw) {
+  const normalizedQuestId = trainerQuestId(questId || TRAINER_DEFAULT_QUEST_ID);
+  const raw = trainerSanitizeAttemptId(attemptIdRaw);
+  if (raw && raw.toLowerCase() !== "latest") {
+    return { questId: normalizedQuestId, attemptId: raw };
+  }
+  const manifests = await trainerListAttemptManifests(normalizedQuestId);
+  const latest = manifests[0];
+  const latestId = String(latest?.attemptId || "").trim();
+  if (!latestId) {
+    throw new Error("ATTEMPT_NOT_FOUND");
+  }
+  return { questId: normalizedQuestId, attemptId: latestId };
+}
+
+function trainerToolResultEnvelopeToData(toolResult) {
+  const text = textFromMessageContent(toolResult?.content || []);
+  const parsed = trainerParseJsonSafe(text, null);
+  if (isPlainObject(parsed) && typeof parsed.ok === "boolean") {
+    return parsed;
+  }
+  if (toolResult?.isError === true) {
+    return makeToolFailure("UNSUPPORTED", text || "Nested tool execution failed");
+  }
+  return makeToolSuccess({ text: text || "" });
+}
+
+async function trainerCollectActionStats({ questId = TRAINER_DEFAULT_QUEST_ID, scanLimit = TRAINER_TOOL_DEFAULT_SCAN_LIMIT } = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const manifests = await trainerListAttemptManifests(normalizedQuestId);
+  const maxAttempts = trainerClampInt(scanLimit, TRAINER_TOOL_DEFAULT_SCAN_LIMIT, 1, TRAINER_TOOL_MAX_RUN_LIMIT);
+  const selected = manifests.slice(0, maxAttempts);
+  const byAction = new Map();
+
+  const ensureAction = (id) => {
+    const key = String(id || "").trim();
+    if (!key) return null;
+    if (!byAction.has(key)) {
+      byAction.set(key, {
+        id: key,
+        params: new Set(),
+        methods: new Set(),
+        urlTemplates: new Set(),
+        invocations: 0,
+        failures: 0,
+        lastSeenAtMs: 0,
+        lastAttemptId: null,
+      });
+    }
+    return byAction.get(key);
+  };
+
+  for (const manifest of selected) {
+    const attemptId = String(manifest?.attemptId || "").trim();
+    if (!attemptId) continue;
+    let bundle;
+    try {
+      bundle = await trainerReadAttemptBundle({ questId: normalizedQuestId, attemptId });
+    } catch {
+      continue;
+    }
+    const events = Array.isArray(bundle?.events) ? bundle.events : [];
+    const requestedByToolCallId = new Map();
+
+    for (const event of events) {
+      if (!isPlainObject(event) || String(event.type || "") !== "tool.call.requested") continue;
+      const name = String(event?.data?.name || "").trim();
+      const toolCallId = String(event?.data?.toolCallId || "").trim();
+      if (!name) continue;
+      const row = ensureAction(name);
+      if (!row) continue;
+      row.invocations += 1;
+      const atMs = Number(event?.atMs || 0);
+      if (Number.isFinite(atMs) && atMs >= row.lastSeenAtMs) {
+        row.lastSeenAtMs = atMs;
+        row.lastAttemptId = attemptId || row.lastAttemptId;
+      }
+      const args = isPlainObject(event?.data?.args) ? event.data.args : {};
+      for (const key of Object.keys(args)) {
+        if (key) row.params.add(String(key));
+      }
+      const method = String(args?.method || "").trim().toUpperCase();
+      if (method) row.methods.add(method);
+      const urlTemplate = String(args?.urlTemplate || args?.url || "").trim();
+      if (urlTemplate) row.urlTemplates.add(urlTemplate);
+      if (toolCallId) requestedByToolCallId.set(toolCallId, name);
+    }
+
+    for (const event of events) {
+      if (!isPlainObject(event) || String(event.type || "") !== "tool.call.executed") continue;
+      const toolCallId = String(event?.data?.toolCallId || "").trim();
+      const explicitName = String(event?.data?.name || "").trim();
+      const name = explicitName || (toolCallId ? requestedByToolCallId.get(toolCallId) : "") || "";
+      if (!name) continue;
+      const row = ensureAction(name);
+      if (!row) continue;
+      if (event?.data?.ok !== true) {
+        row.failures += 1;
+      }
+    }
+  }
+
+  const actions = Array.from(byAction.values())
+    .map((row) => ({
+      id: row.id,
+      source: "trainer_capture",
+      confidence: Math.max(0.1, Math.min(0.99, row.invocations / (row.invocations + 1))),
+      request: {
+        method: row.methods.values().next().value || "GET",
+        urlTemplate: row.urlTemplates.values().next().value || "",
+      },
+      params: Array.from(row.params.values()).sort(),
+      runStats: {
+        invocations: row.invocations,
+        failures: row.failures,
+        successes: Math.max(0, row.invocations - row.failures),
+        lastSeenAtMs: row.lastSeenAtMs || null,
+        lastAttemptId: row.lastAttemptId || null,
+      },
+    }))
+    .sort((a, b) => {
+      const invocationsDelta = Number(b?.runStats?.invocations || 0) - Number(a?.runStats?.invocations || 0);
+      if (invocationsDelta !== 0) return invocationsDelta;
+      return String(a?.id || "").localeCompare(String(b?.id || ""));
+    });
+
+  return { questId: normalizedQuestId, actions, scannedAttempts: selected.length };
+}
+
+async function trainerCollectEvidenceRows({
+  questId = TRAINER_DEFAULT_QUEST_ID,
+  actionId = "",
+  scanLimit = TRAINER_TOOL_DEFAULT_SCAN_LIMIT,
+  limit = TRAINER_TOOL_DEFAULT_EVIDENCE_LIMIT,
+} = {}) {
+  const normalizedQuestId = trainerQuestId(questId);
+  const manifests = await trainerListAttemptManifests(normalizedQuestId);
+  const maxAttempts = trainerClampInt(scanLimit, TRAINER_TOOL_DEFAULT_SCAN_LIMIT, 1, TRAINER_TOOL_MAX_RUN_LIMIT);
+  const maxRows = trainerClampInt(limit, TRAINER_TOOL_DEFAULT_EVIDENCE_LIMIT, 1, TRAINER_TOOL_MAX_EVIDENCE_LIMIT);
+  const selected = manifests.slice(0, maxAttempts);
+  const requestedActionId = String(actionId || "").trim();
+  const rows = [];
+
+  for (const manifest of selected) {
+    const attemptId = String(manifest?.attemptId || "").trim();
+    if (!attemptId) continue;
+    let bundle;
+    try {
+      bundle = await trainerReadAttemptBundle({ questId: normalizedQuestId, attemptId });
+    } catch {
+      continue;
+    }
+    const events = Array.isArray(bundle?.events) ? bundle.events : [];
+    for (const event of events) {
+      if (!isPlainObject(event) || String(event.type || "") !== "tool.call.executed") continue;
+      const name = String(event?.data?.name || "").trim();
+      if (!name) continue;
+      if (requestedActionId && name !== requestedActionId) continue;
+      rows.push({
+        questId: normalizedQuestId,
+        attemptId,
+        seq: Number(event?.seq || 0) || null,
+        atMs: Number(event?.atMs || 0) || null,
+        actionId: name,
+        ok: event?.data?.ok === true,
+        durationMs: Number(event?.data?.durationMs || 0) || 0,
+        errorCode: event?.data?.ok === true ? null : String(event?.data?.error?.code || "UNSUPPORTED"),
+        errorMessage: event?.data?.ok === true ? null : String(event?.data?.error?.message || "Tool execution failed"),
+      });
+    }
+  }
+
+  rows.sort((a, b) => {
+    const atDelta = Number(b?.atMs || 0) - Number(a?.atMs || 0);
+    if (atDelta !== 0) return atDelta;
+    return Number(b?.seq || 0) - Number(a?.seq || 0);
+  });
+  return rows.slice(0, maxRows);
+}
+
+async function runTrainerListRuns(params, toolName = "trainer.list_runs") {
+  const startedAtMs = nowMs();
+  const questId = trainerQuestId(params?.questId || TRAINER_DEFAULT_QUEST_ID);
+  const limit = trainerClampInt(params?.limit, TRAINER_TOOL_DEFAULT_RUN_LIMIT, 1, TRAINER_TOOL_MAX_RUN_LIMIT);
+  const manifests = await trainerListAttemptManifests(questId);
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    questId,
+    runs: manifests.slice(0, limit),
+    totalRuns: manifests.length,
+  }));
+}
+
+async function runTrainerGetRun(params, toolName = "trainer.get_run") {
+  const startedAtMs = nowMs();
+  try {
+    const resolved = await trainerResolveAttemptIdForTool(
+      params?.questId || TRAINER_DEFAULT_QUEST_ID,
+      params?.attemptId || "",
+    );
+    const bundle = await trainerReadAttemptBundle({
+      questId: resolved.questId,
+      attemptId: resolved.attemptId,
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      questId: resolved.questId,
+      attemptId: resolved.attemptId,
+      run: {
+        ...bundle.manifest,
+        events: bundle.events,
+        manifestPath: bundle.manifestPath,
+        eventsPath: bundle.eventsPath,
+      },
+    }));
+  } catch (err) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("NOT_FOUND", String(err?.message || "ATTEMPT_NOT_FOUND")),
+    );
+  }
+}
+
+async function runTrainerGetEvent(params, toolName = "trainer.get_event") {
+  const startedAtMs = nowMs();
+  const seq = trainerClampInt(params?.seq, 0, 0, 9e9);
+  if (seq <= 0) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing or invalid seq"));
+  }
+  try {
+    const resolved = await trainerResolveAttemptIdForTool(
+      params?.questId || TRAINER_DEFAULT_QUEST_ID,
+      params?.attemptId || "",
+    );
+    const bundle = await trainerReadAttemptBundle({
+      questId: resolved.questId,
+      attemptId: resolved.attemptId,
+    });
+    const events = Array.isArray(bundle?.events) ? bundle.events : [];
+    const event = events.find((row) => Number(row?.seq || 0) === seq) || null;
+    if (!event) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", "EVENT_NOT_FOUND", {
+        questId: resolved.questId,
+        attemptId: resolved.attemptId,
+        seq,
+      }));
+    }
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      questId: resolved.questId,
+      attemptId: resolved.attemptId,
+      seq,
+      event,
+    }));
+  } catch (err) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", String(err?.message || "ATTEMPT_NOT_FOUND")));
+  }
+}
+
+async function runTrainerListActions(params, toolName = "trainer.list_actions") {
+  const startedAtMs = nowMs();
+  const scanLimit = trainerClampInt(params?.scanLimit, TRAINER_TOOL_DEFAULT_SCAN_LIMIT, 1, TRAINER_TOOL_MAX_RUN_LIMIT);
+  const limit = trainerClampInt(params?.limit, TRAINER_TOOL_DEFAULT_RUN_LIMIT, 1, TRAINER_TOOL_MAX_RUN_LIMIT);
+  const collected = await trainerCollectActionStats({
+    questId: params?.questId || TRAINER_DEFAULT_QUEST_ID,
+    scanLimit,
+  });
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    questId: collected.questId,
+    actions: collected.actions.slice(0, limit),
+    totalActions: collected.actions.length,
+    scannedAttempts: collected.scannedAttempts,
+  }));
+}
+
+async function runTrainerInvokeAction(params, toolName = "trainer.invoke_action", toolCallId = null) {
+  const startedAtMs = nowMs();
+  const actionId = String(params?.actionId || "").trim();
+  if (!actionId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing actionId"));
+  }
+  if (actionId.startsWith("trainer.")) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("INVALID_ARGUMENTS", "trainer.invoke_action only supports non-trainer actionIds"),
+    );
+  }
+  const knownTools = new Set(getLiteTools().map((tool) => String(tool?.name || "")));
+  if (!knownTools.has(actionId)) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", `Unknown actionId: ${actionId}`));
+  }
+
+  const actionParams = isPlainObject(params?.params) ? params.params : {};
+  const nestedCallId = typeof toolCallId === "string" && toolCallId.trim() ? `${toolCallId}:invoke` : randomId("tc");
+  const nestedToolResult = await dispatchLiteTool(actionId, actionParams, undefined, undefined, nestedCallId);
+  const nestedEnvelope = trainerToolResultEnvelopeToData(nestedToolResult);
+  if (nestedEnvelope?.ok !== true) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure(
+        String(nestedEnvelope?.error?.code || "UNSUPPORTED"),
+        String(nestedEnvelope?.error?.message || "Action invocation failed"),
+        {
+          actionId,
+          nested: nestedEnvelope?.error?.details || {},
+        },
+        nestedEnvelope?.error?.retryable === true,
+      ),
+    );
+  }
+
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    actionId,
+    request: { params: actionParams },
+    response: nestedEnvelope?.data ?? null,
+    nestedTool: actionId,
+  }));
+}
+
+async function runTrainerListEvidence(params, toolName = "trainer.list_evidence") {
+  const startedAtMs = nowMs();
+  const rows = await trainerCollectEvidenceRows({
+    questId: params?.questId || TRAINER_DEFAULT_QUEST_ID,
+    actionId: params?.actionId || "",
+    scanLimit: params?.scanLimit,
+    limit: params?.limit,
+  });
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    evidence: rows,
+    count: rows.length,
+  }));
+}
+
+function runTrainerGetTranscriptIntegrity(_params, toolName = "trainer.get_transcript_integrity") {
+  const startedAtMs = nowMs();
+  const transcriptIntegrity = computeTranscriptToolStats(state.transcript);
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    transcriptIntegrity,
+    transcriptLength: Array.isArray(state.transcript) ? state.transcript.length : 0,
+  }));
+}
+
+async function runTrainerGetSessionContext(params, toolName = "trainer.get_session_context") {
+  const startedAtMs = nowMs();
+  const runtimeSnapshot = await resolveRuntimeSnapshotFromInput({
+    runtimeContext: params?.runtimeContext || null,
+    runtimeState: params?.runtimeState || null,
+  });
+  const runtimeSections = buildRuntimeContextSections(runtimeSnapshot);
+  const transcriptIntegrity = computeTranscriptToolStats(state.transcript);
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    sessionContext: {
+      sessionId: state.sessionId || null,
+      generatedAtMs: nowMs(),
+      runtimeContext: runtimeSections.runtimeContext,
+      runtimeAppState: runtimeSections.runtimeAppStateSummary,
+      runtimeContextPrompt: runtimeSections.runtimeContextPrompt || null,
+      runtimeExperiencePrompt: runtimeSections.runtimeExperiencePrompt || null,
+      activeSkillPrompt: runtimeSections.activeSkillPrompt || null,
+      coopChatPrompt: runtimeSections.coopChatPrompt || null,
+      contextSections: runtimeSections.contextSections,
+      combinedContext: runtimeSections.combinedContext || "",
+      lastLlmInput: state.lastLlmInput || null,
+      transcriptIntegrity,
+      trainer: {
+        activeCaptureAttemptId: state.trainer?.activeCapture?.attemptId || null,
+        coaching: trainerNormalizeCoachingState(state.trainer?.coaching),
+      },
+    },
+    runtimeContext: runtimeSections.runtimeContext,
+  }));
+}
+
+async function runTrainerExplainNotUsed(params, toolName = "trainer.explain_not_used") {
+  const startedAtMs = nowMs();
+  const actionId = String(params?.actionId || "").trim();
+  const collected = await trainerCollectActionStats({
+    questId: params?.questId || TRAINER_DEFAULT_QUEST_ID,
+    scanLimit: params?.scanLimit,
+  });
+  const action = collected.actions.find((row) => String(row?.id || "") === actionId) || null;
+  const evidence = await trainerCollectEvidenceRows({
+    questId: collected.questId,
+    actionId,
+    scanLimit: params?.scanLimit,
+    limit: 10,
+  });
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    actionId: actionId || null,
+    actionExists: !!action,
+    attempted: Number(action?.runStats?.invocations || 0) > 0,
+    matchedCalls: Number(action?.runStats?.invocations || 0),
+    missingResults: 0,
+    notUsed: actionId ? Number(action?.runStats?.invocations || 0) === 0 : null,
+    reasonCodes: actionId
+      ? (Number(action?.runStats?.invocations || 0) > 0 ? [] : ["NO_MATCHING_TOOL_CALLS"])
+      : [],
+    evidenceCount: evidence.length,
+    freshEvidenceCount: evidence.length,
+    evidence,
+    diagnostics: {
+      totalActions: collected.actions.length,
+      scannedAttempts: collected.scannedAttempts,
+    },
+  }));
+}
+
+async function runTrainerDeleteTrace(params, toolName = "trainer.delete_trace") {
+  const startedAtMs = nowMs();
+  let resolved;
+  try {
+    resolved = await trainerResolveAttemptIdForTool(
+      params?.questId || TRAINER_DEFAULT_QUEST_ID,
+      params?.attemptId || "",
+    );
+  } catch (err) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", String(err?.message || "ATTEMPT_NOT_FOUND")));
+  }
+
+  const prefix = `${trainerAttemptRoot(resolved.questId, resolved.attemptId)}/`;
+  const paths = await vfsListPaths(prefix);
+  if (!paths.length) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("NOT_FOUND", "ATTEMPT_NOT_FOUND"));
+  }
+
+  const decision = await requestApproval({
+    title: "Approval",
+    body: `Delete trainer trace ${resolved.attemptId}`,
+  });
+  if (decision !== "approve") {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "Trainer trace delete rejected"));
+  }
+
+  await deleteByKeys("vfs", paths);
+  if (String(state.trainer?.activeCapture?.attemptId || "") === resolved.attemptId) {
+    state.trainer.activeCapture = null;
+  }
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    questId: resolved.questId,
+    attemptId: resolved.attemptId,
+    deleted: true,
+    deletedPaths: paths.length,
+  }));
+}
+
+async function runTrainerClearTraces(params, toolName = "trainer.clear_traces") {
+  const startedAtMs = nowMs();
+  const questIdRaw = String(params?.questId || "").trim();
+  const prefix = questIdRaw
+    ? `${trainerAttemptsRoot(trainerQuestId(questIdRaw))}/`
+    : `${TRAINER_ROOT_PATH}/quests/`;
+  const allPaths = await vfsListPaths(prefix);
+  const tracePaths = allPaths.filter((path) => String(path || "").includes("/attempts/"));
+  if (!tracePaths.length) {
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      deleted: true,
+      deletedPaths: 0,
+      deletedAttempts: 0,
+      scope: questIdRaw ? trainerQuestId(questIdRaw) : "all",
+    }));
+  }
+
+  const decision = await requestApproval({
+    title: "Approval",
+    body: questIdRaw ? `Clear trainer traces for ${trainerQuestId(questIdRaw)}` : "Clear all trainer traces",
+  });
+  if (decision !== "approve") {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "Trainer trace clear rejected"));
+  }
+
+  await deleteByKeys("vfs", tracePaths);
+  state.trainer.activeCapture = null;
+  const attemptRoots = new Set(
+    tracePaths
+      .map((path) => {
+        const normalized = String(path || "");
+        const marker = "/attempts/";
+        const idx = normalized.indexOf(marker);
+        if (idx < 0) return "";
+        const suffix = normalized.slice(idx + marker.length);
+        const parts = suffix.split("/");
+        if (!parts.length || !parts[0]) return "";
+        return normalized.slice(0, idx + marker.length + parts[0].length);
+      })
+      .filter(Boolean),
+  );
+  return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+    deleted: true,
+    deletedPaths: tracePaths.length,
+    deletedAttempts: attemptRoots.size,
+    scope: questIdRaw ? trainerQuestId(questIdRaw) : "all",
+  }));
 }
 
 function trainerClone(value) {
