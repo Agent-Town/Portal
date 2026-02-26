@@ -58,8 +58,8 @@ function setStatus(msg) {
 }
 
 const ERROR_MESSAGES = {
-  AG0_SDK_NOT_BUNDLED: 'ERC-8004 minting is disabled until the Agent0 SDK is bundled.',
-  AG0_SDK_LOAD_FAILED: 'Unable to load the Agent0 SDK. Check your network or try again.'
+  AG0_SDK_NOT_BUNDLED: 'ERC-8004 minting is disabled until the local Agent0 SDK bundle is built.',
+  AG0_SDK_LOAD_FAILED: 'Unable to load the local Agent0 SDK bundle. Run: npm run build:agent0-sdk'
 };
 
 function setError(msg) {
@@ -157,7 +157,6 @@ const PUBLIC_MEDIA_PROMPT_MAX = 280;
 const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const AUTO_LOCK_MS = null;
 const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
-const AGENT0_SDK_CDN_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
 const OPENCLAW_DB_NAME = 'openclaw-lite';
 const OPENCLAW_DB_VERSION = 1;
 const AGENT_STATE_KIND = 'openclaw-lite-state';
@@ -171,6 +170,7 @@ const AGENT_STATE_MAX_BYTES = 8 * 1024 * 1024;
 const AGENT_STATE_MAX_META_RECORDS = 2048;
 const AGENT_STATE_MAX_VFS_RECORDS = 20000;
 const AGENT_STATE_MAX_CHECKPOINT_RECORDS = 5000;
+const AGENT0_SDK_BUILD_HINT = 'Run: npm run build:agent0-sdk';
 const MIND_DEFAULT_PROVIDER = 'openai';
 const MIND_DEFAULT_MODEL = 'gpt-4o-mini';
 const MIND_AUTH_API_KEY = 'api-key';
@@ -219,21 +219,16 @@ let mindOpenAiCodexOAuthMessageListenerBound = false;
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
 
-  let localMod = null;
   try {
-    localMod = await import(AGENT0_SDK_ESM_URL);
+    const localMod = await import(AGENT0_SDK_ESM_URL);
+    if (!localMod || localMod.AG0_SDK_BUNDLED === false) {
+      throw new Error('AG0_SDK_NOT_BUNDLED');
+    }
+    return localMod;
   } catch {
-    localMod = null;
+    if (statusNode) statusNode.textContent = AGENT0_SDK_BUILD_HINT;
+    throw new Error('AG0_SDK_NOT_BUNDLED');
   }
-
-  if (!localMod || localMod.AG0_SDK_BUNDLED === false) {
-    const ok = confirm('Agent0 SDK is not bundled locally. Load it from the official CDN for this mint?');
-    if (!ok) throw new Error('AG0_SDK_NOT_BUNDLED');
-    if (statusNode) statusNode.textContent = 'Loading Agent0 SDK…';
-    return await import(AGENT0_SDK_CDN_URL);
-  }
-
-  return localMod;
 }
 
 // --- base64 helpers ---

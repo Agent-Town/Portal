@@ -1,0 +1,8 @@
+[submodule "vendors/openclaw-lite-main/vendor/openclaw-main"]
+	path = vendors/openclaw-lite-main/vendor/openclaw-main
+	url = https://github.com/openclaw/openclaw.git
+	branch = main
+
+[submodule "vendors/agent0-ts"]
+	path = vendors/agent0-ts
+	url = https://github.com/Agent-Town/agent0-ts.git
