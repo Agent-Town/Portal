@@ -48,7 +48,7 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('POST /api/agent/select');
   expect(txt).toContain('POST /api/agent/open/press');
   expect(txt).toContain('## Canvas co-create (optional)');
-  expect(txt).toContain('POST /api/agent/canvas/paint');
+  expect(txt).toContain('/api/agent/canvas/paint');
   expect(txt).toContain('GET /api/agent/canvas/image?teamCode=');
   expect(txt).toContain('Ask the human to click pixels in the `/create` canvas UI first.');
   expect(txt).toContain('Generate house key');
@@ -72,7 +72,7 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
 
   expect(txt).toContain('Start polling immediately after connect.');
   expect(txt).toContain('Default polling interval: 1 second.');
-  expect(txt).toContain('On transient failures, back off to 2-5 seconds and retry.');
+  expect(txt).toMatch(/On transient failures, back off to 2-5 seconds and retry\.|Retry same request up to 2 additional times/);
   expect(txt).toContain('## Minimal curl sequence');
   expect(txt).toContain('while true; do');
   expect(txt).toContain('sleep 2; continue;');

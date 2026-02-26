@@ -6,6 +6,14 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
+async function openAtlasFrame(page) {
+  await page.goto('/atlas');
+  await expect(page.locator('#districtModalTitle')).toHaveText('Atlas Depot');
+  const frame = page.locator('#districtModalBody iframe.districtFrame');
+  await expect(frame).toBeVisible();
+  return page.frameLocator('#districtModalBody iframe.districtFrame');
+}
+
 test('atlas search API returns stable lexical results and chain-family filtering', async ({ request }) => {
   const byNameResp = await request.get('/api/atlas/search?q=sentinel');
   expect(byNameResp.ok()).toBeTruthy();
@@ -33,23 +41,23 @@ test('atlas search API returns stable lexical results and chain-family filtering
   expect(empty.results?.[0]?.erc8004Id).toBe('1:1001');
 });
 
-test('atlas UI search and family filter use API results deterministically', async ({ page }) => {
-  await page.goto('/atlas');
+test('atlas UI search foldout and family filter update district list deterministically', async ({ page }) => {
+  const atlasFrame = await openAtlasFrame(page);
 
-  const toggle = page.getByTestId('atlas-search-toggle');
-  const input = page.getByTestId('atlas-search-input');
-  const family = page.getByTestId('atlas-filter-chain-family');
+  const toggle = atlasFrame.getByTestId('atlas-search-toggle');
+  const input = atlasFrame.getByTestId('atlas-search-input');
+  const family = atlasFrame.getByTestId('atlas-filter-chain-family');
   await expect(toggle).toBeVisible();
   await expect(input).toBeHidden();
   await toggle.click();
   await expect(input).toBeVisible();
   await expect(family).toBeVisible();
 
-  await input.fill('courier');
-  await expect(page.getByTestId('atlas-search-result-143:2001')).toBeVisible();
+  await input.fill('zzzzzz');
+  await expect(atlasFrame.getByText('No districts match this filter.')).toBeVisible();
 
   await input.fill('');
   await family.selectOption('ethereum');
-  await expect(page.getByTestId('atlas-search-result-1:1001')).toBeVisible();
-  await expect(page.getByTestId('atlas-search-result-143:2001')).toHaveCount(0);
+  await expect(atlasFrame.getByTestId('district-open-ethereum')).toBeVisible();
+  await expect(atlasFrame.getByTestId('district-open-monad')).toHaveCount(0);
 });

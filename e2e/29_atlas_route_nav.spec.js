@@ -6,9 +6,17 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('atlas route renders and nav exposes Atlas link across core pages', async ({ page }) => {
+async function openAtlasFrame(page) {
   await page.goto('/atlas');
-  await expect(page.getByTestId('atlas-root')).toBeVisible();
+  await expect(page.locator('#districtModalTitle')).toHaveText('Atlas Depot');
+  const frame = page.locator('#districtModalBody iframe.districtFrame');
+  await expect(frame).toBeVisible();
+  return page.frameLocator('#districtModalBody iframe.districtFrame');
+}
+
+test('atlas route renders and nav exposes Atlas link across core pages', async ({ page }) => {
+  const atlasFrame = await openAtlasFrame(page);
+  await expect(atlasFrame.getByTestId('atlas-root')).toBeVisible();
 
   const pages = ['/leaderboard', '/house', '/s/sh_missing'];
   for (const path of pages) {
