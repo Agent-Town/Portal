@@ -206,12 +206,9 @@ async function mintErc8004Identity() {
     if (!ok) return;
   }
 
-  // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
-  // Prefer a vendored same-origin bundle for reliability (CSP/adblock/CDN flake).
-  // Fallback to esm.sh if the vendored import fails.
+  // Use the local Agent-Town fork bundle from /public/vendor only.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.1.4.2.bundle.mjs';
-  const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.mjs';
 
   let mod;
   if (window.__AG0_SDK_MOCK) {
@@ -220,14 +217,9 @@ async function mintErc8004Identity() {
     try {
       mod = await import(AGENT0_SDK_LOCAL_URL);
     } catch (eLocal) {
-      console.warn('Agent0 SDK local import failed; falling back to esm.sh', eLocal);
-      try {
-        mod = await import(AGENT0_SDK_ESM_URL);
-      } catch (eRemote) {
-        console.error('Agent0 SDK esm.sh import also failed', eRemote);
-        const detail = (eRemote && (eRemote.stack || eRemote.message)) || String(eRemote);
-        throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}`);
-      }
+      console.error('Agent0 SDK local import failed', eLocal);
+      const detail = (eLocal && (eLocal.stack || eLocal.message)) || String(eLocal);
+      throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}. Run: npm run build:agent0-sdk`);
     }
   }
 

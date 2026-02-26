@@ -13,6 +13,28 @@ Common variables (optional):
 - `USE_LOCAL_POSTGRES` (set to `true` to auto-start local Postgres in Docker)
 - `SOLANA_RPC_URL`, `INDEXER_URL`, `INDEXER_API_KEY` (Solana script)
 
+## Local Agent0 SDK bundle (fork)
+
+The app loads ERC-8004 minting SDK code from a local bundle only (`public/vendor/agent0-sdk.mjs`).
+No CDN fallback is used.
+
+Setup + build:
+
+```bash
+cd /Users/robin/.codex/worktrees/729b/Portal
+git submodule update --init --recursive vendors/agent0-ts
+npm run build:agent0-sdk
+```
+
+Output artifacts:
+- `public/vendor/agent0-sdk.mjs`
+- `public/vendor/agent0-sdk.build-info.json`
+
+Notes:
+- Source fork checkout: `vendors/agent0-ts` (currently `https://github.com/Agent-Town/agent0-ts.git`)
+- Build script: `scripts/build_agent0_sdk_bundle.mjs`
+- Fast re-bundle after local fork edits (skip install/build): `npm run bundle:agent0-sdk`
+
 ## Scripts
 
 ### `pull-colosseum-agent-hackathon-projects.ts`
@@ -239,6 +261,144 @@ Prompt output includes stable mapping fields for post-generation ingest:
 - `outputFileBase`
 - `outputFilename`
 - `prompt`
+
+### `build_erc8004_score_image_plan.js`
+
+Deterministic local-data planner for Atlas + image generation prioritization.
+It reads:
+- `data/erc8004.sqlite3` (ingested 8004scan agent/chain rows)
+- `erc8004_solana_agents` in the same SQLite (Solana devnet ingest)
+- backend store anchors/houses (for `erc8004Id -> houseId` ingest mapping)
+
+Default planning scope is **mainnet-only** for per-agent image spend.
+Testnet agents are excluded from per-agent prompts and emitted as generic testnet-chain prompts instead.
+Solana agents are included by default; `quality_score > 0` are treated as unique-image candidates and the rest map to a shared Solana chain-default image.
+
+It produces:
+- verified score/signal availability report (including `total_score`, `rank` presence, endpoint/x402/url/service signals)
+- ranked chain distribution (district/family level + chain/network split)
+- ranked worthy-agent shortlist for image generation
+- prompt artifacts in `txt`, `jsonl`, and `csv`
+- ingest mapping artifacts for assigning generated images back to houses/storefronts
+- clustering metrics (`before` vs `after`) and estimated image volume/cost
+
+Run (recommended):
+
+```bash
+npm run plan:erc8004-score-images
+```
+
+Run (explicit options):
+
+```bash
+node scripts/build_erc8004_score_image_plan.js \
+  --sqlite-path ./data/erc8004.sqlite3 \
+  --out-dir ./data/erc8004-score-image-plan \
+  --style-anchor-file ./scripts/style_anchor_agent_town_wild_west.txt
+```
+
+Common flags:
+- `--store-path <path>` override backend store sqlite
+- `--top-chain-limit <n>` max unique chain prompts
+- `--chain-priority-min <n>` chain score threshold for unique chain prompts
+- `--agent-score-min <n>` minimum `total_score` for unique-agent prompts
+- `--solana-prefix <prefix>` Solana ERC-8004 id prefix (default `solana-devnet`)
+- `--solana-quality-min <n>` Solana unique cutoff uses `quality_score > n` (default `0`)
+- `--exclude-solana` ignore Solana agents in the plan
+- `--fallback-assignment <chain-default|shared-category>` fallback mode for non-special agents (default `chain-default`)
+- `--exclude-agent-file <path>` optional list of ERC-8004 IDs forced to generic fallback
+- `--exclude-agent-id <id>` repeatable manual ERC-8004 ID exclusion to generic fallback
+- `--low-score-max <n>` low-score cutoff for shared-category fallback mode
+- `--shortlist-limit <n>` max rows in ranked worthy shortlist
+- `--batch-size <n>` prompt rows per batch file
+- `--include-testnets` include testnet agents in per-agent planning
+- `--include-existing-share-hero`
+- `--candidates-per-prompt <n>`
+- `--estimated-unit-cost-usd <n>`
+
+Expected output tree:
+- `./data/erc8004-score-image-plan/summary.json`
+- `./data/erc8004-score-image-plan/analysis/signal-availability.json`
+- `./data/erc8004-score-image-plan/analysis/solana-signal-availability.json`
+- `./data/erc8004-score-image-plan/analysis/ranked-chain-distribution.json`
+- `./data/erc8004-score-image-plan/analysis/ranked-chain-distribution.csv`
+- `./data/erc8004-score-image-plan/analysis/ranked-chain-network-split.json`
+- `./data/erc8004-score-image-plan/analysis/ranked-chain-network-split.csv`
+- `./data/erc8004-score-image-plan/analysis/testnet-chain-distribution.json`
+- `./data/erc8004-score-image-plan/analysis/testnet-chain-distribution.csv`
+- `./data/erc8004-score-image-plan/analysis/ranked-worthy-agents.jsonl`
+- `./data/erc8004-score-image-plan/analysis/ranked-worthy-agents.csv`
+- `./data/erc8004-score-image-plan/prompts/all-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/all-prompts.jsonl`
+- `./data/erc8004-score-image-plan/prompts/all-prompts.csv`
+- `./data/erc8004-score-image-plan/prompts/chain-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/chain-default-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/unique-agent-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/shared-category-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/testnet-generic-chain-prompts.txt`
+- `./data/erc8004-score-image-plan/prompts/testnet-generic-chain-prompts.jsonl`
+- `./data/erc8004-score-image-plan/prompts/batches/batch-*.txt`
+- `./data/erc8004-score-image-plan/ingest/agent-image-map.csv`
+- `./data/erc8004-score-image-plan/ingest/agent-image-map.jsonl`
+- `./data/erc8004-score-image-plan/ingest/chain-image-map.csv`
+- `./data/erc8004-score-image-plan/ingest/chain-image-map.jsonl`
+
+`agent-image-map` now includes source-aware fields:
+- `source` (`evm` or `solana`)
+- `qualityScore`, `confidence`, `riskScore` (for Solana rows)
+- `assignmentKind` (`unique-agent`, `chain-default`, or `shared-category`)
+
+### `export_erc8004_family_score_lists.js`
+
+Builds per-family line lists for image generation with score/coverage constraints.
+
+Selection rules:
+- Include score `>=80` in each family.
+- If selected rows are `<50`, fill using score `60-79`.
+- Ensure at least `10` per chain in each family, or all chain agents if fewer.
+- Default scope is **mainnet-only** (`--include-testnets` to override).
+
+Run:
+
+```bash
+node scripts/export_erc8004_family_score_lists.js \
+  --sqlite-path ./data/erc8004.sqlite3 \
+  --out-dir ./data/erc8004-family-score-lists \
+  --min-high-score 80 \
+  --fill-min-score 60 \
+  --target-per-family 50 \
+  --min-per-chain 10
+```
+
+Optional:
+- `--include-testnets` include testnet agents in family lists.
+- `--exclude-agent-file <path>` remove IDs from all family lists.
+- `--exclude-agent-id <id>` repeatable ID removal.
+
+Expected outputs:
+- `./data/erc8004-family-score-lists/families/<family>.txt` (one agent per line)
+- `./data/erc8004-family-score-lists/families/<family>.csv`
+- `./data/erc8004-family-score-lists/summary.csv`
+- `./data/erc8004-family-score-lists/summary.json`
+
+### `optimize_atlas_district_images.sh`
+
+Converts district style source images (`png/jpg/jpeg`) into `.webp` variants used by Atlas map cards.
+
+Run:
+
+```bash
+npm run optimize:atlas-district-images
+```
+
+Options:
+- `ATLAS_WEBP_QUALITY=<1-100>` (default `74`)
+- `ATLAS_WEBP_MAX_WIDTH=<px>` (default `1280`)
+- positional arg `<src-dir>` defaults to `./public/images/districts_style_images`
+
+Expected output:
+- one `.webp` file per district style source image in `./public/images/districts_style_images`
+- printed summary with total bytes before/after and savings percentage
 
 ### `export_auto_whisk_prompt_files.js`
 
