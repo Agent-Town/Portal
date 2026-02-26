@@ -18,7 +18,7 @@ const { loadDotEnv } = require('./env');
 loadDotEnv();
 
 const { parseCookies, nowIso, randomHex } = require('./util');
-const { readStore, writeStore } = require('./store');
+const { readStore, writeStore, getStorePath } = require('./store');
 const { getAtlasSnapshot, searchAtlasAgents } = require('./atlas');
 const { createPonyTransportService } = require('./ponyTransport');
 const { createServerHouseVaultBackend } = require('./houseVaultBackend');
@@ -6441,6 +6441,22 @@ function buildLeaderboard(store) {
   return { teams, referralsTotal };
 }
 
+const ATLAS_SQLITE_PATH = path.join(process.cwd(), 'data', 'erc8004.sqlite3');
+const ATLAS_STORE_CACHE_TTL_MS = 10 * 1000;
+const ATLAS_DISTRICT_CACHE_TTL_MS = 20 * 1000;
+const ATLAS_DISTRICT_CACHE_MAX = 220;
+const ATLAS_DISTRICT_MAX_LIMIT = 80;
+const ATLAS_PREFETCH_IMAGE_COUNT = 8;
+
+let atlasStoreContextCache = {
+  signature: '',
+  expiresAt: 0,
+  optedOutSet: new Set(),
+  mediaByErcId: new Map()
+};
+const atlasDistrictSummaryCache = new Map();
+const atlasDistrictAgentsCache = new Map();
+
 function buildAtlasMediaByErc8004Id(store) {
   const out = new Map();
   const housesById = new Map();
@@ -6512,6 +6528,281 @@ function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
   });
 }
 
+function fileSignature(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return `${path.resolve(filePath)}:${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return `${path.resolve(filePath)}:missing`;
+  }
+}
+
+function currentAtlasDataSignature() {
+  return `${fileSignature(ATLAS_SQLITE_PATH)}|${fileSignature(getStorePath())}`;
+}
+
+function pruneAtlasCache(cache, maxEntries = ATLAS_DISTRICT_CACHE_MAX) {
+  if (cache.size <= maxEntries) return;
+  const entries = [...cache.entries()].sort((a, b) => Number(a[1]?.touchedAt || 0) - Number(b[1]?.touchedAt || 0));
+  const removeCount = Math.max(1, cache.size - maxEntries);
+  for (let i = 0; i < removeCount; i += 1) {
+    cache.delete(entries[i][0]);
+  }
+}
+
+function getAtlasStoreContext() {
+  const signature = currentAtlasDataSignature();
+  const now = Date.now();
+  if (atlasStoreContextCache.signature === signature && atlasStoreContextCache.expiresAt > now) {
+    return atlasStoreContextCache;
+  }
+
+  const store = readStore();
+  const nextContext = {
+    signature,
+    expiresAt: now + ATLAS_STORE_CACHE_TTL_MS,
+    optedOutSet: buildOptedOutErc8004Set(store),
+    mediaByErcId: buildAtlasMediaByErc8004Id(store)
+  };
+  if (atlasStoreContextCache.signature && atlasStoreContextCache.signature !== signature) {
+    atlasDistrictSummaryCache.clear();
+    atlasDistrictAgentsCache.clear();
+  }
+  atlasStoreContextCache = nextContext;
+  return nextContext;
+}
+
+function toFiniteNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function toEpochMs(value) {
+  const text = String(value || '').trim();
+  if (!text) return 0;
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function normalizeDistrictText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeDistrictSearchType(value) {
+  return normalizeDistrictText(value) === 'semantic' ? 'semantic' : 'keyword';
+}
+
+function normalizeDistrictSort(value) {
+  const key = normalizeDistrictText(value);
+  if (key === 'score_asc') return 'score_asc';
+  if (key === 'updated_desc') return 'updated_desc';
+  if (key === 'updated_asc') return 'updated_asc';
+  if (key === 'relevance_desc') return 'relevance_desc';
+  if (key === 'relevance_asc') return 'relevance_asc';
+  return 'score_desc';
+}
+
+function normalizeDistrictNetwork(value) {
+  const key = normalizeDistrictText(value);
+  if (key === 'all') return 'all';
+  if (key === 'test' || key === 'testnet') return 'testnet';
+  return 'mainnet';
+}
+
+function parseDistrictLimit(value, fallback = 24) {
+  const raw = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(raw)) return fallback;
+  return Math.max(1, Math.min(ATLAS_DISTRICT_MAX_LIMIT, raw));
+}
+
+function encodeDistrictCursor(offset) {
+  const payload = JSON.stringify({ offset: Math.max(0, Number(offset) || 0) });
+  return Buffer.from(payload, 'utf8').toString('base64url');
+}
+
+function decodeDistrictCursor(rawCursor) {
+  const raw = String(rawCursor || '').trim();
+  if (!raw) return 0;
+  try {
+    const text = Buffer.from(raw, 'base64url').toString('utf8');
+    const payload = JSON.parse(text);
+    const offset = Number(payload?.offset);
+    if (!Number.isFinite(offset) || offset < 0) return 0;
+    return Math.floor(offset);
+  } catch {
+    return 0;
+  }
+}
+
+function getDistrictVisibleAgents(snapshot, districtKey, optedOutSet, mediaByErcId, network = 'all') {
+  const normalizedNetwork = normalizeDistrictNetwork(network);
+  return (snapshot.agents || [])
+    .filter((agent) => agent?.districtKey === districtKey)
+    .filter((agent) => {
+      if (normalizedNetwork === 'all') return true;
+      const networkType = normalizeDistrictText(agent?.networkType || 'mainnet');
+      return networkType === normalizedNetwork;
+    })
+    .filter((agent) => !optedOutSet.has(agent.erc8004Id))
+    .map((agent) => withAtlasAgentMedia(agent, mediaByErcId));
+}
+
+function scoreDistrictQuery(agent, queryText, searchType) {
+  const q = normalizeDistrictText(queryText);
+  if (!q) return 0;
+
+  const id = normalizeDistrictText(agent?.erc8004Id);
+  const name = normalizeDistrictText(agent?.name);
+  const description = normalizeDistrictText(agent?.description);
+  const categories = Array.isArray(agent?.categories) ? agent.categories.map((row) => normalizeDistrictText(row)).filter(Boolean) : [];
+  const haystack = [
+    id,
+    name,
+    description,
+    normalizeDistrictText(agent?.agentUrl),
+    normalizeDistrictText(agent?.mcpEndpoint),
+    normalizeDistrictText(agent?.a2aEndpoint),
+    normalizeDistrictText(agent?.oasfEndpoint),
+    ...categories
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  let score = 0;
+  if (id === q) score += 900;
+  else if (id.startsWith(q)) score += 700;
+  else if (id.includes(q)) score += 560;
+  if (name === q) score += 820;
+  else if (name.startsWith(q)) score += 650;
+  else if (name.includes(q)) score += 480;
+  if (description.includes(q)) score += 180;
+
+  const tokens = q.split(/\s+/).filter((token) => token.length >= 2);
+  for (const token of tokens) {
+    if (haystack.includes(token)) score += 70;
+    if (searchType === 'semantic') {
+      if (token === 'mcp' && agent?.hasMcp) score += 190;
+      if (token === 'a2a' && agent?.hasA2a) score += 190;
+      if ((token === 'x402' || token === 'pay') && agent?.x402Supported) score += 170;
+      if ((token === 'verified' || token === 'endpoint') && agent?.isEndpointVerified) score += 150;
+      if ((token === 'web' || token === 'site') && agent?.hasWeb) score += 120;
+    }
+  }
+  if (searchType === 'semantic' && q.includes('service') && (agent?.hasMcp || agent?.hasA2a || agent?.isEndpointVerified)) score += 180;
+  return score;
+}
+
+function sortDistrictRows(rows, sortKey) {
+  const direction = sortKey.endsWith('_asc') ? 1 : -1;
+  rows.sort((a, b) => {
+    if (sortKey.startsWith('updated_')) {
+      const byUpdated = (a.updatedAtMs - b.updatedAtMs) * direction;
+      if (byUpdated !== 0) return byUpdated;
+    } else if (sortKey.startsWith('relevance_')) {
+      const byRelevance = (a.queryScore - b.queryScore) * direction;
+      if (byRelevance !== 0) return byRelevance;
+    } else {
+      const leftScore = Number.isFinite(a.qualityScore) ? a.qualityScore : -1;
+      const rightScore = Number.isFinite(b.qualityScore) ? b.qualityScore : -1;
+      const byScore = (leftScore - rightScore) * direction;
+      if (byScore !== 0) return byScore;
+    }
+
+    const byQuery = b.queryScore - a.queryScore;
+    if (byQuery !== 0) return byQuery;
+    const byUpdated = b.updatedAtMs - a.updatedAtMs;
+    if (byUpdated !== 0) return byUpdated;
+    const byName = String(a.name || '').localeCompare(String(b.name || ''));
+    if (byName !== 0) return byName;
+    return String(a.erc8004Id || '').localeCompare(String(b.erc8004Id || ''));
+  });
+}
+
+function pickAgentPrefetchImage(agent) {
+  return (
+    agent?.media?.shareHero?.imageUrl
+    || agent?.media?.agentAvatar?.imageUrl
+    || (typeof agent?.imageUrl === 'string' ? agent.imageUrl : null)
+    || null
+  );
+}
+
+function buildDistrictSummaryFromAgents(district, agents, network = 'all') {
+  const scoreBins = {
+    score0: 0,
+    score1to19: 0,
+    score20to39: 0,
+    score40to59: 0,
+    score60to79: 0,
+    score80plus: 0
+  };
+  const serviceCounts = {
+    hasWeb: 0,
+    hasMcp: 0,
+    hasA2a: 0,
+    endpointVerified: 0,
+    x402Supported: 0,
+    active: 0
+  };
+  let scored = 0;
+  let scoreSum = 0;
+  let scoreGt0 = 0;
+
+  for (const agent of agents) {
+    const score = toFiniteNumber(agent?.qualityScore) ?? 0;
+    scored += 1;
+    scoreSum += score;
+    if (score > 0) scoreGt0 += 1;
+    if (score === 0) scoreBins.score0 += 1;
+    else if (score < 20) scoreBins.score1to19 += 1;
+    else if (score < 40) scoreBins.score20to39 += 1;
+    else if (score < 60) scoreBins.score40to59 += 1;
+    else if (score < 80) scoreBins.score60to79 += 1;
+    else scoreBins.score80plus += 1;
+
+    if (agent?.hasWeb) serviceCounts.hasWeb += 1;
+    if (agent?.hasMcp) serviceCounts.hasMcp += 1;
+    if (agent?.hasA2a) serviceCounts.hasA2a += 1;
+    if (agent?.isEndpointVerified) serviceCounts.endpointVerified += 1;
+    if (agent?.x402Supported) serviceCounts.x402Supported += 1;
+    if (agent?.isActive) serviceCounts.active += 1;
+  }
+
+  return {
+    districtKey: district.key,
+    districtLabel: district.label,
+    network: normalizeDistrictNetwork(network),
+    totals: {
+      agents: agents.length,
+      mainnet: Number(district?.mainnet?.agents || 0),
+      testnet: Number(district?.testnets?.agents || 0),
+      scoreGt0,
+      scored,
+      averageScore: scored > 0 ? Number((scoreSum / scored).toFixed(2)) : 0
+    },
+    scoreBins,
+    serviceCounts
+  };
+}
+
+function cacheGet(cache, key, signature, ttlMs, builder) {
+  const now = Date.now();
+  const hit = cache.get(key);
+  if (hit && hit.signature === signature && hit.expiresAt > now) {
+    hit.touchedAt = now;
+    return hit.value;
+  }
+  const value = builder();
+  cache.set(key, {
+    signature,
+    value,
+    expiresAt: now + ttlMs,
+    touchedAt: now
+  });
+  pruneAtlasCache(cache);
+  return value;
+}
+
 app.get('/api/leaderboard', (_req, res) => {
   const store = readStore();
   const { teams, referralsTotal } = buildLeaderboard(store);
@@ -6526,8 +6817,7 @@ app.get('/api/wall', (_req, res) => {
 
 app.get('/api/atlas/districts', (_req, res) => {
   const snapshot = getAtlasSnapshot();
-  const store = readStore();
-  const optedOutSet = buildOptedOutErc8004Set(store);
+  const { optedOutSet } = getAtlasStoreContext();
   const districts = buildVisibleAtlasDistricts(snapshot, optedOutSet);
   res.json({
     ok: true,
@@ -6536,19 +6826,128 @@ app.get('/api/atlas/districts', (_req, res) => {
   });
 });
 
+app.get('/api/atlas/district/:key/summary', (req, res) => {
+  const key = typeof req.params?.key === 'string' ? req.params.key.trim() : '';
+  if (!key) return res.status(400).json({ ok: false, error: 'MISSING_KEY' });
+  const network = normalizeDistrictNetwork(req.query?.network);
+
+  const snapshot = getAtlasSnapshot();
+  const district = snapshot.districts.find((row) => row.key === key) || null;
+  if (!district) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const storeContext = getAtlasStoreContext();
+  const signature = `${snapshot.meta?.signature || 'snapshot'}|${storeContext.signature}`;
+  const cacheKey = `${key}|${network}`;
+  const summary = cacheGet(
+    atlasDistrictSummaryCache,
+    cacheKey,
+    signature,
+    ATLAS_DISTRICT_CACHE_TTL_MS,
+    () => {
+      const visibleAgents = getDistrictVisibleAgents(snapshot, key, storeContext.optedOutSet, storeContext.mediaByErcId, network);
+      return buildDistrictSummaryFromAgents(district, visibleAgents, network);
+    }
+  );
+
+  return res.json({
+    ok: true,
+    meta: snapshot.meta,
+    district,
+    query: { network },
+    summary
+  });
+});
+
+app.get('/api/atlas/district/:key/agents', (req, res) => {
+  const key = typeof req.params?.key === 'string' ? req.params.key.trim() : '';
+  if (!key) return res.status(400).json({ ok: false, error: 'MISSING_KEY' });
+
+  const network = normalizeDistrictNetwork(req.query?.network);
+  const q = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+  const searchType = normalizeDistrictSearchType(req.query?.searchType);
+  const sort = normalizeDistrictSort(req.query?.sort);
+  const limit = parseDistrictLimit(req.query?.limit, 24);
+  const cursor = typeof req.query?.cursor === 'string' ? req.query.cursor : '';
+  const offset = decodeDistrictCursor(cursor);
+
+  const snapshot = getAtlasSnapshot();
+  const district = snapshot.districts.find((row) => row.key === key) || null;
+  if (!district) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const storeContext = getAtlasStoreContext();
+  const signature = `${snapshot.meta?.signature || 'snapshot'}|${storeContext.signature}`;
+  const normalizedQuery = normalizeDistrictText(q);
+  const cacheKey = [key, network, normalizedQuery, searchType, sort].join('|');
+  const allRows = cacheGet(
+    atlasDistrictAgentsCache,
+    cacheKey,
+    signature,
+    ATLAS_DISTRICT_CACHE_TTL_MS,
+    () => {
+      const rows = getDistrictVisibleAgents(snapshot, key, storeContext.optedOutSet, storeContext.mediaByErcId, network)
+        .map((agent) => {
+          const qualityScore = toFiniteNumber(agent?.qualityScore);
+          return {
+            ...agent,
+            qualityScore,
+            queryScore: scoreDistrictQuery(agent, normalizedQuery, searchType),
+            updatedAtMs: toEpochMs(agent?.updatedAt)
+          };
+        })
+        .filter((agent) => !normalizedQuery || agent.queryScore > 0);
+      sortDistrictRows(rows, sort);
+      return rows;
+    }
+  );
+
+  const start = Math.min(Math.max(0, offset), allRows.length);
+  const end = Math.min(allRows.length, start + limit);
+  const pageRows = allRows
+    .slice(start, end)
+    .map(({ updatedAtMs, ...agent }) => agent);
+  const hasMore = end < allRows.length;
+  const nextCursor = hasMore ? encodeDistrictCursor(end) : null;
+  const prefetch = allRows
+    .slice(end, Math.min(allRows.length, end + ATLAS_PREFETCH_IMAGE_COUNT))
+    .map((agent) => ({
+      erc8004Id: agent.erc8004Id,
+      imageUrl: pickAgentPrefetchImage(agent)
+    }))
+    .filter((row) => typeof row.imageUrl === 'string' && row.imageUrl);
+
+  return res.json({
+    ok: true,
+    meta: snapshot.meta,
+    district,
+    query: {
+      q,
+      network,
+      searchType,
+      sort
+    },
+    pagination: {
+      limit,
+      cursor: cursor || null,
+      nextCursor,
+      hasMore,
+      total: allRows.length,
+      returned: pageRows.length
+    },
+    results: pageRows,
+    prefetch
+  });
+});
+
 app.get('/api/atlas/district/:key', (req, res) => {
   const key = typeof req.params?.key === 'string' ? req.params.key.trim() : '';
   if (!key) return res.status(400).json({ ok: false, error: 'MISSING_KEY' });
   const snapshot = getAtlasSnapshot();
-  const store = readStore();
-  const optedOutSet = buildOptedOutErc8004Set(store);
-  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
+  const { optedOutSet, mediaByErcId } = getAtlasStoreContext();
   const district = snapshot.districts.find((d) => d.key === key) || null;
   if (!district) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const agents = (snapshot.agents || [])
-    .filter((a) => a.districtKey === key)
-    .filter((a) => !optedOutSet.has(a.erc8004Id))
-    .map((a) => withAtlasAgentMedia(a, mediaByErcId));
+  const agents = getDistrictVisibleAgents(snapshot, key, optedOutSet, mediaByErcId)
+    .slice()
+    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')) || String(a?.erc8004Id || '').localeCompare(String(b?.erc8004Id || '')));
   return res.json({ ok: true, meta: snapshot.meta, district, agents });
 });
 
@@ -6556,10 +6955,8 @@ app.get('/api/atlas/agent/:erc8004Id', (req, res) => {
   const erc8004Id = typeof req.params?.erc8004Id === 'string' ? req.params.erc8004Id.trim() : '';
   if (!erc8004Id) return res.status(400).json({ ok: false, error: 'MISSING_ERC8004_ID' });
   const snapshot = getAtlasSnapshot();
-  const store = readStore();
-  const optedOutSet = buildOptedOutErc8004Set(store);
+  const { optedOutSet, mediaByErcId } = getAtlasStoreContext();
   if (optedOutSet.has(erc8004Id)) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
   const agentRow = (snapshot.agents || []).find((a) => a.erc8004Id === erc8004Id) || null;
   const agent = withAtlasAgentMedia(agentRow, mediaByErcId);
   if (!agent) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
@@ -6592,9 +6989,7 @@ app.get('/api/atlas/search', (req, res) => {
   const limitRaw = Number.parseInt(String(req.query?.limit || ''), 10);
   const limit = Number.isFinite(limitRaw) ? limitRaw : 20;
   const snapshot = getAtlasSnapshot();
-  const store = readStore();
-  const optedOutSet = buildOptedOutErc8004Set(store);
-  const mediaByErcId = buildAtlasMediaByErc8004Id(store);
+  const { optedOutSet, mediaByErcId } = getAtlasStoreContext();
   const search = searchAtlasAgents(snapshot, {
     q,
     family: familyRaw,
@@ -8133,8 +8528,35 @@ app.use((req, res, next) => {
   return next();
 });
 
+function isAtlasEmbedModalRequest(req) {
+  const embed = String(req.query?.embed || '').trim() === '1';
+  if (!embed) return false;
+  const fetchDest = String(req.get('sec-fetch-dest') || '').trim().toLowerCase();
+  if (fetchDest !== 'iframe' && fetchDest !== 'frame') return false;
+  const fetchSite = String(req.get('sec-fetch-site') || '').trim().toLowerCase();
+  return fetchSite === 'same-origin' || fetchSite === 'same-site';
+}
+
+function atlasModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('district', 'atlas');
+  return `/?${params.toString()}`;
+}
+
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
   res.json(VENDOR_LITE_MANIFEST);
+});
+
+// Atlas is intentionally modal-only so the worker/runtime stays in the town hub page.
+app.get('/atlas.html', (_req, res) => {
+  return res.redirect(302, atlasModalRedirectPath());
+});
+
+app.get('/atlas', (req, res) => {
+  if (isAtlasEmbedModalRequest(req)) {
+    return sendHtmlNoStore(res, 'atlas.html');
+  }
+  return res.redirect(302, atlasModalRedirectPath());
 });
 
 app.use(
@@ -8176,7 +8598,6 @@ app.get('/inbox/:houseId', (_req, res) => sendHtmlNoStore(res, 'inbox.html'));
 app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
-app.get('/atlas', (_req, res) => sendHtmlNoStore(res, 'atlas.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
 app.get('/trainer', (_req, res) => sendHtmlNoStore(res, 'trainer.html'));
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));

@@ -87,8 +87,15 @@ Keep `skill.md` evolution testable as we:
 | Trainer namespace budgets + recursion guards | `public/trainer_namespace_plugin.js` | per-turn/per-window budgets and recursion blocking enforce deterministic `TRAINER_RATE_LIMITED` and `TRAINER_RECURSION_BLOCKED` outcomes | `e2e/105_trainer_namespace_rate_limit_recursion.spec.js` (`trainer namespace enforces rate limits and blocks recursive dispatch attempts deterministically`) |
 | Trainer namespace redaction in diagnostics and debug panes | `public/trainer_namespace_plugin.js`, `public/app.js` | secret-like values are masked in trainer namespace outputs/audit snapshots and agent debug surfaces | `e2e/106_trainer_namespace_redaction.spec.js` (`trainer namespace redacts secret-like values from diagnostics and avoids leaking raw secrets into debug panes`) |
 | Trainer namespace human-agent coop verification loop | `public/trainer_namespace_plugin.js`, `public/trainer.js` | builder demonstration + repeat invocation + evidence-backed verification flow remains deterministic in trainer tooling | `e2e/107_trainer_namespace_coop_canvas.spec.js` (`trainer namespace supports a deterministic human-agent coop loop for canvas verification`) |
+| Experience UI intent tools (modal open / Atlas search / Pony compose) | `public/skill.md`, `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | worker tools `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_pony_compose` dispatch through strict browser intent whitelist; no route replacement, no arbitrary DOM access | `e2e/108_experience_intent_open_modal.spec.js`, `e2e/109_experience_intent_atlas_search.spec.js`, `e2e/110_experience_intent_pony_compose.spec.js` |
+| Experience intent continuity + policy guards | `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js` | deterministic intent envelope + trace, team/worker continuity under multi-intent flow, deterministic rejection codes (`UI_INTENT_UNKNOWN`, `UI_INTENT_INVALID_PARAM`, `CONFIRMATION_REQUIRED`) | `e2e/111_experience_intent_worker_continuity.spec.js`, `e2e/112_experience_intent_policy_negative.spec.js` |
 
 ## Progress Log
+
+### 2026-02-26
+
+- Added Experience OS intent tool contract coverage (`e2e/108` to `e2e/112`) for modal-only UI actions, Atlas modal search execution, Pony compose prefill, continuity, and policy-negative guardrails.
+- Added worker/gateway/app plumbing for `agent_town_state_*` + `agent_town_ui_*` tool families and documented modal-only UI intent policy in `public/skill.md`.
 
 ### 2026-02-22
 

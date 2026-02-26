@@ -1,6 +1,6 @@
 ---
 name: agent-town-playbook
-version: 0.3.5
+version: 0.3.6
 description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + Privy wallet-signature unlock).
 author: Agent Town Portal
 
@@ -244,6 +244,39 @@ Inside OpenClaw Lite runtime, prefer these tools:
   - Recovers the unlocked house key context from wallet flow.
 - `agent_town_house_append_note`
   - Encrypts and appends a text note to `/api/house/:id/append`.
+
+## Experience Tools (State + UI)
+
+When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town tools for state + UI actions.
+
+### State tools
+
+- `agent_town_state_get_session`
+  - Reads `GET /api/session` for current browser session context.
+- `agent_town_state_get_agent_state`
+  - Reads `GET /api/agent/state?teamCode=...` (uses runtime teamCode when omitted).
+- `agent_town_state_get_house_context`
+  - Reads `GET /api/house/:id/meta` (uses runtime houseId when omitted).
+- `agent_town_state_get_pony_inbox`
+  - Reads `GET /api/pony/inbox?houseId=...` (uses runtime houseId when omitted).
+
+### UI tools
+
+- `agent_town_ui_open_modal({ modal, params })`
+  - Opens one whitelisted modal (`atlas`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`).
+- `agent_town_ui_atlas_search({ q, family, searchType })`
+  - Opens Atlas in modal and applies search/filter state.
+- `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
+  - Opens Pony modal compose panel with prefilled values.
+
+### UI intent policy
+
+- UI tools are intent-dispatch only; never use arbitrary DOM selectors or HTML payloads.
+- Keep all experience transitions inside `/app` modal surfaces so worker runtime/session continuity is preserved.
+- Do not navigate to direct standalone routes (for example `/atlas`) when a modal intent exists.
+- If a UI intent is unknown, return/expect deterministic `UI_INTENT_UNKNOWN`.
+- If params are invalid, return/expect deterministic `UI_INTENT_INVALID_PARAM`.
+- Irreversible intents require approval and return `CONFIRMATION_REQUIRED` when missing approval.
 
 ## Optional helpers
 

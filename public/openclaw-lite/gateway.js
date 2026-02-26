@@ -232,6 +232,8 @@ async function init() {
   let testReqCounter = 0;
   const DEFAULT_WORKER_REQUEST_TIMEOUT_MS = 3e4;
   const EXPERIENCE_RUN_REQUEST_TIMEOUT_MS = 18e4;
+  const EXPERIENCE_TOOL_TRACE_LIMIT = 200;
+  const experienceToolTrace = [];
   function nextTestRequestId(prefix = "t") {
     testReqCounter += 1;
     return `${prefix}_${Date.now()}_${testReqCounter}`;
@@ -257,6 +259,80 @@ async function init() {
     testRequests.delete(requestId);
     rec.resolve(msg);
     return true;
+  }
+  function isPlainRecord(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+  function normalizeExperienceToolResult(value) {
+    const payload = isPlainRecord(value) ? value : {};
+    const errorRaw = isPlainRecord(payload.error) ? payload.error : null;
+    return {
+      ok: payload.ok === true,
+      applied: payload.applied === true,
+      stateSnapshot: isPlainRecord(payload.stateSnapshot) ? payload.stateSnapshot : null,
+      error: errorRaw ? {
+        code: String(errorRaw.code || "UI_INTENT_INTERNAL"),
+        message: String(errorRaw.message || errorRaw.code || "UI intent failed")
+      } : null
+    };
+  }
+  function appendExperienceToolTrace({ source = "runtime", tool = "", result = null }) {
+    const normalized = normalizeExperienceToolResult(result);
+    experienceToolTrace.push({
+      atMs: Date.now(),
+      source: String(source || "runtime"),
+      tool: String(tool || ""),
+      ok: normalized.ok === true,
+      applied: normalized.applied === true,
+      errorCode: normalized.error ? normalized.error.code : null
+    });
+    if (experienceToolTrace.length > EXPERIENCE_TOOL_TRACE_LIMIT) {
+      experienceToolTrace.splice(0, experienceToolTrace.length - EXPERIENCE_TOOL_TRACE_LIMIT);
+    }
+  }
+  function resolveExperienceIntentDispatcher() {
+    if (window.AgentTownExperienceIntent && typeof window.AgentTownExperienceIntent.dispatch === "function") {
+      return window.AgentTownExperienceIntent.dispatch.bind(window.AgentTownExperienceIntent);
+    }
+    if (typeof window.dispatchExperienceIntent === "function") {
+      return window.dispatchExperienceIntent.bind(window);
+    }
+    return null;
+  }
+  async function invokeExperienceTool({ tool, params = {}, source = "runtime" } = {}) {
+    const toolName = String(tool || "").trim();
+    const safeParams = isPlainRecord(params) ? params : {};
+    const dispatch = resolveExperienceIntentDispatcher();
+    if (!dispatch) {
+      const unavailable = {
+        ok: false,
+        applied: false,
+        stateSnapshot: null,
+        error: {
+          code: "UI_INTENT_UNAVAILABLE",
+          message: "Experience intent dispatcher is not available"
+        }
+      };
+      appendExperienceToolTrace({ source, tool: toolName, result: unavailable });
+      return unavailable;
+    }
+    let result;
+    try {
+      result = await dispatch(toolName, safeParams, { source });
+    } catch (err) {
+      result = {
+        ok: false,
+        applied: false,
+        stateSnapshot: null,
+        error: {
+          code: "UI_INTENT_INTERNAL",
+          message: String(err?.message || err || "UI intent dispatch failed")
+        }
+      };
+    }
+    const normalized = normalizeExperienceToolResult(result);
+    appendExperienceToolTrace({ source, tool: toolName, result: normalized });
+    return normalized;
   }
   function parseModelRef(modelRef, fallbackProvider = "openai", fallbackModelId = "gpt-4o-mini") {
     const ref = String(modelRef || "").trim();
@@ -696,6 +772,23 @@ async function init() {
       } catch (e) {
         sendToWorker({ type: "gateway.wallet.response", id, ok: false, error: e.message || String(e) });
       }
+      return;
+    }
+    if (msg.type === "worker.ui.intent.request") {
+      const id = String(msg.id || "");
+      if (!id) return;
+      const tool = String(msg.intent || "");
+      const params = isPlainRecord(msg.params) ? msg.params : {};
+      const result = await invokeExperienceTool({
+        tool,
+        params,
+        source: "worker"
+      });
+      sendToWorker({
+        type: "gateway.ui.intent.response",
+        id,
+        result
+      });
       return;
     }
     if (msg.type === "worker.export.zip") {
@@ -1171,6 +1264,16 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "RUNTIME_KEY_STATUS_FAILED"));
       return res.result || null;
     },
+    async invokeExperienceTool({ tool, params = {} } = {}) {
+      return invokeExperienceTool({
+        tool,
+        params,
+        source: "test"
+      });
+    },
+    async getExperienceToolTrace() {
+      return { events: experienceToolTrace.slice() };
+    },
     async runtimeSessionContext(params = {}) {
       return runtimeSessionContextRequest(params);
     },
@@ -1271,6 +1374,12 @@ async function init() {
   gatewayEvents.trainerSetCoaching = trainerSetCoachingRequest;
   gatewayEvents.trainerBackupExport = trainerBackupExportRequest;
   gatewayEvents.trainerBackupImport = trainerBackupImportRequest;
+  gatewayEvents.invokeExperienceTool = (payload = {}) => invokeExperienceTool({
+    tool: payload?.tool,
+    params: payload?.params,
+    source: "runtime"
+  });
+  gatewayEvents.getExperienceToolTrace = () => ({ events: experienceToolTrace.slice() });
   gatewayEvents.send = (msg) => {
     if (msg && msg.type === "chat") {
       sendToWorker({

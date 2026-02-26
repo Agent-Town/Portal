@@ -129,3 +129,16 @@ When changing worker behavior required by skill files (`skill.md` / `SKILL.md`):
 - If changing any of the above, update deterministic coverage in:
   - `e2e/53_agent_panel_global_presence.spec.js`
   - `e2e/57_phase3_onboarding_wallet_llm_persist.spec.js`
+
+### 8) Modal-first navigation guardrail (mandatory)
+
+- Keep experience surfaces (especially Atlas) modal-first from the town hub page.
+- Do not implement full-page navigation for agent-driven UX steps when a modal/frame flow is possible.
+- Reasoning:
+  - The worker runtime is page-scoped JavaScript (`new Worker(...)` in the current document).
+  - Full document navigation tears down that runtime and forces a worker restart.
+  - Session/transcript can be restored, but live continuity and in-flight state are interrupted.
+- Atlas policy:
+  - Atlas must be opened through the main website modal flow.
+  - Direct standalone Atlas access (`/atlas`, `/atlas.html`) should not render Atlas as a normal page.
+  - Standalone hits should be redirected back to the town hub modal entry path.

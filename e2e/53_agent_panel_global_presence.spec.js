@@ -85,3 +85,37 @@ test('agent panel debug tabs expose tools, skill context, traffic, and session c
   await expect(page.getByTestId('agent-debug-panel-session')).not.toHaveClass(/is-hidden/);
   await expect(page.getByTestId('agent-debug-session')).toContainText('"runtimeState"', { timeout: 8000 });
 });
+
+test('agent panel zoom controls persist size and font settings', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('agentTown:panel:minimized', '0');
+    localStorage.setItem('agentTown:panel:debugVisible', '1');
+  });
+
+  await page.goto('/');
+  const panel = page.getByTestId('agent-panel');
+  await expect(panel).toBeVisible({ timeout: 1500 });
+
+  const readPanelMetrics = async (locator) => locator.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const width = node.getBoundingClientRect().width;
+    const zoom = Number(style.getPropertyValue('--agent-panel-zoom') || '1');
+    const title = node.querySelector('.sidebar-header h3');
+    const titleFontPx = title ? Number.parseFloat(getComputedStyle(title).fontSize || '0') : 0;
+    return { width, zoom, titleFontPx };
+  });
+
+  const before = await readPanelMetrics(panel);
+  await page.getByTestId('agent-panel-zoom-in').click();
+  await page.getByTestId('agent-panel-zoom-in').click();
+  const enlarged = await readPanelMetrics(panel);
+
+  expect(enlarged.zoom).toBeGreaterThan(before.zoom);
+  expect(enlarged.width).toBeGreaterThan(before.width);
+  expect(enlarged.titleFontPx).toBeGreaterThan(before.titleFontPx);
+
+  await page.reload();
+  const afterReload = await readPanelMetrics(page.getByTestId('agent-panel'));
+  expect(afterReload.zoom).toBeCloseTo(enlarged.zoom, 2);
+  expect(afterReload.titleFontPx).toBeCloseTo(enlarged.titleFontPx, 1);
+});

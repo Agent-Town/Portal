@@ -8,6 +8,12 @@ const ATLAS_FORMULA = Object.freeze({
 });
 
 const DEFAULT_SQLITE_PATH = path.join(process.cwd(), 'data', 'erc8004.sqlite3');
+const ATLAS_SNAPSHOT_CACHE_TTL_MS = 15 * 1000;
+let atlasSnapshotCache = {
+  signature: '',
+  expiresAt: 0,
+  snapshot: null
+};
 
 const CHAIN_FAMILY_BY_ID = new Map([
   [1, { key: 'ethereum', label: 'Ethereum' }],
@@ -563,6 +569,15 @@ function hasSqliteTable(db, tableName) {
   }
 }
 
+function getSqliteFileSignature(sqlitePath) {
+  try {
+    const stat = fs.statSync(sqlitePath);
+    return `${path.resolve(sqlitePath)}:${stat.mtimeMs}:${stat.size}`;
+  } catch {
+    return `${path.resolve(sqlitePath)}:missing`;
+  }
+}
+
 function getSqliteTableColumns(db, tableName) {
   const table = String(tableName || '').trim();
   if (!table || !/^[a-zA-Z0-9_]+$/.test(table)) return new Set();
@@ -722,6 +737,16 @@ function getAtlasSnapshot({ env = process.env.NODE_ENV, sqlitePath = DEFAULT_SQL
     };
   }
 
+  const signature = getSqliteFileSignature(sqlitePath);
+  const now = Date.now();
+  if (
+    atlasSnapshotCache.snapshot
+    && atlasSnapshotCache.signature === signature
+    && atlasSnapshotCache.expiresAt > now
+  ) {
+    return atlasSnapshotCache.snapshot;
+  }
+
   const agentRows = readAgentsFromSqlite(sqlitePath);
   const agents = buildAgents(agentRows);
   let chainRows = readChainRowsFromSqlite(sqlitePath);
@@ -732,14 +757,21 @@ function getAtlasSnapshot({ env = process.env.NODE_ENV, sqlitePath = DEFAULT_SQL
     ? `sqlite:${path.relative(process.cwd(), sqlitePath) || sqlitePath}`
     : 'empty';
   const districts = attachDistrictAgentViews(buildDistricts(chainRows, formula), agents);
-  return {
+  const snapshot = {
     meta: {
       source,
-      formula
+      formula,
+      signature
     },
     districts,
     agents
   };
+  atlasSnapshotCache = {
+    signature,
+    expiresAt: now + ATLAS_SNAPSHOT_CACHE_TTL_MS,
+    snapshot
+  };
+  return snapshot;
 }
 
 module.exports = {

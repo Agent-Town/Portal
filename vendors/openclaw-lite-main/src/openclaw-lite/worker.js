@@ -630,6 +630,15 @@ async function resolveAgentTownTeamCode(rawTeamCode) {
   return inferred;
 }
 
+async function resolveAgentTownHouseId(rawHouseId) {
+  const explicit = typeof rawHouseId === "string" ? rawHouseId.trim() : "";
+  if (explicit) return explicit;
+  const appState = await apiJson("/api/state", { method: "GET" });
+  const inferred = typeof appState?.houseId === "string" ? appState.houseId.trim() : "";
+  if (!inferred) throw new Error("MISSING_HOUSE_ID");
+  return inferred;
+}
+
 function makeCeremonyRevealKeyInfo({ direction = "", teamCode = "" }) {
   return `elizatown-ceremony-reveal-v1|dir=${direction}|team=${teamCode || ""}`;
 }
@@ -936,6 +945,79 @@ async function runAgentTownHouseAppendNote(params, toolName = "agent_town_house_
       makeToolFailure(code, message, {}, isRetryableAgentTownErrorCode(code)),
     );
   }
+}
+
+async function runAgentTownStateGetSession(_params, toolName = "agent_town_state_get_session") {
+  const startedAtMs = nowMs();
+  try {
+    const session = await apiJson("/api/session", { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ session }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_SESSION_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+
+async function runAgentTownStateGetAgentState(params, toolName = "agent_town_state_get_agent_state") {
+  const startedAtMs = nowMs();
+  let teamCode = "";
+  try {
+    teamCode = await resolveAgentTownTeamCode(params?.teamCode);
+    const snapshot = await apiJson(`/api/agent/state?teamCode=${encodeURIComponent(teamCode)}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ teamCode, state: snapshot }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_AGENT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { teamCode: teamCode || null }));
+  }
+}
+
+async function runAgentTownStateGetHouseContext(params, toolName = "agent_town_state_get_house_context") {
+  const startedAtMs = nowMs();
+  let houseId = "";
+  try {
+    houseId = await resolveAgentTownHouseId(params?.houseId);
+    const context = await apiJson(`/api/house/${encodeURIComponent(houseId)}/meta`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ houseId, context }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_HOUSE_CONTEXT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { houseId: houseId || null }));
+  }
+}
+
+async function runAgentTownStateGetPonyInbox(params, toolName = "agent_town_state_get_pony_inbox") {
+  const startedAtMs = nowMs();
+  let houseId = "";
+  try {
+    houseId = await resolveAgentTownHouseId(params?.houseId);
+    const inbox = await apiJson(`/api/pony/inbox?houseId=${encodeURIComponent(houseId)}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ houseId, inbox }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_PONY_INBOX_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { houseId: houseId || null }));
+  }
+}
+
+async function runAgentTownUiIntentTool(params, toolName) {
+  const startedAtMs = nowMs();
+  const safeParams = isPlainObject(params) ? params : {};
+  const intentResult = await requestUiIntent(toolName, safeParams);
+  if (intentResult.ok === true && intentResult.applied === true) {
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess(intentResult));
+  }
+  const code = String(intentResult?.error?.code || "UI_INTENT_INTERNAL");
+  const message = String(intentResult?.error?.message || code || "UI intent failed");
+  return withToolMeta(
+    toolName,
+    startedAtMs,
+    makeToolFailure(code, message, {
+      intent: toolName,
+      stateSnapshot: intentResult?.stateSnapshot || null,
+    }),
+  );
 }
 
 function makeToolSuccess(data) {
@@ -2229,6 +2311,48 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { text: "hello from agent" },
   },
   {
+    name: "agent_town_state_get_session",
+    label: "Agent Town State Session",
+    description: "Reads /api/session snapshot for current browser session.",
+    sampleArgs: {},
+  },
+  {
+    name: "agent_town_state_get_agent_state",
+    label: "Agent Town State Agent",
+    description: "Reads /api/agent/state for a team code (or inferred runtime team code).",
+    sampleArgs: { teamCode: "TEAM-ABCD-EFGH" },
+  },
+  {
+    name: "agent_town_state_get_house_context",
+    label: "Agent Town State House",
+    description: "Reads /api/house/:id/meta for inferred or explicit house id.",
+    sampleArgs: { houseId: "hs_example_house" },
+  },
+  {
+    name: "agent_town_state_get_pony_inbox",
+    label: "Agent Town State Pony Inbox",
+    description: "Reads /api/pony/inbox for inferred or explicit house id.",
+    sampleArgs: { houseId: "hs_example_house" },
+  },
+  {
+    name: "agent_town_ui_open_modal",
+    label: "Agent Town UI Open Modal",
+    description: "Opens a whitelisted app modal without route replacement.",
+    sampleArgs: { modal: "atlas", params: {} },
+  },
+  {
+    name: "agent_town_ui_atlas_search",
+    label: "Agent Town UI Atlas Search",
+    description: "Opens Atlas modal and applies query/family/searchType intent state.",
+    sampleArgs: { q: "sentinel", family: "ethereum", searchType: "keyword" },
+  },
+  {
+    name: "agent_town_ui_pony_compose",
+    label: "Agent Town UI Pony Compose",
+    description: "Opens Pony modal and prefills compose draft fields.",
+    sampleArgs: { toHouseId: "hs_receiver", subject: "Hello", draft: "Draft body" },
+  },
+  {
     name: "secret_set",
     label: "Secret Set",
     description: "Store/update a secret value by reference name.",
@@ -2521,6 +2645,29 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       const envelope = await runAgentTownHouseAppendNote(params || {}, "agent_town_house_append_note");
       return envelopeToToolResult(envelope, "agent_town_house_append_note");
     }
+    case "agent_town_state_get_session": {
+      const envelope = await runAgentTownStateGetSession(params || {}, "agent_town_state_get_session");
+      return envelopeToToolResult(envelope, "agent_town_state_get_session");
+    }
+    case "agent_town_state_get_agent_state": {
+      const envelope = await runAgentTownStateGetAgentState(params || {}, "agent_town_state_get_agent_state");
+      return envelopeToToolResult(envelope, "agent_town_state_get_agent_state");
+    }
+    case "agent_town_state_get_house_context": {
+      const envelope = await runAgentTownStateGetHouseContext(params || {}, "agent_town_state_get_house_context");
+      return envelopeToToolResult(envelope, "agent_town_state_get_house_context");
+    }
+    case "agent_town_state_get_pony_inbox": {
+      const envelope = await runAgentTownStateGetPonyInbox(params || {}, "agent_town_state_get_pony_inbox");
+      return envelopeToToolResult(envelope, "agent_town_state_get_pony_inbox");
+    }
+    case "agent_town_ui_open_modal":
+    case "agent_town_ui_atlas_search":
+    case "agent_town_ui_pony_compose":
+    case "agent_town_ui_publish_post": {
+      const envelope = await runAgentTownUiIntentTool(params || {}, normalizedName);
+      return envelopeToToolResult(envelope, normalizedName);
+    }
     case "secret_set": {
       const envelope = await runSecretSet(params || {}, "secret_set");
       return envelopeToToolResult(envelope, "secret_set");
@@ -2592,10 +2739,15 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     }
     default: {
       const startedAtMs = nowMs();
+      const notFoundCode = normalizedName.startsWith("agent_town_ui_")
+        ? "UI_INTENT_UNKNOWN"
+        : normalizedName.startsWith("agent_town_state_")
+          ? "STATE_TOOL_UNKNOWN"
+          : "TOOL_NOT_FOUND";
       const envelope = withToolMeta(
         normalizedName,
         startedAtMs,
-        makeToolFailure("TOOL_NOT_FOUND", `Tool ${normalizedName} not found`, {
+        makeToolFailure(notFoundCode, `Tool ${normalizedName} not found`, {
           toolCallId: normalizedToolCallId,
           tool: normalizedName,
         }),
@@ -5021,6 +5173,61 @@ function resolveWalletResponse(msg) {
   else rec.reject(new Error(msg.error || "WALLET_ERROR"));
 }
 
+// --- UI intent bridge ---
+const uiIntentRequests = new Map();
+const UI_INTENT_REQUEST_TIMEOUT_MS = 12_000;
+
+function normalizeUiIntentResult(value) {
+  const payload = isPlainObject(value) ? value : {};
+  const errorRaw = isPlainObject(payload.error) ? payload.error : null;
+  return {
+    ok: payload.ok === true,
+    applied: payload.applied === true,
+    stateSnapshot: isPlainObject(payload.stateSnapshot) ? payload.stateSnapshot : null,
+    error: errorRaw
+      ? {
+        code: String(errorRaw.code || "UI_INTENT_INTERNAL"),
+        message: String(errorRaw.message || errorRaw.code || "UI intent failed"),
+      }
+      : null,
+  };
+}
+
+function requestUiIntent(intent, params = {}) {
+  const id = randomId("ui");
+  post({
+    type: "worker.ui.intent.request",
+    id,
+    intent: String(intent || ""),
+    params: isPlainObject(params) ? params : {},
+  });
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      uiIntentRequests.delete(id);
+      resolve({
+        ok: false,
+        applied: false,
+        stateSnapshot: null,
+        error: {
+          code: "UI_INTENT_UNAVAILABLE",
+          message: "UI intent response timeout",
+        },
+      });
+    }, UI_INTENT_REQUEST_TIMEOUT_MS);
+    uiIntentRequests.set(id, { resolve, timeoutId });
+  });
+}
+
+function resolveUiIntentResponse(msg) {
+  const id = String(msg.id || "");
+  if (!id) return;
+  const rec = uiIntentRequests.get(id);
+  if (!rec) return;
+  uiIntentRequests.delete(id);
+  clearTimeout(rec.timeoutId);
+  rec.resolve(normalizeUiIntentResult(msg.result));
+}
+
 async function walletConnect() {
   const res = await walletRequest("connect", { chain: "solana" });
   const addr = typeof res.address === "string" ? res.address.trim() : "";
@@ -7207,6 +7414,11 @@ self.addEventListener("message", async (ev) => {
 
     if (msg.type === "gateway.wallet.response") {
       resolveWalletResponse(msg);
+      return;
+    }
+
+    if (msg.type === "gateway.ui.intent.response") {
+      resolveUiIntentResponse(msg);
       return;
     }
 

@@ -35,13 +35,22 @@ const DISTRICT_POSITION_PRESETS = Object.freeze({
   megaeth: [45, 20],
   'x-layer': [61, 67]
 });
+const DISTRICT_AGENT_PAGE_SIZE = 24;
+const DISTRICT_SEARCH_DEBOUNCE_MS = 220;
+const DISTRICT_PREFETCH_NEXT_COUNT = 8;
 
 const state = {
   districts: [],
   districtMap: new Map(),
   districtDetailCache: new Map(),
+  districtAgentListCache: new Map(),
   agentsById: new Map(),
   searchRequestSeq: 0,
+  districtAgentRequestSeq: 0,
+  districtSearchDebounceTimer: null,
+  districtAgentsObserver: null,
+  districtTileImageObserver: null,
+  districtPrefetchedImages: new Set(),
   storefrontAgentId: null,
   currentQuery: '',
   currentFamily: '',
@@ -55,6 +64,17 @@ const state = {
     active: null
   },
   selectedDistrictKey: null,
+  districtDetailView: {
+    key: null,
+    network: 'mainnet',
+    query: '',
+    searchType: 'semantic',
+    sort: 'score_desc',
+    loadedCount: 0,
+    nextCursor: null,
+    hasMore: false,
+    loading: false
+  },
   workerPollTimer: null
 };
 
@@ -78,6 +98,24 @@ function normalizeSortField(raw) {
 
 function normalizeSortDirection(raw) {
   return String(raw || '').trim().toLowerCase() === 'asc' ? 'asc' : 'desc';
+}
+
+function normalizeDistrictSearchType(raw) {
+  return String(raw || '').trim().toLowerCase() === 'keyword' ? 'keyword' : 'semantic';
+}
+
+function normalizeDistrictSort(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value === 'score_asc' || value === 'updated_desc' || value === 'updated_asc' || value === 'relevance_desc' || value === 'relevance_asc') {
+    return value;
+  }
+  return 'score_desc';
+}
+
+function normalizeDistrictNetwork(raw) {
+  const value = String(raw || '').trim().toLowerCase();
+  if (value === 'testnet' || value === 'test') return 'testnet';
+  return 'mainnet';
 }
 
 function loadHouseIdFromCache() {
@@ -120,6 +158,7 @@ function districtMatchesFilter(district, query, family) {
   const q = (query || '').trim().toLowerCase();
   const familyMatch = !family || district.key === family;
   if (!familyMatch) return false;
+  if (family && q) return true;
   if (!q) return true;
   return district.key.toLowerCase().includes(q) || String(district.label || '').toLowerCase().includes(q);
 }
@@ -162,6 +201,12 @@ function formatNumber(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return '0';
   return Math.max(0, Math.trunc(n)).toLocaleString();
+}
+
+function formatScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '0';
+  return n.toFixed(2);
 }
 
 function initialsFromAgent(agent) {
@@ -210,6 +255,35 @@ function districtNetworkSplit(district) {
     mainnetPct: Math.max(0, Math.min(100, Math.round((mainnet / total) * 100))),
     testnetPct: Math.max(0, Math.min(100, Math.round((testnet / total) * 100)))
   };
+}
+
+function districtChainCount(district) {
+  const mainnetChains = Array.isArray(district?.mainnet?.chains) ? district.mainnet.chains.length : 0;
+  const testnetChains = Array.isArray(district?.testnets?.chains) ? district.testnets.chains.length : 0;
+  return mainnetChains + testnetChains;
+}
+
+function districtPrimaryChain(district) {
+  const mainnetChains = Array.isArray(district?.mainnet?.chains)
+    ? district.mainnet.chains.map((row) => ({ ...row, isTestnet: false }))
+    : [];
+  const testnetChains = Array.isArray(district?.testnets?.chains)
+    ? district.testnets.chains.map((row) => ({ ...row, isTestnet: true }))
+    : [];
+  const merged = mainnetChains.concat(testnetChains);
+  if (!merged.length) return null;
+  merged.sort((a, b) => Number(b?.agents || 0) - Number(a?.agents || 0) || Number(a?.chainId || 0) - Number(b?.chainId || 0));
+  return merged[0];
+}
+
+function districtPriorityTier(rankIndex, total) {
+  const index = Number(rankIndex) + 1;
+  const size = Math.max(1, Number(total) || 1);
+  const highCutoff = Math.max(1, Math.ceil(size * 0.3));
+  const mediumCutoff = Math.max(highCutoff + 1, Math.ceil(size * 0.65));
+  if (index <= highCutoff) return { key: 'high', label: 'high priority' };
+  if (index <= mediumCutoff) return { key: 'medium', label: 'medium priority' };
+  return { key: 'entry', label: 'entry priority' };
 }
 
 function updateAtlasKpis(districts, opts = {}) {
@@ -336,8 +410,9 @@ function districtStyleImagePath(district) {
   const base = DISTRICT_STYLE_BASE_BY_KEY[key];
   if (!base) return null;
   const variant = (hashText(`${key}|${district?.totalAgents || 0}`) % 2) + 1;
-  const file = `${base}_${variant}.png`;
-  return `url("/images/districts_style_images/${file}")`;
+  const webpFile = `${base}_${variant}.webp`;
+  const pngFile = `${base}_${variant}.png`;
+  return `image-set(url("/images/districts_style_images/${webpFile}") type("image/webp"), url("/images/districts_style_images/${pngFile}") type("image/png"))`;
 }
 
 function districtLogoPath(district) {
@@ -345,6 +420,57 @@ function districtLogoPath(district) {
   const file = DISTRICT_LOGO_FILE_BY_KEY[key];
   if (!file) return null;
   return `/images/districts_style_images/logos/${file}`;
+}
+
+function clearDistrictTileImageObserver() {
+  if (!state.districtTileImageObserver) return;
+  state.districtTileImageObserver.disconnect();
+  state.districtTileImageObserver = null;
+}
+
+function applyDistrictTileImage(card) {
+  if (!card) return;
+  const bgImage = String(card.dataset?.districtStyleImage || '').trim();
+  if (!bgImage) {
+    card.style.removeProperty('--district-style-image');
+    return;
+  }
+  card.style.setProperty('--district-style-image', bgImage);
+  card.dataset.districtStyleApplied = '1';
+}
+
+function hydrateDistrictTileImages(cards, rootNode) {
+  clearDistrictTileImageObserver();
+  const rows = Array.isArray(cards) ? cards : [];
+  if (!rows.length) return;
+  if (typeof window === 'undefined' || typeof window.IntersectionObserver !== 'function') {
+    rows.forEach((card) => applyDistrictTileImage(card));
+    return;
+  }
+
+  state.districtTileImageObserver = new IntersectionObserver(
+    (entries, observer) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        applyDistrictTileImage(entry.target);
+        observer.unobserve(entry.target);
+      }
+    },
+    {
+      root: rootNode || null,
+      rootMargin: '260px 0px',
+      threshold: 0.01
+    }
+  );
+
+  rows.forEach((card, idx) => {
+    if (!card) return;
+    if (idx < 6) {
+      applyDistrictTileImage(card);
+      return;
+    }
+    state.districtTileImageObserver.observe(card);
+  });
 }
 
 function computeDistrictBaseSpan(totalAgents, minAgents, maxAgents) {
@@ -414,9 +540,25 @@ function closeAtlasModal() {
   if (detail) detail.classList.add('is-hidden');
   if (storefront) storefront.classList.add('is-hidden');
   setModalOpen(false);
+  if (state.districtAgentsObserver) {
+    state.districtAgentsObserver.disconnect();
+    state.districtAgentsObserver = null;
+  }
   state.storefrontAgentId = null;
   state.selectedDistrictKey = null;
-  renderDistricts(state.districts, { query: state.currentQuery, family: state.currentFamily });
+  if (state.districtSearchDebounceTimer) {
+    clearTimeout(state.districtSearchDebounceTimer);
+    state.districtSearchDebounceTimer = null;
+  }
+  state.districtDetailView.loading = false;
+  state.districtDetailView.hasMore = false;
+  state.districtDetailView.nextCursor = null;
+  state.districtDetailView.loadedCount = 0;
+  state.districtDetailView.key = null;
+  state.districtDetailView.network = 'mainnet';
+  setDistrictLoadStatus('');
+  updateDistrictNetworkSwitch();
+  updateSelectedDistrictCards();
   setUrlState({ district: null, agent: null });
 }
 
@@ -695,6 +837,7 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
   updateAtlasKpis(districts, { query, family });
   list.innerHTML = '';
   list.classList.add('atlas-tile-map');
+  clearDistrictTileImageObserver();
 
   const filtered = districts
     .filter((d) => districtMatchesFilter(d, query, family))
@@ -729,23 +872,29 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
     }
   }
 
-  filtered.forEach((district) => {
+  const renderedCards = [];
+  filtered.forEach((district, idx) => {
     const card = document.createElement('article');
     card.className = 'card atlas-map-node';
     if (district.key === state.selectedDistrictKey) card.classList.add('is-selected');
     card.dataset.testid = `district-card-${district.key}`;
     card.setAttribute('data-testid', `district-card-${district.key}`);
+    card.dataset.districtKey = district.key;
 
     const tile = computeDistrictTileSpan(district.totalAgents, minAgents, maxAgents, tileScale);
     card.style.setProperty('--tile-col-span', String(tile.colSpan));
     card.style.setProperty('--tile-row-span', String(tile.rowSpan));
     const bgImage = districtStyleImagePath(district);
-    if (bgImage) card.style.setProperty('--district-style-image', bgImage);
-    else card.style.removeProperty('--district-style-image');
+    card.style.removeProperty('--district-style-image');
+    if (bgImage) card.dataset.districtStyleImage = bgImage;
+    else delete card.dataset.districtStyleImage;
     if (tile.colSpan <= 6) card.classList.add('is-compact');
     if (tile.colSpan >= 8) card.classList.add('is-large');
 
     const split = districtNetworkSplit(district);
+    const primaryChain = districtPrimaryChain(district);
+    const chainCount = districtChainCount(district);
+    const priority = districtPriorityTier(idx, filtered.length);
 
     const head = document.createElement('div');
     head.className = 'atlas-district-head';
@@ -772,12 +921,29 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
     }
     titleRow.appendChild(title);
 
+    const priorityChip = document.createElement('span');
+    priorityChip.className = `atlas-district-priority is-${priority.key}`;
+    priorityChip.textContent = `P${String(idx + 1).padStart(2, '0')}`;
+    priorityChip.title = `${priority.label} (${idx + 1}/${filtered.length})`;
+    titleRow.appendChild(priorityChip);
+
     const stats = document.createElement('div');
     stats.className = 'small';
-    stats.textContent = `${formatNumber(district.totalAgents)} agents`;
+    stats.textContent = `${formatNumber(district.totalAgents)} agents • ${formatNumber(chainCount)} chains`;
+
+    const chainMeta = document.createElement('div');
+    chainMeta.className = 'small atlas-district-chain-meta';
+    if (primaryChain) {
+      const primaryName = primaryChain?.name ? `${primaryChain.name}` : `Chain ${primaryChain.chainId}`;
+      const networkText = primaryChain?.isTestnet ? 'testnet lead' : 'mainnet lead';
+      chainMeta.textContent = `Lead: ${primaryName} (${primaryChain.chainId}) • ${networkText}`;
+    } else {
+      chainMeta.textContent = 'Lead: unknown chain';
+    }
 
     head.appendChild(titleRow);
     head.appendChild(stats);
+    head.appendChild(chainMeta);
 
     const ctaRow = document.createElement('div');
     ctaRow.className = 'kv atlas-district-actions';
@@ -818,110 +984,314 @@ function renderDistricts(districts, { query = '', family = '' } = {}) {
     card.appendChild(head);
     card.appendChild(ctaRow);
     list.appendChild(card);
+    renderedCards.push(card);
   });
+  hydrateDistrictTileImages(renderedCards, list);
+}
+
+function updateSelectedDistrictCards() {
+  const cards = document.querySelectorAll('.atlas-map-node[data-district-key]');
+  cards.forEach((card) => {
+    const key = String(card?.dataset?.districtKey || '');
+    card.classList.toggle('is-selected', !!key && key === state.selectedDistrictKey);
+  });
+}
+
+function setDistrictLoadStatus(message) {
+  const node = el('atlasDistrictLoadStatus');
+  if (!node) return;
+  node.textContent = String(message || '');
+}
+
+function updateDistrictNetworkSwitch() {
+  const network = normalizeDistrictNetwork(state.districtDetailView.network);
+  const mainBtn = el('atlasDistrictNetworkMain');
+  const testBtn = el('atlasDistrictNetworkTest');
+  if (mainBtn) {
+    const active = network === 'mainnet';
+    mainBtn.classList.toggle('is-active', active);
+    mainBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+  if (testBtn) {
+    const active = network === 'testnet';
+    testBtn.classList.toggle('is-active', active);
+    testBtn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+}
+
+function renderDistrictSummaryPayload(payload) {
+  const district = payload?.district || null;
+  const summary = payload?.summary || null;
+  if (!district || !summary) return;
+  const summaryNetwork = normalizeDistrictNetwork(summary?.network || state.districtDetailView.network);
+  state.districtDetailView.network = summaryNetwork;
+  updateDistrictNetworkSwitch();
+
+  const title = el('atlasDistrictTitle');
+  const stats = el('atlasDistrictStats');
+  const mainnetCount = el('atlasDistrictMainnetCount');
+  const testnetCount = el('atlasDistrictTestnetCount');
+  const averageScore = el('atlasDistrictAverageScore');
+  const scoreGtZero = el('atlasDistrictScoreGtZero');
+  const binsNode = el('atlasDistrictScoreBins');
+  const serviceNode = el('atlasDistrictServiceCounts');
+
+  if (title) title.textContent = `${district.label || district.key} District`;
+  if (stats) {
+    const networkLabel = summaryNetwork === 'testnet' ? 'testnet' : 'mainnet';
+    stats.textContent = `${formatNumber(summary?.totals?.agents || 0)} ${networkLabel} storefront profiles • ${formatNumber(district?.totalAgents || 0)} total district agents`;
+  }
+  if (mainnetCount) mainnetCount.textContent = formatNumber(summary?.totals?.mainnet || 0);
+  if (testnetCount) testnetCount.textContent = formatNumber(summary?.totals?.testnet || 0);
+  if (averageScore) averageScore.textContent = formatScore(summary?.totals?.averageScore || 0);
+  if (scoreGtZero) scoreGtZero.textContent = formatNumber(summary?.totals?.scoreGt0 || 0);
+
+  if (binsNode) {
+    const bins = summary?.scoreBins || {};
+    binsNode.textContent = `Score bins • 0:${formatNumber(bins.score0)} • 1-19:${formatNumber(bins.score1to19)} • 20-39:${formatNumber(bins.score20to39)} • 40-59:${formatNumber(bins.score40to59)} • 60-79:${formatNumber(bins.score60to79)} • 80+:${formatNumber(bins.score80plus)}`;
+  }
+  if (serviceNode) {
+    const svc = summary?.serviceCounts || {};
+    serviceNode.textContent = `Service signals • web:${formatNumber(svc.hasWeb)} • MCP:${formatNumber(svc.hasMcp)} • A2A:${formatNumber(svc.hasA2a)} • endpoint verified:${formatNumber(svc.endpointVerified)} • x402:${formatNumber(svc.x402Supported)} • active:${formatNumber(svc.active)}`;
+  }
+}
+
+function prefetchDistrictImages(prefetchRows) {
+  const rows = Array.isArray(prefetchRows) ? prefetchRows : [];
+  for (const row of rows.slice(0, DISTRICT_PREFETCH_NEXT_COUNT)) {
+    const imageUrl = typeof row?.imageUrl === 'string' ? row.imageUrl.trim() : '';
+    if (!imageUrl || state.districtPrefetchedImages.has(imageUrl)) continue;
+    state.districtPrefetchedImages.add(imageUrl);
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = imageUrl;
+    if (typeof img.decode === 'function') img.decode().catch(() => {});
+  }
+}
+
+function buildDistrictAgentTile(agent, districtKey) {
+  const id = String(agent?.erc8004Id || '').trim();
+  if (!id) return null;
+  const district = state.districtMap.get(districtKey) || null;
+  const btn = document.createElement('button');
+  btn.className = 'atlas-agent-tile';
+  btn.type = 'button';
+  btn.setAttribute('data-testid', `agent-open-${id}`);
+
+  const media = document.createElement('div');
+  media.className = 'atlas-agent-media';
+  const img = document.createElement('img');
+  img.alt = `${agent.name || id} avatar`;
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  const fb = document.createElement('div');
+  fb.className = 'atlas-agent-fallback';
+  setAgentVisual(img, fb, resolveAgentHero(agent), initialsFromAgent(agent));
+  media.appendChild(img);
+  media.appendChild(fb);
+
+  const content = document.createElement('div');
+  content.className = 'atlas-agent-copy';
+
+  const name = document.createElement('div');
+  name.className = 'atlas-agent-name';
+  name.textContent = agent.name || id;
+
+  const meta = document.createElement('div');
+  meta.className = 'small';
+  const network = classifyChainType(agent, district);
+  const networkLabel = network === 'unknown' ? (agent?.networkType || 'network unknown') : network;
+  const scoreLabel = Number.isFinite(Number(agent?.qualityScore)) ? ` • score ${Number(agent.qualityScore).toFixed(2)}` : '';
+  meta.textContent = `${id} • ${networkLabel}${scoreLabel}`;
+
+  const desc = document.createElement('div');
+  desc.className = 'small atlas-agent-desc';
+  desc.textContent = agent.description || 'No description available.';
+
+  const chips = document.createElement('div');
+  chips.className = 'atlas-chip-row';
+  const capTags = extractCapabilityTags(agent);
+  for (const tag of capTags) chips.appendChild(makeChip(tag, 'muted'));
+
+  content.appendChild(name);
+  content.appendChild(meta);
+  content.appendChild(desc);
+  if (capTags.length) content.appendChild(chips);
+
+  btn.appendChild(media);
+  btn.appendChild(content);
+  btn.addEventListener('click', () => {
+    renderStorefront(agent);
+    setUrlState({ district: districtKey, agent: id });
+  });
+  return btn;
+}
+
+function ensureDistrictAgentsObserver() {
+  const sentinel = el('atlasDistrictSentinel');
+  if (!sentinel) return;
+  if (state.districtAgentsObserver) {
+    state.districtAgentsObserver.disconnect();
+    state.districtAgentsObserver = null;
+  }
+  state.districtAgentsObserver = new IntersectionObserver(
+    (entries) => {
+      const shouldLoad = entries.some((entry) => entry.isIntersecting);
+      if (!shouldLoad) return;
+      if (!state.districtDetailView.key || !state.districtDetailView.hasMore || state.districtDetailView.loading) return;
+      loadDistrictAgentsPage({ reset: false }).catch((err) => {
+        setAtlasError(mapAgentError(err));
+      });
+    },
+    {
+      root: null,
+      rootMargin: '280px 0px',
+      threshold: 0.01
+    }
+  );
+  state.districtAgentsObserver.observe(sentinel);
+}
+
+async function loadDistrictAgentsPage({ reset = false } = {}) {
+  const key = state.districtDetailView.key;
+  if (!key) return;
+  const agentsWrap = el('atlasDistrictAgents');
+  if (!agentsWrap) return;
+  if (!reset && (!state.districtDetailView.hasMore || state.districtDetailView.loading)) return;
+
+  const query = String(state.districtDetailView.query || '').trim();
+  const network = normalizeDistrictNetwork(state.districtDetailView.network);
+  const searchType = normalizeDistrictSearchType(state.districtDetailView.searchType);
+  const sort = normalizeDistrictSort(state.districtDetailView.sort);
+  const cursor = reset ? null : state.districtDetailView.nextCursor;
+  const cacheKey = `${key}|${network}|${query.toLowerCase()}|${searchType}|${sort}|${cursor || ''}`;
+
+  if (reset) {
+    agentsWrap.innerHTML = '';
+    state.districtDetailView.loadedCount = 0;
+    state.districtDetailView.nextCursor = null;
+    state.districtDetailView.hasMore = false;
+  }
+
+  state.districtDetailView.loading = true;
+  setDistrictLoadStatus(reset ? 'Loading district agents…' : 'Loading more…');
+  const seq = ++state.districtAgentRequestSeq;
+  try {
+    let payload = state.districtAgentListCache.get(cacheKey) || null;
+    if (!payload) {
+      const params = new URLSearchParams();
+      params.set('limit', String(DISTRICT_AGENT_PAGE_SIZE));
+      params.set('network', network);
+      params.set('searchType', searchType);
+      params.set('sort', sort);
+      if (query) params.set('q', query);
+      if (cursor) params.set('cursor', cursor);
+      payload = await api(`/api/atlas/district/${encodeURIComponent(key)}/agents?${params.toString()}`);
+      state.districtAgentListCache.set(cacheKey, payload);
+      if (state.districtAgentListCache.size > 240) {
+        const oldestKey = state.districtAgentListCache.keys().next().value;
+        if (oldestKey) state.districtAgentListCache.delete(oldestKey);
+      }
+    }
+
+    if (seq !== state.districtAgentRequestSeq || state.districtDetailView.key !== key) return;
+
+    const results = Array.isArray(payload?.results) ? payload.results : [];
+    const pagination = payload?.pagination && typeof payload.pagination === 'object' ? payload.pagination : {};
+    upsertAgents(results);
+
+    for (const agent of results) {
+      const tile = buildDistrictAgentTile(agent, key);
+      if (!tile) continue;
+      agentsWrap.appendChild(tile);
+    }
+
+    state.districtDetailView.loadedCount += results.length;
+    state.districtDetailView.nextCursor = typeof pagination.nextCursor === 'string' ? pagination.nextCursor : null;
+    state.districtDetailView.hasMore = pagination.hasMore === true;
+
+    const total = Number.isFinite(Number(pagination.total)) ? Number(pagination.total) : state.districtDetailView.loadedCount;
+    if (state.districtDetailView.loadedCount === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'small atlas-empty';
+      empty.textContent = query ? 'No agents match this district search.' : 'No storefront agents listed yet.';
+      agentsWrap.appendChild(empty);
+      setDistrictLoadStatus('No results.');
+    } else if (state.districtDetailView.hasMore) {
+      setDistrictLoadStatus(`Loaded ${formatNumber(state.districtDetailView.loadedCount)} of ${formatNumber(total)}. Scroll for more.`);
+    } else {
+      setDistrictLoadStatus(`Loaded ${formatNumber(state.districtDetailView.loadedCount)} of ${formatNumber(total)}.`);
+    }
+
+    prefetchDistrictImages(payload?.prefetch);
+  } finally {
+    if (seq === state.districtAgentRequestSeq) {
+      state.districtDetailView.loading = false;
+    }
+  }
+}
+
+function scheduleDistrictSearch() {
+  if (state.districtSearchDebounceTimer) clearTimeout(state.districtSearchDebounceTimer);
+  state.districtSearchDebounceTimer = setTimeout(() => {
+    loadDistrictAgentsPage({ reset: true }).catch((err) => {
+      setAtlasError(mapAgentError(err));
+    });
+  }, DISTRICT_SEARCH_DEBOUNCE_MS);
 }
 
 async function openDistrictDetail(key, opts = {}) {
   if (!key) return;
 
   const detailPanel = el('atlasDistrictDetail');
-  const title = el('atlasDistrictTitle');
-  const stats = el('atlasDistrictStats');
-  const agentsWrap = el('atlasDistrictAgents');
-  if (!detailPanel || !title || !stats || !agentsWrap) return;
+  const searchInput = el('atlasDistrictSearch');
+  const searchTypeSelect = el('atlasDistrictSearchType');
+  if (!detailPanel) return;
 
-  let payload = state.districtDetailCache.get(key);
+  const keyChanged = state.districtDetailView.key !== key;
+  const requestedNetwork = normalizeDistrictNetwork(
+    opts.preferredNetwork || (keyChanged ? 'mainnet' : state.districtDetailView.network) || 'mainnet'
+  );
+  if (keyChanged) {
+    state.districtDetailView.query = '';
+    state.districtDetailView.searchType = 'semantic';
+    state.districtDetailView.sort = 'score_desc';
+    state.districtDetailView.network = requestedNetwork;
+    state.districtAgentListCache.clear();
+  } else {
+    state.districtDetailView.network = requestedNetwork;
+  }
+  updateDistrictNetworkSwitch();
+
+  const summaryCacheKey = `${key}|${state.districtDetailView.network}`;
+  let payload = state.districtDetailCache.get(summaryCacheKey);
   if (!payload) {
     try {
-      payload = await api(`/api/atlas/district/${encodeURIComponent(key)}`);
+      const params = new URLSearchParams();
+      params.set('network', state.districtDetailView.network);
+      payload = await api(`/api/atlas/district/${encodeURIComponent(key)}/summary?${params.toString()}`);
     } catch (err) {
-      if (String(err?.message || '') === 'NOT_FOUND') {
-        throw new Error('DISTRICT_NOT_FOUND');
-      }
+      if (String(err?.message || '') === 'NOT_FOUND') throw new Error('DISTRICT_NOT_FOUND');
       throw err;
     }
-    state.districtDetailCache.set(key, payload);
+    state.districtDetailCache.set(summaryCacheKey, payload);
   }
 
   const district = payload?.district || null;
-  const agents = Array.isArray(payload?.agents) ? payload.agents : [];
   if (!district) throw new Error('DISTRICT_NOT_FOUND');
 
+  state.districtDetailView.key = district.key;
   state.selectedDistrictKey = district.key;
-  upsertAgents(agents);
-  renderDistricts(state.districts, { query: state.currentQuery, family: state.currentFamily });
+  updateSelectedDistrictCards();
 
-  title.textContent = `${district.label || district.key} District`;
-  stats.textContent = `${formatNumber(district.totalAgents)} total • ${formatNumber(district.mainnet?.agents || 0)} mainnet • ${formatNumber(district.testnets?.agents || 0)} testnet • ${formatNumber(agents.length)} storefront profiles`;
-
-  agentsWrap.innerHTML = '';
-  if (!agents.length) {
-    const empty = document.createElement('div');
-    empty.className = 'small atlas-empty';
-    empty.textContent = 'No storefront agents listed yet.';
-    agentsWrap.appendChild(empty);
-  } else {
-    for (const agent of agents) {
-      const id = String(agent?.erc8004Id || '').trim();
-      if (!id) continue;
-
-      const btn = document.createElement('button');
-      btn.className = 'atlas-agent-tile';
-      btn.type = 'button';
-      btn.setAttribute('data-testid', `agent-open-${id}`);
-
-      const media = document.createElement('div');
-      media.className = 'atlas-agent-media';
-      const img = document.createElement('img');
-      img.alt = `${agent.name || id} avatar`;
-      img.loading = 'lazy';
-      const fb = document.createElement('div');
-      fb.className = 'atlas-agent-fallback';
-      setAgentVisual(img, fb, resolveAgentHero(agent), initialsFromAgent(agent));
-      media.appendChild(img);
-      media.appendChild(fb);
-
-      const content = document.createElement('div');
-      content.className = 'atlas-agent-copy';
-
-      const name = document.createElement('div');
-      name.className = 'atlas-agent-name';
-      name.textContent = agent.name || id;
-
-      const meta = document.createElement('div');
-      meta.className = 'small';
-      const network = classifyChainType(agent, district);
-      const networkLabel = network === 'unknown' ? 'network unknown' : network;
-      meta.textContent = `${id} • ${networkLabel}`;
-
-      const desc = document.createElement('div');
-      desc.className = 'small atlas-agent-desc';
-      desc.textContent = agent.description || 'No description available.';
-
-      const chips = document.createElement('div');
-      chips.className = 'atlas-chip-row';
-      const capTags = extractCapabilityTags(agent);
-      for (const tag of capTags) chips.appendChild(makeChip(tag, 'muted'));
-
-      content.appendChild(name);
-      content.appendChild(meta);
-      content.appendChild(desc);
-      if (capTags.length) content.appendChild(chips);
-
-      btn.appendChild(media);
-      btn.appendChild(content);
-
-      btn.addEventListener('click', () => {
-        renderStorefront(agent);
-        setUrlState({ district: district.key, agent: id });
-      });
-
-      agentsWrap.appendChild(btn);
-    }
-  }
-
+  if (searchInput) searchInput.value = state.districtDetailView.query;
+  if (searchTypeSelect) searchTypeSelect.value = state.districtDetailView.searchType;
+  renderDistrictSummaryPayload(payload);
   detailPanel.classList.remove('is-hidden');
   setModalOpen(true);
+  ensureDistrictAgentsObserver();
+  await loadDistrictAgentsPage({ reset: true });
+
   if (!opts.silent) {
     setUrlState({ district: district.key, agent: opts.agent || null });
   }
@@ -940,12 +1310,52 @@ async function openAgentStorefront(erc8004Id) {
   }
 
   if (agent.districtKey) {
-    await openDistrictDetail(agent.districtKey, { silent: true, agent: id });
+    await openDistrictDetail(agent.districtKey, {
+      silent: true,
+      agent: id,
+      preferredNetwork: normalizeDistrictNetwork(agent.networkType)
+    });
     agent = state.agentsById.get(id) || agent;
   }
 
   renderStorefront(agent);
   setUrlState({ district: agent.districtKey || null, agent: id });
+}
+
+function initDistrictDetailControls() {
+  const searchInput = el('atlasDistrictSearch');
+  const searchTypeSelect = el('atlasDistrictSearchType');
+  const networkButtons = [...document.querySelectorAll('.atlas-district-network-btn[data-network]')];
+  if (!searchInput || !searchTypeSelect || !networkButtons.length) return;
+  if (searchInput.dataset.bound === '1') return;
+  searchInput.dataset.bound = '1';
+  updateDistrictNetworkSwitch();
+
+  searchInput.addEventListener('input', () => {
+    state.districtDetailView.query = String(searchInput.value || '');
+    scheduleDistrictSearch();
+  });
+  searchTypeSelect.addEventListener('change', () => {
+    state.districtDetailView.searchType = normalizeDistrictSearchType(searchTypeSelect.value);
+    scheduleDistrictSearch();
+  });
+
+  for (const btn of networkButtons) {
+    btn.addEventListener('click', () => {
+      const districtKey = state.districtDetailView.key;
+      if (!districtKey) return;
+      const nextNetwork = normalizeDistrictNetwork(btn.dataset.network);
+      if (state.districtDetailView.network === nextNetwork) return;
+      state.districtDetailView.network = nextNetwork;
+      updateDistrictNetworkSwitch();
+      openDistrictDetail(districtKey, {
+        silent: true,
+        preferredNetwork: nextNetwork
+      }).catch((err) => {
+        setAtlasError(mapAgentError(err));
+      });
+    });
+  }
 }
 
 function initFilters(districts) {
@@ -1169,6 +1579,7 @@ async function init() {
   state.districtMap = new Map(districts.map((d) => [d.key, d]));
 
   initFilters(districts);
+  initDistrictDetailControls();
 
   const closeBtn = el('storefrontCloseBtn');
   if (closeBtn) closeBtn.addEventListener('click', closeStorefront);

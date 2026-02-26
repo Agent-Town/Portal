@@ -204,6 +204,11 @@ function el(id) {
 const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
 const AGENT_PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
 const AGENT_PANEL_DEBUG_VISIBLE_KEY = 'agentTown:panel:debugVisible';
+const AGENT_PANEL_ZOOM_STEP_KEY = 'agentTown:panel:zoomStep';
+const AGENT_PANEL_ZOOM_STEP_DEFAULT = 0;
+const AGENT_PANEL_ZOOM_STEP_MIN = -2;
+const AGENT_PANEL_ZOOM_STEP_MAX = 4;
+const AGENT_PANEL_ZOOM_SCALE_STEP = 0.1;
 
 let elements = [];
 let lastState = null;
@@ -360,6 +365,21 @@ const popupDistrictByPath = {
   '/leaderboard': 'leaderboard',
   '/wall': 'leaderboard',
   '/house': 'house'
+};
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
+const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
+const experienceIntentTrace = [];
+let experienceIntentAtlasState = {
+  query: '',
+  family: '',
+  searchType: 'keyword'
+};
+let experienceIntentPonyState = {
+  composeOpen: false,
+  toHouseId: '',
+  subject: '',
+  draft: ''
 };
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
@@ -2982,6 +3002,7 @@ function bindBrainDistrictControls() {
 function bindTownDistrictControls() {
   if (lastState) syncTownhallRegistrationUI(lastState);
   bindBrainDistrictControls();
+  bindPonyComposeControls();
 
   const connectWalletBtn = el('connectWalletBtn');
   if (connectWalletBtn) {
@@ -3215,6 +3236,29 @@ function loadAgentPanelDebugVisible() {
   }
 }
 
+function normalizeAgentPanelZoomStep(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return AGENT_PANEL_ZOOM_STEP_DEFAULT;
+  const rounded = Math.round(n);
+  return Math.max(AGENT_PANEL_ZOOM_STEP_MIN, Math.min(AGENT_PANEL_ZOOM_STEP_MAX, rounded));
+}
+
+function agentPanelScaleFromZoomStep(step) {
+  const normalized = normalizeAgentPanelZoomStep(step);
+  const scale = 1 + normalized * AGENT_PANEL_ZOOM_SCALE_STEP;
+  return Number(scale.toFixed(2));
+}
+
+function loadAgentPanelZoomStep() {
+  try {
+    const raw = localStorage.getItem(AGENT_PANEL_ZOOM_STEP_KEY);
+    if (raw === null) return AGENT_PANEL_ZOOM_STEP_DEFAULT;
+    return normalizeAgentPanelZoomStep(raw);
+  } catch {
+    return AGENT_PANEL_ZOOM_STEP_DEFAULT;
+  }
+}
+
 function getTrainerModalBackdrop() {
   return document.getElementById('trainerModalBackdrop');
 }
@@ -3405,6 +3449,15 @@ function saveAgentPanelMinimized(minimized) {
 function saveAgentPanelDebugVisible(visible) {
   try {
     localStorage.setItem(AGENT_PANEL_DEBUG_VISIBLE_KEY, visible ? '1' : '0');
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function saveAgentPanelZoomStep(step) {
+  try {
+    const normalized = normalizeAgentPanelZoomStep(step);
+    localStorage.setItem(AGENT_PANEL_ZOOM_STEP_KEY, String(normalized));
   } catch {
     // ignore storage errors
   }
@@ -3715,6 +3768,443 @@ function inferDistrictModalThemeFromUrl(url) {
   if (path.startsWith('/s/')) return 'share';
   return 'house';
 }
+
+function isPlainRecord(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function truncateIntentTraceText(value, max = 180) {
+  const text = String(value || '');
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}…`;
+}
+
+function sanitizeIntentTraceParams(value, depth = 0) {
+  if (depth > 2) return '[max-depth]';
+  if (value == null) return value;
+  if (typeof value === 'string') return truncateIntentTraceText(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.slice(0, 12).map((entry) => sanitizeIntentTraceParams(entry, depth + 1));
+  if (!isPlainRecord(value)) return String(value);
+  const out = {};
+  for (const [key, rawVal] of Object.entries(value).slice(0, 24)) {
+    out[key] = sanitizeIntentTraceParams(rawVal, depth + 1);
+  }
+  return out;
+}
+
+function pushExperienceIntentTraceEvent({ source = 'runtime', tool = '', params = {}, envelope = null }) {
+  const safeEnvelope = isPlainRecord(envelope) ? envelope : {};
+  const errorObj = isPlainRecord(safeEnvelope.error) ? safeEnvelope.error : null;
+  experienceIntentTrace.push({
+    atMs: Date.now(),
+    source: String(source || 'runtime'),
+    tool: String(tool || ''),
+    ok: safeEnvelope.ok === true,
+    applied: safeEnvelope.applied === true,
+    errorCode: errorObj ? String(errorObj.code || '') : null,
+    params: sanitizeIntentTraceParams(params)
+  });
+  if (experienceIntentTrace.length > EXPERIENCE_INTENT_TRACE_LIMIT) {
+    experienceIntentTrace.splice(0, experienceIntentTrace.length - EXPERIENCE_INTENT_TRACE_LIMIT);
+  }
+}
+
+function getExperienceIntentTraceSnapshot() {
+  return { events: experienceIntentTrace.slice() };
+}
+
+function readDistrictModalSnapshot() {
+  const backdrop = el('districtModalBackdrop');
+  const title = el('districtModalTitle');
+  const isOpen = !!backdrop && !backdrop.classList.contains('is-hidden') && backdrop.getAttribute('aria-hidden') !== 'true';
+  return {
+    open: isOpen,
+    title: title ? String(title.textContent || '').trim() : ''
+  };
+}
+
+function buildExperienceIntentStateSnapshot(overrides = {}) {
+  const workerConnected = lastState?.agent?.connected === true;
+  const teamCode = typeof lastState?.teamCode === 'string' ? lastState.teamCode : '';
+  const base = {
+    path: window.location.pathname,
+    activeDistrict: String(activeDistrict || currentDistrict || ''),
+    modal: readDistrictModalSnapshot(),
+    worker: {
+      connected: workerConnected,
+      teamCode
+    },
+    atlas: {
+      query: String(experienceIntentAtlasState.query || ''),
+      family: String(experienceIntentAtlasState.family || ''),
+      searchType: String(experienceIntentAtlasState.searchType || 'keyword')
+    },
+    pony: {
+      composeOpen: experienceIntentPonyState.composeOpen === true,
+      composeTo: String(experienceIntentPonyState.toHouseId || ''),
+      subject: String(experienceIntentPonyState.subject || '')
+    }
+  };
+  if (!isPlainRecord(overrides)) return base;
+  return {
+    ...base,
+    ...overrides,
+    modal: isPlainRecord(overrides.modal) ? { ...base.modal, ...overrides.modal } : base.modal,
+    worker: isPlainRecord(overrides.worker) ? { ...base.worker, ...overrides.worker } : base.worker,
+    atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
+    pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
+  };
+}
+
+function makeExperienceIntentEnvelope({ ok = false, applied = false, stateSnapshot = null, error = null } = {}) {
+  return {
+    ok: ok === true,
+    applied: applied === true,
+    stateSnapshot: stateSnapshot && typeof stateSnapshot === 'object'
+      ? stateSnapshot
+      : buildExperienceIntentStateSnapshot(),
+    error: error ? {
+      code: String(error.code || 'UI_INTENT_INTERNAL'),
+      message: String(error.message || error.code || 'UI intent failed')
+    } : null
+  };
+}
+
+function invalidExperienceParam(message) {
+  return makeExperienceIntentEnvelope({
+    ok: false,
+    applied: false,
+    error: {
+      code: 'UI_INTENT_INVALID_PARAM',
+      message
+    }
+  });
+}
+
+function normalizeExperienceSearchType(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (raw === 'semantic') return 'semantic';
+  return 'keyword';
+}
+
+function isSafeExperienceToken(value, { allowEmpty = false, maxLen = 72 } = {}) {
+  const text = String(value || '').trim();
+  if (!text) return allowEmpty;
+  if (text.length > maxLen) return false;
+  return /^[a-zA-Z0-9:_\-./ ]+$/.test(text);
+}
+
+function setPonyComposePanelOpen(open) {
+  const panel = el('ponyComposePanel');
+  if (!panel) return false;
+  const isOpen = open === true;
+  panel.classList.toggle('is-hidden', !isOpen);
+  panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  return true;
+}
+
+function bindPonyComposeControls() {
+  const openBtn = el('ponyComposeOpenBtn');
+  if (openBtn && openBtn.dataset.bound !== '1') {
+    openBtn.dataset.bound = '1';
+    openBtn.addEventListener('click', () => {
+      setPonyComposePanelOpen(true);
+      experienceIntentPonyState.composeOpen = true;
+    });
+  }
+  const closeBtn = el('ponyComposeCloseBtn');
+  if (closeBtn && closeBtn.dataset.bound !== '1') {
+    closeBtn.dataset.bound = '1';
+    closeBtn.addEventListener('click', () => {
+      setPonyComposePanelOpen(false);
+      experienceIntentPonyState.composeOpen = false;
+    });
+  }
+}
+
+function applyPonyComposePrefill({ toHouseId = '', subject = '', draft = '' } = {}) {
+  const toInput = el('ponyComposeToInput');
+  const subjectInput = el('ponyComposeSubjectInput');
+  const draftInput = el('ponyComposeDraftInput');
+  if (!toInput || !subjectInput || !draftInput) return false;
+  toInput.value = String(toHouseId || '');
+  subjectInput.value = String(subject || '');
+  draftInput.value = String(draft || '');
+  setPonyComposePanelOpen(true);
+  experienceIntentPonyState = {
+    composeOpen: true,
+    toHouseId: toInput.value,
+    subject: subjectInput.value,
+    draft: draftInput.value
+  };
+  return true;
+}
+
+async function waitForDistrictModalOpen(timeoutMs = 2500) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const modal = readDistrictModalSnapshot();
+    if (modal.open) return true;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return readDistrictModalSnapshot().open;
+}
+
+async function waitForDistrictModalFrame(timeoutMs = 4500) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const frame = document.querySelector('#districtModalBody iframe.districtFrame');
+    if (frame) {
+      try {
+        const doc = frame.contentDocument || frame.contentWindow?.document;
+        if (doc && doc.readyState === 'complete') return frame;
+      } catch {
+        return frame;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return document.querySelector('#districtModalBody iframe.districtFrame');
+}
+
+function prefillAtlasFrameInputs(frame, { q = '', family = '', searchType = 'keyword' } = {}) {
+  if (!frame) return;
+  let doc = null;
+  try {
+    doc = frame.contentDocument || frame.contentWindow?.document || null;
+  } catch {
+    doc = null;
+  }
+  if (!doc) return;
+  const qInput = doc.getElementById('atlasSearch');
+  const familySelect = doc.getElementById('atlasChainFamily');
+  const searchTypeSelect = doc.getElementById('atlasSearchType');
+  if (qInput) qInput.value = String(q || '');
+  if (familySelect) familySelect.value = String(family || '');
+  if (searchTypeSelect) searchTypeSelect.value = String(searchType || 'keyword');
+}
+
+async function stabilizeAtlasFrameInputs(frame, values, timeoutMs = 1200) {
+  const targetQ = String(values?.q || '');
+  const targetFamily = String(values?.family || '');
+  const targetSearchType = String(values?.searchType || 'keyword');
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    prefillAtlasFrameInputs(frame, values);
+    let doc = null;
+    try {
+      doc = frame?.contentDocument || frame?.contentWindow?.document || null;
+    } catch {
+      doc = null;
+    }
+    const qInput = doc ? doc.getElementById('atlasSearch') : null;
+    const familySelect = doc ? doc.getElementById('atlasChainFamily') : null;
+    const searchTypeSelect = doc ? doc.getElementById('atlasSearchType') : null;
+    const qOk = !qInput || String(qInput.value || '') === targetQ;
+    const familyOk = !familySelect || String(familySelect.value || '') === targetFamily;
+    const searchTypeOk = !searchTypeSelect || String(searchTypeSelect.value || '') === targetSearchType;
+    if (qOk && familyOk && searchTypeOk) return;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+  }
+  prefillAtlasFrameInputs(frame, values);
+}
+
+function validateStrictKeys(payload, allowedKeys) {
+  if (!isPlainRecord(payload)) return false;
+  for (const key of Object.keys(payload)) {
+    if (!allowedKeys.has(key)) return false;
+  }
+  return true;
+}
+
+async function runExperienceUiOpenModal(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['modal', 'params']))) {
+    return invalidExperienceParam('open_modal accepts only { modal, params }');
+  }
+  if ('selector' in rawParams || 'html' in rawParams) {
+    return invalidExperienceParam('selector/html payloads are not allowed');
+  }
+  const modal = String(rawParams.modal || '').trim().toLowerCase();
+  if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
+    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil');
+  }
+  const params = rawParams.params;
+  if (params != null && !isPlainRecord(params)) {
+    return invalidExperienceParam('params must be an object');
+  }
+  if (isPlainRecord(params) && ('selector' in params || 'html' in params)) {
+    return invalidExperienceParam('selector/html payloads are not allowed');
+  }
+  await showDistrict(modal);
+  if (modal === 'pony') {
+    bindPonyComposeControls();
+    setPonyComposePanelOpen(false);
+    experienceIntentPonyState.composeOpen = false;
+  }
+  await waitForDistrictModalOpen();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true
+  });
+}
+
+async function runExperienceUiAtlasSearch(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['q', 'family', 'searchType']))) {
+    return invalidExperienceParam('atlas_search accepts only { q, family, searchType }');
+  }
+  const q = String(rawParams.q || '').trim();
+  if (q.length > 180) return invalidExperienceParam('q exceeds max length 180');
+  if (!isSafeExperienceToken(q, { allowEmpty: true, maxLen: 180 })) {
+    return invalidExperienceParam('q contains unsupported characters');
+  }
+  const family = String(rawParams.family || '').trim().toLowerCase();
+  if (!isSafeExperienceToken(family, { allowEmpty: true, maxLen: 64 })) {
+    return invalidExperienceParam('family contains unsupported characters');
+  }
+  const searchTypeRaw = String(rawParams.searchType || 'keyword').trim().toLowerCase();
+  if (searchTypeRaw !== 'keyword' && searchTypeRaw !== 'semantic') {
+    return invalidExperienceParam('searchType must be keyword or semantic');
+  }
+  const searchType = normalizeExperienceSearchType(searchTypeRaw);
+  const params = new URLSearchParams();
+  params.set('embed', '1');
+  params.set('searchType', searchType);
+  if (q) params.set('q', q);
+  if (family) params.set('family', family);
+
+  setActiveDistrict('atlas');
+  currentDistrict = 'atlas';
+  openRouteInModalFrame(`/atlas?${params.toString()}`, 'Atlas Depot');
+  experienceIntentAtlasState = { query: q, family, searchType };
+  await waitForDistrictModalOpen();
+  const atlasFrame = await waitForDistrictModalFrame();
+  await stabilizeAtlasFrameInputs(atlasFrame, { q, family, searchType });
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      atlas: {
+        query: q,
+        family,
+        searchType
+      }
+    })
+  });
+}
+
+async function runExperienceUiPonyCompose(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['toHouseId', 'subject', 'draft']))) {
+    return invalidExperienceParam('pony_compose accepts only { toHouseId, subject, draft }');
+  }
+  const toHouseId = String(rawParams.toHouseId || '').trim();
+  const subject = String(rawParams.subject || '').trim();
+  const draft = String(rawParams.draft || '');
+  if (!isSafeExperienceToken(toHouseId, { allowEmpty: true, maxLen: 120 })) {
+    return invalidExperienceParam('toHouseId contains unsupported characters');
+  }
+  if (!isSafeExperienceToken(subject, { allowEmpty: true, maxLen: 180 })) {
+    return invalidExperienceParam('subject contains unsupported characters');
+  }
+  if (draft.length > 6000) {
+    return invalidExperienceParam('draft exceeds max length 6000');
+  }
+
+  await showDistrict('pony');
+  bindPonyComposeControls();
+  const applied = applyPonyComposePrefill({ toHouseId, subject, draft });
+  if (!applied) {
+    return makeExperienceIntentEnvelope({
+      ok: false,
+      applied: false,
+      error: {
+        code: 'UI_INTENT_UNAVAILABLE',
+        message: 'Pony compose panel is unavailable'
+      }
+    });
+  }
+  await waitForDistrictModalOpen();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      pony: {
+        composeOpen: true,
+        composeTo: toHouseId,
+        subject
+      }
+    })
+  });
+}
+
+async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
+  const toolName = String(tool || '').trim();
+  const params = isPlainRecord(rawParams) ? rawParams : {};
+  const source = String(options?.source || 'runtime');
+
+  if (!isTownHub) {
+    const unavailable = makeExperienceIntentEnvelope({
+      ok: false,
+      applied: false,
+      error: {
+        code: 'UI_INTENT_UNAVAILABLE',
+        message: 'Town hub modal runtime is unavailable on this route'
+      }
+    });
+    pushExperienceIntentTraceEvent({ source, tool: toolName, params, envelope: unavailable });
+    return unavailable;
+  }
+
+  let envelope = null;
+  try {
+    if (EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS.has(toolName)) {
+      envelope = makeExperienceIntentEnvelope({
+        ok: false,
+        applied: false,
+        error: {
+          code: 'CONFIRMATION_REQUIRED',
+          message: `${toolName} requires explicit approval token`
+        }
+      });
+    } else if (toolName === 'agent_town_ui_open_modal') {
+      envelope = await runExperienceUiOpenModal(params);
+    } else if (toolName === 'agent_town_ui_atlas_search') {
+      envelope = await runExperienceUiAtlasSearch(params);
+    } else if (toolName === 'agent_town_ui_pony_compose') {
+      envelope = await runExperienceUiPonyCompose(params);
+    } else {
+      envelope = makeExperienceIntentEnvelope({
+        ok: false,
+        applied: false,
+        error: {
+          code: 'UI_INTENT_UNKNOWN',
+          message: `Unknown intent tool: ${toolName || '(empty)'}`,
+        }
+      });
+    }
+  } catch (err) {
+    envelope = makeExperienceIntentEnvelope({
+      ok: false,
+      applied: false,
+      error: {
+        code: 'UI_INTENT_INTERNAL',
+        message: String(err?.message || err || 'UI intent failed')
+      }
+    });
+  }
+
+  pushExperienceIntentTraceEvent({ source, tool: toolName, params, envelope });
+  return envelope;
+}
+
+window.AgentTownExperienceIntent = {
+  dispatch: dispatchExperienceIntent,
+  getTrace: getExperienceIntentTraceSnapshot,
+  clearTrace: () => {
+    experienceIntentTrace.length = 0;
+    return { ok: true };
+  }
+};
 
 function openRouteInModalFrame(url, title) {
   if (!isTownHub) return;
@@ -7088,10 +7578,39 @@ function renderCeremony(state) {
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('minimizeChatBtn');
   const debugBtn = document.getElementById('agentDebugToggleBtn');
+  const zoomOutBtn = document.getElementById('agentPanelZoomOutBtn');
+  const zoomInBtn = document.getElementById('agentPanelZoomInBtn');
   const dock = document.getElementById('agentSidebar');
   const header = dock ? dock.querySelector('.sidebar-header') : null;
 
   if (dock && header && btn) {
+    let zoomStep = AGENT_PANEL_ZOOM_STEP_DEFAULT;
+
+    const applyPanelZoom = (nextStep, { persist = true } = {}) => {
+      const normalized = normalizeAgentPanelZoomStep(nextStep);
+      const scale = agentPanelScaleFromZoomStep(normalized);
+      zoomStep = normalized;
+      dock.style.setProperty('--agent-panel-zoom', String(scale));
+      dock.style.setProperty('--agent-panel-text-scale', String(scale));
+      dock.setAttribute('data-panel-zoom-step', String(normalized));
+      if (persist) saveAgentPanelZoomStep(normalized);
+
+      const percent = Math.round(scale * 100);
+      if (zoomOutBtn) {
+        zoomOutBtn.disabled = normalized <= AGENT_PANEL_ZOOM_STEP_MIN;
+        zoomOutBtn.title = `Decrease panel size (${percent}%)`;
+        zoomOutBtn.setAttribute('aria-label', `Decrease panel size (${percent}%)`);
+      }
+      if (zoomInBtn) {
+        zoomInBtn.disabled = normalized >= AGENT_PANEL_ZOOM_STEP_MAX;
+        zoomInBtn.title = `Increase panel size (${percent}%)`;
+        zoomInBtn.setAttribute('aria-label', `Increase panel size (${percent}%)`);
+      }
+
+      syncAgentPanelLayout(dock);
+      return normalized;
+    };
+
     const applyMinimized = (minimized) => {
       dock.classList.toggle('minimized', minimized);
       btn.textContent = minimized ? '□' : '_';
@@ -7116,6 +7635,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (debugBtn) {
       applyDebugVisible(loadAgentPanelDebugVisible());
     }
+    applyPanelZoom(loadAgentPanelZoomStep(), { persist: false });
     bindAgentPanelLayout(dock);
 
     btn.addEventListener('click', (event) => {
@@ -7129,6 +7649,20 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         event.stopPropagation();
         applyDebugVisible(dock.classList.contains('debug-collapsed'));
+      });
+    }
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyPanelZoom(zoomStep - 1);
+      });
+    }
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        applyPanelZoom(zoomStep + 1);
       });
     }
 

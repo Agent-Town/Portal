@@ -158,7 +158,61 @@
             <section class="panel atlas-detail-panel is-hidden" id="atlasDistrictDetail" data-testid="district-detail">
               <h2 id="atlasDistrictTitle">District</h2>
               <div class="small" id="atlasDistrictStats"></div>
+              <div class="atlas-district-kpis" id="atlasDistrictKpis">
+                <div class="atlas-district-kpi">
+                  <span class="small">Mainnet</span>
+                  <strong id="atlasDistrictMainnetCount">0</strong>
+                </div>
+                <div class="atlas-district-kpi">
+                  <span class="small">Testnet</span>
+                  <strong id="atlasDistrictTestnetCount">0</strong>
+                </div>
+                <div class="atlas-district-kpi">
+                  <span class="small">Avg score</span>
+                  <strong id="atlasDistrictAverageScore">0</strong>
+                </div>
+                <div class="atlas-district-kpi">
+                  <span class="small">Score > 0</span>
+                  <strong id="atlasDistrictScoreGtZero">0</strong>
+                </div>
+              </div>
+              <div class="small atlas-district-extra" id="atlasDistrictScoreBins"></div>
+              <div class="small atlas-district-extra" id="atlasDistrictServiceCounts"></div>
+              <div class="atlas-district-network-switch" role="group" aria-label="District network">
+                <button
+                  class="btn atlas-district-network-btn is-active"
+                  id="atlasDistrictNetworkMain"
+                  data-network="mainnet"
+                  type="button"
+                  aria-pressed="true"
+                >
+                  Mainnet
+                </button>
+                <button
+                  class="btn atlas-district-network-btn"
+                  id="atlasDistrictNetworkTest"
+                  data-network="testnet"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  Testnet
+                </button>
+              </div>
+              <div class="atlas-district-search-row">
+                <input
+                  id="atlasDistrictSearch"
+                  data-testid="atlas-district-search"
+                  type="search"
+                  placeholder="Search this district (name, id, capability)"
+                />
+                <select id="atlasDistrictSearchType" data-testid="atlas-district-search-type">
+                  <option value="semantic">Semantic</option>
+                  <option value="keyword">Keyword</option>
+                </select>
+              </div>
               <div class="atlas-agent-grid" id="atlasDistrictAgents"></div>
+              <div class="small atlas-district-load-status" id="atlasDistrictLoadStatus"></div>
+              <div class="atlas-district-sentinel" id="atlasDistrictSentinel" aria-hidden="true"></div>
             </section>
 
             <section class="panel atlas-storefront-drawer is-hidden" id="storefrontDrawer" data-testid="storefront-drawer">
