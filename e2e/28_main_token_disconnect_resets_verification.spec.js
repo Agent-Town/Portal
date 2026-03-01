@@ -23,7 +23,11 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
   await page.goto('/');
   await enterHatch(page, 'signin', { navigate: false });
 
-  const teamBefore = (await page.getByTestId('team-code').innerText()).trim();
+  const teamBefore = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    const state = await resp.json().catch(() => ({}));
+    return String(state?.teamCode || '').trim();
+  });
   expect(teamBefore).toMatch(/^TEAM-/);
 
   await triggerWalletProfileCheck(page);
@@ -43,7 +47,11 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
 
   await page.reload();
   await enterHatch(page, 'signin', { navigate: false });
-  const teamAfter = (await page.getByTestId('team-code').innerText()).trim();
+  const teamAfter = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    const state = await resp.json().catch(() => ({}));
+    return String(state?.teamCode || '').trim();
+  });
   expect(teamAfter).toMatch(/^TEAM-/);
   expect(teamAfter).not.toBe(teamBefore);
 });

@@ -145,7 +145,8 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
 
   await page.addInitScript(
     ({ houseId, houseAuthB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
     },
     {
       houseId: houseB.houseId,
@@ -161,7 +162,8 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
 
   await page.evaluate(
     ({ houseId, houseAuthB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
     },
     {
       houseId: houseA.houseId,

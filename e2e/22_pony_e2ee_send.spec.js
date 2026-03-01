@@ -104,7 +104,8 @@ test('inbox compose sends E2EE envelope when receiver pony key exists', async ({
 
   await page.addInitScript(
     ({ houseId, keyB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = keyB64;
     },
     { houseId: houseB.houseId, keyB64: houseB.kauth.toString('base64') }
   );

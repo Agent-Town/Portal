@@ -27,6 +27,41 @@ async function setDeterministicLlm(page) {
       useProxy: true
     });
   });
+  await page.waitForFunction(async (expected) => {
+    const openDb = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open('openclaw-lite', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('checkpoints')) {
+          const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+          s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+        }
+        if (!db.objectStoreNames.contains('vfs')) db.createObjectStore('vfs', { keyPath: 'path' });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+    });
+    const txDone = (tx) => new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+      tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+    });
+    const reqToPromise = (req) => new Promise((resolve, reject) => {
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
+    });
+    try {
+      const db = await openDb();
+      const tx = db.transaction(['meta'], 'readonly');
+      const rec = await reqToPromise(tx.objectStore('meta').get('llmApiKey'));
+      await txDone(tx);
+      db.close();
+      return rec && rec.value === expected;
+    } catch {
+      return false;
+    }
+  }, 'trainer-test-key', { timeout: 10000 });
 }
 
 async function visitSkill(page, url = '/skill.md') {

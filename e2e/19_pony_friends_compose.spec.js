@@ -254,10 +254,11 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
   });
   expect(register.ok()).toBeTruthy();
 
-  // Open inbox UI for houseB with its house-auth key in sessionStorage.
+  // Open inbox UI for houseB with its house-auth key in runtime memory.
   await page.addInitScript(
     ({ houseId, keyB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = keyB64;
     },
     { houseId: houseB.houseId, keyB64: houseB.kauth.toString('base64') }
   );
@@ -297,7 +298,8 @@ test('legacy house upgrades Pony keys from inbox and receives encrypted compose'
 
   await page.addInitScript(
     ({ houseId, houseAuthB64, walletAddress, walletSigB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
 
       const bin = atob(walletSigB64);
       const sig = new Uint8Array(bin.length);

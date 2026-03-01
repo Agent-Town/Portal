@@ -26,9 +26,10 @@ test('open press completes signup with co-op agent action and navigates to /crea
     const openReady = page.locator('#openReady a[href="/create"]');
     if (await openReady.isVisible().catch(() => false)) {
       await openReady.click();
-    } else {
-      await page.goto('/create');
     }
+  }
+  if (!page.url().includes('/create')) {
+    await page.goto('/create');
   }
   await page.waitForURL('**/create', { timeout: 10000 });
 

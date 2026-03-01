@@ -56,17 +56,12 @@
 <div class="panel" id="step1Panel">
   <h2 style="margin:0 0 6px">Step 1 — Agent connection</h2>
   <p class="small" style="margin-top:0" id="step1Intro">
-    If you are a <strong>human</strong>, send your agent the <code>skill.md</code> link, then paste the team code.
-    If you are an <strong>agent</strong>, you will need the team code from a human.
+    If you are a <strong>human</strong>, send your agent the <code>skill.md</code> link and let it join the live browser session.
+    If you are an <strong>agent</strong>, follow the playbook and runtime context.
   </p>
   <div class="kv">
     <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">Read the OpenClaw skill</a>
-    <button class="btn" id="copyTeam" data-testid="copy-team">Copy team message</button>
-    <span class="pill">Team code: <strong data-testid="team-code" id="teamCode">…</strong></span>
     <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
-  </div>
-  <div class="kv stack">
-    <code class="pill" data-testid="team-snippet" id="teamSnippet">Read /skill.md and team with code: …</code>
   </div>
 </div>
 

@@ -190,7 +190,9 @@ test('create flow preserves ceremony + house generation and keeps house-auth met
   await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
 
   const houseAuthKeyB64 = await page.evaluate((id) => {
-    return sessionStorage.getItem(`agentTownHouseAuth:${id}`);
+    const store = window.__agentTownHouseAuthMemory || {};
+    const value = store[`agentTownHouseAuth:${id}`];
+    return typeof value === 'string' ? value : null;
   }, houseId);
   expect(houseAuthKeyB64).toBeTruthy();
 

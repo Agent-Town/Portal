@@ -3,6 +3,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+const net = require('net');
+const dns = require('dns').promises;
 const zlib = require('zlib');
 const express = require('express');
 const { registerLlmRoutes } = require('../vendors/openclaw-lite-main/server/routes/llm');
@@ -6529,16 +6531,33 @@ function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
 }
 
 function fileSignature(filePath) {
+  const absolutePath = path.resolve(filePath);
   try {
-    const stat = fs.statSync(filePath);
-    return `${path.resolve(filePath)}:${stat.mtimeMs}:${stat.size}`;
+    const stat = fs.statSync(filePath, { bigint: true });
+    const size = typeof stat.size === 'bigint' ? stat.size.toString() : String(stat.size || 0);
+    const mtimeNs = typeof stat.mtimeNs === 'bigint'
+      ? stat.mtimeNs.toString()
+      : String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
+    const ctimeNs = typeof stat.ctimeNs === 'bigint'
+      ? stat.ctimeNs.toString()
+      : String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
+    const inode = typeof stat.ino === 'bigint' ? stat.ino.toString() : String(stat.ino || 0);
+    return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
   } catch {
-    return `${path.resolve(filePath)}:missing`;
+    return `${absolutePath}:missing`;
   }
 }
 
+function sqliteFamilySignature(filePath) {
+  return [
+    fileSignature(filePath),
+    fileSignature(`${filePath}-wal`),
+    fileSignature(`${filePath}-shm`)
+  ].join('|');
+}
+
 function currentAtlasDataSignature() {
-  return `${fileSignature(ATLAS_SQLITE_PATH)}|${fileSignature(getStorePath())}`;
+  return `${sqliteFamilySignature(ATLAS_SQLITE_PATH)}|${sqliteFamilySignature(getStorePath())}`;
 }
 
 function pruneAtlasCache(cache, maxEntries = ATLAS_DISTRICT_CACHE_MAX) {
@@ -8624,43 +8643,239 @@ app.get('*', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 // --- OpenClaw Lite Tool Proxies ---
 
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; OpenClawLite/1.0; +https://agent.town)';
+const PROXY_TARGET_MAX_REDIRECTS = 5;
+const PROXY_DNS_CACHE_TTL_MS = 30_000;
+const PROXY_BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'metadata',
+  'metadata.google.internal',
+  'ip6-localhost',
+  'ip6-loopback'
+]);
+const PROXY_BLOCKED_HOST_SUFFIXES = ['.local', '.internal'];
+const proxyDnsCache = new Map();
+const proxyAddressDenyList = typeof net.BlockList === 'function' ? new net.BlockList() : null;
+
+function addProxyDenySubnet(address, prefix, type) {
+  if (!proxyAddressDenyList) return;
+  try {
+    proxyAddressDenyList.addSubnet(address, prefix, type);
+  } catch {
+    // Ignore unsupported/invalid ranges.
+  }
+}
+
+// IPv4 deny ranges (local/private/link-local/reserved).
+addProxyDenySubnet('0.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('10.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('100.64.0.0', 10, 'ipv4');
+addProxyDenySubnet('127.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('169.254.0.0', 16, 'ipv4');
+addProxyDenySubnet('172.16.0.0', 12, 'ipv4');
+addProxyDenySubnet('192.0.0.0', 24, 'ipv4');
+addProxyDenySubnet('192.168.0.0', 16, 'ipv4');
+addProxyDenySubnet('198.18.0.0', 15, 'ipv4');
+addProxyDenySubnet('224.0.0.0', 4, 'ipv4');
+addProxyDenySubnet('240.0.0.0', 4, 'ipv4');
+
+// IPv6 deny ranges (loopback/link-local/ULA/multicast/docs).
+addProxyDenySubnet('::', 128, 'ipv6');
+addProxyDenySubnet('::1', 128, 'ipv6');
+addProxyDenySubnet('fc00::', 7, 'ipv6');
+addProxyDenySubnet('fe80::', 10, 'ipv6');
+addProxyDenySubnet('ff00::', 8, 'ipv6');
+addProxyDenySubnet('2001:db8::', 32, 'ipv6');
+
+function makeProxyPolicyError(message, details = null) {
+  const err = new Error(message);
+  err.code = 'PROXY_TARGET_BLOCKED';
+  err.details = details;
+  return err;
+}
+
+function normalizeProxyHostname(hostname) {
+  return String(hostname || '').trim().replace(/\.+$/, '').toLowerCase();
+}
+
+function isBlockedProxyHostname(hostname) {
+  const host = normalizeProxyHostname(hostname);
+  if (!host) return true;
+  if (PROXY_BLOCKED_HOSTNAMES.has(host)) return true;
+  return PROXY_BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
+function isBlockedProxyIpAddress(address) {
+  if (!proxyAddressDenyList) return false;
+  const raw = String(address || '').trim();
+  if (!raw) return true;
+  const zoneSplit = raw.split('%');
+  const normalized = zoneSplit[0];
+  const version = net.isIP(normalized);
+  if (version === 4) return proxyAddressDenyList.check(normalized, 'ipv4');
+  if (version === 6) return proxyAddressDenyList.check(normalized, 'ipv6');
+  return false;
+}
+
+function readCachedProxyDns(hostname) {
+  const now = Date.now();
+  const key = normalizeProxyHostname(hostname);
+  const hit = proxyDnsCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= now) {
+    proxyDnsCache.delete(key);
+    return null;
+  }
+  return hit.addresses;
+}
+
+function writeCachedProxyDns(hostname, addresses) {
+  const key = normalizeProxyHostname(hostname);
+  proxyDnsCache.set(key, {
+    addresses,
+    expiresAt: Date.now() + PROXY_DNS_CACHE_TTL_MS
+  });
+}
+
+async function resolveProxyHostAddresses(hostname) {
+  const host = normalizeProxyHostname(hostname);
+  if (!host) return [];
+  const directIp = net.isIP(host);
+  if (directIp) return [host];
+
+  const cached = readCachedProxyDns(host);
+  if (cached) return cached;
+
+  try {
+    const rows = await dns.lookup(host, { all: true, verbatim: true });
+    const addresses = [...new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((row) => String(row?.address || '').trim())
+        .filter(Boolean)
+    )];
+    writeCachedProxyDns(host, addresses);
+    return addresses;
+  } catch {
+    // Let fetch handle resolution/network errors if DNS lookup fails here.
+    return [];
+  }
+}
+
+async function assertProxyTargetAllowed(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(targetUrl || ''));
+  } catch {
+    throw makeProxyPolicyError('Blocked proxy target (invalid URL)');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw makeProxyPolicyError('Blocked proxy target (protocol not allowed)', {
+      protocol: parsed.protocol || null
+    });
+  }
+  if (parsed.username || parsed.password) {
+    throw makeProxyPolicyError('Blocked proxy target (embedded credentials not allowed)');
+  }
+
+  const hostname = normalizeProxyHostname(parsed.hostname);
+  if (isBlockedProxyHostname(hostname)) {
+    throw makeProxyPolicyError('Blocked proxy target (hostname denied)', { hostname });
+  }
+
+  const addresses = await resolveProxyHostAddresses(hostname);
+  for (const address of addresses) {
+    if (isBlockedProxyIpAddress(address)) {
+      throw makeProxyPolicyError('Blocked proxy target (resolved to denied address)', {
+        hostname,
+        address
+      });
+    }
+  }
+}
 
 async function proxyFetch(url, options = {}) {
   const controller = new AbortController();
-  const timeoutMs = options.timeoutMs || 30000;
+  const timeoutMs = Math.max(1, Number(options.timeoutMs) || 30000);
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let currentUrl = String(url || '').trim();
+  let redirects = 0;
+  let method = String(options.method || 'GET').trim().toUpperCase() || 'GET';
+  let body = options.body;
+  const baseHeaders = {
+    'User-Agent': DEFAULT_USER_AGENT,
+    ...(options.headers || {})
+  };
 
   try {
-    const res = await fetch(url, {
-      method: options.method || 'GET',
-      headers: {
-        'User-Agent': DEFAULT_USER_AGENT,
-        ...(options.headers || {})
-      },
-      body: options.body,
-      redirect: options.followRedirects ? 'follow' : 'manual',
-      signal: controller.signal
-    });
+    while (true) {
+      await assertProxyTargetAllowed(currentUrl);
 
-    // Convert ArrayBuffer to Buffer for processing
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+      const requestHeaders = { ...baseHeaders };
+      if (body == null) {
+        delete requestHeaders['content-length'];
+        delete requestHeaders['Content-Length'];
+      }
 
-    const headers = {};
-    res.headers.forEach((v, k) => headers[k] = v);
+      const res = await fetch(currentUrl, {
+        method,
+        headers: requestHeaders,
+        body,
+        redirect: 'manual',
+        signal: controller.signal
+      });
 
-    return {
-      ok: true,
-      status: res.status,
-      url: res.url,
-      headers,
-      buffer
-    };
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      return { ok: false, error: 'TIMEOUT' };
+      const status = Number(res.status || 0);
+      const shouldFollow = options.followRedirects !== false;
+      if (
+        shouldFollow
+        && [301, 302, 303, 307, 308].includes(status)
+        && redirects < PROXY_TARGET_MAX_REDIRECTS
+      ) {
+        const location = String(res.headers.get('location') || '').trim();
+        if (!location) {
+          return { ok: false, errorCode: 'REDIRECT_MISSING_LOCATION', error: 'Redirect missing location header' };
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+        redirects += 1;
+        if (
+          status === 303
+          || ((status === 301 || status === 302) && method !== 'GET' && method !== 'HEAD')
+        ) {
+          method = 'GET';
+          body = undefined;
+        }
+        continue;
+      }
+      if (shouldFollow && [301, 302, 303, 307, 308].includes(status) && redirects >= PROXY_TARGET_MAX_REDIRECTS) {
+        return { ok: false, errorCode: 'TOO_MANY_REDIRECTS', error: 'Too many redirects' };
+      }
+
+      // Convert ArrayBuffer to Buffer for processing
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      const headers = {};
+      res.headers.forEach((v, k) => {
+        headers[k] = v;
+      });
+
+      return {
+        ok: true,
+        status,
+        url: res.url || currentUrl,
+        headers,
+        buffer
+      };
     }
-    return { ok: false, error: e.message };
+  } catch (e) {
+    if (e?.code === 'PROXY_TARGET_BLOCKED') {
+      return { ok: false, errorCode: 'PROXY_TARGET_BLOCKED', error: e.message, details: e.details || null };
+    }
+    if (e.name === 'AbortError') {
+      return { ok: false, errorCode: 'TIMEOUT', error: 'TIMEOUT' };
+    }
+    return { ok: false, errorCode: 'FETCH_FAILED', error: String(e?.message || 'FETCH_FAILED') };
   } finally {
     clearTimeout(timeout);
   }
@@ -8678,7 +8893,14 @@ app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
     });
 
     if (!result.ok) {
-      return res.json({ ok: false, error: { code: 'FETCH_FAILED', message: result.error } });
+      return res.json({
+        ok: false,
+        error: {
+          code: result.errorCode || 'FETCH_FAILED',
+          message: result.error || 'FETCH_FAILED',
+          ...(result.details ? { details: result.details } : {})
+        }
+      });
     }
 
     const contentType = result.headers['content-type'] || '';
@@ -8788,7 +9010,14 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
     });
 
     if (!result.ok) {
-      return res.json({ ok: false, error: { code: 'REQUEST_FAILED', message: result.error } });
+      return res.json({
+        ok: false,
+        error: {
+          code: result.errorCode || 'REQUEST_FAILED',
+          message: result.error || 'REQUEST_FAILED',
+          ...(result.details ? { details: result.details } : {})
+        }
+      });
     }
 
     let buffer = result.buffer;

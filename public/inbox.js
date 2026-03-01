@@ -22,6 +22,13 @@ function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
 
+function getHouseAuthMemoryStore() {
+  if (!window.__agentTownHouseAuthMemory || typeof window.__agentTownHouseAuthMemory !== 'object') {
+    window.__agentTownHouseAuthMemory = Object.create(null);
+  }
+  return window.__agentTownHouseAuthMemory;
+}
+
 function unb64(str) {
   try {
     const bin = atob(str);
@@ -53,10 +60,41 @@ async function sha256Base64(input) {
   return btoa(bin);
 }
 
-async function importHouseAuthKey(houseId) {
-  const raw = sessionStorage.getItem(houseAuthCacheKey(houseId));
+function cacheHouseAuthBytes(houseId, keyBytes) {
+  if (!houseId || !keyBytes || keyBytes.length < 16) return;
+  const store = getHouseAuthMemoryStore();
+  store[houseAuthCacheKey(houseId)] = b64(keyBytes);
+}
+
+function loadCachedHouseAuthBytes(houseId) {
+  const store = getHouseAuthMemoryStore();
+  const raw = typeof store[houseAuthCacheKey(houseId)] === 'string'
+    ? store[houseAuthCacheKey(houseId)]
+    : '';
   if (!raw) return null;
   const keyBytes = unb64(raw);
+  if (!keyBytes || keyBytes.length < 16) return null;
+  return keyBytes;
+}
+
+async function deriveHouseAuthBytesFromKroot(krootBytes) {
+  const baseKey = await crypto.subtle.importKey('raw', krootBytes, 'HKDF', false, ['deriveBits']);
+  const info = new TextEncoder().encode('elizatown-house-auth-v1');
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array([]), info },
+    baseKey,
+    256
+  );
+  return new Uint8Array(bits);
+}
+
+async function importHouseAuthKey(houseId) {
+  let keyBytes = loadCachedHouseAuthBytes(houseId);
+  if (!keyBytes) {
+    const kroot = await recoverHouseKrootWithWallet(houseId);
+    keyBytes = await deriveHouseAuthBytesFromKroot(kroot);
+    cacheHouseAuthBytes(houseId, keyBytes);
+  }
   if (!keyBytes || keyBytes.length < 16) return null;
   return crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
 }

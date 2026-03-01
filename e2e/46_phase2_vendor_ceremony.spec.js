@@ -49,7 +49,9 @@ test('vendor runtime performs ceremony commit/reveal and house meta remains hous
   expect(houseId).toBeTruthy();
 
   const keyB64 = await page.evaluate((id) => {
-    return sessionStorage.getItem(`agentTownHouseAuth:${id}`);
+    const store = window.__agentTownHouseAuthMemory || {};
+    const value = store[`agentTownHouseAuth:${id}`];
+    return typeof value === 'string' ? value : null;
   }, houseId);
   expect(keyB64).toBeTruthy();
 
@@ -60,4 +62,3 @@ test('vendor runtime performs ceremony commit/reveal and house meta remains hous
   const meta = await metaResp.json();
   expect(meta.housePubKey).toBe(houseId);
 });
-

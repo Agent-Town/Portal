@@ -206,7 +206,7 @@ async function enterHatch(page, intent = 'signin', { navigate = true } = {}) {
     if (await pathPanel.count()) {
       await expect(pathPanel).toBeVisible({ timeout: 1500 });
     } else {
-      await expect(page.getByTestId('team-code')).toBeVisible({ timeout: 3000 });
+      await expect(page.getByTestId('skill-link')).toBeVisible({ timeout: 3000 });
     }
   }
 }

@@ -334,7 +334,11 @@ test('house backup stores encrypted state and supports ZIP download/upload resto
   await expect.poll(() => readLocalVfsRecord(page, 'workspace/AGENTS.md'), { timeout: 8000 }).not.toBeNull();
   await expect(page.locator('#llmKeyInput')).toHaveValue('');
 
-  const keyB64 = await page.evaluate((id) => sessionStorage.getItem(`agentTownHouseAuth:${id}`), houseId);
+  const keyB64 = await page.evaluate((id) => {
+    const store = window.__agentTownHouseAuthMemory || {};
+    const value = store[`agentTownHouseAuth:${id}`];
+    return typeof value === 'string' ? value : null;
+  }, houseId);
   expect(keyB64).toBeTruthy();
 
   const statePath = `/api/house/${houseId}/agent-state`;

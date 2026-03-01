@@ -588,7 +588,7 @@ test('experience run supports ws transport via local test websocket endpoint', a
   expect(run?.data?.resolvedPaths?.skill).toBe('workspace/SKILL.md');
 });
 
-test('web_fetch falls back to proxy for cross-origin loopback alias', async ({ page }) => {
+test('web_fetch blocks proxy access for cross-origin loopback alias', async ({ page }) => {
   await page.goto('/?liteDriver=phase1');
   await waitForLiteTestApi(page);
 
@@ -599,15 +599,18 @@ test('web_fetch falls back to proxy for cross-origin loopback alias', async ({ p
     const aliasUrl = `${current.protocol}//${altHost}${current.port ? `:${current.port}` : ''}/skill.md`;
     const fetched = await api.webFetch({ url: aliasUrl, expectedMime: 'text/markdown' });
     const payload = fetched?.data && typeof fetched.data === 'object' ? fetched.data : fetched;
-    return { aliasUrl, fetched, payload };
+    const errorCode = String(
+      fetched?.error?.code
+      || payload?.error?.code
+      || payload?.code
+      || ''
+    );
+    return { aliasUrl, fetched, payload, errorCode };
   });
 
   expect(summary?.aliasUrl || '').toContain('/skill.md');
-  expect(summary?.fetched?.ok).toBe(true);
-  expect(summary?.payload?.status).toBe(200);
-  expect(summary?.payload?.finalUrl || '').toContain('/skill.md');
-  expect(summary?.payload?.fromCache).toBe(false);
-  expect(summary?.payload?.text || '').toContain('agent-town-playbook');
+  expect(summary?.fetched?.ok).toBe(false);
+  expect(summary?.errorCode).toBe('PROXY_TARGET_BLOCKED');
 });
 
 test('skill diagnostics persist last experience run failure details', async ({ page }) => {

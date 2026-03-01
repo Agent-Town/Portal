@@ -27,12 +27,11 @@ test('agent panel debug tabs expose tools, skill context, traffic, and session c
     await page.getByTestId('agent-debug-toggle').click();
   }
   await expect(page.getByTestId('agent-debug-pane')).toBeVisible({ timeout: 1500 });
-  await expect(page.getByTestId('agent-team-code-row')).toBeVisible({ timeout: 3000 });
-  const teamCode = String((await page.getByTestId('agent-team-code-text').textContent()) || '').trim();
-  expect(teamCode).toMatch(/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  await expect(page.getByTestId('agent-team-code-row')).toHaveCount(0);
 
-  await page.getByTestId('agent-team-code-send').click();
-  await expect(page.locator('#chatTranscript .chat-message.user').last()).toContainText(teamCode, { timeout: 3000 });
+  await page.locator('#chatInput').fill('traffic probe');
+  await page.locator('#sendChatBtn').click();
+  await expect(page.locator('#chatTranscript .chat-message.user').last()).toContainText('traffic probe', { timeout: 3000 });
 
   await expect(page.getByTestId('agent-debug-tools')).toContainText('Worker tools count', { timeout: 8000 });
 
@@ -40,9 +39,8 @@ test('agent panel debug tabs expose tools, skill context, traffic, and session c
   await expect(page.getByTestId('agent-debug-panel-skill')).not.toHaveClass(/is-hidden/);
   await expect(page.getByTestId('agent-debug-skill')).toContainText('Skill import status', { timeout: 8000 });
 
-  await page.locator('#chatInput').fill('traffic probe');
+  await page.locator('#chatInput').fill('traffic probe followup');
   await page.locator('#sendChatBtn').click();
-  await page.getByTestId('agent-team-code-send').click();
   await page.getByTestId('agent-debug-tab-traffic').click();
   await expect(page.getByTestId('agent-debug-panel-traffic')).not.toHaveClass(/is-hidden/);
   const trafficCount = await page.locator('#agentDebugTraffic .agent-traffic-card').count();

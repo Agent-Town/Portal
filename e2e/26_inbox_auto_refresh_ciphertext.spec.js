@@ -145,7 +145,8 @@ test('inbox auto-refreshes without reload and stores encrypted ciphertext', asyn
 
   await page.addInitScript(
     ({ houseId, keyB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = keyB64;
     },
     { houseId: receiver.houseId, keyB64: receiver.kauth.toString('base64') }
   );

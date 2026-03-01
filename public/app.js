@@ -685,6 +685,7 @@ function isTownhallGateLocked(state) {
 }
 
 function isTownhallBrainConfigured(state) {
+  if (onboardingRequired(state)) return !!state?.lite?.llmConfigured;
   return !!(state?.lite?.llmConfigured || isLocalLiteLlmConfigured());
 }
 
@@ -3096,20 +3097,6 @@ function bindTownDistrictControls() {
     };
   }
 
-  const copyTeam = el('copyTeam');
-  if (copyTeam) {
-    copyTeam.onclick = async () => {
-      const msg = readTextContent('teamSnippet');
-      try {
-        await navigator.clipboard.writeText(msg);
-        copyTeam.textContent = 'Copied ✓';
-        setTimeout(() => (copyTeam.textContent = 'Copy team message'), 1200);
-      } catch {
-        alert(msg);
-      }
-    };
-  }
-
   const copyHouse = el('copyHouse');
   if (copyHouse) {
     copyHouse.onclick = async () => {
@@ -5305,25 +5292,7 @@ async function updateUI(state) {
   // Team code (fallback for older servers that still send pairCode)
   const teamCode = state.teamCode || state.pairCode || '…';
   safeSetText('teamCode', teamCode);
-  const teamCodeRow = el('agentTeamCodeRow');
-  const teamCodeText = el('agentTeamCodeText');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
-  const normalizedTeamCode = readCurrentTeamCodeFromState();
-  if (teamCodeText) {
-    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
-  }
-  if (teamCodeRow) {
-    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.disabled = !normalizedTeamCode;
-  }
-
   const origin = window.location.origin;
-  safeSetText(
-    'teamSnippet',
-    `Worker session code: ${teamCode}`
-  );
 
   const houseNavLink = el('houseNavLink');
   if (houseNavLink) {
@@ -7692,19 +7661,6 @@ function updateUILegacy(state) {
   if (teamCodeNode) teamCodeNode.textContent = teamCode;
   const teamCodeResult = el('teamCodeResult');
   if (teamCodeResult) teamCodeResult.classList.add('is-hidden');
-  const teamCodeRow = el('agentTeamCodeRow');
-  const teamCodeText = el('agentTeamCodeText');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
-  const normalizedTeamCode = readCurrentTeamCodeFromState();
-  if (teamCodeText) {
-    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
-  }
-  if (teamCodeRow) {
-    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.disabled = !normalizedTeamCode;
-  }
   const localLlm = getLocalLiteLlm();
 
   applyVisibility(state);
@@ -8016,18 +7972,6 @@ function readCurrentTeamCodeFromState() {
   return value;
 }
 
-async function sendCurrentTeamCodeToAgent() {
-  const teamCode = readCurrentTeamCodeFromState();
-  if (!teamCode) {
-    appendChatMessage('system', 'Team code is not available yet.');
-    return;
-  }
-  const input = el('chatInput');
-  if (!input) return;
-  input.value = teamCode;
-  await handleChat();
-}
-
 async function handleNewSession() {
   const btn = el('newSessionBtn');
   if (btn) btn.disabled = true;
@@ -8101,7 +8045,6 @@ function setupAgentInterface() {
   const sendBtn = el('sendChatBtn');
   const newSessionBtn = el('newSessionBtn');
   const openTrainerBtn = el('agentOpenTrainerBtn');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
   const chatInput = el('chatInput');
 
   if (visitBtn) visitBtn.addEventListener('click', handleVisit);
@@ -8114,11 +8057,6 @@ function setupAgentInterface() {
       openTrainerModal().catch(() => {
         window.location.assign('/trainer');
       });
-    });
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.addEventListener('click', () => {
-      sendCurrentTeamCodeToAgent().catch(() => { });
     });
   }
   if (chatInput) {
