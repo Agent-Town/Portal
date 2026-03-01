@@ -6,6 +6,20 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
+async function configureBrain(page, {
+  provider = 'openai',
+  model = 'gpt-4o-mini'
+} = {}) {
+  const response = await page.request.post('/api/agent/lite/llm/config', {
+    headers: { 'content-type': 'application/json' },
+    data: JSON.stringify({ provider, model })
+  });
+  expect(response.ok()).toBeTruthy();
+  const payload = await response.json().catch(() => ({}));
+  expect(payload.ok).toBe(true);
+  expect(payload.configured).toBe(true);
+}
+
 async function openTownhallPanel(page) {
   const panel = page.locator('#townhallRegisterPanel');
   const townhallVisible = async () => (
@@ -280,6 +294,7 @@ test('town hall registration resolves sponsored Sepolia transaction ids to hashe
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
+  await configureBrain(page);
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   expect(txPolls['tx-user-1']).toBeGreaterThanOrEqual(2);
 });

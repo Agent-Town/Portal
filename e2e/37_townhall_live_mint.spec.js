@@ -431,5 +431,5 @@ test('town hall one-click flow stops on Solana signer mismatch', async ({ page }
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Pending');
   await expect(page.locator('#townhallRegisterError')).toContainText('does not match');
   await expect(page.locator('#townhallRegisterState')).toContainText('Not registered');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
+  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
 });
