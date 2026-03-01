@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.4",
-    "8004-solana": "github:QuantuLabs/8004-solana-ts",
+    "8004-solana": "0.7.4",
     "ethers": "^6.16.0",
     "express": "^4.19.2"
   },
