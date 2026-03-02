@@ -1,10 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const crypto = require('crypto');
-const {
-  makeCeremonyRevealPair,
-  encryptCeremonyReveal,
-  waitForAgentHouseMaterial
-} = require('./helpers/ceremony_crypto');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -12,26 +8,30 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
+test('ERC-8004 UI stays hidden on house page', async ({ page }) => {
   // Mock Solana wallet + EVM wallet + ag0 SDK
   await page.addInitScript(() => {
     // Solana mock
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 17) & 0xff;
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMockMint11111111111111111111111111111' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockMint11111111111111111111111111111' } })
-    };
-
-    // EVM wallet mock
-    window.ethereum = {
+    const solanaAddress = 'So1anaMockMint11111111111111111111111111111';
+    const evmAddress = '0x000000000000000000000000000000000000dEaD';
+    const evmProvider = {
       request: async ({ method, params }) => {
-        if (method === 'eth_requestAccounts') return ['0x000000000000000000000000000000000000dEaD'];
+        if (method === 'eth_requestAccounts') return [evmAddress];
         if (method === 'eth_chainId') return '0xaa36a7'; // sepolia
         if (method === 'wallet_switchEthereumChain') return null;
-        throw new Error(`unhandled method ${method}`);
+        if (method === 'personal_sign') return '0x';
+        throw new Error(`unhandled method ${method} ${JSON.stringify(params || [])}`);
       }
+    };
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: solanaAddress }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => solanaAddress } }),
+      connectEvm: async () => ({ address: evmAddress, provider: evmProvider }),
+      signEvmMessage: async () => '0x',
+      getEvmProvider: () => evmProvider
     };
 
     // ag0 SDK mock
@@ -47,55 +47,20 @@ test('ERC-8004 UI stays hidden on house page', async ({ page, request }) => {
   });
 
   await page.goto('/');
-  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
+  await reachCreateViaLite(page);
 
-  // Connect agent
-  await request.post('/api/agent/connect', { data: { teamCode, agentName: 'ClawTest' } });
-
-  // Match
-  await page.getByTestId('sigil-key').click();
-  await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
-
-  // Press open
-  await page.getByTestId('open-btn').click();
-  await request.post('/api/agent/open/press', { data: { teamCode } });
-  await page.waitForURL('**/create');
-
-  // Agent ceremony
-  // Use randomness to avoid deterministic houseId collisions when tests run in parallel workers.
-  const ra = crypto.randomBytes(32);
-  const agentRevealPair = makeCeremonyRevealPair();
-  const raCommit = crypto.createHash('sha256').update(ra).digest('base64');
-  const commitResp = await request.post('/api/agent/house/commit', {
-    data: { teamCode, commit: raCommit, revealPub: agentRevealPair.publicKeyB64 }
-  });
-  expect(commitResp.ok()).toBeTruthy();
-
-  // Human paints + lock in
   await page.getByTestId('px-0-0').click();
-  const relayAgentReveal = (async () => {
-    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
-    expect(mat).toBeTruthy();
-    const sealedForHuman = encryptCeremonyReveal({
-      revealBytes: ra,
-      recipientRevealPubB64: mat.humanRevealPub,
-      direction: 'agent_to_human',
-      teamCode
-    });
-    const revealResp = await request.post('/api/agent/house/reveal', {
-      data: { teamCode, sealedForHuman }
-    });
-    expect(revealResp.ok()).toBeTruthy();
-  })();
-  await Promise.all([
-    relayAgentReveal,
-    page.getByTestId('share-btn').click(),
-    page.waitForURL(/\/house\?house=/)
-  ]);
+  await page.getByTestId('share-btn').click();
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
-  // Unlock (solana sig)
-  await page.getByRole('button', { name: 'Connect wallet' }).click();
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
+  const walletLabel = (await connectWalletBtn.textContent()) || '';
+  if (walletLabel.includes('Connect')) {
+    await connectWalletBtn.click();
+  }
   await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
+
   await expect(page.locator('#erc8004Panel')).toBeHidden();
   await expect(page.locator('#toggleErc8004Btn')).toHaveClass(/is-hidden/);
   await expect(page.locator('#mintErc8004Btn')).toBeHidden();

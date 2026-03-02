@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Claim with ERC-8004 Wallet</title>
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/logo.jpg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <a class="logoLink" href="/" aria-label="Agent Town home">
+            <img class="logoImg" src="/logo.jpg" alt="" />
+          </a>
+          <strong>Claim via Wallet</strong>
+          <span class="badge">pre-registered house recovery</span>
+        </div>
+      <div class="kv">
+        <a class="btn" href="/">Home</a>
+        <a class="btn" href="/create">Create</a>
+        <a class="btn" href="/leaderboard">Leaderboard</a>
+      </div>
+      </div>
+
+      <div class="panel">
+        <h1 style="margin:0 0 8px">Claim pre-registered house using ERC-8004 wallet</h1>
+        <p class="small" style="margin-top:0">
+          This flow is for users who already hold a preregistered ERC-8004 identity and need to prove wallet ownership.
+        </p>
+        <p class="pill">
+          For EVM identities, sign with the EVM owner wallet. For Solana identities, sign with the Solana owner wallet.
+        </p>
+
+        <div class="card" style="margin-top:12px">
+          <h2 style="margin:0 0 6px">1) Connect the claim wallet</h2>
+          <div class="kv">
+            <button class="btn primary" id="connectWalletBtn">Connect EVM wallet</button>
+            <span class="pill" id="walletStatus">No wallet connected.</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h2 style="margin:0 0 6px">2) Enter your Agent ID</h2>
+          <label class="small" for="erc8004AgentId">Agent ID</label>
+          <input id="erc8004AgentId" class="input" type="text" placeholder="11155111:947 or solana:&lt;asset&gt;" />
+          <p class="small" style="margin:8px 0 0">
+            EVM examples: <code>11155111:947</code> or <code>11155111:0x...:947</code>. Solana example: <code>solana:&lt;asset&gt;</code>.
+          </p>
+          <div class="kv" style="margin-top:10px">
+            <button class="btn" id="erc8004GetNonce">Get nonce</button>
+          </div>
+          <pre id="erc8004Out" class="pre"></pre>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h2 style="margin:0 0 6px">3) Sign claim and verify</h2>
+          <p class="small" style="margin-top:0">The signature is generated locally in your browser with the connected owner wallet.</p>
+          <div class="kv">
+            <button class="btn primary" id="erc8004Verify">Sign + verify</button>
+          </div>
+          <pre id="erc8004VerifyOut" class="pre"></pre>
+        </div>
+
+        <div class="small" id="claimError" style="color: var(--bad); margin-top: 12px;"></div>
+      </div>
+
+      <footer>
+        Claiming is scoped for this wallet-based recovery flow.
+      </footer>
+    </div>
+
+    <script src="/claim-wallet.js"></script>
+  </body>
+</html>

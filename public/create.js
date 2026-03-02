@@ -1,11 +1,57 @@
+const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const CREATE_EMBED_QUERY_KEY = 'embed';
+
+const isCeremonyEmbedMode = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(CREATE_EMBED_QUERY_KEY) === '1' || window.self !== window.top;
+  } catch {
+    return window.self !== window.top;
+  }
+})();
+
+if (isCeremonyEmbedMode) {
+  document.documentElement.classList.add('ceremony-embed');
+}
+window.__agentTownCeremonyEmbed = isCeremonyEmbedMode;
+
+function readTeamCodeHint() {
+  try {
+    return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveTeamCodeHint(value) {
+  const raw = String(value || '').trim().toUpperCase();
+  if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
+  try {
+    localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const teamCodeHint = readTeamCodeHint();
+  if (
+    teamCodeHint
+    && headers['x-team-code-hint'] === undefined
+    && headers['X-Team-Code-Hint'] === undefined
+  ) {
+    headers['x-team-code-hint'] = teamCodeHint;
+  }
   const res = await fetch(url, {
     credentials: 'include',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (typeof data?.teamCode === 'string') {
+    saveTeamCodeHint(data.teamCode);
+  }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -34,6 +80,250 @@ function setHouseNavLink(houseId) {
 let palette = [];
 let pixels = [];
 let selectedColor = 1;
+
+let liteDriver = 'vendor';
+let liteGatewayPromise = null;
+let createSkillTurnPromise = null;
+let createSkillLoopEnabled = false;
+let createSkillLoopBusy = false;
+let createSkillLoopTimer = null;
+let createSkillLoopBackoffMs = 900;
+let createTeamCode = '';
+let createTokenMode = false;
+
+const CREATE_SKILL_COMMIT_GOAL = 'Publish the agent ceremony commit and reveal public key for the current team session.';
+const CREATE_SKILL_REVEAL_GOAL = 'Publish the agent ceremony reveal payload (`sealedForHuman`) for the current team session.';
+const CREATE_SKILL_MIN_POLL_MS = 650;
+const CREATE_SKILL_MAX_POLL_MS = 5_000;
+
+function isVendorLiteDriver() {
+  return liteDriver === 'vendor';
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function loadLiteGateway() {
+  if (liteGatewayPromise) return liteGatewayPromise;
+  liteGatewayPromise = import('/openclaw-lite/gateway.js')
+    .then((mod) => mod?.default || mod)
+    .then(async (gatewayOrPromise) => {
+      if (gatewayOrPromise && typeof gatewayOrPromise.then === 'function') {
+        return await gatewayOrPromise;
+      }
+      return gatewayOrPromise;
+    })
+    .then((gateway) => {
+      if (!gateway || typeof gateway !== 'object') return null;
+      const fallback = window.__openclawLiteTest;
+      if (!fallback || typeof fallback !== 'object') return gateway;
+
+      if (typeof gateway.skillState !== 'function' && typeof fallback.skillState === 'function') {
+        gateway.skillState = (...args) => fallback.skillState(...args);
+      }
+      if (typeof gateway.systemPromptPreview !== 'function' && typeof fallback.systemPromptPreview === 'function') {
+        gateway.systemPromptPreview = (...args) => fallback.systemPromptPreview(...args);
+      }
+      if (typeof gateway.experienceRun !== 'function' && typeof fallback.experienceRun === 'function') {
+        gateway.experienceRun = (...args) => fallback.experienceRun(...args);
+      }
+      if (typeof gateway.visitExperience !== 'function' && typeof fallback.visitExperience === 'function') {
+        gateway.visitExperience = (...args) => fallback.visitExperience(...args);
+      }
+      return gateway;
+    })
+    .catch(() => null);
+  return liteGatewayPromise;
+}
+
+async function ensureCreateSkillImported() {
+  if (!isVendorLiteDriver()) return null;
+  const gateway = await loadLiteGateway();
+  if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
+
+  if (typeof gateway.skillState === 'function') {
+    const skillState = await gateway.skillState().catch(() => null);
+    const status = String(skillState?.data?.status || skillState?.status || '').trim().toLowerCase();
+    const activePath = String(skillState?.data?.activeSkillPath || skillState?.activeSkillPath || '').trim();
+    if (status === 'ready' && activePath) return gateway;
+  }
+
+  if (typeof gateway.visitExperience === 'function') {
+    const visit = await gateway.visitExperience({ url: '/skill.md' });
+    if (visit?.ok !== true) {
+      const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
+      throw new Error(msg);
+    }
+  }
+  return gateway;
+}
+
+async function runCreateSkillTurn({ goal = '', runtimeState = null } = {}) {
+  if (!isVendorLiteDriver()) return null;
+  if (createSkillTurnPromise) return createSkillTurnPromise;
+  createSkillTurnPromise = (async () => {
+    const gateway = await ensureCreateSkillImported();
+    if (!gateway || typeof gateway.experienceRun !== 'function') throw new Error('RUNTIME_NOT_READY');
+    const goalLine = String(goal || '').trim();
+    const prompt = [
+      'Read SKILL.md and execute exactly the next required safe step for this /create ceremony flow.',
+      goalLine ? `Goal: ${goalLine}` : '',
+      'Use runtime session context values directly and avoid asking for teamCode/houseId when already provided.',
+      'If waiting for human action, stop after one safe check/action.'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const run = await gateway.experienceRun({
+      prompt,
+      timeoutMs: 60_000,
+      recordToTranscript: false,
+      emitChat: false,
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: String(runtimeState?.teamCode || createTeamCode || ''),
+        houseId: String(runtimeState?.houseId || '')
+      },
+      runtimeState: runtimeState && typeof runtimeState === 'object' ? runtimeState : undefined
+    });
+    if (run?.ok === false) {
+      const msg = String(run?.error?.message || run?.error?.code || 'EXPERIENCE_RUN_FAILED');
+      throw new Error(msg);
+    }
+    return run;
+  })();
+  try {
+    return await createSkillTurnPromise;
+  } finally {
+    createSkillTurnPromise = null;
+  }
+}
+
+function resolveCreateSkillGoal(ceremony = {}) {
+  if (!ceremony || typeof ceremony !== 'object') return '';
+  if (ceremony.humanReveal && !ceremony.agentReveal) return CREATE_SKILL_REVEAL_GOAL;
+  if (ceremony.humanCommit && (!ceremony.agentCommit || !ceremony.agentRevealPub)) return CREATE_SKILL_COMMIT_GOAL;
+  return '';
+}
+
+function resolveCreateSkillGoalFromState(state = {}) {
+  const nextAgentAction = String(state?.experience?.nextAgentAction || '').trim();
+  if (nextAgentAction === 'agent_town_ceremony_reveal') return CREATE_SKILL_REVEAL_GOAL;
+  if (nextAgentAction === 'agent_town_ceremony_commit') return CREATE_SKILL_COMMIT_GOAL;
+  return resolveCreateSkillGoal(state?.ceremony || {});
+}
+
+function resolveCreateSkillPollDelay(state = {}) {
+  const n = Number(state?.experience?.pollMs);
+  if (!Number.isFinite(n) || n <= 0) return 1_200;
+  return Math.max(CREATE_SKILL_MIN_POLL_MS, Math.min(CREATE_SKILL_MAX_POLL_MS, Math.round(n)));
+}
+
+function clearCreateSkillLoopTimer() {
+  if (!createSkillLoopTimer) return;
+  clearTimeout(createSkillLoopTimer);
+  createSkillLoopTimer = null;
+}
+
+function scheduleCreateSkillLoop(delayMs = createSkillLoopBackoffMs) {
+  if (!createSkillLoopEnabled) return;
+  clearCreateSkillLoopTimer();
+  const wait = Math.max(CREATE_SKILL_MIN_POLL_MS, Number(delayMs) || CREATE_SKILL_MIN_POLL_MS);
+  createSkillLoopTimer = setTimeout(() => {
+    createSkillLoopTimer = null;
+    runCreateSkillLoopTick().catch(() => { });
+  }, wait);
+}
+
+function nudgeCreateSkillLoop(delayMs = 120) {
+  if (!createSkillLoopEnabled) return;
+  scheduleCreateSkillLoop(delayMs);
+}
+
+function startCreateSkillLoop({ enabled = false } = {}) {
+  createSkillLoopEnabled = enabled && isVendorLiteDriver();
+  createSkillLoopBackoffMs = 900;
+  clearCreateSkillLoopTimer();
+  if (!createSkillLoopEnabled) return;
+  scheduleCreateSkillLoop(300);
+}
+
+window.addEventListener('beforeunload', () => {
+  createSkillLoopEnabled = false;
+  clearCreateSkillLoopTimer();
+});
+
+async function runCreateSkillLoopTick() {
+  if (!createSkillLoopEnabled || createSkillLoopBusy || !isVendorLiteDriver()) return;
+  createSkillLoopBusy = true;
+  try {
+    const state = await api('/api/state').catch(() => null);
+    if (!state?.agent?.connected || state?.signup?.mode === 'token') {
+      createSkillLoopBackoffMs = resolveCreateSkillPollDelay(state);
+      return;
+    }
+
+    const goal = resolveCreateSkillGoalFromState(state);
+    if (!goal) {
+      createSkillLoopBackoffMs = resolveCreateSkillPollDelay(state);
+      return;
+    }
+
+    await runCreateSkillTurn({ goal, runtimeState: state });
+    createSkillLoopBackoffMs = CREATE_SKILL_MIN_POLL_MS;
+  } catch {
+    createSkillLoopBackoffMs = Math.min(
+      CREATE_SKILL_MAX_POLL_MS,
+      Math.max(1_000, Math.round(createSkillLoopBackoffMs * 1.6))
+    );
+  } finally {
+    createSkillLoopBusy = false;
+    scheduleCreateSkillLoop(createSkillLoopBackoffMs);
+  }
+}
+
+async function driveAgentCeremonyStep({ needReveal = false } = {}) {
+  let material = await api('/api/human/house/material');
+  const isReady = () => (needReveal
+    ? !!material?.agentRevealSealed
+    : !!(material?.agentCommit && material?.agentRevealPub));
+  if (isReady()) return material;
+  if (!isVendorLiteDriver()) return material;
+
+  const goal = needReveal ? CREATE_SKILL_REVEAL_GOAL : CREATE_SKILL_COMMIT_GOAL;
+  const startedAt = Date.now();
+  let attempt = 0;
+
+  while (Date.now() - startedAt < 20_000) {
+    if (attempt === 0 || attempt % 4 === 0) {
+      try {
+        await runCreateSkillTurn({ goal });
+      } catch {
+        // Keep polling material; the loop can recover on later turns.
+      }
+    } else {
+      nudgeCreateSkillLoop(120);
+    }
+    await delay(350);
+    material = await api('/api/human/house/material');
+    if (isReady()) return material;
+    attempt += 1;
+  }
+  return material;
+}
+
+function applyLocalPixel(x, y, color, w = 16) {
+  const idx = y * w + x;
+  if (!Number.isInteger(idx) || idx < 0 || idx >= pixels.length) return;
+  pixels[idx] = color;
+  const canvas = el('canvas');
+  const cell = canvas ? canvas.querySelector(`[data-x="${x}"][data-y="${y}"]`) : null;
+  if (!cell) return;
+  cell.dataset.color = String(color);
+  cell.style.background = palette[color] || '#000';
+}
+
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 
 function renderPalette() {
   const c = el('palette');
@@ -79,14 +369,13 @@ function renderCanvas(w, h) {
       b.setAttribute('data-testid', `px-${x}-${y}`);
       b.addEventListener('click', async () => {
         try {
+          const humanColor = selectedColor;
           await api('/api/human/canvas/paint', {
             method: 'POST',
-            body: JSON.stringify({ x, y, color: selectedColor })
+            body: JSON.stringify({ x, y, color: humanColor })
           });
-          // Optimistically update
-          pixels[idx] = selectedColor;
-          b.dataset.color = String(selectedColor);
-          b.style.background = palette[selectedColor];
+          // Optimistically update local human paint first.
+          applyLocalPixel(x, y, humanColor, w);
           updateLockState();
         } catch (e) {
           el('err').textContent = e.message;
@@ -129,12 +418,17 @@ async function pollCanvas() {
 async function init() {
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
+  liteDriver = typeof st?.lite?.driver === 'string' ? st.lite.driver : 'vendor';
   setHouseNavLink(st.houseId || null);
   const params = new URLSearchParams(window.location.search);
   const requestedToken = params.get('mode') === 'token';
   const signupMode = st.signup?.mode || (st.signup?.complete ? 'agent' : null);
   const tokenMode = signupMode === 'token';
+  createTokenMode = tokenMode;
+  const claimMode = signupMode === 'claim';
+  const soloMode = tokenMode || claimMode;
   const tokenAddress = st.signup?.address || null;
+  createTeamCode = typeof st?.teamCode === 'string' ? st.teamCode.trim() : '';
   if (st.signup?.complete && st.signup?.createdAt) {
     try {
       localStorage.setItem('agentTownSignupCompleteAt', st.signup.createdAt);
@@ -146,7 +440,7 @@ async function init() {
     window.location.href = '/';
     return;
   }
-  if (requestedToken && signupMode !== 'token') {
+  if (requestedToken && !soloMode) {
     try {
       localStorage.setItem('agentTownPathMode', 'token');
       localStorage.setItem('agentTownTokenError', 'Verify your wallet to create a token-gated house.');
@@ -158,16 +452,17 @@ async function init() {
   }
   const intro = el('createIntro');
   if (intro) {
-    intro.textContent = tokenMode
+    intro.textContent = soloMode
       ? 'Solo flow: paint a few pixels to seed your house key, then lock it in.'
       : 'Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.';
   }
   const nextNote = el('createNextNote');
   if (nextNote) {
-    nextNote.textContent = tokenMode
-      ? 'Next: unlock the house with a Solana wallet signature. You can invite an agent later.'
-      : 'Next: unlock the house with a Solana wallet signature. Then you and the agent can read/write encrypted entries.';
+    nextNote.textContent = soloMode
+      ? 'Next: unlock the house with a wallet signature. You can invite an agent later.'
+      : 'Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.';
   }
+  startCreateSkillLoop({ enabled: !tokenMode });
 
   const state = await api('/api/canvas/state');
   palette = state.palette;
@@ -184,10 +479,11 @@ async function init() {
   updateLockState();
 
   async function connectWalletOrThrow() {
-    if (!window.solana) throw new Error('NO_SOLANA_WALLET');
-    if (typeof window.solana.signMessage !== 'function') throw new Error('NO_SOLANA_SIGN');
-    const resp = await window.solana.connect();
-    return { wallet: window.solana, address: resp.publicKey.toString() };
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    const connected = await walletClient.connect({ chain: 'solana', silent: false });
+    const address = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+    if (!address) throw new Error('NO_SOLANA_PUBKEY');
+    return { address };
   }
 
   async function sha256(bytes) {
@@ -427,13 +723,9 @@ async function init() {
     return parts.join('\n');
   }
 
-  async function signMessageBytes(wallet, message) {
-    const msgBytes = new TextEncoder().encode(message);
-    const resp = await wallet.signMessage(msgBytes, 'utf8');
-    const sigBytes = resp?.signature || resp;
-    const sigArr = normalizeSignatureBytes(sigBytes);
-    if (!sigArr) throw new Error('SIGNATURE_FORMAT');
-    return sigArr;
+  async function signMessageBytes(message) {
+    if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+    return walletClient.signMessage({ chain: 'solana', message });
   }
 
   // (Ceremony houses) We store only a wallet-wrapped K_root (never raw).
@@ -477,7 +769,7 @@ async function init() {
     el('err').textContent = '';
     el('shareStatus').style.display = 'inline-flex';
     try {
-      const { wallet, address } = await connectWalletOrThrow();
+      const { address } = await connectWalletOrThrow();
       if (tokenMode && tokenAddress && address !== tokenAddress) {
         throw new Error('WALLET_MISMATCH');
       }
@@ -485,7 +777,7 @@ async function init() {
       // 1) Human computes Rh from canvas and commits with a reveal-exchange pubkey.
       const Rh = await deriveRhFromCanvas(pixels);
       const humanCommit = b64(await sha256(Rh));
-      if (!tokenMode && !ceremonyRevealPair) {
+      if (!soloMode && !ceremonyRevealPair) {
         ceremonyRevealPair = await crypto.subtle.generateKey(
           { name: 'ECDH', namedCurve: 'P-256' },
           true,
@@ -498,17 +790,18 @@ async function init() {
         method: 'POST',
         body: JSON.stringify({
           commit: humanCommit,
-          revealPub: tokenMode ? undefined : ceremonyRevealPub
+          revealPub: soloMode ? undefined : ceremonyRevealPub
         })
       });
+      nudgeCreateSkillLoop(80);
 
       let Kroot = null;
-      if (tokenMode) {
+      if (soloMode) {
         // Solo flow: derive Kroot from the human entropy only.
         Kroot = await sha256(Rh);
       } else {
         // 2) Exchange sealed reveals and derive Kroot locally once agent payload is available.
-        const mat = await api('/api/human/house/material');
+        const mat = await driveAgentCeremonyStep({ needReveal: false });
         if (!mat.agentCommit || !mat.agentRevealPub) {
           throw new Error('WAITING_AGENT_REVEAL');
         }
@@ -523,12 +816,9 @@ async function init() {
           method: 'POST',
           body: JSON.stringify({ sealedForAgent })
         });
+        nudgeCreateSkillLoop(80);
 
-        let matAfter = await api('/api/human/house/material');
-        for (let i = 0; i < 10 && !matAfter.agentRevealSealed; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-          matAfter = await api('/api/human/house/material');
-        }
+        const matAfter = await driveAgentCeremonyStep({ needReveal: true });
         if (!matAfter.agentRevealSealed) throw new Error('WAITING_AGENT_REVEAL');
         const Ra = await decryptCeremonyReveal({
           sealed: matAfter.agentRevealSealed,
@@ -555,7 +845,7 @@ async function init() {
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
       const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
-      const wrapSig = await signMessageBytes(wallet, wrapMsg);
+      const wrapSig = await signMessageBytes(wrapMsg);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
       const wrapped = await aesGcmEncrypt(wrapKey, Kroot);
@@ -574,7 +864,12 @@ async function init() {
           housePubKey,
           nonce,
           keyMode: 'ceremony',
-          unlock: { kind: 'solana-wallet-signature', address },
+          unlock: {
+            kind: 'wallet-signature',
+            provider: 'privy',
+            chain: 'solana',
+            address
+          },
           keyWrap,
           houseAuthKey,
           ponyInboxPub: ponyInbox.ponyInboxPub,
@@ -591,7 +886,7 @@ async function init() {
         : e.message === 'SIGNATURE_FORMAT'
           ? 'Wallet signature failed.'
         : e.message === 'WAITING_AGENT_REVEAL'
-          ? 'Waiting for agent to contribute to the house ceremony. Ask your agent to call /api/agent/house/commit then /api/agent/house/reveal (see skill.md).'
+          ? 'Waiting for OpenClaw Lite runtime to finish the house ceremony.'
           : e.message;
       el('shareStatus').style.display = 'none';
     }

@@ -3,9 +3,11 @@
 Goal: mint a canonical ERC-8004 identity / profile on Ethereum (or target chain) using the human’s wallet (no server keys).
 
 ## What we use
-- **Agent0 TypeScript SDK** on npm: `agent0-sdk`
-- In-browser load via ESM CDN (no build step):
-  - `https://esm.sh/agent0-sdk@1.4.2?bundle`
+- **Agent-Town fork** of Agent0 SDK at `vendors/agent0-ts` (git submodule)
+- In-browser load via local bundle only:
+  - `/public/vendor/agent0-sdk.mjs`
+- Bundle build command:
+  - `npm run build:agent0-sdk`
 
 ## Current behavior (MVP)
 - Chain selector: **Sepolia** (default) or **mainnet** (confirm dialog)

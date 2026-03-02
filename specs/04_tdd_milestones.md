@@ -45,3 +45,7 @@ Each milestone has a measurable “done” state validated by Playwright.
 **Tests**: `e2e/03_create_share_leaderboard.spec.js`
 
 (You can add M8 for post URL capture if desired.)
+
+## M11 — District map + storefront
+- Implement using the milestone-by-milestone TDD plan in `specs/11_district_map_storefront_spec.md` (Section 15).
+- Success is measured by `RED/GREEN/REGRESSION/SUITE` gates for each milestone.

@@ -5,17 +5,36 @@
   "description": "Minimal Agent Town landing page (human+agent co-op unlock + shared pixel canvas)",
   "license": "MIT",
   "scripts": {
+    "build:openclaw-lite": "node scripts/build_openclaw_lite_runtime.mjs",
+    "build:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs --install --build",
+    "bundle:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs",
+    "optimize:atlas-district-images": "bash scripts/optimize_atlas_district_images.sh",
+    "predev": "npm run build:openclaw-lite",
+    "pretest": "npm run build:openclaw-lite",
     "dev": "node server/index.js",
     "setup:sepolia-wallet": "node scripts/setup_sepolia_wallet.js",
+    "import:claimables": "node scripts/import-claimable-reservations.js",
+    "prefetch:erc8004-images": "node scripts/import_erc8004_preregister_houses.js --download-images-only --with-images",
+    "import:erc8004-preregister": "node scripts/import_erc8004_preregister_houses.js",
+    "import:erc8004-preregister:apply": "node scripts/import_erc8004_preregister_houses.js --apply",
+    "import:erc8004-preregister:apply:images": "node scripts/import_erc8004_preregister_houses.js --apply --with-images",
+    "import:erc8004-preregister:apply:images:cache-only": "node scripts/import_erc8004_preregister_houses.js --apply --with-images --use-image-cache-only",
+    "plan:erc8004-score-images": "node scripts/build_erc8004_score_image_plan.js --style-anchor-file ./scripts/style_anchor_agent_town_wild_west.txt",
+    "gen:erc8004-images:nano": "node scripts/generate_nano_banana_images.js",
+    "gen:erc8004-images:nano:api-key": "node scripts/generate_nano_banana_images_api_key.js",
+    "gen:erc8004-images:nano:oauth": "node scripts/generate_nano_banana_images_oauth.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "8004-solana": "0.7.4",
     "ethers": "^6.16.0",
     "express": "^4.19.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.0"
+    "@playwright/test": "^1.50.0",
+    "esbuild": "^0.25.10"
   }
 }

@@ -1,5 +1,6 @@
 .DS_Store
 
+data/
 data/store.e2e.json
 data/store.json
 data/store*.sqlite
@@ -7,4 +8,11 @@ data/store*.sqlite-wal
 data/store*.sqlite-shm
 
 node_modules/
+
+.env
+.env.*
+!.env.example
+
+# local onboarding mint DB
+scripts/data/*.sqlite3
 

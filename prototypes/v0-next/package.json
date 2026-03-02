@@ -1,0 +1,16 @@
+{
+  "name": "agent-town-v0-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Next.js prototype shell for Trainer + Atlas UX iteration in v0.",
+  "scripts": {
+    "dev": "next dev -p 4300",
+    "build": "next build",
+    "start": "next start -p 4300"
+  },
+  "dependencies": {
+    "next": "14.2.17",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

@@ -108,25 +108,21 @@ async function aesGcmDecrypt(key, ivBytes, ctBytes, aadBytes) {
 }
 
 // --- wallet ---
-let wallet = null;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 let walletAddr = null;
 
 async function connectWallet() {
-  if (!window.solana || !window.solana.isPhantom) {
-    throw new Error('NO_SOLANA_WALLET');
-  }
-  const resp = await window.solana.connect();
-  wallet = window.solana;
-  walletAddr = resp.publicKey.toString();
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+  const connected = await walletClient.connect({ chain: 'solana', silent: false });
+  walletAddr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
   el('walletAddr').textContent = walletAddr;
 }
 
 async function signMessage(message) {
-  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  // Phantom returns { signature: Uint8Array, publicKey }
-  return resp.signature;
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+  return walletClient.signMessage({ chain: 'solana', message });
 }
 
 function buildUnlockMessage({ roomPubKey, nonce, origin }) {
@@ -196,7 +192,9 @@ async function mintErc8004Identity() {
   const status = el('erc8004MintStatus');
   if (status) status.textContent = '';
 
-  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
+  if (!walletClient) throw new Error('NO_EVM_WALLET');
+  const evmProvider = walletClient.getProvider({ chain: 'evm' });
+  if (!evmProvider) throw new Error('NO_EVM_WALLET');
   const roomId = room?.roomId || new URLSearchParams(window.location.search).get('room');
   if (!roomId) throw new Error('NO_ROOM_ID');
 
@@ -208,12 +206,9 @@ async function mintErc8004Identity() {
     if (!ok) return;
   }
 
-  // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
-  // Prefer a vendored same-origin bundle for reliability (CSP/adblock/CDN flake).
-  // Fallback to esm.sh if the vendored import fails.
+  // Use the local Agent-Town fork bundle from /public/vendor only.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.1.4.2.bundle.mjs';
-  const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.mjs';
 
   let mod;
   if (window.__AG0_SDK_MOCK) {
@@ -222,14 +217,9 @@ async function mintErc8004Identity() {
     try {
       mod = await import(AGENT0_SDK_LOCAL_URL);
     } catch (eLocal) {
-      console.warn('Agent0 SDK local import failed; falling back to esm.sh', eLocal);
-      try {
-        mod = await import(AGENT0_SDK_ESM_URL);
-      } catch (eRemote) {
-        console.error('Agent0 SDK esm.sh import also failed', eRemote);
-        const detail = (eRemote && (eRemote.stack || eRemote.message)) || String(eRemote);
-        throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}`);
-      }
+      console.error('Agent0 SDK local import failed', eLocal);
+      const detail = (eLocal && (eLocal.stack || eLocal.message)) || String(eLocal);
+      throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}. Run: npm run build:agent0-sdk`);
     }
   }
 
@@ -240,19 +230,15 @@ async function mintErc8004Identity() {
   }
 
   // Ensure wallet is connected
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const owner = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  const connected = await walletClient.connect({ chain: 'evm' });
+  const owner = connected?.address || walletClient.getAddress({ chain: 'evm' }) || null;
   if (!owner) throw new Error('NO_EVM_ACCOUNT');
 
   // Best-effort chain switch
-  const currentChainHex = await window.ethereum.request({ method: 'eth_chainId' });
-  const currentChainId = parseInt(currentChainHex, 16);
+  const currentChainId = await walletClient.getChainId({ chain: 'evm' });
   if (currentChainId !== chainId) {
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${chainId.toString(16)}` }]
-      });
+      await walletClient.switchChain({ chain: 'evm', chainId });
     } catch {
       throw new Error('WRONG_CHAIN');
     }
@@ -265,7 +251,7 @@ async function mintErc8004Identity() {
   const sdk = new SDKClass({
     chainId,
     rpcUrl,
-    walletProvider: window.ethereum
+    walletProvider: evmProvider
   });
 
   const agentName = `Agent Town Room ${roomId.slice(0, 10)}`;
@@ -497,7 +483,7 @@ async function init() {
       await connectWallet();
       setStatus('Wallet connected.');
     } catch (e) {
-      setError(e.message === 'NO_SOLANA_WALLET' ? 'No Solana wallet found (need Phantom/Solflare).' : e.message);
+      setError(e.message === 'NO_SOLANA_WALLET' ? 'No Privy-connected Solana wallet found.' : e.message);
     }
   });
 

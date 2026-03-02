@@ -145,7 +145,8 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
 
   await page.addInitScript(
     ({ houseId, houseAuthB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
     },
     {
       houseId: houseB.houseId,
@@ -161,7 +162,8 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
 
   await page.evaluate(
     ({ houseId, houseAuthB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, houseAuthB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
     },
     {
       houseId: houseA.houseId,
@@ -174,10 +176,10 @@ test('inbox decrypts E2EE payloads and labels legacy plaintext', async ({ page, 
       const bin = atob(walletSigB64);
       const sig = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
-      window.solana = {
-        isPhantom: true,
-        connect: async () => ({ publicKey: { toString: () => walletAddress } }),
-        signMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
+      window.__PRIVY_WALLET_BRIDGE__ = {
+        connectSolana: async () => ({ address: walletAddress }),
+        disconnectSolana: async () => {},
+        signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
       };
     },
     { walletAddress: houseA.walletAddress, walletSigB64: houseA.walletSigB64 }

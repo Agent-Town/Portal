@@ -1,0 +1,159 @@
+<div class="panel" id="townhallRegisterPanel">
+  <div class="townhallStoryShell">
+    <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
+      Complete onboarding and configure your brain to unlock the sigil flow.
+    </div>
+
+    <div class="townhallStoryStep" id="townhallStepHuman">
+      <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
+      <p class="small" style="margin-top:0">How should we call you?</p>
+
+      <label class="small" for="townhallHumanName">Your name</label>
+      <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
+
+      <div class="townhallAvatarBlock">
+        <div class="small">Your avatar</div>
+        <div class="public-media-preview is-hidden" id="townhallHumanPreview">
+          <img id="townhallHumanPreviewImg" alt="Human avatar preview" />
+        </div>
+        <button class="btn" id="townhallHumanCustomizeBtn" type="button">Customize</button>
+      </div>
+
+      <div class="townhallCustomizeModal is-hidden" id="townhallHumanCustomize">
+        <label class="small" for="townhallHumanPrompt">Prompt</label>
+        <div class="small">To help AI understand your image.</div>
+        <textarea id="townhallHumanPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
+        <label class="small" for="townhallHumanImage" style="margin-top:8px; display:block;">Upload image</label>
+        <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn primary" id="townhallHumanSubmitBtn" data-testid="townhall-human-submit-btn">Submit</button>
+      </div>
+    </div>
+
+    <div class="townhallStoryStep is-hidden" id="townhallStepAgent">
+      <h2 style="margin:0 0 6px">This is your agent - you rescued it!</h2>
+      <p class="small" style="margin-top:0">What should we call it?</p>
+
+      <label class="small" for="townhallAgentName">Agent name</label>
+      <input id="townhallAgentName" type="text" maxlength="48" placeholder="OpenClaw" />
+
+      <div class="townhallAvatarBlock">
+        <div class="small">Agent avatar</div>
+        <div class="public-media-preview is-hidden" id="townhallAgentPreview">
+          <img id="townhallAgentPreviewImg" alt="Agent avatar preview" />
+        </div>
+        <button class="btn" id="townhallAgentCustomizeBtn" type="button">Customize</button>
+      </div>
+
+      <div class="townhallCustomizeModal is-hidden" id="townhallAgentCustomize">
+        <label class="small" for="townhallAgentPrompt">Prompt</label>
+        <div class="small">To help AI understand your image.</div>
+        <textarea id="townhallAgentPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
+        <label class="small" for="townhallAgentImage" style="margin-top:8px; display:block;">Upload image</label>
+        <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn" id="townhallAgentBackBtn" type="button">Back</button>
+        <button class="btn primary" id="townhallAgentSubmitBtn" data-testid="townhall-agent-submit-btn">Submit</button>
+      </div>
+    </div>
+
+    <div class="townhallStoryStep is-hidden" id="townhallStepProcessing">
+      <h2 style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
+
+      <div class="townhallMintChecklist" id="townhallMintChecklist">
+        <div class="townhallMintChecklistRow">
+          <span>User is registering on Ethereum</span>
+          <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>User is registering on Solana</span>
+          <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>Agent is registering on Ethereum</span>
+          <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
+        </div>
+        <div class="townhallMintChecklistRow">
+          <span>Agent is registering on Solana</span>
+          <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
+        </div>
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <button class="btn" id="townhallRegisterBtn" data-testid="townhall-register-btn">Retry registration</button>
+        <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue to sigil test</button>
+        <span class="pill" id="townhallRegisterState">Not registered</span>
+      </div>
+      <div class="small" id="townhallRegisterStatus" style="margin-top:8px; color: var(--muted);"></div>
+      <div class="small" id="townhallRegisterError" style="margin-top:6px; color: var(--bad);"></div>
+    </div>
+  </div>
+</div>
+
+<div id="townhallSigilFlow">
+  <div class="divider"></div>
+
+  <div class="panel spaced" data-testid="townhall-single-path-note">
+    <h2 style="margin:0 0 6px">Single Worker Path</h2>
+    <p class="small" style="margin-top:0">
+      Every session now uses the in-browser worker agent. Keep this tab open and complete onboarding here.
+    </p>
+  </div>
+
+  <div class="panel is-hidden" id="reconnectPanel" data-testid="reconnect-panel">
+    <h2 style="margin:0 0 6px" id="reconnectTitle">Reconnect to House</h2>
+    <p class="small" style="margin-top:0" id="reconnectIntro">
+      Your house is ready. Re-open it in this town session.
+    </p>
+    <div class="kv agent-only">
+      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link-reconnect">View worker playbook</a>
+      <button class="btn" id="copyHouse" data-testid="copy-house">Copy house message</button>
+      <span class="pill status" data-testid="agent-status-house"><span class="dot" id="agentDotHouse"></span><span id="agentStatusTextHouse">Agent not connected</span></span>
+    </div>
+    <div class="kv stack agent-only">
+      <code class="pill" data-testid="house-snippet" id="houseSnippet">Reconnect the worker to this house session.</code>
+    </div>
+    <div class="kv">
+      <a class="btn" id="openHouseLink" href="/house">Open house</a>
+    </div>
+  </div>
+
+  <div class="panel" id="step1Panel">
+    <h2 style="margin:0 0 6px">Step 1 — Worker Agent</h2>
+    <p class="small" style="margin-top:0" id="step1Intro">
+      Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
+    </p>
+    <div class="kv">
+      <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
+      <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
+      <button class="btn" id="workerReconnectBtn" data-testid="worker-reconnect-btn" type="button">Reconnect worker</button>
+      <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">View worker playbook</a>
+      <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
+    </div>
+    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
+  </div>
+
+  <div class="divider" id="stepDivider"></div>
+
+  <div class="panel" id="step2Panel">
+    <h2 style="margin:0 0 6px">Step 2 — Sigil Test</h2>
+    <p class="small" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.</p>
+
+    <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
+
+    <div style="margin-top:12px" class="lock" data-testid="match-status">
+      <span class="state bad" id="matchState">LOCKED</span>
+      <span class="small" id="matchDetail">Pick the same sigil to unlock.</span>
+    </div>
+    <div class="kv" style="margin-top:10px">
+      <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
+      <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
+      <span class="pill" id="openReady" style="display:none">Continue → <a href="/create">Ceremony</a> · <a href="/house">House</a></span>
+    </div>
+    <div class="small" id="openError" style="color: var(--bad);"></div>
+  </div>
+</div>

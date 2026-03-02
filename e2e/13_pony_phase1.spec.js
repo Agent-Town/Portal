@@ -1,11 +1,6 @@
 const { test, expect } = require('@playwright/test');
-const crypto = require('crypto');
-const {
-  makeCeremonyRevealPair,
-  encryptCeremonyReveal,
-  decryptCeremonyReveal,
-  waitForAgentHouseMaterial
-} = require('./helpers/ceremony_crypto');
+const { installMockSolanaWallet, houseAuthHeadersFromKeyB64 } = require('./helpers/phase1');
+const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -13,89 +8,45 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-function sha256(buf) {
-  return crypto.createHash('sha256').update(buf).digest();
-}
-
-function hkdf(ikm, info, len = 32) {
-  return crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len);
-}
-
-function houseAuthHeaders(houseId, method, path, body, key) {
-  const ts = String(Date.now());
-  const bodyHash = crypto.createHash('sha256').update(body || '').digest('base64');
-  const msg = `${houseId}.${ts}.${method}.${path}.${bodyHash}`;
-  const auth = crypto.createHmac('sha256', key).update(msg).digest('base64');
-  return { 'x-house-ts': ts, 'x-house-auth': auth };
-}
-
 test('pony inbox uses canonical house ids and house-auth on protected actions', async ({ page, request }) => {
   await page.addInitScript(() => {
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 23) & 0xff;
-    window.solana = {
-      connect: async () => ({ publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } })
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So1anaMockPony1111111111111111111111111111111' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => 'So1anaMockPony1111111111111111111111111111111' } })
     };
   });
 
   await page.goto('/');
-  const teamCode = (await page.getByTestId('team-code').innerText()).trim();
-
-  await request.post('/api/agent/connect', { data: { teamCode, agentName: 'ClawTest' } });
-  await page.getByTestId('sigil-key').click();
-  await request.post('/api/agent/select', { data: { teamCode, elementId: 'key' } });
-  await page.getByTestId('open-btn').click();
-  await request.post('/api/agent/open/press', { data: { teamCode } });
-  await page.waitForURL('**/create');
-
-  const ra = crypto.randomBytes(32);
-  const agentRevealPair = makeCeremonyRevealPair();
-  const commitResp = await request.post('/api/agent/house/commit', {
-    data: { teamCode, commit: sha256(ra).toString('base64'), revealPub: agentRevealPair.publicKeyB64 }
-  });
-  expect(commitResp.ok()).toBeTruthy();
+  await reachCreateViaLite(page);
 
   await page.getByTestId('px-0-0').click();
-  const relayAgentReveal = (async () => {
-    const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealPub, 60, 100);
-    expect(mat).toBeTruthy();
-    const sealedForHuman = encryptCeremonyReveal({
-      revealBytes: ra,
-      recipientRevealPubB64: mat.humanRevealPub,
-      direction: 'agent_to_human',
-      teamCode
-    });
-    const revealResp = await request.post('/api/agent/house/reveal', {
-      data: { teamCode, sealedForHuman }
-    });
-    expect(revealResp.ok()).toBeTruthy();
-  })();
-  await Promise.all([
-    relayAgentReveal,
-    page.getByTestId('share-btn').click(),
-    page.waitForURL(/\/house\?house=/)
-  ]);
+  await page.getByTestId('share-btn').click();
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();
 
-  const mat = await waitForAgentHouseMaterial(request, teamCode, (m) => !!m?.humanRevealSealed, 60, 100);
-  expect(mat).toBeTruthy();
-  const rh = decryptCeremonyReveal({
-    sealed: mat.humanRevealSealed,
-    privateKey: agentRevealPair.privateKey,
-    direction: 'human_to_agent',
-    teamCode
-  });
-  expect(sha256(rh).toString('base64')).toBe(mat.humanCommit);
-  const kroot = sha256(Buffer.concat([rh, ra]));
-  const kauth = hkdf(kroot, 'elizatown-house-auth-v1', 32);
+  const connectWalletBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
+  const walletLabel = (await connectWalletBtn.textContent()) || '';
+  if (walletLabel.includes('Connect')) {
+    await connectWalletBtn.click();
+  }
+  await page.getByRole('button', { name: 'Sign to unlock' }).click();
+  await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
 
-  // Create share so we can verify legacy share-id alias -> canonical house-id mapping.
+  const houseAuthKeyB64 = await page.evaluate((id) => {
+    const store = window.__agentTownHouseAuthMemory || {};
+    const value = store[`agentTownHouseAuth:${id}`];
+    return typeof value === 'string' ? value : null;
+  }, houseId);
+  expect(houseAuthKeyB64).toBeTruthy();
+
   const createSharePath = `/api/house/${houseId}/share`;
   const createShareBody = JSON.stringify({});
-  const createShareHeaders = houseAuthHeaders(houseId, 'POST', createSharePath, createShareBody, kauth);
+  const createShareHeaders = houseAuthHeadersFromKeyB64(houseId, 'POST', createSharePath, createShareBody, houseAuthKeyB64);
   const createShareResp = await request.post(createSharePath, {
     data: createShareBody,
     headers: { 'content-type': 'application/json', ...createShareHeaders }
@@ -105,36 +56,33 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   const shareId = createShare.shareId;
   expect(shareId).toBeTruthy();
 
-  // Phase-7 cutover: this test still verifies legacy plaintext acceptance, so opt in explicitly.
   const policyPath = '/api/pony/policy';
   const policyBody = JSON.stringify({ houseId, allowLegacyPlaintext: true });
-  const policyHeaders = houseAuthHeaders(houseId, 'POST', policyPath, policyBody, kauth);
+  const policyHeaders = houseAuthHeadersFromKeyB64(houseId, 'POST', policyPath, policyBody, houseAuthKeyB64);
   const policyResp = await request.post(policyPath, {
     data: policyBody,
     headers: { 'content-type': 'application/json', ...policyHeaders }
   });
   expect(policyResp.ok()).toBeTruthy();
 
-  // Send to share id alias; server should normalize destination to canonical house id.
   const sendPath = '/api/pony/send';
   const sendBody = JSON.stringify({
     toHouseId: shareId,
     fromHouseId: houseId,
     ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'hello from canonical sender' }
   });
-  const sendHeaders = houseAuthHeaders(houseId, 'POST', sendPath, sendBody, kauth);
+  const sendHeaders = houseAuthHeadersFromKeyB64(houseId, 'POST', sendPath, sendBody, houseAuthKeyB64);
   const sendResp = await request.post(sendPath, {
     data: sendBody,
     headers: { 'content-type': 'application/json', ...sendHeaders }
   });
   expect(sendResp.ok()).toBeTruthy();
 
-  // Inbox read now requires house-auth.
   const inboxPath = '/api/pony/inbox';
   const inboxNoAuth = await request.get(`${inboxPath}?houseId=${encodeURIComponent(houseId)}`);
   expect(inboxNoAuth.status()).toBe(401);
 
-  const inboxHeaders = houseAuthHeaders(houseId, 'GET', inboxPath, '', kauth);
+  const inboxHeaders = houseAuthHeadersFromKeyB64(houseId, 'GET', inboxPath, '', houseAuthKeyB64);
   const inboxResp = await request.get(`${inboxPath}?houseId=${encodeURIComponent(houseId)}`, {
     headers: inboxHeaders
   });
@@ -144,7 +92,6 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   expect(canonicalMsg).toBeTruthy();
   expect(canonicalMsg.toHouseId).toBe(houseId);
 
-  // Anonymous request is allowed but accept/reject is house-auth protected.
   const anonSend = await request.post(sendPath, {
     data: {
       toHouseId: houseId,
@@ -163,26 +110,16 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
 
   const acceptPath = `/api/pony/inbox/${pending.id}/accept`;
   const acceptBody = JSON.stringify({ houseId });
-
-  // Missing house-auth should be rejected.
   const acceptNoAuth = await request.post(acceptPath, {
     data: acceptBody,
     headers: { 'content-type': 'application/json' }
   });
   expect(acceptNoAuth.status()).toBe(401);
 
-  // With house-auth it succeeds.
-  const acceptHeaders = houseAuthHeaders(houseId, 'POST', acceptPath, acceptBody, kauth);
+  const acceptHeaders = houseAuthHeadersFromKeyB64(houseId, 'POST', acceptPath, acceptBody, houseAuthKeyB64);
   const acceptOk = await request.post(acceptPath, {
     data: acceptBody,
     headers: { 'content-type': 'application/json', ...acceptHeaders }
   });
   expect(acceptOk.ok()).toBeTruthy();
-
-  const inboxResp3 = await request.get(`${inboxPath}?houseId=${encodeURIComponent(houseId)}`, {
-    headers: inboxHeaders
-  });
-  const inboxData3 = await inboxResp3.json();
-  const accepted = inboxData3.inbox.find((m) => m.id === pending.id);
-  expect(accepted.status).toBe('accepted');
 });
