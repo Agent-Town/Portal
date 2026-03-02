@@ -3791,6 +3791,14 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
 
+  if (onboarding.required === true && onboarding.registrationComplete !== true) {
+    return res.status(409).json({
+      ok: false,
+      error: 'ONBOARDING_TOWNHALL_REQUIRED',
+      message: 'Complete Town Hall registration before configuring brain.'
+    });
+  }
+
   let payload;
   try {
     payload = normalizeLiteLlmPayload(req.body || {});
@@ -6544,6 +6552,17 @@ let atlasStoreContextCache = {
 const atlasDistrictSummaryCache = new Map();
 const atlasDistrictAgentsCache = new Map();
 
+function invalidateAtlasStoreCaches() {
+  atlasStoreContextCache = {
+    signature: '',
+    expiresAt: 0,
+    optedOutSet: new Set(),
+    mediaByErcId: new Map()
+  };
+  atlasDistrictSummaryCache.clear();
+  atlasDistrictAgentsCache.clear();
+}
+
 function buildAtlasMediaByErc8004Id(store) {
   const out = new Map();
   const housesById = new Map();
@@ -6618,16 +6637,25 @@ function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
 function fileSignature(filePath) {
   const absolutePath = path.resolve(filePath);
   try {
-    const stat = fs.statSync(filePath, { bigint: true });
-    const size = typeof stat.size === 'bigint' ? stat.size.toString() : String(stat.size || 0);
-    const mtimeNs = typeof stat.mtimeNs === 'bigint'
-      ? stat.mtimeNs.toString()
-      : String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
-    const ctimeNs = typeof stat.ctimeNs === 'bigint'
-      ? stat.ctimeNs.toString()
-      : String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
-    const inode = typeof stat.ino === 'bigint' ? stat.ino.toString() : String(stat.ino || 0);
-    return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
+    try {
+      const stat = fs.statSync(absolutePath, { bigint: true });
+      const size = typeof stat.size === 'bigint' ? stat.size.toString() : String(stat.size || 0);
+      const mtimeNs = typeof stat.mtimeNs === 'bigint'
+        ? stat.mtimeNs.toString()
+        : String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
+      const ctimeNs = typeof stat.ctimeNs === 'bigint'
+        ? stat.ctimeNs.toString()
+        : String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
+      const inode = typeof stat.ino === 'bigint' ? stat.ino.toString() : String(stat.ino || 0);
+      return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
+    } catch {
+      const stat = fs.statSync(absolutePath);
+      const size = String(stat.size || 0);
+      const mtimeNs = String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
+      const ctimeNs = String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
+      const inode = String(stat.ino || 0);
+      return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
+    }
   } catch {
     return `${absolutePath}:missing`;
   }
@@ -7528,6 +7556,7 @@ if (process.env.NODE_ENV === 'test') {
       anchors: [],
       inbox: []
     });
+    invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();

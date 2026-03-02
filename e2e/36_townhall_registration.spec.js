@@ -340,6 +340,30 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
+test('town hall story enforces avatar prompts before advancing each onboarding step', async ({ page }) => {
+  await page.goto('/app');
+  await openTownhallPanel(page);
+
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await page.locator('#townhallHumanCustomizeBtn').click();
+  await page.locator('#townhallHumanPrompt').fill('');
+  await page.locator('#townhallHumanName').fill('Robin');
+  await page.getByTestId('townhall-human-submit-btn').click();
+  await expect(page.locator('#townhallStepHuman')).toBeVisible();
+  await expect(page.locator('#townhallRegisterError')).toContainText('human avatar prompt');
+
+  await page.locator('#townhallHumanPrompt').fill('Hero avatar prompt');
+  await page.getByTestId('townhall-human-submit-btn').click();
+  await expect(page.locator('#townhallStepAgent')).toBeVisible();
+
+  await page.locator('#townhallAgentCustomizeBtn').click();
+  await page.locator('#townhallAgentPrompt').fill('');
+  await page.locator('#townhallAgentName').fill('OpenClaw');
+  await page.getByTestId('townhall-agent-submit-btn').click();
+  await expect(page.locator('#townhallStepAgent')).toBeVisible();
+  await expect(page.locator('#townhallRegisterError')).toContainText('agent avatar prompt');
+});
+
 test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to session state', async ({ page }) => {
   await mockTownhallMintFlow(page);
   await page.goto('/app');

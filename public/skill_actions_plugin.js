@@ -257,6 +257,75 @@
       .filter(Boolean);
   }
 
+  function listQueryParamNames(urlTemplate) {
+    const out = [];
+    const seen = new Set();
+    let raw = String(urlTemplate || "").trim();
+    if (!raw || raw.indexOf("?") < 0) return out;
+    raw = raw.replace(/^\{origin\}/i, "http://origin");
+    const addName = (name) => {
+      const key = String(name || "").trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(key);
+    };
+    try {
+      const parsed = new URL(raw, "http://localhost");
+      parsed.searchParams.forEach((_value, key) => addName(key));
+      return out;
+    } catch {
+      const query = String(raw.split("?")[1] || "").split("#")[0];
+      for (const pair of query.split("&")) {
+        if (!pair) continue;
+        const key = String(pair.split("=")[0] || "").trim();
+        if (key) addName(key);
+      }
+    }
+    return out;
+  }
+
+  function canonicalRequestSignature(method, urlTemplate) {
+    const methodNorm = normalizeMethod(method);
+    const raw = sanitizeUrlTemplate(urlTemplate);
+    if (!raw) return "";
+    let path = "";
+    let queryKeys = [];
+    try {
+      const parsed = new URL(raw.replace(/^\{origin\}/i, "http://origin"), "http://localhost");
+      path = String(parsed.pathname || "/");
+      parsed.searchParams.forEach((_value, key) => {
+        const clean = String(key || "").trim();
+        if (clean) queryKeys.push(clean);
+      });
+    } catch {
+      const [pathPart, queryPart = ""] = raw.replace(/^\{origin\}/i, "").split("?");
+      path = String(pathPart || "/");
+      queryKeys = queryPart
+        .split("#")[0]
+        .split("&")
+        .map((pair) => String(pair.split("=")[0] || "").trim())
+        .filter(Boolean);
+    }
+    path = path.replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+    queryKeys = Array.from(new Set(queryKeys)).sort((a, b) => a.localeCompare(b));
+    return `${methodNorm} ${path}?${queryKeys.join("&")}`;
+  }
+
+  function dedupeActionsByRequestSignature(actions) {
+    const rows = Array.isArray(actions) ? actions : [];
+    const out = [];
+    const seen = new Set();
+    for (const row of rows) {
+      const method = normalizeMethod(row?.request?.method || row?.method || "GET");
+      const urlTemplate = String(row?.request?.urlTemplate || row?.request?.url || row?.urlTemplate || row?.url || "").trim();
+      const key = canonicalRequestSignature(method, urlTemplate);
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      out.push(row);
+    }
+    return out;
+  }
+
   function inferActionId(method, urlTemplate, fallbackIndex) {
     const segments = splitPathSegments(urlTemplate);
     const joined = segments.join("/");
@@ -291,6 +360,7 @@
 
     const methodNorm = normalizeMethod(method);
     const pathSegments = splitPathSegments(urlTemplate).join("/");
+    const queryParamNames = listQueryParamNames(urlTemplate);
     if (/\/canvas\/paint$/i.test(pathSegments)) {
       addParam("teamCode", "string", true, { source: "runtime.teamCode" });
       addParam("x", "integer", true, { min: 0, max: 15 });
@@ -330,6 +400,26 @@
       addParam("teamCode", "string", true, { source: "runtime.teamCode" });
       addParam("sealedForHuman", "object", true);
       return params;
+    }
+    if (/\/agent\/house\/material$/i.test(pathSegments)) {
+      addParam("teamCode", "string", true, { source: "runtime.teamCode" });
+    }
+    if (/\/agent\/share\/instructions$/i.test(pathSegments)) {
+      addParam("teamCode", "string", true, { source: "runtime.teamCode" });
+    }
+    if (/\/pony\/inbox$/i.test(pathSegments)) {
+      addParam("houseId", "string", true, { source: "runtime.houseId" });
+    }
+    for (const queryName of queryParamNames) {
+      if (queryName === "teamCode") {
+        addParam("teamCode", "string", true, { source: "runtime.teamCode" });
+        continue;
+      }
+      if (queryName === "houseId") {
+        addParam("houseId", "string", true, { source: "runtime.houseId" });
+        continue;
+      }
+      addParam(queryName, "string", false);
     }
     if (methodNorm === "POST" || methodNorm === "PUT" || methodNorm === "PATCH") {
       addParam("teamCode", "string", false, { source: "runtime.teamCode" });
@@ -446,7 +536,10 @@
       inferredActions = inferActionsFromMarkdown(text);
     }
 
-    const allActions = explicitActions.length ? explicitActions : inferredActions;
+    const allActionsRaw = explicitActions.length ? explicitActions : inferredActions;
+    const allActions = explicitActions.length
+      ? allActionsRaw
+      : dedupeActionsByRequestSignature(allActionsRaw);
     const byId = new Map();
     for (let i = 0; i < allActions.length; i += 1) {
       const row = allActions[i];

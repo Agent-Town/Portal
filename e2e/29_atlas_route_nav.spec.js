@@ -31,4 +31,10 @@ test('atlas route renders and nav exposes Atlas link across core pages', async (
   await page.locator('.townDistrictHotspot[data-district="atlas"]').click();
   await expect(page.locator('#districtModalTitle')).toHaveText('Atlas Depot');
   await expect(page.locator('#districtModalBody iframe.districtFrame')).toBeVisible();
+  await page.locator('#districtModalClose').click();
+
+  await expect(page.locator('.townDistrictHotspot[data-district="leaderboard"] .townDistrictLabel')).toContainText('Town Board');
+  await page.locator('.townDistrictHotspot[data-district="leaderboard"]').click();
+  await expect(page.locator('#districtModalTitle')).toHaveText('Town Board');
+  await expect(page.locator('#districtModalBody')).toContainText('Community leaderboard and team snapshots');
 });

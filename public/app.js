@@ -760,7 +760,7 @@ function districtStatusText(district) {
   if (!district) return 'Select a district on the map.';
   if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
-  if (district === 'saloon') return 'Saloon selected: reserved for future menu content.';
+  if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
   if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
   if (district === 'leaderboard') return 'Town Board selected: public rankings and team snapshots.';
   return 'Plan Wagons selected: unlock and enter your house flow.';
@@ -2782,11 +2782,26 @@ function bindTownhallRegistrationControls() {
     return false;
   };
 
+  const requireAvatarPrompt = (kind) => {
+    const isHuman = kind === 'human';
+    const input = el(isHuman ? 'townhallHumanPrompt' : 'townhallAgentPrompt');
+    const value = (input?.value || '').trim();
+    if (value) return true;
+    setTownhallCustomizeOpen(kind, true);
+    setTownhallRegisterFeedback(
+      isHuman ? 'Add the exact human avatar prompt to continue.' : 'Add the exact agent avatar prompt to continue.',
+      true
+    );
+    if (input) input.focus();
+    return false;
+  };
+
   const humanSubmitBtn = el('townhallHumanSubmitBtn');
   if (humanSubmitBtn && humanSubmitBtn.dataset.bound !== '1') {
     humanSubmitBtn.dataset.bound = '1';
     humanSubmitBtn.addEventListener('click', () => {
       if (!requireName('human')) return;
+      if (!requireAvatarPrompt('human')) return;
       setTownhallRegisterFeedback('');
       setTownhallStoryStep('agent');
     });
@@ -2806,7 +2821,9 @@ function bindTownhallRegistrationControls() {
     agentSubmitBtn.dataset.bound = '1';
     agentSubmitBtn.addEventListener('click', () => {
       if (!requireName('human')) return;
+      if (!requireAvatarPrompt('human')) return;
       if (!requireName('agent')) return;
+      if (!requireAvatarPrompt('agent')) return;
       townhallAwaitingContinue = true;
       townhallSigilUnlockedByContinue = false;
       setTownhallStoryStep('processing');
@@ -2835,6 +2852,10 @@ function bindTownhallRegistrationControls() {
   if (registerBtn && registerBtn.dataset.bound !== '1') {
     registerBtn.dataset.bound = '1';
     registerBtn.addEventListener('click', () => {
+      if (!requireName('human')) return;
+      if (!requireAvatarPrompt('human')) return;
+      if (!requireName('agent')) return;
+      if (!requireAvatarPrompt('agent')) return;
       townhallAwaitingContinue = true;
       townhallSigilUnlockedByContinue = false;
       mintAllTownhallIdentitiesAndRegister();
@@ -4998,7 +5019,10 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       return await refreshSkillActionPluginCache(gatewayApi, debugApi, skillSnapshot).catch(() => null);
     }), null, 7000);
     const pluginActions = Array.isArray(skillActionPluginState?.actions) ? skillActionPluginState.actions : [];
+    const workerToolNames = Array.isArray(toolRegistry?.names) ? toolRegistry.names : [];
+    const workerToolNameSet = new Set(workerToolNames.map((name) => String(name || '').trim()).filter(Boolean));
     const pluginActionToolNames = pluginActions.map((action) => `skill_action.${action.id}`);
+    const pluginActionAddonToolNames = pluginActionToolNames.filter((name) => !workerToolNameSet.has(name));
     const pluginUsage = skillActionPluginState?.usage || null;
     const trainerNamespaceState = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
       return await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
@@ -5007,6 +5031,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const trainerNamespaceToolNames = trainerNamespaceTools
       .map((row) => String(row?.name || '').trim())
       .filter(Boolean);
+    const trainerNamespaceAddonToolNames = trainerNamespaceToolNames.filter((name) => !workerToolNameSet.has(name));
     const trainerNamespaceDiagnostics = trainerNamespaceState?.diagnostics && typeof trainerNamespaceState.diagnostics === 'object'
       ? trainerNamespaceState.diagnostics
       : null;
@@ -5022,14 +5047,14 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const toolsLines = [
       `Refreshed: ${nowIso}`,
       `Reason: ${reason}`,
-      `Worker tools count: ${Number(toolRegistry?.count || (Array.isArray(toolRegistry?.names) ? toolRegistry.names.length : 0))}`,
-      `Skill action tools (plugin): ${pluginActionToolNames.length}`,
-      `Trainer namespace tools (plugin): ${trainerNamespaceToolNames.length}`,
+      `Worker tools count: ${Number(toolRegistry?.count || workerToolNames.length)}`,
+      `Skill action tools (plugin additions): ${pluginActionAddonToolNames.length}`,
+      `Trainer namespace tools (plugin additions): ${trainerNamespaceAddonToolNames.length}`,
       `Trainer budget per turn remaining: ${trainerBudgetPerTurnRemaining === null || trainerBudgetPerTurnRemaining === undefined ? '(n/a)' : trainerBudgetPerTurnRemaining}`,
       `Trainer budget per minute remaining: ${trainerBudgetPerMinuteRemaining === null || trainerBudgetPerMinuteRemaining === undefined ? '(n/a)' : trainerBudgetPerMinuteRemaining}`,
-      formatDebugList('Tools', Array.isArray(toolRegistry?.names) ? toolRegistry.names : []),
-      formatDebugList('Skill action tools', pluginActionToolNames.slice(0, 60)),
-      formatDebugList('Trainer namespace tools', trainerNamespaceToolNames.slice(0, 60)),
+      formatDebugList('Tools', workerToolNames),
+      formatDebugList('Skill action tools (plugin additions)', pluginActionAddonToolNames.slice(0, 60)),
+      formatDebugList('Trainer namespace tools (plugin additions)', trainerNamespaceAddonToolNames.slice(0, 60)),
       '',
       `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
       `Active tab: ${agentDebugActiveTab}`,
