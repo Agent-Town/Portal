@@ -3718,6 +3718,14 @@ app.post('/api/agent/lite/llm/config', (req, res) => {
   const lite = ensureLiteState(s);
   const onboarding = ensureSessionOnboarding(s);
 
+  if (onboarding.required === true && onboarding.registrationComplete !== true) {
+    return res.status(409).json({
+      ok: false,
+      error: 'ONBOARDING_TOWNHALL_REQUIRED',
+      message: 'Complete Town Hall registration before configuring brain.'
+    });
+  }
+
   let payload;
   try {
     payload = normalizeLiteLlmPayload(req.body || {});
@@ -6457,6 +6465,17 @@ let atlasStoreContextCache = {
 const atlasDistrictSummaryCache = new Map();
 const atlasDistrictAgentsCache = new Map();
 
+function invalidateAtlasStoreCaches() {
+  atlasStoreContextCache = {
+    signature: '',
+    expiresAt: 0,
+    optedOutSet: new Set(),
+    mediaByErcId: new Map()
+  };
+  atlasDistrictSummaryCache.clear();
+  atlasDistrictAgentsCache.clear();
+}
+
 function buildAtlasMediaByErc8004Id(store) {
   const out = new Map();
   const housesById = new Map();
@@ -6530,8 +6549,17 @@ function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
 
 function fileSignature(filePath) {
   try {
-    const stat = fs.statSync(filePath);
-    return `${path.resolve(filePath)}:${stat.mtimeMs}:${stat.size}`;
+    const resolved = path.resolve(filePath);
+    try {
+      const statBig = fs.statSync(filePath, { bigint: true });
+      const size = typeof statBig.size === 'bigint' ? statBig.size.toString() : String(statBig.size || 0);
+      const mtimeNs = typeof statBig.mtimeNs === 'bigint' ? statBig.mtimeNs.toString() : String(statBig.mtimeMs || 0);
+      const ctimeNs = typeof statBig.ctimeNs === 'bigint' ? statBig.ctimeNs.toString() : String(statBig.ctimeMs || 0);
+      return `${resolved}:${mtimeNs}:${ctimeNs}:${size}`;
+    } catch {
+      const stat = fs.statSync(filePath);
+      return `${resolved}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+    }
   } catch {
     return `${path.resolve(filePath)}:missing`;
   }
@@ -7424,6 +7452,7 @@ if (process.env.NODE_ENV === 'test') {
       anchors: [],
       inbox: []
     });
+    invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();

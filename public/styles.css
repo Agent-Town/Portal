@@ -552,6 +552,20 @@ h3 {
   border-radius: 999px;
 }
 
+.townDistrict-board {
+  left: 57%;
+  top: 47%;
+  width: 12%;
+  height: 14%;
+  border-radius: 14px;
+}
+
+.townDistrict-board .townDistrictLabel {
+  width: 100%;
+  min-height: 100%;
+  padding: 8px 6px;
+}
+
 .townDistrict-pony {
   top: 28%;
   left: 8%;
@@ -1621,6 +1635,13 @@ footer::before {
     top: 45%;
     width: 24%;
     height: 16%;
+  }
+
+  .townDistrict-board {
+    left: 64%;
+    top: 46%;
+    width: 28%;
+    height: 14%;
   }
 
   .townDistrict-wagons .townDistrictLabel {

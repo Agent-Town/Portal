@@ -332,6 +332,7 @@ Errors:
 - `MISSING_LLM_PROVIDER`
 - `MISSING_LLM_MODEL`
 - `MISSING_LLM_API_KEY`
+- `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
 
 ### DELETE `/api/agent/lite/llm/config` (human)
 Clears server-side LLM configuration metadata for the current session.
@@ -725,6 +726,7 @@ Errors:
 - `MISSING_LLM_PROVIDER`
 - `MISSING_LLM_MODEL`
 - `MISSING_LLM_API_KEY`
+- `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
 
 ### DELETE `/api/agent/lite/llm/config` (human)
 Clears server-side LLM configuration metadata for the current session.
