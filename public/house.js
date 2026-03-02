@@ -256,10 +256,18 @@ function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
 
+function getHouseAuthMemoryStore() {
+  if (!window.__agentTownHouseAuthMemory || typeof window.__agentTownHouseAuthMemory !== 'object') {
+    window.__agentTownHouseAuthMemory = Object.create(null);
+  }
+  return window.__agentTownHouseAuthMemory;
+}
+
 function cacheHouseAuthBytes(houseId, keyBytes) {
   if (!houseId || !keyBytes || !keyBytes.length) return;
   try {
-    sessionStorage.setItem(houseAuthCacheKey(houseId), b64(keyBytes));
+    const store = getHouseAuthMemoryStore();
+    store[houseAuthCacheKey(houseId)] = b64(keyBytes);
   } catch {
     // ignore storage errors
   }
@@ -268,7 +276,20 @@ function cacheHouseAuthBytes(houseId, keyBytes) {
 function clearHouseAuthCache(houseId) {
   if (!houseId) return;
   try {
-    sessionStorage.removeItem(houseAuthCacheKey(houseId));
+    const store = getHouseAuthMemoryStore();
+    delete store[houseAuthCacheKey(houseId)];
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearAllHouseAuthCache() {
+  try {
+    const store = getHouseAuthMemoryStore();
+    for (const key of Object.keys(store)) {
+      if (!key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) continue;
+      delete store[key];
+    }
   } catch {
     // ignore storage errors
   }
@@ -1962,12 +1983,7 @@ function clearClientFlowState() {
     // ignore
   }
   try {
-    // Clear any cached house auth keys for this origin.
-    for (let i = sessionStorage.length - 1; i >= 0; i--) {
-      const key = sessionStorage.key(i);
-      if (!key) continue;
-      if (key.startsWith(HOUSE_AUTH_CACHE_PREFIX)) sessionStorage.removeItem(key);
-    }
+    clearAllHouseAuthCache();
   } catch {
     // ignore
   }

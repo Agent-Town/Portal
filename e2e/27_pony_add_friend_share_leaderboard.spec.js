@@ -154,7 +154,8 @@ test('share page and leaderboard can add houses into Pony friends', async ({ pag
           return { signature: sigBytes };
         }
       };
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = keyB64;
       localStorage.setItem('agentTownWallet', JSON.stringify({
         address,
         houseId
@@ -176,7 +177,8 @@ test('share page and leaderboard can add houses into Pony friends', async ({ pag
   await expect(page.locator('#friends')).toContainText(shareTarget.houseId);
 
   await page.evaluate((houseId) => {
-    sessionStorage.removeItem(`agentTownHouseAuth:${houseId}`);
+    if (!window.__agentTownHouseAuthMemory || typeof window.__agentTownHouseAuthMemory !== 'object') return;
+    delete window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`];
   }, selfHouse.houseId);
 
   await page.goto('/leaderboard');

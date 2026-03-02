@@ -38,6 +38,13 @@ function houseAuthCacheKey(houseId) {
   return `${HOUSE_AUTH_CACHE_PREFIX}${houseId}`;
 }
 
+function getHouseAuthMemoryStore() {
+  if (!window.__agentTownHouseAuthMemory || typeof window.__agentTownHouseAuthMemory !== 'object') {
+    window.__agentTownHouseAuthMemory = Object.create(null);
+  }
+  return window.__agentTownHouseAuthMemory;
+}
+
 function b64(bytes) {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -71,11 +78,15 @@ async function sha256(bytes) {
 
 function cacheHouseAuthBytes(houseId, keyBytes) {
   if (!houseId || !keyBytes || keyBytes.length < 16) return;
-  sessionStorage.setItem(houseAuthCacheKey(houseId), b64(keyBytes));
+  const store = getHouseAuthMemoryStore();
+  store[houseAuthCacheKey(houseId)] = b64(keyBytes);
 }
 
 function loadCachedHouseAuthBytes(houseId) {
-  const raw = sessionStorage.getItem(houseAuthCacheKey(houseId));
+  const store = getHouseAuthMemoryStore();
+  const raw = typeof store[houseAuthCacheKey(houseId)] === 'string'
+    ? store[houseAuthCacheKey(houseId)]
+    : '';
   if (!raw) return null;
   const keyBytes = unb64(raw);
   if (!keyBytes || keyBytes.length < 16) return null;

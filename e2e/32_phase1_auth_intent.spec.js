@@ -14,7 +14,7 @@ async function openHatchVia(page, intent = 'signin', { navigate = false } = {}) 
 }
 
 async function captureVisibleHatchControls(page) {
-  const candidateIds = ['path-human', 'path-coop', 'path-agent', 'team-code', 'skill-link', 'lite-llm-panel'];
+  const candidateIds = ['path-human', 'path-coop', 'path-agent', 'skill-link', 'lite-llm-panel'];
   const ids = [];
   for (const id of candidateIds) {
     const locator = page.getByTestId(id);
@@ -45,7 +45,6 @@ test('sign in and sign up both transition to the same setup flow and reload keep
   const signinControls = await captureVisibleHatchControls(page);
   expect(signinControls.length).toBeGreaterThanOrEqual(2);
   expect(signinControls).toContain('lite-llm-panel');
-  expect(signinControls).toContain('team-code');
 
   await page.reload();
   await openHatchVia(page, 'signin');

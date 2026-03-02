@@ -7,10 +7,15 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('home loads, shows team code and skill link', async ({ page, request }) => {
+test('home loads, hides visual team code, and keeps skill link reachable', async ({ page, request }) => {
   await enterHatch(page, 'signin');
 
-  await expect(page.getByTestId('team-code')).toHaveText(/TEAM-[A-Z0-9]{4}-[A-Z0-9]{4}/);
+  const state = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    return resp.json().catch(() => ({}));
+  });
+  expect(String(state?.teamCode || '')).toMatch(/^TEAM-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  await expect(page.getByTestId('team-code')).toHaveCount(0);
   await expect(page.getByTestId('skill-link')).toBeVisible();
 
   // skill.md is reachable and looks like a skill file (frontmatter)

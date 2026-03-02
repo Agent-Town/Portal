@@ -1508,9 +1508,8 @@ function initFilters(districts) {
 function setWorkerDockState(payload) {
   const dot = el('atlasWorkerDot');
   const status = el('atlasWorkerStatus');
-  const team = el('atlasWorkerTeam');
   const name = el('atlasWorkerName');
-  if (!dot || !status || !team || !name) return;
+  if (!dot || !status || !name) return;
 
   const connected = payload?.agent?.connected === true;
   const matched = payload?.match?.matched === true;
@@ -1524,7 +1523,6 @@ function setWorkerDockState(payload) {
   else if (!openReady) status.textContent = 'Match locked. Awaiting both open presses.';
   else status.textContent = 'Worker active. Co-op state synchronized.';
 
-  team.textContent = payload?.teamCode || '—';
   name.textContent = payload?.agent?.name || 'Unassigned';
 }
 

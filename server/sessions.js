@@ -5,6 +5,10 @@ const sessionsById = new Map();
 const sessionIdByTeamCode = new Map();
 const sessionIdByHouseId = new Map();
 const sessionIdByWalletAddress = new Map();
+const SESSION_TTL_MS = Math.max(60_000, Number.parseInt(process.env.SESSION_TTL_MS || '', 10) || (24 * 60 * 60 * 1000));
+const SESSION_MAX = Math.max(100, Number.parseInt(process.env.SESSION_MAX || '', 10) || 2000);
+const SESSION_PRUNE_INTERVAL_MS = 60_000;
+let nextSessionPruneAtMs = 0;
 
 const ELEMENTS = [
   { id: 'key', label: 'Key', icon: '🔑' },
@@ -22,7 +26,8 @@ function makeWalletSessionKey(chain, address) {
   const normalizedChain = rawChain === 'evm' || rawChain === 'solana' ? rawChain : '';
   const rawAddress = typeof address === 'string' ? address.trim() : '';
   if (!normalizedChain || !rawAddress) return null;
-  return `${normalizedChain}:${rawAddress}`;
+  const normalizedAddress = normalizedChain === 'evm' ? rawAddress.toLowerCase() : rawAddress;
+  return `${normalizedChain}:${normalizedAddress}`;
 }
 
 function bindSessionWallet(session, chain, address) {
@@ -33,12 +38,74 @@ function bindSessionWallet(session, chain, address) {
   sessionIdByWalletAddress.set(key, session.sessionId);
 }
 
+function removeSessionIndices(session) {
+  if (!session || typeof session !== 'object') return;
+  const sessionId = String(session.sessionId || '').trim();
+  if (!sessionId) return;
+  const teamCode = String(session.teamCode || '').trim();
+  if (teamCode) sessionIdByTeamCode.delete(teamCode);
+  const houseId = String(session?.houseCeremony?.houseId || '').trim();
+  if (houseId && sessionIdByHouseId.get(houseId) === sessionId) {
+    sessionIdByHouseId.delete(houseId);
+  }
+  for (const [walletKey, mappedSessionId] of sessionIdByWalletAddress.entries()) {
+    if (mappedSessionId === sessionId) {
+      sessionIdByWalletAddress.delete(walletKey);
+    }
+  }
+}
+
+function deleteSessionById(sessionId) {
+  const existing = sessionsById.get(sessionId);
+  if (!existing) return;
+  sessionsById.delete(sessionId);
+  removeSessionIndices(existing);
+}
+
+function touchSession(session) {
+  if (!session || typeof session !== 'object') return;
+  session.lastSeenAtMs = Date.now();
+}
+
+function sessionLastSeenMs(session) {
+  const raw = Number(session?.lastSeenAtMs);
+  if (Number.isFinite(raw) && raw > 0) return raw;
+  const createdAtMs = Date.parse(String(session?.createdAt || ''));
+  if (Number.isFinite(createdAtMs) && createdAtMs > 0) return createdAtMs;
+  return 0;
+}
+
+function maybePruneSessions(now = Date.now()) {
+  if (now < nextSessionPruneAtMs) return;
+  nextSessionPruneAtMs = now + SESSION_PRUNE_INTERVAL_MS;
+
+  const ttlCutoff = now - SESSION_TTL_MS;
+  for (const [sessionId, session] of sessionsById.entries()) {
+    const lastSeen = sessionLastSeenMs(session);
+    if (!lastSeen || lastSeen < ttlCutoff) {
+      deleteSessionById(sessionId);
+    }
+  }
+
+  if (sessionsById.size <= SESSION_MAX) return;
+  const ordered = Array.from(sessionsById.entries())
+    .map(([sessionId, session]) => ({ sessionId, lastSeen: sessionLastSeenMs(session) }))
+    .sort((a, b) => a.lastSeen - b.lastSeen);
+  while (sessionsById.size > SESSION_MAX && ordered.length > 0) {
+    const oldest = ordered.shift();
+    if (!oldest?.sessionId) continue;
+    deleteSessionById(oldest.sessionId);
+  }
+}
+
 function getSessionByWallet(chain, address) {
   const key = makeWalletSessionKey(chain, address);
   if (!key) return null;
   const sessionId = sessionIdByWalletAddress.get(key);
   if (!sessionId) return null;
-  return getSessionById(sessionId);
+  const session = getSessionById(sessionId);
+  if (!session) sessionIdByWalletAddress.delete(key);
+  return session;
 }
 
 function emptyCanvas() {
@@ -62,13 +129,16 @@ function defaultLiteState() {
 }
 
 function createSession({ flow } = {}) {
+  maybePruneSessions();
   const sessionId = randomHex(16);
   const teamCode = createTeamCode();
+  const nowMs = Date.now();
   const session = {
     sessionId,
     teamCode,
     flow: flow === 'agent_solo' ? 'agent_solo' : 'human',
     createdAt: nowIso(),
+    lastSeenAtMs: nowMs,
     agent: {
       connected: false,
       source: null,
@@ -180,8 +250,17 @@ function createSession({ flow } = {}) {
 }
 
 function getSessionById(sessionId) {
+  maybePruneSessions();
   if (!sessionId) return null;
-  return sessionsById.get(sessionId) || null;
+  const session = sessionsById.get(sessionId) || null;
+  if (!session) return null;
+  const lastSeen = sessionLastSeenMs(session);
+  if (lastSeen && lastSeen < Date.now() - SESSION_TTL_MS) {
+    deleteSessionById(sessionId);
+    return null;
+  }
+  touchSession(session);
+  return session;
 }
 
 function getSessionByTeamCode(teamCode) {
@@ -189,7 +268,9 @@ function getSessionByTeamCode(teamCode) {
   const code = teamCode.trim();
   const sessionId = sessionIdByTeamCode.get(code);
   if (!sessionId) return null;
-  return getSessionById(sessionId);
+  const session = getSessionById(sessionId);
+  if (!session) sessionIdByTeamCode.delete(code);
+  return session;
 }
 
 function indexHouseId(session, houseId) {
@@ -203,7 +284,9 @@ function getSessionByHouseId(houseId) {
   if (!id) return null;
   const sessionId = sessionIdByHouseId.get(id);
   if (!sessionId) return null;
-  return getSessionById(sessionId);
+  const session = getSessionById(sessionId);
+  if (!session) sessionIdByHouseId.delete(id);
+  return session;
 }
 
 function listElements() {

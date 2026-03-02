@@ -118,7 +118,8 @@ test('leaderboard cards render share hero from media and keep add-as-friend acti
 
   await page.addInitScript(
     ({ houseId, keyB64 }) => {
-      sessionStorage.setItem(`agentTownHouseAuth:${houseId}`, keyB64);
+      window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = keyB64;
       localStorage.setItem('agentTownWallet', JSON.stringify({
         address: 'So1anaMockBoardHero111111111111111111111111111',
         houseId

@@ -38,7 +38,9 @@ test('pony inbox uses canonical house ids and house-auth on protected actions', 
   await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
 
   const houseAuthKeyB64 = await page.evaluate((id) => {
-    return sessionStorage.getItem(`agentTownHouseAuth:${id}`);
+    const store = window.__agentTownHouseAuthMemory || {};
+    const value = store[`agentTownHouseAuth:${id}`];
+    return typeof value === 'string' ? value : null;
   }, houseId);
   expect(houseAuthKeyB64).toBeTruthy();
 

@@ -2,6 +2,8 @@ const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
 const WALLET_IDENTITY_HINT_STORAGE_KEY = 'agentTown:walletIdentityHint';
 const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
 const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
+const WALLET_RECOVERY_INTENT_HEADER = 'x-wallet-recovery-intent';
+const WALLET_RECOVERY_INTENT_MAX_ATTEMPTS = 3;
 
 const ONBOARDING_STEP_TOWNHALL = 'townhall_profile';
 const ONBOARDING_STEP_BRAIN = 'brain';
@@ -106,6 +108,18 @@ async function api(url, opts = {}) {
     }
   }
   const teamCodeHint = readTeamCodeHint();
+  if (!teamCodeHint && walletRecoveryIntentAttempts < WALLET_RECOVERY_INTENT_MAX_ATTEMPTS) {
+    walletRecoveryIntentAttempts = WALLET_RECOVERY_INTENT_MAX_ATTEMPTS;
+  }
+  let sentWalletRecoveryIntent = false;
+  if (
+    walletRecoveryIntentAttempts > 0
+    && headers[WALLET_RECOVERY_INTENT_HEADER] === undefined
+    && headers['X-Wallet-Recovery-Intent'] === undefined
+  ) {
+    headers[WALLET_RECOVERY_INTENT_HEADER] = '1';
+    sentWalletRecoveryIntent = true;
+  }
   if (
     teamCodeHint
     && headers['x-team-code-hint'] === undefined
@@ -120,6 +134,12 @@ async function api(url, opts = {}) {
     headers
   });
   const data = await res.json().catch(() => ({}));
+  if (sentWalletRecoveryIntent && walletRecoveryIntentAttempts > 0) {
+    walletRecoveryIntentAttempts -= 1;
+  }
+  if (data?.onboarding?.registrationComplete === true) {
+    walletRecoveryIntentAttempts = 0;
+  }
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
   }
@@ -214,6 +234,7 @@ let elements = [];
 let lastState = null;
 let wallet = null;
 let walletAddr = null;
+let walletRecoveryIntentAttempts = 0;
 let redirecting = false;
 let pendingWalletCheck = false;
 let pendingLiteConnect = false;
@@ -685,6 +706,7 @@ function isTownhallGateLocked(state) {
 }
 
 function isTownhallBrainConfigured(state) {
+  if (onboardingRequired(state)) return !!state?.lite?.llmConfigured;
   return !!(state?.lite?.llmConfigured || isLocalLiteLlmConfigured());
 }
 
@@ -2956,7 +2978,16 @@ function syncTownhallRegistrationUI(state) {
 
   const continueBtn = el('townhallContinueBtn');
   if (continueBtn) {
-    const canContinue = registrationComplete && isBrainConfigured && !townhallMintInFlight;
+    const canContinue = (
+      registrationComplete
+      && (
+        onboardingStep === ONBOARDING_STEP_BRAIN
+        || onboardingStep === ONBOARDING_STEP_SIGIL
+        || !required
+      )
+      && isBrainConfigured
+      && !townhallMintInFlight
+    );
     continueBtn.disabled = !canContinue;
   }
 
@@ -3106,20 +3137,6 @@ function bindTownDistrictControls() {
         setTokenStatus({ active: true, good: false, text: 'Check failed' });
       } finally {
         tokenVerifyBtn.disabled = false;
-      }
-    };
-  }
-
-  const copyTeam = el('copyTeam');
-  if (copyTeam) {
-    copyTeam.onclick = async () => {
-      const msg = readTextContent('teamSnippet');
-      try {
-        await navigator.clipboard.writeText(msg);
-        copyTeam.textContent = 'Copied ✓';
-        setTimeout(() => (copyTeam.textContent = 'Copy team message'), 1200);
-      } catch {
-        alert(msg);
       }
     };
   }
@@ -4500,6 +4517,7 @@ async function disconnectWallet({ fromProvider = false } = {}) {
   updateWalletUI();
   clearWalletCache();
   clearWalletIdentityHint();
+  walletRecoveryIntentAttempts = 0;
   if (lastState) updateUI(lastState);
   if (fromProvider) {
     return;
@@ -4512,6 +4530,7 @@ async function resetSessionAndReload() {
   } catch (e) {
     console.warn('session reset failed', e);
   }
+  walletRecoveryIntentAttempts = 0;
   clearClientFlowState();
   // Full reload so we pick up the new `et_session` cookie.
   window.location.replace('/');
@@ -5323,25 +5342,7 @@ async function updateUI(state) {
   // Team code (fallback for older servers that still send pairCode)
   const teamCode = state.teamCode || state.pairCode || '…';
   safeSetText('teamCode', teamCode);
-  const teamCodeRow = el('agentTeamCodeRow');
-  const teamCodeText = el('agentTeamCodeText');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
-  const normalizedTeamCode = readCurrentTeamCodeFromState();
-  if (teamCodeText) {
-    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
-  }
-  if (teamCodeRow) {
-    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.disabled = !normalizedTeamCode;
-  }
-
   const origin = window.location.origin;
-  safeSetText(
-    'teamSnippet',
-    `Worker session code: ${teamCode}`
-  );
 
   const houseNavLink = el('houseNavLink');
   if (houseNavLink) {
@@ -7710,19 +7711,6 @@ function updateUILegacy(state) {
   if (teamCodeNode) teamCodeNode.textContent = teamCode;
   const teamCodeResult = el('teamCodeResult');
   if (teamCodeResult) teamCodeResult.classList.add('is-hidden');
-  const teamCodeRow = el('agentTeamCodeRow');
-  const teamCodeText = el('agentTeamCodeText');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
-  const normalizedTeamCode = readCurrentTeamCodeFromState();
-  if (teamCodeText) {
-    teamCodeText.textContent = normalizedTeamCode || 'TEAM-....-....';
-  }
-  if (teamCodeRow) {
-    teamCodeRow.classList.toggle('is-hidden', !normalizedTeamCode);
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.disabled = !normalizedTeamCode;
-  }
   const localLlm = getLocalLiteLlm();
 
   applyVisibility(state);
@@ -8034,18 +8022,6 @@ function readCurrentTeamCodeFromState() {
   return value;
 }
 
-async function sendCurrentTeamCodeToAgent() {
-  const teamCode = readCurrentTeamCodeFromState();
-  if (!teamCode) {
-    appendChatMessage('system', 'Team code is not available yet.');
-    return;
-  }
-  const input = el('chatInput');
-  if (!input) return;
-  input.value = teamCode;
-  await handleChat();
-}
-
 async function handleNewSession() {
   const btn = el('newSessionBtn');
   if (btn) btn.disabled = true;
@@ -8119,7 +8095,6 @@ function setupAgentInterface() {
   const sendBtn = el('sendChatBtn');
   const newSessionBtn = el('newSessionBtn');
   const openTrainerBtn = el('agentOpenTrainerBtn');
-  const teamCodeSendBtn = el('agentTeamCodeSendBtn');
   const chatInput = el('chatInput');
 
   if (visitBtn) visitBtn.addEventListener('click', handleVisit);
@@ -8132,11 +8107,6 @@ function setupAgentInterface() {
       openTrainerModal().catch(() => {
         window.location.assign('/trainer');
       });
-    });
-  }
-  if (teamCodeSendBtn) {
-    teamCodeSendBtn.addEventListener('click', () => {
-      sendCurrentTeamCodeToAgent().catch(() => { });
     });
   }
   if (chatInput) {
@@ -8236,6 +8206,32 @@ async function bootstrapInitialRouteState() {
       },
       stats: session.stats
     });
+
+    if (walletRecoveryIntentAttempts > 0 && session?.onboarding?.registrationComplete !== true) {
+      try {
+        const recovered = await api('/api/session');
+        if (recovered && typeof recovered === 'object') {
+          elements = Array.isArray(recovered?.elements) ? recovered.elements : elements;
+          updateUI({
+            teamCode: recovered.teamCode || session.teamCode,
+            elements,
+            agent: { connected: false },
+            human: {},
+            match: { matched: false },
+            signup: { complete: false, mode: null },
+            share: { id: null },
+            onboarding: recovered.onboarding || session.onboarding || {
+              required: false,
+              registrationComplete: true,
+              step: ONBOARDING_STEP_DONE
+            },
+            stats: recovered.stats || session.stats
+          });
+        }
+      } catch {
+        // best-effort recovery pass
+      }
+    }
   } catch {
     // continue with the full /api/state load below
   }

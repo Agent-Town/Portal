@@ -3,6 +3,8 @@ const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
 const http = require('http');
+const net = require('net');
+const dns = require('dns').promises;
 const zlib = require('zlib');
 const express = require('express');
 const { registerLlmRoutes } = require('../vendors/openclaw-lite-main/server/routes/llm');
@@ -1616,6 +1618,8 @@ app.use('/api', (req, res, next) => {
 
 app.use('/api/llm', requireProxySessionAccess);
 app.use('/api/tools', requireProxySessionAccess);
+app.use('/api/privy/wallet-rpc', requireProxySessionAccess);
+app.use('/api/privy/transactions', requireProxySessionAccess);
 
 // OpenClaw Lite compatibility: proxy OpenAI-compatible provider calls from browser runtime.
 registerLlmRoutes(app);
@@ -1707,12 +1711,53 @@ app.use(
   })
 );
 
+function sessionScopedRateKey(prefix, req) {
+  const cookies = parseCookies(req.header('cookie') || '');
+  const sid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
+  return `${prefix}:${sid || req.ip || 'unknown'}`;
+}
+
+// Abuse controls: keep normal UX smooth while preventing runaway proxy/relay use.
+app.use(
+  '/api/tools',
+  rateLimit({
+    windowMs: 60_000,
+    max: 180,
+    keyFn: (req) => sessionScopedRateKey('tools', req)
+  })
+);
+
+app.use(
+  '/api/privy/wallet-rpc',
+  rateLimit({
+    windowMs: 60_000,
+    max: 90,
+    keyFn: (req) => sessionScopedRateKey('privy-wallet-rpc', req)
+  })
+);
+
+app.use(
+  '/api/privy/transactions',
+  rateLimit({
+    windowMs: 60_000,
+    max: 120,
+    keyFn: (req) => sessionScopedRateKey('privy-transactions', req)
+  })
+);
+
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
   let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
-  const walletCandidates = collectWalletCandidatesFromRequest(req);
+  const walletCandidates = collectWalletCandidatesFromHeaders(req);
+  const walletRecoveryIntentHeader = typeof req.header('x-wallet-recovery-intent') === 'string'
+    ? req.header('x-wallet-recovery-intent').trim()
+    : '';
+  const walletRecoveryIntent = (
+    walletRecoveryIntentHeader === '1'
+    || walletRecoveryIntentHeader.toLowerCase() === 'true'
+  );
   const hintedTeamCode = typeof req.header('x-team-code-hint') === 'string'
     ? req.header('x-team-code-hint').trim()
     : '';
@@ -1722,9 +1767,10 @@ function ensureHumanSession(req, res) {
     if (!candidateSession) return 0;
     const candidateOnboarding = ensureSessionOnboarding(candidateSession);
     if (!candidateOnboarding) return 0;
+    const onboardingRequired = candidateOnboarding.required === true;
     let score = 0;
     if (candidateOnboarding.registrationComplete === true) score += 4;
-    if (candidateOnboarding.step === ONBOARDING_STEP_DONE) score += 3;
+    if (onboardingRequired && candidateOnboarding.step === ONBOARDING_STEP_DONE) score += 3;
     if (candidateSession?.houseCeremony?.houseId) score += 2;
     if (candidateSession?.signup?.complete) score += 1;
     return score;
@@ -1780,7 +1826,21 @@ function ensureHumanSession(req, res) {
   if (session) {
     const walletSession = pickBestWalletSession();
     const walletScore = sessionRecoveryScore(walletSession);
-    if (walletSession && walletSession.sessionId !== session.sessionId && walletScore > currentScore) {
+    const hasStickyHintForCurrentSession = (
+      !!hintedTeamCode
+      && !!session?.teamCode
+      && hintedTeamCode === session.teamCode
+    );
+    const allowWalletOverride = currentScore < 2 && (
+      !hasStickyHintForCurrentSession
+      || walletRecoveryIntent
+    );
+    if (
+      allowWalletOverride
+      && walletSession
+      && walletSession.sessionId !== session.sessionId
+      && walletScore > currentScore
+    ) {
       session = walletSession;
       sid = walletSession.sessionId;
     }
@@ -1794,10 +1854,6 @@ function ensureHumanSession(req, res) {
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
 
-  for (const candidate of walletCandidates) {
-    bindSessionWallet(session, candidate?.chain, candidate?.address);
-  }
-
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
@@ -1808,26 +1864,7 @@ function normalizeWalletChainInput(rawChain) {
   return chain === 'evm' || chain === 'solana' ? chain : '';
 }
 
-function collectWalletCandidatesFromPayload(payload, append) {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
-  if (typeof payload.chain === 'string' && typeof payload.address === 'string') {
-    append(payload.chain, payload.address);
-  }
-  if (typeof payload.evm === 'string') {
-    append('evm', payload.evm);
-  }
-  if (typeof payload.solana === 'string') {
-    append('solana', payload.solana);
-  }
-  if (typeof payload.evmAddress === 'string') {
-    append('evm', payload.evmAddress);
-  }
-  if (typeof payload.solanaAddress === 'string') {
-    append('solana', payload.solanaAddress);
-  }
-}
-
-function collectWalletCandidatesFromRequest(req) {
+function collectWalletCandidatesFromHeaders(req) {
   const out = [];
   const seen = new Set();
   const add = (chain, address) => {
@@ -1843,13 +1880,36 @@ function collectWalletCandidatesFromRequest(req) {
     out.push({ chain: normalizedChain, address: normalizedAddress });
   };
 
-  const hintedChain = req.header('x-wallet-chain');
-  const hintedAddress = req.header('x-wallet-address');
-  add(hintedChain, hintedAddress);
+  add(req.header('x-wallet-chain'), req.header('x-wallet-address'));
   add('evm', req.header('x-wallet-evm-address'));
   add('solana', req.header('x-wallet-solana-address'));
-  collectWalletCandidatesFromPayload(req.body?.wallet, add);
-  collectWalletCandidatesFromPayload(req.body?.wallets, add);
+  return out;
+}
+
+function collectTownhallWalletCandidatesFromPayload(walletPayload) {
+  const wallet = walletPayload && typeof walletPayload === 'object' ? walletPayload : null;
+  if (!wallet) return [];
+
+  const out = [];
+  const seen = new Set();
+  const add = (chain, address) => {
+    const normalizedChain = normalizeWalletChainInput(chain);
+    if (!normalizedChain) return;
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeWalletSessionSolanaAddress(address);
+    if (!normalizedAddress) return;
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ chain: normalizedChain, address: normalizedAddress });
+  };
+
+  add('evm', wallet.evmAddress);
+  add('evm', wallet.evm);
+  add('solana', wallet.solanaAddress);
+  add('solana', wallet.solana);
+  add(wallet.chain, wallet.address);
   return out;
 }
 
@@ -2999,6 +3059,19 @@ function serializeHouseMedia(house) {
     storefront: {
       gallery: Array.isArray(storefrontRaw?.gallery) ? storefrontRaw.gallery : [],
       cards: Array.isArray(storefrontRaw?.cards) ? storefrontRaw.cards : []
+    }
+  };
+}
+
+function serializePublicOnlyHouseMedia(house) {
+  const emptySlot = { imageUrl: null, prompt: null, source: null, version: null, updatedAt: null };
+  return {
+    shareHero: serializeMediaSlot(house, 'shareHero'),
+    agentAvatar: { ...emptySlot },
+    humanAvatar: { ...emptySlot },
+    storefront: {
+      gallery: [],
+      cards: []
     }
   };
 }
@@ -5038,11 +5111,25 @@ app.post('/api/townhall/register', (req, res) => {
 
   onboarding.registrationComplete = true;
   onboarding.registeredAt = nowIso();
-  const walletCandidates = collectWalletCandidatesFromRequest(req);
-  for (const candidate of walletCandidates) {
-    bindSessionWallet(s, candidate?.chain, candidate?.address);
-  }
   onboarding.step = ONBOARDING_STEP_BRAIN;
+
+  // Preserve wallet-linked session recovery after registration completes.
+  // We bind normalized wallet candidates from trusted headers and explicit
+  // registration payload hints so cookie resets can recover the same session.
+  const registrationWalletCandidates = [
+    ...collectWalletCandidatesFromHeaders(req),
+    ...collectTownhallWalletCandidatesFromPayload(req.body?.wallet)
+  ];
+  const seenRegistrationWalletKeys = new Set();
+  for (const candidate of registrationWalletCandidates) {
+    const chain = normalizeWalletChainInput(candidate?.chain);
+    const address = typeof candidate?.address === 'string' ? candidate.address.trim() : '';
+    if (!chain || !address) continue;
+    const key = `${chain}:${address}`;
+    if (seenRegistrationWalletKeys.has(key)) continue;
+    seenRegistrationWalletKeys.add(key);
+    bindSessionWallet(s, chain, address);
+  }
 
   res.json({ ok: true, onboarding: cloneOnboarding(onboarding) });
 });
@@ -6548,25 +6635,42 @@ function buildVisibleAtlasDistricts(snapshot, optedOutSet) {
 }
 
 function fileSignature(filePath) {
+  const absolutePath = path.resolve(filePath);
   try {
-    const resolved = path.resolve(filePath);
     try {
-      const statBig = fs.statSync(filePath, { bigint: true });
-      const size = typeof statBig.size === 'bigint' ? statBig.size.toString() : String(statBig.size || 0);
-      const mtimeNs = typeof statBig.mtimeNs === 'bigint' ? statBig.mtimeNs.toString() : String(statBig.mtimeMs || 0);
-      const ctimeNs = typeof statBig.ctimeNs === 'bigint' ? statBig.ctimeNs.toString() : String(statBig.ctimeMs || 0);
-      return `${resolved}:${mtimeNs}:${ctimeNs}:${size}`;
+      const stat = fs.statSync(absolutePath, { bigint: true });
+      const size = typeof stat.size === 'bigint' ? stat.size.toString() : String(stat.size || 0);
+      const mtimeNs = typeof stat.mtimeNs === 'bigint'
+        ? stat.mtimeNs.toString()
+        : String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
+      const ctimeNs = typeof stat.ctimeNs === 'bigint'
+        ? stat.ctimeNs.toString()
+        : String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
+      const inode = typeof stat.ino === 'bigint' ? stat.ino.toString() : String(stat.ino || 0);
+      return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
     } catch {
-      const stat = fs.statSync(filePath);
-      return `${resolved}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`;
+      const stat = fs.statSync(absolutePath);
+      const size = String(stat.size || 0);
+      const mtimeNs = String(Math.floor(Number(stat.mtimeMs || 0) * 1e6));
+      const ctimeNs = String(Math.floor(Number(stat.ctimeMs || 0) * 1e6));
+      const inode = String(stat.ino || 0);
+      return `${absolutePath}:${size}:${mtimeNs}:${ctimeNs}:${inode}`;
     }
   } catch {
-    return `${path.resolve(filePath)}:missing`;
+    return `${absolutePath}:missing`;
   }
 }
 
+function sqliteFamilySignature(filePath) {
+  return [
+    fileSignature(filePath),
+    fileSignature(`${filePath}-wal`),
+    fileSignature(`${filePath}-shm`)
+  ].join('|');
+}
+
 function currentAtlasDataSignature() {
-  return `${fileSignature(ATLAS_SQLITE_PATH)}|${fileSignature(getStorePath())}`;
+  return `${sqliteFamilySignature(ATLAS_SQLITE_PATH)}|${sqliteFamilySignature(getStorePath())}`;
 }
 
 function pruneAtlasCache(cache, maxEntries = ATLAS_DISTRICT_CACHE_MAX) {
@@ -7517,6 +7621,7 @@ app.post('/api/wallet/lookup', (req, res) => {
     s.houseCeremony.createdAt = s.houseCeremony.createdAt || house.createdAt || nowIso();
     indexHouseId(s, house.id);
   }
+  bindSessionWallet(s, 'solana', address);
   res.json({
     ok: true,
     houseId: house.id,
@@ -7548,6 +7653,7 @@ app.post('/api/token/verify', async (req, res) => {
     return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
   }
   s.tokenLookupNonce = null;
+  bindSessionWallet(s, 'solana', address);
 
   if (s.signup.complete && s.signup.mode === 'token' && s.signup.address && s.signup.address !== address) {
     return res.status(409).json({ ok: false, error: 'ADDRESS_MISMATCH' });
@@ -7702,6 +7808,7 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
     return res.status(400).json({ ok: false, error: 'UNSUPPORTED_CLAIM_CHAIN' });
   }
   if (!verified) return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
+  bindSessionWallet(s, claimChain, claimedAddress);
   if (s.signup.complete && s.signup.mode && s.signup.mode !== 'claim') {
     return res.status(409).json({ ok: false, error: 'ALREADY_SIGNED_UP' });
   }
@@ -8235,7 +8342,9 @@ app.get('/api/house/:id/media', (req, res) => {
   const store = readStore();
   const house = store.houses.find((r) => r.id === houseId);
   if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
-  res.json({ ok: true, media: serializeHouseMedia(house), publicMedia: serializePublicMedia(house) });
+  const auth = verifyHouseAuth(req, house);
+  const media = auth.ok ? serializeHouseMedia(house) : serializePublicOnlyHouseMedia(house);
+  res.json({ ok: true, media, publicMedia: serializePublicMedia(house) });
 });
 
 app.get('/api/house/:id/media/:slot/image', (req, res) => {
@@ -8653,70 +8762,428 @@ app.get('*', (_req, res) => sendHtmlNoStore(res, HOME_ROUTE_FILE));
 // --- OpenClaw Lite Tool Proxies ---
 
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (compatible; OpenClawLite/1.0; +https://agent.town)';
+const PROXY_TARGET_MAX_REDIRECTS = 5;
+const PROXY_DNS_CACHE_TTL_MS = 30_000;
+const PROXY_BLOCKED_HOSTNAMES = new Set([
+  'localhost',
+  'localhost.localdomain',
+  'metadata',
+  'metadata.google.internal',
+  'ip6-localhost',
+  'ip6-loopback'
+]);
+const PROXY_BLOCKED_HOST_SUFFIXES = ['.local', '.internal'];
+const PROXY_FETCH_HARD_MAX_BYTES = 4 * 1024 * 1024;
+const PROXY_FETCH_MIN_BYTES = 1024;
+const proxyDnsCache = new Map();
+const proxyAddressDenyList = typeof net.BlockList === 'function' ? new net.BlockList() : null;
 
-async function proxyFetch(url, options = {}) {
-  const controller = new AbortController();
-  const timeoutMs = options.timeoutMs || 30000;
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+function addProxyDenySubnet(address, prefix, type) {
+  if (!proxyAddressDenyList) return;
+  try {
+    proxyAddressDenyList.addSubnet(address, prefix, type);
+  } catch {
+    // Ignore unsupported/invalid ranges.
+  }
+}
+
+// IPv4 deny ranges (local/private/link-local/reserved).
+addProxyDenySubnet('0.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('10.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('100.64.0.0', 10, 'ipv4');
+addProxyDenySubnet('127.0.0.0', 8, 'ipv4');
+addProxyDenySubnet('169.254.0.0', 16, 'ipv4');
+addProxyDenySubnet('172.16.0.0', 12, 'ipv4');
+addProxyDenySubnet('192.0.0.0', 24, 'ipv4');
+addProxyDenySubnet('192.168.0.0', 16, 'ipv4');
+addProxyDenySubnet('198.18.0.0', 15, 'ipv4');
+addProxyDenySubnet('224.0.0.0', 4, 'ipv4');
+addProxyDenySubnet('240.0.0.0', 4, 'ipv4');
+
+// IPv6 deny ranges (loopback/link-local/ULA/multicast/docs).
+addProxyDenySubnet('::', 128, 'ipv6');
+addProxyDenySubnet('::1', 128, 'ipv6');
+addProxyDenySubnet('fc00::', 7, 'ipv6');
+addProxyDenySubnet('fe80::', 10, 'ipv6');
+addProxyDenySubnet('ff00::', 8, 'ipv6');
+addProxyDenySubnet('2001:db8::', 32, 'ipv6');
+addProxyDenySubnet('::ffff:0:0', 96, 'ipv6');
+
+function makeProxyPolicyError(message, details = null) {
+  const err = new Error(message);
+  err.code = 'PROXY_TARGET_BLOCKED';
+  err.details = details;
+  return err;
+}
+
+function normalizeProxyIpLiteral(input) {
+  let raw = String(input || '').trim().toLowerCase();
+  if (!raw) return '';
+  if (raw.startsWith('[') && raw.endsWith(']')) raw = raw.slice(1, -1);
+  const zoneIndex = raw.indexOf('%');
+  if (zoneIndex >= 0) raw = raw.slice(0, zoneIndex);
+  return raw;
+}
+
+function normalizeProxyHostname(hostname) {
+  const normalized = normalizeProxyIpLiteral(hostname);
+  return normalized.replace(/\.+$/, '');
+}
+
+function isBlockedProxyHostname(hostname) {
+  const host = normalizeProxyHostname(hostname);
+  if (!host) return true;
+  if (net.isIP(host)) return false;
+  if (PROXY_BLOCKED_HOSTNAMES.has(host)) return true;
+  return PROXY_BLOCKED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+}
+
+function isBlockedProxyIpAddress(address) {
+  if (!proxyAddressDenyList) return false;
+  const normalized = normalizeProxyIpLiteral(address);
+  if (!normalized) return true;
+  if (normalized.startsWith('::ffff:')) return true;
+  const version = net.isIP(normalized);
+  if (version === 4) return proxyAddressDenyList.check(normalized, 'ipv4');
+  if (version === 6) return proxyAddressDenyList.check(normalized, 'ipv6');
+  return false;
+}
+
+function readCachedProxyDns(hostname) {
+  const now = Date.now();
+  const key = normalizeProxyHostname(hostname);
+  const hit = proxyDnsCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= now) {
+    proxyDnsCache.delete(key);
+    return null;
+  }
+  return hit.addresses;
+}
+
+function writeCachedProxyDns(hostname, addresses) {
+  const key = normalizeProxyHostname(hostname);
+  proxyDnsCache.set(key, {
+    addresses,
+    expiresAt: Date.now() + PROXY_DNS_CACHE_TTL_MS
+  });
+}
+
+async function resolveProxyHostAddresses(hostname) {
+  const host = normalizeProxyHostname(hostname);
+  if (!host) {
+    throw makeProxyPolicyError('Blocked proxy target (hostname missing)');
+  }
+  const directIp = net.isIP(host);
+  if (directIp) return [host];
+
+  const cached = readCachedProxyDns(host);
+  if (Array.isArray(cached) && cached.length > 0) return cached;
 
   try {
-    const res = await fetch(url, {
-      method: options.method || 'GET',
-      headers: {
-        'User-Agent': DEFAULT_USER_AGENT,
-        ...(options.headers || {})
-      },
-      body: options.body,
-      redirect: options.followRedirects ? 'follow' : 'manual',
-      signal: controller.signal
+    const rows = await dns.lookup(host, { all: true, verbatim: true });
+    const addresses = [...new Set(
+      (Array.isArray(rows) ? rows : [])
+        .map((row) => normalizeProxyIpLiteral(row?.address || ''))
+        .filter((address) => net.isIP(address) !== 0)
+        .filter(Boolean)
+    )];
+    if (!addresses.length) {
+      throw makeProxyPolicyError('Blocked proxy target (no resolvable addresses)', { hostname: host });
+    }
+    writeCachedProxyDns(host, addresses);
+    return addresses;
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') throw err;
+    throw makeProxyPolicyError('Blocked proxy target (dns lookup failed)', { hostname: host });
+  }
+}
+
+async function assertProxyTargetAllowed(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(targetUrl || ''));
+  } catch {
+    throw makeProxyPolicyError('Blocked proxy target (invalid URL)');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw makeProxyPolicyError('Blocked proxy target (protocol not allowed)', {
+      protocol: parsed.protocol || null
+    });
+  }
+  if (parsed.username || parsed.password) {
+    throw makeProxyPolicyError('Blocked proxy target (embedded credentials not allowed)');
+  }
+
+  const hostname = normalizeProxyHostname(parsed.hostname);
+  if (isBlockedProxyHostname(hostname)) {
+    throw makeProxyPolicyError('Blocked proxy target (hostname denied)', { hostname });
+  }
+
+  const addresses = await resolveProxyHostAddresses(hostname);
+  if (!addresses.length) {
+    throw makeProxyPolicyError('Blocked proxy target (no addresses)', { hostname });
+  }
+  for (const address of addresses) {
+    if (isBlockedProxyIpAddress(address)) {
+      throw makeProxyPolicyError('Blocked proxy target (resolved to denied address)', {
+        hostname,
+        address
+      });
+    }
+  }
+  return { hostname, addresses };
+}
+
+function normalizeProxyByteLimit(value, fallback = PROXY_FETCH_HARD_MAX_BYTES) {
+  const n = Number.parseInt(String(value || ''), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(PROXY_FETCH_MIN_BYTES, Math.min(PROXY_FETCH_HARD_MAX_BYTES, n));
+}
+
+function normalizeProxyBoolean(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const text = String(value).trim().toLowerCase();
+  if (!text) return fallback;
+  return text !== 'false' && text !== '0' && text !== 'no';
+}
+
+function normalizeProxyMethod(value, fallback = 'GET') {
+  const method = String(value || fallback).trim().toUpperCase();
+  const allowed = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
+  if (!allowed.has(method)) return fallback;
+  return method;
+}
+
+function pickPreferredProxyAddress(addresses) {
+  if (!Array.isArray(addresses) || addresses.length === 0) return '';
+  const ipv4 = addresses.find((address) => net.isIP(address) === 4);
+  return ipv4 || addresses[0];
+}
+
+function proxyRequestOnce(targetUrl, {
+  method = 'GET',
+  headers = {},
+  body = undefined,
+  timeoutMs = 30000,
+  resolvedAddress = '',
+  responseLimitBytes = PROXY_FETCH_HARD_MAX_BYTES
+} = {}) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(String(targetUrl || ''));
+    } catch {
+      const err = new Error('INVALID_URL');
+      err.code = 'INVALID_URL';
+      reject(err);
+      return;
+    }
+
+    const protocol = parsed.protocol === 'https:' ? 'https:' : 'http:';
+    const lib = protocol === 'https:' ? https : http;
+    const host = normalizeProxyHostname(parsed.hostname);
+    const family = net.isIP(resolvedAddress);
+    const requestHeaders = { ...headers };
+    const hardLimit = normalizeProxyByteLimit(responseLimitBytes);
+
+    const req = lib.request({
+      protocol,
+      hostname: host,
+      port: parsed.port || (protocol === 'https:' ? 443 : 80),
+      method,
+      path: `${parsed.pathname}${parsed.search}`,
+      headers: requestHeaders,
+      servername: net.isIP(host) ? undefined : host,
+      lookup: (_lookupHost, optionsOrCb, maybeCb) => {
+        const cb = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
+        if (typeof cb !== 'function') return;
+        cb(null, resolvedAddress, family || 0);
+      }
+    }, (response) => {
+      const chunks = [];
+      let totalBytes = 0;
+
+      response.on('data', (chunk) => {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytes += buf.length;
+        if (totalBytes > hardLimit) {
+          const err = new Error('Response exceeds proxy byte limit');
+          err.code = 'RESPONSE_TOO_LARGE';
+          response.destroy(err);
+          return;
+        }
+        chunks.push(buf);
+      });
+
+      response.on('error', (err) => reject(err));
+      response.on('end', () => {
+        const responseHeaders = {};
+        for (const [key, value] of Object.entries(response.headers || {})) {
+          if (value == null) continue;
+          responseHeaders[String(key || '').toLowerCase()] = Array.isArray(value)
+            ? value.join(', ')
+            : String(value);
+        }
+        resolve({
+          status: Number(response.statusCode || 0),
+          url: targetUrl,
+          headers: responseHeaders,
+          buffer: Buffer.concat(chunks)
+        });
+      });
     });
 
-    // Convert ArrayBuffer to Buffer for processing
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    req.on('timeout', () => {
+      const err = new Error('TIMEOUT');
+      err.code = 'TIMEOUT';
+      req.destroy(err);
+    });
+    req.on('error', (err) => reject(err));
+    req.setTimeout(Math.max(1, Number(timeoutMs) || 30000));
 
-    const headers = {};
-    res.headers.forEach((v, k) => headers[k] = v);
+    if (body != null) req.write(body);
+    req.end();
+  });
+}
 
-    return {
-      ok: true,
-      status: res.status,
-      url: res.url,
-      headers,
-      buffer
-    };
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      return { ok: false, error: 'TIMEOUT' };
+async function proxyFetch(url, options = {}) {
+  const timeoutMs = Math.max(1, Number(options.timeoutMs) || 30000);
+  const responseLimitBytes = normalizeProxyByteLimit(options.responseLimitBytes, PROXY_FETCH_HARD_MAX_BYTES);
+  let currentUrl = String(url || '').trim();
+  let redirects = 0;
+  let method = normalizeProxyMethod(options.method, 'GET');
+  let body = options.body;
+  const baseHeaders = {
+    'User-Agent': DEFAULT_USER_AGENT,
+    ...(options.headers || {})
+  };
+
+  try {
+    while (true) {
+      const policy = await assertProxyTargetAllowed(currentUrl);
+      const addresses = Array.isArray(policy?.addresses) ? policy.addresses : [];
+      if (!addresses.length) {
+        throw makeProxyPolicyError('Blocked proxy target (no addresses)');
+      }
+
+      const requestHeaders = { ...baseHeaders };
+      if (body == null) {
+        delete requestHeaders['content-length'];
+        delete requestHeaders['Content-Length'];
+      }
+      if (!requestHeaders['host']) delete requestHeaders.host;
+
+      let response = null;
+      let lastError = null;
+      const preferred = pickPreferredProxyAddress(addresses);
+      const attemptOrder = preferred
+        ? [preferred, ...addresses.filter((entry) => entry !== preferred)]
+        : addresses;
+
+      for (const resolvedAddress of attemptOrder) {
+        try {
+          response = await proxyRequestOnce(currentUrl, {
+            method,
+            headers: requestHeaders,
+            body,
+            timeoutMs,
+            resolvedAddress,
+            responseLimitBytes
+          });
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!response) throw lastError || new Error('REQUEST_FAILED');
+
+      const status = Number(response.status || 0);
+      const shouldFollow = normalizeProxyBoolean(options.followRedirects, true);
+      if (
+        shouldFollow
+        && [301, 302, 303, 307, 308].includes(status)
+        && redirects < PROXY_TARGET_MAX_REDIRECTS
+      ) {
+        const location = String(response.headers?.location || '').trim();
+        if (!location) {
+          return { ok: false, errorCode: 'REDIRECT_MISSING_LOCATION', error: 'Redirect missing location header' };
+        }
+        currentUrl = new URL(location, currentUrl).toString();
+        redirects += 1;
+        if (
+          status === 303
+          || ((status === 301 || status === 302) && method !== 'GET' && method !== 'HEAD')
+        ) {
+          method = 'GET';
+          body = undefined;
+        }
+        continue;
+      }
+      if (shouldFollow && [301, 302, 303, 307, 308].includes(status) && redirects >= PROXY_TARGET_MAX_REDIRECTS) {
+        return { ok: false, errorCode: 'TOO_MANY_REDIRECTS', error: 'Too many redirects' };
+      }
+
+      return {
+        ok: true,
+        status,
+        url: response.url || currentUrl,
+        headers: response.headers || {},
+        buffer: response.buffer || Buffer.alloc(0)
+      };
     }
-    return { ok: false, error: e.message };
-  } finally {
-    clearTimeout(timeout);
+  } catch (e) {
+    if (e?.code === 'PROXY_TARGET_BLOCKED') {
+      return { ok: false, errorCode: 'PROXY_TARGET_BLOCKED', error: e.message, details: e.details || null };
+    }
+    if (e?.code === 'TIMEOUT') {
+      return { ok: false, errorCode: 'TIMEOUT', error: 'TIMEOUT' };
+    }
+    if (e?.code === 'RESPONSE_TOO_LARGE') {
+      return { ok: false, errorCode: 'RESPONSE_TOO_LARGE', error: 'Response exceeds proxy byte limit' };
+    }
+    return { ok: false, errorCode: 'FETCH_FAILED', error: String(e?.message || 'FETCH_FAILED') };
   }
 }
 
 app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
   const { url, maxBytes = 262144, followRedirects = true, expectedMime = 'any' } = req.body;
   if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+  const outputLimitBytes = normalizeProxyByteLimit(maxBytes, 262144);
+  const fetchLimitBytes = normalizeProxyByteLimit(Math.max(outputLimitBytes * 2, 262144), PROXY_FETCH_HARD_MAX_BYTES);
+  const expectedMimeText = typeof expectedMime === 'string' ? expectedMime.trim().toLowerCase() : 'any';
+  const shouldFollow = normalizeProxyBoolean(followRedirects, true);
 
   try {
     const result = await proxyFetch(url, {
       method: 'GET',
-      followRedirects,
-      timeoutMs: 15000
+      followRedirects: shouldFollow,
+      timeoutMs: 15000,
+      responseLimitBytes: fetchLimitBytes
     });
 
     if (!result.ok) {
-      return res.json({ ok: false, error: { code: 'FETCH_FAILED', message: result.error } });
+      return res.json({
+        ok: false,
+        error: {
+          code: result.errorCode || 'FETCH_FAILED',
+          message: result.error || 'FETCH_FAILED',
+          ...(result.details ? { details: result.details } : {})
+        }
+      });
     }
 
     const contentType = result.headers['content-type'] || '';
-    if (expectedMime !== 'any' && !contentType.toLowerCase().startsWith(expectedMime)) {
+    if (expectedMimeText !== 'any' && !contentType.toLowerCase().startsWith(expectedMimeText)) {
       return res.json({
         ok: false,
         error: {
           code: 'MIME_MISMATCH',
-          message: `Expected ${expectedMime}, got ${contentType}`,
+          message: `Expected ${expectedMimeText}, got ${contentType}`,
           details: { contentType }
         }
       });
@@ -8724,8 +9191,8 @@ app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
 
     let buffer = result.buffer;
     let truncated = false;
-    if (buffer.length > maxBytes) {
-      buffer = buffer.subarray(0, maxBytes);
+    if (buffer.length > outputLimitBytes) {
+      buffer = buffer.subarray(0, outputLimitBytes);
       truncated = true;
     }
 
@@ -8753,12 +9220,33 @@ app.post('/api/tools/web_fetch', express.json(), async (req, res) => {
 app.post('/api/tools/http_request', express.json(), async (req, res) => {
   const { url, method = 'GET', headers = {}, body, timeoutMs = 30000, followRedirects = true, maxBytes = 262144, responseMode = 'auto' } = req.body;
   if (!url) return res.status(400).json({ ok: false, error: 'MISSING_URL' });
+  const outputLimitBytes = normalizeProxyByteLimit(maxBytes, 262144);
+  const fetchLimitBytes = normalizeProxyByteLimit(Math.max(outputLimitBytes * 2, 262144), PROXY_FETCH_HARD_MAX_BYTES);
+  const timeoutMsSafe = Math.max(100, Math.min(Number(timeoutMs) || 30000, 60000));
+  const followRedirectsSafe = normalizeProxyBoolean(followRedirects, true);
+  const methodSafe = normalizeProxyMethod(method, 'GET');
+  const responseModeSafe = (() => {
+    const mode = String(responseMode || 'auto').trim().toLowerCase();
+    if (mode === 'text' || mode === 'json' || mode === 'base64') return mode;
+    return 'auto';
+  })();
 
   // Safety: Sanitize headers
   const safeHeaders = {};
+  const blockedHeaderNames = new Set([
+    'host',
+    'connection',
+    'proxy-authorization',
+    'proxy-authenticate',
+    'transfer-encoding',
+    'content-length'
+  ]);
   for (const [k, v] of Object.entries(headers)) {
-    if (k.toLowerCase() === 'host') continue;
-    safeHeaders[k] = v;
+    if (typeof k !== 'string' || typeof v !== 'string') continue;
+    const headerName = k.trim();
+    if (!headerName) continue;
+    if (blockedHeaderNames.has(headerName.toLowerCase())) continue;
+    safeHeaders[headerName] = v;
   }
 
   // Handle body
@@ -8806,24 +9294,41 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
     return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENTS' });
   }
 
+  if (fetchBody != null) {
+    const bodySize = Buffer.isBuffer(fetchBody)
+      ? fetchBody.length
+      : Buffer.byteLength(String(fetchBody), 'utf8');
+    if (bodySize > 65536) {
+      return res.status(400).json({ ok: false, error: 'REQUEST_BODY_TOO_LARGE' });
+    }
+  }
+
   const startedAtMs = Date.now();
   try {
     const result = await proxyFetch(url, {
-      method,
+      method: methodSafe,
       headers: safeHeaders,
       body: fetchBody,
-      timeoutMs: Math.min(timeoutMs, 60000), // Cap at 60s
-      followRedirects
+      timeoutMs: timeoutMsSafe,
+      followRedirects: followRedirectsSafe,
+      responseLimitBytes: fetchLimitBytes
     });
 
     if (!result.ok) {
-      return res.json({ ok: false, error: { code: 'REQUEST_FAILED', message: result.error } });
+      return res.json({
+        ok: false,
+        error: {
+          code: result.errorCode || 'REQUEST_FAILED',
+          message: result.error || 'REQUEST_FAILED',
+          ...(result.details ? { details: result.details } : {})
+        }
+      });
     }
 
     let buffer = result.buffer;
     let truncated = false;
-    if (buffer.length > maxBytes) {
-      buffer = buffer.subarray(0, maxBytes);
+    if (buffer.length > outputLimitBytes) {
+      buffer = buffer.subarray(0, outputLimitBytes);
       truncated = true;
     }
 
@@ -8833,18 +9338,18 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
     let bodyBase64 = null;
     const contentType = result.headers['content-type'] || '';
 
-    if (responseMode === 'text' || responseMode === 'auto') {
+    if (responseModeSafe === 'text' || responseModeSafe === 'auto') {
       try { bodyText = buffer.toString('utf8'); } catch { }
     }
 
-    if (responseMode === 'json' || (responseMode === 'auto' && contentType.includes('application/json'))) {
+    if (responseModeSafe === 'json' || (responseModeSafe === 'auto' && contentType.includes('application/json'))) {
       try {
         if (!bodyText) bodyText = buffer.toString('utf8');
         bodyJson = JSON.parse(bodyText);
       } catch { }
     }
 
-    if (responseMode === 'base64' || (responseMode === 'auto' && !bodyText && !bodyJson)) {
+    if (responseModeSafe === 'base64' || (responseModeSafe === 'auto' && !bodyText && !bodyJson)) {
       bodyBase64 = buffer.toString('base64');
     }
 
