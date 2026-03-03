@@ -1,14 +1,14 @@
 {
-  "builtAt": "2026-02-26T11:11:02.998Z",
+  "builtAt": "2026-03-02T10:27:57.903Z",
   "source": {
     "path": "vendors/agent0-ts",
-    "commit": "60692a9a482eb938996bc71ee6943465ce6f597c",
+    "commit": "b25805b79d88d8d29f60df91110bb36caf4dd4b4",
     "branch": "main"
   },
   "output": {
     "file": "public/vendor/agent0-sdk.mjs",
-    "bytes": 1920779,
-    "sha256": "a9efb93980dcd7ca73ad1d470c8131cc77bc0003ea7a02d2ae5282a1f4272ab6"
+    "bytes": 1932886,
+    "sha256": "b2a3d903ea563181a017085ad16eae08f4d089e859318d16f9cd7aa8b80b0214"
   },
   "notes": [
     "Bundle built from local Agent-Town fork checkout.",

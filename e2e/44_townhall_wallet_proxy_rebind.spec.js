@@ -266,20 +266,6 @@ async function openTownhallPanel(page) {
   await expect(page.locator('#townhallStepHuman')).toBeVisible();
 }
 
-async function configureBrain(page, {
-  provider = 'openai',
-  model = 'gpt-4o-mini'
-} = {}) {
-  const response = await page.request.post('/api/agent/lite/llm/config', {
-    headers: { 'content-type': 'application/json' },
-    data: JSON.stringify({ provider, model })
-  });
-  expect(response.ok()).toBeTruthy();
-  const payload = await response.json().catch(() => ({}));
-  expect(payload.ok).toBe(true);
-  expect(payload.configured).toBe(true);
-}
-
 test('town hall registration rebinds wallet provider after proxy reset', async ({ page }) => {
   await installWalletProxyRebindMocks(page);
   await page.goto('/app');

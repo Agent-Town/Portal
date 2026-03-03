@@ -142,6 +142,19 @@ async function evmSignMessageHex(messageStr, address) {
   return { address: data.address, signatureHex: data.signatureHex };
 }
 
+async function evmSendTransaction({ transaction = {} } = {}) {
+  const eth = window.ethereum;
+  if (!eth || typeof eth.request !== "function") {
+    throw new Error("NO_EVM_PROVIDER");
+  }
+  const tx = transaction && typeof transaction === "object" ? transaction : {};
+  const payload = { ...tx };
+  const result = await eth.request({ method: "eth_sendTransaction", params: [payload] });
+  const txHash = typeof result === "string" ? result.trim() : "";
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error("EVM_SEND_TX_FAILED");
+  return txHash;
+}
+
 async function init() {
   const runtimeStatus = byId("runtimeStatus");
   const walletLine = byId("walletLine");
@@ -888,6 +901,22 @@ async function init() {
           }
           return;
         }
+        if (method === "sendTransaction") {
+          if (chain !== "evm") throw new Error("UNSUPPORTED_WALLET_CHAIN");
+          if (!walletAddrEvm) {
+            walletAddrEvm = await evmConnect();
+          }
+          const transaction = msg.transaction && typeof msg.transaction === "object" ? msg.transaction : {};
+          const txHash = await evmSendTransaction({ transaction });
+          sendToWorker({
+            type: "gateway.wallet.response",
+            id,
+            ok: true,
+            address: walletAddrEvm,
+            txHash,
+          });
+          return;
+        }
         throw new Error("UNSUPPORTED_WALLET_METHOD");
       } catch (e) {
         sendToWorker({ type: "gateway.wallet.response", id, ok: false, error: e.message || String(e) });
@@ -1078,6 +1107,37 @@ async function init() {
       timeoutMs: 30_000,
     });
     if (!res?.ok) throw new Error(String(res?.error || "TRAINER_BACKUP_IMPORT_FAILED"));
+    return res.result || null;
+  }
+
+  async function permissionPolicyGetRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.permission.policy.get",
+      responseType: "worker.permission.policy.get",
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "PERMISSION_POLICY_GET_FAILED"));
+    return res.result || null;
+  }
+
+  async function permissionPolicySetRequest({ manifest = null, source = null } = {}) {
+    const payload = {};
+    if (manifest && typeof manifest === "object") payload.manifest = manifest;
+    if (source && typeof source === "object") payload.source = source;
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.permission.policy.set",
+      responseType: "worker.permission.policy.set",
+      payload,
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "PERMISSION_POLICY_SET_FAILED"));
+    return res.result || null;
+  }
+
+  async function permissionPolicyClearRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.permission.policy.clear",
+      responseType: "worker.permission.policy.clear",
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "PERMISSION_POLICY_CLEAR_FAILED"));
     return res.result || null;
   }
 
@@ -1402,6 +1462,15 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "WALLET_SIGN_TOOL_FAILED"));
       return res.result || null;
     },
+    async walletSendTransactionTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.wallet.sendTransaction",
+        responseType: "worker.tools.wallet.sendTransaction",
+        payload: { params },
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "WALLET_SEND_TX_TOOL_FAILED"));
+      return res.result || null;
+    },
     async runtimeKeyMaterialStatus() {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.runtime.keyMaterialStatus",
@@ -1480,6 +1549,15 @@ async function init() {
     async trainerBackupImport(params = {}) {
       return trainerBackupImportRequest(params);
     },
+    async getPermissionPolicy() {
+      return permissionPolicyGetRequest();
+    },
+    async setPermissionPolicy({ manifest = null, source = null } = {}) {
+      return permissionPolicySetRequest({ manifest, source });
+    },
+    async clearPermissionPolicy() {
+      return permissionPolicyClearRequest();
+    },
     async checkOriginAccess({ url, capability = "web_fetch", method = "GET", consume = true } = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.origin.check",
@@ -1522,6 +1600,9 @@ async function init() {
   gatewayEvents.trainerSetCoaching = trainerSetCoachingRequest;
   gatewayEvents.trainerBackupExport = trainerBackupExportRequest;
   gatewayEvents.trainerBackupImport = trainerBackupImportRequest;
+  gatewayEvents.permissionPolicyGet = permissionPolicyGetRequest;
+  gatewayEvents.permissionPolicySet = permissionPolicySetRequest;
+  gatewayEvents.permissionPolicyClear = permissionPolicyClearRequest;
   gatewayEvents.invokeExperienceTool = (payload = {}) => invokeExperienceTool({
     tool: payload?.tool,
     params: payload?.params,

@@ -1046,6 +1046,108 @@ Errors:
 
 ---
 
+## ERC-8004 registration drafts
+
+Portal supports a draft -> mint -> complete workflow for ERC-8004 `tokenUri` stability.
+
+### POST `/api/erc8004/registration/draft`
+Creates a draft registration and returns a stable `tokenUri`.
+
+Body:
+```json
+{
+  "context": { "kind": "house", "houseId": "..." },
+  "entityType": "human|agent|tool|skill|experience|house",
+  "name": "Display name",
+  "description": "Description",
+  "image": "https://...",
+  "services": [{ "name": "web", "endpoint": "https://..." }],
+  "permissionManifest": { "...": "optional extension object" },
+  "provenance": { "...": "optional extension object" }
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "regId": "reg_...",
+  "tokenUri": "https://<origin>/api/erc8004/registration/reg_....json",
+  "completionToken": "rct_..."
+}
+```
+
+Notes:
+- `completionToken` is required by `/api/erc8004/registration/complete`.
+- `completionToken` is secret material for completion authorization and must not be published.
+
+Validation notes:
+- `entityType` must be one of: `human|agent|tool|skill|experience|house`.
+- `services` must contain at least one `web` service with an allowed endpoint.
+
+### GET `/api/erc8004/registration/:regId.json`
+Returns ERC-8004 registration-v1 JSON.
+
+Response shape:
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "...",
+  "description": "...",
+  "image": "...",
+  "services": [{ "name": "web", "endpoint": "..." }],
+  "x402Support": false,
+  "active": true,
+  "registrations": [
+    { "agentId": 947, "agentRegistry": "eip155:11155111:0x..." }
+  ],
+  "supportedTrust": [],
+  "entityType": "optional extension",
+  "permissionManifest": {},
+  "provenance": {}
+}
+```
+
+Notes:
+- If draft is not completed yet, `registrations` is an empty array.
+- In dev/test, this endpoint is served with `Cache-Control: no-store`.
+
+### POST `/api/erc8004/registration/complete`
+Attaches on-chain mint identity to a draft.
+
+Body:
+```json
+{
+  "regId": "reg_...",
+  "completionToken": "rct_...",
+  "onchain": {
+    "namespace": "eip155",
+    "chainId": 11155111,
+    "identityRegistry": "0x...",
+    "agentId": 947
+  }
+}
+```
+
+Response:
+```json
+{ "ok": true }
+```
+
+Errors:
+- `MISSING_REG_ID`
+- `MISSING_COMPLETION_TOKEN`
+- `MISSING_ONCHAIN`
+- `INVALID_NAMESPACE`
+- `INVALID_CHAIN_ID`
+- `INVALID_IDENTITY_REGISTRY`
+- `INVALID_AGENT_ID`
+- `INVALID_COMPLETION_TOKEN`
+- `ALREADY_COMPLETED`
+- `NOT_FOUND`
+
+---
+
 ## Anchors (ERC-8004 routing directory)
 
 House anchor links are stored in the **E2EE house vault**, so the server cannot read them.
