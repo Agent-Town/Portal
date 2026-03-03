@@ -1,0 +1,64 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic [ref=e1]:
+    - generic [ref=e2]:
+      - navigation "Town menu map" [ref=e3]:
+        - button "Open Atlas Depot" [disabled] [ref=e4]:
+          - generic [ref=e5]: Atlas Depot
+        - button "Open Town Board" [disabled] [ref=e6]:
+          - generic [ref=e7]: Town Board
+        - button "Open Pony Express" [disabled] [ref=e8]
+        - button "Open Town Hall" [pressed] [ref=e9] [cursor=pointer]
+        - button "Open Saloon" [disabled] [ref=e10]
+        - button "Open Plan Wagons" [disabled] [ref=e11]:
+          - generic [ref=e12]: Plan Wagons
+      - generic [ref=e13]: Town Hall is required until onboarding is complete.
+    - dialog "Town Hall" [ref=e15]:
+      - banner [ref=e16]:
+        - heading "Town Hall" [level=2] [ref=e17]
+      - generic [ref=e20]:
+        - generic [ref=e21]: Complete Town Hall onboarding to continue.
+        - generic [ref=e22]:
+          - heading "Hello hero! Welcome to Agent Town." [level=2] [ref=e23]
+          - paragraph [ref=e24]: How should we call you?
+          - generic [ref=e25]: Your name
+          - textbox "Your name" [ref=e26]:
+            - /placeholder: Promptmancer
+          - generic [ref=e27]:
+            - generic [ref=e28]: Your avatar
+            - img "Human avatar preview" [ref=e30]
+            - button "Customize" [ref=e31] [cursor=pointer]
+          - button "Submit" [ref=e33] [cursor=pointer]
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Agent Comms" [level=3] [ref=e37]
+          - generic [ref=e38]: ready
+        - generic [ref=e39]:
+          - button "Toggle debug panel" [expanded] [ref=e40] [cursor=pointer]: ⚙
+          - button "Decrease panel size (100%)" [ref=e41] [cursor=pointer]: 🔍-
+          - button "Increase panel size (100%)" [ref=e42] [cursor=pointer]: 🔍+
+          - button "Minimize agent panel" [ref=e43] [cursor=pointer]: _
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e48]: openclaw-lite boot
+          - generic [ref=e49]:
+            - textbox "Message agent..." [ref=e50]
+            - button "Send" [ref=e51] [cursor=pointer]
+            - button "New session" [ref=e52] [cursor=pointer]
+            - button "Trainer" [ref=e53] [cursor=pointer]
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - tablist "Agent debug views" [ref=e56]:
+              - button "Worker Tools" [ref=e57] [cursor=pointer]
+              - button "Skill Context" [ref=e58] [cursor=pointer]
+              - button "Worker Traffic" [ref=e59] [cursor=pointer]
+              - button "Brain" [active] [ref=e60] [cursor=pointer]
+              - button "Session Context" [ref=e61] [cursor=pointer]
+            - button "Refresh" [ref=e62] [cursor=pointer]
+          - generic [ref=e65]: "Refreshed: 2026-03-03T01:20:03.790Z Reason: state Worker tools count: 48 Skill action tools (plugin additions): 0 Trainer namespace tools (plugin additions): 0 Trainer budget per turn remaining: (n/a) Trainer budget per minute remaining: 20 Tools: - lite_echo - lite_uppercase - lite_add - lite_now - lite_sleep - lite_sha256 - web_fetch - skill_fetch - http_request - trainer.list_runs - trainer.get_run - trainer.get_event - trainer.list_actions - trainer.invoke_action - trainer.list_evidence - trainer.get_transcript_integrity - trainer.get_session_context - trainer.explain_not_used - trainer.delete_trace - trainer.clear_traces - agent_town_ceremony_commit - agent_town_ceremony_reveal - agent_town_house_recover - agent_town_house_append_note - agent_town_state_get_session - agent_town_state_get_agent_state - agent_town_state_get_house_context - agent_town_state_get_pony_inbox - agent_town_ui_open_modal - agent_town_ui_atlas_search - agent_town_ui_pony_compose - secret_set - secret_list - secret_delete - ws_open - ws_send - ws_recv - ws_close - ws_status - workspace_mkdir - workspace_list - workspace_read_file - workspace_write_file - workspace_edit_file - workspace_delete - wallet_connect - wallet_get_accounts - wallet_sign_message Skill action tools (plugin additions): (none) Trainer namespace tools (plugin additions): (none) Dispatch path: lite_tool_dispatch_v1 Active tab: tools Recent worker events: [2026-03-03T01:20:01.412Z] status: ready [2026-03-03T01:20:03.159Z] [info] llm configured api=default provider=default model=default proxy=1 thinking=default"
+  - iframe [ref=e66]:
+    
+```

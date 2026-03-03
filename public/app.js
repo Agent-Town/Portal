@@ -1,5 +1,6 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
 const WALLET_IDENTITY_HINT_STORAGE_KEY = 'agentTown:walletIdentityHint';
+const WALLET_RECOVERY_KEY_STORAGE_KEY = 'agentTown:walletRecoveryKey';
 const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
 const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
 const WALLET_RECOVERY_INTENT_HEADER = 'x-wallet-recovery-intent';
@@ -51,6 +52,33 @@ function saveTeamCodeHint(value) {
   if (!/^TEAM-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(raw)) return;
   try {
     localStorage.setItem(TEAM_CODE_HINT_STORAGE_KEY, raw);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function readWalletRecoveryKey() {
+  try {
+    const raw = String(localStorage.getItem(WALLET_RECOVERY_KEY_STORAGE_KEY) || '').trim().toLowerCase();
+    return /^wrk_[a-f0-9]{64}$/.test(raw) ? raw : '';
+  } catch {
+    return '';
+  }
+}
+
+function saveWalletRecoveryKey(value) {
+  const key = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!/^wrk_[a-f0-9]{64}$/.test(key)) return;
+  try {
+    localStorage.setItem(WALLET_RECOVERY_KEY_STORAGE_KEY, key);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearWalletRecoveryKey() {
+  try {
+    localStorage.removeItem(WALLET_RECOVERY_KEY_STORAGE_KEY);
   } catch {
     // ignore storage errors
   }
@@ -108,8 +136,16 @@ async function api(url, opts = {}) {
     }
   }
   const teamCodeHint = readTeamCodeHint();
+  const walletRecoveryKey = readWalletRecoveryKey();
   if (!teamCodeHint && walletRecoveryIntentAttempts < WALLET_RECOVERY_INTENT_MAX_ATTEMPTS) {
     walletRecoveryIntentAttempts = WALLET_RECOVERY_INTENT_MAX_ATTEMPTS;
+  }
+  if (
+    walletRecoveryKey
+    && headers['x-wallet-recovery-key'] === undefined
+    && headers['X-Wallet-Recovery-Key'] === undefined
+  ) {
+    headers['x-wallet-recovery-key'] = walletRecoveryKey;
   }
   let sentWalletRecoveryIntent = false;
   if (
@@ -142,6 +178,9 @@ async function api(url, opts = {}) {
   }
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
+  }
+  if (typeof data?.walletRecoveryKey === 'string') {
+    saveWalletRecoveryKey(data.walletRecoveryKey);
   }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;

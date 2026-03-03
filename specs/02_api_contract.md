@@ -189,6 +189,7 @@ Response shape:
 {
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
+  "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
   "onboarding": {
     "required": true,
@@ -208,6 +209,7 @@ Response shape (same fields as `/api/session`):
 {
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
+  "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
   "onboarding": {
     "required": true,

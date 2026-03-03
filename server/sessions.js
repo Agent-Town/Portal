@@ -30,12 +30,22 @@ function makeWalletSessionKey(chain, address) {
   return `${normalizedChain}:${normalizedAddress}`;
 }
 
-function bindSessionWallet(session, chain, address) {
+function bindSessionWallet(session, chain, address, { allowRebind = false } = {}) {
   if (!session || typeof session !== 'object' || !session.sessionId) return;
   if (typeof address !== 'string' || !address.trim()) return;
   const key = makeWalletSessionKey(chain, address);
   if (!key) return;
+  const existingSessionId = sessionIdByWalletAddress.get(key);
+  if (existingSessionId && existingSessionId !== session.sessionId) {
+    const existingSession = getSessionById(existingSessionId);
+    if (!existingSession) {
+      sessionIdByWalletAddress.delete(key);
+    } else if (!allowRebind) {
+      return false;
+    }
+  }
   sessionIdByWalletAddress.set(key, session.sessionId);
+  return true;
 }
 
 function removeSessionIndices(session) {
@@ -136,6 +146,7 @@ function createSession({ flow } = {}) {
   const session = {
     sessionId,
     teamCode,
+    walletRecoveryKey: `wrk_${randomHex(32)}`,
     flow: flow === 'agent_solo' ? 'agent_solo' : 'human',
     createdAt: nowIso(),
     lastSeenAtMs: nowMs,

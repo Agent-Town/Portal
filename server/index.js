@@ -739,8 +739,13 @@ const OPENAI_CODEX_OAUTH_CLAIM_PATH = 'https://api.openai.com/auth';
 const OPENAI_CODEX_OAUTH_CALLBACK_PORT = Number(process.env.OPENAI_CODEX_OAUTH_CALLBACK_PORT || 1455);
 const OPENAI_CODEX_OAUTH_CALLBACK_HOST = String(process.env.OPENAI_CODEX_OAUTH_CALLBACK_HOST || '127.0.0.1').trim() || '127.0.0.1';
 const OPENAI_CODEX_OAUTH_CALLBACK_PATH = '/auth/callback';
+const OPENAI_CODEX_OAUTH_CALLBACK_HOST_FOR_URI = OPENAI_CODEX_OAUTH_CALLBACK_HOST.includes(':')
+  && !OPENAI_CODEX_OAUTH_CALLBACK_HOST.startsWith('[')
+  ? `[${OPENAI_CODEX_OAUTH_CALLBACK_HOST}]`
+  : OPENAI_CODEX_OAUTH_CALLBACK_HOST;
 const OPENAI_CODEX_OAUTH_REDIRECT_URI = String(
-  process.env.OPENAI_CODEX_OAUTH_REDIRECT_URI || `http://localhost:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}${OPENAI_CODEX_OAUTH_CALLBACK_PATH}`
+  process.env.OPENAI_CODEX_OAUTH_REDIRECT_URI
+    || `http://${OPENAI_CODEX_OAUTH_CALLBACK_HOST_FOR_URI}:${OPENAI_CODEX_OAUTH_CALLBACK_PORT}${OPENAI_CODEX_OAUTH_CALLBACK_PATH}`
 ).trim();
 const OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS = 10 * 60 * 1000;
 const OPENAI_CODEX_OAUTH_MAX_ATTEMPTS = 200;
@@ -1751,6 +1756,7 @@ function ensureHumanSession(req, res) {
   let sid = cookieSid;
   let session = sid ? getSessionById(sid) : null;
   const walletCandidates = collectWalletCandidatesFromHeaders(req);
+  const walletRecoveryKey = normalizeWalletRecoveryKeyInput(req.header('x-wallet-recovery-key'));
   const walletRecoveryIntentHeader = typeof req.header('x-wallet-recovery-intent') === 'string'
     ? req.header('x-wallet-recovery-intent').trim()
     : '';
@@ -1776,12 +1782,24 @@ function ensureHumanSession(req, res) {
     return score;
   };
 
+  const walletRecoveryKeyMatches = (candidateSession) => {
+    if (!candidateSession || !walletRecoveryKey) return false;
+    const candidateKey = normalizeWalletRecoveryKeyInput(candidateSession.walletRecoveryKey);
+    if (!candidateKey) return false;
+    const a = Buffer.from(candidateKey);
+    const b = Buffer.from(walletRecoveryKey);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  };
+
   const pickBestWalletSession = () => {
+    if (!walletRecoveryKey) return null;
     let bestSession = null;
-    let bestScore = 0;
+    let bestScore = -1;
     for (const candidate of walletCandidates) {
       const walletSession = getSessionByWallet(candidate?.chain, candidate?.address);
       if (!walletSession) continue;
+      if (!walletRecoveryKeyMatches(walletSession)) continue;
       const score = sessionRecoveryScore(walletSession);
       if (score > bestScore) {
         bestSession = walletSession;
@@ -1797,13 +1815,10 @@ function ensureHumanSession(req, res) {
   }
 
   if (!session) {
-    for (const candidate of walletCandidates) {
-      const walletSession = getSessionByWallet(candidate?.chain, candidate?.address);
-      if (walletSession) {
-        session = walletSession;
-        sid = walletSession.sessionId;
-        break;
-      }
+    const walletSession = pickBestWalletSession();
+    if (walletSession) {
+      session = walletSession;
+      sid = walletSession.sessionId;
     }
   }
 
@@ -1854,6 +1869,9 @@ function ensureHumanSession(req, res) {
     res.setHeader('Set-Cookie', `et_session=${encodeURIComponent(sid)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`);
   }
 
+  if (!normalizeWalletRecoveryKeyInput(session.walletRecoveryKey)) {
+    session.walletRecoveryKey = `wrk_${randomHex(32)}`;
+  }
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
@@ -1862,6 +1880,11 @@ function ensureHumanSession(req, res) {
 function normalizeWalletChainInput(rawChain) {
   const chain = typeof rawChain === 'string' ? rawChain.trim().toLowerCase() : '';
   return chain === 'evm' || chain === 'solana' ? chain : '';
+}
+
+function normalizeWalletRecoveryKeyInput(rawKey) {
+  const key = typeof rawKey === 'string' ? rawKey.trim().toLowerCase() : '';
+  return /^wrk_[a-f0-9]{64}$/.test(key) ? key : '';
 }
 
 function collectWalletCandidatesFromHeaders(req) {
@@ -3384,6 +3407,7 @@ app.get('/api/session', (req, res) => {
   res.json({
     ok: true,
     teamCode: s.teamCode,
+    walletRecoveryKey: normalizeWalletRecoveryKeyInput(s.walletRecoveryKey) || null,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
     featureFlags: {
@@ -3411,6 +3435,7 @@ app.post('/api/session/reset', (req, res) => {
   res.json({
     ok: true,
     teamCode: next.teamCode,
+    walletRecoveryKey: normalizeWalletRecoveryKeyInput(next.walletRecoveryKey) || null,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
     stats: {
@@ -3430,6 +3455,7 @@ app.get('/api/state', (req, res) => {
   res.json({
     ok: true,
     teamCode: s.teamCode,
+    walletRecoveryKey: normalizeWalletRecoveryKeyInput(s.walletRecoveryKey) || null,
     elements: listElements(),
     agent: {
       connected: s.agent.connected,
@@ -3578,6 +3604,14 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     host: OPENAI_CODEX_OAUTH_CALLBACK_HOST,
     port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
   }));
+
+  if (!callbackServer.ready) {
+    return res.status(503).json({
+      ok: false,
+      error: 'CALLBACK_SERVER_UNAVAILABLE',
+      callbackServer
+    });
+  }
 
   const { verifier, challenge } = createOpenAiCodexPkce();
   const state = createOpenAiCodexOAuthState();
@@ -4210,58 +4244,37 @@ async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
   return payload?.data && typeof payload.data === 'object' ? payload.data : payload;
 }
 
-// --- API ---
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, time: nowIso() });
-});
-
 app.get('/api/onboarding/status', (req, res) => {
-  const store = readStore();
-  const cookies = parseCookies(req.headers.cookie);
-  const sid = cookies.get('agenttown_sid') || '';
-  const session = getSessionById(store, sid);
+  const s = ensureHumanSession(req, res);
+  const onboarding = ensureSessionOnboarding(s);
+  const flowStep = normalizeOnboardingStep(onboarding?.step);
 
-  if (!session || !session.wallet) {
-    return res.json({ ok: true, step: 1, done: false });
+  let step = 1;
+  let done = false;
+  if (onboarding.required !== true) {
+    step = 7;
+    done = true;
+  } else if (onboarding.registrationComplete !== true) {
+    step = 2;
+  } else if (flowStep === ONBOARDING_STEP_BRAIN) {
+    step = 4;
+  } else if (flowStep === ONBOARDING_STEP_SIGIL) {
+    step = 5;
+  } else if (flowStep === ONBOARDING_STEP_CEREMONY) {
+    step = 6;
+  } else if (flowStep === ONBOARDING_STEP_DONE) {
+    step = 7;
+    done = true;
+  } else {
+    step = 4;
   }
 
-  // Determine current step based on session/profile completeness
-  // Steps:
-  // 1: Login (done if wallet exists)
-  // 2: Profile (name/avatar)
-  // 3: ERC-8004 (Sepolia/Solana IDs)
-  // 4: Brain config
-  // 5: Sigil test
-  // 6: House ceremony (wrapped kroot)
-  // 7: Done
-
-  const isProfileComplete = session.onboarding?.profile?.humanName
-    && session.onboarding?.profile?.agentName
-    && session.onboarding?.profile?.humanAvatar?.image
-    && session.onboarding?.profile?.agentAvatar?.image;
-
-  if (!isProfileComplete) return res.json({ ok: true, step: 2, done: false });
-
-  const isErc8004Complete = session.onboarding?.mint?.user?.evm?.id
-    && session.onboarding?.mint?.user?.solana?.id
-    && session.onboarding?.mint?.agent?.evm?.id
-    && session.onboarding?.mint?.agent?.solana?.id;
-
-  if (!isErc8004Complete) return res.json({ ok: true, step: 3, done: false });
-
-  const house = session.houseId ? store.houses.find(h => h.id === session.houseId) : null;
-  const isBrainComplete = house?.worker?.url && house?.worker?.state?.active;
-
-  if (!isBrainComplete) return res.json({ ok: true, step: 4, done: false });
-
-  // Add the remaining checks for steps 5-7 based on application state
-  const isSigilComplete = house?.sigilTestComplete;
-  if (!isSigilComplete) return res.json({ ok: true, step: 5, done: false });
-
-  const isCeremonyComplete = house?.ceremonyComplete;
-  if (!isCeremonyComplete) return res.json({ ok: true, step: 6, done: false });
-
-  return res.json({ ok: true, step: 7, done: true });
+  return res.json({
+    ok: true,
+    step,
+    done,
+    hasWallet: onboarding.registrationComplete === true || step > 1
+  });
 });
 
 app.get('/api/privy/config', (_req, res) => {
@@ -4345,46 +4358,6 @@ app.post('/api/privy/wallet-rpc/relay', async (req, res) => {
       ...(detail ? { detail } : {})
     });
   }
-});
-
-app.get('/api/session', (req, res) => {
-  const s = ensureHumanSession(req, res);
-  const store = readStore();
-  const onboarding = ensureSessionOnboarding(s);
-  res.json({
-    ok: true,
-    teamCode: s.teamCode,
-    elements: listElements(),
-    onboarding: cloneOnboarding(onboarding),
-    stats: {
-      signups: store.signups.length,
-      publicTeams: store.publicTeams.length
-    }
-  });
-});
-
-// Rotates the human session cookie to a fresh session/team code.
-// Useful for shared devices where multiple people onboard sequentially.
-app.post('/api/session/reset', (req, res) => {
-  // Ensure we still have a valid response cookie context (Secure flag in prod).
-  const store = readStore();
-  const next = createSession();
-  const onboarding = ensureSessionOnboarding(next);
-  const secureFlag = isProd || req.secure ? '; Secure' : '';
-  res.setHeader(
-    'Set-Cookie',
-    `et_session=${encodeURIComponent(next.sessionId)}; Path=/; SameSite=Lax; HttpOnly${secureFlag}`
-  );
-  res.json({
-    ok: true,
-    teamCode: next.teamCode,
-    elements: listElements(),
-    onboarding: cloneOnboarding(onboarding),
-    stats: {
-      signups: store.signups.length,
-      publicTeams: store.publicTeams.length
-    }
-  });
 });
 
 app.post('/api/referral', (req, res) => {
@@ -5113,22 +5086,43 @@ app.post('/api/townhall/register', (req, res) => {
   onboarding.registeredAt = nowIso();
   onboarding.step = ONBOARDING_STEP_BRAIN;
 
-  // Preserve wallet-linked session recovery after registration completes.
-  // We bind normalized wallet candidates from trusted headers and explicit
-  // registration payload hints so cookie resets can recover the same session.
+  // Wallet-first continuity:
+  // 1) Verified wallet proofs may rebind an existing mapping.
+  // 2) Registration hints may only bind if the wallet key is currently unclaimed.
+  const verifiedWalletCandidates = [];
+  const verifiedTokenAddress = normalizeWalletSessionSolanaAddress(s?.token?.address);
+  if (verifiedTokenAddress) {
+    verifiedWalletCandidates.push({ chain: 'solana', address: verifiedTokenAddress });
+  }
+  const verifiedClaimChain = normalizeWalletChainInput(s?.claim?.erc8004?.claimChain);
+  const verifiedClaimAddressRaw = typeof s?.claim?.erc8004?.address === 'string'
+    ? s.claim.erc8004.address
+    : '';
+  const verifiedClaimAddress = verifiedClaimChain === 'evm'
+    ? normalizeEvmAddress(verifiedClaimAddressRaw)
+    : normalizeWalletSessionSolanaAddress(verifiedClaimAddressRaw);
+  if (verifiedClaimChain && verifiedClaimAddress && Number.isFinite(Number(s?.claim?.erc8004?.verifiedAt))) {
+    verifiedWalletCandidates.push({ chain: verifiedClaimChain, address: verifiedClaimAddress });
+  }
   const registrationWalletCandidates = [
     ...collectWalletCandidatesFromHeaders(req),
     ...collectTownhallWalletCandidatesFromPayload(req.body?.wallet)
   ];
-  const seenRegistrationWalletKeys = new Set();
-  for (const candidate of registrationWalletCandidates) {
+  const seenWalletKeys = new Set();
+  const bindWalletCandidate = (candidate, allowRebind) => {
     const chain = normalizeWalletChainInput(candidate?.chain);
     const address = typeof candidate?.address === 'string' ? candidate.address.trim() : '';
-    if (!chain || !address) continue;
+    if (!chain || !address) return;
     const key = `${chain}:${address}`;
-    if (seenRegistrationWalletKeys.has(key)) continue;
-    seenRegistrationWalletKeys.add(key);
-    bindSessionWallet(s, chain, address);
+    if (seenWalletKeys.has(key)) return;
+    seenWalletKeys.add(key);
+    bindSessionWallet(s, chain, address, { allowRebind });
+  };
+  for (const candidate of verifiedWalletCandidates) {
+    bindWalletCandidate(candidate, true);
+  }
+  for (const candidate of registrationWalletCandidates) {
+    bindWalletCandidate(candidate, false);
   }
 
   res.json({ ok: true, onboarding: cloneOnboarding(onboarding) });
@@ -7621,7 +7615,7 @@ app.post('/api/wallet/lookup', (req, res) => {
     s.houseCeremony.createdAt = s.houseCeremony.createdAt || house.createdAt || nowIso();
     indexHouseId(s, house.id);
   }
-  bindSessionWallet(s, 'solana', address);
+  bindSessionWallet(s, 'solana', address, { allowRebind: true });
   res.json({
     ok: true,
     houseId: house.id,
@@ -7653,7 +7647,7 @@ app.post('/api/token/verify', async (req, res) => {
     return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
   }
   s.tokenLookupNonce = null;
-  bindSessionWallet(s, 'solana', address);
+  bindSessionWallet(s, 'solana', address, { allowRebind: true });
 
   if (s.signup.complete && s.signup.mode === 'token' && s.signup.address && s.signup.address !== address) {
     return res.status(409).json({ ok: false, error: 'ADDRESS_MISMATCH' });
@@ -7808,7 +7802,7 @@ app.post('/api/claim/erc8004/verify', (req, res) => {
     return res.status(400).json({ ok: false, error: 'UNSUPPORTED_CLAIM_CHAIN' });
   }
   if (!verified) return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
-  bindSessionWallet(s, claimChain, claimedAddress);
+  bindSessionWallet(s, claimChain, claimedAddress, { allowRebind: true });
   if (s.signup.complete && s.signup.mode && s.signup.mode !== 'claim') {
     return res.status(409).json({ ok: false, error: 'ALREADY_SIGNED_UP' });
   }
