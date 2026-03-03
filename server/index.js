@@ -7158,6 +7158,9 @@ app.get('/api/atlas/search', (req, res) => {
 const { verifyMessage } = require('ethers');
 const ERC8004_OPTOUT_NONCE_TTL_MS = 10 * 60 * 1000;
 const erc8004OptOutNonces = new Map();
+const ERC8004_REGISTRATION_TYPE = 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1';
+const ERC8004_ENTITY_TYPES = new Set(['human', 'agent', 'tool', 'skill', 'experience', 'house']);
+const ERC8004_CONTEXT_KINDS = new Set(['house', 'room', 'townhall', 'tool', 'skill', 'experience']);
 
 function makeAnchorNonce() {
   return `an_${randomHex(16)}`;
@@ -7167,10 +7170,30 @@ function makeErc8004OptOutNonce() {
   return `eo_${randomHex(16)}`;
 }
 
+function makeErc8004RegistrationId() {
+  return `reg_${randomHex(16)}`;
+}
+
+function makeErc8004RegistrationCompletionToken() {
+  return `rct_${randomHex(24)}`;
+}
+
 function normalizeEvmAddress(value) {
   const raw = typeof value === 'string' ? value.trim() : '';
   if (!/^0x[0-9a-fA-F]{40}$/.test(raw)) return null;
   return raw.toLowerCase();
+}
+
+function timingSafeStringEquals(left, right) {
+  if (typeof left !== 'string' || typeof right !== 'string') return false;
+  const a = Buffer.from(left, 'utf8');
+  const b = Buffer.from(right, 'utf8');
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 function normalizeOptOutReason(value) {
@@ -7179,6 +7202,143 @@ function normalizeOptOutReason(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
   return trimmed.slice(0, 280);
+}
+
+function normalizeErc8004Context(input) {
+  if (!input || typeof input !== 'object') return null;
+  const kind = typeof input.kind === 'string' ? input.kind.trim() : '';
+  if (!ERC8004_CONTEXT_KINDS.has(kind)) return null;
+  const out = { kind };
+  if (typeof input.houseId === 'string' && input.houseId.trim()) out.houseId = input.houseId.trim();
+  if (typeof input.roomId === 'string' && input.roomId.trim()) out.roomId = input.roomId.trim();
+  if (typeof input.sourceUri === 'string' && input.sourceUri.trim()) out.sourceUri = input.sourceUri.trim();
+  return out;
+}
+
+function isAllowedRegistrationServiceEndpoint(value) {
+  if (typeof value !== 'string') return false;
+  const clean = value.trim();
+  if (!clean) return false;
+  try {
+    const parsed = new URL(clean);
+    if (parsed.protocol === 'https:') return true;
+    if (parsed.protocol !== 'http:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+function normalizeErc8004Services(input) {
+  if (!Array.isArray(input) || !input.length) return null;
+  const out = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== 'object') continue;
+    const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+    const endpoint = typeof raw.endpoint === 'string' ? raw.endpoint.trim() : '';
+    if (!name || !endpoint) continue;
+    if (!isAllowedRegistrationServiceEndpoint(endpoint)) continue;
+    const entry = { name, endpoint };
+    if (typeof raw.version === 'string' && raw.version.trim()) entry.version = raw.version.trim();
+    if (Array.isArray(raw.skills)) {
+      const skills = raw.skills.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim());
+      if (skills.length) entry.skills = skills;
+    }
+    if (Array.isArray(raw.domains)) {
+      const domains = raw.domains.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim());
+      if (domains.length) entry.domains = domains;
+    }
+    out.push(entry);
+  }
+  if (!out.length) return null;
+  const hasWeb = out.some((entry) => entry.name === 'web' && entry.endpoint);
+  return hasWeb ? out : null;
+}
+
+function normalizeErc8004EntityType(value) {
+  if (value == null || value === '') return 'agent';
+  if (typeof value !== 'string') return null;
+  const clean = value.trim().toLowerCase();
+  if (!ERC8004_ENTITY_TYPES.has(clean)) return null;
+  return clean;
+}
+
+function normalizeErc8004RegistrationDraftInput(body = {}) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const description = typeof body?.description === 'string' ? body.description.trim() : '';
+  const image = typeof body?.image === 'string' ? body.image.trim() : '';
+  const services = normalizeErc8004Services(body?.services);
+  const entityType = normalizeErc8004EntityType(body?.entityType);
+  if (!name) return { error: 'INVALID_NAME' };
+  if (!description) return { error: 'INVALID_DESCRIPTION' };
+  if (!image) return { error: 'INVALID_IMAGE' };
+  if (!services) return { error: 'INVALID_SERVICES' };
+  if (!entityType) return { error: 'INVALID_ENTITY_TYPE' };
+
+  const context = normalizeErc8004Context(body?.context);
+  if (body?.context && !context) return { error: 'INVALID_CONTEXT' };
+
+  const x402Support = body?.x402Support === true;
+  const active = body?.active !== false;
+  const supportedTrust = Array.isArray(body?.supportedTrust)
+    ? body.supportedTrust.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim())
+    : [];
+
+  const record = {
+    regId: makeErc8004RegistrationId(),
+    completionToken: makeErc8004RegistrationCompletionToken(),
+    createdAtMs: Date.now(),
+    updatedAtMs: Date.now(),
+    ...(context ? { context } : {}),
+    name,
+    description,
+    image,
+    services,
+    x402Support,
+    active,
+    supportedTrust,
+    entityType
+  };
+  if (body?.permissionManifest != null) record.permissionManifest = body.permissionManifest;
+  if (body?.provenance != null) record.provenance = body.provenance;
+  return { record };
+}
+
+function buildErc8004TokenUri(req, regId) {
+  const origin = `${req.protocol}://${req.get('host')}`;
+  return `${origin}/api/erc8004/registration/${encodeURIComponent(regId)}.json`;
+}
+
+function buildErc8004RegistrationResponse(record) {
+  const registrations = [];
+  if (record?.onchain && typeof record.onchain === 'object') {
+    registrations.push({
+      agentId: Number(record.onchain.agentId),
+      agentRegistry: `eip155:${Number(record.onchain.chainId)}:${record.onchain.identityRegistry}`
+    });
+  }
+
+  const out = {
+    type: ERC8004_REGISTRATION_TYPE,
+    name: String(record?.name || ''),
+    description: String(record?.description || ''),
+    image: String(record?.image || ''),
+    services: Array.isArray(record?.services) ? record.services : [],
+    x402Support: record?.x402Support === true,
+    active: record?.active !== false,
+    registrations,
+    supportedTrust: Array.isArray(record?.supportedTrust) ? record.supportedTrust : []
+  };
+
+  if (record?.entityType) out.entityType = record.entityType;
+  if (Object.prototype.hasOwnProperty.call(record || {}, 'permissionManifest')) {
+    out.permissionManifest = record.permissionManifest;
+  }
+  if (Object.prototype.hasOwnProperty.call(record || {}, 'provenance')) {
+    out.provenance = record.provenance;
+  }
+  return out;
 }
 
 function buildErc8004OptOutMessage({ erc8004Id, nonce, mode = 'delete' }) {
@@ -7215,13 +7375,6 @@ function buildErc8004ClaimMessage({ agentId, nonce }) {
     `agentId: ${agentId}`,
     `nonce: ${nonce}`
   ].join('\n');
-}
-
-function normalizeEvmAddress(value) {
-  if (typeof value !== 'string') return null;
-  const v = value.trim().toLowerCase();
-  if (!/^0x[a-f0-9]{40}$/.test(v)) return null;
-  return v;
 }
 
 function normalizeSolanaAddress(value) {
@@ -7328,6 +7481,100 @@ function verifyEvmClaimSignature({ message, signature, address }) {
   }
   return recovered.toLowerCase() === expected;
 }
+
+app.post('/api/erc8004/registration/draft', (req, res) => {
+  const normalized = normalizeErc8004RegistrationDraftInput(req.body || {});
+  if (normalized.error) {
+    return res.status(400).json({ ok: false, error: normalized.error });
+  }
+
+  const store = readStore();
+  store.erc8004Registrations = Array.isArray(store.erc8004Registrations) ? store.erc8004Registrations : [];
+  const knownRegIds = new Set(
+    store.erc8004Registrations
+      .map((entry) => (entry && typeof entry.regId === 'string' ? entry.regId : ''))
+      .filter(Boolean)
+  );
+
+  const record = { ...normalized.record };
+  while (knownRegIds.has(record.regId)) {
+    record.regId = makeErc8004RegistrationId();
+  }
+  store.erc8004Registrations.unshift(record);
+  writeStore(store);
+
+  return res.json({
+    ok: true,
+    regId: record.regId,
+    tokenUri: buildErc8004TokenUri(req, record.regId),
+    completionToken: record.completionToken
+  });
+});
+
+app.get('/api/erc8004/registration/:regId.json', (req, res) => {
+  const regId = typeof req.params?.regId === 'string' ? req.params.regId.trim() : '';
+  if (!regId) return res.status(400).json({ ok: false, error: 'MISSING_REG_ID' });
+
+  const store = readStore();
+  const records = Array.isArray(store.erc8004Registrations) ? store.erc8004Registrations : [];
+  const record = records.find((entry) => entry && entry.regId === regId);
+  if (!record) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json(buildErc8004RegistrationResponse(record));
+});
+
+app.post('/api/erc8004/registration/complete', (req, res) => {
+  const regId = typeof req.body?.regId === 'string' ? req.body.regId.trim() : '';
+  const completionToken = typeof req.body?.completionToken === 'string' ? req.body.completionToken.trim() : '';
+  const onchain = req.body?.onchain && typeof req.body.onchain === 'object' ? req.body.onchain : null;
+  if (!regId) return res.status(400).json({ ok: false, error: 'MISSING_REG_ID' });
+  if (!completionToken) return res.status(400).json({ ok: false, error: 'MISSING_COMPLETION_TOKEN' });
+  if (!onchain) return res.status(400).json({ ok: false, error: 'MISSING_ONCHAIN' });
+
+  const namespace = typeof onchain.namespace === 'string' ? onchain.namespace.trim() : '';
+  const chainId = Number(onchain.chainId);
+  const identityRegistry = normalizeEvmAddress(onchain.identityRegistry);
+  const agentId = Number(onchain.agentId);
+  if (namespace !== 'eip155') return res.status(400).json({ ok: false, error: 'INVALID_NAMESPACE' });
+  if (!Number.isInteger(chainId) || chainId < 1) return res.status(400).json({ ok: false, error: 'INVALID_CHAIN_ID' });
+  if (!identityRegistry) return res.status(400).json({ ok: false, error: 'INVALID_IDENTITY_REGISTRY' });
+  if (!Number.isInteger(agentId) || agentId < 0) return res.status(400).json({ ok: false, error: 'INVALID_AGENT_ID' });
+
+  const store = readStore();
+  store.erc8004Registrations = Array.isArray(store.erc8004Registrations) ? store.erc8004Registrations : [];
+  const index = store.erc8004Registrations.findIndex((entry) => entry && entry.regId === regId);
+  if (index < 0) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+
+  const prev = store.erc8004Registrations[index];
+  const expectedCompletionToken = typeof prev?.completionToken === 'string' ? prev.completionToken.trim() : '';
+  if (!expectedCompletionToken || !timingSafeStringEquals(completionToken, expectedCompletionToken)) {
+    return res.status(403).json({ ok: false, error: 'INVALID_COMPLETION_TOKEN' });
+  }
+
+  const nextOnchain = {
+    namespace: 'eip155',
+    chainId,
+    identityRegistry,
+    agentId
+  };
+  if (prev?.onchain && typeof prev.onchain === 'object') {
+    const same = prev.onchain.namespace === nextOnchain.namespace
+      && Number(prev.onchain.chainId) === nextOnchain.chainId
+      && normalizeEvmAddress(prev.onchain.identityRegistry) === nextOnchain.identityRegistry
+      && Number(prev.onchain.agentId) === nextOnchain.agentId;
+    if (same) return res.json({ ok: true, idempotent: true });
+    return res.status(409).json({ ok: false, error: 'ALREADY_COMPLETED' });
+  }
+
+  store.erc8004Registrations[index] = {
+    ...prev,
+    updatedAtMs: Date.now(),
+    onchain: nextOnchain
+  };
+  writeStore(store);
+  return res.json({ ok: true });
+});
 
 app.get('/api/erc8004/optout/nonce', (req, res) => {
   const erc8004Id = typeof req.query?.erc8004Id === 'string' ? req.query.erc8004Id.trim() : '';
@@ -7548,7 +7795,9 @@ if (process.env.NODE_ENV === 'test') {
       milestones: [],
       rewardsLedger: [],
       anchors: [],
-      inbox: []
+      inbox: [],
+      erc8004OptOut: [],
+      erc8004Registrations: []
     });
     invalidateAtlasStoreCaches();
     resetAllSessions();

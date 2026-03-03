@@ -13,7 +13,8 @@ const TABLES = [
   'rewardsLedger',
   'anchors',
   'inbox',
-  'erc8004OptOut'
+  'erc8004OptOut',
+  'erc8004Registrations'
 ];
 
 let db = null;
@@ -55,7 +56,8 @@ function ensureDb() {
       'CREATE TABLE IF NOT EXISTS rewardsLedger (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS anchors (pos INTEGER NOT NULL, data TEXT NOT NULL);',
       'CREATE TABLE IF NOT EXISTS inbox (pos INTEGER NOT NULL, data TEXT NOT NULL);',
-      'CREATE TABLE IF NOT EXISTS erc8004OptOut (pos INTEGER NOT NULL, data TEXT NOT NULL);'
+      'CREATE TABLE IF NOT EXISTS erc8004OptOut (pos INTEGER NOT NULL, data TEXT NOT NULL);',
+      'CREATE TABLE IF NOT EXISTS erc8004Registrations (pos INTEGER NOT NULL, data TEXT NOT NULL);'
     ].join('\n')
   );
   statements = buildStatements(db);
@@ -104,7 +106,8 @@ function normalizeStore(next) {
     rewardsLedger: Array.isArray(next?.rewardsLedger) ? next.rewardsLedger : [],
     anchors: Array.isArray(next?.anchors) ? next.anchors : [],
     inbox: Array.isArray(next?.inbox) ? next.inbox : [],
-    erc8004OptOut: Array.isArray(next?.erc8004OptOut) ? next.erc8004OptOut : []
+    erc8004OptOut: Array.isArray(next?.erc8004OptOut) ? next.erc8004OptOut : [],
+    erc8004Registrations: Array.isArray(next?.erc8004Registrations) ? next.erc8004Registrations : []
   };
 }
 
@@ -121,7 +124,8 @@ function readStore() {
     rewardsLedger: [],
     anchors: [],
     inbox: [],
-    erc8004OptOut: []
+    erc8004OptOut: [],
+    erc8004Registrations: []
   };
   for (const table of TABLES) {
     const rows = statements[table].all.all();

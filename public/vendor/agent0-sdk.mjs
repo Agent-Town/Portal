@@ -35567,116 +35567,6 @@ var TrustModel;
   TrustModel2["TEE_ATTESTATION"] = "tee-attestation";
 })(TrustModel || (TrustModel = {}));
 
-// vendors/agent0-ts/dist/utils/validation.js
-function isValidAddress(address) {
-  if (!address || typeof address !== "string") {
-    return false;
-  }
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
-}
-function isValidAgentId(agentId) {
-  if (!agentId || typeof agentId !== "string") {
-    return false;
-  }
-  const parts = agentId.split(":");
-  if (parts.length !== 2) {
-    return false;
-  }
-  const chainId = parseInt(parts[0], 10);
-  const tokenId = parseInt(parts[1], 10);
-  return !isNaN(chainId) && !isNaN(tokenId) && chainId > 0 && tokenId >= 0;
-}
-function isValidURI(uri) {
-  if (!uri || typeof uri !== "string") {
-    return false;
-  }
-  try {
-    const url = new URL(uri);
-    return url.protocol === "http:" || url.protocol === "https:" || uri.startsWith("ipfs://");
-  } catch {
-    return uri.startsWith("ipfs://") || uri.startsWith("/ipfs/");
-  }
-}
-function isValidFeedbackValue(value) {
-  return typeof value === "number" && Number.isFinite(value);
-}
-function normalizeAddress(address) {
-  if (address.startsWith("0x") || address.startsWith("0X")) {
-    return "0x" + address.slice(2).toLowerCase();
-  }
-  return address.toLowerCase();
-}
-
-// vendors/agent0-ts/dist/utils/id-format.js
-function parseAgentId(agentId) {
-  if (!agentId || typeof agentId !== "string") {
-    throw new Error(`Invalid AgentId: ${agentId}. Expected a non-empty string in format "chainId:tokenId"`);
-  }
-  if (agentId.includes(":")) {
-    const [chainId, tokenId] = agentId.split(":");
-    const parsedChainId = parseInt(chainId, 10);
-    const parsedTokenId = parseInt(tokenId, 10);
-    if (isNaN(parsedChainId) || isNaN(parsedTokenId)) {
-      throw new Error(`Invalid AgentId format: ${agentId}. ChainId and tokenId must be valid numbers`);
-    }
-    return {
-      chainId: parsedChainId,
-      tokenId: parsedTokenId
-    };
-  }
-  throw new Error(`Invalid AgentId format: ${agentId}. Expected "chainId:tokenId"`);
-}
-function formatAgentId(chainId, tokenId) {
-  return `${chainId}:${tokenId}`;
-}
-function parseFeedbackId(feedbackId) {
-  const lastColonIndex = feedbackId.lastIndexOf(":");
-  const secondLastColonIndex = feedbackId.lastIndexOf(":", lastColonIndex - 1);
-  if (lastColonIndex === -1 || secondLastColonIndex === -1) {
-    throw new Error(`Invalid feedback ID format: ${feedbackId}`);
-  }
-  const agentId = feedbackId.slice(0, secondLastColonIndex);
-  const clientAddress = feedbackId.slice(secondLastColonIndex + 1, lastColonIndex);
-  const feedbackIndexStr = feedbackId.slice(lastColonIndex + 1);
-  const feedbackIndex = parseInt(feedbackIndexStr, 10);
-  if (isNaN(feedbackIndex)) {
-    throw new Error(`Invalid feedback index: ${feedbackIndexStr}`);
-  }
-  const normalizedAddress = normalizeAddress(clientAddress);
-  return {
-    agentId,
-    clientAddress: normalizedAddress,
-    feedbackIndex
-  };
-}
-function formatFeedbackId(agentId, clientAddress, feedbackIndex) {
-  const normalizedAddress = normalizeAddress(clientAddress);
-  return `${agentId}:${normalizedAddress}:${feedbackIndex}`;
-}
-
-// vendors/agent0-ts/dist/utils/constants.js
-var IPFS_GATEWAYS = [
-  "https://gateway.pinata.cloud/ipfs/",
-  "https://ipfs.io/ipfs/",
-  "https://dweb.link/ipfs/"
-];
-var TIMEOUTS = {
-  IPFS_GATEWAY: 1e4,
-  // 10 seconds
-  PINATA_UPLOAD: 8e4,
-  // 80 seconds
-  TRANSACTION_WAIT: 45e3,
-  // 45 seconds
-  ENDPOINT_CRAWLER_DEFAULT: 5e3,
-  // 5 seconds
-  SEMANTIC_SEARCH: 2e4
-  // 20 seconds (embedding + vector DB, cold start)
-};
-var DEFAULTS = {
-  FEEDBACK_EXPIRY_HOURS: 24,
-  SEARCH_PAGE_SIZE: 50
-};
-
 // vendors/agent0-ts/node_modules/viem/_esm/utils/getAction.js
 function getAction(client, actionFn, name10) {
   const action_implicit = client[actionFn.name];
@@ -46404,6 +46294,232 @@ init_toBytes();
 init_toHex();
 init_keccak256();
 
+// vendors/agent0-ts/dist/models/permission-manifest.js
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function canonicalizeJson(value) {
+  if (value === null)
+    return "null";
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      throw new Error("Cannot canonicalize non-finite number");
+    }
+    return JSON.stringify(value);
+  }
+  if (typeof value === "string") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    const items = value.map((item) => {
+      if (item === void 0)
+        return "null";
+      return canonicalizeJson(item);
+    });
+    return `[${items.join(",")}]`;
+  }
+  if (isRecord(value)) {
+    const keys = Object.keys(value).sort();
+    const pairs = [];
+    for (const key of keys) {
+      const item = value[key];
+      if (item === void 0 || typeof item === "function" || typeof item === "symbol") {
+        continue;
+      }
+      pairs.push(`${JSON.stringify(key)}:${canonicalizeJson(item)}`);
+    }
+    return `{${pairs.join(",")}}`;
+  }
+  throw new Error(`Cannot canonicalize value of type ${typeof value}`);
+}
+function hasRequiredTxConstraints(grant) {
+  if (grant.id !== "wallet.eip1193.tx")
+    return true;
+  if (!isRecord(grant.constraints))
+    return false;
+  const { allowedChainIds, maxValueWei, requireConfirmation } = grant.constraints;
+  const validChainIds = Array.isArray(allowedChainIds) && allowedChainIds.length > 0 && allowedChainIds.every((id) => typeof id === "number" && Number.isFinite(id));
+  const validMaxValueWei = typeof maxValueWei === "string" && /^\d+$/.test(maxValueWei) || typeof maxValueWei === "number" && Number.isInteger(maxValueWei) && maxValueWei >= 0;
+  const validRequireConfirmation = typeof requireConfirmation === "boolean";
+  return validChainIds && validMaxValueWei && validRequireConfirmation;
+}
+function validatePermissionManifest(manifest) {
+  const errors = [];
+  if (!isRecord(manifest)) {
+    return { ok: false, errors: ["manifest must be an object"] };
+  }
+  if (manifest.type !== "https://agent.town/schemas/permission-manifest-v1") {
+    errors.push("type must be https://agent.town/schemas/permission-manifest-v1");
+  }
+  if (typeof manifest.version !== "string" || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(manifest.version)) {
+    errors.push("version must be a semver-like string");
+  }
+  if (!Array.isArray(manifest.permissions) || manifest.permissions.length < 1) {
+    errors.push("permissions must be a non-empty array");
+  } else {
+    manifest.permissions.forEach((p2, idx) => {
+      if (!isRecord(p2)) {
+        errors.push(`permissions[${idx}] must be an object`);
+        return;
+      }
+      if (typeof p2.id !== "string" || p2.id.length < 1) {
+        errors.push(`permissions[${idx}].id must be a non-empty string`);
+      }
+      if (p2.effect !== "allow") {
+        errors.push(`permissions[${idx}].effect must be "allow"`);
+      }
+      if (!hasRequiredTxConstraints(p2)) {
+        errors.push(`permissions[${idx}] wallet.eip1193.tx requires constraints.allowedChainIds, constraints.maxValueWei, constraints.requireConfirmation`);
+      }
+    });
+  }
+  if (!isRecord(manifest.risk)) {
+    errors.push("risk must be an object");
+  } else {
+    if (!["low", "medium", "high", "critical"].includes(String(manifest.risk.level))) {
+      errors.push("risk.level must be one of low|medium|high|critical");
+    }
+    if (!Array.isArray(manifest.risk.rationale) || manifest.risk.rationale.length < 1) {
+      errors.push("risk.rationale must be a non-empty array");
+    } else if (!manifest.risk.rationale.every((r2) => typeof r2 === "string")) {
+      errors.push("risk.rationale entries must be strings");
+    }
+  }
+  if (!isRecord(manifest.safety)) {
+    errors.push("safety must be an object");
+  } else if (manifest.safety.promptInjection !== void 0) {
+    if (!isRecord(manifest.safety.promptInjection)) {
+      errors.push("safety.promptInjection must be an object");
+    } else if (!Array.isArray(manifest.safety.promptInjection.declaredMitigations) || !manifest.safety.promptInjection.declaredMitigations.every((m3) => typeof m3 === "string")) {
+      errors.push("safety.promptInjection.declaredMitigations must be an array of strings");
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+function createPermissionManifestRef(manifest, uri, contentType = "application/json") {
+  const canonical = canonicalizeJson(manifest);
+  const hash3 = keccak256(toBytes(canonical));
+  return {
+    type: "https://agent.town/schemas/permission-manifest-ref-v1",
+    uri,
+    hash: hash3,
+    contentType
+  };
+}
+
+// vendors/agent0-ts/dist/utils/validation.js
+function isValidAddress(address) {
+  if (!address || typeof address !== "string") {
+    return false;
+  }
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+}
+function isValidAgentId(agentId) {
+  if (!agentId || typeof agentId !== "string") {
+    return false;
+  }
+  const parts = agentId.split(":");
+  if (parts.length !== 2) {
+    return false;
+  }
+  const chainId = parseInt(parts[0], 10);
+  const tokenId = parseInt(parts[1], 10);
+  return !isNaN(chainId) && !isNaN(tokenId) && chainId > 0 && tokenId >= 0;
+}
+function isValidURI(uri) {
+  if (!uri || typeof uri !== "string") {
+    return false;
+  }
+  try {
+    const url = new URL(uri);
+    return url.protocol === "http:" || url.protocol === "https:" || uri.startsWith("ipfs://");
+  } catch {
+    return uri.startsWith("ipfs://") || uri.startsWith("/ipfs/");
+  }
+}
+function isValidFeedbackValue(value) {
+  return typeof value === "number" && Number.isFinite(value);
+}
+function normalizeAddress(address) {
+  if (address.startsWith("0x") || address.startsWith("0X")) {
+    return "0x" + address.slice(2).toLowerCase();
+  }
+  return address.toLowerCase();
+}
+
+// vendors/agent0-ts/dist/utils/id-format.js
+function parseAgentId(agentId) {
+  if (!agentId || typeof agentId !== "string") {
+    throw new Error(`Invalid AgentId: ${agentId}. Expected a non-empty string in format "chainId:tokenId"`);
+  }
+  if (agentId.includes(":")) {
+    const [chainId, tokenId] = agentId.split(":");
+    const parsedChainId = parseInt(chainId, 10);
+    const parsedTokenId = parseInt(tokenId, 10);
+    if (isNaN(parsedChainId) || isNaN(parsedTokenId)) {
+      throw new Error(`Invalid AgentId format: ${agentId}. ChainId and tokenId must be valid numbers`);
+    }
+    return {
+      chainId: parsedChainId,
+      tokenId: parsedTokenId
+    };
+  }
+  throw new Error(`Invalid AgentId format: ${agentId}. Expected "chainId:tokenId"`);
+}
+function formatAgentId(chainId, tokenId) {
+  return `${chainId}:${tokenId}`;
+}
+function parseFeedbackId(feedbackId) {
+  const lastColonIndex = feedbackId.lastIndexOf(":");
+  const secondLastColonIndex = feedbackId.lastIndexOf(":", lastColonIndex - 1);
+  if (lastColonIndex === -1 || secondLastColonIndex === -1) {
+    throw new Error(`Invalid feedback ID format: ${feedbackId}`);
+  }
+  const agentId = feedbackId.slice(0, secondLastColonIndex);
+  const clientAddress = feedbackId.slice(secondLastColonIndex + 1, lastColonIndex);
+  const feedbackIndexStr = feedbackId.slice(lastColonIndex + 1);
+  const feedbackIndex = parseInt(feedbackIndexStr, 10);
+  if (isNaN(feedbackIndex)) {
+    throw new Error(`Invalid feedback index: ${feedbackIndexStr}`);
+  }
+  const normalizedAddress = normalizeAddress(clientAddress);
+  return {
+    agentId,
+    clientAddress: normalizedAddress,
+    feedbackIndex
+  };
+}
+function formatFeedbackId(agentId, clientAddress, feedbackIndex) {
+  const normalizedAddress = normalizeAddress(clientAddress);
+  return `${agentId}:${normalizedAddress}:${feedbackIndex}`;
+}
+
+// vendors/agent0-ts/dist/utils/constants.js
+var IPFS_GATEWAYS = [
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://ipfs.io/ipfs/",
+  "https://dweb.link/ipfs/"
+];
+var TIMEOUTS = {
+  IPFS_GATEWAY: 1e4,
+  // 10 seconds
+  PINATA_UPLOAD: 8e4,
+  // 80 seconds
+  TRANSACTION_WAIT: 45e3,
+  // 45 seconds
+  ENDPOINT_CRAWLER_DEFAULT: 5e3,
+  // 5 seconds
+  SEMANTIC_SEARCH: 2e4
+  // 20 seconds (embedding + vector DB, cold start)
+};
+var DEFAULTS = {
+  FEEDBACK_EXPIRY_HOURS: 24,
+  SEARCH_PAGE_SIZE: 50
+};
+
 // vendors/agent0-ts/dist/utils/signatures.js
 function normalizeEcdsaSignature(signature) {
   const bytes = hexToBytes(signature);
@@ -46436,6 +46552,22 @@ async function recoverTypedDataSigner(args) {
     signature: args.signature
   });
   return getAddress(address);
+}
+
+// vendors/agent0-ts/dist/utils/reputation-tags.js
+function normalizeSegment(segment) {
+  return segment.trim().toLowerCase();
+}
+function buildCanonicalTags(input) {
+  const dimension = normalizeSegment(input.dimension);
+  const signal = normalizeSegment(input.signal);
+  return {
+    tag1: `erc8004.v1/${dimension}`,
+    tag2: `erc8004.v1/${signal}`
+  };
+}
+function isCanonicalTag(tag) {
+  return /^erc8004\.v1\/[^/\s]+$/.test(tag.trim());
 }
 
 // vendors/agent0-ts/node_modules/viem/_esm/accounts/privateKeyToAccount.js
@@ -47077,9 +47209,9 @@ var IPFSClient = class {
     return this.add(jsonStr, fileName);
   }
   /**
-   * Add registration file to IPFS and return CID
+   * Build ERC-8004 registration JSON from SDK registration file.
    */
-  async addRegistrationFile(registrationFile, chainId, identityRegistryAddress) {
+  buildRegistrationJson(registrationFile, chainId, identityRegistryAddress) {
     const services = [];
     for (const ep of registrationFile.endpoints) {
       const endpointDict = {
@@ -47115,7 +47247,7 @@ var IPFSClient = class {
         agentRegistry
       });
     }
-    const data3 = {
+    return {
       type: "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
       name: registrationFile.name,
       description: registrationFile.description,
@@ -47127,8 +47259,17 @@ var IPFSClient = class {
       },
       active: registrationFile.active,
       // ERC-8004 registration file uses `x402Support` (camelCase).
-      x402Support: registrationFile.x402support
+      x402Support: registrationFile.x402support,
+      ...registrationFile.entityType && registrationFile.entityType !== "agent" && { entityType: registrationFile.entityType },
+      ...registrationFile.provenance && { provenance: registrationFile.provenance },
+      ...registrationFile.permissionManifest && { permissionManifest: registrationFile.permissionManifest }
     };
+  }
+  /**
+   * Add registration file to IPFS and return CID
+   */
+  async addRegistrationFile(registrationFile, chainId, identityRegistryAddress) {
+    const data3 = this.buildRegistrationJson(registrationFile, chainId, identityRegistryAddress);
     return this.addJson(data3, "agent-registration.json");
   }
   /**
@@ -50783,6 +50924,11 @@ var SubgraphClient = class {
         const data22 = await this.client.request(q2, variables || {});
         return data22;
       }
+      if ((msg.includes('Cannot query field "entityType"') || msg.includes("has no field `entityType`")) && query.includes("entityType")) {
+        const q2 = query.split("entityType").join("");
+        const data22 = await this.client.request(q2, variables || {});
+        return data22;
+      }
       throw new Error(`Failed to query subgraph: ${error}`);
     }
   }
@@ -50853,6 +50999,7 @@ var SubgraphClient = class {
           registrationFile {
             id
             agentId
+            entityType
             name
             description
             image
@@ -50942,6 +51089,7 @@ var SubgraphClient = class {
           registrationFile {
             id
             agentId
+            entityType
             name
             description
             image
@@ -51154,6 +51302,7 @@ var SubgraphClient = class {
     return {
       chainId,
       agentId: agentIdStr,
+      entityType: regFile?.entityType || void 0,
       // Per ERC-8004 registration schema, name SHOULD be present. If missing in subgraph data,
       // fall back to agentId string to avoid returning an unusable empty name.
       name: regFile?.name || agentIdStr,
@@ -52648,6 +52797,7 @@ var SemanticSearchClient = class {
 };
 
 // vendors/agent0-ts/dist/core/indexer.js
+var ENTITY_TYPE_HYDRATION_MAX = 200;
 var AgentIndexer = class _AgentIndexer {
   constructor(subgraphClient, subgraphUrlOverrides, defaultChainId) {
     this.subgraphClient = subgraphClient;
@@ -52911,6 +53061,85 @@ var AgentIndexer = class _AgentIndexer {
       hex += b.toString(16).padStart(2, "0");
     return hex;
   }
+  _normalizeEntityType(type) {
+    const value = typeof type === "string" ? type.trim() : "";
+    return value.length > 0 ? value : "agent";
+  }
+  async _readRegistrationJson(uri) {
+    if (!uri || typeof uri !== "string")
+      return null;
+    const fetchJson = async (url) => {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(TIMEOUTS.IPFS_GATEWAY)
+      });
+      if (!response.ok)
+        return null;
+      const data3 = await response.json();
+      if (typeof data3 !== "object" || data3 === null || Array.isArray(data3))
+        return null;
+      return data3;
+    };
+    if (uri.startsWith("ipfs://")) {
+      const cid = uri.slice(7);
+      for (const gateway of IPFS_GATEWAYS) {
+        try {
+          const data3 = await fetchJson(`${gateway}${cid}`);
+          if (data3)
+            return data3;
+        } catch {
+          continue;
+        }
+      }
+      return null;
+    }
+    if (uri.startsWith("http://") || uri.startsWith("https://")) {
+      try {
+        return await fetchJson(uri);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+  async _hydrateEntityTypeForAgent(agent) {
+    if (agent.entityType && typeof agent.entityType === "string") {
+      return this._normalizeEntityType(agent.entityType);
+    }
+    if (!agent.agentURI) {
+      return "agent";
+    }
+    const raw = await this._readRegistrationJson(agent.agentURI);
+    if (!raw || typeof raw.entityType !== "string") {
+      return "agent";
+    }
+    return this._normalizeEntityType(raw.entityType);
+  }
+  async _hydrateEntityTypes(agents, concurrency = 10) {
+    const queue = agents.filter((a2) => !a2.entityType || typeof a2.entityType !== "string");
+    if (queue.length === 0)
+      return;
+    if (queue.length > ENTITY_TYPE_HYDRATION_MAX) {
+      throw new Error(`ENTITY_TYPE_FILTER_TOO_BROAD: candidate set ${queue.length} exceeds ${ENTITY_TYPE_HYDRATION_MAX}`);
+    }
+    let idx = 0;
+    const workers = new Array(Math.min(concurrency, queue.length)).fill(null).map(async () => {
+      while (idx < queue.length) {
+        const current = queue[idx];
+        idx += 1;
+        const type = await this._hydrateEntityTypeForAgent(current);
+        current.entityType = type;
+      }
+    });
+    await Promise.all(workers);
+  }
+  async _applyEntityTypeFilter(agents, filters) {
+    if (!filters.entityType)
+      return agents;
+    const requested = Array.isArray(filters.entityType) ? filters.entityType : [filters.entityType];
+    const wanted = new Set(requested.map((type) => this._normalizeEntityType(String(type))));
+    await this._hydrateEntityTypes(agents);
+    return agents.filter((agent) => wanted.has(this._normalizeEntityType(agent.entityType)));
+  }
   async _prefilterByMetadata(filters, chains) {
     const key = filters.hasMetadataKey ?? filters.metadataValue?.key;
     if (!key)
@@ -53091,14 +53320,15 @@ var AgentIndexer = class _AgentIndexer {
     const successfulChains = results.filter((r2) => r2.status === "success").map((r2) => r2.chainId);
     const failedChains = results.filter((r2) => r2.status !== "success").map((r2) => r2.chainId);
     const merged = results.flatMap((r2) => r2.items || []);
-    merged.sort((a2, b) => this._compareAgents(a2, b, field, direction));
+    const filteredByEntityType = await this._applyEntityTypeFilter(merged, filters);
+    filteredByEntityType.sort((a2, b) => this._compareAgents(a2, b, field, direction));
     return {
-      items: merged,
+      items: filteredByEntityType,
       meta: {
         chains,
         successfulChains,
         failedChains,
-        totalResults: merged.length,
+        totalResults: filteredByEntityType.length,
         timing: { totalMs: 0 }
       }
     };
@@ -53161,22 +53391,23 @@ var AgentIndexer = class _AgentIndexer {
         failedChains.push(chainId);
       }
     }
+    const filteredByEntityType = await this._applyEntityTypeFilter(fetched, filters);
     const sortField = options.sort && options.sort.length > 0 ? field : "semanticScore";
     const sortDir = options.sort && options.sort.length > 0 ? direction : "desc";
-    fetched.sort((a2, b) => this._compareAgents(a2, b, sortField, sortDir));
+    filteredByEntityType.sort((a2, b) => this._compareAgents(a2, b, sortField, sortDir));
     return {
-      items: fetched,
+      items: filteredByEntityType,
       meta: {
         chains,
         successfulChains,
         failedChains,
-        totalResults: fetched.length,
+        totalResults: filteredByEntityType.length,
         timing: { totalMs: 0 }
       }
     };
   }
   _filterAgents(agents, params) {
-    const { name: name10, description, hasMCP, hasA2A, mcpContains, a2aContains, webContains, ensContains, didContains, walletAddress, supportedTrust, a2aSkills, mcpTools, mcpPrompts, mcpResources, active, x402support, chains } = params;
+    const { name: name10, description, hasMCP, hasA2A, mcpContains, a2aContains, webContains, ensContains, didContains, walletAddress, supportedTrust, a2aSkills, mcpTools, mcpPrompts, mcpResources, active, x402support, chains, entityType } = params;
     return agents.filter((agent) => {
       if (name10 && !agent.name?.toLowerCase().includes(name10.toLowerCase())) {
         return false;
@@ -53247,6 +53478,14 @@ var AgentIndexer = class _AgentIndexer {
       }
       if (x402support !== void 0 && agent.x402support !== x402support) {
         return false;
+      }
+      if (entityType) {
+        const allowed = Array.isArray(entityType) ? entityType : [entityType];
+        const normalizedAgent = this._normalizeEntityType(agent.entityType);
+        const normalizedAllowed = allowed.map((value) => this._normalizeEntityType(String(value)));
+        if (!normalizedAllowed.includes(normalizedAgent)) {
+          return false;
+        }
       }
       if (chains && Array.isArray(chains) && chains.length > 0 && !chains.includes(agent.chainId)) {
         return false;
@@ -56212,6 +56451,9 @@ var Agent = class {
   get image() {
     return this.registrationFile.image;
   }
+  get entityType() {
+    return this.registrationFile.entityType || "agent";
+  }
   get mcpEndpoint() {
     const ep = this.registrationFile.endpoints.find((e2) => e2.type === EndpointType.MCP);
     return ep?.value;
@@ -56685,6 +56927,27 @@ var Agent = class {
     this.registrationFile.updatedAt = Math.floor(Date.now() / 1e3);
     return this;
   }
+  setEntityType(type) {
+    this.registrationFile.entityType = type;
+    this.registrationFile.updatedAt = Math.floor(Date.now() / 1e3);
+    return this;
+  }
+  setPermissionManifest(manifest) {
+    this.registrationFile.permissionManifest = manifest;
+    this.registrationFile.updatedAt = Math.floor(Date.now() / 1e3);
+    return this;
+  }
+  getPermissionManifest() {
+    return this.registrationFile.permissionManifest;
+  }
+  setProvenance(provenance) {
+    this.registrationFile.provenance = provenance;
+    this.registrationFile.updatedAt = Math.floor(Date.now() / 1e3);
+    return this;
+  }
+  getProvenance() {
+    return this.registrationFile.provenance;
+  }
   setTrust(reputation = false, cryptoEconomic = false, teeAttestation = false) {
     const trustModels = [];
     if (reputation)
@@ -57146,21 +57409,34 @@ var SDK = class {
    * Create a new agent (off-chain object in memory)
    */
   createAgent(name10, description, image) {
-    const registrationFile = {
-      name: name10,
-      description,
-      image,
-      endpoints: [],
-      // Default trust model: reputation (if caller doesn't set one explicitly).
-      trustModels: [TrustModel.REPUTATION],
-      owners: [],
-      operators: [],
-      active: false,
-      x402support: false,
-      metadata: {},
-      updatedAt: Math.floor(Date.now() / 1e3)
-    };
+    const registrationFile = this._createBaseRegistrationFile(name10, description, image);
     return new Agent(this, registrationFile);
+  }
+  /**
+   * Create a new entity (off-chain object in memory)
+   */
+  createEntity(input) {
+    const registrationFile = this._createBaseRegistrationFile(input.name, input.description, input.image);
+    registrationFile.entityType = input.entityType;
+    return new Agent(this, registrationFile);
+  }
+  createHuman(name10, description, image) {
+    return this.createEntity({ entityType: "human", name: name10, description, image });
+  }
+  createTool(name10, description, image) {
+    return this.createEntity({ entityType: "tool", name: name10, description, image });
+  }
+  createSkill(name10, description, image) {
+    return this.createEntity({ entityType: "skill", name: name10, description, image });
+  }
+  createExperience(name10, description, image) {
+    return this.createEntity({ entityType: "experience", name: name10, description, image });
+  }
+  createHouse(name10, description, image) {
+    return this.createEntity({ entityType: "house", name: name10, description, image });
+  }
+  createOrganization(name10, description, image) {
+    return this.createEntity({ entityType: "organization", name: name10, description, image });
   }
   /**
    * Load an existing agent (hydrates from registration file if registered)
@@ -57325,6 +57601,22 @@ var SDK = class {
     this._feedbackManager.setReputationRegistryAddress(this.reputationRegistryAddress());
     return this._feedbackManager.getReputationSummary(agentId, tag1, tag2);
   }
+  _createBaseRegistrationFile(name10, description, image) {
+    return {
+      name: name10,
+      description,
+      image,
+      endpoints: [],
+      // Default trust model: reputation (if caller doesn't set one explicitly).
+      trustModels: [TrustModel.REPUTATION],
+      owners: [],
+      operators: [],
+      active: false,
+      x402support: false,
+      metadata: {},
+      updatedAt: Math.floor(Date.now() / 1e3)
+    };
+  }
   /**
    * Create an empty registration file structure
    */
@@ -57404,6 +57696,9 @@ var SDK = class {
     const { walletAddress, walletChainId } = this._extractWalletInfo(rawData);
     const trustModels = Array.isArray(rawData.supportedTrust) ? rawData.supportedTrust : Array.isArray(rawData.trustModels) ? rawData.trustModels : [];
     return {
+      entityType: typeof rawData.entityType === "string" ? rawData.entityType : void 0,
+      provenance: typeof rawData.provenance === "object" && rawData.provenance !== null && !Array.isArray(rawData.provenance) ? rawData.provenance : void 0,
+      permissionManifest: typeof rawData.permissionManifest === "object" && rawData.permissionManifest !== null && !Array.isArray(rawData.permissionManifest) ? rawData.permissionManifest : void 0,
       name: typeof rawData.name === "string" ? rawData.name : "",
       description: typeof rawData.description === "string" ? rawData.description : "",
       image: typeof rawData.image === "string" ? rawData.image : void 0,
@@ -57515,6 +57810,7 @@ export {
   DEFAULTS,
   DEFAULT_REGISTRIES,
   DEFAULT_SUBGRAPH_URLS,
+  ENTITY_TYPE_HYDRATION_MAX,
   ERC721_ABI,
   ERC721_URI_STORAGE_ABI,
   EndpointCrawler,
@@ -57531,8 +57827,11 @@ export {
   TrustModel,
   VALIDATION_REGISTRY_ABI,
   ViemChainClient,
+  buildCanonicalTags,
+  createPermissionManifestRef,
   formatAgentId,
   formatFeedbackId,
+  isCanonicalTag,
   isValidAddress,
   isValidAgentId,
   isValidFeedbackValue,
@@ -57542,5 +57841,6 @@ export {
   parseAgentId,
   parseFeedbackId,
   recoverMessageSigner,
-  recoverTypedDataSigner
+  recoverTypedDataSigner,
+  validatePermissionManifest
 };

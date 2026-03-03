@@ -321,6 +321,7 @@ const DEFAULT_LITE_SKILL_STATE = Object.freeze({
   lastImportedAtMs: null
 });
 let liteSkillState = { ...DEFAULT_LITE_SKILL_STATE };
+let liteRuntimeState = {};
 let liteSkillSyncPromise = null;
 let liteSkillLastSyncAtMs = 0;
 let liteSkillAutoImportPromise = null;
@@ -5015,6 +5016,53 @@ function formatDebugList(prefix, values) {
   return `${prefix}:\n${items.map((item) => `- ${item}`).join('\n')}`;
 }
 
+function getLitePermissionPolicyState() {
+  const snapshot = liteRuntimeState && typeof liteRuntimeState === 'object' ? liteRuntimeState : {};
+  const policy = snapshot.policy && typeof snapshot.policy === 'object' ? snapshot.policy : {};
+  const permissions = Array.isArray(policy.permissions) ? policy.permissions : [];
+  const originsByPermission = policy.originsByPermission && typeof policy.originsByPermission === 'object'
+    ? policy.originsByPermission
+    : {};
+  const risk = policy.risk && typeof policy.risk === 'object' ? policy.risk : {};
+  return {
+    mode: String(policy.mode || 'legacy-allow'),
+    permissions,
+    originsByPermission,
+    risk: {
+      level: String(risk.level || 'unknown'),
+      rationale: String(risk.rationale || ''),
+    },
+    source: policy.source && typeof policy.source === 'object' ? policy.source : null,
+    lastError: typeof policy.lastError === 'string' && policy.lastError ? policy.lastError : null,
+  };
+}
+
+function formatPermissionPolicyPermissionList(policyState) {
+  const permissions = Array.isArray(policyState?.permissions) ? policyState.permissions : [];
+  return permissions.map((entry) => {
+    const id = String(entry?.id || '').trim();
+    const constraints = entry?.constraints && typeof entry.constraints === 'object' ? entry.constraints : {};
+    const origins = Array.isArray(constraints.origins) ? constraints.origins : [];
+    const originSuffix = origins.length ? ` origins=${origins.join(',')}` : '';
+    return `${id}${originSuffix}`;
+  });
+}
+
+function formatPermissionPolicyOriginAllowlist(policyState) {
+  const out = [];
+  const byPermission = policyState?.originsByPermission && typeof policyState.originsByPermission === 'object'
+    ? policyState.originsByPermission
+    : {};
+  for (const [permissionId, originsRaw] of Object.entries(byPermission)) {
+    const origins = Array.isArray(originsRaw)
+      ? originsRaw.map((value) => String(value || '').trim()).filter(Boolean)
+      : [];
+    if (!origins.length) continue;
+    out.push(`${String(permissionId || '')}: ${origins.join(', ')}`);
+  }
+  return out;
+}
+
 async function refreshAgentDebugPanels(reason = 'poll') {
   const toolsPane = el('agentDebugTools');
   const skillPane = el('agentDebugSkill');
@@ -5094,6 +5142,9 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const trainerRecentBlockCodes = Array.isArray(trainerNamespaceDiagnostics?.recentBlockCodes)
       ? trainerNamespaceDiagnostics.recentBlockCodes
       : [];
+    const permissionPolicyState = getLitePermissionPolicyState();
+    const permissionPolicyPermissionLines = formatPermissionPolicyPermissionList(permissionPolicyState);
+    const permissionPolicyOriginLines = formatPermissionPolicyOriginAllowlist(permissionPolicyState);
 
     const toolsLines = [
       `Refreshed: ${nowIso}`,
@@ -5123,6 +5174,14 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       `Last error: ${String(skillSnapshot?.lastError || '(none)')}`,
       `Imported paths: ${importedPaths.length}`,
       `Imported files: ${importedFiles.length}`,
+      '',
+      `Permission policy mode: ${permissionPolicyState.mode}`,
+      `Permission risk level: ${permissionPolicyState.risk.level}`,
+      `Permission risk rationale: ${permissionPolicyState.risk.rationale || '(none)'}`,
+      `Permission policy source: ${permissionPolicyState.source ? String(permissionPolicyState.source.kind || 'unknown') : '(none)'}`,
+      `Permission policy error: ${permissionPolicyState.lastError || '(none)'}`,
+      formatDebugList('Declared permissions', permissionPolicyPermissionLines),
+      formatDebugList('Origin allowlist', permissionPolicyOriginLines),
       '',
       formatDebugList('Imported paths', importedPaths.slice(0, 40)),
       '',
@@ -5231,6 +5290,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
           : [],
         recentBlockCodes: trainerRecentBlockCodes,
       },
+      permissionPolicy: permissionPolicyState,
       promptContextFiles: contextPaths,
       promptSkillsCount: availableSkills.length,
       transcriptItems: Array.isArray(transcript) ? transcript.length : null,
@@ -5292,6 +5352,9 @@ async function refreshAgentDebugPanels(reason = 'poll') {
           : [],
         recentBlockCodes: trainerRecentBlockCodes,
       }, null, 2),
+      '',
+      'Permission policy diagnostics:',
+      JSON.stringify(permissionPolicyState, null, 2),
       '',
       'Transcript dump:',
       Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
@@ -7947,12 +8010,18 @@ async function initGateway() {
     });
     gateway.on('state', (runtimeState) => {
       const snapshot = runtimeState && typeof runtimeState === 'object' ? runtimeState : {};
+      liteRuntimeState = snapshot;
+      const policy = snapshot?.policy && typeof snapshot.policy === 'object' ? snapshot.policy : {};
+      const policyRisk = policy?.risk && typeof policy.risk === 'object' ? policy.risk : {};
       pushAgentDebugTraffic('in', 'worker.state.update', {
         step: String(snapshot?.experience?.step || ''),
         nextAgentAction: String(snapshot?.experience?.nextAgentAction || ''),
         humanSelected: String(snapshot?.human?.selected || ''),
         agentSelected: String(snapshot?.agent?.selected || ''),
         matched: !!snapshot?.match?.matched,
+        permissionPolicyMode: String(policy?.mode || ''),
+        permissionRiskLevel: String(policyRisk?.level || ''),
+        permissionCount: Array.isArray(policy?.permissions) ? policy.permissions.length : 0,
       });
       if (runtimeState && typeof runtimeState === 'object' && runtimeState.skill) {
         setLiteSkillState(runtimeState.skill);

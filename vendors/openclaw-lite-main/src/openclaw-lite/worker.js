@@ -78,6 +78,17 @@ const TRAINER_NAMESPACE_QUERY_KEYS = ["trainerNamespace", "trainer_namespace", "
 const TRAINER_NAMESPACE_DEFAULT_ENABLED = true;
 const TRAINER_NAMESPACE_TOOL_PREFIX = "trainer.";
 const TRAINER_NAMESPACE_ENABLED = resolveTrainerNamespaceEnabledFromWorkerLocation();
+const ERC8004_REGISTRATION_V1_TYPE = "https://eips.ethereum.org/EIPS/eip-8004#registration-v1";
+const PERMISSION_MANIFEST_V1_TYPE = "https://agent.town/schemas/permission-manifest-v1";
+const PERMISSION_POLICY_META_KEY = "permissionPolicyV1";
+const PERMISSION_RISK_LEVELS = new Set(["unknown", "low", "medium", "high", "critical"]);
+const PERMISSION_IDS = new Set([
+  "network.fetch",
+  "storage.local.persistent",
+  "wallet.eip1193.sign",
+  "wallet.eip1193.tx",
+  "secrets.read",
+]);
 
 function post(msg) {
   self.postMessage(msg);
@@ -283,6 +294,7 @@ function updateGatewayState() {
       houseId: state.houseId,
       vault: { latestBackupId: state.vaultLatestBackupId || null },
       skill: skillImportSnapshot({ importedPathLimit: 200 }),
+      policy: permissionPolicySnapshot(),
     },
   });
 }
@@ -330,6 +342,335 @@ function bytesToHex(bytes) {
 
 function isPlainObject(value) {
   return !!(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function normalizePermissionRiskLevel(value) {
+  const raw = String(value || "unknown").trim().toLowerCase();
+  return PERMISSION_RISK_LEVELS.has(raw) ? raw : "unknown";
+}
+
+function normalizePermissionOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw === "*") return "*";
+  try {
+    const parsed = new URL(raw, safeOrigin() || "http://localhost");
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.origin;
+  } catch {
+    return "";
+  }
+}
+
+function normalizePermissionOrigins(values) {
+  if (!Array.isArray(values)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    const normalized = normalizePermissionOrigin(value);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+function normalizePermissionEntry(value) {
+  if (!isPlainObject(value)) return null;
+  const id = String(value.id || "").trim();
+  if (!id || !PERMISSION_IDS.has(id)) return null;
+  const constraints = isPlainObject(value.constraints) ? value.constraints : {};
+  return {
+    id,
+    constraints: {
+      origins: normalizePermissionOrigins(constraints.origins),
+      chainIds: Array.isArray(constraints.chainIds)
+        ? constraints.chainIds.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry))
+        : [],
+      maxValueWei:
+        constraints.maxValueWei == null || constraints.maxValueWei === ""
+          ? null
+          : String(constraints.maxValueWei),
+      to:
+        constraints.to == null || constraints.to === ""
+          ? null
+          : String(constraints.to).trim().toLowerCase(),
+    },
+  };
+}
+
+function normalizePermissionManifest(value) {
+  if (!isPlainObject(value)) {
+    return { ok: false, error: "INVALID_PERMISSION_MANIFEST" };
+  }
+  const type = String(value.type || "").trim();
+  if (type && type !== PERMISSION_MANIFEST_V1_TYPE) {
+    return { ok: false, error: "INVALID_PERMISSION_MANIFEST_TYPE" };
+  }
+  const version = String(value.version || "1.0.0").trim() || "1.0.0";
+  const permissions = [];
+  for (const entry of Array.isArray(value.permissions) ? value.permissions : []) {
+    const normalized = normalizePermissionEntry(entry);
+    if (!normalized) continue;
+    permissions.push(normalized);
+  }
+  const deduped = [];
+  const seenIds = new Set();
+  for (const entry of permissions) {
+    if (seenIds.has(entry.id)) continue;
+    seenIds.add(entry.id);
+    deduped.push(entry);
+  }
+  const risk = isPlainObject(value.risk) ? value.risk : {};
+  const safety = isPlainObject(value.safety) ? value.safety : {};
+  return {
+    ok: true,
+    manifest: {
+      type: PERMISSION_MANIFEST_V1_TYPE,
+      version,
+      permissions: deduped,
+      risk: {
+        level: normalizePermissionRiskLevel(risk.level),
+        rationale: String(risk.rationale || "").trim() || "",
+      },
+      safety,
+    },
+  };
+}
+
+function normalizePermissionManifestRef(value) {
+  if (!isPlainObject(value)) return null;
+  const uri = String(value.uri || "").trim();
+  if (!uri) return null;
+  const contentType = String(value.contentType || "").trim() || null;
+  const hash = String(value.hash || "").trim() || null;
+  return { uri, contentType, hash };
+}
+
+function parseJsonObject(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return isPlainObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function permissionPolicyDefault() {
+  return {
+    mode: "legacy-allow",
+    source: null,
+    manifest: null,
+    permissions: [],
+    permissionIds: [],
+    originsByPermission: {},
+    risk: { level: "unknown", rationale: "" },
+    lastError: null,
+  };
+}
+
+function permissionPolicySnapshot() {
+  const source = isPlainObject(state.permissionPolicy?.source) ? state.permissionPolicy.source : null;
+  const permissions = Array.isArray(state.permissionPolicy?.permissions) ? state.permissionPolicy.permissions : [];
+  const originsByPermission = isPlainObject(state.permissionPolicy?.originsByPermission)
+    ? state.permissionPolicy.originsByPermission
+    : {};
+  const risk = isPlainObject(state.permissionPolicy?.risk)
+    ? state.permissionPolicy.risk
+    : { level: "unknown", rationale: "" };
+  return {
+    mode: String(state.permissionPolicy?.mode || "legacy-allow"),
+    source,
+    risk: {
+      level: normalizePermissionRiskLevel(risk.level),
+      rationale: String(risk.rationale || ""),
+    },
+    permissions,
+    originsByPermission,
+    lastError:
+      typeof state.permissionPolicy?.lastError === "string" && state.permissionPolicy.lastError
+        ? state.permissionPolicy.lastError
+        : null,
+  };
+}
+
+function setPermissionPolicy(nextPolicy) {
+  const base = permissionPolicyDefault();
+  const next = isPlainObject(nextPolicy) ? nextPolicy : {};
+  const permissions = Array.isArray(next.permissions) ? next.permissions : [];
+  const permissionIds = permissions.map((entry) => String(entry?.id || "")).filter(Boolean);
+  const originsByPermission = isPlainObject(next.originsByPermission) ? next.originsByPermission : {};
+  state.permissionPolicy = {
+    ...base,
+    ...next,
+    permissions,
+    permissionIds: Array.from(new Set(permissionIds)),
+    originsByPermission,
+    risk: isPlainObject(next.risk)
+      ? {
+        level: normalizePermissionRiskLevel(next.risk.level),
+        rationale: String(next.risk.rationale || ""),
+      }
+      : base.risk,
+  };
+}
+
+async function persistPermissionPolicyState() {
+  await metaSet(PERMISSION_POLICY_META_KEY, permissionPolicySnapshot());
+}
+
+function permissionPolicyHasPermission(permissionId) {
+  if (!state.permissionPolicy || state.permissionPolicy.mode !== "manifest-enforced") return false;
+  const id = String(permissionId || "").trim();
+  if (!id) return false;
+  const ids = Array.isArray(state.permissionPolicy.permissionIds) ? state.permissionPolicy.permissionIds : [];
+  return ids.includes(id);
+}
+
+function permissionPolicyAllowedOrigins(permissionId) {
+  if (!state.permissionPolicy || state.permissionPolicy.mode !== "manifest-enforced") return [];
+  const byPermission = isPlainObject(state.permissionPolicy.originsByPermission)
+    ? state.permissionPolicy.originsByPermission
+    : {};
+  const raw = byPermission[String(permissionId || "").trim()];
+  return Array.isArray(raw) ? raw.map((value) => String(value || "")).filter(Boolean) : [];
+}
+
+function permissionPolicyEntry(permissionId) {
+  if (!state.permissionPolicy || state.permissionPolicy.mode !== "manifest-enforced") return null;
+  const id = String(permissionId || "").trim();
+  if (!id) return null;
+  const permissions = Array.isArray(state.permissionPolicy.permissions) ? state.permissionPolicy.permissions : [];
+  for (const entry of permissions) {
+    if (!entry || String(entry.id || "").trim() !== id) continue;
+    return entry;
+  }
+  return null;
+}
+
+function permissionPolicyConstraints(permissionId) {
+  const entry = permissionPolicyEntry(permissionId);
+  if (!entry || !isPlainObject(entry.constraints)) return {};
+  return entry.constraints;
+}
+
+function permissionDeniedEnvelope({ message = "Permission denied", details = {} } = {}) {
+  return makeToolFailure("PERMISSION_DENIED", String(message || "Permission denied"), details);
+}
+
+function permissionDeniedReasonDetails(reason, extra = {}) {
+  const out = { ...extra };
+  if (reason === "missing_permission") out.missing_permission = String(extra.permissionId || "");
+  if (reason === "origin_not_allowed") out.origin_not_allowed = String(extra.origin || "");
+  if (reason === "approval_required") out.approval_required = true;
+  out.reason = String(reason || "permission_denied");
+  return out;
+}
+
+function parseRegistrationJsonFromFetchEnvelope(envelope) {
+  const text = typeof envelope?.data?.text === "string" ? envelope.data.text : "";
+  const parsed = parseJsonObject(text);
+  if (!parsed) return null;
+  if (String(parsed.type || "").trim() !== ERC8004_REGISTRATION_V1_TYPE) return null;
+  return parsed;
+}
+
+function pickRegistrationWebServiceEndpoint(registration, registrationUrl) {
+  const services = Array.isArray(registration?.services) ? registration.services : [];
+  const webService = services.find((entry) => {
+    if (!isPlainObject(entry)) return false;
+    return String(entry.name || "").trim().toLowerCase() === "web" && typeof entry.endpoint === "string";
+  });
+  if (!webService) return "";
+  const endpointRaw = String(webService.endpoint || "").trim();
+  if (!endpointRaw) return "";
+  try {
+    const resolved = new URL(endpointRaw, registrationUrl || safeOrigin() || "http://localhost");
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") return "";
+    return resolved.toString();
+  } catch {
+    return "";
+  }
+}
+
+function permissionOriginsAllowOrigin(origins, targetOrigin) {
+  const target = String(targetOrigin || "").trim();
+  if (!target) return false;
+  const allowlist = Array.isArray(origins) ? origins : [];
+  if (allowlist.includes("*")) return true;
+  return allowlist.includes(target);
+}
+
+function shouldEnforcePermissionPolicy() {
+  return state.permissionPolicy?.mode === "manifest-enforced";
+}
+
+function denyIfMissingPermission(permissionId) {
+  if (!shouldEnforcePermissionPolicy()) return null;
+  if (permissionPolicyHasPermission(permissionId)) return null;
+  return permissionDeniedEnvelope({
+    details: permissionDeniedReasonDetails("missing_permission", { permissionId }),
+  });
+}
+
+function permissionPolicyOriginsByPermission(permissions) {
+  const out = {};
+  for (const entry of Array.isArray(permissions) ? permissions : []) {
+    const id = String(entry?.id || "").trim();
+    if (!id) continue;
+    const origins = normalizePermissionOrigins(entry?.constraints?.origins);
+    out[id] = origins;
+  }
+  return out;
+}
+
+async function clearPermissionPolicyToLegacy(lastError = null) {
+  setPermissionPolicy({
+    ...permissionPolicyDefault(),
+    lastError: typeof lastError === "string" && lastError ? lastError : null,
+  });
+  await persistPermissionPolicyState();
+  updateGatewayState();
+}
+
+async function applyManifestPermissionPolicy({
+  manifest,
+  source = null,
+  lastError = null,
+} = {}) {
+  const normalized = normalizePermissionManifest(manifest);
+  if (!normalized.ok) {
+    setPermissionPolicy({
+      mode: "manifest-enforced",
+      source: isPlainObject(source) ? source : null,
+      manifest: null,
+      permissions: [],
+      originsByPermission: {},
+      risk: {
+        level: "unknown",
+        rationale: "Invalid permission manifest",
+      },
+      lastError: normalized.error,
+    });
+    await persistPermissionPolicyState();
+    updateGatewayState();
+    return { ok: false, error: normalized.error };
+  }
+
+  const normalizedManifest = normalized.manifest;
+  setPermissionPolicy({
+    mode: "manifest-enforced",
+    source: isPlainObject(source) ? source : null,
+    manifest: normalizedManifest,
+    permissions: normalizedManifest.permissions,
+    originsByPermission: permissionPolicyOriginsByPermission(normalizedManifest.permissions),
+    risk: normalizedManifest.risk,
+    lastError: typeof lastError === "string" && lastError ? lastError : null,
+  });
+  await persistPermissionPolicyState();
+  updateGatewayState();
+  return { ok: true, manifest: normalizedManifest };
 }
 
 function stableJsonStringify(value) {
@@ -526,6 +867,69 @@ function evaluateOriginAccess({ url, capability = "web_fetch", method = "GET", c
     grantId: grant.id,
     scope: grant.scope,
   };
+}
+
+function evaluatePermissionPolicyForNetworkFetch({ url, method = "GET", capability = "web_fetch", consume = true }) {
+  const sameOrigin = isSameOriginHttpUrl(url);
+  if (sameOrigin || !shouldEnforcePermissionPolicy()) {
+    return { allowed: true, sameOrigin, reason: null, details: {} };
+  }
+
+  const permissionId = "network.fetch";
+  const missingPermission = denyIfMissingPermission(permissionId);
+  if (missingPermission) {
+    return {
+      allowed: false,
+      reason: "missing_permission",
+      envelope: missingPermission,
+      details: permissionDeniedReasonDetails("missing_permission", { permissionId }),
+    };
+  }
+
+  const origin = parseUrlOrigin(url);
+  const allowedOrigins = permissionPolicyAllowedOrigins(permissionId);
+  if (!permissionOriginsAllowOrigin(allowedOrigins, origin)) {
+    return {
+      allowed: false,
+      reason: "origin_not_allowed",
+      envelope: permissionDeniedEnvelope({
+        details: permissionDeniedReasonDetails("origin_not_allowed", {
+          permissionId,
+          origin,
+          allowedOrigins,
+        }),
+      }),
+      details: permissionDeniedReasonDetails("origin_not_allowed", {
+        permissionId,
+        origin,
+        allowedOrigins,
+      }),
+    };
+  }
+
+  const originAccess = evaluateOriginAccess({ url, capability, method, consume });
+  if (!originAccess.allowed) {
+    return {
+      allowed: false,
+      reason: "approval_required",
+      envelope: permissionDeniedEnvelope({
+        details: permissionDeniedReasonDetails("approval_required", {
+          permissionId,
+          origin,
+          capability,
+          method: normalizeHttpMethod(method),
+        }),
+      }),
+      details: permissionDeniedReasonDetails("approval_required", {
+        permissionId,
+        origin,
+        capability,
+        method: normalizeHttpMethod(method),
+      }),
+    };
+  }
+
+  return { allowed: true, sameOrigin: false, reason: null, details: {} };
 }
 
 async function requestOriginGrant({ url, capability = "web_fetch", scope = "once", methods }) {
@@ -1206,6 +1610,18 @@ async function runWebFetch(params, toolName = "web_fetch") {
   }
 
   const sameOrigin = isSameOriginHttpUrl(normalized.url);
+  const shouldApplyPermissionPolicy = toolName !== "skill_fetch";
+  if (shouldApplyPermissionPolicy) {
+    const policyDecision = evaluatePermissionPolicyForNetworkFetch({
+      url: normalized.url,
+      method: "GET",
+      capability: "web_fetch",
+      consume: true,
+    });
+    if (!policyDecision.allowed) {
+      return withToolMeta(toolName, startedAtMs, policyDecision.envelope);
+    }
+  }
 
   try {
     const directEnvelope = await webFetchSameOrigin(normalized);
@@ -1654,6 +2070,10 @@ async function persistSecretStore() {
 
 async function runSecretSet(params, toolName = "secret_set") {
   const startedAtMs = nowMs();
+  const policyDeny = denyIfMissingPermission("secrets.read");
+  if (policyDeny) {
+    return withToolMeta(toolName, startedAtMs, policyDeny);
+  }
   const name = typeof params?.name === "string" ? params.name.trim() : "";
   const value = typeof params?.value === "string" ? params.value : "";
   if (!isValidSecretName(name) || !value) {
@@ -1675,12 +2095,20 @@ async function runSecretSet(params, toolName = "secret_set") {
 
 function runSecretList(_params, toolName = "secret_list") {
   const startedAtMs = nowMs();
+  const policyDeny = denyIfMissingPermission("secrets.read");
+  if (policyDeny) {
+    return withToolMeta(toolName, startedAtMs, policyDeny);
+  }
   const names = Object.keys(state.secretStore || {}).sort();
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ names, count: names.length }));
 }
 
 async function runSecretDelete(params, toolName = "secret_delete") {
   const startedAtMs = nowMs();
+  const policyDeny = denyIfMissingPermission("secrets.read");
+  if (policyDeny) {
+    return withToolMeta(toolName, startedAtMs, policyDeny);
+  }
   const name = typeof params?.name === "string" ? params.name.trim() : "";
   if (!isValidSecretName(name)) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Invalid secret name"));
@@ -1998,6 +2426,24 @@ async function runHttpRequest(params, toolName = "http_request") {
   }
 
   const sameOrigin = isSameOriginHttpUrl(input.url);
+  if (!sameOrigin) {
+    const policyDecision = evaluatePermissionPolicyForNetworkFetch({
+      url: input.url,
+      method: input.method,
+      capability: "web_fetch",
+      consume: true,
+    });
+    if (!policyDecision.allowed) {
+      return withToolMeta(toolName, startedAtMs, policyDecision.envelope);
+    }
+  }
+
+  if (String(input?.auth?.mode || "") === "bearer_secret_ref") {
+    const secretPermissionDeny = denyIfMissingPermission("secrets.read");
+    if (secretPermissionDeny) {
+      return withToolMeta(toolName, startedAtMs, secretPermissionDeny);
+    }
+  }
 
   const authApplied = applyHttpAuthToHeaders(input.auth, input.headers);
   if (!authApplied.ok) {
@@ -2454,6 +2900,12 @@ const LITE_TOOL_SPECS = [
     description: "Sign message with connected wallet (approval-gated).",
     sampleArgs: { chain: "solana", message: "hello" },
   },
+  {
+    name: "wallet_send_transaction",
+    label: "Wallet Send Tx",
+    description: "Send EVM transaction with connected wallet (approval-gated).",
+    sampleArgs: { chain: "evm", to: "0x000000000000000000000000000000000000dEaD", valueWei: "1", chainId: 11155111 },
+  },
 ];
 
 function makeLiteToolSchema() {
@@ -2736,6 +3188,10 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "wallet_sign_message": {
       const envelope = await runWalletSignMessageTool(params || {}, "wallet_sign_message");
       return envelopeToToolResult(envelope, "wallet_sign_message");
+    }
+    case "wallet_send_transaction": {
+      const envelope = await runWalletSendTransactionTool(params || {}, "wallet_send_transaction");
+      return envelopeToToolResult(envelope, "wallet_send_transaction");
     }
     default: {
       const startedAtMs = nowMs();
@@ -5256,6 +5712,128 @@ async function walletSignMessageEvm(message) {
   return { address: typeof res.address === "string" ? res.address.trim() : "", signatureHex: sig };
 }
 
+async function walletSendTransactionEvm(transaction) {
+  const res = await walletRequest("sendTransaction", { chain: "evm", transaction });
+  const txHash = typeof res.txHash === "string" ? res.txHash.trim() : "";
+  if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) throw new Error("MISSING_TX_HASH");
+  return { txHash };
+}
+
+function parseNonNegativeInteger(value) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) return value;
+  if (typeof value === "string") {
+    const raw = value.trim();
+    if (!raw) return null;
+    if (/^0x[0-9a-fA-F]+$/.test(raw)) {
+      const parsed = Number.parseInt(raw.slice(2), 16);
+      return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    }
+    if (/^\d+$/.test(raw)) {
+      const parsed = Number.parseInt(raw, 10);
+      return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    }
+  }
+  return null;
+}
+
+function parseWeiBigInt(value) {
+  if (typeof value === "bigint") return value >= 0n ? value : null;
+  if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= 0) {
+    return BigInt(value);
+  }
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+  try {
+    if (/^0x[0-9a-fA-F]+$/.test(raw)) return BigInt(raw);
+    if (/^\d+$/.test(raw)) return BigInt(raw);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function normalizeHexQuantityFromBigInt(value) {
+  if (typeof value !== "bigint" || value < 0n) return null;
+  return `0x${value.toString(16)}`;
+}
+
+function normalizeEvmAddressStrict(value) {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!/^0x[a-fA-F0-9]{40}$/.test(raw)) return null;
+  return raw.toLowerCase();
+}
+
+function evaluateWalletTxPermissionConstraints({ chainId = null, to = null, valueWei = null } = {}) {
+  const permissionId = "wallet.eip1193.tx";
+  const constraints = permissionPolicyConstraints(permissionId);
+  const allowedChainIds = Array.isArray(constraints.chainIds)
+    ? constraints.chainIds.map((entry) => Number(entry)).filter((entry) => Number.isInteger(entry) && entry > 0)
+    : [];
+  if (allowedChainIds.length && (!Number.isInteger(chainId) || !allowedChainIds.includes(chainId))) {
+    return {
+      allowed: false,
+      envelope: permissionDeniedEnvelope({
+        details: {
+          reason: "constraint_violation",
+          permissionId,
+          constraint_violation: "chain_not_allowed",
+          chainId,
+          allowedChainIds,
+        },
+      }),
+    };
+  }
+
+  const requiredTo = normalizeEvmAddressStrict(constraints.to);
+  const txTo = normalizeEvmAddressStrict(to);
+  if (requiredTo && txTo && txTo !== requiredTo) {
+    return {
+      allowed: false,
+      envelope: permissionDeniedEnvelope({
+        details: {
+          reason: "constraint_violation",
+          permissionId,
+          constraint_violation: "to_not_allowed",
+          to: txTo,
+          requiredTo,
+        },
+      }),
+    };
+  }
+  if (requiredTo && !txTo) {
+    return {
+      allowed: false,
+      envelope: permissionDeniedEnvelope({
+        details: {
+          reason: "constraint_violation",
+          permissionId,
+          constraint_violation: "to_missing",
+          requiredTo,
+        },
+      }),
+    };
+  }
+
+  const maxValueWei = parseWeiBigInt(constraints.maxValueWei);
+  if (typeof maxValueWei === "bigint" && typeof valueWei === "bigint" && valueWei > maxValueWei) {
+    return {
+      allowed: false,
+      envelope: permissionDeniedEnvelope({
+        details: {
+          reason: "constraint_violation",
+          permissionId,
+          constraint_violation: "value_exceeds_max",
+          valueWei: valueWei.toString(),
+          maxValueWei: maxValueWei.toString(),
+        },
+      }),
+    };
+  }
+
+  return { allowed: true };
+}
+
 function normalizeWalletChain(chain) {
   const c = String(chain || "solana").trim().toLowerCase();
   return c || "solana";
@@ -5285,6 +5863,10 @@ async function runWalletGetAccountsTool(params, toolName = "wallet_get_accounts"
 
 async function runWalletSignMessageTool(params, toolName = "wallet_sign_message") {
   const startedAtMs = nowMs();
+  const policyDeny = denyIfMissingPermission("wallet.eip1193.sign");
+  if (policyDeny) {
+    return withToolMeta(toolName, startedAtMs, policyDeny);
+  }
   const chain = normalizeWalletChain(params?.chain);
   const message = typeof params?.message === "string" ? params.message : "";
   if (!message) {
@@ -5294,7 +5876,7 @@ async function runWalletSignMessageTool(params, toolName = "wallet_sign_message"
   const preview = message.length > 160 ? `${message.slice(0, 160)}...` : message;
   const decision = await requestApproval({
     title: "Approval",
-    body: `Wallet sign message (solana): ${preview}`,
+    body: `Wallet sign message (${chain}): ${preview}`,
   });
   if (decision !== "approve") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "Wallet signing rejected"));
@@ -5326,6 +5908,81 @@ async function runWalletSignMessageTool(params, toolName = "wallet_sign_message"
     );
   } catch (e) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", e?.message || "WALLET_SIGN_FAILED"));
+  }
+}
+
+async function runWalletSendTransactionTool(params, toolName = "wallet_send_transaction") {
+  const startedAtMs = nowMs();
+  const policyDeny = denyIfMissingPermission("wallet.eip1193.tx");
+  if (policyDeny) {
+    return withToolMeta(toolName, startedAtMs, policyDeny);
+  }
+
+  const chain = normalizeWalletChain(params?.chain || "evm");
+  if (chain !== "evm") {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", "wallet_send_transaction currently supports evm only"));
+  }
+
+  const input = isPlainObject(params?.transaction)
+    ? params.transaction
+    : (isPlainObject(params) ? params : {});
+
+  const to = normalizeEvmAddressStrict(input.to || "");
+  const from = normalizeEvmAddressStrict(input.from || "");
+  const data = typeof input.data === "string" ? input.data.trim() : "";
+  const chainId = parseNonNegativeInteger(input.chainId);
+  const valueWei = parseWeiBigInt(input.valueWei != null ? input.valueWei : input.value);
+  if (!to) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing or invalid transaction to address"));
+  }
+  if (!data && valueWei === null) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing transaction value/data payload"));
+  }
+
+  if (shouldEnforcePermissionPolicy()) {
+    const constraints = evaluateWalletTxPermissionConstraints({ chainId, to, valueWei });
+    if (!constraints.allowed) {
+      return withToolMeta(toolName, startedAtMs, constraints.envelope);
+    }
+  }
+
+  const valueHex = valueWei == null ? null : normalizeHexQuantityFromBigInt(valueWei);
+  if (valueWei != null && !valueHex) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Invalid transaction value"));
+  }
+  const chainIdHex = chainId == null ? null : `0x${chainId.toString(16)}`;
+
+  const txPayload = {
+    to,
+    ...(from ? { from } : {}),
+    ...(data ? { data } : {}),
+    ...(valueHex ? { value: valueHex } : {}),
+    ...(chainIdHex ? { chainId: chainIdHex } : {}),
+  };
+
+  const decision = await requestApproval({
+    title: "Approval",
+    body: `Wallet transaction (evm): to=${to} value=${valueWei == null ? "0" : valueWei.toString()} chainId=${chainId == null ? "unknown" : chainId}`,
+  });
+  if (decision !== "approve") {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      permissionDeniedEnvelope({
+        details: permissionDeniedReasonDetails("approval_required", {
+          permissionId: "wallet.eip1193.tx",
+          to,
+          chainId,
+        }),
+      }),
+    );
+  }
+
+  try {
+    const sent = await walletSendTransactionEvm(txPayload);
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ chain: "evm", txHash: sent.txHash }));
+  } catch (e) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("UNSUPPORTED", e?.message || "WALLET_TX_FAILED"));
   }
 }
 
@@ -5588,8 +6245,12 @@ async function persistTranscript(options = {}) {
   await vfsPutUtf8(sessionsPath, JSON.stringify(store, null, 2));
 }
 
-async function runWorkspaceMkdir(params, toolName = "workspace_mkdir") {
+async function runWorkspaceMkdir(params, toolName = "workspace_mkdir", options = {}) {
   const startedAtMs = nowMs();
+  const policy = await evaluatePersistentStoragePolicyWrite(toolName, options);
+  if (!policy.ok) {
+    return withToolMeta(toolName, startedAtMs, policy.envelope);
+  }
   let path;
   try {
     path = normalizeWorkspacePath(params?.path, { allowDirectory: true });
@@ -5636,8 +6297,35 @@ async function runWorkspaceReadFile(params, toolName = "workspace_read_file") {
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ path, content }));
 }
 
-async function runWorkspaceWriteFile(params, toolName = "workspace_write_file") {
+async function evaluatePersistentStoragePolicyWrite(toolName, { skipPermissionPolicy = false } = {}) {
+  if (skipPermissionPolicy) return { ok: true };
+  const deny = denyIfMissingPermission("storage.local.persistent");
+  if (deny) return { ok: false, envelope: deny };
+  if (!shouldEnforcePermissionPolicy()) return { ok: true };
+  const decision = await requestApproval({
+    title: "Approval",
+    body: `Persistent storage write: ${String(toolName || "workspace_write_file")}`,
+  });
+  if (decision !== "approve") {
+    return {
+      ok: false,
+      envelope: permissionDeniedEnvelope({
+        details: permissionDeniedReasonDetails("approval_required", {
+          permissionId: "storage.local.persistent",
+          tool: String(toolName || "workspace_write_file"),
+        }),
+      }),
+    };
+  }
+  return { ok: true };
+}
+
+async function runWorkspaceWriteFile(params, toolName = "workspace_write_file", options = {}) {
   const startedAtMs = nowMs();
+  const policy = await evaluatePersistentStoragePolicyWrite(toolName, options);
+  if (!policy.ok) {
+    return withToolMeta(toolName, startedAtMs, policy.envelope);
+  }
   let path;
   try {
     path = normalizeWorkspacePath(params?.path, { allowDirectory: false });
@@ -5666,8 +6354,12 @@ async function runWorkspaceWriteFile(params, toolName = "workspace_write_file") 
   );
 }
 
-async function runWorkspaceEditFile(params, toolName = "workspace_edit_file") {
+async function runWorkspaceEditFile(params, toolName = "workspace_edit_file", options = {}) {
   const startedAtMs = nowMs();
+  const policy = await evaluatePersistentStoragePolicyWrite(toolName, options);
+  if (!policy.ok) {
+    return withToolMeta(toolName, startedAtMs, policy.envelope);
+  }
   let path;
   try {
     path = normalizeWorkspacePath(params?.path, { allowDirectory: false });
@@ -5709,8 +6401,12 @@ async function runWorkspaceEditFile(params, toolName = "workspace_edit_file") {
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ path, replacements }));
 }
 
-async function runWorkspaceDelete(params, toolName = "workspace_delete") {
+async function runWorkspaceDelete(params, toolName = "workspace_delete", options = {}) {
   const startedAtMs = nowMs();
+  const policy = await evaluatePersistentStoragePolicyWrite(toolName, options);
+  if (!policy.ok) {
+    return withToolMeta(toolName, startedAtMs, policy.envelope);
+  }
   const raw = typeof params?.path === "string" ? params.path.trim() : "";
   if (!raw) {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing workspace delete path"));
@@ -5779,8 +6475,12 @@ async function runWorkspaceDelete(params, toolName = "workspace_delete") {
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ path: filePath, deleted: true }));
 }
 
-async function runWorkspaceBootstrap(toolName = "workspace_bootstrap") {
+async function runWorkspaceBootstrap(toolName = "workspace_bootstrap", options = {}) {
   const startedAtMs = nowMs();
+  const policy = await evaluatePersistentStoragePolicyWrite(toolName, options);
+  if (!policy.ok) {
+    return withToolMeta(toolName, startedAtMs, policy.envelope);
+  }
   const createdPaths = await ensureWorkspaceFiles({ recordEvents: true });
   return withToolMeta(toolName, startedAtMs, makeToolSuccess({ createdPaths }));
 }
@@ -6045,13 +6745,99 @@ async function runVisitImport(params, toolName = "visit_import") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Invalid visit url"));
   }
 
+  await clearPermissionPolicyToLegacy(null);
+
+  let resolvedEntryUrl = entryUrl;
+  let registrationInfo = null;
+  try {
+    const registrationFetch = await runWebFetch(
+      { url: entryUrl, maxBytes: MAX_WEB_FETCH_MAX_BYTES, expectedMime: "any", followRedirects: true },
+      "skill_fetch",
+    );
+    const registration = parseRegistrationJsonFromFetchEnvelope(registrationFetch);
+    if (registration) {
+      const registrationUrl = String(registrationFetch?.data?.finalUrl || registrationFetch?.data?.url || entryUrl);
+      const webEndpoint = pickRegistrationWebServiceEndpoint(registration, registrationUrl);
+      if (!webEndpoint) {
+        await clearPermissionPolicyToLegacy("REGISTRATION_WEB_ENDPOINT_MISSING");
+        return withToolMeta(
+          toolName,
+          startedAtMs,
+          makeToolFailure("INVALID_REGISTRATION", "Registration missing web service endpoint", {
+            registrationUrl,
+          }),
+        );
+      }
+      resolvedEntryUrl = normalizeVisitInputUrl(webEndpoint);
+
+      let manifestRaw = null;
+      let manifestUrl = registrationUrl;
+      const manifestRef = normalizePermissionManifestRef(registration.permissionManifest);
+      const manifestDeclared = !!manifestRef || isPlainObject(registration.permissionManifest);
+      const permissionPolicySource = {
+        kind: "erc8004-registration",
+        entryUrl,
+        registrationUrl,
+        manifestUrl,
+        loadedAtMs: nowMs(),
+      };
+      if (manifestRef?.uri) {
+        let resolvedManifestUrl;
+        try {
+          resolvedManifestUrl = new URL(manifestRef.uri, registrationUrl).toString();
+        } catch {
+          resolvedManifestUrl = "";
+        }
+        if (resolvedManifestUrl) {
+          const manifestFetch = await runWebFetch(
+            { url: resolvedManifestUrl, maxBytes: MAX_WEB_FETCH_MAX_BYTES, expectedMime: "any", followRedirects: true },
+            "skill_fetch",
+          );
+          manifestRaw = parseJsonObject(manifestFetch?.data?.text || "");
+          manifestUrl = String(manifestFetch?.data?.finalUrl || manifestFetch?.data?.url || resolvedManifestUrl);
+          permissionPolicySource.manifestUrl = manifestUrl;
+        }
+      } else if (isPlainObject(registration.permissionManifest)) {
+        manifestRaw = registration.permissionManifest;
+      }
+
+      if (manifestDeclared && manifestRaw && isPlainObject(manifestRaw)) {
+        const applied = await applyManifestPermissionPolicy({
+          manifest: manifestRaw,
+          source: permissionPolicySource,
+        });
+        if (!applied.ok) {
+          log(`permission manifest parse failed code=${String(applied.error || "INVALID_PERMISSION_MANIFEST")}`);
+        }
+      } else if (manifestDeclared) {
+        const applied = await applyManifestPermissionPolicy({
+          manifest: null,
+          source: permissionPolicySource,
+        });
+        if (!applied.ok) {
+          log(`permission manifest unavailable code=${String(applied.error || "INVALID_PERMISSION_MANIFEST")}`);
+        }
+      } else {
+        await clearPermissionPolicyToLegacy(null);
+      }
+
+      registrationInfo = {
+        registrationUrl,
+        webEndpoint: resolvedEntryUrl,
+        hasPermissionManifest: manifestDeclared,
+      };
+    }
+  } catch (e) {
+    log(`registration probe skipped: ${String(e?.message || e || "UNKNOWN")}`);
+  }
+
   state.skillImport.status = "loading";
-  state.skillImport.sourceUrl = entryUrl;
+  state.skillImport.sourceUrl = resolvedEntryUrl;
   state.skillImport.lastError = null;
   await persistSkillImportState();
   updateGatewayState();
 
-  const skillCandidates = buildVisitSkillCandidates(entryUrl);
+  const skillCandidates = buildVisitSkillCandidates(resolvedEntryUrl);
   const attempted = [];
   let primary = null;
   for (const candidateUrl of skillCandidates) {
@@ -6082,7 +6868,12 @@ async function runVisitImport(params, toolName = "visit_import") {
     return withToolMeta(
       toolName,
       startedAtMs,
-      makeToolFailure("NOT_FOUND", "Skill file not found for visit target", { entryUrl, attempted }),
+      makeToolFailure("NOT_FOUND", "Skill file not found for visit target", {
+        entryUrl,
+        resolvedEntryUrl,
+        registration: registrationInfo,
+        attempted,
+      }),
     );
   }
 
@@ -6136,7 +6927,11 @@ async function runVisitImport(params, toolName = "visit_import") {
       finalUrl,
       content,
     });
-    const writeResult = await runWorkspaceWriteFile({ path: importPath, content }, "workspace_write_file");
+    const writeResult = await runWorkspaceWriteFile(
+      { path: importPath, content },
+      "workspace_write_file",
+      { skipPermissionPolicy: true },
+    );
     if (writeResult?.ok !== true) {
       failedUrls.push({
         url: finalUrl,
@@ -6171,7 +6966,11 @@ async function runVisitImport(params, toolName = "visit_import") {
   for (const [path, descriptor] of compatibilityAllWrites.entries()) {
     const content = typeof descriptor?.content === "string" ? descriptor.content : String(descriptor?.content || "");
     const metadata = descriptor?.metadata || null;
-    const writeResult = await runWorkspaceWriteFile({ path, content }, "workspace_write_file");
+    const writeResult = await runWorkspaceWriteFile(
+      { path, content },
+      "workspace_write_file",
+      { skipPermissionPolicy: true },
+    );
     if (writeResult?.ok === true) {
       if (metadata) {
         recordImportedFile(path, metadata);
@@ -6208,6 +7007,8 @@ async function runVisitImport(params, toolName = "visit_import") {
       importedCount: importedPaths.length,
       failedUrls,
       attempted,
+      registration: registrationInfo,
+      permissionPolicy: permissionPolicySnapshot(),
     }),
   );
   log(`visit import ok source=${primaryUrl} files=${importedPaths.length} failed=${failedUrls.length}`);
@@ -7213,6 +8014,7 @@ const state = {
   wsSessions: new Map(),
   workspaceDirs: new Set(["workspace/"]),
   workspaceEvents: [],
+  permissionPolicy: permissionPolicyDefault(),
   trainer: {
     activeCapture: null,
     activeLoadoutByQuest: {},
@@ -7358,6 +8160,35 @@ async function loadStateFromIdb() {
         { limit: 500 },
       );
     }
+  }
+
+  const permissionPolicyRaw = await metaGet(PERMISSION_POLICY_META_KEY);
+  if (isPlainObject(permissionPolicyRaw)) {
+    const mode = String(permissionPolicyRaw.mode || "legacy-allow").trim();
+    if (mode === "manifest-enforced") {
+      const permissions = [];
+      for (const entry of Array.isArray(permissionPolicyRaw.permissions) ? permissionPolicyRaw.permissions : []) {
+        const normalized = normalizePermissionEntry(entry);
+        if (!normalized) continue;
+        permissions.push(normalized);
+      }
+      setPermissionPolicy({
+        mode: "manifest-enforced",
+        source: isPlainObject(permissionPolicyRaw.source) ? permissionPolicyRaw.source : null,
+        manifest: isPlainObject(permissionPolicyRaw.manifest) ? permissionPolicyRaw.manifest : null,
+        permissions,
+        originsByPermission: permissionPolicyOriginsByPermission(permissions),
+        risk: isPlainObject(permissionPolicyRaw.risk) ? permissionPolicyRaw.risk : { level: "unknown", rationale: "" },
+        lastError:
+          typeof permissionPolicyRaw.lastError === "string" && permissionPolicyRaw.lastError
+            ? permissionPolicyRaw.lastError
+            : null,
+      });
+    } else {
+      setPermissionPolicy(permissionPolicyDefault());
+    }
+  } else {
+    setPermissionPolicy(permissionPolicyDefault());
   }
 
   await ensureWorkspaceFiles();
@@ -7952,6 +8783,17 @@ self.addEventListener("message", async (ev) => {
       return;
     }
 
+    if (msg.type === "gateway.command.tools.wallet.sendTransaction") {
+      const result = await runWalletSendTransactionTool(msg.params || {}, "wallet_send_transaction");
+      post({
+        type: "worker.tools.wallet.sendTransaction",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result,
+      });
+      return;
+    }
+
     if (msg.type === "gateway.command.runtime.sessionContext") {
       const params = msg.params && typeof msg.params === "object" ? msg.params : {};
       const runtimeSnapshot = await resolveRuntimeSnapshotFromInput({
@@ -7975,6 +8817,7 @@ self.addEventListener("message", async (ev) => {
           contextSections: runtimeSections.contextSections,
           combinedContext: runtimeSections.combinedContext || "",
           lastLlmInput: state.lastLlmInput || null,
+          permissionPolicy: permissionPolicySnapshot(),
         }),
       });
       return;
@@ -7999,11 +8842,71 @@ self.addEventListener("message", async (ev) => {
     }
 
     if (msg.type === "gateway.command.skill.state") {
+      const skillState = skillImportSnapshot({ importedPathLimit: 500 });
       post({
         type: "worker.skill.state",
         requestId: String(msg.requestId || ""),
         ok: true,
-        result: makeToolSuccess(skillImportSnapshot({ importedPathLimit: 500 })),
+        result: makeToolSuccess({
+          ...skillState,
+          permissionPolicy: permissionPolicySnapshot(),
+        }),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.permission.policy.get") {
+      post({
+        type: "worker.permission.policy.get",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess(permissionPolicySnapshot()),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.permission.policy.clear") {
+      await clearPermissionPolicyToLegacy(null);
+      post({
+        type: "worker.permission.policy.clear",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess({
+          cleared: true,
+          policy: permissionPolicySnapshot(),
+        }),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.permission.policy.set") {
+      const source = isPlainObject(msg.source)
+        ? msg.source
+        : {
+          kind: "manual",
+          loadedAtMs: nowMs(),
+        };
+      let result;
+      if (isPlainObject(msg.manifest)) {
+        const applied = await applyManifestPermissionPolicy({ manifest: msg.manifest, source });
+        result = makeToolSuccess({
+          applied: applied.ok === true,
+          error: applied.ok === true ? null : applied.error || "INVALID_PERMISSION_MANIFEST",
+          policy: permissionPolicySnapshot(),
+        });
+      } else {
+        await clearPermissionPolicyToLegacy(null);
+        result = makeToolSuccess({
+          applied: false,
+          error: null,
+          policy: permissionPolicySnapshot(),
+        });
+      }
+      post({
+        type: "worker.permission.policy.set",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result,
       });
       return;
     }
