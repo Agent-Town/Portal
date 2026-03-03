@@ -156,6 +156,12 @@ const PUBLIC_MEDIA_MAX_BYTES = 1024 * 1024;
 const PUBLIC_MEDIA_PROMPT_MAX = 280;
 const PUBLIC_MEDIA_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const AUTO_LOCK_MS = null;
+const ERC8004_IDENTITY_CACHE_PREFIX = 'agentTownErc8004Identity:';
+const ERC8004_DEFAULT_IDENTITY_REGISTRY = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+const ERC8004_IDENTITY_REGISTRY_BY_CHAIN = Object.freeze({
+  1: ERC8004_DEFAULT_IDENTITY_REGISTRY,
+  11155111: ERC8004_DEFAULT_IDENTITY_REGISTRY
+});
 const AGENT0_SDK_ESM_URL = '/vendor/agent0-sdk.mjs';
 const OPENCLAW_DB_NAME = 'openclaw-lite';
 const OPENCLAW_DB_VERSION = 1;
@@ -215,6 +221,147 @@ let mindOpenAiCodexOAuthAttempt = null;
 let mindOpenAiCodexOAuthPollTimer = null;
 let mindOpenAiCodexOAuthExchangeInFlight = false;
 let mindOpenAiCodexOAuthMessageListenerBound = false;
+
+function isErc8004AdvancedEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('erc8004') === '1' || params.get('advanced') === '1';
+}
+
+function erc8004IdentityStorageKey(houseId) {
+  return `${ERC8004_IDENTITY_CACHE_PREFIX}${houseId}`;
+}
+
+function normalizeEvmAddressClient(value) {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(clean)) return null;
+  return clean;
+}
+
+function parseEip155AgentRegistry(value) {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim();
+  const match = clean.match(/^eip155:(\d+):(0x[a-fA-F0-9]{40})$/);
+  if (!match) return null;
+  const chainId = Number(match[1]);
+  const identityRegistry = normalizeEvmAddressClient(match[2]);
+  if (!Number.isInteger(chainId) || chainId < 1 || !identityRegistry) return null;
+  return { chainId, identityRegistry };
+}
+
+function resolveErc8004IdentityRegistry(chainId, ...candidates) {
+  for (const candidate of candidates) {
+    const normalized = normalizeEvmAddressClient(candidate);
+    if (normalized) return normalized;
+  }
+  const fallback = ERC8004_IDENTITY_REGISTRY_BY_CHAIN[chainId];
+  const normalizedFallback = normalizeEvmAddressClient(fallback);
+  return normalizedFallback || null;
+}
+
+function parseMintedAgentIdentity(rawAgentId, fallbackChainId) {
+  if (typeof rawAgentId === 'string' && rawAgentId.trim()) {
+    const parseNonNegativeIntegerString = (value) => {
+      const text = String(value || '').trim();
+      if (!/^\d+$/.test(text)) return null;
+      const parsed = Number.parseInt(text, 10);
+      return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    };
+    const parsed = parseAgent0Erc8004Id(rawAgentId.trim());
+    if (parsed) {
+      const tokenId = parseNonNegativeIntegerString(parsed.id);
+      const chainId = Number.isInteger(parsed.chainId) && parsed.chainId > 0 ? parsed.chainId : fallbackChainId;
+      if (Number.isInteger(tokenId) && tokenId >= 0 && Number.isInteger(chainId) && chainId > 0) {
+        return {
+          chainId,
+          agentId: tokenId,
+          erc8004Id: `${chainId}:${tokenId}`
+        };
+      }
+    }
+    const numericOnly = parseNonNegativeIntegerString(rawAgentId);
+    if (Number.isInteger(numericOnly) && numericOnly >= 0 && Number.isInteger(fallbackChainId) && fallbackChainId > 0) {
+      return {
+        chainId: fallbackChainId,
+        agentId: numericOnly,
+        erc8004Id: `${fallbackChainId}:${numericOnly}`
+      };
+    }
+    return null;
+  }
+  if (Number.isInteger(rawAgentId) && rawAgentId >= 0 && Number.isInteger(fallbackChainId) && fallbackChainId > 0) {
+    return {
+      chainId: fallbackChainId,
+      agentId: rawAgentId,
+      erc8004Id: `${fallbackChainId}:${rawAgentId}`
+    };
+  }
+  return null;
+}
+
+function loadStoredErc8004Identity(houseId) {
+  if (!houseId) return null;
+  try {
+    const raw = localStorage.getItem(erc8004IdentityStorageKey(houseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const agentId = typeof parsed.agentId === 'string' ? parsed.agentId.trim() : '';
+    const regId = typeof parsed.regId === 'string' ? parsed.regId.trim() : '';
+    if (!agentId) return null;
+    return {
+      type: parsed.type === 'erc8004_identity' ? parsed.type : 'erc8004_identity',
+      regId: regId || null,
+      agentId,
+      createdAtMs: Number(parsed.createdAtMs || Date.now())
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredErc8004Identity(houseId, value) {
+  if (!houseId || !value) return;
+  try {
+    localStorage.setItem(
+      erc8004IdentityStorageKey(houseId),
+      JSON.stringify({
+        type: 'erc8004_identity',
+        regId: value.regId || null,
+        agentId: value.agentId || null,
+        createdAtMs: Number(value.createdAtMs || Date.now())
+      })
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function buildErc8004RegistrationDraftPayload({ houseId }) {
+  const origin = window.location.origin;
+  const houseUrl = `${origin}/house?house=${encodeURIComponent(houseId)}`;
+  return {
+    context: { kind: 'house', houseId },
+    entityType: 'house',
+    name: `Agent Town House ${houseId.slice(0, 10)}`,
+    description: `E2EE shared house in Agent Town. houseId=${houseId}.`,
+    image: `${origin}/brand-kit/default_user_avatar.png`,
+    services: [
+      { name: 'web', endpoint: houseUrl }
+    ]
+  };
+}
+
+function restoreStoredErc8004IdentityForHouse(houseId) {
+  const stored = loadStoredErc8004Identity(houseId);
+  if (!stored || !stored.agentId) return;
+  humanErc8004Id = stored.agentId;
+  humanErc8004RegId = stored.regId || null;
+  const anchorInput = el('anchorErc8004Id');
+  if (anchorInput && !anchorInput.value) anchorInput.value = stored.agentId;
+  const status = el('erc8004MintStatus');
+  if (status) status.textContent = `Minted identity: ${stored.agentId}`;
+}
 
 async function loadAgent0Sdk(statusNode) {
   if (window.__AG0_SDK_MOCK) return window.__AG0_SDK_MOCK;
@@ -2176,8 +2323,9 @@ let KauthBytes = null; // Uint8Array (memory only)
 let KauthKey = null; // CryptoKey for HMAC auth
 let autoLockTimer = null;
 
-// Phase 3: store minted ERC-8004 ids locally (not persisted yet)
+// Phase 3: store minted ERC-8004 ids in memory + browser storage (per-house).
 let humanErc8004Id = null;
+let humanErc8004RegId = null;
 let agentErc8004Id = null;
 
 function randomNonce(prefix = 'n_') {
@@ -2327,6 +2475,7 @@ function buildHouseDescriptor(currentHouseId) {
           chain: 'solana',
           kind: 'pda',
           status: 'placeholder',
+          note: 'Placeholder only. This mailbox is not live messaging infrastructure yet.',
           address: 'PDA_TODO',
           program: 'PROGRAM_TODO'
         }
@@ -2352,6 +2501,7 @@ function buildErc8004Statement(currentHouseId) {
     human: walletAddr || null,
     // phase 2/3: fill in agent + human ERC-8004 identity ids once minted
     humanErc8004: humanErc8004Id,
+    humanErc8004RegId,
     agentErc8004: agentErc8004Id,
     origin: window.location.origin,
     createdAtMs: Date.now()
@@ -2408,12 +2558,25 @@ async function mintErc8004Identity() {
     walletProvider: evmProvider
   });
 
-  const agentName = `Agent Town House ${houseId.slice(0, 10)}`;
-  const agentDesc = `E2EE shared house in Agent Town. houseId=${houseId}.`;
+  const draftPayload = buildErc8004RegistrationDraftPayload({ houseId });
+  if (status) status.textContent = 'Creating ERC-8004 registration draft…';
+  const draft = await api('/api/erc8004/registration/draft', {
+    method: 'POST',
+    body: JSON.stringify(draftPayload)
+  });
+  const regId = typeof draft?.regId === 'string' ? draft.regId.trim() : '';
+  const tokenUri = typeof draft?.tokenUri === 'string' ? draft.tokenUri.trim() : '';
+  const completionToken = typeof draft?.completionToken === 'string' ? draft.completionToken.trim() : '';
+  if (!regId || !tokenUri || !completionToken) throw new Error('ERC8004_DRAFT_FAILED');
 
-  const agent = sdk.createAgent(agentName, agentDesc);
+  const agent = sdk.createAgent(draftPayload.name, draftPayload.description, draftPayload.image);
+  try {
+    agent.setEntityType?.('house');
+  } catch {
+    // optional in older SDK versions
+  }
 
-  // Attach some metadata to make it discoverable off-chain later.
+  // Attach context metadata for consumers that read SDK metadata.
   try {
     agent.setMetadata?.({ houseId, origin: window.location.origin });
   } catch {
@@ -2421,34 +2584,61 @@ async function mintErc8004Identity() {
   }
 
   if (status) status.textContent = `Submitting ERC-8004 registration on ${chain}…`;
-
-  // NOTE: We register with an empty URI for now (no hosted registration JSON yet).
-  // The SDK will still mint the identity and return the agentId once confirmed.
-  const tx = await agent.registerHTTP('');
+  const tx = await agent.registerHTTP(tokenUri);
 
   const txHash = tx?.hash;
-  const explorerBase = chainId === 1 ? 'https://etherscan.io/tx/' : 'https://sepolia.etherscan.io/tx/';
   if (status) {
     status.textContent = txHash ? `Submitted: ${txHash}` : 'Submitted.';
   }
 
-  // Wait for confirmation and then update the ERC-8004 statement.
-  if (typeof tx?.waitConfirmed === 'function') {
-    if (status) status.textContent = 'Waiting for confirmation…';
-    const { result } = await tx.waitConfirmed();
-    const agentId = result?.agentId;
-    if (agentId) {
-      humanErc8004Id = agentId;
-      // If we haven't unlocked yet, still re-render the statement using the URL houseId
-      renderDescriptorUI((house && house.houseId) ? house.houseId : houseId);
-      // Prefill anchor link input for convenience.
-      const anchorInput = el('anchorErc8004Id');
-      if (anchorInput && !anchorInput.value) anchorInput.value = String(agentId);
-      if (status) status.textContent = `Minted identity: ${agentId}`;
-    } else {
-      if (status) status.textContent = 'Confirmed (no agentId returned).';
-    }
-  }
+  if (typeof tx?.waitConfirmed !== 'function') throw new Error('MINT_CONFIRMATION_UNAVAILABLE');
+  if (status) status.textContent = 'Waiting for confirmation…';
+
+  const { result } = await tx.waitConfirmed();
+  const registryFromUri = parseEip155AgentRegistry(result?.agentRegistry);
+  const chainIdFromResult = Number(result?.chainId);
+  const resolvedChainId = registryFromUri?.chainId
+    || (Number.isInteger(chainIdFromResult) && chainIdFromResult > 0 ? chainIdFromResult : chainId);
+  const parsedIdentity = parseMintedAgentIdentity(result?.agentId, resolvedChainId);
+  if (!parsedIdentity) throw new Error('INVALID_AGENT_ID');
+
+  const identityRegistry = resolveErc8004IdentityRegistry(
+    parsedIdentity.chainId,
+    registryFromUri?.identityRegistry,
+    result?.identityRegistry
+  );
+  if (!identityRegistry) throw new Error('INVALID_IDENTITY_REGISTRY');
+
+  await api('/api/erc8004/registration/complete', {
+    method: 'POST',
+    body: JSON.stringify({
+      regId,
+      completionToken,
+      onchain: {
+        namespace: 'eip155',
+        chainId: parsedIdentity.chainId,
+        identityRegistry,
+        agentId: parsedIdentity.agentId
+      }
+    })
+  });
+
+  humanErc8004Id = parsedIdentity.erc8004Id;
+  humanErc8004RegId = regId;
+  saveStoredErc8004Identity(houseId, {
+    type: 'erc8004_identity',
+    regId,
+    agentId: humanErc8004Id,
+    createdAtMs: Date.now()
+  });
+
+  // If we haven't unlocked yet, still re-render using the URL houseId.
+  renderDescriptorUI((house && house.houseId) ? house.houseId : houseId);
+
+  // Prefill anchor link input for convenience.
+  const anchorInput = el('anchorErc8004Id');
+  if (anchorInput && !anchorInput.value) anchorInput.value = String(humanErc8004Id);
+  if (status) status.textContent = `Minted identity: ${humanErc8004Id}`;
 }
 
 function renderDescriptorUI(currentHouseId) {
@@ -2515,7 +2705,10 @@ function setDescriptorOpen(open) {
 
 function setErc8004Open(open) {
   erc8004Open = !!open;
-  setPanelVisible('erc8004Panel', erc8004Open);
+  const advancedEnabled = isErc8004AdvancedEnabled();
+  const show = advancedEnabled && erc8004Open;
+  setPanelVisible('erc8004Panel', show);
+  setPanelVisible('anchorsPanel', show);
   const btn = el('toggleErc8004Btn');
   if (btn) {
     btn.textContent = erc8004Open ? 'Hide ERC-8004' : 'Show ERC-8004';
@@ -2527,8 +2720,12 @@ function setErc8004Open(open) {
 function setHousePanelButtonsEnabled(enabled) {
   const descBtn = el('toggleDescriptorBtn');
   const ercBtn = el('toggleErc8004Btn');
+  const advancedEnabled = isErc8004AdvancedEnabled();
   if (descBtn) descBtn.disabled = !enabled;
-  if (ercBtn) ercBtn.disabled = !enabled;
+  if (ercBtn) {
+    ercBtn.classList.toggle('is-hidden', !advancedEnabled);
+    ercBtn.disabled = !enabled || !advancedEnabled;
+  }
   setPublicMediaEnabled(enabled);
   setAgentStateControlsEnabled(enabled);
   if (!enabled) {
@@ -2624,6 +2821,8 @@ function wipeKeys() {
   const prevHouseId = house?.houseId || null;
   unlocked = false;
   house = null;
+  humanErc8004Id = null;
+  humanErc8004RegId = null;
   KrootBytes = null;
   Kenc = null;
   KauthBytes = null;
@@ -2643,6 +2842,10 @@ function wipeKeys() {
     authMode: MIND_AUTH_API_KEY
   });
   clearDescriptorUI();
+  const anchorInput = el('anchorErc8004Id');
+  if (anchorInput) anchorInput.value = '';
+  const mintStatus = el('erc8004MintStatus');
+  if (mintStatus) mintStatus.textContent = '';
   renderPublicMediaPreview({ imageUrl: null, prompt: '', pending: false });
   setHousePanelButtonsEnabled(false);
   setUnlockButtonState(false);
@@ -2692,6 +2895,7 @@ async function unlockExistingHouse(houseId) {
   setUnlockButtonState(true);
   armAutoLock();
 
+  restoreStoredErc8004IdentityForHouse(house.houseId);
   renderDescriptorUI(house.houseId);
   setHousePanelButtonsEnabled(true);
   setDescriptorOpen(false);
