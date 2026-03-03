@@ -180,7 +180,19 @@ async function api(url, opts = {}) {
     saveTeamCodeHint(data.teamCode);
   }
   if (typeof data?.walletRecoveryKey === 'string') {
-    saveWalletRecoveryKey(data.walletRecoveryKey);
+    const incomingWalletRecoveryKey = String(data.walletRecoveryKey || '').trim().toLowerCase();
+    const currentWalletRecoveryKey = readWalletRecoveryKey();
+    const isSessionResetCall = typeof url === 'string' && /\/api\/session\/reset(?:$|[?#])/.test(url);
+    const shouldPreserveCurrentWalletRecoveryKey = (
+      !!currentWalletRecoveryKey
+      && currentWalletRecoveryKey !== incomingWalletRecoveryKey
+      && walletRecoveryIntentAttempts > 0
+      && data?.onboarding?.registrationComplete !== true
+      && !isSessionResetCall
+    );
+    if (!shouldPreserveCurrentWalletRecoveryKey) {
+      saveWalletRecoveryKey(incomingWalletRecoveryKey);
+    }
   }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;

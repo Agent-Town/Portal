@@ -45,6 +45,12 @@ function loadEnvFile(filePath, lockedKeys = new Set()) {
 
 function loadDotEnv(cwd = process.cwd()) {
   const envName = process.env.NODE_ENV ? String(process.env.NODE_ENV).trim() : '';
+  if (envName === 'test') {
+    const allowInTest = String(process.env.LOAD_DOTENV_IN_TEST || '').trim().toLowerCase();
+    if (allowInTest !== '1' && allowInTest !== 'true' && allowInTest !== 'yes' && allowInTest !== 'on') {
+      return;
+    }
+  }
   const files = ['.env'];
   if (envName) files.push(`.env.${envName}`);
   files.push('.env.local');
