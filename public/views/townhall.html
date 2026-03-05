@@ -1,8 +1,6 @@
 <div class="panel" id="townhallRegisterPanel">
   <div class="townhallStoryShell">
-    <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
-      Complete onboarding and configure your brain to unlock the sigil flow.
-    </div>
+    <div class="small is-hidden" id="townHallGateHint" style="margin-bottom:8px;"></div>
 
     <div class="townhallStoryStep" id="townhallStepHuman">
       <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
@@ -27,7 +25,7 @@
         <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
       </div>
 
-      <div class="kv" style="margin-top:10px;">
+      <div class="kv townhallSubmitRow" style="margin-top:10px;">
         <button class="btn primary" id="townhallHumanSubmitBtn" data-testid="townhall-human-submit-btn">Submit</button>
       </div>
     </div>
@@ -55,7 +53,7 @@
         <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
       </div>
 
-      <div class="kv" style="margin-top:10px;">
+      <div class="kv townhallSubmitRow" style="margin-top:10px;">
         <button class="btn" id="townhallAgentBackBtn" type="button">Back</button>
         <button class="btn primary" id="townhallAgentSubmitBtn" data-testid="townhall-agent-submit-btn">Submit</button>
       </div>
@@ -66,19 +64,19 @@
 
       <div class="townhallMintChecklist" id="townhallMintChecklist">
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Ethereum</span>
+          <span id="townhallMintUserEvmLabel">User is registering on Ethereum</span>
           <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Solana</span>
+          <span id="townhallMintUserSolanaLabel">User is registering on Solana</span>
           <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Ethereum</span>
+          <span id="townhallMintAgentEvmLabel">Agent is registering on Ethereum</span>
           <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Solana</span>
+          <span id="townhallMintAgentSolanaLabel">Agent is registering on Solana</span>
           <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
         </div>
       </div>

@@ -1219,16 +1219,17 @@ body.trainer-modal-open {
 .townhallStoryStep textarea,
 .townhallStoryStep input[type="text"],
 .townhallStoryStep input[type="file"],
-.townhallStoryStep .townhallAvatarBlock,
 .townhallStoryStep .townhallCustomizeModal,
 .townhallStoryStep .townhallMintChecklist {
   width: min(680px, 100%);
 }
 
-.townhallAvatarBlock {
+.townhallStoryStep .townhallAvatarBlock {
   display: grid;
   gap: 8px;
   padding: 10px;
+  width: min(460px, 100%);
+  margin-inline: auto;
   border: 2px solid rgba(44, 69, 99, 0.22);
   border-radius: 10px;
   background: rgba(255, 248, 230, 0.72);
@@ -1236,6 +1237,11 @@ body.trainer-modal-open {
 
 .townhallAvatarBlock .public-media-preview {
   margin-top: 0;
+  justify-self: center;
+}
+
+.townhallAvatarBlock .small {
+  width: 100%;
 }
 
 .townhallAvatarBlock .public-media-preview img {
@@ -1244,6 +1250,15 @@ body.trainer-modal-open {
   border: 2px solid var(--border);
   border-radius: 10px;
   background: #fff8e8;
+}
+
+.townhallAvatarBlock .btn {
+  justify-self: center;
+  width: min(280px, 100%);
+}
+
+.townhallSubmitRow {
+  justify-content: center;
 }
 
 .townhallCustomizeModal {
@@ -4013,6 +4028,12 @@ body.town-hub-page .districtModal.is-district {
   min-width: min(720px, calc(100vw - 16px));
 }
 
+body.town-hub-page .districtModal.is-district[data-theme="townhall"] {
+  width: fit-content;
+  max-width: calc(100vw - 16px);
+  min-width: 0;
+}
+
 body.town-hub-page .districtModal.is-district .districtModalHeader {
   justify-content: space-between;
   padding: 14px 20px 14px 32px;
@@ -4036,6 +4057,22 @@ body.town-hub-page .districtModal.is-district .districtModalBody {
 body.town-hub-page .districtModal.is-district .districtModalBody > * {
   width: 100%;
   max-width: 100%;
+}
+
+body.town-hub-page .districtModal.is-district[data-theme="townhall"] .districtModalBody {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0;
+}
+
+body.town-hub-page .districtModal.is-district[data-theme="townhall"] .districtModalBody > * {
+  width: fit-content;
+  max-width: 100%;
+}
+
+body.town-hub-page .districtModal.is-district[data-theme="townhall"] .districtModalBody .panel::before {
+  content: none;
 }
 
 .atlas-page .atlas-modal-backdrop {

@@ -1141,6 +1141,26 @@ const townhallMintSteps = [
   { key: 'agentSolana', role: 'agent', chain: 'solana', statusId: 'townhallMintAgentSolanaStatus' }
 ];
 
+function normalizeTownhallDisplayName(value, fallback) {
+  const text = typeof value === 'string' ? value.trim() : '';
+  return text || fallback;
+}
+
+function syncTownhallMintChecklistLabels({ humanName = '', agentName = '' } = {}) {
+  const human = normalizeTownhallDisplayName(humanName, 'User');
+  const agent = normalizeTownhallDisplayName(agentName, 'Agent');
+  const labels = [
+    { id: 'townhallMintUserEvmLabel', text: `${human} is registering on Ethereum` },
+    { id: 'townhallMintUserSolanaLabel', text: `${human} is registering on Solana` },
+    { id: 'townhallMintAgentEvmLabel', text: `${agent} is registering on Ethereum` },
+    { id: 'townhallMintAgentSolanaLabel', text: `${agent} is registering on Solana` }
+  ];
+  for (const item of labels) {
+    const node = el(item.id);
+    if (node) node.textContent = item.text;
+  }
+}
+
 function createEmptyTownhallMintDraft() {
   return {
     user: {
@@ -2708,6 +2728,9 @@ async function mintAllTownhallIdentitiesAndRegister() {
     if (!config?.evm?.enabled || !config?.solana?.enabled) throw new Error('MINT_ALL_CHAINS_NOT_ENABLED');
 
     const profile = collectTownhallProfilePayload();
+    const humanName = normalizeTownhallDisplayName(profile?.humanName, 'User');
+    const agentName = normalizeTownhallDisplayName(profile?.agentName, 'Agent');
+    syncTownhallMintChecklistLabels({ humanName, agentName });
     setTownhallRegisterFeedback('Preparing Privy wallets...');
     let evmWallet;
     let solanaWallet;
@@ -2793,12 +2816,12 @@ async function mintAllTownhallIdentitiesAndRegister() {
       return agentSolana;
     };
 
-    setTownhallRegisterFeedback('User is registering on Ethereum and Solana...');
+    setTownhallRegisterFeedback(`${humanName} is registering on Ethereum and Solana...`);
     const userMintResults = await Promise.allSettled([mintUserEvm(), mintUserSolana()]);
     const userMintError = firstRejected(userMintResults);
     if (userMintError) throw userMintError;
 
-    setTownhallRegisterFeedback('Agent is registering on Ethereum and Solana...');
+    setTownhallRegisterFeedback(`${agentName} is registering on Ethereum and Solana...`);
     const agentMintResults = await Promise.allSettled([mintAgentEvm(), mintAgentSolana()]);
     const agentMintError = firstRejected(agentMintResults);
     if (agentMintError) throw agentMintError;
@@ -2987,6 +3010,10 @@ function syncTownhallRegistrationUI(state) {
   syncTownhallInputValue(humanNameInput, profile.humanName || '');
   const agentNameInput = el('townhallAgentName');
   syncTownhallInputValue(agentNameInput, profile.agentName || '');
+  syncTownhallMintChecklistLabels({
+    humanName: (humanNameInput?.value || profile.humanName || ''),
+    agentName: (agentNameInput?.value || profile.agentName || '')
+  });
 
   const humanPromptInput = el('townhallHumanPrompt');
   syncTownhallInputValue(humanPromptInput, humanAvatar.prompt || '');
@@ -3054,10 +3081,11 @@ function syncTownhallRegistrationUI(state) {
     } else if (registrationComplete) {
       gateHint.textContent = 'Registration complete.';
     } else if (required) {
-      gateHint.textContent = 'Complete Town Hall onboarding to continue.';
+      gateHint.textContent = '';
     } else {
       gateHint.textContent = 'Town Hall onboarding is optional here.';
     }
+    gateHint.classList.toggle('is-hidden', gateHint.textContent.trim().length === 0);
   }
 
   const canUseSigil = canUseTownhallSigilFlow(state);
