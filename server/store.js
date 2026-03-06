@@ -68,7 +68,7 @@ function buildStatements(database) {
   const out = {};
   for (const table of TABLES) {
     out[table] = {
-      all: database.prepare(`SELECT data FROM ${table} ORDER BY pos ASC`),
+      all: database.prepare(`SELECT pos, data FROM ${table} ORDER BY pos ASC`),
       clear: database.prepare(`DELETE FROM ${table}`),
       insert: database.prepare(`INSERT INTO ${table} (pos, data) VALUES (?, ?)`),
       count: database.prepare(`SELECT COUNT(1) as count FROM ${table}`)
@@ -111,6 +111,12 @@ function normalizeStore(next) {
   };
 }
 
+function readRawRows(next) {
+  const rawRows = next?.__rawRows;
+  if (!rawRows || typeof rawRows !== 'object') return null;
+  return rawRows;
+}
+
 function readStore() {
   ensureDb();
   const store = {
@@ -127,30 +133,51 @@ function readStore() {
     erc8004OptOut: [],
     erc8004Registrations: []
   };
+  const rawRows = {};
   for (const table of TABLES) {
     const rows = statements[table].all.all();
     const parsed = [];
+    const malformed = [];
     for (const row of rows) {
       try {
         parsed.push(JSON.parse(row.data));
       } catch (err) {
-        // Skip malformed rows to keep the store usable.
+        malformed.push({
+          pos: Number.isInteger(row.pos) ? row.pos : malformed.length,
+          data: row.data
+        });
       }
     }
     store[table] = parsed;
+    rawRows[table] = malformed;
   }
+  Object.defineProperty(store, '__rawRows', {
+    value: rawRows,
+    enumerable: false,
+    configurable: false,
+    writable: false
+  });
   return store;
 }
 
 function writeStore(next) {
   ensureDb();
   const cleaned = normalizeStore(next);
+  const rawRows = readRawRows(next);
   withTransaction(db, () => {
     for (const table of TABLES) {
       statements[table].clear.run();
       const rows = cleaned[table];
+      let pos = 0;
       for (let i = 0; i < rows.length; i += 1) {
-        statements[table].insert.run(i, JSON.stringify(rows[i]));
+        statements[table].insert.run(pos, JSON.stringify(rows[i]));
+        pos += 1;
+      }
+      const malformed = Array.isArray(rawRows?.[table]) ? rawRows[table] : [];
+      for (const row of malformed) {
+        if (!row || typeof row.data !== 'string') continue;
+        statements[table].insert.run(pos, row.data);
+        pos += 1;
       }
     }
   });

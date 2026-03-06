@@ -42,6 +42,7 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('- `houseId` (reconnect to an existing house)');
   expect(txt).toContain('If runtime/session context already includes one of these values, use it directly and do not ask again.');
   expect(txt).toContain('Do not ask for any other credential.');
+  expect(txt).toContain('External API clients must reconnect with `teamCode`; include `houseId` too when available as a consistency check.');
 
   expect(txt).toContain('POST /api/agent/connect');
   expect(txt).toContain('GET /api/agent/state?teamCode=');
@@ -69,6 +70,7 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('Keep polling `GET /api/agent/state?teamCode=...` during ceremony too.');
   expect(txt).toContain('GET /api/agent/house/material?teamCode=');
   expect(txt).toContain('POST /api/agent/house/connect');
+  expect(txt).toContain('{ "teamCode": "TEAM-ABCD-EFGH", "houseId": "<base58>", "agentName": "OpenClaw" }');
 
   expect(txt).toContain('Start polling immediately after connect.');
   expect(txt).toContain('Default polling interval: 1 second.');

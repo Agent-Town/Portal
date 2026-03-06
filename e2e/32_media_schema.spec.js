@@ -131,10 +131,29 @@ test('media schema endpoints expose shareHero and share/leaderboard return media
   expect(slotImageResp.ok()).toBeTruthy();
   expect(slotImageResp.headers()['content-type']).toContain('image/png');
 
+  const privateSlotBody = JSON.stringify({
+    slot: 'agent-avatar',
+    image: imageJson.image,
+    source: 'uploaded',
+    version: 'v1'
+  });
+  const privateSlotHeaders = houseAuthHeaders(houseId, 'POST', mediaPath, privateSlotBody, kauth);
+  const privateSlotWriteResp = await request.post(mediaPath, {
+    data: privateSlotBody,
+    headers: { 'content-type': 'application/json', ...privateSlotHeaders }
+  });
+  expect(privateSlotWriteResp.ok()).toBeTruthy();
+
+  const privateSlotImageResp = await request.get(`/api/house/${houseId}/media/agent-avatar/image`);
+  expect(privateSlotImageResp.status()).toBe(401);
+
   const shareResp = await request.get(`/api/share/${encodeURIComponent(share.shareId)}`);
   expect(shareResp.ok()).toBeTruthy();
   const shareJson = await shareResp.json();
   expect(shareJson.share?.media?.shareHero?.imageUrl).toContain(`/api/house/${houseId}/media/share-hero/image`);
+  expect(shareJson.share?.media?.agentAvatar?.imageUrl).toBeNull();
+  expect(shareJson.share?.media?.shareHero?.source).toBeNull();
+  expect(shareJson.share?.media?.shareHero?.version).toBeNull();
 
   const leaderboardResp = await request.get('/api/leaderboard');
   expect(leaderboardResp.ok()).toBeTruthy();
@@ -142,4 +161,11 @@ test('media schema endpoints expose shareHero and share/leaderboard return media
   const team = (leaderboardJson.teams || []).find((t) => t.shareId === share.shareId);
   expect(team).toBeTruthy();
   expect(team.media?.shareHero?.imageUrl).toContain(`/api/house/${houseId}/media/share-hero/image`);
+  expect(team.media?.agentAvatar?.imageUrl).toBeNull();
+
+  const publicMediaResp = await request.get(`/api/house/${houseId}/public-media`);
+  expect(publicMediaResp.ok()).toBeTruthy();
+  const publicMedia = await publicMediaResp.json();
+  expect(publicMedia.publicMedia?.imageUrl).toContain(`/api/house/${houseId}/public-media/image`);
+  expect(Object.prototype.hasOwnProperty.call(publicMedia, 'media')).toBe(false);
 });

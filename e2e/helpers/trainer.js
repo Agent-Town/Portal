@@ -89,6 +89,11 @@ async function openTrainerFromSidebar(page) {
   await page.getByTestId('agent-open-trainer').click();
   await page.getByTestId('trainer-modal').waitFor({ state: 'visible', timeout: 5000 });
   await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 5000 });
+  await page.waitForFunction(() => window.__agentTownTrainerReady === true, null, { timeout: 10000 });
+  await page.waitForFunction(() => {
+    const select = document.getElementById('trainerToolNameSelect');
+    return !!select && Array.from(select.options || []).length > 0;
+  }, null, { timeout: 10000 });
 }
 
 async function openTrainerToolsTab(page) {

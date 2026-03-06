@@ -30,7 +30,11 @@ function parseCookies(headerValue) {
     const k = p.slice(0, idx).trim();
     const v = p.slice(idx + 1).trim();
     if (!k) continue;
-    out[k] = decodeURIComponent(v);
+    try {
+      out[k] = decodeURIComponent(v);
+    } catch {
+      out[k] = v;
+    }
   }
   return out;
 }

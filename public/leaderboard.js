@@ -99,6 +99,12 @@ function buildKeyWrapMessage({ houseId, origin }) {
   return parts.join('\n');
 }
 
+function buildWalletLookupMessage({ address, nonce, houseId }) {
+  const parts = ['ElizaTown House Lookup', `address: ${address}`, `nonce: ${nonce}`];
+  if (houseId) parts.push(`houseId: ${houseId}`);
+  return parts.join('\n');
+}
+
 function base58Encode(bytes) {
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   if (!bytes || !bytes.length) return '';
@@ -217,6 +223,9 @@ async function recoverHouseAuthBytesWithWallet(houseId) {
     if (cached) return cached;
 
     const { wallet, address } = await connectWalletForRecovery();
+    const nonceResp = await api('/api/wallet/nonce');
+    const lookupMsg = buildWalletLookupMessage({ address, nonce: nonceResp.nonce, houseId });
+    const lookupSig = await signWalletMessageBytes(wallet, lookupMsg);
     const primaryMsg = buildKeyWrapMessage({ houseId });
     const primarySig = await signWalletMessageBytes(wallet, primaryMsg);
 
@@ -224,7 +233,8 @@ async function recoverHouseAuthBytesWithWallet(houseId) {
       method: 'POST',
       body: JSON.stringify({
         address,
-        signature: b64(primarySig),
+        nonce: nonceResp.nonce,
+        signature: b64(lookupSig),
         houseId
       })
     });

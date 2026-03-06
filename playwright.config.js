@@ -56,6 +56,7 @@ module.exports = defineConfig({
       PRIVY_APP_SECRET: '',
       PRIVY_PUBLIC_CONFIG_JSON: '{}',
       START_PAGE_ENABLED: '0',
+      PUBLIC_ORIGIN: `http://[::1]:${PORT}`,
       // Avoid modifying tracked data/store.json during e2e runs.
       STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.sqlite')
     }

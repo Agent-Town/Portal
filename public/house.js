@@ -2441,7 +2441,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
 
   if (discoverable) {
     setAnchorStatus('Publishing mapping…');
-    await api('/api/anchors/register', {
+    await houseApi(house.houseId, '/api/anchors/register', {
       method: 'POST',
       body: JSON.stringify({
         houseId: house.houseId,
@@ -2751,13 +2751,17 @@ async function initKeysFromKroot(Kroot) {
 async function recoverHouseKeyWithWallet(houseId) {
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
   setStatus('Recovering house key…');
+  const nonceResp = await api('/api/wallet/nonce');
+  const lookupMsg = buildWalletLookupMessage({ address: walletAddr, nonce: nonceResp.nonce, houseId });
+  const lookupSig = await signMessageBytes(lookupMsg);
   const primaryWrapMsg = buildKeyWrapMessage({ houseId });
   const primaryWrapSig = await signMessageBytes(primaryWrapMsg);
   const lookup = await api('/api/wallet/lookup', {
     method: 'POST',
     body: JSON.stringify({
       address: walletAddr,
-      signature: b64(primaryWrapSig),
+      nonce: nonceResp.nonce,
+      signature: b64(lookupSig),
       houseId
     })
   });

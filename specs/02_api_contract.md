@@ -1611,7 +1611,7 @@ Body:
 { "xPostUrl": "https://...", "shareId": "sh_..." }
 ```
 Stores the human post URL on the session. If a share exists, updates the share record and leaderboard.
-`shareId` is optional and lets the client update an existing share when the session no longer has `share.id`.
+`shareId` is optional and may only target the current session's canonical share. Cross-house updates are rejected.
 Returns:
 - `INVALID_URL` if not a valid http/https URL
 
@@ -1639,12 +1639,17 @@ Returns:
 ## Houses (ceremony + E2EE)
 
 ### POST `/api/agent/house/connect`
-Reconnects an agent to an existing house session by `houseId`.
+Reconnects an agent to an existing house session.
 
 Body:
 ```json
-{ "houseId": "<base58>", "agentName": "OpenClaw" }
+{ "teamCode": "TEAM-ABCD-EFGH", "houseId": "<base58>", "agentName": "OpenClaw" }
 ```
+
+Rules:
+- External callers must provide `teamCode`.
+- Same-browser runtime calls may use `houseId` alone when the current human session cookie already owns that house.
+- If both are provided, they must resolve to the same live house session.
 
 Returns:
 ```json
@@ -1972,12 +1977,7 @@ address: <address>
 nonce: <nonce>
 [houseId: <houseId>]
 ```
-
-If `nonce` is omitted and `houseId` is provided, signature must be `signMessage()` over:
-```
-ElizaTown House Key Wrap
-houseId: <houseId>
-```
+`nonce` is required.
 
 Returns:
 ```json

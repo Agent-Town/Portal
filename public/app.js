@@ -3382,6 +3382,15 @@ async function ensureTrainerScriptLoaded() {
   return trainerScriptLoadPromise;
 }
 
+async function waitForTrainerReady() {
+  const readyPromise = window.__agentTownTrainerReadyPromise;
+  if (readyPromise && typeof readyPromise.then === 'function') {
+    await readyPromise;
+    return;
+  }
+  if (window.__agentTownTrainerReady === true) return;
+}
+
 async function openTrainerModal() {
   const backdrop = getTrainerModalBackdrop();
   if (!isTownHub || !backdrop) {
@@ -3400,6 +3409,7 @@ async function openTrainerModal() {
   try {
     await initGateway();
     await ensureTrainerScriptLoaded();
+    await waitForTrainerReady();
   } catch (err) {
     if (statusLine) {
       statusLine.textContent = `Trainer failed to initialize: ${err?.message || 'UNKNOWN'}`;
@@ -5541,6 +5551,10 @@ async function updateUI(state) {
 function scheduleAgentDebugRefresh(reason = 'event') {
   refreshAgentDebugPanels(reason).catch(() => { });
 }
+
+window.__agentTownRefreshAgentDebugPanels = async (reason = 'external') => {
+  await refreshAgentDebugPanels(reason);
+};
 
 function startAgentDebugRefreshLoop() {
   if (agentDebugRefreshTimer) return;

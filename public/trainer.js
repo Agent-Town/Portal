@@ -171,6 +171,31 @@
   };
 
   let gatewayPromise = null;
+  let resolveTrainerReady = null;
+  let rejectTrainerReady = null;
+  let trainerReadySettled = false;
+  const trainerReadyPromise = new Promise((resolve, reject) => {
+    resolveTrainerReady = resolve;
+    rejectTrainerReady = reject;
+  });
+  window.__agentTownTrainerReady = false;
+  window.__agentTownTrainerReadyPromise = trainerReadyPromise;
+
+  function markTrainerReady() {
+    window.__agentTownTrainerReady = true;
+    if (trainerReadySettled) return;
+    trainerReadySettled = true;
+    if (typeof resolveTrainerReady === "function") resolveTrainerReady(true);
+  }
+
+  function markTrainerFailed(error) {
+    window.__agentTownTrainerReady = false;
+    if (trainerReadySettled) return;
+    trainerReadySettled = true;
+    if (typeof rejectTrainerReady === "function") {
+      rejectTrainerReady(error instanceof Error ? error : new Error(String(error || "TRAINER_INIT_FAILED")));
+    }
+  }
 
   function el(id) {
     return document.getElementById(id);
@@ -1543,6 +1568,9 @@
       await refreshToolLab().catch(() => {});
       await refreshTranscriptIntegrity().catch(() => {});
       await render();
+      if (typeof window.__agentTownRefreshAgentDebugPanels === "function") {
+        await window.__agentTownRefreshAgentDebugPanels("trainer-tool").catch(() => {});
+      }
       if (isSkillAction && result?.ok !== true) {
         setStatus(`Skill action ${toolName} failed: ${result?.code || "UNSUPPORTED"}`, true);
       } else if (isTrainerNamespace && result?.ok !== true) {
@@ -1754,9 +1782,11 @@
       await refreshBuilderDiagnostics();
       await render();
     };
+    markTrainerReady();
   }
 
   boot().catch((err) => {
+    markTrainerFailed(err);
     setStatus(`Trainer failed to initialize: ${err?.message || "UNKNOWN"}`, true);
   });
 })();

@@ -173,7 +173,8 @@ test('preregister import populates media slots and respects opt-out suppression'
   expect(shareAResp.ok()).toBeTruthy();
   const shareA = await shareAResp.json();
   expect(shareA.share?.media?.shareHero?.imageUrl).toContain(`/api/house/${houseA.id}/media/share-hero/image`);
-  expect(shareA.share?.media?.agentAvatar?.imageUrl).toContain(`/api/house/${houseA.id}/media/agent-avatar/image`);
+  expect(shareA.share?.media?.agentAvatar?.imageUrl).toBeNull();
+  expect(shareA.share?.media?.shareHero?.source).toBeNull();
 
   const shareBResp = await request.get('/api/share/sh_m11_8_b');
   expect(shareBResp.ok()).toBeTruthy();
@@ -186,7 +187,7 @@ test('preregister import populates media slots and respects opt-out suppression'
   const teamA = (leaderboard.teams || []).find((t) => t.shareId === 'sh_m11_8_a');
   const teamB = (leaderboard.teams || []).find((t) => t.shareId === 'sh_m11_8_b');
   expect(teamA?.media?.shareHero?.imageUrl).toContain(`/api/house/${houseA.id}/media/share-hero/image`);
-  expect(teamA?.media?.agentAvatar?.imageUrl).toContain(`/api/house/${houseA.id}/media/agent-avatar/image`);
+  expect(teamA?.media?.agentAvatar?.imageUrl).toBeNull();
   expect(teamB?.media?.agentAvatar?.imageUrl).toBeNull();
 
   const atlasResp = await request.get('/api/atlas/agent/1:1001');
