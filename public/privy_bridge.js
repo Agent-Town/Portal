@@ -1144,9 +1144,17 @@
               from: signer
             };
             const sponsoredTx = { ...tx };
+            const numericChainId = Number(chainId);
+            const chainHex = Number.isFinite(numericChainId) && numericChainId > 0
+              ? `0x${Math.floor(numericChainId).toString(16)}`
+              : null;
+            const incomingChainId = Object.prototype.hasOwnProperty.call(sponsoredTx, 'chain_id')
+              ? sponsoredTx.chain_id
+              : sponsoredTx.chainId;
             if (Object.prototype.hasOwnProperty.call(sponsoredTx, 'chainId')) delete sponsoredTx.chainId;
             if (Object.prototype.hasOwnProperty.call(sponsoredTx, 'chain_id')) delete sponsoredTx.chain_id;
-            const numericChainId = Number(chainId);
+            const normalizedChainId = toPrivyRpcHex(incomingChainId) || chainHex;
+            if (normalizedChainId) sponsoredTx.chain_id = normalizedChainId;
             const resolvedCaip2 = typeof caip2 === 'string' && caip2.trim()
               ? caip2.trim()
               : Number.isFinite(numericChainId) && numericChainId > 0
@@ -1169,32 +1177,44 @@
                 && typeof client.embeddedWallet.signWithUserSigner === 'function'
                 && normalizedWalletId
               ) {
-                try {
-                  const rpcOut = await sdk.rpc(
-                    client,
-                    client.embeddedWallet.signWithUserSigner.bind(client.embeddedWallet),
-                    {
-                      wallet_id: normalizedWalletId,
-                      chain_type: 'ethereum',
-                      method: 'eth_sendTransaction',
-                      params: { transaction: sponsoredTx },
-                      sponsor: true,
-                      ...(resolvedCaip2 ? { caip2: resolvedCaip2 } : {})
+                for (let rpcAttempt = 0; rpcAttempt < 3; rpcAttempt += 1) {
+                  try {
+                    const rpcOut = await sdk.rpc(
+                      client,
+                      client.embeddedWallet.signWithUserSigner.bind(client.embeddedWallet),
+                      {
+                        wallet_id: normalizedWalletId,
+                        chain_type: 'ethereum',
+                        method: 'eth_sendTransaction',
+                        params: { transaction: sponsoredTx },
+                        sponsor: true,
+                        ...(resolvedCaip2 ? { caip2: resolvedCaip2 } : {})
+                      }
+                    );
+                    const sponsored = parseSponsoredEvmSendResult(rpcOut);
+                    if (sponsored.hash || sponsored.transactionId || sponsored.userOperationHash) {
+                      return {
+                        hash: sponsored.hash,
+                        transactionId: sponsored.transactionId,
+                        userOperationHash: sponsored.userOperationHash,
+                        result: rpcOut
+                      };
                     }
-                  );
-                  const sponsored = parseSponsoredEvmSendResult(rpcOut);
-                  if (sponsored.hash || sponsored.transactionId || sponsored.userOperationHash) {
-                    return {
-                      hash: sponsored.hash,
-                      transactionId: sponsored.transactionId,
-                      userOperationHash: sponsored.userOperationHash,
-                      result: rpcOut
-                    };
-                  }
-                } catch (err) {
-                  rpcErr = err;
-                  if (!isUnsupportedEvmMethodError(err, 'eth_sendTransaction')) {
-                    console.warn('privy sdk rpc send failed; trying server relay fallback', err);
+                    throw new Error('PRIVY_SPONSORED_TX_NO_RESULT');
+                  } catch (err) {
+                    rpcErr = err;
+                    if (isUnsupportedEvmMethodError(err, 'eth_sendTransaction')) break;
+                    const retryableTransient = (
+                      String(err?.name || '').toLowerCase() === 'aborterror'
+                      || errorContains(err, 'signal is aborted')
+                      || errorContains(err, 'timed out')
+                      || errorContains(err, 'timeout')
+                    );
+                    if (!retryableTransient || rpcAttempt >= 2) {
+                      console.warn('privy sdk rpc send failed; trying server relay fallback', err);
+                      break;
+                    }
+                    await wait(140 * (rpcAttempt + 1));
                   }
                 }
               }

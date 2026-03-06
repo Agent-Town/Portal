@@ -1949,8 +1949,14 @@ function hasSameOriginNavigationContext(req) {
 
   const originHeader = String(req.get('origin') || '').trim();
   const refererHeader = String(req.get('referer') || '').trim();
+  const secFetchSite = String(req.get('sec-fetch-site') || '').trim().toLowerCase();
   if (!originHeader && !refererHeader) {
-    return false;
+    // Referrer can be intentionally suppressed by Referrer-Policy: no-referrer.
+    // In that case, trust browser-provided Fetch Metadata for same-origin requests.
+    if (secFetchSite === 'same-origin') return true;
+    // Fallback for same-origin GET/HEAD fetches where fetch metadata headers are unavailable.
+    const method = String(req.method || 'GET').trim().toUpperCase();
+    return method === 'GET' || method === 'HEAD';
   }
 
   if (originHeader) {
