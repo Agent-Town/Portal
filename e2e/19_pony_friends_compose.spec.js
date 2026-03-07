@@ -184,6 +184,21 @@ function buildAnchorLinkMessage({ houseId, erc8004Id, origin, nonce, createdAtMs
   ].join('\n');
 }
 
+async function completeTestBypassClaim({ request, agentId, address }) {
+  const nonceResp = await request.get(`/api/claim/erc8004/nonce?agentId=${encodeURIComponent(agentId)}`);
+  expect(nonceResp.ok()).toBeTruthy();
+  const nonceJson = await nonceResp.json();
+  const verifyResp = await request.post('/api/claim/erc8004/verify', {
+    data: {
+      agentId,
+      nonce: nonceJson.nonce,
+      signature: '0xtest-bypass-signature',
+      address
+    }
+  });
+  expect(verifyResp.ok()).toBeTruthy();
+}
+
 test('pony friends list derives from accepted + manual add; compose sends', async ({ page, request }) => {
   const houseA = await createAgentSoloHouse(request, 'A');
   const houseB = await createAgentSoloHouse(request, 'B');
@@ -236,6 +251,7 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
 
   const signer = Wallet.createRandom();
   const erc8004Id = '11155111:777';
+  await completeTestBypassClaim({ request, agentId: erc8004Id, address: signer.address });
   const createdAtMs = Date.now();
   const msg = buildAnchorLinkMessage({ houseId: houseC.houseId, erc8004Id, origin, nonce, createdAtMs });
   const signature = await signer.signMessage(msg);

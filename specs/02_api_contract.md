@@ -1194,6 +1194,8 @@ createdAtMs: <createdAtMs>
 
 Notes:
 - `nonce` must match the most recent `/api/anchors/nonce` for the session (then it is consumed).
+- The same human session must have a verified ERC-8004 claim for the `erc8004Id` (`/api/claim/erc8004/*`), and the verified owner wallet must match `signer`.
+- When the verified claim includes a reserved house, `houseId` must match that reserved house.
 - Latest registration for a given `erc8004Id` wins.
 
 ### GET `/api/anchors/resolve?erc8004Id=...`
