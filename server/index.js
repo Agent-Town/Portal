@@ -7758,6 +7758,28 @@ app.post('/api/anchors/register', (req, res) => {
     return res.status(401).json({ ok: false, error: 'SIGNER_MISMATCH' });
   }
 
+  const verifiedClaim = s?.claim?.erc8004;
+  const verifiedAt = Number(verifiedClaim?.verifiedAt || 0);
+  if (!Number.isFinite(verifiedAt) || verifiedAt <= 0) {
+    return res.status(403).json({ ok: false, error: 'ANCHOR_CLAIM_REQUIRED' });
+  }
+  if (!reservationAliasMatchesInput(String(verifiedClaim?.agentId || ''), erc8004Id)) {
+    return res.status(403).json({ ok: false, error: 'ANCHOR_CLAIM_REQUIRED' });
+  }
+
+  const reservedHouseId = typeof verifiedClaim?.reservedHouseId === 'string'
+    ? verifiedClaim.reservedHouseId.trim()
+    : '';
+  if (reservedHouseId && reservedHouseId !== houseId) {
+    return res.status(403).json({ ok: false, error: 'HOUSE_MISMATCH' });
+  }
+
+  const verifiedOwner = normalizeEvmAddress(verifiedClaim?.address || verifiedClaim?.ownerAddress);
+  const normalizedSigner = normalizeEvmAddress(signer);
+  if (!verifiedOwner || !normalizedSigner || verifiedOwner !== normalizedSigner) {
+    return res.status(403).json({ ok: false, error: 'ANCHOR_OWNER_MISMATCH' });
+  }
+
   // Consume nonce
   s.anchorPublishNonce = null;
 
