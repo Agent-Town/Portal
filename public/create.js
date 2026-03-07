@@ -137,6 +137,21 @@ async function loadLiteGateway() {
   return liteGatewayPromise;
 }
 
+function isTrustedCreateSkill(skillState) {
+  const status = String(skillState?.data?.status || skillState?.status || '').trim().toLowerCase();
+  const activePath = String(skillState?.data?.activeSkillPath || skillState?.activeSkillPath || '').trim();
+  if (status !== 'ready' || !activePath) return false;
+
+  const sourceUrlRaw = String(skillState?.data?.sourceUrl || skillState?.sourceUrl || '').trim();
+  if (!sourceUrlRaw) return false;
+  try {
+    const sourceUrl = new URL(sourceUrlRaw, window.location.origin);
+    return sourceUrl.origin === window.location.origin && sourceUrl.pathname === '/skill.md';
+  } catch {
+    return false;
+  }
+}
+
 async function ensureCreateSkillImported() {
   if (!isVendorLiteDriver()) return null;
   const gateway = await loadLiteGateway();
@@ -144,9 +159,7 @@ async function ensureCreateSkillImported() {
 
   if (typeof gateway.skillState === 'function') {
     const skillState = await gateway.skillState().catch(() => null);
-    const status = String(skillState?.data?.status || skillState?.status || '').trim().toLowerCase();
-    const activePath = String(skillState?.data?.activeSkillPath || skillState?.activeSkillPath || '').trim();
-    if (status === 'ready' && activePath) return gateway;
+    if (isTrustedCreateSkill(skillState)) return gateway;
   }
 
   if (typeof gateway.visitExperience === 'function') {
