@@ -419,9 +419,19 @@ async function mintErc8004Identity() {
   const txHash = tx?.hash;
   const explorerBase = chainId === 1 ? 'https://etherscan.io/tx/' : 'https://sepolia.etherscan.io/tx/';
   if (status) {
-    status.innerHTML = txHash
-      ? `Submitted: <a href="${explorerBase}${txHash}" target="_blank" rel="noreferrer">${txHash}</a>`
-      : 'Submitted.';
+    if (txHash) {
+      const txHashText = String(txHash);
+      const txLink = document.createElement('a');
+      txLink.href = `${explorerBase}${encodeURIComponent(txHashText)}`;
+      txLink.target = '_blank';
+      txLink.rel = 'noreferrer';
+      txLink.textContent = txHashText;
+
+      status.textContent = 'Submitted: ';
+      status.appendChild(txLink);
+    } else {
+      status.textContent = 'Submitted.';
+    }
   }
 
   if (typeof tx?.waitConfirmed !== 'function') throw new Error('MINT_CONFIRMATION_UNAVAILABLE');
