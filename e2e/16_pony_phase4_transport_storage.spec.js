@@ -48,6 +48,40 @@ function buildPonyInboxBundle() {
   };
 }
 
+
+function countLeadingZeroBits(hex) {
+  let bits = 0;
+  for (const ch of String(hex || '')) {
+    const nibble = Number.parseInt(ch, 16);
+    if (Number.isNaN(nibble)) break;
+    if (nibble === 0) {
+      bits += 4;
+      continue;
+    }
+    if (nibble < 2) bits += 3;
+    else if (nibble < 4) bits += 2;
+    else if (nibble < 8) bits += 1;
+    break;
+  }
+  return bits;
+}
+
+function buildPowPostage({ difficulty, fromHouseId = null, toHouseId }) {
+  for (let i = 0; i < 2_000_000; i += 1) {
+    const nonce = `pow-${difficulty}-${i}`;
+    const digest = crypto.createHash('sha256').update(JSON.stringify({
+      v: 1,
+      nonce,
+      fromHouseId: fromHouseId || null,
+      toHouseId: toHouseId || null
+    }), 'utf8').digest('hex');
+    if (countLeadingZeroBits(digest) >= difficulty) {
+      return { kind: 'pow.v1', nonce, digest, difficulty };
+    }
+  }
+  throw new Error('FAILED_TO_BUILD_POW_POSTAGE');
+}
+
 function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
   const recipientPub = crypto.createPublicKey({
     key: Buffer.from(recipientPonyInboxPub, 'base64'),
@@ -165,7 +199,7 @@ test('pony phase4: transport abstraction + storage backend + postage verificatio
         recipientPonyInboxPub: houseA.ponyInboxPub,
         body: 'weak pow'
       }),
-      postage: { kind: 'pow.v1', nonce: 'n-low', digest: '00abc123', difficulty: 2 }
+      postage: buildPowPostage({ difficulty: 2, toHouseId: houseA.houseId })
     }
   });
   expect(weakPostage.status()).toBe(402);
@@ -173,6 +207,23 @@ test('pony phase4: transport abstraction + storage backend + postage verificatio
   expect(weakBody.error).toBe('POSTAGE_POW_DIFFICULTY_TOO_LOW');
   expect(weakBody.requiredDifficulty).toBe(8);
   expect(weakBody.actualDifficulty).toBe(2);
+
+
+  // Forged digest is rejected even if the client claims enough difficulty.
+  const forgedPostage = await request.post('/api/pony/send', {
+    data: {
+      toHouseId: houseA.houseId,
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'forged pow'
+      }),
+      postage: { kind: 'pow.v1', nonce: 'forged', digest: '0'.repeat(64), difficulty: 8 }
+    }
+  });
+  expect(forgedPostage.status()).toBe(400);
+  expect((await forgedPostage.json()).error).toBe('POSTAGE_POW_DIGEST_MISMATCH');
 
   // Unknown transport kinds should still dispatch through fallback transport adapter.
   const customTransport = await request.post('/api/pony/send', {
@@ -185,7 +236,7 @@ test('pony phase4: transport abstraction + storage backend + postage verificatio
         body: 'phase4 custom transport'
       }),
       transport: { kind: 'relay.mesh.v1', relayHints: ['mesh://west'] },
-      postage: { kind: 'pow.v1', nonce: 'n-ok', digest: '00deadbeef', difficulty: 8 }
+      postage: buildPowPostage({ difficulty: 8, toHouseId: houseA.houseId })
     }
   });
   expect(customTransport.ok()).toBeTruthy();

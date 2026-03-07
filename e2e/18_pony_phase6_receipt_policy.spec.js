@@ -48,6 +48,40 @@ function buildPonyInboxBundle() {
   };
 }
 
+
+function countLeadingZeroBits(hex) {
+  let bits = 0;
+  for (const ch of String(hex || '')) {
+    const nibble = Number.parseInt(ch, 16);
+    if (Number.isNaN(nibble)) break;
+    if (nibble === 0) {
+      bits += 4;
+      continue;
+    }
+    if (nibble < 2) bits += 3;
+    else if (nibble < 4) bits += 2;
+    else if (nibble < 8) bits += 1;
+    break;
+  }
+  return bits;
+}
+
+function buildPowPostage({ difficulty, fromHouseId = null, toHouseId }) {
+  for (let i = 0; i < 2_000_000; i += 1) {
+    const nonce = `pow-${difficulty}-${i}`;
+    const digest = crypto.createHash('sha256').update(JSON.stringify({
+      v: 1,
+      nonce,
+      fromHouseId: fromHouseId || null,
+      toHouseId: toHouseId || null
+    }), 'utf8').digest('hex');
+    if (countLeadingZeroBits(digest) >= difficulty) {
+      return { kind: 'pow.v1', nonce, digest, difficulty };
+    }
+  }
+  throw new Error('FAILED_TO_BUILD_POW_POSTAGE');
+}
+
 function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
   const recipientPub = crypto.createPublicKey({
     key: Buffer.from(recipientPonyInboxPub, 'base64'),
@@ -192,7 +226,7 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
         recipientPonyInboxPub: houseA.ponyInboxPub,
         body: 'anon-pow'
       }),
-      postage: { kind: 'pow.v1', nonce: 'pow-1', digest: '00abc123', difficulty: 9 }
+      postage: buildPowPostage({ difficulty: 9, toHouseId: houseA.houseId })
     }
   });
   expect(anonPow.status()).toBe(402);
