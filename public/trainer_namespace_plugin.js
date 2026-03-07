@@ -94,22 +94,23 @@
     storageOverride = null,
     fallback = DEFAULT_ENABLED,
   } = {}) {
-    let enabled = parseBoolLike(runtimeFeatureFlag);
-    if (enabled === null) enabled = parseBoolLike(fallback);
-    if (enabled === null) enabled = DEFAULT_ENABLED;
-
-    const queryOverride = parseQueryOverride(
-      locationSearch === null || locationSearch === undefined
-        ? (typeof window !== "undefined" ? window.location.search : "")
-        : locationSearch
-    );
-    if (queryOverride !== null) enabled = queryOverride;
+    const runtimeEnabled = parseBoolLike(runtimeFeatureFlag);
+    if (runtimeEnabled !== null) return runtimeEnabled;
 
     const explicitStorage = parseBoolLike(storageOverride);
     if (explicitStorage !== null) return explicitStorage;
     const storageFlag = readStorageOverride();
     if (storageFlag !== null) return storageFlag;
 
+    const queryOverride = parseQueryOverride(
+      locationSearch === null || locationSearch === undefined
+        ? (typeof window !== "undefined" ? window.location.search : "")
+        : locationSearch
+    );
+    if (queryOverride !== null) return queryOverride;
+
+    let enabled = parseBoolLike(fallback);
+    if (enabled === null) enabled = DEFAULT_ENABLED;
     return enabled;
   }
 
