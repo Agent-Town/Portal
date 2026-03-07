@@ -8257,6 +8257,7 @@ app.post('/api/house/init', (req, res) => {
   const nonce = typeof req.body?.nonce === 'string' ? req.body.nonce.trim() : '';
   const keyMode = typeof req.body?.keyMode === 'string' ? req.body.keyMode.trim() : 'ceremony';
   const unlock = req.body?.unlock || null;
+  const keyWrapSig = typeof req.body?.keyWrapSig === 'string' ? req.body.keyWrapSig.trim() : '';
   const keyWrap = req.body?.keyWrap || null;
   const houseAuthKey = typeof req.body?.houseAuthKey === 'string' ? req.body.houseAuthKey.trim() : '';
   let ponyInboxRegistration = null;
@@ -8297,6 +8298,17 @@ app.post('/api/house/init', (req, res) => {
   // Converged for today's publish: ceremony-only houses.
   if (keyMode !== 'ceremony') {
     return res.status(400).json({ ok: false, error: 'CEREMONY_ONLY' });
+  }
+
+  const unlockAddress = unlockAddressForLookup(unlock);
+  if (unlockAddress && !isTestMockAddress(unlockAddress)) {
+    if (!keyWrapSig) {
+      return res.status(400).json({ ok: false, error: 'MISSING_UNLOCK_SIGNATURE' });
+    }
+    const msg = buildHouseKeyWrapMessage({ houseId });
+    if (!verifySolanaSignature(unlockAddress, msg, keyWrapSig)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_UNLOCK_SIGNATURE' });
+    }
   }
 
   try {
