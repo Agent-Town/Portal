@@ -81,6 +81,23 @@ function readMap(pathname) {
   return rows;
 }
 
+function resolveDestPath(outDir, outputFilename) {
+  if (typeof outputFilename !== 'string' || !outputFilename.trim()) {
+    throw new Error('INVALID_MAP_OUTPUT_FILENAME');
+  }
+  const normalized = path.normalize(outputFilename.trim());
+  if (path.isAbsolute(normalized)) {
+    throw new Error(`INVALID_MAP_OUTPUT_FILENAME_ABSOLUTE:${outputFilename}`);
+  }
+
+  const dest = path.resolve(outDir, normalized);
+  const rel = path.relative(outDir, dest);
+  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+    throw new Error(`INVALID_MAP_OUTPUT_FILENAME_TRAVERSAL:${outputFilename}`);
+  }
+  return dest;
+}
+
 function listImages(dir, order) {
   const items = fs
     .readdirSync(dir)
@@ -122,7 +139,8 @@ function main() {
 
   for (let i = 0; i < n; i += 1) {
     const src = images[i].abs;
-    const dest = path.join(opts.outDir, mapRows[i].outputFilename);
+    const dest = resolveDestPath(opts.outDir, mapRows[i].outputFilename);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
     if (opts.copy) {
       fs.copyFileSync(src, dest);
     } else {
