@@ -1750,6 +1750,15 @@ app.use(
   })
 );
 
+app.use(
+  '/api/townhall/mint',
+  rateLimit({
+    windowMs: 60_000,
+    max: 24,
+    keyFn: (req) => sessionScopedRateKey('townhall-mint', req)
+  })
+);
+
 function ensureHumanSession(req, res) {
   const cookies = parseCookies(req.header('cookie') || '');
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
@@ -1983,6 +1992,19 @@ function requireProxySessionAccess(req, res, next) {
     return res.status(403).json({ ok: false, error: 'FORBIDDEN_ORIGIN' });
   }
   return next();
+}
+
+function requireTownhallMintPrepareAccess(req, res) {
+  const session = getExistingHumanSession(req);
+  if (!session) {
+    res.status(401).json({ ok: false, error: 'SESSION_REQUIRED' });
+    return null;
+  }
+  if (!hasSameOriginNavigationContext(req)) {
+    res.status(403).json({ ok: false, error: 'FORBIDDEN_ORIGIN' });
+    return null;
+  }
+  return session;
 }
 
 function sanitizeUrl(url) {
@@ -4426,7 +4448,8 @@ app.get('/api/townhall/mint/config', async (_req, res) => {
 });
 
 app.post('/api/townhall/mint/evm/prepare', async (req, res) => {
-  const s = ensureHumanSession(req, res);
+  const s = requireTownhallMintPrepareAccess(req, res);
+  if (!s) return;
   const onboarding = ensureSessionOnboarding(s);
   const caps = townhallMintCapabilities();
   if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
@@ -4478,7 +4501,8 @@ app.post('/api/townhall/mint/evm/prepare', async (req, res) => {
 });
 
 app.post('/api/townhall/mint/solana/prepare', async (req, res) => {
-  const s = ensureHumanSession(req, res);
+  const s = requireTownhallMintPrepareAccess(req, res);
+  if (!s) return;
   const onboarding = ensureSessionOnboarding(s);
   const caps = townhallMintCapabilities();
   if (!caps.enabled) return res.status(503).json({ ok: false, error: 'MINT_DISABLED' });
