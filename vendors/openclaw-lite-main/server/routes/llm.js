@@ -1,4 +1,6 @@
 const { Readable } = require("stream");
+const net = require("net");
+const dns = require("dns").promises;
 
 
 function registerLlmRoutes(app) {
@@ -244,6 +246,60 @@ function registerLlmRoutes(app) {
     return `${base}/${tail}`;
   }
 
+  function isPrivateIpv4(host) {
+    const parts = String(host || "")
+      .split(".")
+      .map((p) => Number(p));
+    if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+    const [a, b] = parts;
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 0) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    return false;
+  }
+
+  function isLocalOrPrivateIpv6(host) {
+    const h = String(host || "").toLowerCase();
+    if (!h) return false;
+    if (h === "::1") return true;
+    if (h.startsWith("fc") || h.startsWith("fd")) return true; // unique local
+    if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return true; // link-local
+    return false;
+  }
+
+  function isBlockedProxyHost(hostname) {
+    const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
+    if (!host) return true;
+    if (host === "localhost" || host.endsWith(".localhost")) return true;
+    if (host === "0.0.0.0") return true;
+    if (host.endsWith(".local")) return true;
+
+    const ipVersion = net.isIP(host);
+    if (ipVersion === 4 && isPrivateIpv4(host)) return true;
+    if (ipVersion === 6 && isLocalOrPrivateIpv6(host)) return true;
+    return false;
+  }
+
+  async function isBlockedDnsTarget(hostname) {
+    try {
+      const records = await dns.lookup(hostname, { all: true, verbatim: true });
+      if (!Array.isArray(records) || records.length === 0) return false;
+      return records.some((record) => isBlockedProxyHost(record?.address || ""));
+    } catch {
+      return false;
+    }
+  }
+
+  async function isBlockedGenericProxyTarget(upstream) {
+    if (!(upstream instanceof URL)) return true;
+    if (isBlockedProxyHost(upstream.hostname)) return true;
+    return await isBlockedDnsTarget(upstream.hostname);
+  }
+
   function resolveGenericUpstreamUrl(req) {
     const encodedBase = typeof req.params?.encodedBase === "string" ? req.params.encodedBase.trim() : "";
     if (!encodedBase) {
@@ -297,6 +353,17 @@ function registerLlmRoutes(app) {
     } catch (err) {
       const msg = err && typeof err.message === "string" ? err.message : "INVALID_UPSTREAM_BASE";
       return res.status(400).json({ ok: false, error: msg });
+    }
+
+    let parsedUpstream = null;
+    try {
+      parsedUpstream = new URL(upstreamUrl);
+    } catch {
+      return res.status(400).json({ ok: false, error: "INVALID_UPSTREAM_BASE" });
+    }
+
+    if (await isBlockedGenericProxyTarget(parsedUpstream)) {
+      return res.status(403).json({ ok: false, error: "UPSTREAM_HOST_BLOCKED" });
     }
 
     const method = String(req.method || "POST").toUpperCase();
