@@ -1086,6 +1086,8 @@ Notes:
 Validation notes:
 - `entityType` must be one of: `human|agent|tool|skill|experience|house`.
 - `services` must contain at least one `web` service with an allowed endpoint.
+- Draft payloads larger than 64 KiB (post-normalization) are rejected with `413 REGISTRATION_DRAFT_TOO_LARGE`.
+- The server retains at most the 500 most-recent draft records.
 
 ### GET `/api/erc8004/registration/:regId.json`
 Returns ERC-8004 registration-v1 JSON.

@@ -274,3 +274,22 @@ test('M2.API.3 Complete endpoint requires completion token and is immutable', as
   expect(registration.registrations.length).toBe(1);
   expect(registration.registrations[0].agentId).toBe(1001);
 });
+
+test('M2.API.4 Draft endpoint rejects oversized payloads', async ({ request }) => {
+  const oversized = 'x'.repeat(70 * 1024);
+  const draftResp = await request.post('/api/erc8004/registration/draft', {
+    data: {
+      context: { kind: 'house', houseId: 'house_test_4' },
+      entityType: 'human',
+      name: 'Large Draft',
+      description: 'Large payload should be rejected',
+      image: 'https://example.com/large.png',
+      services: [{ name: 'web', endpoint: 'https://example.com/large' }],
+      permissionManifest: { oversized }
+    }
+  });
+
+  expect(draftResp.status()).toBe(413);
+  const draftBody = await draftResp.json();
+  expect(draftBody.error).toBe('REGISTRATION_DRAFT_TOO_LARGE');
+});
