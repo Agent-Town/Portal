@@ -499,10 +499,30 @@ function extFromMime(mime) {
   return null;
 }
 
+function sanitizeOutputFilename(input) {
+  const value = nonEmpty(input);
+  if (!value) return null;
+
+  const normalized = value.replace(/\\/g, '/');
+  if (path.isAbsolute(value) || normalized.includes('/')) return null;
+  if (value === '.' || value === '..') return null;
+
+  return value;
+}
+
+function resolvePathWithinDir(dirPath, fileName) {
+  const resolvedDir = path.resolve(dirPath);
+  const resolvedPath = path.resolve(resolvedDir, fileName);
+  if (resolvedPath === resolvedDir || resolvedPath.startsWith(`${resolvedDir}${path.sep}`)) {
+    return resolvedPath;
+  }
+  throw new Error(`INVALID_OUTPUT_FILENAME:${fileName}`);
+}
+
 function findExistingImagePath(imagesDir, rec) {
-  const explicit = nonEmpty(rec?.outputFilename);
+  const explicit = sanitizeOutputFilename(rec?.outputFilename);
   if (explicit) {
-    const candidate = path.join(imagesDir, explicit);
+    const candidate = resolvePathWithinDir(imagesDir, explicit);
     if (fs.existsSync(candidate)) return candidate;
   }
 
@@ -517,7 +537,7 @@ function findExistingImagePath(imagesDir, rec) {
 
 function buildOutputFilename(rec, mimeType, fallbackIndex) {
   const extFromResponse = extFromMime(mimeType) || '.png';
-  const explicit = nonEmpty(rec?.outputFilename);
+  const explicit = sanitizeOutputFilename(rec?.outputFilename);
   const explicitExt = explicit ? path.extname(explicit).toLowerCase() : null;
   if (explicit && explicitExt === extFromResponse) {
     return {
@@ -879,7 +899,7 @@ async function run() {
         generated.mimeType,
         row.__manifestIndex
       );
-      const outputPath = path.join(opts.imagesDir, filename);
+      const outputPath = resolvePathWithinDir(opts.imagesDir, filename);
 
       fs.writeFileSync(outputPath, Buffer.from(generated.data, 'base64'));
 
