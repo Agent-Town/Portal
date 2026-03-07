@@ -1374,7 +1374,7 @@ Rules:
   - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
   - dispatch result is persisted on each delivered message under `dispatch.*`
 - Postage verification hook runs before dispatch:
-  - `pow.v1` enforces digest shape
+  - `pow.v1` enforces nonce/digest validity (`digest` must equal `sha256("pony_pow_v1|" + nonce)`)
   - when `requirePostageAnonymous=true` and sender is anonymous, postage is required
   - when `requireReceiptAnonymous=true` and sender is anonymous, postage must be `receipt.v1`
   - when `requirePostageAnonymous=true` and sender is anonymous and using `pow.v1`, `difficulty` must meet server minimum (`>= 8`)
@@ -1570,7 +1570,7 @@ Body:
 }
 ```
 Requires house-auth. Appends a hash-chained encrypted event for the house vault.
-Postage verification hook also runs here (`pow.v1` threshold/digest checks, `receipt.v1` dispatch receipt checks).
+Postage verification hook also runs here (`pow.v1` threshold + digest authenticity checks, `receipt.v1` dispatch receipt checks).
 `refsMeta` (optional) is contract-validated: each item must reference a known `refs` entry, and duplicate `ref` values are rejected.
 
 Additional vault errors:

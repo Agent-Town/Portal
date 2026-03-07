@@ -1,5 +1,8 @@
-const HEX_DIGEST_RE = /^[0-9a-f]+$/i;
+const crypto = require('crypto');
+
+const HEX_DIGEST_RE = /^[0-9a-f]{64}$/i;
 const RECEIPT_ID_RE = /^[A-Za-z0-9:_-]{6,120}$/;
+const MAX_POW_NONCE_CHARS = 256;
 
 function toInt(value, fallback = 0) {
   const num = Number(value);
@@ -14,6 +17,23 @@ function normalizeReceiptId(value) {
 
 function isDispatchReceiptId(receiptId) {
   return typeof receiptId === 'string' && receiptId.startsWith('dr_');
+}
+
+function countLeadingZeroBitsHex(hexDigest) {
+  let bits = 0;
+  for (const ch of hexDigest) {
+    const nibble = Number.parseInt(ch, 16);
+    if (!Number.isFinite(nibble) || nibble < 0 || nibble > 15) return 0;
+    if (nibble === 0) {
+      bits += 4;
+      continue;
+    }
+    if ((nibble & 0b1000) === 0) bits += 1;
+    if ((nibble & 0b0100) === 0) bits += 1;
+    if ((nibble & 0b0010) === 0) bits += 1;
+    break;
+  }
+  return bits;
 }
 
 function createPostageVerifier(options = {}) {
@@ -35,8 +55,19 @@ function createPostageVerifier(options = {}) {
       throw err;
     }
 
-    const digest = typeof postage?.digest === 'string' ? postage.digest.trim() : '';
-    if (!digest || !HEX_DIGEST_RE.test(digest) || digest.length < 6) {
+    const nonce = typeof postage?.nonce === 'string' ? postage.nonce.trim() : '';
+    const digest = typeof postage?.digest === 'string' ? postage.digest.trim().toLowerCase() : '';
+    if (!nonce || nonce.length > MAX_POW_NONCE_CHARS || !digest || !HEX_DIGEST_RE.test(digest)) {
+      throw new Error('POSTAGE_POW_DIGEST_INVALID');
+    }
+
+    const expectedDigest = crypto
+      .createHash('sha256')
+      .update(`pony_pow_v1|${nonce}`, 'utf8')
+      .digest('hex');
+    if (digest !== expectedDigest) throw new Error('POSTAGE_POW_DIGEST_INVALID');
+
+    if (countLeadingZeroBitsHex(digest) < toInt(postage?.difficulty, 0)) {
       throw new Error('POSTAGE_POW_DIGEST_INVALID');
     }
   }
