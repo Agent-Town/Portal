@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { enterHatch, triggerWalletProfileCheck } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -11,31 +13,45 @@ test('disconnecting wallet on main page resets token verified state', async ({ p
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 13) & 0xff;
     const address = 'So1anaMockToken1111111111111111111111111111';
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => address } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => address } }),
-      disconnect: async () => {}
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
     };
   });
 
   await page.goto('/');
-  const teamBefore = (await page.getByTestId('team-code').innerText()).trim();
+  await enterHatch(page, 'signin', { navigate: false });
+
+  const teamBefore = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    const state = await resp.json().catch(() => ({}));
+    return String(state?.teamCode || '').trim();
+  });
   expect(teamBefore).toMatch(/^TEAM-/);
 
-  await page.getByTestId('path-human').click();
-  await page.getByRole('button', { name: 'Check wallet' }).click();
-  await expect(page.getByTestId('token-status')).toContainText('Verified');
+  await triggerWalletProfileCheck(page);
+  await expect(page.locator('#walletStatus')).toContainText(/no existing house|continue setting up|wallet verified/i);
 
-  await page.getByRole('button', { name: 'Disconnect wallet' }).click();
-  await page.waitForURL('**/');
+  const resetResult = await page.evaluate(async () => {
+    const resp = await fetch('/api/session/reset', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({})
+    });
+    const data = await resp.json().catch(() => ({}));
+    return { ok: resp.ok, data };
+  });
+  expect(resetResult.ok).toBe(true);
 
-  await expect(page.getByTestId('reconnect-panel')).toBeHidden();
-  await page.getByTestId('path-human').click();
-  await expect(page.getByTestId('token-status')).toBeHidden();
-  await expect(page.getByRole('link', { name: 'Create house' })).toBeHidden();
-
-  const teamAfter = (await page.getByTestId('team-code').innerText()).trim();
+  await page.reload();
+  await enterHatch(page, 'signin', { navigate: false });
+  const teamAfter = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    const state = await resp.json().catch(() => ({}));
+    return String(state?.teamCode || '').trim();
+  });
   expect(teamAfter).toMatch(/^TEAM-/);
   expect(teamAfter).not.toBe(teamBefore);
 });

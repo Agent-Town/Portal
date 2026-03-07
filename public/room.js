@@ -108,25 +108,21 @@ async function aesGcmDecrypt(key, ivBytes, ctBytes, aadBytes) {
 }
 
 // --- wallet ---
-let wallet = null;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
 let walletAddr = null;
 
 async function connectWallet() {
-  if (!window.solana || !window.solana.isPhantom) {
-    throw new Error('NO_SOLANA_WALLET');
-  }
-  const resp = await window.solana.connect();
-  wallet = window.solana;
-  walletAddr = resp.publicKey.toString();
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+  const connected = await walletClient.connect({ chain: 'solana', silent: false });
+  walletAddr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
+  if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
   el('walletAddr').textContent = walletAddr;
 }
 
 async function signMessage(message) {
-  if (!wallet) throw new Error('WALLET_NOT_CONNECTED');
-  const msgBytes = new TextEncoder().encode(message);
-  const resp = await wallet.signMessage(msgBytes, 'utf8');
-  // Phantom returns { signature: Uint8Array, publicKey }
-  return resp.signature;
+  if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
+  if (!walletClient) throw new Error('NO_SOLANA_WALLET');
+  return walletClient.signMessage({ chain: 'solana', message });
 }
 
 function buildUnlockMessage({ roomPubKey, nonce, origin }) {
@@ -138,13 +134,145 @@ function buildUnlockMessage({ roomPubKey, nonce, origin }) {
   ].join('\n');
 }
 
+const ERC8004_ROOM_IDENTITY_CACHE_PREFIX = 'agentTownErc8004RoomIdentity:';
+const ERC8004_DEFAULT_IDENTITY_REGISTRY = '0x8004a818bfb912233c491871b3d84c89a494bd9e';
+const ERC8004_IDENTITY_REGISTRY_BY_CHAIN = Object.freeze({
+  1: ERC8004_DEFAULT_IDENTITY_REGISTRY,
+  11155111: ERC8004_DEFAULT_IDENTITY_REGISTRY
+});
+
+function normalizeEvmAddressClient(value) {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(clean)) return null;
+  return clean;
+}
+
+function parseEip155AgentRegistry(value) {
+  if (typeof value !== 'string') return null;
+  const clean = value.trim();
+  const match = clean.match(/^eip155:(\d+):(0x[a-fA-F0-9]{40})$/);
+  if (!match) return null;
+  const chainId = Number(match[1]);
+  const identityRegistry = normalizeEvmAddressClient(match[2]);
+  if (!Number.isInteger(chainId) || chainId < 1 || !identityRegistry) return null;
+  return { chainId, identityRegistry };
+}
+
+function parseAgent0Erc8004Id(value) {
+  if (typeof value !== 'string') return null;
+  const match = value.trim().match(/^(\d+):(.+)$/);
+  if (!match) return null;
+  return { chainId: Number(match[1]), id: match[2] };
+}
+
+function parseMintedAgentIdentity(rawAgentId, fallbackChainId) {
+  if (typeof rawAgentId === 'string' && rawAgentId.trim()) {
+    const parseNonNegativeIntegerString = (value) => {
+      const text = String(value || '').trim();
+      if (!/^\d+$/.test(text)) return null;
+      const parsed = Number.parseInt(text, 10);
+      return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+    };
+    const parsed = parseAgent0Erc8004Id(rawAgentId.trim());
+    if (parsed) {
+      const tokenId = parseNonNegativeIntegerString(parsed.id);
+      const chainId = Number.isInteger(parsed.chainId) && parsed.chainId > 0 ? parsed.chainId : fallbackChainId;
+      if (Number.isInteger(tokenId) && tokenId >= 0 && Number.isInteger(chainId) && chainId > 0) {
+        return { chainId, agentId: tokenId, erc8004Id: `${chainId}:${tokenId}` };
+      }
+    }
+    const numericOnly = parseNonNegativeIntegerString(rawAgentId);
+    if (Number.isInteger(numericOnly) && numericOnly >= 0 && Number.isInteger(fallbackChainId) && fallbackChainId > 0) {
+      return { chainId: fallbackChainId, agentId: numericOnly, erc8004Id: `${fallbackChainId}:${numericOnly}` };
+    }
+    return null;
+  }
+  if (Number.isInteger(rawAgentId) && rawAgentId >= 0 && Number.isInteger(fallbackChainId) && fallbackChainId > 0) {
+    return { chainId: fallbackChainId, agentId: rawAgentId, erc8004Id: `${fallbackChainId}:${rawAgentId}` };
+  }
+  return null;
+}
+
+function resolveErc8004IdentityRegistry(chainId, ...candidates) {
+  for (const candidate of candidates) {
+    const normalized = normalizeEvmAddressClient(candidate);
+    if (normalized) return normalized;
+  }
+  const fallback = ERC8004_IDENTITY_REGISTRY_BY_CHAIN[chainId];
+  return normalizeEvmAddressClient(fallback);
+}
+
+function erc8004RoomIdentityStorageKey(roomId) {
+  return `${ERC8004_ROOM_IDENTITY_CACHE_PREFIX}${roomId}`;
+}
+
+function loadStoredErc8004Identity(roomId) {
+  if (!roomId) return null;
+  try {
+    const raw = localStorage.getItem(erc8004RoomIdentityStorageKey(roomId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const agentId = typeof parsed.agentId === 'string' ? parsed.agentId.trim() : '';
+    if (!agentId) return null;
+    const regId = typeof parsed.regId === 'string' ? parsed.regId.trim() : '';
+    return {
+      type: parsed.type === 'erc8004_identity' ? parsed.type : 'erc8004_identity',
+      regId: regId || null,
+      agentId,
+      createdAtMs: Number(parsed.createdAtMs || Date.now())
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredErc8004Identity(roomId, value) {
+  if (!roomId || !value) return;
+  try {
+    localStorage.setItem(
+      erc8004RoomIdentityStorageKey(roomId),
+      JSON.stringify({
+        type: 'erc8004_identity',
+        regId: value.regId || null,
+        agentId: value.agentId || null,
+        createdAtMs: Number(value.createdAtMs || Date.now())
+      })
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function buildErc8004RegistrationDraftPayload(roomId) {
+  const origin = window.location.origin;
+  const roomUrl = `${origin}/room?room=${encodeURIComponent(roomId)}`;
+  return {
+    context: { kind: 'room', roomId },
+    entityType: 'house',
+    name: `Agent Town Room ${roomId.slice(0, 10)}`,
+    description: `E2EE shared room in Agent Town. roomId=${roomId}.`,
+    image: `${origin}/brand-kit/default_user_avatar.png`,
+    services: [{ name: 'web', endpoint: roomUrl }]
+  };
+}
+
+function restoreStoredErc8004Identity(roomId) {
+  const stored = loadStoredErc8004Identity(roomId);
+  if (!stored) return;
+  humanErc8004Id = stored.agentId;
+  humanErc8004RegId = stored.regId || null;
+}
+
 let unlocked = false;
 let room = null; // { roomId, roomPubKey, nonce }
 let KrootBytes = null; // Uint8Array (memory only)
 let Kenc = null; // CryptoKey for room log encryption
 
-// Phase 3: store minted ERC-8004 ids locally (not persisted yet)
+// Phase 3: store minted ERC-8004 ids in memory + browser storage (per-room).
 let humanErc8004Id = null;
+let humanErc8004RegId = null;
 let agentErc8004Id = null;
 
 function buildRoomDescriptor(currentRoomId) {
@@ -161,6 +289,7 @@ function buildRoomDescriptor(currentRoomId) {
           chain: 'solana',
           kind: 'pda',
           status: 'placeholder',
+          note: 'Placeholder only. This mailbox is not live messaging infrastructure yet.',
           address: 'PDA_TODO',
           program: 'PROGRAM_TODO'
         }
@@ -186,6 +315,7 @@ function buildErc8004Statement(currentRoomId) {
     human: walletAddr || null,
     // phase 2/3: fill in agent + human ERC-8004 identity ids once minted
     humanErc8004: humanErc8004Id,
+    humanErc8004RegId,
     agentErc8004: agentErc8004Id,
     origin: window.location.origin,
     createdAtMs: Date.now()
@@ -196,7 +326,9 @@ async function mintErc8004Identity() {
   const status = el('erc8004MintStatus');
   if (status) status.textContent = '';
 
-  if (!window.ethereum) throw new Error('NO_EVM_WALLET');
+  if (!walletClient) throw new Error('NO_EVM_WALLET');
+  const evmProvider = walletClient.getProvider({ chain: 'evm' });
+  if (!evmProvider) throw new Error('NO_EVM_WALLET');
   const roomId = room?.roomId || new URLSearchParams(window.location.search).get('room');
   if (!roomId) throw new Error('NO_ROOM_ID');
 
@@ -208,12 +340,9 @@ async function mintErc8004Identity() {
     if (!ok) return;
   }
 
-  // Use the official Agent0 SDK (published on npm as `agent0-sdk`).
-  // Prefer a vendored same-origin bundle for reliability (CSP/adblock/CDN flake).
-  // Fallback to esm.sh if the vendored import fails.
+  // Use the local Agent-Town fork bundle from /public/vendor only.
   // For e2e tests we allow injecting a mock via window.__AG0_SDK_MOCK.
-  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.1.4.2.bundle.mjs';
-  const AGENT0_SDK_ESM_URL = 'https://esm.sh/agent0-sdk@1.4.2?bundle';
+  const AGENT0_SDK_LOCAL_URL = '/vendor/agent0-sdk.mjs';
 
   let mod;
   if (window.__AG0_SDK_MOCK) {
@@ -222,14 +351,9 @@ async function mintErc8004Identity() {
     try {
       mod = await import(AGENT0_SDK_LOCAL_URL);
     } catch (eLocal) {
-      console.warn('Agent0 SDK local import failed; falling back to esm.sh', eLocal);
-      try {
-        mod = await import(AGENT0_SDK_ESM_URL);
-      } catch (eRemote) {
-        console.error('Agent0 SDK esm.sh import also failed', eRemote);
-        const detail = (eRemote && (eRemote.stack || eRemote.message)) || String(eRemote);
-        throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}`);
-      }
+      console.error('Agent0 SDK local import failed', eLocal);
+      const detail = (eLocal && (eLocal.stack || eLocal.message)) || String(eLocal);
+      throw new Error(`AG0_SDK_LOAD_FAILED: ${detail}. Run: npm run build:agent0-sdk`);
     }
   }
 
@@ -240,19 +364,15 @@ async function mintErc8004Identity() {
   }
 
   // Ensure wallet is connected
-  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-  const owner = Array.isArray(accounts) && accounts.length ? accounts[0] : null;
+  const connected = await walletClient.connect({ chain: 'evm' });
+  const owner = connected?.address || walletClient.getAddress({ chain: 'evm' }) || null;
   if (!owner) throw new Error('NO_EVM_ACCOUNT');
 
   // Best-effort chain switch
-  const currentChainHex = await window.ethereum.request({ method: 'eth_chainId' });
-  const currentChainId = parseInt(currentChainHex, 16);
+  const currentChainId = await walletClient.getChainId({ chain: 'evm' });
   if (currentChainId !== chainId) {
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: `0x${chainId.toString(16)}` }]
-      });
+      await walletClient.switchChain({ chain: 'evm', chainId });
     } catch {
       throw new Error('WRONG_CHAIN');
     }
@@ -265,13 +385,26 @@ async function mintErc8004Identity() {
   const sdk = new SDKClass({
     chainId,
     rpcUrl,
-    walletProvider: window.ethereum
+    walletProvider: evmProvider
   });
 
-  const agentName = `Agent Town Room ${roomId.slice(0, 10)}`;
-  const agentDesc = `E2EE shared room in Agent Town. roomId=${roomId}.`;
+  const draftPayload = buildErc8004RegistrationDraftPayload(roomId);
+  if (status) status.textContent = 'Creating ERC-8004 registration draft…';
+  const draft = await api('/api/erc8004/registration/draft', {
+    method: 'POST',
+    body: JSON.stringify(draftPayload)
+  });
+  const regId = typeof draft?.regId === 'string' ? draft.regId.trim() : '';
+  const tokenUri = typeof draft?.tokenUri === 'string' ? draft.tokenUri.trim() : '';
+  const completionToken = typeof draft?.completionToken === 'string' ? draft.completionToken.trim() : '';
+  if (!regId || !tokenUri || !completionToken) throw new Error('ERC8004_DRAFT_FAILED');
 
-  const agent = sdk.createAgent(agentName, agentDesc);
+  const agent = sdk.createAgent(draftPayload.name, draftPayload.description, draftPayload.image);
+  try {
+    agent.setEntityType?.('house');
+  } catch {
+    // optional in older SDK versions
+  }
 
   // Attach some metadata to make it discoverable off-chain later.
   try {
@@ -281,10 +414,7 @@ async function mintErc8004Identity() {
   }
 
   if (status) status.textContent = `Submitting ERC-8004 registration on ${chain}…`;
-
-  // NOTE: We register with an empty URI for now (no hosted registration JSON yet).
-  // The SDK will still mint the identity and return the agentId once confirmed.
-  const tx = await agent.registerHTTP('');
+  const tx = await agent.registerHTTP(tokenUri);
 
   const txHash = tx?.hash;
   const explorerBase = chainId === 1 ? 'https://etherscan.io/tx/' : 'https://sepolia.etherscan.io/tx/';
@@ -294,20 +424,50 @@ async function mintErc8004Identity() {
       : 'Submitted.';
   }
 
-  // Wait for confirmation and then update the ERC-8004 statement.
-  if (typeof tx?.waitConfirmed === 'function') {
-    if (status) status.textContent = 'Waiting for confirmation…';
-    const { result } = await tx.waitConfirmed();
-    const agentId = result?.agentId;
-    if (agentId) {
-      humanErc8004Id = agentId;
-      // If we haven't unlocked yet, still re-render the statement using the URL roomId
-      renderDescriptorUI((room && room.roomId) ? room.roomId : roomId);
-      if (status) status.textContent = `Minted identity: ${agentId}`;
-    } else {
-      if (status) status.textContent = 'Confirmed (no agentId returned).';
-    }
-  }
+  if (typeof tx?.waitConfirmed !== 'function') throw new Error('MINT_CONFIRMATION_UNAVAILABLE');
+  if (status) status.textContent = 'Waiting for confirmation…';
+
+  const { result } = await tx.waitConfirmed();
+  const registryFromUri = parseEip155AgentRegistry(result?.agentRegistry);
+  const chainIdFromResult = Number(result?.chainId);
+  const resolvedChainId = registryFromUri?.chainId
+    || (Number.isInteger(chainIdFromResult) && chainIdFromResult > 0 ? chainIdFromResult : chainId);
+  const parsedIdentity = parseMintedAgentIdentity(result?.agentId, resolvedChainId);
+  if (!parsedIdentity) throw new Error('INVALID_AGENT_ID');
+
+  const identityRegistry = resolveErc8004IdentityRegistry(
+    parsedIdentity.chainId,
+    registryFromUri?.identityRegistry,
+    result?.identityRegistry
+  );
+  if (!identityRegistry) throw new Error('INVALID_IDENTITY_REGISTRY');
+
+  await api('/api/erc8004/registration/complete', {
+    method: 'POST',
+    body: JSON.stringify({
+      regId,
+      completionToken,
+      onchain: {
+        namespace: 'eip155',
+        chainId: parsedIdentity.chainId,
+        identityRegistry,
+        agentId: parsedIdentity.agentId
+      }
+    })
+  });
+
+  humanErc8004Id = parsedIdentity.erc8004Id;
+  humanErc8004RegId = regId;
+  saveStoredErc8004Identity(roomId, {
+    type: 'erc8004_identity',
+    regId,
+    agentId: humanErc8004Id,
+    createdAtMs: Date.now()
+  });
+
+  // If we haven't unlocked yet, still re-render the statement using the URL roomId.
+  renderDescriptorUI((room && room.roomId) ? room.roomId : roomId);
+  if (status) status.textContent = `Minted identity: ${humanErc8004Id}`;
 }
 
 function renderDescriptorUI(currentRoomId) {
@@ -346,6 +506,8 @@ function clearDescriptorUI() {
 function wipeKeys() {
   unlocked = false;
   room = null;
+  humanErc8004Id = null;
+  humanErc8004RegId = null;
   KrootBytes = null;
   Kenc = null;
   el('entries').textContent = '';
@@ -404,6 +566,8 @@ async function createRoom() {
   KrootBytes = Kroot;
   Kenc = await deriveRoomEncKey(KrootBytes);
   unlocked = true;
+  humanErc8004Id = null;
+  humanErc8004RegId = null;
   el('roomId').textContent = room.roomId;
   setStatus('Room created and unlocked.');
 
@@ -431,6 +595,7 @@ async function unlockExistingRoom(roomId) {
   KrootBytes = Kroot;
   Kenc = await deriveRoomEncKey(KrootBytes);
   unlocked = true;
+  restoreStoredErc8004Identity(room.roomId);
   el('roomId').textContent = room.roomId;
   setStatus('Unlocked.');
 
@@ -497,7 +662,7 @@ async function init() {
       await connectWallet();
       setStatus('Wallet connected.');
     } catch (e) {
-      setError(e.message === 'NO_SOLANA_WALLET' ? 'No Solana wallet found (need Phantom/Solflare).' : e.message);
+      setError(e.message === 'NO_SOLANA_WALLET' ? 'No Privy-connected Solana wallet found.' : e.message);
     }
   });
 

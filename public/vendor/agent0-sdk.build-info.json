@@ -1,0 +1,17 @@
+{
+  "builtAt": "2026-03-02T10:27:57.903Z",
+  "source": {
+    "path": "vendors/agent0-ts",
+    "commit": "b25805b79d88d8d29f60df91110bb36caf4dd4b4",
+    "branch": "main"
+  },
+  "output": {
+    "file": "public/vendor/agent0-sdk.mjs",
+    "bytes": 1932886,
+    "sha256": "b2a3d903ea563181a017085ad16eae08f4d089e859318d16f9cd7aa8b80b0214"
+  },
+  "notes": [
+    "Bundle built from local Agent-Town fork checkout.",
+    "fs is externalized for Node-only addFile() dynamic import path."
+  ]
+}

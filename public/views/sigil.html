@@ -1,0 +1,29 @@
+<div class="panel spaced" data-testid="townhall-single-path-note">
+    <h2 style="margin:0 0 6px">Sigil Test</h2>
+    <p class="small" style="margin-top:0">
+        Welcome to the House Ceremony. You need to prove the bond with your agent.
+    </p>
+</div>
+
+
+
+<div style="max-width: 600px; margin: 0 auto;">
+    <div class="panel" id="step2Panel">
+        <h2 style="margin:0 0 6px">Sigil Test</h2>
+        <p class="small" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.
+        </p>
+
+        <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
+
+        <div style="margin-top:12px" class="lock" data-testid="match-status">
+            <span class="state bad" id="matchState">LOCKED</span>
+            <span class="small" id="matchDetail">Pick the same sigil to unlock.</span>
+        </div>
+        <div class="kv" style="margin-top:10px">
+            <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
+            <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for
+                agent…</span>
+        </div>
+        <div class="small" id="openError" style="color: var(--bad);"></div>
+    </div>
+</div>

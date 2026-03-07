@@ -31,6 +31,152 @@ Response:
 ### GET `/api/health`
 Returns `{ ok: true, time: ISO8601 }`.
 
+### GET `/api/privy/config`
+Returns browser-safe Privy config from server env.
+
+Response (enabled):
+```json
+{
+  "ok": true,
+  "enabled": true,
+  "startPageEnabled": true,
+  "appPath": "/app",
+  "config": {
+    "appId": "<privy app id>",
+    "clientId": "<optional>",
+    "sdkScriptUrl": "<optional>",
+    "sdkModuleUrl": "<optional>",
+    "loginMethod": "email"
+  }
+}
+```
+
+Response (disabled):
+```json
+{ "ok": true, "enabled": false, "startPageEnabled": false, "appPath": "/app", "config": null }
+```
+
+Notes:
+- Only public config is returned.
+- `PRIVY_APP_SECRET` is server-only and is never exposed by this endpoint.
+- `sdkScriptUrl` / `sdkModuleUrl` are omitted when unset or invalid (for example placeholder `*.example.com` values).
+- In `NODE_ENV=test`, this endpoint is disabled by default unless `ENABLE_PRIVY_IN_TEST=true`.
+- Browser CSP for this app allows Privy SDK module loading from `esm.sh`, `cdn.jsdelivr.net`, and `cdn.skypack.dev`.
+
+### GET `/api/privy/transactions/:transactionId`
+Returns server-side Privy transaction status for a client-submitted sponsored transaction.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "transaction": {
+    "id": "tx_...",
+    "status": "pending|confirmed|failed|...",
+    "transactionHash": "0x...|null",
+    "userOperationHash": "0x...|null"
+  }
+}
+```
+
+Notes:
+- Used by Town Hall EVM mint when Privy returns a sponsored `transactionId` before a chain tx hash is available.
+- Requires `PRIVY_APP_SECRET` on the server. If missing, returns `PRIVY_SERVER_AUTH_NOT_CONFIGURED`.
+- This endpoint never returns app secrets.
+- Errors: `MISSING_PRIVY_TRANSACTION_ID`, `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `PRIVY_TRANSACTION_STATUS_UNAVAILABLE`.
+
+### POST `/api/privy/wallet-rpc/prepare`
+Prepares a canonical signed payload for sponsored Privy wallet RPC relay.
+
+Request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": {
+    "method": "signAndSendTransaction",
+    "params": {
+      "transaction": "<base64 serialized tx>",
+      "encoding": "base64"
+    },
+    "sponsor": true,
+    "caip2": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+  }
+}
+```
+
+Alternate EVM request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": {
+    "chain_type": "ethereum",
+    "method": "eth_sendTransaction",
+    "params": {
+      "transaction": {
+        "from": "0x...",
+        "to": "0x...",
+        "data": "0x..."
+      }
+    },
+    "sponsor": true,
+    "caip2": "eip155:11155111"
+  }
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "walletId": "wallet_...",
+  "body": { "...normalized rpc body..." },
+  "signingPayload": {
+    "version": 1,
+    "url": "https://api.privy.io/v1/wallets/<walletId>/rpc",
+    "method": "POST",
+    "headers": { "privy-app-id": "<privy app id>" },
+    "body": { "...normalized rpc body..." }
+  }
+}
+```
+
+Notes:
+- Used by frontend to sign the exact payload with Privy user signer (`generateAuthorizationSignature`) before relay.
+- Server validates and normalizes sponsored wallet RPC bodies for:
+  - EVM `eth_sendTransaction`
+  - Solana `signAndSendTransaction` (base64-encoded transaction payload)
+- Errors include: `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `INVALID_PRIVY_WALLET_ID`, and `INVALID_PRIVY_WALLET_RPC_*`.
+
+### POST `/api/privy/wallet-rpc/relay`
+Relays a signed Privy wallet RPC request through server auth.
+
+Request shape:
+```json
+{
+  "walletId": "wallet_...",
+  "body": { "...normalized rpc body from /prepare..." },
+  "signature": "<privy authorization signature>"
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "result": {
+    "transaction_id": "tx_...",
+    "transaction_hash": "0x... (optional, EVM)",
+    "user_operation_hash": "0x... (optional, EVM)",
+    "hash": "<base58 signature optional, Solana>"
+  }
+}
+```
+
+Notes:
+- Maintains user ownership: frontend wallet signs payload; server only relays with app auth.
+- Relay endpoint never exposes app secret.
+- Errors include: `PRIVY_DISABLED`, `PRIVY_SERVER_AUTH_NOT_CONFIGURED`, `INVALID_PRIVY_WALLET_ID`, `MISSING_PRIVY_AUTH_SIGNATURE`, `PRIVY_WALLET_RPC_RELAY_FAILED`.
+
 ---
 
 ## Home / state
@@ -43,7 +189,12 @@ Response shape:
 {
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
+  "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  },
   "stats": { "signups": 0, "publicTeams": 0 }
 }
 ```
@@ -58,7 +209,12 @@ Response shape (same fields as `/api/session`):
 {
   "ok": true,
   "teamCode": "TEAM-ABCD-EFGH",
+  "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  },
   "stats": { "signups": 0, "publicTeams": 0 }
 }
 ```
@@ -69,6 +225,600 @@ Includes:
 - `houseId` (string | null) — present after the house ceremony completes for this session.
 - `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.
+- `ceremony` — boolean ceremony-state snapshot:
+  - `ceremony.humanCommit`
+  - `ceremony.agentCommit`
+  - `ceremony.humanReveal`
+  - `ceremony.agentReveal`
+  - `ceremony.humanRevealPub`
+  - `ceremony.agentRevealPub`
+  - `ceremony.houseId`
+- `experience` — single polling state machine snapshot:
+  - `experience.id` (`"agent_town_coop_v1"`)
+  - `experience.step` (for example: `connect_agent`, `mirror_sigil`, `press_open`, `wait_human_commit`, `agent_commit`, `wait_human_reveal`, `agent_reveal`, `ready_for_house_init`, `house_ready`)
+  - `experience.nextAgentAction` (`"agent_town_ceremony_commit"` | `"agent_town_ceremony_reveal"` | null)
+  - `experience.pollMs` (recommended polling interval in milliseconds)
+- `hatch` — Phase 1 single-path hatch state:
+  - `hatch.complete` (boolean)
+  - `hatch.createdAt` (ISO string | null)
+  - `hatch.agentKind` (`"openclaw-lite"` | null)
+- `agent.source` (`"openclaw-lite"` | `"external"` | null)
+- `lite` — OpenClaw Lite runtime state:
+  - `lite.driver` (`"vendor"`)
+  - `lite.runtimeReady` (boolean)
+  - `lite.llmConfigured` (boolean, legacy server metadata; local-only UI flow does not rely on it)
+  - `lite.llmProvider` (string | null, legacy server metadata)
+  - `lite.llmModel` (string | null, legacy server metadata)
+  - `lite.runtimeVersion` (string | null)
+  - `lite.lastError` (string | null)
+
+### POST `/api/hatch/complete` (human)
+Marks hatch completion for the current browser session.
+
+Behavior:
+- sets `hatch.complete=true`
+- sets `hatch.agentKind="openclaw-lite"`
+- leaves agent disconnected until runtime boot is complete and the browser has local LLM config
+
+Response:
+```json
+{
+  "ok": true,
+  "hatch": { "complete": true, "createdAt": "2026-02-12T00:00:00.000Z", "agentKind": "openclaw-lite" },
+  "agent": { "connected": false, "source": null, "name": "OpenClaw Lite" }
+}
+```
+
+### POST `/api/agent/lite/connect` (human)
+Connects the in-browser OpenClaw Lite agent for the current session.
+
+Body:
+```json
+{}
+```
+
+Errors:
+- `HATCH_REQUIRED` (hatch must be completed first)
+- `LITE_RUNTIME_NOT_READY` (vendor runtime bootstrap not completed)
+
+### GET `/api/agent/lite/runtime` (human)
+Returns deterministic runtime bootstrap metadata.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "teamCode": "TEAM-ABCD-EFGH",
+  "origin": "http://localhost:4173",
+  "runtimeVersion": "1.2.0",
+  "driver": "vendor",
+  "featureFlags": { "llmConfigRequired": true, "trainerNamespace": true }
+}
+```
+
+### GET `/api/agent/lite/llm/config` (human)
+Returns non-secret server-side LLM metadata for the current session.
+This endpoint is legacy for the local-only vendor flow.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "configured": false,
+  "provider": null,
+  "model": null,
+  "apiKeySet": false
+}
+```
+
+### POST `/api/agent/lite/llm/config` (human)
+Saves server-side LLM provider/model metadata.
+Local-only vendor flow does not require calling this endpoint.
+- `onboarding` — Town Hall onboarding state:
+  - `required` (boolean) — whether Town Hall gating is enforced in this deployment.
+  - `registrationComplete` (boolean)
+  - `profile.humanName`, `profile.agentName`
+  - `profile.humanAvatar` / `profile.agentAvatar` (`image`, `prompt`, `source`, `updatedAt`)
+  - `erc8004.user.evm` (`id`, `chain`, `txHash`, `updatedAt`)
+  - `erc8004.user.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+  - `erc8004.agent.evm` (`id`, `chain`, `txHash`, `updatedAt`)
+  - `erc8004.agent.solana` (`id`, `cluster`, `txSig`, `updatedAt`)
+  -  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "apiKey": "sk-..."
+}
+```
+
+Errors:
+- `HATCH_REQUIRED`
+- `MISSING_LLM_PROVIDER`
+- `MISSING_LLM_MODEL`
+- `MISSING_LLM_API_KEY`
+- `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
+
+### DELETE `/api/agent/lite/llm/config` (human)
+Clears server-side LLM configuration metadata for the current session.
+
+Behavior:
+- sets `lite.llmConfigured=false`
+- clears `lite.llmProvider` and `lite.llmModel`
+- keeps API key secret material server-hidden
+- disconnects `agent.source="openclaw-lite"` until configuration is saved again
+
+### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
+Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
+
+Behavior:
+- creates deterministic in-memory attempt state (`attemptId`, `state`, `code_verifier`, expiry)
+- returns the OpenAI authorization URL with PKCE challenge
+- binds localhost callback capture on `http://localhost:1455/auth/callback` when available
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attemptId": "ocx_...",
+  "state": "hex-state",
+  "authorizeUrl": "https://auth.openai.com/oauth/authorize?...",
+  "redirectUri": "http://localhost:1455/auth/callback",
+  "expiresAtMs": 1770000000000,
+  "callbackServer": { "ready": true, "error": "", "host": "127.0.0.1", "port": 1455 }
+}
+```
+
+### GET `/api/agent/lite/llm/oauth/openai-codex/status?attemptId=...` (human)
+Reads current PKCE attempt status for polling/debug.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attempt": {
+    "id": "ocx_...",
+    "state": "hex-state",
+    "status": "pending",
+    "hasCode": false
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+
+### POST `/api/agent/lite/llm/oauth/openai-codex/exchange` (human)
+Exchanges the PKCE authorization code for access/refresh tokens.
+
+Body:
+```json
+{
+  "attemptId": "ocx_...",
+  "callbackInput": "http://localhost:1455/auth/callback?code=...&state=..."
+}
+```
+
+`callbackInput` is optional if callback capture already received the code.
+`attemptId` is required for poll-only completion (`callbackInput` omitted), but can be omitted when `callbackInput` includes a valid `state`; in that case the backend resolves the matching live attempt by state for the same session.
+
+Success response shape:
+```json
+{
+  "ok": true,
+  "credential": {
+    "provider": "openai-codex",
+    "access": "eyJ...",
+    "refresh": "...",
+    "expires": 1770000000000,
+    "accountId": "acct_..."
+
+### GET `/api/townhall/state` (human)
+Returns Town Hall onboarding state for the current session.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "houseId": "....|null",
+  "locked": true,
+  "onboarding": {
+    "required": true,
+    "registrationComplete": false
+  }
+}
+```
+
+### GET `/api/townhall/mint/config` (human)
+Returns live-mint feature/config flags for Town Hall.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "mint": {
+    "enabled": true,
+    "pinataEnabled": true,
+    "evm": {
+      "enabled": true,
+      "chainId": 11155111,
+      "network": "sepolia",
+      "rpcUrl": "https://sepolia.infura.io/v3/...",
+      "contractAddress": "0x8004a818bfb912233c491871b3d84c89a494bd9e"
+    },
+    "solana": {
+      "enabled": true,
+      "cluster": "devnet",
+      "rpcUrl": "https://api.devnet.solana.com",
+      "web3ModuleUrl": "https://esm.sh/@solana/web3.js@1.98.4?bundle",
+      "sponsorSendEnabled": true,
+      "sponsorFeePayer": "<solana base58>|null",
+      "sponsorSendError": "SOLANA_SPONSOR_SECRET_INVALID|null"
+    }
+  }
+}
+```
+
+### POST `/api/townhall/mint/evm/prepare` (human)
+Pins Town Hall metadata to IPFS and returns `tokenUri` + EVM mint settings.
+Frontend wallet performs the actual Sepolia transaction and remains owner.
+
+Body:
+```json
+{
+  "walletAddress": "0x...",
+  "subject": "human",
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  }
+}
+```
+
+Notes:
+- Frontend sends `eth_sendTransaction` from the connected Privy EVM wallet to `evm.contractAddress` (`register(string,(string,bytes)[])`), then derives ERC-8004 ID from the confirmed receipt logs.
+- If Privy sponsorship returns a `transactionId` without an immediate tx hash, frontend polls `GET /api/privy/transactions/:transactionId` until `transactionHash` is available, then confirms receipt.
+
+Response:
+```json
+{
+  "ok": true,
+  "tokenUri": "ipfs://bafy...",
+  "metadataCid": "bafy...",
+  "subject": "human",
+  "evm": {
+    "chainId": 11155111,
+    "network": "sepolia",
+    "rpcUrl": "https://sepolia.infura.io/v3/...",
+    "contractAddress": "0x8004a818bfb912233c491871b3d84c89a494bd9e"
+  }
+}
+```
+
+### POST `/api/townhall/mint/solana/prepare` (human)
+Pins Town Hall metadata to IPFS and returns an unsigned prepared Solana transaction.
+Frontend wallet signs this transaction (user wallet + local asset keypair). If sponsorship is enabled, the server fee-payer signs and broadcasts in a second step.
+
+Body:
+```json
+{
+  "walletAddress": "<solana base58>",
+  "assetPubkey": "<solana base58>",
+  "subject": "agent",
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  }
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "tokenUri": "ipfs://bafy...",
+  "metadataCid": "bafy...",
+  "subject": "agent",
+  "erc8004Id": "solana:<asset>",
+  "prepared": {
+    "transaction": "<base64 unsigned tx>",
+    "blockhash": "...",
+    "lastValidBlockHeight": 12345,
+    "signer": "<solana base58>",
+    "signed": false
+  },
+  "solana": {
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "assetPubkey": "<solana base58>",
+    "sponsorSendEnabled": true,
+    "sponsorFeePayer": "<solana base58>|null"
+  }
+}
+```
+
+### POST `/api/townhall/mint/solana/sponsor-send` (human)
+Broadcasts a client-signed Solana registration transaction using the server fee payer.
+
+Body:
+```json
+{
+  "walletAddress": "<solana base58>",
+  "assetPubkey": "<solana base58>",
+  "transaction": "<base64 client-signed tx>"
+}
+```
+
+Behavior:
+- Server may auto-top-up the owner wallet from the sponsor fee payer before/while sending when `SOLANA_SPONSOR_AUTO_TOPUP=true`.
+- Default owner pre-fund target is `10,000,000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
+
+Response:
+```json
+{
+  "ok": true,
+  "signature": "<solana tx signature>",
+  "solana": {
+    "signature": "<solana tx signature>",
+    "cluster": "devnet",
+    "rpcUrl": "https://api.devnet.solana.com",
+    "feePayer": "<solana base58>"
+  }
+}
+```
+
+Errors (prepare endpoints):
+- `MINT_DISABLED`
+- `PINATA_NOT_CONFIGURED`
+- `MINT_EVM_NOT_CONFIGURED`
+- `MINT_SOLANA_NOT_CONFIGURED`
+- `MISSING_HUMAN_NAME`
+- `MISSING_AGENT_NAME`
+- `MISSING_HUMAN_AVATAR_PROMPT`
+- `MISSING_AGENT_AVATAR_PROMPT`
+- `INVALID_TOWNHALL_IMAGE`
+- `TOWNHALL_IMAGE_TOO_LARGE`
+- `INVALID_EVM_ADDRESS` (EVM prepare only)
+- `INVALID_MINT_SUBJECT`
+- `MISSING_SOLANA_ADDRESS` (Solana prepare only)
+- `MISSING_SOLANA_ASSET_PUBKEY` (Solana prepare only)
+- `PINATA_UPLOAD_FAILED`
+- `SOLANA_PREPARE_FAILED` (Solana prepare only)
+- `SOLANA_SPONSOR_NOT_CONFIGURED`
+- `SOLANA_SPONSOR_SECRET_INVALID`
+- `INVALID_SOLANA_SPONSORED_TX`
+- `SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING`
+- `SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING`
+- `SOLANA_SPONSORED_TX_NOT_PREPARED`
+- `SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER`
+- `SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET`
+- `SOLANA_SPONSOR_FEEPAYER_UNFUNDED`
+- `SOLANA_SPONSORED_OWNER_UNFUNDED`
+- `SOLANA_SPONSOR_SEND_FAILED`
+
+Notes:
+- For `PINATA_UPLOAD_FAILED`, response may include optional `detail` with upstream Pinata reason (e.g. `NO_SCOPES_FOUND`).
+- For `SOLANA_SPONSORED_TX_NOT_PREPARED`, response may include optional `detail` describing wallet/asset/hash mismatch context.
+
+### POST `/api/townhall/register` (human)
+Saves Town Hall registration metadata and marks registration complete.
+
+Body:
+```json
+{
+  "profile": {
+    "humanName": "Promptmancer",
+    "agentName": "OpenClaw",
+    "humanAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." },
+    "agentAvatar": { "prompt": "text...", "image": "data:image/png;base64,..." }
+  },
+  "erc8004": {
+    "user": {
+      "evm": { "id": "11155111:123", "chain": "sepolia", "txHash": "0x..." },
+      "solana": { "id": "solana:userAsset...", "cluster": "devnet", "txSig": "..." }
+    },
+    "agent": {
+      "evm": { "id": "11155111:124", "chain": "sepolia", "txHash": "0x..." },
+      "solana": { "id": "solana:agentAsset...", "cluster": "devnet", "txSig": "..." }
+    }
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+- `STATE_MISMATCH`
+- `CODE_PENDING`
+- `TOKEN_EXCHANGE_FAILED`
+- `TOKEN_EXCHANGE_UNAVAILABLE`
+- `TOKEN_RESPONSE_INVALID`
+- `ACCOUNT_ID_MISSING`
+- `MISSING_HUMAN_NAME`
+- `MISSING_AGENT_NAME`
+- `MISSING_HUMAN_AVATAR_PROMPT`
+- `MISSING_AGENT_AVATAR_PROMPT`
+- `MISSING_ERC8004_USER_EVM_ID`
+- `MISSING_ERC8004_USER_SOLANA_ID`
+- `MISSING_ERC8004_AGENT_EVM_ID`
+- `MISSING_ERC8004_AGENT_SOLANA_ID`
+- `INVALID_TOWNHALL_IMAGE`
+- `TOWNHALL_IMAGE_TOO_LARGE`
+
+---
+
+### POST `/api/hatch/complete` (human)
+Marks hatch completion for the current browser session.
+
+Behavior:
+- sets `hatch.complete=true`
+- sets `hatch.agentKind="openclaw-lite"`
+- leaves agent disconnected until runtime boot is complete and the browser has local LLM config
+
+Response:
+```json
+{
+  "ok": true,
+  "hatch": { "complete": true, "createdAt": "2026-02-12T00:00:00.000Z", "agentKind": "openclaw-lite" },
+  "agent": { "connected": false, "source": null, "name": "OpenClaw Lite" }
+}
+```
+
+### POST `/api/agent/lite/connect` (human)
+Connects the in-browser OpenClaw Lite agent for the current session.
+
+Body:
+```json
+{}
+```
+
+Errors:
+- `HATCH_REQUIRED` (hatch must be completed first)
+- `LITE_RUNTIME_NOT_READY` (vendor runtime bootstrap not completed)
+
+### GET `/api/agent/lite/runtime` (human)
+Returns deterministic runtime bootstrap metadata.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "teamCode": "TEAM-ABCD-EFGH",
+  "origin": "http://localhost:4173",
+  "runtimeVersion": "1.2.0",
+  "driver": "vendor",
+  "featureFlags": { "llmConfigRequired": true, "trainerNamespace": true }
+}
+```
+
+### GET `/api/agent/lite/llm/config` (human)
+Returns non-secret server-side LLM metadata for the current session.
+This endpoint is legacy for the local-only vendor flow.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "configured": false,
+  "provider": null,
+  "model": null,
+  "apiKeySet": false
+}
+```
+
+### POST `/api/agent/lite/llm/config` (human)
+Saves server-side LLM provider/model metadata.
+Local-only vendor flow does not require calling this endpoint.
+
+Body:
+```json
+{
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "apiKey": "sk-..."
+}
+```
+
+Errors:
+- `HATCH_REQUIRED`
+- `MISSING_LLM_PROVIDER`
+- `MISSING_LLM_MODEL`
+- `MISSING_LLM_API_KEY`
+- `ONBOARDING_TOWNHALL_REQUIRED` (HTTP 409 when Town Hall registration is still incomplete and onboarding gating is required)
+
+### DELETE `/api/agent/lite/llm/config` (human)
+Clears server-side LLM configuration metadata for the current session.
+
+Behavior:
+- sets `lite.llmConfigured=false`
+- clears `lite.llmProvider` and `lite.llmModel`
+- keeps API key secret material server-hidden
+- disconnects `agent.source="openclaw-lite"` until configuration is saved again
+
+### POST `/api/agent/lite/llm/oauth/openai-codex/start` (human)
+Starts a PKCE OAuth attempt for OpenAI Codex (ChatGPT subscription auth).
+
+Behavior:
+- creates deterministic in-memory attempt state (`attemptId`, `state`, `code_verifier`, expiry)
+- returns the OpenAI authorization URL with PKCE challenge
+- binds localhost callback capture on `http://localhost:1455/auth/callback` when available
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attemptId": "ocx_...",
+  "state": "hex-state",
+  "authorizeUrl": "https://auth.openai.com/oauth/authorize?...",
+  "redirectUri": "http://localhost:1455/auth/callback",
+  "expiresAtMs": 1770000000000,
+  "callbackServer": { "ready": true, "error": "", "host": "127.0.0.1", "port": 1455 }
+}
+```
+
+### GET `/api/agent/lite/llm/oauth/openai-codex/status?attemptId=...` (human)
+Reads current PKCE attempt status for polling/debug.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "attempt": {
+    "id": "ocx_...",
+    "state": "hex-state",
+    "status": "pending",
+    "hasCode": false
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+
+### POST `/api/agent/lite/llm/oauth/openai-codex/exchange` (human)
+Exchanges the PKCE authorization code for access/refresh tokens.
+
+Body:
+```json
+{
+  "attemptId": "ocx_...",
+  "callbackInput": "http://localhost:1455/auth/callback?code=...&state=..."
+}
+```
+
+`callbackInput` is optional if callback capture already received the code.
+`attemptId` is required for poll-only completion (`callbackInput` omitted), but can be omitted when `callbackInput` includes a valid `state`; in that case the backend resolves the matching live attempt by state for the same session.
+
+Success response shape:
+```json
+{
+  "ok": true,
+  "credential": {
+    "provider": "openai-codex",
+    "access": "eyJ...",
+    "refresh": "...",
+    "expires": 1770000000000,
+    "accountId": "acct_..."
+  }
+}
+```
+
+Errors:
+- `MISSING_ATTEMPT_ID`
+- `OAUTH_ATTEMPT_NOT_FOUND`
+- `OAUTH_ATTEMPT_FORBIDDEN`
+- `STATE_MISMATCH`
+- `CODE_PENDING`
+- `TOKEN_EXCHANGE_FAILED`
+- `TOKEN_EXCHANGE_UNAVAILABLE`
+- `TOKEN_RESPONSE_INVALID`
+- `ACCOUNT_ID_MISSING`
 
 ---
 
@@ -87,6 +837,8 @@ Body:
 ```
 
 ### POST `/api/agent/connect`
+Connects an external agent client by Team Code.
+
 Body:
 ```json
 { "teamCode": "TEAM-ABCD-EFGH", "agentName": "OpenClaw" }
@@ -94,6 +846,12 @@ Body:
 
 ### GET `/api/agent/state?teamCode=TEAM-ABCD-EFGH`
 Agent-friendly state snapshot.
+
+Includes:
+- `agent`, `human`, `match`, `signup` (co-op/open progress)
+- `ceremony` (same booleans as human `/api/state`)
+- `experience` (single experience polling contract with `step`, `nextAgentAction`, `pollMs`)
+- `houseId` shortcut (same as `ceremony.houseId`)
 
 ---
 
@@ -148,6 +906,247 @@ Errors:
 - `NONCE_MISMATCH`
 - `RPC_UNAVAILABLE` (Solana RPC not reachable)
 - `ALREADY_SIGNED_UP` (session already completed via agent)
+
+---
+
+## Claimable reservations
+
+Reservations pre-assign deterministic `houseId`s that can later be claimed.
+
+Reservation kinds:
+- `x` (X handle claim)
+- `erc8004` (ERC-8004 owner-wallet claim, EVM or Solana)
+
+### POST `/api/reservations/x` (admin)
+Creates an X reservation for `@handle`.
+
+Body:
+```json
+{ "handle": "alice" }
+```
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response:
+```json
+{ "ok": true, "houseId": "<base58>", "status": "reserved" }
+```
+
+### POST `/api/reservations/erc8004` (admin)
+Creates an ERC-8004 reservation bound to an owner wallet.
+
+Body:
+```json
+{
+  "agentId": "11155111:0x...:947|11155111:947|solana:<asset>",
+  "claimChain": "evm|solana",
+  "ownerAddress": "0x...|<base58>",
+  "aliases": ["optional additional IDs"]
+}
+```
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response:
+```json
+{
+  "ok": true,
+  "reservationId": "rv_...",
+  "houseId": "<base58>",
+  "status": "reserved",
+  "claimChain": "evm|solana",
+  "agentId": "<canonical key>"
+}
+```
+
+### GET `/api/claim/x/challenge?handle=...` (human)
+Starts X claim challenge for a reserved handle.
+
+Response:
+```json
+{
+  "ok": true,
+  "handle": "alice",
+  "nonce": "<hex>",
+  "challenge": "AgentTown X Claim\\nhandle: @alice\\nnonce: ...",
+  "expiresInMs": 1800000
+}
+```
+
+Errors:
+- `RESERVATION_REQUIRED`
+- `INVALID_HANDLE`
+
+### POST `/api/claim/x/verify` (human)
+Verifies public X post challenge and binds session to the reserved `houseId`.
+
+Body:
+```json
+{ "handle": "alice", "nonce": "<hex>", "tweetUrl": "https://x.com/alice/status/..." }
+```
+
+Response:
+```json
+{ "ok": true, "verified": true, "houseId": "<base58>", "nextUrl": "/create?reserved=..." }
+```
+
+### GET `/api/claim/erc8004/nonce?agentId=...` (human)
+Starts ERC-8004 claim challenge for a reserved ERC-8004 identity.
+
+`agentId` formats currently accepted:
+- EVM short: `<chainId>:<tokenId>`
+- EVM full: `<chainId>:<contractAddress>:<tokenId>`
+- Solana: `solana:<asset>` (or bare `<asset>`)
+
+Response:
+```json
+{
+  "ok": true,
+  "nonce": "<hex>",
+  "message": "Agent Town ERC-8004 Claim\\nagentId: ...\\nnonce: ...",
+  "agentId": "<canonical agent id>",
+  "claimChain": "evm|solana"
+}
+```
+
+Errors:
+- `RESERVATION_REQUIRED`
+- `CLAIM_UNAVAILABLE`
+
+### POST `/api/claim/erc8004/verify` (human)
+Verifies claim signature against reservation owner wallet and binds session to reserved `houseId`.
+
+Body:
+```json
+{
+  "agentId": "<canonical agent id from nonce response>",
+  "nonce": "<hex>",
+  "signature": "<hex for EVM | base64 for Solana>",
+  "address": "<owner wallet address>"
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "verified": true,
+  "claimChain": "evm|solana",
+  "houseId": "<base58>",
+  "nextUrl": "/create?reserved=..."
+}
+```
+
+Errors:
+- `NONCE_MISMATCH`
+- `BAD_SIGNATURE`
+- `OWNER_MISMATCH`
+- `RESERVATION_REQUIRED`
+- `CLAIM_UNAVAILABLE`
+
+---
+
+## ERC-8004 registration drafts
+
+Portal supports a draft -> mint -> complete workflow for ERC-8004 `tokenUri` stability.
+
+### POST `/api/erc8004/registration/draft`
+Creates a draft registration and returns a stable `tokenUri`.
+
+Body:
+```json
+{
+  "context": { "kind": "house", "houseId": "..." },
+  "entityType": "human|agent|tool|skill|experience|house",
+  "name": "Display name",
+  "description": "Description",
+  "image": "https://...",
+  "services": [{ "name": "web", "endpoint": "https://..." }],
+  "permissionManifest": { "...": "optional extension object" },
+  "provenance": { "...": "optional extension object" }
+}
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "regId": "reg_...",
+  "tokenUri": "https://<origin>/api/erc8004/registration/reg_....json",
+  "completionToken": "rct_..."
+}
+```
+
+Notes:
+- `completionToken` is required by `/api/erc8004/registration/complete`.
+- `completionToken` is secret material for completion authorization and must not be published.
+
+Validation notes:
+- `entityType` must be one of: `human|agent|tool|skill|experience|house`.
+- `services` must contain at least one `web` service with an allowed endpoint.
+
+### GET `/api/erc8004/registration/:regId.json`
+Returns ERC-8004 registration-v1 JSON.
+
+Response shape:
+```json
+{
+  "type": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1",
+  "name": "...",
+  "description": "...",
+  "image": "...",
+  "services": [{ "name": "web", "endpoint": "..." }],
+  "x402Support": false,
+  "active": true,
+  "registrations": [
+    { "agentId": 947, "agentRegistry": "eip155:11155111:0x..." }
+  ],
+  "supportedTrust": [],
+  "entityType": "optional extension",
+  "permissionManifest": {},
+  "provenance": {}
+}
+```
+
+Notes:
+- If draft is not completed yet, `registrations` is an empty array.
+- In dev/test, this endpoint is served with `Cache-Control: no-store`.
+
+### POST `/api/erc8004/registration/complete`
+Attaches on-chain mint identity to a draft.
+
+Body:
+```json
+{
+  "regId": "reg_...",
+  "completionToken": "rct_...",
+  "onchain": {
+    "namespace": "eip155",
+    "chainId": 11155111,
+    "identityRegistry": "0x...",
+    "agentId": 947
+  }
+}
+```
+
+Response:
+```json
+{ "ok": true }
+```
+
+Errors:
+- `MISSING_REG_ID`
+- `MISSING_COMPLETION_TOKEN`
+- `MISSING_ONCHAIN`
+- `INVALID_NAMESPACE`
+- `INVALID_CHAIN_ID`
+- `INVALID_IDENTITY_REGISTRY`
+- `INVALID_AGENT_ID`
+- `INVALID_COMPLETION_TOKEN`
+- `ALREADY_COMPLETED`
+- `NOT_FOUND`
 
 ---
 
@@ -385,7 +1384,7 @@ Rules:
 - Per-pair rate limit is enforced (`RATE_LIMITED_PONY`).
 - Strict cutover:
   - `ciphertext.alg` must be `PONY_E2EE_P256_AESGCM_V1` for key-enabled houses unless `allowLegacyPlaintext=true` is set on receiver policy.
-  - For houses without Pony inbox keys, legacy plaintext remains allowed by default during migration.
+  - For houses without Pony inbox keys, legacy plaintext is blocked by default unless receiver policy explicitly enables it.
   - Plaintext payload size is capped (`PONY_CIPHERTEXT_TOO_LARGE`).
 
 Response:
@@ -758,7 +1757,12 @@ Body:
   "housePubKey": "<base58>",
   "nonce": "n_...",
   "keyMode": "ceremony",
-  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "unlock": {
+    "kind": "wallet-signature",
+    "provider": "privy",
+    "chain": "solana",
+    "address": "..."
+  },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
   "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
   "ponyInboxPub": "<optional base64 SPKI>",
@@ -784,7 +1788,12 @@ Body:
   "housePubKey": "<base58>",
   "nonce": "n_...",
   "keyMode": "ceremony",
-  "unlock": { "kind": "solana-wallet-signature", "address": "..." },
+  "unlock": {
+    "kind": "wallet-signature",
+    "provider": "privy",
+    "chain": "solana",
+    "address": "..."
+  },
   "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" },
   "houseAuthKey": "<base64 HKDF-SHA256(K_root, info=elizatown-house-auth-v1)>",
   "ponyInboxPub": "<optional base64 SPKI>",
@@ -795,9 +1804,12 @@ Body:
 ### House auth headers (required)
 For these endpoints:
 - `GET /api/house/:id/meta`
+- `GET /api/house/:id/onboarding`
 - `GET /api/house/:id/log`
 - `POST /api/house/:id/append`
 - `POST /api/house/:id/public-media`
+- `GET /api/house/:id/agent-state`
+- `POST /api/house/:id/agent-state`
 
 Send:
 - `x-house-ts`: unix ms timestamp as string
@@ -812,6 +1824,23 @@ Where:
 Returns:
 ```json
 { "ok": true, "houseId": "...", "housePubKey": "...", "nonce": "...", "keyMode": "ceremony" }
+```
+
+### GET `/api/house/:id/onboarding`
+House-authenticated endpoint returning the onboarding metadata snapshot captured at house creation.
+
+Returns:
+```json
+{
+  "ok": true,
+  "houseId": "...",
+  "onboarding": {
+    "required": true,
+    "registrationComplete": true,
+    "profile": { "...": "..." },
+    "erc8004": { "...": "..." }
+  }
+}
 ```
 
 ### GET `/api/house/:id/log`
@@ -854,6 +1883,72 @@ Constraints:
 - `prompt` max 280 chars.
 - `image` and `prompt` must both be present (or both cleared).
 
+### GET `/api/house/:id/agent-state`
+Returns the latest persisted OpenClaw Lite agent snapshot for this house.
+
+Response:
+```json
+{
+  "ok": true,
+  "agentState": {
+    "v": 1,
+    "kind": "openclaw-lite-state-sealed",
+    "schema": "openclaw-lite-state-sealed@1",
+    "createdAt": "ISO8601",
+    "houseId": "<base58|null>",
+    "ciphertext": {
+      "alg": "AES-GCM",
+      "iv": "<base64>",
+      "ct": "<base64>"
+    }
+  } | null,
+  "updatedAt": "ISO8601|null",
+  "sizeBytes": 12345
+}
+```
+Notes:
+- House UI stores agent state as sealed ciphertext JSON (`openclaw-lite-state-sealed@1`) derived from the unlocked house key.
+- Legacy/plain snapshots (`openclaw-lite-state@1`) may still exist and are accepted.
+
+### POST `/api/house/:id/agent-state`
+Stores or replaces the OpenClaw Lite snapshot for this house.
+
+Body (sealed, preferred):
+```json
+{
+  "snapshot": {
+    "v": 1,
+    "kind": "openclaw-lite-state-sealed",
+    "schema": "openclaw-lite-state-sealed@1",
+    "createdAt": "ISO8601",
+    "houseId": "<base58|null>",
+    "ciphertext": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" }
+  }
+}
+```
+
+Body (plain, accepted for migration/import tools):
+```json
+{
+  "snapshot": {
+    "v": 1,
+    "kind": "openclaw-lite-state",
+    "schema": "openclaw-lite-state@1",
+    "createdAt": "ISO8601",
+    "stores": {
+      "meta": [{ "key": "houseId", "value": "<base58>" }],
+      "vfs": [{ "path": "workspace/AGENTS.md", "updatedAtMs": 0, "dataB64": "..." }],
+      "checkpoints": [{ "checkpointId": "cp_..." }]
+    }
+  }
+}
+```
+
+Errors:
+- `INVALID_AGENT_STATE`
+- `AGENT_STATE_TOO_LARGE`
+- `AGENT_STATE_HOUSE_MISMATCH`
+
 ---
 
 ## Wallet House Recovery
@@ -888,6 +1983,11 @@ Returns:
 ```json
 { "ok": true, "houseId": "<base58 | null>", "keyWrap": { "alg": "AES-GCM", "iv": "<base64>", "ct": "<base64>" } | null }
 ```
+
+Lookup matching behavior during migration:
+- New house records use `unlock.kind = "wallet-signature"` with `provider = "privy"` and `chain = "solana"`.
+- Legacy records with `unlock.kind = "solana-wallet-signature"` are still matched during migration.
+- If a returning user connects the same wallet address via Privy, lookup/unlock continues to work.
 
 `keyWrap` is a wallet-wrapped `K_root` for recovery. It is encrypted client-side with a key derived from a deterministic wallet signature over:
 ```

@@ -37,6 +37,59 @@ function base58Encode(bytes) {
   return out || '1';
 }
 
+function buildPonyInboxBundle() {
+  const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  return {
+    ponyInboxPub: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    ponyInboxPrivWrap: {
+      alg: 'AES-GCM',
+      iv: crypto.randomBytes(12).toString('base64'),
+      ct: crypto.randomBytes(96).toString('base64')
+    }
+  };
+}
+
+function encryptPonyMessageForTest({ fromHouseId, toHouseId, recipientPonyInboxPub, body }) {
+  const recipientPub = crypto.createPublicKey({
+    key: Buffer.from(recipientPonyInboxPub, 'base64'),
+    format: 'der',
+    type: 'spki'
+  });
+  const eph = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const shared = crypto.diffieHellman({ privateKey: eph.privateKey, publicKey: recipientPub });
+  const key = Buffer.from(
+    crypto.hkdfSync(
+      'sha256',
+      shared,
+      Buffer.alloc(0),
+      Buffer.from(`elizatown-pony-msg-v1|from=${fromHouseId || ''}|to=${toHouseId || ''}`, 'utf8'),
+      32
+    )
+  );
+  const iv = crypto.randomBytes(12);
+  const aad = Buffer.from(JSON.stringify({
+    v: 1,
+    kind: 'msg.chat.v1',
+    fromHouseId: fromHouseId || null,
+    toHouseId,
+    createdAt: new Date().toISOString()
+  }), 'utf8');
+  const plaintext = Buffer.from(JSON.stringify({ v: 1, body: String(body || '') }), 'utf8');
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  cipher.setAAD(aad);
+  const enc = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+  const tag = cipher.getAuthTag();
+
+  return {
+    alg: 'PONY_E2EE_P256_AESGCM_V1',
+    epk: eph.publicKey.export({ type: 'spki', format: 'der' }).toString('base64'),
+    iv: iv.toString('base64'),
+    ct: Buffer.concat([enc, tag]).toString('base64'),
+    aad: aad.toString('base64')
+  };
+}
+
 async function createAgentSoloHouse(request, label) {
   const sess = await request.post('/api/agent/session', { data: { agentName: `Agent-${label}` } });
   expect(sess.ok()).toBeTruthy();
@@ -65,6 +118,7 @@ async function createAgentSoloHouse(request, label) {
   const kroot = sha256(ra);
   const houseId = base58Encode(sha256(kroot));
   const houseAuthKey = hkdf(kroot, 'elizatown-house-auth-v1', 32).toString('base64');
+  const ponyInbox = buildPonyInboxBundle();
 
   const init = await request.post('/api/agent/house/init', {
     data: {
@@ -74,14 +128,17 @@ async function createAgentSoloHouse(request, label) {
       nonce,
       keyMode: 'ceremony',
       unlock: { kind: 'solana-wallet-signature', address: `So1anaMock${label}11111111111111111111111111111` },
-      houseAuthKey
+      houseAuthKey,
+      ponyInboxPub: ponyInbox.ponyInboxPub,
+      ponyInboxPrivWrap: ponyInbox.ponyInboxPrivWrap
     }
   });
   expect(init.ok()).toBeTruthy();
 
   return {
     houseId,
-    kauth: hkdf(kroot, 'elizatown-house-auth-v1', 32)
+    kauth: hkdf(kroot, 'elizatown-house-auth-v1', 32),
+    ponyInboxPub: ponyInbox.ponyInboxPub
   };
 }
 
@@ -155,7 +212,12 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   const anonSend = await request.post('/api/pony/send', {
     data: {
       toErc8004Id: erc8004Id,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'anon attempt' }
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: '',
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: 'anon attempt'
+      })
     }
   });
   expect(anonSend.status()).toBe(403);
@@ -165,7 +227,12 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   const firstSendBody = JSON.stringify({
     toErc8004Id: erc8004Id,
     fromHouseId: houseB.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'allowlisted hello' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseB.houseId,
+      toHouseId: houseA.houseId,
+      recipientPonyInboxPub: houseA.ponyInboxPub,
+      body: 'allowlisted hello'
+    })
   });
   const firstSendHeaders = houseAuthHeaders(houseB.houseId, 'POST', sendPath, firstSendBody, houseB.kauth);
   const firstSend = await request.post(sendPath, {
@@ -173,7 +240,8 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
     headers: { 'content-type': 'application/json', ...firstSendHeaders }
   });
   expect(firstSend.ok()).toBeTruthy();
-  expect((await firstSend.json()).status).toBe('accepted');
+  const firstSendData = await firstSend.json();
+  expect(firstSendData.status).toBe('accepted');
 
   // Receiver inbox should show accepted message.
   const inboxPath = '/api/pony/inbox';
@@ -183,7 +251,7 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   });
   expect(inbox.ok()).toBeTruthy();
   const inboxData = await inbox.json();
-  const accepted = inboxData.inbox.find((m) => m.envelope?.ciphertext?.ct === 'allowlisted hello');
+  const accepted = inboxData.inbox.find((m) => m.id === firstSendData.id);
   expect(accepted).toBeTruthy();
   expect(accepted.status).toBe('accepted');
 
@@ -192,7 +260,12 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
     const body = JSON.stringify({
       toErc8004Id: erc8004Id,
       fromHouseId: houseB.houseId,
-      ciphertext: { alg: 'PLAINTEXT', iv: '', ct: `burst-${i}` }
+      ciphertext: encryptPonyMessageForTest({
+        fromHouseId: houseB.houseId,
+        toHouseId: houseA.houseId,
+        recipientPonyInboxPub: houseA.ponyInboxPub,
+        body: `burst-${i}`
+      })
     });
     const headers = houseAuthHeaders(houseB.houseId, 'POST', sendPath, body, houseB.kauth);
     const ok = await request.post(sendPath, {
@@ -205,7 +278,12 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   const overBody = JSON.stringify({
     toErc8004Id: erc8004Id,
     fromHouseId: houseB.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'over-limit' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseB.houseId,
+      toHouseId: houseA.houseId,
+      recipientPonyInboxPub: houseA.ponyInboxPub,
+      body: 'over-limit'
+    })
   });
   const overHeaders = houseAuthHeaders(houseB.houseId, 'POST', sendPath, overBody, houseB.kauth);
   const over = await request.post(sendPath, {
@@ -230,7 +308,12 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   const blockedBody = JSON.stringify({
     toErc8004Id: erc8004Id,
     fromHouseId: houseB.houseId,
-    ciphertext: { alg: 'PLAINTEXT', iv: '', ct: 'blocked' }
+    ciphertext: encryptPonyMessageForTest({
+      fromHouseId: houseB.houseId,
+      toHouseId: houseA.houseId,
+      recipientPonyInboxPub: houseA.ponyInboxPub,
+      body: 'blocked'
+    })
   });
   const blockedHeaders = houseAuthHeaders(houseB.houseId, 'POST', sendPath, blockedBody, houseB.kauth);
   const blocked = await request.post(sendPath, {

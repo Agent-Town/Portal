@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenClaw Lite - House</title>
+    <meta name="description" content="OpenClaw Lite house log viewer" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <div class="brand">
+          <a class="logoLink" href="/lite" aria-label="OpenClaw Lite">
+            <img class="logoImg" src="/logo.jpg" alt="" />
+          </a>
+          <strong>OpenClaw Lite</strong>
+          <span class="badge">house</span>
+        </div>
+        <div class="kv">
+          <button class="btn" id="connectWalletBtn">Connect wallet</button>
+          <a class="btn" href="/town">Town</a>
+          <a class="btn" href="/lite">Gateway</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2 style="margin: 0 0 6px">Unlock</h2>
+        <div class="kv" style="gap: 10px; flex-wrap: wrap">
+          <button class="btn" id="unlockBtn">Sign to unlock</button>
+          <span class="pill">House: <strong id="houseId">—</strong></span>
+        </div>
+        <div class="small" id="status" style="margin-top: 10px; color: var(--muted)"></div>
+        <div class="small" id="error" style="margin-top: 6px; color: var(--bad)"></div>
+      </div>
+
+      <div class="panel spaced" style="margin-top: 14px">
+        <h2 style="margin: 0 0 8px">Entries</h2>
+        <pre id="entries" class="small" style="white-space: pre-wrap; margin: 0; color: var(--muted)"></pre>
+      </div>
+    </div>
+
+    <script src="/openclaw-wallet.js"></script>
+    <script src="/house.js"></script>
+  </body>
+</html>

@@ -48,6 +48,14 @@ module.exports = defineConfig({
       NODE_ENV: 'test',
       PORT: String(PORT),
       TEST_RESET_TOKEN: 'test-reset',
+      ADMIN_TOKEN: 'test-admin',
+      // Force deterministic non-Privy test mode, even if host env has Privy creds.
+      ENABLE_PRIVY_IN_TEST: '0',
+      PRIVY_APP_ID: '',
+      PRIVY_CLIENT_ID: '',
+      PRIVY_APP_SECRET: '',
+      PRIVY_PUBLIC_CONFIG_JSON: '{}',
+      START_PAGE_ENABLED: '0',
       // Avoid modifying tracked data/store.json during e2e runs.
       STORE_PATH: require('path').join(process.cwd(), 'data', 'store.e2e.sqlite')
     }

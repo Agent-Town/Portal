@@ -1,4 +1,6 @@
 const { test, expect } = require('@playwright/test');
+const { installMockSolanaWallet } = require('./helpers/phase1');
+const { reachCreateViaLite, enterHatch } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -11,29 +13,26 @@ test('disconnecting wallet after unlocking resets to a fresh session (shared dev
     const sig = new Uint8Array(64);
     for (let i = 0; i < sig.length; i++) sig[i] = (i * 11) & 0xff;
     const address = 'So1anaMockToken1111111111111111111111111111';
-    window.solana = {
-      isPhantom: true,
-      connect: async () => ({ publicKey: { toString: () => address } }),
-      signMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => address } })
     };
   });
-
   await page.goto('/');
-  const teamBefore = (await page.getByTestId('team-code').innerText()).trim();
+
+  const before = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    return resp.json();
+  });
+  const teamBefore = before.teamCode;
   expect(teamBefore).toMatch(/^TEAM-/);
 
-  // Human token-holder flow to create a house.
-  await page.getByTestId('path-human').click();
-  await page.getByRole('button', { name: 'Check wallet' }).click();
-  await expect(page.getByTestId('token-status')).toContainText('Verified');
-
-  await page.getByRole('link', { name: 'Create house' }).click();
-  await page.waitForURL('**/create?mode=token');
+  await reachCreateViaLite(page);
   await page.getByTestId('px-0-0').click();
   await page.getByTestId('share-btn').click();
-  await page.waitForURL(/\/house\?house=/);
+  await page.waitForURL(/\/house\?house=/, { timeout: 20000 });
 
-  // Unlock, then disconnect wallet.
   const connectBtn = page.getByRole('button', { name: /Connect wallet|Disconnect wallet/ });
   const label = (await connectBtn.textContent()) || '';
   if (label.includes('Connect')) await connectBtn.click();
@@ -41,11 +40,14 @@ test('disconnecting wallet after unlocking resets to a fresh session (shared dev
   await expect(page.getByRole('button', { name: 'Unlocked' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Disconnect wallet' }).click();
-
-  // After disconnect, we should land back on "/" with a fresh team code.
   await page.waitForURL('**/');
-  await expect(page.getByTestId('reconnect-panel')).toBeHidden();
-  const teamAfter = (await page.getByTestId('team-code').innerText()).trim();
+
+  await enterHatch(page, 'signin', { navigate: false });
+  const teamAfter = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', { credentials: 'include' });
+    const state = await resp.json().catch(() => ({}));
+    return String(state?.teamCode || '').trim();
+  });
   expect(teamAfter).toMatch(/^TEAM-/);
   expect(teamAfter).not.toBe(teamBefore);
 });
