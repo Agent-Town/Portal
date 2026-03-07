@@ -1201,8 +1201,9 @@ createdAtMs: <createdAtMs>
 ```
 
 Notes:
-- `nonce` must match the most recent `/api/anchors/nonce` for the session (then it is consumed).
-- Latest registration for a given `erc8004Id` wins.
+- Requires house authentication headers (`x-house-ts`, `x-house-auth`) for the target `houseId`.
+- `nonce` must match the most recent `/api/anchors/nonce` for the session (then it is consumed on successful registration).
+- Existing mappings can only be updated by the same normalized EVM signer address.
 
 ### GET `/api/anchors/resolve?erc8004Id=...`
 Resolve an ERC-8004 ID to its registered house.

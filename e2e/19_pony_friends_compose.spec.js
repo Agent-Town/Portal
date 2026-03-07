@@ -240,16 +240,23 @@ test('pony friends list derives from accepted + manual add; compose sends', asyn
   const msg = buildAnchorLinkMessage({ houseId: houseC.houseId, erc8004Id, origin, nonce, createdAtMs });
   const signature = await signer.signMessage(msg);
 
-  const register = await request.post('/api/anchors/register', {
-    data: {
-      houseId: houseC.houseId,
-      erc8004Id,
-      createdAtMs,
-      nonce,
-      signer: signer.address,
-      signature,
-      chainId: 11155111,
-      origin
+  const registerPath = '/api/anchors/register';
+  const registerBody = JSON.stringify({
+    houseId: houseC.houseId,
+    erc8004Id,
+    createdAtMs,
+    nonce,
+    signer: signer.address,
+    signature,
+    chainId: 11155111,
+    origin
+  });
+  const registerHeaders = houseAuthHeaders(houseC.houseId, 'POST', registerPath, registerBody, houseC.kauth);
+  const register = await request.post(registerPath, {
+    data: registerBody,
+    headers: {
+      'content-type': 'application/json',
+      ...registerHeaders
     }
   });
   expect(register.ok()).toBeTruthy();
