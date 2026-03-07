@@ -11,6 +11,35 @@ function sha256(buf) {
   return crypto.createHash('sha256').update(buf).digest();
 }
 
+
+function countLeadingZeroBitsHex(hexDigest) {
+  let bits = 0;
+  for (const ch of String(hexDigest || '').toLowerCase()) {
+    const nibble = Number.parseInt(ch, 16);
+    if (!Number.isFinite(nibble) || nibble < 0 || nibble > 15) return 0;
+    if (nibble === 0) {
+      bits += 4;
+      continue;
+    }
+    if ((nibble & 0b1000) === 0) bits += 1;
+    if ((nibble & 0b0100) === 0) bits += 1;
+    if ((nibble & 0b0010) === 0) bits += 1;
+    break;
+  }
+  return bits;
+}
+
+function buildPowPostage(difficulty, seed = 'pow') {
+  const target = Math.max(1, Math.floor(Number(difficulty) || 0));
+  for (let i = 0; i < 1_000_000; i += 1) {
+    const nonce = `${seed}-${i}`;
+    const digest = crypto.createHash('sha256').update(`pony_pow_v1|${nonce}`, 'utf8').digest('hex');
+    if (countLeadingZeroBitsHex(digest) >= target) {
+      return { kind: 'pow.v1', nonce, digest, difficulty: target };
+    }
+  }
+  throw new Error('POW_BUILD_FAILED');
+}
 function hkdf(ikm, info, len = 32) {
   return Buffer.from(crypto.hkdfSync('sha256', ikm, Buffer.alloc(0), Buffer.from(info, 'utf8'), len));
 }
@@ -192,7 +221,7 @@ test('pony phase6: receipt-required anonymous policy + receipt house binding', a
         recipientPonyInboxPub: houseA.ponyInboxPub,
         body: 'anon-pow'
       }),
-      postage: { kind: 'pow.v1', nonce: 'pow-1', digest: '00abc123', difficulty: 9 }
+      postage: buildPowPostage(9, 'pow-1')
     }
   });
   expect(anonPow.status()).toBe(402);
