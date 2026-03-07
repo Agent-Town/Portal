@@ -197,7 +197,7 @@ function makeInboxMsg({ toHouseId, fromHouseId = null, ciphertext, body, status 
 }
 
 function makeDispatchReceiptId() {
-  return `dr_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  return `dr_${crypto.randomBytes(16).toString('hex')}`;
 }
 
 const PONY_RATE_WINDOW_MS = 60_000;
