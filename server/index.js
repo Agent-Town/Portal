@@ -6394,11 +6394,25 @@ app.post('/api/human/posts', (req, res) => {
   s.human.xPostUrl = xPostUrl;
   s.human.xHandle = extractXHandle(xPostUrl) || null;
 
-  const targetShareId = s.share.id || shareIdRaw || null;
+  const sessionShareId = typeof s.share?.id === 'string' ? s.share.id.trim() : '';
+  if (sessionShareId && shareIdRaw && shareIdRaw !== sessionShareId) {
+    return res.status(403).json({ ok: false, error: 'SHARE_FORBIDDEN' });
+  }
+
+  const targetShareId = sessionShareId || shareIdRaw || null;
   if (targetShareId) {
     const store = readStore();
     const rec = store.shares.find((x) => x.id === targetShareId);
     if (!rec) return res.status(404).json({ ok: false, error: 'SHARE_NOT_FOUND' });
+
+    if (!sessionShareId) {
+      const sessionHouseId = typeof s.houseCeremony?.houseId === 'string' ? s.houseCeremony.houseId.trim() : '';
+      const shareHouseId = typeof rec.houseId === 'string' ? rec.houseId.trim() : '';
+      if (!sessionHouseId || !shareHouseId || sessionHouseId !== shareHouseId) {
+        return res.status(403).json({ ok: false, error: 'SHARE_FORBIDDEN' });
+      }
+    }
+
     rec.xPostUrl = xPostUrl;
     rec.humanHandle = s.human.xHandle || null;
     const pub = store.publicTeams.find((p) => p.shareId === targetShareId);
