@@ -14,7 +14,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('trainer namespace tools are discoverable when enabled and hidden when disabled', async ({ page }) => {
+test('trainer namespace tools are discoverable when enabled', async ({ page }) => {
   await gotoAppWithLite(page, { trainerNamespace: true });
   await setDeterministicLlm(page);
   const visit = await visitSkill(page, '/skill.md');
@@ -27,13 +27,33 @@ test('trainer namespace tools are discoverable when enabled and hidden when disa
   expect(enabledTools).toContain('trainer.list_runs');
   expect(enabledTools).toContain('trainer.list_actions');
   expect(enabledTools).toContain('trainer.invoke_action');
+});
 
-  await gotoAppWithLite(page, { trainerNamespace: false });
-  await openTrainerFromSidebar(page);
-  await openTrainerToolsTab(page);
+test('runtime feature flag cannot be bypassed by query/localStorage overrides', async ({ page }) => {
+  await gotoAppWithLite(page, { trainerNamespace: true });
 
-  const disabledTools = await listTrainerToolNames(page);
-  expect(disabledTools).not.toContain('trainer.list_runs');
-  expect(disabledTools).not.toContain('trainer.list_actions');
-  expect(disabledTools).not.toContain('trainer.invoke_action');
+  const result = await page.evaluate(() => {
+    const plugin = window.AgentTownTrainerNamespacePlugin;
+    if (!plugin || typeof plugin.resolveEnabled !== 'function') return null;
+    localStorage.setItem('agentTown:feature:trainerNamespace', '1');
+    const fromQuery = plugin.resolveEnabled({
+      runtimeFeatureFlag: false,
+      locationSearch: '?trainerNamespace=1',
+      storageOverride: null,
+    });
+    localStorage.removeItem('agentTown:feature:trainerNamespace');
+    const fromStorageOverride = plugin.resolveEnabled({
+      runtimeFeatureFlag: false,
+      storageOverride: true,
+      locationSearch: '',
+    });
+    return {
+      fromQuery,
+      fromStorageOverride,
+    };
+  });
+
+  expect(result).toBeTruthy();
+  expect(result.fromQuery).toBe(false);
+  expect(result.fromStorageOverride).toBe(false);
 });
