@@ -5623,6 +5623,18 @@ function isLiteSkillReady() {
   return skill.status === 'ready' && !!skill.activeSkillPath;
 }
 
+function isTrustedDefaultSkill(skill = {}) {
+  if (skill.status !== 'ready' || !skill.activeSkillPath) return false;
+  const sourceUrlRaw = String(skill.sourceUrl || '').trim();
+  if (!sourceUrlRaw) return false;
+  try {
+    const sourceUrl = new URL(sourceUrlRaw, window.location.origin);
+    return sourceUrl.origin === window.location.origin && sourceUrl.pathname === '/skill.md';
+  } catch {
+    return false;
+  }
+}
+
 function isLiteAgentActive(state) {
   if (!isAnyAgentConnected(state)) return false;
   if (!isVendorLite(state)) return true;
@@ -6477,7 +6489,7 @@ async function ensureDefaultLiteSkillImported(state) {
   if (!teamCode) return;
 
   const skill = await refreshLiteSkillState({ force: false });
-  if (skill.status === 'ready' && skill.activeSkillPath) {
+  if (isTrustedDefaultSkill(skill)) {
     liteSkillAutoImportTeamCode = teamCode;
     return;
   }
@@ -6605,7 +6617,7 @@ async function runHomeSkillStep(reason = 'state') {
 
     await ensureDefaultLiteSkillImported(lastState);
     const skill = await refreshLiteSkillState({ force: false });
-    if (skill.status !== 'ready' || !skill.activeSkillPath) {
+    if (!isTrustedDefaultSkill(skill)) {
       liteSkillLoopBackoffMs = Math.min(5000, Math.max(1200, liteSkillLoopBackoffMs + 300));
       return;
     }
