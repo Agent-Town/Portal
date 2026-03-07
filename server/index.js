@@ -7150,6 +7150,8 @@ app.get('/api/atlas/search', (req, res) => {
 const { verifyMessage } = require('ethers');
 const ERC8004_OPTOUT_NONCE_TTL_MS = 10 * 60 * 1000;
 const erc8004OptOutNonces = new Map();
+const ERC8004_REGISTRATION_DRAFT_MAX_RECORD_BYTES = 64 * 1024;
+const ERC8004_REGISTRATION_DRAFT_MAX_RECORDS = 500;
 const ERC8004_REGISTRATION_TYPE = 'https://eips.ethereum.org/EIPS/eip-8004#registration-v1';
 const ERC8004_ENTITY_TYPES = new Set(['human', 'agent', 'tool', 'skill', 'experience', 'house']);
 const ERC8004_CONTEXT_KINDS = new Set(['house', 'room', 'townhall', 'tool', 'skill', 'experience']);
@@ -7480,6 +7482,11 @@ app.post('/api/erc8004/registration/draft', (req, res) => {
     return res.status(400).json({ ok: false, error: normalized.error });
   }
 
+  const recordSizeBytes = Buffer.byteLength(JSON.stringify(normalized.record), 'utf8');
+  if (recordSizeBytes > ERC8004_REGISTRATION_DRAFT_MAX_RECORD_BYTES) {
+    return res.status(413).json({ ok: false, error: 'REGISTRATION_DRAFT_TOO_LARGE' });
+  }
+
   const store = readStore();
   store.erc8004Registrations = Array.isArray(store.erc8004Registrations) ? store.erc8004Registrations : [];
   const knownRegIds = new Set(
@@ -7493,6 +7500,9 @@ app.post('/api/erc8004/registration/draft', (req, res) => {
     record.regId = makeErc8004RegistrationId();
   }
   store.erc8004Registrations.unshift(record);
+  if (store.erc8004Registrations.length > ERC8004_REGISTRATION_DRAFT_MAX_RECORDS) {
+    store.erc8004Registrations = store.erc8004Registrations.slice(0, ERC8004_REGISTRATION_DRAFT_MAX_RECORDS);
+  }
   writeStore(store);
 
   return res.json({
