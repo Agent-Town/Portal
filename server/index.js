@@ -4864,21 +4864,13 @@ app.post('/api/townhall/mint/solana/sponsor-send', async (req, res) => {
       (best, entry) => (!best || entry.createdAtMs > best.createdAtMs ? entry : best),
       null
     );
-    let matchedEntry = pickNewest(
+    const matchedEntry = pickNewest(
       walletCandidates.filter((entry) => {
         if (entry.pendingHash !== messageHash) return false;
         if (assetPubkey && entry.pendingAsset !== assetPubkey) return false;
         return true;
       })
     );
-    if (!matchedEntry && assetPubkey) {
-      // Some wallet providers refresh blockhashes during signing, which can alter message hash.
-      // Accept an asset+wallet match when there is only one pending candidate for that pair.
-      const assetCandidates = walletCandidates.filter((entry) => entry.pendingAsset === assetPubkey);
-      if (assetCandidates.length === 1) {
-        matchedEntry = assetCandidates[0];
-      }
-    }
     if (!matchedEntry) {
       return res.status(400).json({
         ok: false,
