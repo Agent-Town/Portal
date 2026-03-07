@@ -200,9 +200,11 @@ Behavior:
 - Forwards request method, body, and request headers (excluding hop-by-hop headers, `host`, `content-length`, and `cookie`).
 - Streams upstream response bytes and status back to browser.
 - Does not persist API keys or provider tokens.
+- Rejects localhost/private/link-local upstream targets (including DNS-resolved private IPs).
 
 Errors:
 - `400 INVALID_UPSTREAM_BASE` for invalid/missing upstream base URL.
+- `403 UPSTREAM_HOST_BLOCKED` when upstream hostname or resolved IP is local/private.
 - `502 UPSTREAM_UNAVAILABLE` when upstream cannot be reached.
 
 ---
