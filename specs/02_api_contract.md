@@ -1374,10 +1374,11 @@ Rules:
   - unknown kinds fall back to server relay delivery (message envelope stays unchanged)
   - dispatch result is persisted on each delivered message under `dispatch.*`
 - Postage verification hook runs before dispatch:
-  - `pow.v1` enforces digest shape
+  - `pow.v1` recomputes `digest = sha256(JSON.stringify({v:1, nonce, fromHouseId, toHouseId}))` and requires digest equality
   - when `requirePostageAnonymous=true` and sender is anonymous, postage is required
   - when `requireReceiptAnonymous=true` and sender is anonymous, postage must be `receipt.v1`
-  - when `requirePostageAnonymous=true` and sender is anonymous and using `pow.v1`, `difficulty` must meet server minimum (`>= 8`)
+  - when `requirePostageAnonymous=true` and sender is anonymous and using `pow.v1`, claimed `difficulty` must meet server minimum (`>= 8`)
+  - `pow.v1` digest must satisfy leading-zero-bit difficulty (`leadingZeroBits(digest) >= difficulty`)
   - `receipt.v1` validates receipt ids
   - dispatch-style receipt ids (`dr_...`) are resolved against stored dispatch receipts
   - when a dispatch receipt is resolved, it must belong to the same `toHouseId`

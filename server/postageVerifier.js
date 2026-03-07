@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const HEX_DIGEST_RE = /^[0-9a-f]+$/i;
 const RECEIPT_ID_RE = /^[A-Za-z0-9:_-]{6,120}$/;
 
@@ -16,6 +18,33 @@ function isDispatchReceiptId(receiptId) {
   return typeof receiptId === 'string' && receiptId.startsWith('dr_');
 }
 
+function countLeadingZeroBits(hex) {
+  let bits = 0;
+  for (let i = 0; i < hex.length; i += 1) {
+    const nibble = parseInt(hex[i], 16);
+    if (Number.isNaN(nibble)) break;
+    if (nibble === 0) {
+      bits += 4;
+      continue;
+    }
+    if (nibble < 2) bits += 3;
+    else if (nibble < 4) bits += 2;
+    else if (nibble < 8) bits += 1;
+    break;
+  }
+  return bits;
+}
+
+function computePowDigest({ nonce = '', fromHouseId = null, toHouseId = null } = {}) {
+  const payload = {
+    v: 1,
+    nonce: String(nonce || ''),
+    fromHouseId: fromHouseId || null,
+    toHouseId: toHouseId || null
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(payload), 'utf8').digest('hex');
+}
+
 function createPostageVerifier(options = {}) {
   const basePowMinDifficulty = Math.max(1, toInt(options.basePowMinDifficulty, 1));
   const anonymousPowMinDifficulty = Math.max(basePowMinDifficulty, toInt(options.anonymousPowMinDifficulty, 8));
@@ -28,16 +57,38 @@ function createPostageVerifier(options = {}) {
       ? anonymousPowMinDifficulty
       : basePowMinDifficulty;
 
-    if (toInt(postage?.difficulty, 0) < requiredDifficulty) {
+    const claimedDifficulty = toInt(postage?.difficulty, 0);
+    if (claimedDifficulty < requiredDifficulty) {
       const err = new Error('POSTAGE_POW_DIFFICULTY_TOO_LOW');
       err.requiredDifficulty = requiredDifficulty;
-      err.actualDifficulty = toInt(postage?.difficulty, 0);
+      err.actualDifficulty = claimedDifficulty;
       throw err;
     }
 
-    const digest = typeof postage?.digest === 'string' ? postage.digest.trim() : '';
-    if (!digest || !HEX_DIGEST_RE.test(digest) || digest.length < 6) {
+    const nonce = typeof postage?.nonce === 'string' ? postage.nonce.trim() : '';
+    const digest = typeof postage?.digest === 'string' ? postage.digest.trim().toLowerCase() : '';
+    if (!nonce) {
+      throw new Error('POSTAGE_POW_NONCE_INVALID');
+    }
+    if (!digest || !HEX_DIGEST_RE.test(digest) || digest.length !== 64) {
       throw new Error('POSTAGE_POW_DIGEST_INVALID');
+    }
+
+    const expectedDigest = computePowDigest({
+      nonce,
+      fromHouseId: context?.fromHouseId || null,
+      toHouseId: context?.toHouseId || null
+    });
+    if (digest !== expectedDigest) {
+      throw new Error('POSTAGE_POW_DIGEST_MISMATCH');
+    }
+
+    const achievedDifficulty = countLeadingZeroBits(digest);
+    if (achievedDifficulty < claimedDifficulty) {
+      const err = new Error('POSTAGE_POW_DIGEST_TOO_WEAK');
+      err.requiredDifficulty = claimedDifficulty;
+      err.actualDifficulty = achievedDifficulty;
+      throw err;
     }
   }
 
