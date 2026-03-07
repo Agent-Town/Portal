@@ -7746,12 +7746,26 @@ app.post('/api/anchors/register', (req, res) => {
     return res.status(401).json({ ok: false, error: 'SIGNER_MISMATCH' });
   }
 
-  // Consume nonce
-  s.anchorPublishNonce = null;
+  const normalizedSigner = normalizeEvmAddress(signer);
+  if (!normalizedSigner) return res.status(400).json({ ok: false, error: 'INVALID_SIGNER' });
 
   const store = readStore();
-  const houseExists = store.houses.find((h) => h && h.id === houseId);
-  if (!houseExists) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+  const house = store.houses.find((h) => h && h.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'HOUSE_NOT_FOUND' });
+
+  const houseAuth = verifyHouseAuth(req, house);
+  if (!houseAuth.ok) return res.status(403).json({ ok: false, error: houseAuth.error });
+
+  const existing = (store.anchors || []).find((a) => a && a.erc8004Id === erc8004Id) || null;
+  if (existing) {
+    const existingSigner = normalizeEvmAddress(existing.signer);
+    if (!existingSigner || existingSigner !== normalizedSigner) {
+      return res.status(403).json({ ok: false, error: 'ANCHOR_OWNERSHIP_MISMATCH' });
+    }
+  }
+
+  // Consume nonce after all authorization checks pass.
+  s.anchorPublishNonce = null;
 
   // Upsert by erc8004Id (latest wins)
   store.anchors = Array.isArray(store.anchors) ? store.anchors : [];
@@ -7759,7 +7773,7 @@ app.post('/api/anchors/register', (req, res) => {
   store.anchors.unshift({
     erc8004Id,
     houseId,
-    signer,
+    signer: normalizedSigner,
     chainId: chainId || null,
     createdAtMs,
     updatedAt: nowIso()

@@ -172,16 +172,23 @@ test('pony phase2: anchor routing + policy controls + rate limiting', async ({ r
   const msg = buildAnchorLinkMessage({ houseId: houseA.houseId, erc8004Id, origin, nonce, createdAtMs });
   const signature = await signer.signMessage(msg);
 
-  const register = await request.post('/api/anchors/register', {
-    data: {
-      houseId: houseA.houseId,
-      erc8004Id,
-      createdAtMs,
-      nonce,
-      signer: signer.address,
-      signature,
-      chainId: 11155111,
-      origin
+  const registerPath = '/api/anchors/register';
+  const registerBody = JSON.stringify({
+    houseId: houseA.houseId,
+    erc8004Id,
+    createdAtMs,
+    nonce,
+    signer: signer.address,
+    signature,
+    chainId: 11155111,
+    origin
+  });
+  const registerHeaders = houseAuthHeaders(houseA.houseId, 'POST', registerPath, registerBody, houseA.kauth);
+  const register = await request.post(registerPath, {
+    data: registerBody,
+    headers: {
+      'content-type': 'application/json',
+      ...registerHeaders
     }
   });
   expect(register.ok()).toBeTruthy();
