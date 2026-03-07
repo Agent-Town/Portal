@@ -1809,11 +1809,6 @@ function ensureHumanSession(req, res) {
     return bestSession;
   };
 
-  if (!session && hintedSession) {
-    session = hintedSession;
-    sid = hintedSession.sessionId;
-  }
-
   if (!session) {
     const walletSession = pickBestWalletSession();
     if (walletSession) {
@@ -1828,15 +1823,6 @@ function ensureHumanSession(req, res) {
   }
 
   let currentScore = sessionRecoveryScore(session);
-
-  if (session && hintedSession && hintedSession.sessionId !== session.sessionId) {
-    const hintedScore = sessionRecoveryScore(hintedSession);
-    if (hintedScore > currentScore) {
-      session = hintedSession;
-      sid = hintedSession.sessionId;
-      currentScore = hintedScore;
-    }
-  }
 
   if (session) {
     const walletSession = pickBestWalletSession();
