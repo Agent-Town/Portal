@@ -8133,8 +8133,7 @@ app.get('/api/claim/x/challenge', (req, res) => {
     nonce,
     challenge,
     createdAt: Date.now(),
-    expiresAt: Date.now() + ttlMs,
-    reservedHouseId: reservation.houseId
+    expiresAt: Date.now() + ttlMs
   };
   res.json({ ok: true, handle, nonce, challenge, expiresInMs: ttlMs });
 });
@@ -8279,7 +8278,7 @@ app.post('/api/house/init', (req, res) => {
     }
   }
 
-  const enforcedReserved = (s && (s.reservedHouseId || s.claim?.x?.reservedHouseId)) || null;
+  const enforcedReserved = (s && s.reservedHouseId) || null;
   if (enforcedReserved && enforcedReserved !== houseId) {
     return res.status(403).json({ ok: false, error: 'RESERVED_HOUSE_MISMATCH' });
   }
