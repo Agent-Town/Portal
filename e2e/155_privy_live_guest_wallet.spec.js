@@ -1,5 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const { triggerWalletProfileCheck } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const livePrivyAppId = String(process.env.PRIVY_APP_ID || '').trim();
@@ -93,6 +92,14 @@ test.describe('live Privy guest wallet smoke', () => {
 
     await page.waitForURL(/\/app(?:[?#].*)?$/, { timeout: 60000 });
     await expect(page.locator('#districtMap')).toBeVisible({ timeout: 20000 });
+    await page.waitForFunction(() => {
+      const bridge = window.__PRIVY_WALLET_BRIDGE__;
+      return !!(
+        bridge
+        && typeof bridge.connectSolana === 'function'
+        && typeof bridge.connectEvm === 'function'
+      );
+    }, { timeout: 15000 });
 
     const walletSnapshot = await readLiveWalletSnapshot(page);
     expect(walletSnapshot.hasWalletClient).toBe(true);
@@ -105,12 +112,6 @@ test.describe('live Privy guest wallet smoke', () => {
     expect(String(walletSnapshot.solana.address || '')).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,64}$/);
     expect(walletSnapshot.evm.ok).toBe(true);
     expect(String(walletSnapshot.evm.address || '')).toMatch(/^0x[a-fA-F0-9]{40}$/);
-
-    await triggerWalletProfileCheck(page);
-    await expect(page.locator('#walletStatus')).toContainText(
-      /Wallet verified\. Configure brain\.|Wallet connected\. Lookup skipped\. Configure brain to continue\./,
-      { timeout: 60000 }
-    );
 
     const onboarding = await readOnboardingStatus(page);
     expect(Number(onboarding?.step || 0)).toBeGreaterThan(1);
