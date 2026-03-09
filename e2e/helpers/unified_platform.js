@@ -255,6 +255,58 @@ async function resolvePlatformIntegration(request, {
   }
 }
 
+async function compilePlatformIntegration(request, {
+  houseId = '',
+  houseAuthKey = '',
+  integrationId = '',
+  idempotencyKey = '',
+  payload = {},
+} = {}) {
+  const path = `/v1/integrations/${encodeURIComponent(String(integrationId || '').trim())}/compilations`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function executePlatformIntegration(request, {
+  houseId = '',
+  houseAuthKey = '',
+  integrationId = '',
+  idempotencyKey = '',
+  payload = {},
+} = {}) {
+  const path = `/v1/integrations/${encodeURIComponent(String(integrationId || '').trim())}/executions`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function ingestPlatformTraceRecords(request, {
   houseId = '',
   houseAuthKey = '',
@@ -317,10 +369,12 @@ async function setPlatformRunStatus(request, runId, status) {
 }
 
 module.exports = {
+  compilePlatformIntegration,
   compileDefaultSkillPack,
   createPlatformConfigVersion,
   createPlatformRun,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
+  executePlatformIntegration,
   getDefaultCompiledPackManifest,
   getPlatformConfigVersionRecord,
   getPlatformCounts,

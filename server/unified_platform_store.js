@@ -488,6 +488,19 @@ function getIntegrationCandidateByIdempotency(idempotencyKey = '') {
   return mapIntegrationCandidateRow(row);
 }
 
+function getIntegrationCandidateById(integrationCandidateId = '') {
+  const normalizedIntegrationCandidateId = String(integrationCandidateId || '').trim();
+  if (!normalizedIntegrationCandidateId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM integration_candidates
+    WHERE integration_candidate_id = ?
+    LIMIT 1
+  `).get(normalizedIntegrationCandidateId);
+  return mapIntegrationCandidateRow(row);
+}
+
 function upsertConfigVersion({
   configVersionId = '',
   houseId = '',
@@ -696,6 +709,198 @@ function createIntegrationCandidate({
     requires_compilation: requiresCompilation ? 1 : 0,
     candidate_json: JSON.stringify(candidate && typeof candidate === 'object' ? candidate : {}),
     created_at: nowIso,
+  });
+}
+
+function mapIntegrationPackVersionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    packVersionId: String(row.pack_version_id || ''),
+    integrationId: String(row.integration_id || ''),
+    sourceKind: String(row.source_kind || ''),
+    contentHash: String(row.content_hash || ''),
+    manifest: parseJsonColumn(row.manifest_json, {}),
+    fileHashes: parseJsonColumn(row.file_hashes_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getIntegrationPackVersionByIdempotency({
+  integrationId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedIntegrationId = String(integrationId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedIntegrationId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM integration_pack_versions
+    WHERE integration_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedIntegrationId, normalizedIdempotencyKey);
+  return mapIntegrationPackVersionRow(row);
+}
+
+function createIntegrationPackVersion({
+  packVersionId = '',
+  integrationId = '',
+  sourceKind = '',
+  contentHash = '',
+  manifest = null,
+  fileHashes = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedPackVersionId = String(packVersionId || '').trim();
+  const normalizedIntegrationId = String(integrationId || '').trim();
+  const normalizedSourceKind = String(sourceKind || '').trim();
+  const normalizedContentHash = String(contentHash || '').trim();
+  if (!normalizedPackVersionId || !normalizedIntegrationId || !normalizedSourceKind || !normalizedContentHash) {
+    throw new Error('INTEGRATION_PACK_VERSION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO integration_pack_versions (
+      pack_version_id,
+      integration_id,
+      source_kind,
+      content_hash,
+      manifest_json,
+      file_hashes_json,
+      idempotency_key,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedPackVersionId,
+    normalizedIntegrationId,
+    normalizedSourceKind,
+    normalizedContentHash,
+    JSON.stringify(manifest && typeof manifest === 'object' ? manifest : {}),
+    JSON.stringify(fileHashes && typeof fileHashes === 'object' ? fileHashes : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getIntegrationPackVersionByIdempotency({
+    integrationId: normalizedIntegrationId,
+    idempotencyKey,
+  }) || mapIntegrationPackVersionRow({
+    pack_version_id: normalizedPackVersionId,
+    integration_id: normalizedIntegrationId,
+    source_kind: normalizedSourceKind,
+    content_hash: normalizedContentHash,
+    manifest_json: JSON.stringify(manifest && typeof manifest === 'object' ? manifest : {}),
+    file_hashes_json: JSON.stringify(fileHashes && typeof fileHashes === 'object' ? fileHashes : {}),
+    idempotency_key: String(idempotencyKey || '').trim() || null,
+    created_at: nowIso,
+    updated_at: nowIso,
+  });
+}
+
+function mapIntegrationExecutionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    integrationExecutionId: String(row.integration_execution_id || ''),
+    integrationId: String(row.integration_id || ''),
+    actionId: String(row.action_id || ''),
+    requestedBy: parseJsonColumn(row.requested_by_json, {}),
+    approvalId: row.approval_id ? String(row.approval_id) : null,
+    status: String(row.status || ''),
+    request: parseJsonColumn(row.request_json, {}),
+    result: parseJsonColumn(row.result_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getIntegrationExecutionByIdempotency({
+  integrationId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedIntegrationId = String(integrationId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedIntegrationId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM integration_executions
+    WHERE integration_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedIntegrationId, normalizedIdempotencyKey);
+  return mapIntegrationExecutionRow(row);
+}
+
+function createIntegrationExecution({
+  integrationExecutionId = '',
+  integrationId = '',
+  actionId = '',
+  requestedBy = null,
+  approvalId = '',
+  status = 'queued',
+  request = null,
+  result = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedIntegrationExecutionId = String(integrationExecutionId || '').trim();
+  const normalizedIntegrationId = String(integrationId || '').trim();
+  const normalizedActionId = String(actionId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedIntegrationExecutionId || !normalizedIntegrationId || !normalizedActionId || !normalizedStatus) {
+    throw new Error('INTEGRATION_EXECUTION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO integration_executions (
+      integration_execution_id,
+      integration_id,
+      action_id,
+      requested_by_json,
+      approval_id,
+      status,
+      request_json,
+      result_json,
+      idempotency_key,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedIntegrationExecutionId,
+    normalizedIntegrationId,
+    normalizedActionId,
+    JSON.stringify(requestedBy && typeof requestedBy === 'object' ? requestedBy : {}),
+    String(approvalId || '').trim() || null,
+    normalizedStatus,
+    JSON.stringify(request && typeof request === 'object' ? request : {}),
+    JSON.stringify(result && typeof result === 'object' ? result : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getIntegrationExecutionByIdempotency({
+    integrationId: normalizedIntegrationId,
+    idempotencyKey,
+  }) || mapIntegrationExecutionRow({
+    integration_execution_id: normalizedIntegrationExecutionId,
+    integration_id: normalizedIntegrationId,
+    action_id: normalizedActionId,
+    requested_by_json: JSON.stringify(requestedBy && typeof requestedBy === 'object' ? requestedBy : {}),
+    approval_id: String(approvalId || '').trim() || null,
+    status: normalizedStatus,
+    request_json: JSON.stringify(request && typeof request === 'object' ? request : {}),
+    result_json: JSON.stringify(result && typeof result === 'object' ? result : {}),
+    idempotency_key: String(idempotencyKey || '').trim() || null,
+    created_at: nowIso,
+    updated_at: nowIso,
   });
 }
 
@@ -1092,6 +1297,8 @@ function getUnifiedPlatformTestStats() {
 
 module.exports = {
   createIntegrationCandidate,
+  createIntegrationExecution,
+  createIntegrationPackVersion,
   createRun,
   createTraceEvent,
   createTraceIntakeRecord,
@@ -1099,7 +1306,10 @@ module.exports = {
   countPlatformTableRows,
   getConfigVersion,
   getConfigVersionByIdempotency,
+  getIntegrationCandidateById,
   getIntegrationCandidateByIdempotency,
+  getIntegrationExecutionByIdempotency,
+  getIntegrationPackVersionByIdempotency,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,

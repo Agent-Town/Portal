@@ -85,13 +85,18 @@ const {
 } = require('./web_poker_store');
 const {
   createIntegrationCandidate,
+  createIntegrationExecution,
+  createIntegrationPackVersion,
   createRun,
   createTraceEvent,
   createTraceIntakeRecord,
   countUnifiedPlatformTableRows,
   getConfigVersion,
   getConfigVersionByIdempotency,
+  getIntegrationCandidateById,
   getIntegrationCandidateByIdempotency,
+  getIntegrationExecutionByIdempotency,
+  getIntegrationPackVersionByIdempotency,
   getLatestTraceEvent,
   getRunByIdempotency,
   getRunById,
@@ -4910,6 +4915,158 @@ app.post('/v1/integrations/resolve', express.json({ limit: '64kb' }), (req, res)
   }
 });
 
+app.post('/v1/integrations/:integrationId/compilations', express.json({ limit: '48kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const integrationId = typeof req.params?.integrationId === 'string' ? req.params.integrationId.trim() : '';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  if (!integrationId || !idempotencyKey) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'integrationId and Idempotency-Key are required.', { requestId });
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const candidate = getIntegrationCandidateById(integrationId);
+  if (!candidate) {
+    return sendPortalApiError(res, 404, 'INTEGRATION_NOT_FOUND', 'Integration candidate not found.', { requestId });
+  }
+
+  const replayed = getIntegrationPackVersionByIdempotency({
+    integrationId,
+    idempotencyKey,
+  });
+  if (replayed) {
+    return sendPortalApiSuccess(res, {
+      packVersionId: replayed.packVersionId,
+      contentHash: replayed.contentHash,
+      fileHashes: replayed.fileHashes,
+      manifest: replayed.manifest,
+    }, { requestId });
+  }
+
+  const compiled = buildCompiledIntegrationPack({
+    ...candidate.candidate,
+    integrationCandidateId: candidate.integrationCandidateId,
+    sourceKind: candidate.sourceKind,
+    targetUrl: candidate.targetUrl,
+  });
+  const created = createIntegrationPackVersion({
+    packVersionId: compiled.packVersionId,
+    integrationId,
+    sourceKind: candidate.sourceKind,
+    contentHash: compiled.contentHash,
+    manifest: compiled.manifest,
+    fileHashes: compiled.fileHashes,
+    idempotencyKey,
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    packVersionId: created.packVersionId,
+    contentHash: created.contentHash,
+    fileHashes: created.fileHashes,
+    manifest: created.manifest,
+  }, { status: 201, requestId });
+});
+
+app.post('/v1/integrations/:integrationId/executions', express.json({ limit: '64kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const integrationId = typeof req.params?.integrationId === 'string' ? req.params.integrationId.trim() : '';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const actionId = typeof req.body?.actionId === 'string' ? req.body.actionId.trim() : '';
+  const requestedBy = req.body?.requestedBy && typeof req.body.requestedBy === 'object' && !Array.isArray(req.body.requestedBy)
+    ? req.body.requestedBy
+    : {};
+  const executionRequest = req.body?.request && typeof req.body.request === 'object' && !Array.isArray(req.body.request)
+    ? req.body.request
+    : {};
+  if (!integrationId || !idempotencyKey || !actionId) {
+    return sendPortalApiError(
+      res,
+      400,
+      actionId ? 'INVALID_ARGUMENT' : 'EXECUTION_NOT_ALLOWED',
+      'integrationId, actionId, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const candidate = getIntegrationCandidateById(integrationId);
+  if (!candidate) {
+    return sendPortalApiError(res, 404, 'INTEGRATION_NOT_FOUND', 'Integration candidate not found.', { requestId });
+  }
+
+  const replayed = getIntegrationExecutionByIdempotency({
+    integrationId,
+    idempotencyKey,
+  });
+  if (replayed) {
+    return sendPortalApiSuccess(res, {
+      executionId: replayed.integrationExecutionId,
+      status: replayed.status,
+      actionId: replayed.actionId,
+      requestedBy: replayed.requestedBy,
+    }, { requestId });
+  }
+
+  const policy = getPlatformIntegrationActionPolicy({
+    ...candidate.candidate,
+    sourceKind: candidate.sourceKind,
+    website: candidate.candidate?.website || null,
+  }, actionId);
+  if (!policy) {
+    return sendPortalApiError(res, 400, 'EXECUTION_NOT_ALLOWED', 'actionId is not allowed for this integration.', { requestId });
+  }
+  const approvalId = typeof executionRequest?.approvalId === 'string' ? executionRequest.approvalId.trim() : '';
+  if (policy.requiresApproval && !approvalId) {
+    return sendPortalApiError(res, 409, 'APPROVAL_REQUIRED', 'This action requires explicit approval.', { requestId });
+  }
+
+  const execution = createIntegrationExecution({
+    integrationExecutionId: `exec_${randomHex(10)}`,
+    integrationId,
+    actionId,
+    requestedBy,
+    approvalId,
+    status: policy.status,
+    request: executionRequest,
+    result: {
+      policy: {
+        requiresApproval: policy.requiresApproval,
+      },
+    },
+    idempotencyKey,
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    executionId: execution.integrationExecutionId,
+    status: execution.status,
+    actionId: execution.actionId,
+    requestedBy: execution.requestedBy,
+  }, { status: 201, requestId });
+});
+
 app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {
   const requestId = buildPortalRequestId();
   const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -6043,6 +6200,159 @@ function resolveWebTarget(targetUrl, { preferredMode = 'auto', sourceHints = {} 
       automationFallbackAllowed: false
     }
   };
+}
+
+function buildCompiledIntegrationPack(candidate) {
+  const sourceKind = String(candidate?.sourceKind || '').trim() || 'parse';
+  const website = candidate?.website && typeof candidate.website === 'object' ? candidate.website : {};
+  const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
+  const websiteName = String(website.displayName || website.registryId || 'Website').trim();
+  const actionIds = sourceKind === 'native_pack'
+    ? ['github.issue.read', 'github.issue.reply']
+    : ['integration.generic.read'];
+  const manualSkill = [
+    '# INTEGRATION PACK MANUAL',
+    '',
+    `- Source kind: ${sourceKind}`,
+    `- Target origin: ${String(website.origin || '')}`,
+    `- Website: ${websiteName}`,
+    '',
+    '## Actions',
+    ...actionIds.map((actionId) => `- ${actionId}`),
+    '',
+  ].join('\n');
+  const heartbeat = [
+    '# HEARTBEAT',
+    '',
+    '- Re-check capability metadata before high-impact actions.',
+    '- Request approval for write-capable actions when required by policy.',
+    '',
+  ].join('\n');
+  const tools = [
+    '# TOOLS',
+    '',
+    '- Execution records are server-persisted, but worker-selected.',
+    '- Preserve `actionId`, `executionId`, and `approvalId` exactly.',
+    '',
+  ].join('\n');
+  const traceMapPayload = {
+    schema: 'agent-town-trace-map/v1',
+    sourceKind,
+    targetOrigin: String(website.origin || ''),
+    actions: actionIds.map((actionId) => ({
+      actionId,
+      eventType: `integration.${actionId.replace(/[^a-z0-9]+/gi, '_').toLowerCase()}`,
+    })),
+  };
+  const traceMap = `${JSON.stringify(traceMapPayload, null, 2)}\n`;
+  const fileBodies = {
+    'skill.md': [
+      '# INTEGRATION PACK',
+      '',
+      '- manual/skill.md',
+      '- heartbeat.md',
+      '- tools.md',
+      '- trace_map.json',
+      '',
+    ].join('\n'),
+    'SKILL.md': [
+      '# INTEGRATION PACK',
+      '',
+      '- manual/skill.md',
+      '- heartbeat.md',
+      '- tools.md',
+      '- trace_map.json',
+      '',
+    ].join('\n'),
+    'manual/skill.md': manualSkill,
+    'heartbeat.md': heartbeat,
+    'tools.md': tools,
+    'trace_map.json': traceMap,
+  };
+  const fileHashes = {
+    'manual/skill.md': sha256PrefixedHex(fileBodies['manual/skill.md']),
+    'heartbeat.md': sha256PrefixedHex(fileBodies['heartbeat.md']),
+    'tools.md': sha256PrefixedHex(fileBodies['tools.md']),
+    'trace_map.json': sha256PrefixedHex(fileBodies['trace_map.json']),
+  };
+  const manifestSeed = stableJsonStringify({
+    sourceRef: {
+      url: String(candidate?.targetUrl || ''),
+      sourceKind,
+    },
+    compatibility: {
+      websiteRegistryId: String(website.registryId || ''),
+      integrationRegistryId: String(integration.integrationRegistryId || ''),
+      versionId: String(integration.versionId || ''),
+      sourceKind,
+      actionIds,
+    },
+    fileHashes,
+  });
+  const contentHash = sha256PrefixedHex(manifestSeed);
+  const packVersionId = `intpackv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  return {
+    packVersionId,
+    contentHash,
+    fileHashes,
+    manifest: {
+      integrationId: String(candidate?.integrationCandidateId || ''),
+      sourceKind,
+      packVersionId,
+      contentHash,
+      sourceRefs: [
+        {
+          url: String(candidate?.targetUrl || ''),
+          sourceKind,
+        },
+      ],
+      compatibility: {
+        websiteRegistryId: String(website.registryId || ''),
+        integrationRegistryId: String(integration.integrationRegistryId || ''),
+        versionId: String(integration.versionId || ''),
+        sourceKind,
+        actionIds,
+      },
+      fileHashes,
+      files: {
+        'manual/skill.md': 'manual/skill.md',
+        'heartbeat.md': 'heartbeat.md',
+        'tools.md': 'tools.md',
+        'trace_map.json': 'trace_map.json',
+      },
+    },
+  };
+}
+
+function getPlatformIntegrationActionPolicy(candidate, actionId) {
+  const canonicalActionId = String(actionId || '').trim();
+  if (!canonicalActionId) return null;
+  const sourceKind = String(candidate?.sourceKind || '').trim();
+  const websiteRegistryId = String(candidate?.website?.registryId || '').trim();
+  if (sourceKind === 'native_pack' && websiteRegistryId === 'ws_github') {
+    if (canonicalActionId === 'github.issue.read') {
+      return {
+        actionId: canonicalActionId,
+        requiresApproval: false,
+        status: 'queued',
+      };
+    }
+    if (canonicalActionId === 'github.issue.reply') {
+      return {
+        actionId: canonicalActionId,
+        requiresApproval: true,
+        status: 'queued',
+      };
+    }
+  }
+  if (canonicalActionId === 'integration.generic.read') {
+    return {
+      actionId: canonicalActionId,
+      requiresApproval: false,
+      status: 'queued',
+    };
+  }
+  return null;
 }
 
 function getWebActionPolicy(actionId, webSession) {
