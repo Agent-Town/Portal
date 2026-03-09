@@ -621,6 +621,50 @@ Response shape:
 }
 ```
 
+### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
+Creates one durable run row for the requested experience and binds the run to one declared trace authority.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "configVersionId": "cfg_01HR...",
+  "entryMode": "normal",
+  "metadata": {}
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "runId": "run_01H...",
+    "status": "queued",
+    "traceAuthorityType": "house_trace_ingester"
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `EXPERIENCE_NOT_FOUND`
+- `CONFIG_NOT_FOUND`
+- `CONFIG_NOT_ELIGIBLE`
+- `INVALID_ARGUMENT`
+
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
 

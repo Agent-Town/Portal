@@ -84,12 +84,16 @@ const {
   writeCheckpoint,
 } = require('./web_poker_store');
 const {
+  createRun,
   countUnifiedPlatformTableRows,
+  getConfigVersion,
+  getRunByIdempotency,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
   listUnifiedPlatformFixtureFamilies,
   resetUnifiedPlatformStore,
+  upsertConfigVersion,
 } = require('./unified_platform_store');
 const {
   DEFAULT_OPERATOR_TOKEN,
@@ -3557,6 +3561,10 @@ function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
 }
 
 const DEFAULT_SKILL_PACK_BASE_PATH = '/__compiled/default-skill-pack';
+const PLATFORM_RUN_ENTRY_MODES = new Set(['normal', 'season_lock']);
+const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
+const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
+const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
 
 function buildDefaultCompiledSkillPack() {
   const manualSkill = fs.readFileSync(path.join(PUBLIC_DIR, 'skill.md'), 'utf8');
@@ -4403,6 +4411,95 @@ app.get('/api/registry/entities/:id', (req, res) => {
     return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry entity not found.', { requestId });
   }
   return sendPortalApiSuccess(res, { entity }, { requestId });
+});
+
+app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const experienceId = typeof req.params?.experienceId === 'string' ? req.params.experienceId.trim() : '';
+  if (!SUPPORTED_PLATFORM_EXPERIENCE_IDS.has(experienceId)) {
+    return sendPortalApiError(res, 404, 'EXPERIENCE_NOT_FOUND', 'Experience not found.', { requestId });
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const configVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
+  const entryMode = typeof req.body?.entryMode === 'string' ? req.body.entryMode.trim() : '';
+  const metadata = req.body?.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata)
+    ? req.body.metadata
+    : {};
+  if (!idempotencyKey || !teamId || !configVersionId || !PLATFORM_RUN_ENTRY_MODES.has(entryMode)) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'teamId, configVersionId, entryMode, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const configVersion = getConfigVersion(configVersionId);
+  if (!configVersion) {
+    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
+  }
+
+  const configStatus = typeof configVersion?.manifest?.status === 'string' ? configVersion.manifest.status.trim() : '';
+  if (
+    configVersion.houseId !== resolvedHouse.houseId
+    || configVersion.teamId !== teamId
+    || (configStatus && !PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(configStatus))
+  ) {
+    return sendPortalApiError(res, 409, 'CONFIG_NOT_ELIGIBLE', 'Config version is not eligible for this run.', { requestId });
+  }
+
+  const replayed = getRunByIdempotency({
+    houseId: resolvedHouse.houseId,
+    idempotencyKey,
+  });
+  if (replayed) {
+    return sendPortalApiSuccess(res, {
+      runId: replayed.runId,
+      status: replayed.status,
+      traceAuthorityType: replayed.traceAuthorityType,
+    }, { requestId });
+  }
+
+  const run = createRun({
+    runId: `run_${randomHex(10)}`,
+    traceId: `trace_${randomHex(10)}`,
+    experienceId,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    configVersionId,
+    entryMode,
+    status: 'queued',
+    traceAuthorityType: PLATFORM_TRACE_AUTHORITY_TYPE,
+    metadata: {
+      ...metadata,
+      requestId,
+      sessionId: session.sessionId,
+      traceAuthorityRef: `house:${resolvedHouse.houseId}`,
+    },
+    idempotencyKey,
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    runId: run.runId,
+    status: run.status,
+    traceAuthorityType: run.traceAuthorityType,
+  }, { status: 201, requestId });
 });
 
 app.get('/v1/health', respondPokerOperatorTransport);
@@ -9701,6 +9798,56 @@ if (process.env.NODE_ENV === 'test') {
       ok: true,
       family: String(req.params.family || '').trim(),
       fixture,
+    });
+  });
+
+  app.post('/__test__/unified-platform/config-versions', express.json({ limit: '64kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+    const configVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'active';
+    if (!configVersionId || !houseId || !teamId) {
+      return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    }
+
+    const manifest = req.body?.manifest && typeof req.body.manifest === 'object' && !Array.isArray(req.body.manifest)
+      ? req.body.manifest
+      : {
+        configVersionId,
+        houseId,
+        teamId,
+        branch: 'stable',
+        status,
+        resolvedComponents: {
+          housePolicyVersionId: 'hpv_fixture_01',
+          teamCompositionVersionId: 'tcv_fixture_01',
+          agentConfigVersionIds: ['agv_fixture_01'],
+          officePolicyVersionIds: [],
+          experiencePresetVersionId: 'epv_fixture_01',
+          integrationOverlayVersionIds: [],
+          trainerPresetVersionId: 'tpv_fixture_01',
+        },
+      };
+    const configHash = sha256PrefixedHex(JSON.stringify(manifest));
+    const record = upsertConfigVersion({
+      configVersionId,
+      houseId,
+      teamId,
+      experienceId: typeof manifest?.experienceId === 'string' ? manifest.experienceId.trim() : '',
+      status,
+      configHash,
+      manifest,
+      lineage: { seededBy: 'playwright' },
+      nowIso: nowIso(),
+    });
+    return res.json({
+      ok: true,
+      config: record,
     });
   });
 

@@ -40,6 +40,16 @@ const FIXTURE_FILES = Object.freeze({
 let db = null;
 const fixtureCache = new Map();
 
+function hasTableColumn(database, tableName, columnName) {
+  const rows = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  return rows.some((row) => String(row?.name || '').trim() === String(columnName || '').trim());
+}
+
+function ensureColumn(database, tableName, columnName, definitionSql) {
+  if (hasTableColumn(database, tableName, columnName)) return;
+  database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definitionSql}`);
+}
+
 function ensureDb() {
   if (db) return db;
   const storePath = getStorePath();
@@ -258,6 +268,14 @@ function ensureDb() {
       created_at TEXT NOT NULL
     );
   `);
+  ensureColumn(db, 'config_versions', 'lineage_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'config_versions', 'experience_id', 'TEXT');
+  ensureColumn(db, 'config_versions', 'status', `TEXT NOT NULL DEFAULT 'draft'`);
+  ensureColumn(db, 'config_versions', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'runs', 'config_version_id', 'TEXT');
+  ensureColumn(db, 'runs', 'entry_mode', `TEXT NOT NULL DEFAULT 'normal'`);
+  ensureColumn(db, 'runs', 'metadata_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'runs', 'completed_at', 'TEXT');
   return db;
 }
 
@@ -304,6 +322,219 @@ function loadFixtureFamily(family) {
   return parsed;
 }
 
+function parseJsonColumn(raw, fallback) {
+  if (typeof raw !== 'string' || !raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function mapConfigVersionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    configVersionId: String(row.config_version_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    experienceId: row.experience_id ? String(row.experience_id) : null,
+    status: row.status ? String(row.status) : null,
+    configHash: String(row.config_hash || ''),
+    manifest: parseJsonColumn(row.manifest_json, {}),
+    lineage: parseJsonColumn(row.lineage_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getConfigVersion(configVersionId = '') {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  if (!normalizedConfigVersionId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM config_versions
+    WHERE config_version_id = ?
+    LIMIT 1
+  `).get(normalizedConfigVersionId);
+  return mapConfigVersionRow(row);
+}
+
+function upsertConfigVersion({
+  configVersionId = '',
+  houseId = '',
+  teamId = '',
+  experienceId = '',
+  status = 'draft',
+  configHash = '',
+  manifest = null,
+  lineage = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedConfigHash = String(configHash || '').trim();
+  if (!normalizedConfigVersionId || !normalizedHouseId || !normalizedTeamId || !normalizedConfigHash) {
+    throw new Error('CONFIG_VERSION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO config_versions (
+      config_version_id,
+      house_id,
+      team_id,
+      experience_id,
+      config_hash,
+      status,
+      manifest_json,
+      lineage_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(config_version_id) DO UPDATE SET
+      house_id = excluded.house_id,
+      team_id = excluded.team_id,
+      experience_id = excluded.experience_id,
+      config_hash = excluded.config_hash,
+      status = excluded.status,
+      manifest_json = excluded.manifest_json,
+      lineage_json = excluded.lineage_json,
+      updated_at = excluded.updated_at
+  `).run(
+    normalizedConfigVersionId,
+    normalizedHouseId,
+    normalizedTeamId,
+    String(experienceId || '').trim() || null,
+    normalizedConfigHash,
+    String(status || 'draft').trim() || 'draft',
+    JSON.stringify(manifest && typeof manifest === 'object' ? manifest : {}),
+    JSON.stringify(lineage && typeof lineage === 'object' ? lineage : {}),
+    nowIso,
+    nowIso,
+  );
+  return getConfigVersion(normalizedConfigVersionId);
+}
+
+function mapRunRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    runId: String(row.run_id || ''),
+    traceId: String(row.trace_id || ''),
+    experienceId: String(row.experience_id || ''),
+    houseId: row.house_id ? String(row.house_id) : null,
+    teamId: row.team_id ? String(row.team_id) : null,
+    configVersionId: row.config_version_id ? String(row.config_version_id) : null,
+    entryMode: String(row.entry_mode || ''),
+    status: String(row.status || ''),
+    traceAuthorityType: String(row.trace_authority_type || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+    completedAt: row.completed_at ? String(row.completed_at) : null,
+  };
+}
+
+function getRunById(runId = '') {
+  const normalizedRunId = String(runId || '').trim();
+  if (!normalizedRunId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM runs
+    WHERE run_id = ?
+    LIMIT 1
+  `).get(normalizedRunId);
+  return mapRunRow(row);
+}
+
+function getRunByIdempotency({ houseId = '', idempotencyKey = '' } = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM runs
+    WHERE house_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedHouseId, normalizedIdempotencyKey);
+  return mapRunRow(row);
+}
+
+function createRun({
+  runId = '',
+  traceId = '',
+  experienceId = '',
+  houseId = '',
+  teamId = '',
+  configVersionId = '',
+  entryMode = '',
+  status = 'queued',
+  traceAuthorityType = '',
+  metadata = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedTraceId = String(traceId || '').trim();
+  const normalizedExperienceId = String(experienceId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  const normalizedEntryMode = String(entryMode || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  const normalizedTraceAuthorityType = String(traceAuthorityType || '').trim();
+  if (
+    !normalizedRunId
+    || !normalizedTraceId
+    || !normalizedExperienceId
+    || !normalizedEntryMode
+    || !normalizedStatus
+    || !normalizedTraceAuthorityType
+  ) {
+    throw new Error('RUN_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO runs (
+      run_id,
+      trace_id,
+      experience_id,
+      house_id,
+      team_id,
+      config_version_id,
+      entry_mode,
+      status,
+      trace_authority_type,
+      metadata_json,
+      idempotency_key,
+      created_at,
+      updated_at,
+      completed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedRunId,
+    normalizedTraceId,
+    normalizedExperienceId,
+    normalizedHouseId || null,
+    normalizedTeamId || null,
+    normalizedConfigVersionId || null,
+    normalizedEntryMode,
+    normalizedStatus,
+    normalizedTraceAuthorityType,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+    null,
+  );
+  return getRunById(normalizedRunId);
+}
+
 function isUnifiedPlatformTable(tableName) {
   return PLATFORM_TABLES.includes(String(tableName || '').trim());
 }
@@ -316,8 +547,12 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  createRun,
   countUnifiedPlatformTableRows: countPlatformTableRows,
   countPlatformTableRows,
+  getConfigVersion,
+  getRunById,
+  getRunByIdempotency,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,
   getPlatformTableCounts,
@@ -326,4 +561,5 @@ module.exports = {
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,
   resetUnifiedPlatformStore,
+  upsertConfigVersion,
 };

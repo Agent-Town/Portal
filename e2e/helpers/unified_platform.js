@@ -85,6 +85,40 @@ async function getDefaultCompiledPackManifest(page) {
   });
 }
 
+async function seedPlatformConfigVersion(request, {
+  configVersionId = '',
+  houseId = '',
+  teamId = 'team_main',
+  status = 'active',
+  manifest = null,
+} = {}) {
+  const response = await request.post('/__test__/unified-platform/config-versions', {
+    headers: {
+      'content-type': 'application/json',
+      'x-test-reset': resetToken,
+    },
+    data: JSON.stringify({
+      configVersionId,
+      houseId,
+      teamId,
+      status,
+      manifest,
+    }),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      status: response.status(),
+      contentType: response.headers()['content-type'] || '',
+      raw: text,
+    };
+  }
+}
+
 module.exports = {
   compileDefaultSkillPack,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
@@ -93,4 +127,5 @@ module.exports = {
   getPlatformFixture,
   listPlatformFixtures,
   readWorkerSessionId,
+  seedPlatformConfigVersion,
 };
