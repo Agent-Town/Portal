@@ -5128,35 +5128,82 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const gatewayApi = await withDebugTimeout(() => initGateway(), null, 6000);
     const debugApi = window.__openclawLiteTest || null;
     const nowIso = new Date().toISOString();
-    let transcriptToolStats = null;
-    if (debugApi && typeof debugApi.getTranscriptToolStats === 'function') {
-      transcriptToolStats = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
+    const shouldLoadSession =
+      reason === 'manual'
+      || reason === 'tab-session'
+      || agentDebugActiveTab === 'session'
+      || !sessionPane?.textContent;
+
+    const runtimeStateInput = lastState && typeof lastState === 'object' ? lastState : null;
+    const runtimeContextInput = {
+      origin: window.location.origin,
+      teamCode: String(lastState?.teamCode || ''),
+      houseId: String(lastState?.houseId || ''),
+    };
+
+    const transcriptToolStatsPromise = debugApi && typeof debugApi.getTranscriptToolStats === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await debugApi.getTranscriptToolStats().catch(() => null);
-      }), null, 5000);
-    }
+      }), null, 5000)
+      : Promise.resolve(null);
 
-    let toolRegistry = null;
-    if (debugApi && typeof debugApi.getToolRegistryInfo === 'function') {
-      toolRegistry = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
+    const toolRegistryPromise = debugApi && typeof debugApi.getToolRegistryInfo === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await debugApi.getToolRegistryInfo().catch(() => null);
-      }), null, 5000);
-    }
+      }), null, 5000)
+      : Promise.resolve(null);
 
-    let skillSnapshot = null;
-    if (gatewayApi && typeof gatewayApi.skillState === 'function') {
-      const snapshot = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
+    const skillSnapshotPromise = gatewayApi && typeof gatewayApi.skillState === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await gatewayApi.skillState().catch(() => null);
-      }), null, 6000);
-      skillSnapshot = snapshot?.data || snapshot || null;
-    }
+      }), null, 6000)
+      : Promise.resolve(null);
 
-    let promptPreview = null;
-    if (gatewayApi && typeof gatewayApi.systemPromptPreview === 'function') {
-      const preview = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
+    const promptPreviewPromise = gatewayApi && typeof gatewayApi.systemPromptPreview === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
         return await gatewayApi.systemPromptPreview().catch(() => null);
-      }), null, 6000);
-      promptPreview = preview?.data || preview || null;
-    }
+      }), null, 6000)
+      : Promise.resolve(null);
+
+    const trainerNamespaceStatePromise = withDebugTimeout(() => withAgentTrafficMuted(async () => {
+      return await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
+    }), null, 5000);
+
+    const workerSessionContextPromise = gatewayApi && typeof gatewayApi.runtimeSessionContext === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
+        return await gatewayApi.runtimeSessionContext({
+          runtimeContext: runtimeContextInput,
+          runtimeState: runtimeStateInput,
+        });
+      }), null, 7000)
+      : Promise.resolve(null);
+
+    const transcriptPromise = shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function'
+      ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
+        return await debugApi.getTranscriptDump().catch(() => '[]');
+      }), '[]', 6000)
+      : Promise.resolve(null);
+
+    const [
+      transcriptToolStats,
+      toolRegistry,
+      skillSnapshotEnvelope,
+      promptPreviewEnvelope,
+      trainerNamespaceState,
+      workerSessionContextEnvelope,
+      transcriptRaw,
+    ] = await Promise.all([
+      transcriptToolStatsPromise,
+      toolRegistryPromise,
+      skillSnapshotPromise,
+      promptPreviewPromise,
+      trainerNamespaceStatePromise,
+      workerSessionContextPromise,
+      transcriptPromise,
+    ]);
+
+    const skillSnapshot = skillSnapshotEnvelope?.data || skillSnapshotEnvelope || null;
+    const promptPreview = promptPreviewEnvelope?.data || promptPreviewEnvelope || null;
 
     const availableSkills = parseAvailableSkills(promptPreview?.skillsPrompt || '');
     const contextPaths = Array.isArray(promptPreview?.contextFilePaths) ? promptPreview.contextFilePaths : [];
@@ -5171,9 +5218,6 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const pluginActionToolNames = pluginActions.map((action) => `skill_action.${action.id}`);
     const pluginActionAddonToolNames = pluginActionToolNames.filter((name) => !workerToolNameSet.has(name));
     const pluginUsage = skillActionPluginState?.usage || null;
-    const trainerNamespaceState = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
-      return await refreshTrainerNamespacePluginCache(lastState).catch(() => null);
-    }), null, 5000);
     const trainerNamespaceTools = Array.isArray(trainerNamespaceState?.tools) ? trainerNamespaceState.tools : [];
     const trainerNamespaceToolNames = trainerNamespaceTools
       .map((row) => String(row?.name || '').trim())
@@ -5265,46 +5309,11 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     ];
     setAgentDebugText('agentDebugSkill', skillLines.filter(Boolean).join('\n'));
 
-    const shouldLoadSession =
-      reason === 'manual'
-      || reason === 'tab-session'
-      || agentDebugActiveTab === 'session'
-      || !sessionPane?.textContent;
-
-    let workerSessionContext = null;
-    let workerSessionContextError = null;
-    if (gatewayApi && typeof gatewayApi.runtimeSessionContext === 'function') {
-      try {
-        const runtimeStateInput = lastState && typeof lastState === 'object' ? lastState : null;
-        const runtimeContextInput = {
-          origin: window.location.origin,
-          teamCode: String(lastState?.teamCode || ''),
-          houseId: String(lastState?.houseId || ''),
-        };
-        const snapshot = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
-          return await gatewayApi.runtimeSessionContext({
-            runtimeContext: runtimeContextInput,
-            runtimeState: runtimeStateInput,
-          });
-        }), null, 7000);
-        workerSessionContext = snapshot?.data || snapshot || null;
-        if (!workerSessionContext) {
-          workerSessionContextError = workerSessionContextError || 'RUNTIME_SESSION_CONTEXT_TIMEOUT';
-        }
-      } catch (err) {
-        workerSessionContextError = String(err?.message || err || 'RUNTIME_SESSION_CONTEXT_FAILED');
-      }
-    } else {
-      workerSessionContextError = 'RUNTIME_SESSION_CONTEXT_UNAVAILABLE';
-    }
-
-    let transcript = null;
-    if (shouldLoadSession && debugApi && typeof debugApi.getTranscriptDump === 'function') {
-      const dumpRaw = await withDebugTimeout(() => withAgentTrafficMuted(async () => {
-        return await debugApi.getTranscriptDump().catch(() => '[]');
-      }), '[]', 6000);
-      transcript = safeJsonParse(dumpRaw, []);
-    }
+    const workerSessionContext = workerSessionContextEnvelope?.data || workerSessionContextEnvelope || null;
+    const workerSessionContextError = gatewayApi && typeof gatewayApi.runtimeSessionContext === 'function'
+      ? (workerSessionContext ? null : 'RUNTIME_SESSION_CONTEXT_TIMEOUT')
+      : 'RUNTIME_SESSION_CONTEXT_UNAVAILABLE';
+    const transcript = shouldLoadSession ? safeJsonParse(transcriptRaw, []) : null;
 
     const sessionHeader = {
       refreshedAt: nowIso,

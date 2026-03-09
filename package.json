@@ -9,6 +9,8 @@
     "build:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs --install --build",
     "bundle:agent0-sdk": "node scripts/build_agent0_sdk_bundle.mjs",
     "optimize:atlas-district-images": "bash scripts/optimize_atlas_district_images.sh",
+    "research:portal:prepare": "node research/portal/prepare.mjs",
+    "research:portal:eval": "node research/portal/evaluate.mjs",
     "predev": "npm run build:openclaw-lite",
     "pretest": "npm run build:openclaw-lite",
     "dev": "node server/index.js",
