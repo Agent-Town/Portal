@@ -562,6 +562,29 @@
       return null;
     }
 
+    function isUnifiedWalletAccount(account) {
+      if (!account || typeof account !== 'object') return false;
+      if (sdk && typeof sdk.isUnifiedWallet === 'function') {
+        try {
+          return sdk.isUnifiedWallet(account) === true;
+        } catch {
+          return false;
+        }
+      }
+      return account.recovery_method === 'privy-v2';
+    }
+
+    function getWalletExecutionMeta(account) {
+      if (!account || typeof account !== 'object') {
+        return { executionMode: null, isUnifiedWallet: null };
+      }
+      const isUnifiedWallet = isUnifiedWalletAccount(account);
+      return {
+        executionMode: isUnifiedWallet ? 'tee' : 'on-device',
+        isUnifiedWallet
+      };
+    }
+
     async function refreshUser() {
       try {
         const out = await client.user.get();
@@ -1090,7 +1113,11 @@
             const accounts = await provider.request({ method: 'eth_requestAccounts' });
             const address = normalizeAddress(Array.isArray(accounts) && accounts.length ? accounts[0] : account.address);
             if (!address) throw new Error('NO_EVM_ACCOUNT');
-            return { address, provider };
+            return {
+              address,
+              provider,
+              ...getWalletExecutionMeta(account)
+            };
           } catch (err) {
             lastErr = err;
             if (!isWalletProxyInitError(err) || attempt >= 3) throw err;

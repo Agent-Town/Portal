@@ -477,7 +477,7 @@ Body:
 ```
 
 Notes:
-- Requires an existing `et_session` cookie and same-origin browser context headers (`Origin` and/or `Referer`). Requests without a valid existing session return `401 SESSION_REQUIRED`; cross-origin/absent navigation context returns `403 FORBIDDEN_ORIGIN`.
+- Requires an existing `et_session` cookie and same-origin browser context proof. Accepted proof is either matching `Origin`/`Referer`, or browser Fetch Metadata showing `Sec-Fetch-Site: same-origin` when `Origin`/`Referer` are omitted on same-origin fetches. Requests without a valid existing session return `401 SESSION_REQUIRED`; explicit cross-origin `Origin`/`Referer` or missing same-origin browser context return `403 FORBIDDEN_ORIGIN`.
 - Frontend sends `eth_sendTransaction` from the connected Privy EVM wallet to `evm.contractAddress` (`register(string,(string,bytes)[])`), then derives ERC-8004 ID from the confirmed receipt logs.
 - If Privy sponsorship returns a `transactionId` without an immediate tx hash, frontend polls `GET /api/privy/transactions/:transactionId` until `transactionHash` is available, then confirms receipt.
 - Route family is rate-limited at `/api/townhall/mint` to reduce abuse.
@@ -503,7 +503,7 @@ Pins Town Hall metadata to IPFS and returns an unsigned prepared Solana transact
 Frontend wallet signs this transaction (user wallet + local asset keypair). If sponsorship is enabled, the server fee-payer signs and broadcasts in a second step.
 
 Access requirements:
-- Requires an existing `et_session` cookie and same-origin browser context headers (`Origin` and/or `Referer`). Requests without a valid existing session return `401 SESSION_REQUIRED`; cross-origin/absent navigation context returns `403 FORBIDDEN_ORIGIN`.
+- Requires an existing `et_session` cookie and same-origin browser context proof. Accepted proof is either matching `Origin`/`Referer`, or browser Fetch Metadata showing `Sec-Fetch-Site: same-origin` when `Origin`/`Referer` are omitted on same-origin fetches. Requests without a valid existing session return `401 SESSION_REQUIRED`; explicit cross-origin `Origin`/`Referer` or missing same-origin browser context return `403 FORBIDDEN_ORIGIN`.
 - Route family is rate-limited at `/api/townhall/mint` to reduce abuse.
 
 Body:
@@ -560,7 +560,7 @@ Body:
 
 Behavior:
 - Server may auto-top-up the owner wallet from the sponsor fee payer before/while sending when `SOLANA_SPONSOR_AUTO_TOPUP=true`.
-- Default owner pre-fund target is `10,000,000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
+- Default owner pre-fund target is `50,000,000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
 
 Response:
 ```json

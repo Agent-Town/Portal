@@ -1494,6 +1494,9 @@ function knownMintErrorMessage(err, chain = 'evm') {
   if (code === 'PRIVY_SOLANA_SPONSORED_TX_UNAVAILABLE') {
     return 'Privy sponsored Solana send is unavailable for this wallet/session. Check Privy gas sponsorship settings for Solana Devnet.';
   }
+  if (code === 'PRIVY_SPONSORED_TX_TEE_REQUIRED') {
+    return 'This Privy EVM wallet is still using on-device execution. Sponsored Sepolia sends require a Privy TEE/unified wallet. Log out and back in so Privy can migrate the wallet, or fund it via a Sepolia faucet.';
+  }
   if (code === 'PRIVY_SPONSORED_TX_UNAVAILABLE') {
     return 'Privy sponsored Sepolia send is unavailable for this wallet/session. Check Privy gas sponsorship settings.';
   }
@@ -1577,12 +1580,19 @@ function knownMintErrorMessage(err, chain = 'evm') {
   ) {
     return 'Solana registration failed before execution. Confirm Privy Solana Devnet gas sponsorship is enabled and retry.';
   }
+  if (lower.includes('insufficient funds for rent')) {
+    return chain === 'solana'
+      ? 'Solana sponsored send needs more temporary lamports for rent-exempt account creation. Increase the sponsor top-up threshold or fund the wallet and retry.'
+      : 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
+  }
   if (
     lower.includes('insufficient funds')
     || lower.includes('exceeds the balance of the account')
     || lower.includes('total cost (gas * gas fee + value)')
   ) {
-    return 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
+    return chain === 'solana'
+      ? 'Solana sponsored send ran out of lamports during simulation. Increase the sponsor top-up threshold or fund the wallet and retry.'
+      : 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
   }
   if (lower.includes('user rejected') || lower.includes('rejected') || lower.includes('denied')) {
     return 'Wallet action was rejected.';
@@ -1770,7 +1780,19 @@ async function ensureEvmMintWallet(config) {
     if (String(err?.message || '') === 'EVM_ACCOUNT_MISMATCH') throw err;
     throw new Error('EVM_ACCOUNT_MISMATCH');
   }
-  return { address: normalizedAddress, provider, refreshProvider };
+  const executionMode = typeof connected?.executionMode === 'string' && connected.executionMode.trim()
+    ? connected.executionMode.trim().toLowerCase()
+    : null;
+  const isUnifiedWallet = typeof connected?.isUnifiedWallet === 'boolean'
+    ? connected.isUnifiedWallet
+    : null;
+  return {
+    address: normalizedAddress,
+    provider,
+    refreshProvider,
+    executionMode,
+    isUnifiedWallet
+  };
 }
 
 async function ensureSolanaMintWallet(config) {
@@ -2340,11 +2362,21 @@ async function sendPreparedEvmTransaction({ wallet, chainId, to, data }) {
   const caip2 = Number.isFinite(numericChainId) && numericChainId > 0
     ? `eip155:${Math.floor(numericChainId)}`
     : null;
+  const executionMode = typeof wallet?.executionMode === 'string'
+    ? wallet.executionMode.trim().toLowerCase()
+    : '';
+  const requiresTeeSponsoredPath = executionMode === 'on-device' || wallet?.isUnifiedWallet === false;
   const tx = {
     from: wallet.address,
     to,
     data
   };
+
+  if (requiresTeeSponsoredPath) {
+    const err = new Error('PRIVY_SPONSORED_TX_TEE_REQUIRED');
+    err.detail = 'Privy EVM sponsorship requires a TEE/unified wallet, but this wallet is still using on-device execution.';
+    throw err;
+  }
 
   const refreshProvider = async () => {
     if (typeof wallet?.refreshProvider === 'function') {
@@ -2543,6 +2575,31 @@ async function runTownhallMintStep(stepKey, action) {
   }
 }
 
+function collectRejectedTownhallMintMessages(results) {
+  const out = [];
+  const seen = new Set();
+  for (const result of results) {
+    if (result?.status !== 'rejected') continue;
+    const reason = result.reason;
+    const message = reason instanceof Error
+      ? String(reason.message || '').trim()
+      : String(reason || '').trim();
+    if (!message) continue;
+    const key = message.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(message);
+  }
+  return out;
+}
+
+function combineRejectedTownhallMintErrors(results) {
+  const messages = collectRejectedTownhallMintMessages(results);
+  if (!messages.length) return null;
+  if (messages.length === 1) return new Error(messages[0]);
+  return new Error(messages.map((message, index) => (index === 0 ? message : `Also: ${message}`)).join(' '));
+}
+
 function setTownhallRegisterFeedback(message = '', isError = false) {
   const status = el('townhallRegisterStatus');
   const error = el('townhallRegisterError');
@@ -2720,15 +2777,6 @@ async function mintAllTownhallIdentitiesAndRegister() {
       throw new Error(knownMintErrorMessage(walletErr, chain));
     }
 
-    const firstRejected = (results) => {
-      for (const result of results) {
-        if (result?.status !== 'rejected') continue;
-        const reason = result.reason;
-        return reason instanceof Error ? reason : new Error(String(reason || 'Mint failed.'));
-      }
-      return null;
-    };
-
     const mintUserEvm = async () => {
       const userEvm = await runTownhallMintStep('userEvm', () => mintTownhallEvmIdentity({
         subject: 'human',
@@ -2795,12 +2843,12 @@ async function mintAllTownhallIdentitiesAndRegister() {
 
     setTownhallRegisterFeedback('User is registering on Ethereum and Solana...');
     const userMintResults = await Promise.allSettled([mintUserEvm(), mintUserSolana()]);
-    const userMintError = firstRejected(userMintResults);
+    const userMintError = combineRejectedTownhallMintErrors(userMintResults);
     if (userMintError) throw userMintError;
 
     setTownhallRegisterFeedback('Agent is registering on Ethereum and Solana...');
     const agentMintResults = await Promise.allSettled([mintAgentEvm(), mintAgentSolana()]);
-    const agentMintError = firstRejected(agentMintResults);
+    const agentMintError = combineRejectedTownhallMintErrors(agentMintResults);
     if (agentMintError) throw agentMintError;
 
     setTownhallRegisterFeedback('Saving Town Hall registration...');

@@ -43,7 +43,7 @@ This document captures working behavior and hard-won debugging outcomes for the 
   - Safe fallback match: wallet + asset (when message hash drifts due to wallet-side blockhash refresh).
 - Owner lamport funding:
   - Server can auto-top-up owner wallet from sponsor wallet when needed (`SOLANA_SPONSOR_AUTO_TOPUP=true`).
-  - Default owner pre-fund target: `10_000_000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
+  - Default owner pre-fund target: `50_000_000` lamports (`SOLANA_SPONSOR_OWNER_MIN_LAMPORTS`).
   - If simulation returns `insufficient lamports X, need Y`, server computes shortfall, top-ups, and retries once.
 
 ## Common failures and direct meaning

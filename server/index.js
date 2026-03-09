@@ -1454,11 +1454,14 @@ const SOLANA_ERC8004_FEE_PAYER_SECRET = String(
   || process.env.SOLANA_DEVNET_FEE_PAYER_SECRET
   || ''
 ).trim();
-const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW = Number(process.env.SOLANA_SPONSOR_OWNER_MIN_LAMPORTS || 10_000_000);
+const DEFAULT_SOLANA_SPONSOR_OWNER_MIN_LAMPORTS = 50_000_000;
+const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW = Number(
+  process.env.SOLANA_SPONSOR_OWNER_MIN_LAMPORTS || DEFAULT_SOLANA_SPONSOR_OWNER_MIN_LAMPORTS
+);
 const SOLANA_SPONSOR_OWNER_MIN_LAMPORTS = Number.isFinite(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
   && SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW > 0
   ? Math.floor(SOLANA_SPONSOR_OWNER_MIN_LAMPORTS_RAW)
-  : 10_000_000;
+  : DEFAULT_SOLANA_SPONSOR_OWNER_MIN_LAMPORTS;
 const SOLANA_SPONSOR_AUTO_TOPUP = parseBoolEnv(
   process.env.SOLANA_SPONSOR_AUTO_TOPUP,
   SOLANA_ERC8004_CLUSTER === 'devnet' || SOLANA_ERC8004_CLUSTER === 'testnet'
@@ -1938,35 +1941,48 @@ function getExistingHumanSession(req) {
   return getSessionById(sid) || null;
 }
 
+function headerHostMatchesRequestHost(rawValue, host) {
+  const value = String(rawValue || '').trim();
+  if (!value) return null;
+  try {
+    return new URL(value).host.toLowerCase() === host;
+  } catch {
+    return false;
+  }
+}
+
+function hasTrustedSameOriginFetchMetadata(req) {
+  const fetchSite = String(req.get('sec-fetch-site') || '').trim().toLowerCase();
+  if (fetchSite !== 'same-origin') return false;
+
+  const fetchMode = String(req.get('sec-fetch-mode') || '').trim().toLowerCase();
+  if (!fetchMode || fetchMode === 'navigate') return false;
+
+  const fetchDest = String(req.get('sec-fetch-dest') || '').trim().toLowerCase();
+  if (['document', 'frame', 'iframe', 'embed', 'object'].includes(fetchDest)) {
+    return false;
+  }
+
+  return true;
+}
+
 function hasSameOriginNavigationContext(req) {
   const host = String(req.get('host') || '').trim().toLowerCase();
   if (!host) return false;
 
-  const originHeader = String(req.get('origin') || '').trim();
-  const refererHeader = String(req.get('referer') || '').trim();
-  if (!originHeader && !refererHeader) {
-    return false;
+  const originMatch = headerHostMatchesRequestHost(req.get('origin'), host);
+  if (originMatch === false) return false;
+
+  const refererMatch = headerHostMatchesRequestHost(req.get('referer'), host);
+  if (refererMatch === false) return false;
+
+  if (originMatch === true || refererMatch === true) {
+    return true;
   }
 
-  if (originHeader) {
-    try {
-      const originHost = new URL(originHeader).host.toLowerCase();
-      if (originHost !== host) return false;
-    } catch {
-      return false;
-    }
-  }
-
-  if (refererHeader) {
-    try {
-      const refererHost = new URL(refererHeader).host.toLowerCase();
-      if (refererHost !== host) return false;
-    } catch {
-      return false;
-    }
-  }
-
-  return true;
+  // Same-origin browser fetches may omit Origin/Referer on GETs; in that case
+  // fall back to browser-managed Fetch Metadata rather than opening the route.
+  return hasTrustedSameOriginFetchMetadata(req);
 }
 
 function requireProxySessionAccess(req, res, next) {
@@ -2753,6 +2769,11 @@ function parseSolanaLamportShortfall(detailText) {
     need,
     shortfall: need - have
   };
+}
+
+function isSolanaRentFundingError(detailText) {
+  const text = String(detailText || '').toLowerCase();
+  return text.includes('insufficient funds for rent');
 }
 
 function ensureSessionOnboarding(session) {
@@ -4929,6 +4950,11 @@ app.post('/api/townhall/mint/solana/sponsor-send', async (req, res) => {
     } catch (sendErr) {
       const detailText = String(sendErr?.detail || sendErr?.cause?.message || sendErr?.message || '');
       const shortfall = parseSolanaLamportShortfall(detailText);
+      if (isSolanaRentFundingError(detailText)) {
+        const err = new Error('SOLANA_SPONSORED_OWNER_UNFUNDED');
+        err.detail = `Owner wallet needs more lamports for rent-exempt account creation during sponsored mint. ${detailText}`.trim();
+        throw err;
+      }
       const canRetryAfterTopUp = SOLANA_SPONSOR_AUTO_TOPUP && shortfall && Number.isFinite(shortfall.shortfall);
       if (!canRetryAfterTopUp) throw sendErr;
       const topUpLamports = Math.max(1, Math.floor(shortfall.shortfall + 250_000));

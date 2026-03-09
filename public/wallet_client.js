@@ -284,7 +284,17 @@
         if (!address) throw new Error('NO_EVM_ACCOUNT');
         this.evmAddress = address;
         if (out?.provider) this.evmProvider = out.provider;
-        return { chain: CHAIN_EVM, address, provider: this.evmProvider || out?.provider || null };
+        const executionMode = typeof out?.executionMode === 'string' && out.executionMode.trim()
+          ? out.executionMode.trim()
+          : null;
+        const isUnifiedWallet = typeof out?.isUnifiedWallet === 'boolean' ? out.isUnifiedWallet : null;
+        return {
+          chain: CHAIN_EVM,
+          address,
+          provider: this.evmProvider || out?.provider || null,
+          executionMode,
+          isUnifiedWallet
+        };
       }
       throw new Error('NO_EVM_WALLET');
     }
