@@ -11,6 +11,7 @@
   let gatewayListenersBound = false;
   let panelLayoutObserver = null;
   let panelLayoutResizeBound = false;
+  let panelLayoutDeferredSyncBound = false;
 
   function el(id) {
     return document.getElementById(id);
@@ -55,9 +56,21 @@
     body.classList.toggle('agent-panel-expanded', !dock.classList.contains('minimized'));
   }
 
+  function schedulePanelLayoutSync(panel = null) {
+    const dock = panel || el('agentSidebar');
+    if (!dock) return;
+    const run = () => syncPanelLayout(dock);
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run);
+      return;
+    }
+    setTimeout(run, 0);
+  }
+
   function bindPanelLayout(panel) {
     if (!panel) return;
     syncPanelLayout(panel);
+    schedulePanelLayoutSync(panel);
     if (typeof ResizeObserver === 'function') {
       if (!panelLayoutObserver) {
         panelLayoutObserver = new ResizeObserver(() => {
@@ -73,6 +86,19 @@
       window.addEventListener('resize', () => {
         syncPanelLayout(panel);
       });
+    }
+    if (!panelLayoutDeferredSyncBound) {
+      panelLayoutDeferredSyncBound = true;
+      window.addEventListener('load', () => {
+        schedulePanelLayoutSync(panel);
+      }, { once: true });
+      if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+        document.fonts.ready
+          .then(() => {
+            schedulePanelLayoutSync(panel);
+          })
+          .catch(() => {});
+      }
     }
   }
 
@@ -145,6 +171,7 @@
     syncMinimizeLabel();
     saveMinimizedPreference(!!minimized);
     syncPanelLayout(panel);
+    schedulePanelLayoutSync(panel);
   }
 
   async function initGateway() {

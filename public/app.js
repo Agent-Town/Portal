@@ -355,6 +355,7 @@ let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
+let agentPanelLayoutDeferredSyncBound = false;
 let trainerScriptLoadPromise = null;
 let skillActionPluginCache = {
   activeSkillPath: '',
@@ -3609,9 +3610,21 @@ function syncAgentPanelLayout(panel = null) {
   body.classList.toggle('agent-panel-expanded', !dock.classList.contains('minimized'));
 }
 
+function scheduleAgentPanelLayoutSync(panel = null) {
+  const dock = panel || el('agentSidebar');
+  if (!dock) return;
+  const run = () => syncAgentPanelLayout(dock);
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(run);
+    return;
+  }
+  setTimeout(run, 0);
+}
+
 function bindAgentPanelLayout(panel) {
   if (!panel) return;
   syncAgentPanelLayout(panel);
+  scheduleAgentPanelLayoutSync(panel);
   if (typeof ResizeObserver === 'function') {
     if (!agentPanelLayoutObserver) {
       agentPanelLayoutObserver = new ResizeObserver(() => {
@@ -3627,6 +3640,19 @@ function bindAgentPanelLayout(panel) {
     window.addEventListener('resize', () => {
       syncAgentPanelLayout(panel);
     });
+  }
+  if (!agentPanelLayoutDeferredSyncBound) {
+    agentPanelLayoutDeferredSyncBound = true;
+    window.addEventListener('load', () => {
+      scheduleAgentPanelLayoutSync(panel);
+    }, { once: true });
+    if (document.fonts && typeof document.fonts.ready?.then === 'function') {
+      document.fonts.ready
+        .then(() => {
+          scheduleAgentPanelLayoutSync(panel);
+        })
+        .catch(() => {});
+    }
   }
 }
 
@@ -7801,6 +7827,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       syncAgentPanelLayout(dock);
+      scheduleAgentPanelLayoutSync(dock);
       return normalized;
     };
 
@@ -7810,6 +7837,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.title = minimized ? 'Expand panel' : 'Minimize panel';
       saveAgentPanelMinimized(minimized);
       syncAgentPanelLayout(dock);
+      scheduleAgentPanelLayoutSync(dock);
     };
 
     const applyDebugVisible = (visible) => {
@@ -7819,6 +7847,7 @@ document.addEventListener('DOMContentLoaded', () => {
       debugBtn.title = visible ? 'Hide debug panel' : 'Show debug panel';
       saveAgentPanelDebugVisible(visible);
       syncAgentPanelLayout(dock);
+      scheduleAgentPanelLayoutSync(dock);
       if (visible) {
         scheduleAgentDebugRefresh('debug-open');
       }
