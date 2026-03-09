@@ -49,7 +49,6 @@ npm run research:portal:app
 - runs a baseline eval when needed,
 - optionally supports `-- --baseline` or `-- --full-test`,
 - prints a ready-to-paste prompt for an app session.
-
 The evaluator prints a parseable footer:
 
 ```text
