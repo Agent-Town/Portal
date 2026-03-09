@@ -2723,13 +2723,13 @@ const LITE_TOOL_SPECS = [
   {
     name: "trainer.delete_trace",
     label: "Trainer Delete Trace",
-    description: "Delete one trainer run trace (approval required).",
+    description: "Delete one browser-local trainer trace cache entry (approval required).",
     sampleArgs: { attemptId: "latest" },
   },
   {
     name: "trainer.clear_traces",
     label: "Trainer Clear Traces",
-    description: "Delete all trainer run traces (approval required).",
+    description: "Delete all browser-local trainer trace cache entries (approval required).",
     sampleArgs: {},
   },
   {
@@ -4320,7 +4320,7 @@ async function runTrainerDeleteTrace(params, toolName = "trainer.delete_trace") 
 
   const decision = await requestApproval({
     title: "Approval",
-    body: `Delete trainer trace ${resolved.attemptId}`,
+    body: `Delete local trainer trace cache ${resolved.attemptId}`,
   });
   if (decision !== "approve") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "Trainer trace delete rejected"));
@@ -4357,7 +4357,7 @@ async function runTrainerClearTraces(params, toolName = "trainer.clear_traces") 
 
   const decision = await requestApproval({
     title: "Approval",
-    body: questIdRaw ? `Clear trainer traces for ${trainerQuestId(questIdRaw)}` : "Clear all trainer traces",
+    body: questIdRaw ? `Clear local trainer trace cache for ${trainerQuestId(questIdRaw)}` : "Clear all local trainer trace cache",
   });
   if (decision !== "approve") {
     return withToolMeta(toolName, startedAtMs, makeToolFailure("APPROVAL_REJECTED", "Trainer trace clear rejected"));

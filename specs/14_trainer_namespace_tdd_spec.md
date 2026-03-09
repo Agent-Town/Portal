@@ -337,6 +337,7 @@ Response includes:
 1. Require valid approval token.
 2. Emit `TRAINER_APPROVAL_REQUIRED` when missing/expired.
 3. Emit immutable audit record with actor, token id, and affected run count.
+4. Operate only on browser-local trainer cache entries; canonical archive rows remain untouched.
 
 ## 7. UX Requirements
 
@@ -354,7 +355,7 @@ Response includes:
    - `budgetRemaining`
    - `pendingApprovals`
    - `recentBlockCodes`
-5. Tool lab and traces remain human-operable (including `[x]` delete and clear all).
+5. Tool lab and traces remain human-operable (including `[x]` delete and clear-local-cache actions with explicit local/cache wording).
 
 ## 8. Security and Threat Model Requirements
 

@@ -910,9 +910,9 @@
     await render();
     if (!silent) {
       if (deletedFiles > 0) {
-        setStatus(`Deleted trace for ${key}.`);
+        setStatus(`Deleted local trace cache for ${key}.`);
       } else {
-        setStatus(`No trace found for ${key}.`);
+        setStatus(`No local trace cache found for ${key}.`);
       }
     }
     return {
@@ -927,7 +927,7 @@
     const silent = options?.silent === true;
     const attemptCount = state.attempts.length;
     if (!attemptCount) {
-      if (!silent) setStatus("No attempts to clear.");
+      if (!silent) setStatus("No local cache attempts to clear.");
       return {
         ok: true,
         clearedAttempts: 0,
@@ -943,7 +943,7 @@
     await refreshBackupCache().catch(() => {});
     await refreshBuilderDiagnostics();
     await render();
-    if (!silent) setStatus(`Cleared ${attemptCount} attempt(s).`);
+    if (!silent) setStatus(`Cleared ${attemptCount} local cache attempt(s).`);
     return {
       ok: true,
       clearedAttempts: attemptCount,
@@ -982,7 +982,7 @@
       const remove = document.createElement("span");
       remove.className = "trainerAttemptDelete";
       remove.textContent = "[x]";
-      remove.title = `Delete trace ${attempt.attemptId || ""}`;
+      remove.title = `Delete local trace cache ${attempt.attemptId || ""}`;
       remove.setAttribute("data-testid", "trainer-attempt-delete");
       remove.tabIndex = 0;
       const onDelete = (event) => {

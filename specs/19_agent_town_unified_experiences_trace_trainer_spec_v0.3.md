@@ -1293,7 +1293,7 @@ The platform release is acceptable only when all of the following are automated 
 4. protected `/v1/*` routes reject missing or wrong auth with stable error codes from this spec.
 5. duplicate trace intake records with the same `ingestKey` are ignored deterministically.
 6. late trace intake after run completion is either rejected with `TRACE_LATE_EVENT_REJECTED` or appended as a post-run annotation event according to declared policy, never by mutating prior canonical events.
-7. clearing browser-local trainer traces does not delete or corrupt canonical archived traces.
+7. clearing browser-local trainer traces does not delete or corrupt canonical archived traces, and user-facing controls must label that action as local/cache-only.
 8. any published config version resolves only to immutable component version IDs and hashes.
 9. any meaningful config change produces a new `configHash`.
 10. write-capable web executions require approval by default and create auditable execution records.

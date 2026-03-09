@@ -25,8 +25,8 @@
     { name: "trainer.get_transcript_integrity", tier: "A", description: "Read transcript integrity diagnostics." },
     { name: "trainer.get_session_context", tier: "A", description: "Read runtime/session context snapshot." },
     { name: "trainer.explain_not_used", tier: "A", description: "Explain why an action was not used." },
-    { name: "trainer.delete_trace", tier: "C", description: "Delete one run trace (approval required)." },
-    { name: "trainer.clear_traces", tier: "C", description: "Clear all run traces (approval required)." },
+    { name: "trainer.delete_trace", tier: "C", description: "Delete one local trainer trace cache entry (approval required)." },
+    { name: "trainer.clear_traces", tier: "C", description: "Clear all local trainer trace cache entries (approval required)." },
   ]);
 
   const TOOL_ALIAS_MAP = Object.freeze({
