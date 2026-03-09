@@ -3417,6 +3417,18 @@ function setTrainerModalOpen(open) {
   document.body.classList.toggle('trainer-modal-open', nextOpen);
 }
 
+function syncTrainerModalQuery(open) {
+  if (!window.history || typeof window.history.replaceState !== 'function') return;
+  const parsed = new URL(window.location.href);
+  if (open) {
+    parsed.searchParams.set('modal', 'trainer');
+  } else if (parsed.searchParams.get('modal') === 'trainer') {
+    parsed.searchParams.delete('modal');
+  }
+  const nextUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  window.history.replaceState({}, '', nextUrl);
+}
+
 async function ensureTrainerScriptLoaded() {
   if (window.__agentTownTrainerScriptLoaded === true) return;
   if (!trainerScriptLoadPromise) {
@@ -3442,11 +3454,12 @@ async function ensureTrainerScriptLoaded() {
 async function openTrainerModal() {
   const backdrop = getTrainerModalBackdrop();
   if (!isTownHub || !backdrop) {
-    window.location.assign('/trainer');
+    window.location.assign('/?modal=trainer');
     return;
   }
 
   setTrainerModalOpen(true);
+  syncTrainerModalQuery(true);
 
   const statusLine = document.getElementById('trainerStatusLine');
   if (statusLine && statusLine.textContent.includes('failed')) {
@@ -3467,6 +3480,7 @@ async function openTrainerModal() {
 
 function closeTrainerModal() {
   setTrainerModalOpen(false);
+  syncTrainerModalQuery(false);
 }
 
 function bindTrainerModalInteractions() {
@@ -8337,7 +8351,7 @@ function setupAgentInterface() {
   if (openTrainerBtn) {
     openTrainerBtn.addEventListener('click', () => {
       openTrainerModal().catch(() => {
-        window.location.assign('/trainer');
+        window.location.assign('/?modal=trainer');
       });
     });
   }
@@ -8382,6 +8396,7 @@ async function bootstrapInitialRouteState() {
   const districtParam = params.get('district');
   const pathDistrict = popupDistrictByPath[window.location.pathname] || null;
   const explicitDistrict = explicitDistrictFromInput(districtParam) || explicitDistrictFromInput(pathDistrict);
+  const initialModal = String(params.get('modal') || '').trim().toLowerCase();
   pathMode = loadPathMode();
   const initialDistrict = explicitDistrict;
   activeDistrict = initialDistrict;
@@ -8470,6 +8485,10 @@ async function bootstrapInitialRouteState() {
 
   if (isTownHub && initialDistrict) {
     await showDistrict(activeDistrict);
+  }
+
+  if (isTownHub && initialModal === 'trainer') {
+    await openTrainerModal().catch(() => { });
   }
 
   if (tokenErr) {
