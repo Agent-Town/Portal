@@ -1494,6 +1494,8 @@
       return;
     }
     const startedAt = Date.now();
+    state.toolLastResult = null;
+    await render();
     setStatus(`Running tool ${toolName}...`);
     try {
       const isSkillAction = isSkillActionToolName(toolName);
