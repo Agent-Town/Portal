@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal Poker</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root {
+      --poker-bg: #101418;
+      --poker-ink: #f7efd8;
+      --poker-card: rgba(27, 38, 33, 0.88);
+      --poker-accent: #d2a24c;
+      --poker-muted: #cbbd9f;
+      --poker-line: rgba(247, 239, 216, 0.12);
+    }
+    body.pokerShell {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--poker-ink);
+      font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      background:
+        radial-gradient(circle at top, rgba(210, 162, 76, 0.2), transparent 36%),
+        linear-gradient(180deg, #12191d 0%, #0d1216 100%);
+    }
+    .pokerFrame {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 28px 20px 40px;
+    }
+    .pokerHero {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+    .pokerHero h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 52px);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .pokerHero p {
+      max-width: 42rem;
+      margin: 8px 0 0;
+      color: var(--poker-muted);
+      line-height: 1.5;
+    }
+    .pokerStatus {
+      min-height: 20px;
+      margin-bottom: 16px;
+      color: var(--poker-muted);
+    }
+    .pokerGrid {
+      display: grid;
+      gap: 16px;
+    }
+    .pokerCard {
+      border-radius: 22px;
+      border: 1px solid var(--poker-line);
+      background: var(--poker-card);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+      padding: 20px;
+      backdrop-filter: blur(6px);
+    }
+    .pokerCard h2,
+    .pokerCard h3 {
+      margin: 0 0 8px;
+    }
+    .pokerMeta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 10px 0 0;
+    }
+    .pokerBadge {
+      border-radius: 999px;
+      border: 1px solid rgba(210, 162, 76, 0.28);
+      color: var(--poker-accent);
+      padding: 5px 10px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .pokerLinks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .pokerLinks a,
+    .pokerButton {
+      border-radius: 999px;
+      border: 1px solid rgba(247, 239, 216, 0.18);
+      color: var(--poker-ink);
+      text-decoration: none;
+      padding: 10px 14px;
+      background: rgba(247, 239, 216, 0.04);
+    }
+    .pokerButton {
+      cursor: pointer;
+      font: inherit;
+    }
+    .pokerTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    .pokerTable th,
+    .pokerTable td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--poker-line);
+      text-align: left;
+    }
+    .pokerTable th {
+      color: var(--poker-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .pokerForm {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .pokerForm label {
+      display: grid;
+      gap: 6px;
+    }
+    .pokerForm input,
+    .pokerForm textarea {
+      width: 100%;
+      min-height: 44px;
+      box-sizing: border-box;
+      border-radius: 14px;
+      border: 1px solid var(--poker-line);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--poker-ink);
+      padding: 12px 14px;
+      font: inherit;
+    }
+    .pokerForm textarea {
+      min-height: 96px;
+      resize: vertical;
+    }
+    .pokerSummary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .pokerSummaryValue {
+      font-size: 28px;
+      color: var(--poker-accent);
+    }
+    @media (max-width: 720px) {
+      .pokerFrame {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+    }
+  </style>
+</head>
+<body class="pokerShell">
+  <main class="pokerFrame">
+    <header class="pokerHero">
+      <div>
+        <h1 id="pokerTitle">Portal Poker</h1>
+        <p id="pokerSubtitle">Operator-authoritative seasons, submissions, leaderboards, and replay manifests.</p>
+      </div>
+    </header>
+    <div id="pokerStatus" class="pokerStatus" aria-live="polite"></div>
+    <section id="pokerContent" class="pokerGrid" aria-live="polite"></section>
+  </main>
+  <script src="/poker.js?v=20260309"></script>
+</body>
+</html>

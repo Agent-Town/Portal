@@ -1,0 +1,8 @@
+{
+  "family": "poker_operator_expected_canonical_trace",
+  "traceId": "trace_fixture_poker_01",
+  "authority": {
+    "type": "poker_operator"
+  },
+  "eventCount": 2
+}

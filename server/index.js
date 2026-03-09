@@ -41,6 +41,138 @@ const {
   CANVAS,
   defaultLiteState
 } = require('./sessions');
+const {
+  activateCredentialGrant,
+  countTableRows,
+  createApprovalRequest,
+  createCredentialGrant,
+  createImportJob,
+  createEvidence,
+  createInvocation,
+  createWebSession,
+  decideApproval,
+  getActiveCredentialGrant,
+  getApprovalById,
+  getCredentialGrantById,
+  getImportJobById,
+  getInvocationByIdempotency,
+  getLatestCheckpointForSession,
+  getLatestPokerLeaderboardSnapshot,
+  getPokerBatchById,
+  getPokerLeaderboardSnapshotById,
+  getPokerReplayArtifactByRunId,
+  getRegistryEntityById,
+  getPokerRunById,
+  getPokerSeasonById,
+  getPokerSubmissionById,
+  getPokerSubmissionByRequest,
+  getWebSessionById,
+  listApprovalsForSession,
+  listCredentialStatusByOrigin,
+  listEvidenceForSession,
+  listPokerSeasons,
+  resetExtendedStore,
+  searchRegistryEntities,
+  setWebSessionRevisionAndState,
+  touchCredentialGrant,
+  upsertPokerBatch,
+  upsertPokerLeaderboardSnapshot,
+  upsertPokerReplayArtifact,
+  upsertPokerRun,
+  upsertPokerSeason,
+  upsertPokerSubmission,
+  writeCheckpoint,
+} = require('./web_poker_store');
+const { getLiveSuiteManifest } = require('./live_suite_manifest');
+const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = require('./route_manifest');
+const { registerPlatformReadRoutes } = require('./platform_read_routes');
+const { registerWebRoutes } = require('./web_routes');
+const { registerRegistryRoutes } = require('./registry_routes');
+const { registerPlatformV1Routes } = require('./platform_v1_routes');
+const { registerPokerRoutes } = require('./poker_routes');
+const {
+  createTrainerJob,
+  createTrainerResult,
+  createIntegrationCandidate,
+  createIntegrationExecution,
+  createIntegrationPackVersion,
+  createRun,
+  createSealedContextViolation,
+  createTraceEvent,
+  createTraceIntakeRecord,
+  countUnifiedPlatformTableRows,
+  getConfigVersion,
+  getConfigVersionByIdempotency,
+  getApprovalRecordById,
+  getIntegrationCandidateById,
+  getIntegrationCandidateByIdempotency,
+  getIntegrationExecutionByIdempotency,
+  getIntegrationPackVersionByIdempotency,
+  getLatestTraceEvent,
+  getRunByIdempotency,
+  getRunById,
+  getRunByTraceId,
+  getSealedContextById,
+  getTeamConfigBinding,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
+  getTraceIntakeRecord,
+  getUnifiedPlatformTestFixture,
+  getUnifiedPlatformTestStats,
+  isUnifiedPlatformTable,
+  listConfigComponentVersions,
+  listHouseTeamIds,
+  listRuns,
+  listTrainerJobs,
+  listTrainerResults,
+  listTraceEvents,
+  listUnifiedPlatformFixtureFamilies,
+  replaceConfigComponentVersions,
+  resetUnifiedPlatformStore,
+  updateRunMetadata,
+  updateSealedContextStatus,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
+  updateRunStatus,
+  upsertApprovalRecord,
+  upsertSealedContext,
+  upsertTeamConfigBinding,
+  upsertConfigVersion,
+} = require('./unified_platform_store');
+const {
+  DEFAULT_OPERATOR_TOKEN,
+  POKER_OPERATOR_SCHEMA_VERSION,
+  createBatch: createPokerOperatorBatch,
+  createSeason: createPokerOperatorSeason,
+  createSubmission: createPokerOperatorSubmission,
+  getBatchDetail: getPokerOperatorBatchDetail,
+  getLeaderboardSnapshotDetail: getPokerOperatorLeaderboardSnapshotDetail,
+  getLatestLeaderboardDetail: getPokerOperatorLatestLeaderboardDetail,
+  getPokerOperatorSnapshot,
+  getReplayDetail: getPokerOperatorReplayDetail,
+  getRunDetail: getPokerOperatorRunDetail,
+  getSeasonDetail: getPokerOperatorSeasonDetail,
+  listSeasons: listPokerOperatorSeasons,
+  resetPokerOperatorState,
+  seedPokerOperatorState,
+} = require('./poker_operator');
+const { createPokerOperatorClient } = require('./poker_operator_client');
+const {
+  consumeEmailOtp,
+  getEmailOtpActivity,
+  getLatestEmailOtp,
+  issueEmailOtp,
+  resetEmailOtpAdapter,
+} = require('./email_otp_adapter');
+const {
+  exportPlatformStateSnapshot,
+  importPlatformStateSnapshot,
+  verifyPlatformStateSnapshot,
+} = require('./platform_export');
+
+const PORTAL_WEB_API_VERSION = '2026-03-09';
 
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
@@ -606,6 +738,26 @@ function sha256Base64(input) {
   return crypto.createHash('sha256').update(input).digest('base64');
 }
 
+function sha256PrefixedHex(input) {
+  return `sha256:${crypto.createHash('sha256').update(input).digest('hex')}`;
+}
+
+function stableJsonValue(value) {
+  if (Array.isArray(value)) return value.map((item) => stableJsonValue(item));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) {
+      out[key] = stableJsonValue(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function stableJsonStringify(value) {
+  return JSON.stringify(stableJsonValue(value));
+}
+
 function reservedHouseId(kind, key) {
   const seed = `agenttown:reserved:${kind}:${key}`;
   const bytes = crypto.createHash('sha256').update(seed).digest();
@@ -695,6 +847,13 @@ function isTestMockAddress(address) {
 }
 
 const app = express();
+
+resetRouteOwnerManifest();
+registerRouteOwner('platform', 'server/platform_read_routes.js');
+registerRouteOwner('poker', 'server/poker_routes.js');
+registerRouteOwner('registry', 'server/registry_routes.js');
+registerRouteOwner('v1', 'server/platform_v1_routes.js');
+registerRouteOwner('web', 'server/web_routes.js');
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(
@@ -1550,6 +1709,7 @@ function setSecurityHeaders(req, res, next) {
   const allowSameOriginFrame = (
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
+    || reqPath === '/registry'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -1762,7 +1922,67 @@ app.use(
   })
 );
 
-function ensureHumanSession(req, res) {
+app.use(
+  '/api/web',
+  rateLimit({
+    windowMs: 60_000,
+    max: 120,
+    keyFn: (req) => sessionScopedRateKey('web', req)
+  })
+);
+
+app.use(
+  '/api/registry/import',
+  rateLimit({
+    windowMs: 60_000,
+    max: 30,
+    keyFn: (req) => sessionScopedRateKey('registry-import', req)
+  })
+);
+
+function buildPortalRequestId() {
+  return `req_${randomHex(10)}`;
+}
+
+function makePortalApiMeta(requestId = buildPortalRequestId()) {
+  return {
+    requestId,
+    apiVersion: PORTAL_WEB_API_VERSION
+  };
+}
+
+function sendPortalApiSuccess(res, data, { status = 200, requestId = buildPortalRequestId() } = {}) {
+  return res.status(status).json({
+    ok: true,
+    data,
+    meta: makePortalApiMeta(requestId)
+  });
+}
+
+function sendPortalApiError(
+  res,
+  status,
+  code,
+  message,
+  {
+    retryable = false,
+    details = {},
+    requestId = buildPortalRequestId()
+  } = {}
+) {
+  return res.status(status).json({
+    ok: false,
+    error: {
+      code,
+      message,
+      retryable: retryable === true,
+      details: details && typeof details === 'object' ? details : {}
+    },
+    meta: makePortalApiMeta(requestId)
+  });
+}
+
+function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) {
   const cookies = parseCookies(req.header('cookie') || '');
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
   let sid = cookieSid;
@@ -1837,6 +2057,7 @@ function ensureHumanSession(req, res) {
   }
 
   if (!session) {
+    if (!allowCreate) return null;
     session = createSession();
     sid = session.sessionId;
   }
@@ -1880,6 +2101,23 @@ function ensureHumanSession(req, res) {
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
+}
+
+function ensureHumanSession(req, res) {
+  return resolveHumanSessionWithRecovery(req, res, { allowCreate: true });
+}
+
+function requireBoundHumanSession(req, res, { requestId = buildPortalRequestId() } = {}) {
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (session) return session;
+  sendPortalApiError(
+    res,
+    401,
+    'UNAUTHORIZED',
+    'A live Portal session is required for this route.',
+    { requestId }
+  );
+  return null;
 }
 
 function normalizeWalletChainInput(rawChain) {
@@ -3410,6 +3648,239 @@ function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
   ].join('\n  ');
 }
 
+const DEFAULT_SKILL_PACK_BASE_PATH = '/__compiled/default-skill-pack';
+const PLATFORM_CONFIG_STATUSES = new Set(['draft', 'candidate', 'active', 'archived', 'blocked']);
+const PLATFORM_IMMUTABLE_CONFIG_STATUSES = new Set(['candidate', 'active', 'archived', 'blocked']);
+const PLATFORM_MUTABLE_COMPONENT_REFS = new Set(['latest', 'stable', 'main', 'master', 'experimental', 'season-lock']);
+const PLATFORM_CONFIG_COMPONENT_SPECS = Object.freeze([
+  { inputKey: 'housePolicyVersionId', componentKind: 'house_policy_version', multiple: false, required: true },
+  { inputKey: 'teamCompositionVersionId', componentKind: 'team_composition_version', multiple: false, required: true },
+  { inputKey: 'agentConfigVersionIds', componentKind: 'agent_config_version', multiple: true, required: true },
+  { inputKey: 'officePolicyVersionIds', componentKind: 'office_policy_version', multiple: true, required: false },
+  { inputKey: 'experiencePresetVersionId', componentKind: 'experience_preset_version', multiple: false, required: true },
+  { inputKey: 'integrationOverlayVersionIds', componentKind: 'integration_overlay_version', multiple: true, required: false },
+  { inputKey: 'trainerPresetVersionId', componentKind: 'trainer_preset_version', multiple: false, required: true },
+]);
+const PLATFORM_RUN_ENTRY_MODES = new Set(['normal', 'season_lock']);
+const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
+const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
+const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
+const PLATFORM_TRAINER_JOB_KINDS = new Set([
+  'trainer_job.ingest',
+  'trainer_job.index',
+  'trainer_job.replay',
+  'trainer_job.tag',
+  'trainer_job.compare',
+  'trainer_job.recommend',
+  'trainer_job.patch',
+  'trainer_job.scrim',
+  'trainer_job.guardrails',
+]);
+const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
+const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
+
+function isPlatformMutableComponentRef(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (PLATFORM_MUTABLE_COMPONENT_REFS.has(normalized)) return true;
+  if (normalized.startsWith('refs/heads/')) return true;
+  if (normalized.includes('/')) return true;
+  return false;
+}
+
+function derivePlatformComponentHash(componentKind, immutableVersionId) {
+  return sha256PrefixedHex(`${String(componentKind || '').trim()}:${String(immutableVersionId || '').trim()}`);
+}
+
+function resolvePlatformConfigComponents(componentRefs, { requireImmutable = true } = {}) {
+  const source = componentRefs && typeof componentRefs === 'object' && !Array.isArray(componentRefs)
+    ? componentRefs
+    : {};
+  const resolvedComponents = {};
+  const resolvedComponentHashes = {};
+  const componentVersions = [];
+  for (const spec of PLATFORM_CONFIG_COMPONENT_SPECS) {
+    const raw = source[spec.inputKey];
+    if (spec.multiple) {
+      const refs = Array.isArray(raw)
+        ? raw.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+      if (spec.required && refs.length === 0) {
+        const err = new Error('CONFIG_COMPONENT_INVALID');
+        err.code = 'CONFIG_COMPONENT_INVALID';
+        err.componentKey = spec.inputKey;
+        throw err;
+      }
+      resolvedComponents[spec.inputKey] = [];
+      resolvedComponentHashes[spec.inputKey] = [];
+      refs.forEach((ref, index) => {
+        if (requireImmutable && isPlatformMutableComponentRef(ref)) {
+          const err = new Error('CONFIG_COMPONENT_MUTABLE_REF');
+          err.code = 'CONFIG_COMPONENT_MUTABLE_REF';
+          err.componentKey = spec.inputKey;
+          err.ref = ref;
+          throw err;
+        }
+        resolvedComponents[spec.inputKey].push(ref);
+        const componentHash = derivePlatformComponentHash(spec.componentKind, ref);
+        resolvedComponentHashes[spec.inputKey].push(componentHash);
+        componentVersions.push({
+          componentKind: spec.componentKind,
+          componentKey: `${spec.inputKey}[${index}]`,
+          immutableVersionId: ref,
+          componentHash,
+          metadata: {
+            ordinal: index,
+            sourceKey: spec.inputKey,
+          },
+        });
+      });
+      continue;
+    }
+
+    const ref = typeof raw === 'string' ? raw.trim() : '';
+    if (spec.required && !ref) {
+      const err = new Error('CONFIG_COMPONENT_INVALID');
+      err.code = 'CONFIG_COMPONENT_INVALID';
+      err.componentKey = spec.inputKey;
+      throw err;
+    }
+    if (!ref) {
+      resolvedComponents[spec.inputKey] = '';
+      resolvedComponentHashes[spec.inputKey] = '';
+      continue;
+    }
+    if (requireImmutable && isPlatformMutableComponentRef(ref)) {
+      const err = new Error('CONFIG_COMPONENT_MUTABLE_REF');
+      err.code = 'CONFIG_COMPONENT_MUTABLE_REF';
+      err.componentKey = spec.inputKey;
+      err.ref = ref;
+      throw err;
+    }
+    const componentHash = derivePlatformComponentHash(spec.componentKind, ref);
+    resolvedComponents[spec.inputKey] = ref;
+    resolvedComponentHashes[spec.inputKey] = componentHash;
+    componentVersions.push({
+      componentKind: spec.componentKind,
+      componentKey: spec.inputKey,
+      immutableVersionId: ref,
+      componentHash,
+      metadata: {
+        sourceKey: spec.inputKey,
+      },
+    });
+  }
+  return {
+    resolvedComponents,
+    resolvedComponentHashes,
+    componentVersions,
+  };
+}
+
+function encodeTraceCursor(afterSeq) {
+  return Buffer.from(JSON.stringify({ afterSeq: Number(afterSeq || 0) }), 'utf8').toString('base64url');
+}
+
+function decodeTraceCursor(cursor) {
+  const normalizedCursor = typeof cursor === 'string' ? cursor.trim() : '';
+  if (!normalizedCursor) return 0;
+  try {
+    const parsed = JSON.parse(Buffer.from(normalizedCursor, 'base64url').toString('utf8'));
+    const afterSeq = Number(parsed?.afterSeq || 0);
+    return Number.isFinite(afterSeq) && afterSeq > 0 ? afterSeq : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function buildDefaultCompiledSkillPack() {
+  const manualSkill = fs.readFileSync(path.join(PUBLIC_DIR, 'skill.md'), 'utf8');
+  const heartbeat = [
+    '# HEARTBEAT',
+    '',
+    '- Poll `GET /api/agent/state?teamCode=...` once per second while the co-op flow is active.',
+    '- On transient failures, back off to 2-5 seconds before retrying.',
+    '- Keep agent actions aligned to the shared state machine and avoid backend shortcuts.',
+    '',
+  ].join('\n');
+  const tools = [
+    '# TOOLS',
+    '',
+    '- Use the existing Agent Town runtime tools and `/api/*` routes documented in `manual/skill.md`.',
+    '- Preserve backend ids exactly when present: `webSessionId`, `invocationId`, and `evidenceId`.',
+    '- Runtime trainer tools remain under `trainer.*`; durable jobs belong to `trainer_job.*`.',
+    '',
+  ].join('\n');
+  const traceMapPayload = {
+    schema: 'agent-town-trace-map/v1',
+    experienceId: 'agent_town_coop_v1',
+    traceAuthorityType: 'portal.worker',
+    steps: [
+      { step: 'mirror_sigil', eventType: 'coop.sigil.mirror' },
+      { step: 'press_open', eventType: 'coop.open.press' },
+      { step: 'agent_commit', eventType: 'house.ceremony.commit' },
+      { step: 'agent_reveal', eventType: 'house.ceremony.reveal' },
+    ],
+  };
+  const traceMap = `${JSON.stringify(traceMapPayload, null, 2)}\n`;
+  const entrySkill = [
+    manualSkill.trimEnd(),
+    '',
+    '## Internal Pack Files',
+    '',
+    '- manual/skill.md',
+    '- heartbeat.md',
+    '- tools.md',
+    '- trace_map.json',
+    '',
+  ].join('\n');
+
+  const fileBodies = {
+    'skill.md': entrySkill,
+    'SKILL.md': entrySkill,
+    'manual/skill.md': manualSkill,
+    'heartbeat.md': heartbeat,
+    'tools.md': tools,
+    'trace_map.json': traceMap,
+  };
+  const fileHashes = {
+    'manual/skill.md': sha256PrefixedHex(fileBodies['manual/skill.md']),
+    'heartbeat.md': sha256PrefixedHex(fileBodies['heartbeat.md']),
+    'tools.md': sha256PrefixedHex(fileBodies['tools.md']),
+    'trace_map.json': sha256PrefixedHex(fileBodies['trace_map.json']),
+  };
+  const manifestSeed = JSON.stringify({
+    sourceRefs: [{ path: '/skill.md', hash: fileHashes['manual/skill.md'] }],
+    fileHashes,
+  });
+  const contentHash = sha256PrefixedHex(manifestSeed);
+  const packVersionId = `packv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+
+  return {
+    manifest: {
+      experienceId: 'agent_town_coop_v1',
+      packId: 'pack_portal_onboarding_v1',
+      packVersionId,
+      contentHash,
+      sourceRefs: [
+        {
+          path: '/skill.md',
+          hash: fileHashes['manual/skill.md'],
+        },
+      ],
+      fileHashes,
+      entryUrl: `${DEFAULT_SKILL_PACK_BASE_PATH}/skill.md`,
+      files: {
+        'manual/skill.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/manual/skill.md`,
+        'heartbeat.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/heartbeat.md`,
+        'tools.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/tools.md`,
+        'trace_map.json': `${DEFAULT_SKILL_PACK_BASE_PATH}/trace_map.json`,
+      },
+    },
+    fileBodies,
+  };
+}
+
 function verifyHouseAuth(req, house) {
   if (!house || !house.authKey) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
   const ts = req.header('x-house-ts');
@@ -3456,6 +3927,244 @@ app.get('/api/session', (req, res) => {
   });
 });
 
+function resolveSessionPlatformContext(session) {
+  const houseId = typeof session?.houseCeremony?.houseId === 'string'
+    ? session.houseCeremony.houseId.trim()
+    : '';
+  const availableTeamIds = houseId ? listHouseTeamIds(houseId) : [];
+  let activeTeamId = typeof session?.activeTeamId === 'string' ? session.activeTeamId.trim() : '';
+  if (activeTeamId && availableTeamIds.length && !availableTeamIds.includes(activeTeamId)) {
+    activeTeamId = '';
+  }
+  if (!activeTeamId && availableTeamIds.length) {
+    activeTeamId = availableTeamIds[0];
+  }
+  if (session && typeof session === 'object') {
+    session.activeTeamId = activeTeamId;
+  }
+  return {
+    houseId: houseId || null,
+    activeTeamId: activeTeamId || null,
+    availableTeamIds,
+  };
+}
+
+function buildPlatformContextResponse(session, overrides = {}) {
+  const context = resolveSessionPlatformContext(session);
+  if (overrides && typeof overrides === 'object') {
+    if (Object.prototype.hasOwnProperty.call(overrides, 'houseId')) {
+      context.houseId = overrides.houseId || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, 'activeTeamId')) {
+      context.activeTeamId = overrides.activeTeamId || null;
+    }
+    if (Array.isArray(overrides.availableTeamIds)) {
+      context.availableTeamIds = overrides.availableTeamIds.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  }
+  return {
+    houseId: context.houseId,
+    activeTeamId: context.activeTeamId,
+    availableTeamIds: context.availableTeamIds,
+  };
+}
+
+registerPlatformReadRoutes(app, {
+  express,
+  buildDefaultCompiledSkillPack,
+  buildPlatformContextResponse,
+  buildPlatformTrainerResultPayload,
+  buildPortalRequestId,
+  createTrainerJob,
+  createTrainerResult,
+  getConfigVersion,
+  getConfigVersionByIdempotency,
+  getTeamConfigBinding,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
+  listConfigComponentVersions,
+  listRuns,
+  listTraceEvents,
+  listTrainerJobs,
+  listTrainerResults,
+  normalizePlatformTrainerBudget,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  randomHex,
+  replaceConfigComponentVersions,
+  resolveApprovedTrainerPatchPromotion,
+  resolveHumanSessionWithRecovery,
+  resolvePlatformTrainerLinkedConfigVersionId,
+  resolveSessionPlatformContext,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sha256PrefixedHex,
+  stableJsonStringify,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
+  upsertConfigVersion,
+  upsertTeamConfigBinding,
+});
+
+registerWebRoutes(app, {
+  buildPortalRequestId,
+  collectWalletSubjectsForSession,
+  createApprovalRequest,
+  createCredentialGrant,
+  createEvidence,
+  createImportJob,
+  createInvocation,
+  createWebSession,
+  decideApproval,
+  getActiveCredentialGrant,
+  getApprovalById,
+  getInvocationByIdempotency,
+  getLatestCheckpointForSession,
+  getWebActionPolicy,
+  getWebSessionById,
+  listApprovalsForSession,
+  listCredentialStatusByOrigin,
+  listEvidenceForSession,
+  normalizePortalIdempotencyKey,
+  normalizeWebAutonomyMode,
+  normalizeWebRenderMode,
+  proxyPolicyErrorCode,
+  randomHex,
+  requireBoundHumanSession,
+  requireOwnedWebSession,
+  resolveWebTarget,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+  assertPortalContractTargetAllowed,
+  setWebSessionRevisionAndState,
+  touchCredentialGrant,
+  writeCheckpoint,
+});
+
+registerRegistryRoutes(app, {
+  assertPortalContractTargetAllowed,
+  buildPortalRequestId,
+  collectWalletSubjectsForSession,
+  createImportJob,
+  getRegistryEntityById,
+  invalidateAtlasStoreCaches,
+  normalizePortalIdempotencyKey,
+  proxyPolicyErrorCode,
+  requireBoundHumanSession,
+  searchRegistryEntities,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+});
+
+registerPlatformV1Routes(app, {
+  PLATFORM_CONFIG_STATUSES,
+  PLATFORM_IMMUTABLE_CONFIG_STATUSES,
+  PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES,
+  PLATFORM_RUN_ENTRY_MODES,
+  PLATFORM_TRACE_AUTHORITY_TYPE,
+  PLATFORM_TRAINER_JOB_KINDS,
+  SUPPORTED_PLATFORM_EXPERIENCE_IDS,
+  allowedReaderIdsFromSealedContext,
+  assertPortalContractTargetAllowed,
+  buildCompiledIntegrationPack,
+  buildPlatformTrainerResultPayload,
+  buildPortalRequestId,
+  buildSeededSealedContextRecord,
+  createIntegrationCandidate,
+  createIntegrationExecution,
+  createIntegrationPackVersion,
+  createRun,
+  createSealedContextViolation,
+  createTraceEvent,
+  createTraceIntakeRecord,
+  createTrainerJob,
+  createTrainerResult,
+  decodeTraceCursor,
+  deriveDeterministicSealId,
+  encodeTraceCursor,
+  express,
+  getConfigVersion,
+  getConfigVersionByIdempotency,
+  getIntegrationCandidateById,
+  getIntegrationCandidateByIdempotency,
+  getIntegrationExecutionByIdempotency,
+  getIntegrationPackVersionByIdempotency,
+  getLatestTraceEvent,
+  getPlatformIntegrationActionPolicy,
+  getRunById,
+  getRunByIdempotency,
+  getRunByTraceId,
+  getSealedContextById,
+  getTeamConfigBinding,
+  getTraceIntakeRecord,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
+  hasPlatformTrainerTargets,
+  listConfigComponentVersions,
+  listTraceEvents,
+  normalizePlatformTrainerBudget,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  parsePokerOperatorFixtureRecords,
+  randomHex,
+  readStore,
+  replaceConfigComponentVersions,
+  resolveApprovedTrainerPatchPromotion,
+  resolveHouseAddress,
+  resolveHumanSessionWithRecovery,
+  resolvePlatformConfigComponents,
+  resolvePlatformTrainerLinkedConfigVersionId,
+  resolveSessionPlatformContext,
+  resolveWebTarget,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+  sha256PrefixedHex,
+  stableJsonStringify,
+  updateRunMetadata,
+  updateRunStatus,
+  updateSealedContextStatus,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
+  upsertConfigVersion,
+  upsertSealedContext,
+  upsertTeamConfigBinding,
+  verifyHouseAuth,
+});
+
+registerPokerRoutes(app, {
+  buildPortalRequestId,
+  computePokerArtifactSha256,
+  createPortalPokerOperatorClient,
+  express,
+  getLatestPokerLeaderboardSnapshot,
+  getPokerOperatorServiceToken,
+  getPokerReplayArtifactByRunId,
+  getPokerRunById,
+  getPokerSeasonById,
+  getPokerSubmissionById,
+  getPokerSubmissionByRequest,
+  listPokerSeasons,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  randomHex,
+  requireBoundHumanSession,
+  resolvePrimaryWalletSubject,
+  respondPokerOperatorTransport,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  summarizeMirroredPokerSeason,
+  syncPokerMirrorFromOperator,
+  upsertPokerSeason,
+  upsertPokerSubmission,
+});
+
 // Rotates the human session cookie to a fresh session/team code.
 // Useful for shared devices where multiple people onboard sequentially.
 app.post('/api/session/reset', (req, res) => {
@@ -3488,9 +4197,12 @@ app.get('/api/state', (req, res) => {
   const onboarding = ensureSessionOnboarding(s);
   const ceremony = buildCeremonyStateSnapshot(s);
   const experience = buildExperienceStateSnapshot(s, ceremony);
+  const platform = buildPlatformContextResponse(s, { houseId: ceremony.houseId || null });
   res.json({
     ok: true,
     teamCode: s.teamCode,
+    activeTeamId: platform.activeTeamId,
+    availableTeamIds: platform.availableTeamIds,
     walletRecoveryKey: normalizeWalletRecoveryKeyInput(s.walletRecoveryKey) || null,
     elements: listElements(),
     agent: {
@@ -3531,6 +4243,7 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: ceremony.houseId,
+    platform,
     onboarding: cloneOnboarding(onboarding)
   });
 });
@@ -4041,6 +4754,999 @@ function normalizePrivyWalletRpcEvmTx(input) {
   }
 
   return out;
+}
+
+function normalizePortalIdempotencyKey(req) {
+  const headerKey = typeof req.header('Idempotency-Key') === 'string'
+    ? req.header('Idempotency-Key').trim()
+    : '';
+  const bodyKey = typeof req.body?.idempotencyKey === 'string'
+    ? req.body.idempotencyKey.trim()
+    : '';
+  const value = headerKey || bodyKey;
+  if (!value) return '';
+  if (value.length > 200) return '';
+  return value;
+}
+
+function collectWalletSubjectsForSession(session, req) {
+  const seen = new Set();
+  const out = [];
+  const add = (chain, address, boundAt = null) => {
+    const normalizedChain = normalizeWalletChainInput(chain);
+    if (!normalizedChain) return;
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeWalletSessionSolanaAddress(address);
+    if (!normalizedAddress) return;
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      chain: normalizedChain,
+      address: normalizedAddress,
+      normalizedAddress,
+      boundAt: boundAt || session?.createdAt || nowIso()
+    });
+  };
+
+  for (const candidate of collectWalletCandidatesFromHeaders(req)) {
+    add(candidate.chain, candidate.address, session?.createdAt || null);
+  }
+  for (const binding of Array.isArray(session?.walletBindings) ? session.walletBindings : []) {
+    add(binding?.chain, binding?.address, binding?.boundAt || session?.createdAt || null);
+  }
+  add('solana', session?.token?.address, session?.signup?.createdAt || null);
+  add(session?.claim?.erc8004?.claimChain, session?.claim?.erc8004?.address, session?.claim?.erc8004?.verifiedAt
+    ? new Date(Number(session.claim.erc8004.verifiedAt)).toISOString()
+    : null);
+  return out;
+}
+
+function normalizeWebRenderMode(input, fallback = 'companion') {
+  const value = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  if (value === 'embedded' || value === 'companion') return value;
+  return fallback;
+}
+
+function normalizeWebAutonomyMode(input, fallback = 'assist') {
+  const value = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  if (value === 'observe' || value === 'assist' || value === 'auto') return value;
+  return fallback;
+}
+
+function inferWebPageClass(parsedUrl, sourceHints = {}) {
+  const explicit = typeof sourceHints?.expectedPageClass === 'string'
+    ? sourceHints.expectedPageClass.trim()
+    : '';
+  if (explicit) return explicit;
+  const pathname = parsedUrl?.pathname || '';
+  if (/^\/[^/]+\/[^/]+\/issues\/\d+/.test(pathname)) return 'issue_detail';
+  return 'generic_page';
+}
+
+function resolveWebTarget(targetUrl, { preferredMode = 'auto', sourceHints = {} } = {}) {
+  const parsed = new URL(String(targetUrl || ''));
+  const origin = parsed.origin;
+  const pageClass = inferWebPageClass(parsed, sourceHints);
+  const mode = normalizeWebRenderMode(preferredMode, 'companion');
+  if (parsed.hostname === 'github.com') {
+    return {
+      resolutionState: 'supported',
+      website: {
+        origin,
+        canonicalUrl: parsed.toString(),
+        registryId: 'ws_github',
+        displayName: 'GitHub',
+        trustTier: 'A',
+        domainProofState: 'verified'
+      },
+      integration: {
+        integrationRegistryId: 'wi_github_issue_reply',
+        versionId: 'rv_github_issue_reply_v1',
+        sourceType: 'native_pack',
+        authModel: 'oauth',
+        renderMode: mode === 'embedded' ? 'embedded' : 'companion',
+        pageClass
+      },
+      alternatives: [],
+      fallback: null
+    };
+  }
+  return {
+    resolutionState: 'unsupported',
+    website: {
+      origin,
+      canonicalUrl: parsed.toString()
+    },
+    integration: null,
+    alternatives: [],
+    fallback: {
+      reasonCode: 'WEB_UNSUPPORTED_SITE',
+      importAllowed: true,
+      suggestedImportKinds: ['site_origin', 'openapi_url'],
+      automationFallbackAllowed: false
+    }
+  };
+}
+
+function buildCompiledIntegrationPack(candidate) {
+  const sourceKind = String(candidate?.sourceKind || '').trim() || 'parse';
+  const website = candidate?.website && typeof candidate.website === 'object' ? candidate.website : {};
+  const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
+  const websiteName = String(website.displayName || website.registryId || 'Website').trim();
+  const actionIds = sourceKind === 'native_pack'
+    ? ['github.issue.read', 'github.issue.reply']
+    : ['integration.generic.read'];
+  const manualSkill = [
+    '# INTEGRATION PACK MANUAL',
+    '',
+    `- Source kind: ${sourceKind}`,
+    `- Target origin: ${String(website.origin || '')}`,
+    `- Website: ${websiteName}`,
+    '',
+    '## Actions',
+    ...actionIds.map((actionId) => `- ${actionId}`),
+    '',
+  ].join('\n');
+  const heartbeat = [
+    '# HEARTBEAT',
+    '',
+    '- Re-check capability metadata before high-impact actions.',
+    '- Request approval for write-capable actions when required by policy.',
+    '',
+  ].join('\n');
+  const tools = [
+    '# TOOLS',
+    '',
+    '- Execution records are server-persisted, but worker-selected.',
+    '- Preserve `actionId`, `executionId`, and `approvalId` exactly.',
+    '',
+  ].join('\n');
+  const traceMapPayload = {
+    schema: 'agent-town-trace-map/v1',
+    sourceKind,
+    targetOrigin: String(website.origin || ''),
+    actions: actionIds.map((actionId) => ({
+      actionId,
+      eventType: `integration.${actionId.replace(/[^a-z0-9]+/gi, '_').toLowerCase()}`,
+    })),
+  };
+  const traceMap = `${JSON.stringify(traceMapPayload, null, 2)}\n`;
+  const fileBodies = {
+    'skill.md': [
+      '# INTEGRATION PACK',
+      '',
+      '- manual/skill.md',
+      '- heartbeat.md',
+      '- tools.md',
+      '- trace_map.json',
+      '',
+    ].join('\n'),
+    'SKILL.md': [
+      '# INTEGRATION PACK',
+      '',
+      '- manual/skill.md',
+      '- heartbeat.md',
+      '- tools.md',
+      '- trace_map.json',
+      '',
+    ].join('\n'),
+    'manual/skill.md': manualSkill,
+    'heartbeat.md': heartbeat,
+    'tools.md': tools,
+    'trace_map.json': traceMap,
+  };
+  const fileHashes = {
+    'manual/skill.md': sha256PrefixedHex(fileBodies['manual/skill.md']),
+    'heartbeat.md': sha256PrefixedHex(fileBodies['heartbeat.md']),
+    'tools.md': sha256PrefixedHex(fileBodies['tools.md']),
+    'trace_map.json': sha256PrefixedHex(fileBodies['trace_map.json']),
+  };
+  const manifestSeed = stableJsonStringify({
+    sourceRef: {
+      url: String(candidate?.targetUrl || ''),
+      sourceKind,
+    },
+    compatibility: {
+      websiteRegistryId: String(website.registryId || ''),
+      integrationRegistryId: String(integration.integrationRegistryId || ''),
+      versionId: String(integration.versionId || ''),
+      sourceKind,
+      actionIds,
+    },
+    fileHashes,
+  });
+  const contentHash = sha256PrefixedHex(manifestSeed);
+  const packVersionId = `intpackv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  return {
+    packVersionId,
+    contentHash,
+    fileHashes,
+    manifest: {
+      integrationId: String(candidate?.integrationCandidateId || ''),
+      sourceKind,
+      packVersionId,
+      contentHash,
+      sourceRefs: [
+        {
+          url: String(candidate?.targetUrl || ''),
+          sourceKind,
+        },
+      ],
+      compatibility: {
+        websiteRegistryId: String(website.registryId || ''),
+        integrationRegistryId: String(integration.integrationRegistryId || ''),
+        versionId: String(integration.versionId || ''),
+        sourceKind,
+        actionIds,
+      },
+      fileHashes,
+      files: {
+        'manual/skill.md': 'manual/skill.md',
+        'heartbeat.md': 'heartbeat.md',
+        'tools.md': 'tools.md',
+        'trace_map.json': 'trace_map.json',
+      },
+    },
+  };
+}
+
+function getPlatformIntegrationActionPolicy(candidate, actionId) {
+  const canonicalActionId = String(actionId || '').trim();
+  if (!canonicalActionId) return null;
+  const sourceKind = String(candidate?.sourceKind || '').trim();
+  const websiteRegistryId = String(candidate?.website?.registryId || '').trim();
+  if (sourceKind === 'native_pack' && websiteRegistryId === 'ws_github') {
+    if (canonicalActionId === 'github.issue.read') {
+      return {
+        actionId: canonicalActionId,
+        requiresApproval: false,
+        status: 'queued',
+      };
+    }
+    if (canonicalActionId === 'github.issue.reply') {
+      return {
+        actionId: canonicalActionId,
+        requiresApproval: true,
+        status: 'queued',
+      };
+    }
+  }
+  if (canonicalActionId === 'integration.generic.read') {
+    return {
+      actionId: canonicalActionId,
+      requiresApproval: false,
+      status: 'queued',
+    };
+  }
+  return null;
+}
+
+function hasPlatformTrainerTargets(targets) {
+  const source = targets && typeof targets === 'object' && !Array.isArray(targets) ? targets : {};
+  if (typeof source.traceId === 'string' && source.traceId.trim()) return true;
+  if (typeof source.runId === 'string' && source.runId.trim()) return true;
+  if (typeof source.configVersionId === 'string' && source.configVersionId.trim()) return true;
+  if (Array.isArray(source.traceIds) && source.traceIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  if (Array.isArray(source.runIds) && source.runIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  if (Array.isArray(source.configVersionIds) && source.configVersionIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  return false;
+}
+
+function normalizePlatformTrainerBudget(rawBudget) {
+  const budget = rawBudget && typeof rawBudget === 'object' && !Array.isArray(rawBudget) ? rawBudget : {};
+  const normalized = {};
+  if (budget.maxUsd != null) {
+    const maxUsd = Number(budget.maxUsd);
+    if (!Number.isFinite(maxUsd) || maxUsd <= 0) {
+      const err = new Error('TRAINER_BUDGET_INVALID');
+      err.code = 'TRAINER_BUDGET_INVALID';
+      throw err;
+    }
+    normalized.maxUsd = Number(maxUsd.toFixed(2));
+  }
+  return normalized;
+}
+
+function resolvePlatformTrainerLinkedConfigVersionId({ houseId = '', teamId = '', targets = null } = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const source = targets && typeof targets === 'object' && !Array.isArray(targets) ? targets : {};
+  const binding = normalizedHouseId && normalizedTeamId
+    ? getTeamConfigBinding({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+    : null;
+  if (binding?.activeConfigVersionId) return String(binding.activeConfigVersionId || '').trim();
+  if (typeof source.configVersionId === 'string' && source.configVersionId.trim()) return source.configVersionId.trim();
+  if (Array.isArray(source.configVersionIds)) {
+    const first = source.configVersionIds.find((item) => typeof item === 'string' && item.trim());
+    if (first) return String(first).trim();
+  }
+  return '';
+}
+
+function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } = {}) {
+  const fixture = getUnifiedPlatformTestFixture('trainer_compare_seed') || {};
+  const seededPatchIds = Array.isArray(fixture?.result?.candidatePatchIds)
+    ? fixture.result.candidatePatchIds.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const candidatePatchIds = seededPatchIds.length ? seededPatchIds : [`patch_${randomHex(10)}`];
+  const summary = typeof fixture?.result?.summary === 'string' && fixture.result.summary.trim()
+    ? fixture.result.summary.trim()
+    : 'Compare job completed with one candidate patch recommendation.';
+  const approvalNeeded = fixture?.result?.approvalNeeded === true;
+  const trainerResultId = `trr_${randomHex(10)}`;
+  const resultPayload = {
+    trainerResultId,
+    trainerJobId: job.trainerJobId,
+    summary,
+    findings: [],
+    recommendations: candidatePatchIds.map((candidatePatchId) => ({
+      candidatePatchId,
+      action: 'promote_config_patch',
+      approvalNeeded,
+    })),
+    candidatePatchIds,
+    metrics: {
+      scoreDeltaPct: 7.5,
+      comparedConfigs: Array.isArray(job?.targets?.configVersionIds) ? job.targets.configVersionIds.length : 0,
+    },
+    artifactRefs: [],
+    version: 'trainer-result/v2',
+  };
+  if (linkedConfigVersionId) {
+    resultPayload.linkedConfigVersionId = linkedConfigVersionId;
+  }
+  return {
+    trainerResultId,
+    status: 'succeeded',
+    resultPayload,
+    candidatePatchIds,
+    linkedConfigVersionId: linkedConfigVersionId || null,
+    approvalNeeded,
+  };
+}
+
+function resolveApprovedTrainerPatchPromotion(approvalId, {
+  houseId = '',
+  trainerResultId = '',
+  candidatePatchId = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== TRAINER_PATCH_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'trainer_patch_promotion',
+    subject: {
+      trainerResultId: String(trainerResultId || '').trim() || null,
+      candidatePatchId: String(candidatePatchId || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
+}
+
+function buildSeededSealedContextRecord({
+  houseId = '',
+  traceId = '',
+  runId = '',
+  releasePolicy = 'manual',
+  status = 'active',
+} = {}) {
+  const fixture = getUnifiedPlatformTestFixture('sealed_context_seed') || {};
+  const sealedFixture = fixture?.sealedContext && typeof fixture.sealedContext === 'object'
+    ? fixture.sealedContext
+    : {};
+  const allowedReaders = Array.isArray(sealedFixture.allowedReaders)
+    ? sealedFixture.allowedReaders
+    : [];
+  const forbiddenSources = Array.isArray(sealedFixture.forbiddenSources)
+    ? sealedFixture.forbiddenSources
+    : [];
+  return {
+    sealedContextId: String(sealedFixture.sealedContextId || `seal_${randomHex(10)}`),
+    traceId: String(traceId || '').trim() || null,
+    runId: String(runId || '').trim() || null,
+    entrantId: String(sealedFixture.entrantId || 'entrant_fixture_alpha'),
+    scopeType: String(sealedFixture.scopeType || 'entrant_private'),
+    scopeKey: String(sealedFixture.scopeKey || 'table-7'),
+    allowedReaders,
+    forbiddenSources,
+    releasePolicy,
+    status: String(status || sealedFixture.status || 'active'),
+    houseId: String(houseId || '').trim() || null,
+  };
+}
+
+function parsePokerOperatorFixtureRecords(records) {
+  const sourceRecords = Array.isArray(records) ? records : [];
+  return sourceRecords.map((entry) => {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) return entry;
+    if (typeof entry !== 'string') return null;
+    try {
+      return JSON.parse(entry);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function deriveDeterministicSealId(entrantId) {
+  const normalizedEntrantId = String(entrantId || '').trim();
+  const digest = sha256PrefixedHex(`sealed:${normalizedEntrantId}`);
+  return `seal_${digest.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+}
+
+function allowedReaderIdsFromSealedContext(context) {
+  const readers = Array.isArray(context?.allowedReaders) ? context.allowedReaders : [];
+  return readers.map((entry) => {
+    if (typeof entry === 'string') return entry.trim();
+    if (entry && typeof entry === 'object' && typeof entry.actorId === 'string') return entry.actorId.trim();
+    return '';
+  }).filter(Boolean);
+}
+
+function getWebActionPolicy(actionId, webSession) {
+  const canonicalActionId = String(actionId || '').trim();
+  const base = {
+    actionId: canonicalActionId,
+    requiresApproval: false,
+    requiresCredential: false,
+    scopes: [],
+    summary: 'Generic web action',
+  };
+  if (canonicalActionId === 'submit_reply') {
+    return {
+      ...base,
+      requiresApproval: true,
+      requiresCredential: true,
+      scopes: ['repo:issue:write'],
+      summary: 'Submit a GitHub issue reply'
+    };
+  }
+  if (canonicalActionId === 'save_draft') {
+    return {
+      ...base,
+      summary: 'Persist a local draft'
+    };
+  }
+  if (webSession?.origin === 'https://github.com' && canonicalActionId === 'draft_reply') {
+    return {
+      ...base,
+      summary: 'Draft a GitHub issue reply'
+    };
+  }
+  return null;
+}
+
+function requireOwnedWebSession(req, res, requestId, webSessionId) {
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return { session: null, webSession: null };
+  const webSession = getWebSessionById(webSessionId);
+  if (!webSession) {
+    sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
+    return { session: null, webSession: null };
+  }
+  if (webSession.portalSessionId !== session.sessionId) {
+    sendPortalApiError(res, 403, 'FORBIDDEN', 'This web session belongs to a different Portal session.', { requestId });
+    return { session: null, webSession: null };
+  }
+  return { session, webSession };
+}
+
+function proxyPolicyErrorCode(err) {
+  const text = String(err?.message || '').toLowerCase();
+  if (text.includes('denied address') || text.includes('private') || text.includes('link-local')) {
+    return 'PRIVATE_NETWORK_BLOCKED';
+  }
+  return 'UNSAFE_TARGET';
+}
+
+function sendProxyPolicyContractError(res, err, requestId) {
+  return sendPortalApiError(
+    res,
+    400,
+    proxyPolicyErrorCode(err),
+    'The requested target is blocked by Portal fetch policy.',
+    {
+      requestId,
+      details: err?.details || {}
+    }
+  );
+}
+
+function makePortalApiSuccessBody(data, { requestId = buildPortalRequestId() } = {}) {
+  return {
+    ok: true,
+    data,
+    meta: makePortalApiMeta(requestId),
+  };
+}
+
+function makePortalApiErrorBody(
+  code,
+  message,
+  {
+    requestId = buildPortalRequestId(),
+    retryable = false,
+    details = {},
+  } = {}
+) {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      retryable: retryable === true,
+      details: details && typeof details === 'object' ? details : {},
+    },
+    meta: makePortalApiMeta(requestId),
+  };
+}
+
+function readPlainHeader(headers, name) {
+  if (!headers || typeof headers !== 'object') return '';
+  const target = String(name || '').trim().toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (String(key || '').trim().toLowerCase() !== target) continue;
+    if (Array.isArray(value)) return String(value[0] || '').trim();
+    return String(value || '').trim();
+  }
+  return '';
+}
+
+function getPokerOperatorServiceToken() {
+  const snapshot = getPokerOperatorSnapshot();
+  return typeof snapshot?.serviceToken === 'string' && snapshot.serviceToken.trim()
+    ? snapshot.serviceToken.trim()
+    : DEFAULT_OPERATOR_TOKEN;
+}
+
+function normalizePokerOperatorMutationContext(headers) {
+  const authorization = readPlainHeader(headers, 'authorization');
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    throw Object.assign(new Error('Operator auth required.'), {
+      status: 401,
+      code: 'POKER_OPERATOR_AUTH_REQUIRED',
+      details: {},
+    });
+  }
+  const token = authorization.slice(7).trim();
+  if (!token || token !== getPokerOperatorServiceToken()) {
+    throw Object.assign(new Error('Operator auth required.'), {
+      status: 401,
+      code: 'POKER_OPERATOR_AUTH_REQUIRED',
+      details: {},
+    });
+  }
+  const idempotencyKey = readPlainHeader(headers, 'idempotency-key');
+  if (!idempotencyKey) {
+    throw Object.assign(new Error('Idempotency key is required.'), {
+      status: 400,
+      code: 'INVALID_ARGUMENT',
+      details: {
+        field: 'Idempotency-Key',
+      },
+    });
+  }
+  return {
+    bearerToken: token,
+    idempotencyKey,
+    actor: token === getPokerOperatorServiceToken() ? 'portal_service' : 'operator_service',
+  };
+}
+
+function respondPokerOperatorTransport(req, res) {
+  const result = invokePokerOperatorTransport({
+    method: req.method,
+    path: req.path,
+    query: req.query,
+    body: req.body,
+    headers: req.headers,
+    requestId: buildPortalRequestId(),
+  });
+  return res.status(result.status).json(result.body);
+}
+
+function invokePokerOperatorTransport({
+  method,
+  path,
+  query = {},
+  body = null,
+  headers = {},
+  requestId = buildPortalRequestId(),
+}) {
+  try {
+    const normalizedMethod = String(method || 'GET').trim().toUpperCase();
+    const normalizedPath = String(path || '').trim();
+    const snapshot = getPokerOperatorSnapshot();
+
+    if (normalizedMethod === 'GET' && normalizedPath === '/v1/health') {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody({
+          status: 'ok',
+          operatorVersion: snapshot.operatorVersion,
+          schemaVersion: snapshot.schemaVersion,
+          time: nowIso(),
+        }, { requestId }),
+      };
+    }
+
+    if (normalizedMethod === 'GET' && normalizedPath === '/v1/seasons') {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(listPokerOperatorSeasons({
+          cursor: typeof query?.cursor === 'string' ? query.cursor : null,
+          limit: Number.parseInt(String(query?.limit || '20'), 10),
+          status: typeof query?.status === 'string' ? query.status : '',
+        }), { requestId }),
+      };
+    }
+
+    const seasonDetailMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && seasonDetailMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorSeasonDetail(decodeURIComponent(seasonDetailMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const batchMatch = normalizedPath.match(/^\/v1\/batches\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && batchMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorBatchDetail(decodeURIComponent(batchMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const runReplayMatch = normalizedPath.match(/^\/v1\/runs\/([^/]+)\/replay$/);
+    if (normalizedMethod === 'GET' && runReplayMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorReplayDetail(decodeURIComponent(runReplayMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const runMatch = normalizedPath.match(/^\/v1\/runs\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && runMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorRunDetail(decodeURIComponent(runMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const leaderboardSnapshotMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/snapshots\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && leaderboardSnapshotMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorLeaderboardSnapshotDetail(
+            decodeURIComponent(leaderboardSnapshotMatch[1]),
+            decodeURIComponent(leaderboardSnapshotMatch[2])
+          ),
+          { requestId }
+        ),
+      };
+    }
+
+    const leaderboardLatestMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/latest$/);
+    if (normalizedMethod === 'GET' && leaderboardLatestMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorLatestLeaderboardDetail(decodeURIComponent(leaderboardLatestMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    if (normalizedMethod === 'POST' && normalizedPath === '/v1/seasons') {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorSeason(body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    const submissionMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)\/submissions$/);
+    if (normalizedMethod === 'POST' && submissionMatch) {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorSubmission(decodeURIComponent(submissionMatch[1]), body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    const createBatchMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)\/batches$/);
+    if (normalizedMethod === 'POST' && createBatchMatch) {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorBatch(decodeURIComponent(createBatchMatch[1]), body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    return {
+      status: 404,
+      body: makePortalApiErrorBody('NOT_FOUND', 'Operator route not found.', { requestId }),
+    };
+  } catch (err) {
+    return {
+      status: Number(err?.status || 500),
+      body: makePortalApiErrorBody(
+        typeof err?.code === 'string' && err.code ? err.code : 'INTERNAL_ERROR',
+        typeof err?.message === 'string' && err.message ? err.message : 'Operator request failed.',
+        {
+          requestId,
+          retryable: Number(err?.status || 500) >= 500,
+          details: err?.details || {},
+        }
+      ),
+    };
+  }
+}
+
+function createPortalPokerOperatorClient() {
+  return createPokerOperatorClient({
+    transport: async ({ method, path, query, body, headers }) => invokePokerOperatorTransport({
+      method,
+      path,
+      query,
+      body,
+      headers,
+      requestId: buildPortalRequestId(),
+    }),
+  });
+}
+
+function resolvePrimaryWalletSubject(session, req) {
+  const walletSubjects = collectWalletSubjectsForSession(session, req);
+  const primary = walletSubjects[0] || null;
+  if (!primary?.address) return null;
+  return {
+    walletSubject: primary.address,
+    submitterWallet: {
+      chain: primary.chain,
+      address: primary.address,
+    },
+  };
+}
+
+async function syncPokerMirrorFromOperator({ seasonId = '' } = {}) {
+  const client = createPortalPokerOperatorClient();
+  const health = await client.health();
+  const seasonIds = [];
+  if (seasonId) {
+    seasonIds.push(seasonId);
+  } else {
+    let cursor = null;
+    do {
+      const page = await client.listSeasons({ cursor, limit: 100 });
+      for (const item of page.items) {
+        if (item?.seasonId) seasonIds.push(item.seasonId);
+      }
+      cursor = page.nextCursor || null;
+    } while (cursor);
+  }
+  const counts = {
+    seasons: 0,
+    leaderboards: 0,
+    batches: 0,
+    runs: 0,
+    replays: 0,
+  };
+  for (const itemSeasonId of seasonIds) {
+    const season = await client.getSeason(itemSeasonId);
+    upsertPokerSeason({
+      seasonId: season.seasonId,
+      seasonSlug: season.seasonSlug,
+      displayName: season.displayName,
+      rulesVersion: season.rulesVersion,
+      operatorVersion: season.operatorVersion,
+      status: season.status,
+      submissionOpenAt: season.submissionOpenAt,
+      submissionCloseAt: season.submissionCloseAt,
+      divisions: season.divisions,
+      raw: season,
+      createdAt: season.createdAt || nowIso(),
+      updatedAt: season.updatedAt || nowIso(),
+    });
+    counts.seasons += 1;
+
+    if (season?.latestLeaderboardSnapshot?.snapshotId) {
+      const latest = await client.getLatestLeaderboard(season.seasonId);
+      if (latest?.snapshotId) {
+        upsertPokerLeaderboardSnapshot({
+          snapshotId: latest.snapshotId,
+          seasonId: season.seasonId,
+          rankings: latest.rankings,
+          raw: latest,
+          createdAt: latest.createdAt || nowIso(),
+          updatedAt: latest.createdAt || nowIso(),
+        });
+        counts.leaderboards += 1;
+      }
+    }
+
+    if (season?.latestReplayHighlight?.runId) {
+      const run = await client.getRun(season.latestReplayHighlight.runId);
+      if (run?.batchId) {
+        const batch = await client.getBatch(run.batchId);
+        upsertPokerBatch({
+          batchId: batch.batchId,
+          seasonId: batch.seasonId,
+          batchKind: batch.batchKind,
+          submissionIds: batch.submissionIds,
+          batchConfig: batch.batchConfig,
+          status: batch.status,
+          raw: batch,
+          createdAt: batch.createdAt || nowIso(),
+          updatedAt: batch.updatedAt || nowIso(),
+        });
+        counts.batches += 1;
+      }
+      upsertPokerRun({
+        runId: run.runId,
+        batchId: run.batchId,
+        seasonId: run.seasonId,
+        summary: run.summary,
+        raw: run,
+        createdAt: run.createdAt || nowIso(),
+        updatedAt: run.updatedAt || nowIso(),
+      });
+      counts.runs += 1;
+      try {
+        const replay = await client.getReplay(run.runId);
+        upsertPokerReplayArtifact({
+          runId: replay.runId,
+          replayFormat: replay.replay.replayFormat,
+          summary: replay.replay.summaryJson,
+          eventsJsonlUri: replay.replay.eventsJsonlUri,
+          artifactSha256: replay.replay.artifactSha256,
+          contentType: replay.replay.contentType,
+          raw: replay.replay,
+          createdAt: run.createdAt || nowIso(),
+          updatedAt: run.updatedAt || nowIso(),
+        });
+        counts.replays += 1;
+      } catch (err) {
+        if (err?.code !== 'POKER_REPLAY_NOT_READY') throw err;
+      }
+    }
+  }
+  return {
+    health,
+    seasonIds,
+    counts,
+  };
+}
+
+function summarizeMirroredPokerSeason(season) {
+  if (!season) return null;
+  const latestSnapshot = getLatestPokerLeaderboardSnapshot(season.seasonId);
+  const raw = season.raw && typeof season.raw === 'object' ? season.raw : {};
+  return {
+    seasonId: season.seasonId,
+    seasonSlug: season.seasonSlug,
+    displayName: season.displayName,
+    rulesVersion: season.rulesVersion,
+    operatorVersion: season.operatorVersion,
+    status: season.status,
+    submissionOpenAt: season.submissionOpenAt,
+    submissionCloseAt: season.submissionCloseAt,
+    divisions: season.divisions,
+    latestLeaderboardSnapshot: latestSnapshot ? {
+      snapshotId: latestSnapshot.snapshotId,
+      createdAt: latestSnapshot.createdAt,
+    } : null,
+    latestReplayHighlight: raw.latestReplayHighlight || null,
+  };
+}
+
+function computePokerArtifactSha256(rawReplay) {
+  const eventsJsonl = typeof rawReplay?.eventsJsonl === 'string' ? rawReplay.eventsJsonl : '';
+  if (!eventsJsonl) return null;
+  return `sha256:${crypto.createHash('sha256').update(eventsJsonl, 'utf8').digest('hex')}`;
+}
+
+function isBlockedPortalContractHostname(hostname) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/\.+$/, '');
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  const ipVersion = net.isIP(host);
+  if (!ipVersion) return false;
+  if (ipVersion === 6) {
+    if (host === '::1') return true;
+    if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return true;
+    return false;
+  }
+  const parts = host.split('.').map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true;
+  }
+  if (parts[0] === 10) return true;
+  if (parts[0] === 127) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+function assertPortalContractTargetAllowed(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(targetUrl || ''));
+  } catch {
+    const err = new Error('INVALID_URL');
+    err.code = 'INVALID_URL';
+    throw err;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    const err = new Error('PROTOCOL_NOT_ALLOWED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = { protocol: parsed.protocol || null };
+    throw err;
+  }
+  if (parsed.username || parsed.password) {
+    const err = new Error('EMBEDDED_CREDENTIALS_NOT_ALLOWED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = {};
+    throw err;
+  }
+  if (isBlockedPortalContractHostname(parsed.hostname)) {
+    const err = new Error('PRIVATE_NETWORK_BLOCKED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = { hostname: parsed.hostname };
+    throw err;
+  }
+  return parsed;
 }
 
 function normalizePrivyWalletRpcSolanaTransaction(value) {
@@ -7880,12 +9586,385 @@ if (process.env.NODE_ENV === 'test') {
       erc8004OptOut: [],
       erc8004Registrations: []
     });
+    resetExtendedStore();
+    resetUnifiedPlatformStore();
+    resetPokerOperatorState();
+    resetEmailOtpAdapter();
     invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
     res.json({ ok: true });
+  });
+
+  app.get('/__test__/counts/:table', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const tableName = String(req.params.table || '').trim();
+    const count = isUnifiedPlatformTable(tableName)
+      ? countUnifiedPlatformTableRows(tableName)
+      : countTableRows(tableName);
+    return res.json({
+      ok: true,
+      table: tableName,
+      count: Number(count || 0)
+    });
+  });
+
+  app.get('/__test__/unified-platform/stats', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      stats: getUnifiedPlatformTestStats(),
+    });
+  });
+
+  app.get('/__test__/route-manifest', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      routes: getRouteOwnerManifest(),
+    });
+  });
+
+  app.get('/__test__/live-suites', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      suites: getLiveSuiteManifest(),
+    });
+  });
+
+  app.post('/__test__/otp/email/issue', express.json({ limit: '16kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'stub';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    if (!email) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    try {
+      const record = issueEmailOtp({
+        provider,
+        email,
+        code: typeof req.body?.code === 'string' ? req.body.code.trim() : '',
+        nowIso: nowIso(),
+      });
+      return res.json({ ok: true, record });
+    } catch {
+      return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    }
+  });
+
+  app.get('/__test__/otp/email/latest', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.query?.provider === 'string' ? req.query.provider.trim() : 'stub';
+    const email = typeof req.query?.email === 'string' ? req.query.email.trim() : '';
+    if (!email) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const record = getLatestEmailOtp({ provider, email });
+    if (!record) return res.status(404).json({ ok: false, error: 'OTP_NOT_FOUND' });
+    return res.json({ ok: true, record });
+  });
+
+  app.post('/__test__/otp/email/consume', express.json({ limit: '16kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'stub';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!email || !code) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const outcome = consumeEmailOtp({ provider, email, code, nowIso: nowIso() });
+    if (!outcome.ok) {
+      return res.status(409).json({
+        ok: false,
+        error: outcome.error,
+        record: outcome.record,
+      });
+    }
+    return res.json({ ok: true, record: outcome.record });
+  });
+
+  app.get('/__test__/otp/email/activity', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.query?.provider === 'string' ? req.query.provider.trim() : '';
+    const email = typeof req.query?.email === 'string' ? req.query.email.trim() : '';
+    return res.json({
+      ok: true,
+      activity: getEmailOtpActivity({ provider, email }),
+    });
+  });
+
+  app.get('/__test__/platform-export', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      snapshot: exportPlatformStateSnapshot(),
+    });
+  });
+
+  app.post('/__test__/platform-import', express.json({ limit: '2mb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const snapshot = req.body?.snapshot && typeof req.body.snapshot === 'object' ? req.body.snapshot : null;
+    if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const imported = importPlatformStateSnapshot(snapshot, { reset: req.body?.reset !== false });
+    return res.json({ ok: true, snapshot: imported });
+  });
+
+  app.post('/__test__/platform-verify', express.json({ limit: '2mb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const snapshot = req.body?.snapshot && typeof req.body.snapshot === 'object' ? req.body.snapshot : null;
+    if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    return res.json({
+      ok: true,
+      verification: verifyPlatformStateSnapshot(snapshot),
+    });
+  });
+
+  app.get('/__test__/unified-platform/fixtures', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      families: listUnifiedPlatformFixtureFamilies(),
+    });
+  });
+
+  app.get('/__test__/unified-platform/fixtures/:family', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const fixture = getUnifiedPlatformTestFixture(req.params.family);
+    if (!fixture) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({
+      ok: true,
+      family: String(req.params.family || '').trim(),
+      fixture,
+    });
+  });
+
+  app.post('/__test__/unified-platform/sealed-contexts/seed', express.json({ limit: '32kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const seeded = buildSeededSealedContextRecord({
+      houseId,
+      traceId: typeof req.body?.traceId === 'string' ? req.body.traceId.trim() : '',
+      runId: typeof req.body?.runId === 'string' ? req.body.runId.trim() : '',
+      releasePolicy: typeof req.body?.releasePolicy === 'string' ? req.body.releasePolicy.trim() : 'manual',
+      status: typeof req.body?.status === 'string' ? req.body.status.trim() : 'active',
+    });
+    const context = upsertSealedContext({
+      houseId: seeded.houseId,
+      sealedContextId: seeded.sealedContextId,
+      traceId: seeded.traceId,
+      runId: seeded.runId,
+      entrantId: seeded.entrantId,
+      scopeType: seeded.scopeType,
+      scopeKey: seeded.scopeKey,
+      allowedReaders: seeded.allowedReaders,
+      forbiddenSources: seeded.forbiddenSources,
+      releasePolicy: seeded.releasePolicy,
+      status: seeded.status,
+      nowIso: nowIso(),
+    });
+    return res.json({ ok: true, sealedContext: context });
+  });
+
+  app.post('/__test__/unified-platform/config-versions', express.json({ limit: '64kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+    const configVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'active';
+    if (!configVersionId || !houseId || !teamId) {
+      return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    }
+
+    const manifest = req.body?.manifest && typeof req.body.manifest === 'object' && !Array.isArray(req.body.manifest)
+      ? req.body.manifest
+      : {
+        configVersionId,
+        houseId,
+        teamId,
+        branch: 'stable',
+        status,
+        resolvedComponents: {
+          housePolicyVersionId: 'hpv_fixture_01',
+          teamCompositionVersionId: 'tcv_fixture_01',
+          agentConfigVersionIds: ['agv_fixture_01'],
+          officePolicyVersionIds: [],
+          experiencePresetVersionId: 'epv_fixture_01',
+          integrationOverlayVersionIds: [],
+          trainerPresetVersionId: 'tpv_fixture_01',
+        },
+      };
+    const configHash = sha256PrefixedHex(JSON.stringify(manifest));
+    const record = upsertConfigVersion({
+      configVersionId,
+      houseId,
+      teamId,
+      experienceId: typeof manifest?.experienceId === 'string' ? manifest.experienceId.trim() : '',
+      status,
+      configHash,
+      manifest,
+      lineage: { seededBy: 'playwright' },
+      nowIso: nowIso(),
+    });
+    return res.json({
+      ok: true,
+      config: record,
+    });
+  });
+
+  app.get('/__test__/unified-platform/config-versions/:configVersionId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const config = getConfigVersion(req.params.configVersionId);
+    if (!config) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({
+      ok: true,
+      config,
+      componentVersions: listConfigComponentVersions(config.configVersionId),
+    });
+  });
+
+  app.get('/__test__/unified-platform/traces/:traceId/events', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      events: listTraceEvents(req.params.traceId),
+    });
+  });
+
+  app.post('/__test__/unified-platform/runs/:runId/status', express.json({ limit: '32kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : '';
+    if (!status) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const completedAt = status === 'completed' ? nowIso() : null;
+    const run = updateRunStatus({
+      runId: req.params.runId,
+      status,
+      completedAt,
+      nowIso: nowIso(),
+    });
+    return res.json({
+      ok: !!run,
+      run,
+    });
+  });
+
+  app.post('/__test__/web/credentials/activate', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const brokerSessionId = typeof req.body?.brokerSessionId === 'string' ? req.body.brokerSessionId.trim() : '';
+    if (!brokerSessionId) return res.status(400).json({ ok: false, error: 'MISSING_BROKER_SESSION_ID' });
+    const grant = activateCredentialGrant({
+      brokerSessionId,
+      redactedLabel: typeof req.body?.redactedLabel === 'string' ? req.body.redactedLabel.trim() : 'Test Credential',
+      expiresAt: typeof req.body?.expiresAt === 'string' ? req.body.expiresAt.trim() : null
+    });
+    if (!grant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    res.json({ ok: true, grant });
+  });
+
+  app.post('/__test__/session/bind-wallet', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const s = ensureHumanSession(req, res);
+    const chain = typeof req.body?.chain === 'string' ? req.body.chain.trim() : 'solana';
+    const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+    if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+    bindSessionWallet(s, chain, address, { allowRebind: true });
+    res.json({ ok: true, sessionId: s.sessionId, chain, address });
+  });
+
+  app.post('/__test__/session/attach-house', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const session = ensureHumanSession(req, res);
+    session.houseCeremony = session.houseCeremony || {};
+    session.houseCeremony.houseId = houseId;
+    session.houseCeremony.createdAt = session.houseCeremony.createdAt || nowIso();
+    if (teamId) session.activeTeamId = teamId;
+    indexHouseId(session, houseId);
+    const context = buildPlatformContextResponse(session);
+    return res.json({ ok: true, houseId, sessionId: session.sessionId, activeTeamId: context.activeTeamId, availableTeamIds: context.availableTeamIds });
+  });
+
+  app.post('/__test__/poker/operator-fixture', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const fixture = req.body && typeof req.body === 'object' ? req.body : {};
+    const snapshot = seedPokerOperatorState(fixture);
+    return res.json({ ok: true, snapshot });
+  });
+
+  app.get('/__test__/poker/submissions/:submissionId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const submission = getPokerSubmissionById(req.params.submissionId);
+    if (!submission) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({ ok: true, submission });
   });
 }
 
@@ -9016,6 +11095,32 @@ function atlasModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
+function trainerModalRedirectPath(req) {
+  const params = new URLSearchParams();
+  const source = req && req.query && typeof req.query === 'object' ? req.query : {};
+  const allowedKeys = ['liteDriver', 'trainerNamespace', 'trainer_namespace', 'trainerTools', 'trainer-tools'];
+  for (const key of allowedKeys) {
+    const rawValue = source[key];
+    if (Array.isArray(rawValue)) {
+      for (const item of rawValue) {
+        if (item === null || item === undefined) continue;
+        params.append(key, String(item));
+      }
+      continue;
+    }
+    if (rawValue === null || rawValue === undefined || rawValue === '') continue;
+    params.set(key, String(rawValue));
+  }
+  params.set('modal', 'trainer');
+  return `/app?${params.toString()}`;
+}
+
+function registryModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('district', 'registry');
+  return `/?${params.toString()}`;
+}
+
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
   res.json(VENDOR_LITE_MANIFEST);
 });
@@ -9030,6 +11135,29 @@ app.get('/atlas', (req, res) => {
     return sendHtmlNoStore(res, 'atlas.html');
   }
   return res.redirect(302, atlasModalRedirectPath());
+});
+
+app.get('/registry', (req, res) => {
+  if (String(req.query?.embed || '').trim() === '1') {
+    return sendHtmlNoStore(res, 'registry.html');
+  }
+  return res.redirect(302, registryModalRedirectPath());
+});
+
+app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
+  const pack = buildDefaultCompiledSkillPack();
+  const requestedPath = String(req.params?.[0] || '').trim().replace(/^\/+/, '');
+  const body = pack.fileBodies[requestedPath];
+  if (typeof body !== 'string') {
+    return res.status(404).type('text/plain').send('NOT_FOUND');
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.type(requestedPath.endsWith('.json') ? 'application/json' : 'text/markdown');
+  return res.send(body);
+});
+
+app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (_req, res) => {
+  return sendHtmlNoStore(res, 'poker.html');
 });
 
 app.use(
@@ -9072,7 +11200,12 @@ app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
-app.get('/trainer', (_req, res) => sendHtmlNoStore(res, 'trainer.html'));
+app.get('/trainer', (req, res) => {
+  if (String(req.query?.embed || '').trim() === '1') {
+    return sendHtmlNoStore(res, 'trainer.html');
+  }
+  return res.redirect(302, trainerModalRedirectPath(req));
+});
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;

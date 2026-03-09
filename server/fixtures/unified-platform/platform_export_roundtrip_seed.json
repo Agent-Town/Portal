@@ -1,0 +1,11 @@
+{
+  "family": "platform_export_roundtrip_seed",
+  "tables": [
+    "runs",
+    "trace_events",
+    "config_versions",
+    "trainer_jobs",
+    "trainer_results",
+    "sealed_contexts"
+  ]
+}

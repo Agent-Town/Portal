@@ -94,6 +94,10 @@ async function openTrainerFromSidebar(page) {
 async function openTrainerToolsTab(page) {
   await page.getByTestId('trainer-tab-tools').click();
   await page.getByTestId('trainer-tool-name').waitFor({ state: 'visible', timeout: 5000 });
+  await page.waitForFunction(() => {
+    const select = document.getElementById('trainerToolNameSelect');
+    return !!select && Array.from(select.options || []).some((option) => String(option.value || '').trim().length > 0);
+  }, null, { timeout: 5000 });
 }
 
 async function listTrainerToolNames(page) {

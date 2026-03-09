@@ -1,0 +1,19 @@
+{
+  "family": "multi_team_trainer_seed",
+  "teams": [
+    {
+      "teamId": "team_alpha",
+      "configVersionId": "cfg_multi_team_trainer_alpha_01",
+      "trainerJobId": "trainer_multi_team_alpha_01",
+      "trainerResultId": "trr_multi_team_alpha_01",
+      "candidatePatchId": "patch_multi_team_alpha_01"
+    },
+    {
+      "teamId": "team_beta",
+      "configVersionId": "cfg_multi_team_trainer_beta_01",
+      "trainerJobId": "trainer_multi_team_beta_01",
+      "trainerResultId": "trr_multi_team_beta_01",
+      "candidatePatchId": "patch_multi_team_beta_01"
+    }
+  ]
+}

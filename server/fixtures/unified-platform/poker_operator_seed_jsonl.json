@@ -1,0 +1,7 @@
+{
+  "family": "poker_operator_seed_jsonl",
+  "records": [
+    "{\"ingestKey\":\"op:1\",\"type\":\"hand_started\",\"entrantId\":\"entrant_fixture_alpha\"}",
+    "{\"ingestKey\":\"op:2\",\"type\":\"action_taken\",\"entrantId\":\"entrant_fixture_alpha\"}"
+  ]
+}

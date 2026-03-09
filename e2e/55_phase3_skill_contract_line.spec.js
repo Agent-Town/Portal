@@ -69,6 +69,15 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('Keep polling `GET /api/agent/state?teamCode=...` during ceremony too.');
   expect(txt).toContain('GET /api/agent/house/material?teamCode=');
   expect(txt).toContain('POST /api/agent/house/connect');
+  expect(txt).toContain('agent_town_ui_open_modal({ modal, params })');
+  expect(txt).toContain('agent_town_ui_atlas_search({ q, family, searchType })');
+  expect(txt).toContain('agent_town_ui_registry_search({ q, family })');
+  expect(txt).toContain('agent_town_ui_pony_compose({ toHouseId, subject, draft })');
+  expect(txt).toContain('trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.');
+  expect(txt).toContain('Preserve backend ids exactly:');
+  expect(txt).toContain('`invocationId`');
+  expect(txt).toContain('`evidenceId`');
+  expect(txt).toContain('`webSessionId`');
 
   expect(txt).toContain('Start polling immediately after connect.');
   expect(txt).toContain('Default polling interval: 1 second.');

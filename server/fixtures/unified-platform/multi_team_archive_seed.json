@@ -1,0 +1,17 @@
+{
+  "family": "multi_team_archive_seed",
+  "teams": [
+    {
+      "teamId": "team_alpha",
+      "configVersionId": "cfg_multi_team_archive_alpha_01",
+      "runId": "run_multi_team_archive_alpha_01",
+      "traceId": "trace_multi_team_archive_alpha_01"
+    },
+    {
+      "teamId": "team_beta",
+      "configVersionId": "cfg_multi_team_archive_beta_01",
+      "runId": "run_multi_team_archive_beta_01",
+      "traceId": "trace_multi_team_archive_beta_01"
+    }
+  ]
+}

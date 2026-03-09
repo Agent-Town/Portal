@@ -195,10 +195,20 @@ async function api(url, opts = {}) {
     }
   }
   if (!res.ok) {
-    const msg = data && data.error ? data.error : `HTTP_${res.status}`;
+    const msg = typeof data?.error === 'string'
+      ? data.error
+      : typeof data?.error?.code === 'string' && data.error.code
+        ? data.error.code
+        : `HTTP_${res.status}`;
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
+    if (typeof data?.error?.code === 'string' && data.error.code) {
+      err.code = data.error.code;
+    }
+    if (typeof data?.error?.message === 'string' && data.error.message) {
+      err.detail = data.error.message;
+    }
     throw err;
   }
   return data;
@@ -320,6 +330,8 @@ const DEFAULT_LITE_SKILL_STATE = Object.freeze({
   lastError: null,
   lastImportedAtMs: null
 });
+const DEFAULT_LITE_SKILL_PACK_MANIFEST_PATH = '/api/platform/default-skill-pack';
+const DEFAULT_LITE_SKILL_PACK_ENTRY_PATH = '/__compiled/default-skill-pack/skill.md';
 let liteSkillState = { ...DEFAULT_LITE_SKILL_STATE };
 let liteRuntimeState = {};
 let liteSkillSyncPromise = null;
@@ -417,6 +429,7 @@ let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
+  registry: { title: 'Registry', viewPath: '/registry?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -437,9 +450,10 @@ const isTownHub = !!document.getElementById('districtMap') && !!document.getElem
 const popupDistrictByPath = {
   '/leaderboard': 'leaderboard',
   '/wall': 'leaderboard',
+  '/registry': 'registry',
   '/house': 'house'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -448,11 +462,42 @@ let experienceIntentAtlasState = {
   family: '',
   searchType: 'keyword'
 };
+let experienceIntentRegistryState = {
+  query: '',
+  family: ''
+};
 let experienceIntentPonyState = {
   composeOpen: false,
   toHouseId: '',
   subject: '',
   draft: ''
+};
+let houseSurfaceState = {
+  activeSurface: '',
+  context: {
+    loaded: false,
+    houseId: '',
+    activeTeamId: '',
+    availableTeamIds: [],
+  },
+  archive: {
+    loaded: false,
+    items: [],
+    selectedTraceId: '',
+    emptyStateText: 'No canonical traces archived yet.'
+  },
+  trainer: {
+    loaded: false,
+    jobs: [],
+    results: [],
+    selectedResultId: '',
+    emptyStateText: 'No durable trainer jobs yet.',
+    activeConfigVersionId: '',
+    submitIdempotencyKey: '',
+    promotionIdempotencyKey: '',
+    actionStatusText: '',
+    actionStatusError: false,
+  }
 };
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
@@ -811,6 +856,7 @@ function districtStatusText(district) {
   }
   if (!district) return 'Select a district on the map.';
   if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
+  if (district === 'registry') return 'Registry selected: capability and storefront discovery.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
   if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
   if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
@@ -819,7 +865,7 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas' || district === 'registry' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -836,6 +882,7 @@ function setActiveDistrict(district) {
 
 function normalizeDistrict(district) {
   return district === 'atlas'
+    || district === 'registry'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -849,6 +896,7 @@ function normalizeDistrict(district) {
 
 function explicitDistrictFromInput(district) {
   return district === 'atlas'
+    || district === 'registry'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -1125,6 +1173,412 @@ async function loadDistrictView(district) {
     districtViewCache.set(safeDistrict, text);
   }
   return districtViewCache.get(safeDistrict);
+}
+
+function setHouseSurfaceStatus(text, isError = false) {
+  const node = el('houseSurfaceStatus');
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
+function setHouseTrainerActionStatus(text, isError = false) {
+  const node = el('houseTrainerActionStatus');
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  houseSurfaceState.trainer.actionStatusText = String(text || '');
+  houseSurfaceState.trainer.actionStatusError = !!isError;
+}
+
+function makeHouseIdempotencyKey(prefix) {
+  const safePrefix = String(prefix || 'house').trim() || 'house';
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return `${safePrefix}_${window.crypto.randomUUID()}`;
+  }
+  return `${safePrefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function resetHouseTrainerActionKeys() {
+  houseSurfaceState.trainer.submitIdempotencyKey = makeHouseIdempotencyKey('house_compare');
+  houseSurfaceState.trainer.promotionIdempotencyKey = makeHouseIdempotencyKey('house_promote');
+}
+
+function normalizeHouseTeamIds(items) {
+  const source = Array.isArray(items) ? items : [];
+  const seen = new Set();
+  return source.map((item) => String(item || '').trim()).filter((item) => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function syncHouseSurfaceContextFromPayload(payload = {}) {
+  const previousHouseId = houseSurfaceState.context.houseId;
+  const nextHouseId = String(payload?.houseId || '').trim();
+  const nextTeamIds = normalizeHouseTeamIds(payload?.availableTeamIds);
+  let nextActiveTeamId = String(payload?.activeTeamId || '').trim();
+  if (nextActiveTeamId && nextTeamIds.length && !nextTeamIds.includes(nextActiveTeamId)) {
+    nextActiveTeamId = '';
+  }
+  if (!nextActiveTeamId && nextTeamIds.length) {
+    nextActiveTeamId = nextTeamIds[0];
+  }
+  const previousActiveTeamId = houseSurfaceState.context.activeTeamId;
+  houseSurfaceState.context.loaded = true;
+  houseSurfaceState.context.houseId = nextHouseId;
+  houseSurfaceState.context.activeTeamId = nextActiveTeamId;
+  houseSurfaceState.context.availableTeamIds = nextTeamIds;
+  if (previousActiveTeamId !== nextActiveTeamId) {
+    houseSurfaceState.archive.selectedTraceId = '';
+    houseSurfaceState.trainer.selectedResultId = '';
+    resetHouseTrainerActionKeys();
+  }
+  renderHouseSurfaceContext();
+  if (nextHouseId && previousHouseId !== nextHouseId && currentDistrict === 'house' && nextTeamIds.length === 0) {
+    loadHousePlatformContext().catch(() => {});
+  }
+}
+
+function syncHouseSurfaceContextFromState(state) {
+  const source = state && typeof state === 'object' ? state : {};
+  const platform = source.platform && typeof source.platform === 'object' ? source.platform : {};
+  syncHouseSurfaceContextFromPayload({
+    houseId: String(platform.houseId || source.houseId || '').trim(),
+    activeTeamId: String(platform.activeTeamId || source.activeTeamId || '').trim(),
+    availableTeamIds: Array.isArray(platform.availableTeamIds) ? platform.availableTeamIds : source.availableTeamIds,
+  });
+}
+
+function renderHouseSurfaceContext() {
+  const selectNode = el('houseTeamSelect');
+  const summaryNode = el('houseTeamSummary');
+  const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const teamIds = normalizeHouseTeamIds(houseSurfaceState.context.availableTeamIds);
+  if (selectNode) {
+    const currentValue = String(selectNode.value || '').trim();
+    if (
+      selectNode.options.length !== teamIds.length
+      || teamIds.some((teamId, index) => String(selectNode.options[index]?.value || '') !== teamId)
+    ) {
+      selectNode.innerHTML = '';
+      teamIds.forEach((teamId) => {
+        const option = document.createElement('option');
+        option.value = teamId;
+        option.textContent = teamId;
+        selectNode.appendChild(option);
+      });
+    }
+    selectNode.disabled = teamIds.length <= 1;
+    if (activeTeamId && currentValue !== activeTeamId) {
+      selectNode.value = activeTeamId;
+    }
+  }
+  if (!summaryNode) return;
+  if (!houseSurfaceState.context.houseId) {
+    summaryNode.textContent = 'Attach a house to inspect team-specific archive and trainer records.';
+    return;
+  }
+  if (!activeTeamId) {
+    summaryNode.textContent = 'No seeded team context is available for this house yet.';
+    return;
+  }
+  summaryNode.textContent = `Active team: ${activeTeamId}`;
+}
+
+async function loadHousePlatformContext() {
+  const response = await api('/api/platform/context');
+  const data = response?.data || response || {};
+  syncHouseSurfaceContextFromPayload(data);
+  return data;
+}
+
+async function setHouseActiveTeam(teamId) {
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedTeamId || normalizedTeamId === String(houseSurfaceState.context.activeTeamId || '').trim()) {
+    return buildHousePlatformSnapshot();
+  }
+  const response = await api('/api/platform/active-team', {
+    method: 'POST',
+    body: JSON.stringify({ teamId: normalizedTeamId }),
+  });
+  const data = response?.data || response || {};
+  syncHouseSurfaceContextFromPayload(data);
+  if (houseSurfaceState.activeSurface === 'archive') {
+    await loadHouseArchiveSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'trainer') {
+    await loadHouseTrainerSurface({ skipContext: true });
+  }
+  return data;
+}
+
+function buildHousePlatformSnapshot() {
+  return {
+    houseId: String(houseSurfaceState.context.houseId || '').trim() || null,
+    activeTeamId: String(houseSurfaceState.context.activeTeamId || '').trim() || null,
+    availableTeamIds: normalizeHouseTeamIds(houseSurfaceState.context.availableTeamIds),
+  };
+}
+
+function setHouseSurfaceMode(mode) {
+  const activeMode = mode === 'archive' || mode === 'trainer' ? mode : '';
+  houseSurfaceState.activeSurface = activeMode;
+  const archivePanel = el('houseArchivePanel');
+  const trainerPanel = el('houseTrainerPanel');
+  const archiveBtn = el('houseArchiveBtn');
+  const trainerBtn = el('houseTrainerBtn');
+  if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
+  if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
+  if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
+  if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
+}
+
+function renderHouseArchiveSurface() {
+  const listNode = el('houseArchiveList');
+  const detailNode = el('houseArchiveDetail');
+  const emptyNode = el('houseArchiveEmpty');
+  if (!listNode || !detailNode || !emptyNode) return;
+  const items = Array.isArray(houseSurfaceState.archive.items) ? houseSurfaceState.archive.items : [];
+  listNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.archive.emptyStateText || 'No canonical traces archived yet.';
+  emptyNode.classList.toggle('is-hidden', items.length > 0);
+  if (!items.length) {
+    detailNode.textContent = 'Select a trace to inspect archive counters.';
+    return;
+  }
+
+  const selectedTraceId = houseSurfaceState.archive.selectedTraceId || String(items[0]?.traceId || '');
+  houseSurfaceState.archive.selectedTraceId = selectedTraceId;
+  const selectedItem = items.find((item) => String(item?.traceId || '') === selectedTraceId) || items[0];
+
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(item?.traceId || '') === selectedItem.traceId ? ' primary' : ''}`;
+    button.dataset.traceId = String(item?.traceId || '');
+    button.textContent = `${String(item?.traceId || '')} · ${String(item?.status || '')}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.archive.selectedTraceId = String(item?.traceId || '');
+      renderHouseArchiveSurface();
+    });
+    listNode.appendChild(button);
+  });
+
+  const counters = selectedItem?.archiveCounters && typeof selectedItem.archiveCounters === 'object'
+    ? selectedItem.archiveCounters
+    : { accepted: 0, ignored: 0, rejected: 0 };
+  detailNode.textContent = `Trace ${String(selectedItem?.traceId || '')} · accepted ${Number(counters.accepted || 0)} · ignored ${Number(counters.ignored || 0)} · rejected ${Number(counters.rejected || 0)}`;
+}
+
+function renderHouseTrainerSurface() {
+  const jobsNode = el('houseTrainerJobs');
+  const resultsNode = el('houseTrainerResults');
+  const detailNode = el('houseTrainerDetail');
+  const emptyNode = el('houseTrainerEmpty');
+  const createCompareBtn = el('houseTrainerCreateCompareBtn');
+  const promotePatchBtn = el('houseTrainerPromotePatchBtn');
+  const approvalInput = el('houseTrainerApprovalIdInput');
+  if (!jobsNode || !resultsNode || !detailNode || !emptyNode) return;
+  const jobs = Array.isArray(houseSurfaceState.trainer.jobs) ? houseSurfaceState.trainer.jobs : [];
+  const results = Array.isArray(houseSurfaceState.trainer.results) ? houseSurfaceState.trainer.results : [];
+  jobsNode.innerHTML = '';
+  resultsNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.trainer.emptyStateText || 'No durable trainer jobs yet.';
+  emptyNode.classList.toggle('is-hidden', jobs.length > 0 || results.length > 0);
+  if (!jobs.length && !results.length) {
+    if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+    if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (approvalInput) approvalInput.disabled = true;
+    setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
+    detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
+    return;
+  }
+
+  const selectedResultId = houseSurfaceState.trainer.selectedResultId || String(results[0]?.trainerResultId || '');
+  houseSurfaceState.trainer.selectedResultId = selectedResultId;
+  const selectedResult = results.find((item) => String(item?.trainerResultId || '') === selectedResultId) || results[0] || null;
+
+  jobs.forEach((job) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.dataset.trainerJobId = String(job?.trainerJobId || '');
+    button.textContent = `${String(job?.trainerJobId || '')} · ${String(job?.jobKind || '')} · ${String(job?.status || '')}`;
+    jobsNode.appendChild(button);
+  });
+
+  results.forEach((result) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(result?.trainerResultId || '') === String(selectedResult?.trainerResultId || '') ? ' primary' : ''}`;
+    button.dataset.trainerResultId = String(result?.trainerResultId || '');
+    const approvalLabel = result?.approvalNeeded === true ? 'approval needed' : 'read-only';
+    button.textContent = `${String(result?.trainerResultId || '')} · ${approvalLabel}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.trainer.selectedResultId = String(result?.trainerResultId || '');
+      renderHouseTrainerSurface();
+    });
+    resultsNode.appendChild(button);
+  });
+
+  if (!selectedResult) {
+    if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+    if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (approvalInput) approvalInput.disabled = true;
+    setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
+    detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
+    return;
+  }
+  const linkedConfigVersionId = String(selectedResult?.linkedConfigVersionId || '').trim();
+  const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
+  const approvalText = selectedResult?.approvalNeeded === true ? 'approval needed' : 'ready';
+  const activeConfigVersionId = String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · ${approvalText} · active config ${activeConfigVersionId || '—'} · linked config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
+  if (createCompareBtn) {
+    createCompareBtn.disabled = !activeConfigVersionId;
+  }
+  if (promotePatchBtn) {
+    promotePatchBtn.disabled = !candidatePatchId;
+  }
+  if (approvalInput) {
+    approvalInput.disabled = !candidatePatchId;
+  }
+  setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
+}
+
+async function createHouseTrainerCompareJob() {
+  const idempotencyKey = String(houseSurfaceState.trainer.submitIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_compare');
+  houseSurfaceState.trainer.submitIdempotencyKey = idempotencyKey;
+  setHouseTrainerActionStatus('Creating durable compare job...');
+  const response = await api('/api/platform/trainer/jobs', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      jobKind: 'trainer_job.compare',
+      budget: {
+        maxUsd: 5,
+      },
+    }),
+  });
+  const data = response?.data || response || {};
+  await loadHouseTrainerSurface({ skipContext: true });
+  const resultId = String(data?.result?.trainerResultId || '').trim();
+  if (resultId) {
+    houseSurfaceState.trainer.selectedResultId = resultId;
+    renderHouseTrainerSurface();
+  }
+  const trainerJobId = String(data?.trainerJobId || '').trim();
+  setHouseTrainerActionStatus(
+    trainerJobId
+      ? `Durable compare job ready: ${trainerJobId}`
+      : 'Durable compare job ready.'
+  );
+  return data;
+}
+
+async function promoteSelectedHouseTrainerPatch() {
+  const selectedResultId = String(houseSurfaceState.trainer.selectedResultId || '').trim();
+  const selectedResult = Array.isArray(houseSurfaceState.trainer.results)
+    ? houseSurfaceState.trainer.results.find((item) => String(item?.trainerResultId || '') === selectedResultId) || null
+    : null;
+  const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
+  if (!selectedResultId || !candidatePatchId) {
+    throw new Error('TRAINER_PATCH_NOT_FOUND');
+  }
+  const approvalId = String(el('houseTrainerApprovalIdInput')?.value || '').trim();
+  const idempotencyKey = String(houseSurfaceState.trainer.promotionIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_promote');
+  houseSurfaceState.trainer.promotionIdempotencyKey = idempotencyKey;
+  setHouseTrainerActionStatus(`Promoting patch ${candidatePatchId}...`);
+  const response = await api(`/api/platform/trainer/results/${encodeURIComponent(selectedResultId)}/promote-patch`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      candidatePatchId,
+      approvalId,
+    }),
+  });
+  const data = response?.data || response || {};
+  await loadHouseTrainerSurface({ skipContext: true });
+  if (selectedResultId) {
+    houseSurfaceState.trainer.selectedResultId = selectedResultId;
+    renderHouseTrainerSurface();
+  }
+  const configVersionId = String(data?.configVersionId || '').trim();
+  setHouseTrainerActionStatus(
+    configVersionId
+      ? `Promoted patch ${candidatePatchId} to ${configVersionId}.`
+      : `Promoted patch ${candidatePatchId}.`
+  );
+  return data;
+}
+
+async function loadHouseArchiveSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('archive');
+  setHouseSurfaceStatus('Loading canonical archive...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/archive');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.archive.loaded = true;
+    houseSurfaceState.archive.items = Array.isArray(data.items) ? data.items : [];
+    houseSurfaceState.archive.emptyStateText = String(data.emptyStateText || 'No canonical traces archived yet.');
+    if (!houseSurfaceState.archive.items.some((item) => String(item?.traceId || '') === String(houseSurfaceState.archive.selectedTraceId || ''))) {
+      houseSurfaceState.archive.selectedTraceId = '';
+    }
+    if (!houseSurfaceState.archive.selectedTraceId && houseSurfaceState.archive.items[0]?.traceId) {
+      houseSurfaceState.archive.selectedTraceId = String(houseSurfaceState.archive.items[0].traceId);
+    }
+    renderHouseArchiveSurface();
+    setHouseSurfaceStatus(houseSurfaceState.archive.items.length ? '' : houseSurfaceState.archive.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.archive.loaded = true;
+    houseSurfaceState.archive.items = [];
+    renderHouseArchiveSurface();
+    setHouseSurfaceStatus(`Archive unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseTrainerSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('trainer');
+  setHouseSurfaceStatus('Loading durable trainer records...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/trainer');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.trainer.loaded = true;
+    houseSurfaceState.trainer.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+    houseSurfaceState.trainer.results = Array.isArray(data.results) ? data.results : [];
+    houseSurfaceState.trainer.emptyStateText = String(data.emptyStateText || 'No durable trainer jobs yet.');
+    houseSurfaceState.trainer.activeConfigVersionId = String(data.activeConfigVersionId || '').trim();
+    if (!houseSurfaceState.trainer.results.some((item) => String(item?.trainerResultId || '') === String(houseSurfaceState.trainer.selectedResultId || ''))) {
+      houseSurfaceState.trainer.selectedResultId = '';
+    }
+    if (!houseSurfaceState.trainer.selectedResultId && houseSurfaceState.trainer.results[0]?.trainerResultId) {
+      houseSurfaceState.trainer.selectedResultId = String(houseSurfaceState.trainer.results[0].trainerResultId);
+    }
+    renderHouseTrainerSurface();
+    setHouseSurfaceStatus(houseSurfaceState.trainer.jobs.length || houseSurfaceState.trainer.results.length
+      ? ''
+      : houseSurfaceState.trainer.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.trainer.loaded = true;
+    houseSurfaceState.trainer.jobs = [];
+    houseSurfaceState.trainer.results = [];
+    houseSurfaceState.trainer.activeConfigVersionId = '';
+    renderHouseTrainerSurface();
+    setHouseSurfaceStatus(`Trainer unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
 }
 
 const townhallDraftFieldIds = [
@@ -3317,6 +3771,89 @@ function bindTownDistrictControls() {
       }
     };
   }
+
+  const houseArchiveBtn = el('houseArchiveBtn');
+  if (houseArchiveBtn) {
+    houseArchiveBtn.onclick = async () => {
+      houseArchiveBtn.disabled = true;
+      try {
+        await loadHouseArchiveSurface();
+      } finally {
+        houseArchiveBtn.disabled = false;
+      }
+    };
+  }
+
+  const houseTeamSelect = el('houseTeamSelect');
+  if (houseTeamSelect) {
+    houseTeamSelect.onchange = async (event) => {
+      const nextTeamId = String(event?.target?.value || '').trim();
+      if (!nextTeamId) return;
+      houseTeamSelect.disabled = true;
+      setHouseSurfaceStatus(`Switching to ${nextTeamId}...`);
+      try {
+        await setHouseActiveTeam(nextTeamId);
+        setHouseSurfaceStatus(`Active team set to ${nextTeamId}.`);
+      } catch (err) {
+        renderHouseSurfaceContext();
+        setHouseSurfaceStatus(`Team switch unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        renderHouseSurfaceContext();
+      }
+    };
+  }
+
+  const houseTrainerBtn = el('houseTrainerBtn');
+  if (houseTrainerBtn) {
+    houseTrainerBtn.onclick = async () => {
+      houseTrainerBtn.disabled = true;
+      try {
+        await loadHouseTrainerSurface();
+      } finally {
+        houseTrainerBtn.disabled = false;
+      }
+    };
+  }
+
+  const houseTrainerCreateCompareBtn = el('houseTrainerCreateCompareBtn');
+  if (houseTrainerCreateCompareBtn) {
+    houseTrainerCreateCompareBtn.onclick = async () => {
+      houseTrainerCreateCompareBtn.disabled = true;
+      try {
+        await createHouseTrainerCompareJob();
+      } catch (err) {
+        setHouseTrainerActionStatus(`Compare job unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  const houseTrainerPromotePatchBtn = el('houseTrainerPromotePatchBtn');
+  if (houseTrainerPromotePatchBtn) {
+    houseTrainerPromotePatchBtn.onclick = async () => {
+      houseTrainerPromotePatchBtn.disabled = true;
+      try {
+        await promoteSelectedHouseTrainerPatch();
+      } catch (err) {
+        const code = String(err?.message || 'UNKNOWN_ERROR');
+        setHouseTrainerActionStatus(code, true);
+      } finally {
+        renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  if (!houseSurfaceState.trainer.submitIdempotencyKey || !houseSurfaceState.trainer.promotionIdempotencyKey) {
+    resetHouseTrainerActionKeys();
+  }
+  setHouseSurfaceMode(houseSurfaceState.activeSurface);
+  renderHouseSurfaceContext();
+  renderHouseArchiveSurface();
+  renderHouseTrainerSurface();
+  loadHousePlatformContext().catch(() => {
+    renderHouseSurfaceContext();
+  });
 }
 
 function isBlankOrModifierClick(event) {
@@ -3408,6 +3945,33 @@ function setTrainerModalOpen(open) {
   document.body.classList.toggle('trainer-modal-open', nextOpen);
 }
 
+function buildTrainerModalEntryUrl() {
+  const params = new URLSearchParams();
+  const current = new URL(window.location.href).searchParams;
+  const allowedKeys = ['liteDriver', 'trainerNamespace', 'trainer_namespace', 'trainerTools', 'trainer-tools'];
+  for (const key of allowedKeys) {
+    const values = current.getAll(key);
+    for (const value of values) {
+      if (!value) continue;
+      params.append(key, value);
+    }
+  }
+  params.set('modal', 'trainer');
+  return `/app?${params.toString()}`;
+}
+
+function syncTrainerModalQuery(open) {
+  if (!window.history || typeof window.history.replaceState !== 'function') return;
+  const parsed = new URL(window.location.href);
+  if (open) {
+    parsed.searchParams.set('modal', 'trainer');
+  } else if (parsed.searchParams.get('modal') === 'trainer') {
+    parsed.searchParams.delete('modal');
+  }
+  const nextUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  window.history.replaceState({}, '', nextUrl);
+}
+
 async function ensureTrainerScriptLoaded() {
   if (window.__agentTownTrainerScriptLoaded === true) return;
   if (!trainerScriptLoadPromise) {
@@ -3433,11 +3997,12 @@ async function ensureTrainerScriptLoaded() {
 async function openTrainerModal() {
   const backdrop = getTrainerModalBackdrop();
   if (!isTownHub || !backdrop) {
-    window.location.assign('/trainer');
+    window.location.assign(buildTrainerModalEntryUrl());
     return;
   }
 
   setTrainerModalOpen(true);
+  syncTrainerModalQuery(true);
 
   const statusLine = document.getElementById('trainerStatusLine');
   if (statusLine && statusLine.textContent.includes('failed')) {
@@ -3458,6 +4023,7 @@ async function openTrainerModal() {
 
 function closeTrainerModal() {
   setTrainerModalOpen(false);
+  syncTrainerModalQuery(false);
 }
 
 function bindTrainerModalInteractions() {
@@ -3501,7 +4067,10 @@ function routeToPopupMode(rawHref) {
 
   const path = parsed.pathname;
   if (path === '/app' || path === '/') {
-    return { mode: 'leave', url: parsed.pathname };
+    if (String(parsed.searchParams.get('modal') || '').trim().toLowerCase() === 'trainer' && isTownHub) {
+      return { mode: 'trainer' };
+    }
+    return { mode: 'leave', url: `${parsed.pathname}${parsed.search}${parsed.hash}` };
   }
   if (path === '/start') {
     return { mode: 'leave', url: '/start' };
@@ -3560,7 +4129,7 @@ function routeToPopupMode(rawHref) {
   if (path === '/trainer') {
     return isTownHub
       ? { mode: 'trainer' }
-      : { mode: 'leave', url: '/trainer' };
+      : { mode: 'leave', url: buildTrainerModalEntryUrl() };
   }
 
   return {
@@ -3864,6 +4433,7 @@ function setDistrictModalMode(mode) {
 const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
+  registry: 'atlas',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -3891,6 +4461,7 @@ function inferDistrictModalThemeFromUrl(url) {
   }
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
+  if (path === '/registry') return 'atlas';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -3971,6 +4542,10 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
       family: String(experienceIntentAtlasState.family || ''),
       searchType: String(experienceIntentAtlasState.searchType || 'keyword')
     },
+    registry: {
+      query: String(experienceIntentRegistryState.query || ''),
+      family: String(experienceIntentRegistryState.family || '')
+    },
     pony: {
       composeOpen: experienceIntentPonyState.composeOpen === true,
       composeTo: String(experienceIntentPonyState.toHouseId || ''),
@@ -3984,6 +4559,7 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     modal: isPlainRecord(overrides.modal) ? { ...base.modal, ...overrides.modal } : base.modal,
     worker: isPlainRecord(overrides.worker) ? { ...base.worker, ...overrides.worker } : base.worker,
     atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
+    registry: isPlainRecord(overrides.registry) ? { ...base.registry, ...overrides.registry } : base.registry,
     pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
   };
 }
@@ -4158,7 +4734,7 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   const modal = String(rawParams.modal || '').trim().toLowerCase();
   if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
-    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil');
+    return invalidExperienceParam('modal must be one of atlas|registry|pony|townhall|saloon|leaderboard|house|brain|sigil');
   }
   const params = rawParams.params;
   if (params != null && !isPlainRecord(params)) {
@@ -4219,6 +4795,40 @@ async function runExperienceUiAtlasSearch(rawParams) {
         query: q,
         family,
         searchType
+      }
+    })
+  });
+}
+
+async function runExperienceUiRegistrySearch(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['q', 'family']))) {
+    return invalidExperienceParam('registry_search accepts only { q, family }');
+  }
+  const q = String(rawParams.q || '').trim();
+  const family = String(rawParams.family || '').trim().toLowerCase();
+  if (!isSafeExperienceToken(q, { allowEmpty: true, maxLen: 180 })) {
+    return invalidExperienceParam('q contains unsupported characters');
+  }
+  if (!isSafeExperienceToken(family, { allowEmpty: true, maxLen: 64 })) {
+    return invalidExperienceParam('family contains unsupported characters');
+  }
+  const params = new URLSearchParams();
+  params.set('embed', '1');
+  if (q) params.set('q', q);
+  if (family) params.set('family', family);
+
+  setActiveDistrict('registry');
+  currentDistrict = 'registry';
+  openRouteInModalFrame(`/registry?${params.toString()}`, 'Registry');
+  experienceIntentRegistryState = { query: q, family };
+  await waitForDistrictModalOpen();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      registry: {
+        query: q,
+        family
       }
     })
   });
@@ -4301,6 +4911,8 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
       envelope = await runExperienceUiOpenModal(params);
     } else if (toolName === 'agent_town_ui_atlas_search') {
       envelope = await runExperienceUiAtlasSearch(params);
+    } else if (toolName === 'agent_town_ui_registry_search') {
+      envelope = await runExperienceUiRegistrySearch(params);
     } else if (toolName === 'agent_town_ui_pony_compose') {
       envelope = await runExperienceUiPonyCompose(params);
     } else {
@@ -5686,10 +6298,25 @@ function isTrustedDefaultSkill(skill = {}) {
   if (!sourceUrlRaw) return false;
   try {
     const sourceUrl = new URL(sourceUrlRaw, window.location.origin);
-    return sourceUrl.origin === window.location.origin && sourceUrl.pathname === '/skill.md';
+    return sourceUrl.origin === window.location.origin && (
+      sourceUrl.pathname === '/skill.md'
+      || sourceUrl.pathname === DEFAULT_LITE_SKILL_PACK_ENTRY_PATH
+      || sourceUrl.pathname === '/__compiled/default-skill-pack/SKILL.md'
+    );
   } catch {
     return false;
   }
+}
+
+async function resolveDefaultLiteSkillImportUrl() {
+  try {
+    const payload = await api(DEFAULT_LITE_SKILL_PACK_MANIFEST_PATH);
+    const entryUrl = String(payload?.data?.entryUrl || '').trim();
+    if (entryUrl) return entryUrl;
+  } catch {
+    // Fall back to the legacy public manual route if the compiled bridge is unavailable.
+  }
+  return '/skill.md';
 }
 
 function isLiteAgentActive(state) {
@@ -6558,14 +7185,15 @@ async function ensureDefaultLiteSkillImported(state) {
   liteSkillAutoImportPromise = (async () => {
     const gatewayApi = await initGateway();
     if (!gatewayApi || typeof gatewayApi.visitExperience !== 'function') return;
-    const visit = await gatewayApi.visitExperience({ url: '/skill.md' });
+    const importUrl = await resolveDefaultLiteSkillImportUrl();
+    const visit = await gatewayApi.visitExperience({ url: importUrl });
     if (visit?.ok !== true) {
       const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
       appendAgentLog(`Default skill import failed: ${msg}`);
       await refreshLiteSkillState({ force: true });
       return;
     }
-    appendAgentLog('Default skill imported: /skill.md');
+    appendAgentLog(`Default skill imported: ${importUrl}`);
     await refreshLiteSkillState({ force: true });
   })()
     .catch((err) => {
@@ -7877,6 +8505,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateUILegacy(state) {
   lastState = state;
+  syncHouseSurfaceContextFromState(state);
   elements = Array.isArray(state?.elements) ? state.elements : elements;
   if (!isVendorLite(state)) {
     runtimeBootstrapDone = false;
@@ -8294,7 +8923,7 @@ function setupAgentInterface() {
   if (openTrainerBtn) {
     openTrainerBtn.addEventListener('click', () => {
       openTrainerModal().catch(() => {
-        window.location.assign('/trainer');
+        window.location.assign(buildTrainerModalEntryUrl());
       });
     });
   }
@@ -8339,6 +8968,7 @@ async function bootstrapInitialRouteState() {
   const districtParam = params.get('district');
   const pathDistrict = popupDistrictByPath[window.location.pathname] || null;
   const explicitDistrict = explicitDistrictFromInput(districtParam) || explicitDistrictFromInput(pathDistrict);
+  const initialModal = String(params.get('modal') || '').trim().toLowerCase();
   pathMode = loadPathMode();
   const initialDistrict = explicitDistrict;
   activeDistrict = initialDistrict;
@@ -8427,6 +9057,10 @@ async function bootstrapInitialRouteState() {
 
   if (isTownHub && initialDistrict) {
     await showDistrict(activeDistrict);
+  }
+
+  if (isTownHub && initialModal === 'trainer') {
+    await openTrainerModal().catch(() => { });
   }
 
   if (tokenErr) {

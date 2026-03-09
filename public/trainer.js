@@ -118,17 +118,22 @@
       seq: 1,
     },
     "trainer.invoke_action": {
-      actionId: "canvas.image",
+      webSessionId: "we_1234567890",
+      actionId: "save_draft",
+      idempotencyKey: "act-web-001",
+      expectedRevision: 1,
       params: {
-        teamCode: "TEAM-ABCD-EFGH",
+        draft: "Keep this local",
       },
     },
     "trainer.list_evidence": {
-      actionId: "canvas.image",
+      webSessionId: "we_1234567890",
       freshOnly: true,
     },
     "trainer.get_transcript_integrity": {},
-    "trainer.get_session_context": {},
+    "trainer.get_session_context": {
+      webSessionId: "we_1234567890",
+    },
     "trainer.explain_not_used": {
       actionId: "canvas.image",
     },
@@ -606,6 +611,14 @@
     return { value: raw };
   }
 
+  function cloneForToolResult(value, fallback = null) {
+    try {
+      return JSON.parse(JSON.stringify(value == null ? fallback : value));
+    } catch {
+      return fallback;
+    }
+  }
+
   function isToolCallable(gatewayApi, toolName) {
     if (!gatewayApi || !toolName) return false;
     if (isTrainerNamespaceToolName(toolName)) {
@@ -897,9 +910,9 @@
     await render();
     if (!silent) {
       if (deletedFiles > 0) {
-        setStatus(`Deleted trace for ${key}.`);
+        setStatus(`Deleted local trace cache for ${key}.`);
       } else {
-        setStatus(`No trace found for ${key}.`);
+        setStatus(`No local trace cache found for ${key}.`);
       }
     }
     return {
@@ -914,7 +927,7 @@
     const silent = options?.silent === true;
     const attemptCount = state.attempts.length;
     if (!attemptCount) {
-      if (!silent) setStatus("No attempts to clear.");
+      if (!silent) setStatus("No local cache attempts to clear.");
       return {
         ok: true,
         clearedAttempts: 0,
@@ -930,7 +943,7 @@
     await refreshBackupCache().catch(() => {});
     await refreshBuilderDiagnostics();
     await render();
-    if (!silent) setStatus(`Cleared ${attemptCount} attempt(s).`);
+    if (!silent) setStatus(`Cleared ${attemptCount} local cache attempt(s).`);
     return {
       ok: true,
       clearedAttempts: attemptCount,
@@ -969,7 +982,7 @@
       const remove = document.createElement("span");
       remove.className = "trainerAttemptDelete";
       remove.textContent = "[x]";
-      remove.title = `Delete trace ${attempt.attemptId || ""}`;
+      remove.title = `Delete local trace cache ${attempt.attemptId || ""}`;
       remove.setAttribute("data-testid", "trainer-attempt-delete");
       remove.tabIndex = 0;
       const onDelete = (event) => {
@@ -1524,12 +1537,13 @@
               ? Number(result.durationMs)
               : Date.now() - startedAt,
             request: result?.request || params,
-            response: normalizeToolInvocationResult(result?.response || result),
+            response: normalizeToolInvocationResult(cloneForToolResult(result?.response || result, {})),
             code: result?.code || null,
             message: result?.message || null,
             ...(result && typeof result === "object" ? {
               actionId: result.actionId || null,
-              evidence: Array.isArray(result.evidence) ? result.evidence : [],
+              evidence: Array.isArray(result.evidence) ? cloneForToolResult(result.evidence, []) : [],
+              invocation: cloneForToolResult(result.invocation, null),
               validation: result.validation || null,
             } : {}),
           }

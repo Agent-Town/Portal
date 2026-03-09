@@ -7,6 +7,389 @@
 - Human identity is a session cookie: `et_session`.
 - Agent identity is a **Team Code** shown to the human.
 
+## Portal Web + Registry contract
+
+All Portal Web and Registry routes use a stable envelope:
+
+Success:
+```json
+{
+  "ok": true,
+  "data": {},
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Failure:
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "INVALID_ARGUMENT",
+    "message": "Human-readable summary",
+    "retryable": false,
+    "details": {}
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+### POST `/api/web/resolve`
+Resolves a URL into supported integration metadata or a structured unsupported-site fallback.
+
+Request shape:
+```json
+{
+  "url": "https://github.com/openai/openai-codex/issues/1",
+  "preferredMode": "auto",
+  "sourceHints": {
+    "expectedPageClass": "issue_detail"
+  }
+}
+```
+
+Success notes:
+- Supported GitHub issue URLs return `data.resolutionState === "supported"` with `website`, `integration`, `alternatives`, and `fallback: null`.
+- Unsupported sites return `data.resolutionState === "unsupported"` with `fallback.reasonCode === "WEB_UNSUPPORTED_SITE"`.
+
+Failure codes:
+- `INVALID_ARGUMENT`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+
+### POST `/api/web/import`
+Queues a human-authenticated Web import request with idempotency and auditability.
+
+Request shape:
+```json
+{
+  "url": "https://example.com/",
+  "requestKind": "site_origin",
+  "parseFallbackAllowed": true,
+  "sourceHints": {
+    "expectedObjectKind": "website"
+  },
+  "idempotencyKey": "imp_..."
+}
+```
+
+Response fields:
+- `data.importJobId`
+- `data.status`
+- `data.requestKind`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `INVALID_ARGUMENT`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+
+### POST `/api/registry/import`
+Queues a human-authenticated Registry import request with the same idempotency and unsafe-target policy as `/api/web/import`.
+
+### POST `/api/web/sessions`
+Creates a durable Web Experience session bound to the current Portal session.
+
+Request shape:
+```json
+{
+  "url": "https://github.com/openai/openai-codex/issues/1",
+  "integrationRegistryId": "wi_github_issue_reply",
+  "versionId": "rv_github_issue_reply_v1",
+  "renderMode": "auto",
+  "autonomyMode": "assist"
+}
+```
+
+Response fields:
+- `data.session.webSessionId`
+- `data.session.teamCode`
+- `data.session.houseId`
+- `data.session.renderMode`
+- `data.session.autonomyMode`
+- `data.session.runtimeState`
+- `data.session.activeRevision`
+- `data.activeIntegration`
+- `data.policy.sameOriginOnlyDefault`
+
+### GET `/api/web/sessions/:id`
+Returns:
+- `data.session`
+- `data.activeIntegration`
+- `data.approvalQueue`
+- `data.lastCheckpoint`
+- `data.runtimeSnapshot`
+- `data.credentialStatusByOrigin`
+
+### POST `/api/web/sessions/:id/checkpoint`
+Writes a durable checkpoint and increments `activeRevision`.
+
+Request shape:
+```json
+{
+  "expectedRevision": 1,
+  "idempotencyKey": "ckp_...",
+  "checkpoint": {
+    "pageClass": "issue_detail",
+    "draftBuffers": {
+      "replyBody": "Draft body"
+    }
+  }
+}
+```
+
+Conflict failure:
+- `WEB_CHECKPOINT_CONFLICT`
+
+### POST `/api/web/sessions/:id/actions/:actionId/invoke`
+Invokes a durable Web action.
+
+Request shape:
+```json
+{
+  "expectedRevision": 2,
+  "idempotencyKey": "act_...",
+  "params": {
+    "draft": "Hello world"
+  },
+  "approvalId": "apr_...",
+  "credentialGrantId": "wcg_..."
+}
+```
+
+Implemented action policies:
+- `submit_reply` requires approval and an origin-scoped credential grant
+- `save_draft` succeeds without approval or credentials
+
+Failure codes:
+- `WEB_APPROVAL_REQUIRED`
+- `WEB_APPROVAL_EXPIRED`
+- `WEB_CREDENTIAL_REQUIRED`
+- `WEB_CREDENTIAL_SCOPE_MISMATCH`
+- `WEB_CHECKPOINT_CONFLICT`
+- `NOT_FOUND`
+
+### POST `/api/web/approvals/:approvalId/decision`
+Records a human approval decision and emits durable approval evidence.
+
+### GET `/api/web/sessions/:id/evidence`
+Returns newest-first evidence rows with:
+- `limit`
+- `cursor`
+- `freshOnly=true|false`
+
+### POST `/api/web/credentials/start`
+Starts an origin-scoped credential broker flow.
+
+Request shape:
+```json
+{
+  "webSessionId": "we_...",
+  "origin": "https://github.com",
+  "authClass": "oauth",
+  "scopes": ["repo:issue:write"]
+}
+```
+
+Response fields:
+- `data.brokerSessionId`
+- `data.approvalId`
+- `data.authUrl`
+
+## Poker operator + Portal mirror contract
+
+The operator `/v1/*` surface uses the same stable envelope as Portal Web and Registry.
+
+Protected operator mutation requirements:
+- `Authorization: Bearer <operator-or-portal-service-token>`
+- `Idempotency-Key: <stable-key>`
+
+### GET `/v1/health`
+Returns:
+- `data.status === "ok"`
+- `data.operatorVersion`
+- `data.schemaVersion`
+- `data.time`
+
+### GET `/v1/seasons`
+Query params:
+- `cursor`
+- `limit` default `20`, max `100`
+- `status`
+
+Returns:
+- `data.items[]`
+- `data.nextCursor`
+
+### GET `/v1/seasons/:seasonId`
+Returns:
+- season metadata
+- rules summary
+- divisions
+- submission window fields
+- `data.latestLeaderboardSnapshot`
+- `data.latestReplayHighlight`
+
+### POST `/v1/seasons`
+Protected operator route for season creation.
+
+Failure codes:
+- `POKER_OPERATOR_AUTH_REQUIRED`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/seasons/:seasonId/submissions`
+Protected Portal/operator route for bundle submission forwarding.
+
+Request shape:
+```json
+{
+  "portalSubmissionId": "portal-submit-open",
+  "submitterWallet": {
+    "chain": "solana",
+    "address": "So1anaMockResume11111111111111111111111111111"
+  },
+  "bundle": {
+    "contentAddress": "sha256:open-bundle",
+    "manifestHash": "sha256:open-manifest",
+    "artifactUri": "s3://operator/submissions/open.zip",
+    "entrypoint": "play.py"
+  },
+  "declaredCapabilities": {
+    "browserCompatible": false
+  }
+}
+```
+
+Stable failure codes:
+- `POKER_OPERATOR_AUTH_REQUIRED`
+- `POKER_SEASON_CLOSED`
+- `POKER_SUBMISSION_DUPLICATE`
+- `POKER_INVALID_BUNDLE`
+
+### POST `/v1/seasons/:seasonId/batches`
+Protected operator route for season evaluation batch creation.
+
+### GET `/v1/batches/:batchId`
+Returns:
+- `data.batchId`
+- `data.seasonId`
+- `data.batchKind`
+- `data.submissionIds`
+- `data.batchConfig`
+- `data.status`
+
+### GET `/v1/runs/:runId`
+Returns:
+- `data.runId`
+- `data.batchId`
+- `data.seasonId`
+- `data.summary`
+
+### GET `/v1/runs/:runId/replay`
+Returns:
+- `data.runId`
+- `data.replay.replayFormat === "poker-run-replay-v1"`
+- `data.replay.summaryJson`
+- `data.replay.eventsJsonlUri`
+- `data.replay.artifactSha256`
+- `data.replay.contentType`
+
+### GET `/v1/leaderboards/:seasonId/latest`
+Returns:
+- `data.seasonId`
+- `data.snapshotId`
+- `data.createdAt`
+- `data.rankings[]`
+
+### GET `/v1/leaderboards/:seasonId/snapshots/:snapshotId`
+Returns the requested snapshot with the same shape as `/latest`.
+
+### POST `/api/poker/admin/sync`
+Human-authenticated Portal admin route that validates operator schema/version and mirrors operator truth into durable Portal tables.
+
+Request shape:
+```json
+{
+  "seasonId": "pks_01"
+}
+```
+
+Response fields:
+- `data.operator`
+- `data.mirrored.seasons`
+- `data.mirrored.leaderboards`
+- `data.mirrored.batches`
+- `data.mirrored.runs`
+- `data.mirrored.replays`
+- `data.seasonIds`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+- `POKER_REPLAY_NOT_READY`
+
+### GET `/api/poker/seasons`
+Returns mirrored season summaries for the Portal poker index.
+
+### GET `/api/poker/seasons/:seasonId`
+Returns the mirrored season page payload with:
+- `data.season`
+- `data.season.latestLeaderboardSnapshot`
+- `data.season.latestReplayHighlight`
+
+### POST `/api/poker/seasons/:seasonId/submissions`
+Human-authenticated Portal proxy route for wallet-bound setup submissions.
+
+Request shape:
+```json
+{
+  "portalSubmissionId": "portal-submit-open",
+  "bundle": {
+    "contentAddress": "sha256:open-bundle",
+    "manifestHash": "sha256:open-manifest",
+    "artifactUri": "s3://operator/submissions/open.zip",
+    "entrypoint": "play.py"
+  },
+  "declaredCapabilities": {
+    "browserCompatible": false
+  },
+  "idempotencyKey": "poker-submit-open-001"
+}
+```
+
+Response fields:
+- `data.submission.submissionId`
+- `data.submission.portalSessionId`
+- `data.submission.walletSubject`
+- `data.submission.validation`
+- `data.replayed`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `POKER_SEASON_CLOSED`
+- `POKER_INVALID_BUNDLE`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+
+### GET `/api/poker/submissions/:submissionId`
+Returns the owning Portal session’s submission status page payload.
+
+### GET `/api/poker/leaderboards/:seasonId/latest`
+Returns the latest mirrored leaderboard snapshot.
+
+### GET `/api/poker/runs/:runId/replay`
+Returns the mirrored replay manifest after format and artifact-hash verification.
+
+Stable failure codes:
+- `POKER_REPLAY_NOT_READY`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+
 ---
 
 ## Agent solo session
@@ -198,6 +581,637 @@ Response shape:
   "stats": { "signups": 0, "publicTeams": 0 }
 }
 ```
+
+### GET `/api/platform/default-skill-pack` (human)
+Returns the deterministic internal pack compiled from `public/skill.md` for the default Portal experience.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "experienceId": "agent_town_coop_v1",
+    "packId": "pack_portal_onboarding_v1",
+    "packVersionId": "packv_<hash-prefix>",
+    "contentHash": "sha256:<manifest hash>",
+    "sourceRefs": [
+      {
+        "path": "/skill.md",
+        "hash": "sha256:<manual hash>"
+      }
+    ],
+    "fileHashes": {
+      "manual/skill.md": "sha256:<hash>",
+      "heartbeat.md": "sha256:<hash>",
+      "tools.md": "sha256:<hash>",
+      "trace_map.json": "sha256:<hash>"
+    },
+    "entryUrl": "/__compiled/default-skill-pack/skill.md",
+    "files": {
+      "manual/skill.md": "/__compiled/default-skill-pack/manual/skill.md",
+      "heartbeat.md": "/__compiled/default-skill-pack/heartbeat.md",
+      "tools.md": "/__compiled/default-skill-pack/tools.md",
+      "trace_map.json": "/__compiled/default-skill-pack/trace_map.json"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+### GET `/api/platform/context` (human)
+Returns the explicit House/team context resolved from the current Portal session.
+
+Response fields:
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### POST `/api/platform/active-team` (human)
+Sets the active House team for the current Portal session. This is the authoritative UI write path for House Archive and House Trainer when `teamId` is omitted from later reads.
+
+Request shape:
+```json
+{
+  "teamId": "team_alpha"
+}
+```
+
+Response fields:
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+### GET `/api/platform/archive` (human)
+Returns the canonical Archive list for the current active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.items[]`
+
+### GET `/api/platform/trainer` (human)
+Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.activeConfigVersionId`
+- `data.activeConfigHash`
+- `data.jobs[]`
+- `data.results[]`
+
+### POST `/api/platform/trainer/jobs` (human)
+Creates one House-scoped durable compare job for the current active team and replays idempotently.
+
+Required headers:
+- `Idempotency-Key`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `ACTIVE_CONFIG_REQUIRED`
+- `TRAINER_BUDGET_INVALID`
+- `INVALID_ARGUMENT`
+
+### POST `/api/platform/trainer/results/:trainerResultId/promote-patch` (human)
+Promotes one trainer patch from the current active House team and updates the active binding idempotently.
+
+Required headers:
+- `Idempotency-Key`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `APPROVAL_REQUIRED`
+- `CONFIG_NOT_FOUND`
+- `TRAINER_PATCH_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+### GET `/v1/houses/:houseId/team` (human + house-auth)
+Reads the effective team binding for one House, including the currently promoted immutable config version.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to the current session `activeTeamId`)
+
+Required headers:
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "houseId": "house_abc",
+    "teamId": "team_main",
+    "activeConfigVersionId": "cfg_01HR...",
+    "activeConfigHash": "sha256:<manifest hash>",
+    "binding": {
+      "teamBindingId": "tb_01H...",
+      "activeConfigVersionId": "cfg_01HR..."
+    },
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "configHash": "sha256:<manifest hash>",
+      "lineage": {
+        "parentConfigVersionIds": ["cfg_prev"]
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/houses/:houseId/configs` (human + house-auth)
+Creates one immutable candidate or active config version with resolved component version IDs and hashes.
+
+Request shape:
+```json
+{
+  "configVersionId": "cfg_01HR...",
+  "teamId": "team_main",
+  "displayVersion": "web-main@2026.03.09-1",
+  "branch": "season-lock",
+  "status": "candidate",
+  "parentConfigVersionIds": ["cfg_prev"],
+  "componentRefs": {
+    "housePolicyVersionId": "hpv_01",
+    "teamCompositionVersionId": "tcv_01",
+    "agentConfigVersionIds": ["agv_01", "agv_02"],
+    "officePolicyVersionIds": [],
+    "experiencePresetVersionId": "epv_01",
+    "integrationOverlayVersionIds": [],
+    "trainerPresetVersionId": "tpv_01"
+  }
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "configVersionId": "cfg_01HR...",
+    "status": "candidate",
+    "configHash": "sha256:<manifest hash>",
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "houseId": "house_abc",
+      "teamId": "team_main",
+      "status": "candidate",
+      "configHash": "sha256:<manifest hash>",
+      "manifest": {
+        "resolvedComponents": {
+          "housePolicyVersionId": "hpv_01"
+        },
+        "resolvedComponentHashes": {
+          "housePolicyVersionId": "sha256:<component hash>"
+        },
+        "integrity": {
+          "configHash": "sha256:<manifest hash>"
+        }
+      }
+    },
+    "componentVersions": [
+      {
+        "configComponentVersionId": "ccv_01H...",
+        "componentKind": "house_policy_version",
+        "componentKey": "housePolicyVersionId",
+        "immutableVersionId": "hpv_01",
+        "componentHash": "sha256:<component hash>"
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `CONFIG_COMPONENT_MUTABLE_REF`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/houses/:houseId/configs/:configVersionId/promote` (human + house-auth)
+Promotes an existing immutable config version by changing the active team binding, without mutating the historical config row.
+
+Request shape:
+```json
+{
+  "teamId": "team_main"
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "houseId": "house_abc",
+    "teamId": "team_main",
+    "activeConfigVersionId": "cfg_01HR...",
+    "binding": {
+      "teamBindingId": "tb_01H...",
+      "activeConfigVersionId": "cfg_01HR..."
+    },
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "configHash": "sha256:<manifest hash>"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `CONFIG_NOT_FOUND`
+- `CONFIG_PROMOTION_BLOCKED`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/integrations/resolve` (human + house-auth)
+Resolves one target URL into a deterministic integration candidate and stores that candidate durably for idempotent replay.
+
+Request shape:
+```json
+{
+  "targetUrl": "https://github.com/openai/openai-codex/issues/1",
+  "preferredMode": "auto",
+  "sourceHints": {}
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "integrationCandidateId": "intcand_01H...",
+    "resolutionState": "supported",
+    "sourceKind": "native_pack",
+    "requiresCompilation": false,
+    "targetUrl": "https://github.com/openai/openai-codex/issues/1",
+    "website": {
+      "registryId": "ws_github",
+      "origin": "https://github.com"
+    },
+    "integration": {
+      "integrationRegistryId": "wi_github_issue_reply",
+      "versionId": "rv_github_issue_reply_v1"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INTEGRATION_TARGET_UNSUPPORTED`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
+Creates one durable run row for the requested experience and binds the run to one declared trace authority.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "configVersionId": "cfg_01HR...",
+  "entryMode": "normal",
+  "metadata": {}
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "runId": "run_01H...",
+    "status": "queued",
+    "traceAuthorityType": "house_trace_ingester"
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `EXPERIENCE_NOT_FOUND`
+- `CONFIG_NOT_FOUND`
+- `CONFIG_NOT_ELIGIBLE`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/traces/ingestions` (house-auth)
+Accepts raw trace intake records for one run, dedupes by `ingestKey`, and emits canonical trace events through the run authority.
+
+Request shape:
+```json
+{
+  "runId": "run_01H...",
+  "records": [
+    {
+      "ingestKey": "worker_main:1",
+      "sourceType": "worker",
+      "payloadSchema": "raw.web.observation/v1",
+      "payload": {}
+    }
+  ]
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "runId": "run_01H...",
+    "accepted": 1,
+    "ignored": 0,
+    "rejected": 0,
+    "traceId": "trace_01H..."
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `RUN_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `TRACE_LATE_EVENT_REJECTED`
+- `TRACE_INTAKE_INVALID`
+
+### GET `/v1/traces/:traceId` (human + house-auth)
+Returns the durable trace summary for one canonical trace.
+
+Response fields:
+- `data.traceId`
+- `data.runId`
+- `data.eventCount`
+- `data.status`
+- `data.completedAt`
+- `data.traceAuthorityType`
+- `data.authority`
+
+### GET `/v1/traces/:traceId/events` (human + house-auth)
+Returns canonical events in ascending `seq` order by default.
+
+Query params:
+- `limit`
+- `cursor`
+
+Response fields:
+- `data.traceId`
+- `data.items[]`
+- `data.nextCursor`
+
+### POST `/v1/trainer/jobs` (human + house-auth)
+Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one trainer result.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "jobKind": "trainer_job.compare",
+  "targets": {
+    "configVersionIds": ["cfg_a", "cfg_b"]
+  },
+  "budget": {
+    "maxUsd": 5
+  }
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.trainerJobId`
+- `data.status`
+- `data.jobKind`
+- `data.result.trainerResultId` when a deterministic seeded result is emitted
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `TRAINER_JOB_KIND_INVALID`
+- `TRAINER_TARGET_INVALID`
+- `TRAINER_BUDGET_INVALID`
+- `INVALID_ARGUMENT`
+
+### GET `/v1/trainer/jobs/:trainerJobId` (human + house-auth)
+Returns one durable trainer job with its current stable status and latest trainer result summary when present.
+
+Response fields:
+- `data.trainerJobId`
+- `data.status`
+- `data.jobKind`
+- `data.targets`
+- `data.budget`
+- `data.result`
+
+### GET `/v1/trainer/results/:trainerResultId` (human + house-auth)
+Returns one durable trainer result artifact.
+
+Response fields:
+- `data.trainerResultId`
+- `data.trainerJobId`
+- `data.status`
+- `data.summary`
+- `data.candidatePatchIds[]`
+- `data.linkedConfigVersionId`
+- `data.approvalNeeded`
+
+### POST `/v1/trainer/results/:trainerResultId/promote-patch` (human + house-auth)
+Promotes one approved candidate patch into a new durable config version and updates the active team binding.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "candidatePatchId": "patch_fixture_01",
+  "approvalId": "appr_fixture_approved_01"
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.configVersionId`
+- `data.activeConfigVersionId`
+- `data.config`
+- `data.binding`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `APPROVAL_REQUIRED`
+- `CONFIG_NOT_FOUND`
+- `TRAINER_PATCH_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+### GET `/v1/seals/:sealedContextId` (human + house-auth)
+Returns one sealed-context metadata object.
+
+Response fields:
+- `data.sealedContextId`
+- `data.entrantId`
+- `data.scopeType`
+- `data.scopeKey`
+- `data.allowedReaders[]`
+- `data.forbiddenSources[]`
+- `data.releasePolicy`
+- `data.status`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+
+### POST `/v1/seals/:sealedContextId/release` (human + house-auth)
+Releases a sealed context only when its release policy allows manual release.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `SEAL_RELEASE_BLOCKED`
+
+### POST `/v1/seals/:sealedContextId/violation` (human + house-auth)
+Creates one durable sealed-context violation record.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+
+### POST `/v1/traces/poker-operator-ingestions` (human + house-auth)
+Accepts seeded operator JSONL-style records, creates one poker-authoritative run/trace, and maps each record into canonical entrant-private events.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "records": [
+    "{\"ingestKey\":\"op:1\",\"type\":\"hand_started\",\"entrantId\":\"entrant_fixture_alpha\"}"
+  ]
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.runId`
+- `data.traceId`
+- `data.eventCount`
+- `data.authority.type`
 
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
@@ -1959,6 +2973,50 @@ Errors:
 - `INVALID_AGENT_STATE`
 - `AGENT_STATE_TOO_LARGE`
 - `AGENT_STATE_HOUSE_MISMATCH`
+
+---
+
+## Test-only helper contracts
+
+These routes are available only in test mode and require the `x-test-reset` header.
+
+### GET `/__test__/route-manifest`
+Returns the deterministic route-owner manifest used by M20.8.
+
+Response fields:
+- `routes[].family`
+- `routes[].owner`
+
+### GET `/__test__/live-suites`
+Returns the machine-readable live-suite manifest.
+
+Response fields:
+- `suites[].suiteId`
+- `suites[].command`
+- `suites[].requiredEnv[]`
+- `suites[].requiredFlag`
+- `suites[].defaultMode`
+
+### POST `/__test__/otp/email/issue`
+Issues one deterministic test OTP for the requested inbox.
+
+### GET `/__test__/otp/email/latest`
+Returns the latest issued OTP for the requested inbox without consuming it.
+
+### POST `/__test__/otp/email/consume`
+Consumes one issued OTP and deterministically rejects replay.
+
+### GET `/__test__/otp/email/activity`
+Returns OTP adapter activity for local deterministic tests.
+
+### GET `/__test__/platform-export`
+Returns a deterministic durable-platform export snapshot with per-table counts.
+
+### POST `/__test__/platform-import`
+Imports one previously exported snapshot, optionally after a reset.
+
+### POST `/__test__/platform-verify`
+Verifies one exported snapshot against live rows and returns exact mismatches by `table` and immutable `id`.
 
 ---
 

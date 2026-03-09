@@ -41,6 +41,7 @@ function ensureDb() {
   const p = getStorePath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
   db = new DatabaseSync(p);
+  db.exec('PRAGMA foreign_keys = ON;');
   db.exec('PRAGMA journal_mode = WAL;');
   db.exec('PRAGMA synchronous = NORMAL;');
   db.exec('PRAGMA busy_timeout = 5000;');

@@ -1,0 +1,6 @@
+{
+  "family": "privy_email_otp_stub_seed",
+  "provider": "stub",
+  "email": "otp-stub@example.com",
+  "code": "246810"
+}

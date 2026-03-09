@@ -1,0 +1,17 @@
+{
+  "family": "portal_default_compiled_pack_expected",
+  "packVersionId": "pack_fixture_default_v1",
+  "contentHash": "sha256:fixture-default-pack",
+  "sourceRefs": [
+    {
+      "path": "/skill.md",
+      "kind": "same_origin_manual"
+    }
+  ],
+  "fileHashes": {
+    "manual/skill.md": "sha256:fixture-manual-skill",
+    "heartbeat.md": "sha256:fixture-heartbeat",
+    "tools.md": "sha256:fixture-tools",
+    "trace_map.json": "sha256:fixture-trace-map"
+  }
+}

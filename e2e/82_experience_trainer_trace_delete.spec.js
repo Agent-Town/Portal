@@ -34,7 +34,7 @@ test('trainer can delete one trace and clear all traces', async ({ page }) => {
   await page.getByTestId('trainer-attempt-delete').first().click();
 
   await expect(page.getByTestId('trainer-attempts').getByRole('button')).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator('#trainerStatusLine')).toContainText('Deleted trace');
+  await expect(page.locator('#trainerStatusLine')).toContainText('Deleted local trace cache');
 
   const afterSingleDeleteIds = await listTrainerAttemptIds(page);
   expect(afterSingleDeleteIds).toHaveLength(1);
@@ -42,7 +42,7 @@ test('trainer can delete one trace and clear all traces', async ({ page }) => {
   await page.getByTestId('trainer-clear-all').click();
 
   await expect(page.getByTestId('trainer-attempts')).toContainText('No attempts yet.', { timeout: 5000 });
-  await expect(page.locator('#trainerStatusLine')).toContainText('Cleared 1 attempt');
+  await expect(page.locator('#trainerStatusLine')).toContainText('Cleared 1 local cache attempt');
 
   const afterClearAllIds = await listTrainerAttemptIds(page);
   expect(afterClearAllIds).toHaveLength(0);

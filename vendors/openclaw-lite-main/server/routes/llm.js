@@ -266,6 +266,8 @@ function registerLlmRoutes(app) {
     const h = String(host || "").toLowerCase();
     if (!h) return false;
     if (h === "::1") return true;
+    if (h === "::") return true;
+    if (h.startsWith("::ffff:")) return isPrivateIpv4(h.slice("::ffff:".length));
     if (h.startsWith("fc") || h.startsWith("fd")) return true; // unique local
     if (h.startsWith("fe8") || h.startsWith("fe9") || h.startsWith("fea") || h.startsWith("feb")) return true; // link-local
     return false;
