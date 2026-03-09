@@ -228,6 +228,7 @@ function ensureDb() {
 
     CREATE TABLE IF NOT EXISTS sealed_contexts (
       sealed_context_id TEXT PRIMARY KEY,
+      house_id TEXT,
       trace_id TEXT,
       run_id TEXT,
       entrant_id TEXT NOT NULL,
@@ -297,6 +298,7 @@ function ensureDb() {
   ensureColumn(db, 'trace_events', 'actor_id', 'TEXT');
   ensureColumn(db, 'trace_events', 'sealed_context_id', 'TEXT');
   ensureColumn(db, 'trace_events', 'canonical_at', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'sealed_contexts', 'house_id', 'TEXT');
   return db;
 }
 
@@ -1270,6 +1272,189 @@ function upsertApprovalRecord({
   return getApprovalRecordById(normalizedApprovalId);
 }
 
+function mapSealedContextRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  const releasePolicy = parseJsonColumn(row.release_policy_json, {});
+  return {
+    sealedContextId: String(row.sealed_context_id || ''),
+    houseId: row.house_id ? String(row.house_id) : null,
+    traceId: row.trace_id ? String(row.trace_id) : null,
+    runId: row.run_id ? String(row.run_id) : null,
+    entrantId: String(row.entrant_id || ''),
+    scopeType: String(row.scope_type || ''),
+    scopeKey: String(row.scope_key || ''),
+    allowedReaders: parseJsonColumn(row.allowed_readers_json, []),
+    forbiddenSources: parseJsonColumn(row.forbidden_sources_json, []),
+    releasePolicy: typeof releasePolicy === 'string'
+      ? releasePolicy
+      : String(releasePolicy?.mode || ''),
+    releasePolicyMeta: typeof releasePolicy === 'object' && releasePolicy !== null
+      ? releasePolicy
+      : { mode: typeof releasePolicy === 'string' ? releasePolicy : '' },
+    status: String(row.status || ''),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getSealedContextById(sealedContextId = '') {
+  const normalizedSealedContextId = String(sealedContextId || '').trim();
+  if (!normalizedSealedContextId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM sealed_contexts
+    WHERE sealed_context_id = ?
+    LIMIT 1
+  `).get(normalizedSealedContextId);
+  return mapSealedContextRow(row);
+}
+
+function upsertSealedContext({
+  sealedContextId = '',
+  houseId = '',
+  traceId = '',
+  runId = '',
+  entrantId = '',
+  scopeType = '',
+  scopeKey = '',
+  allowedReaders = [],
+  forbiddenSources = [],
+  releasePolicy = 'manual',
+  status = 'active',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedSealedContextId = String(sealedContextId || '').trim();
+  const normalizedEntrantId = String(entrantId || '').trim();
+  const normalizedScopeType = String(scopeType || '').trim();
+  const normalizedScopeKey = String(scopeKey || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedSealedContextId || !normalizedEntrantId || !normalizedScopeType || !normalizedScopeKey || !normalizedStatus) {
+    throw new Error('SEALED_CONTEXT_INVALID');
+  }
+  const existing = getSealedContextById(normalizedSealedContextId);
+  const database = ensureDb();
+  const releasePolicyPayload = releasePolicy && typeof releasePolicy === 'object' && !Array.isArray(releasePolicy)
+    ? releasePolicy
+    : { mode: String(releasePolicy || '').trim() || 'manual' };
+  database.prepare(`
+    INSERT INTO sealed_contexts (
+      sealed_context_id,
+      house_id,
+      trace_id,
+      run_id,
+      entrant_id,
+      scope_type,
+      scope_key,
+      allowed_readers_json,
+      forbidden_sources_json,
+      release_policy_json,
+      status,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(sealed_context_id) DO UPDATE SET
+      house_id = excluded.house_id,
+      trace_id = excluded.trace_id,
+      run_id = excluded.run_id,
+      entrant_id = excluded.entrant_id,
+      scope_type = excluded.scope_type,
+      scope_key = excluded.scope_key,
+      allowed_readers_json = excluded.allowed_readers_json,
+      forbidden_sources_json = excluded.forbidden_sources_json,
+      release_policy_json = excluded.release_policy_json,
+      status = excluded.status,
+      updated_at = excluded.updated_at
+  `).run(
+    normalizedSealedContextId,
+    String(houseId || '').trim() || null,
+    String(traceId || '').trim() || null,
+    String(runId || '').trim() || null,
+    normalizedEntrantId,
+    normalizedScopeType,
+    normalizedScopeKey,
+    JSON.stringify(Array.isArray(allowedReaders) ? allowedReaders : []),
+    JSON.stringify(Array.isArray(forbiddenSources) ? forbiddenSources : []),
+    JSON.stringify(releasePolicyPayload),
+    normalizedStatus,
+    existing?.createdAt || nowIso,
+    nowIso,
+  );
+  return getSealedContextById(normalizedSealedContextId);
+}
+
+function updateSealedContextStatus({
+  sealedContextId = '',
+  status = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedSealedContextId = String(sealedContextId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedSealedContextId || !normalizedStatus) {
+    throw new Error('SEALED_CONTEXT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE sealed_contexts
+    SET status = ?,
+        updated_at = ?
+    WHERE sealed_context_id = ?
+  `).run(
+    normalizedStatus,
+    nowIso,
+    normalizedSealedContextId,
+  );
+  return getSealedContextById(normalizedSealedContextId);
+}
+
+function mapSealedContextViolationRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    sealedContextViolationId: String(row.sealed_context_violation_id || ''),
+    sealedContextId: String(row.sealed_context_id || ''),
+    actor: parseJsonColumn(row.actor_json, {}),
+    details: parseJsonColumn(row.details_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function createSealedContextViolation({
+  sealedContextViolationId = '',
+  sealedContextId = '',
+  actor = null,
+  details = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedSealedContextViolationId = String(sealedContextViolationId || '').trim();
+  const normalizedSealedContextId = String(sealedContextId || '').trim();
+  if (!normalizedSealedContextViolationId || !normalizedSealedContextId) {
+    throw new Error('SEALED_CONTEXT_VIOLATION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO sealed_context_violations (
+      sealed_context_violation_id,
+      sealed_context_id,
+      actor_json,
+      details_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?)
+  `).run(
+    normalizedSealedContextViolationId,
+    normalizedSealedContextId,
+    JSON.stringify(actor && typeof actor === 'object' ? actor : {}),
+    JSON.stringify(details && typeof details === 'object' ? details : {}),
+    nowIso,
+  );
+  const row = database.prepare(`
+    SELECT *
+    FROM sealed_context_violations
+    WHERE sealed_context_violation_id = ?
+    LIMIT 1
+  `).get(normalizedSealedContextViolationId);
+  return mapSealedContextViolationRow(row);
+}
+
 function mapRunRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -1682,6 +1867,7 @@ module.exports = {
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,
+  getSealedContextById,
   getTeamConfigBinding,
   getTrainerJobById,
   getTrainerJobByIdempotency,
@@ -1702,6 +1888,9 @@ module.exports = {
   loadFixtureFamily,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
+  createSealedContextViolation,
+  updateSealedContextStatus,
+  upsertSealedContext,
   updateTrainerJobStatus,
   updateTrainerResultLink,
   updateRunStatus,

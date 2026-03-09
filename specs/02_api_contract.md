@@ -953,6 +953,7 @@ Response fields:
 - `data.status`
 - `data.completedAt`
 - `data.traceAuthorityType`
+- `data.authority`
 
 ### GET `/v1/traces/:traceId/events` (human + house-auth)
 Returns canonical events in ascending `seq` order by default.
@@ -1059,6 +1060,68 @@ Stable failure codes:
 - `CONFIG_NOT_FOUND`
 - `TRAINER_PATCH_NOT_FOUND`
 - `INVALID_ARGUMENT`
+
+### GET `/v1/seals/:sealedContextId` (human + house-auth)
+Returns one sealed-context metadata object.
+
+Response fields:
+- `data.sealedContextId`
+- `data.entrantId`
+- `data.scopeType`
+- `data.scopeKey`
+- `data.allowedReaders[]`
+- `data.forbiddenSources[]`
+- `data.releasePolicy`
+- `data.status`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+
+### POST `/v1/seals/:sealedContextId/release` (human + house-auth)
+Releases a sealed context only when its release policy allows manual release.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `SEAL_RELEASE_BLOCKED`
+
+### POST `/v1/seals/:sealedContextId/violation` (human + house-auth)
+Creates one durable sealed-context violation record.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+
+### POST `/v1/traces/poker-operator-ingestions` (human + house-auth)
+Accepts seeded operator JSONL-style records, creates one poker-authoritative run/trace, and maps each record into canonical entrant-private events.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "records": [
+    "{\"ingestKey\":\"op:1\",\"type\":\"hand_started\",\"entrantId\":\"entrant_fixture_alpha\"}"
+  ]
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.runId`
+- `data.traceId`
+- `data.eventCount`
+- `data.authority.type`
 
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.

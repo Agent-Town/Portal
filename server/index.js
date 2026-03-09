@@ -90,6 +90,7 @@ const {
   createIntegrationExecution,
   createIntegrationPackVersion,
   createRun,
+  createSealedContextViolation,
   createTraceEvent,
   createTraceIntakeRecord,
   countUnifiedPlatformTableRows,
@@ -104,6 +105,7 @@ const {
   getRunByIdempotency,
   getRunById,
   getRunByTraceId,
+  getSealedContextById,
   getTeamConfigBinding,
   getTrainerJobById,
   getTrainerJobByIdempotency,
@@ -120,10 +122,12 @@ const {
   listUnifiedPlatformFixtureFamilies,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
+  updateSealedContextStatus,
   updateTrainerJobStatus,
   updateTrainerResultLink,
   updateRunStatus,
   upsertApprovalRecord,
+  upsertSealedContext,
   upsertTeamConfigBinding,
   upsertConfigVersion,
 } = require('./unified_platform_store');
@@ -5339,6 +5343,12 @@ app.get('/v1/traces/:traceId', (req, res) => {
     status: run.status,
     completedAt: run.completedAt,
     traceAuthorityType: run.traceAuthorityType,
+    authority: {
+      type: run.traceAuthorityType,
+      ref: run.traceAuthorityType === 'poker_operator'
+        ? 'svc_poker_operator'
+        : `house:${run.houseId || ''}`,
+    },
   }, { requestId });
 });
 
@@ -5718,6 +5728,272 @@ app.post('/v1/trainer/results/:trainerResultId/promote-patch', express.json({ li
     activeConfigVersionId: binding.activeConfigVersionId,
     config,
     binding,
+  }, { status: 201, requestId });
+});
+
+app.get('/v1/seals/:sealedContextId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
+  const sealedContext = getSealedContextById(sealedContextId);
+  if (!sealedContext) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Seal read authorization failed.', { requestId });
+  }
+  return sendPortalApiSuccess(res, {
+    sealedContextId: sealedContext.sealedContextId,
+    entrantId: sealedContext.entrantId,
+    scopeType: sealedContext.scopeType,
+    scopeKey: sealedContext.scopeKey,
+    allowedReaders: sealedContext.allowedReaders,
+    forbiddenSources: sealedContext.forbiddenSources,
+    releasePolicy: sealedContext.releasePolicy,
+    status: sealedContext.status,
+  }, { requestId });
+});
+
+app.post('/v1/seals/:sealedContextId/release', express.json({ limit: '32kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
+  const sealedContext = getSealedContextById(sealedContextId);
+  if (!sealedContext) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Seal release authorization failed.', { requestId });
+  }
+  if (sealedContext.status === 'released') {
+    return sendPortalApiSuccess(res, sealedContext, { requestId });
+  }
+  if (sealedContext.releasePolicy !== 'manual') {
+    return sendPortalApiError(res, 409, 'SEAL_RELEASE_BLOCKED', 'This sealed context cannot be manually released.', { requestId });
+  }
+  const updated = updateSealedContextStatus({
+    sealedContextId,
+    status: 'released',
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, updated, { requestId });
+});
+
+app.post('/v1/seals/:sealedContextId/violation', express.json({ limit: '32kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
+  const sealedContext = getSealedContextById(sealedContextId);
+  if (!sealedContext) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Seal violation authorization failed.', { requestId });
+  }
+  const actor = req.body?.actor && typeof req.body.actor === 'object' && !Array.isArray(req.body.actor)
+    ? req.body.actor
+    : {
+      actorType: 'human',
+      actorId: session.sessionId,
+    };
+  const details = req.body?.details && typeof req.body.details === 'object' && !Array.isArray(req.body.details)
+    ? req.body.details
+    : {};
+  const violation = createSealedContextViolation({
+    sealedContextViolationId: `sealvio_${randomHex(10)}`,
+    sealedContextId,
+    actor,
+    details,
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    sealedContextId,
+    violation,
+  }, { status: 201, requestId });
+});
+
+app.post('/v1/traces/poker-operator-ingestions', express.json({ limit: '128kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const records = parsePokerOperatorFixtureRecords(req.body?.records);
+  if (!idempotencyKey || !teamId || records.length === 0) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'teamId, records, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const replayedRun = getRunByIdempotency({
+    houseId: resolvedHouse.houseId,
+    idempotencyKey,
+  });
+  if (replayedRun && replayedRun.traceAuthorityType === 'poker_operator') {
+    return sendPortalApiSuccess(res, {
+      runId: replayedRun.runId,
+      traceId: replayedRun.traceId,
+      eventCount: listTraceEvents(replayedRun.traceId).length,
+      authority: {
+        type: 'poker_operator',
+      },
+    }, { requestId });
+  }
+
+  const run = createRun({
+    runId: `run_${randomHex(10)}`,
+    traceId: `trace_${randomHex(10)}`,
+    experienceId: 'arena.poker.season0',
+    houseId: resolvedHouse.houseId,
+    teamId,
+    configVersionId: '',
+    entryMode: 'season_lock',
+    status: 'queued',
+    traceAuthorityType: 'poker_operator',
+    metadata: {
+      authority: {
+        type: 'poker_operator',
+        ref: 'svc_poker_operator',
+      },
+      requestId,
+    },
+    idempotencyKey,
+    nowIso: nowIso(),
+  });
+
+  let latestEvent = null;
+  for (const record of records) {
+    const ingestKey = typeof record?.ingestKey === 'string' ? record.ingestKey.trim() : '';
+    const eventType = typeof record?.type === 'string' ? record.type.trim() : '';
+    const entrantId = typeof record?.entrantId === 'string' ? record.entrantId.trim() : '';
+    if (!ingestKey || !eventType || !entrantId) {
+      continue;
+    }
+    createTraceIntakeRecord({
+      traceIntakeRecordId: `intk_${randomHex(10)}`,
+      traceId: run.traceId,
+      runId: run.runId,
+      ingestKey,
+      sourceType: 'poker_operator',
+      payloadSchema: `raw.poker.operator.${eventType}/v1`,
+      payload: record,
+      createdAt: nowIso(),
+    });
+
+    const fixtureSealed = buildSeededSealedContextRecord({
+      houseId: resolvedHouse.houseId,
+      traceId: run.traceId,
+      runId: run.runId,
+      releasePolicy: 'post_match',
+      status: 'active',
+    });
+    const sealedContext = upsertSealedContext({
+      houseId: resolvedHouse.houseId,
+      sealedContextId: entrantId === fixtureSealed.entrantId
+        ? fixtureSealed.sealedContextId
+        : deriveDeterministicSealId(entrantId),
+      traceId: run.traceId,
+      runId: run.runId,
+      entrantId,
+      scopeType: 'entrant_private',
+      scopeKey: `poker:${entrantId}`,
+      allowedReaders: entrantId === fixtureSealed.entrantId
+        ? fixtureSealed.allowedReaders
+        : [entrantId, 'arbiter_fixture'],
+      forbiddenSources: fixtureSealed.forbiddenSources,
+      releasePolicy: 'post_match',
+      status: 'active',
+      nowIso: nowIso(),
+    });
+    const seq = latestEvent ? Number(latestEvent.seq || 0) + 1 : 1;
+    const payloadSchema = `et.trace.poker.${eventType}/v1`;
+    const eventHash = sha256PrefixedHex(JSON.stringify({
+      traceId: run.traceId,
+      runId: run.runId,
+      seq,
+      eventType,
+      entrantId,
+      prevEventHash: latestEvent?.eventHash || null,
+      payloadSchema,
+      payload: record,
+    }));
+    latestEvent = createTraceEvent({
+      eventId: `evt_${randomHex(10)}`,
+      traceId: run.traceId,
+      runId: run.runId,
+      seq,
+      eventKind: `poker.${eventType}`,
+      sourceType: 'poker_operator',
+      eventHash,
+      prevEventHash: latestEvent?.eventHash || null,
+      audience: {
+        class: 'ENTRANT',
+        houseId: resolvedHouse.houseId,
+        teamId,
+        entrantId,
+        readerIds: allowedReaderIdsFromSealedContext(sealedContext),
+      },
+      seal: {
+        active: true,
+        sealedContextId: sealedContext.sealedContextId,
+        releasePolicy: 'post_match',
+      },
+      actorKind: 'service',
+      actorId: 'svc_poker_operator',
+      sealedContextId: sealedContext.sealedContextId,
+      payload: {
+        payloadSchema,
+        payload: record,
+      },
+      createdAt: nowIso(),
+    });
+  }
+  const completedRun = updateRunStatus({
+    runId: run.runId,
+    status: 'completed',
+    completedAt: nowIso(),
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    runId: completedRun.runId,
+    traceId: completedRun.traceId,
+    eventCount: listTraceEvents(completedRun.traceId).length,
+    authority: {
+      type: 'poker_operator',
+    },
   }, { status: 201, requestId });
 });
 
@@ -6843,6 +7119,66 @@ function resolveApprovedTrainerPatchPromotion(approvalId, {
     },
     nowIso: nowIso(),
   });
+}
+
+function buildSeededSealedContextRecord({
+  houseId = '',
+  traceId = '',
+  runId = '',
+  releasePolicy = 'manual',
+  status = 'active',
+} = {}) {
+  const fixture = getUnifiedPlatformTestFixture('sealed_context_seed') || {};
+  const sealedFixture = fixture?.sealedContext && typeof fixture.sealedContext === 'object'
+    ? fixture.sealedContext
+    : {};
+  const allowedReaders = Array.isArray(sealedFixture.allowedReaders)
+    ? sealedFixture.allowedReaders
+    : [];
+  const forbiddenSources = Array.isArray(sealedFixture.forbiddenSources)
+    ? sealedFixture.forbiddenSources
+    : [];
+  return {
+    sealedContextId: String(sealedFixture.sealedContextId || `seal_${randomHex(10)}`),
+    traceId: String(traceId || '').trim() || null,
+    runId: String(runId || '').trim() || null,
+    entrantId: String(sealedFixture.entrantId || 'entrant_fixture_alpha'),
+    scopeType: String(sealedFixture.scopeType || 'entrant_private'),
+    scopeKey: String(sealedFixture.scopeKey || 'table-7'),
+    allowedReaders,
+    forbiddenSources,
+    releasePolicy,
+    status: String(status || sealedFixture.status || 'active'),
+    houseId: String(houseId || '').trim() || null,
+  };
+}
+
+function parsePokerOperatorFixtureRecords(records) {
+  const sourceRecords = Array.isArray(records) ? records : [];
+  return sourceRecords.map((entry) => {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) return entry;
+    if (typeof entry !== 'string') return null;
+    try {
+      return JSON.parse(entry);
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function deriveDeterministicSealId(entrantId) {
+  const normalizedEntrantId = String(entrantId || '').trim();
+  const digest = sha256PrefixedHex(`sealed:${normalizedEntrantId}`);
+  return `seal_${digest.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+}
+
+function allowedReaderIdsFromSealedContext(context) {
+  const readers = Array.isArray(context?.allowedReaders) ? context.allowedReaders : [];
+  return readers.map((entry) => {
+    if (typeof entry === 'string') return entry.trim();
+    if (entry && typeof entry === 'object' && typeof entry.actorId === 'string') return entry.actorId.trim();
+    return '';
+  }).filter(Boolean);
 }
 
 function getWebActionPolicy(actionId, webSession) {
@@ -11290,6 +11626,37 @@ if (process.env.NODE_ENV === 'test') {
       family: String(req.params.family || '').trim(),
       fixture,
     });
+  });
+
+  app.post('/__test__/unified-platform/sealed-contexts/seed', express.json({ limit: '32kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const seeded = buildSeededSealedContextRecord({
+      houseId,
+      traceId: typeof req.body?.traceId === 'string' ? req.body.traceId.trim() : '',
+      runId: typeof req.body?.runId === 'string' ? req.body.runId.trim() : '',
+      releasePolicy: typeof req.body?.releasePolicy === 'string' ? req.body.releasePolicy.trim() : 'manual',
+      status: typeof req.body?.status === 'string' ? req.body.status.trim() : 'active',
+    });
+    const context = upsertSealedContext({
+      houseId: seeded.houseId,
+      sealedContextId: seeded.sealedContextId,
+      traceId: seeded.traceId,
+      runId: seeded.runId,
+      entrantId: seeded.entrantId,
+      scopeType: seeded.scopeType,
+      scopeKey: seeded.scopeKey,
+      allowedReaders: seeded.allowedReaders,
+      forbiddenSources: seeded.forbiddenSources,
+      releasePolicy: seeded.releasePolicy,
+      status: seeded.status,
+      nowIso: nowIso(),
+    });
+    return res.json({ ok: true, sealedContext: context });
   });
 
   app.post('/__test__/unified-platform/config-versions', express.json({ limit: '64kb' }), (req, res) => {

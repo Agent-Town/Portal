@@ -394,6 +394,129 @@ async function promotePlatformTrainerResultPatch(request, {
   }
 }
 
+async function seedPlatformSealedContext(request, {
+  houseId = '',
+  releasePolicy = 'manual',
+  status = 'active',
+} = {}) {
+  const response = await request.post('/__test__/unified-platform/sealed-contexts/seed', {
+    headers: {
+      'content-type': 'application/json',
+      'x-test-reset': resetToken,
+    },
+    data: JSON.stringify({
+      houseId,
+      releasePolicy,
+      status,
+    }),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function getPlatformSealedContext(request, {
+  houseId = '',
+  houseAuthKey = '',
+  sealedContextId = '',
+  includeAuth = true,
+} = {}) {
+  const path = `/v1/seals/${encodeURIComponent(String(sealedContextId || '').trim())}`;
+  const response = await request.get(path, {
+    headers: includeAuth ? houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey) : {},
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function releasePlatformSealedContext(request, {
+  houseId = '',
+  houseAuthKey = '',
+  sealedContextId = '',
+  payload = {},
+  includeAuth = true,
+} = {}) {
+  const path = `/v1/seals/${encodeURIComponent(String(sealedContextId || '').trim())}/release`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      ...(includeAuth ? houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey) : {}),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function reportPlatformSealedContextViolation(request, {
+  houseId = '',
+  houseAuthKey = '',
+  sealedContextId = '',
+  payload = {},
+  includeAuth = true,
+} = {}) {
+  const path = `/v1/seals/${encodeURIComponent(String(sealedContextId || '').trim())}/violation`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      ...(includeAuth ? houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey) : {}),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function ingestPlatformPokerOperatorTrace(request, {
+  houseId = '',
+  houseAuthKey = '',
+  teamId = 'team_main',
+  records = [],
+  idempotencyKey = '',
+} = {}) {
+  const path = '/v1/traces/poker-operator-ingestions';
+  const body = JSON.stringify({
+    teamId,
+    records,
+  });
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function ingestPlatformTraceRecords(request, {
   houseId = '',
   houseAuthKey = '',
@@ -428,6 +551,24 @@ async function getPlatformTraceEvents(request, traceId) {
     headers: { 'x-test-reset': resetToken },
   });
   return await response.json();
+}
+
+async function getPlatformTraceSummary(request, {
+  houseId = '',
+  houseAuthKey = '',
+  traceId = '',
+} = {}) {
+  const path = `/v1/traces/${encodeURIComponent(String(traceId || '').trim())}`;
+  const response = await request.get(path, {
+    headers: houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
 }
 
 async function getPlatformConfigVersionRecord(request, configVersionId) {
@@ -470,13 +611,19 @@ module.exports = {
   getPlatformTeamBinding,
   getPlatformTrainerJob,
   getPlatformTrainerResult,
+  getPlatformSealedContext,
   getPlatformTraceEvents,
+  getPlatformTraceSummary,
   listPlatformFixtures,
+  ingestPlatformPokerOperatorTrace,
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,
   promotePlatformTrainerResultPatch,
   readWorkerSessionId,
+  releasePlatformSealedContext,
+  reportPlatformSealedContextViolation,
   resolvePlatformIntegration,
+  seedPlatformSealedContext,
   seedPlatformConfigVersion,
   setPlatformRunStatus,
 };
