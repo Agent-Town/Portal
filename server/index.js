@@ -92,6 +92,7 @@ const {
   getLatestTraceEvent,
   getRunByIdempotency,
   getRunById,
+  getRunByTraceId,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
@@ -3573,6 +3574,22 @@ const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
 const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
 const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
 
+function encodeTraceCursor(afterSeq) {
+  return Buffer.from(JSON.stringify({ afterSeq: Number(afterSeq || 0) }), 'utf8').toString('base64url');
+}
+
+function decodeTraceCursor(cursor) {
+  const normalizedCursor = typeof cursor === 'string' ? cursor.trim() : '';
+  if (!normalizedCursor) return 0;
+  try {
+    const parsed = JSON.parse(Buffer.from(normalizedCursor, 'base64url').toString('utf8'));
+    const afterSeq = Number(parsed?.afterSeq || 0);
+    return Number.isFinite(afterSeq) && afterSeq > 0 ? afterSeq : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function buildDefaultCompiledSkillPack() {
   const manualSkill = fs.readFileSync(path.join(PUBLIC_DIR, 'skill.md'), 'utf8');
   const heartbeat = [
@@ -4639,6 +4656,67 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
     ignored,
     rejected,
     traceId: run.traceId,
+  }, { requestId });
+});
+
+app.get('/v1/traces/:traceId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const traceId = typeof req.params?.traceId === 'string' ? req.params.traceId.trim() : '';
+  const run = getRunByTraceId(traceId);
+  if (!run) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trace not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Trace read authorization failed.', { requestId });
+  }
+  const events = listTraceEvents(traceId);
+  return sendPortalApiSuccess(res, {
+    traceId,
+    runId: run.runId,
+    eventCount: events.length,
+    status: run.status,
+    completedAt: run.completedAt,
+    traceAuthorityType: run.traceAuthorityType,
+  }, { requestId });
+});
+
+app.get('/v1/traces/:traceId/events', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const traceId = typeof req.params?.traceId === 'string' ? req.params.traceId.trim() : '';
+  const run = getRunByTraceId(traceId);
+  if (!run) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trace not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Trace read authorization failed.', { requestId });
+  }
+  const requestedLimit = Number(req.query?.limit || 50);
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, Math.floor(requestedLimit)) : 50;
+  const afterSeq = decodeTraceCursor(typeof req.query?.cursor === 'string' ? req.query.cursor : '');
+  const allEvents = listTraceEvents(traceId);
+  const filtered = allEvents.filter((event) => Number(event?.seq || 0) > afterSeq);
+  const items = filtered.slice(0, limit);
+  const nextCursor = filtered.length > items.length
+    ? encodeTraceCursor(items[items.length - 1]?.seq || 0)
+    : null;
+  return sendPortalApiSuccess(res, {
+    traceId,
+    items,
+    nextCursor,
   }, { requestId });
 });
 

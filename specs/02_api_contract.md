@@ -714,6 +714,29 @@ Stable failure codes:
 - `TRACE_LATE_EVENT_REJECTED`
 - `TRACE_INTAKE_INVALID`
 
+### GET `/v1/traces/:traceId` (human + house-auth)
+Returns the durable trace summary for one canonical trace.
+
+Response fields:
+- `data.traceId`
+- `data.runId`
+- `data.eventCount`
+- `data.status`
+- `data.completedAt`
+- `data.traceAuthorityType`
+
+### GET `/v1/traces/:traceId/events` (human + house-auth)
+Returns canonical events in ascending `seq` order by default.
+
+Query params:
+- `limit`
+- `cursor`
+
+Response fields:
+- `data.traceId`
+- `data.items[]`
+- `data.nextCursor`
+
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
 

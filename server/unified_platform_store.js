@@ -468,6 +468,19 @@ function getRunById(runId = '') {
   return mapRunRow(row);
 }
 
+function getRunByTraceId(traceId = '') {
+  const normalizedTraceId = String(traceId || '').trim();
+  if (!normalizedTraceId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM runs
+    WHERE trace_id = ?
+    LIMIT 1
+  `).get(normalizedTraceId);
+  return mapRunRow(row);
+}
+
 function getRunByIdempotency({ houseId = '', idempotencyKey = '' } = {}) {
   const normalizedHouseId = String(houseId || '').trim();
   const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
@@ -821,6 +834,7 @@ module.exports = {
   countPlatformTableRows,
   getConfigVersion,
   getRunById,
+  getRunByTraceId,
   getRunByIdempotency,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
