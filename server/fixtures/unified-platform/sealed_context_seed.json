@@ -1,0 +1,17 @@
+{
+  "family": "sealed_context_seed",
+  "sealedContext": {
+    "sealedContextId": "seal_fixture_01",
+    "entrantId": "entrant_fixture_alpha",
+    "scopeType": "entrant_private",
+    "scopeKey": "table-7",
+    "allowedReaders": [
+      "house_agent_alpha",
+      "arbiter_fixture"
+    ],
+    "forbiddenSources": [
+      "trainer_job.compare"
+    ],
+    "status": "active"
+  }
+}

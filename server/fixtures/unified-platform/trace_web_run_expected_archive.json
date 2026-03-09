@@ -1,0 +1,9 @@
+{
+  "family": "trace_web_run_expected_archive",
+  "traceId": "trace_fixture_web_01",
+  "runId": "run_fixture_web_01",
+  "eventCount": 1,
+  "accepted": 1,
+  "ignored": 0,
+  "rejected": 0
+}

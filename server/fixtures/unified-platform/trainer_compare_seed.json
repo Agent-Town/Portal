@@ -1,0 +1,15 @@
+{
+  "family": "trainer_compare_seed",
+  "job": {
+    "trainerJobId": "trainer_fixture_compare_01",
+    "jobKind": "trainer_job.compare",
+    "status": "queued"
+  },
+  "result": {
+    "trainerResultId": "trainer_result_fixture_01",
+    "candidatePatchIds": [
+      "patch_fixture_01"
+    ],
+    "approvalNeeded": true
+  }
+}

@@ -2,51 +2,69 @@ const { gotoAppWithLite } = require('./trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
-async function getUnifiedPlatformStats(request) {
-  const resp = await request.get('/__test__/unified-platform/stats', {
+async function getPlatformCounts(request) {
+  const response = await request.get('/__test__/unified-platform/stats', {
     headers: { 'x-test-reset': resetToken },
   });
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok()) {
-    throw new Error(`UNIFIED_PLATFORM_STATS_FAILED:${resp.status()}:${JSON.stringify(body)}`);
-  }
-  return body?.stats || { counts: {}, tables: [] };
+  const payload = await response.json();
+  return {
+    ok: payload?.ok === true,
+    counts: payload?.stats?.counts || {},
+  };
 }
 
-async function listUnifiedPlatformFixtureFamilies(request) {
-  const resp = await request.get('/__test__/unified-platform/fixtures', {
+async function getPlatformFixture(request, family) {
+  const response = await request.get(`/__test__/unified-platform/fixtures/${encodeURIComponent(String(family || ''))}`, {
     headers: { 'x-test-reset': resetToken },
   });
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok()) {
-    throw new Error(`UNIFIED_PLATFORM_FIXTURE_LIST_FAILED:${resp.status()}:${JSON.stringify(body)}`);
-  }
-  return Array.isArray(body?.families) ? body.families : [];
+  return await response.json();
 }
 
-async function getUnifiedPlatformFixture(request, family) {
-  const resp = await request.get(`/__test__/unified-platform/fixtures/${encodeURIComponent(String(family || ''))}`, {
+async function listPlatformFixtures(request) {
+  const response = await request.get('/__test__/unified-platform/fixtures', {
     headers: { 'x-test-reset': resetToken },
   });
-  const body = await resp.json().catch(() => ({}));
-  if (!resp.ok()) {
-    throw new Error(`UNIFIED_PLATFORM_FIXTURE_FAILED:${resp.status()}:${JSON.stringify(body)}`);
-  }
-  return body?.fixture || null;
+  return await response.json();
 }
 
-async function getWorkerSessionId(page) {
+async function readWorkerSessionId(page) {
+  await gotoAppWithLite(page);
+  await page.waitForFunction(async () => {
+    try {
+      if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
+        return false;
+      }
+      const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
+        runtimeContext: {
+          origin: window.location.origin,
+          teamCode: '',
+          houseId: '',
+        },
+        runtimeState: {},
+      });
+      const data = snapshot?.data || snapshot || null;
+      return typeof data?.sessionId === 'string' && data.sessionId.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }, null, { timeout: 10000 });
   return await page.evaluate(async () => {
-    const api = window.__openclawLiteTest;
-    if (!api || typeof api.getWorkerSessionId !== 'function') return '';
-    return await api.getWorkerSessionId();
+    const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: '',
+        houseId: '',
+      },
+      runtimeState: {},
+    });
+    const data = snapshot?.data || snapshot || null;
+    return String(data?.sessionId || '').trim();
   });
 }
 
 module.exports = {
-  getUnifiedPlatformFixture,
-  getUnifiedPlatformStats,
-  getWorkerSessionId,
-  gotoAppWithLite,
-  listUnifiedPlatformFixtureFamilies,
+  getPlatformCounts,
+  getPlatformFixture,
+  listPlatformFixtures,
+  readWorkerSessionId,
 };

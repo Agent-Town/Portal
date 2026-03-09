@@ -1,0 +1,22 @@
+{
+  "family": "trace_web_run_seed",
+  "run": {
+    "runId": "run_fixture_web_01",
+    "traceId": "trace_fixture_web_01",
+    "experienceId": "web_portal_demo",
+    "teamId": "team_main",
+    "configVersionId": "cfg_fixture_web_01",
+    "traceAuthorityType": "house_trace_ingester"
+  },
+  "records": [
+    {
+      "ingestKey": "worker_main:1",
+      "sourceType": "worker",
+      "payloadSchema": "raw.web.observation/v1",
+      "payload": {
+        "kind": "navigate",
+        "url": "https://example.com/"
+      }
+    }
+  ]
+}

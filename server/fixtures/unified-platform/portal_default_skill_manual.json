@@ -1,0 +1,12 @@
+{
+  "family": "portal_default_skill_manual",
+  "path": "/skill.md",
+  "experienceId": "agent_town_home",
+  "manual": "# Agent Town Skill\n\nFollow the shared-state co-op flow.\n",
+  "sourceRefs": [
+    {
+      "path": "/skill.md",
+      "kind": "same_origin_manual"
+    }
+  ]
+}
