@@ -462,6 +462,22 @@ let experienceIntentPonyState = {
   subject: '',
   draft: ''
 };
+let houseSurfaceState = {
+  activeSurface: '',
+  archive: {
+    loaded: false,
+    items: [],
+    selectedTraceId: '',
+    emptyStateText: 'No canonical traces archived yet.'
+  },
+  trainer: {
+    loaded: false,
+    jobs: [],
+    results: [],
+    selectedResultId: '',
+    emptyStateText: 'No durable trainer jobs yet.'
+  }
+};
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
 let townhallMintConfig = null;
@@ -1136,6 +1152,165 @@ async function loadDistrictView(district) {
     districtViewCache.set(safeDistrict, text);
   }
   return districtViewCache.get(safeDistrict);
+}
+
+function setHouseSurfaceStatus(text, isError = false) {
+  const node = el('houseSurfaceStatus');
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
+function setHouseSurfaceMode(mode) {
+  const activeMode = mode === 'archive' || mode === 'trainer' ? mode : '';
+  houseSurfaceState.activeSurface = activeMode;
+  const archivePanel = el('houseArchivePanel');
+  const trainerPanel = el('houseTrainerPanel');
+  const archiveBtn = el('houseArchiveBtn');
+  const trainerBtn = el('houseTrainerBtn');
+  if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
+  if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
+  if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
+  if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
+}
+
+function renderHouseArchiveSurface() {
+  const listNode = el('houseArchiveList');
+  const detailNode = el('houseArchiveDetail');
+  const emptyNode = el('houseArchiveEmpty');
+  if (!listNode || !detailNode || !emptyNode) return;
+  const items = Array.isArray(houseSurfaceState.archive.items) ? houseSurfaceState.archive.items : [];
+  listNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.archive.emptyStateText || 'No canonical traces archived yet.';
+  emptyNode.classList.toggle('is-hidden', items.length > 0);
+  if (!items.length) {
+    detailNode.textContent = 'Select a trace to inspect archive counters.';
+    return;
+  }
+
+  const selectedTraceId = houseSurfaceState.archive.selectedTraceId || String(items[0]?.traceId || '');
+  houseSurfaceState.archive.selectedTraceId = selectedTraceId;
+  const selectedItem = items.find((item) => String(item?.traceId || '') === selectedTraceId) || items[0];
+
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(item?.traceId || '') === selectedItem.traceId ? ' primary' : ''}`;
+    button.dataset.traceId = String(item?.traceId || '');
+    button.textContent = `${String(item?.traceId || '')} · ${String(item?.status || '')}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.archive.selectedTraceId = String(item?.traceId || '');
+      renderHouseArchiveSurface();
+    });
+    listNode.appendChild(button);
+  });
+
+  const counters = selectedItem?.archiveCounters && typeof selectedItem.archiveCounters === 'object'
+    ? selectedItem.archiveCounters
+    : { accepted: 0, ignored: 0, rejected: 0 };
+  detailNode.textContent = `Trace ${String(selectedItem?.traceId || '')} · accepted ${Number(counters.accepted || 0)} · ignored ${Number(counters.ignored || 0)} · rejected ${Number(counters.rejected || 0)}`;
+}
+
+function renderHouseTrainerSurface() {
+  const jobsNode = el('houseTrainerJobs');
+  const resultsNode = el('houseTrainerResults');
+  const detailNode = el('houseTrainerDetail');
+  const emptyNode = el('houseTrainerEmpty');
+  if (!jobsNode || !resultsNode || !detailNode || !emptyNode) return;
+  const jobs = Array.isArray(houseSurfaceState.trainer.jobs) ? houseSurfaceState.trainer.jobs : [];
+  const results = Array.isArray(houseSurfaceState.trainer.results) ? houseSurfaceState.trainer.results : [];
+  jobsNode.innerHTML = '';
+  resultsNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.trainer.emptyStateText || 'No durable trainer jobs yet.';
+  emptyNode.classList.toggle('is-hidden', jobs.length > 0 || results.length > 0);
+  if (!jobs.length && !results.length) {
+    detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
+    return;
+  }
+
+  const selectedResultId = houseSurfaceState.trainer.selectedResultId || String(results[0]?.trainerResultId || '');
+  houseSurfaceState.trainer.selectedResultId = selectedResultId;
+  const selectedResult = results.find((item) => String(item?.trainerResultId || '') === selectedResultId) || results[0] || null;
+
+  jobs.forEach((job) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.dataset.trainerJobId = String(job?.trainerJobId || '');
+    button.textContent = `${String(job?.trainerJobId || '')} · ${String(job?.jobKind || '')} · ${String(job?.status || '')}`;
+    jobsNode.appendChild(button);
+  });
+
+  results.forEach((result) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(result?.trainerResultId || '') === String(selectedResult?.trainerResultId || '') ? ' primary' : ''}`;
+    button.dataset.trainerResultId = String(result?.trainerResultId || '');
+    const approvalLabel = result?.approvalNeeded === true ? 'approval needed' : 'read-only';
+    button.textContent = `${String(result?.trainerResultId || '')} · ${approvalLabel}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.trainer.selectedResultId = String(result?.trainerResultId || '');
+      renderHouseTrainerSurface();
+    });
+    resultsNode.appendChild(button);
+  });
+
+  if (!selectedResult) {
+    detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
+    return;
+  }
+  const linkedConfigVersionId = String(selectedResult?.linkedConfigVersionId || '').trim();
+  const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
+  const approvalText = selectedResult?.approvalNeeded === true ? 'approval needed' : 'ready';
+  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · ${approvalText} · config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
+}
+
+async function loadHouseArchiveSurface() {
+  setHouseSurfaceMode('archive');
+  setHouseSurfaceStatus('Loading canonical archive...');
+  try {
+    const response = await api('/api/platform/archive?teamId=team_main');
+    const data = response?.data || response || {};
+    houseSurfaceState.archive.loaded = true;
+    houseSurfaceState.archive.items = Array.isArray(data.items) ? data.items : [];
+    houseSurfaceState.archive.emptyStateText = String(data.emptyStateText || 'No canonical traces archived yet.');
+    if (!houseSurfaceState.archive.selectedTraceId && houseSurfaceState.archive.items[0]?.traceId) {
+      houseSurfaceState.archive.selectedTraceId = String(houseSurfaceState.archive.items[0].traceId);
+    }
+    renderHouseArchiveSurface();
+    setHouseSurfaceStatus(houseSurfaceState.archive.items.length ? '' : houseSurfaceState.archive.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.archive.loaded = true;
+    houseSurfaceState.archive.items = [];
+    renderHouseArchiveSurface();
+    setHouseSurfaceStatus(`Archive unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseTrainerSurface() {
+  setHouseSurfaceMode('trainer');
+  setHouseSurfaceStatus('Loading durable trainer records...');
+  try {
+    const response = await api('/api/platform/trainer?teamId=team_main');
+    const data = response?.data || response || {};
+    houseSurfaceState.trainer.loaded = true;
+    houseSurfaceState.trainer.jobs = Array.isArray(data.jobs) ? data.jobs : [];
+    houseSurfaceState.trainer.results = Array.isArray(data.results) ? data.results : [];
+    houseSurfaceState.trainer.emptyStateText = String(data.emptyStateText || 'No durable trainer jobs yet.');
+    if (!houseSurfaceState.trainer.selectedResultId && houseSurfaceState.trainer.results[0]?.trainerResultId) {
+      houseSurfaceState.trainer.selectedResultId = String(houseSurfaceState.trainer.results[0].trainerResultId);
+    }
+    renderHouseTrainerSurface();
+    setHouseSurfaceStatus(houseSurfaceState.trainer.jobs.length || houseSurfaceState.trainer.results.length
+      ? ''
+      : houseSurfaceState.trainer.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.trainer.loaded = true;
+    houseSurfaceState.trainer.jobs = [];
+    houseSurfaceState.trainer.results = [];
+    renderHouseTrainerSurface();
+    setHouseSurfaceStatus(`Trainer unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
 }
 
 const townhallDraftFieldIds = [
@@ -3328,6 +3503,34 @@ function bindTownDistrictControls() {
       }
     };
   }
+
+  const houseArchiveBtn = el('houseArchiveBtn');
+  if (houseArchiveBtn) {
+    houseArchiveBtn.onclick = async () => {
+      houseArchiveBtn.disabled = true;
+      try {
+        await loadHouseArchiveSurface();
+      } finally {
+        houseArchiveBtn.disabled = false;
+      }
+    };
+  }
+
+  const houseTrainerBtn = el('houseTrainerBtn');
+  if (houseTrainerBtn) {
+    houseTrainerBtn.onclick = async () => {
+      houseTrainerBtn.disabled = true;
+      try {
+        await loadHouseTrainerSurface();
+      } finally {
+        houseTrainerBtn.disabled = false;
+      }
+    };
+  }
+
+  setHouseSurfaceMode(houseSurfaceState.activeSurface);
+  renderHouseArchiveSurface();
+  renderHouseTrainerSurface();
 }
 
 function isBlankOrModifierClick(event) {

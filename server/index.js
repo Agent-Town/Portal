@@ -116,12 +116,14 @@ const {
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listRuns,
   listTrainerJobs,
   listTrainerResults,
   listTraceEvents,
   listUnifiedPlatformFixtureFamilies,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
+  updateRunMetadata,
   updateSealedContextStatus,
   updateTrainerJobStatus,
   updateTrainerResultLink,
@@ -3897,6 +3899,97 @@ app.get('/api/platform/default-skill-pack', (_req, res) => {
   return sendPortalApiSuccess(res, pack.manifest, { requestId });
 });
 
+app.get('/api/platform/archive', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+  if (!houseId) {
+    return sendPortalApiSuccess(res, {
+      houseId: null,
+      items: [],
+      emptyStateText: 'No canonical traces archived yet.',
+    }, { requestId });
+  }
+  const items = listRuns({ houseId, teamId }).map((run) => {
+    const events = listTraceEvents(run.traceId);
+    const archiveCounters = run?.metadata?.archiveCounters && typeof run.metadata.archiveCounters === 'object'
+      ? run.metadata.archiveCounters
+      : { accepted: events.length, ignored: 0, rejected: 0 };
+    return {
+      traceId: run.traceId,
+      runId: run.runId,
+      status: run.status,
+      traceAuthorityType: run.traceAuthorityType,
+      eventCount: events.length,
+      archiveCounters,
+      createdAt: run.createdAt,
+      updatedAt: run.updatedAt,
+    };
+  });
+  return sendPortalApiSuccess(res, {
+    houseId,
+    items,
+    emptyStateText: 'No canonical traces archived yet.',
+  }, { requestId });
+});
+
+app.get('/api/platform/trainer', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+  if (!houseId) {
+    return sendPortalApiSuccess(res, {
+      houseId: null,
+      jobs: [],
+      results: [],
+      emptyStateText: 'No durable trainer jobs yet.',
+    }, { requestId });
+  }
+  const jobs = listTrainerJobs({ houseId, teamId }).map((job) => {
+    const result = getTrainerResultByJobId(job.trainerJobId);
+    return {
+      trainerJobId: job.trainerJobId,
+      teamId: job.teamId,
+      jobKind: job.jobKind,
+      status: job.status,
+      targets: job.targets,
+      budget: job.budget,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      result: result ? {
+        trainerResultId: result.trainerResultId,
+        status: result.status,
+        approvalNeeded: result.approvalNeeded,
+      } : null,
+    };
+  });
+  const results = listTrainerResults({ houseId, teamId }).map((result) => ({
+    trainerResultId: result.trainerResultId,
+    trainerJobId: result.trainerJobId,
+    status: result.status,
+    summary: String(result?.result?.summary || ''),
+    candidatePatchIds: result.candidatePatchIds,
+    linkedConfigVersionId: result.linkedConfigVersionId,
+    approvalNeeded: result.approvalNeeded,
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+  }));
+  return sendPortalApiSuccess(res, {
+    houseId,
+    jobs,
+    results,
+    emptyStateText: 'No durable trainer jobs yet.',
+  }, { requestId });
+});
+
 // Rotates the human session cookie to a fresh session/team code.
 // Useful for shared devices where multiple people onboard sequentially.
 app.post('/api/session/reset', (req, res) => {
@@ -5309,6 +5402,23 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
     accepted += 1;
   }
 
+  const currentRun = getRunById(runId);
+  const priorCounters = currentRun?.metadata?.archiveCounters && typeof currentRun.metadata.archiveCounters === 'object'
+    ? currentRun.metadata.archiveCounters
+    : {};
+  updateRunMetadata({
+    runId,
+    metadata: {
+      ...(currentRun?.metadata && typeof currentRun.metadata === 'object' ? currentRun.metadata : {}),
+      archiveCounters: {
+        accepted: Number(priorCounters.accepted || 0) + accepted,
+        ignored: Number(priorCounters.ignored || 0) + ignored,
+        rejected: Number(priorCounters.rejected || 0) + rejected,
+      },
+    },
+    nowIso: nowIso(),
+  });
+
   return sendPortalApiSuccess(res, {
     runId,
     accepted,
@@ -5349,6 +5459,9 @@ app.get('/v1/traces/:traceId', (req, res) => {
         ? 'svc_poker_operator'
         : `house:${run.houseId || ''}`,
     },
+    archiveCounters: run?.metadata?.archiveCounters && typeof run.metadata.archiveCounters === 'object'
+      ? run.metadata.archiveCounters
+      : { accepted: events.length, ignored: 0, rejected: 0 },
   }, { requestId });
 });
 
@@ -5981,6 +6094,23 @@ app.post('/v1/traces/poker-operator-ingestions', express.json({ limit: '128kb' }
       createdAt: nowIso(),
     });
   }
+  const eventCount = listTraceEvents(run.traceId).length;
+  const runWithCounters = updateRunMetadata({
+    runId: run.runId,
+    metadata: {
+      ...(run.metadata && typeof run.metadata === 'object' ? run.metadata : {}),
+      authority: {
+        type: 'poker_operator',
+        ref: 'svc_poker_operator',
+      },
+      archiveCounters: {
+        accepted: eventCount,
+        ignored: 0,
+        rejected: 0,
+      },
+    },
+    nowIso: nowIso(),
+  });
   const completedRun = updateRunStatus({
     runId: run.runId,
     status: 'completed',
@@ -5990,7 +6120,7 @@ app.post('/v1/traces/poker-operator-ingestions', express.json({ limit: '128kb' }
   return sendPortalApiSuccess(res, {
     runId: completedRun.runId,
     traceId: completedRun.traceId,
-    eventCount: listTraceEvents(completedRun.traceId).length,
+    eventCount: runWithCounters?.metadata?.archiveCounters?.accepted || eventCount,
     authority: {
       type: 'poker_operator',
     },
@@ -11781,6 +11911,21 @@ if (process.env.NODE_ENV === 'test') {
     if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
     bindSessionWallet(s, chain, address, { allowRebind: true });
     res.json({ ok: true, sessionId: s.sessionId, chain, address });
+  });
+
+  app.post('/__test__/session/attach-house', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    if (!houseId) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const session = ensureHumanSession(req, res);
+    session.houseCeremony = session.houseCeremony || {};
+    session.houseCeremony.houseId = houseId;
+    session.houseCeremony.createdAt = session.houseCeremony.createdAt || nowIso();
+    indexHouseId(session, houseId);
+    return res.json({ ok: true, houseId, sessionId: session.sessionId });
   });
 
   app.post('/__test__/poker/operator-fixture', (req, res) => {

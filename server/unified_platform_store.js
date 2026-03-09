@@ -1614,6 +1614,67 @@ function updateRunStatus({
   return getRunById(normalizedRunId);
 }
 
+function updateRunMetadata({
+  runId = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedRunId = String(runId || '').trim();
+  if (!normalizedRunId) {
+    throw new Error('RUN_METADATA_INVALID');
+  }
+  const current = getRunById(normalizedRunId);
+  if (!current) return null;
+  const nextMetadata = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? metadata
+    : {};
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE runs
+    SET metadata_json = ?,
+        updated_at = ?
+    WHERE run_id = ?
+  `).run(
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedRunId,
+  );
+  return getRunById(normalizedRunId);
+}
+
+function listRuns({
+  houseId = '',
+  teamId = '',
+  traceAuthorityType = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTraceAuthorityType = String(traceAuthorityType || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  if (normalizedTraceAuthorityType) {
+    clauses.push('trace_authority_type = ?');
+    args.push(normalizedTraceAuthorityType);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM runs
+    ${whereSql}
+    ORDER BY created_at DESC, run_id DESC
+  `).all(...args);
+  return rows.map(mapRunRow).filter(Boolean);
+}
+
 function mapTraceIntakeRecordRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -1880,6 +1941,7 @@ module.exports = {
   getPlatformTableCounts,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listRuns,
   listTrainerJobs,
   listTrainerResults,
   listTraceEvents,
@@ -1889,6 +1951,7 @@ module.exports = {
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   createSealedContextViolation,
+  updateRunMetadata,
   updateSealedContextStatus,
   upsertSealedContext,
   updateTrainerJobStatus,

@@ -84,3 +84,40 @@
   </div>
   <div class="small" id="openError" style="color: var(--bad);"></div>
 </div>
+
+<div class="divider"></div>
+
+<div class="panel" id="houseConsolePanel" data-testid="house-console-panel">
+  <h2 style="margin:0 0 6px">House Console</h2>
+  <p class="small" style="margin-top:0">
+    Read-only access to the canonical archive and durable trainer outputs for this house.
+  </p>
+  <div class="kv" style="margin-bottom:8px;">
+    <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
+    <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
+  </div>
+  <div class="small" id="houseSurfaceStatus" style="min-height:1.4em;"></div>
+</div>
+
+<div class="panel is-hidden" id="houseArchivePanel" data-testid="house-archive-panel">
+  <h2 style="margin:0 0 6px">House Archive</h2>
+  <p class="small" style="margin-top:0">
+    Canonical traces stay in the archive even if local trainer cache entries are deleted.
+  </p>
+  <div class="small" id="houseArchiveEmpty" data-testid="house-archive-empty">No canonical traces archived yet.</div>
+  <div class="kv stack" id="houseArchiveList" data-testid="house-archive-list"></div>
+  <div class="small" id="houseArchiveDetail" data-testid="house-archive-detail">Select a trace to inspect archive counters.</div>
+</div>
+
+<div class="panel is-hidden" id="houseTrainerPanel" data-testid="house-trainer-panel">
+  <h2 style="margin:0 0 6px">House Trainer</h2>
+  <p class="small" style="margin-top:0">
+    Durable `trainer_job.*` jobs and results stay separate from runtime `trainer.*` tools.
+  </p>
+  <div class="small" id="houseTrainerEmpty" data-testid="house-trainer-empty">No durable trainer jobs yet.</div>
+  <div class="small" style="margin:10px 0 4px;">Jobs</div>
+  <div class="kv stack" id="houseTrainerJobs" data-testid="house-trainer-jobs"></div>
+  <div class="small" style="margin:10px 0 4px;">Results</div>
+  <div class="kv stack" id="houseTrainerResults" data-testid="house-trainer-results"></div>
+  <div class="small" id="houseTrainerDetail" data-testid="house-trainer-detail">Select a trainer result to inspect linked config refs.</div>
+</div>

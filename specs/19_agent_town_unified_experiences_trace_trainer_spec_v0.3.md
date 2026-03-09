@@ -1265,6 +1265,7 @@ Ship:
 
 Ship:
 
+- minimal modal-first Trainer and Archive House read surfaces first,
 - Trainer, Archive, Workshop, Inbox House surfaces,
 - config lineage UI,
 - recommendation promotion flows.
