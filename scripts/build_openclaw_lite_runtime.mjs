@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 
 const execAsync = promisify(exec);
 
@@ -31,6 +32,14 @@ async function ensureDir(dirPath) {
 async function readJson(filePath) {
   const raw = await fs.readFile(filePath, 'utf8');
   return JSON.parse(raw);
+}
+
+async function readJsonIfExists(filePath) {
+  try {
+    return await readJson(filePath);
+  } catch {
+    return null;
+  }
 }
 
 async function buildVendorProject() {
@@ -78,7 +87,7 @@ async function copyVendorBuildArtifacts() {
       copied.push(file);
     }
   }
-  return copied;
+  return copied.sort();
 }
 
 async function copySharedModules() {
@@ -123,16 +132,58 @@ async function assertRuntimeFilesPresent() {
   }
 }
 
-async function writeBuildInfo({ vendorVersion, copiedArtifacts, copiedShared }) {
-  const payload = {
+function buildInfoIdentity(payload) {
+  return JSON.stringify({
+    vendorPath: 'vendors/openclaw-lite-main',
+    vendorVersion: typeof payload?.vendorVersion === 'string' ? payload.vendorVersion : '',
+    copiedArtifacts: Array.isArray(payload?.copiedArtifacts) ? [...payload.copiedArtifacts].sort() : [],
+    copiedShared: Array.isArray(payload?.copiedShared) ? [...payload.copiedShared].sort() : []
+  });
+}
+
+export function createBuildInfoPayload({ vendorVersion, copiedArtifacts, copiedShared, builtAt }) {
+  return {
     vendorPath: 'vendors/openclaw-lite-main',
     vendorVersion,
-    builtAt: new Date().toISOString(),
-    copiedArtifacts,
-    copiedShared
+    builtAt: typeof builtAt === 'string' && builtAt.trim() ? builtAt.trim() : new Date().toISOString(),
+    copiedArtifacts: Array.isArray(copiedArtifacts) ? [...copiedArtifacts].sort() : [],
+    copiedShared: Array.isArray(copiedShared) ? [...copiedShared].sort() : []
   };
+}
+
+export function stabilizeBuildInfoPayload({ nextPayload, existingPayload }) {
+  const existingBuiltAt = typeof existingPayload?.builtAt === 'string' ? existingPayload.builtAt.trim() : '';
+  if (existingBuiltAt && buildInfoIdentity(existingPayload) === buildInfoIdentity(nextPayload)) {
+    return {
+      ...nextPayload,
+      builtAt: existingBuiltAt
+    };
+  }
+  return nextPayload;
+}
+
+async function writeFileIfChanged(filePath, nextContent) {
+  try {
+    const existingContent = await fs.readFile(filePath, 'utf8');
+    if (existingContent === nextContent) return false;
+  } catch {
+    // Missing target is fine; we'll create it below.
+  }
+  await fs.writeFile(filePath, nextContent);
+  return true;
+}
+
+async function writeBuildInfo({ vendorVersion, copiedArtifacts, copiedShared }) {
   const target = path.join(outRoot, 'build-info.json');
-  await fs.writeFile(target, JSON.stringify(payload, null, 2));
+  const existingPayload = await readJsonIfExists(target);
+  const nextPayload = stabilizeBuildInfoPayload({
+    nextPayload: createBuildInfoPayload({ vendorVersion, copiedArtifacts, copiedShared }),
+    existingPayload
+  });
+  if (existingPayload && JSON.stringify(existingPayload) === JSON.stringify(nextPayload)) {
+    return;
+  }
+  await writeFileIfChanged(target, `${JSON.stringify(nextPayload, null, 2)}\n`);
 }
 
 async function main() {
@@ -163,8 +214,13 @@ async function main() {
   console.log(`[openclaw-lite] sync complete. Artifacts: ${copiedArtifacts.length}, Shared: ${copiedShared.length}`);
 }
 
-main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(String(err?.stack || err?.message || err));
-  process.exit(1);
-});
+const thisFilePath = fileURLToPath(import.meta.url);
+const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
+
+if (invokedPath === thisFilePath) {
+  main().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error(String(err?.stack || err?.message || err));
+    process.exit(1);
+  });
+}
