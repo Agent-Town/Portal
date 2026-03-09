@@ -99,6 +99,7 @@ const {
   listTraceEvents,
   listUnifiedPlatformFixtureFamilies,
   resetUnifiedPlatformStore,
+  updateRunStatus,
   upsertConfigVersion,
 } = require('./unified_platform_store');
 const {
@@ -4539,10 +4540,14 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
   let ignored = 0;
   let rejected = 0;
   let latestEvent = getLatestTraceEvent(run.traceId);
+  const runStatus = String(run.status || '').trim().toLowerCase();
   for (const record of records) {
     const ingestKey = typeof record?.ingestKey === 'string' ? record.ingestKey.trim() : '';
     const sourceType = typeof record?.sourceType === 'string' ? record.sourceType.trim() : '';
     const payloadSchema = typeof record?.payloadSchema === 'string' ? record.payloadSchema.trim() : '';
+    const recordKind = typeof record?.recordKind === 'string' && record.recordKind.trim()
+      ? record.recordKind.trim()
+      : (typeof record?.payload?.kind === 'string' && record.payload.kind.trim() === 'annotation' ? 'annotation' : 'fact');
     const payload = record?.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
       ? record.payload
       : {};
@@ -4555,6 +4560,15 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
       ignored += 1;
       continue;
     }
+    if (runStatus === 'completed' && recordKind !== 'annotation') {
+      return sendPortalApiError(
+        res,
+        409,
+        'TRACE_LATE_EVENT_REJECTED',
+        'Completed runs reject fact-changing late intake records.',
+        { requestId }
+      );
+    }
 
     createTraceIntakeRecord({
       traceIntakeRecordId: `intk_${randomHex(10)}`,
@@ -4563,7 +4577,9 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
       ingestKey,
       sourceType,
       payloadSchema,
+      recordKind,
       payload: {
+        recordKind,
         payloadSchema,
         payload,
       },
@@ -4581,6 +4597,7 @@ app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) =
       eventKind,
       sourceType,
       payloadSchema,
+      recordKind,
       payload,
       prevEventHash: latestEvent?.eventHash || null,
     }));
@@ -9982,6 +9999,26 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       events: listTraceEvents(req.params.traceId),
+    });
+  });
+
+  app.post('/__test__/unified-platform/runs/:runId/status', express.json({ limit: '32kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const status = typeof req.body?.status === 'string' ? req.body.status.trim() : '';
+    if (!status) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const completedAt = status === 'completed' ? nowIso() : null;
+    const run = updateRunStatus({
+      runId: req.params.runId,
+      status,
+      completedAt,
+      nowIso: nowIso(),
+    });
+    return res.json({
+      ok: !!run,
+      run,
     });
   });
 

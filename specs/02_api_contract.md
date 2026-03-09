@@ -711,6 +711,7 @@ Stable failure codes:
 - `HOUSE_AUTH_REQUIRED`
 - `HOUSE_AUTH_INVALID`
 - `HOUSE_AUTH_EXPIRED`
+- `TRACE_LATE_EVENT_REJECTED`
 - `TRACE_INTAKE_INVALID`
 
 ### POST `/api/session/reset` (human)

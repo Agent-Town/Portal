@@ -554,6 +554,33 @@ function createRun({
   return getRunById(normalizedRunId);
 }
 
+function updateRunStatus({
+  runId = '',
+  status = '',
+  completedAt = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedRunId || !normalizedStatus) {
+    throw new Error('RUN_STATUS_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE runs
+    SET status = ?,
+        updated_at = ?,
+        completed_at = ?
+    WHERE run_id = ?
+  `).run(
+    normalizedStatus,
+    nowIso,
+    completedAt ? String(completedAt) : null,
+    normalizedRunId,
+  );
+  return getRunById(normalizedRunId);
+}
+
 function mapTraceIntakeRecordRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -806,5 +833,6 @@ module.exports = {
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,
   resetUnifiedPlatformStore,
+  updateRunStatus,
   upsertConfigVersion,
 };

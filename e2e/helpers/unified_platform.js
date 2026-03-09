@@ -190,6 +190,18 @@ async function getPlatformTraceEvents(request, traceId) {
   return await response.json();
 }
 
+async function setPlatformRunStatus(request, runId, status) {
+  const response = await request.post(`/__test__/unified-platform/runs/${encodeURIComponent(String(runId || ''))}/status`, {
+    headers: {
+      'content-type': 'application/json',
+      'x-test-reset': resetToken,
+    },
+    data: JSON.stringify({ status }),
+    failOnStatusCode: false,
+  });
+  return await response.json();
+}
+
 module.exports = {
   compileDefaultSkillPack,
   createPlatformRun,
@@ -202,4 +214,5 @@ module.exports = {
   ingestPlatformTraceRecords,
   readWorkerSessionId,
   seedPlatformConfigVersion,
+  setPlatformRunStatus,
 };
