@@ -47969,7 +47969,7 @@ async function runAgentTownHouseAppendNote(params, toolName = "agent_town_house_
     );
   }
   try {
-    const result = await appendE2eeEntry(text, { requireApproval: false, author: "lite" });
+    const result = await appendE2eeEntry(text, { author: "lite" });
     if (!result || !result.houseId) {
       return withToolMeta(
         toolName,
