@@ -222,6 +222,18 @@ Request:
 }
 ```
 
+Web Experience parity addendum:
+
+```json
+{
+  "webSessionId": "we_1234567890",
+  "actionId": "save_draft",
+  "idempotencyKey": "act-web-001",
+  "expectedRevision": 1,
+  "params": { "draft": "Keep this local" }
+}
+```
+
 Response:
 
 ```json
@@ -244,6 +256,8 @@ Acceptance rules:
 1. Input params must override placeholder values in inferred templates.
 2. All plugin security guards remain enforced (`ORIGIN_BLOCKED`, `METHOD_NOT_ALLOWED`, `SIZE_LIMIT`).
 3. Failure codes are deterministic and stable.
+4. When `webSessionId` is present, dispatch through `POST /api/web/sessions/:id/actions/:actionId/invoke`.
+5. Reusing the same `idempotencyKey` for the same `webSessionId` and `actionId` must preserve backend `invocationId` parity instead of inventing a trainer-local id.
 
 ### 6.6 `trainer.list_evidence`
 
@@ -257,6 +271,18 @@ Request:
 ```
 
 Response includes evidence rows with `evidenceKey`, `atMs`, `ttlMs`, `expired`.
+
+Web Experience parity addendum:
+
+```json
+{
+  "webSessionId": "we_1234567890",
+  "limit": 20,
+  "freshOnly": true
+}
+```
+
+When `webSessionId` is present, read the durable evidence ledger from `GET /api/web/sessions/:id/evidence` and preserve backend `evidenceId` values exactly.
 
 ### 6.7 `trainer.get_transcript_integrity`
 
@@ -275,6 +301,21 @@ Returns runtime/session snapshot used by trainer namespace:
 3. action catalog size
 4. recent reason codes
 5. policy budget snapshot
+
+Web Experience parity addendum:
+
+```json
+{ "webSessionId": "we_1234567890" }
+```
+
+When `webSessionId` is present, `trainer.get_session_context` must read the server-backed Web Experience session and return:
+
+1. `sessionContext.webSession`
+2. `sessionContext.activeIntegration`
+3. `sessionContext.approvalQueue`
+4. `sessionContext.lastCheckpoint`
+5. `sessionContext.runtimeSnapshot`
+6. `sessionContext.credentialStatusByOrigin`
 
 ### 6.9 `trainer.explain_not_used`
 
@@ -453,6 +494,20 @@ Acceptance criteria:
 Tests:
 
 1. `e2e/107_trainer_namespace_coop_canvas.spec.js`
+
+## M10: Web Experience Session Parity
+
+Acceptance criteria:
+
+1. `trainer.list_evidence` returns the same durable rows as `GET /api/web/sessions/:id/evidence` for the same `webSessionId`.
+2. `trainer.invoke_action` returns the same backend `invocationId` as `POST /api/web/sessions/:id/actions/:actionId/invoke` for the same idempotent request.
+3. `trainer.get_session_context` returns server-backed Web Experience session state when `webSessionId` is provided.
+4. Contract docs stay aligned across skill, internal testline, and trainer namespace specs.
+
+Tests:
+
+1. `e2e/127_web_approval_roundtrip.spec.js`
+2. `e2e/135_docs_contract_sync.spec.js`
 
 ## 10. Implementation Sequence (Test-First)
 

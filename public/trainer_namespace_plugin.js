@@ -353,6 +353,138 @@
     };
   }
 
+  function normalizeWebSessionId(value) {
+    const raw = String(value || "").trim();
+    return /^we_[A-Za-z0-9]+$/.test(raw) ? raw : "";
+  }
+
+  function cloneValue(value, fallback = null) {
+    try {
+      return JSON.parse(JSON.stringify(value == null ? fallback : value));
+    } catch {
+      return fallback;
+    }
+  }
+
+  async function portalApiJson(path, { method = "GET", body = null } = {}) {
+    const response = await fetch(String(path || ""), {
+      method,
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: body === null ? undefined : JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const err = new Error(String(payload?.error?.message || `HTTP_${response.status}`));
+      err.status = response.status;
+      err.code = String(payload?.error?.code || "TRAINER_UNAVAILABLE");
+      err.details = payload?.error?.details && typeof payload.error.details === "object"
+        ? payload.error.details
+        : {};
+      throw err;
+    }
+    return payload;
+  }
+
+  async function readPortalWebSession(webSessionId) {
+    const payload = await portalApiJson(`/api/web/sessions/${encodeURIComponent(webSessionId)}`);
+    return payload?.data && typeof payload.data === "object" ? payload.data : {};
+  }
+
+  async function invokePortalWebSessionAction(webSessionId, actionId, params = {}) {
+    const sessionData = await readPortalWebSession(webSessionId);
+    const expectedRevision = clampInt(
+      params?.expectedRevision,
+      1,
+      9e9,
+      clampInt(sessionData?.session?.activeRevision, 1, 9e9, 1)
+    );
+    const idempotencyKey = String(params?.idempotencyKey || "").trim();
+    if (!idempotencyKey) {
+      const err = new Error("idempotencyKey is required");
+      err.code = "TRAINER_PARAM_INVALID";
+      err.status = 400;
+      throw err;
+    }
+    const payload = await portalApiJson(
+      `/api/web/sessions/${encodeURIComponent(webSessionId)}/actions/${encodeURIComponent(actionId)}/invoke`,
+      {
+        method: "POST",
+        body: {
+          expectedRevision,
+          idempotencyKey,
+          params: toObject(params?.params),
+          approvalId: typeof params?.approvalId === "string" ? params.approvalId.trim() : undefined,
+          credentialGrantId: typeof params?.credentialGrantId === "string" ? params.credentialGrantId.trim() : undefined,
+        },
+      }
+    );
+    return {
+      session: cloneValue(sessionData?.session, null),
+      invocation: cloneValue(payload?.data?.invocation, null),
+      evidence: Array.isArray(payload?.data?.evidence) ? cloneValue(payload.data.evidence, []) : [],
+      raw: cloneValue(payload?.data, null),
+      request: {
+        webSessionId,
+        actionId,
+        expectedRevision,
+        idempotencyKey,
+        params: toObject(params?.params),
+      },
+    };
+  }
+
+  async function listPortalWebEvidence(webSessionId, params = {}) {
+    const limit = clampInt(params?.limit, 1, 200, 20);
+    const query = new URLSearchParams();
+    query.set("limit", String(limit));
+    if (typeof params?.cursor === "string" && params.cursor.trim()) {
+      query.set("cursor", params.cursor.trim());
+    }
+    if (params?.freshOnly === true) {
+      query.set("freshOnly", "true");
+    }
+    const payload = await portalApiJson(`/api/web/sessions/${encodeURIComponent(webSessionId)}/evidence?${query.toString()}`);
+    let rows = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    const actionId = String(params?.actionId || "").trim();
+    if (actionId) {
+      rows = rows.filter((row) => String(row?.summary || "").trim() === actionId);
+    }
+    return {
+      evidence: rows,
+      count: rows.length,
+      nextCursor: typeof payload?.data?.nextCursor === "string" ? payload.data.nextCursor : null,
+    };
+  }
+
+  async function getPortalWebSessionContext(webSessionId) {
+    const sessionData = await readPortalWebSession(webSessionId);
+    const webSession = sessionData?.session && typeof sessionData.session === "object" ? sessionData.session : null;
+    return {
+      sessionContext: {
+        webSession: cloneValue(webSession, null),
+        activeIntegration: cloneValue(sessionData?.activeIntegration, null),
+        approvalQueue: Array.isArray(sessionData?.approvalQueue) ? cloneValue(sessionData.approvalQueue, []) : [],
+        lastCheckpoint: cloneValue(sessionData?.lastCheckpoint, null),
+        runtimeSnapshot: cloneValue(sessionData?.runtimeSnapshot, null),
+        credentialStatusByOrigin: cloneValue(sessionData?.credentialStatusByOrigin, {}),
+      },
+      runtimeContext: webSession
+        ? {
+          origin: webSession.origin || null,
+          teamCode: webSession.teamCode || null,
+          houseId: webSession.houseId || null,
+          webSessionId: webSession.webSessionId || null,
+          activeRevision: webSession.activeRevision || null,
+        }
+        : null,
+    };
+  }
+
   function prunePolicyState(nowMs, policy) {
     const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now();
     const minCutoff = now - Number(policy.minuteWindowMs || DEFAULT_POLICY.minuteWindowMs);
@@ -833,6 +965,39 @@
           break;
         }
         case "trainer.invoke_action": {
+          const webSessionId = normalizeWebSessionId(safeParams.webSessionId);
+          if (webSessionId) {
+            const actionId = String(safeParams.actionId || "").trim();
+            if (!actionId) {
+              result = fail(canonical, "TRAINER_PARAM_INVALID", "actionId is required", startedAtMs);
+              break;
+            }
+            try {
+              const invoked = await invokePortalWebSessionAction(webSessionId, actionId, safeParams);
+              result = success(canonical, startedAtMs, {
+                actionId,
+                webSessionId,
+                request: invoked.request,
+                response: invoked.raw,
+                invocation: invoked.invocation,
+                evidence: invoked.evidence,
+                validation: null,
+              });
+            } catch (err) {
+              result = fail(
+                canonical,
+                String(err?.code || "TRAINER_UNAVAILABLE"),
+                String(err?.message || "Portal web action invocation failed"),
+                startedAtMs,
+                {
+                  webSessionId,
+                  actionId,
+                  details: err?.details || {},
+                }
+              );
+            }
+            break;
+          }
           if (typeof invokeSkillAction !== "function") {
             result = fail(canonical, "TRAINER_UNAVAILABLE", "Skill action bridge unavailable", startedAtMs);
             break;
@@ -868,6 +1033,30 @@
           break;
         }
         case "trainer.list_evidence": {
+          const webSessionId = normalizeWebSessionId(safeParams.webSessionId);
+          if (webSessionId) {
+            try {
+              const rows = await listPortalWebEvidence(webSessionId, safeParams);
+              result = success(canonical, startedAtMs, {
+                webSessionId,
+                evidence: rows.evidence,
+                count: rows.count,
+                nextCursor: rows.nextCursor,
+              });
+            } catch (err) {
+              result = fail(
+                canonical,
+                String(err?.code || "TRAINER_UNAVAILABLE"),
+                String(err?.message || "Portal web evidence read failed"),
+                startedAtMs,
+                {
+                  webSessionId,
+                  details: err?.details || {},
+                }
+              );
+            }
+            break;
+          }
           const rows = listEvidenceRows(evidenceRows, safeParams, nowMs);
           result = success(canonical, startedAtMs, {
             evidence: rows,
@@ -884,6 +1073,30 @@
           break;
         }
         case "trainer.get_session_context": {
+          const webSessionId = normalizeWebSessionId(safeParams.webSessionId);
+          if (webSessionId) {
+            try {
+              const webContext = await getPortalWebSessionContext(webSessionId);
+              result = success(canonical, startedAtMs, {
+                webSessionId,
+                sessionContext: webContext.sessionContext,
+                runtimeContext: webContext.runtimeContext,
+                trainerNamespace: buildDiagnostics({ policy, nowMs, turnKey: internal.turnKey }),
+              });
+            } catch (err) {
+              result = fail(
+                canonical,
+                String(err?.code || "TRAINER_UNAVAILABLE"),
+                String(err?.message || "Portal web session context read failed"),
+                startedAtMs,
+                {
+                  webSessionId,
+                  details: err?.details || {},
+                }
+              );
+            }
+            break;
+          }
           const reasonCodes = Array.isArray(usageDiagnostics?.reasonCodes) ? usageDiagnostics.reasonCodes : [];
           const actionCount = Array.isArray(skillActions) ? skillActions.length : 0;
           result = success(canonical, startedAtMs, {

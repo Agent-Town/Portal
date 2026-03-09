@@ -281,6 +281,16 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - If params are invalid, return/expect deterministic `UI_INTENT_INVALID_PARAM`.
 - Irreversible intents require approval and return `CONFIRMATION_REQUIRED` when missing approval.
 
+## Trainer bridge for Web sessions
+
+- `trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.
+- When `webSessionId` is present, those trainer tools must use the durable `/api/web/*` backend state instead of a local-only trainer ledger.
+- Preserve backend ids exactly:
+  - `invocationId`
+  - `evidenceId`
+  - `webSessionId`
+- For idempotent replays, reuse the same `idempotencyKey` and compare returned `invocationId` rather than inventing a new local run id.
+
 ## Optional helpers
 
 - `GET /api/agent/share/instructions?teamCode=...`
