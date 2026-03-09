@@ -16,3 +16,6 @@ node_modules/
 # local onboarding mint DB
 scripts/data/*.sqlite3
 
+# portal autoresearch harness
+research/portal/results.tsv
+research/portal/artifacts/

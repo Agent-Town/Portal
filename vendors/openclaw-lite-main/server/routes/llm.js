@@ -271,8 +271,17 @@ function registerLlmRoutes(app) {
     return false;
   }
 
+  function normalizeProxyHostname(hostname) {
+    const host = String(hostname || "").trim().toLowerCase().replace(/\.$/, "");
+    if (!host) return "";
+    if (host.startsWith("[") && host.endsWith("]")) {
+      return host.slice(1, -1);
+    }
+    return host;
+  }
+
   function isBlockedProxyHost(hostname) {
-    const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
+    const host = normalizeProxyHostname(hostname);
     if (!host) return true;
     if (host === "localhost" || host.endsWith(".localhost")) return true;
     if (host === "0.0.0.0") return true;

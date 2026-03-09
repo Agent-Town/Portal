@@ -1822,6 +1822,13 @@ function ensureHumanSession(req, res) {
   };
 
   if (!session) {
+    if (hintedSession) {
+      session = hintedSession;
+      sid = hintedSession.sessionId;
+    }
+  }
+
+  if (!session) {
     const walletSession = pickBestWalletSession();
     if (walletSession) {
       session = walletSession;
