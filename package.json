@@ -33,6 +33,10 @@
     "test:privy-email-live": "PRIVY_EMAIL_OTP_REQUIRED=1 playwright test -c playwright.privy.email.config.js",
     "verify:route-modules": "node scripts/verify_route_modules.js",
     "verify:platform-export": "node scripts/verify_platform_export.js",
+    "pretest:privy": "npm run build:openclaw-lite",
+    "test:privy": "node scripts/run_playwright_privy.mjs",
+    "pretest:privy:guest": "npm run build:openclaw-lite",
+    "test:privy:guest": "node scripts/run_playwright_privy.mjs --guest",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },

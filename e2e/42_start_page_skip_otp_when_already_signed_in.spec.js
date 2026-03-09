@@ -51,3 +51,40 @@ test('start page skips OTP modal when Privy session already exists', async ({ pa
   await page.goto('/start');
   await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
 });
+
+test('wallet-only mock Privy bridge satisfies silent hub auth without OTP state', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: 'So11111111111111111111111111111111111111112' }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: new Uint8Array(64) })
+    };
+  });
+
+  await page.route('**/api/privy/config', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        enabled: true,
+        startPageEnabled: true,
+        appPath: '/app',
+        config: {
+          appId: 'app-mock',
+          loginMethod: 'guest',
+          enableDefaultBridge: false
+        }
+      })
+    });
+  });
+
+  await page.goto('/start');
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
+  await expect(page.locator('#districtMap')).toBeVisible();
+
+  await page.goto('/app');
+  await expect(page).toHaveURL(/\/app$/, { timeout: 8000 });
+  await expect(page.locator('#districtMap')).toBeVisible();
+});

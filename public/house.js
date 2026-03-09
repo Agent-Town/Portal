@@ -1,6 +1,12 @@
 /* eslint-disable no-console */
 
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const WALLET_IDENTITY_HINT_STORAGE_KEY = 'agentTown:walletIdentityHint';
+const WALLET_RECOVERY_KEY_STORAGE_KEY = 'agentTown:walletRecoveryKey';
+const WALLET_STORAGE_KEY = 'agentTownWallet';
+const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
+const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
+const WALLET_RECOVERY_INTENT_HEADER = 'x-wallet-recovery-intent';
 
 function readTeamCodeHint() {
   try {
@@ -20,8 +26,82 @@ function saveTeamCodeHint(value) {
   }
 }
 
+function normalizeEvmAddress(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return /^0x[a-fA-F0-9]{40}$/.test(raw) ? raw.toLowerCase() : '';
+}
+
+function normalizeSolanaAddress(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return /^[1-9A-HJ-NP-Za-km-z]{32,64}$/.test(raw) ? raw : '';
+}
+
+function readWalletIdentityHint() {
+  try {
+    const raw = localStorage.getItem(WALLET_IDENTITY_HINT_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    const cacheRaw = localStorage.getItem(WALLET_STORAGE_KEY);
+    const cached = cacheRaw ? JSON.parse(cacheRaw) : {};
+    return {
+      evm: normalizeEvmAddress(parsed?.evm || parsed?.evmAddress || ''),
+      solana: normalizeSolanaAddress(parsed?.solana || parsed?.solanaAddress || cached?.address || '')
+    };
+  } catch {
+    return { evm: '', solana: '' };
+  }
+}
+
+function readWalletRecoveryKey() {
+  try {
+    const raw = String(localStorage.getItem(WALLET_RECOVERY_KEY_STORAGE_KEY) || '').trim().toLowerCase();
+    return /^wrk_[a-f0-9]{64}$/.test(raw) ? raw : '';
+  } catch {
+    return '';
+  }
+}
+
+function saveWalletRecoveryKey(value) {
+  const key = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!/^wrk_[a-f0-9]{64}$/.test(key)) return;
+  try {
+    localStorage.setItem(WALLET_RECOVERY_KEY_STORAGE_KEY, key);
+  } catch {
+    // ignore storage errors
+  }
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
+  const walletIdentityHint = readWalletIdentityHint();
+  const walletRecoveryKey = readWalletRecoveryKey();
+  if (
+    walletIdentityHint.evm
+    && headers[WALLET_IDENTITY_EVM_HEADER] === undefined
+    && headers['X-Wallet-Evm-Address'] === undefined
+  ) {
+    headers[WALLET_IDENTITY_EVM_HEADER] = walletIdentityHint.evm;
+  }
+  if (
+    walletIdentityHint.solana
+    && headers[WALLET_IDENTITY_SOLANA_HEADER] === undefined
+    && headers['X-Wallet-Solana-Address'] === undefined
+  ) {
+    headers[WALLET_IDENTITY_SOLANA_HEADER] = walletIdentityHint.solana;
+  }
+  if (
+    walletRecoveryKey
+    && headers['x-wallet-recovery-key'] === undefined
+    && headers['X-Wallet-Recovery-Key'] === undefined
+  ) {
+    headers['x-wallet-recovery-key'] = walletRecoveryKey;
+  }
+  if (
+    walletRecoveryKey
+    && headers[WALLET_RECOVERY_INTENT_HEADER] === undefined
+    && headers['X-Wallet-Recovery-Intent'] === undefined
+  ) {
+    headers[WALLET_RECOVERY_INTENT_HEADER] = '1';
+  }
   const teamCodeHint = readTeamCodeHint();
   if (
     teamCodeHint
@@ -32,12 +112,16 @@ async function api(url, opts = {}) {
   }
   const res = await fetch(url, {
     credentials: 'include',
+    cache: 'no-store',
     ...opts,
     headers
   });
   const data = await res.json().catch(() => ({}));
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
+  }
+  if (typeof data?.walletRecoveryKey === 'string') {
+    saveWalletRecoveryKey(data.walletRecoveryKey);
   }
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;

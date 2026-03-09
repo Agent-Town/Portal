@@ -5197,6 +5197,10 @@ async function connectWallet({ silent = false } = {}) {
   bindWalletEvents();
   walletAddr = connected?.address || appWalletClient.getAddress({ chain: 'solana' }) || null;
   if (!walletAddr) throw new Error('NO_SOLANA_PUBKEY');
+  const normalizedAddress = normalizeSolanaAddress(walletAddr);
+  if (normalizedAddress) {
+    saveWalletIdentityHint({ solana: normalizedAddress });
+  }
   if (previousAddr && previousAddr !== walletAddr) {
     walletHouseId = null;
     walletRecovered = false;

@@ -24,6 +24,17 @@
     return !!fallback;
   }
 
+  function normalizePrivyLoginMethod(value, fallback = 'email') {
+    const tokens = String(value || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    for (const token of tokens) {
+      if (token === 'email' || token === 'guest') return token;
+    }
+    return fallback;
+  }
+
   function hasBridge() {
     return !!window.__PRIVY_WALLET_BRIDGE__;
   }
@@ -161,6 +172,67 @@
       } catch {
         return null;
       }
+    }
+    return null;
+  }
+
+  function bridgeUserFromAddress(chain, address) {
+    const normalizedChain = chain === 'evm' ? 'evm' : 'solana';
+    const normalizedAddress = normalizeAddress(address);
+    if (!normalizedAddress) return null;
+    return {
+      id: `${normalizedChain}:${normalizedAddress}`,
+      wallets: [{ chain: normalizedChain, address: normalizedAddress }]
+    };
+  }
+
+  async function probeCustomBridgeUser(bridge, { interactive = false, preferred = 'solana' } = {}) {
+    if (!bridge || typeof bridge !== 'object') return null;
+
+    if (bridge.user && typeof bridge.user === 'object') {
+      return bridge.user;
+    }
+    if (typeof bridge.getUser === 'function') {
+      try {
+        const user = await bridge.getUser();
+        if (user && typeof user === 'object') return user;
+      } catch {
+        // ignore bridge-specific getUser failures and continue probing
+      }
+    }
+    if (bridge.isLoggedIn === true) {
+      return { id: 'bridge-user' };
+    }
+
+    const directSolanaAddress = normalizeAddress(bridge.solanaAddress || bridge.solana || bridge.publicKey || null);
+    if (directSolanaAddress) return bridgeUserFromAddress('solana', directSolanaAddress);
+    const directEvmAddress = normalizeAddress(bridge.evmAddress || bridge.evm || bridge.address || null);
+    if (directEvmAddress) return bridgeUserFromAddress('evm', directEvmAddress);
+
+    const tryConnect = async (methodName, chain, params) => {
+      if (typeof bridge[methodName] !== 'function') return null;
+      try {
+        const out = await bridge[methodName](params);
+        const address = normalizeAddress(out?.address || out?.publicKey || out?.wallet?.address || out);
+        return bridgeUserFromAddress(chain, address);
+      } catch {
+        return null;
+      }
+    };
+
+    const orderedChains = preferred === 'evm'
+      ? [
+          ['connectEvm', 'evm', interactive ? {} : { silent: true }],
+          ['connectSolana', 'solana', interactive ? { silent: false } : { silent: true }]
+        ]
+      : [
+          ['connectSolana', 'solana', interactive ? { silent: false } : { silent: true }],
+          ['connectEvm', 'evm', interactive ? {} : { silent: true }]
+        ];
+
+    for (const [methodName, chain, params] of orderedChains) {
+      const user = await tryConnect(methodName, chain, params);
+      if (user) return user;
     }
     return null;
   }
@@ -596,7 +668,7 @@
     }
 
     async function loginInteractive({ preferred = 'solana', loginUi = null } = {}) {
-      const method = String(config.loginMethod || 'email').trim().toLowerCase();
+      const method = normalizePrivyLoginMethod(config.loginMethod || 'email', 'email');
       if (method === 'guest') {
         try {
           const out = await client.auth.guest.create(buildLoginOptions(preferred));
@@ -1401,6 +1473,9 @@
       const user = await bridge.ensureLoggedIn({ interactive, preferred: 'solana', loginUi });
       return !!user;
     }
+
+    const fallbackUser = await probeCustomBridgeUser(bridge, { interactive, preferred: 'solana' });
+    if (fallbackUser) return true;
 
     if (!interactive) return false;
 
