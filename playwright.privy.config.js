@@ -40,6 +40,9 @@ module.exports = defineConfig({
     }
   ],
   use: {
+    // Privy/start flow canonicalizes loopback hosts to localhost.
+    // Keep Playwright on the same origin so cookies + localStorage survive
+    // document navigations between /start, /app, and /create.
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry'
   },

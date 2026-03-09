@@ -83,23 +83,62 @@ function saveWalletRecoveryKey(value) {
   }
 }
 
+function collectWalletIdentitiesFromClient() {
+  const out = [];
+  const seen = new Set();
+  const add = (chain, address) => {
+    const normalizedChain = chain === 'evm' ? 'evm' : chain === 'solana' ? 'solana' : '';
+    if (!normalizedChain) return;
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeSolanaAddress(address);
+    if (!normalizedAddress) return;
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ chain: normalizedChain, address: normalizedAddress });
+  };
+
+  const walletIdentityHint = readWalletIdentityHint();
+  if (walletIdentityHint.solana) add('solana', walletIdentityHint.solana);
+  if (walletIdentityHint.evm) add('evm', walletIdentityHint.evm);
+
+  try {
+    const cacheRaw = localStorage.getItem(WALLET_STORAGE_KEY);
+    const cached = cacheRaw ? JSON.parse(cacheRaw) : null;
+    if (cached && typeof cached.address === 'string') add('solana', cached.address);
+  } catch {
+    // ignore malformed cache
+  }
+
+  if (walletClient && typeof walletClient.getAddress === 'function') {
+    try {
+      add('solana', walletClient.getAddress({ chain: 'solana' }));
+    } catch {
+      // ignore unavailable wallet state
+    }
+    try {
+      add('evm', walletClient.getAddress({ chain: 'evm' }));
+    } catch {
+      // ignore unavailable wallet state
+    }
+  }
+
+  return out;
+}
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
-  const walletIdentityHint = readWalletIdentityHint();
+  const walletIdentities = collectWalletIdentitiesFromClient();
   const walletRecoveryKey = readWalletRecoveryKey();
-  if (
-    walletIdentityHint.evm
-    && headers[WALLET_IDENTITY_EVM_HEADER] === undefined
-    && headers['X-Wallet-Evm-Address'] === undefined
-  ) {
-    headers[WALLET_IDENTITY_EVM_HEADER] = walletIdentityHint.evm;
-  }
-  if (
-    walletIdentityHint.solana
-    && headers[WALLET_IDENTITY_SOLANA_HEADER] === undefined
-    && headers['X-Wallet-Solana-Address'] === undefined
-  ) {
-    headers[WALLET_IDENTITY_SOLANA_HEADER] = walletIdentityHint.solana;
+  for (const { chain, address } of walletIdentities) {
+    if (chain === 'evm' && headers[WALLET_IDENTITY_EVM_HEADER] === undefined) {
+      headers[WALLET_IDENTITY_EVM_HEADER] = address;
+      continue;
+    }
+    if (chain === 'solana' && headers[WALLET_IDENTITY_SOLANA_HEADER] === undefined) {
+      headers[WALLET_IDENTITY_SOLANA_HEADER] = address;
+    }
   }
   if (
     walletRecoveryKey

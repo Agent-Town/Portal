@@ -348,6 +348,7 @@ function resetAllSessions() {
 
 module.exports = {
   createSession,
+  deleteSessionById,
   getSessionById,
   getSessionByTeamCode,
   getSessionByHouseId,

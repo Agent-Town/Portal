@@ -112,7 +112,7 @@ async function bootstrapWorker(page) {
   });
   const teamCode = String(state?.teamCode || '').trim();
   expect(teamCode).toMatch(/^TEAM-/);
-  return { teamCode, origin: String(page.url()).replace(/\/$/, '') };
+  return { teamCode, origin: new URL(String(page.url())).origin };
 }
 
 async function ensureSkillImported(page, url = '/skill.md') {

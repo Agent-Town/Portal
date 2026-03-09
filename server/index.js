@@ -29,6 +29,7 @@ const { emitMilestone } = require('./milestones');
 const { computeRewardsSummary } = require('./rewards');
 const {
   createSession,
+  deleteSessionById,
   getSessionById,
   getSessionByTeamCode,
   getSessionByHouseId,
@@ -4196,6 +4197,10 @@ registerPokerRoutes(app, {
 // Rotates the human session cookie to a fresh session/team code.
 // Useful for shared devices where multiple people onboard sequentially.
 app.post('/api/session/reset', (req, res) => {
+  const current = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (current?.sessionId) {
+    deleteSessionById(current.sessionId);
+  }
   // Ensure we still have a valid response cookie context (Secure flag in prod).
   const store = readStore();
   const next = createSession();
