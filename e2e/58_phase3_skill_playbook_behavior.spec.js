@@ -129,7 +129,7 @@ async function clearTranscript(page) {
   expect(reset?.ok).not.toBe(false);
 }
 
-async function runScriptedExperience(page, { prompt, steps }) {
+async function runScriptedExperience(page, { prompt, steps, autoApprove = false }) {
   const llmRequests = [];
   let callCount = 0;
   const routeUrl = '**/api/llm/openai/v1/chat/completions';
@@ -162,9 +162,37 @@ async function runScriptedExperience(page, { prompt, steps }) {
     });
   });
 
-  const run = await page.evaluate(async ({ runPrompt }) => {
+  const runPromise = page.evaluate(async ({ runPrompt }) => {
     return await window.__openclawLiteTest.experienceRun({ prompt: runPrompt });
   }, { runPrompt: String(prompt || 'Read SKILL.md and do the next safe step.') });
+
+  let run = null;
+  let runError = null;
+  const settled = runPromise
+    .then((value) => {
+      run = value;
+    })
+    .catch((error) => {
+      runError = error;
+    });
+
+  if (autoApprove) {
+    const deadline = Date.now() + 30000;
+    while (!run && !runError && Date.now() < deadline) {
+      const approveBtn = page.getByRole('button', { name: 'Approve' }).first();
+      if (await approveBtn.isVisible().catch(() => false)) {
+        await approveBtn.click().catch(() => {});
+      }
+      if (!run && !runError) {
+        await page.waitForTimeout(100);
+      }
+    }
+    await settled;
+    if (runError) throw runError;
+  } else {
+    run = await runPromise;
+  }
+
   return { run, llmRequests, callCount };
 }
 
@@ -898,6 +926,7 @@ test('worker+llm skill run recovers house context and appends encrypted vault no
   const noteText = 'worker vault note: co-op memory';
   const run = await runScriptedExperience(page, {
     prompt: 'Read SKILL.md, recover house context, and append one vault note.',
+    autoApprove: true,
     steps: [
       toolStep('workspace_read_file', { path: 'workspace/SKILL.md' }),
       toolStep('agent_town_house_recover', {}),
