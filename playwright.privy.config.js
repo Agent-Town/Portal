@@ -8,11 +8,14 @@ module.exports = {
   ...base,
   use: {
     ...(base.use || {}),
-    baseURL: `http://[::1]:${PORT}`,
+    // Privy/start flow canonicalizes loopback hosts to localhost.
+    // Keep Playwright on the same origin so cookies + localStorage survive
+    // document navigations between /start, /app, and /create.
+    baseURL: `http://localhost:${PORT}`,
   },
   webServer: {
     ...(base.webServer || {}),
-    url: `http://[::1]:${PORT}/api/health`,
+    url: `http://localhost:${PORT}/api/health`,
     env: {
       ...process.env,
       NODE_ENV: 'test',

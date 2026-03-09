@@ -81,6 +81,16 @@ async function pressOpenViaAgentApi(page) {
   return { teamCode };
 }
 
+async function isCreateCanvasReady(page) {
+  const pixel = page.getByTestId('px-0-0');
+  try {
+    if (!(await pixel.count())) return false;
+    return await pixel.first().isVisible();
+  } catch {
+    return false;
+  }
+}
+
 async function ensureAppShell(page, { navigate = true } = {}) {
   if (navigate) {
     await page.goto('/');
@@ -514,6 +524,7 @@ async function unlockGateWithSigil(page, sigil = 'key') {
 async function openToCreate(page) {
   await page.getByTestId('open-btn').click();
   for (let i = 0; i < 4; i += 1) {
+    if (await isCreateCanvasReady(page)) return;
     if (page.url().includes('/create')) break;
     const run = await runSkillStep(page, 'Read SKILL.md and press Open after the human has pressed Open.');
     if (run?.ok === false && String(run?.error?.code || '').toUpperCase() === 'LLM_RUN_FAILED') {
@@ -521,10 +532,10 @@ async function openToCreate(page) {
     }
     await page.waitForTimeout(180);
   }
-  if (!page.url().includes('/create')) {
+  if (!(await isCreateCanvasReady(page)) && !page.url().includes('/create')) {
     await pressOpenViaAgentApi(page);
   }
-  if (!page.url().includes('/create')) {
+  if (!(await isCreateCanvasReady(page)) && !page.url().includes('/create')) {
     const createLink = page.locator('#openReady a[href="/create"]');
     if (await createLink.count()) {
       const target = createLink.first();
@@ -533,14 +544,20 @@ async function openToCreate(page) {
       }
     }
   }
-  if (!page.url().includes('/create')) {
+  if (!(await isCreateCanvasReady(page))) {
     await ensurePrivySignupForCreate(page);
     await primePrivyRecoveryStorage(page);
-    await page.goto('/create');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await page.goto('/create', { waitUntil: 'domcontentloaded' });
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+      await page.waitForTimeout(150);
+      if (await isCreateCanvasReady(page)) return;
+    }
   }
-  await page.waitForURL('**/create', { timeout: 10000 });
-  const createReady = await page.getByTestId('px-0-0').isVisible().catch(() => false);
+  const createReady = await isCreateCanvasReady(page);
   if (!createReady) {
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+    await page.waitForTimeout(100);
     const state = await fetchSessionState(page).catch(() => null);
     const recovery = await page.evaluate(() => ({
       teamCodeHint: localStorage.getItem('agentTown:teamCodeHint'),
