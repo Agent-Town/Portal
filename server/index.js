@@ -84,6 +84,14 @@ const {
   writeCheckpoint,
 } = require('./web_poker_store');
 const {
+  countUnifiedPlatformTableRows,
+  getUnifiedPlatformTestFixture,
+  getUnifiedPlatformTestStats,
+  isUnifiedPlatformTable,
+  listUnifiedPlatformFixtureFamilies,
+  resetUnifiedPlatformStore,
+} = require('./unified_platform_store');
+const {
   DEFAULT_OPERATOR_TOKEN,
   POKER_OPERATOR_SCHEMA_VERSION,
   createBatch: createPokerOperatorBatch,
@@ -9534,6 +9542,7 @@ if (process.env.NODE_ENV === 'test') {
       erc8004Registrations: []
     });
     resetExtendedStore();
+    resetUnifiedPlatformStore();
     resetPokerOperatorState();
     invalidateAtlasStoreCaches();
     resetAllSessions();
@@ -9548,10 +9557,50 @@ if (process.env.NODE_ENV === 'test') {
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     const header = req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const tableName = String(req.params.table || '').trim();
+    const count = isUnifiedPlatformTable(tableName)
+      ? countUnifiedPlatformTableRows(tableName)
+      : countTableRows(tableName);
     return res.json({
       ok: true,
-      table: req.params.table,
-      count: countTableRows(String(req.params.table || '').trim())
+      table: tableName,
+      count: Number(count || 0)
+    });
+  });
+
+  app.get('/__test__/unified-platform/stats', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      stats: getUnifiedPlatformTestStats(),
+    });
+  });
+
+  app.get('/__test__/unified-platform/fixtures', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      families: listUnifiedPlatformFixtureFamilies(),
+    });
+  });
+
+  app.get('/__test__/unified-platform/fixtures/:family', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const fixture = getUnifiedPlatformTestFixture(req.params.family);
+    if (!fixture) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({
+      ok: true,
+      family: String(req.params.family || '').trim(),
+      fixture,
     });
   });
 
@@ -10732,6 +10781,12 @@ function atlasModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
+function trainerModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('modal', 'trainer');
+  return `/?${params.toString()}`;
+}
+
 function registryModalRedirectPath() {
   const params = new URLSearchParams();
   params.set('district', 'registry');
@@ -10805,7 +10860,12 @@ app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
-app.get('/trainer', (_req, res) => sendHtmlNoStore(res, 'trainer.html'));
+app.get('/trainer', (req, res) => {
+  if (String(req.query?.embed || '').trim() === '1') {
+    return sendHtmlNoStore(res, 'trainer.html');
+  }
+  return res.redirect(302, trainerModalRedirectPath());
+});
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {
   const shareId = req.params.id;

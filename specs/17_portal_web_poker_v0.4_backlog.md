@@ -40,10 +40,10 @@ To avoid file-number collisions, this program reserves the following new Playwri
 - `e2e/128_web_credential_broker.spec.js`
 - `e2e/129_registry_import_idempotency.spec.js`
 - `e2e/130_registry_tool_projection_compat.spec.js`
-- `e2e/131_poker_operator_client_contract.spec.js`
-- `e2e/132_poker_submission_proxy.spec.js`
-- `e2e/133_poker_leaderboard_mirror.spec.js`
-- `e2e/134_poker_replay_manifest.spec.js`
+- `e2e/151_poker_operator_client_contract.spec.js`
+- `e2e/152_poker_submission_proxy.spec.js`
+- `e2e/153_poker_leaderboard_mirror.spec.js`
+- `e2e/154_poker_replay_manifest.spec.js`
 - `e2e/135_docs_contract_sync.spec.js`
 
 ## 4. Phase plan
@@ -298,7 +298,7 @@ Bundle gate:
 - operator auth failures are deterministic
 - mirrored tables are queryable without live operator dependence
 - Suggested tests:
-- `e2e/131_poker_operator_client_contract.spec.js`
+- `e2e/151_poker_operator_client_contract.spec.js`
 - Required doc sync:
 - `specs/16_portal_web_poker_v0.4_implementation_pack.md`
 
@@ -318,8 +318,8 @@ Bundle gate:
 - season pages read only from mirrored operator data
 - replay page renders operator manifest metadata without score rewriting
 - Suggested tests:
-- `e2e/133_poker_leaderboard_mirror.spec.js`
-- `e2e/134_poker_replay_manifest.spec.js`
+- `e2e/153_poker_leaderboard_mirror.spec.js`
+- `e2e/154_poker_replay_manifest.spec.js`
 
 ## POKER-103 - Setup submission proxy and ownership binding
 
@@ -337,7 +337,7 @@ Bundle gate:
 - duplicate submissions replay the original accepted result
 - submission rows record wallet subject, Portal session, and operator submission id
 - Suggested tests:
-- `e2e/132_poker_submission_proxy.spec.js`
+- `e2e/152_poker_submission_proxy.spec.js`
 - Required doc sync:
 - `specs/02_api_contract.md`
 
@@ -376,8 +376,8 @@ Bundle gate:
 - replay manifest and evidence TTL assertions are stable under CI timing
 - Suggested tests:
 - `e2e/124_web_resolve_contract.spec.js`
-- `e2e/131_poker_operator_client_contract.spec.js`
-- `e2e/134_poker_replay_manifest.spec.js`
+- `e2e/151_poker_operator_client_contract.spec.js`
+- `e2e/154_poker_replay_manifest.spec.js`
 
 ## DOC-002 - Contract sync gate
 

@@ -1342,6 +1342,18 @@ async function init() {
     async runtimeSessionContext(params = {}) {
       return runtimeSessionContextRequest(params);
     },
+    async getWorkerContinuitySnapshot(params = {}) {
+      const snapshot = await runtimeSessionContextRequest(params);
+      const data = snapshot?.data || snapshot || {};
+      return {
+        sessionId: typeof data.sessionId === "string" ? data.sessionId : "",
+        generatedAtMs: Number.isFinite(Number(data.generatedAtMs)) ? Number(data.generatedAtMs) : null
+      };
+    },
+    async getWorkerSessionId(params = {}) {
+      const snapshot = await this.getWorkerContinuitySnapshot(params);
+      return String(snapshot?.sessionId || "");
+    },
     async skillState() {
       return skillStateRequest();
     },

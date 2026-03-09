@@ -420,7 +420,7 @@ Purpose:
 
 Primary test:
 
-- `e2e/131_poker_operator_client_contract.spec.js`
+- `e2e/151_poker_operator_client_contract.spec.js`
 
 RED gate:
 
@@ -447,7 +447,7 @@ Purpose:
 
 Primary test:
 
-- `e2e/132_poker_submission_proxy.spec.js`
+- `e2e/152_poker_submission_proxy.spec.js`
 
 RED gate:
 
@@ -478,7 +478,7 @@ Purpose:
 
 Primary test:
 
-- `e2e/133_poker_leaderboard_mirror.spec.js`
+- `e2e/153_poker_leaderboard_mirror.spec.js`
 
 RED gate:
 
@@ -504,7 +504,7 @@ Purpose:
 
 Primary test:
 
-- `e2e/134_poker_replay_manifest.spec.js`
+- `e2e/154_poker_replay_manifest.spec.js`
 
 RED gate:
 
