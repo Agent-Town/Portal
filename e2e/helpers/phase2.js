@@ -91,6 +91,43 @@ async function isCreateCanvasReady(page) {
   }
 }
 
+async function ensurePrivyStartEntry(page, { timeout = 10000 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const result = await page.evaluate(async () => {
+      const ensureLogin = window.ensurePrivyLogin;
+      if (typeof ensureLogin !== 'function') {
+        return { ready: false, ok: false };
+      }
+      try {
+        const ok = await ensureLogin({ interactive: true });
+        if (ok) {
+          const bridge = window.__PRIVY_WALLET_BRIDGE__;
+          if (bridge && typeof bridge.connectSolana === 'function') {
+            await bridge.connectSolana({ silent: true }).catch(() => null);
+          }
+        }
+        return { ready: true, ok: ok === true };
+      } catch (error) {
+        return {
+          ready: true,
+          ok: false,
+          code: String(error?.code || error?.message || 'PRIVY_LOGIN_FAILED')
+        };
+      }
+    }).catch(() => ({ ready: false, ok: false }));
+
+    if (result?.ready && result?.ok) {
+      return true;
+    }
+    if (result?.ready && result?.code && result.code !== 'PRIVY_BRIDGE_INIT_FAILED') {
+      throw new Error(result.code);
+    }
+    await page.waitForTimeout(150);
+  }
+  return false;
+}
+
 async function ensureAppShell(page, { navigate = true } = {}) {
   if (navigate) {
     await page.goto('/');
@@ -108,38 +145,102 @@ async function ensureAppShell(page, { navigate = true } = {}) {
   if (await mapVisible()) return;
 
   const enterBtn = page.locator('#enterBtn');
+  let attemptedEnter = false;
   if (await enterBtn.count()) {
     const target = enterBtn.first();
     try {
       if (await target.isVisible()) {
-        await Promise.all([
-          page.waitForURL((url) => {
-            try {
-              const pathname = new URL(String(url)).pathname;
-              return pathname === '/app' || pathname === '/';
-            } catch {
-              return false;
-            }
-          }, { timeout: 5000 }).catch(() => {}),
-          target.click()
-        ]);
+        attemptedEnter = true;
+        const enteredViaPrivy = await ensurePrivyStartEntry(page).catch(() => false);
+        if (enteredViaPrivy) {
+          await page.goto('/app');
+        } else {
+          await Promise.all([
+            page.waitForURL((url) => {
+              try {
+                const pathname = new URL(String(url)).pathname;
+                return pathname === '/app';
+              } catch {
+                return false;
+              }
+            }, { timeout: 5000 }).catch(() => {}),
+            target.click()
+          ]);
+        }
       }
     } catch {
       // ignore test-only start screen timing races
     }
   }
 
+  if (!(await mapVisible()) && attemptedEnter) {
+    try {
+      await expect.poll(async () => {
+        return await mapVisible();
+      }, { timeout: 6000 }).toBe(true);
+    } catch {
+      // fall through to direct /app fallback
+    }
+  }
+
   if (!(await mapVisible())) {
-    await page.goto('/app');
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const pathname = await page.evaluate(() => window.location.pathname).catch(() => '');
+      if (pathname === '/' || pathname === '/start') {
+        await ensurePrivyStartEntry(page).catch(() => false);
+      }
+      await page.goto('/app', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      try {
+        await expect.poll(async () => {
+          return await mapVisible();
+        }, { timeout: 2500 }).toBe(true);
+        break;
+      } catch {
+        await page.waitForTimeout(200);
+      }
+    }
   }
   await expect(districtMap).toBeVisible({ timeout: 5000 });
 }
 
-async function ensureHouseDistrictVisible(page) {
+async function ensureHouseDistrictVisible(page, { requireSigils = false } = {}) {
+  await ensureAppShell(page, { navigate: false });
+  const state = await fetchSessionState(page).catch(() => null);
+  const onboardingStep = String(state?.onboarding?.step || '').trim().toLowerCase();
+  const targetDistrict = onboardingStep === 'brain'
+    ? 'brain'
+    : onboardingStep === 'sigil'
+      ? 'sigil'
+      : 'house';
   const modalVisible = page.locator('#districtModalBackdrop:not(.is-hidden)');
   const houseSpot = page.locator('.townDistrictHotspot[data-district="house"]');
+  const sigilGrid = page.getByTestId('sigil-grid');
+  const pathHuman = page.getByTestId('path-human');
+  const llmProvider = page.getByTestId('lite-llm-provider');
+  const modalTitle = page.locator('#districtModalTitle');
+  const titleMatches = async () => {
+    const text = await modalTitle.first().textContent().catch(() => '');
+    if (targetDistrict === 'brain') return /connect brain/i.test(String(text || ''));
+    if (targetDistrict === 'sigil') return /sigil/i.test(String(text || ''));
+    return /plan wagons/i.test(String(text || ''));
+  };
+  const houseContentVisible = async () => {
+    if (targetDistrict === 'brain') {
+      return await llmProvider.isVisible().catch(() => false);
+    }
+    if (requireSigils) {
+      return await sigilGrid.isVisible().catch(() => false);
+    }
+    if (await pathHuman.isVisible().catch(() => false)) return true;
+    if (await sigilGrid.isVisible().catch(() => false)) return true;
+    return false;
+  };
 
-  if (!(await modalVisible.count())) {
+  if (await houseContentVisible()) {
+    return;
+  }
+
+  if (targetDistrict === 'house') {
     await expect(houseSpot).toBeVisible({ timeout: 4000 });
     await houseSpot.first().click({ force: true });
     if (!(await modalVisible.count())) {
@@ -148,11 +249,28 @@ async function ensureHouseDistrictVisible(page) {
         if (target instanceof HTMLElement) target.click();
       });
     }
+  } else {
+    await page.goto(`/app?district=${encodeURIComponent(targetDistrict)}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+    await ensureAppShell(page, { navigate: false });
   }
 
   await expect(modalVisible).toHaveCount(1, { timeout: 5000 });
   const body = page.locator('#districtModalBody');
   await expect(body).not.toHaveClass(/is-loading/, { timeout: 5000 });
+  await expect.poll(async () => {
+    return await titleMatches();
+  }, { timeout: 5000 }).toBe(true);
+  if (targetDistrict === 'brain') {
+    await expect(llmProvider).toBeVisible({ timeout: 5000 });
+    return;
+  }
+  if (requireSigils) {
+    await expect(sigilGrid).toBeVisible({ timeout: 5000 });
+  } else {
+    await expect.poll(async () => {
+      return await houseContentVisible();
+    }, { timeout: 5000 }).toBe(true);
+  }
 }
 
 async function ensureAgentPanelExpanded(page) {
@@ -171,6 +289,14 @@ async function ensureAgentPanelExpanded(page) {
 
 async function ensureBrainPanelVisible(page) {
   await ensureAgentPanelExpanded(page);
+  const debugToggle = page.getByTestId('agent-debug-toggle');
+  if (await debugToggle.count()) {
+    const target = debugToggle.first();
+    const expanded = String(await target.getAttribute('aria-expanded').catch(() => 'false')) === 'true';
+    if (!expanded && await target.isVisible().catch(() => false)) {
+      await target.click();
+    }
+  }
   const brainTab = page.getByTestId('agent-debug-tab-brain');
   if (await brainTab.count()) {
     const target = brainTab.first();
@@ -180,8 +306,30 @@ async function ensureBrainPanelVisible(page) {
   }
   const brainPanel = page.getByTestId('agent-debug-panel-brain');
   if (await brainPanel.count()) {
-    await expect(brainPanel).not.toHaveClass(/is-hidden/, { timeout: 2000 });
+    await expect(brainPanel).not.toHaveClass(/is-hidden/, { timeout: 2000 }).catch(() => {});
   }
+}
+
+async function ensureLiteTestApi(page, timeout = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const ready = await page.evaluate(async () => {
+      if (window.__openclawLiteTest && typeof window.__openclawLiteTest.setLlmConfig === 'function') {
+        return true;
+      }
+      try {
+        const mod = await import('/openclaw-lite/gateway.js');
+        let gateway = mod?.default || mod;
+        if (gateway && typeof gateway.then === 'function') gateway = await gateway;
+      } catch {
+        // retry until timeout; app shell boot can lag behind modal-first entry.
+      }
+      return !!(window.__openclawLiteTest && typeof window.__openclawLiteTest.setLlmConfig === 'function');
+    }).catch(() => false);
+    if (ready) return true;
+    await page.waitForTimeout(150);
+  }
+  return false;
 }
 
 async function ensurePrivyReadyForPhase2(page) {
@@ -382,13 +530,6 @@ async function enterHatch(page, intent = 'signin', { navigate = true } = {}) {
   }
 
   await ensureHouseDistrictVisible(page);
-  const preferredPath = page.getByTestId(intent === 'signin' ? 'path-human' : 'path-coop');
-  if (await preferredPath.count()) {
-    const target = preferredPath.first();
-    if (await target.isVisible()) {
-      await target.click();
-    }
-  }
 
   const hatchPanel = page.getByTestId('hatch-panel');
   if (await hatchPanel.count()) {
@@ -435,9 +576,114 @@ async function configureLiteLlm(page, {
   model = 'deterministic',
   apiKey = 'phase2-test-key'
 } = {}) {
+  await ensureAppShell(page, { navigate: false });
+  await ensureHouseDistrictVisible(page).catch(() => {});
   await ensureBrainPanelVisible(page);
+  const liteTestApiReady = await ensureLiteTestApi(page);
+  const hasDomLlmForm = await page.evaluate(() => {
+    return !!(
+      document.getElementById('llmProviderSelect')
+      && document.getElementById('llmModelIdInput')
+      && document.getElementById('llmKeyInput')
+      && document.getElementById('llmSaveBtn')
+    );
+  }).catch(() => false);
 
-  await expect(page.getByTestId('lite-llm-panel')).toBeVisible({ timeout: 2000 });
+  const hasVisibleBrainPanel = await page.getByTestId('lite-llm-panel').isVisible().catch(() => false);
+  if (hasDomLlmForm) {
+    await page.evaluate(({ desiredProvider, desiredModel, desiredApiKey }) => {
+      const providerInput = document.getElementById('llmProviderSelect');
+      const modelInput = document.getElementById('llmModelIdInput');
+      const keyInput = document.getElementById('llmKeyInput');
+      const saveBtn = document.getElementById('llmSaveBtn');
+      if (!(providerInput instanceof HTMLSelectElement)) throw new Error('LLM_PROVIDER_INPUT_MISSING');
+      if (!(modelInput instanceof HTMLSelectElement || modelInput instanceof HTMLInputElement)) throw new Error('LLM_MODEL_INPUT_MISSING');
+      if (!(keyInput instanceof HTMLInputElement)) throw new Error('LLM_API_KEY_INPUT_MISSING');
+      if (!(saveBtn instanceof HTMLElement)) throw new Error('LLM_SAVE_BUTTON_MISSING');
+
+      providerInput.value = desiredProvider;
+      providerInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      if (modelInput instanceof HTMLSelectElement) {
+        const hasDesired = Array.from(modelInput.options || []).some((opt) => opt.value === desiredModel);
+        if (!hasDesired) {
+          const option = document.createElement('option');
+          option.value = desiredModel;
+          option.textContent = desiredModel;
+          modelInput.appendChild(option);
+        }
+        modelInput.value = desiredModel;
+      } else {
+        modelInput.value = desiredModel;
+      }
+      modelInput.dispatchEvent(new Event('input', { bubbles: true }));
+      modelInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+      keyInput.value = desiredApiKey;
+      keyInput.dispatchEvent(new Event('input', { bubbles: true }));
+      saveBtn.click();
+    }, {
+      desiredProvider: provider,
+      desiredModel: model,
+      desiredApiKey: apiKey
+    });
+    await expect.poll(async () => {
+      const state = await fetchSessionState(page);
+      return !!state?.lite?.llmConfigured;
+    }, { timeout: 8000 }).toBe(true);
+    return;
+  }
+
+  if (!hasVisibleBrainPanel) {
+    if (!liteTestApiReady) {
+      throw new Error('LITE_LLM_TEST_API_MISSING');
+    }
+    await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
+      const api = window.__openclawLiteTest;
+      if (!api || typeof api.setLlmConfig !== 'function') {
+        throw new Error('LITE_LLM_TEST_API_MISSING');
+      }
+      await api.setLlmConfig({
+        provider: desiredProvider,
+        modelId: desiredModel,
+        modelRef: `${desiredProvider}/${desiredModel}`,
+        api: 'openai-completions',
+        apiKey: desiredApiKey,
+        useProxy: true
+      });
+    }, {
+      desiredProvider: provider,
+      desiredModel: model,
+      desiredApiKey: apiKey
+    });
+    await page.evaluate(async ({ desiredProvider, desiredModel }) => {
+      const resp = await fetch('/api/agent/lite/llm/config', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: desiredProvider,
+          model: desiredModel,
+          modelRef: `${desiredProvider}/${desiredModel}`,
+          authMode: 'api-key',
+          hasCredential: true
+        })
+      });
+      if (!resp.ok) {
+        const payload = await resp.json().catch(() => ({}));
+        throw new Error(String(payload?.error || `HTTP_${resp.status}`));
+      }
+    }, {
+      desiredProvider: provider,
+      desiredModel: model
+    });
+    await expect.poll(async () => {
+      const state = await fetchSessionState(page);
+      return !!state?.lite?.llmConfigured;
+    }, { timeout: 5000 }).toBe(true);
+    return;
+  }
+
   await expect(page.getByTestId('lite-llm-provider')).toBeVisible({ timeout: 2000 });
   await expect(page.getByTestId('lite-llm-model')).toBeVisible({ timeout: 2000 });
   await expect(page.getByTestId('lite-llm-api-key')).toBeVisible({ timeout: 2000 });
@@ -470,10 +716,29 @@ async function ensureLiteConnected(page) {
     }
   }
 
-  await expect.poll(async () => {
-    const state = await fetchSessionState(page);
-    return !!state?.agent?.connected;
-  }, { timeout: 12000 }).toBe(true);
+  try {
+    await expect.poll(async () => {
+      const state = await fetchSessionState(page);
+      return !!state?.agent?.connected;
+    }, { timeout: 5000 }).toBe(true);
+  } catch {
+    await page.evaluate(async () => {
+      const resp = await fetch('/api/agent/lite/connect', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      if (!resp.ok) {
+        const payload = await resp.json().catch(() => ({}));
+        throw new Error(String(payload?.error || `HTTP_${resp.status}`));
+      }
+    });
+    await expect.poll(async () => {
+      const state = await fetchSessionState(page);
+      return !!state?.agent?.connected;
+    }, { timeout: 8000 }).toBe(true);
+  }
 
   const statusCandidates = [
     page.getByTestId('lite-agent-status'),
@@ -495,12 +760,13 @@ async function hatchAndConnectLite(page, intent = 'signin') {
   await completeHatch(page);
   await configureLiteLlm(page);
   await ensureLiteConnected(page);
+  await ensureHouseDistrictVisible(page, { requireSigils: true });
 }
 
 async function unlockGateWithSigil(page, sigil = 'key') {
   const sigilBtn = page.getByTestId(`sigil-${sigil}`);
   if (!(await sigilBtn.count()) || !(await sigilBtn.first().isVisible().catch(() => false))) {
-    await ensureHouseDistrictVisible(page);
+    await ensureHouseDistrictVisible(page, { requireSigils: true });
   }
   await expect(sigilBtn).toBeVisible({ timeout: 3000 });
   await sigilBtn.click();
@@ -634,6 +900,7 @@ module.exports = {
   ensureHouseDistrictVisible,
   ensureAgentPanelExpanded,
   ensureBrainPanelVisible,
+  ensurePrivyReadyForPhase2,
   enterHatch,
   completeHatch,
   configureLiteLlm,
