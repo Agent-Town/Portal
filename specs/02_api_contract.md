@@ -621,6 +621,52 @@ Response shape:
 }
 ```
 
+### GET `/v1/houses/:houseId/team` (human + house-auth)
+Reads the effective team binding for one House, including the currently promoted immutable config version.
+
+Query params:
+- `teamId` (defaults to `team_main`)
+
+Required headers:
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "houseId": "house_abc",
+    "teamId": "team_main",
+    "activeConfigVersionId": "cfg_01HR...",
+    "activeConfigHash": "sha256:<manifest hash>",
+    "binding": {
+      "teamBindingId": "tb_01H...",
+      "activeConfigVersionId": "cfg_01HR..."
+    },
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "configHash": "sha256:<manifest hash>",
+      "lineage": {
+        "parentConfigVersionIds": ["cfg_prev"]
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INVALID_ARGUMENT`
+
 ### POST `/v1/houses/:houseId/configs` (human + house-auth)
 Creates one immutable candidate or active config version with resolved component version IDs and hashes.
 
@@ -700,6 +746,55 @@ Stable failure codes:
 - `HOUSE_AUTH_INVALID`
 - `HOUSE_AUTH_EXPIRED`
 - `CONFIG_COMPONENT_MUTABLE_REF`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/houses/:houseId/configs/:configVersionId/promote` (human + house-auth)
+Promotes an existing immutable config version by changing the active team binding, without mutating the historical config row.
+
+Request shape:
+```json
+{
+  "teamId": "team_main"
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "houseId": "house_abc",
+    "teamId": "team_main",
+    "activeConfigVersionId": "cfg_01HR...",
+    "binding": {
+      "teamBindingId": "tb_01H...",
+      "activeConfigVersionId": "cfg_01HR..."
+    },
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "configHash": "sha256:<manifest hash>"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `CONFIG_NOT_FOUND`
+- `CONFIG_PROMOTION_BLOCKED`
 - `INVALID_ARGUMENT`
 
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)

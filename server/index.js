@@ -94,6 +94,7 @@ const {
   getRunByIdempotency,
   getRunById,
   getRunByTraceId,
+  getTeamConfigBinding,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
@@ -104,6 +105,7 @@ const {
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   updateRunStatus,
+  upsertTeamConfigBinding,
   upsertConfigVersion,
 } = require('./unified_platform_store');
 const {
@@ -4566,6 +4568,46 @@ app.get('/api/registry/entities/:id', (req, res) => {
   return sendPortalApiSuccess(res, { entity }, { requestId });
 });
 
+app.get('/v1/houses/:houseId/team', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
+  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : 'team_main';
+  if (!requestedHouseId || !teamId) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseId and teamId are required.', { requestId });
+  }
+
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
+  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
+    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
+  }
+  const auth = verifyHouseAuth(req, resolvedHouse.house);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const binding = getTeamConfigBinding({
+    houseId: resolvedHouse.houseId,
+    teamId,
+  });
+  const activeConfig = binding
+    ? getConfigVersion(binding.activeConfigVersionId)
+    : null;
+  return sendPortalApiSuccess(res, {
+    houseId: resolvedHouse.houseId,
+    teamId,
+    activeConfigVersionId: binding?.activeConfigVersionId || null,
+    activeConfigHash: activeConfig?.configHash || null,
+    binding,
+    config: activeConfig,
+  }, { requestId });
+});
+
 app.post('/v1/houses/:houseId/configs', express.json({ limit: '96kb' }), (req, res) => {
   const requestId = buildPortalRequestId();
   const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -4719,6 +4761,67 @@ app.post('/v1/houses/:houseId/configs', express.json({ limit: '96kb' }), (req, r
     config,
     componentVersions,
   }, { status: 201, requestId });
+});
+
+app.post('/v1/houses/:houseId/configs/:configVersionId/promote', express.json({ limit: '48kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
+  const configVersionId = typeof req.params?.configVersionId === 'string' ? req.params.configVersionId.trim() : '';
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  if (!requestedHouseId || !configVersionId || !teamId || !idempotencyKey) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'houseId, configVersionId, teamId, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
+  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
+    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
+  }
+  const auth = verifyHouseAuth(req, resolvedHouse.house);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const config = getConfigVersion(configVersionId);
+  if (!config || config.houseId !== resolvedHouse.houseId || config.teamId !== teamId) {
+    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
+  }
+  if (!PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(String(config.status || '').trim())) {
+    return sendPortalApiError(
+      res,
+      409,
+      'CONFIG_PROMOTION_BLOCKED',
+      'Only candidate or active config versions may be promoted.',
+      { requestId }
+    );
+  }
+
+  const binding = upsertTeamConfigBinding({
+    teamBindingId: `tb_${randomHex(10)}`,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    activeConfigVersionId: configVersionId,
+    nowIso: nowIso(),
+  });
+  return sendPortalApiSuccess(res, {
+    houseId: resolvedHouse.houseId,
+    teamId,
+    activeConfigVersionId: binding.activeConfigVersionId,
+    binding,
+    config,
+  }, { requestId });
 });
 
 app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {
@@ -10350,6 +10453,20 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       config: record,
+    });
+  });
+
+  app.get('/__test__/unified-platform/config-versions/:configVersionId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const config = getConfigVersion(req.params.configVersionId);
+    if (!config) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({
+      ok: true,
+      config,
+      componentVersions: listConfigComponentVersions(config.configVersionId),
     });
   });
 

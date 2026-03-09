@@ -179,6 +179,51 @@ async function createPlatformRun(request, {
   }
 }
 
+async function promotePlatformConfigVersion(request, {
+  houseId = '',
+  houseAuthKey = '',
+  configVersionId = '',
+  teamId = 'team_main',
+  idempotencyKey = '',
+} = {}) {
+  const path = `/v1/houses/${encodeURIComponent(String(houseId || '').trim())}/configs/${encodeURIComponent(String(configVersionId || '').trim())}/promote`;
+  const body = JSON.stringify({ teamId });
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function getPlatformTeamBinding(request, {
+  houseId = '',
+  houseAuthKey = '',
+  teamId = 'team_main',
+} = {}) {
+  const path = `/v1/houses/${encodeURIComponent(String(houseId || '').trim())}/team`;
+  const requestPath = `${path}?teamId=${encodeURIComponent(String(teamId || '').trim())}`;
+  const response = await request.get(requestPath, {
+    headers: houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function ingestPlatformTraceRecords(request, {
   houseId = '',
   houseAuthKey = '',
@@ -215,6 +260,19 @@ async function getPlatformTraceEvents(request, traceId) {
   return await response.json();
 }
 
+async function getPlatformConfigVersionRecord(request, configVersionId) {
+  const response = await request.get(`/__test__/unified-platform/config-versions/${encodeURIComponent(String(configVersionId || ''))}`, {
+    headers: { 'x-test-reset': resetToken },
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function setPlatformRunStatus(request, runId, status) {
   const response = await request.post(`/__test__/unified-platform/runs/${encodeURIComponent(String(runId || ''))}/status`, {
     headers: {
@@ -233,11 +291,14 @@ module.exports = {
   createPlatformRun,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
   getDefaultCompiledPackManifest,
+  getPlatformConfigVersionRecord,
   getPlatformCounts,
   getPlatformFixture,
+  getPlatformTeamBinding,
   getPlatformTraceEvents,
   listPlatformFixtures,
   ingestPlatformTraceRecords,
+  promotePlatformConfigVersion,
   readWorkerSessionId,
   seedPlatformConfigVersion,
   setPlatformRunStatus,

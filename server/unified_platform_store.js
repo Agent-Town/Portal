@@ -431,6 +431,36 @@ function listConfigComponentVersions(configVersionId = '') {
   return rows.map(mapConfigComponentVersionRow).filter(Boolean);
 }
 
+function mapTeamConfigBindingRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    teamBindingId: String(row.team_binding_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    activeConfigVersionId: String(row.active_config_version_id || ''),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getTeamConfigBinding({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM team_config_bindings
+    WHERE house_id = ?
+      AND team_id = ?
+    LIMIT 1
+  `).get(normalizedHouseId, normalizedTeamId);
+  return mapTeamConfigBindingRow(row);
+}
+
 function upsertConfigVersion({
   configVersionId = '',
   houseId = '',
@@ -546,6 +576,54 @@ function replaceConfigComponentVersions({
     throw err;
   }
   return listConfigComponentVersions(normalizedConfigVersionId);
+}
+
+function upsertTeamConfigBinding({
+  teamBindingId = '',
+  houseId = '',
+  teamId = '',
+  activeConfigVersionId = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedActiveConfigVersionId = String(activeConfigVersionId || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedActiveConfigVersionId) {
+    throw new Error('TEAM_CONFIG_BINDING_INVALID');
+  }
+  const existing = getTeamConfigBinding({
+    houseId: normalizedHouseId,
+    teamId: normalizedTeamId,
+  });
+  const bindingId = String(teamBindingId || '').trim() || existing?.teamBindingId || '';
+  if (!bindingId) {
+    throw new Error('TEAM_CONFIG_BINDING_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO team_config_bindings (
+      team_binding_id,
+      house_id,
+      team_id,
+      active_config_version_id,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(house_id, team_id) DO UPDATE SET
+      active_config_version_id = excluded.active_config_version_id,
+      updated_at = excluded.updated_at
+  `).run(
+    bindingId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedActiveConfigVersionId,
+    existing?.createdAt || nowIso,
+    nowIso,
+  );
+  return getTeamConfigBinding({
+    houseId: normalizedHouseId,
+    teamId: normalizedTeamId,
+  });
 }
 
 function mapRunRow(row) {
@@ -950,6 +1028,7 @@ module.exports = {
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,
+  getTeamConfigBinding,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,
@@ -964,5 +1043,6 @@ module.exports = {
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   updateRunStatus,
+  upsertTeamConfigBinding,
   upsertConfigVersion,
 };
