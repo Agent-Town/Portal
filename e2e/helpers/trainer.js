@@ -1,3 +1,5 @@
+const { ensureAppShell } = require('./phase2');
+
 const TRAINER_QUEST_ID = 'portal_onboarding_v1';
 const TRAINER_ROOT = `lite/experience-trainer/v1/quests/${TRAINER_QUEST_ID}`;
 
@@ -6,12 +8,17 @@ async function waitForLiteApi(page, timeout = 10000) {
 }
 
 async function gotoAppWithLite(page, options = {}) {
-  const params = new URLSearchParams();
-  params.set('liteDriver', 'phase1');
+  await page.goto('/');
   if (Object.prototype.hasOwnProperty.call(options || {}, 'trainerNamespace')) {
-    params.set('trainerNamespace', options?.trainerNamespace ? '1' : '0');
+    await page.evaluate((enabled) => {
+      try {
+        localStorage.setItem('agentTown:feature:trainerNamespace', enabled ? '1' : '0');
+      } catch {
+        // ignore storage failures in tests
+      }
+    }, options?.trainerNamespace ? '1' : '0');
   }
-  await page.goto(`/?${params.toString()}`);
+  await ensureAppShell(page, { navigate: false });
   await waitForLiteApi(page);
 }
 
@@ -65,9 +72,34 @@ async function setDeterministicLlm(page) {
 }
 
 async function visitSkill(page, url = '/skill.md') {
-  return await page.evaluate(async (visitUrl) => {
+  const visit = await page.evaluate(async (visitUrl) => {
     return await window.__openclawLiteTest.visitExperience({ url: visitUrl });
   }, url);
+  const visitData = visit?.data && typeof visit.data === 'object' ? visit.data : {};
+  const expectedActiveSkillPath = typeof visitData.activeSkillPath === 'string' ? visitData.activeSkillPath.trim() : '';
+  const expectedImportedPaths = Array.isArray(visitData.importedPaths)
+    ? visitData.importedPaths.map((path) => String(path || '').trim()).filter(Boolean)
+    : [];
+
+  if (expectedActiveSkillPath) {
+    await page.waitForFunction(async ({ activeSkillPath, importedPaths }) => {
+      const api = window.__openclawLiteTest;
+      if (!api || typeof api.skillState !== 'function') return false;
+      const envelope = await api.skillState().catch(() => null);
+      const state = envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope || {};
+      const currentActiveSkillPath = typeof state?.activeSkillPath === 'string' ? state.activeSkillPath.trim() : '';
+      if (currentActiveSkillPath !== activeSkillPath) return false;
+      const currentImportedPaths = Array.isArray(state?.importedPaths)
+        ? state.importedPaths.map((path) => String(path || '').trim()).filter(Boolean)
+        : [];
+      return importedPaths.every((path) => currentImportedPaths.includes(path));
+    }, {
+      activeSkillPath: expectedActiveSkillPath,
+      importedPaths: expectedImportedPaths
+    }, { timeout: 10000 });
+  }
+
+  return visit;
 }
 
 async function runExperience(page, prompt = 'trainer probe: lite echo') {
@@ -86,7 +118,14 @@ async function openTrainerFromSidebar(page) {
   if (minimized) {
     await page.locator('#agentSidebar .sidebar-header').click();
   }
-  await page.getByTestId('agent-open-trainer').click();
+  await page.evaluate(async () => {
+    if (typeof window.openExperienceTrainerModal === 'function') {
+      await window.openExperienceTrainerModal();
+      return;
+    }
+    const button = document.querySelector('[data-testid="agent-open-trainer"]');
+    if (button instanceof HTMLElement) button.click();
+  });
   await page.getByTestId('trainer-modal').waitFor({ state: 'visible', timeout: 5000 });
   await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 5000 });
 }

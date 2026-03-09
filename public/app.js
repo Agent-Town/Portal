@@ -489,11 +489,12 @@ async function loadPrivyConfigForApp() {
     appPrivyConfig = {
       ok: payload?.ok === true,
       enabled,
-      appPath: payload?.appPath || '/app'
+      appPath: payload?.appPath || '/app',
+      loginMethod: payload?.config?.loginMethod || ''
     };
     return appPrivyConfig;
   } catch {
-    appPrivyConfig = { ok: false, enabled: false, appPath: '/app' };
+    appPrivyConfig = { ok: false, enabled: false, appPath: '/app', loginMethod: '' };
     return appPrivyConfig;
   }
 }
@@ -503,14 +504,35 @@ async function ensurePrivyAuthenticatedForHub() {
 
   const cfg = await loadPrivyConfigForApp();
   if (!cfg || cfg.enabled !== true) return true;
-  if (typeof window.ensurePrivyLogin !== 'function') return false;
 
-  try {
-    const isLoggedIn = await window.ensurePrivyLogin({ interactive: false });
-    if (!isLoggedIn) return false;
-  } catch {
-    return false;
+  let ensureLogin = null;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    if (typeof window.ensurePrivyLogin === 'function') {
+      ensureLogin = window.ensurePrivyLogin;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  if (typeof ensureLogin !== 'function') return false;
+
+  let isLoggedIn = false;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      isLoggedIn = await ensureLogin({ interactive: false });
+    } catch {
+      isLoggedIn = false;
+    }
+    if (isLoggedIn) break;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  if (!isLoggedIn && String(cfg?.loginMethod || '').trim().toLowerCase() === 'guest') {
+    try {
+      isLoggedIn = await ensureLogin({ interactive: true });
+    } catch {
+      isLoggedIn = false;
+    }
+  }
+  if (!isLoggedIn) return false;
 
   if (appWalletClient) {
     try {
@@ -6562,6 +6584,29 @@ async function applyGatewayLlmConfig(config) {
   gatewayApi.send(buildGatewayLlmPayload(config));
 }
 
+async function syncLiteLlmSessionConfig(config) {
+  const provider = String(config?.provider || '').trim();
+  const model = String(config?.model || '').trim();
+  const modelRef = String(config?.modelRef || `${provider}/${model}`).trim();
+  if (!provider || !model) return null;
+  return await api('/api/agent/lite/llm/config', {
+    method: 'POST',
+    body: JSON.stringify({
+      provider,
+      model,
+      modelRef,
+      authMode: config?.authMode === 'oauth-json' ? 'oauth-json' : 'api-key',
+      hasCredential: config?.configured !== false && !!String(config?.credential || '').trim()
+    })
+  });
+}
+
+async function clearLiteLlmSessionConfig() {
+  return await api('/api/agent/lite/llm/config', {
+    method: 'DELETE'
+  });
+}
+
 async function refreshLiteSkillState({ force = false } = {}) {
   const now = Date.now();
   if (!force && now - liteSkillLastSyncAtMs < 1200) return getLiteSkillState();
@@ -7440,6 +7485,9 @@ async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
     const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
     applyLocalLiteLlmToInputs(localCfg);
 
+    if (localCfg.configured) {
+      await syncLiteLlmSessionConfig(localCfg).catch(() => null);
+    }
     await applyGatewayLlmConfig(localCfg);
     if (runtimeBridge) {
       await ensureVendorRuntimeBridge(state);
@@ -7518,6 +7566,14 @@ function initStep2Listener() {
         apiKeySet: true
       });
       clearLiteSkillLoopPause();
+      await syncLiteLlmSessionConfig({
+        configured: true,
+        provider: config.provider,
+        model: config.model,
+        modelRef: config.modelRef,
+        credential: config.credential,
+        authMode: config.authMode
+      });
       await applyGatewayLlmConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
@@ -7602,6 +7658,7 @@ async function clearLiteLlmConfig() {
       apiKeySet: false
     });
     clearLiteSkillLoopPause();
+    await clearLiteLlmSessionConfig();
     await applyGatewayLlmConfig({ configured: false });
     if (authModeSel) {
       authModeSel.value = 'api-key';

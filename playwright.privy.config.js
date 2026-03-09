@@ -2,7 +2,7 @@
 const path = require('path');
 const base = require('./playwright.config');
 
-const PORT = Number(process.env.PW_PORT || 4184);
+const PORT = Number(process.env.PW_PORT || 4173);
 
 module.exports = {
   ...base,

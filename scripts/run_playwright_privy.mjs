@@ -9,6 +9,7 @@ const env = {
   LOAD_DOTENV_IN_TEST: '1',
   ENABLE_PRIVY_IN_TEST: '1',
   START_PAGE_ENABLED: process.env.START_PAGE_ENABLED || '1',
+  PW_PORT: process.env.PW_PORT || '4173',
 };
 
 if (useGuest) {

@@ -6000,10 +6000,19 @@ app.get('/api/onboarding/status', (req, res) => {
 });
 
 app.get('/api/privy/config', (_req, res) => {
+  const publicConfig = PRIVY_ENABLED
+    ? {
+        ...PRIVY_PUBLIC_CONFIG,
+        ...(process.env.NODE_ENV === 'test' ? { testMode: true } : {}),
+        ...(process.env.NODE_ENV === 'test' && process.env.TEST_RESET_TOKEN
+          ? { testResetToken: process.env.TEST_RESET_TOKEN }
+          : {})
+      }
+    : null;
   res.json({
     ok: true,
     enabled: PRIVY_ENABLED,
-    config: PRIVY_ENABLED ? PRIVY_PUBLIC_CONFIG : null,
+    config: publicConfig,
     startPageEnabled: START_PAGE_ENABLED,
     appPath: '/app'
   });

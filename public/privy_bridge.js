@@ -35,6 +35,16 @@
     return fallback;
   }
 
+  const TEST_PRIVY_STORAGE_KEY = 'agentTown:privy:test-guest:v1';
+  const TEST_PRIVY_SOLANA_ADDRESS = 'So11111111111111111111111111111111111111112';
+  const TEST_PRIVY_EVM_ADDRESS = '0x1111111111111111111111111111111111111111';
+  const TEST_PRIVY_EVM_CHAIN_ID = '0xaa36a7';
+
+  function shouldUseDeterministicTestBridge(config) {
+    return parseBool(config?.testMode, false)
+      && normalizePrivyLoginMethod(config?.loginMethod || 'email', 'email') === 'guest';
+  }
+
   function hasBridge() {
     return !!window.__PRIVY_WALLET_BRIDGE__;
   }
@@ -110,6 +120,84 @@
 
   function textBytes(value) {
     return new TextEncoder().encode(String(value || ''));
+  }
+
+  function readDeterministicTestGuestUser() {
+    try {
+      const raw = localStorage.getItem(TEST_PRIVY_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeDeterministicTestGuestUser(user) {
+    try {
+      if (!user) {
+        localStorage.removeItem(TEST_PRIVY_STORAGE_KEY);
+        return;
+      }
+      localStorage.setItem(TEST_PRIVY_STORAGE_KEY, JSON.stringify(user));
+    } catch {
+      // ignore storage failures in deterministic test bridge
+    }
+  }
+
+  async function deterministicBytes(label, value, length = 32) {
+    const normalizedLength = Number.isFinite(Number(length)) ? Math.max(1, Math.floor(length)) : 32;
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value || {});
+    const out = new Uint8Array(normalizedLength);
+    let offset = 0;
+    let counter = 0;
+    while (offset < normalizedLength) {
+      const seed = textBytes(`${String(label || 'seed')}:${counter}:${serialized}`);
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', seed));
+      const chunk = digest.subarray(0, Math.min(digest.length, normalizedLength - offset));
+      out.set(chunk, offset);
+      offset += chunk.length;
+      counter += 1;
+    }
+    return out;
+  }
+
+  async function deterministicHex(label, value, length = 32) {
+    const bytes = await deterministicBytes(label, value, length);
+    return `0x${Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  }
+
+  function createDeterministicTestGuestUser() {
+    return {
+      id: 'privy:test:guest',
+      linkedAccounts: [
+        { chain: 'solana', address: TEST_PRIVY_SOLANA_ADDRESS },
+        { chain: 'evm', address: TEST_PRIVY_EVM_ADDRESS }
+      ],
+      wallets: [
+        { chain: 'solana', address: TEST_PRIVY_SOLANA_ADDRESS },
+        { chain: 'evm', address: TEST_PRIVY_EVM_ADDRESS }
+      ]
+    };
+  }
+
+  async function bindDeterministicTestWallet(config, chain, address) {
+    const resetToken = typeof config?.testResetToken === 'string' ? config.testResetToken.trim() : '';
+    if (!resetToken) return false;
+    try {
+      const resp = await fetch('/__test__/session/bind-wallet', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'content-type': 'application/json',
+          'x-test-reset': resetToken
+        },
+        body: JSON.stringify({ chain, address })
+      });
+      return resp.ok;
+    } catch {
+      return false;
+    }
   }
 
   function normalizeAddress(value) {
@@ -428,6 +516,201 @@
         ethereum: { createOnLogin: 'users-without-wallets' },
         solana: { createOnLogin: 'users-without-wallets' }
       }
+    };
+  }
+
+  async function createDeterministicTestPrivyBridge(config) {
+    const state = {
+      user: readDeterministicTestGuestUser(),
+      solanaProvider: null,
+      evmProvider: null,
+    };
+
+    const syncState = () => {
+      state.user = readDeterministicTestGuestUser();
+      return state.user;
+    };
+
+    const storeUser = (user) => {
+      state.user = user && typeof user === 'object' ? user : null;
+      writeDeterministicTestGuestUser(state.user);
+      return state.user;
+    };
+
+    const clearState = () => {
+      state.solanaProvider = null;
+      state.evmProvider = null;
+      storeUser(null);
+    };
+
+    const makeSolanaProvider = () => {
+      if (state.solanaProvider) return state.solanaProvider;
+      const publicKey = {
+        toString() {
+          return TEST_PRIVY_SOLANA_ADDRESS;
+        },
+        toBase58() {
+          return TEST_PRIVY_SOLANA_ADDRESS;
+        }
+      };
+      state.solanaProvider = {
+        publicKey,
+        isConnected: true,
+        on() {},
+        off() {},
+        async connect() {
+          return { publicKey };
+        },
+        async disconnect() {
+          return true;
+        },
+        async signMessage(messageBytes) {
+          const normalized = normalizeBytes(messageBytes) || textBytes(String(messageBytes || ''));
+          return {
+            signature: await deterministicBytes('privy-test-solana-sign', {
+              address: TEST_PRIVY_SOLANA_ADDRESS,
+              message: bytesToBase64(normalized)
+            }, 64)
+          };
+        },
+        async request({ method = '', params = {} } = {}) {
+          if (method === 'connect') return { publicKey };
+          if (method === 'signMessage') {
+            const messageBytes = normalizeBytes(params?.message) || textBytes(String(params?.message || ''));
+            return {
+              signature: await deterministicBytes('privy-test-solana-sign', {
+                address: TEST_PRIVY_SOLANA_ADDRESS,
+                message: bytesToBase64(messageBytes)
+              }, 64)
+            };
+          }
+          if (method === 'getAccounts') {
+            return [{ address: TEST_PRIVY_SOLANA_ADDRESS, public_key: TEST_PRIVY_SOLANA_ADDRESS }];
+          }
+          throw new Error(`UNSUPPORTED_SOLANA_METHOD:${method}`);
+        }
+      };
+      return state.solanaProvider;
+    };
+
+    const makeEvmProvider = () => {
+      if (state.evmProvider) return state.evmProvider;
+      state.evmProvider = {
+        on() {},
+        off() {},
+        async request({ method = '', params = [] } = {}) {
+          if (method === 'eth_requestAccounts' || method === 'eth_accounts') {
+            return [TEST_PRIVY_EVM_ADDRESS];
+          }
+          if (method === 'eth_chainId') {
+            return TEST_PRIVY_EVM_CHAIN_ID;
+          }
+          if (method === 'wallet_switchEthereumChain' || method === 'wallet_addEthereumChain') {
+            return null;
+          }
+          if (method === 'personal_sign') {
+            const message = Array.isArray(params) ? String(params[0] || '') : '';
+            return deterministicHex('privy-test-evm-sign', {
+              address: TEST_PRIVY_EVM_ADDRESS,
+              message
+            }, 65);
+          }
+          if (method === 'eth_sendTransaction') {
+            const transaction = Array.isArray(params) ? params[0] || {} : {};
+            return deterministicHex('privy-test-evm-send', transaction, 32);
+          }
+          throw new Error(`UNSUPPORTED_EVM_METHOD:${method}`);
+        }
+      };
+      return state.evmProvider;
+    };
+
+    const ensureLoggedIn = async ({ interactive = true } = {}) => {
+      const current = state.user || syncState();
+      if (current) return current;
+      if (!interactive) return null;
+      const created = createDeterministicTestGuestUser();
+      storeUser(created);
+      await bindDeterministicTestWallet(config, 'solana', TEST_PRIVY_SOLANA_ADDRESS);
+      await bindDeterministicTestWallet(config, 'evm', TEST_PRIVY_EVM_ADDRESS);
+      return created;
+    };
+
+    return {
+      get user() {
+        return state.user || syncState();
+      },
+      get isLoggedIn() {
+        return !!(state.user || syncState());
+      },
+      async getUser() {
+        return state.user || syncState();
+      },
+      ensureLoggedIn,
+      connectSolana: async ({ silent = false } = {}) => {
+        const user = await ensureLoggedIn({ interactive: !silent });
+        if (!user) throw new Error('NO_SOLANA_WALLET');
+        await bindDeterministicTestWallet(config, 'solana', TEST_PRIVY_SOLANA_ADDRESS);
+        const provider = makeSolanaProvider();
+        return { address: TEST_PRIVY_SOLANA_ADDRESS, provider, wallet: provider };
+      },
+      disconnectSolana: async () => {
+        clearState();
+        return true;
+      },
+      signSolanaMessage: async ({ message = '', bytes = null } = {}) => {
+        await ensureLoggedIn({ interactive: true });
+        const normalized = normalizeBytes(bytes) || textBytes(message);
+        return {
+          signature: await deterministicBytes('privy-test-solana-sign', {
+            address: TEST_PRIVY_SOLANA_ADDRESS,
+            message: bytesToBase64(normalized)
+          }, 64)
+        };
+      },
+      sendSolanaTransaction: async ({ transaction = '' } = {}) => {
+        await ensureLoggedIn({ interactive: true });
+        return {
+          hash: bytesToBase58(await deterministicBytes('privy-test-solana-tx', transaction, 32)),
+          transactionId: bytesToBase58(await deterministicBytes('privy-test-solana-tx-id', transaction, 32))
+        };
+      },
+      connectEvm: async ({ silent = false } = {}) => {
+        const user = await ensureLoggedIn({ interactive: !silent });
+        if (!user) throw new Error('NO_EVM_WALLET');
+        await bindDeterministicTestWallet(config, 'evm', TEST_PRIVY_EVM_ADDRESS);
+        const provider = makeEvmProvider();
+        return {
+          address: TEST_PRIVY_EVM_ADDRESS,
+          provider,
+          wallet: { provider, refreshProvider: async () => provider },
+          executionMode: 'tee',
+          isUnifiedWallet: true
+        };
+      },
+      disconnectEvm: async () => {
+        clearState();
+        return true;
+      },
+      signEvmMessage: async ({ message = '', address = null } = {}) => {
+        await ensureLoggedIn({ interactive: true });
+        return {
+          signature: await deterministicHex('privy-test-evm-sign', {
+            address: normalizeAddress(address) || TEST_PRIVY_EVM_ADDRESS,
+            message: String(message || '')
+          }, 65)
+        };
+      },
+      sendEvmTransaction: async ({ transaction = {} } = {}) => {
+        await ensureLoggedIn({ interactive: true });
+        const hash = await deterministicHex('privy-test-evm-send', transaction, 32);
+        return {
+          hash,
+          transactionHash: hash,
+          userOperationHash: hash
+        };
+      },
+      resetWalletProxies: async () => true,
     };
   }
 
@@ -1392,6 +1675,16 @@
       }
     }
 
+    if (shouldUseDeterministicTestBridge(config)) {
+      const bridge = await createDeterministicTestPrivyBridge(config);
+      if (bridge && typeof bridge === 'object') {
+        window.__PRIVY_WALLET_BRIDGE__ = bridge;
+        lastBootstrapError = null;
+        return true;
+      }
+      return false;
+    }
+
     if (!parseBool(config.enableDefaultBridge, true)) return false;
     if (defaultBridgePromise) return defaultBridgePromise;
     defaultBridgePromise = createDefaultPrivyBridge(config)
@@ -1422,7 +1715,7 @@
       const config = await fetchPrivyConfig();
       if (!config) return false;
 
-      if (config.sdkScriptUrl) {
+      if (!shouldUseDeterministicTestBridge(config) && config.sdkScriptUrl) {
         try {
           await loadScriptOnce(config.sdkScriptUrl);
         } catch (err) {

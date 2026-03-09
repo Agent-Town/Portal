@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { ensureAppShell, ensurePrivyReadyForPhase2 } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -7,7 +8,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 async function openAtlasFrame(page) {
-  await page.goto('/atlas');
+  await ensureAppShell(page);
+  await ensurePrivyReadyForPhase2(page);
+  await page.locator('.townDistrictHotspot[data-district="atlas"]').click();
   await expect(page.locator('#districtModalTitle')).toHaveText('Atlas Depot');
   const frame = page.locator('#districtModalBody iframe.districtFrame');
   await expect(frame).toBeVisible();

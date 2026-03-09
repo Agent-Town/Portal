@@ -27,16 +27,14 @@ test('open transition is completed by co-op agent open-press action', async ({ p
 
   await expect.poll(() => agentOpenSeen, { timeout: 2000 }).toBe(true);
   await agentOpen;
-  if (!page.url().includes('/create')) {
-    const openReady = page.locator('#openReady a[href="/create"]');
-    if (await openReady.isVisible().catch(() => false)) {
-      await openReady.click();
-    }
-  }
-  if (!page.url().includes('/create')) {
-    await page.goto('/create');
-  }
-  await page.waitForURL('**/create', { timeout: 10000 });
+  const openReady = page.locator('#openReady a[href="/create"]');
+  await expect(openReady).toBeVisible({ timeout: 5000 });
+  await openReady.click();
+  await expect(page).toHaveURL(/\/app/);
+  await expect(page.locator('#districtModalTitle')).toHaveText('Ceremony');
+  const frame = page.locator('#districtModalBody iframe.districtFrame');
+  await expect(frame).toBeVisible({ timeout: 5000 });
+  await expect(frame).toHaveAttribute('src', /\/create\?embed=1/);
 
   const state = await fetchSessionState(page);
   expect(state.signup?.complete).toBe(true);
