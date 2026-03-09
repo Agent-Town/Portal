@@ -1,6 +1,7 @@
 const { gotoAppWithLite } = require('./trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+const DEFAULT_COMPILED_PACK_MANIFEST_PATH = 'workspace/.agent-town/default-pack/manifest.json';
 
 async function getPlatformCounts(request) {
   const response = await request.get('/__test__/unified-platform/stats', {
@@ -62,7 +63,32 @@ async function readWorkerSessionId(page) {
   });
 }
 
+async function compileDefaultSkillPack(page, { idempotencyKey = '', force = false } = {}) {
+  return await page.evaluate(async ({ compileIdempotencyKey, compileForce }) => {
+    const api = window.__openclawLiteTest;
+    if (!api || typeof api.compileDefaultSkillPack !== 'function') return null;
+    return await api.compileDefaultSkillPack({
+      idempotencyKey: compileIdempotencyKey,
+      force: compileForce,
+    });
+  }, {
+    compileIdempotencyKey: String(idempotencyKey || ''),
+    compileForce: force === true,
+  });
+}
+
+async function getDefaultCompiledPackManifest(page) {
+  return await page.evaluate(async () => {
+    const api = window.__openclawLiteTest;
+    if (!api || typeof api.getDefaultCompiledPackManifest !== 'function') return null;
+    return await api.getDefaultCompiledPackManifest();
+  });
+}
+
 module.exports = {
+  compileDefaultSkillPack,
+  DEFAULT_COMPILED_PACK_MANIFEST_PATH,
+  getDefaultCompiledPackManifest,
   getPlatformCounts,
   getPlatformFixture,
   listPlatformFixtures,

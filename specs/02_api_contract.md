@@ -582,6 +582,45 @@ Response shape:
 }
 ```
 
+### GET `/api/platform/default-skill-pack` (human)
+Returns the deterministic internal pack compiled from `public/skill.md` for the default Portal experience.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "experienceId": "agent_town_coop_v1",
+    "packId": "pack_portal_onboarding_v1",
+    "packVersionId": "packv_<hash-prefix>",
+    "contentHash": "sha256:<manifest hash>",
+    "sourceRefs": [
+      {
+        "path": "/skill.md",
+        "hash": "sha256:<manual hash>"
+      }
+    ],
+    "fileHashes": {
+      "manual/skill.md": "sha256:<hash>",
+      "heartbeat.md": "sha256:<hash>",
+      "tools.md": "sha256:<hash>",
+      "trace_map.json": "sha256:<hash>"
+    },
+    "entryUrl": "/__compiled/default-skill-pack/skill.md",
+    "files": {
+      "manual/skill.md": "/__compiled/default-skill-pack/manual/skill.md",
+      "heartbeat.md": "/__compiled/default-skill-pack/heartbeat.md",
+      "tools.md": "/__compiled/default-skill-pack/tools.md",
+      "trace_map.json": "/__compiled/default-skill-pack/trace_map.json"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
 

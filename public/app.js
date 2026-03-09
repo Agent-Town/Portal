@@ -320,6 +320,8 @@ const DEFAULT_LITE_SKILL_STATE = Object.freeze({
   lastError: null,
   lastImportedAtMs: null
 });
+const DEFAULT_LITE_SKILL_PACK_MANIFEST_PATH = '/api/platform/default-skill-pack';
+const DEFAULT_LITE_SKILL_PACK_ENTRY_PATH = '/__compiled/default-skill-pack/skill.md';
 let liteSkillState = { ...DEFAULT_LITE_SKILL_STATE };
 let liteRuntimeState = {};
 let liteSkillSyncPromise = null;
@@ -5761,10 +5763,25 @@ function isTrustedDefaultSkill(skill = {}) {
   if (!sourceUrlRaw) return false;
   try {
     const sourceUrl = new URL(sourceUrlRaw, window.location.origin);
-    return sourceUrl.origin === window.location.origin && sourceUrl.pathname === '/skill.md';
+    return sourceUrl.origin === window.location.origin && (
+      sourceUrl.pathname === '/skill.md'
+      || sourceUrl.pathname === DEFAULT_LITE_SKILL_PACK_ENTRY_PATH
+      || sourceUrl.pathname === '/__compiled/default-skill-pack/SKILL.md'
+    );
   } catch {
     return false;
   }
+}
+
+async function resolveDefaultLiteSkillImportUrl() {
+  try {
+    const payload = await api(DEFAULT_LITE_SKILL_PACK_MANIFEST_PATH);
+    const entryUrl = String(payload?.data?.entryUrl || '').trim();
+    if (entryUrl) return entryUrl;
+  } catch {
+    // Fall back to the legacy public manual route if the compiled bridge is unavailable.
+  }
+  return '/skill.md';
 }
 
 function isLiteAgentActive(state) {
@@ -6633,14 +6650,15 @@ async function ensureDefaultLiteSkillImported(state) {
   liteSkillAutoImportPromise = (async () => {
     const gatewayApi = await initGateway();
     if (!gatewayApi || typeof gatewayApi.visitExperience !== 'function') return;
-    const visit = await gatewayApi.visitExperience({ url: '/skill.md' });
+    const importUrl = await resolveDefaultLiteSkillImportUrl();
+    const visit = await gatewayApi.visitExperience({ url: importUrl });
     if (visit?.ok !== true) {
       const msg = String(visit?.error?.message || visit?.error?.code || 'VISIT_FAILED');
       appendAgentLog(`Default skill import failed: ${msg}`);
       await refreshLiteSkillState({ force: true });
       return;
     }
-    appendAgentLog('Default skill imported: /skill.md');
+    appendAgentLog(`Default skill imported: ${importUrl}`);
     await refreshLiteSkillState({ force: true });
   })()
     .catch((err) => {

@@ -864,7 +864,228 @@ async function init() {
     if (!res?.ok) throw new Error(String(res?.error || "RUNTIME_SESSION_CONTEXT_FAILED"));
     return res.result || null;
   }
+  const DEFAULT_COMPILED_PACK_ROOT = "workspace/.agent-town/default-pack";
+  const DEFAULT_COMPILED_PACK_MANIFEST_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/manifest.json`;
+  const DEFAULT_COMPILED_PACK_MANUAL_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/manual/skill.md`;
+  const DEFAULT_COMPILED_PACK_HEARTBEAT_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/heartbeat.md`;
+  const DEFAULT_COMPILED_PACK_TOOLS_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/tools.md`;
+  const DEFAULT_COMPILED_PACK_TRACE_MAP_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/trace_map.json`;
+  let defaultCompiledPackPromise = null;
+  let defaultCompiledPackCache = null;
+  function unwrapToolEnvelope(value) {
+    if (!value || typeof value !== "object") return null;
+    if (value.ok === true && value.data && typeof value.data === "object") {
+      return value.data;
+    }
+    return value;
+  }
+  async function workspaceReadFileRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.workspace.readFile",
+      responseType: "worker.workspace.readFile",
+      payload: { params }
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "WORKSPACE_READ_FAILED"));
+    return res.result || null;
+  }
+  async function workspaceWriteFileRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.workspace.writeFile",
+      responseType: "worker.workspace.writeFile",
+      payload: { params }
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "WORKSPACE_WRITE_FAILED"));
+    return res.result || null;
+  }
+  async function toolRegistryRequest() {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.tools.registry",
+      responseType: "worker.tools.registry"
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "TOOLS_REGISTRY_FAILED"));
+    return res.info || null;
+  }
+  async function sha256HexFromText(value) {
+    const digest = await crypto.subtle.digest("SHA-256", utf8ToBytes(value));
+    const hex = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `sha256:${hex}`;
+  }
+  function shortHashId(hash, prefix = "packv") {
+    const normalized = String(hash || "").replace(/^sha256:/, "");
+    return `${prefix}_${normalized.slice(0, 24)}`;
+  }
+  function normalizeDefaultSkillSourcePath(sourceUrl) {
+    try {
+      const parsed = new URL(String(sourceUrl || ""), window.location.href);
+      return parsed.pathname || "/skill.md";
+    } catch {
+      return "/skill.md";
+    }
+  }
+  function isSameOriginDefaultSkillSourceUrl(sourceUrl) {
+    try {
+      const parsed = new URL(String(sourceUrl || ""), window.location.href);
+      return parsed.origin === window.location.origin && parsed.pathname === "/skill.md";
+    } catch {
+      return false;
+    }
+  }
+  async function readWorkspaceText(path, fallback = "") {
+    const result = await workspaceReadFileRequest({ path }).catch(() => null);
+    const data = unwrapToolEnvelope(result);
+    return typeof data?.content === "string" ? data.content : fallback;
+  }
+  async function writeWorkspaceText(path, content) {
+    await workspaceWriteFileRequest({ path, content });
+  }
+  function buildDefaultHeartbeatMd(sourcePath) {
+    return [
+      "# Heartbeat",
+      "",
+      `Source manual: ${sourcePath}`,
+      "- Poll shared state at 1 second while the experience is active.",
+      "- Back off to 2-5 seconds only on transient failures.",
+      "- Keep worker-first execution and ask for human input only when the playbook requires it.",
+      ""
+    ].join("\n");
+  }
+  function buildDefaultToolsMd(toolNames = []) {
+    const names = Array.isArray(toolNames) ? toolNames.map((name) => String(name || "").trim()).filter(Boolean).sort() : [];
+    const lines = [
+      "# Tools",
+      "",
+      "Validated runtime tools available when the default pack was compiled:"
+    ];
+    if (names.length === 0) {
+      lines.push("- (tool registry unavailable during compile)");
+    } else {
+      for (const name of names) {
+        lines.push(`- ${name}`);
+      }
+    }
+    lines.push("");
+    return lines.join("\n");
+  }
+  function buildDefaultTraceMapJson(sourcePath) {
+    return `${JSON.stringify({
+      traceMapVersion: "portal-default-pack-v1",
+      sourcePath,
+      experienceId: "agent_town_home",
+      eventFamilies: [
+        "experience.started",
+        "experience.completed",
+        "agent.tool",
+        "human.action"
+      ]
+    }, null, 2)}
+`;
+  }
+  async function readDefaultCompiledPackManifest() {
+    const raw = await readWorkspaceText(DEFAULT_COMPILED_PACK_MANIFEST_PATH, "");
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  async function ensureDefaultSkillPackCompiled({ force = false, idempotencyKey = "" } = {}) {
+    if (defaultCompiledPackPromise && !force) return defaultCompiledPackPromise;
+    let compilePromise = null;
+    compilePromise = (async () => {
+      const skillEnvelope = await skillStateRequest();
+      const skillState = unwrapToolEnvelope(skillEnvelope);
+      const sourceUrl = typeof skillState?.sourceUrl === "string" ? skillState.sourceUrl : "";
+      if (!isSameOriginDefaultSkillSourceUrl(sourceUrl)) return null;
+      const activeSkillPath = typeof skillState?.activeSkillPath === "string" ? skillState.activeSkillPath.trim() : "";
+      if (!activeSkillPath) {
+        throw new Error("DEFAULT_SKILL_PACK_NO_ACTIVE_SKILL");
+      }
+      const manualContent = await readWorkspaceText(activeSkillPath, "");
+      if (!manualContent) {
+        throw new Error("DEFAULT_SKILL_PACK_EMPTY_MANUAL");
+      }
+      const sourcePath = normalizeDefaultSkillSourcePath(sourceUrl);
+      const existingHeartbeat = await readWorkspaceText("workspace/heartbeat.md", "");
+      const existingTools = await readWorkspaceText("workspace/tools.md", "");
+      const existingTraceMap = await readWorkspaceText("workspace/trace_map.json", "");
+      const toolRegistry = await toolRegistryRequest().catch(() => null);
+      const toolNames = Array.isArray(toolRegistry?.names) ? toolRegistry.names.map((name) => String(name || "").trim()).filter(Boolean) : [];
+      const heartbeatContent = existingHeartbeat || buildDefaultHeartbeatMd(sourcePath);
+      const toolsContent = existingTools || buildDefaultToolsMd(toolNames);
+      const traceMapContent = existingTraceMap || buildDefaultTraceMapJson(sourcePath);
+      const fileContents = {
+        "manual/skill.md": manualContent,
+        "heartbeat.md": heartbeatContent,
+        "tools.md": toolsContent,
+        "trace_map.json": traceMapContent
+      };
+      const fileHashes = {};
+      for (const [filePath, content] of Object.entries(fileContents)) {
+        fileHashes[filePath] = await sha256HexFromText(content);
+      }
+      const sourceRefs = [
+        {
+          path: sourcePath,
+          kind: "same_origin_manual",
+          hash: fileHashes["manual/skill.md"]
+        }
+      ];
+      const contentHash = await sha256HexFromText(JSON.stringify({
+        sourceRefs,
+        fileHashes
+      }));
+      const manifest = {
+        packId: "pack_portal_onboarding_v1",
+        packVersionId: shortHashId(contentHash, "packv"),
+        displayName: "Portal Default Skill",
+        sourceKind: "same_origin_manual",
+        sourceRefs,
+        contentHash,
+        fileHashes,
+        compatibility: {
+          experienceKind: "web.portal",
+          minClientVersion: "0.1.0"
+        },
+        compiler: {
+          version: "portal-default-pack-bridge-v1",
+          idempotencyKey: String(idempotencyKey || shortHashId(fileHashes["manual/skill.md"], "idem"))
+        }
+      };
+      if (!force && defaultCompiledPackCache?.manifest?.contentHash === manifest.contentHash && defaultCompiledPackCache?.manifest?.packVersionId === manifest.packVersionId) {
+        return defaultCompiledPackCache.manifest;
+      }
+      await writeWorkspaceText("workspace/heartbeat.md", heartbeatContent);
+      await writeWorkspaceText("workspace/tools.md", toolsContent);
+      await writeWorkspaceText("workspace/trace_map.json", traceMapContent);
+      await writeWorkspaceText(DEFAULT_COMPILED_PACK_MANUAL_PATH, manualContent);
+      await writeWorkspaceText(DEFAULT_COMPILED_PACK_HEARTBEAT_PATH, heartbeatContent);
+      await writeWorkspaceText(DEFAULT_COMPILED_PACK_TOOLS_PATH, toolsContent);
+      await writeWorkspaceText(DEFAULT_COMPILED_PACK_TRACE_MAP_PATH, traceMapContent);
+      await writeWorkspaceText(
+        DEFAULT_COMPILED_PACK_MANIFEST_PATH,
+        `${JSON.stringify(manifest, null, 2)}
+`
+      );
+      defaultCompiledPackCache = {
+        manifest,
+        fileContents
+      };
+      return manifest;
+    })();
+    defaultCompiledPackPromise = compilePromise;
+    try {
+      return await compilePromise;
+    } finally {
+      if (defaultCompiledPackPromise === compilePromise) {
+        defaultCompiledPackPromise = null;
+      }
+    }
+  }
   async function experienceRunRequest(params = {}) {
+    await ensureDefaultSkillPackCompiled({
+      idempotencyKey: typeof params?.idempotencyKey === "string" && params.idempotencyKey.trim() ? params.idempotencyKey.trim() : "default-skill-pack-run"
+    });
     const requestedTimeoutMs = Number(params?.timeoutMs);
     const timeoutMs = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0 ? Math.max(1e4, requestedTimeoutMs) : EXPERIENCE_RUN_REQUEST_TIMEOUT_MS;
     const res = await sendWorkerRequest({
@@ -1049,12 +1270,7 @@ async function init() {
       return Number(count) || 0;
     },
     async getToolRegistryInfo() {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.tools.registry",
-        responseType: "worker.tools.registry"
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "TOOLS_REGISTRY_FAILED"));
-      return res.info || null;
+      return toolRegistryRequest();
     },
     async runToolSmoke({ count = 5 } = {}) {
       const res = await sendWorkerRequest({
@@ -1234,22 +1450,10 @@ async function init() {
       return res.result || null;
     },
     async workspaceReadFile(params = {}) {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.workspace.readFile",
-        responseType: "worker.workspace.readFile",
-        payload: { params }
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "WORKSPACE_READ_FAILED"));
-      return res.result || null;
+      return workspaceReadFileRequest(params);
     },
     async workspaceWriteFile(params = {}) {
-      const res = await sendWorkerRequest({
-        requestType: "gateway.command.workspace.writeFile",
-        responseType: "worker.workspace.writeFile",
-        payload: { params }
-      });
-      if (!res?.ok) throw new Error(String(res?.error || "WORKSPACE_WRITE_FAILED"));
-      return res.result || null;
+      return workspaceWriteFileRequest(params);
     },
     async workspaceEditFile(params = {}) {
       const res = await sendWorkerRequest({
@@ -1341,6 +1545,15 @@ async function init() {
     },
     async runtimeSessionContext(params = {}) {
       return runtimeSessionContextRequest(params);
+    },
+    async compileDefaultSkillPack(params = {}) {
+      return await ensureDefaultSkillPackCompiled({
+        force: params?.force === true,
+        idempotencyKey: typeof params?.idempotencyKey === "string" ? params.idempotencyKey : ""
+      });
+    },
+    async getDefaultCompiledPackManifest() {
+      return await readDefaultCompiledPackManifest();
     },
     async skillState() {
       return skillStateRequest();

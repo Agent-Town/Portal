@@ -676,6 +676,10 @@ function sha256Base64(input) {
   return crypto.createHash('sha256').update(input).digest('base64');
 }
 
+function sha256PrefixedHex(input) {
+  return `sha256:${crypto.createHash('sha256').update(input).digest('hex')}`;
+}
+
 function reservedHouseId(kind, key) {
   const seed = `agenttown:reserved:${kind}:${key}`;
   const bytes = crypto.createHash('sha256').update(seed).digest();
@@ -3552,6 +3556,96 @@ function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
   ].join('\n  ');
 }
 
+const DEFAULT_SKILL_PACK_BASE_PATH = '/__compiled/default-skill-pack';
+
+function buildDefaultCompiledSkillPack() {
+  const manualSkill = fs.readFileSync(path.join(PUBLIC_DIR, 'skill.md'), 'utf8');
+  const heartbeat = [
+    '# HEARTBEAT',
+    '',
+    '- Poll `GET /api/agent/state?teamCode=...` once per second while the co-op flow is active.',
+    '- On transient failures, back off to 2-5 seconds before retrying.',
+    '- Keep agent actions aligned to the shared state machine and avoid backend shortcuts.',
+    '',
+  ].join('\n');
+  const tools = [
+    '# TOOLS',
+    '',
+    '- Use the existing Agent Town runtime tools and `/api/*` routes documented in `manual/skill.md`.',
+    '- Preserve backend ids exactly when present: `webSessionId`, `invocationId`, and `evidenceId`.',
+    '- Runtime trainer tools remain under `trainer.*`; durable jobs belong to `trainer_job.*`.',
+    '',
+  ].join('\n');
+  const traceMapPayload = {
+    schema: 'agent-town-trace-map/v1',
+    experienceId: 'agent_town_coop_v1',
+    traceAuthorityType: 'portal.worker',
+    steps: [
+      { step: 'mirror_sigil', eventType: 'coop.sigil.mirror' },
+      { step: 'press_open', eventType: 'coop.open.press' },
+      { step: 'agent_commit', eventType: 'house.ceremony.commit' },
+      { step: 'agent_reveal', eventType: 'house.ceremony.reveal' },
+    ],
+  };
+  const traceMap = `${JSON.stringify(traceMapPayload, null, 2)}\n`;
+  const entrySkill = [
+    manualSkill.trimEnd(),
+    '',
+    '## Internal Pack Files',
+    '',
+    '- manual/skill.md',
+    '- heartbeat.md',
+    '- tools.md',
+    '- trace_map.json',
+    '',
+  ].join('\n');
+
+  const fileBodies = {
+    'skill.md': entrySkill,
+    'SKILL.md': entrySkill,
+    'manual/skill.md': manualSkill,
+    'heartbeat.md': heartbeat,
+    'tools.md': tools,
+    'trace_map.json': traceMap,
+  };
+  const fileHashes = {
+    'manual/skill.md': sha256PrefixedHex(fileBodies['manual/skill.md']),
+    'heartbeat.md': sha256PrefixedHex(fileBodies['heartbeat.md']),
+    'tools.md': sha256PrefixedHex(fileBodies['tools.md']),
+    'trace_map.json': sha256PrefixedHex(fileBodies['trace_map.json']),
+  };
+  const manifestSeed = JSON.stringify({
+    sourceRefs: [{ path: '/skill.md', hash: fileHashes['manual/skill.md'] }],
+    fileHashes,
+  });
+  const contentHash = sha256PrefixedHex(manifestSeed);
+  const packVersionId = `packv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+
+  return {
+    manifest: {
+      experienceId: 'agent_town_coop_v1',
+      packId: 'pack_portal_onboarding_v1',
+      packVersionId,
+      contentHash,
+      sourceRefs: [
+        {
+          path: '/skill.md',
+          hash: fileHashes['manual/skill.md'],
+        },
+      ],
+      fileHashes,
+      entryUrl: `${DEFAULT_SKILL_PACK_BASE_PATH}/skill.md`,
+      files: {
+        'manual/skill.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/manual/skill.md`,
+        'heartbeat.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/heartbeat.md`,
+        'tools.md': `${DEFAULT_SKILL_PACK_BASE_PATH}/tools.md`,
+        'trace_map.json': `${DEFAULT_SKILL_PACK_BASE_PATH}/trace_map.json`,
+      },
+    },
+    fileBodies,
+  };
+}
+
 function verifyHouseAuth(req, house) {
   if (!house || !house.authKey) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
   const ts = req.header('x-house-ts');
@@ -3596,6 +3690,12 @@ app.get('/api/session', (req, res) => {
       publicTeams: store.publicTeams.length
     }
   });
+});
+
+app.get('/api/platform/default-skill-pack', (_req, res) => {
+  const requestId = buildPortalRequestId();
+  const pack = buildDefaultCompiledSkillPack();
+  return sendPortalApiSuccess(res, pack.manifest, { requestId });
 });
 
 // Rotates the human session cookie to a fresh session/team code.
@@ -10828,6 +10928,18 @@ app.get('/registry', (req, res) => {
     return sendHtmlNoStore(res, 'registry.html');
   }
   return res.redirect(302, registryModalRedirectPath());
+});
+
+app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
+  const pack = buildDefaultCompiledSkillPack();
+  const requestedPath = String(req.params?.[0] || '').trim().replace(/^\/+/, '');
+  const body = pack.fileBodies[requestedPath];
+  if (typeof body !== 'string') {
+    return res.status(404).type('text/plain').send('NOT_FOUND');
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.type(requestedPath.endsWith('.json') ? 'application/json' : 'text/markdown');
+  return res.send(body);
 });
 
 app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (_req, res) => {
