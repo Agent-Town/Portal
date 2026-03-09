@@ -84,12 +84,14 @@ const {
   writeCheckpoint,
 } = require('./web_poker_store');
 const {
+  createIntegrationCandidate,
   createRun,
   createTraceEvent,
   createTraceIntakeRecord,
   countUnifiedPlatformTableRows,
   getConfigVersion,
   getConfigVersionByIdempotency,
+  getIntegrationCandidateByIdempotency,
   getLatestTraceEvent,
   getRunByIdempotency,
   getRunById,
@@ -4822,6 +4824,90 @@ app.post('/v1/houses/:houseId/configs/:configVersionId/promote', express.json({ 
     binding,
     config,
   }, { requestId });
+});
+
+app.post('/v1/integrations/resolve', express.json({ limit: '64kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const targetUrl = typeof req.body?.targetUrl === 'string'
+    ? req.body.targetUrl.trim()
+    : (typeof req.body?.url === 'string' ? req.body.url.trim() : '');
+  const preferredMode = typeof req.body?.preferredMode === 'string' ? req.body.preferredMode.trim() : 'auto';
+  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object' && !Array.isArray(req.body.sourceHints)
+    ? req.body.sourceHints
+    : {};
+  if (!idempotencyKey || !targetUrl) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'targetUrl and Idempotency-Key are required.', { requestId });
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const replayed = getIntegrationCandidateByIdempotency(idempotencyKey);
+  if (replayed) {
+    return sendPortalApiSuccess(res, {
+      integrationCandidateId: replayed.integrationCandidateId,
+      sourceKind: replayed.sourceKind,
+      requiresCompilation: replayed.requiresCompilation,
+      ...((replayed.candidate && typeof replayed.candidate === 'object') ? replayed.candidate : {}),
+    }, { requestId });
+  }
+
+  try {
+    assertPortalContractTargetAllowed(targetUrl);
+    const resolved = resolveWebTarget(targetUrl, { preferredMode, sourceHints });
+    if (!resolved?.integration) {
+      return sendPortalApiError(
+        res,
+        409,
+        'INTEGRATION_TARGET_UNSUPPORTED',
+        'No supported integration candidate was found for this target.',
+        { requestId }
+      );
+    }
+    const sourceKind = String(resolved.integration?.sourceType || 'parse').trim() || 'parse';
+    const requiresCompilation = sourceKind !== 'native_pack';
+    const candidate = {
+      resolutionState: String(resolved.resolutionState || 'supported'),
+      sourceKind,
+      requiresCompilation,
+      website: resolved.website || null,
+      integration: resolved.integration || null,
+      alternatives: Array.isArray(resolved.alternatives) ? resolved.alternatives : [],
+      fallback: resolved.fallback || null,
+      targetUrl: new URL(targetUrl).toString(),
+    };
+    const created = createIntegrationCandidate({
+      integrationCandidateId: `intcand_${randomHex(10)}`,
+      idempotencyKey,
+      targetUrl: candidate.targetUrl,
+      sourceKind,
+      requiresCompilation,
+      candidate,
+      nowIso: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      integrationCandidateId: created.integrationCandidateId,
+      sourceKind: created.sourceKind,
+      requiresCompilation: created.requiresCompilation,
+      ...candidate,
+    }, { status: 201, requestId });
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') {
+      return sendProxyPolicyContractError(res, err, requestId);
+    }
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'targetUrl must be a valid http(s) URL.', { requestId });
+  }
 });
 
 app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {

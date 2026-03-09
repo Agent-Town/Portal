@@ -224,6 +224,37 @@ async function getPlatformTeamBinding(request, {
   }
 }
 
+async function resolvePlatformIntegration(request, {
+  houseId = '',
+  houseAuthKey = '',
+  targetUrl = '',
+  preferredMode = 'auto',
+  sourceHints = {},
+  idempotencyKey = '',
+} = {}) {
+  const path = '/v1/integrations/resolve';
+  const body = JSON.stringify({
+    targetUrl,
+    preferredMode,
+    sourceHints: sourceHints && typeof sourceHints === 'object' ? sourceHints : {},
+  });
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function ingestPlatformTraceRecords(request, {
   houseId = '',
   houseAuthKey = '',
@@ -300,6 +331,7 @@ module.exports = {
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,
   readWorkerSessionId,
+  resolvePlatformIntegration,
   seedPlatformConfigVersion,
   setPlatformRunStatus,
 };

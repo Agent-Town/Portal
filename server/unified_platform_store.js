@@ -443,6 +443,19 @@ function mapTeamConfigBindingRow(row) {
   };
 }
 
+function mapIntegrationCandidateRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    integrationCandidateId: String(row.integration_candidate_id || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    targetUrl: String(row.target_url || ''),
+    sourceKind: String(row.source_kind || ''),
+    requiresCompilation: Number(row.requires_compilation || 0) === 1,
+    candidate: parseJsonColumn(row.candidate_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
 function getTeamConfigBinding({
   houseId = '',
   teamId = '',
@@ -459,6 +472,20 @@ function getTeamConfigBinding({
     LIMIT 1
   `).get(normalizedHouseId, normalizedTeamId);
   return mapTeamConfigBindingRow(row);
+}
+
+function getIntegrationCandidateByIdempotency(idempotencyKey = '') {
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM integration_candidates
+    WHERE idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedIdempotencyKey);
+  return mapIntegrationCandidateRow(row);
 }
 
 function upsertConfigVersion({
@@ -623,6 +650,52 @@ function upsertTeamConfigBinding({
   return getTeamConfigBinding({
     houseId: normalizedHouseId,
     teamId: normalizedTeamId,
+  });
+}
+
+function createIntegrationCandidate({
+  integrationCandidateId = '',
+  idempotencyKey = '',
+  targetUrl = '',
+  sourceKind = '',
+  requiresCompilation = true,
+  candidate = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedIntegrationCandidateId = String(integrationCandidateId || '').trim();
+  const normalizedTargetUrl = String(targetUrl || '').trim();
+  const normalizedSourceKind = String(sourceKind || '').trim();
+  if (!normalizedIntegrationCandidateId || !normalizedTargetUrl || !normalizedSourceKind) {
+    throw new Error('INTEGRATION_CANDIDATE_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO integration_candidates (
+      integration_candidate_id,
+      idempotency_key,
+      target_url,
+      source_kind,
+      requires_compilation,
+      candidate_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedIntegrationCandidateId,
+    String(idempotencyKey || '').trim() || null,
+    normalizedTargetUrl,
+    normalizedSourceKind,
+    requiresCompilation ? 1 : 0,
+    JSON.stringify(candidate && typeof candidate === 'object' ? candidate : {}),
+    nowIso,
+  );
+  return getIntegrationCandidateByIdempotency(idempotencyKey) || mapIntegrationCandidateRow({
+    integration_candidate_id: normalizedIntegrationCandidateId,
+    idempotency_key: String(idempotencyKey || '').trim() || null,
+    target_url: normalizedTargetUrl,
+    source_kind: normalizedSourceKind,
+    requires_compilation: requiresCompilation ? 1 : 0,
+    candidate_json: JSON.stringify(candidate && typeof candidate === 'object' ? candidate : {}),
+    created_at: nowIso,
   });
 }
 
@@ -1018,6 +1091,7 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  createIntegrationCandidate,
   createRun,
   createTraceEvent,
   createTraceIntakeRecord,
@@ -1025,6 +1099,7 @@ module.exports = {
   countPlatformTableRows,
   getConfigVersion,
   getConfigVersionByIdempotency,
+  getIntegrationCandidateByIdempotency,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,

@@ -797,6 +797,59 @@ Stable failure codes:
 - `CONFIG_PROMOTION_BLOCKED`
 - `INVALID_ARGUMENT`
 
+### POST `/v1/integrations/resolve` (human + house-auth)
+Resolves one target URL into a deterministic integration candidate and stores that candidate durably for idempotent replay.
+
+Request shape:
+```json
+{
+  "targetUrl": "https://github.com/openai/openai-codex/issues/1",
+  "preferredMode": "auto",
+  "sourceHints": {}
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "integrationCandidateId": "intcand_01H...",
+    "resolutionState": "supported",
+    "sourceKind": "native_pack",
+    "requiresCompilation": false,
+    "targetUrl": "https://github.com/openai/openai-codex/issues/1",
+    "website": {
+      "registryId": "ws_github",
+      "origin": "https://github.com"
+    },
+    "integration": {
+      "integrationRegistryId": "wi_github_issue_reply",
+      "versionId": "rv_github_issue_reply_v1"
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INTEGRATION_TARGET_UNSUPPORTED`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+- `INVALID_ARGUMENT`
+
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
 Creates one durable run row for the requested experience and binds the run to one declared trace authority.
 
