@@ -118,17 +118,22 @@
       seq: 1,
     },
     "trainer.invoke_action": {
-      actionId: "canvas.image",
+      webSessionId: "we_1234567890",
+      actionId: "save_draft",
+      idempotencyKey: "act-web-001",
+      expectedRevision: 1,
       params: {
-        teamCode: "TEAM-ABCD-EFGH",
+        draft: "Keep this local",
       },
     },
     "trainer.list_evidence": {
-      actionId: "canvas.image",
+      webSessionId: "we_1234567890",
       freshOnly: true,
     },
     "trainer.get_transcript_integrity": {},
-    "trainer.get_session_context": {},
+    "trainer.get_session_context": {
+      webSessionId: "we_1234567890",
+    },
     "trainer.explain_not_used": {
       actionId: "canvas.image",
     },
@@ -604,6 +609,14 @@
   function normalizeToolInvocationResult(raw) {
     if (raw && typeof raw === "object") return raw;
     return { value: raw };
+  }
+
+  function cloneForToolResult(value, fallback = null) {
+    try {
+      return JSON.parse(JSON.stringify(value == null ? fallback : value));
+    } catch {
+      return fallback;
+    }
   }
 
   function isToolCallable(gatewayApi, toolName) {
@@ -1524,12 +1537,13 @@
               ? Number(result.durationMs)
               : Date.now() - startedAt,
             request: result?.request || params,
-            response: normalizeToolInvocationResult(result?.response || result),
+            response: normalizeToolInvocationResult(cloneForToolResult(result?.response || result, {})),
             code: result?.code || null,
             message: result?.message || null,
             ...(result && typeof result === "object" ? {
               actionId: result.actionId || null,
-              evidence: Array.isArray(result.evidence) ? result.evidence : [],
+              evidence: Array.isArray(result.evidence) ? cloneForToolResult(result.evidence, []) : [],
+              invocation: cloneForToolResult(result.invocation, null),
               validation: result.validation || null,
             } : {}),
           }
