@@ -1354,6 +1354,18 @@ function parseBoolEnv(raw, fallback = false) {
   return !!fallback;
 }
 
+function normalizePrivyLoginMethod(raw, fallback = 'email') {
+  const candidates = splitCsvEnv(raw);
+  if (!candidates.length) {
+    const single = String(raw || '').trim().toLowerCase();
+    if (single) candidates.push(single);
+  }
+  for (const candidate of candidates) {
+    if (candidate === 'email' || candidate === 'guest') return candidate;
+  }
+  return fallback;
+}
+
 function parseJsonObjectEnv(raw) {
   const src = String(raw || '').trim();
   if (!src) return {};
@@ -1422,7 +1434,7 @@ const PRIVY_APP_SECRET = String(process.env.PRIVY_APP_SECRET || '').trim();
 const PRIVY_API_BASE_URL = String(process.env.PRIVY_API_BASE_URL || 'https://api.privy.io').trim().replace(/\/+$/, '');
 const PRIVY_SDK_SCRIPT_URL = sanitizePublicUrl(process.env.PRIVY_SDK_SCRIPT_URL || '');
 const PRIVY_SDK_MODULE_URL = sanitizePublicUrl(process.env.PRIVY_SDK_MODULE_URL || '');
-const PRIVY_LOGIN_METHOD = String(process.env.PRIVY_LOGIN_METHOD || 'email').trim().toLowerCase();
+const PRIVY_LOGIN_METHOD = normalizePrivyLoginMethod(process.env.PRIVY_LOGIN_METHOD || 'email', 'email');
 const PRIVY_PUBLIC_CONFIG_JSON = sanitizePublicConfig(parseJsonObjectEnv(process.env.PRIVY_PUBLIC_CONFIG_JSON));
 const PRIVY_PUBLIC_CONFIG = {
   ...PRIVY_PUBLIC_CONFIG_JSON,
@@ -1952,6 +1964,11 @@ function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) 
     }
   }
 
+  if (!session && hintedSession) {
+    session = hintedSession;
+    sid = hintedSession.sessionId;
+  }
+
   if (!session) {
     if (!allowCreate) return null;
     session = createSession();
@@ -1961,6 +1978,17 @@ function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) 
   let currentScore = sessionRecoveryScore(session);
 
   if (session) {
+    if (
+      hintedSession
+      && hintedSession.sessionId !== session.sessionId
+      && hintedTeamCode
+      && hintedSession.teamCode === hintedTeamCode
+    ) {
+      session = hintedSession;
+      sid = hintedSession.sessionId;
+      currentScore = sessionRecoveryScore(session);
+    }
+
     const walletSession = pickBestWalletSession();
     const walletScore = sessionRecoveryScore(walletSession);
     const hasStickyHintForCurrentSession = (
@@ -9582,6 +9610,135 @@ if (process.env.NODE_ENV === 'test') {
     if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
     bindSessionWallet(s, chain, address, { allowRebind: true });
     res.json({ ok: true, sessionId: s.sessionId, chain, address });
+  });
+
+  app.post('/__test__/session/bootstrap-onboarding', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+    const s = ensureHumanSession(req, res);
+    const onboarding = ensureSessionOnboarding(s);
+    const input = req.body && typeof req.body === 'object' ? req.body : {};
+    const profileInput = input.profile && typeof input.profile === 'object' ? input.profile : {};
+    const walletsInput = Array.isArray(input.wallets) ? input.wallets : [];
+    const updatedAt = nowIso();
+    const normalizedStep = normalizeOnboardingStep(input.step);
+
+    const humanName = normalizeTownhallName(profileInput.humanName) || 'Test Human';
+    const agentName = normalizeTownhallName(profileInput.agentName) || s.agent?.name || 'OpenClaw';
+    const humanPrompt = normalizeTownhallPrompt(profileInput.humanPrompt) || 'Deterministic Town Hall human avatar prompt';
+    const agentPrompt = normalizeTownhallPrompt(profileInput.agentPrompt) || 'Deterministic Town Hall agent avatar prompt';
+
+    onboarding.profile = onboarding.profile || {};
+    onboarding.profile.humanName = humanName;
+    onboarding.profile.agentName = agentName;
+    onboarding.profile.humanAvatar = {
+      image: DEFAULT_TOWNHALL_HUMAN_IMAGE,
+      prompt: humanPrompt,
+      source: 'default',
+      updatedAt,
+    };
+    onboarding.profile.agentAvatar = {
+      image: DEFAULT_TOWNHALL_AGENT_IMAGE,
+      prompt: agentPrompt,
+      source: 'default',
+      updatedAt,
+    };
+    onboarding.erc8004 = {
+      user: {
+        evm: {
+          id: '11155111:901',
+          chain: 'sepolia',
+          txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff11',
+          updatedAt,
+        },
+        solana: {
+          id: 'solana:UserAssetPubkeyMock1111111111111111111111111111',
+          cluster: 'devnet',
+          txSig: '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ1',
+          updatedAt,
+        },
+      },
+      agent: {
+        evm: {
+          id: '11155111:902',
+          chain: 'sepolia',
+          txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff22',
+          updatedAt,
+        },
+        solana: {
+          id: 'solana:AgentAssetPubkeyMock111111111111111111111111111',
+          cluster: 'devnet',
+          txSig: '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ2',
+          updatedAt,
+        },
+      },
+    };
+    onboarding.required = ONBOARDING_REQUIRED;
+    onboarding.registrationComplete = true;
+    onboarding.registeredAt = onboarding.registeredAt || updatedAt;
+    onboarding.step = normalizedStep || ONBOARDING_STEP_DONE;
+
+    for (const wallet of walletsInput) {
+      const chain = typeof wallet?.chain === 'string' ? wallet.chain.trim() : '';
+      const address = typeof wallet?.address === 'string' ? wallet.address.trim() : '';
+      if (!chain || !address) continue;
+      bindSessionWallet(s, chain, address, { allowRebind: true });
+    }
+
+    res.json({
+      ok: true,
+      sessionId: s.sessionId,
+      onboarding: cloneOnboarding(onboarding),
+      walletBindings: Array.isArray(s.walletBindings) ? s.walletBindings : [],
+    });
+  });
+
+  app.post('/__test__/session/bootstrap-signup', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+
+    const s = ensureHumanSession(req, res);
+    const input = req.body && typeof req.body === 'object' ? req.body : {};
+    const requestedMode = typeof input.mode === 'string' ? input.mode.trim().toLowerCase() : 'agent';
+    const mode = requestedMode === 'token' || requestedMode === 'claim' ? requestedMode : 'agent';
+    const address = typeof input.address === 'string' ? input.address.trim() : '';
+    const now = nowIso();
+
+    s.signup.complete = true;
+    s.signup.createdAt = s.signup.createdAt || now;
+    s.signup.mode = mode;
+    s.signup.address = mode === 'token' && address ? address : null;
+
+    if (mode === 'token' && s.signup.address) {
+      s.token = s.token || { verifiedAt: null, address: null };
+      s.token.verifiedAt = Date.now();
+      s.token.address = s.signup.address;
+      bindSessionWallet(s, 'solana', s.signup.address, { allowRebind: true });
+    }
+
+    if (mode === 'claim' && address) {
+      s.claim = s.claim || {};
+      s.claim.erc8004 = {
+        ...(s.claim.erc8004 && typeof s.claim.erc8004 === 'object' ? s.claim.erc8004 : {}),
+        address,
+        claimChain: 'solana',
+        verifiedAt: Date.now(),
+      };
+      bindSessionWallet(s, 'solana', address, { allowRebind: true });
+    }
+
+    res.json({
+      ok: true,
+      sessionId: s.sessionId,
+      signup: { ...s.signup },
+      token: s.token || null,
+      claim: s.claim || null,
+    });
   });
 
   app.post('/__test__/poker/operator-fixture', (req, res) => {

@@ -24,6 +24,10 @@
     "gen:erc8004-images:nano:api-key": "node scripts/generate_nano_banana_images_api_key.js",
     "gen:erc8004-images:nano:oauth": "node scripts/generate_nano_banana_images_oauth.js",
     "test": "playwright test",
+    "pretest:privy": "npm run build:openclaw-lite",
+    "test:privy": "node scripts/run_playwright_privy.mjs",
+    "pretest:privy:guest": "npm run build:openclaw-lite",
+    "test:privy:guest": "node scripts/run_playwright_privy.mjs --guest",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },

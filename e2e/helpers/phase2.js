@@ -1,4 +1,5 @@
 const { expect } = require('@playwright/test');
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
 async function fetchSessionState(page) {
   return page.evaluate(async () => {
@@ -173,8 +174,189 @@ async function ensureBrainPanelVisible(page) {
   }
 }
 
+async function ensurePrivyReadyForPhase2(page) {
+  const state = await fetchSessionState(page).catch(() => null);
+  if (!state?.onboarding || state.onboarding.required !== true || state.onboarding.registrationComplete === true) {
+    return false;
+  }
+
+  const result = await page.evaluate(async ({ token }) => {
+    const wallets = [];
+    const seen = new Set();
+    const addWallet = (chain, address) => {
+      const normalizedChain = typeof chain === 'string' ? chain.trim().toLowerCase() : '';
+      const normalizedAddress = typeof address === 'string' ? address.trim() : '';
+      if (!normalizedChain || !normalizedAddress) return;
+      const key = `${normalizedChain}:${normalizedAddress}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      wallets.push({ chain: normalizedChain, address: normalizedAddress });
+    };
+
+    const bridge = window.__PRIVY_WALLET_BRIDGE__;
+    if (bridge && typeof bridge.connectSolana === 'function') {
+      try {
+        const sol = await bridge.connectSolana({ silent: true });
+        addWallet('solana', sol && typeof sol.address === 'string' ? sol.address : '');
+      } catch {
+        // ignore silent mock wallet probe failures
+      }
+    }
+    if (bridge && typeof bridge.connectEvm === 'function') {
+      try {
+        const evm = await bridge.connectEvm({ silent: true });
+        addWallet('evm', evm && typeof evm.address === 'string' ? evm.address : '');
+      } catch {
+        // ignore silent mock wallet probe failures
+      }
+    }
+
+    const resp = await fetch('/__test__/session/bootstrap-onboarding', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-reset': token
+      },
+      body: JSON.stringify({ wallets })
+    });
+    const body = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      body
+    };
+  }, { token: resetToken });
+
+  if (!result?.ok) {
+    throw new Error(`PRIVY_ONBOARDING_BOOTSTRAP_FAILED:${result?.status || 500}:${JSON.stringify(result?.body || {})}`);
+  }
+
+  const verify = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', {
+      credentials: 'include'
+    });
+    const body = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      body
+    };
+  });
+  if (!verify?.ok || verify?.body?.onboarding?.registrationComplete !== true) {
+    throw new Error(`PRIVY_ONBOARDING_BOOTSTRAP_STATE_MISMATCH:${JSON.stringify({
+      bootstrap: result?.body || {},
+      state: verify?.body || {}
+    })}`);
+  }
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#districtMap')).toBeVisible({ timeout: 5000 });
+  return true;
+}
+
+async function ensurePrivySignupForCreate(page) {
+  const state = await fetchSessionState(page).catch(() => null);
+  if (!state?.onboarding || state.onboarding.required !== true || state?.signup?.complete === true) {
+    return false;
+  }
+
+  const result = await page.evaluate(async ({ token }) => {
+    let tokenAddress = '';
+    const bridge = window.__PRIVY_WALLET_BRIDGE__;
+    if (bridge && typeof bridge.connectSolana === 'function') {
+      try {
+        const sol = await bridge.connectSolana({ silent: true });
+        tokenAddress = sol && typeof sol.address === 'string' ? sol.address.trim() : '';
+      } catch {
+        // ignore silent mock wallet probe failures
+      }
+    }
+    const mode = tokenAddress ? 'token' : 'agent';
+    const resp = await fetch('/__test__/session/bootstrap-signup', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-reset': token
+      },
+      body: JSON.stringify({
+        mode,
+        address: tokenAddress
+      })
+    });
+    const body = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      body
+    };
+  }, { token: resetToken });
+
+  if (!result?.ok) {
+    throw new Error(`PRIVY_SIGNUP_BOOTSTRAP_FAILED:${result?.status || 500}:${JSON.stringify(result?.body || {})}`);
+  }
+
+  const verify = await page.evaluate(async () => {
+    const resp = await fetch('/api/state', {
+      credentials: 'include'
+    });
+    const body = await resp.json().catch(() => ({}));
+    return {
+      ok: resp.ok,
+      body
+    };
+  });
+  if (!verify?.ok || verify?.body?.signup?.complete !== true) {
+    throw new Error(`PRIVY_SIGNUP_BOOTSTRAP_STATE_MISMATCH:${JSON.stringify({
+      bootstrap: result?.body || {},
+      state: verify?.body || {}
+    })}`);
+  }
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const afterReload = await fetchSessionState(page).catch(() => null);
+  if (!afterReload?.signup?.complete) {
+    throw new Error(`PRIVY_SIGNUP_BOOTSTRAP_RELOAD_MISMATCH:${JSON.stringify({
+      bootstrap: result?.body || {},
+      beforeReload: verify?.body || {},
+      afterReload: afterReload || {}
+    })}`);
+  }
+  return true;
+}
+
+async function primePrivyRecoveryStorage(page) {
+  await page.evaluate(async () => {
+    const sessionResp = await fetch('/api/session', {
+      credentials: 'include'
+    });
+    const session = await sessionResp.json().catch(() => ({}));
+    if (typeof session?.teamCode === 'string' && session.teamCode.trim()) {
+      localStorage.setItem('agentTown:teamCodeHint', session.teamCode.trim());
+    }
+    if (typeof session?.walletRecoveryKey === 'string' && /^wrk_[a-f0-9]{64}$/i.test(session.walletRecoveryKey.trim())) {
+      localStorage.setItem('agentTown:walletRecoveryKey', session.walletRecoveryKey.trim().toLowerCase());
+    }
+
+    let solanaAddress = '';
+    const bridge = window.__PRIVY_WALLET_BRIDGE__;
+    if (bridge && typeof bridge.connectSolana === 'function') {
+      try {
+        const sol = await bridge.connectSolana({ silent: true });
+        solanaAddress = sol && typeof sol.address === 'string' ? sol.address.trim() : '';
+      } catch {
+        // ignore silent mock wallet probe failures
+      }
+    }
+    if (solanaAddress) {
+      localStorage.setItem('agentTown:walletIdentityHint', JSON.stringify({ solana: solanaAddress }));
+      localStorage.setItem('agentTownWallet', JSON.stringify({ address: solanaAddress, houseId: null }));
+    }
+  });
+}
+
 async function enterHatch(page, intent = 'signin', { navigate = true } = {}) {
   await ensureAppShell(page, { navigate });
+  await ensurePrivyReadyForPhase2(page);
 
   const legacyAuthBtn = page.getByTestId(`auth-${intent}`);
   if (await legacyAuthBtn.count()) {
@@ -352,9 +534,27 @@ async function openToCreate(page) {
     }
   }
   if (!page.url().includes('/create')) {
+    await ensurePrivySignupForCreate(page);
+    await primePrivyRecoveryStorage(page);
     await page.goto('/create');
   }
   await page.waitForURL('**/create', { timeout: 10000 });
+  const createReady = await page.getByTestId('px-0-0').isVisible().catch(() => false);
+  if (!createReady) {
+    const state = await fetchSessionState(page).catch(() => null);
+    const recovery = await page.evaluate(() => ({
+      teamCodeHint: localStorage.getItem('agentTown:teamCodeHint'),
+      walletRecoveryKey: localStorage.getItem('agentTown:walletRecoveryKey'),
+      walletIdentityHint: localStorage.getItem('agentTown:walletIdentityHint'),
+      walletCache: localStorage.getItem('agentTownWallet'),
+    })).catch(() => null);
+    throw new Error(`CREATE_ROUTE_NOT_READY:${JSON.stringify({
+      url: page.url(),
+      signup: state?.signup || null,
+      onboarding: state?.onboarding || null,
+      recovery,
+    })}`);
+  }
 }
 
 async function reachCreateViaLite(page) {
