@@ -1,3 +1,4 @@
+const { houseAuthHeadersFromKeyB64 } = require('./phase1');
 const { gotoAppWithLite } = require('./trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
@@ -119,13 +120,86 @@ async function seedPlatformConfigVersion(request, {
   }
 }
 
+async function createPlatformRun(request, {
+  houseId = '',
+  houseAuthKey = '',
+  experienceId = 'agent_town_coop_v1',
+  teamId = 'team_main',
+  configVersionId = '',
+  entryMode = 'normal',
+  metadata = {},
+  idempotencyKey = '',
+} = {}) {
+  const path = `/v1/experiences/${encodeURIComponent(String(experienceId || '').trim())}/runs`;
+  const body = JSON.stringify({
+    teamId,
+    configVersionId,
+    entryMode,
+    metadata,
+  });
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function ingestPlatformTraceRecords(request, {
+  houseId = '',
+  houseAuthKey = '',
+  runId = '',
+  records = [],
+  idempotencyKey = '',
+} = {}) {
+  const path = '/v1/traces/ingestions';
+  const body = JSON.stringify({
+    runId,
+    records,
+  });
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function getPlatformTraceEvents(request, traceId) {
+  const response = await request.get(`/__test__/unified-platform/traces/${encodeURIComponent(String(traceId || ''))}/events`, {
+    headers: { 'x-test-reset': resetToken },
+  });
+  return await response.json();
+}
+
 module.exports = {
   compileDefaultSkillPack,
+  createPlatformRun,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
   getDefaultCompiledPackManifest,
   getPlatformCounts,
   getPlatformFixture,
+  getPlatformTraceEvents,
   listPlatformFixtures,
+  ingestPlatformTraceRecords,
   readWorkerSessionId,
   seedPlatformConfigVersion,
 };

@@ -276,6 +276,25 @@ function ensureDb() {
   ensureColumn(db, 'runs', 'entry_mode', `TEXT NOT NULL DEFAULT 'normal'`);
   ensureColumn(db, 'runs', 'metadata_json', `TEXT NOT NULL DEFAULT '{}'`);
   ensureColumn(db, 'runs', 'completed_at', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'trace_intake_record_id', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'source_type', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'payload_schema', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'record_kind', `TEXT NOT NULL DEFAULT 'fact'`);
+  ensureColumn(db, 'trace_intake_records', 'accepted', 'INTEGER NOT NULL DEFAULT 1');
+  ensureColumn(db, 'trace_intake_records', 'producer_kind', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'producer_id', 'TEXT');
+  ensureColumn(db, 'trace_intake_records', 'status', `TEXT NOT NULL DEFAULT 'accepted'`);
+  ensureColumn(db, 'trace_intake_records', 'received_at', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'trace_intake_records', 'intake_id', 'TEXT');
+  ensureColumn(db, 'trace_events', 'event_kind', 'TEXT');
+  ensureColumn(db, 'trace_events', 'event_type', 'TEXT');
+  ensureColumn(db, 'trace_events', 'source_type', 'TEXT');
+  ensureColumn(db, 'trace_events', 'audience_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'trace_events', 'seal_json', `TEXT NOT NULL DEFAULT '{}'`);
+  ensureColumn(db, 'trace_events', 'actor_kind', 'TEXT');
+  ensureColumn(db, 'trace_events', 'actor_id', 'TEXT');
+  ensureColumn(db, 'trace_events', 'sealed_context_id', 'TEXT');
+  ensureColumn(db, 'trace_events', 'canonical_at', `TEXT NOT NULL DEFAULT ''`);
   return db;
 }
 
@@ -535,6 +554,227 @@ function createRun({
   return getRunById(normalizedRunId);
 }
 
+function mapTraceIntakeRecordRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    traceIntakeRecordId: String(row.trace_intake_record_id || row.intake_id || ''),
+    intakeId: String(row.intake_id || row.trace_intake_record_id || ''),
+    traceId: String(row.trace_id || ''),
+    runId: row.run_id ? String(row.run_id) : null,
+    ingestKey: String(row.ingest_key || ''),
+    sourceType: row.source_type ? String(row.source_type) : (row.producer_kind ? String(row.producer_kind) : ''),
+    payloadSchema: row.payload_schema ? String(row.payload_schema) : '',
+    recordKind: row.record_kind ? String(row.record_kind) : 'fact',
+    accepted: row.accepted == null ? String(row.status || '').trim().toLowerCase() === 'accepted' : Number(row.accepted) === 1,
+    payload: parseJsonColumn(row.payload_json, {}),
+    createdAt: String(row.created_at || ''),
+    receivedAt: row.received_at ? String(row.received_at) : String(row.created_at || ''),
+  };
+}
+
+function getTraceIntakeRecord({ runId = '', ingestKey = '' } = {}) {
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedIngestKey = String(ingestKey || '').trim();
+  if (!normalizedRunId || !normalizedIngestKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trace_intake_records
+    WHERE run_id = ?
+      AND ingest_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedRunId, normalizedIngestKey);
+  return mapTraceIntakeRecordRow(row);
+}
+
+function createTraceIntakeRecord({
+  traceIntakeRecordId = '',
+  traceId = '',
+  runId = '',
+  ingestKey = '',
+  sourceType = '',
+  payloadSchema = '',
+  recordKind = 'fact',
+  payload = null,
+  accepted = true,
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const normalizedTraceIntakeRecordId = String(traceIntakeRecordId || '').trim();
+  const normalizedTraceId = String(traceId || '').trim();
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedIngestKey = String(ingestKey || '').trim();
+  const normalizedSourceType = String(sourceType || '').trim();
+  const normalizedPayloadSchema = String(payloadSchema || '').trim();
+  const normalizedRecordKind = String(recordKind || 'fact').trim() || 'fact';
+  if (!normalizedTraceIntakeRecordId || !normalizedTraceId || !normalizedIngestKey) {
+    throw new Error('TRACE_INTAKE_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO trace_intake_records (
+      trace_intake_record_id,
+      intake_id,
+      trace_id,
+      run_id,
+      ingest_key,
+      source_type,
+      payload_schema,
+      record_kind,
+      accepted,
+      producer_kind,
+      producer_id,
+      status,
+      payload_json,
+      received_at,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedTraceIntakeRecordId,
+    normalizedTraceIntakeRecordId,
+    normalizedTraceId,
+    normalizedRunId || null,
+    normalizedIngestKey,
+    normalizedSourceType || null,
+    normalizedPayloadSchema || null,
+    normalizedRecordKind,
+    accepted ? 1 : 0,
+    normalizedSourceType || null,
+    null,
+    accepted ? 'accepted' : 'rejected',
+    JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    createdAt,
+    createdAt,
+  );
+  return getTraceIntakeRecord({ runId: normalizedRunId, ingestKey: normalizedIngestKey });
+}
+
+function mapTraceEventRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    eventId: String(row.event_id || ''),
+    traceId: String(row.trace_id || ''),
+    runId: row.run_id ? String(row.run_id) : null,
+    seq: Number(row.seq || 0),
+    eventKind: row.event_kind ? String(row.event_kind) : String(row.event_type || ''),
+    eventType: row.event_type ? String(row.event_type) : String(row.event_kind || ''),
+    sourceType: row.source_type ? String(row.source_type) : '',
+    eventHash: String(row.event_hash || ''),
+    prevEventHash: row.prev_event_hash ? String(row.prev_event_hash) : null,
+    audience: parseJsonColumn(row.audience_json, {}),
+    seal: parseJsonColumn(row.seal_json, {}),
+    actorKind: row.actor_kind ? String(row.actor_kind) : null,
+    actorId: row.actor_id ? String(row.actor_id) : null,
+    sealedContextId: row.sealed_context_id ? String(row.sealed_context_id) : null,
+    payload: parseJsonColumn(row.payload_json, {}),
+    canonicalAt: row.canonical_at ? String(row.canonical_at) : String(row.created_at || ''),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function getLatestTraceEvent(traceId = '') {
+  const normalizedTraceId = String(traceId || '').trim();
+  if (!normalizedTraceId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trace_events
+    WHERE trace_id = ?
+    ORDER BY seq DESC, created_at DESC
+    LIMIT 1
+  `).get(normalizedTraceId);
+  return mapTraceEventRow(row);
+}
+
+function listTraceEvents(traceId = '') {
+  const normalizedTraceId = String(traceId || '').trim();
+  if (!normalizedTraceId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM trace_events
+    WHERE trace_id = ?
+    ORDER BY seq ASC, created_at ASC
+  `).all(normalizedTraceId);
+  return rows.map(mapTraceEventRow).filter(Boolean);
+}
+
+function createTraceEvent({
+  eventId = '',
+  traceId = '',
+  runId = '',
+  seq = 0,
+  eventKind = '',
+  sourceType = '',
+  eventHash = '',
+  prevEventHash = null,
+  audience = null,
+  seal = null,
+  actorKind = 'service',
+  actorId = 'house_trace_ingester',
+  sealedContextId = null,
+  payload = null,
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const normalizedEventId = String(eventId || '').trim();
+  const normalizedTraceId = String(traceId || '').trim();
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedSeq = Number(seq || 0);
+  const normalizedEventKind = String(eventKind || '').trim();
+  const normalizedSourceType = String(sourceType || '').trim();
+  const normalizedEventHash = String(eventHash || '').trim();
+  if (!normalizedEventId || !normalizedTraceId || !normalizedSeq || !normalizedEventKind || !normalizedEventHash) {
+    throw new Error('TRACE_EVENT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO trace_events (
+      event_id,
+      trace_id,
+      run_id,
+      seq,
+      event_kind,
+      event_type,
+      source_type,
+      event_hash,
+      prev_event_hash,
+      audience_json,
+      seal_json,
+      actor_kind,
+      actor_id,
+      sealed_context_id,
+      payload_json,
+      canonical_at,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedEventId,
+    normalizedTraceId,
+    normalizedRunId || null,
+    normalizedSeq,
+    normalizedEventKind,
+    normalizedEventKind,
+    normalizedSourceType || null,
+    normalizedEventHash,
+    prevEventHash ? String(prevEventHash) : null,
+    JSON.stringify(audience && typeof audience === 'object' ? audience : {}),
+    JSON.stringify(seal && typeof seal === 'object' ? seal : {}),
+    actorKind ? String(actorKind) : null,
+    actorId ? String(actorId) : null,
+    sealedContextId ? String(sealedContextId) : null,
+    JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    createdAt,
+    createdAt,
+  );
+  const row = database.prepare(`
+    SELECT *
+    FROM trace_events
+    WHERE event_id = ?
+    LIMIT 1
+  `).get(normalizedEventId);
+  return mapTraceEventRow(row);
+}
+
 function isUnifiedPlatformTable(tableName) {
   return PLATFORM_TABLES.includes(String(tableName || '').trim());
 }
@@ -548,15 +788,20 @@ function getUnifiedPlatformTestStats() {
 
 module.exports = {
   createRun,
+  createTraceEvent,
+  createTraceIntakeRecord,
   countUnifiedPlatformTableRows: countPlatformTableRows,
   countPlatformTableRows,
   getConfigVersion,
   getRunById,
   getRunByIdempotency,
+  getTraceIntakeRecord,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,
+  getLatestTraceEvent,
   getPlatformTableCounts,
   isUnifiedPlatformTable,
+  listTraceEvents,
   listFixtureFamilies,
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,

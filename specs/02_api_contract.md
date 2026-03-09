@@ -665,6 +665,54 @@ Stable failure codes:
 - `CONFIG_NOT_ELIGIBLE`
 - `INVALID_ARGUMENT`
 
+### POST `/v1/traces/ingestions` (house-auth)
+Accepts raw trace intake records for one run, dedupes by `ingestKey`, and emits canonical trace events through the run authority.
+
+Request shape:
+```json
+{
+  "runId": "run_01H...",
+  "records": [
+    {
+      "ingestKey": "worker_main:1",
+      "sourceType": "worker",
+      "payloadSchema": "raw.web.observation/v1",
+      "payload": {}
+    }
+  ]
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "runId": "run_01H...",
+    "accepted": 1,
+    "ignored": 0,
+    "rejected": 0,
+    "traceId": "trace_01H..."
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `RUN_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `TRACE_INTAKE_INVALID`
+
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
 

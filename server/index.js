@@ -85,12 +85,18 @@ const {
 } = require('./web_poker_store');
 const {
   createRun,
+  createTraceEvent,
+  createTraceIntakeRecord,
   countUnifiedPlatformTableRows,
   getConfigVersion,
+  getLatestTraceEvent,
   getRunByIdempotency,
+  getRunById,
+  getTraceIntakeRecord,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
+  listTraceEvents,
   listUnifiedPlatformFixtureFamilies,
   resetUnifiedPlatformStore,
   upsertConfigVersion,
@@ -4500,6 +4506,123 @@ app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), 
     status: run.status,
     traceAuthorityType: run.traceAuthorityType,
   }, { status: 201, requestId });
+});
+
+app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const runId = typeof req.body?.runId === 'string' ? req.body.runId.trim() : '';
+  const records = Array.isArray(req.body?.records) ? req.body.records : [];
+  if (!idempotencyKey || !runId || records.length === 0) {
+    return sendPortalApiError(
+      res,
+      400,
+      'TRACE_INTAKE_INVALID',
+      'runId, records, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const run = getRunById(runId);
+  if (!run) {
+    return sendPortalApiError(res, 404, 'RUN_NOT_FOUND', 'Run not found.', { requestId });
+  }
+
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Trace intake authorization failed.', { requestId });
+  }
+
+  let accepted = 0;
+  let ignored = 0;
+  let rejected = 0;
+  let latestEvent = getLatestTraceEvent(run.traceId);
+  for (const record of records) {
+    const ingestKey = typeof record?.ingestKey === 'string' ? record.ingestKey.trim() : '';
+    const sourceType = typeof record?.sourceType === 'string' ? record.sourceType.trim() : '';
+    const payloadSchema = typeof record?.payloadSchema === 'string' ? record.payloadSchema.trim() : '';
+    const payload = record?.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
+      ? record.payload
+      : {};
+    if (!ingestKey || !sourceType || !payloadSchema) {
+      rejected += 1;
+      continue;
+    }
+    const duplicate = getTraceIntakeRecord({ runId, ingestKey });
+    if (duplicate) {
+      ignored += 1;
+      continue;
+    }
+
+    createTraceIntakeRecord({
+      traceIntakeRecordId: `intk_${randomHex(10)}`,
+      traceId: run.traceId,
+      runId,
+      ingestKey,
+      sourceType,
+      payloadSchema,
+      payload: {
+        payloadSchema,
+        payload,
+      },
+      createdAt: nowIso(),
+    });
+
+    const seq = latestEvent ? Number(latestEvent.seq || 0) + 1 : 1;
+    const eventKind = typeof payload?.kind === 'string' && payload.kind.trim()
+      ? payload.kind.trim()
+      : payloadSchema;
+    const eventHash = sha256PrefixedHex(JSON.stringify({
+      traceId: run.traceId,
+      runId,
+      seq,
+      eventKind,
+      sourceType,
+      payloadSchema,
+      payload,
+      prevEventHash: latestEvent?.eventHash || null,
+    }));
+    latestEvent = createTraceEvent({
+      eventId: `evt_${randomHex(10)}`,
+      traceId: run.traceId,
+      runId,
+      seq,
+      eventKind,
+      sourceType,
+      eventHash,
+      prevEventHash: latestEvent?.eventHash || null,
+      audience: {
+        class: 'TEAM',
+        houseId: run.houseId,
+        teamId: run.teamId,
+        entrantId: null,
+        readerIds: [],
+      },
+      seal: {
+        active: false,
+        sealedContextId: null,
+        releasePolicy: null,
+      },
+      actorKind: sourceType,
+      actorId: 'trace_ingestion',
+      payload: {
+        payloadSchema,
+        payload,
+      },
+      createdAt: nowIso(),
+    });
+    accepted += 1;
+  }
+
+  return sendPortalApiSuccess(res, {
+    runId,
+    accepted,
+    ignored,
+    rejected,
+    traceId: run.traceId,
+  }, { requestId });
 });
 
 app.get('/v1/health', respondPokerOperatorTransport);
@@ -9848,6 +9971,17 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       config: record,
+    });
+  });
+
+  app.get('/__test__/unified-platform/traces/:traceId/events', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      events: listTraceEvents(req.params.traceId),
     });
   });
 
