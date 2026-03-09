@@ -202,6 +202,194 @@ Response fields:
 - `data.approvalId`
 - `data.authUrl`
 
+## Poker operator + Portal mirror contract
+
+The operator `/v1/*` surface uses the same stable envelope as Portal Web and Registry.
+
+Protected operator mutation requirements:
+- `Authorization: Bearer <operator-or-portal-service-token>`
+- `Idempotency-Key: <stable-key>`
+
+### GET `/v1/health`
+Returns:
+- `data.status === "ok"`
+- `data.operatorVersion`
+- `data.schemaVersion`
+- `data.time`
+
+### GET `/v1/seasons`
+Query params:
+- `cursor`
+- `limit` default `20`, max `100`
+- `status`
+
+Returns:
+- `data.items[]`
+- `data.nextCursor`
+
+### GET `/v1/seasons/:seasonId`
+Returns:
+- season metadata
+- rules summary
+- divisions
+- submission window fields
+- `data.latestLeaderboardSnapshot`
+- `data.latestReplayHighlight`
+
+### POST `/v1/seasons`
+Protected operator route for season creation.
+
+Failure codes:
+- `POKER_OPERATOR_AUTH_REQUIRED`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/seasons/:seasonId/submissions`
+Protected Portal/operator route for bundle submission forwarding.
+
+Request shape:
+```json
+{
+  "portalSubmissionId": "portal-submit-open",
+  "submitterWallet": {
+    "chain": "solana",
+    "address": "So1anaMockResume11111111111111111111111111111"
+  },
+  "bundle": {
+    "contentAddress": "sha256:open-bundle",
+    "manifestHash": "sha256:open-manifest",
+    "artifactUri": "s3://operator/submissions/open.zip",
+    "entrypoint": "play.py"
+  },
+  "declaredCapabilities": {
+    "browserCompatible": false
+  }
+}
+```
+
+Stable failure codes:
+- `POKER_OPERATOR_AUTH_REQUIRED`
+- `POKER_SEASON_CLOSED`
+- `POKER_SUBMISSION_DUPLICATE`
+- `POKER_INVALID_BUNDLE`
+
+### POST `/v1/seasons/:seasonId/batches`
+Protected operator route for season evaluation batch creation.
+
+### GET `/v1/batches/:batchId`
+Returns:
+- `data.batchId`
+- `data.seasonId`
+- `data.batchKind`
+- `data.submissionIds`
+- `data.batchConfig`
+- `data.status`
+
+### GET `/v1/runs/:runId`
+Returns:
+- `data.runId`
+- `data.batchId`
+- `data.seasonId`
+- `data.summary`
+
+### GET `/v1/runs/:runId/replay`
+Returns:
+- `data.runId`
+- `data.replay.replayFormat === "poker-run-replay-v1"`
+- `data.replay.summaryJson`
+- `data.replay.eventsJsonlUri`
+- `data.replay.artifactSha256`
+- `data.replay.contentType`
+
+### GET `/v1/leaderboards/:seasonId/latest`
+Returns:
+- `data.seasonId`
+- `data.snapshotId`
+- `data.createdAt`
+- `data.rankings[]`
+
+### GET `/v1/leaderboards/:seasonId/snapshots/:snapshotId`
+Returns the requested snapshot with the same shape as `/latest`.
+
+### POST `/api/poker/admin/sync`
+Human-authenticated Portal admin route that validates operator schema/version and mirrors operator truth into durable Portal tables.
+
+Request shape:
+```json
+{
+  "seasonId": "pks_01"
+}
+```
+
+Response fields:
+- `data.operator`
+- `data.mirrored.seasons`
+- `data.mirrored.leaderboards`
+- `data.mirrored.batches`
+- `data.mirrored.runs`
+- `data.mirrored.replays`
+- `data.seasonIds`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+- `POKER_REPLAY_NOT_READY`
+
+### GET `/api/poker/seasons`
+Returns mirrored season summaries for the Portal poker index.
+
+### GET `/api/poker/seasons/:seasonId`
+Returns the mirrored season page payload with:
+- `data.season`
+- `data.season.latestLeaderboardSnapshot`
+- `data.season.latestReplayHighlight`
+
+### POST `/api/poker/seasons/:seasonId/submissions`
+Human-authenticated Portal proxy route for wallet-bound setup submissions.
+
+Request shape:
+```json
+{
+  "portalSubmissionId": "portal-submit-open",
+  "bundle": {
+    "contentAddress": "sha256:open-bundle",
+    "manifestHash": "sha256:open-manifest",
+    "artifactUri": "s3://operator/submissions/open.zip",
+    "entrypoint": "play.py"
+  },
+  "declaredCapabilities": {
+    "browserCompatible": false
+  },
+  "idempotencyKey": "poker-submit-open-001"
+}
+```
+
+Response fields:
+- `data.submission.submissionId`
+- `data.submission.portalSessionId`
+- `data.submission.walletSubject`
+- `data.submission.validation`
+- `data.replayed`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `POKER_SEASON_CLOSED`
+- `POKER_INVALID_BUNDLE`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+
+### GET `/api/poker/submissions/:submissionId`
+Returns the owning Portal session’s submission status page payload.
+
+### GET `/api/poker/leaderboards/:seasonId/latest`
+Returns the latest mirrored leaderboard snapshot.
+
+### GET `/api/poker/runs/:runId/replay`
+Returns the mirrored replay manifest after format and artifact-hash verification.
+
+Stable failure codes:
+- `POKER_REPLAY_NOT_READY`
+- `POKER_OPERATOR_SCHEMA_MISMATCH`
+
 ---
 
 ## Agent solo session

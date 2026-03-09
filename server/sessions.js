@@ -35,6 +35,7 @@ function bindSessionWallet(session, chain, address, { allowRebind = false } = {}
   if (typeof address !== 'string' || !address.trim()) return;
   const key = makeWalletSessionKey(chain, address);
   if (!key) return;
+  const [normalizedChain, normalizedAddress] = key.split(':');
   const existingSessionId = sessionIdByWalletAddress.get(key);
   if (existingSessionId && existingSessionId !== session.sessionId) {
     const existingSession = getSessionById(existingSessionId);
@@ -45,6 +46,21 @@ function bindSessionWallet(session, chain, address, { allowRebind = false } = {}
     }
   }
   sessionIdByWalletAddress.set(key, session.sessionId);
+  session.walletBindings = Array.isArray(session.walletBindings) ? session.walletBindings : [];
+  const existingBinding = session.walletBindings.find((entry) => (
+    entry
+    && entry.chain === normalizedChain
+    && entry.address === normalizedAddress
+  ));
+  if (existingBinding) {
+    existingBinding.boundAt = existingBinding.boundAt || nowIso();
+  } else {
+    session.walletBindings.push({
+      chain: normalizedChain,
+      address: normalizedAddress,
+      boundAt: nowIso(),
+    });
+  }
   return true;
 }
 
@@ -205,6 +221,7 @@ function createSession({ flow } = {}) {
       verifiedAt: null,
       address: null
     },
+    walletBindings: [],
     onboarding: {
       required: false,
       registrationComplete: false,

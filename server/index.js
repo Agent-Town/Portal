@@ -57,17 +57,50 @@ const {
   getImportJobById,
   getInvocationByIdempotency,
   getLatestCheckpointForSession,
+  getLatestPokerLeaderboardSnapshot,
+  getPokerBatchById,
+  getPokerLeaderboardSnapshotById,
+  getPokerReplayArtifactByRunId,
   getRegistryEntityById,
+  getPokerRunById,
+  getPokerSeasonById,
+  getPokerSubmissionById,
+  getPokerSubmissionByRequest,
   getWebSessionById,
   listApprovalsForSession,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  upsertPokerBatch,
+  upsertPokerLeaderboardSnapshot,
+  upsertPokerReplayArtifact,
+  upsertPokerRun,
+  upsertPokerSeason,
+  upsertPokerSubmission,
   writeCheckpoint,
 } = require('./web_poker_store');
+const {
+  DEFAULT_OPERATOR_TOKEN,
+  POKER_OPERATOR_SCHEMA_VERSION,
+  createBatch: createPokerOperatorBatch,
+  createSeason: createPokerOperatorSeason,
+  createSubmission: createPokerOperatorSubmission,
+  getBatchDetail: getPokerOperatorBatchDetail,
+  getLeaderboardSnapshotDetail: getPokerOperatorLeaderboardSnapshotDetail,
+  getLatestLeaderboardDetail: getPokerOperatorLatestLeaderboardDetail,
+  getPokerOperatorSnapshot,
+  getReplayDetail: getPokerOperatorReplayDetail,
+  getRunDetail: getPokerOperatorRunDetail,
+  getSeasonDetail: getPokerOperatorSeasonDetail,
+  listSeasons: listPokerOperatorSeasons,
+  resetPokerOperatorState,
+  seedPokerOperatorState,
+} = require('./poker_operator');
+const { createPokerOperatorClient } = require('./poker_operator_client');
 
 const PORTAL_WEB_API_VERSION = '2026-03-09';
 
@@ -4264,6 +4297,236 @@ app.get('/api/registry/entities/:id', (req, res) => {
   return sendPortalApiSuccess(res, { entity }, { requestId });
 });
 
+app.get('/v1/health', respondPokerOperatorTransport);
+app.get('/v1/seasons', respondPokerOperatorTransport);
+app.get('/v1/seasons/:seasonId', respondPokerOperatorTransport);
+app.post('/v1/seasons', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
+app.post('/v1/seasons/:seasonId/submissions', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
+app.post('/v1/seasons/:seasonId/batches', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
+app.get('/v1/batches/:batchId', respondPokerOperatorTransport);
+app.get('/v1/runs/:runId', respondPokerOperatorTransport);
+app.get('/v1/runs/:runId/replay', respondPokerOperatorTransport);
+app.get('/v1/leaderboards/:seasonId/latest', respondPokerOperatorTransport);
+app.get('/v1/leaderboards/:seasonId/snapshots/:snapshotId', respondPokerOperatorTransport);
+
+app.post('/api/poker/admin/sync', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const seasonId = typeof req.body?.seasonId === 'string' ? req.body.seasonId.trim() : '';
+  try {
+    const mirrored = await syncPokerMirrorFromOperator({ seasonId });
+    return sendPortalApiSuccess(res, {
+      operator: mirrored.health,
+      mirrored: mirrored.counts,
+      seasonIds: mirrored.seasonIds,
+    }, { requestId });
+  } catch (err) {
+    return sendPortalApiError(
+      res,
+      Number(err?.status || 502),
+      typeof err?.code === 'string' && err.code ? err.code : 'POKER_OPERATOR_SYNC_FAILED',
+      typeof err?.message === 'string' && err.message ? err.message : 'Poker operator sync failed.',
+      {
+        requestId,
+        retryable: Number(err?.status || 502) >= 500,
+        details: err?.details || {},
+      }
+    );
+  }
+});
+
+app.get('/api/poker/seasons', (_req, res) => {
+  const requestId = buildPortalRequestId();
+  const items = listPokerSeasons()
+    .map(summarizeMirroredPokerSeason)
+    .filter(Boolean);
+  return sendPortalApiSuccess(res, { items }, { requestId });
+});
+
+app.get('/api/poker/seasons/:seasonId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const season = getPokerSeasonById(req.params.seasonId);
+  if (!season) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker season not found.', { requestId });
+  }
+  return sendPortalApiSuccess(res, {
+    season: summarizeMirroredPokerSeason(season),
+  }, { requestId });
+});
+
+app.post('/api/poker/seasons/:seasonId/submissions', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  if (!idempotencyKey) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'idempotencyKey is required.', { requestId });
+  }
+  const walletBinding = resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding) {
+    return sendPortalApiError(res, 409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before submitting.', { requestId });
+  }
+  const existing = getPokerSubmissionByRequest({
+    seasonId: req.params.seasonId,
+    portalSessionId: session.sessionId,
+    idempotencyKey,
+  });
+  if (existing) {
+    return sendPortalApiSuccess(res, {
+      submission: existing,
+      replayed: true,
+    }, { requestId });
+  }
+
+  const bundle = req.body?.bundle && typeof req.body.bundle === 'object' ? req.body.bundle : null;
+  const declaredCapabilities = req.body?.declaredCapabilities && typeof req.body.declaredCapabilities === 'object'
+    ? req.body.declaredCapabilities
+    : {};
+  const portalSubmissionId = typeof req.body?.portalSubmissionId === 'string' && req.body.portalSubmissionId.trim()
+    ? req.body.portalSubmissionId.trim()
+    : `psub_${randomHex(8)}`;
+  try {
+    const client = createPortalPokerOperatorClient();
+    const result = await client.createSubmission(
+      req.params.seasonId,
+      {
+        portalSubmissionId,
+        submitterWallet: walletBinding.submitterWallet,
+        bundle,
+        declaredCapabilities,
+      },
+      {
+        bearerToken: getPokerOperatorServiceToken(),
+        idempotencyKey,
+      }
+    );
+    if (!getPokerSeasonById(req.params.seasonId)) {
+      const season = await client.getSeason(req.params.seasonId);
+      upsertPokerSeason({
+        seasonId: season.seasonId,
+        seasonSlug: season.seasonSlug,
+        displayName: season.displayName,
+        rulesVersion: season.rulesVersion,
+        operatorVersion: season.operatorVersion,
+        status: season.status,
+        submissionOpenAt: season.submissionOpenAt,
+        submissionCloseAt: season.submissionCloseAt,
+        divisions: season.divisions,
+        raw: season,
+        createdAt: season.createdAt || nowIso(),
+        updatedAt: season.updatedAt || nowIso(),
+      });
+    }
+    const mirrored = upsertPokerSubmission({
+      submissionId: result.submissionId,
+      seasonId: req.params.seasonId,
+      portalSubmissionId,
+      portalSessionId: session.sessionId,
+      walletSubject: walletBinding.walletSubject,
+      submitterWallet: walletBinding.submitterWallet,
+      bundle,
+      declaredCapabilities,
+      validation: result.validation,
+      status: result.status,
+      idempotencyKey,
+      raw: result,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      submission: mirrored,
+      replayed: false,
+    }, { requestId });
+  } catch (err) {
+    return sendPortalApiError(
+      res,
+      Number(err?.status || 502),
+      typeof err?.code === 'string' && err.code ? err.code : 'POKER_SUBMISSION_FAILED',
+      typeof err?.message === 'string' && err.message ? err.message : 'Poker submission failed.',
+      {
+        requestId,
+        retryable: Number(err?.status || 502) >= 500,
+        details: err?.details || {},
+      }
+    );
+  }
+});
+
+app.get('/api/poker/submissions/:submissionId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const submission = getPokerSubmissionById(req.params.submissionId);
+  if (!submission) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker submission not found.', { requestId });
+  }
+  if (submission.portalSessionId && submission.portalSessionId !== session.sessionId) {
+    return sendPortalApiError(res, 403, 'FORBIDDEN', 'This poker submission belongs to a different Portal session.', { requestId });
+  }
+  return sendPortalApiSuccess(res, {
+    submission: {
+      submissionId: submission.submissionId,
+      seasonId: submission.seasonId,
+      status: submission.status,
+      validation: submission.validation,
+      createdAt: submission.createdAt,
+      updatedAt: submission.updatedAt,
+    },
+  }, { requestId });
+});
+
+app.get('/api/poker/leaderboards/:seasonId/latest', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const snapshot = getLatestPokerLeaderboardSnapshot(req.params.seasonId);
+  return sendPortalApiSuccess(res, {
+    seasonId: req.params.seasonId,
+    snapshotId: snapshot?.snapshotId || null,
+    createdAt: snapshot?.createdAt || null,
+    rankings: Array.isArray(snapshot?.rankings) ? snapshot.rankings : [],
+  }, { requestId });
+});
+
+app.get('/api/poker/runs/:runId/replay', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const run = getPokerRunById(req.params.runId);
+  const replay = getPokerReplayArtifactByRunId(req.params.runId);
+  if (!run || !replay) {
+    return sendPortalApiError(res, 404, 'POKER_REPLAY_NOT_READY', 'Replay artifact is not ready.', { requestId });
+  }
+  if (replay.replayFormat !== 'poker-run-replay-v1') {
+    return sendPortalApiError(res, 502, 'POKER_OPERATOR_SCHEMA_MISMATCH', 'Replay format does not match Portal expectations.', {
+      requestId,
+      details: {
+        expectedReplayFormat: 'poker-run-replay-v1',
+        receivedReplayFormat: replay.replayFormat,
+      },
+    });
+  }
+  const computedHash = computePokerArtifactSha256(replay.raw);
+  if (!computedHash || computedHash !== replay.artifactSha256) {
+    return sendPortalApiError(res, 409, 'POKER_REPLAY_NOT_READY', 'Replay artifact hash is not ready or does not match.', {
+      requestId,
+      details: {
+        expectedArtifactSha256: replay.artifactSha256,
+        computedArtifactSha256: computedHash,
+      },
+    });
+  }
+  return sendPortalApiSuccess(res, {
+    runId: run.runId,
+    summary: run.summary,
+    replay: {
+      replayFormat: replay.replayFormat,
+      summaryJson: replay.summary,
+      eventsJsonlUri: replay.eventsJsonlUri,
+      artifactSha256: replay.artifactSha256,
+      contentType: replay.contentType,
+    },
+    hashVerified: true,
+  }, { requestId });
+});
+
 app.post('/api/hatch/complete', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
@@ -4809,6 +5072,9 @@ function collectWalletSubjectsForSession(session, req) {
   for (const candidate of collectWalletCandidatesFromHeaders(req)) {
     add(candidate.chain, candidate.address, session?.createdAt || null);
   }
+  for (const binding of Array.isArray(session?.walletBindings) ? session.walletBindings : []) {
+    add(binding?.chain, binding?.address, binding?.boundAt || session?.createdAt || null);
+  }
   add('solana', session?.token?.address, session?.signup?.createdAt || null);
   add(session?.claim?.erc8004?.claimChain, session?.claim?.erc8004?.address, session?.claim?.erc8004?.verifiedAt
     ? new Date(Number(session.claim.erc8004.verifiedAt)).toISOString()
@@ -4950,6 +5216,431 @@ function sendProxyPolicyContractError(res, err, requestId) {
       details: err?.details || {}
     }
   );
+}
+
+function makePortalApiSuccessBody(data, { requestId = buildPortalRequestId() } = {}) {
+  return {
+    ok: true,
+    data,
+    meta: makePortalApiMeta(requestId),
+  };
+}
+
+function makePortalApiErrorBody(
+  code,
+  message,
+  {
+    requestId = buildPortalRequestId(),
+    retryable = false,
+    details = {},
+  } = {}
+) {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      retryable: retryable === true,
+      details: details && typeof details === 'object' ? details : {},
+    },
+    meta: makePortalApiMeta(requestId),
+  };
+}
+
+function readPlainHeader(headers, name) {
+  if (!headers || typeof headers !== 'object') return '';
+  const target = String(name || '').trim().toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (String(key || '').trim().toLowerCase() !== target) continue;
+    if (Array.isArray(value)) return String(value[0] || '').trim();
+    return String(value || '').trim();
+  }
+  return '';
+}
+
+function getPokerOperatorServiceToken() {
+  const snapshot = getPokerOperatorSnapshot();
+  return typeof snapshot?.serviceToken === 'string' && snapshot.serviceToken.trim()
+    ? snapshot.serviceToken.trim()
+    : DEFAULT_OPERATOR_TOKEN;
+}
+
+function normalizePokerOperatorMutationContext(headers) {
+  const authorization = readPlainHeader(headers, 'authorization');
+  if (!authorization.toLowerCase().startsWith('bearer ')) {
+    throw Object.assign(new Error('Operator auth required.'), {
+      status: 401,
+      code: 'POKER_OPERATOR_AUTH_REQUIRED',
+      details: {},
+    });
+  }
+  const token = authorization.slice(7).trim();
+  if (!token || token !== getPokerOperatorServiceToken()) {
+    throw Object.assign(new Error('Operator auth required.'), {
+      status: 401,
+      code: 'POKER_OPERATOR_AUTH_REQUIRED',
+      details: {},
+    });
+  }
+  const idempotencyKey = readPlainHeader(headers, 'idempotency-key');
+  if (!idempotencyKey) {
+    throw Object.assign(new Error('Idempotency key is required.'), {
+      status: 400,
+      code: 'INVALID_ARGUMENT',
+      details: {
+        field: 'Idempotency-Key',
+      },
+    });
+  }
+  return {
+    bearerToken: token,
+    idempotencyKey,
+    actor: token === getPokerOperatorServiceToken() ? 'portal_service' : 'operator_service',
+  };
+}
+
+function respondPokerOperatorTransport(req, res) {
+  const result = invokePokerOperatorTransport({
+    method: req.method,
+    path: req.path,
+    query: req.query,
+    body: req.body,
+    headers: req.headers,
+    requestId: buildPortalRequestId(),
+  });
+  return res.status(result.status).json(result.body);
+}
+
+function invokePokerOperatorTransport({
+  method,
+  path,
+  query = {},
+  body = null,
+  headers = {},
+  requestId = buildPortalRequestId(),
+}) {
+  try {
+    const normalizedMethod = String(method || 'GET').trim().toUpperCase();
+    const normalizedPath = String(path || '').trim();
+    const snapshot = getPokerOperatorSnapshot();
+
+    if (normalizedMethod === 'GET' && normalizedPath === '/v1/health') {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody({
+          status: 'ok',
+          operatorVersion: snapshot.operatorVersion,
+          schemaVersion: snapshot.schemaVersion,
+          time: nowIso(),
+        }, { requestId }),
+      };
+    }
+
+    if (normalizedMethod === 'GET' && normalizedPath === '/v1/seasons') {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(listPokerOperatorSeasons({
+          cursor: typeof query?.cursor === 'string' ? query.cursor : null,
+          limit: Number.parseInt(String(query?.limit || '20'), 10),
+          status: typeof query?.status === 'string' ? query.status : '',
+        }), { requestId }),
+      };
+    }
+
+    const seasonDetailMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && seasonDetailMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorSeasonDetail(decodeURIComponent(seasonDetailMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const batchMatch = normalizedPath.match(/^\/v1\/batches\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && batchMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorBatchDetail(decodeURIComponent(batchMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const runReplayMatch = normalizedPath.match(/^\/v1\/runs\/([^/]+)\/replay$/);
+    if (normalizedMethod === 'GET' && runReplayMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorReplayDetail(decodeURIComponent(runReplayMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const runMatch = normalizedPath.match(/^\/v1\/runs\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && runMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorRunDetail(decodeURIComponent(runMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    const leaderboardSnapshotMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/snapshots\/([^/]+)$/);
+    if (normalizedMethod === 'GET' && leaderboardSnapshotMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorLeaderboardSnapshotDetail(
+            decodeURIComponent(leaderboardSnapshotMatch[1]),
+            decodeURIComponent(leaderboardSnapshotMatch[2])
+          ),
+          { requestId }
+        ),
+      };
+    }
+
+    const leaderboardLatestMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/latest$/);
+    if (normalizedMethod === 'GET' && leaderboardLatestMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          getPokerOperatorLatestLeaderboardDetail(decodeURIComponent(leaderboardLatestMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
+    if (normalizedMethod === 'POST' && normalizedPath === '/v1/seasons') {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorSeason(body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    const submissionMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)\/submissions$/);
+    if (normalizedMethod === 'POST' && submissionMatch) {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorSubmission(decodeURIComponent(submissionMatch[1]), body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    const createBatchMatch = normalizedPath.match(/^\/v1\/seasons\/([^/]+)\/batches$/);
+    if (normalizedMethod === 'POST' && createBatchMatch) {
+      const ctx = normalizePokerOperatorMutationContext(headers);
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          createPokerOperatorBatch(decodeURIComponent(createBatchMatch[1]), body, {
+            actor: ctx.actor,
+            idempotencyKey: ctx.idempotencyKey,
+          }),
+          { requestId }
+        ),
+      };
+    }
+
+    return {
+      status: 404,
+      body: makePortalApiErrorBody('NOT_FOUND', 'Operator route not found.', { requestId }),
+    };
+  } catch (err) {
+    return {
+      status: Number(err?.status || 500),
+      body: makePortalApiErrorBody(
+        typeof err?.code === 'string' && err.code ? err.code : 'INTERNAL_ERROR',
+        typeof err?.message === 'string' && err.message ? err.message : 'Operator request failed.',
+        {
+          requestId,
+          retryable: Number(err?.status || 500) >= 500,
+          details: err?.details || {},
+        }
+      ),
+    };
+  }
+}
+
+function createPortalPokerOperatorClient() {
+  return createPokerOperatorClient({
+    transport: async ({ method, path, query, body, headers }) => invokePokerOperatorTransport({
+      method,
+      path,
+      query,
+      body,
+      headers,
+      requestId: buildPortalRequestId(),
+    }),
+  });
+}
+
+function resolvePrimaryWalletSubject(session, req) {
+  const walletSubjects = collectWalletSubjectsForSession(session, req);
+  const primary = walletSubjects[0] || null;
+  if (!primary?.address) return null;
+  return {
+    walletSubject: primary.address,
+    submitterWallet: {
+      chain: primary.chain,
+      address: primary.address,
+    },
+  };
+}
+
+async function syncPokerMirrorFromOperator({ seasonId = '' } = {}) {
+  const client = createPortalPokerOperatorClient();
+  const health = await client.health();
+  const seasonIds = [];
+  if (seasonId) {
+    seasonIds.push(seasonId);
+  } else {
+    let cursor = null;
+    do {
+      const page = await client.listSeasons({ cursor, limit: 100 });
+      for (const item of page.items) {
+        if (item?.seasonId) seasonIds.push(item.seasonId);
+      }
+      cursor = page.nextCursor || null;
+    } while (cursor);
+  }
+  const counts = {
+    seasons: 0,
+    leaderboards: 0,
+    batches: 0,
+    runs: 0,
+    replays: 0,
+  };
+  for (const itemSeasonId of seasonIds) {
+    const season = await client.getSeason(itemSeasonId);
+    upsertPokerSeason({
+      seasonId: season.seasonId,
+      seasonSlug: season.seasonSlug,
+      displayName: season.displayName,
+      rulesVersion: season.rulesVersion,
+      operatorVersion: season.operatorVersion,
+      status: season.status,
+      submissionOpenAt: season.submissionOpenAt,
+      submissionCloseAt: season.submissionCloseAt,
+      divisions: season.divisions,
+      raw: season,
+      createdAt: season.createdAt || nowIso(),
+      updatedAt: season.updatedAt || nowIso(),
+    });
+    counts.seasons += 1;
+
+    if (season?.latestLeaderboardSnapshot?.snapshotId) {
+      const latest = await client.getLatestLeaderboard(season.seasonId);
+      if (latest?.snapshotId) {
+        upsertPokerLeaderboardSnapshot({
+          snapshotId: latest.snapshotId,
+          seasonId: season.seasonId,
+          rankings: latest.rankings,
+          raw: latest,
+          createdAt: latest.createdAt || nowIso(),
+          updatedAt: latest.createdAt || nowIso(),
+        });
+        counts.leaderboards += 1;
+      }
+    }
+
+    if (season?.latestReplayHighlight?.runId) {
+      const run = await client.getRun(season.latestReplayHighlight.runId);
+      if (run?.batchId) {
+        const batch = await client.getBatch(run.batchId);
+        upsertPokerBatch({
+          batchId: batch.batchId,
+          seasonId: batch.seasonId,
+          batchKind: batch.batchKind,
+          submissionIds: batch.submissionIds,
+          batchConfig: batch.batchConfig,
+          status: batch.status,
+          raw: batch,
+          createdAt: batch.createdAt || nowIso(),
+          updatedAt: batch.updatedAt || nowIso(),
+        });
+        counts.batches += 1;
+      }
+      upsertPokerRun({
+        runId: run.runId,
+        batchId: run.batchId,
+        seasonId: run.seasonId,
+        summary: run.summary,
+        raw: run,
+        createdAt: run.createdAt || nowIso(),
+        updatedAt: run.updatedAt || nowIso(),
+      });
+      counts.runs += 1;
+      try {
+        const replay = await client.getReplay(run.runId);
+        upsertPokerReplayArtifact({
+          runId: replay.runId,
+          replayFormat: replay.replay.replayFormat,
+          summary: replay.replay.summaryJson,
+          eventsJsonlUri: replay.replay.eventsJsonlUri,
+          artifactSha256: replay.replay.artifactSha256,
+          contentType: replay.replay.contentType,
+          raw: replay.replay,
+          createdAt: run.createdAt || nowIso(),
+          updatedAt: run.updatedAt || nowIso(),
+        });
+        counts.replays += 1;
+      } catch (err) {
+        if (err?.code !== 'POKER_REPLAY_NOT_READY') throw err;
+      }
+    }
+  }
+  return {
+    health,
+    seasonIds,
+    counts,
+  };
+}
+
+function summarizeMirroredPokerSeason(season) {
+  if (!season) return null;
+  const latestSnapshot = getLatestPokerLeaderboardSnapshot(season.seasonId);
+  const raw = season.raw && typeof season.raw === 'object' ? season.raw : {};
+  return {
+    seasonId: season.seasonId,
+    seasonSlug: season.seasonSlug,
+    displayName: season.displayName,
+    rulesVersion: season.rulesVersion,
+    operatorVersion: season.operatorVersion,
+    status: season.status,
+    submissionOpenAt: season.submissionOpenAt,
+    submissionCloseAt: season.submissionCloseAt,
+    divisions: season.divisions,
+    latestLeaderboardSnapshot: latestSnapshot ? {
+      snapshotId: latestSnapshot.snapshotId,
+      createdAt: latestSnapshot.createdAt,
+    } : null,
+    latestReplayHighlight: raw.latestReplayHighlight || null,
+  };
+}
+
+function computePokerArtifactSha256(rawReplay) {
+  const eventsJsonl = typeof rawReplay?.eventsJsonl === 'string' ? rawReplay.eventsJsonl : '';
+  if (!eventsJsonl) return null;
+  return `sha256:${crypto.createHash('sha256').update(eventsJsonl, 'utf8').digest('hex')}`;
 }
 
 function isBlockedPortalContractHostname(hostname) {
@@ -8843,6 +9534,7 @@ if (process.env.NODE_ENV === 'test') {
       erc8004Registrations: []
     });
     resetExtendedStore();
+    resetPokerOperatorState();
     invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
@@ -8890,6 +9582,26 @@ if (process.env.NODE_ENV === 'test') {
     if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
     bindSessionWallet(s, chain, address, { allowRebind: true });
     res.json({ ok: true, sessionId: s.sessionId, chain, address });
+  });
+
+  app.post('/__test__/poker/operator-fixture', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const fixture = req.body && typeof req.body === 'object' ? req.body : {};
+    const snapshot = seedPokerOperatorState(fixture);
+    return res.json({ ok: true, snapshot });
+  });
+
+  app.get('/__test__/poker/submissions/:submissionId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const submission = getPokerSubmissionById(req.params.submissionId);
+    if (!submission) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    return res.json({ ok: true, submission });
   });
 }
 
@@ -10047,6 +10759,10 @@ app.get('/registry', (req, res) => {
     return sendHtmlNoStore(res, 'registry.html');
   }
   return res.redirect(302, registryModalRedirectPath());
+});
+
+app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (_req, res) => {
+  return sendHtmlNoStore(res, 'poker.html');
 });
 
 app.use(
