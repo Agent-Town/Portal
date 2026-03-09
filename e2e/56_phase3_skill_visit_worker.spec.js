@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+const PHASE1_APP_URL = '/app?liteDriver=phase1';
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
@@ -50,7 +51,7 @@ function parseAvailableSkills(skillsPrompt = '') {
 }
 
 test('gateway default exposes skill runtime methods for page integrations', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -79,7 +80,7 @@ test('gateway default exposes skill runtime methods for page integrations', asyn
 });
 
 test('visit imports portal skill and writes compatibility mirrors', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const visit = await page.evaluate(async () => {
@@ -121,7 +122,7 @@ test('visit imports portal skill and writes compatibility mirrors', async ({ pag
 });
 
 test('system prompt exposes available_skills without inline SKILL context injection', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const preview = await page.evaluate(async () => {
@@ -147,7 +148,7 @@ test('system prompt exposes available_skills without inline SKILL context inject
 });
 
 test('chat prompt carries runtime team context and active skill guidance after skill import', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -227,7 +228,7 @@ test('chat prompt carries runtime team context and active skill guidance after s
 });
 
 test('multi-skill prompt preview prefers most-specific imported skill and keeps single upfront read constraint', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -270,7 +271,7 @@ test('multi-skill prompt preview prefers most-specific imported skill and keeps 
 });
 
 test('repeat multi-skill prompt preview keeps deterministic available_skills ordering', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -292,7 +293,7 @@ test('repeat multi-skill prompt preview keeps deterministic available_skills ord
 });
 
 test('visit imports same-origin companion files for a skill package', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -349,7 +350,7 @@ test('visit imports same-origin companion files for a skill package', async ({ p
 });
 
 test('repeat visit keeps deterministic imported metadata ordering', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -393,7 +394,7 @@ test('repeat visit keeps deterministic imported metadata ordering', async ({ pag
 });
 
 test('visit imports Moltbook-shaped package files and preserves domain-like path conventions', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -443,7 +444,7 @@ test('visit imports Moltbook-shaped package files and preserves domain-like path
 });
 
 test('experience dry-run resolves uppercase workspace files', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const run = await page.evaluate(async () => {
@@ -467,7 +468,7 @@ test('experience dry-run resolves uppercase workspace files', async ({ page }) =
 });
 
 test('experience dry-run succeeds with SKILL-only workspace', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const run = await page.evaluate(async () => {
@@ -500,7 +501,7 @@ test('experience dry-run succeeds with SKILL-only workspace', async ({ page }) =
 });
 
 test('experience run defaults to local agent-turn path (no test ws dependency)', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const run = await page.evaluate(async () => {
@@ -518,7 +519,7 @@ test('experience run defaults to local agent-turn path (no test ws dependency)',
 });
 
 test('experience run can skip transcript persistence for polling turns', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -568,7 +569,7 @@ test('experience run can skip transcript persistence for polling turns', async (
 });
 
 test('experience run supports ws transport via local test websocket endpoint', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const run = await page.evaluate(async () => {
@@ -589,7 +590,7 @@ test('experience run supports ws transport via local test websocket endpoint', a
 });
 
 test('web_fetch blocks proxy access for cross-origin loopback alias', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -614,7 +615,7 @@ test('web_fetch blocks proxy access for cross-origin loopback alias', async ({ p
 });
 
 test('permission manifest denies cross-origin web_fetch when network.fetch is missing', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -686,7 +687,7 @@ test('visit import resolves ERC-8004 registration permission manifest into activ
     });
   });
 
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -727,7 +728,7 @@ test('permission manifest requires origin approval before allowed cross-origin w
     });
   });
 
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const firstAttempt = await page.evaluate(async () => {
@@ -811,7 +812,7 @@ test('permission manifest requires origin approval before allowed cross-origin w
 });
 
 test('permission manifest denies persistent workspace writes when storage.local.persistent is missing', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -841,7 +842,7 @@ test('permission manifest requires approval before persistent workspace write wh
   await page.addInitScript(() => {
     localStorage.setItem('agentTown:panel:minimized', '0');
   });
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   await page.evaluate(() => {
@@ -878,7 +879,7 @@ test('permission manifest requires approval before persistent workspace write wh
 });
 
 test('permission manifest denies secret access when secrets.read is missing', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -905,7 +906,7 @@ test('permission manifest denies secret access when secrets.read is missing', as
 });
 
 test('permission manifest denies wallet_sign_message when wallet.eip1193.sign is missing', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -932,7 +933,7 @@ test('permission manifest denies wallet_sign_message when wallet.eip1193.sign is
 });
 
 test('permission manifest enforces wallet.eip1193.tx permission + tx constraints', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -997,7 +998,7 @@ test('permission manifest enforces wallet.eip1193.tx permission + tx constraints
 });
 
 test('skill diagnostics persist last experience run failure details', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -1025,7 +1026,7 @@ test('skill diagnostics persist last experience run failure details', async ({ p
 });
 
 test('http_request accepts raw JSON string/object body for /api/agent/connect', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const result = await page.evaluate(async () => {
@@ -1063,7 +1064,7 @@ test('http_request accepts raw JSON string/object body for /api/agent/connect', 
 });
 
 test('agent-town ceremony tools drive commit/reveal payloads without server-side shortcuts', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -1136,7 +1137,7 @@ test('agent-town ceremony tools drive commit/reveal payloads without server-side
 });
 
 test('agent-town ceremony commit is idempotent per team and random across team reset', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -1193,7 +1194,7 @@ test('approval requests render in index flow and can be rejected', async ({ page
     localStorage.setItem('agentTown:panel:minimized', '0');
   });
 
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   await expect(page.getByTestId('approvals-panel')).toHaveClass(/is-hidden/, { timeout: 2500 });
@@ -1233,7 +1234,7 @@ test('approval requests render in index flow and can be rejected', async ({ page
 });
 
 test('transcript can be reset to avoid stale context pollution', async ({ page }) => {
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   const summary = await page.evaluate(async () => {
@@ -1273,7 +1274,7 @@ test('agent panel New session button rotates and clears worker context', async (
     localStorage.setItem('agentTown:panel:minimized', '0');
   });
 
-  await page.goto('/?liteDriver=phase1');
+  await page.goto(PHASE1_APP_URL);
   await waitForLiteTestApi(page);
 
   await page.evaluate(async () => {

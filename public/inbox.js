@@ -62,15 +62,30 @@ async function sha256Base64(input) {
 
 function cacheHouseAuthBytes(houseId, keyBytes) {
   if (!houseId || !keyBytes || keyBytes.length < 16) return;
+  const encoded = b64(keyBytes);
   const store = getHouseAuthMemoryStore();
-  store[houseAuthCacheKey(houseId)] = b64(keyBytes);
+  const key = houseAuthCacheKey(houseId);
+  store[key] = encoded;
+  try {
+    window.localStorage?.setItem(key, encoded);
+  } catch {
+    // ignore storage quota / privacy mode failures
+  }
 }
 
 function loadCachedHouseAuthBytes(houseId) {
   const store = getHouseAuthMemoryStore();
-  const raw = typeof store[houseAuthCacheKey(houseId)] === 'string'
-    ? store[houseAuthCacheKey(houseId)]
-    : '';
+  const key = houseAuthCacheKey(houseId);
+  let raw = typeof store[key] === 'string' ? store[key] : '';
+  if (!raw) {
+    try {
+      raw = typeof window.localStorage?.getItem(key) === 'string'
+        ? window.localStorage.getItem(key)
+        : '';
+    } catch {
+      raw = '';
+    }
+  }
   if (!raw) return null;
   const keyBytes = unb64(raw);
   if (!keyBytes || keyBytes.length < 16) return null;

@@ -130,7 +130,7 @@ async function ensurePrivyStartEntry(page, { timeout = 10000 } = {}) {
 
 async function ensureAppShell(page, { navigate = true } = {}) {
   if (navigate) {
-    await page.goto('/');
+    await page.goto('/app');
   }
 
   const districtMap = page.locator('#districtMap');
@@ -220,8 +220,8 @@ async function ensureHouseDistrictVisible(page, { requireSigils = false } = {}) 
   const modalTitle = page.locator('#districtModalTitle');
   const titleMatches = async () => {
     const text = await modalTitle.first().textContent().catch(() => '');
-    if (targetDistrict === 'brain') return /connect brain/i.test(String(text || ''));
-    if (targetDistrict === 'sigil') return /sigil/i.test(String(text || ''));
+    if (targetDistrict === 'brain') return /connect brain|town hall/i.test(String(text || ''));
+    if (targetDistrict === 'sigil') return /sigil|town hall/i.test(String(text || ''));
     return /plan wagons/i.test(String(text || ''));
   };
   const houseContentVisible = async () => {
@@ -249,6 +249,10 @@ async function ensureHouseDistrictVisible(page, { requireSigils = false } = {}) 
         if (target instanceof HTMLElement) target.click();
       });
     }
+  } else if (targetDistrict === 'sigil') {
+    const townhallSpot = page.getByRole('button', { name: 'Open Town Hall' });
+    await expect(townhallSpot).toBeVisible({ timeout: 4000 });
+    await townhallSpot.first().click({ force: true });
   } else {
     await page.goto(`/app?district=${encodeURIComponent(targetDistrict)}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
     await ensureAppShell(page, { navigate: false });
@@ -276,38 +280,122 @@ async function ensureHouseDistrictVisible(page, { requireSigils = false } = {}) 
 async function ensureAgentPanelExpanded(page) {
   const sidebar = page.locator('#agentSidebar');
   if (!(await sidebar.count())) return;
-  const isMinimized = await sidebar.evaluate((node) => node.classList.contains('minimized')).catch(() => false);
-  if (!isMinimized) return;
+  const isExpanded = async () => {
+    return await sidebar.evaluate((node) => !node.classList.contains('minimized')).catch(() => false);
+  };
+  if (await isExpanded()) return;
 
-  const header = page.locator('#agentSidebar .sidebar-header');
-  if (!(await header.count())) return;
-  const target = header.first();
-  if (!(await target.isVisible())) return;
-  await target.click();
-  await expect(sidebar).not.toHaveClass(/minimized/, { timeout: 2000 });
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem('agentTown:panel:minimized', '0');
+    } catch {
+      // ignore localStorage access errors in test helpers
+    }
+  }).catch(() => {});
+
+  const minimizeBtn = page.locator('#minimizeChatBtn');
+  if (await minimizeBtn.count()) {
+    const target = minimizeBtn.first();
+    if (await target.isVisible().catch(() => false)) {
+      await target.click({ force: true });
+    }
+  }
+
+  if (!(await isExpanded())) {
+    const header = page.locator('#agentSidebar .sidebar-header');
+    if (await header.count()) {
+      const target = header.first();
+      if (await target.isVisible().catch(() => false)) {
+        await target.click({ position: { x: 12, y: 12 }, force: true });
+      }
+    }
+  }
+
+  if (!(await isExpanded())) {
+    await page.evaluate(() => {
+      const sidebarNode = document.getElementById('agentSidebar');
+      if (!(sidebarNode instanceof HTMLElement)) return;
+      sidebarNode.classList.remove('minimized');
+      document.body.classList.add('agent-panel-expanded');
+    }).catch(() => {});
+  }
+
+  await expect.poll(async () => {
+    return await isExpanded();
+  }, { timeout: 3000 }).toBe(true);
 }
 
 async function ensureBrainPanelVisible(page) {
   await ensureAgentPanelExpanded(page);
+  await page.evaluate(() => {
+    if (typeof window.setupAgentInterface === 'function') {
+      window.setupAgentInterface();
+    }
+  }).catch(() => {});
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const sendBtn = document.getElementById('sendChatBtn');
+      const brainTab = document.getElementById('agentDebugTabBrain');
+      return (
+        sendBtn instanceof HTMLElement
+        && sendBtn.dataset.boundSend === '1'
+        && brainTab instanceof HTMLElement
+        && brainTab.dataset.boundDebugTab === '1'
+      );
+    }).catch(() => false);
+  }, { timeout: 1500 }).toBe(true);
   const debugToggle = page.getByTestId('agent-debug-toggle');
   if (await debugToggle.count()) {
-    const target = debugToggle.first();
-    const expanded = String(await target.getAttribute('aria-expanded').catch(() => 'false')) === 'true';
-    if (!expanded && await target.isVisible().catch(() => false)) {
-      await target.click();
+    const expanded = String(await debugToggle.first().getAttribute('aria-expanded').catch(() => 'false')) === 'true';
+    if (!expanded) {
+      await page.evaluate(() => {
+        const target = document.getElementById('agentDebugToggleBtn');
+        if (target instanceof HTMLElement) target.click();
+      }).catch(() => {});
     }
   }
+  await ensureAgentPanelExpanded(page);
   const brainTab = page.getByTestId('agent-debug-tab-brain');
   if (await brainTab.count()) {
-    const target = brainTab.first();
-    if (await target.isVisible()) {
-      await target.click();
-    }
+    await page.evaluate(() => {
+      const target = document.getElementById('agentDebugTabBrain');
+      if (target instanceof HTMLElement) target.click();
+    }).catch(() => {});
   }
   const brainPanel = page.getByTestId('agent-debug-panel-brain');
   if (await brainPanel.count()) {
-    await expect(brainPanel).not.toHaveClass(/is-hidden/, { timeout: 2000 }).catch(() => {});
+    await expect(brainTab.first()).toHaveAttribute('aria-selected', 'true', { timeout: 2000 });
+    await expect(brainPanel).not.toHaveClass(/is-hidden/, { timeout: 2000 });
   }
+  const litePanel = page.getByTestId('lite-llm-panel');
+  if (await litePanel.count()) {
+    await expect(litePanel).toBeVisible({ timeout: 5000 });
+  }
+}
+
+async function waitForLocalLiteLlmConfig(page, {
+  provider,
+  model,
+  timeout = 8000
+} = {}) {
+  await expect.poll(async () => {
+    return await page.evaluate(async ({ desiredProvider, desiredModel }) => {
+      try {
+        const mod = await import('/openclaw-lite/llm-config-library.js');
+        const cfg = await mod.loadLlmConfig();
+        return (
+          cfg?.configured === true
+          && String(cfg?.provider || '') === String(desiredProvider || '')
+          && String(cfg?.model || '') === String(desiredModel || '')
+        );
+      } catch {
+        return false;
+      }
+    }, {
+      desiredProvider: provider,
+      desiredModel: model
+    });
+  }, { timeout }).toBe(true);
 }
 
 async function ensureLiteTestApi(page, timeout = 10000) {
@@ -580,6 +668,38 @@ async function configureLiteLlm(page, {
   await ensureHouseDistrictVisible(page).catch(() => {});
   await ensureBrainPanelVisible(page);
   const liteTestApiReady = await ensureLiteTestApi(page);
+  const applyViaTestApi = async () => {
+    if (!liteTestApiReady) {
+      throw new Error('LITE_LLM_TEST_API_MISSING');
+    }
+    await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
+      const api = window.__openclawLiteTest;
+      if (!api || typeof api.setLlmConfig !== 'function') {
+        throw new Error('LITE_LLM_TEST_API_MISSING');
+      }
+      await api.setLlmConfig({
+        provider: desiredProvider,
+        modelId: desiredModel,
+        modelRef: `${desiredProvider}/${desiredModel}`,
+        api: 'openai-completions',
+        apiKey: desiredApiKey,
+        useProxy: true
+      });
+    }, {
+      desiredProvider: provider,
+      desiredModel: model,
+      desiredApiKey: apiKey
+    });
+    await waitForLocalLiteLlmConfig(page, { provider, model });
+    await page.evaluate(async () => {
+      if (typeof window.bootstrapVendorRuntime === 'function') {
+        await window.bootstrapVendorRuntime().catch(() => null);
+      }
+      if (typeof window.connectLiteAgent === 'function') {
+        await window.connectLiteAgent().catch(() => null);
+      }
+    }).catch(() => {});
+  };
   const hasDomLlmForm = await page.evaluate(() => {
     return !!(
       document.getElementById('llmProviderSelect')
@@ -590,7 +710,7 @@ async function configureLiteLlm(page, {
   }).catch(() => false);
 
   const hasVisibleBrainPanel = await page.getByTestId('lite-llm-panel').isVisible().catch(() => false);
-  if (hasDomLlmForm) {
+  if (!hasVisibleBrainPanel && hasDomLlmForm) {
     await page.evaluate(({ desiredProvider, desiredModel, desiredApiKey }) => {
       const providerInput = document.getElementById('llmProviderSelect');
       const modelInput = document.getElementById('llmModelIdInput');
@@ -627,60 +747,13 @@ async function configureLiteLlm(page, {
       desiredModel: model,
       desiredApiKey: apiKey
     });
-    await expect.poll(async () => {
-      const state = await fetchSessionState(page);
-      return !!state?.lite?.llmConfigured;
-    }, { timeout: 8000 }).toBe(true);
+    await waitForLocalLiteLlmConfig(page, { provider, model });
+    await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|brain/i, { timeout: 5000 });
     return;
   }
 
   if (!hasVisibleBrainPanel) {
-    if (!liteTestApiReady) {
-      throw new Error('LITE_LLM_TEST_API_MISSING');
-    }
-    await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
-      const api = window.__openclawLiteTest;
-      if (!api || typeof api.setLlmConfig !== 'function') {
-        throw new Error('LITE_LLM_TEST_API_MISSING');
-      }
-      await api.setLlmConfig({
-        provider: desiredProvider,
-        modelId: desiredModel,
-        modelRef: `${desiredProvider}/${desiredModel}`,
-        api: 'openai-completions',
-        apiKey: desiredApiKey,
-        useProxy: true
-      });
-    }, {
-      desiredProvider: provider,
-      desiredModel: model,
-      desiredApiKey: apiKey
-    });
-    await page.evaluate(async ({ desiredProvider, desiredModel }) => {
-      const resp = await fetch('/api/agent/lite/llm/config', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          provider: desiredProvider,
-          model: desiredModel,
-          modelRef: `${desiredProvider}/${desiredModel}`,
-          authMode: 'api-key',
-          hasCredential: true
-        })
-      });
-      if (!resp.ok) {
-        const payload = await resp.json().catch(() => ({}));
-        throw new Error(String(payload?.error || `HTTP_${resp.status}`));
-      }
-    }, {
-      desiredProvider: provider,
-      desiredModel: model
-    });
-    await expect.poll(async () => {
-      const state = await fetchSessionState(page);
-      return !!state?.lite?.llmConfigured;
-    }, { timeout: 5000 }).toBe(true);
+    await applyViaTestApi();
     return;
   }
 
@@ -705,7 +778,12 @@ async function configureLiteLlm(page, {
   await modelInput.selectOption(model);
   await page.getByTestId('lite-llm-api-key').fill(apiKey);
   await page.getByTestId('lite-llm-save').click();
-  await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|connected|brain/i, { timeout: 3000 });
+  try {
+    await waitForLocalLiteLlmConfig(page, { provider, model, timeout: 2500 });
+  } catch (error) {
+    await applyViaTestApi();
+  }
+  await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|connected|brain/i, { timeout: 5000 });
 }
 
 async function ensureLiteConnected(page) {

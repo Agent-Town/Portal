@@ -2974,18 +2974,14 @@ function ensureSessionOnboarding(session) {
   humanAvatar.image = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
     ? humanAvatar.image
     : DEFAULT_TOWNHALL_HUMAN_IMAGE;
-  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' && humanAvatar.prompt.trim()
-    ? humanAvatar.prompt
-    : DEFAULT_TOWNHALL_HUMAN_PROMPT;
+  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' ? humanAvatar.prompt : '';
   humanAvatar.source = humanAvatar.source === 'upload' ? 'upload' : 'default';
   humanAvatar.updatedAt = typeof humanAvatar.updatedAt === 'string' ? humanAvatar.updatedAt : null;
 
   agentAvatar.image = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
     ? agentAvatar.image
     : DEFAULT_TOWNHALL_AGENT_IMAGE;
-  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' && agentAvatar.prompt.trim()
-    ? agentAvatar.prompt
-    : DEFAULT_TOWNHALL_AGENT_PROMPT;
+  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' ? agentAvatar.prompt : '';
   agentAvatar.source = agentAvatar.source === 'upload' ? 'upload' : 'default';
   agentAvatar.updatedAt = typeof agentAvatar.updatedAt === 'string' ? agentAvatar.updatedAt : null;
 
@@ -9636,6 +9632,7 @@ if (process.env.NODE_ENV === 'test') {
     const onboarding = ensureSessionOnboarding(s);
     const input = req.body && typeof req.body === 'object' ? req.body : {};
     const profileInput = input.profile && typeof input.profile === 'object' ? input.profile : {};
+    const ercInput = input.erc8004 && typeof input.erc8004 === 'object' ? input.erc8004 : {};
     const walletsInput = Array.isArray(input.wallets) ? input.wallets : [];
     const updatedAt = nowIso();
     const normalizedStep = normalizeOnboardingStep(input.step);
@@ -9660,32 +9657,60 @@ if (process.env.NODE_ENV === 'test') {
       source: 'default',
       updatedAt,
     };
+    const userEvmInput = ercInput?.user?.evm && typeof ercInput.user.evm === 'object' ? ercInput.user.evm : {};
+    const userSolanaInput = ercInput?.user?.solana && typeof ercInput.user.solana === 'object' ? ercInput.user.solana : {};
+    const agentEvmInput = ercInput?.agent?.evm && typeof ercInput.agent.evm === 'object' ? ercInput.agent.evm : {};
+    const agentSolanaInput = ercInput?.agent?.solana && typeof ercInput.agent.solana === 'object' ? ercInput.agent.solana : {};
     onboarding.erc8004 = {
       user: {
         evm: {
-          id: '11155111:901',
-          chain: 'sepolia',
-          txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff11',
+          id: typeof userEvmInput.id === 'string' && userEvmInput.id.trim()
+            ? userEvmInput.id.trim()
+            : '11155111:901',
+          chain: typeof userEvmInput.chain === 'string' && userEvmInput.chain.trim()
+            ? userEvmInput.chain.trim()
+            : 'sepolia',
+          txHash: typeof userEvmInput.txHash === 'string' && userEvmInput.txHash.trim()
+            ? userEvmInput.txHash.trim()
+            : '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff11',
           updatedAt,
         },
         solana: {
-          id: 'solana:UserAssetPubkeyMock1111111111111111111111111111',
-          cluster: 'devnet',
-          txSig: '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ1',
+          id: typeof userSolanaInput.id === 'string' && userSolanaInput.id.trim()
+            ? userSolanaInput.id.trim()
+            : 'solana:UserAssetPubkeyMock1111111111111111111111111111',
+          cluster: typeof userSolanaInput.cluster === 'string' && userSolanaInput.cluster.trim()
+            ? userSolanaInput.cluster.trim()
+            : 'devnet',
+          txSig: typeof userSolanaInput.txSig === 'string' && userSolanaInput.txSig.trim()
+            ? userSolanaInput.txSig.trim()
+            : '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ1',
           updatedAt,
         },
       },
       agent: {
         evm: {
-          id: '11155111:902',
-          chain: 'sepolia',
-          txHash: '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff22',
+          id: typeof agentEvmInput.id === 'string' && agentEvmInput.id.trim()
+            ? agentEvmInput.id.trim()
+            : '11155111:902',
+          chain: typeof agentEvmInput.chain === 'string' && agentEvmInput.chain.trim()
+            ? agentEvmInput.chain.trim()
+            : 'sepolia',
+          txHash: typeof agentEvmInput.txHash === 'string' && agentEvmInput.txHash.trim()
+            ? agentEvmInput.txHash.trim()
+            : '0x1111222233334444555566667777888899990000aaaabbbbccccddddeeeeff22',
           updatedAt,
         },
         solana: {
-          id: 'solana:AgentAssetPubkeyMock111111111111111111111111111',
-          cluster: 'devnet',
-          txSig: '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ2',
+          id: typeof agentSolanaInput.id === 'string' && agentSolanaInput.id.trim()
+            ? agentSolanaInput.id.trim()
+            : 'solana:AgentAssetPubkeyMock111111111111111111111111111',
+          cluster: typeof agentSolanaInput.cluster === 'string' && agentSolanaInput.cluster.trim()
+            ? agentSolanaInput.cluster.trim()
+            : 'devnet',
+          txSig: typeof agentSolanaInput.txSig === 'string' && agentSolanaInput.txSig.trim()
+            ? agentSolanaInput.txSig.trim()
+            : '5fWrv4Mm7KxXw4VjQYw9r9k6nJg2wG2GQ6f4zS5aNehNZm6v4W4JUEV5h2wNQ2',
           updatedAt,
         },
       },

@@ -3,6 +3,9 @@ const path = require('path');
 const base = require('./playwright.config');
 
 const PORT = Number(process.env.PW_PORT || 4173);
+const STORE_PATH = process.env.STORE_PATH || path.join(process.cwd(), 'data', 'store.privy.e2e.sqlite');
+
+process.env.STORE_PATH = STORE_PATH;
 
 module.exports = {
   ...base,
@@ -25,7 +28,7 @@ module.exports = {
       LOAD_DOTENV_IN_TEST: '1',
       ENABLE_PRIVY_IN_TEST: '1',
       START_PAGE_ENABLED: String(process.env.START_PAGE_ENABLED || '1'),
-      STORE_PATH: path.join(process.cwd(), 'data', 'store.privy.e2e.sqlite'),
+      STORE_PATH,
     },
   },
 };

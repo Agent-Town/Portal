@@ -4145,6 +4145,7 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
   left: 50%;
   right: auto;
   bottom: 0;
+  z-index: 80;
   transform: translateX(-50%);
   width: min(calc(860px * var(--agent-panel-zoom)), calc(100vw - 16px));
   height: min(calc(34vh * var(--agent-panel-zoom)), calc(318px * var(--agent-panel-zoom)));
@@ -4160,6 +4161,10 @@ body.town-hub-page .districtModal.is-district .districtModalBody > * {
     inset 0 1px 0 rgba(255, 255, 255, 0.32);
   overflow: hidden;
   position: fixed;
+  transition: none;
+}
+
+#agentSidebar.agent-sidebar.agent-panel-layout-ready {
   transition: width 120ms ease, height 120ms ease, min-height 120ms ease;
 }
 

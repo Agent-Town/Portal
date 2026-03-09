@@ -10,7 +10,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
   <link rel="apple-touch-icon" href="/logo.jpg" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=20260309a" />
 </head>
 
 <body class="town-hub-page">
@@ -319,7 +319,18 @@
   <script src="/trainer_namespace_plugin.js?v=20260222b"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/app.js?v=20260222l"></script>
+  <script src="/app.js?v=20260309a"></script>
+  <script>
+    (() => {
+      const rebind = () => {
+        if (typeof window.setupAgentInterface === 'function') {
+          window.setupAgentInterface();
+        }
+      };
+      requestAnimationFrame(rebind);
+      setTimeout(rebind, 250);
+    })();
+  </script>
 </body>
 
 </html>

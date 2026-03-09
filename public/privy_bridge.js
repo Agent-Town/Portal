@@ -1747,6 +1747,7 @@
   window.ensurePrivyLogin = async function ensurePrivyLogin(options = {}) {
     const interactive = !(options && options.interactive === false);
     const loginUi = options && options.loginUi ? options.loginUi : null;
+    const requireSession = options && options.requireSession === true;
     const ready = await bootstrapPrivyBridge();
     if (!ready) {
       const out = new Error('PRIVY_BRIDGE_INIT_FAILED');
@@ -1767,8 +1768,10 @@
       return !!user;
     }
 
-    const fallbackUser = await probeCustomBridgeUser(bridge, { interactive, preferred: 'solana' });
-    if (fallbackUser) return true;
+    if (!requireSession) {
+      const fallbackUser = await probeCustomBridgeUser(bridge, { interactive, preferred: 'solana' });
+      if (fallbackUser) return true;
+    }
 
     if (!interactive) return false;
 

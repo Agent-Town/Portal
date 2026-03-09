@@ -266,7 +266,7 @@ async function maybeAutoSkipStart() {
   if (typeof window.ensurePrivyLogin !== 'function') return;
 
   try {
-    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
+    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false, requireSession: true });
     if (!alreadySignedIn) return;
 
     // Check onboarding status before redirecting
