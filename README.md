@@ -61,6 +61,22 @@ npm test
 
 Tests reset state via `POST /__test__/reset` (header `x-test-reset` uses `TEST_RESET_TOKEN`, default `test-reset`).
 
+Live Privy guest-login smoke (real `.env`, no OTP):
+```bash
+npm run test:privy-live
+```
+
+Requirements for the live Privy smoke:
+- set `PRIVY_APP_ID` in `.env` or `.env.local`
+- set `PRIVY_LOGIN_METHOD=guest` to avoid OTP during Playwright
+- allow `http://localhost:4175` in the Privy app origin/domain allowlist
+- optionally set `PRIVY_CLIENT_ID`
+
+What `npm run test:privy-live` does:
+- loads `.env*` even though the server runs under `NODE_ENV=test`
+- enables Privy in test mode (`ENABLE_PRIVY_IN_TEST=1`)
+- runs a dedicated live smoke that verifies `/start` login, redirect to `/app`, and real Privy-provided Solana + EVM wallet availability
+
 Optional local integration check (reused Sepolia wallet):
 ```bash
 REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
@@ -163,6 +179,7 @@ Unlocking a house in the UI is gated by a Privy-backed Solana wallet signature. 
 - `PRIVY_LOGIN_METHOD` (`email` or `guest`, default `email`)
 - `START_PAGE_ENABLED` (default: enabled when `PRIVY_APP_ID` is set)
 - `ENABLE_PRIVY_IN_TEST` (default `false`; test env disables Privy bridge unless this is explicitly enabled)
+- `LOAD_DOTENV_IN_TEST` (default `false`; when `true`, test-mode servers also load `.env*` files)
 - `CSP_SCRIPT_SRC_EXTRA` (optional comma-separated extra `script-src` entries)
 - `CSP_CONNECT_SRC_EXTRA` (optional comma-separated extra `connect-src` entries)
 - `CSP_FRAME_SRC_EXTRA` (optional comma-separated extra `frame-src` entries)
