@@ -2015,6 +2015,13 @@ function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) 
   };
 
   if (!session) {
+    if (hintedSession) {
+      session = hintedSession;
+      sid = hintedSession.sessionId;
+    }
+  }
+
+  if (!session) {
     const walletSession = pickBestWalletSession();
     if (walletSession) {
       session = walletSession;
