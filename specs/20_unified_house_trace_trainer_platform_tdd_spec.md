@@ -253,7 +253,7 @@ RED gate:
 GREEN gate:
 
 1. Trainer opens as a modal from the hub.
-2. Direct `/trainer` resolves to `/?modal=trainer` or an equivalent documented modal-preserving route.
+2. Direct `/trainer` resolves to `/app?modal=trainer` or an equivalent documented modal-preserving route.
 3. Worker continuity is preserved.
 
 Measurable metrics:

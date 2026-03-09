@@ -10781,10 +10781,24 @@ function atlasModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
-function trainerModalRedirectPath() {
+function trainerModalRedirectPath(req) {
   const params = new URLSearchParams();
+  const source = req && req.query && typeof req.query === 'object' ? req.query : {};
+  const allowedKeys = ['liteDriver', 'trainerNamespace', 'trainer_namespace', 'trainerTools', 'trainer-tools'];
+  for (const key of allowedKeys) {
+    const rawValue = source[key];
+    if (Array.isArray(rawValue)) {
+      for (const item of rawValue) {
+        if (item === null || item === undefined) continue;
+        params.append(key, String(item));
+      }
+      continue;
+    }
+    if (rawValue === null || rawValue === undefined || rawValue === '') continue;
+    params.set(key, String(rawValue));
+  }
   params.set('modal', 'trainer');
-  return `/?${params.toString()}`;
+  return `/app?${params.toString()}`;
 }
 
 function registryModalRedirectPath() {
@@ -10864,7 +10878,7 @@ app.get('/trainer', (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'trainer.html');
   }
-  return res.redirect(302, trainerModalRedirectPath());
+  return res.redirect(302, trainerModalRedirectPath(req));
 });
 app.get('/wall', (_req, res) => res.redirect(302, '/leaderboard'));
 app.get('/s/:id', (req, res) => {

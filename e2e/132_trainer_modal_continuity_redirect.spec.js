@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { readMetaValue, waitForLiteApi } = require('./helpers/trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -11,19 +12,22 @@ test('direct /trainer entry redirects into the modal-preserving hub route', asyn
     maxRedirects: 0,
   });
   expect(redirect.status()).toBe(302);
-  expect(String(redirect.headers().location || '')).toBe('/?modal=trainer');
+  expect(String(redirect.headers().location || '')).toBe('/app?modal=trainer');
 
   await page.goto('/trainer');
-  await expect(page).toHaveURL(/\/\?modal=trainer$/);
+  await expect(page).toHaveURL(/\/app\?modal=trainer$/);
   await expect(page.getByTestId('trainer-modal')).toBeVisible({ timeout: 5000 });
   await expect(page.getByTestId('trainer-root')).toBeVisible({ timeout: 1500 });
 });
 
-test('opening and closing trainer updates modal query state without leaving the hub', async ({ page }) => {
+test('opening and closing trainer preserves hub path and worker session continuity', async ({ page }) => {
   await page.goto('/app?liteDriver=phase1');
+  await waitForLiteApi(page);
 
   const trainerBtn = page.getByTestId('agent-open-trainer');
   await expect(trainerBtn).toHaveCount(1);
+  const initialSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  expect(initialSessionId).toMatch(/^sess_/);
 
   const sidebar = page.locator('#agentSidebar');
   const minimized = await sidebar.evaluate((node) => node.classList.contains('minimized'));
@@ -32,10 +36,20 @@ test('opening and closing trainer updates modal query state without leaving the 
   }
 
   await trainerBtn.click();
-  await expect(page).toHaveURL(/modal=trainer/);
+  const openUrl = new URL(page.url());
+  expect(openUrl.pathname).toBe('/app');
+  expect(openUrl.searchParams.get('liteDriver')).toBe('phase1');
+  expect(openUrl.searchParams.get('modal')).toBe('trainer');
   await expect(page.getByTestId('trainer-modal')).toBeVisible({ timeout: 5000 });
+  const openedSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  expect(openedSessionId).toBe(initialSessionId);
 
   await page.locator('#trainerModalClose').click();
   await expect(page.getByTestId('trainer-modal')).toHaveAttribute('aria-hidden', 'true');
-  await expect(page).not.toHaveURL(/modal=trainer/);
+  const closedUrl = new URL(page.url());
+  expect(closedUrl.pathname).toBe('/app');
+  expect(closedUrl.searchParams.get('liteDriver')).toBe('phase1');
+  expect(closedUrl.searchParams.get('modal')).toBe(null);
+  const closedSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  expect(closedSessionId).toBe(initialSessionId);
 });

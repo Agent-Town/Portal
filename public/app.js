@@ -3417,6 +3417,21 @@ function setTrainerModalOpen(open) {
   document.body.classList.toggle('trainer-modal-open', nextOpen);
 }
 
+function buildTrainerModalEntryUrl() {
+  const params = new URLSearchParams();
+  const current = new URL(window.location.href).searchParams;
+  const allowedKeys = ['liteDriver', 'trainerNamespace', 'trainer_namespace', 'trainerTools', 'trainer-tools'];
+  for (const key of allowedKeys) {
+    const values = current.getAll(key);
+    for (const value of values) {
+      if (!value) continue;
+      params.append(key, value);
+    }
+  }
+  params.set('modal', 'trainer');
+  return `/app?${params.toString()}`;
+}
+
 function syncTrainerModalQuery(open) {
   if (!window.history || typeof window.history.replaceState !== 'function') return;
   const parsed = new URL(window.location.href);
@@ -3454,7 +3469,7 @@ async function ensureTrainerScriptLoaded() {
 async function openTrainerModal() {
   const backdrop = getTrainerModalBackdrop();
   if (!isTownHub || !backdrop) {
-    window.location.assign('/?modal=trainer');
+    window.location.assign(buildTrainerModalEntryUrl());
     return;
   }
 
@@ -3524,7 +3539,10 @@ function routeToPopupMode(rawHref) {
 
   const path = parsed.pathname;
   if (path === '/app' || path === '/') {
-    return { mode: 'leave', url: parsed.pathname };
+    if (String(parsed.searchParams.get('modal') || '').trim().toLowerCase() === 'trainer' && isTownHub) {
+      return { mode: 'trainer' };
+    }
+    return { mode: 'leave', url: `${parsed.pathname}${parsed.search}${parsed.hash}` };
   }
   if (path === '/start') {
     return { mode: 'leave', url: '/start' };
@@ -3583,7 +3601,7 @@ function routeToPopupMode(rawHref) {
   if (path === '/trainer') {
     return isTownHub
       ? { mode: 'trainer' }
-      : { mode: 'leave', url: '/trainer' };
+      : { mode: 'leave', url: buildTrainerModalEntryUrl() };
   }
 
   return {
@@ -8351,7 +8369,7 @@ function setupAgentInterface() {
   if (openTrainerBtn) {
     openTrainerBtn.addEventListener('click', () => {
       openTrainerModal().catch(() => {
-        window.location.assign('/?modal=trainer');
+        window.location.assign(buildTrainerModalEntryUrl());
       });
     });
   }

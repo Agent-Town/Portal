@@ -179,7 +179,7 @@ The following are normative:
 Recommended deep links:
 
 - `/atlas` -> `/?district=atlas`
-- `/trainer` -> `/?modal=trainer`
+- `/trainer` -> `/app?modal=trainer`
 
 ---
 

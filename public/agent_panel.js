@@ -283,11 +283,11 @@
       openTrainerBtn.addEventListener('click', () => {
         if (typeof window.openExperienceTrainerModal === 'function') {
           Promise.resolve(window.openExperienceTrainerModal()).catch(() => {
-            window.location.assign('/?modal=trainer');
+            window.location.assign('/app?modal=trainer');
           });
           return;
         }
-        window.location.assign('/?modal=trainer');
+        window.location.assign('/app?modal=trainer');
       });
     }
 
