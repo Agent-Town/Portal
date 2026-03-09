@@ -904,6 +904,372 @@ function createIntegrationExecution({
   });
 }
 
+function mapTrainerJobRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    trainerJobId: String(row.trainer_job_id || ''),
+    houseId: row.house_id ? String(row.house_id) : null,
+    teamId: row.team_id ? String(row.team_id) : null,
+    jobKind: String(row.job_kind || ''),
+    status: String(row.status || ''),
+    targets: parseJsonColumn(row.targets_json, {}),
+    budget: parseJsonColumn(row.budget_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getTrainerJobById(trainerJobId = '') {
+  const normalizedTrainerJobId = String(trainerJobId || '').trim();
+  if (!normalizedTrainerJobId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trainer_jobs
+    WHERE trainer_job_id = ?
+    LIMIT 1
+  `).get(normalizedTrainerJobId);
+  return mapTrainerJobRow(row);
+}
+
+function getTrainerJobByIdempotency({
+  houseId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trainer_jobs
+    WHERE house_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedHouseId, normalizedIdempotencyKey);
+  return mapTrainerJobRow(row);
+}
+
+function listTrainerJobs({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM trainer_jobs
+  `;
+  const args = [];
+  if (normalizedHouseId || normalizedTeamId) {
+    const clauses = [];
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, trainer_job_id DESC';
+  return database.prepare(query).all(...args).map(mapTrainerJobRow).filter(Boolean);
+}
+
+function createTrainerJob({
+  trainerJobId = '',
+  houseId = '',
+  teamId = '',
+  jobKind = '',
+  status = 'queued',
+  targets = null,
+  budget = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedTrainerJobId = String(trainerJobId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedJobKind = String(jobKind || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedTrainerJobId || !normalizedHouseId || !normalizedTeamId || !normalizedJobKind || !normalizedStatus) {
+    throw new Error('TRAINER_JOB_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO trainer_jobs (
+      trainer_job_id,
+      house_id,
+      team_id,
+      job_kind,
+      status,
+      targets_json,
+      budget_json,
+      idempotency_key,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedTrainerJobId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedJobKind,
+    normalizedStatus,
+    JSON.stringify(targets && typeof targets === 'object' ? targets : {}),
+    JSON.stringify(budget && typeof budget === 'object' ? budget : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getTrainerJobById(normalizedTrainerJobId);
+}
+
+function updateTrainerJobStatus({
+  trainerJobId = '',
+  status = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedTrainerJobId = String(trainerJobId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedTrainerJobId || !normalizedStatus) {
+    throw new Error('TRAINER_JOB_STATUS_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE trainer_jobs
+    SET status = ?,
+        updated_at = ?
+    WHERE trainer_job_id = ?
+  `).run(
+    normalizedStatus,
+    nowIso,
+    normalizedTrainerJobId,
+  );
+  return getTrainerJobById(normalizedTrainerJobId);
+}
+
+function mapTrainerResultRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    trainerResultId: String(row.trainer_result_id || ''),
+    trainerJobId: String(row.trainer_job_id || ''),
+    status: String(row.status || ''),
+    result: parseJsonColumn(row.result_json, {}),
+    candidatePatchIds: parseJsonColumn(row.candidate_patch_ids_json, []),
+    linkedConfigVersionId: row.linked_config_version_id ? String(row.linked_config_version_id) : null,
+    approvalNeeded: Number(row.approval_needed || 0) === 1,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getTrainerResultById(trainerResultId = '') {
+  const normalizedTrainerResultId = String(trainerResultId || '').trim();
+  if (!normalizedTrainerResultId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trainer_results
+    WHERE trainer_result_id = ?
+    LIMIT 1
+  `).get(normalizedTrainerResultId);
+  return mapTrainerResultRow(row);
+}
+
+function getTrainerResultByJobId(trainerJobId = '') {
+  const normalizedTrainerJobId = String(trainerJobId || '').trim();
+  if (!normalizedTrainerJobId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trainer_results
+    WHERE trainer_job_id = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(normalizedTrainerJobId);
+  return mapTrainerResultRow(row);
+}
+
+function listTrainerResults({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('j.house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('j.team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT r.*
+    FROM trainer_results r
+    JOIN trainer_jobs j
+      ON j.trainer_job_id = r.trainer_job_id
+    ${whereSql}
+    ORDER BY r.created_at DESC, r.trainer_result_id DESC
+  `).all(...args);
+  return rows.map(mapTrainerResultRow).filter(Boolean);
+}
+
+function createTrainerResult({
+  trainerResultId = '',
+  trainerJobId = '',
+  status = 'succeeded',
+  result = null,
+  candidatePatchIds = [],
+  linkedConfigVersionId = '',
+  approvalNeeded = false,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedTrainerResultId = String(trainerResultId || '').trim();
+  const normalizedTrainerJobId = String(trainerJobId || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedTrainerResultId || !normalizedTrainerJobId || !normalizedStatus) {
+    throw new Error('TRAINER_RESULT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO trainer_results (
+      trainer_result_id,
+      trainer_job_id,
+      status,
+      result_json,
+      candidate_patch_ids_json,
+      linked_config_version_id,
+      approval_needed,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedTrainerResultId,
+    normalizedTrainerJobId,
+    normalizedStatus,
+    JSON.stringify(result && typeof result === 'object' ? result : {}),
+    JSON.stringify(Array.isArray(candidatePatchIds) ? candidatePatchIds : []),
+    String(linkedConfigVersionId || '').trim() || null,
+    approvalNeeded ? 1 : 0,
+    nowIso,
+    nowIso,
+  );
+  return getTrainerResultById(normalizedTrainerResultId);
+}
+
+function updateTrainerResultLink({
+  trainerResultId = '',
+  linkedConfigVersionId = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedTrainerResultId = String(trainerResultId || '').trim();
+  if (!normalizedTrainerResultId) {
+    throw new Error('TRAINER_RESULT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE trainer_results
+    SET linked_config_version_id = ?,
+        updated_at = ?
+    WHERE trainer_result_id = ?
+  `).run(
+    String(linkedConfigVersionId || '').trim() || null,
+    nowIso,
+    normalizedTrainerResultId,
+  );
+  return getTrainerResultById(normalizedTrainerResultId);
+}
+
+function mapApprovalRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    approvalId: String(row.approval_id || ''),
+    houseId: String(row.house_id || ''),
+    approvalKind: String(row.approval_kind || ''),
+    subject: parseJsonColumn(row.subject_json, {}),
+    status: String(row.status || ''),
+    requestedBy: parseJsonColumn(row.requested_by_json, {}),
+    decidedBy: parseJsonColumn(row.decided_by_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getApprovalRecordById(approvalId = '') {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  if (!normalizedApprovalId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM approvals
+    WHERE approval_id = ?
+    LIMIT 1
+  `).get(normalizedApprovalId);
+  return mapApprovalRow(row);
+}
+
+function upsertApprovalRecord({
+  approvalId = '',
+  houseId = '',
+  approvalKind = '',
+  subject = null,
+  status = 'pending',
+  requestedBy = null,
+  decidedBy = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedApprovalKind = String(approvalKind || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId || !normalizedApprovalKind || !normalizedStatus) {
+    throw new Error('APPROVAL_INVALID');
+  }
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO approvals (
+      approval_id,
+      house_id,
+      approval_kind,
+      subject_json,
+      status,
+      requested_by_json,
+      decided_by_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(approval_id) DO UPDATE SET
+      house_id = excluded.house_id,
+      approval_kind = excluded.approval_kind,
+      subject_json = excluded.subject_json,
+      status = excluded.status,
+      requested_by_json = excluded.requested_by_json,
+      decided_by_json = excluded.decided_by_json,
+      updated_at = excluded.updated_at
+  `).run(
+    normalizedApprovalId,
+    normalizedHouseId,
+    normalizedApprovalKind,
+    JSON.stringify(subject && typeof subject === 'object' ? subject : {}),
+    normalizedStatus,
+    JSON.stringify(requestedBy && typeof requestedBy === 'object' ? requestedBy : {}),
+    JSON.stringify(decidedBy && typeof decidedBy === 'object' ? decidedBy : {}),
+    existing?.createdAt || nowIso,
+    nowIso,
+  );
+  return getApprovalRecordById(normalizedApprovalId);
+}
+
 function mapRunRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -1296,6 +1662,8 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  createTrainerJob,
+  createTrainerResult,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -1310,10 +1678,15 @@ module.exports = {
   getIntegrationCandidateByIdempotency,
   getIntegrationExecutionByIdempotency,
   getIntegrationPackVersionByIdempotency,
+  getApprovalRecordById,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,
   getTeamConfigBinding,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,
@@ -1321,13 +1694,18 @@ module.exports = {
   getPlatformTableCounts,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listTrainerJobs,
+  listTrainerResults,
   listTraceEvents,
   listFixtureFamilies,
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
   updateRunStatus,
+  upsertApprovalRecord,
   upsertTeamConfigBinding,
   upsertConfigVersion,
 };

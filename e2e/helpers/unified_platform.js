@@ -307,6 +307,93 @@ async function executePlatformIntegration(request, {
   }
 }
 
+async function createPlatformTrainerJob(request, {
+  houseId = '',
+  houseAuthKey = '',
+  idempotencyKey = '',
+  payload = {},
+} = {}) {
+  const path = '/v1/trainer/jobs';
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function getPlatformTrainerJob(request, {
+  houseId = '',
+  houseAuthKey = '',
+  trainerJobId = '',
+} = {}) {
+  const path = `/v1/trainer/jobs/${encodeURIComponent(String(trainerJobId || '').trim())}`;
+  const response = await request.get(path, {
+    headers: houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function getPlatformTrainerResult(request, {
+  houseId = '',
+  houseAuthKey = '',
+  trainerResultId = '',
+} = {}) {
+  const path = `/v1/trainer/results/${encodeURIComponent(String(trainerResultId || '').trim())}`;
+  const response = await request.get(path, {
+    headers: houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function promotePlatformTrainerResultPatch(request, {
+  houseId = '',
+  houseAuthKey = '',
+  trainerResultId = '',
+  idempotencyKey = '',
+  payload = {},
+} = {}) {
+  const path = `/v1/trainer/results/${encodeURIComponent(String(trainerResultId || '').trim())}/promote-patch`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function ingestPlatformTraceRecords(request, {
   houseId = '',
   houseAuthKey = '',
@@ -373,6 +460,7 @@ module.exports = {
   compileDefaultSkillPack,
   createPlatformConfigVersion,
   createPlatformRun,
+  createPlatformTrainerJob,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
   executePlatformIntegration,
   getDefaultCompiledPackManifest,
@@ -380,10 +468,13 @@ module.exports = {
   getPlatformCounts,
   getPlatformFixture,
   getPlatformTeamBinding,
+  getPlatformTrainerJob,
+  getPlatformTrainerResult,
   getPlatformTraceEvents,
   listPlatformFixtures,
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,
+  promotePlatformTrainerResultPatch,
   readWorkerSessionId,
   resolvePlatformIntegration,
   seedPlatformConfigVersion,

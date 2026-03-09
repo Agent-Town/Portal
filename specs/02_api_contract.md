@@ -966,6 +966,100 @@ Response fields:
 - `data.items[]`
 - `data.nextCursor`
 
+### POST `/v1/trainer/jobs` (human + house-auth)
+Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one trainer result.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "jobKind": "trainer_job.compare",
+  "targets": {
+    "configVersionIds": ["cfg_a", "cfg_b"]
+  },
+  "budget": {
+    "maxUsd": 5
+  }
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.trainerJobId`
+- `data.status`
+- `data.jobKind`
+- `data.result.trainerResultId` when a deterministic seeded result is emitted
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `TRAINER_JOB_KIND_INVALID`
+- `TRAINER_TARGET_INVALID`
+- `TRAINER_BUDGET_INVALID`
+- `INVALID_ARGUMENT`
+
+### GET `/v1/trainer/jobs/:trainerJobId` (human + house-auth)
+Returns one durable trainer job with its current stable status and latest trainer result summary when present.
+
+Response fields:
+- `data.trainerJobId`
+- `data.status`
+- `data.jobKind`
+- `data.targets`
+- `data.budget`
+- `data.result`
+
+### GET `/v1/trainer/results/:trainerResultId` (human + house-auth)
+Returns one durable trainer result artifact.
+
+Response fields:
+- `data.trainerResultId`
+- `data.trainerJobId`
+- `data.status`
+- `data.summary`
+- `data.candidatePatchIds[]`
+- `data.linkedConfigVersionId`
+- `data.approvalNeeded`
+
+### POST `/v1/trainer/results/:trainerResultId/promote-patch` (human + house-auth)
+Promotes one approved candidate patch into a new durable config version and updates the active team binding.
+
+Request shape:
+```json
+{
+  "teamId": "team_main",
+  "candidatePatchId": "patch_fixture_01",
+  "approvalId": "appr_fixture_approved_01"
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response fields:
+- `data.configVersionId`
+- `data.activeConfigVersionId`
+- `data.config`
+- `data.binding`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `APPROVAL_REQUIRED`
+- `CONFIG_NOT_FOUND`
+- `TRAINER_PATCH_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
 ### POST `/api/session/reset` (human)
 Rotates the human session cookie (`et_session`) to a fresh session and returns a new Team Code.
 

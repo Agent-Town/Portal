@@ -84,6 +84,8 @@ const {
   writeCheckpoint,
 } = require('./web_poker_store');
 const {
+  createTrainerJob,
+  createTrainerResult,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -93,6 +95,7 @@ const {
   countUnifiedPlatformTableRows,
   getConfigVersion,
   getConfigVersionByIdempotency,
+  getApprovalRecordById,
   getIntegrationCandidateById,
   getIntegrationCandidateByIdempotency,
   getIntegrationExecutionByIdempotency,
@@ -102,16 +105,25 @@ const {
   getRunById,
   getRunByTraceId,
   getTeamConfigBinding,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listTrainerJobs,
+  listTrainerResults,
   listTraceEvents,
   listUnifiedPlatformFixtureFamilies,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
   updateRunStatus,
+  upsertApprovalRecord,
   upsertTeamConfigBinding,
   upsertConfigVersion,
 } = require('./unified_platform_store');
@@ -3613,6 +3625,19 @@ const PLATFORM_RUN_ENTRY_MODES = new Set(['normal', 'season_lock']);
 const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
 const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
 const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
+const PLATFORM_TRAINER_JOB_KINDS = new Set([
+  'trainer_job.ingest',
+  'trainer_job.index',
+  'trainer_job.replay',
+  'trainer_job.tag',
+  'trainer_job.compare',
+  'trainer_job.recommend',
+  'trainer_job.patch',
+  'trainer_job.scrim',
+  'trainer_job.guardrails',
+]);
+const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
+const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
 
 function isPlatformMutableComponentRef(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -5350,6 +5375,352 @@ app.get('/v1/traces/:traceId/events', (req, res) => {
   }, { requestId });
 });
 
+app.post('/v1/trainer/jobs', express.json({ limit: '64kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const jobKind = typeof req.body?.jobKind === 'string' ? req.body.jobKind.trim() : '';
+  const targets = req.body?.targets && typeof req.body.targets === 'object' && !Array.isArray(req.body.targets)
+    ? req.body.targets
+    : {};
+  let budget = {};
+  if (!idempotencyKey || !teamId || !jobKind) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'teamId, jobKind, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+  if (!PLATFORM_TRAINER_JOB_KINDS.has(jobKind)) {
+    return sendPortalApiError(res, 400, 'TRAINER_JOB_KIND_INVALID', 'jobKind is not supported.', { requestId });
+  }
+  if (!hasPlatformTrainerTargets(targets)) {
+    return sendPortalApiError(res, 400, 'TRAINER_TARGET_INVALID', 'targets must identify at least one trace, run, or config.', { requestId });
+  }
+  try {
+    budget = normalizePlatformTrainerBudget(req.body?.budget);
+  } catch (err) {
+    return sendPortalApiError(res, 400, 'TRAINER_BUDGET_INVALID', 'budget.maxUsd must be a positive number when provided.', { requestId });
+  }
+
+  const replayed = getTrainerJobByIdempotency({
+    houseId: resolvedHouse.houseId,
+    idempotencyKey,
+  });
+  if (replayed) {
+    const replayedResult = getTrainerResultByJobId(replayed.trainerJobId);
+    return sendPortalApiSuccess(res, {
+      trainerJobId: replayed.trainerJobId,
+      status: replayed.status,
+      jobKind: replayed.jobKind,
+      result: replayedResult ? {
+        trainerResultId: replayedResult.trainerResultId,
+        status: replayedResult.status,
+        approvalNeeded: replayedResult.approvalNeeded,
+      } : null,
+    }, { requestId });
+  }
+
+  const createdJob = createTrainerJob({
+    trainerJobId: `trainer_${randomHex(10)}`,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    jobKind,
+    status: 'queued',
+    targets,
+    budget,
+    idempotencyKey,
+    nowIso: nowIso(),
+  });
+
+  let job = createdJob;
+  let result = null;
+  if (jobKind === 'trainer_job.compare') {
+    const linkedConfigVersionId = resolvePlatformTrainerLinkedConfigVersionId({
+      houseId: resolvedHouse.houseId,
+      teamId,
+      targets,
+    });
+    const resultSeed = buildPlatformTrainerResultPayload(job, { linkedConfigVersionId });
+    result = createTrainerResult({
+      trainerResultId: resultSeed.trainerResultId,
+      trainerJobId: job.trainerJobId,
+      status: resultSeed.status,
+      result: resultSeed.resultPayload,
+      candidatePatchIds: resultSeed.candidatePatchIds,
+      linkedConfigVersionId: resultSeed.linkedConfigVersionId,
+      approvalNeeded: resultSeed.approvalNeeded,
+      nowIso: nowIso(),
+    });
+    job = updateTrainerJobStatus({
+      trainerJobId: job.trainerJobId,
+      status: 'succeeded',
+      nowIso: nowIso(),
+    });
+  }
+
+  return sendPortalApiSuccess(res, {
+    trainerJobId: job.trainerJobId,
+    status: job.status,
+    jobKind: job.jobKind,
+    result: result ? {
+      trainerResultId: result.trainerResultId,
+      status: result.status,
+      approvalNeeded: result.approvalNeeded,
+    } : null,
+  }, { status: 201, requestId });
+});
+
+app.get('/v1/trainer/jobs/:trainerJobId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const trainerJobId = typeof req.params?.trainerJobId === 'string' ? req.params.trainerJobId.trim() : '';
+  const job = getTrainerJobById(trainerJobId);
+  if (!job) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Trainer read authorization failed.', { requestId });
+  }
+  const result = getTrainerResultByJobId(job.trainerJobId);
+  return sendPortalApiSuccess(res, {
+    trainerJobId: job.trainerJobId,
+    status: job.status,
+    jobKind: job.jobKind,
+    targets: job.targets,
+    budget: job.budget,
+    result: result ? {
+      trainerResultId: result.trainerResultId,
+      status: result.status,
+      candidatePatchIds: result.candidatePatchIds,
+      linkedConfigVersionId: result.linkedConfigVersionId,
+      approvalNeeded: result.approvalNeeded,
+    } : null,
+  }, { requestId });
+});
+
+app.get('/v1/trainer/results/:trainerResultId', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+  const trainerResultId = typeof req.params?.trainerResultId === 'string' ? req.params.trainerResultId.trim() : '';
+  const result = getTrainerResultById(trainerResultId);
+  if (!result) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result not found.', { requestId });
+  }
+  const job = getTrainerJobById(result.trainerJobId);
+  if (!job) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
+  }
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'Trainer read authorization failed.', { requestId });
+  }
+  return sendPortalApiSuccess(res, {
+    trainerResultId: result.trainerResultId,
+    trainerJobId: result.trainerJobId,
+    status: result.status,
+    linkedConfigVersionId: result.linkedConfigVersionId,
+    approvalNeeded: result.approvalNeeded,
+    ...((result.result && typeof result.result === 'object') ? result.result : {}),
+  }, { requestId });
+});
+
+app.post('/v1/trainer/results/:trainerResultId/promote-patch', express.json({ limit: '64kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const trainerResultId = typeof req.params?.trainerResultId === 'string' ? req.params.trainerResultId.trim() : '';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const candidatePatchId = typeof req.body?.candidatePatchId === 'string' ? req.body.candidatePatchId.trim() : '';
+  const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+  if (!trainerResultId || !idempotencyKey || !teamId || !candidatePatchId) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'trainerResultId, teamId, candidatePatchId, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const result = getTrainerResultById(trainerResultId);
+  if (!result) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result not found.', { requestId });
+  }
+  const job = getTrainerJobById(result.trainerJobId);
+  if (!job) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
+  }
+  if (job.teamId !== teamId) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result does not belong to this team.', { requestId });
+  }
+
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
+  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+  if (!result.candidatePatchIds.includes(candidatePatchId)) {
+    return sendPortalApiError(res, 404, 'TRAINER_PATCH_NOT_FOUND', 'Candidate patch not found on this trainer result.', { requestId });
+  }
+  if (result.approvalNeeded) {
+    const approval = resolveApprovedTrainerPatchPromotion(approvalId, {
+      houseId: resolvedHouse.houseId,
+      trainerResultId,
+      candidatePatchId,
+    });
+    if (!approval) {
+      return sendPortalApiError(res, 409, 'APPROVAL_REQUIRED', 'Patch promotion requires an approved decision.', { requestId });
+    }
+  }
+
+  const replayedConfig = getConfigVersionByIdempotency({
+    houseId: resolvedHouse.houseId,
+    teamId,
+    idempotencyKey,
+  });
+  if (replayedConfig) {
+    const binding = upsertTeamConfigBinding({
+      teamBindingId: `tb_${randomHex(10)}`,
+      houseId: resolvedHouse.houseId,
+      teamId,
+      activeConfigVersionId: replayedConfig.configVersionId,
+      nowIso: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      configVersionId: replayedConfig.configVersionId,
+      activeConfigVersionId: binding.activeConfigVersionId,
+      config: replayedConfig,
+      binding,
+    }, { requestId });
+  }
+
+  const parentConfigVersionId = result.linkedConfigVersionId
+    || resolvePlatformTrainerLinkedConfigVersionId({
+      houseId: resolvedHouse.houseId,
+      teamId,
+      targets: job.targets,
+    });
+  const parentConfig = getConfigVersion(parentConfigVersionId);
+  if (!parentConfig) {
+    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'A base config version is required before promotion.', { requestId });
+  }
+
+  const newConfigVersionId = `cfg_${randomHex(10)}`;
+  const parentManifest = parentConfig.manifest && typeof parentConfig.manifest === 'object' ? parentConfig.manifest : {};
+  const manifestBase = {
+    ...parentManifest,
+    configVersionId: newConfigVersionId,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    displayVersion: `${newConfigVersionId}@trainer-patch`,
+    status: 'active',
+    parentConfigVersionIds: [parentConfig.configVersionId],
+    trainerPromotion: {
+      trainerJobId: job.trainerJobId,
+      trainerResultId,
+      candidatePatchId,
+      approvalId: approvalId || null,
+    },
+  };
+  delete manifestBase.integrity;
+  const configHash = sha256PrefixedHex(stableJsonStringify(manifestBase));
+  const manifest = {
+    ...manifestBase,
+    integrity: {
+      configHash,
+    },
+  };
+  const now = nowIso();
+  const config = upsertConfigVersion({
+    configVersionId: newConfigVersionId,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    experienceId: typeof parentConfig.experienceId === 'string' ? parentConfig.experienceId : '',
+    status: 'active',
+    configHash,
+    idempotencyKey,
+    manifest,
+    lineage: {
+      parentConfigVersionIds: [parentConfig.configVersionId],
+      trainerJobId: job.trainerJobId,
+      trainerResultId,
+      candidatePatchId,
+      approvalId: approvalId || null,
+      createdBy: 'v1.trainer.results.promote-patch',
+      requestId,
+    },
+    nowIso: now,
+  });
+  const parentComponents = listConfigComponentVersions(parentConfig.configVersionId);
+  replaceConfigComponentVersions({
+    configVersionId: newConfigVersionId,
+    components: parentComponents.map((component, index) => ({
+      configComponentVersionId: `ccv_${randomHex(10)}`,
+      componentKind: component.componentKind,
+      componentKey: component.componentKey,
+      immutableVersionId: component.immutableVersionId,
+      componentHash: component.componentHash,
+      metadata: {
+        ...(component.metadata && typeof component.metadata === 'object' ? component.metadata : {}),
+        ordinal: index,
+        promotedFromConfigVersionId: parentConfig.configVersionId,
+        candidatePatchId,
+      },
+    })),
+    nowIso: now,
+  });
+  const binding = upsertTeamConfigBinding({
+    teamBindingId: `tb_${randomHex(10)}`,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    activeConfigVersionId: newConfigVersionId,
+    nowIso: now,
+  });
+  updateTrainerResultLink({
+    trainerResultId,
+    linkedConfigVersionId: newConfigVersionId,
+    nowIso: now,
+  });
+  return sendPortalApiSuccess(res, {
+    configVersionId: config.configVersionId,
+    activeConfigVersionId: binding.activeConfigVersionId,
+    config,
+    binding,
+  }, { status: 201, requestId });
+});
+
 app.get('/v1/health', respondPokerOperatorTransport);
 app.get('/v1/seasons', respondPokerOperatorTransport);
 app.get('/v1/seasons/:seasonId', respondPokerOperatorTransport);
@@ -6353,6 +6724,125 @@ function getPlatformIntegrationActionPolicy(candidate, actionId) {
     };
   }
   return null;
+}
+
+function hasPlatformTrainerTargets(targets) {
+  const source = targets && typeof targets === 'object' && !Array.isArray(targets) ? targets : {};
+  if (typeof source.traceId === 'string' && source.traceId.trim()) return true;
+  if (typeof source.runId === 'string' && source.runId.trim()) return true;
+  if (typeof source.configVersionId === 'string' && source.configVersionId.trim()) return true;
+  if (Array.isArray(source.traceIds) && source.traceIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  if (Array.isArray(source.runIds) && source.runIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  if (Array.isArray(source.configVersionIds) && source.configVersionIds.some((item) => typeof item === 'string' && item.trim())) return true;
+  return false;
+}
+
+function normalizePlatformTrainerBudget(rawBudget) {
+  const budget = rawBudget && typeof rawBudget === 'object' && !Array.isArray(rawBudget) ? rawBudget : {};
+  const normalized = {};
+  if (budget.maxUsd != null) {
+    const maxUsd = Number(budget.maxUsd);
+    if (!Number.isFinite(maxUsd) || maxUsd <= 0) {
+      const err = new Error('TRAINER_BUDGET_INVALID');
+      err.code = 'TRAINER_BUDGET_INVALID';
+      throw err;
+    }
+    normalized.maxUsd = Number(maxUsd.toFixed(2));
+  }
+  return normalized;
+}
+
+function resolvePlatformTrainerLinkedConfigVersionId({ houseId = '', teamId = '', targets = null } = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const source = targets && typeof targets === 'object' && !Array.isArray(targets) ? targets : {};
+  const binding = normalizedHouseId && normalizedTeamId
+    ? getTeamConfigBinding({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+    : null;
+  if (binding?.activeConfigVersionId) return String(binding.activeConfigVersionId || '').trim();
+  if (typeof source.configVersionId === 'string' && source.configVersionId.trim()) return source.configVersionId.trim();
+  if (Array.isArray(source.configVersionIds)) {
+    const first = source.configVersionIds.find((item) => typeof item === 'string' && item.trim());
+    if (first) return String(first).trim();
+  }
+  return '';
+}
+
+function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } = {}) {
+  const fixture = getUnifiedPlatformTestFixture('trainer_compare_seed') || {};
+  const seededPatchIds = Array.isArray(fixture?.result?.candidatePatchIds)
+    ? fixture.result.candidatePatchIds.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const candidatePatchIds = seededPatchIds.length ? seededPatchIds : [`patch_${randomHex(10)}`];
+  const summary = typeof fixture?.result?.summary === 'string' && fixture.result.summary.trim()
+    ? fixture.result.summary.trim()
+    : 'Compare job completed with one candidate patch recommendation.';
+  const approvalNeeded = fixture?.result?.approvalNeeded === true;
+  const trainerResultId = `trr_${randomHex(10)}`;
+  const resultPayload = {
+    trainerResultId,
+    trainerJobId: job.trainerJobId,
+    summary,
+    findings: [],
+    recommendations: candidatePatchIds.map((candidatePatchId) => ({
+      candidatePatchId,
+      action: 'promote_config_patch',
+      approvalNeeded,
+    })),
+    candidatePatchIds,
+    metrics: {
+      scoreDeltaPct: 7.5,
+      comparedConfigs: Array.isArray(job?.targets?.configVersionIds) ? job.targets.configVersionIds.length : 0,
+    },
+    artifactRefs: [],
+    version: 'trainer-result/v2',
+  };
+  if (linkedConfigVersionId) {
+    resultPayload.linkedConfigVersionId = linkedConfigVersionId;
+  }
+  return {
+    trainerResultId,
+    status: 'succeeded',
+    resultPayload,
+    candidatePatchIds,
+    linkedConfigVersionId: linkedConfigVersionId || null,
+    approvalNeeded,
+  };
+}
+
+function resolveApprovedTrainerPatchPromotion(approvalId, {
+  houseId = '',
+  trainerResultId = '',
+  candidatePatchId = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== TRAINER_PATCH_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'trainer_patch_promotion',
+    subject: {
+      trainerResultId: String(trainerResultId || '').trim() || null,
+      candidatePatchId: String(candidatePatchId || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
 }
 
 function getWebActionPolicy(actionId, webSession) {
