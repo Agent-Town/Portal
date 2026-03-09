@@ -211,18 +211,21 @@ function ensureDb() {
       season_id TEXT NOT NULL,
       portal_submission_id TEXT UNIQUE,
       portal_session_id TEXT,
+      wallet_subject TEXT,
       submitter_wallet_json TEXT NOT NULL,
       bundle_json TEXT NOT NULL,
+      declared_capabilities_json TEXT NOT NULL DEFAULT '{}',
       validation_json TEXT NOT NULL,
       status TEXT NOT NULL,
       idempotency_key TEXT,
+      raw_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY (season_id) REFERENCES poker_seasons(season_id)
     );
 
     CREATE INDEX IF NOT EXISTS poker_submissions_season_wallet_created_idx
-      ON poker_setup_submissions(season_id, created_at DESC);
+      ON poker_setup_submissions(season_id, wallet_subject, created_at DESC);
 
     CREATE TABLE IF NOT EXISTS poker_batches (
       batch_id TEXT PRIMARY KEY,
@@ -278,8 +281,18 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_leaderboard_snapshots_season_created_idx
       ON poker_leaderboard_snapshots(season_id, created_at DESC);
   `);
+  ensureColumnExists(db, 'poker_setup_submissions', 'wallet_subject', 'TEXT');
+  ensureColumnExists(db, 'poker_setup_submissions', 'declared_capabilities_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumnExists(db, 'poker_setup_submissions', 'raw_json', "TEXT NOT NULL DEFAULT '{}'");
   seedRegistryEntities();
   return db;
+}
+
+function ensureColumnExists(database, tableName, columnName, columnSql) {
+  const rows = database.prepare(`PRAGMA table_info(${tableName})`).all();
+  const exists = rows.some((row) => String(row?.name || '').trim() === columnName);
+  if (exists) return;
+  database.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnSql};`);
 }
 
 function sqlNow() {
@@ -1284,6 +1297,517 @@ function getRegistryEntityById(registryEntityId) {
   };
 }
 
+function hydratePokerSeason(row) {
+  if (!row) return null;
+  return {
+    seasonId: row.season_id,
+    seasonSlug: row.season_slug,
+    displayName: row.display_name,
+    rulesVersion: row.rules_version || null,
+    operatorVersion: row.operator_version || null,
+    status: row.status,
+    submissionOpenAt: row.submission_open_at || null,
+    submissionCloseAt: row.submission_close_at || null,
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listPokerSeasons() {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_seasons
+    ORDER BY created_at DESC, season_id DESC
+  `).all();
+  return rows.map((row) => getPokerSeasonById(row.season_id));
+}
+
+function getPokerSeasonById(seasonId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_seasons WHERE season_id = ?').get(seasonId);
+  if (!row) return null;
+  const season = hydratePokerSeason(row);
+  const divisionRows = database.prepare(`
+    SELECT * FROM poker_divisions
+    WHERE season_id = ?
+    ORDER BY division_slug ASC, division_id ASC
+  `).all(seasonId);
+  return {
+    ...season,
+    divisions: divisionRows.map((divisionRow) => ({
+      divisionId: divisionRow.division_id,
+      seasonId: divisionRow.season_id,
+      divisionSlug: divisionRow.division_slug,
+      runnerKind: divisionRow.runner_kind || null,
+      raw: fromJson(divisionRow.raw_json, {}),
+      createdAt: divisionRow.created_at,
+      updatedAt: divisionRow.updated_at,
+    })),
+  };
+}
+
+function upsertPokerSeason({
+  seasonId,
+  seasonSlug,
+  displayName,
+  rulesVersion = null,
+  operatorVersion = null,
+  status = 'scheduled',
+  submissionOpenAt = null,
+  submissionCloseAt = null,
+  divisions = [],
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_seasons WHERE season_id = ?').get(seasonId);
+    database.prepare(`
+      INSERT INTO poker_seasons (
+        season_id,
+        season_slug,
+        display_name,
+        rules_version,
+        operator_version,
+        status,
+        submission_open_at,
+        submission_close_at,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(season_id) DO UPDATE SET
+        season_slug = excluded.season_slug,
+        display_name = excluded.display_name,
+        rules_version = excluded.rules_version,
+        operator_version = excluded.operator_version,
+        status = excluded.status,
+        submission_open_at = excluded.submission_open_at,
+        submission_close_at = excluded.submission_close_at,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      seasonId,
+      seasonSlug,
+      displayName,
+      rulesVersion,
+      operatorVersion,
+      status,
+      submissionOpenAt,
+      submissionCloseAt,
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    database.prepare('DELETE FROM poker_divisions WHERE season_id = ?').run(seasonId);
+    const insertDivision = database.prepare(`
+      INSERT INTO poker_divisions (
+        division_id,
+        season_id,
+        division_slug,
+        runner_kind,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const division of Array.isArray(divisions) ? divisions : []) {
+      const divisionId = typeof division?.divisionId === 'string' && division.divisionId.trim()
+        ? division.divisionId.trim()
+        : makeId('pkd');
+      const rawDivision = division && typeof division === 'object' ? division : {};
+      insertDivision.run(
+        divisionId,
+        seasonId,
+        String(rawDivision.divisionSlug || rawDivision.slug || 'standard'),
+        typeof rawDivision.runnerKind === 'string' ? rawDivision.runnerKind : null,
+        toJson(rawDivision, {}),
+        createdAt || now,
+        updatedAt || now
+      );
+    }
+    return getPokerSeasonById(seasonId);
+  });
+}
+
+function hydratePokerSubmission(row) {
+  if (!row) return null;
+  return {
+    submissionId: row.submission_id,
+    seasonId: row.season_id,
+    portalSubmissionId: row.portal_submission_id || null,
+    portalSessionId: row.portal_session_id || null,
+    walletSubject: row.wallet_subject || null,
+    submitterWallet: fromJson(row.submitter_wallet_json, {}),
+    bundle: fromJson(row.bundle_json, {}),
+    declaredCapabilities: fromJson(row.declared_capabilities_json, {}),
+    validation: fromJson(row.validation_json, {}),
+    status: row.status,
+    idempotencyKey: row.idempotency_key || null,
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerSubmissionById(submissionId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_setup_submissions WHERE submission_id = ?').get(submissionId);
+  return hydratePokerSubmission(row);
+}
+
+function getPokerSubmissionByRequest({ seasonId, portalSessionId, idempotencyKey }) {
+  if (!seasonId || !portalSessionId || !idempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_setup_submissions
+    WHERE season_id = ? AND portal_session_id = ? AND idempotency_key = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).get(seasonId, portalSessionId, idempotencyKey);
+  return hydratePokerSubmission(row);
+}
+
+function upsertPokerSubmission({
+  submissionId,
+  seasonId,
+  portalSubmissionId = null,
+  portalSessionId = null,
+  walletSubject = null,
+  submitterWallet = {},
+  bundle = {},
+  declaredCapabilities = {},
+  validation = {},
+  status = 'accepted',
+  idempotencyKey = null,
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_setup_submissions WHERE submission_id = ?').get(submissionId);
+    database.prepare(`
+      INSERT INTO poker_setup_submissions (
+        submission_id,
+        season_id,
+        portal_submission_id,
+        portal_session_id,
+        wallet_subject,
+        submitter_wallet_json,
+        bundle_json,
+        declared_capabilities_json,
+        validation_json,
+        status,
+        idempotency_key,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(submission_id) DO UPDATE SET
+        season_id = excluded.season_id,
+        portal_submission_id = excluded.portal_submission_id,
+        portal_session_id = excluded.portal_session_id,
+        wallet_subject = excluded.wallet_subject,
+        submitter_wallet_json = excluded.submitter_wallet_json,
+        bundle_json = excluded.bundle_json,
+        declared_capabilities_json = excluded.declared_capabilities_json,
+        validation_json = excluded.validation_json,
+        status = excluded.status,
+        idempotency_key = excluded.idempotency_key,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      submissionId,
+      seasonId,
+      portalSubmissionId,
+      portalSessionId,
+      walletSubject,
+      toJson(submitterWallet, {}),
+      toJson(bundle, {}),
+      toJson(declaredCapabilities, {}),
+      toJson(validation, {}),
+      status,
+      idempotencyKey,
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerSubmissionById(submissionId);
+  });
+}
+
+function hydratePokerBatch(row) {
+  if (!row) return null;
+  return {
+    batchId: row.batch_id,
+    seasonId: row.season_id || null,
+    batchKind: row.batch_kind,
+    submissionIds: fromJson(row.submission_ids_json, []),
+    batchConfig: fromJson(row.batch_config_json, {}),
+    status: row.status,
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerBatchById(batchId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_batches WHERE batch_id = ?').get(batchId);
+  return hydratePokerBatch(row);
+}
+
+function upsertPokerBatch({
+  batchId,
+  seasonId = null,
+  batchKind,
+  submissionIds = [],
+  batchConfig = {},
+  status = 'queued',
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_batches WHERE batch_id = ?').get(batchId);
+    database.prepare(`
+      INSERT INTO poker_batches (
+        batch_id,
+        season_id,
+        batch_kind,
+        submission_ids_json,
+        batch_config_json,
+        status,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(batch_id) DO UPDATE SET
+        season_id = excluded.season_id,
+        batch_kind = excluded.batch_kind,
+        submission_ids_json = excluded.submission_ids_json,
+        batch_config_json = excluded.batch_config_json,
+        status = excluded.status,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      batchId,
+      seasonId,
+      batchKind,
+      toJson(submissionIds, []),
+      toJson(batchConfig, {}),
+      status,
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerBatchById(batchId);
+  });
+}
+
+function hydratePokerRun(row) {
+  if (!row) return null;
+  return {
+    runId: row.run_id,
+    batchId: row.batch_id,
+    seasonId: row.season_id || null,
+    summary: fromJson(row.summary_json, {}),
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerRunById(runId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_runs WHERE run_id = ?').get(runId);
+  return hydratePokerRun(row);
+}
+
+function upsertPokerRun({
+  runId,
+  batchId,
+  seasonId = null,
+  summary = {},
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_runs WHERE run_id = ?').get(runId);
+    database.prepare(`
+      INSERT INTO poker_runs (
+        run_id,
+        batch_id,
+        season_id,
+        summary_json,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id) DO UPDATE SET
+        batch_id = excluded.batch_id,
+        season_id = excluded.season_id,
+        summary_json = excluded.summary_json,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      runId,
+      batchId,
+      seasonId,
+      toJson(summary, {}),
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerRunById(runId);
+  });
+}
+
+function hydratePokerReplayArtifact(row) {
+  if (!row) return null;
+  return {
+    runId: row.run_id,
+    replayFormat: row.replay_format,
+    summary: fromJson(row.summary_json, {}),
+    eventsJsonlUri: row.events_jsonl_uri || null,
+    artifactSha256: row.artifact_sha256 || null,
+    contentType: row.content_type || null,
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerReplayArtifactByRunId(runId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_replay_artifacts WHERE run_id = ?').get(runId);
+  return hydratePokerReplayArtifact(row);
+}
+
+function upsertPokerReplayArtifact({
+  runId,
+  replayFormat,
+  summary = {},
+  eventsJsonlUri = null,
+  artifactSha256 = null,
+  contentType = null,
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_replay_artifacts WHERE run_id = ?').get(runId);
+    database.prepare(`
+      INSERT INTO poker_replay_artifacts (
+        run_id,
+        replay_format,
+        summary_json,
+        events_jsonl_uri,
+        artifact_sha256,
+        content_type,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(run_id) DO UPDATE SET
+        replay_format = excluded.replay_format,
+        summary_json = excluded.summary_json,
+        events_jsonl_uri = excluded.events_jsonl_uri,
+        artifact_sha256 = excluded.artifact_sha256,
+        content_type = excluded.content_type,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      runId,
+      replayFormat,
+      toJson(summary, {}),
+      eventsJsonlUri,
+      artifactSha256,
+      contentType,
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerReplayArtifactByRunId(runId);
+  });
+}
+
+function hydratePokerLeaderboardSnapshot(row) {
+  if (!row) return null;
+  return {
+    snapshotId: row.snapshot_id,
+    seasonId: row.season_id,
+    rankings: fromJson(row.rankings_json, []),
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerLeaderboardSnapshotById(seasonId, snapshotId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_leaderboard_snapshots
+    WHERE season_id = ? AND snapshot_id = ?
+  `).get(seasonId, snapshotId);
+  return hydratePokerLeaderboardSnapshot(row);
+}
+
+function getLatestPokerLeaderboardSnapshot(seasonId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_leaderboard_snapshots
+    WHERE season_id = ?
+    ORDER BY created_at DESC, snapshot_id DESC
+    LIMIT 1
+  `).get(seasonId);
+  return hydratePokerLeaderboardSnapshot(row);
+}
+
+function upsertPokerLeaderboardSnapshot({
+  snapshotId,
+  seasonId,
+  rankings = [],
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_leaderboard_snapshots WHERE snapshot_id = ?').get(snapshotId);
+    database.prepare(`
+      INSERT INTO poker_leaderboard_snapshots (
+        snapshot_id,
+        season_id,
+        rankings_json,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(snapshot_id) DO UPDATE SET
+        season_id = excluded.season_id,
+        rankings_json = excluded.rankings_json,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      snapshotId,
+      seasonId,
+      toJson(rankings, []),
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerLeaderboardSnapshotById(seasonId, snapshotId);
+  });
+}
+
 module.exports = {
   activateCredentialGrant,
   countTableRows,
@@ -1303,14 +1827,29 @@ module.exports = {
   getInvocationById,
   getInvocationByIdempotency,
   getLatestCheckpointForSession,
+  getLatestPokerLeaderboardSnapshot,
+  getPokerBatchById,
+  getPokerLeaderboardSnapshotById,
+  getPokerReplayArtifactByRunId,
   getRegistryEntityById,
+  getPokerRunById,
+  getPokerSeasonById,
+  getPokerSubmissionById,
+  getPokerSubmissionByRequest,
   getWebSessionById,
   listApprovalsForSession,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  upsertPokerBatch,
+  upsertPokerLeaderboardSnapshot,
+  upsertPokerReplayArtifact,
+  upsertPokerRun,
+  upsertPokerSeason,
+  upsertPokerSubmission,
   writeCheckpoint,
 };

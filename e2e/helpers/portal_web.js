@@ -63,11 +63,45 @@ async function createWebSession(request, {
   return body;
 }
 
+async function seedPokerOperatorFixture(request, fixture) {
+  const resp = await request.post('/__test__/poker/operator-fixture', {
+    headers: { 'x-test-reset': resetToken },
+    data: fixture,
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`POKER_FIXTURE_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function syncPokerMirror(request, { seasonId = '' } = {}) {
+  const resp = await request.post('/api/poker/admin/sync', {
+    data: seasonId ? { seasonId } : {},
+  });
+  const body = await resp.json().catch(() => ({}));
+  return { resp, body };
+}
+
+async function getPokerSubmissionRow(request, submissionId) {
+  const resp = await request.get(`/__test__/poker/submissions/${encodeURIComponent(submissionId)}`, {
+    headers: { 'x-test-reset': resetToken },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`POKER_SUBMISSION_ROW_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body?.submission || null;
+}
+
 module.exports = {
   bindMockSolanaWallet,
   createWebSession,
+  getPokerSubmissionRow,
   getPortalState,
   getTableCount,
   resetPortalWebState,
   resetToken,
+  seedPokerOperatorFixture,
+  syncPokerMirror,
 };
