@@ -89,6 +89,7 @@ const {
   createTraceIntakeRecord,
   countUnifiedPlatformTableRows,
   getConfigVersion,
+  getConfigVersionByIdempotency,
   getLatestTraceEvent,
   getRunByIdempotency,
   getRunById,
@@ -97,8 +98,10 @@ const {
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
+  listConfigComponentVersions,
   listTraceEvents,
   listUnifiedPlatformFixtureFamilies,
+  replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   updateRunStatus,
   upsertConfigVersion,
@@ -690,6 +693,22 @@ function sha256Base64(input) {
 
 function sha256PrefixedHex(input) {
   return `sha256:${crypto.createHash('sha256').update(input).digest('hex')}`;
+}
+
+function stableJsonValue(value) {
+  if (Array.isArray(value)) return value.map((item) => stableJsonValue(item));
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) {
+      out[key] = stableJsonValue(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function stableJsonStringify(value) {
+  return JSON.stringify(stableJsonValue(value));
 }
 
 function reservedHouseId(kind, key) {
@@ -3569,10 +3588,120 @@ function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
 }
 
 const DEFAULT_SKILL_PACK_BASE_PATH = '/__compiled/default-skill-pack';
+const PLATFORM_CONFIG_STATUSES = new Set(['draft', 'candidate', 'active', 'archived', 'blocked']);
+const PLATFORM_IMMUTABLE_CONFIG_STATUSES = new Set(['candidate', 'active', 'archived', 'blocked']);
+const PLATFORM_MUTABLE_COMPONENT_REFS = new Set(['latest', 'stable', 'main', 'master', 'experimental', 'season-lock']);
+const PLATFORM_CONFIG_COMPONENT_SPECS = Object.freeze([
+  { inputKey: 'housePolicyVersionId', componentKind: 'house_policy_version', multiple: false, required: true },
+  { inputKey: 'teamCompositionVersionId', componentKind: 'team_composition_version', multiple: false, required: true },
+  { inputKey: 'agentConfigVersionIds', componentKind: 'agent_config_version', multiple: true, required: true },
+  { inputKey: 'officePolicyVersionIds', componentKind: 'office_policy_version', multiple: true, required: false },
+  { inputKey: 'experiencePresetVersionId', componentKind: 'experience_preset_version', multiple: false, required: true },
+  { inputKey: 'integrationOverlayVersionIds', componentKind: 'integration_overlay_version', multiple: true, required: false },
+  { inputKey: 'trainerPresetVersionId', componentKind: 'trainer_preset_version', multiple: false, required: true },
+]);
 const PLATFORM_RUN_ENTRY_MODES = new Set(['normal', 'season_lock']);
 const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
 const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
 const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
+
+function isPlatformMutableComponentRef(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (PLATFORM_MUTABLE_COMPONENT_REFS.has(normalized)) return true;
+  if (normalized.startsWith('refs/heads/')) return true;
+  if (normalized.includes('/')) return true;
+  return false;
+}
+
+function derivePlatformComponentHash(componentKind, immutableVersionId) {
+  return sha256PrefixedHex(`${String(componentKind || '').trim()}:${String(immutableVersionId || '').trim()}`);
+}
+
+function resolvePlatformConfigComponents(componentRefs, { requireImmutable = true } = {}) {
+  const source = componentRefs && typeof componentRefs === 'object' && !Array.isArray(componentRefs)
+    ? componentRefs
+    : {};
+  const resolvedComponents = {};
+  const resolvedComponentHashes = {};
+  const componentVersions = [];
+  for (const spec of PLATFORM_CONFIG_COMPONENT_SPECS) {
+    const raw = source[spec.inputKey];
+    if (spec.multiple) {
+      const refs = Array.isArray(raw)
+        ? raw.map((item) => String(item || '').trim()).filter(Boolean)
+        : [];
+      if (spec.required && refs.length === 0) {
+        const err = new Error('CONFIG_COMPONENT_INVALID');
+        err.code = 'CONFIG_COMPONENT_INVALID';
+        err.componentKey = spec.inputKey;
+        throw err;
+      }
+      resolvedComponents[spec.inputKey] = [];
+      resolvedComponentHashes[spec.inputKey] = [];
+      refs.forEach((ref, index) => {
+        if (requireImmutable && isPlatformMutableComponentRef(ref)) {
+          const err = new Error('CONFIG_COMPONENT_MUTABLE_REF');
+          err.code = 'CONFIG_COMPONENT_MUTABLE_REF';
+          err.componentKey = spec.inputKey;
+          err.ref = ref;
+          throw err;
+        }
+        resolvedComponents[spec.inputKey].push(ref);
+        const componentHash = derivePlatformComponentHash(spec.componentKind, ref);
+        resolvedComponentHashes[spec.inputKey].push(componentHash);
+        componentVersions.push({
+          componentKind: spec.componentKind,
+          componentKey: `${spec.inputKey}[${index}]`,
+          immutableVersionId: ref,
+          componentHash,
+          metadata: {
+            ordinal: index,
+            sourceKey: spec.inputKey,
+          },
+        });
+      });
+      continue;
+    }
+
+    const ref = typeof raw === 'string' ? raw.trim() : '';
+    if (spec.required && !ref) {
+      const err = new Error('CONFIG_COMPONENT_INVALID');
+      err.code = 'CONFIG_COMPONENT_INVALID';
+      err.componentKey = spec.inputKey;
+      throw err;
+    }
+    if (!ref) {
+      resolvedComponents[spec.inputKey] = '';
+      resolvedComponentHashes[spec.inputKey] = '';
+      continue;
+    }
+    if (requireImmutable && isPlatformMutableComponentRef(ref)) {
+      const err = new Error('CONFIG_COMPONENT_MUTABLE_REF');
+      err.code = 'CONFIG_COMPONENT_MUTABLE_REF';
+      err.componentKey = spec.inputKey;
+      err.ref = ref;
+      throw err;
+    }
+    const componentHash = derivePlatformComponentHash(spec.componentKind, ref);
+    resolvedComponents[spec.inputKey] = ref;
+    resolvedComponentHashes[spec.inputKey] = componentHash;
+    componentVersions.push({
+      componentKind: spec.componentKind,
+      componentKey: spec.inputKey,
+      immutableVersionId: ref,
+      componentHash,
+      metadata: {
+        sourceKey: spec.inputKey,
+      },
+    });
+  }
+  return {
+    resolvedComponents,
+    resolvedComponentHashes,
+    componentVersions,
+  };
+}
 
 function encodeTraceCursor(afterSeq) {
   return Buffer.from(JSON.stringify({ afterSeq: Number(afterSeq || 0) }), 'utf8').toString('base64url');
@@ -4435,6 +4564,161 @@ app.get('/api/registry/entities/:id', (req, res) => {
     return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry entity not found.', { requestId });
   }
   return sendPortalApiSuccess(res, { entity }, { requestId });
+});
+
+app.post('/v1/houses/:houseId/configs', express.json({ limit: '96kb' }), (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (!session) {
+    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+  }
+
+  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
+  if (!requestedHouseId) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseId is required.', { requestId });
+  }
+
+  const store = readStore();
+  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
+  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
+    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
+  }
+  const auth = verifyHouseAuth(req, resolvedHouse.house);
+  if (!auth.ok) {
+    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+  }
+
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
+  const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'draft';
+  const branch = typeof req.body?.branch === 'string' ? req.body.branch.trim() : '';
+  const displayVersion = typeof req.body?.displayVersion === 'string' ? req.body.displayVersion.trim() : '';
+  const providedConfigVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
+  const experienceId = typeof req.body?.experienceId === 'string' ? req.body.experienceId.trim() : '';
+  const parentConfigVersionIds = Array.isArray(req.body?.parentConfigVersionIds)
+    ? req.body.parentConfigVersionIds.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const componentRefs = req.body?.componentRefs && typeof req.body.componentRefs === 'object' && !Array.isArray(req.body.componentRefs)
+    ? req.body.componentRefs
+    : null;
+  if (!idempotencyKey || !teamId || !branch || !displayVersion || !componentRefs || !PLATFORM_CONFIG_STATUSES.has(status)) {
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      'teamId, branch, displayVersion, componentRefs, status, and Idempotency-Key are required.',
+      { requestId }
+    );
+  }
+
+  const replayed = getConfigVersionByIdempotency({
+    houseId: resolvedHouse.houseId,
+    teamId,
+    idempotencyKey,
+  });
+  if (replayed) {
+    return sendPortalApiSuccess(res, {
+      configVersionId: replayed.configVersionId,
+      status: replayed.status,
+      configHash: replayed.configHash,
+      config: replayed,
+      componentVersions: listConfigComponentVersions(replayed.configVersionId),
+    }, { requestId });
+  }
+
+  let resolvedComponentsPayload = null;
+  try {
+    resolvedComponentsPayload = resolvePlatformConfigComponents(componentRefs, {
+      requireImmutable: PLATFORM_IMMUTABLE_CONFIG_STATUSES.has(status),
+    });
+  } catch (err) {
+    if (err?.code === 'CONFIG_COMPONENT_MUTABLE_REF') {
+      return sendPortalApiError(
+        res,
+        409,
+        'CONFIG_COMPONENT_MUTABLE_REF',
+        'Config publication requires immutable component version ids.',
+        {
+          requestId,
+          details: {
+            componentKey: String(err?.componentKey || ''),
+            ref: String(err?.ref || ''),
+          },
+        }
+      );
+    }
+    return sendPortalApiError(
+      res,
+      400,
+      'INVALID_ARGUMENT',
+      `Invalid config component reference${err?.componentKey ? ` for ${String(err.componentKey)}` : ''}.`,
+      { requestId }
+    );
+  }
+
+  const configVersionId = providedConfigVersionId || `cfg_${randomHex(10)}`;
+  if (getConfigVersion(configVersionId)) {
+    return sendPortalApiError(res, 409, 'CONFIG_ALREADY_EXISTS', 'Config version already exists.', { requestId });
+  }
+
+  const manifestBase = {
+    configVersionId,
+    displayVersion,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    branch,
+    status,
+    parentConfigVersionIds,
+    resolvedComponents: resolvedComponentsPayload.resolvedComponents,
+    resolvedComponentHashes: resolvedComponentsPayload.resolvedComponentHashes,
+  };
+  if (experienceId) manifestBase.experienceId = experienceId;
+  const configHash = sha256PrefixedHex(stableJsonStringify(manifestBase));
+  const manifest = {
+    ...manifestBase,
+    integrity: {
+      configHash,
+    },
+  };
+  const now = nowIso();
+  const config = upsertConfigVersion({
+    configVersionId,
+    houseId: resolvedHouse.houseId,
+    teamId,
+    experienceId,
+    status,
+    configHash,
+    idempotencyKey,
+    manifest,
+    lineage: {
+      parentConfigVersionIds,
+      createdBy: 'v1.house.configs',
+      requestId,
+    },
+    nowIso: now,
+  });
+  const componentVersions = replaceConfigComponentVersions({
+    configVersionId,
+    components: resolvedComponentsPayload.componentVersions.map((component, index) => ({
+      configComponentVersionId: `ccv_${randomHex(10)}`,
+      componentKind: component.componentKind,
+      componentKey: component.componentKey,
+      immutableVersionId: component.immutableVersionId,
+      componentHash: component.componentHash,
+      metadata: {
+        ...component.metadata,
+        ordinal: index,
+      },
+    })),
+    nowIso: now,
+  });
+  return sendPortalApiSuccess(res, {
+    configVersionId: config.configVersionId,
+    status: config.status,
+    configHash: config.configHash,
+    config,
+    componentVersions,
+  }, { status: 201, requestId });
 });
 
 app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {

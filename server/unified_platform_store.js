@@ -134,6 +134,7 @@ function ensureDb() {
       house_id TEXT NOT NULL,
       team_id TEXT NOT NULL,
       config_hash TEXT NOT NULL,
+      idempotency_key TEXT,
       manifest_json TEXT NOT NULL,
       lineage_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
@@ -272,6 +273,7 @@ function ensureDb() {
   ensureColumn(db, 'config_versions', 'experience_id', 'TEXT');
   ensureColumn(db, 'config_versions', 'status', `TEXT NOT NULL DEFAULT 'draft'`);
   ensureColumn(db, 'config_versions', 'updated_at', `TEXT NOT NULL DEFAULT ''`);
+  ensureColumn(db, 'config_versions', 'idempotency_key', 'TEXT');
   ensureColumn(db, 'runs', 'config_version_id', 'TEXT');
   ensureColumn(db, 'runs', 'entry_mode', `TEXT NOT NULL DEFAULT 'normal'`);
   ensureColumn(db, 'runs', 'metadata_json', `TEXT NOT NULL DEFAULT '{}'`);
@@ -359,10 +361,25 @@ function mapConfigVersionRow(row) {
     experienceId: row.experience_id ? String(row.experience_id) : null,
     status: row.status ? String(row.status) : null,
     configHash: String(row.config_hash || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     manifest: parseJsonColumn(row.manifest_json, {}),
     lineage: parseJsonColumn(row.lineage_json, {}),
     createdAt: String(row.created_at || ''),
     updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapConfigComponentVersionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    configComponentVersionId: String(row.config_component_version_id || ''),
+    configVersionId: String(row.config_version_id || ''),
+    componentKind: String(row.component_kind || ''),
+    componentKey: String(row.component_key || ''),
+    immutableVersionId: String(row.immutable_version_id || ''),
+    componentHash: String(row.component_hash || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
   };
 }
 
@@ -379,6 +396,41 @@ function getConfigVersion(configVersionId = '') {
   return mapConfigVersionRow(row);
 }
 
+function getConfigVersionByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM config_versions
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(normalizedHouseId, normalizedTeamId, normalizedIdempotencyKey);
+  return mapConfigVersionRow(row);
+}
+
+function listConfigComponentVersions(configVersionId = '') {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  if (!normalizedConfigVersionId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM config_component_versions
+    WHERE config_version_id = ?
+    ORDER BY created_at ASC, component_key ASC
+  `).all(normalizedConfigVersionId);
+  return rows.map(mapConfigComponentVersionRow).filter(Boolean);
+}
+
 function upsertConfigVersion({
   configVersionId = '',
   houseId = '',
@@ -386,6 +438,7 @@ function upsertConfigVersion({
   experienceId = '',
   status = 'draft',
   configHash = '',
+  idempotencyKey = '',
   manifest = null,
   lineage = null,
   nowIso = new Date().toISOString(),
@@ -405,17 +458,19 @@ function upsertConfigVersion({
       team_id,
       experience_id,
       config_hash,
+      idempotency_key,
       status,
       manifest_json,
       lineage_json,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(config_version_id) DO UPDATE SET
       house_id = excluded.house_id,
       team_id = excluded.team_id,
       experience_id = excluded.experience_id,
       config_hash = excluded.config_hash,
+      idempotency_key = excluded.idempotency_key,
       status = excluded.status,
       manifest_json = excluded.manifest_json,
       lineage_json = excluded.lineage_json,
@@ -426,6 +481,7 @@ function upsertConfigVersion({
     normalizedTeamId,
     String(experienceId || '').trim() || null,
     normalizedConfigHash,
+    String(idempotencyKey || '').trim() || null,
     String(status || 'draft').trim() || 'draft',
     JSON.stringify(manifest && typeof manifest === 'object' ? manifest : {}),
     JSON.stringify(lineage && typeof lineage === 'object' ? lineage : {}),
@@ -433,6 +489,63 @@ function upsertConfigVersion({
     nowIso,
   );
   return getConfigVersion(normalizedConfigVersionId);
+}
+
+function replaceConfigComponentVersions({
+  configVersionId = '',
+  components = [],
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  if (!normalizedConfigVersionId) {
+    throw new Error('CONFIG_COMPONENT_INVALID');
+  }
+  const normalizedComponents = Array.isArray(components) ? components : [];
+  const database = ensureDb();
+  database.exec('BEGIN');
+  try {
+    database.prepare(`
+      DELETE FROM config_component_versions
+      WHERE config_version_id = ?
+    `).run(normalizedConfigVersionId);
+    const insert = database.prepare(`
+      INSERT INTO config_component_versions (
+        config_component_version_id,
+        config_version_id,
+        component_kind,
+        component_key,
+        immutable_version_id,
+        component_hash,
+        metadata_json,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const component of normalizedComponents) {
+      const configComponentVersionId = String(component?.configComponentVersionId || '').trim();
+      const componentKind = String(component?.componentKind || '').trim();
+      const componentKey = String(component?.componentKey || '').trim();
+      const immutableVersionId = String(component?.immutableVersionId || '').trim();
+      const componentHash = String(component?.componentHash || '').trim();
+      if (!configComponentVersionId || !componentKind || !componentKey || !immutableVersionId || !componentHash) {
+        throw new Error('CONFIG_COMPONENT_INVALID');
+      }
+      insert.run(
+        configComponentVersionId,
+        normalizedConfigVersionId,
+        componentKind,
+        componentKey,
+        immutableVersionId,
+        componentHash,
+        JSON.stringify(component?.metadata && typeof component.metadata === 'object' ? component.metadata : {}),
+        nowIso,
+      );
+    }
+    database.exec('COMMIT');
+  } catch (err) {
+    database.exec('ROLLBACK');
+    throw err;
+  }
+  return listConfigComponentVersions(normalizedConfigVersionId);
 }
 
 function mapRunRow(row) {
@@ -833,6 +946,7 @@ module.exports = {
   countUnifiedPlatformTableRows: countPlatformTableRows,
   countPlatformTableRows,
   getConfigVersion,
+  getConfigVersionByIdempotency,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,
@@ -842,10 +956,12 @@ module.exports = {
   getLatestTraceEvent,
   getPlatformTableCounts,
   isUnifiedPlatformTable,
+  listConfigComponentVersions,
   listTraceEvents,
   listFixtureFamilies,
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,
+  replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   updateRunStatus,
   upsertConfigVersion,

@@ -120,6 +120,31 @@ async function seedPlatformConfigVersion(request, {
   }
 }
 
+async function createPlatformConfigVersion(request, {
+  houseId = '',
+  houseAuthKey = '',
+  idempotencyKey = '',
+  payload = null,
+} = {}) {
+  const path = `/v1/houses/${encodeURIComponent(String(houseId || '').trim())}/configs`;
+  const body = JSON.stringify(payload && typeof payload === 'object' ? payload : {});
+  const response = await request.post(path, {
+    headers: {
+      'content-type': 'application/json',
+      'Idempotency-Key': String(idempotencyKey || ''),
+      ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, body, houseAuthKey),
+    },
+    data: body,
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function createPlatformRun(request, {
   houseId = '',
   houseAuthKey = '',
@@ -204,6 +229,7 @@ async function setPlatformRunStatus(request, runId, status) {
 
 module.exports = {
   compileDefaultSkillPack,
+  createPlatformConfigVersion,
   createPlatformRun,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
   getDefaultCompiledPackManifest,

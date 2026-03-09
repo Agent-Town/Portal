@@ -621,6 +621,87 @@ Response shape:
 }
 ```
 
+### POST `/v1/houses/:houseId/configs` (human + house-auth)
+Creates one immutable candidate or active config version with resolved component version IDs and hashes.
+
+Request shape:
+```json
+{
+  "configVersionId": "cfg_01HR...",
+  "teamId": "team_main",
+  "displayVersion": "web-main@2026.03.09-1",
+  "branch": "season-lock",
+  "status": "candidate",
+  "parentConfigVersionIds": ["cfg_prev"],
+  "componentRefs": {
+    "housePolicyVersionId": "hpv_01",
+    "teamCompositionVersionId": "tcv_01",
+    "agentConfigVersionIds": ["agv_01", "agv_02"],
+    "officePolicyVersionIds": [],
+    "experiencePresetVersionId": "epv_01",
+    "integrationOverlayVersionIds": [],
+    "trainerPresetVersionId": "tpv_01"
+  }
+}
+```
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "configVersionId": "cfg_01HR...",
+    "status": "candidate",
+    "configHash": "sha256:<manifest hash>",
+    "config": {
+      "configVersionId": "cfg_01HR...",
+      "houseId": "house_abc",
+      "teamId": "team_main",
+      "status": "candidate",
+      "configHash": "sha256:<manifest hash>",
+      "manifest": {
+        "resolvedComponents": {
+          "housePolicyVersionId": "hpv_01"
+        },
+        "resolvedComponentHashes": {
+          "housePolicyVersionId": "sha256:<component hash>"
+        },
+        "integrity": {
+          "configHash": "sha256:<manifest hash>"
+        }
+      }
+    },
+    "componentVersions": [
+      {
+        "configComponentVersionId": "ccv_01H...",
+        "componentKind": "house_policy_version",
+        "componentKey": "housePolicyVersionId",
+        "immutableVersionId": "hpv_01",
+        "componentHash": "sha256:<component hash>"
+      }
+    ]
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `CONFIG_COMPONENT_MUTABLE_REF`
+- `INVALID_ARGUMENT`
+
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
 Creates one durable run row for the requested experience and binds the run to one declared trace authority.
 
