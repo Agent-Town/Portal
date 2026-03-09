@@ -263,9 +263,11 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 ### UI tools
 
 - `agent_town_ui_open_modal({ modal, params })`
-  - Opens one whitelisted modal (`atlas`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`).
+  - Opens one whitelisted modal (`atlas`, `registry`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`).
 - `agent_town_ui_atlas_search({ q, family, searchType })`
   - Opens Atlas in modal and applies search/filter state.
+- `agent_town_ui_registry_search({ q, family })`
+  - Opens Registry in modal and applies registry discovery filters without changing Atlas district state.
 - `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
   - Opens Pony modal compose panel with prefilled values.
 
@@ -274,6 +276,7 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - UI tools are intent-dispatch only; never use arbitrary DOM selectors or HTML payloads.
 - Keep all experience transitions inside `/app` modal surfaces so worker runtime/session continuity is preserved.
 - Do not navigate to direct standalone routes (for example `/atlas`) when a modal intent exists.
+- Do not navigate to direct standalone routes (for example `/registry`) when a modal intent exists.
 - If a UI intent is unknown, return/expect deterministic `UI_INTENT_UNKNOWN`.
 - If params are invalid, return/expect deterministic `UI_INTENT_INVALID_PARAM`.
 - Irreversible intents require approval and return `CONFIRMATION_REQUIRED` when missing approval.

@@ -417,6 +417,7 @@ let activeDistrict = 'house';
 const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
+  registry: { title: 'Registry', viewPath: '/registry?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -437,9 +438,10 @@ const isTownHub = !!document.getElementById('districtMap') && !!document.getElem
 const popupDistrictByPath = {
   '/leaderboard': 'leaderboard',
   '/wall': 'leaderboard',
+  '/registry': 'registry',
   '/house': 'house'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -447,6 +449,10 @@ let experienceIntentAtlasState = {
   query: '',
   family: '',
   searchType: 'keyword'
+};
+let experienceIntentRegistryState = {
+  query: '',
+  family: ''
 };
 let experienceIntentPonyState = {
   composeOpen: false,
@@ -811,6 +817,7 @@ function districtStatusText(district) {
   }
   if (!district) return 'Select a district on the map.';
   if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
+  if (district === 'registry') return 'Registry selected: capability and storefront discovery.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
   if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
   if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
@@ -819,7 +826,7 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'atlas' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas' || district === 'registry' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -836,6 +843,7 @@ function setActiveDistrict(district) {
 
 function normalizeDistrict(district) {
   return district === 'atlas'
+    || district === 'registry'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -849,6 +857,7 @@ function normalizeDistrict(district) {
 
 function explicitDistrictFromInput(district) {
   return district === 'atlas'
+    || district === 'registry'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -3864,6 +3873,7 @@ function setDistrictModalMode(mode) {
 const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
+  registry: 'atlas',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -3891,6 +3901,7 @@ function inferDistrictModalThemeFromUrl(url) {
   }
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
+  if (path === '/registry') return 'atlas';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -3971,6 +3982,10 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
       family: String(experienceIntentAtlasState.family || ''),
       searchType: String(experienceIntentAtlasState.searchType || 'keyword')
     },
+    registry: {
+      query: String(experienceIntentRegistryState.query || ''),
+      family: String(experienceIntentRegistryState.family || '')
+    },
     pony: {
       composeOpen: experienceIntentPonyState.composeOpen === true,
       composeTo: String(experienceIntentPonyState.toHouseId || ''),
@@ -3984,6 +3999,7 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     modal: isPlainRecord(overrides.modal) ? { ...base.modal, ...overrides.modal } : base.modal,
     worker: isPlainRecord(overrides.worker) ? { ...base.worker, ...overrides.worker } : base.worker,
     atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
+    registry: isPlainRecord(overrides.registry) ? { ...base.registry, ...overrides.registry } : base.registry,
     pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
   };
 }
@@ -4158,7 +4174,7 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   const modal = String(rawParams.modal || '').trim().toLowerCase();
   if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
-    return invalidExperienceParam('modal must be one of atlas|pony|townhall|saloon|leaderboard|house|brain|sigil');
+    return invalidExperienceParam('modal must be one of atlas|registry|pony|townhall|saloon|leaderboard|house|brain|sigil');
   }
   const params = rawParams.params;
   if (params != null && !isPlainRecord(params)) {
@@ -4219,6 +4235,40 @@ async function runExperienceUiAtlasSearch(rawParams) {
         query: q,
         family,
         searchType
+      }
+    })
+  });
+}
+
+async function runExperienceUiRegistrySearch(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['q', 'family']))) {
+    return invalidExperienceParam('registry_search accepts only { q, family }');
+  }
+  const q = String(rawParams.q || '').trim();
+  const family = String(rawParams.family || '').trim().toLowerCase();
+  if (!isSafeExperienceToken(q, { allowEmpty: true, maxLen: 180 })) {
+    return invalidExperienceParam('q contains unsupported characters');
+  }
+  if (!isSafeExperienceToken(family, { allowEmpty: true, maxLen: 64 })) {
+    return invalidExperienceParam('family contains unsupported characters');
+  }
+  const params = new URLSearchParams();
+  params.set('embed', '1');
+  if (q) params.set('q', q);
+  if (family) params.set('family', family);
+
+  setActiveDistrict('registry');
+  currentDistrict = 'registry';
+  openRouteInModalFrame(`/registry?${params.toString()}`, 'Registry');
+  experienceIntentRegistryState = { query: q, family };
+  await waitForDistrictModalOpen();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      registry: {
+        query: q,
+        family
       }
     })
   });
@@ -4301,6 +4351,8 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
       envelope = await runExperienceUiOpenModal(params);
     } else if (toolName === 'agent_town_ui_atlas_search') {
       envelope = await runExperienceUiAtlasSearch(params);
+    } else if (toolName === 'agent_town_ui_registry_search') {
+      envelope = await runExperienceUiRegistrySearch(params);
     } else if (toolName === 'agent_town_ui_pony_compose') {
       envelope = await runExperienceUiPonyCompose(params);
     } else {

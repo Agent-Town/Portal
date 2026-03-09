@@ -7,6 +7,201 @@
 - Human identity is a session cookie: `et_session`.
 - Agent identity is a **Team Code** shown to the human.
 
+## Portal Web + Registry contract
+
+All Portal Web and Registry routes use a stable envelope:
+
+Success:
+```json
+{
+  "ok": true,
+  "data": {},
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Failure:
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "INVALID_ARGUMENT",
+    "message": "Human-readable summary",
+    "retryable": false,
+    "details": {}
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+### POST `/api/web/resolve`
+Resolves a URL into supported integration metadata or a structured unsupported-site fallback.
+
+Request shape:
+```json
+{
+  "url": "https://github.com/openai/openai-codex/issues/1",
+  "preferredMode": "auto",
+  "sourceHints": {
+    "expectedPageClass": "issue_detail"
+  }
+}
+```
+
+Success notes:
+- Supported GitHub issue URLs return `data.resolutionState === "supported"` with `website`, `integration`, `alternatives`, and `fallback: null`.
+- Unsupported sites return `data.resolutionState === "unsupported"` with `fallback.reasonCode === "WEB_UNSUPPORTED_SITE"`.
+
+Failure codes:
+- `INVALID_ARGUMENT`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+
+### POST `/api/web/import`
+Queues a human-authenticated Web import request with idempotency and auditability.
+
+Request shape:
+```json
+{
+  "url": "https://example.com/",
+  "requestKind": "site_origin",
+  "parseFallbackAllowed": true,
+  "sourceHints": {
+    "expectedObjectKind": "website"
+  },
+  "idempotencyKey": "imp_..."
+}
+```
+
+Response fields:
+- `data.importJobId`
+- `data.status`
+- `data.requestKind`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `INVALID_ARGUMENT`
+- `UNSAFE_TARGET`
+- `PRIVATE_NETWORK_BLOCKED`
+
+### POST `/api/registry/import`
+Queues a human-authenticated Registry import request with the same idempotency and unsafe-target policy as `/api/web/import`.
+
+### POST `/api/web/sessions`
+Creates a durable Web Experience session bound to the current Portal session.
+
+Request shape:
+```json
+{
+  "url": "https://github.com/openai/openai-codex/issues/1",
+  "integrationRegistryId": "wi_github_issue_reply",
+  "versionId": "rv_github_issue_reply_v1",
+  "renderMode": "auto",
+  "autonomyMode": "assist"
+}
+```
+
+Response fields:
+- `data.session.webSessionId`
+- `data.session.teamCode`
+- `data.session.houseId`
+- `data.session.renderMode`
+- `data.session.autonomyMode`
+- `data.session.runtimeState`
+- `data.session.activeRevision`
+- `data.activeIntegration`
+- `data.policy.sameOriginOnlyDefault`
+
+### GET `/api/web/sessions/:id`
+Returns:
+- `data.session`
+- `data.activeIntegration`
+- `data.approvalQueue`
+- `data.lastCheckpoint`
+- `data.runtimeSnapshot`
+- `data.credentialStatusByOrigin`
+
+### POST `/api/web/sessions/:id/checkpoint`
+Writes a durable checkpoint and increments `activeRevision`.
+
+Request shape:
+```json
+{
+  "expectedRevision": 1,
+  "idempotencyKey": "ckp_...",
+  "checkpoint": {
+    "pageClass": "issue_detail",
+    "draftBuffers": {
+      "replyBody": "Draft body"
+    }
+  }
+}
+```
+
+Conflict failure:
+- `WEB_CHECKPOINT_CONFLICT`
+
+### POST `/api/web/sessions/:id/actions/:actionId/invoke`
+Invokes a durable Web action.
+
+Request shape:
+```json
+{
+  "expectedRevision": 2,
+  "idempotencyKey": "act_...",
+  "params": {
+    "draft": "Hello world"
+  },
+  "approvalId": "apr_...",
+  "credentialGrantId": "wcg_..."
+}
+```
+
+Implemented action policies:
+- `submit_reply` requires approval and an origin-scoped credential grant
+- `save_draft` succeeds without approval or credentials
+
+Failure codes:
+- `WEB_APPROVAL_REQUIRED`
+- `WEB_APPROVAL_EXPIRED`
+- `WEB_CREDENTIAL_REQUIRED`
+- `WEB_CREDENTIAL_SCOPE_MISMATCH`
+- `WEB_CHECKPOINT_CONFLICT`
+- `NOT_FOUND`
+
+### POST `/api/web/approvals/:approvalId/decision`
+Records a human approval decision and emits durable approval evidence.
+
+### GET `/api/web/sessions/:id/evidence`
+Returns newest-first evidence rows with:
+- `limit`
+- `cursor`
+- `freshOnly=true|false`
+
+### POST `/api/web/credentials/start`
+Starts an origin-scoped credential broker flow.
+
+Request shape:
+```json
+{
+  "webSessionId": "we_...",
+  "origin": "https://github.com",
+  "authClass": "oauth",
+  "scopes": ["repo:issue:write"]
+}
+```
+
+Response fields:
+- `data.brokerSessionId`
+- `data.approvalId`
+- `data.authUrl`
+
 ---
 
 ## Agent solo session

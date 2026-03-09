@@ -1,7 +1,9 @@
 # Phase 11 - District Map + ERC-8004 Storefront Spec
 
+> Revision note (2026-03-09): Atlas is modal-first. `/atlas` remains the same-origin render route used by the town-hub modal and iframe flow, while standalone `/atlas` and `/atlas.html` redirect back to the hub entry path. Any earlier wording in this spec that implied a first-class standalone Atlas page is superseded by the modal-first worker-continuity rule in `AGENTS.md`.
+
 ## 1) Objective
-Add a new full-screen exploration surface for ERC-8004 population inside Agent Town, with a strong viral share loop.
+Add a new modal-first exploration surface for ERC-8004 population inside Agent Town, with a strong viral share loop.
 
 The new surface must:
 - stay on the same website/app origin and deployment,
@@ -30,8 +32,8 @@ If every pre-registered ERC-8004 agent has a compelling share image, share links
 
 ## 4) UX Surface and IA
 ### 4.1 New route
-- Add full-screen route: `/atlas` (name can change, contract remains).
-- This is a first-class page in the same app with shared navigation.
+- Add same-origin Atlas render route: `/atlas` (name can change, contract remains).
+- Atlas is opened through the main website modal flow; standalone `/atlas` access redirects back to the hub.
 
 ### 4.2 Navigation integration
 - Add `Atlas` nav entry on `/`, `/leaderboard`, `/house`, and `/s/:id`.
@@ -310,11 +312,11 @@ Test first:
 - Add `e2e/29_atlas_route_nav.spec.js`.
 
 RED gate:
-- Test expects `/atlas` and `Atlas` nav links to exist; fails before implementation.
+- Test expects Atlas modal entry and `/atlas?embed=1` render path to exist; fails before implementation.
 
 GREEN gate:
-- `/atlas` responds with page containing `data-testid="atlas-root"`.
-- Nav link to `/atlas` is visible on all required pages.
+- `/atlas?embed=1` responds with page containing `data-testid="atlas-root"`.
+- Atlas entry is visible on all required pages and opens through the modal-first flow.
 
 Regression gate:
 - `npx playwright test e2e/01_home.spec.js e2e/03_create_share_leaderboard.spec.js`

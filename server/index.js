@@ -41,6 +41,35 @@ const {
   CANVAS,
   defaultLiteState
 } = require('./sessions');
+const {
+  activateCredentialGrant,
+  countTableRows,
+  createApprovalRequest,
+  createCredentialGrant,
+  createImportJob,
+  createEvidence,
+  createInvocation,
+  createWebSession,
+  decideApproval,
+  getActiveCredentialGrant,
+  getApprovalById,
+  getCredentialGrantById,
+  getImportJobById,
+  getInvocationByIdempotency,
+  getLatestCheckpointForSession,
+  getRegistryEntityById,
+  getWebSessionById,
+  listApprovalsForSession,
+  listCredentialStatusByOrigin,
+  listEvidenceForSession,
+  resetExtendedStore,
+  searchRegistryEntities,
+  setWebSessionRevisionAndState,
+  touchCredentialGrant,
+  writeCheckpoint,
+} = require('./web_poker_store');
+
+const PORTAL_WEB_API_VERSION = '2026-03-09';
 
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
@@ -1550,6 +1579,7 @@ function setSecurityHeaders(req, res, next) {
   const allowSameOriginFrame = (
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
+    || reqPath === '/registry'
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -1762,7 +1792,67 @@ app.use(
   })
 );
 
-function ensureHumanSession(req, res) {
+app.use(
+  '/api/web',
+  rateLimit({
+    windowMs: 60_000,
+    max: 120,
+    keyFn: (req) => sessionScopedRateKey('web', req)
+  })
+);
+
+app.use(
+  '/api/registry/import',
+  rateLimit({
+    windowMs: 60_000,
+    max: 30,
+    keyFn: (req) => sessionScopedRateKey('registry-import', req)
+  })
+);
+
+function buildPortalRequestId() {
+  return `req_${randomHex(10)}`;
+}
+
+function makePortalApiMeta(requestId = buildPortalRequestId()) {
+  return {
+    requestId,
+    apiVersion: PORTAL_WEB_API_VERSION
+  };
+}
+
+function sendPortalApiSuccess(res, data, { status = 200, requestId = buildPortalRequestId() } = {}) {
+  return res.status(status).json({
+    ok: true,
+    data,
+    meta: makePortalApiMeta(requestId)
+  });
+}
+
+function sendPortalApiError(
+  res,
+  status,
+  code,
+  message,
+  {
+    retryable = false,
+    details = {},
+    requestId = buildPortalRequestId()
+  } = {}
+) {
+  return res.status(status).json({
+    ok: false,
+    error: {
+      code,
+      message,
+      retryable: retryable === true,
+      details: details && typeof details === 'object' ? details : {}
+    },
+    meta: makePortalApiMeta(requestId)
+  });
+}
+
+function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) {
   const cookies = parseCookies(req.header('cookie') || '');
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
   let sid = cookieSid;
@@ -1830,6 +1920,7 @@ function ensureHumanSession(req, res) {
   }
 
   if (!session) {
+    if (!allowCreate) return null;
     session = createSession();
     sid = session.sessionId;
   }
@@ -1873,6 +1964,23 @@ function ensureHumanSession(req, res) {
   ensureLiteState(session);
   updateLiteRuntimeReady(session);
   return session;
+}
+
+function ensureHumanSession(req, res) {
+  return resolveHumanSessionWithRecovery(req, res, { allowCreate: true });
+}
+
+function requireBoundHumanSession(req, res, { requestId = buildPortalRequestId() } = {}) {
+  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+  if (session) return session;
+  sendPortalApiError(
+    res,
+    401,
+    'UNAUTHORIZED',
+    'A live Portal session is required for this route.',
+    { requestId }
+  );
+  return null;
 }
 
 function normalizeWalletChainInput(rawChain) {
@@ -3528,6 +3636,634 @@ app.get('/api/state', (req, res) => {
   });
 });
 
+app.post('/api/web/resolve', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  const preferredMode = typeof req.body?.preferredMode === 'string' ? req.body.preferredMode.trim() : 'auto';
+  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
+    ? req.body.sourceHints
+    : {};
+  if (!url) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url is required.', { requestId });
+  }
+  try {
+    assertPortalContractTargetAllowed(url);
+    return sendPortalApiSuccess(
+      res,
+      resolveWebTarget(url, { preferredMode, sourceHints }),
+      { requestId }
+    );
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') {
+      return sendProxyPolicyContractError(res, err, requestId);
+    }
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
+  }
+});
+
+app.post('/api/web/import', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  const requestKind = typeof req.body?.requestKind === 'string' ? req.body.requestKind.trim() : '';
+  const parseFallbackAllowed = req.body?.parseFallbackAllowed === true;
+  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
+    ? req.body.sourceHints
+    : {};
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  if (!url || !requestKind || !idempotencyKey) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url, requestKind, and idempotencyKey are required.', { requestId });
+  }
+
+  try {
+    const parsed = new URL(url);
+    assertPortalContractTargetAllowed(url);
+    const job = createImportJob({
+      surface: 'web',
+      portalSessionId: session.sessionId,
+      teamCode: session.teamCode || null,
+      houseId: session?.houseCeremony?.houseId || null,
+      walletSubjects: collectWalletSubjectsForSession(session, req),
+      sourceUrl: parsed.toString(),
+      sourceOrigin: parsed.origin,
+      requestKind,
+      parseFallbackAllowed,
+      sourceHints,
+      idempotencyKey,
+      status: 'queued',
+      result: {
+        status: 'queued',
+        sourceType: 'manual_import'
+      }
+    });
+    return sendPortalApiSuccess(res, {
+      importJobId: job.importJobId,
+      status: job.status,
+      requestKind: job.requestKind
+    }, { requestId });
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') {
+      let parsed = null;
+      try {
+        parsed = new URL(url);
+      } catch {
+        parsed = null;
+      }
+      createImportJob({
+        surface: 'web',
+        portalSessionId: session.sessionId,
+        teamCode: session.teamCode || null,
+        houseId: session?.houseCeremony?.houseId || null,
+        walletSubjects: collectWalletSubjectsForSession(session, req),
+        sourceUrl: parsed?.toString() || url,
+        sourceOrigin: parsed?.origin || null,
+        requestKind,
+        parseFallbackAllowed,
+        sourceHints,
+        idempotencyKey,
+        status: 'rejected',
+        decisionCode: proxyPolicyErrorCode(err),
+        decisionReason: 'Blocked by unsafe target policy',
+        result: {
+          policy: 'blocked',
+          details: err?.details || {}
+        }
+      });
+      return sendProxyPolicyContractError(res, err, requestId);
+    }
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
+  }
+});
+
+app.post('/api/web/sessions', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  if (!url) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url is required.', { requestId });
+  }
+  try {
+    assertPortalContractTargetAllowed(url);
+    const resolved = resolveWebTarget(url, {
+      preferredMode: typeof req.body?.renderMode === 'string' ? req.body.renderMode : 'auto',
+      sourceHints: req.body?.sourceHints && typeof req.body.sourceHints === 'object'
+        ? req.body.sourceHints
+        : {}
+    });
+    const integration = resolved.integration || null;
+    const created = createWebSession({
+      portalSessionId: session.sessionId,
+      teamCode: session.teamCode || null,
+      houseId: session?.houseCeremony?.houseId || null,
+      walletSubjects: collectWalletSubjectsForSession(session, req),
+      url: new URL(url).toString(),
+      origin: new URL(url).origin,
+      websiteRegistryId: resolved.website?.registryId || null,
+      integrationRegistryId: typeof req.body?.integrationRegistryId === 'string'
+        ? req.body.integrationRegistryId.trim()
+        : integration?.integrationRegistryId || null,
+      versionId: typeof req.body?.versionId === 'string'
+        ? req.body.versionId.trim()
+        : integration?.versionId || null,
+      renderMode: integration?.renderMode || normalizeWebRenderMode(req.body?.renderMode, 'companion'),
+      autonomyMode: normalizeWebAutonomyMode(req.body?.autonomyMode, 'assist'),
+      runtimeState: resolved.resolutionState === 'supported' ? 'ready' : 'error',
+      pageClass: integration?.pageClass || resolved.website?.pageClass || null,
+    });
+    return sendPortalApiSuccess(res, {
+      session: {
+        webSessionId: created.webSessionId,
+        teamCode: created.teamCode,
+        houseId: created.houseId,
+        renderMode: created.renderMode,
+        autonomyMode: created.autonomyMode,
+        runtimeState: created.runtimeState,
+        activeRevision: created.activeRevision
+      },
+      activeIntegration: {
+        integrationRegistryId: created.integrationRegistryId,
+        versionId: created.versionId
+      },
+      policy: {
+        sameOriginOnlyDefault: true,
+        allowExternalCredentials: false
+      }
+    }, { requestId });
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') {
+      return sendProxyPolicyContractError(res, err, requestId);
+    }
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
+  }
+});
+
+app.get('/api/web/sessions/:id', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const { session, webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
+  if (!session || !webSession) return;
+  const approvalQueue = listApprovalsForSession(webSession.webSessionId);
+  const lastCheckpoint = webSession.checkpointRef
+    ? getLatestCheckpointForSession(webSession.webSessionId)
+    : null;
+  return sendPortalApiSuccess(res, {
+    session: webSession,
+    activeIntegration: {
+      integrationRegistryId: webSession.integrationRegistryId,
+      versionId: webSession.versionId
+    },
+    approvalQueue,
+    lastCheckpoint,
+    runtimeSnapshot: lastCheckpoint?.payload || null,
+    credentialStatusByOrigin: listCredentialStatusByOrigin(session.sessionId, webSession.webSessionId)
+  }, { requestId });
+});
+
+app.post('/api/web/sessions/:id/checkpoint', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const { webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
+  if (!webSession) return;
+  const checkpoint = req.body?.checkpoint && typeof req.body.checkpoint === 'object'
+    ? req.body.checkpoint
+    : null;
+  const expectedRevision = Number(req.body?.expectedRevision);
+  if (!checkpoint || !Number.isInteger(expectedRevision)) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'checkpoint and expectedRevision are required.', { requestId });
+  }
+  try {
+    const written = writeCheckpoint({
+      webSessionId: webSession.webSessionId,
+      expectedRevision,
+      idempotencyKey: idempotencyKey || null,
+      checkpoint
+    });
+    return sendPortalApiSuccess(res, {
+      checkpointRef: written.checkpointRef,
+      writtenRevision: written.revision,
+      writtenAt: written.createdAt
+    }, { requestId });
+  } catch (err) {
+    if (err?.code === 'WEB_CHECKPOINT_CONFLICT') {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_CHECKPOINT_CONFLICT',
+        'The checkpoint was based on a stale revision.',
+        {
+          requestId,
+          details: {
+            currentRevision: Number(err.currentRevision || webSession.activeRevision)
+          }
+        }
+      );
+    }
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
+  }
+});
+
+app.post('/api/web/sessions/:id/actions/:actionId/invoke', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const { session, webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
+  if (!session || !webSession) return;
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const expectedRevision = Number(req.body?.expectedRevision);
+  if (!idempotencyKey || !Number.isInteger(expectedRevision)) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'idempotencyKey and expectedRevision are required.', { requestId });
+  }
+  const cached = getInvocationByIdempotency(webSession.webSessionId, idempotencyKey);
+  if (cached) {
+    const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
+      .filter((item) => item.invocationId === cached.invocationId);
+    return sendPortalApiSuccess(res, {
+      invocation: {
+        invocationId: cached.invocationId,
+        actionId: cached.actionId,
+        status: cached.status,
+        verificationStatus: cached.verificationStatus,
+        durationMs: Number(cached.response?.durationMs || 1),
+        usedApprovalId: cached.approvalId,
+        usedCredentialGrantId: cached.credentialGrantId
+      },
+      evidence
+    }, { requestId });
+  }
+
+  if (expectedRevision !== webSession.activeRevision) {
+    return sendPortalApiError(
+      res,
+      409,
+      'WEB_CHECKPOINT_CONFLICT',
+      'The requested action was based on a stale revision.',
+      {
+        requestId,
+        details: {
+          currentRevision: webSession.activeRevision
+        }
+      }
+    );
+  }
+
+  const actionPolicy = getWebActionPolicy(req.params.actionId, webSession);
+  if (!actionPolicy) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Unknown web action.', { requestId });
+  }
+
+  let approval = null;
+  if (actionPolicy.requiresApproval) {
+    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+    approval = approvalId ? getApprovalById(approvalId) : null;
+    if (!approval) {
+      const createdApproval = createApprovalRequest({
+        webSessionId: webSession.webSessionId,
+        actionId: actionPolicy.actionId,
+        reason: actionPolicy.summary,
+        requestedBy: 'agent',
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+      });
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_APPROVAL_REQUIRED',
+        'This action requires human approval.',
+        {
+          requestId,
+          details: {
+            approvalId: createdApproval.approvalId,
+            status: createdApproval.status
+          }
+        }
+      );
+    }
+    if (approval.webSessionId !== webSession.webSessionId) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Approval does not belong to this web session.', { requestId });
+    }
+    if (Date.parse(approval.expiresAt) <= Date.now()) {
+      return sendPortalApiError(res, 409, 'WEB_APPROVAL_EXPIRED', 'Approval has expired.', { requestId });
+    }
+    if (approval.status !== 'approved') {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_APPROVAL_REQUIRED',
+        'This action requires an approved human decision.',
+        {
+          requestId,
+          details: {
+            approvalId: approval.approvalId,
+            status: approval.status
+          }
+        }
+      );
+    }
+  }
+
+  let credentialGrant = null;
+  if (actionPolicy.requiresCredential) {
+    const credentialGrantId = typeof req.body?.credentialGrantId === 'string'
+      ? req.body.credentialGrantId.trim()
+      : '';
+    credentialGrant = getActiveCredentialGrant({
+      portalSessionId: session.sessionId,
+      webSessionId: webSession.webSessionId,
+      origin: webSession.origin,
+      credentialGrantId: credentialGrantId || null
+    });
+    if (!credentialGrant) {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_CREDENTIAL_REQUIRED',
+        'A valid credential grant is required for this origin.',
+        { requestId }
+      );
+    }
+    if (credentialGrant.origin !== webSession.origin) {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_CREDENTIAL_SCOPE_MISMATCH',
+        'The provided credential grant does not match this origin.',
+        { requestId }
+      );
+    }
+    if (credentialGrant.status !== 'active') {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_CREDENTIAL_REQUIRED',
+        'The provided credential grant is not active.',
+        { requestId }
+      );
+    }
+    touchCredentialGrant(credentialGrant.credentialGrantId);
+  }
+
+  const params = req.body?.params && typeof req.body.params === 'object'
+    ? req.body.params
+    : {};
+  const requestPayload = {
+    expectedRevision,
+    params,
+    approvalId: approval?.approvalId || null,
+    credentialGrantId: credentialGrant?.credentialGrantId || null,
+    dryRun: req.body?.dryRun === true
+  };
+  const responsePayload = {
+    durationMs: 1,
+    targetOrigin: webSession.origin,
+    renderMode: webSession.renderMode
+  };
+  const invocation = createInvocation({
+    webSessionId: webSession.webSessionId,
+    actionId: actionPolicy.actionId,
+    idempotencyKey,
+    approvalId: approval?.approvalId || null,
+    credentialGrantId: credentialGrant?.credentialGrantId || null,
+    request: requestPayload,
+    response: responsePayload
+  });
+  createEvidence({
+    webSessionId: webSession.webSessionId,
+    invocationId: invocation.invocationId,
+    category: 'tool_invoked',
+    actor: 'server',
+    status: 'success',
+    summary: actionPolicy.actionId,
+    targetUrl: webSession.url,
+    pageClass: webSession.pageClass,
+    freshnessTtlMs: 300000
+  });
+  const refreshed = setWebSessionRevisionAndState(webSession.webSessionId, {
+    nextRevision: webSession.activeRevision + 1,
+    runtimeState: 'verifying',
+    pageClass: webSession.pageClass
+  });
+  const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
+    .filter((item) => item.invocationId === invocation.invocationId);
+  return sendPortalApiSuccess(res, {
+    invocation: {
+      invocationId: invocation.invocationId,
+      actionId: invocation.actionId,
+      status: invocation.status,
+      verificationStatus: invocation.verificationStatus,
+      durationMs: Number(invocation.response?.durationMs || 1),
+      usedApprovalId: invocation.approvalId,
+      usedCredentialGrantId: invocation.credentialGrantId,
+      writtenRevision: refreshed?.activeRevision || webSession.activeRevision + 1
+    },
+    evidence
+  }, { requestId });
+});
+
+app.post('/api/web/approvals/:approvalId/decision', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const approval = getApprovalById(req.params.approvalId);
+  if (!approval) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Approval not found.', { requestId });
+  }
+  const webSession = getWebSessionById(approval.webSessionId);
+  if (!webSession) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
+  }
+  if (webSession.portalSessionId !== session.sessionId) {
+    return sendPortalApiError(res, 403, 'FORBIDDEN', 'Approval belongs to a different Portal session.', { requestId });
+  }
+  const decision = typeof req.body?.decision === 'string' ? req.body.decision.trim().toLowerCase() : '';
+  const expectedRevision = Number(req.body?.expectedRevision);
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  if ((decision !== 'approved' && decision !== 'rejected') || !Number.isInteger(expectedRevision) || !idempotencyKey) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'decision, expectedRevision, and idempotencyKey are required.', { requestId });
+  }
+  try {
+    const decided = decideApproval({
+      approvalId: approval.approvalId,
+      decision,
+      decisionBy: 'human',
+      reason,
+      expectedRevision,
+      idempotencyKey
+    });
+    const nextSession = getWebSessionById(webSession.webSessionId);
+    const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
+      .filter((item) => item.category === 'approval_decided' && item.summary === approval.approvalId)
+      .slice(0, 1);
+    return sendPortalApiSuccess(res, {
+      approval: decided,
+      writtenRevision: nextSession?.activeRevision || expectedRevision,
+      evidence
+    }, { requestId });
+  } catch (err) {
+    if (err?.code === 'WEB_APPROVAL_EXPIRED') {
+      return sendPortalApiError(res, 409, 'WEB_APPROVAL_EXPIRED', 'Approval has expired.', { requestId });
+    }
+    if (err?.code === 'WEB_CHECKPOINT_CONFLICT') {
+      return sendPortalApiError(
+        res,
+        409,
+        'WEB_CHECKPOINT_CONFLICT',
+        'The approval decision was based on a stale revision.',
+        { requestId, details: { currentRevision: Number(err.currentRevision || webSession.activeRevision) } }
+      );
+    }
+    return sendPortalApiError(res, 500, 'INTERNAL_ERROR', 'Approval decision failed.', { requestId, retryable: true });
+  }
+});
+
+app.get('/api/web/sessions/:id/evidence', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const { webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
+  if (!webSession) return;
+  const limit = Number.parseInt(String(req.query?.limit || '50'), 10);
+  const cursor = typeof req.query?.cursor === 'string' ? req.query.cursor.trim() : '';
+  const freshOnly = String(req.query?.freshOnly || '').trim().toLowerCase() === 'true';
+  const payload = listEvidenceForSession(webSession.webSessionId, {
+    limit,
+    cursor: cursor || null,
+    freshOnly
+  });
+  return sendPortalApiSuccess(res, payload, { requestId });
+});
+
+app.post('/api/web/credentials/start', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const webSessionId = typeof req.body?.webSessionId === 'string' ? req.body.webSessionId.trim() : '';
+  const origin = typeof req.body?.origin === 'string' ? req.body.origin.trim() : '';
+  const authClass = typeof req.body?.authClass === 'string' ? req.body.authClass.trim() : '';
+  const scopes = Array.isArray(req.body?.scopes) ? req.body.scopes.filter((entry) => typeof entry === 'string' && entry.trim()) : [];
+  if (!webSessionId || !origin || !authClass || scopes.length === 0) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'webSessionId, origin, authClass, and scopes are required.', { requestId });
+  }
+  const webSession = getWebSessionById(webSessionId);
+  if (!webSession || webSession.portalSessionId !== session.sessionId) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
+  }
+  if (webSession.origin !== origin) {
+    return sendPortalApiError(res, 409, 'WEB_ORIGIN_BLOCKED', 'Credential broker origin must match the web session origin.', { requestId });
+  }
+  const approval = createApprovalRequest({
+    webSessionId,
+    actionId: 'credential_grant',
+    reason: `Grant ${authClass} access for ${origin}`,
+    requestedBy: 'human',
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  });
+  const brokerSessionId = `wcb_${randomHex(10)}`;
+  createCredentialGrant({
+    portalSessionId: session.sessionId,
+    webSessionId,
+    origin,
+    authClass,
+    scopes,
+    status: 'pending',
+    brokerSessionId,
+    approvalId: approval.approvalId
+  });
+  return sendPortalApiSuccess(res, {
+    brokerSessionId,
+    approvalId: approval.approvalId,
+    authUrl: `/auth-broker/${encodeURIComponent(new URL(origin).hostname)}/start?brokerSessionId=${encodeURIComponent(brokerSessionId)}`
+  }, { requestId });
+});
+
+app.post('/api/registry/import', async (req, res) => {
+  const requestId = buildPortalRequestId();
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return;
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+  const requestKind = typeof req.body?.requestKind === 'string' ? req.body.requestKind.trim() : 'site_origin';
+  const idempotencyKey = normalizePortalIdempotencyKey(req);
+  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
+    ? req.body.sourceHints
+    : {};
+  if (!url || !idempotencyKey) {
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url and idempotencyKey are required.', { requestId });
+  }
+  try {
+    const parsed = new URL(url);
+    assertPortalContractTargetAllowed(url);
+    const job = createImportJob({
+      surface: 'registry',
+      portalSessionId: session.sessionId,
+      teamCode: session.teamCode || null,
+      houseId: session?.houseCeremony?.houseId || null,
+      walletSubjects: collectWalletSubjectsForSession(session, req),
+      sourceUrl: parsed.toString(),
+      sourceOrigin: parsed.origin,
+      requestKind,
+      parseFallbackAllowed: req.body?.parseFallbackAllowed === true,
+      sourceHints,
+      idempotencyKey,
+      status: 'queued',
+      result: {
+        status: 'queued',
+        importType: 'registry'
+      }
+    });
+    invalidateAtlasStoreCaches();
+    return sendPortalApiSuccess(res, {
+      importJobId: job.importJobId,
+      status: job.status,
+      requestKind: job.requestKind
+    }, { requestId });
+  } catch (err) {
+    if (err?.code === 'PROXY_TARGET_BLOCKED') {
+      let parsed = null;
+      try {
+        parsed = new URL(url);
+      } catch {
+        parsed = null;
+      }
+      createImportJob({
+        surface: 'registry',
+        portalSessionId: session.sessionId,
+        teamCode: session.teamCode || null,
+        houseId: session?.houseCeremony?.houseId || null,
+        walletSubjects: collectWalletSubjectsForSession(session, req),
+        sourceUrl: parsed?.toString() || url,
+        sourceOrigin: parsed?.origin || null,
+        requestKind,
+        parseFallbackAllowed: req.body?.parseFallbackAllowed === true,
+        sourceHints,
+        idempotencyKey,
+        status: 'rejected',
+        decisionCode: proxyPolicyErrorCode(err),
+        decisionReason: 'Blocked by unsafe target policy',
+        result: {
+          policy: 'blocked',
+          details: err?.details || {}
+        }
+      });
+      return sendProxyPolicyContractError(res, err, requestId);
+    }
+    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
+  }
+});
+
+app.get('/api/registry/search', (_req, res) => {
+  const requestId = buildPortalRequestId();
+  const items = searchRegistryEntities({
+    query: typeof _req.query?.q === 'string' ? _req.query.q : '',
+    family: typeof _req.query?.family === 'string' ? _req.query.family : ''
+  });
+  return sendPortalApiSuccess(res, { items }, { requestId });
+});
+
+app.get('/api/registry/entities/:id', (req, res) => {
+  const requestId = buildPortalRequestId();
+  const entity = getRegistryEntityById(req.params.id);
+  if (!entity) {
+    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry entity not found.', { requestId });
+  }
+  return sendPortalApiSuccess(res, { entity }, { requestId });
+});
+
 app.post('/api/hatch/complete', (req, res) => {
   const s = ensureHumanSession(req, res);
   const lite = ensureLiteState(s);
@@ -4034,6 +4770,239 @@ function normalizePrivyWalletRpcEvmTx(input) {
   }
 
   return out;
+}
+
+function normalizePortalIdempotencyKey(req) {
+  const headerKey = typeof req.header('Idempotency-Key') === 'string'
+    ? req.header('Idempotency-Key').trim()
+    : '';
+  const bodyKey = typeof req.body?.idempotencyKey === 'string'
+    ? req.body.idempotencyKey.trim()
+    : '';
+  const value = headerKey || bodyKey;
+  if (!value) return '';
+  if (value.length > 200) return '';
+  return value;
+}
+
+function collectWalletSubjectsForSession(session, req) {
+  const seen = new Set();
+  const out = [];
+  const add = (chain, address, boundAt = null) => {
+    const normalizedChain = normalizeWalletChainInput(chain);
+    if (!normalizedChain) return;
+    const normalizedAddress = normalizedChain === 'evm'
+      ? normalizeEvmAddress(address)
+      : normalizeWalletSessionSolanaAddress(address);
+    if (!normalizedAddress) return;
+    const key = `${normalizedChain}:${normalizedAddress}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      chain: normalizedChain,
+      address: normalizedAddress,
+      normalizedAddress,
+      boundAt: boundAt || session?.createdAt || nowIso()
+    });
+  };
+
+  for (const candidate of collectWalletCandidatesFromHeaders(req)) {
+    add(candidate.chain, candidate.address, session?.createdAt || null);
+  }
+  add('solana', session?.token?.address, session?.signup?.createdAt || null);
+  add(session?.claim?.erc8004?.claimChain, session?.claim?.erc8004?.address, session?.claim?.erc8004?.verifiedAt
+    ? new Date(Number(session.claim.erc8004.verifiedAt)).toISOString()
+    : null);
+  return out;
+}
+
+function normalizeWebRenderMode(input, fallback = 'companion') {
+  const value = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  if (value === 'embedded' || value === 'companion') return value;
+  return fallback;
+}
+
+function normalizeWebAutonomyMode(input, fallback = 'assist') {
+  const value = typeof input === 'string' ? input.trim().toLowerCase() : '';
+  if (value === 'observe' || value === 'assist' || value === 'auto') return value;
+  return fallback;
+}
+
+function inferWebPageClass(parsedUrl, sourceHints = {}) {
+  const explicit = typeof sourceHints?.expectedPageClass === 'string'
+    ? sourceHints.expectedPageClass.trim()
+    : '';
+  if (explicit) return explicit;
+  const pathname = parsedUrl?.pathname || '';
+  if (/^\/[^/]+\/[^/]+\/issues\/\d+/.test(pathname)) return 'issue_detail';
+  return 'generic_page';
+}
+
+function resolveWebTarget(targetUrl, { preferredMode = 'auto', sourceHints = {} } = {}) {
+  const parsed = new URL(String(targetUrl || ''));
+  const origin = parsed.origin;
+  const pageClass = inferWebPageClass(parsed, sourceHints);
+  const mode = normalizeWebRenderMode(preferredMode, 'companion');
+  if (parsed.hostname === 'github.com') {
+    return {
+      resolutionState: 'supported',
+      website: {
+        origin,
+        canonicalUrl: parsed.toString(),
+        registryId: 'ws_github',
+        displayName: 'GitHub',
+        trustTier: 'A',
+        domainProofState: 'verified'
+      },
+      integration: {
+        integrationRegistryId: 'wi_github_issue_reply',
+        versionId: 'rv_github_issue_reply_v1',
+        sourceType: 'native_pack',
+        authModel: 'oauth',
+        renderMode: mode === 'embedded' ? 'embedded' : 'companion',
+        pageClass
+      },
+      alternatives: [],
+      fallback: null
+    };
+  }
+  return {
+    resolutionState: 'unsupported',
+    website: {
+      origin,
+      canonicalUrl: parsed.toString()
+    },
+    integration: null,
+    alternatives: [],
+    fallback: {
+      reasonCode: 'WEB_UNSUPPORTED_SITE',
+      importAllowed: true,
+      suggestedImportKinds: ['site_origin', 'openapi_url'],
+      automationFallbackAllowed: false
+    }
+  };
+}
+
+function getWebActionPolicy(actionId, webSession) {
+  const canonicalActionId = String(actionId || '').trim();
+  const base = {
+    actionId: canonicalActionId,
+    requiresApproval: false,
+    requiresCredential: false,
+    scopes: [],
+    summary: 'Generic web action',
+  };
+  if (canonicalActionId === 'submit_reply') {
+    return {
+      ...base,
+      requiresApproval: true,
+      requiresCredential: true,
+      scopes: ['repo:issue:write'],
+      summary: 'Submit a GitHub issue reply'
+    };
+  }
+  if (canonicalActionId === 'save_draft') {
+    return {
+      ...base,
+      summary: 'Persist a local draft'
+    };
+  }
+  if (webSession?.origin === 'https://github.com' && canonicalActionId === 'draft_reply') {
+    return {
+      ...base,
+      summary: 'Draft a GitHub issue reply'
+    };
+  }
+  return null;
+}
+
+function requireOwnedWebSession(req, res, requestId, webSessionId) {
+  const session = requireBoundHumanSession(req, res, { requestId });
+  if (!session) return { session: null, webSession: null };
+  const webSession = getWebSessionById(webSessionId);
+  if (!webSession) {
+    sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
+    return { session: null, webSession: null };
+  }
+  if (webSession.portalSessionId !== session.sessionId) {
+    sendPortalApiError(res, 403, 'FORBIDDEN', 'This web session belongs to a different Portal session.', { requestId });
+    return { session: null, webSession: null };
+  }
+  return { session, webSession };
+}
+
+function proxyPolicyErrorCode(err) {
+  const text = String(err?.message || '').toLowerCase();
+  if (text.includes('denied address') || text.includes('private') || text.includes('link-local')) {
+    return 'PRIVATE_NETWORK_BLOCKED';
+  }
+  return 'UNSAFE_TARGET';
+}
+
+function sendProxyPolicyContractError(res, err, requestId) {
+  return sendPortalApiError(
+    res,
+    400,
+    proxyPolicyErrorCode(err),
+    'The requested target is blocked by Portal fetch policy.',
+    {
+      requestId,
+      details: err?.details || {}
+    }
+  );
+}
+
+function isBlockedPortalContractHostname(hostname) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/\.+$/, '');
+  if (!host) return true;
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return true;
+  const ipVersion = net.isIP(host);
+  if (!ipVersion) return false;
+  if (ipVersion === 6) {
+    if (host === '::1') return true;
+    if (host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:')) return true;
+    return false;
+  }
+  const parts = host.split('.').map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true;
+  }
+  if (parts[0] === 10) return true;
+  if (parts[0] === 127) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+function assertPortalContractTargetAllowed(targetUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(targetUrl || ''));
+  } catch {
+    const err = new Error('INVALID_URL');
+    err.code = 'INVALID_URL';
+    throw err;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    const err = new Error('PROTOCOL_NOT_ALLOWED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = { protocol: parsed.protocol || null };
+    throw err;
+  }
+  if (parsed.username || parsed.password) {
+    const err = new Error('EMBEDDED_CREDENTIALS_NOT_ALLOWED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = {};
+    throw err;
+  }
+  if (isBlockedPortalContractHostname(parsed.hostname)) {
+    const err = new Error('PRIVATE_NETWORK_BLOCKED');
+    err.code = 'PROXY_TARGET_BLOCKED';
+    err.details = { hostname: parsed.hostname };
+    throw err;
+  }
+  return parsed;
 }
 
 function normalizePrivyWalletRpcSolanaTransaction(value) {
@@ -7873,12 +8842,54 @@ if (process.env.NODE_ENV === 'test') {
       erc8004OptOut: [],
       erc8004Registrations: []
     });
+    resetExtendedStore();
     invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
     res.json({ ok: true });
+  });
+
+  app.get('/__test__/counts/:table', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      table: req.params.table,
+      count: countTableRows(String(req.params.table || '').trim())
+    });
+  });
+
+  app.post('/__test__/web/credentials/activate', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const brokerSessionId = typeof req.body?.brokerSessionId === 'string' ? req.body.brokerSessionId.trim() : '';
+    if (!brokerSessionId) return res.status(400).json({ ok: false, error: 'MISSING_BROKER_SESSION_ID' });
+    const grant = activateCredentialGrant({
+      brokerSessionId,
+      redactedLabel: typeof req.body?.redactedLabel === 'string' ? req.body.redactedLabel.trim() : 'Test Credential',
+      expiresAt: typeof req.body?.expiresAt === 'string' ? req.body.expiresAt.trim() : null
+    });
+    if (!grant) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    res.json({ ok: true, grant });
+  });
+
+  app.post('/__test__/session/bind-wallet', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const s = ensureHumanSession(req, res);
+    const chain = typeof req.body?.chain === 'string' ? req.body.chain.trim() : 'solana';
+    const address = typeof req.body?.address === 'string' ? req.body.address.trim() : '';
+    if (!address) return res.status(400).json({ ok: false, error: 'MISSING_ADDRESS' });
+    bindSessionWallet(s, chain, address, { allowRebind: true });
+    res.json({ ok: true, sessionId: s.sessionId, chain, address });
   });
 }
 
@@ -9009,6 +10020,12 @@ function atlasModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
+function registryModalRedirectPath() {
+  const params = new URLSearchParams();
+  params.set('district', 'registry');
+  return `/?${params.toString()}`;
+}
+
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
   res.json(VENDOR_LITE_MANIFEST);
 });
@@ -9023,6 +10040,13 @@ app.get('/atlas', (req, res) => {
     return sendHtmlNoStore(res, 'atlas.html');
   }
   return res.redirect(302, atlasModalRedirectPath());
+});
+
+app.get('/registry', (req, res) => {
+  if (String(req.query?.embed || '').trim() === '1') {
+    return sendHtmlNoStore(res, 'registry.html');
+  }
+  return res.redirect(302, registryModalRedirectPath());
 });
 
 app.use(

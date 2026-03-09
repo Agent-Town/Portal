@@ -49,3 +49,7 @@ Each milestone has a measurable “done” state validated by Playwright.
 ## M11 — District map + storefront
 - Implement using the milestone-by-milestone TDD plan in `specs/11_district_map_storefront_spec.md` (Section 15).
 - Success is measured by `RED/GREEN/REGRESSION/SUITE` gates for each milestone.
+
+## M16 — Portal Web + Poker
+- Implement using the contract-first TDD plan in [specs/18_portal_web_poker_tdd_spec.md](/Users/robin/Projects/Portal/specs/18_portal_web_poker_tdd_spec.md).
+- Success is measured by the milestone-specific RED/GREEN gates plus the phase completion rules in that spec.

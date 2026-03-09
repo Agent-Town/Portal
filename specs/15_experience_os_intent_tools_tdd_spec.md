@@ -87,7 +87,8 @@ Define explicit tools and parameters for at least:
 
 1. `agent_town_ui_open_modal({ modal, params })`
 2. `agent_town_ui_atlas_search({ q, family, searchType })`
-3. `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
+3. `agent_town_ui_registry_search({ q, family })`
+4. `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
 4. selected `agent_town_state_*` tools listed in section 7.
 
 Tool docs in `skill.md` must include:
@@ -238,6 +239,21 @@ Behavior:
 
 ## 7.2 State Tools (Initial Set)
 
+### `agent_town_ui_registry_search`
+
+Purpose:
+- open Registry in the town hub modal flow
+- apply registry discovery query/filter state without mutating Atlas search state
+
+Allowed params:
+- `q` (string, optional)
+- `family` (string, optional)
+
+Contract:
+- current path remains `/app`
+- modal title becomes `Registry`
+- Atlas snapshot state is preserved unless an Atlas tool is called explicitly
+
 ### `agent_town_state_get_session`
 
 Maps to `GET /api/session`.
@@ -268,7 +284,7 @@ State tool envelope:
 
 No confirmation required:
 
-1. view/navigation intents (`open_modal`, `atlas_search`, `pony_compose`),
+1. view/navigation intents (`open_modal`, `atlas_search`, `registry_search`, `pony_compose`),
 2. read-only state tools.
 
 Confirmation required:
@@ -384,7 +400,7 @@ Phase C: Coverage
 
 1. `skill.md` defines both tool families and their strict parameters.
 2. UI tools cannot execute arbitrary selector/DOM actions.
-3. `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, and `agent_town_ui_pony_compose` work end-to-end.
+3. `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_registry_search`, and `agent_town_ui_pony_compose` work end-to-end.
 4. Worker session remains connected across UI intent flow.
 5. Confirmation gate is enforced for irreversible actions.
 6. Each new Playwright test includes explicit AC IDs and measurable assertions (no narrative-only checks).
