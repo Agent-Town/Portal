@@ -164,6 +164,12 @@ async function createAgentSoloHouse(request, label, { withPonyInbox = true } = {
   });
   expect(init.ok()).toBeTruthy();
 
+  const resolvePath = `/api/pony/resolve?houseId=${encodeURIComponent(houseId)}`;
+  await expect.poll(async () => {
+    const resp = await request.get(resolvePath);
+    return resp.status();
+  }, { timeout: 3000 }).toBe(200);
+
   return {
     houseId,
     kauth,
@@ -315,7 +321,9 @@ test('legacy house upgrades Pony keys from inbox and receives encrypted compose'
   await page.addInitScript(
     ({ houseId, houseAuthB64, walletAddress, walletSigB64 }) => {
       window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
-      window.__agentTownHouseAuthMemory[`agentTownHouseAuth:${houseId}`] = houseAuthB64;
+      const cacheKey = `agentTownHouseAuth:${houseId}`;
+      window.__agentTownHouseAuthMemory[cacheKey] = houseAuthB64;
+      localStorage.setItem(cacheKey, houseAuthB64);
 
       const bin = atob(walletSigB64);
       const sig = new Uint8Array(bin.length);
@@ -335,6 +343,27 @@ test('legacy house upgrades Pony keys from inbox and receives encrypted compose'
   );
 
   await page.goto(`/inbox/${encodeURIComponent(legacyReceiver.houseId)}`);
+  await page.evaluate(({ houseId, houseAuthB64, walletAddress, walletSigB64 }) => {
+    window.__agentTownHouseAuthMemory = window.__agentTownHouseAuthMemory || Object.create(null);
+    const cacheKey = `agentTownHouseAuth:${houseId}`;
+    window.__agentTownHouseAuthMemory[cacheKey] = houseAuthB64;
+    localStorage.setItem(cacheKey, houseAuthB64);
+
+    const bin = atob(walletSigB64);
+    const sig = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) sig[i] = bin.charCodeAt(i);
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: walletAddress }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async () => ({ signature: sig, publicKey: { toString: () => walletAddress } })
+    };
+  }, {
+    houseId: legacyReceiver.houseId,
+    houseAuthB64: legacyReceiver.kauth.toString('base64'),
+    walletAddress: legacyReceiver.walletAddress,
+    walletSigB64: legacyReceiver.walletSigB64
+  });
+  await page.reload();
 
   const resolvePath = `/api/pony/resolve?houseId=${encodeURIComponent(legacyReceiver.houseId)}`;
   await expect.poll(async () => {

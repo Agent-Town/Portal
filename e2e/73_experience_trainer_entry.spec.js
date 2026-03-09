@@ -8,6 +8,13 @@ test.beforeEach(async ({ request }) => {
 
 test('agent sidebar opens trainer modal and trainer shell renders quickly', async ({ page }) => {
   await page.goto('/app?liteDriver=phase1');
+  await expect(page.getByTestId('agent-debug-tools')).toContainText('Worker tools count', { timeout: 8000 });
+  await page.evaluate(() => {
+    if (typeof window.setupAgentInterface === 'function') {
+      window.setupAgentInterface();
+    }
+  });
+  await page.waitForTimeout(100);
 
   const trainerBtn = page.getByTestId('agent-open-trainer');
   await expect(trainerBtn).toHaveCount(1);

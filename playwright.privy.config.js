@@ -14,6 +14,7 @@ if (!process.env.START_PAGE_ENABLED && process.env.PRIVY_APP_ID) process.env.STA
 const SYSTEM_CHROMIUM = ['/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => fs.existsSync(p));
 const PORT = Number(process.env.PW_PORT || 4175);
 const STORE_PATH = process.env.STORE_PATH || path.join(process.cwd(), 'data', 'store.e2e.privy.sqlite');
+process.env.STORE_PATH = STORE_PATH;
 
 module.exports = defineConfig({
   testDir: './e2e',

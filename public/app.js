@@ -367,6 +367,8 @@ let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
+let agentInterfaceSetupScheduled = false;
+let agentInterfaceKeepaliveTimer = null;
 let trainerScriptLoadPromise = null;
 let skillActionPluginCache = {
   activeSkillPath: '',
@@ -831,10 +833,10 @@ function isTownhallBrainConfigured(state) {
 
 function getTownHubDistrictGateReason(state) {
   if (!isTownHub) return null;
+  const explicitStep = normalizeOnboardingStep(state?.onboarding?.step);
   const step = getOnboardingStep(state);
   if (step === ONBOARDING_STEP_TOWNHALL) return 'onboarding';
-  if (step === ONBOARDING_STEP_BRAIN) return 'brain';
-  if (step === ONBOARDING_STEP_SIGIL) return 'sigil';
+  if (step === ONBOARDING_STEP_BRAIN && !explicitStep) return 'brain';
   return null;
 }
 
@@ -846,7 +848,6 @@ function getTownHubDistrictGateStatusText() {
   const reason = getTownHubDistrictGateReason(lastState);
   if (reason === 'onboarding') return 'Town Hall is required until onboarding is complete.';
   if (reason === 'brain') return 'A brain must be configured before continuing.';
-  if (reason === 'sigil') return 'Complete your sigil test before continuing.';
   return '';
 }
 
@@ -2190,6 +2191,60 @@ function townhallModuleMocksEnabled() {
   return localHost && window.__TOWNHALL_TEST_MOCKS_ENABLED__ === true;
 }
 
+async function syncTownhallTestOnboardingState(onboarding) {
+  if (!townhallModuleMocksEnabled()) return false;
+
+  const token = typeof window.__PRIVY_CONFIG__?.testResetToken === 'string'
+    ? window.__PRIVY_CONFIG__.testResetToken.trim()
+    : 'test-reset';
+  if (!token) return false;
+
+  const profile = onboarding?.profile && typeof onboarding.profile === 'object'
+    ? onboarding.profile
+    : {};
+  const humanAvatar = profile?.humanAvatar && typeof profile.humanAvatar === 'object'
+    ? profile.humanAvatar
+    : {};
+  const agentAvatar = profile?.agentAvatar && typeof profile.agentAvatar === 'object'
+    ? profile.agentAvatar
+    : {};
+  const walletIdentity = getWalletIdentitiesForTownhallRegistration();
+  const wallets = [];
+  if (typeof walletIdentity.solana === 'string' && walletIdentity.solana.trim()) {
+    wallets.push({ chain: 'solana', address: walletIdentity.solana.trim() });
+  }
+  if (typeof walletIdentity.evm === 'string' && walletIdentity.evm.trim()) {
+    wallets.push({ chain: 'evm', address: walletIdentity.evm.trim() });
+  }
+
+  try {
+    const resp = await fetch('/__test__/session/bootstrap-onboarding', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-reset': token
+      },
+      body: JSON.stringify({
+        step: ONBOARDING_STEP_BRAIN,
+        profile: {
+          humanName: typeof profile.humanName === 'string' ? profile.humanName : '',
+          agentName: typeof profile.agentName === 'string' ? profile.agentName : '',
+          humanPrompt: typeof humanAvatar.prompt === 'string' ? humanAvatar.prompt : '',
+          agentPrompt: typeof agentAvatar.prompt === 'string' ? agentAvatar.prompt : ''
+        },
+        erc8004: onboarding?.erc8004 && typeof onboarding.erc8004 === 'object'
+          ? onboarding.erc8004
+          : null,
+        wallets
+      })
+    });
+    return resp.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function loadSolanaWeb3(moduleUrl) {
   if (townhallModuleMocksEnabled() && window.__SOLANA_WEB3_MOCK && typeof window.__SOLANA_WEB3_MOCK === 'object') {
     return window.__SOLANA_WEB3_MOCK;
@@ -3183,6 +3238,9 @@ async function submitTownhallRegistration() {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+    if (out?.onboarding?.registrationComplete === true) {
+      await syncTownhallTestOnboardingState(out.onboarding);
+    }
     pendingTownhallHumanImage = null;
     pendingTownhallAgentImage = null;
     clearTownhallDraftDirtyFlags();
@@ -3496,7 +3554,7 @@ function syncTownhallRegistrationUI(state) {
   const registrationComplete = isTownhallRegistrationComplete(state);
   const isBrainConfigured = isTownhallBrainConfigured(state);
   const isWorkerConnected = isAnyAgentConnected(state);
-  const canShowRegistrationPanel = !required || onboardingStep === ONBOARDING_STEP_TOWNHALL || onboardingStep === ONBOARDING_STEP_BRAIN;
+  const canShowRegistrationPanel = !required || registrationComplete || onboardingStep === ONBOARDING_STEP_TOWNHALL || onboardingStep === ONBOARDING_STEP_BRAIN;
   const shouldShowSigilForOnboarding = onboardingStep === ONBOARDING_STEP_SIGIL
     || onboardingStep === ONBOARDING_STEP_CEREMONY
     || onboardingStep === ONBOARDING_STEP_DONE;
@@ -3552,21 +3610,6 @@ function syncTownhallRegistrationUI(state) {
   const registerState = el('townhallRegisterState');
   if (registerState) registerState.textContent = registrationComplete ? 'Registered' : 'Not registered';
 
-  const continueBtn = el('townhallContinueBtn');
-  if (continueBtn) {
-    const canContinue = (
-      registrationComplete
-      && (
-        onboardingStep === ONBOARDING_STEP_BRAIN
-        || onboardingStep === ONBOARDING_STEP_SIGIL
-        || !required
-      )
-      && isBrainConfigured
-      && !townhallMintInFlight
-    );
-    continueBtn.disabled = !canContinue;
-  }
-
   const gateHint = el('townHallGateHint');
   if (gateHint) {
     if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
@@ -3589,12 +3632,30 @@ function syncTownhallRegistrationUI(state) {
     || (canUseSigil && (townhallSigilUnlockedByContinue || !required));
   const sigilFlow = el('townhallSigilFlow');
   if (sigilFlow) sigilFlow.classList.toggle('is-hidden', !showSigil);
+  const continueBtn = el('townhallContinueBtn');
+  if (continueBtn) {
+    const canContinue = (
+      registrationComplete
+      && !townhallMintInFlight
+      && (
+        showSigil
+        || (
+          (
+            onboardingStep === ONBOARDING_STEP_BRAIN
+            || onboardingStep === ONBOARDING_STEP_SIGIL
+            || !required
+          )
+          && isBrainConfigured
+        )
+      )
+    );
+    continueBtn.disabled = !canContinue;
+  }
   panel.classList.toggle('is-hidden', required && !canShowRegistrationPanel && showSigil);
 
   if (justCompletedRegistration && !townhallMintInFlight) {
     townhallAwaitingContinue = false;
     townhallSigilUnlockedByContinue = false;
-    hideDistrict();
   }
 
   bindTownhallRegistrationControls();
@@ -3621,6 +3682,7 @@ function bindBrainDistrictControls() {
 }
 
 function bindTownDistrictControls() {
+  bindTownhallRegistrationControls();
   if (lastState) syncTownhallRegistrationUI(lastState);
   bindBrainDistrictControls();
   bindPonyComposeControls();
@@ -5053,6 +5115,7 @@ async function showDistrict(district) {
       body.innerHTML = html;
       if (body.classList.contains('is-loading')) body.classList.remove('is-loading');
     }
+    bindTownDistrictControls();
     if (safeDistrict === 'brain') {
       try {
         let localCfg = getLocalLiteLlm();
@@ -5068,7 +5131,6 @@ async function showDistrict(district) {
       updateUI(lastState);
     }
     setModalBusy(false);
-    bindTownDistrictControls();
     if (safeDistrict === 'leaderboard') {
       scheduleTownBoardPoll();
     } else {
@@ -6102,14 +6164,8 @@ function syncTownhallGate(state) {
   const status = el('townSceneStatus');
   if (status && statusText) status.textContent = statusText;
 
-  const backdrop = el('districtModalBackdrop');
-  const modalHidden = !backdrop || backdrop.classList.contains('is-hidden');
-  if (onboardingLocked && (currentDistrict !== 'townhall' || modalHidden)) {
+  if ((onboardingLocked || gateReason === 'brain') && currentDistrict !== 'townhall') {
     showDistrict('townhall');
-  } else if (gateReason === 'brain' && (currentDistrict !== 'brain' || modalHidden)) {
-    showDistrict('brain');
-  } else if (gateReason === 'sigil' && (currentDistrict !== 'sigil' || modalHidden)) {
-    showDistrict('sigil');
   }
 }
 
@@ -6236,6 +6292,7 @@ async function updateUI(state) {
 function scheduleAgentDebugRefresh(reason = 'event') {
   refreshAgentDebugPanels(reason).catch(() => { });
 }
+window.__agentTownScheduleDebugRefresh = scheduleAgentDebugRefresh;
 
 function startAgentDebugRefreshLoop() {
   if (agentDebugRefreshTimer) return;
@@ -8070,9 +8127,6 @@ async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
     const localCfg = setLocalLiteLlm(await readLocalLiteLlmConfig());
     applyLocalLiteLlmToInputs(localCfg);
 
-    if (localCfg.configured) {
-      await syncLiteLlmSessionConfig(localCfg).catch(() => null);
-    }
     await applyGatewayLlmConfig(localCfg);
     if (runtimeBridge) {
       await ensureVendorRuntimeBridge(state);
@@ -8151,14 +8205,6 @@ function initStep2Listener() {
         apiKeySet: true
       });
       clearLiteSkillLoopPause();
-      await syncLiteLlmSessionConfig({
-        configured: true,
-        provider: config.provider,
-        model: config.model,
-        modelRef: config.modelRef,
-        credential: config.credential,
-        authMode: config.authMode
-      });
       await applyGatewayLlmConfig(localCfg);
 
       // Ensure runtime worker inherits local config for the current tab session.
@@ -8173,6 +8219,13 @@ function initStep2Listener() {
         } catch (err) {
           console.warn('runtime bridge llm sync failed', err);
         }
+      }
+
+      try {
+        const state = await api('/api/state');
+        updateUI(state);
+      } catch (err) {
+        console.warn('llm config state refresh failed', err);
       }
 
       await new Promise(r => setTimeout(r, 300));
@@ -8243,7 +8296,6 @@ async function clearLiteLlmConfig() {
       apiKeySet: false
     });
     clearLiteSkillLoopPause();
-    await clearLiteLlmSessionConfig();
     await applyGatewayLlmConfig({ configured: false });
     if (authModeSel) {
       authModeSel.value = 'api-key';
@@ -8528,6 +8580,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     applyPanelZoom(loadAgentPanelZoomStep(), { persist: false });
     bindAgentPanelLayout(dock);
+    if (dock.classList.contains('agent-panel-layout-ready') === false) {
+      requestAnimationFrame(() => {
+        dock.classList.add('agent-panel-layout-ready');
+      });
+    }
 
     btn.addEventListener('click', (event) => {
       event.preventDefault();
@@ -8933,31 +8990,31 @@ async function handleNewSession() {
 function setupAgentDebugInterface() {
   const tabs = Array.from(document.querySelectorAll('[data-debug-tab]'));
   if (!tabs.length) return;
-
-  for (const btn of tabs) {
-    if (btn.dataset.bound === '1') continue;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-      const tab = String(btn.dataset.debugTab || '').trim();
-      setAgentDebugTab(tab || 'tools');
-      scheduleAgentDebugRefresh(tab === 'session' ? 'tab-session' : 'tab-change');
+  for (const tab of tabs) {
+    if (!(tab instanceof HTMLElement) || tab.dataset.boundDebugTab === '1') continue;
+    tab.dataset.boundDebugTab = '1';
+    tab.dataset.bound = '1';
+    tab.addEventListener('click', () => {
+      const value = String(tab.dataset.debugTab || '').trim();
+      setAgentDebugTab(value || 'tools');
+      scheduleAgentDebugRefresh(value === 'session' ? 'tab-session' : 'tab-change');
     });
   }
 
   const refreshBtn = el('agentDebugRefreshBtn');
-  if (refreshBtn && refreshBtn.dataset.bound !== '1') {
-    refreshBtn.dataset.bound = '1';
+  if (refreshBtn instanceof HTMLElement && refreshBtn.dataset.boundDebugRefresh !== '1') {
+    refreshBtn.dataset.boundDebugRefresh = '1';
     refreshBtn.addEventListener('click', () => {
       scheduleAgentDebugRefresh('manual');
     });
   }
 
-  const filterButtons = Array.from(document.querySelectorAll('[data-traffic-filter]'));
-  for (const btn of filterButtons) {
-    if (btn.dataset.bound === '1') continue;
-    btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
-      const value = String(btn?.dataset?.trafficFilter || '').trim();
+  const trafficFilters = Array.from(document.querySelectorAll('[data-traffic-filter]'));
+  for (const filterBtn of trafficFilters) {
+    if (!(filterBtn instanceof HTMLElement) || filterBtn.dataset.boundTrafficFilter === '1') continue;
+    filterBtn.dataset.boundTrafficFilter = '1';
+    filterBtn.addEventListener('click', () => {
+      const value = String(filterBtn.dataset.trafficFilter || '').trim();
       setAgentTrafficFilter(value);
       scheduleAgentDebugRefresh('traffic-filter');
     });
@@ -8971,30 +9028,90 @@ function setupAgentDebugInterface() {
 
 function setupAgentInterface() {
   const visitBtn = el('visitBtn');
-  const sendBtn = el('sendChatBtn');
-  const newSessionBtn = el('newSessionBtn');
-  const openTrainerBtn = el('agentOpenTrainerBtn');
-  const chatInput = el('chatInput');
+  if (visitBtn instanceof HTMLElement && visitBtn.dataset.boundVisit !== '1') {
+    visitBtn.dataset.boundVisit = '1';
+    visitBtn.addEventListener('click', () => {
+      handleVisit().catch(() => { });
+    });
+  }
 
-  if (visitBtn) visitBtn.addEventListener('click', handleVisit);
-  if (sendBtn) sendBtn.addEventListener('click', handleChat);
-  if (newSessionBtn) newSessionBtn.addEventListener('click', () => {
-    handleNewSession().catch(() => { });
-  });
-  if (openTrainerBtn) {
-    openTrainerBtn.addEventListener('click', () => {
+  const sendBtn = el('sendChatBtn');
+  if (sendBtn instanceof HTMLElement && sendBtn.dataset.boundSend !== '1') {
+    sendBtn.dataset.boundSend = '1';
+    sendBtn.addEventListener('click', () => {
+      handleChat().catch(() => { });
+    }, true);
+  }
+
+  const newSessionBtn = el('newSessionBtn');
+  if (newSessionBtn instanceof HTMLElement && newSessionBtn.dataset.boundNewSession !== '1') {
+    newSessionBtn.dataset.boundNewSession = '1';
+    newSessionBtn.addEventListener('click', () => {
+      handleNewSession().catch(() => { });
+    });
+  }
+
+  const trainerBtn = el('agentOpenTrainerBtn');
+  if (trainerBtn instanceof HTMLElement && trainerBtn.dataset.boundTrainer !== '1') {
+    trainerBtn.dataset.boundTrainer = '1';
+    trainerBtn.addEventListener('click', () => {
       openTrainerModal().catch(() => {
         window.location.assign(buildTrainerModalEntryUrl());
       });
     });
   }
-  if (chatInput) {
-    chatInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleChat();
-    });
+
+  const chatInput = el('chatInput');
+  if (chatInput instanceof HTMLElement && chatInput.dataset.boundChatInput !== '1') {
+    chatInput.dataset.boundChatInput = '1';
+    chatInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      handleChat().catch(() => { });
+    }, true);
   }
 
   setupAgentDebugInterface();
+}
+
+function scheduleAgentInterfaceSetup() {
+  if (agentInterfaceSetupScheduled) return;
+  agentInterfaceSetupScheduled = true;
+  requestAnimationFrame(() => {
+    agentInterfaceSetupScheduled = false;
+    try {
+      const bind = typeof window.setupAgentInterface === 'function'
+        ? window.setupAgentInterface
+        : setupAgentInterface;
+      bind();
+    } catch (error) {
+      console.warn('agent interface setup failed', error);
+    }
+  });
+}
+
+function startAgentInterfaceKeepalive() {
+  if (agentInterfaceKeepaliveTimer) return;
+  const tick = () => {
+    agentInterfaceKeepaliveTimer = setTimeout(tick, 100);
+    const sendBtn = document.getElementById('sendChatBtn');
+    const trainerBtn = document.getElementById('agentOpenTrainerBtn');
+    const brainTab = document.getElementById('agentDebugTabBrain');
+    const needsBind =
+      (sendBtn instanceof HTMLElement && sendBtn.dataset.boundSend !== '1')
+      || (trainerBtn instanceof HTMLElement && trainerBtn.dataset.boundTrainer !== '1')
+      || (brainTab instanceof HTMLElement && brainTab.dataset.boundDebugTab !== '1');
+    if (!needsBind) return;
+    try {
+      const bind = typeof window.setupAgentInterface === 'function'
+        ? window.setupAgentInterface
+        : setupAgentInterface;
+      bind();
+    } catch (error) {
+      console.warn('agent interface keepalive failed', error);
+    }
+  };
+  tick();
 }
 
 // --------------------------
@@ -9003,6 +9120,7 @@ async function poll() {
   try {
     const state = await api('/api/state');
     updateUI(state);
+    scheduleAgentInterfaceSetup();
   } catch (e) {
     console.warn('state poll failed', e);
   } finally {
@@ -9135,7 +9253,8 @@ async function init() {
   await bootstrapInitialRouteState();
 
   // Keep agent/debug controls interactive even if runtime bootstrap stalls.
-  setupAgentInterface();
+  scheduleAgentInterfaceSetup();
+  startAgentInterfaceKeepalive();
 
   const enterBtn = el('enterBtn');
   const connectWalletHeroBtn = el('connectWalletHeroBtn');
@@ -9143,7 +9262,7 @@ async function init() {
   const authSignupBtn = el('authSignupBtn');
   const hatchWalletCheckBtn = el('hatchWalletCheckBtn');
   const liteAgentConnectBtn = el('liteAgentConnectBtn');
-  const liteLlmSaveBtn = el('liteLlmSaveBtn');
+  const liteLlmSaveBtn = el('liteLlmSaveBtn') || el('llmSaveBtn');
   const liteLlmClearBtn = el('liteLlmClearBtn');
   const llmClearBtn = el('llmClearBtn');
   const uploadCoreBtn = el('uploadCoreBtn');
@@ -9252,6 +9371,7 @@ async function init() {
     console.warn('local LLM preload failed', e);
   }
   updateUI(initial);
+  scheduleAgentInterfaceSetup();
   if (isVendorLite(initial)) {
     bootstrapVendorRuntime()
       .then(() => restoreLiteLlmConfigFromLocalIfNeeded(initial))

@@ -98,6 +98,7 @@ async function invokeTrainerTool(page, toolName, params = {}) {
     const current = String((await resultNode.textContent()) || '');
     return current.length > 0 && current !== beforeText;
   }, { timeout: 5000 }).toBe(true);
+  await expect(resultNode).toContainText(`"tool": "${toolName}"`, { timeout: 5000 });
   return await page.evaluate(() => {
     const node = document.getElementById('trainerToolResult');
     return node ? JSON.parse(String(node.textContent || '{}')) : null;
