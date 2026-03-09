@@ -873,11 +873,26 @@ No external identity provider is introduced by this spec.
 | existing `/api/session*` | `et_session` cookie | same-origin browser expectations remain |
 | existing `/api/agent/*` | Team Code | current co-op contract remains |
 | existing `/api/house/*` private surfaces | house-auth | current HMAC scheme remains |
+| `/api/platform/context` | `et_session` cookie | returns explicit `houseId`, `activeTeamId`, and `availableTeamIds[]` for House Console surfaces |
+| `/api/platform/active-team` | `et_session` cookie | updates the current House Console team context for subsequent private reads |
+| `/api/platform/archive` and `/api/platform/trainer` | `et_session` cookie | `teamId` may be omitted only when the session already carries an explicit `activeTeamId` |
 | wallet claim/recovery surfaces | wallet signature plus nonce as documented | current contract remains |
 | `/v1/houses/:houseId/*` private surfaces | session + house-auth | session locates context, house-auth authorizes House access |
 | `/v1/trainer/jobs` | house-auth or service credential scoped to House | Team Code alone is insufficient |
 | `/v1/traces/ingestions` | authority credential or house-auth scoped to run | source identity must be auditable |
 | `/v1/integrations/:id/executions` | session + house-auth or approved service credential | write-capable requests also require approval when policy says so |
+
+## 12.3.1 House Console team context
+
+House Archive and House Trainer are team-scoped House-private surfaces.
+
+Rules:
+
+1. The browser session must carry an explicit `activeTeamId` when a House has more than one available team.
+2. The House Console must expose the current `activeTeamId` and the available team list to the human.
+3. Omitting `teamId` from House-private read routes resolves to the current `activeTeamId`.
+4. Hidden UI defaults such as a literal `team_main` are forbidden unless `team_main` is in fact the selected active team.
+5. Switching teams must not restart the in-browser worker or leave the modal-first hub shell.
 
 ## 12.4 House-auth for `/v1/*`
 
@@ -942,6 +957,7 @@ Every `/v1/*` response must use one of:
 3. timestamps are ISO8601 UTC.
 4. route handlers must return stable error codes suitable for tests.
 5. every mutating or job-creation endpoint must return the resulting durable ID.
+6. House-private reads that omit `teamId` must resolve from explicit session team context, not from a hidden string-literal fallback.
 
 ## 13.3 Route contract table
 

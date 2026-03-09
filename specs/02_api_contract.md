@@ -621,11 +621,101 @@ Response shape:
 }
 ```
 
+### GET `/api/platform/context` (human)
+Returns the explicit House/team context resolved from the current Portal session.
+
+Response fields:
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### POST `/api/platform/active-team` (human)
+Sets the active House team for the current Portal session. This is the authoritative UI write path for House Archive and House Trainer when `teamId` is omitted from later reads.
+
+Request shape:
+```json
+{
+  "teamId": "team_alpha"
+}
+```
+
+Response fields:
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+### GET `/api/platform/archive` (human)
+Returns the canonical Archive list for the current active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.items[]`
+
+### GET `/api/platform/trainer` (human)
+Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.activeConfigVersionId`
+- `data.activeConfigHash`
+- `data.jobs[]`
+- `data.results[]`
+
+### POST `/api/platform/trainer/jobs` (human)
+Creates one House-scoped durable compare job for the current active team and replays idempotently.
+
+Required headers:
+- `Idempotency-Key`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `ACTIVE_CONFIG_REQUIRED`
+- `TRAINER_BUDGET_INVALID`
+- `INVALID_ARGUMENT`
+
+### POST `/api/platform/trainer/results/:trainerResultId/promote-patch` (human)
+Promotes one trainer patch from the current active House team and updates the active binding idempotently.
+
+Required headers:
+- `Idempotency-Key`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `APPROVAL_REQUIRED`
+- `CONFIG_NOT_FOUND`
+- `TRAINER_PATCH_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
 ### GET `/v1/houses/:houseId/team` (human + house-auth)
 Reads the effective team binding for one House, including the currently promoted immutable config version.
 
 Query params:
-- `teamId` (defaults to `team_main`)
+- `teamId` (optional override; when omitted, resolves to the current session `activeTeamId`)
 
 Required headers:
 - `x-house-ts`
@@ -2883,6 +2973,50 @@ Errors:
 - `INVALID_AGENT_STATE`
 - `AGENT_STATE_TOO_LARGE`
 - `AGENT_STATE_HOUSE_MISMATCH`
+
+---
+
+## Test-only helper contracts
+
+These routes are available only in test mode and require the `x-test-reset` header.
+
+### GET `/__test__/route-manifest`
+Returns the deterministic route-owner manifest used by M20.8.
+
+Response fields:
+- `routes[].family`
+- `routes[].owner`
+
+### GET `/__test__/live-suites`
+Returns the machine-readable live-suite manifest.
+
+Response fields:
+- `suites[].suiteId`
+- `suites[].command`
+- `suites[].requiredEnv[]`
+- `suites[].requiredFlag`
+- `suites[].defaultMode`
+
+### POST `/__test__/otp/email/issue`
+Issues one deterministic test OTP for the requested inbox.
+
+### GET `/__test__/otp/email/latest`
+Returns the latest issued OTP for the requested inbox without consuming it.
+
+### POST `/__test__/otp/email/consume`
+Consumes one issued OTP and deterministically rejects replay.
+
+### GET `/__test__/otp/email/activity`
+Returns OTP adapter activity for local deterministic tests.
+
+### GET `/__test__/platform-export`
+Returns a deterministic durable-platform export snapshot with per-table counts.
+
+### POST `/__test__/platform-import`
+Imports one previously exported snapshot, optionally after a reset.
+
+### POST `/__test__/platform-verify`
+Verifies one exported snapshot against live rows and returns exact mismatches by `table` and immutable `id`.
 
 ---
 

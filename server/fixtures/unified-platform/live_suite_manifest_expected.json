@@ -1,0 +1,8 @@
+{
+  "family": "live_suite_manifest_expected",
+  "suiteIds": [
+    "privy-guest",
+    "privy-email-otp",
+    "sepolia-wallet"
+  ]
+}

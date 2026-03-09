@@ -1,0 +1,10 @@
+{
+  "family": "route_module_manifest_expected",
+  "families": [
+    "platform",
+    "poker",
+    "registry",
+    "v1",
+    "web"
+  ]
+}

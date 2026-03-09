@@ -162,6 +162,7 @@ function createSession({ flow } = {}) {
   const session = {
     sessionId,
     teamCode,
+    activeTeamId: '',
     walletRecoveryKey: `wrk_${randomHex(32)}`,
     flow: flow === 'agent_solo' ? 'agent_solo' : 'human',
     createdAt: nowIso(),

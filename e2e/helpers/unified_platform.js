@@ -29,8 +29,116 @@ async function listPlatformFixtures(request) {
   return await response.json();
 }
 
+async function getRouteManifest(request) {
+  const response = await request.get('/__test__/route-manifest', {
+    headers: { 'x-test-reset': resetToken },
+  });
+  return await response.json();
+}
+
+async function getLiveSuiteManifest(request) {
+  const response = await request.get('/__test__/live-suites', {
+    headers: { 'x-test-reset': resetToken },
+  });
+  return await response.json();
+}
+
+async function exportPlatformSnapshot(request) {
+  const response = await request.get('/__test__/platform-export', {
+    headers: { 'x-test-reset': resetToken },
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function importPlatformSnapshot(request, snapshot, { reset = true } = {}) {
+  const response = await request.post('/__test__/platform-import', {
+    headers: {
+      'content-type': 'application/json',
+      'x-test-reset': resetToken,
+    },
+    data: JSON.stringify({ snapshot, reset }),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function verifyPlatformSnapshot(request, snapshot) {
+  const response = await request.post('/__test__/platform-verify', {
+    headers: {
+      'content-type': 'application/json',
+      'x-test-reset': resetToken,
+    },
+    data: JSON.stringify({ snapshot }),
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
+async function attachHouseToPageSession(page, {
+  houseId = '',
+  teamId = '',
+} = {}) {
+  return await page.evaluate(async ({ nextHouseId, nextTeamId, testResetToken }) => {
+    const response = await fetch('/__test__/session/attach-house', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-reset': testResetToken,
+      },
+      body: JSON.stringify({
+        houseId: nextHouseId,
+        teamId: nextTeamId,
+      }),
+    });
+    return {
+      status: response.status,
+      json: await response.json(),
+    };
+  }, {
+    nextHouseId: String(houseId || ''),
+    nextTeamId: String(teamId || ''),
+    testResetToken: resetToken,
+  });
+}
+
+async function getPlatformContextFromPage(page) {
+  return await page.evaluate(async () => {
+    const response = await fetch('/api/platform/context', {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    return await response.json();
+  });
+}
+
 async function readWorkerSessionId(page) {
-  await gotoAppWithLite(page);
+  const hasRuntimeContext = await page.evaluate(() => {
+    return !!(
+      window.__openclawLiteTest
+      && typeof window.__openclawLiteTest.runtimeSessionContext === 'function'
+    );
+  }).catch(() => false);
+  if (!hasRuntimeContext) {
+    await gotoAppWithLite(page);
+  }
   await page.waitForFunction(async () => {
     try {
       if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
@@ -604,8 +712,11 @@ module.exports = {
   createPlatformTrainerJob,
   DEFAULT_COMPILED_PACK_MANIFEST_PATH,
   executePlatformIntegration,
+  exportPlatformSnapshot,
   getDefaultCompiledPackManifest,
+  getLiveSuiteManifest,
   getPlatformConfigVersionRecord,
+  getPlatformContextFromPage,
   getPlatformCounts,
   getPlatformFixture,
   getPlatformTeamBinding,
@@ -614,7 +725,10 @@ module.exports = {
   getPlatformSealedContext,
   getPlatformTraceEvents,
   getPlatformTraceSummary,
+  getRouteManifest,
+  importPlatformSnapshot,
   listPlatformFixtures,
+  attachHouseToPageSession,
   ingestPlatformPokerOperatorTrace,
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,
@@ -626,4 +740,5 @@ module.exports = {
   seedPlatformSealedContext,
   seedPlatformConfigVersion,
   setPlatformRunStatus,
+  verifyPlatformSnapshot,
 };

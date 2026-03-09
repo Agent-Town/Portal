@@ -93,6 +93,13 @@
     Read-only access to the canonical archive and durable trainer outputs for this house.
   </p>
   <div class="kv" style="margin-bottom:8px;">
+    <label class="small" for="houseTeamSelect">Team</label>
+    <select id="houseTeamSelect" data-testid="house-team-select" aria-label="House Team"></select>
+  </div>
+  <div class="small" id="houseTeamSummary" data-testid="house-team-summary" style="margin-bottom:8px;">
+    Attach a house to inspect team-specific archive and trainer records.
+  </div>
+  <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
   </div>
@@ -112,12 +119,21 @@
 <div class="panel is-hidden" id="houseTrainerPanel" data-testid="house-trainer-panel">
   <h2 style="margin:0 0 6px">House Trainer</h2>
   <p class="small" style="margin-top:0">
-    Durable `trainer_job.*` jobs and results stay separate from runtime `trainer.*` tools.
+    Durable `trainer_job.*` jobs and patch promotions stay separate from runtime `trainer.*` tools.
   </p>
+  <div class="kv" style="margin-bottom:8px;">
+    <button class="btn" id="houseTrainerCreateCompareBtn" type="button" data-testid="house-trainer-create-compare">Create Compare Job</button>
+    <button class="btn" id="houseTrainerPromotePatchBtn" type="button" data-testid="house-trainer-promote-patch">Promote Patch</button>
+  </div>
+  <div class="kv" style="margin-bottom:8px;">
+    <label class="small" for="houseTrainerApprovalIdInput">Approval ID</label>
+    <input id="houseTrainerApprovalIdInput" data-testid="house-trainer-approval-input" type="text" placeholder="appr_..." />
+  </div>
   <div class="small" id="houseTrainerEmpty" data-testid="house-trainer-empty">No durable trainer jobs yet.</div>
   <div class="small" style="margin:10px 0 4px;">Jobs</div>
   <div class="kv stack" id="houseTrainerJobs" data-testid="house-trainer-jobs"></div>
   <div class="small" style="margin:10px 0 4px;">Results</div>
   <div class="kv stack" id="houseTrainerResults" data-testid="house-trainer-results"></div>
+  <div class="small" id="houseTrainerActionStatus" data-testid="house-trainer-action-status" style="min-height:1.4em;"></div>
   <div class="small" id="houseTrainerDetail" data-testid="house-trainer-detail">Select a trainer result to inspect linked config refs.</div>
 </div>

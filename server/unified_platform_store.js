@@ -35,6 +35,12 @@ const FIXTURE_FILES = Object.freeze({
   sealed_context_seed: 'sealed_context_seed.json',
   poker_operator_seed_jsonl: 'poker_operator_seed_jsonl.json',
   poker_operator_expected_canonical_trace: 'poker_operator_expected_canonical_trace.json',
+  multi_team_archive_seed: 'multi_team_archive_seed.json',
+  multi_team_trainer_seed: 'multi_team_trainer_seed.json',
+  privy_email_otp_stub_seed: 'privy_email_otp_stub_seed.json',
+  live_suite_manifest_expected: 'live_suite_manifest_expected.json',
+  route_module_manifest_expected: 'route_module_manifest_expected.json',
+  platform_export_roundtrip_seed: 'platform_export_roundtrip_seed.json',
 });
 
 let db = null;
@@ -474,6 +480,38 @@ function getTeamConfigBinding({
     LIMIT 1
   `).get(normalizedHouseId, normalizedTeamId);
   return mapTeamConfigBindingRow(row);
+}
+
+function listHouseTeamIds(houseId = '') {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT team_id AS team_id
+    FROM team_config_bindings
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM config_versions
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM runs
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM trainer_jobs
+    WHERE house_id = ?
+    ORDER BY team_id ASC
+  `).all(
+    normalizedHouseId,
+    normalizedHouseId,
+    normalizedHouseId,
+    normalizedHouseId,
+  );
+  return rows
+    .map((row) => String(row?.team_id || '').trim())
+    .filter(Boolean);
 }
 
 function getIntegrationCandidateByIdempotency(idempotencyKey = '') {
@@ -1930,6 +1968,7 @@ module.exports = {
   getRunByIdempotency,
   getSealedContextById,
   getTeamConfigBinding,
+  listHouseTeamIds,
   getTrainerJobById,
   getTrainerJobByIdempotency,
   getTrainerResultById,

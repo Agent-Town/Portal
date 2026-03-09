@@ -83,6 +83,13 @@ const {
   upsertPokerSubmission,
   writeCheckpoint,
 } = require('./web_poker_store');
+const { getLiveSuiteManifest } = require('./live_suite_manifest');
+const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = require('./route_manifest');
+const { registerPlatformReadRoutes } = require('./platform_read_routes');
+const { registerWebRoutes } = require('./web_routes');
+const { registerRegistryRoutes } = require('./registry_routes');
+const { registerPlatformV1Routes } = require('./platform_v1_routes');
+const { registerPokerRoutes } = require('./poker_routes');
 const {
   createTrainerJob,
   createTrainerResult,
@@ -116,6 +123,7 @@ const {
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listHouseTeamIds,
   listRuns,
   listTrainerJobs,
   listTrainerResults,
@@ -151,6 +159,18 @@ const {
   seedPokerOperatorState,
 } = require('./poker_operator');
 const { createPokerOperatorClient } = require('./poker_operator_client');
+const {
+  consumeEmailOtp,
+  getEmailOtpActivity,
+  getLatestEmailOtp,
+  issueEmailOtp,
+  resetEmailOtpAdapter,
+} = require('./email_otp_adapter');
+const {
+  exportPlatformStateSnapshot,
+  importPlatformStateSnapshot,
+  verifyPlatformStateSnapshot,
+} = require('./platform_export');
 
 const PORTAL_WEB_API_VERSION = '2026-03-09';
 
@@ -827,6 +847,13 @@ function isTestMockAddress(address) {
 }
 
 const app = express();
+
+resetRouteOwnerManifest();
+registerRouteOwner('platform', 'server/platform_read_routes.js');
+registerRouteOwner('poker', 'server/poker_routes.js');
+registerRouteOwner('registry', 'server/registry_routes.js');
+registerRouteOwner('v1', 'server/platform_v1_routes.js');
+registerRouteOwner('web', 'server/web_routes.js');
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.use(
@@ -3900,101 +3927,242 @@ app.get('/api/session', (req, res) => {
   });
 });
 
-app.get('/api/platform/default-skill-pack', (_req, res) => {
-  const requestId = buildPortalRequestId();
-  const pack = buildDefaultCompiledSkillPack();
-  return sendPortalApiSuccess(res, pack.manifest, { requestId });
+function resolveSessionPlatformContext(session) {
+  const houseId = typeof session?.houseCeremony?.houseId === 'string'
+    ? session.houseCeremony.houseId.trim()
+    : '';
+  const availableTeamIds = houseId ? listHouseTeamIds(houseId) : [];
+  let activeTeamId = typeof session?.activeTeamId === 'string' ? session.activeTeamId.trim() : '';
+  if (activeTeamId && availableTeamIds.length && !availableTeamIds.includes(activeTeamId)) {
+    activeTeamId = '';
+  }
+  if (!activeTeamId && availableTeamIds.length) {
+    activeTeamId = availableTeamIds[0];
+  }
+  if (session && typeof session === 'object') {
+    session.activeTeamId = activeTeamId;
+  }
+  return {
+    houseId: houseId || null,
+    activeTeamId: activeTeamId || null,
+    availableTeamIds,
+  };
+}
+
+function buildPlatformContextResponse(session, overrides = {}) {
+  const context = resolveSessionPlatformContext(session);
+  if (overrides && typeof overrides === 'object') {
+    if (Object.prototype.hasOwnProperty.call(overrides, 'houseId')) {
+      context.houseId = overrides.houseId || null;
+    }
+    if (Object.prototype.hasOwnProperty.call(overrides, 'activeTeamId')) {
+      context.activeTeamId = overrides.activeTeamId || null;
+    }
+    if (Array.isArray(overrides.availableTeamIds)) {
+      context.availableTeamIds = overrides.availableTeamIds.map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  }
+  return {
+    houseId: context.houseId,
+    activeTeamId: context.activeTeamId,
+    availableTeamIds: context.availableTeamIds,
+  };
+}
+
+registerPlatformReadRoutes(app, {
+  express,
+  buildDefaultCompiledSkillPack,
+  buildPlatformContextResponse,
+  buildPlatformTrainerResultPayload,
+  buildPortalRequestId,
+  createTrainerJob,
+  createTrainerResult,
+  getConfigVersion,
+  getConfigVersionByIdempotency,
+  getTeamConfigBinding,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
+  listConfigComponentVersions,
+  listRuns,
+  listTraceEvents,
+  listTrainerJobs,
+  listTrainerResults,
+  normalizePlatformTrainerBudget,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  randomHex,
+  replaceConfigComponentVersions,
+  resolveApprovedTrainerPatchPromotion,
+  resolveHumanSessionWithRecovery,
+  resolvePlatformTrainerLinkedConfigVersionId,
+  resolveSessionPlatformContext,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sha256PrefixedHex,
+  stableJsonStringify,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
+  upsertConfigVersion,
+  upsertTeamConfigBinding,
 });
 
-app.get('/api/platform/archive', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
-  if (!houseId) {
-    return sendPortalApiSuccess(res, {
-      houseId: null,
-      items: [],
-      emptyStateText: 'No canonical traces archived yet.',
-    }, { requestId });
-  }
-  const items = listRuns({ houseId, teamId }).map((run) => {
-    const events = listTraceEvents(run.traceId);
-    const archiveCounters = run?.metadata?.archiveCounters && typeof run.metadata.archiveCounters === 'object'
-      ? run.metadata.archiveCounters
-      : { accepted: events.length, ignored: 0, rejected: 0 };
-    return {
-      traceId: run.traceId,
-      runId: run.runId,
-      status: run.status,
-      traceAuthorityType: run.traceAuthorityType,
-      eventCount: events.length,
-      archiveCounters,
-      createdAt: run.createdAt,
-      updatedAt: run.updatedAt,
-    };
-  });
-  return sendPortalApiSuccess(res, {
-    houseId,
-    items,
-    emptyStateText: 'No canonical traces archived yet.',
-  }, { requestId });
+registerWebRoutes(app, {
+  buildPortalRequestId,
+  collectWalletSubjectsForSession,
+  createApprovalRequest,
+  createCredentialGrant,
+  createEvidence,
+  createImportJob,
+  createInvocation,
+  createWebSession,
+  decideApproval,
+  getActiveCredentialGrant,
+  getApprovalById,
+  getInvocationByIdempotency,
+  getLatestCheckpointForSession,
+  getWebActionPolicy,
+  getWebSessionById,
+  listApprovalsForSession,
+  listCredentialStatusByOrigin,
+  listEvidenceForSession,
+  normalizePortalIdempotencyKey,
+  normalizeWebAutonomyMode,
+  normalizeWebRenderMode,
+  proxyPolicyErrorCode,
+  randomHex,
+  requireBoundHumanSession,
+  requireOwnedWebSession,
+  resolveWebTarget,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+  assertPortalContractTargetAllowed,
+  setWebSessionRevisionAndState,
+  touchCredentialGrant,
+  writeCheckpoint,
 });
 
-app.get('/api/platform/trainer', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const houseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
-  if (!houseId) {
-    return sendPortalApiSuccess(res, {
-      houseId: null,
-      jobs: [],
-      results: [],
-      emptyStateText: 'No durable trainer jobs yet.',
-    }, { requestId });
-  }
-  const jobs = listTrainerJobs({ houseId, teamId }).map((job) => {
-    const result = getTrainerResultByJobId(job.trainerJobId);
-    return {
-      trainerJobId: job.trainerJobId,
-      teamId: job.teamId,
-      jobKind: job.jobKind,
-      status: job.status,
-      targets: job.targets,
-      budget: job.budget,
-      createdAt: job.createdAt,
-      updatedAt: job.updatedAt,
-      result: result ? {
-        trainerResultId: result.trainerResultId,
-        status: result.status,
-        approvalNeeded: result.approvalNeeded,
-      } : null,
-    };
-  });
-  const results = listTrainerResults({ houseId, teamId }).map((result) => ({
-    trainerResultId: result.trainerResultId,
-    trainerJobId: result.trainerJobId,
-    status: result.status,
-    summary: String(result?.result?.summary || ''),
-    candidatePatchIds: result.candidatePatchIds,
-    linkedConfigVersionId: result.linkedConfigVersionId,
-    approvalNeeded: result.approvalNeeded,
-    createdAt: result.createdAt,
-    updatedAt: result.updatedAt,
-  }));
-  return sendPortalApiSuccess(res, {
-    houseId,
-    jobs,
-    results,
-    emptyStateText: 'No durable trainer jobs yet.',
-  }, { requestId });
+registerRegistryRoutes(app, {
+  assertPortalContractTargetAllowed,
+  buildPortalRequestId,
+  collectWalletSubjectsForSession,
+  createImportJob,
+  getRegistryEntityById,
+  invalidateAtlasStoreCaches,
+  normalizePortalIdempotencyKey,
+  proxyPolicyErrorCode,
+  requireBoundHumanSession,
+  searchRegistryEntities,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+});
+
+registerPlatformV1Routes(app, {
+  PLATFORM_CONFIG_STATUSES,
+  PLATFORM_IMMUTABLE_CONFIG_STATUSES,
+  PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES,
+  PLATFORM_RUN_ENTRY_MODES,
+  PLATFORM_TRACE_AUTHORITY_TYPE,
+  PLATFORM_TRAINER_JOB_KINDS,
+  SUPPORTED_PLATFORM_EXPERIENCE_IDS,
+  allowedReaderIdsFromSealedContext,
+  assertPortalContractTargetAllowed,
+  buildCompiledIntegrationPack,
+  buildPlatformTrainerResultPayload,
+  buildPortalRequestId,
+  buildSeededSealedContextRecord,
+  createIntegrationCandidate,
+  createIntegrationExecution,
+  createIntegrationPackVersion,
+  createRun,
+  createSealedContextViolation,
+  createTraceEvent,
+  createTraceIntakeRecord,
+  createTrainerJob,
+  createTrainerResult,
+  decodeTraceCursor,
+  deriveDeterministicSealId,
+  encodeTraceCursor,
+  express,
+  getConfigVersion,
+  getConfigVersionByIdempotency,
+  getIntegrationCandidateById,
+  getIntegrationCandidateByIdempotency,
+  getIntegrationExecutionByIdempotency,
+  getIntegrationPackVersionByIdempotency,
+  getLatestTraceEvent,
+  getPlatformIntegrationActionPolicy,
+  getRunById,
+  getRunByIdempotency,
+  getRunByTraceId,
+  getSealedContextById,
+  getTeamConfigBinding,
+  getTraceIntakeRecord,
+  getTrainerJobById,
+  getTrainerJobByIdempotency,
+  getTrainerResultById,
+  getTrainerResultByJobId,
+  hasPlatformTrainerTargets,
+  listConfigComponentVersions,
+  listTraceEvents,
+  normalizePlatformTrainerBudget,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  parsePokerOperatorFixtureRecords,
+  randomHex,
+  readStore,
+  replaceConfigComponentVersions,
+  resolveApprovedTrainerPatchPromotion,
+  resolveHouseAddress,
+  resolveHumanSessionWithRecovery,
+  resolvePlatformConfigComponents,
+  resolvePlatformTrainerLinkedConfigVersionId,
+  resolveSessionPlatformContext,
+  resolveWebTarget,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  sendProxyPolicyContractError,
+  sha256PrefixedHex,
+  stableJsonStringify,
+  updateRunMetadata,
+  updateRunStatus,
+  updateSealedContextStatus,
+  updateTrainerJobStatus,
+  updateTrainerResultLink,
+  upsertConfigVersion,
+  upsertSealedContext,
+  upsertTeamConfigBinding,
+  verifyHouseAuth,
+});
+
+registerPokerRoutes(app, {
+  buildPortalRequestId,
+  computePokerArtifactSha256,
+  createPortalPokerOperatorClient,
+  express,
+  getLatestPokerLeaderboardSnapshot,
+  getPokerOperatorServiceToken,
+  getPokerReplayArtifactByRunId,
+  getPokerRunById,
+  getPokerSeasonById,
+  getPokerSubmissionById,
+  getPokerSubmissionByRequest,
+  listPokerSeasons,
+  normalizePortalIdempotencyKey,
+  nowIso,
+  randomHex,
+  requireBoundHumanSession,
+  resolvePrimaryWalletSubject,
+  respondPokerOperatorTransport,
+  sendPortalApiError,
+  sendPortalApiSuccess,
+  summarizeMirroredPokerSeason,
+  syncPokerMirrorFromOperator,
+  upsertPokerSeason,
+  upsertPokerSubmission,
 });
 
 // Rotates the human session cookie to a fresh session/team code.
@@ -4029,9 +4197,12 @@ app.get('/api/state', (req, res) => {
   const onboarding = ensureSessionOnboarding(s);
   const ceremony = buildCeremonyStateSnapshot(s);
   const experience = buildExperienceStateSnapshot(s, ceremony);
+  const platform = buildPlatformContextResponse(s, { houseId: ceremony.houseId || null });
   res.json({
     ok: true,
     teamCode: s.teamCode,
+    activeTeamId: platform.activeTeamId,
+    availableTeamIds: platform.availableTeamIds,
     walletRecoveryKey: normalizeWalletRecoveryKeyInput(s.walletRecoveryKey) || null,
     elements: listElements(),
     agent: {
@@ -4072,2296 +4243,9 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: ceremony.houseId,
+    platform,
     onboarding: cloneOnboarding(onboarding)
   });
-});
-
-app.post('/api/web/resolve', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
-  const preferredMode = typeof req.body?.preferredMode === 'string' ? req.body.preferredMode.trim() : 'auto';
-  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
-    ? req.body.sourceHints
-    : {};
-  if (!url) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url is required.', { requestId });
-  }
-  try {
-    assertPortalContractTargetAllowed(url);
-    return sendPortalApiSuccess(
-      res,
-      resolveWebTarget(url, { preferredMode, sourceHints }),
-      { requestId }
-    );
-  } catch (err) {
-    if (err?.code === 'PROXY_TARGET_BLOCKED') {
-      return sendProxyPolicyContractError(res, err, requestId);
-    }
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
-  }
-});
-
-app.post('/api/web/import', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
-  const requestKind = typeof req.body?.requestKind === 'string' ? req.body.requestKind.trim() : '';
-  const parseFallbackAllowed = req.body?.parseFallbackAllowed === true;
-  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
-    ? req.body.sourceHints
-    : {};
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  if (!url || !requestKind || !idempotencyKey) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url, requestKind, and idempotencyKey are required.', { requestId });
-  }
-
-  try {
-    const parsed = new URL(url);
-    assertPortalContractTargetAllowed(url);
-    const job = createImportJob({
-      surface: 'web',
-      portalSessionId: session.sessionId,
-      teamCode: session.teamCode || null,
-      houseId: session?.houseCeremony?.houseId || null,
-      walletSubjects: collectWalletSubjectsForSession(session, req),
-      sourceUrl: parsed.toString(),
-      sourceOrigin: parsed.origin,
-      requestKind,
-      parseFallbackAllowed,
-      sourceHints,
-      idempotencyKey,
-      status: 'queued',
-      result: {
-        status: 'queued',
-        sourceType: 'manual_import'
-      }
-    });
-    return sendPortalApiSuccess(res, {
-      importJobId: job.importJobId,
-      status: job.status,
-      requestKind: job.requestKind
-    }, { requestId });
-  } catch (err) {
-    if (err?.code === 'PROXY_TARGET_BLOCKED') {
-      let parsed = null;
-      try {
-        parsed = new URL(url);
-      } catch {
-        parsed = null;
-      }
-      createImportJob({
-        surface: 'web',
-        portalSessionId: session.sessionId,
-        teamCode: session.teamCode || null,
-        houseId: session?.houseCeremony?.houseId || null,
-        walletSubjects: collectWalletSubjectsForSession(session, req),
-        sourceUrl: parsed?.toString() || url,
-        sourceOrigin: parsed?.origin || null,
-        requestKind,
-        parseFallbackAllowed,
-        sourceHints,
-        idempotencyKey,
-        status: 'rejected',
-        decisionCode: proxyPolicyErrorCode(err),
-        decisionReason: 'Blocked by unsafe target policy',
-        result: {
-          policy: 'blocked',
-          details: err?.details || {}
-        }
-      });
-      return sendProxyPolicyContractError(res, err, requestId);
-    }
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
-  }
-});
-
-app.post('/api/web/sessions', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
-  if (!url) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url is required.', { requestId });
-  }
-  try {
-    assertPortalContractTargetAllowed(url);
-    const resolved = resolveWebTarget(url, {
-      preferredMode: typeof req.body?.renderMode === 'string' ? req.body.renderMode : 'auto',
-      sourceHints: req.body?.sourceHints && typeof req.body.sourceHints === 'object'
-        ? req.body.sourceHints
-        : {}
-    });
-    const integration = resolved.integration || null;
-    const created = createWebSession({
-      portalSessionId: session.sessionId,
-      teamCode: session.teamCode || null,
-      houseId: session?.houseCeremony?.houseId || null,
-      walletSubjects: collectWalletSubjectsForSession(session, req),
-      url: new URL(url).toString(),
-      origin: new URL(url).origin,
-      websiteRegistryId: resolved.website?.registryId || null,
-      integrationRegistryId: typeof req.body?.integrationRegistryId === 'string'
-        ? req.body.integrationRegistryId.trim()
-        : integration?.integrationRegistryId || null,
-      versionId: typeof req.body?.versionId === 'string'
-        ? req.body.versionId.trim()
-        : integration?.versionId || null,
-      renderMode: integration?.renderMode || normalizeWebRenderMode(req.body?.renderMode, 'companion'),
-      autonomyMode: normalizeWebAutonomyMode(req.body?.autonomyMode, 'assist'),
-      runtimeState: resolved.resolutionState === 'supported' ? 'ready' : 'error',
-      pageClass: integration?.pageClass || resolved.website?.pageClass || null,
-    });
-    return sendPortalApiSuccess(res, {
-      session: {
-        webSessionId: created.webSessionId,
-        teamCode: created.teamCode,
-        houseId: created.houseId,
-        renderMode: created.renderMode,
-        autonomyMode: created.autonomyMode,
-        runtimeState: created.runtimeState,
-        activeRevision: created.activeRevision
-      },
-      activeIntegration: {
-        integrationRegistryId: created.integrationRegistryId,
-        versionId: created.versionId
-      },
-      policy: {
-        sameOriginOnlyDefault: true,
-        allowExternalCredentials: false
-      }
-    }, { requestId });
-  } catch (err) {
-    if (err?.code === 'PROXY_TARGET_BLOCKED') {
-      return sendProxyPolicyContractError(res, err, requestId);
-    }
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
-  }
-});
-
-app.get('/api/web/sessions/:id', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const { session, webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
-  if (!session || !webSession) return;
-  const approvalQueue = listApprovalsForSession(webSession.webSessionId);
-  const lastCheckpoint = webSession.checkpointRef
-    ? getLatestCheckpointForSession(webSession.webSessionId)
-    : null;
-  return sendPortalApiSuccess(res, {
-    session: webSession,
-    activeIntegration: {
-      integrationRegistryId: webSession.integrationRegistryId,
-      versionId: webSession.versionId
-    },
-    approvalQueue,
-    lastCheckpoint,
-    runtimeSnapshot: lastCheckpoint?.payload || null,
-    credentialStatusByOrigin: listCredentialStatusByOrigin(session.sessionId, webSession.webSessionId)
-  }, { requestId });
-});
-
-app.post('/api/web/sessions/:id/checkpoint', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const { webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
-  if (!webSession) return;
-  const checkpoint = req.body?.checkpoint && typeof req.body.checkpoint === 'object'
-    ? req.body.checkpoint
-    : null;
-  const expectedRevision = Number(req.body?.expectedRevision);
-  if (!checkpoint || !Number.isInteger(expectedRevision)) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'checkpoint and expectedRevision are required.', { requestId });
-  }
-  try {
-    const written = writeCheckpoint({
-      webSessionId: webSession.webSessionId,
-      expectedRevision,
-      idempotencyKey: idempotencyKey || null,
-      checkpoint
-    });
-    return sendPortalApiSuccess(res, {
-      checkpointRef: written.checkpointRef,
-      writtenRevision: written.revision,
-      writtenAt: written.createdAt
-    }, { requestId });
-  } catch (err) {
-    if (err?.code === 'WEB_CHECKPOINT_CONFLICT') {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_CHECKPOINT_CONFLICT',
-        'The checkpoint was based on a stale revision.',
-        {
-          requestId,
-          details: {
-            currentRevision: Number(err.currentRevision || webSession.activeRevision)
-          }
-        }
-      );
-    }
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
-  }
-});
-
-app.post('/api/web/sessions/:id/actions/:actionId/invoke', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const { session, webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
-  if (!session || !webSession) return;
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const expectedRevision = Number(req.body?.expectedRevision);
-  if (!idempotencyKey || !Number.isInteger(expectedRevision)) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'idempotencyKey and expectedRevision are required.', { requestId });
-  }
-  const cached = getInvocationByIdempotency(webSession.webSessionId, idempotencyKey);
-  if (cached) {
-    const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
-      .filter((item) => item.invocationId === cached.invocationId);
-    return sendPortalApiSuccess(res, {
-      invocation: {
-        invocationId: cached.invocationId,
-        actionId: cached.actionId,
-        status: cached.status,
-        verificationStatus: cached.verificationStatus,
-        durationMs: Number(cached.response?.durationMs || 1),
-        usedApprovalId: cached.approvalId,
-        usedCredentialGrantId: cached.credentialGrantId
-      },
-      evidence
-    }, { requestId });
-  }
-
-  if (expectedRevision !== webSession.activeRevision) {
-    return sendPortalApiError(
-      res,
-      409,
-      'WEB_CHECKPOINT_CONFLICT',
-      'The requested action was based on a stale revision.',
-      {
-        requestId,
-        details: {
-          currentRevision: webSession.activeRevision
-        }
-      }
-    );
-  }
-
-  const actionPolicy = getWebActionPolicy(req.params.actionId, webSession);
-  if (!actionPolicy) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Unknown web action.', { requestId });
-  }
-
-  let approval = null;
-  if (actionPolicy.requiresApproval) {
-    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
-    approval = approvalId ? getApprovalById(approvalId) : null;
-    if (!approval) {
-      const createdApproval = createApprovalRequest({
-        webSessionId: webSession.webSessionId,
-        actionId: actionPolicy.actionId,
-        reason: actionPolicy.summary,
-        requestedBy: 'agent',
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
-      });
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_APPROVAL_REQUIRED',
-        'This action requires human approval.',
-        {
-          requestId,
-          details: {
-            approvalId: createdApproval.approvalId,
-            status: createdApproval.status
-          }
-        }
-      );
-    }
-    if (approval.webSessionId !== webSession.webSessionId) {
-      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Approval does not belong to this web session.', { requestId });
-    }
-    if (Date.parse(approval.expiresAt) <= Date.now()) {
-      return sendPortalApiError(res, 409, 'WEB_APPROVAL_EXPIRED', 'Approval has expired.', { requestId });
-    }
-    if (approval.status !== 'approved') {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_APPROVAL_REQUIRED',
-        'This action requires an approved human decision.',
-        {
-          requestId,
-          details: {
-            approvalId: approval.approvalId,
-            status: approval.status
-          }
-        }
-      );
-    }
-  }
-
-  let credentialGrant = null;
-  if (actionPolicy.requiresCredential) {
-    const credentialGrantId = typeof req.body?.credentialGrantId === 'string'
-      ? req.body.credentialGrantId.trim()
-      : '';
-    credentialGrant = getActiveCredentialGrant({
-      portalSessionId: session.sessionId,
-      webSessionId: webSession.webSessionId,
-      origin: webSession.origin,
-      credentialGrantId: credentialGrantId || null
-    });
-    if (!credentialGrant) {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_CREDENTIAL_REQUIRED',
-        'A valid credential grant is required for this origin.',
-        { requestId }
-      );
-    }
-    if (credentialGrant.origin !== webSession.origin) {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_CREDENTIAL_SCOPE_MISMATCH',
-        'The provided credential grant does not match this origin.',
-        { requestId }
-      );
-    }
-    if (credentialGrant.status !== 'active') {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_CREDENTIAL_REQUIRED',
-        'The provided credential grant is not active.',
-        { requestId }
-      );
-    }
-    touchCredentialGrant(credentialGrant.credentialGrantId);
-  }
-
-  const params = req.body?.params && typeof req.body.params === 'object'
-    ? req.body.params
-    : {};
-  const requestPayload = {
-    expectedRevision,
-    params,
-    approvalId: approval?.approvalId || null,
-    credentialGrantId: credentialGrant?.credentialGrantId || null,
-    dryRun: req.body?.dryRun === true
-  };
-  const responsePayload = {
-    durationMs: 1,
-    targetOrigin: webSession.origin,
-    renderMode: webSession.renderMode
-  };
-  const invocation = createInvocation({
-    webSessionId: webSession.webSessionId,
-    actionId: actionPolicy.actionId,
-    idempotencyKey,
-    approvalId: approval?.approvalId || null,
-    credentialGrantId: credentialGrant?.credentialGrantId || null,
-    request: requestPayload,
-    response: responsePayload
-  });
-  createEvidence({
-    webSessionId: webSession.webSessionId,
-    invocationId: invocation.invocationId,
-    category: 'tool_invoked',
-    actor: 'server',
-    status: 'success',
-    summary: actionPolicy.actionId,
-    targetUrl: webSession.url,
-    pageClass: webSession.pageClass,
-    freshnessTtlMs: 300000
-  });
-  const refreshed = setWebSessionRevisionAndState(webSession.webSessionId, {
-    nextRevision: webSession.activeRevision + 1,
-    runtimeState: 'verifying',
-    pageClass: webSession.pageClass
-  });
-  const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
-    .filter((item) => item.invocationId === invocation.invocationId);
-  return sendPortalApiSuccess(res, {
-    invocation: {
-      invocationId: invocation.invocationId,
-      actionId: invocation.actionId,
-      status: invocation.status,
-      verificationStatus: invocation.verificationStatus,
-      durationMs: Number(invocation.response?.durationMs || 1),
-      usedApprovalId: invocation.approvalId,
-      usedCredentialGrantId: invocation.credentialGrantId,
-      writtenRevision: refreshed?.activeRevision || webSession.activeRevision + 1
-    },
-    evidence
-  }, { requestId });
-});
-
-app.post('/api/web/approvals/:approvalId/decision', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const approval = getApprovalById(req.params.approvalId);
-  if (!approval) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Approval not found.', { requestId });
-  }
-  const webSession = getWebSessionById(approval.webSessionId);
-  if (!webSession) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
-  }
-  if (webSession.portalSessionId !== session.sessionId) {
-    return sendPortalApiError(res, 403, 'FORBIDDEN', 'Approval belongs to a different Portal session.', { requestId });
-  }
-  const decision = typeof req.body?.decision === 'string' ? req.body.decision.trim().toLowerCase() : '';
-  const expectedRevision = Number(req.body?.expectedRevision);
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  if ((decision !== 'approved' && decision !== 'rejected') || !Number.isInteger(expectedRevision) || !idempotencyKey) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'decision, expectedRevision, and idempotencyKey are required.', { requestId });
-  }
-  try {
-    const decided = decideApproval({
-      approvalId: approval.approvalId,
-      decision,
-      decisionBy: 'human',
-      reason,
-      expectedRevision,
-      idempotencyKey
-    });
-    const nextSession = getWebSessionById(webSession.webSessionId);
-    const evidence = listEvidenceForSession(webSession.webSessionId, { limit: 50 }).items
-      .filter((item) => item.category === 'approval_decided' && item.summary === approval.approvalId)
-      .slice(0, 1);
-    return sendPortalApiSuccess(res, {
-      approval: decided,
-      writtenRevision: nextSession?.activeRevision || expectedRevision,
-      evidence
-    }, { requestId });
-  } catch (err) {
-    if (err?.code === 'WEB_APPROVAL_EXPIRED') {
-      return sendPortalApiError(res, 409, 'WEB_APPROVAL_EXPIRED', 'Approval has expired.', { requestId });
-    }
-    if (err?.code === 'WEB_CHECKPOINT_CONFLICT') {
-      return sendPortalApiError(
-        res,
-        409,
-        'WEB_CHECKPOINT_CONFLICT',
-        'The approval decision was based on a stale revision.',
-        { requestId, details: { currentRevision: Number(err.currentRevision || webSession.activeRevision) } }
-      );
-    }
-    return sendPortalApiError(res, 500, 'INTERNAL_ERROR', 'Approval decision failed.', { requestId, retryable: true });
-  }
-});
-
-app.get('/api/web/sessions/:id/evidence', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const { webSession } = requireOwnedWebSession(req, res, requestId, req.params.id);
-  if (!webSession) return;
-  const limit = Number.parseInt(String(req.query?.limit || '50'), 10);
-  const cursor = typeof req.query?.cursor === 'string' ? req.query.cursor.trim() : '';
-  const freshOnly = String(req.query?.freshOnly || '').trim().toLowerCase() === 'true';
-  const payload = listEvidenceForSession(webSession.webSessionId, {
-    limit,
-    cursor: cursor || null,
-    freshOnly
-  });
-  return sendPortalApiSuccess(res, payload, { requestId });
-});
-
-app.post('/api/web/credentials/start', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const webSessionId = typeof req.body?.webSessionId === 'string' ? req.body.webSessionId.trim() : '';
-  const origin = typeof req.body?.origin === 'string' ? req.body.origin.trim() : '';
-  const authClass = typeof req.body?.authClass === 'string' ? req.body.authClass.trim() : '';
-  const scopes = Array.isArray(req.body?.scopes) ? req.body.scopes.filter((entry) => typeof entry === 'string' && entry.trim()) : [];
-  if (!webSessionId || !origin || !authClass || scopes.length === 0) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'webSessionId, origin, authClass, and scopes are required.', { requestId });
-  }
-  const webSession = getWebSessionById(webSessionId);
-  if (!webSession || webSession.portalSessionId !== session.sessionId) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Web session not found.', { requestId });
-  }
-  if (webSession.origin !== origin) {
-    return sendPortalApiError(res, 409, 'WEB_ORIGIN_BLOCKED', 'Credential broker origin must match the web session origin.', { requestId });
-  }
-  const approval = createApprovalRequest({
-    webSessionId,
-    actionId: 'credential_grant',
-    reason: `Grant ${authClass} access for ${origin}`,
-    requestedBy: 'human',
-    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
-  });
-  const brokerSessionId = `wcb_${randomHex(10)}`;
-  createCredentialGrant({
-    portalSessionId: session.sessionId,
-    webSessionId,
-    origin,
-    authClass,
-    scopes,
-    status: 'pending',
-    brokerSessionId,
-    approvalId: approval.approvalId
-  });
-  return sendPortalApiSuccess(res, {
-    brokerSessionId,
-    approvalId: approval.approvalId,
-    authUrl: `/auth-broker/${encodeURIComponent(new URL(origin).hostname)}/start?brokerSessionId=${encodeURIComponent(brokerSessionId)}`
-  }, { requestId });
-});
-
-app.post('/api/registry/import', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
-  const requestKind = typeof req.body?.requestKind === 'string' ? req.body.requestKind.trim() : 'site_origin';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object'
-    ? req.body.sourceHints
-    : {};
-  if (!url || !idempotencyKey) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url and idempotencyKey are required.', { requestId });
-  }
-  try {
-    const parsed = new URL(url);
-    assertPortalContractTargetAllowed(url);
-    const job = createImportJob({
-      surface: 'registry',
-      portalSessionId: session.sessionId,
-      teamCode: session.teamCode || null,
-      houseId: session?.houseCeremony?.houseId || null,
-      walletSubjects: collectWalletSubjectsForSession(session, req),
-      sourceUrl: parsed.toString(),
-      sourceOrigin: parsed.origin,
-      requestKind,
-      parseFallbackAllowed: req.body?.parseFallbackAllowed === true,
-      sourceHints,
-      idempotencyKey,
-      status: 'queued',
-      result: {
-        status: 'queued',
-        importType: 'registry'
-      }
-    });
-    invalidateAtlasStoreCaches();
-    return sendPortalApiSuccess(res, {
-      importJobId: job.importJobId,
-      status: job.status,
-      requestKind: job.requestKind
-    }, { requestId });
-  } catch (err) {
-    if (err?.code === 'PROXY_TARGET_BLOCKED') {
-      let parsed = null;
-      try {
-        parsed = new URL(url);
-      } catch {
-        parsed = null;
-      }
-      createImportJob({
-        surface: 'registry',
-        portalSessionId: session.sessionId,
-        teamCode: session.teamCode || null,
-        houseId: session?.houseCeremony?.houseId || null,
-        walletSubjects: collectWalletSubjectsForSession(session, req),
-        sourceUrl: parsed?.toString() || url,
-        sourceOrigin: parsed?.origin || null,
-        requestKind,
-        parseFallbackAllowed: req.body?.parseFallbackAllowed === true,
-        sourceHints,
-        idempotencyKey,
-        status: 'rejected',
-        decisionCode: proxyPolicyErrorCode(err),
-        decisionReason: 'Blocked by unsafe target policy',
-        result: {
-          policy: 'blocked',
-          details: err?.details || {}
-        }
-      });
-      return sendProxyPolicyContractError(res, err, requestId);
-    }
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'url must be a valid http(s) URL.', { requestId });
-  }
-});
-
-app.get('/api/registry/search', (_req, res) => {
-  const requestId = buildPortalRequestId();
-  const items = searchRegistryEntities({
-    query: typeof _req.query?.q === 'string' ? _req.query.q : '',
-    family: typeof _req.query?.family === 'string' ? _req.query.family : ''
-  });
-  return sendPortalApiSuccess(res, { items }, { requestId });
-});
-
-app.get('/api/registry/entities/:id', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const entity = getRegistryEntityById(req.params.id);
-  if (!entity) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry entity not found.', { requestId });
-  }
-  return sendPortalApiSuccess(res, { entity }, { requestId });
-});
-
-app.get('/v1/houses/:houseId/team', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
-  const teamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : 'team_main';
-  if (!requestedHouseId || !teamId) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseId and teamId are required.', { requestId });
-  }
-
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
-  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
-    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
-  }
-  const auth = verifyHouseAuth(req, resolvedHouse.house);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const binding = getTeamConfigBinding({
-    houseId: resolvedHouse.houseId,
-    teamId,
-  });
-  const activeConfig = binding
-    ? getConfigVersion(binding.activeConfigVersionId)
-    : null;
-  return sendPortalApiSuccess(res, {
-    houseId: resolvedHouse.houseId,
-    teamId,
-    activeConfigVersionId: binding?.activeConfigVersionId || null,
-    activeConfigHash: activeConfig?.configHash || null,
-    binding,
-    config: activeConfig,
-  }, { requestId });
-});
-
-app.post('/v1/houses/:houseId/configs', express.json({ limit: '96kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
-  if (!requestedHouseId) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseId is required.', { requestId });
-  }
-
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
-  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
-    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
-  }
-  const auth = verifyHouseAuth(req, resolvedHouse.house);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const status = typeof req.body?.status === 'string' ? req.body.status.trim() : 'draft';
-  const branch = typeof req.body?.branch === 'string' ? req.body.branch.trim() : '';
-  const displayVersion = typeof req.body?.displayVersion === 'string' ? req.body.displayVersion.trim() : '';
-  const providedConfigVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
-  const experienceId = typeof req.body?.experienceId === 'string' ? req.body.experienceId.trim() : '';
-  const parentConfigVersionIds = Array.isArray(req.body?.parentConfigVersionIds)
-    ? req.body.parentConfigVersionIds.map((item) => String(item || '').trim()).filter(Boolean)
-    : [];
-  const componentRefs = req.body?.componentRefs && typeof req.body.componentRefs === 'object' && !Array.isArray(req.body.componentRefs)
-    ? req.body.componentRefs
-    : null;
-  if (!idempotencyKey || !teamId || !branch || !displayVersion || !componentRefs || !PLATFORM_CONFIG_STATUSES.has(status)) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'teamId, branch, displayVersion, componentRefs, status, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const replayed = getConfigVersionByIdempotency({
-    houseId: resolvedHouse.houseId,
-    teamId,
-    idempotencyKey,
-  });
-  if (replayed) {
-    return sendPortalApiSuccess(res, {
-      configVersionId: replayed.configVersionId,
-      status: replayed.status,
-      configHash: replayed.configHash,
-      config: replayed,
-      componentVersions: listConfigComponentVersions(replayed.configVersionId),
-    }, { requestId });
-  }
-
-  let resolvedComponentsPayload = null;
-  try {
-    resolvedComponentsPayload = resolvePlatformConfigComponents(componentRefs, {
-      requireImmutable: PLATFORM_IMMUTABLE_CONFIG_STATUSES.has(status),
-    });
-  } catch (err) {
-    if (err?.code === 'CONFIG_COMPONENT_MUTABLE_REF') {
-      return sendPortalApiError(
-        res,
-        409,
-        'CONFIG_COMPONENT_MUTABLE_REF',
-        'Config publication requires immutable component version ids.',
-        {
-          requestId,
-          details: {
-            componentKey: String(err?.componentKey || ''),
-            ref: String(err?.ref || ''),
-          },
-        }
-      );
-    }
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      `Invalid config component reference${err?.componentKey ? ` for ${String(err.componentKey)}` : ''}.`,
-      { requestId }
-    );
-  }
-
-  const configVersionId = providedConfigVersionId || `cfg_${randomHex(10)}`;
-  if (getConfigVersion(configVersionId)) {
-    return sendPortalApiError(res, 409, 'CONFIG_ALREADY_EXISTS', 'Config version already exists.', { requestId });
-  }
-
-  const manifestBase = {
-    configVersionId,
-    displayVersion,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    branch,
-    status,
-    parentConfigVersionIds,
-    resolvedComponents: resolvedComponentsPayload.resolvedComponents,
-    resolvedComponentHashes: resolvedComponentsPayload.resolvedComponentHashes,
-  };
-  if (experienceId) manifestBase.experienceId = experienceId;
-  const configHash = sha256PrefixedHex(stableJsonStringify(manifestBase));
-  const manifest = {
-    ...manifestBase,
-    integrity: {
-      configHash,
-    },
-  };
-  const now = nowIso();
-  const config = upsertConfigVersion({
-    configVersionId,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    experienceId,
-    status,
-    configHash,
-    idempotencyKey,
-    manifest,
-    lineage: {
-      parentConfigVersionIds,
-      createdBy: 'v1.house.configs',
-      requestId,
-    },
-    nowIso: now,
-  });
-  const componentVersions = replaceConfigComponentVersions({
-    configVersionId,
-    components: resolvedComponentsPayload.componentVersions.map((component, index) => ({
-      configComponentVersionId: `ccv_${randomHex(10)}`,
-      componentKind: component.componentKind,
-      componentKey: component.componentKey,
-      immutableVersionId: component.immutableVersionId,
-      componentHash: component.componentHash,
-      metadata: {
-        ...component.metadata,
-        ordinal: index,
-      },
-    })),
-    nowIso: now,
-  });
-  return sendPortalApiSuccess(res, {
-    configVersionId: config.configVersionId,
-    status: config.status,
-    configHash: config.configHash,
-    config,
-    componentVersions,
-  }, { status: 201, requestId });
-});
-
-app.post('/v1/houses/:houseId/configs/:configVersionId/promote', express.json({ limit: '48kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const requestedHouseId = typeof req.params?.houseId === 'string' ? req.params.houseId.trim() : '';
-  const configVersionId = typeof req.params?.configVersionId === 'string' ? req.params.configVersionId.trim() : '';
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  if (!requestedHouseId || !configVersionId || !teamId || !idempotencyKey) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'houseId, configVersionId, teamId, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, requestedHouseId);
-  if (!resolvedHouse?.house || resolvedHouse.houseId !== requestedHouseId) {
-    return sendPortalApiError(res, 404, 'HOUSE_NOT_FOUND', 'House not found.', { requestId });
-  }
-  const auth = verifyHouseAuth(req, resolvedHouse.house);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const config = getConfigVersion(configVersionId);
-  if (!config || config.houseId !== resolvedHouse.houseId || config.teamId !== teamId) {
-    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
-  }
-  if (!PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(String(config.status || '').trim())) {
-    return sendPortalApiError(
-      res,
-      409,
-      'CONFIG_PROMOTION_BLOCKED',
-      'Only candidate or active config versions may be promoted.',
-      { requestId }
-    );
-  }
-
-  const binding = upsertTeamConfigBinding({
-    teamBindingId: `tb_${randomHex(10)}`,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    activeConfigVersionId: configVersionId,
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    houseId: resolvedHouse.houseId,
-    teamId,
-    activeConfigVersionId: binding.activeConfigVersionId,
-    binding,
-    config,
-  }, { requestId });
-});
-
-app.post('/v1/integrations/resolve', express.json({ limit: '64kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const targetUrl = typeof req.body?.targetUrl === 'string'
-    ? req.body.targetUrl.trim()
-    : (typeof req.body?.url === 'string' ? req.body.url.trim() : '');
-  const preferredMode = typeof req.body?.preferredMode === 'string' ? req.body.preferredMode.trim() : 'auto';
-  const sourceHints = req.body?.sourceHints && typeof req.body.sourceHints === 'object' && !Array.isArray(req.body.sourceHints)
-    ? req.body.sourceHints
-    : {};
-  if (!idempotencyKey || !targetUrl) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'targetUrl and Idempotency-Key are required.', { requestId });
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const replayed = getIntegrationCandidateByIdempotency(idempotencyKey);
-  if (replayed) {
-    return sendPortalApiSuccess(res, {
-      integrationCandidateId: replayed.integrationCandidateId,
-      sourceKind: replayed.sourceKind,
-      requiresCompilation: replayed.requiresCompilation,
-      ...((replayed.candidate && typeof replayed.candidate === 'object') ? replayed.candidate : {}),
-    }, { requestId });
-  }
-
-  try {
-    assertPortalContractTargetAllowed(targetUrl);
-    const resolved = resolveWebTarget(targetUrl, { preferredMode, sourceHints });
-    if (!resolved?.integration) {
-      return sendPortalApiError(
-        res,
-        409,
-        'INTEGRATION_TARGET_UNSUPPORTED',
-        'No supported integration candidate was found for this target.',
-        { requestId }
-      );
-    }
-    const sourceKind = String(resolved.integration?.sourceType || 'parse').trim() || 'parse';
-    const requiresCompilation = sourceKind !== 'native_pack';
-    const candidate = {
-      resolutionState: String(resolved.resolutionState || 'supported'),
-      sourceKind,
-      requiresCompilation,
-      website: resolved.website || null,
-      integration: resolved.integration || null,
-      alternatives: Array.isArray(resolved.alternatives) ? resolved.alternatives : [],
-      fallback: resolved.fallback || null,
-      targetUrl: new URL(targetUrl).toString(),
-    };
-    const created = createIntegrationCandidate({
-      integrationCandidateId: `intcand_${randomHex(10)}`,
-      idempotencyKey,
-      targetUrl: candidate.targetUrl,
-      sourceKind,
-      requiresCompilation,
-      candidate,
-      nowIso: nowIso(),
-    });
-    return sendPortalApiSuccess(res, {
-      integrationCandidateId: created.integrationCandidateId,
-      sourceKind: created.sourceKind,
-      requiresCompilation: created.requiresCompilation,
-      ...candidate,
-    }, { status: 201, requestId });
-  } catch (err) {
-    if (err?.code === 'PROXY_TARGET_BLOCKED') {
-      return sendProxyPolicyContractError(res, err, requestId);
-    }
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'targetUrl must be a valid http(s) URL.', { requestId });
-  }
-});
-
-app.post('/v1/integrations/:integrationId/compilations', express.json({ limit: '48kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const integrationId = typeof req.params?.integrationId === 'string' ? req.params.integrationId.trim() : '';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  if (!integrationId || !idempotencyKey) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'integrationId and Idempotency-Key are required.', { requestId });
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const candidate = getIntegrationCandidateById(integrationId);
-  if (!candidate) {
-    return sendPortalApiError(res, 404, 'INTEGRATION_NOT_FOUND', 'Integration candidate not found.', { requestId });
-  }
-
-  const replayed = getIntegrationPackVersionByIdempotency({
-    integrationId,
-    idempotencyKey,
-  });
-  if (replayed) {
-    return sendPortalApiSuccess(res, {
-      packVersionId: replayed.packVersionId,
-      contentHash: replayed.contentHash,
-      fileHashes: replayed.fileHashes,
-      manifest: replayed.manifest,
-    }, { requestId });
-  }
-
-  const compiled = buildCompiledIntegrationPack({
-    ...candidate.candidate,
-    integrationCandidateId: candidate.integrationCandidateId,
-    sourceKind: candidate.sourceKind,
-    targetUrl: candidate.targetUrl,
-  });
-  const created = createIntegrationPackVersion({
-    packVersionId: compiled.packVersionId,
-    integrationId,
-    sourceKind: candidate.sourceKind,
-    contentHash: compiled.contentHash,
-    manifest: compiled.manifest,
-    fileHashes: compiled.fileHashes,
-    idempotencyKey,
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    packVersionId: created.packVersionId,
-    contentHash: created.contentHash,
-    fileHashes: created.fileHashes,
-    manifest: created.manifest,
-  }, { status: 201, requestId });
-});
-
-app.post('/v1/integrations/:integrationId/executions', express.json({ limit: '64kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const integrationId = typeof req.params?.integrationId === 'string' ? req.params.integrationId.trim() : '';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const actionId = typeof req.body?.actionId === 'string' ? req.body.actionId.trim() : '';
-  const requestedBy = req.body?.requestedBy && typeof req.body.requestedBy === 'object' && !Array.isArray(req.body.requestedBy)
-    ? req.body.requestedBy
-    : {};
-  const executionRequest = req.body?.request && typeof req.body.request === 'object' && !Array.isArray(req.body.request)
-    ? req.body.request
-    : {};
-  if (!integrationId || !idempotencyKey || !actionId) {
-    return sendPortalApiError(
-      res,
-      400,
-      actionId ? 'INVALID_ARGUMENT' : 'EXECUTION_NOT_ALLOWED',
-      'integrationId, actionId, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const candidate = getIntegrationCandidateById(integrationId);
-  if (!candidate) {
-    return sendPortalApiError(res, 404, 'INTEGRATION_NOT_FOUND', 'Integration candidate not found.', { requestId });
-  }
-
-  const replayed = getIntegrationExecutionByIdempotency({
-    integrationId,
-    idempotencyKey,
-  });
-  if (replayed) {
-    return sendPortalApiSuccess(res, {
-      executionId: replayed.integrationExecutionId,
-      status: replayed.status,
-      actionId: replayed.actionId,
-      requestedBy: replayed.requestedBy,
-    }, { requestId });
-  }
-
-  const policy = getPlatformIntegrationActionPolicy({
-    ...candidate.candidate,
-    sourceKind: candidate.sourceKind,
-    website: candidate.candidate?.website || null,
-  }, actionId);
-  if (!policy) {
-    return sendPortalApiError(res, 400, 'EXECUTION_NOT_ALLOWED', 'actionId is not allowed for this integration.', { requestId });
-  }
-  const approvalId = typeof executionRequest?.approvalId === 'string' ? executionRequest.approvalId.trim() : '';
-  if (policy.requiresApproval && !approvalId) {
-    return sendPortalApiError(res, 409, 'APPROVAL_REQUIRED', 'This action requires explicit approval.', { requestId });
-  }
-
-  const execution = createIntegrationExecution({
-    integrationExecutionId: `exec_${randomHex(10)}`,
-    integrationId,
-    actionId,
-    requestedBy,
-    approvalId,
-    status: policy.status,
-    request: executionRequest,
-    result: {
-      policy: {
-        requiresApproval: policy.requiresApproval,
-      },
-    },
-    idempotencyKey,
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    executionId: execution.integrationExecutionId,
-    status: execution.status,
-    actionId: execution.actionId,
-    requestedBy: execution.requestedBy,
-  }, { status: 201, requestId });
-});
-
-app.post('/v1/experiences/:experienceId/runs', express.json({ limit: '64kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const experienceId = typeof req.params?.experienceId === 'string' ? req.params.experienceId.trim() : '';
-  if (!SUPPORTED_PLATFORM_EXPERIENCE_IDS.has(experienceId)) {
-    return sendPortalApiError(res, 404, 'EXPERIENCE_NOT_FOUND', 'Experience not found.', { requestId });
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const configVersionId = typeof req.body?.configVersionId === 'string' ? req.body.configVersionId.trim() : '';
-  const entryMode = typeof req.body?.entryMode === 'string' ? req.body.entryMode.trim() : '';
-  const metadata = req.body?.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata)
-    ? req.body.metadata
-    : {};
-  if (!idempotencyKey || !teamId || !configVersionId || !PLATFORM_RUN_ENTRY_MODES.has(entryMode)) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'teamId, configVersionId, entryMode, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const configVersion = getConfigVersion(configVersionId);
-  if (!configVersion) {
-    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
-  }
-
-  const configStatus = typeof configVersion?.manifest?.status === 'string' ? configVersion.manifest.status.trim() : '';
-  if (
-    configVersion.houseId !== resolvedHouse.houseId
-    || configVersion.teamId !== teamId
-    || (configStatus && !PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(configStatus))
-  ) {
-    return sendPortalApiError(res, 409, 'CONFIG_NOT_ELIGIBLE', 'Config version is not eligible for this run.', { requestId });
-  }
-
-  const replayed = getRunByIdempotency({
-    houseId: resolvedHouse.houseId,
-    idempotencyKey,
-  });
-  if (replayed) {
-    return sendPortalApiSuccess(res, {
-      runId: replayed.runId,
-      status: replayed.status,
-      traceAuthorityType: replayed.traceAuthorityType,
-    }, { requestId });
-  }
-
-  const run = createRun({
-    runId: `run_${randomHex(10)}`,
-    traceId: `trace_${randomHex(10)}`,
-    experienceId,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    configVersionId,
-    entryMode,
-    status: 'queued',
-    traceAuthorityType: PLATFORM_TRACE_AUTHORITY_TYPE,
-    metadata: {
-      ...metadata,
-      requestId,
-      sessionId: session.sessionId,
-      traceAuthorityRef: `house:${resolvedHouse.houseId}`,
-    },
-    idempotencyKey,
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    runId: run.runId,
-    status: run.status,
-    traceAuthorityType: run.traceAuthorityType,
-  }, { status: 201, requestId });
-});
-
-app.post('/v1/traces/ingestions', express.json({ limit: '128kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const runId = typeof req.body?.runId === 'string' ? req.body.runId.trim() : '';
-  const records = Array.isArray(req.body?.records) ? req.body.records : [];
-  if (!idempotencyKey || !runId || records.length === 0) {
-    return sendPortalApiError(
-      res,
-      400,
-      'TRACE_INTAKE_INVALID',
-      'runId, records, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const run = getRunById(runId);
-  if (!run) {
-    return sendPortalApiError(res, 404, 'RUN_NOT_FOUND', 'Run not found.', { requestId });
-  }
-
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Trace intake authorization failed.', { requestId });
-  }
-
-  let accepted = 0;
-  let ignored = 0;
-  let rejected = 0;
-  let latestEvent = getLatestTraceEvent(run.traceId);
-  const runStatus = String(run.status || '').trim().toLowerCase();
-  for (const record of records) {
-    const ingestKey = typeof record?.ingestKey === 'string' ? record.ingestKey.trim() : '';
-    const sourceType = typeof record?.sourceType === 'string' ? record.sourceType.trim() : '';
-    const payloadSchema = typeof record?.payloadSchema === 'string' ? record.payloadSchema.trim() : '';
-    const recordKind = typeof record?.recordKind === 'string' && record.recordKind.trim()
-      ? record.recordKind.trim()
-      : (typeof record?.payload?.kind === 'string' && record.payload.kind.trim() === 'annotation' ? 'annotation' : 'fact');
-    const payload = record?.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)
-      ? record.payload
-      : {};
-    if (!ingestKey || !sourceType || !payloadSchema) {
-      rejected += 1;
-      continue;
-    }
-    const duplicate = getTraceIntakeRecord({ runId, ingestKey });
-    if (duplicate) {
-      ignored += 1;
-      continue;
-    }
-    if (runStatus === 'completed' && recordKind !== 'annotation') {
-      return sendPortalApiError(
-        res,
-        409,
-        'TRACE_LATE_EVENT_REJECTED',
-        'Completed runs reject fact-changing late intake records.',
-        { requestId }
-      );
-    }
-
-    createTraceIntakeRecord({
-      traceIntakeRecordId: `intk_${randomHex(10)}`,
-      traceId: run.traceId,
-      runId,
-      ingestKey,
-      sourceType,
-      payloadSchema,
-      recordKind,
-      payload: {
-        recordKind,
-        payloadSchema,
-        payload,
-      },
-      createdAt: nowIso(),
-    });
-
-    const seq = latestEvent ? Number(latestEvent.seq || 0) + 1 : 1;
-    const eventKind = typeof payload?.kind === 'string' && payload.kind.trim()
-      ? payload.kind.trim()
-      : payloadSchema;
-    const eventHash = sha256PrefixedHex(JSON.stringify({
-      traceId: run.traceId,
-      runId,
-      seq,
-      eventKind,
-      sourceType,
-      payloadSchema,
-      recordKind,
-      payload,
-      prevEventHash: latestEvent?.eventHash || null,
-    }));
-    latestEvent = createTraceEvent({
-      eventId: `evt_${randomHex(10)}`,
-      traceId: run.traceId,
-      runId,
-      seq,
-      eventKind,
-      sourceType,
-      eventHash,
-      prevEventHash: latestEvent?.eventHash || null,
-      audience: {
-        class: 'TEAM',
-        houseId: run.houseId,
-        teamId: run.teamId,
-        entrantId: null,
-        readerIds: [],
-      },
-      seal: {
-        active: false,
-        sealedContextId: null,
-        releasePolicy: null,
-      },
-      actorKind: sourceType,
-      actorId: 'trace_ingestion',
-      payload: {
-        payloadSchema,
-        payload,
-      },
-      createdAt: nowIso(),
-    });
-    accepted += 1;
-  }
-
-  const currentRun = getRunById(runId);
-  const priorCounters = currentRun?.metadata?.archiveCounters && typeof currentRun.metadata.archiveCounters === 'object'
-    ? currentRun.metadata.archiveCounters
-    : {};
-  updateRunMetadata({
-    runId,
-    metadata: {
-      ...(currentRun?.metadata && typeof currentRun.metadata === 'object' ? currentRun.metadata : {}),
-      archiveCounters: {
-        accepted: Number(priorCounters.accepted || 0) + accepted,
-        ignored: Number(priorCounters.ignored || 0) + ignored,
-        rejected: Number(priorCounters.rejected || 0) + rejected,
-      },
-    },
-    nowIso: nowIso(),
-  });
-
-  return sendPortalApiSuccess(res, {
-    runId,
-    accepted,
-    ignored,
-    rejected,
-    traceId: run.traceId,
-  }, { requestId });
-});
-
-app.get('/v1/traces/:traceId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const traceId = typeof req.params?.traceId === 'string' ? req.params.traceId.trim() : '';
-  const run = getRunByTraceId(traceId);
-  if (!run) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trace not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Trace read authorization failed.', { requestId });
-  }
-  const events = listTraceEvents(traceId);
-  return sendPortalApiSuccess(res, {
-    traceId,
-    runId: run.runId,
-    eventCount: events.length,
-    status: run.status,
-    completedAt: run.completedAt,
-    traceAuthorityType: run.traceAuthorityType,
-    authority: {
-      type: run.traceAuthorityType,
-      ref: run.traceAuthorityType === 'poker_operator'
-        ? 'svc_poker_operator'
-        : `house:${run.houseId || ''}`,
-    },
-    archiveCounters: run?.metadata?.archiveCounters && typeof run.metadata.archiveCounters === 'object'
-      ? run.metadata.archiveCounters
-      : { accepted: events.length, ignored: 0, rejected: 0 },
-  }, { requestId });
-});
-
-app.get('/v1/traces/:traceId/events', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const traceId = typeof req.params?.traceId === 'string' ? req.params.traceId.trim() : '';
-  const run = getRunByTraceId(traceId);
-  if (!run) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trace not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, run.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Trace read authorization failed.', { requestId });
-  }
-  const requestedLimit = Number(req.query?.limit || 50);
-  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, Math.floor(requestedLimit)) : 50;
-  const afterSeq = decodeTraceCursor(typeof req.query?.cursor === 'string' ? req.query.cursor : '');
-  const allEvents = listTraceEvents(traceId);
-  const filtered = allEvents.filter((event) => Number(event?.seq || 0) > afterSeq);
-  const items = filtered.slice(0, limit);
-  const nextCursor = filtered.length > items.length
-    ? encodeTraceCursor(items[items.length - 1]?.seq || 0)
-    : null;
-  return sendPortalApiSuccess(res, {
-    traceId,
-    items,
-    nextCursor,
-  }, { requestId });
-});
-
-app.post('/v1/trainer/jobs', express.json({ limit: '64kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const jobKind = typeof req.body?.jobKind === 'string' ? req.body.jobKind.trim() : '';
-  const targets = req.body?.targets && typeof req.body.targets === 'object' && !Array.isArray(req.body.targets)
-    ? req.body.targets
-    : {};
-  let budget = {};
-  if (!idempotencyKey || !teamId || !jobKind) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'teamId, jobKind, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-  if (!PLATFORM_TRAINER_JOB_KINDS.has(jobKind)) {
-    return sendPortalApiError(res, 400, 'TRAINER_JOB_KIND_INVALID', 'jobKind is not supported.', { requestId });
-  }
-  if (!hasPlatformTrainerTargets(targets)) {
-    return sendPortalApiError(res, 400, 'TRAINER_TARGET_INVALID', 'targets must identify at least one trace, run, or config.', { requestId });
-  }
-  try {
-    budget = normalizePlatformTrainerBudget(req.body?.budget);
-  } catch (err) {
-    return sendPortalApiError(res, 400, 'TRAINER_BUDGET_INVALID', 'budget.maxUsd must be a positive number when provided.', { requestId });
-  }
-
-  const replayed = getTrainerJobByIdempotency({
-    houseId: resolvedHouse.houseId,
-    idempotencyKey,
-  });
-  if (replayed) {
-    const replayedResult = getTrainerResultByJobId(replayed.trainerJobId);
-    return sendPortalApiSuccess(res, {
-      trainerJobId: replayed.trainerJobId,
-      status: replayed.status,
-      jobKind: replayed.jobKind,
-      result: replayedResult ? {
-        trainerResultId: replayedResult.trainerResultId,
-        status: replayedResult.status,
-        approvalNeeded: replayedResult.approvalNeeded,
-      } : null,
-    }, { requestId });
-  }
-
-  const createdJob = createTrainerJob({
-    trainerJobId: `trainer_${randomHex(10)}`,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    jobKind,
-    status: 'queued',
-    targets,
-    budget,
-    idempotencyKey,
-    nowIso: nowIso(),
-  });
-
-  let job = createdJob;
-  let result = null;
-  if (jobKind === 'trainer_job.compare') {
-    const linkedConfigVersionId = resolvePlatformTrainerLinkedConfigVersionId({
-      houseId: resolvedHouse.houseId,
-      teamId,
-      targets,
-    });
-    const resultSeed = buildPlatformTrainerResultPayload(job, { linkedConfigVersionId });
-    result = createTrainerResult({
-      trainerResultId: resultSeed.trainerResultId,
-      trainerJobId: job.trainerJobId,
-      status: resultSeed.status,
-      result: resultSeed.resultPayload,
-      candidatePatchIds: resultSeed.candidatePatchIds,
-      linkedConfigVersionId: resultSeed.linkedConfigVersionId,
-      approvalNeeded: resultSeed.approvalNeeded,
-      nowIso: nowIso(),
-    });
-    job = updateTrainerJobStatus({
-      trainerJobId: job.trainerJobId,
-      status: 'succeeded',
-      nowIso: nowIso(),
-    });
-  }
-
-  return sendPortalApiSuccess(res, {
-    trainerJobId: job.trainerJobId,
-    status: job.status,
-    jobKind: job.jobKind,
-    result: result ? {
-      trainerResultId: result.trainerResultId,
-      status: result.status,
-      approvalNeeded: result.approvalNeeded,
-    } : null,
-  }, { status: 201, requestId });
-});
-
-app.get('/v1/trainer/jobs/:trainerJobId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const trainerJobId = typeof req.params?.trainerJobId === 'string' ? req.params.trainerJobId.trim() : '';
-  const job = getTrainerJobById(trainerJobId);
-  if (!job) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Trainer read authorization failed.', { requestId });
-  }
-  const result = getTrainerResultByJobId(job.trainerJobId);
-  return sendPortalApiSuccess(res, {
-    trainerJobId: job.trainerJobId,
-    status: job.status,
-    jobKind: job.jobKind,
-    targets: job.targets,
-    budget: job.budget,
-    result: result ? {
-      trainerResultId: result.trainerResultId,
-      status: result.status,
-      candidatePatchIds: result.candidatePatchIds,
-      linkedConfigVersionId: result.linkedConfigVersionId,
-      approvalNeeded: result.approvalNeeded,
-    } : null,
-  }, { requestId });
-});
-
-app.get('/v1/trainer/results/:trainerResultId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const trainerResultId = typeof req.params?.trainerResultId === 'string' ? req.params.trainerResultId.trim() : '';
-  const result = getTrainerResultById(trainerResultId);
-  if (!result) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result not found.', { requestId });
-  }
-  const job = getTrainerJobById(result.trainerJobId);
-  if (!job) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Trainer read authorization failed.', { requestId });
-  }
-  return sendPortalApiSuccess(res, {
-    trainerResultId: result.trainerResultId,
-    trainerJobId: result.trainerJobId,
-    status: result.status,
-    linkedConfigVersionId: result.linkedConfigVersionId,
-    approvalNeeded: result.approvalNeeded,
-    ...((result.result && typeof result.result === 'object') ? result.result : {}),
-  }, { requestId });
-});
-
-app.post('/v1/trainer/results/:trainerResultId/promote-patch', express.json({ limit: '64kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const trainerResultId = typeof req.params?.trainerResultId === 'string' ? req.params.trainerResultId.trim() : '';
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const candidatePatchId = typeof req.body?.candidatePatchId === 'string' ? req.body.candidatePatchId.trim() : '';
-  const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
-  if (!trainerResultId || !idempotencyKey || !teamId || !candidatePatchId) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'trainerResultId, teamId, candidatePatchId, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const result = getTrainerResultById(trainerResultId);
-  if (!result) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result not found.', { requestId });
-  }
-  const job = getTrainerJobById(result.trainerJobId);
-  if (!job) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer job not found.', { requestId });
-  }
-  if (job.teamId !== teamId) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Trainer result does not belong to this team.', { requestId });
-  }
-
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, job.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-  if (!result.candidatePatchIds.includes(candidatePatchId)) {
-    return sendPortalApiError(res, 404, 'TRAINER_PATCH_NOT_FOUND', 'Candidate patch not found on this trainer result.', { requestId });
-  }
-  if (result.approvalNeeded) {
-    const approval = resolveApprovedTrainerPatchPromotion(approvalId, {
-      houseId: resolvedHouse.houseId,
-      trainerResultId,
-      candidatePatchId,
-    });
-    if (!approval) {
-      return sendPortalApiError(res, 409, 'APPROVAL_REQUIRED', 'Patch promotion requires an approved decision.', { requestId });
-    }
-  }
-
-  const replayedConfig = getConfigVersionByIdempotency({
-    houseId: resolvedHouse.houseId,
-    teamId,
-    idempotencyKey,
-  });
-  if (replayedConfig) {
-    const binding = upsertTeamConfigBinding({
-      teamBindingId: `tb_${randomHex(10)}`,
-      houseId: resolvedHouse.houseId,
-      teamId,
-      activeConfigVersionId: replayedConfig.configVersionId,
-      nowIso: nowIso(),
-    });
-    return sendPortalApiSuccess(res, {
-      configVersionId: replayedConfig.configVersionId,
-      activeConfigVersionId: binding.activeConfigVersionId,
-      config: replayedConfig,
-      binding,
-    }, { requestId });
-  }
-
-  const parentConfigVersionId = result.linkedConfigVersionId
-    || resolvePlatformTrainerLinkedConfigVersionId({
-      houseId: resolvedHouse.houseId,
-      teamId,
-      targets: job.targets,
-    });
-  const parentConfig = getConfigVersion(parentConfigVersionId);
-  if (!parentConfig) {
-    return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'A base config version is required before promotion.', { requestId });
-  }
-
-  const newConfigVersionId = `cfg_${randomHex(10)}`;
-  const parentManifest = parentConfig.manifest && typeof parentConfig.manifest === 'object' ? parentConfig.manifest : {};
-  const manifestBase = {
-    ...parentManifest,
-    configVersionId: newConfigVersionId,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    displayVersion: `${newConfigVersionId}@trainer-patch`,
-    status: 'active',
-    parentConfigVersionIds: [parentConfig.configVersionId],
-    trainerPromotion: {
-      trainerJobId: job.trainerJobId,
-      trainerResultId,
-      candidatePatchId,
-      approvalId: approvalId || null,
-    },
-  };
-  delete manifestBase.integrity;
-  const configHash = sha256PrefixedHex(stableJsonStringify(manifestBase));
-  const manifest = {
-    ...manifestBase,
-    integrity: {
-      configHash,
-    },
-  };
-  const now = nowIso();
-  const config = upsertConfigVersion({
-    configVersionId: newConfigVersionId,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    experienceId: typeof parentConfig.experienceId === 'string' ? parentConfig.experienceId : '',
-    status: 'active',
-    configHash,
-    idempotencyKey,
-    manifest,
-    lineage: {
-      parentConfigVersionIds: [parentConfig.configVersionId],
-      trainerJobId: job.trainerJobId,
-      trainerResultId,
-      candidatePatchId,
-      approvalId: approvalId || null,
-      createdBy: 'v1.trainer.results.promote-patch',
-      requestId,
-    },
-    nowIso: now,
-  });
-  const parentComponents = listConfigComponentVersions(parentConfig.configVersionId);
-  replaceConfigComponentVersions({
-    configVersionId: newConfigVersionId,
-    components: parentComponents.map((component, index) => ({
-      configComponentVersionId: `ccv_${randomHex(10)}`,
-      componentKind: component.componentKind,
-      componentKey: component.componentKey,
-      immutableVersionId: component.immutableVersionId,
-      componentHash: component.componentHash,
-      metadata: {
-        ...(component.metadata && typeof component.metadata === 'object' ? component.metadata : {}),
-        ordinal: index,
-        promotedFromConfigVersionId: parentConfig.configVersionId,
-        candidatePatchId,
-      },
-    })),
-    nowIso: now,
-  });
-  const binding = upsertTeamConfigBinding({
-    teamBindingId: `tb_${randomHex(10)}`,
-    houseId: resolvedHouse.houseId,
-    teamId,
-    activeConfigVersionId: newConfigVersionId,
-    nowIso: now,
-  });
-  updateTrainerResultLink({
-    trainerResultId,
-    linkedConfigVersionId: newConfigVersionId,
-    nowIso: now,
-  });
-  return sendPortalApiSuccess(res, {
-    configVersionId: config.configVersionId,
-    activeConfigVersionId: binding.activeConfigVersionId,
-    config,
-    binding,
-  }, { status: 201, requestId });
-});
-
-app.get('/v1/seals/:sealedContextId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
-  const sealedContext = getSealedContextById(sealedContextId);
-  if (!sealedContext) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Seal read authorization failed.', { requestId });
-  }
-  return sendPortalApiSuccess(res, {
-    sealedContextId: sealedContext.sealedContextId,
-    entrantId: sealedContext.entrantId,
-    scopeType: sealedContext.scopeType,
-    scopeKey: sealedContext.scopeKey,
-    allowedReaders: sealedContext.allowedReaders,
-    forbiddenSources: sealedContext.forbiddenSources,
-    releasePolicy: sealedContext.releasePolicy,
-    status: sealedContext.status,
-  }, { requestId });
-});
-
-app.post('/v1/seals/:sealedContextId/release', express.json({ limit: '32kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
-  const sealedContext = getSealedContextById(sealedContextId);
-  if (!sealedContext) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Seal release authorization failed.', { requestId });
-  }
-  if (sealedContext.status === 'released') {
-    return sendPortalApiSuccess(res, sealedContext, { requestId });
-  }
-  if (sealedContext.releasePolicy !== 'manual') {
-    return sendPortalApiError(res, 409, 'SEAL_RELEASE_BLOCKED', 'This sealed context cannot be manually released.', { requestId });
-  }
-  const updated = updateSealedContextStatus({
-    sealedContextId,
-    status: 'released',
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, updated, { requestId });
-});
-
-app.post('/v1/seals/:sealedContextId/violation', express.json({ limit: '32kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-  const sealedContextId = typeof req.params?.sealedContextId === 'string' ? req.params.sealedContextId.trim() : '';
-  const sealedContext = getSealedContextById(sealedContextId);
-  if (!sealedContext) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Sealed context not found.', { requestId });
-  }
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sealedContext.houseId || '');
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'Seal violation authorization failed.', { requestId });
-  }
-  const actor = req.body?.actor && typeof req.body.actor === 'object' && !Array.isArray(req.body.actor)
-    ? req.body.actor
-    : {
-      actorType: 'human',
-      actorId: session.sessionId,
-    };
-  const details = req.body?.details && typeof req.body.details === 'object' && !Array.isArray(req.body.details)
-    ? req.body.details
-    : {};
-  const violation = createSealedContextViolation({
-    sealedContextViolationId: `sealvio_${randomHex(10)}`,
-    sealedContextId,
-    actor,
-    details,
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    sealedContextId,
-    violation,
-  }, { status: 201, requestId });
-});
-
-app.post('/v1/traces/poker-operator-ingestions', express.json({ limit: '128kb' }), (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
-  if (!session) {
-    return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
-  }
-
-  const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
-  const store = readStore();
-  const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
-  const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
-  if (!auth.ok) {
-    return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
-  }
-
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
-  const records = parsePokerOperatorFixtureRecords(req.body?.records);
-  if (!idempotencyKey || !teamId || records.length === 0) {
-    return sendPortalApiError(
-      res,
-      400,
-      'INVALID_ARGUMENT',
-      'teamId, records, and Idempotency-Key are required.',
-      { requestId }
-    );
-  }
-
-  const replayedRun = getRunByIdempotency({
-    houseId: resolvedHouse.houseId,
-    idempotencyKey,
-  });
-  if (replayedRun && replayedRun.traceAuthorityType === 'poker_operator') {
-    return sendPortalApiSuccess(res, {
-      runId: replayedRun.runId,
-      traceId: replayedRun.traceId,
-      eventCount: listTraceEvents(replayedRun.traceId).length,
-      authority: {
-        type: 'poker_operator',
-      },
-    }, { requestId });
-  }
-
-  const run = createRun({
-    runId: `run_${randomHex(10)}`,
-    traceId: `trace_${randomHex(10)}`,
-    experienceId: 'arena.poker.season0',
-    houseId: resolvedHouse.houseId,
-    teamId,
-    configVersionId: '',
-    entryMode: 'season_lock',
-    status: 'queued',
-    traceAuthorityType: 'poker_operator',
-    metadata: {
-      authority: {
-        type: 'poker_operator',
-        ref: 'svc_poker_operator',
-      },
-      requestId,
-    },
-    idempotencyKey,
-    nowIso: nowIso(),
-  });
-
-  let latestEvent = null;
-  for (const record of records) {
-    const ingestKey = typeof record?.ingestKey === 'string' ? record.ingestKey.trim() : '';
-    const eventType = typeof record?.type === 'string' ? record.type.trim() : '';
-    const entrantId = typeof record?.entrantId === 'string' ? record.entrantId.trim() : '';
-    if (!ingestKey || !eventType || !entrantId) {
-      continue;
-    }
-    createTraceIntakeRecord({
-      traceIntakeRecordId: `intk_${randomHex(10)}`,
-      traceId: run.traceId,
-      runId: run.runId,
-      ingestKey,
-      sourceType: 'poker_operator',
-      payloadSchema: `raw.poker.operator.${eventType}/v1`,
-      payload: record,
-      createdAt: nowIso(),
-    });
-
-    const fixtureSealed = buildSeededSealedContextRecord({
-      houseId: resolvedHouse.houseId,
-      traceId: run.traceId,
-      runId: run.runId,
-      releasePolicy: 'post_match',
-      status: 'active',
-    });
-    const sealedContext = upsertSealedContext({
-      houseId: resolvedHouse.houseId,
-      sealedContextId: entrantId === fixtureSealed.entrantId
-        ? fixtureSealed.sealedContextId
-        : deriveDeterministicSealId(entrantId),
-      traceId: run.traceId,
-      runId: run.runId,
-      entrantId,
-      scopeType: 'entrant_private',
-      scopeKey: `poker:${entrantId}`,
-      allowedReaders: entrantId === fixtureSealed.entrantId
-        ? fixtureSealed.allowedReaders
-        : [entrantId, 'arbiter_fixture'],
-      forbiddenSources: fixtureSealed.forbiddenSources,
-      releasePolicy: 'post_match',
-      status: 'active',
-      nowIso: nowIso(),
-    });
-    const seq = latestEvent ? Number(latestEvent.seq || 0) + 1 : 1;
-    const payloadSchema = `et.trace.poker.${eventType}/v1`;
-    const eventHash = sha256PrefixedHex(JSON.stringify({
-      traceId: run.traceId,
-      runId: run.runId,
-      seq,
-      eventType,
-      entrantId,
-      prevEventHash: latestEvent?.eventHash || null,
-      payloadSchema,
-      payload: record,
-    }));
-    latestEvent = createTraceEvent({
-      eventId: `evt_${randomHex(10)}`,
-      traceId: run.traceId,
-      runId: run.runId,
-      seq,
-      eventKind: `poker.${eventType}`,
-      sourceType: 'poker_operator',
-      eventHash,
-      prevEventHash: latestEvent?.eventHash || null,
-      audience: {
-        class: 'ENTRANT',
-        houseId: resolvedHouse.houseId,
-        teamId,
-        entrantId,
-        readerIds: allowedReaderIdsFromSealedContext(sealedContext),
-      },
-      seal: {
-        active: true,
-        sealedContextId: sealedContext.sealedContextId,
-        releasePolicy: 'post_match',
-      },
-      actorKind: 'service',
-      actorId: 'svc_poker_operator',
-      sealedContextId: sealedContext.sealedContextId,
-      payload: {
-        payloadSchema,
-        payload: record,
-      },
-      createdAt: nowIso(),
-    });
-  }
-  const eventCount = listTraceEvents(run.traceId).length;
-  const runWithCounters = updateRunMetadata({
-    runId: run.runId,
-    metadata: {
-      ...(run.metadata && typeof run.metadata === 'object' ? run.metadata : {}),
-      authority: {
-        type: 'poker_operator',
-        ref: 'svc_poker_operator',
-      },
-      archiveCounters: {
-        accepted: eventCount,
-        ignored: 0,
-        rejected: 0,
-      },
-    },
-    nowIso: nowIso(),
-  });
-  const completedRun = updateRunStatus({
-    runId: run.runId,
-    status: 'completed',
-    completedAt: nowIso(),
-    nowIso: nowIso(),
-  });
-  return sendPortalApiSuccess(res, {
-    runId: completedRun.runId,
-    traceId: completedRun.traceId,
-    eventCount: runWithCounters?.metadata?.archiveCounters?.accepted || eventCount,
-    authority: {
-      type: 'poker_operator',
-    },
-  }, { status: 201, requestId });
-});
-
-app.get('/v1/health', respondPokerOperatorTransport);
-app.get('/v1/seasons', respondPokerOperatorTransport);
-app.get('/v1/seasons/:seasonId', respondPokerOperatorTransport);
-app.post('/v1/seasons', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
-app.post('/v1/seasons/:seasonId/submissions', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
-app.post('/v1/seasons/:seasonId/batches', express.json({ limit: '1mb' }), respondPokerOperatorTransport);
-app.get('/v1/batches/:batchId', respondPokerOperatorTransport);
-app.get('/v1/runs/:runId', respondPokerOperatorTransport);
-app.get('/v1/runs/:runId/replay', respondPokerOperatorTransport);
-app.get('/v1/leaderboards/:seasonId/latest', respondPokerOperatorTransport);
-app.get('/v1/leaderboards/:seasonId/snapshots/:snapshotId', respondPokerOperatorTransport);
-
-app.post('/api/poker/admin/sync', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const seasonId = typeof req.body?.seasonId === 'string' ? req.body.seasonId.trim() : '';
-  try {
-    const mirrored = await syncPokerMirrorFromOperator({ seasonId });
-    return sendPortalApiSuccess(res, {
-      operator: mirrored.health,
-      mirrored: mirrored.counts,
-      seasonIds: mirrored.seasonIds,
-    }, { requestId });
-  } catch (err) {
-    return sendPortalApiError(
-      res,
-      Number(err?.status || 502),
-      typeof err?.code === 'string' && err.code ? err.code : 'POKER_OPERATOR_SYNC_FAILED',
-      typeof err?.message === 'string' && err.message ? err.message : 'Poker operator sync failed.',
-      {
-        requestId,
-        retryable: Number(err?.status || 502) >= 500,
-        details: err?.details || {},
-      }
-    );
-  }
-});
-
-app.get('/api/poker/seasons', (_req, res) => {
-  const requestId = buildPortalRequestId();
-  const items = listPokerSeasons()
-    .map(summarizeMirroredPokerSeason)
-    .filter(Boolean);
-  return sendPortalApiSuccess(res, { items }, { requestId });
-});
-
-app.get('/api/poker/seasons/:seasonId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const season = getPokerSeasonById(req.params.seasonId);
-  if (!season) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker season not found.', { requestId });
-  }
-  return sendPortalApiSuccess(res, {
-    season: summarizeMirroredPokerSeason(season),
-  }, { requestId });
-});
-
-app.post('/api/poker/seasons/:seasonId/submissions', async (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const idempotencyKey = normalizePortalIdempotencyKey(req);
-  if (!idempotencyKey) {
-    return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'idempotencyKey is required.', { requestId });
-  }
-  const walletBinding = resolvePrimaryWalletSubject(session, req);
-  if (!walletBinding) {
-    return sendPortalApiError(res, 409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before submitting.', { requestId });
-  }
-  const existing = getPokerSubmissionByRequest({
-    seasonId: req.params.seasonId,
-    portalSessionId: session.sessionId,
-    idempotencyKey,
-  });
-  if (existing) {
-    return sendPortalApiSuccess(res, {
-      submission: existing,
-      replayed: true,
-    }, { requestId });
-  }
-
-  const bundle = req.body?.bundle && typeof req.body.bundle === 'object' ? req.body.bundle : null;
-  const declaredCapabilities = req.body?.declaredCapabilities && typeof req.body.declaredCapabilities === 'object'
-    ? req.body.declaredCapabilities
-    : {};
-  const portalSubmissionId = typeof req.body?.portalSubmissionId === 'string' && req.body.portalSubmissionId.trim()
-    ? req.body.portalSubmissionId.trim()
-    : `psub_${randomHex(8)}`;
-  try {
-    const client = createPortalPokerOperatorClient();
-    const result = await client.createSubmission(
-      req.params.seasonId,
-      {
-        portalSubmissionId,
-        submitterWallet: walletBinding.submitterWallet,
-        bundle,
-        declaredCapabilities,
-      },
-      {
-        bearerToken: getPokerOperatorServiceToken(),
-        idempotencyKey,
-      }
-    );
-    if (!getPokerSeasonById(req.params.seasonId)) {
-      const season = await client.getSeason(req.params.seasonId);
-      upsertPokerSeason({
-        seasonId: season.seasonId,
-        seasonSlug: season.seasonSlug,
-        displayName: season.displayName,
-        rulesVersion: season.rulesVersion,
-        operatorVersion: season.operatorVersion,
-        status: season.status,
-        submissionOpenAt: season.submissionOpenAt,
-        submissionCloseAt: season.submissionCloseAt,
-        divisions: season.divisions,
-        raw: season,
-        createdAt: season.createdAt || nowIso(),
-        updatedAt: season.updatedAt || nowIso(),
-      });
-    }
-    const mirrored = upsertPokerSubmission({
-      submissionId: result.submissionId,
-      seasonId: req.params.seasonId,
-      portalSubmissionId,
-      portalSessionId: session.sessionId,
-      walletSubject: walletBinding.walletSubject,
-      submitterWallet: walletBinding.submitterWallet,
-      bundle,
-      declaredCapabilities,
-      validation: result.validation,
-      status: result.status,
-      idempotencyKey,
-      raw: result,
-      createdAt: nowIso(),
-      updatedAt: nowIso(),
-    });
-    return sendPortalApiSuccess(res, {
-      submission: mirrored,
-      replayed: false,
-    }, { requestId });
-  } catch (err) {
-    return sendPortalApiError(
-      res,
-      Number(err?.status || 502),
-      typeof err?.code === 'string' && err.code ? err.code : 'POKER_SUBMISSION_FAILED',
-      typeof err?.message === 'string' && err.message ? err.message : 'Poker submission failed.',
-      {
-        requestId,
-        retryable: Number(err?.status || 502) >= 500,
-        details: err?.details || {},
-      }
-    );
-  }
-});
-
-app.get('/api/poker/submissions/:submissionId', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const session = requireBoundHumanSession(req, res, { requestId });
-  if (!session) return;
-  const submission = getPokerSubmissionById(req.params.submissionId);
-  if (!submission) {
-    return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker submission not found.', { requestId });
-  }
-  if (submission.portalSessionId && submission.portalSessionId !== session.sessionId) {
-    return sendPortalApiError(res, 403, 'FORBIDDEN', 'This poker submission belongs to a different Portal session.', { requestId });
-  }
-  return sendPortalApiSuccess(res, {
-    submission: {
-      submissionId: submission.submissionId,
-      seasonId: submission.seasonId,
-      status: submission.status,
-      validation: submission.validation,
-      createdAt: submission.createdAt,
-      updatedAt: submission.updatedAt,
-    },
-  }, { requestId });
-});
-
-app.get('/api/poker/leaderboards/:seasonId/latest', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const snapshot = getLatestPokerLeaderboardSnapshot(req.params.seasonId);
-  return sendPortalApiSuccess(res, {
-    seasonId: req.params.seasonId,
-    snapshotId: snapshot?.snapshotId || null,
-    createdAt: snapshot?.createdAt || null,
-    rankings: Array.isArray(snapshot?.rankings) ? snapshot.rankings : [],
-  }, { requestId });
-});
-
-app.get('/api/poker/runs/:runId/replay', (req, res) => {
-  const requestId = buildPortalRequestId();
-  const run = getPokerRunById(req.params.runId);
-  const replay = getPokerReplayArtifactByRunId(req.params.runId);
-  if (!run || !replay) {
-    return sendPortalApiError(res, 404, 'POKER_REPLAY_NOT_READY', 'Replay artifact is not ready.', { requestId });
-  }
-  if (replay.replayFormat !== 'poker-run-replay-v1') {
-    return sendPortalApiError(res, 502, 'POKER_OPERATOR_SCHEMA_MISMATCH', 'Replay format does not match Portal expectations.', {
-      requestId,
-      details: {
-        expectedReplayFormat: 'poker-run-replay-v1',
-        receivedReplayFormat: replay.replayFormat,
-      },
-    });
-  }
-  const computedHash = computePokerArtifactSha256(replay.raw);
-  if (!computedHash || computedHash !== replay.artifactSha256) {
-    return sendPortalApiError(res, 409, 'POKER_REPLAY_NOT_READY', 'Replay artifact hash is not ready or does not match.', {
-      requestId,
-      details: {
-        expectedArtifactSha256: replay.artifactSha256,
-        computedArtifactSha256: computedHash,
-      },
-    });
-  }
-  return sendPortalApiSuccess(res, {
-    runId: run.runId,
-    summary: run.summary,
-    replay: {
-      replayFormat: replay.replayFormat,
-      summaryJson: replay.summary,
-      eventsJsonlUri: replay.eventsJsonlUri,
-      artifactSha256: replay.artifactSha256,
-      contentType: replay.contentType,
-    },
-    hashVerified: true,
-  }, { requestId });
 });
 
 app.post('/api/hatch/complete', (req, res) => {
@@ -11705,6 +9589,7 @@ if (process.env.NODE_ENV === 'test') {
     resetExtendedStore();
     resetUnifiedPlatformStore();
     resetPokerOperatorState();
+    resetEmailOtpAdapter();
     invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();
@@ -11737,6 +9622,130 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       stats: getUnifiedPlatformTestStats(),
+    });
+  });
+
+  app.get('/__test__/route-manifest', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      routes: getRouteOwnerManifest(),
+    });
+  });
+
+  app.get('/__test__/live-suites', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      suites: getLiveSuiteManifest(),
+    });
+  });
+
+  app.post('/__test__/otp/email/issue', express.json({ limit: '16kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'stub';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    if (!email) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    try {
+      const record = issueEmailOtp({
+        provider,
+        email,
+        code: typeof req.body?.code === 'string' ? req.body.code.trim() : '',
+        nowIso: nowIso(),
+      });
+      return res.json({ ok: true, record });
+    } catch {
+      return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    }
+  });
+
+  app.get('/__test__/otp/email/latest', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.query?.provider === 'string' ? req.query.provider.trim() : 'stub';
+    const email = typeof req.query?.email === 'string' ? req.query.email.trim() : '';
+    if (!email) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const record = getLatestEmailOtp({ provider, email });
+    if (!record) return res.status(404).json({ ok: false, error: 'OTP_NOT_FOUND' });
+    return res.json({ ok: true, record });
+  });
+
+  app.post('/__test__/otp/email/consume', express.json({ limit: '16kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'stub';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!email || !code) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const outcome = consumeEmailOtp({ provider, email, code, nowIso: nowIso() });
+    if (!outcome.ok) {
+      return res.status(409).json({
+        ok: false,
+        error: outcome.error,
+        record: outcome.record,
+      });
+    }
+    return res.json({ ok: true, record: outcome.record });
+  });
+
+  app.get('/__test__/otp/email/activity', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const provider = typeof req.query?.provider === 'string' ? req.query.provider.trim() : '';
+    const email = typeof req.query?.email === 'string' ? req.query.email.trim() : '';
+    return res.json({
+      ok: true,
+      activity: getEmailOtpActivity({ provider, email }),
+    });
+  });
+
+  app.get('/__test__/platform-export', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      snapshot: exportPlatformStateSnapshot(),
+    });
+  });
+
+  app.post('/__test__/platform-import', express.json({ limit: '2mb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const snapshot = req.body?.snapshot && typeof req.body.snapshot === 'object' ? req.body.snapshot : null;
+    if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    const imported = importPlatformStateSnapshot(snapshot, { reset: req.body?.reset !== false });
+    return res.json({ ok: true, snapshot: imported });
+  });
+
+  app.post('/__test__/platform-verify', express.json({ limit: '2mb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const snapshot = req.body?.snapshot && typeof req.body.snapshot === 'object' ? req.body.snapshot : null;
+    if (!snapshot) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    return res.json({
+      ok: true,
+      verification: verifyPlatformStateSnapshot(snapshot),
     });
   });
 
@@ -11926,13 +9935,16 @@ if (process.env.NODE_ENV === 'test') {
     const header = req.header('x-test-reset');
     if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
     const houseId = typeof req.body?.houseId === 'string' ? req.body.houseId.trim() : '';
+    const teamId = typeof req.body?.teamId === 'string' ? req.body.teamId.trim() : '';
     if (!houseId) return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
     const session = ensureHumanSession(req, res);
     session.houseCeremony = session.houseCeremony || {};
     session.houseCeremony.houseId = houseId;
     session.houseCeremony.createdAt = session.houseCeremony.createdAt || nowIso();
+    if (teamId) session.activeTeamId = teamId;
     indexHouseId(session, houseId);
-    return res.json({ ok: true, houseId, sessionId: session.sessionId });
+    const context = buildPlatformContextResponse(session);
+    return res.json({ ok: true, houseId, sessionId: session.sessionId, activeTeamId: context.activeTeamId, availableTeamIds: context.availableTeamIds });
   });
 
   app.post('/__test__/poker/operator-fixture', (req, res) => {

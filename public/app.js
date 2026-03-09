@@ -195,10 +195,20 @@ async function api(url, opts = {}) {
     }
   }
   if (!res.ok) {
-    const msg = data && data.error ? data.error : `HTTP_${res.status}`;
+    const msg = typeof data?.error === 'string'
+      ? data.error
+      : typeof data?.error?.code === 'string' && data.error.code
+        ? data.error.code
+        : `HTTP_${res.status}`;
     const err = new Error(msg);
     err.status = res.status;
     err.data = data;
+    if (typeof data?.error?.code === 'string' && data.error.code) {
+      err.code = data.error.code;
+    }
+    if (typeof data?.error?.message === 'string' && data.error.message) {
+      err.detail = data.error.message;
+    }
     throw err;
   }
   return data;
@@ -464,6 +474,12 @@ let experienceIntentPonyState = {
 };
 let houseSurfaceState = {
   activeSurface: '',
+  context: {
+    loaded: false,
+    houseId: '',
+    activeTeamId: '',
+    availableTeamIds: [],
+  },
   archive: {
     loaded: false,
     items: [],
@@ -475,7 +491,12 @@ let houseSurfaceState = {
     jobs: [],
     results: [],
     selectedResultId: '',
-    emptyStateText: 'No durable trainer jobs yet.'
+    emptyStateText: 'No durable trainer jobs yet.',
+    activeConfigVersionId: '',
+    submitIdempotencyKey: '',
+    promotionIdempotencyKey: '',
+    actionStatusText: '',
+    actionStatusError: false,
   }
 };
 let pendingTownhallHumanImage = null;
@@ -1161,6 +1182,145 @@ function setHouseSurfaceStatus(text, isError = false) {
   node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
 }
 
+function setHouseTrainerActionStatus(text, isError = false) {
+  const node = el('houseTrainerActionStatus');
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  houseSurfaceState.trainer.actionStatusText = String(text || '');
+  houseSurfaceState.trainer.actionStatusError = !!isError;
+}
+
+function makeHouseIdempotencyKey(prefix) {
+  const safePrefix = String(prefix || 'house').trim() || 'house';
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return `${safePrefix}_${window.crypto.randomUUID()}`;
+  }
+  return `${safePrefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function resetHouseTrainerActionKeys() {
+  houseSurfaceState.trainer.submitIdempotencyKey = makeHouseIdempotencyKey('house_compare');
+  houseSurfaceState.trainer.promotionIdempotencyKey = makeHouseIdempotencyKey('house_promote');
+}
+
+function normalizeHouseTeamIds(items) {
+  const source = Array.isArray(items) ? items : [];
+  const seen = new Set();
+  return source.map((item) => String(item || '').trim()).filter((item) => {
+    if (!item || seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function syncHouseSurfaceContextFromPayload(payload = {}) {
+  const previousHouseId = houseSurfaceState.context.houseId;
+  const nextHouseId = String(payload?.houseId || '').trim();
+  const nextTeamIds = normalizeHouseTeamIds(payload?.availableTeamIds);
+  let nextActiveTeamId = String(payload?.activeTeamId || '').trim();
+  if (nextActiveTeamId && nextTeamIds.length && !nextTeamIds.includes(nextActiveTeamId)) {
+    nextActiveTeamId = '';
+  }
+  if (!nextActiveTeamId && nextTeamIds.length) {
+    nextActiveTeamId = nextTeamIds[0];
+  }
+  const previousActiveTeamId = houseSurfaceState.context.activeTeamId;
+  houseSurfaceState.context.loaded = true;
+  houseSurfaceState.context.houseId = nextHouseId;
+  houseSurfaceState.context.activeTeamId = nextActiveTeamId;
+  houseSurfaceState.context.availableTeamIds = nextTeamIds;
+  if (previousActiveTeamId !== nextActiveTeamId) {
+    houseSurfaceState.archive.selectedTraceId = '';
+    houseSurfaceState.trainer.selectedResultId = '';
+    resetHouseTrainerActionKeys();
+  }
+  renderHouseSurfaceContext();
+  if (nextHouseId && previousHouseId !== nextHouseId && currentDistrict === 'house' && nextTeamIds.length === 0) {
+    loadHousePlatformContext().catch(() => {});
+  }
+}
+
+function syncHouseSurfaceContextFromState(state) {
+  const source = state && typeof state === 'object' ? state : {};
+  const platform = source.platform && typeof source.platform === 'object' ? source.platform : {};
+  syncHouseSurfaceContextFromPayload({
+    houseId: String(platform.houseId || source.houseId || '').trim(),
+    activeTeamId: String(platform.activeTeamId || source.activeTeamId || '').trim(),
+    availableTeamIds: Array.isArray(platform.availableTeamIds) ? platform.availableTeamIds : source.availableTeamIds,
+  });
+}
+
+function renderHouseSurfaceContext() {
+  const selectNode = el('houseTeamSelect');
+  const summaryNode = el('houseTeamSummary');
+  const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const teamIds = normalizeHouseTeamIds(houseSurfaceState.context.availableTeamIds);
+  if (selectNode) {
+    const currentValue = String(selectNode.value || '').trim();
+    if (
+      selectNode.options.length !== teamIds.length
+      || teamIds.some((teamId, index) => String(selectNode.options[index]?.value || '') !== teamId)
+    ) {
+      selectNode.innerHTML = '';
+      teamIds.forEach((teamId) => {
+        const option = document.createElement('option');
+        option.value = teamId;
+        option.textContent = teamId;
+        selectNode.appendChild(option);
+      });
+    }
+    selectNode.disabled = teamIds.length <= 1;
+    if (activeTeamId && currentValue !== activeTeamId) {
+      selectNode.value = activeTeamId;
+    }
+  }
+  if (!summaryNode) return;
+  if (!houseSurfaceState.context.houseId) {
+    summaryNode.textContent = 'Attach a house to inspect team-specific archive and trainer records.';
+    return;
+  }
+  if (!activeTeamId) {
+    summaryNode.textContent = 'No seeded team context is available for this house yet.';
+    return;
+  }
+  summaryNode.textContent = `Active team: ${activeTeamId}`;
+}
+
+async function loadHousePlatformContext() {
+  const response = await api('/api/platform/context');
+  const data = response?.data || response || {};
+  syncHouseSurfaceContextFromPayload(data);
+  return data;
+}
+
+async function setHouseActiveTeam(teamId) {
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedTeamId || normalizedTeamId === String(houseSurfaceState.context.activeTeamId || '').trim()) {
+    return buildHousePlatformSnapshot();
+  }
+  const response = await api('/api/platform/active-team', {
+    method: 'POST',
+    body: JSON.stringify({ teamId: normalizedTeamId }),
+  });
+  const data = response?.data || response || {};
+  syncHouseSurfaceContextFromPayload(data);
+  if (houseSurfaceState.activeSurface === 'archive') {
+    await loadHouseArchiveSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'trainer') {
+    await loadHouseTrainerSurface({ skipContext: true });
+  }
+  return data;
+}
+
+function buildHousePlatformSnapshot() {
+  return {
+    houseId: String(houseSurfaceState.context.houseId || '').trim() || null,
+    activeTeamId: String(houseSurfaceState.context.activeTeamId || '').trim() || null,
+    availableTeamIds: normalizeHouseTeamIds(houseSurfaceState.context.availableTeamIds),
+  };
+}
+
 function setHouseSurfaceMode(mode) {
   const activeMode = mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
@@ -1216,6 +1376,9 @@ function renderHouseTrainerSurface() {
   const resultsNode = el('houseTrainerResults');
   const detailNode = el('houseTrainerDetail');
   const emptyNode = el('houseTrainerEmpty');
+  const createCompareBtn = el('houseTrainerCreateCompareBtn');
+  const promotePatchBtn = el('houseTrainerPromotePatchBtn');
+  const approvalInput = el('houseTrainerApprovalIdInput');
   if (!jobsNode || !resultsNode || !detailNode || !emptyNode) return;
   const jobs = Array.isArray(houseSurfaceState.trainer.jobs) ? houseSurfaceState.trainer.jobs : [];
   const results = Array.isArray(houseSurfaceState.trainer.results) ? houseSurfaceState.trainer.results : [];
@@ -1224,6 +1387,10 @@ function renderHouseTrainerSurface() {
   emptyNode.textContent = houseSurfaceState.trainer.emptyStateText || 'No durable trainer jobs yet.';
   emptyNode.classList.toggle('is-hidden', jobs.length > 0 || results.length > 0);
   if (!jobs.length && !results.length) {
+    if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+    if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (approvalInput) approvalInput.disabled = true;
+    setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
     detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
     return;
   }
@@ -1256,24 +1423,116 @@ function renderHouseTrainerSurface() {
   });
 
   if (!selectedResult) {
+    if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+    if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (approvalInput) approvalInput.disabled = true;
+    setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
     detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
     return;
   }
   const linkedConfigVersionId = String(selectedResult?.linkedConfigVersionId || '').trim();
   const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
   const approvalText = selectedResult?.approvalNeeded === true ? 'approval needed' : 'ready';
-  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · ${approvalText} · config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
+  const activeConfigVersionId = String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
+  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · ${approvalText} · active config ${activeConfigVersionId || '—'} · linked config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
+  if (createCompareBtn) {
+    createCompareBtn.disabled = !activeConfigVersionId;
+  }
+  if (promotePatchBtn) {
+    promotePatchBtn.disabled = !candidatePatchId;
+  }
+  if (approvalInput) {
+    approvalInput.disabled = !candidatePatchId;
+  }
+  setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
 }
 
-async function loadHouseArchiveSurface() {
+async function createHouseTrainerCompareJob() {
+  const idempotencyKey = String(houseSurfaceState.trainer.submitIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_compare');
+  houseSurfaceState.trainer.submitIdempotencyKey = idempotencyKey;
+  setHouseTrainerActionStatus('Creating durable compare job...');
+  const response = await api('/api/platform/trainer/jobs', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      jobKind: 'trainer_job.compare',
+      budget: {
+        maxUsd: 5,
+      },
+    }),
+  });
+  const data = response?.data || response || {};
+  await loadHouseTrainerSurface({ skipContext: true });
+  const resultId = String(data?.result?.trainerResultId || '').trim();
+  if (resultId) {
+    houseSurfaceState.trainer.selectedResultId = resultId;
+    renderHouseTrainerSurface();
+  }
+  const trainerJobId = String(data?.trainerJobId || '').trim();
+  setHouseTrainerActionStatus(
+    trainerJobId
+      ? `Durable compare job ready: ${trainerJobId}`
+      : 'Durable compare job ready.'
+  );
+  return data;
+}
+
+async function promoteSelectedHouseTrainerPatch() {
+  const selectedResultId = String(houseSurfaceState.trainer.selectedResultId || '').trim();
+  const selectedResult = Array.isArray(houseSurfaceState.trainer.results)
+    ? houseSurfaceState.trainer.results.find((item) => String(item?.trainerResultId || '') === selectedResultId) || null
+    : null;
+  const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
+  if (!selectedResultId || !candidatePatchId) {
+    throw new Error('TRAINER_PATCH_NOT_FOUND');
+  }
+  const approvalId = String(el('houseTrainerApprovalIdInput')?.value || '').trim();
+  const idempotencyKey = String(houseSurfaceState.trainer.promotionIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_promote');
+  houseSurfaceState.trainer.promotionIdempotencyKey = idempotencyKey;
+  setHouseTrainerActionStatus(`Promoting patch ${candidatePatchId}...`);
+  const response = await api(`/api/platform/trainer/results/${encodeURIComponent(selectedResultId)}/promote-patch`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      candidatePatchId,
+      approvalId,
+    }),
+  });
+  const data = response?.data || response || {};
+  await loadHouseTrainerSurface({ skipContext: true });
+  if (selectedResultId) {
+    houseSurfaceState.trainer.selectedResultId = selectedResultId;
+    renderHouseTrainerSurface();
+  }
+  const configVersionId = String(data?.configVersionId || '').trim();
+  setHouseTrainerActionStatus(
+    configVersionId
+      ? `Promoted patch ${candidatePatchId} to ${configVersionId}.`
+      : `Promoted patch ${candidatePatchId}.`
+  );
+  return data;
+}
+
+async function loadHouseArchiveSurface({ skipContext = false } = {}) {
   setHouseSurfaceMode('archive');
   setHouseSurfaceStatus('Loading canonical archive...');
   try {
-    const response = await api('/api/platform/archive?teamId=team_main');
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/archive');
     const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.archive.loaded = true;
     houseSurfaceState.archive.items = Array.isArray(data.items) ? data.items : [];
     houseSurfaceState.archive.emptyStateText = String(data.emptyStateText || 'No canonical traces archived yet.');
+    if (!houseSurfaceState.archive.items.some((item) => String(item?.traceId || '') === String(houseSurfaceState.archive.selectedTraceId || ''))) {
+      houseSurfaceState.archive.selectedTraceId = '';
+    }
     if (!houseSurfaceState.archive.selectedTraceId && houseSurfaceState.archive.items[0]?.traceId) {
       houseSurfaceState.archive.selectedTraceId = String(houseSurfaceState.archive.items[0].traceId);
     }
@@ -1287,16 +1546,24 @@ async function loadHouseArchiveSurface() {
   }
 }
 
-async function loadHouseTrainerSurface() {
+async function loadHouseTrainerSurface({ skipContext = false } = {}) {
   setHouseSurfaceMode('trainer');
   setHouseSurfaceStatus('Loading durable trainer records...');
   try {
-    const response = await api('/api/platform/trainer?teamId=team_main');
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/trainer');
     const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.trainer.loaded = true;
     houseSurfaceState.trainer.jobs = Array.isArray(data.jobs) ? data.jobs : [];
     houseSurfaceState.trainer.results = Array.isArray(data.results) ? data.results : [];
     houseSurfaceState.trainer.emptyStateText = String(data.emptyStateText || 'No durable trainer jobs yet.');
+    houseSurfaceState.trainer.activeConfigVersionId = String(data.activeConfigVersionId || '').trim();
+    if (!houseSurfaceState.trainer.results.some((item) => String(item?.trainerResultId || '') === String(houseSurfaceState.trainer.selectedResultId || ''))) {
+      houseSurfaceState.trainer.selectedResultId = '';
+    }
     if (!houseSurfaceState.trainer.selectedResultId && houseSurfaceState.trainer.results[0]?.trainerResultId) {
       houseSurfaceState.trainer.selectedResultId = String(houseSurfaceState.trainer.results[0].trainerResultId);
     }
@@ -1308,6 +1575,7 @@ async function loadHouseTrainerSurface() {
     houseSurfaceState.trainer.loaded = true;
     houseSurfaceState.trainer.jobs = [];
     houseSurfaceState.trainer.results = [];
+    houseSurfaceState.trainer.activeConfigVersionId = '';
     renderHouseTrainerSurface();
     setHouseSurfaceStatus(`Trainer unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
@@ -3516,6 +3784,25 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseTeamSelect = el('houseTeamSelect');
+  if (houseTeamSelect) {
+    houseTeamSelect.onchange = async (event) => {
+      const nextTeamId = String(event?.target?.value || '').trim();
+      if (!nextTeamId) return;
+      houseTeamSelect.disabled = true;
+      setHouseSurfaceStatus(`Switching to ${nextTeamId}...`);
+      try {
+        await setHouseActiveTeam(nextTeamId);
+        setHouseSurfaceStatus(`Active team set to ${nextTeamId}.`);
+      } catch (err) {
+        renderHouseSurfaceContext();
+        setHouseSurfaceStatus(`Team switch unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        renderHouseSurfaceContext();
+      }
+    };
+  }
+
   const houseTrainerBtn = el('houseTrainerBtn');
   if (houseTrainerBtn) {
     houseTrainerBtn.onclick = async () => {
@@ -3528,9 +3815,45 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseTrainerCreateCompareBtn = el('houseTrainerCreateCompareBtn');
+  if (houseTrainerCreateCompareBtn) {
+    houseTrainerCreateCompareBtn.onclick = async () => {
+      houseTrainerCreateCompareBtn.disabled = true;
+      try {
+        await createHouseTrainerCompareJob();
+      } catch (err) {
+        setHouseTrainerActionStatus(`Compare job unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  const houseTrainerPromotePatchBtn = el('houseTrainerPromotePatchBtn');
+  if (houseTrainerPromotePatchBtn) {
+    houseTrainerPromotePatchBtn.onclick = async () => {
+      houseTrainerPromotePatchBtn.disabled = true;
+      try {
+        await promoteSelectedHouseTrainerPatch();
+      } catch (err) {
+        const code = String(err?.message || 'UNKNOWN_ERROR');
+        setHouseTrainerActionStatus(code, true);
+      } finally {
+        renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  if (!houseSurfaceState.trainer.submitIdempotencyKey || !houseSurfaceState.trainer.promotionIdempotencyKey) {
+    resetHouseTrainerActionKeys();
+  }
   setHouseSurfaceMode(houseSurfaceState.activeSurface);
+  renderHouseSurfaceContext();
   renderHouseArchiveSurface();
   renderHouseTrainerSurface();
+  loadHousePlatformContext().catch(() => {
+    renderHouseSurfaceContext();
+  });
 }
 
 function isBlankOrModifierClick(event) {
@@ -8173,6 +8496,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateUILegacy(state) {
   lastState = state;
+  syncHouseSurfaceContextFromState(state);
   elements = Array.isArray(state?.elements) ? state.elements : elements;
   if (!isVendorLite(state)) {
     runtimeBootstrapDone = false;

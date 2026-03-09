@@ -50,7 +50,7 @@ test('M19.0 harness exposes deterministic platform counts, fixtures, and worker 
 
   const familiesEnvelope = await listPlatformFixtures(request);
   expect(familiesEnvelope?.ok).toBe(true);
-  expect(familiesEnvelope?.families).toEqual(REQUIRED_FIXTURE_FAMILIES);
+  expect(familiesEnvelope?.families).toEqual(expect.arrayContaining(REQUIRED_FIXTURE_FAMILIES));
 
   for (const family of REQUIRED_FIXTURE_FAMILIES) {
     const fixtureEnvelope = await getPlatformFixture(request, family);

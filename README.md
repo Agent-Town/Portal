@@ -66,6 +66,23 @@ Live Privy guest-login smoke (real `.env`, no OTP):
 npm run test:privy-live
 ```
 
+Optional live Privy email-OTP smoke (real `.env` plus OTP provider adapter):
+```bash
+npm run test:privy-email-live
+```
+
+Machine-readable live-suite manifest and setup checker:
+```bash
+npm run test:live -- --list
+npm run test:live -- --check privy-email-otp
+```
+
+Structural and durable-store verification helpers:
+```bash
+npm run verify:route-modules
+npm run verify:platform-export
+```
+
 Requirements for the live Privy smoke:
 - set `PRIVY_APP_ID` in `.env` or `.env.local`
 - set `PRIVY_LOGIN_METHOD=guest` to avoid OTP during Playwright
@@ -76,6 +93,13 @@ What `npm run test:privy-live` does:
 - loads `.env*` even though the server runs under `NODE_ENV=test`
 - enables Privy in test mode (`ENABLE_PRIVY_IN_TEST=1`)
 - runs a dedicated live smoke that verifies `/start` login, redirect to `/app`, and real Privy-provided Solana + EVM wallet availability
+
+What `npm run test:privy-email-live` requires:
+- set `PRIVY_LOGIN_METHOD=email`
+- set `PRIVY_EMAIL_OTP_PROVIDER`
+- set `PRIVY_EMAIL_OTP_FETCH_URL`
+- set `PRIVY_EMAIL_OTP_TEST_EMAIL`
+- the OTP fetch endpoint must return one deterministic current code for that test inbox
 
 Optional local integration check (reused Sepolia wallet):
 ```bash
