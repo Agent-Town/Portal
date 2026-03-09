@@ -1,5 +1,40 @@
 const { test, expect } = require('@playwright/test');
-const { readMetaValue, waitForLiteApi } = require('./helpers/trainer');
+const { waitForLiteApi } = require('./helpers/trainer');
+
+async function readRuntimeWorkerSessionId(page) {
+  await page.waitForFunction(async () => {
+    try {
+      if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
+        return false;
+      }
+      const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
+        runtimeContext: {
+          origin: window.location.origin,
+          teamCode: '',
+          houseId: '',
+        },
+        runtimeState: {},
+      });
+      const data = snapshot?.data || snapshot || null;
+      return typeof data?.sessionId === 'string' && data.sessionId.trim().length > 0;
+    } catch {
+      return false;
+    }
+  }, null, { timeout: 10000 });
+
+  return await page.evaluate(async () => {
+    const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
+      runtimeContext: {
+        origin: window.location.origin,
+        teamCode: '',
+        houseId: '',
+      },
+      runtimeState: {},
+    });
+    const data = snapshot?.data || snapshot || null;
+    return String(data?.sessionId || '').trim();
+  });
+}
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -26,7 +61,7 @@ test('opening and closing trainer preserves hub path and worker session continui
 
   const trainerBtn = page.getByTestId('agent-open-trainer');
   await expect(trainerBtn).toHaveCount(1);
-  const initialSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  const initialSessionId = await readRuntimeWorkerSessionId(page);
   expect(initialSessionId).toMatch(/^sess_/);
 
   const sidebar = page.locator('#agentSidebar');
@@ -41,7 +76,7 @@ test('opening and closing trainer preserves hub path and worker session continui
   expect(openUrl.searchParams.get('liteDriver')).toBe('phase1');
   expect(openUrl.searchParams.get('modal')).toBe('trainer');
   await expect(page.getByTestId('trainer-modal')).toBeVisible({ timeout: 5000 });
-  const openedSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  const openedSessionId = await readRuntimeWorkerSessionId(page);
   expect(openedSessionId).toBe(initialSessionId);
 
   await page.locator('#trainerModalClose').click();
@@ -50,6 +85,6 @@ test('opening and closing trainer preserves hub path and worker session continui
   expect(closedUrl.pathname).toBe('/app');
   expect(closedUrl.searchParams.get('liteDriver')).toBe('phase1');
   expect(closedUrl.searchParams.get('modal')).toBe(null);
-  const closedSessionId = String(await readMetaValue(page, 'sessionId') || '');
+  const closedSessionId = await readRuntimeWorkerSessionId(page);
   expect(closedSessionId).toBe(initialSessionId);
 });
