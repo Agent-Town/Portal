@@ -5339,6 +5339,17 @@ function getPlatformIntegrationActionPolicy(candidate, actionId) {
       status: 'queued',
     };
   }
+  if (adapterId === 'deliberation_v1') {
+    const adapterActions = new Set(getPlatformIntegrationActionIds(candidate));
+    if (!adapterActions.has(canonicalActionId)) return null;
+    const actionName = canonicalActionId.slice(`${adapterId}.`.length);
+    const requiresApproval = actionName === 'comment_item' || actionName === 'change_status';
+    return {
+      actionId: canonicalActionId,
+      requiresApproval,
+      status: 'queued',
+    };
+  }
   if (canonicalActionId === 'integration.generic.read') {
     return {
       actionId: canonicalActionId,
