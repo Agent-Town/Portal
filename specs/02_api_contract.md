@@ -865,6 +865,27 @@ Response fields:
 - `data.lineage.candidatePatchId`
 - `data.inboxPath`
 
+### GET `/api/platform/house-structure` (human)
+Returns deterministic office and staff-agent scaffolding for the currently attached House.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.offices[]`
+- `data.offices[].officeId`
+- `data.offices[].slug`
+- `data.offices[].displayName`
+- `data.staffAgents[]`
+- `data.staffAgents[].staffAgentId`
+- `data.staffAgents[].role`
+- `data.staffAgents[].officeId`
+- `data.modelVersion`
+
 ### GET `/api/platform/trainer` (human)
 Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
 

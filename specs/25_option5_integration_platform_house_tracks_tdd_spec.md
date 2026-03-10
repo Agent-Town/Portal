@@ -283,6 +283,12 @@ GREEN gate:
 2. current team behavior remains intact,
 3. serialization is deterministic and forward-compatible.
 
+Implementation notes:
+
+1. `GET /api/platform/house-structure` is the read route for this milestone.
+2. Office and staff scaffolding remains additive and fixture-backed in this slice.
+3. Existing House context and team-selection flows must remain unchanged.
+
 ### M25.8 - Tracks core and reward hooks
 
 Primary test:

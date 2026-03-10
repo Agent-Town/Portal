@@ -404,6 +404,7 @@ Exit criteria:
 2. The new surfaces do not break modal continuity or worker continuity.
 3. The minimal Experiences surface links into current Registry, Web, and Poker surfaces from the same shell.
 4. The minimal Workshop surface reflects active config lineage truth and can open Inbox from the same shell.
+5. Office and staff scaffolding remains deterministic and additive rather than forcing a House-model rewrite.
 
 ## 6.7 Phase 6 - Later platform surfaces
 

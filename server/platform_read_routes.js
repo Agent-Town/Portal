@@ -257,6 +257,39 @@ function registerPlatformReadRoutes(app, deps) {
     }, { requestId });
   });
 
+  app.get('/api/platform/house-structure', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const fixture = getUnifiedPlatformTestFixture('house_office_staff_seed') || {};
+    if (!houseId) {
+      return sendPortalApiSuccess(res, {
+        houseId: null,
+        teamId: null,
+        activeTeamId: context.activeTeamId,
+        availableTeamIds: context.availableTeamIds,
+        offices: [],
+        staffAgents: [],
+        modelVersion: 'house_scaffold_v1',
+      }, { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      houseId,
+      teamId: teamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      offices: Array.isArray(fixture?.offices) ? fixture.offices : [],
+      staffAgents: Array.isArray(fixture?.staffAgents) ? fixture.staffAgents : [],
+      modelVersion: 'house_scaffold_v1',
+    }, { requestId });
+  });
+
   app.get('/api/platform/trainer', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
