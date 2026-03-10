@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { selectStartPreset } = require('./helpers/experience');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -60,6 +61,7 @@ test('start page uses email+code auth box for Privy login before entering app', 
 
   await page.goto('/start');
 
+  await selectStartPreset(page, 'global-default');
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page.locator('[data-testid="privy-auth-box"]')).toBeVisible();
   await expect(page.getByText('Enter your email to receive a one-time code.')).toBeVisible();

@@ -41,6 +41,13 @@ const {
   CANVAS,
   defaultLiteState
 } = require('./sessions');
+const {
+  DEFAULT_PRESET_ID: EXPERIENCE_DEFAULT_PRESET_ID,
+  listPresets: listExperiencePresets,
+  getPreset: getExperiencePreset,
+  normalizePreference: normalizeExperiencePreference,
+  isSupportedPresetId: isSupportedExperiencePresetId
+} = require('../public/experience_profiles.js');
 
 function b64ToBytes(str) {
   const bin = Buffer.from(str, 'base64');
@@ -2856,6 +2863,44 @@ function ensureSessionOnboarding(session) {
   return onboarding;
 }
 
+function ensureSessionExperiencePreference(session, { presetId = null, source = null } = {}) {
+  if (!session || typeof session !== 'object') return null;
+  const nextPresetId = presetId && isSupportedExperiencePresetId(presetId)
+    ? presetId
+    : (session?.experiencePreference?.presetId || EXPERIENCE_DEFAULT_PRESET_ID);
+  const normalized = normalizeExperiencePreference({
+    ...(session.experiencePreference && typeof session.experiencePreference === 'object' ? session.experiencePreference : {}),
+    ...(presetId ? { presetId: nextPresetId } : {}),
+    ...(source ? { source } : {})
+  }, {
+    defaultPresetId: EXPERIENCE_DEFAULT_PRESET_ID,
+    source: source || session?.experiencePreference?.source || 'server-default'
+  });
+  session.experiencePreference = normalized;
+  return session.experiencePreference;
+}
+
+function cloneExperiencePreference(preference) {
+  if (!preference || typeof preference !== 'object') return null;
+  return JSON.parse(JSON.stringify(preference));
+}
+
+function buildExperienceBootstrapPayload(session) {
+  const current = ensureSessionExperiencePreference(session);
+  const presets = listExperiencePresets().map((preset) => ({
+    id: preset.id,
+    label: preset.label,
+    locale: preset.locale,
+    market: preset.market
+  }));
+  return {
+    ok: true,
+    defaultPresetId: EXPERIENCE_DEFAULT_PRESET_ID,
+    current: cloneExperiencePreference(current),
+    presets
+  };
+}
+
 function cloneOnboarding(onboarding) {
   if (!onboarding || typeof onboarding !== 'object') return null;
   return JSON.parse(JSON.stringify(onboarding));
@@ -3440,12 +3485,14 @@ app.get('/api/session', (req, res) => {
   const s = ensureHumanSession(req, res);
   const store = readStore();
   const onboarding = ensureSessionOnboarding(s);
+  const experiencePreference = ensureSessionExperiencePreference(s);
   res.json({
     ok: true,
     teamCode: s.teamCode,
     walletRecoveryKey: normalizeWalletRecoveryKeyInput(s.walletRecoveryKey) || null,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
+    experiencePreference: cloneExperiencePreference(experiencePreference),
     featureFlags: {
       trainerNamespace: ENABLE_TRAINER_NAMESPACE
     },
@@ -3463,6 +3510,7 @@ app.post('/api/session/reset', (req, res) => {
   const store = readStore();
   const next = createSession();
   const onboarding = ensureSessionOnboarding(next);
+  const experiencePreference = ensureSessionExperiencePreference(next);
   const secureFlag = isProd ? '; Secure' : '';
   res.setHeader(
     'Set-Cookie',
@@ -3474,6 +3522,7 @@ app.post('/api/session/reset', (req, res) => {
     walletRecoveryKey: normalizeWalletRecoveryKeyInput(next.walletRecoveryKey) || null,
     elements: listElements(),
     onboarding: cloneOnboarding(onboarding),
+    experiencePreference: cloneExperiencePreference(experiencePreference),
     stats: {
       signups: store.signups.length,
       publicTeams: store.publicTeams.length
@@ -3486,6 +3535,7 @@ app.get('/api/state', (req, res) => {
   const lite = ensureLiteState(s);
   updateLiteRuntimeReady(s);
   const onboarding = ensureSessionOnboarding(s);
+  const experiencePreference = ensureSessionExperiencePreference(s);
   const ceremony = buildCeremonyStateSnapshot(s);
   const experience = buildExperienceStateSnapshot(s, ceremony);
   res.json({
@@ -3531,7 +3581,39 @@ app.get('/api/state', (req, res) => {
     share: s.share,
     shareApproval: s.shareApproval || { human: false, agent: false },
     houseId: ceremony.houseId,
-    onboarding: cloneOnboarding(onboarding)
+    onboarding: cloneOnboarding(onboarding),
+    experiencePreference: cloneExperiencePreference(experiencePreference)
+  });
+});
+
+app.get('/api/experience/bootstrap', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  res.json(buildExperienceBootstrapPayload(s));
+});
+
+app.post('/api/experience/preference', (req, res) => {
+  const s = ensureHumanSession(req, res);
+  const presetId = typeof req.body?.presetId === 'string' ? req.body.presetId.trim() : '';
+  if (!presetId) {
+    return res.status(400).json({ ok: false, error: 'MISSING_PRESET_ID' });
+  }
+  if (!isSupportedExperiencePresetId(presetId)) {
+    const current = ensureSessionExperiencePreference(s);
+    return res.status(400).json({
+      ok: false,
+      error: 'INVALID_PRESET_ID',
+      experiencePreference: cloneExperiencePreference(current)
+    });
+  }
+
+  const experiencePreference = ensureSessionExperiencePreference(s, {
+    presetId,
+    source: 'user'
+  });
+
+  return res.json({
+    ok: true,
+    experiencePreference: cloneExperiencePreference(experiencePreference)
   });
 });
 
@@ -4283,6 +4365,7 @@ async function relayPrivyWalletRpc({ walletId, body, authorizationSignature }) {
 app.get('/api/onboarding/status', (req, res) => {
   const s = ensureHumanSession(req, res);
   const onboarding = ensureSessionOnboarding(s);
+  const experiencePreference = ensureSessionExperiencePreference(s);
   const flowStep = normalizeOnboardingStep(onboarding?.step);
 
   let step = 1;
@@ -4309,7 +4392,8 @@ app.get('/api/onboarding/status', (req, res) => {
     ok: true,
     step,
     done,
-    hasWallet: onboarding.registrationComplete === true || step > 1
+    hasWallet: onboarding.registrationComplete === true || step > 1,
+    experiencePreference: cloneExperiencePreference(experiencePreference)
   });
 });
 
@@ -4410,12 +4494,14 @@ app.post('/api/referral', (req, res) => {
 app.get('/api/townhall/state', (req, res) => {
   const s = ensureHumanSession(req, res);
   const onboarding = ensureSessionOnboarding(s);
+  const experiencePreference = ensureSessionExperiencePreference(s);
   const houseId = s.houseCeremony?.houseId || null;
   res.json({
     ok: true,
     houseId,
     locked: onboarding.required === true && !houseId,
-    onboarding: cloneOnboarding(onboarding)
+    onboarding: cloneOnboarding(onboarding),
+    experiencePreference: cloneExperiencePreference(experiencePreference)
   });
 });
 
@@ -5636,6 +5722,7 @@ app.post('/api/share/create', (req, res) => {
     return res.status(403).json({ ok: false, error: 'STORE_FULL' });
   }
   const shareId = `sh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const experiencePreference = cloneExperiencePreference(ensureSessionExperiencePreference(s));
   const record = {
     id: shareId,
     createdAt: nowIso(),
@@ -5653,7 +5740,8 @@ app.post('/api/share/create', (req, res) => {
     locked: true,
     lockedAt: nowIso(),
     optIn: { human: null, agent: null },
-    public: false
+    public: false,
+    experiencePreference
   };
 
   store.shares.push(record);
@@ -6342,7 +6430,8 @@ app.post('/api/house/:id/share', (req, res) => {
       locked: true,
       lockedAt: nowIso(),
       optIn: { human: true, agent: true },
-      public: false
+      public: false,
+      experiencePreference: cloneExperiencePreference(ensureSessionExperiencePreference(session))
     };
 
     store.shares.push(share);
@@ -6545,7 +6634,11 @@ function ensurePublicTeamForShare(store, share, session = null) {
     agentName: share.agentName || session?.agent?.name || 'OpenClaw',
     xPostUrl: share.xPostUrl || null,
     humanHandle,
-    agentPosts: share.agentPosts ? { moltbookUrl: share.agentPosts.moltbookUrl || null } : null
+    agentPosts: share.agentPosts ? { moltbookUrl: share.agentPosts.moltbookUrl || null } : null,
+    experiencePreference: cloneExperiencePreference(
+      share.experiencePreference
+      || (session ? ensureSessionExperiencePreference(session) : null)
+    )
   };
 
   store.publicTeams.unshift(record);

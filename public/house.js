@@ -1,6 +1,10 @@
 /* eslint-disable no-console */
 
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
+const HouseI18n = window.AgentTownI18n || null;
+const LlmCatalog = window.AgentTownLlmCatalog || null;
 
 function readTeamCodeHint() {
   try {
@@ -39,6 +43,7 @@ async function api(url, opts = {}) {
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
   }
+  updateExperiencePreferenceFromPayload(data);
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -51,6 +56,136 @@ async function api(url, opts = {}) {
 
 function el(id) {
   return document.getElementById(id);
+}
+
+function normalizeExperiencePreferenceClient(value) {
+  if (ExperienceProfiles && typeof ExperienceProfiles.normalizePreference === 'function') {
+    return ExperienceProfiles.normalizePreference(
+      value && typeof value === 'object' ? value : { presetId: ExperienceProfiles.DEFAULT_PRESET_ID },
+      {
+        source: value?.source || 'server-default'
+      }
+    );
+  }
+  return value || {
+    presetId: 'global-default',
+    locale: 'en',
+    market: 'global',
+    providerPolicy: 'global-default',
+    sharePolicy: 'x-moltbook',
+    mediaPolicy: 'youtube',
+    agentPolicy: 'default',
+    selectedAt: new Date().toISOString(),
+    source: 'server-default'
+  };
+}
+
+let currentExperiencePreference = null;
+
+function getCurrentExperiencePreference() {
+  return normalizeExperiencePreferenceClient(currentExperiencePreference);
+}
+
+function tHouse(key, vars = {}) {
+  const preference = getCurrentExperiencePreference();
+  if (!HouseI18n || typeof HouseI18n.t !== 'function') return key;
+  return HouseI18n.t(key, vars, preference.locale || 'en');
+}
+
+function isLinkFirstExperience(preference = getCurrentExperiencePreference()) {
+  return String(preference?.sharePolicy || '').trim() === 'link-first'
+    || String(preference?.presetId || '').trim() === 'cn-mainland';
+}
+
+function getDefaultMindProviderForExperience() {
+  if (LlmCatalog && typeof LlmCatalog.getDefaultProvider === 'function') {
+    return LlmCatalog.getDefaultProvider(getCurrentExperiencePreference());
+  }
+  return MIND_DEFAULT_PROVIDER;
+}
+
+function getOrderedMindProviders() {
+  if (LlmCatalog && typeof LlmCatalog.getProviderOrder === 'function') {
+    return LlmCatalog.getProviderOrder(getCurrentExperiencePreference());
+  }
+  return [MIND_DEFAULT_PROVIDER];
+}
+
+function getSupportedMindModels(provider) {
+  if (LlmCatalog && typeof LlmCatalog.getSupportedModels === 'function') {
+    return LlmCatalog.getSupportedModels(provider);
+  }
+  return [];
+}
+
+function getDefaultMindModelForProvider(provider) {
+  if (LlmCatalog && typeof LlmCatalog.getDefaultModel === 'function') {
+    return LlmCatalog.getDefaultModel(provider);
+  }
+  return MIND_DEFAULT_MODEL;
+}
+
+function getMindProviderWarningText(provider, preference = getCurrentExperiencePreference()) {
+  const message = LlmCatalog && typeof LlmCatalog.getProviderWarning === 'function'
+    ? LlmCatalog.getProviderWarning(provider, preference)
+    : '';
+  if (!message) return '';
+  if (String(preference?.presetId || '') === 'cn-mainland') {
+    return tHouse('brain.warning.cn_openai');
+  }
+  return message;
+}
+
+function updateMindProviderWarning() {
+  const warningNode = el('llmProviderWarning');
+  if (!warningNode) return;
+  const provider = String(el('llmProviderSelect')?.value || '').trim();
+  warningNode.textContent = getMindProviderWarningText(provider) || '';
+}
+
+function applyExperiencePreferenceToHouseUi() {
+  const preference = getCurrentExperiencePreference();
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(preference);
+  }
+  const providerSelect = el('llmProviderSelect');
+  const modelInput = el('llmModelIdInput');
+  if (providerSelect) {
+    const provider = applyMindProviderSelection(providerSelect.value || getDefaultMindProviderForExperience());
+    if (modelInput) applyMindModelSelection(provider, modelInput.value || '');
+    syncMindModelRefFromInputs();
+  }
+  const shareHumanPostLabel = el('shareHumanPostLabel');
+  if (shareHumanPostLabel) {
+    shareHumanPostLabel.textContent = isLinkFirstExperience(preference)
+      ? tHouse('share.human_label.generic')
+      : tHouse('share.human_label.global');
+  }
+  const shareHumanPost = el('shareHumanPost');
+  if (shareHumanPost) {
+    shareHumanPost.placeholder = isLinkFirstExperience(preference)
+      ? tHouse('share.human_placeholder.generic')
+      : tHouse('share.human_placeholder.global');
+  }
+  const shareAgentPostLabel = el('shareAgentPostLabel');
+  if (shareAgentPostLabel) shareAgentPostLabel.textContent = tHouse('share.agent_label');
+  const shareAgentPost = el('shareAgentPost');
+  if (shareAgentPost) shareAgentPost.placeholder = tHouse('share.agent_placeholder');
+  updateMindProviderWarning();
+}
+
+function updateExperiencePreferenceFromPayload(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.experiencePreference) return;
+  currentExperiencePreference = normalizeExperiencePreferenceClient(payload.experiencePreference);
+  applyExperiencePreferenceToHouseUi();
+}
+
+async function bootstrapExperiencePreferenceForHouse() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap({ fetchImpl: fetch.bind(window) });
+  currentExperiencePreference = normalizeExperiencePreferenceClient(bootstrap.current);
+  applyExperiencePreferenceToHouseUi();
+  return bootstrap;
 }
 
 function setStatus(msg) {
@@ -80,7 +215,7 @@ function setPublicMediaError(msg) {
 function setPublicMediaStatus(msg) {
   const node = el('publicUploadStatus');
   if (!node) return;
-  node.textContent = msg || 'Saved';
+  node.textContent = msg || tHouse('common.saved');
   node.style.display = msg ? 'inline-flex' : 'none';
 }
 
@@ -181,40 +316,6 @@ const MIND_DEFAULT_PROVIDER = 'openai';
 const MIND_DEFAULT_MODEL = 'gpt-4o-mini';
 const MIND_AUTH_API_KEY = 'api-key';
 const MIND_AUTH_OAUTH = 'oauth-json';
-const MIND_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
-  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
-  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
-  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
-  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
-  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
-  litellm: Object.freeze(['claude-opus-4-6']),
-  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
-  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
-  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
-  'kimi-coding': Object.freeze(['k2p5']),
-  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
-  opencode: Object.freeze(['claude-opus-4-6']),
-  zai: Object.freeze(['glm-5']),
-  glm: Object.freeze(['glm-5']),
-  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
-  qianfan: Object.freeze(['model-id']),
-  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
-  qwen: Object.freeze(['coder-model', 'vision-model']),
-  together: Object.freeze(['moonshotai/Kimi-K2.5']),
-  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
-  xiaomi: Object.freeze(['mimo-v2-flash']),
-  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
-  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
-  vllm: Object.freeze(['your-model-id']),
-  nvidia: Object.freeze(['model-id']),
-  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
-  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
-  'test-local': Object.freeze(['deterministic'])
-});
-const MIND_PROVIDER_ALIASES = Object.freeze({
-  glm: 'zai',
-  qwen: 'qwen-portal'
-});
 const MIND_OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
 const MIND_OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
 let mindOpenAiCodexOAuthAttempt = null;
@@ -519,15 +620,20 @@ async function loadLiteGateway() {
 }
 
 function defaultProviderApi(provider) {
-  const p = String(provider || '').trim();
-  if (p === 'openai' || p === 'ollama') return 'openai-completions';
-  return '';
+  if (LlmCatalog && typeof LlmCatalog.defaultProviderApi === 'function') {
+    return LlmCatalog.defaultProviderApi(provider);
+  }
+  const normalized = String(provider || '').trim();
+  return normalized === 'openai' || normalized === 'ollama' ? 'openai-completions' : '';
 }
 
 function defaultProviderBaseUrl(provider) {
-  const p = String(provider || '').trim();
-  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
-  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  if (LlmCatalog && typeof LlmCatalog.defaultProviderBaseUrl === 'function') {
+    return LlmCatalog.defaultProviderBaseUrl(provider, window.location.origin);
+  }
+  const normalized = String(provider || '').trim();
+  if (normalized === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
+  if (normalized === 'ollama') return 'http://127.0.0.1:11434/v1';
   return '';
 }
 
@@ -539,8 +645,9 @@ function normalizeThinkingLevel(value) {
 }
 
 function buildGatewayLlmPayload(config) {
-  const provider = String(config?.provider || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
-  const model = String(config?.model || MIND_DEFAULT_MODEL).trim() || MIND_DEFAULT_MODEL;
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const provider = String(config?.provider || fallbackProvider).trim() || fallbackProvider;
+  const model = String(config?.model || getDefaultMindModelForProvider(provider)).trim() || getDefaultMindModelForProvider(provider);
   const modelRef = String(config?.modelRef || `${provider}/${model}`).trim() || `${provider}/${model}`;
   const credential = String(config?.credential || '').trim();
   const overrideApi = String(el('llmApiInput')?.value || '').trim();
@@ -682,13 +789,6 @@ function normalizeMindAuthMode(mode) {
   return String(mode || '').trim() === MIND_AUTH_OAUTH ? MIND_AUTH_OAUTH : MIND_AUTH_API_KEY;
 }
 
-function getSupportedMindModels(provider) {
-  const raw = String(provider || '').trim();
-  const key = MIND_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (MIND_PROVIDER_ALIASES[raw] || raw);
-  const options = MIND_MODEL_OPTIONS_BY_PROVIDER[key];
-  return Array.isArray(options) ? [...options] : [];
-}
-
 function replaceSelectOptions(select, values) {
   if (!select || select.tagName !== 'SELECT') return;
   select.innerHTML = '';
@@ -717,21 +817,24 @@ function ensureSelectOption(select, value, label) {
 
 function applyMindProviderSelection(preferredProvider) {
   const providerSelect = el('llmProviderSelect');
-  const selected = String(preferredProvider || providerSelect?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const selected = String(preferredProvider || providerSelect?.value || fallbackProvider).trim() || fallbackProvider;
   if (!providerSelect) return selected;
   if (providerSelect.tagName === 'SELECT') {
-    const providers = Object.keys(MIND_MODEL_OPTIONS_BY_PROVIDER);
+    const providers = getOrderedMindProviders();
     replaceSelectOptions(providerSelect, providers);
-    providerSelect.value = providers.includes(selected) ? selected : MIND_DEFAULT_PROVIDER;
-    return String(providerSelect.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+    providerSelect.value = providers.includes(selected) ? selected : fallbackProvider;
+    updateMindProviderWarning();
+    return String(providerSelect.value || fallbackProvider).trim() || fallbackProvider;
   }
   providerSelect.value = selected;
+  updateMindProviderWarning();
   return selected;
 }
 
 function applyMindModelSelection(provider, preferredModel) {
   const modelSelect = el('llmModelIdInput');
-  const fallbackModel = getDefaultLlmModelForProvider(provider);
+  const fallbackModel = getDefaultMindModelForProvider(provider);
   const selected = String(preferredModel || modelSelect?.value || '').trim();
   if (!modelSelect) return selected || fallbackModel;
   if (modelSelect.tagName === 'SELECT') {
@@ -760,7 +863,8 @@ function updateMindOauthLaunchUi() {
   const launchBtn = el('llmOauthLaunchBtn');
   const completeBtn = el('llmOauthCompleteBtn');
   if (!launchBtn) return;
-  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const provider = String(el('llmProviderSelect')?.value || fallbackProvider).trim() || fallbackProvider;
   const mode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
   const supported = MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
   launchBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
@@ -842,7 +946,8 @@ async function completeMindOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
   if (mindOpenAiCodexOAuthExchangeInFlight) return;
   mindOpenAiCodexOAuthExchangeInFlight = true;
   try {
-    const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+    const fallbackProvider = getDefaultMindProviderForExperience();
+    const provider = String(el('llmProviderSelect')?.value || fallbackProvider).trim().toLowerCase();
     if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
       throw new Error('OAuth completion is available for OpenAI providers only.');
     }
@@ -898,7 +1003,8 @@ function startMindOpenAiCodexOAuthPoll() {
 }
 
 async function launchMindOauthInNewTab() {
-  const provider = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim().toLowerCase();
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const provider = String(el('llmProviderSelect')?.value || fallbackProvider).trim().toLowerCase();
   if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
     setMindConfigError('OAuth launch is available for OpenAI providers only.');
     return;
@@ -920,12 +1026,6 @@ async function launchMindOauthInNewTab() {
   setMindConfigStatus('OAuth started. Complete sign-in in the popup. Then use Complete OAuth if needed.');
   setMindConfigError('');
   startMindOpenAiCodexOAuthPoll();
-}
-
-function getDefaultLlmModelForProvider(provider) {
-  const supported = getSupportedMindModels(provider);
-  if (supported.length > 0) return supported[0];
-  return MIND_DEFAULT_MODEL;
 }
 
 function mapMindConfigError(error) {
@@ -961,6 +1061,7 @@ function setMindAuthModeUi(mode) {
       ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
       : '';
   }
+  updateMindProviderWarning();
   updateMindOauthLaunchUi();
 }
 
@@ -969,10 +1070,14 @@ function syncMindModelRefFromInputs() {
   const modelInput = el('llmModelIdInput');
   const modelRefInput = el('llmModelRefInput');
   if (!providerInput || !modelInput || !modelRefInput) return;
-  const providerRaw = String(providerInput.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
-  const provider = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const providerRaw = String(providerInput.value || fallbackProvider).trim() || fallbackProvider;
+  const provider = LlmCatalog && typeof LlmCatalog.normalizeProvider === 'function'
+    ? (LlmCatalog.normalizeProvider(providerRaw) || providerRaw)
+    : providerRaw;
   const model = String(modelInput.value || '').trim();
   modelRefInput.value = model ? `${provider}/${model}` : '';
+  updateMindProviderWarning();
 }
 
 function getAccessTokenFromProfileValue(value) {
@@ -1242,9 +1347,12 @@ function applyMindConfigToInputs(config) {
   const modelRefInput = el('llmModelRefInput');
   const keyInput = el('llmKeyInput');
   const oauthInput = el('llmOauthProfileInput');
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const selectedProvider = config?.provider || fallbackProvider;
+  const selectedModel = config?.model || getDefaultMindModelForProvider(selectedProvider);
   const selected = applyMindProviderModelSelection(
-    config?.provider || MIND_DEFAULT_PROVIDER,
-    config?.model || MIND_DEFAULT_MODEL
+    selectedProvider,
+    selectedModel
   );
   if (providerInput) providerInput.value = selected.provider;
   if (modelInput) modelInput.value = selected.model;
@@ -1265,18 +1373,19 @@ function applyMindConfigToInputs(config) {
 async function readLocalMindConfig() {
   const lib = await loadLiteLlmLibrary();
   const localCfg = await lib.loadLlmConfig();
+  const fallbackProvider = getDefaultMindProviderForExperience();
   const providerRaw = typeof localCfg?.provider === 'string' ? localCfg.provider.trim() : '';
   const modelRaw = typeof localCfg?.model === 'string' ? localCfg.model.trim() : '';
   const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
   const credential = typeof localCfg?.apiKey === 'string' ? localCfg.apiKey : '';
   const authMode = normalizeMindAuthMode(localCfg?.authMode);
   const parsed = parseModelRef(
-    modelRefRaw || `${providerRaw || MIND_DEFAULT_PROVIDER}/${modelRaw || MIND_DEFAULT_MODEL}`,
-    providerRaw || MIND_DEFAULT_PROVIDER,
-    modelRaw || MIND_DEFAULT_MODEL
+    modelRefRaw || `${providerRaw || fallbackProvider}/${modelRaw || getDefaultMindModelForProvider(providerRaw || fallbackProvider)}`,
+    providerRaw || fallbackProvider,
+    modelRaw || getDefaultMindModelForProvider(providerRaw || fallbackProvider)
   );
-  const provider = providerRaw || parsed.provider || MIND_DEFAULT_PROVIDER;
-  const model = modelRaw || parsed.modelId || MIND_DEFAULT_MODEL;
+  const provider = providerRaw || parsed.provider || fallbackProvider;
+  const model = modelRaw || parsed.modelId || getDefaultMindModelForProvider(provider);
   const modelRef = modelRefRaw || parsed.modelRef;
   return {
     configured: !!(provider && model && credential && localCfg?.configured),
@@ -1308,8 +1417,11 @@ async function hydrateMindConfigFromLocal({ silent = false } = {}) {
 }
 
 function resolveMindConfigFromInputs() {
-  const providerRaw = String(el('llmProviderSelect')?.value || MIND_DEFAULT_PROVIDER).trim() || MIND_DEFAULT_PROVIDER;
-  const providerInput = MIND_PROVIDER_ALIASES[providerRaw] || providerRaw;
+  const fallbackProvider = getDefaultMindProviderForExperience();
+  const providerRaw = String(el('llmProviderSelect')?.value || fallbackProvider).trim() || fallbackProvider;
+  const providerInput = LlmCatalog && typeof LlmCatalog.normalizeProvider === 'function'
+    ? (LlmCatalog.normalizeProvider(providerRaw) || providerRaw)
+    : providerRaw;
   const modelInput = String(el('llmModelIdInput')?.value || '').trim();
   const authMode = normalizeMindAuthMode(el('llmAuthModeSelect')?.value);
   const keyRaw = String(el('llmKeyInput')?.value || '').trim();
@@ -1317,9 +1429,9 @@ function resolveMindConfigFromInputs() {
   if (!providerInput) throw new Error('MISSING_LLM_PROVIDER');
   if (!modelInput) throw new Error('MISSING_LLM_MODEL');
   const parsed = parseModelRef(
-    `${providerInput}/${modelInput || getDefaultLlmModelForProvider(providerInput)}`,
+    `${providerInput}/${modelInput || getDefaultMindModelForProvider(providerInput)}`,
     providerInput,
-    modelInput || getDefaultLlmModelForProvider(providerInput)
+    modelInput || getDefaultMindModelForProvider(providerInput)
   );
 
   const keyParsed = extractOAuthAccessToken(keyRaw, providerInput);
@@ -1386,9 +1498,10 @@ async function clearMindConfigFromLocal() {
   stopMindOpenAiCodexOAuthPoll();
   const lib = await loadLiteLlmLibrary();
   await lib.clearLlmConfig();
+  const fallbackProvider = getDefaultMindProviderForExperience();
   applyMindConfigToInputs({
-    provider: MIND_DEFAULT_PROVIDER,
-    model: MIND_DEFAULT_MODEL,
+    provider: fallbackProvider,
+    model: getDefaultMindModelForProvider(fallbackProvider),
     credential: '',
     authMode: MIND_AUTH_API_KEY
   });
@@ -2835,9 +2948,10 @@ function wipeKeys() {
   publicMedia = null;
   pendingPublicImage = null;
   el('entries').textContent = '';
+  const fallbackProvider = getDefaultMindProviderForExperience();
   applyMindConfigToInputs({
-    provider: MIND_DEFAULT_PROVIDER,
-    model: MIND_DEFAULT_MODEL,
+    provider: fallbackProvider,
+    model: getDefaultMindModelForProvider(fallbackProvider),
     credential: '',
     authMode: MIND_AUTH_API_KEY
   });
@@ -3293,7 +3407,7 @@ async function initSharePanel() {
 
   function setSharePostsStatus(msg) {
     if (!sharePostsStatus) return;
-    sharePostsStatus.textContent = msg || 'Saved';
+    sharePostsStatus.textContent = msg || tHouse('common.saved');
     sharePostsStatus.style.display = msg ? 'inline-flex' : 'none';
   }
 
@@ -3375,17 +3489,18 @@ async function initSharePanel() {
   }
 
   function updateAgentStatus(connected, name) {
+    const suffix = name ? `: ${name}` : '';
     if (shareAgentDot && shareAgentStatusText) {
       shareAgentDot.className = `dot ${connected ? 'good' : ''}`;
       shareAgentStatusText.textContent = connected
-        ? `Agent connected${name ? `: ${name}` : ''}`
-        : 'Agent not connected';
+        ? tHouse('share.agent_status.connected', { suffix })
+        : tHouse('share.agent_status.disconnected');
     }
     if (shareAgentDotActive && shareAgentStatusTextActive) {
       shareAgentDotActive.className = `dot ${connected ? 'good' : ''}`;
       shareAgentStatusTextActive.textContent = connected
-        ? `Agent connected${name ? `: ${name}` : ''}`
-        : 'Agent not connected';
+        ? tHouse('share.agent_status.connected', { suffix })
+        : tHouse('share.agent_status.disconnected');
     }
   }
 
@@ -3401,37 +3516,37 @@ async function initSharePanel() {
 
   function updateRequirementFromState(state) {
     if (!state) {
-      setShareRequirement('Share links require a co-op house ceremony and agent approval so referrals stay attributable.');
+      setShareRequirement(tHouse('share.requirement.intro'));
       return;
     }
     if (state.share?.id) {
-      setShareRequirement('Share link is active. New signups from it count as referrals.');
+      setShareRequirement(tHouse('share.requirement.active'));
       return;
     }
     if (state.signup?.mode === 'token' || state.signup?.mode === 'claim') {
-      setShareRequirement('Token holder flow: generate a share link (no agent approval required).');
+      setShareRequirement(tHouse('share.requirement.token'));
       return;
     }
     if (!state.houseId) {
-      setShareRequirement('Finish the co-op house ceremony first (needs the agent reveal).');
+      setShareRequirement(tHouse('share.requirement.finish_house'));
       return;
     }
     const approval = state.shareApproval || {};
     const humanPressed = approval.human === true;
     const agentPressed = approval.agent === true || state.agent?.connected;
     if (humanPressed && agentPressed) {
-      setShareRequirement('Both approved. Generate the share link.');
+      setShareRequirement(tHouse('share.requirement.ready'));
       return;
     }
     if (humanPressed && !agentPressed) {
-      setShareRequirement('Waiting on agent approval. Ask them to reconnect to this house.');
+      setShareRequirement(tHouse('share.requirement.waiting_agent'));
       return;
     }
     if (!humanPressed && agentPressed) {
-      setShareRequirement('Agent approved. Press Generate share link to approve and create it.');
+      setShareRequirement(tHouse('share.requirement.agent_ready'));
       return;
     }
-    setShareRequirement('Press Generate share link, then have your agent reconnect to approve.');
+    setShareRequirement(tHouse('share.requirement.waiting'));
   }
 
   function updatePressStatus(state) {
@@ -3439,8 +3554,12 @@ async function initSharePanel() {
     const approval = state?.shareApproval || {};
     const humanPressed = approval.human === true;
     const agentPressed = approval.agent === true || state?.agent?.connected;
-    shareHumanPress.textContent = `Human pressed: ${humanPressed ? 'yes' : 'no'}`;
-    shareAgentPress.textContent = `Agent pressed: ${agentPressed ? 'yes' : 'no'}`;
+    shareHumanPress.textContent = tHouse('share.human_pressed', {
+      value: humanPressed ? tHouse('share.yes') : tHouse('share.no')
+    });
+    shareAgentPress.textContent = tHouse('share.agent_pressed', {
+      value: agentPressed ? tHouse('share.yes') : tHouse('share.no')
+    });
   }
 
   function updateShareLinks({ shareId, sharePath }) {
@@ -3489,7 +3608,7 @@ async function initSharePanel() {
       };
       updateShareLinks(payload);
       if (!state?.share?.id && shareIdForPosts) {
-        setShareRequirement('Share link is active (recovered from house).');
+        setShareRequirement(tHouse('share.requirement.active'));
       }
     } else {
       setSharePanelMode(false);
@@ -3513,15 +3632,17 @@ async function initSharePanel() {
       const humanUrl = shareHumanPost ? shareHumanPost.value.trim() : '';
       const agentUrl = shareAgentPost ? shareAgentPost.value.trim() : '';
       if (shareHumanPost && !isValidHttpUrl(humanUrl)) {
-        setSharePostsError('Enter a valid X post URL (http/https).');
+        setSharePostsError(isLinkFirstExperience()
+          ? tHouse('share.url_error.generic')
+          : tHouse('share.url_error.global'));
         return;
       }
       if (shareAgentPost && !tokenMode && !isValidHttpUrl(agentUrl)) {
-        setSharePostsError('Enter a valid Moltbook URL (http/https).');
+        setSharePostsError(tHouse('share.agent_url_error'));
         return;
       }
       if (saveSharePosts) saveSharePosts.disabled = true;
-      setSharePostsStatus('Saving…');
+      setSharePostsStatus(tHouse('common.saving'));
       try {
         const houseId = currentHouseId();
         if (houseId && KauthKey) {
@@ -3537,7 +3658,7 @@ async function initSharePanel() {
             updateShareLinks({ shareId: r.shareId, sharePath: r.sharePath, houseId });
             await hydrateSharePostsFromShare(r.shareId);
           }
-          setSharePostsStatus('Saved');
+          setSharePostsStatus(tHouse('common.saved'));
           setTimeout(() => setSharePostsStatus(''), 1200);
           return;
         }
@@ -3557,7 +3678,7 @@ async function initSharePanel() {
         if (shareIdForPosts) {
           await hydrateSharePostsFromShare(shareIdForPosts);
         }
-        setSharePostsStatus('Saved');
+        setSharePostsStatus(tHouse('common.saved'));
         setTimeout(() => setSharePostsStatus(''), 1200);
       } catch (e) {
         const msg = e.message === 'TEAM_CODE_MISSING'
@@ -3569,7 +3690,7 @@ async function initSharePanel() {
           : e.message === 'HTTP_404'
             ? 'Missing /api/human/posts. Restart the server and try again.'
           : e.message === 'INVALID_URL'
-            ? 'Enter a valid URL (http/https).'
+            ? (isLinkFirstExperience() ? tHouse('share.url_error.generic') : tHouse('share.url_error.global'))
             : e.message;
         setSharePostsError(msg);
         setSharePostsStatus('');
@@ -3592,7 +3713,7 @@ async function initSharePanel() {
             const payload = { shareId: existing.shareId, sharePath: existing.sharePath, houseId };
             saveShareCache(payload);
             updateShareLinks(payload);
-            setShareRequirement('Share link is active. New signups from it count as referrals.');
+            setShareRequirement(tHouse('share.requirement.active'));
             return;
           }
         } catch (e) {
@@ -3605,7 +3726,7 @@ async function initSharePanel() {
         const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId };
         saveShareCache(payload);
         updateShareLinks(payload);
-        setShareRequirement('Share link is active. New signups from it count as referrals.');
+        setShareRequirement(tHouse('share.requirement.active'));
         return;
       }
 
@@ -3616,7 +3737,7 @@ async function initSharePanel() {
       const payload = { shareId: r.shareId, sharePath: r.sharePath, houseId };
       saveShareCache(payload);
       updateShareLinks(payload);
-      setShareRequirement('Share link is active. New signups from it count as referrals.');
+      setShareRequirement(tHouse('share.requirement.active'));
     } catch (e) {
       const msg = e.message === 'AGENT_REQUIRED'
         ? 'Agent approval required. Ask your agent to reconnect to this house.'
@@ -3648,7 +3769,7 @@ async function initSharePanel() {
             : e.message;
       setShareError(msg);
       if (e.message === 'AGENT_REQUIRED') {
-        setShareRequirement('Ask your agent to reconnect to this house to approve sharing.');
+        setShareRequirement(tHouse('share.requirement.waiting_agent'));
       }
     } finally {
       if (shareStatus) shareStatus.style.display = 'none';
@@ -3687,6 +3808,7 @@ async function initSharePanel() {
 }
 
 async function init() {
+  await bootstrapExperiencePreferenceForHouse().catch(() => null);
   // If URL has ?house=<id>, auto-fill and try unlock.
   const params = new URLSearchParams(window.location.search);
   const houseId = params.get('house');
@@ -3828,17 +3950,18 @@ async function init() {
   const llmOauthInput = el('llmOauthProfileInput');
   const llmOauthLaunchBtn = el('llmOauthLaunchBtn');
   const llmOauthCompleteBtn = el('llmOauthCompleteBtn');
+  const initialProvider = getDefaultMindProviderForExperience();
   if (llmProviderInput && llmModelInput) {
     const selected = applyMindProviderModelSelection(
-      llmProviderInput.value || MIND_DEFAULT_PROVIDER,
-      llmModelInput.value || MIND_DEFAULT_MODEL
+      llmProviderInput.value || initialProvider,
+      llmModelInput.value || getDefaultMindModelForProvider(llmProviderInput.value || initialProvider)
     );
     llmProviderInput.value = selected.provider;
     llmModelInput.value = selected.model;
   }
   if (llmProviderInput) {
     llmProviderInput.addEventListener('change', () => {
-      const provider = applyMindProviderSelection(llmProviderInput.value || MIND_DEFAULT_PROVIDER);
+      const provider = applyMindProviderSelection(llmProviderInput.value || getDefaultMindProviderForExperience());
       if (llmModelInput) applyMindModelSelection(provider, llmModelInput.value || '');
       syncMindModelRefFromInputs();
       setMindAuthModeUi(llmAuthModeInput?.value);
@@ -4045,15 +4168,16 @@ async function init() {
 
   initSharePanel();
   updateWalletUI();
+  const fallbackProvider = getDefaultMindProviderForExperience();
   applyMindConfigToInputs({
-    provider: MIND_DEFAULT_PROVIDER,
-    model: MIND_DEFAULT_MODEL,
+    provider: fallbackProvider,
+    model: getDefaultMindModelForProvider(fallbackProvider),
     credential: '',
     authMode: MIND_AUTH_API_KEY
   });
   setHousePanelButtonsEnabled(false);
   syncInboxNavLink();
-  setStatus('Ready. Connect wallet, then create or unlock a house.');
+  setStatus(tHouse('house.status.ready'));
   restoreWalletConnection({ houseIdFromUrl: !!houseId });
 }
 

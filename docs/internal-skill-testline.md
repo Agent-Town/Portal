@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-02-22
+Last updated: 2026-03-09
 
 ## Goal
 
@@ -31,6 +31,7 @@ Keep `skill.md` evolution testable as we:
 |---|---|---|---|
 | Minimal external agent playbook sections | `public/skill.md` | none | `e2e/55_phase3_skill_contract_line.spec.js` (`skill.md keeps the minimal external-agent contract`) |
 | Required-input + polling/backoff + curl-loop guidance stays explicit in contract text | `public/skill.md` | none | `e2e/55_phase3_skill_contract_line.spec.js` (`skill.md keeps the minimal external-agent contract`) |
+| Preference-aware runtime guidance stays explicit in the external-agent contract | `public/skill.md`, `public/app.js`, `public/create.js` | runtime/session context carries `experiencePreference`; skill text requires locale-aware replies, no language-path re-ask, and blocked-service avoidance when policy hints say so | `e2e/55_phase3_skill_contract_line.spec.js` (`skill.md keeps the minimal external-agent contract`), `e2e/128_preference_session_context_visibility.spec.js` (`session context diagnostics expose the active experience preference`) |
 | Portal external-agent API route wiring | `server/index.js` | HTTP route handlers | `e2e/55_phase3_skill_contract_line.spec.js` (`minimal skill endpoints are wired as JSON routes`) |
 | Worker+LLM co-op loop executes connect/select/open skill actions end-to-end | `public/skill.md`, `server/index.js` | deterministic scripted LLM stream emits tool calls; worker executes `workspace_read_file` + `http_request` to drive `/api/agent/connect`, `/api/agent/state`, `/api/agent/select`, `/api/agent/open/press` | `e2e/58_phase3_skill_playbook_behavior.spec.js` (`worker+llm skill run drives connect/match/open co-op loop with no direct test-side agent API calls`) |
 | Chat-triggered remote skill import + runtime-context injection | `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | `gateway.chat.send` preflights referenced `skill.md` URLs through worker `visit_import` and appends authoritative runtime context (`origin`/`teamCode`/`houseId`), runtime experience state, and active skill-path guidance before LLM turn | `e2e/58_phase3_skill_playbook_behavior.spec.js` (`chat auto-imports referenced skill.md URL and injects runtime context into llm turn`), `e2e/56_phase3_skill_visit_worker.spec.js` (`chat prompt carries runtime team context and active skill guidance after skill import`) |

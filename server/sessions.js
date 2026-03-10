@@ -201,6 +201,7 @@ function createSession({ flow } = {}) {
       human: false,
       agent: false
     },
+    experiencePreference: null,
     token: {
       verifiedAt: null,
       address: null

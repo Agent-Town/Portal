@@ -113,6 +113,7 @@
           <label class="small-label">OAuth profile JSON / token</label>
           <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
           <div class="small" id="llmOauthProfileHint"></div>
+          <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
           <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
           <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;">Complete OAuth</button>
 
@@ -281,11 +282,11 @@
             <span id="shareAgentStatusTextActive">Agent not connected</span>
           </span>
           <div style="display:grid; gap:6px;">
-            <label class="small" for="shareHumanPost">Human X post</label>
+            <label class="small" id="shareHumanPostLabel" for="shareHumanPost">Human X post</label>
             <input id="shareHumanPost" type="url" placeholder="https://x.com/.../status/..." />
           </div>
           <div class="share-agent-only" style="display:grid; gap:6px;">
-            <label class="small" for="shareAgentPost">Agent Moltbook post</label>
+            <label class="small" id="shareAgentPostLabel" for="shareAgentPost">Agent Moltbook post</label>
             <input id="shareAgentPost" type="url" placeholder="https://www.moltbook.com/..." />
           </div>
           <div class="kv">
@@ -349,9 +350,13 @@
   </div>
 
   <script src="/vendor/qrcode.js?v=20260203"></script>
+  <script src="/experience_profiles.js?v=20260309a"></script>
+  <script src="/experience_runtime.js?v=20260309a"></script>
+  <script src="/i18n.js?v=20260309a"></script>
+  <script src="/llm_catalog.js?v=20260309a"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/house.js?v=20260217h"></script>
+  <script src="/house.js?v=20260309a"></script>
   <script src="/agent_panel.js?v=20260213"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
 const CREATE_EMBED_QUERY_KEY = 'embed';
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
 
 const isCeremonyEmbedMode = (() => {
   try {
@@ -14,6 +16,52 @@ if (isCeremonyEmbedMode) {
   document.documentElement.classList.add('ceremony-embed');
 }
 window.__agentTownCeremonyEmbed = isCeremonyEmbedMode;
+
+function normalizeExperiencePreferenceClient(value) {
+  if (ExperienceProfiles && typeof ExperienceProfiles.normalizePreference === 'function') {
+    return ExperienceProfiles.normalizePreference(
+      value && typeof value === 'object' ? value : { presetId: ExperienceProfiles.DEFAULT_PRESET_ID },
+      {
+        source: value?.source || 'server-default'
+      }
+    );
+  }
+  return value || {
+    presetId: 'global-default',
+    locale: 'en',
+    market: 'global',
+    providerPolicy: 'global-default',
+    sharePolicy: 'x-moltbook',
+    mediaPolicy: 'youtube',
+    agentPolicy: 'default',
+    selectedAt: new Date().toISOString(),
+    source: 'server-default'
+  };
+}
+
+let currentExperiencePreference = null;
+
+function getCurrentExperiencePreference() {
+  return normalizeExperiencePreferenceClient(currentExperiencePreference);
+}
+
+function updateExperiencePreferenceFromPayload(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.experiencePreference) return;
+  currentExperiencePreference = normalizeExperiencePreferenceClient(payload.experiencePreference);
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  }
+}
+
+async function bootstrapExperiencePreferenceForCreate() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap({ fetchImpl: fetch.bind(window) });
+  currentExperiencePreference = normalizeExperiencePreferenceClient(bootstrap.current);
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  }
+  return bootstrap;
+}
 
 function readTeamCodeHint() {
   try {
@@ -52,6 +100,7 @@ async function api(url, opts = {}) {
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
   }
+  updateExperiencePreferenceFromPayload(data);
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -195,7 +244,8 @@ async function runCreateSkillTurn({ goal = '', runtimeState = null } = {}) {
       runtimeContext: {
         origin: window.location.origin,
         teamCode: String(runtimeState?.teamCode || createTeamCode || ''),
-        houseId: String(runtimeState?.houseId || '')
+        houseId: String(runtimeState?.houseId || ''),
+        experiencePreference: getCurrentExperiencePreference()
       },
       runtimeState: runtimeState && typeof runtimeState === 'object' ? runtimeState : undefined
     });
@@ -429,6 +479,7 @@ async function pollCanvas() {
 }
 
 async function init() {
+  await bootstrapExperiencePreferenceForCreate().catch(() => null);
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
   liteDriver = typeof st?.lite?.driver === 'string' ? st.lite.driver : 'vendor';

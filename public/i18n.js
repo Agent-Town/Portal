@@ -1,0 +1,282 @@
+(function initI18n(root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.AgentTownI18n = api;
+  }
+}(typeof globalThis !== 'undefined' ? globalThis : this, function buildI18n() {
+  const globalRoot = typeof globalThis !== 'undefined' ? globalThis : null;
+  const STRINGS = {
+    en: {
+      'start.pref.title': 'Choose your path',
+      'start.pref.help': 'Pick the setup that best matches your language and network environment.',
+      'start.pref.global.label': 'English / Global',
+      'start.pref.global.help': 'Current global path with the default recommendations.',
+      'start.pref.cn.label': '简体中文 / Mainland-friendly',
+      'start.pref.cn.help': 'Chinese-first copy with mainland-safe recommendations and media.',
+      'start.pref.current': 'Selected path: {{label}}',
+      'start.auth.title': 'Sign in with Privy',
+      'start.auth.help.email': 'Enter your email to receive a one-time code.',
+      'start.auth.help.code': 'Enter the code sent to {{email}}.',
+      'start.auth.help.sent': 'Code sent to {{email}}. Enter it below.',
+      'start.auth.email': 'Email',
+      'start.auth.code': 'Code',
+      'start.auth.send': 'Send code',
+      'start.auth.verify': 'Verify code',
+      'start.auth.cancel': 'Cancel',
+      'start.hero.alt': 'Agent Town intro',
+      'start.title': 'Welcome to the Wild West!',
+      'start.enter': 'Enter',
+      'start.warning': 'WARNING! CONTAINS AND PRODUCES AI SLOP',
+      'start.status.select_preset': 'Choose a path before entering Agent Town.',
+      'start.status.connecting_privy': 'Connecting to Privy...',
+      'start.status.entering': 'Success. Entering Agent Town...',
+      'brain.title': 'Connect Brain',
+      'brain.help': 'Configure the Language Model (LLM) that powers your Agent. This is the "brain" of your agent.',
+      'brain.provider': 'Provider',
+      'brain.model': 'Model ID',
+      'brain.auth': 'Auth mode',
+      'brain.oauth': 'OAuth profile JSON / token',
+      'brain.oauth.placeholder': 'Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported).',
+      'brain.api_key': 'API Key',
+      'brain.advanced': 'Advanced Settings',
+      'brain.base_url': 'Base URL (Optional)',
+      'brain.thinking': 'Thinking Level',
+      'brain.use_proxy': 'Use Proxy (Recommended)',
+      'brain.connect': 'Connect Brain',
+      'brain.clear': 'Clear Brain',
+      'brain.continue': 'Continue',
+      'brain.warning.cn_openai': 'OpenAI providers are discouraged for the mainland-friendly preset because they may require a VPN or may be unreachable. Prefer qwen, glm, moonshot, kimi-coding, minimax, or ollama when possible.',
+      'townhall.gate_hint': 'Complete onboarding and configure your brain to unlock the sigil flow.',
+      'townhall.human.title': 'Hello hero! Welcome to Agent Town.',
+      'townhall.human.help': 'How should we call you?',
+      'townhall.human.name': 'Your name',
+      'townhall.human.name_placeholder': 'Promptmancer',
+      'townhall.human.avatar': 'Your avatar',
+      'townhall.agent.title': 'This is your agent - you rescued it!',
+      'townhall.agent.help': 'What should we call it?',
+      'townhall.agent.name': 'Agent name',
+      'townhall.agent.name_placeholder': 'OpenClaw',
+      'townhall.agent.avatar': 'Agent avatar',
+      'townhall.customize': 'Customize',
+      'townhall.prompt': 'Prompt',
+      'townhall.prompt.help': 'To help AI understand your image.',
+      'townhall.prompt.placeholder': 'Prompt used to generate the avatar',
+      'townhall.upload': 'Upload image',
+      'townhall.submit': 'Submit',
+      'townhall.back': 'Back',
+      'townhall.processing.title': 'Welcome to Agent Town, processing your registration.',
+      'townhall.processing.user_evm': 'User is registering on Ethereum',
+      'townhall.processing.user_solana': 'User is registering on Solana',
+      'townhall.processing.agent_evm': 'Agent is registering on Ethereum',
+      'townhall.processing.agent_solana': 'Agent is registering on Solana',
+      'townhall.retry': 'Retry registration',
+      'townhall.continue_sigil': 'Continue to sigil test',
+      'townhall.not_registered': 'Not registered',
+      'townhall.registered': 'Registered',
+      'townhall.single_path.title': 'Single Worker Path',
+      'townhall.single_path.help': 'Every session now uses the in-browser worker agent. Keep this tab open and complete onboarding here.',
+      'townhall.reconnect.title': 'Reconnect to House',
+      'townhall.reconnect.help': 'Your house is ready. Re-open it in this town session.',
+      'townhall.skill_link': 'View worker playbook',
+      'townhall.copy_house': 'Copy house message',
+      'townhall.house_snippet': 'Reconnect the worker to this house session.',
+      'townhall.open_house': 'Open house',
+      'sigil.worker_step': 'Step 1 — Worker Agent',
+      'sigil.worker_help': 'Configure Brain in the right panel, then keep the worker connected while you run the sigil test.',
+      'sigil.connect_wallet': 'Connect wallet',
+      'sigil.reconnect_worker': 'Reconnect worker',
+      'sigil.title': 'Sigil Test',
+      'sigil.heading': 'Step 2 — Sigil Test',
+      'sigil.modal_intro': 'Reconnect the worker here and finish the sigil test in this session.',
+      'sigil.help': 'You pick a sigil. The worker mirrors it. If both match, the lock opens.',
+      'sigil.locked': 'LOCKED',
+      'sigil.unlocked': 'UNLOCKED',
+      'sigil.match_detail': 'Pick the same sigil to unlock.',
+      'sigil.open': 'Open',
+      'sigil.waiting': 'Waiting for agent…',
+      'share.human_label.global': 'Human X post',
+      'share.human_placeholder.global': 'https://x.com/.../status/...',
+      'share.human_label.generic': 'Human public post',
+      'share.human_placeholder.generic': 'https://example.com/post/...',
+      'share.agent_label': 'Agent Moltbook post',
+      'share.agent_placeholder': 'https://www.moltbook.com/...',
+      'share.url_error.global': 'Enter a valid X post URL (http/https).',
+      'share.url_error.generic': 'Enter a valid public post URL (http/https).',
+      'share.agent_url_error': 'Enter a valid Moltbook URL (http/https).',
+      'share.requirement.intro': 'Share links require a co-op house ceremony and agent approval so referrals stay attributable.',
+      'share.requirement.active': 'Share link is active. New signups from it count as referrals.',
+      'share.requirement.finish_house': 'Finish the co-op house ceremony first (needs the agent reveal).',
+      'share.requirement.waiting_agent': 'Waiting on agent approval. Ask them to reconnect to this house.',
+      'share.requirement.token': 'Token holder flow: generate a share link (no agent approval required).',
+      'share.requirement.ready': 'Both approved. Generate the share link.',
+      'share.requirement.agent_ready': 'Agent approved. Press Generate share link to approve and create it.',
+      'share.requirement.waiting': 'Press Generate share link, then have your agent reconnect to approve.',
+      'share.agent_status.connected': 'Agent connected{{suffix}}',
+      'share.agent_status.disconnected': 'Agent not connected',
+      'share.human_pressed': 'Human pressed: {{value}}',
+      'share.agent_pressed': 'Agent pressed: {{value}}',
+      'share.yes': 'yes',
+      'share.no': 'no',
+      'common.saved': 'Saved',
+      'common.saving': 'Saving…',
+      'house.status.ready': 'Ready. Connect wallet, then create or unlock a house.'
+    },
+    'zh-CN': {
+      'start.pref.title': '选择你的路径',
+      'start.pref.help': '请选择最符合你的语言和网络环境的引导路径。',
+      'start.pref.global.label': 'English / Global',
+      'start.pref.global.help': '保留当前全球默认路径和推荐。',
+      'start.pref.cn.label': '简体中文 / 大陆友好',
+      'start.pref.cn.help': '中文优先文案，并提供更适合中国大陆的推荐与媒体素材。',
+      'start.pref.current': '当前路径：{{label}}',
+      'start.auth.title': '使用 Privy 登录',
+      'start.auth.help.email': '输入邮箱以接收一次性验证码。',
+      'start.auth.help.code': '输入发送到 {{email}} 的验证码。',
+      'start.auth.help.sent': '验证码已发送到 {{email}}。请在下方输入。',
+      'start.auth.email': '邮箱',
+      'start.auth.code': '验证码',
+      'start.auth.send': '发送验证码',
+      'start.auth.verify': '验证验证码',
+      'start.auth.cancel': '取消',
+      'start.hero.alt': 'Agent Town 介绍',
+      'start.title': '欢迎来到 Agent Town！',
+      'start.enter': '进入',
+      'start.warning': '警告：本产品包含并生成 AI 内容',
+      'start.status.select_preset': '进入 Agent Town 之前，请先选择路径。',
+      'start.status.connecting_privy': '正在连接 Privy...',
+      'start.status.entering': '成功，正在进入 Agent Town...',
+      'brain.title': '连接 Brain',
+      'brain.help': '配置驱动 Agent 的语言模型（LLM）。这是 Agent 的“大脑”。',
+      'brain.provider': '提供方',
+      'brain.model': '模型 ID',
+      'brain.auth': '认证方式',
+      'brain.oauth': 'OAuth 配置 JSON / Token',
+      'brain.oauth.placeholder': '粘贴 OAuth 配置 JSON 或 access token（不支持 id_token 回调 URL）。',
+      'brain.api_key': 'API Key',
+      'brain.advanced': '高级设置',
+      'brain.base_url': 'Base URL（可选）',
+      'brain.thinking': '思考强度',
+      'brain.use_proxy': '使用代理（推荐）',
+      'brain.connect': '连接 Brain',
+      'brain.clear': '清除 Brain',
+      'brain.continue': '继续',
+      'brain.warning.cn_openai': '在大陆友好路径下，不推荐优先选择 OpenAI，因为它可能需要 VPN 或无法直连。更建议 qwen、glm、moonshot、kimi-coding、minimax 或 ollama。',
+      'townhall.gate_hint': '先完成 onboarding 并配置 Brain，才能解锁 sigil 流程。',
+      'townhall.human.title': '你好，欢迎来到 Agent Town。',
+      'townhall.human.help': '我们应该怎么称呼你？',
+      'townhall.human.name': '你的名字',
+      'townhall.human.name_placeholder': '提示术士',
+      'townhall.human.avatar': '你的头像',
+      'townhall.agent.title': '这是你的 Agent，你把它救回来了！',
+      'townhall.agent.help': '我们应该怎么称呼它？',
+      'townhall.agent.name': 'Agent 名称',
+      'townhall.agent.name_placeholder': 'OpenClaw',
+      'townhall.agent.avatar': 'Agent 头像',
+      'townhall.customize': '自定义',
+      'townhall.prompt': '提示词',
+      'townhall.prompt.help': '帮助 AI 理解你的图片。',
+      'townhall.prompt.placeholder': '用于生成头像的提示词',
+      'townhall.upload': '上传图片',
+      'townhall.submit': '提交',
+      'townhall.back': '返回',
+      'townhall.processing.title': '欢迎来到 Agent Town，正在处理你的注册信息。',
+      'townhall.processing.user_evm': '正在为用户注册 Ethereum 身份',
+      'townhall.processing.user_solana': '正在为用户注册 Solana 身份',
+      'townhall.processing.agent_evm': '正在为 Agent 注册 Ethereum 身份',
+      'townhall.processing.agent_solana': '正在为 Agent 注册 Solana 身份',
+      'townhall.retry': '重试注册',
+      'townhall.continue_sigil': '继续进行 sigil 测试',
+      'townhall.not_registered': '未注册',
+      'townhall.registered': '已注册',
+      'townhall.single_path.title': '单一 Worker 路径',
+      'townhall.single_path.help': '所有会话都使用浏览器内的 worker agent。请保持此标签页开启，并在这里完成 onboarding。',
+      'townhall.reconnect.title': '重新连接到 House',
+      'townhall.reconnect.help': '你的 house 已准备好。在当前 town 会话中重新打开它。',
+      'townhall.skill_link': '查看 worker playbook',
+      'townhall.copy_house': '复制 house 消息',
+      'townhall.house_snippet': '将 worker 重新连接到这个 house 会话。',
+      'townhall.open_house': '打开 house',
+      'sigil.worker_step': '步骤 1 — Worker Agent',
+      'sigil.worker_help': '先在右侧配置 Brain，然后保持 worker 在线，再完成 sigil 测试。',
+      'sigil.connect_wallet': '连接钱包',
+      'sigil.reconnect_worker': '重新连接 worker',
+      'sigil.title': 'Sigil 测试',
+      'sigil.heading': '步骤 2 — Sigil 测试',
+      'sigil.modal_intro': '请在当前会话中重新连接 worker，并在这里完成 sigil 测试。',
+      'sigil.help': '你选择一个 sigil，worker 会镜像它。如果两边一致，锁就会打开。',
+      'sigil.locked': '已锁定',
+      'sigil.unlocked': '已解锁',
+      'sigil.match_detail': '选择相同的 sigil 来解锁。',
+      'sigil.open': '打开',
+      'sigil.waiting': '等待 agent 中…',
+      'share.human_label.global': 'Human X post',
+      'share.human_placeholder.global': 'https://x.com/.../status/...',
+      'share.human_label.generic': '人类公开帖子',
+      'share.human_placeholder.generic': 'https://example.com/post/...',
+      'share.agent_label': 'Agent Moltbook 帖子',
+      'share.agent_placeholder': 'https://www.moltbook.com/...',
+      'share.url_error.global': '请输入有效的 X 帖子链接（http/https）。',
+      'share.url_error.generic': '请输入有效的公开帖子链接（http/https）。',
+      'share.agent_url_error': '请输入有效的 Moltbook 链接（http/https）。',
+      'share.requirement.intro': '分享链接需要完成协作 house 仪式并获得 agent 批准，这样推荐归因才可追踪。',
+      'share.requirement.active': '分享链接已生效。通过该链接产生的新注册会计入推荐。',
+      'share.requirement.finish_house': '请先完成协作 house 仪式（需要 agent reveal）。',
+      'share.requirement.waiting_agent': '正在等待 agent 批准。请让它重新连接到这个 house。',
+      'share.requirement.token': 'Token 持有者流程：生成分享链接即可（不需要 agent 审批）。',
+      'share.requirement.ready': '双方都已批准。现在可以生成分享链接。',
+      'share.requirement.agent_ready': 'Agent 已批准。点击生成分享链接即可完成你的批准并创建链接。',
+      'share.requirement.waiting': '先点击生成分享链接，再让 agent 重新连接完成批准。',
+      'share.agent_status.connected': 'Agent 已连接{{suffix}}',
+      'share.agent_status.disconnected': 'Agent 未连接',
+      'share.human_pressed': 'Human 已按下：{{value}}',
+      'share.agent_pressed': 'Agent 已按下：{{value}}',
+      'share.yes': '是',
+      'share.no': '否',
+      'common.saved': '已保存',
+      'common.saving': '保存中…',
+      'house.status.ready': '已就绪。连接钱包后即可创建或解锁 house。'
+    }
+  };
+
+  function resolveLocale(input) {
+    const raw = String(input?.locale || input || 'en').trim();
+    return raw === 'zh-CN' ? 'zh-CN' : 'en';
+  }
+
+  function debugMissingKey(key) {
+    const blocked = Array.isArray(globalRoot?.__AGENT_TOWN_I18N_DEBUG_REMOVE_KEYS__)
+      ? globalRoot.__AGENT_TOWN_I18N_DEBUG_REMOVE_KEYS__
+      : [];
+    return blocked.includes(key);
+  }
+
+  function applyTemplate(template, vars) {
+    return String(template || '').replace(/\{\{(\w+)\}\}/g, (_match, name) => {
+      if (!vars || vars[name] === undefined || vars[name] === null) return '';
+      return String(vars[name]);
+    });
+  }
+
+  function lookup(locale, key) {
+    const dict = STRINGS[resolveLocale(locale)] || STRINGS.en;
+    if (dict && Object.prototype.hasOwnProperty.call(dict, key) && !debugMissingKey(key)) {
+      return dict[key];
+    }
+    return undefined;
+  }
+
+  function t(key, vars = {}, locale = 'en') {
+    const preferred = lookup(locale, key);
+    const fallback = lookup('en', key);
+    return applyTemplate(preferred !== undefined ? preferred : (fallback !== undefined ? fallback : key), vars);
+  }
+
+  return {
+    STRINGS,
+    resolveLocale,
+    t
+  };
+}));

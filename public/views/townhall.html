@@ -5,14 +5,14 @@
     </div>
 
     <div class="townhallStoryStep" id="townhallStepHuman">
-      <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
-      <p class="small" style="margin-top:0">How should we call you?</p>
+      <h2 id="townhallHumanTitle" style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
+      <p class="small" id="townhallHumanHelp" style="margin-top:0">How should we call you?</p>
 
-      <label class="small" for="townhallHumanName">Your name</label>
+      <label class="small" id="townhallHumanNameLabel" for="townhallHumanName">Your name</label>
       <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
 
       <div class="townhallAvatarBlock">
-        <div class="small">Your avatar</div>
+        <div class="small" id="townhallHumanAvatarLabel">Your avatar</div>
         <div class="public-media-preview is-hidden" id="townhallHumanPreview">
           <img id="townhallHumanPreviewImg" alt="Human avatar preview" />
         </div>
@@ -20,10 +20,10 @@
       </div>
 
       <div class="townhallCustomizeModal is-hidden" id="townhallHumanCustomize">
-        <label class="small" for="townhallHumanPrompt">Prompt</label>
-        <div class="small">To help AI understand your image.</div>
+        <label class="small" id="townhallHumanPromptLabel" for="townhallHumanPrompt">Prompt</label>
+        <div class="small" id="townhallHumanPromptHelp">To help AI understand your image.</div>
         <textarea id="townhallHumanPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
-        <label class="small" for="townhallHumanImage" style="margin-top:8px; display:block;">Upload image</label>
+        <label class="small" id="townhallHumanImageLabel" for="townhallHumanImage" style="margin-top:8px; display:block;">Upload image</label>
         <input id="townhallHumanImage" type="file" accept="image/png,image/jpeg,image/webp" />
       </div>
 
@@ -33,14 +33,14 @@
     </div>
 
     <div class="townhallStoryStep is-hidden" id="townhallStepAgent">
-      <h2 style="margin:0 0 6px">This is your agent - you rescued it!</h2>
-      <p class="small" style="margin-top:0">What should we call it?</p>
+      <h2 id="townhallAgentTitle" style="margin:0 0 6px">This is your agent - you rescued it!</h2>
+      <p class="small" id="townhallAgentHelp" style="margin-top:0">What should we call it?</p>
 
-      <label class="small" for="townhallAgentName">Agent name</label>
+      <label class="small" id="townhallAgentNameLabel" for="townhallAgentName">Agent name</label>
       <input id="townhallAgentName" type="text" maxlength="48" placeholder="OpenClaw" />
 
       <div class="townhallAvatarBlock">
-        <div class="small">Agent avatar</div>
+        <div class="small" id="townhallAgentAvatarLabel">Agent avatar</div>
         <div class="public-media-preview is-hidden" id="townhallAgentPreview">
           <img id="townhallAgentPreviewImg" alt="Agent avatar preview" />
         </div>
@@ -48,10 +48,10 @@
       </div>
 
       <div class="townhallCustomizeModal is-hidden" id="townhallAgentCustomize">
-        <label class="small" for="townhallAgentPrompt">Prompt</label>
-        <div class="small">To help AI understand your image.</div>
+        <label class="small" id="townhallAgentPromptLabel" for="townhallAgentPrompt">Prompt</label>
+        <div class="small" id="townhallAgentPromptHelp">To help AI understand your image.</div>
         <textarea id="townhallAgentPrompt" rows="3" maxlength="4096" placeholder="Prompt used to generate the avatar"></textarea>
-        <label class="small" for="townhallAgentImage" style="margin-top:8px; display:block;">Upload image</label>
+        <label class="small" id="townhallAgentImageLabel" for="townhallAgentImage" style="margin-top:8px; display:block;">Upload image</label>
         <input id="townhallAgentImage" type="file" accept="image/png,image/jpeg,image/webp" />
       </div>
 
@@ -62,23 +62,23 @@
     </div>
 
     <div class="townhallStoryStep is-hidden" id="townhallStepProcessing">
-      <h2 style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
+      <h2 id="townhallProcessingTitle" style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
 
       <div class="townhallMintChecklist" id="townhallMintChecklist">
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Ethereum</span>
+          <span id="townhallMintUserEvmLabel">User is registering on Ethereum</span>
           <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Solana</span>
+          <span id="townhallMintUserSolanaLabel">User is registering on Solana</span>
           <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Ethereum</span>
+          <span id="townhallMintAgentEvmLabel">Agent is registering on Ethereum</span>
           <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Solana</span>
+          <span id="townhallMintAgentSolanaLabel">Agent is registering on Solana</span>
           <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
         </div>
       </div>
@@ -98,8 +98,8 @@
   <div class="divider"></div>
 
   <div class="panel spaced" data-testid="townhall-single-path-note">
-    <h2 style="margin:0 0 6px">Single Worker Path</h2>
-    <p class="small" style="margin-top:0">
+    <h2 id="townhallSinglePathTitle" style="margin:0 0 6px">Single Worker Path</h2>
+    <p class="small" id="townhallSinglePathHelp" style="margin-top:0">
       Every session now uses the in-browser worker agent. Keep this tab open and complete onboarding here.
     </p>
   </div>
@@ -123,7 +123,7 @@
   </div>
 
   <div class="panel" id="step1Panel">
-    <h2 style="margin:0 0 6px">Step 1 — Worker Agent</h2>
+    <h2 id="sigilWorkerStepTitle" style="margin:0 0 6px">Step 1 — Worker Agent</h2>
     <p class="small" style="margin-top:0" id="step1Intro">
       Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
     </p>
@@ -140,8 +140,8 @@
   <div class="divider" id="stepDivider"></div>
 
   <div class="panel" id="step2Panel">
-    <h2 style="margin:0 0 6px">Step 2 — Sigil Test</h2>
-    <p class="small" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.</p>
+    <h2 id="sigilHeading" style="margin:0 0 6px">Step 2 — Sigil Test</h2>
+    <p class="small" id="sigilHelp" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.</p>
 
     <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
 

@@ -11,6 +11,10 @@ const ONBOARDING_STEP_BRAIN = 'brain';
 const ONBOARDING_STEP_SIGIL = 'sigil';
 const ONBOARDING_STEP_CEREMONY = 'ceremony';
 const ONBOARDING_STEP_DONE = 'done';
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
+const AppI18n = window.AgentTownI18n || null;
+const LlmCatalog = window.AgentTownLlmCatalog || null;
 
 function normalizeOnboardingStep(value) {
   switch (String(value || '').trim()) {
@@ -272,6 +276,52 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function normalizeExperiencePreferenceClient(value) {
+  if (ExperienceProfiles && typeof ExperienceProfiles.normalizePreference === 'function') {
+    return ExperienceProfiles.normalizePreference(
+      value && typeof value === 'object' ? value : { presetId: ExperienceProfiles.DEFAULT_PRESET_ID },
+      {
+        source: value?.source || 'server-default'
+      }
+    );
+  }
+  return value || {
+    presetId: 'global-default',
+    locale: 'en',
+    market: 'global',
+    providerPolicy: 'global-default',
+    sharePolicy: 'x-moltbook',
+    mediaPolicy: 'youtube',
+    agentPolicy: 'default',
+    selectedAt: new Date().toISOString(),
+    source: 'server-default'
+  };
+}
+
+function getCurrentExperiencePreference() {
+  return normalizeExperiencePreferenceClient(currentExperiencePreference || lastState?.experiencePreference || null);
+}
+
+function tApp(key, vars = {}) {
+  const preference = getCurrentExperiencePreference();
+  if (!AppI18n || typeof AppI18n.t !== 'function') return key;
+  return AppI18n.t(key, vars, preference.locale || 'en');
+}
+
+function isMainlandFriendlyExperience(preference = getCurrentExperiencePreference()) {
+  return String(preference?.presetId || '') === 'cn-mainland'
+    || String(preference?.providerPolicy || '') === 'cn-mainland';
+}
+
+function buildExperienceRuntimeContext(state = lastState) {
+  return {
+    origin: window.location.origin,
+    teamCode: String(state?.teamCode || ''),
+    houseId: String(state?.houseId || ''),
+    experiencePreference: getCurrentExperiencePreference()
+  };
+}
+
 const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
 const AGENT_PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
 const AGENT_PANEL_DEBUG_VISIBLE_KEY = 'agentTown:panel:debugVisible';
@@ -283,6 +333,7 @@ const AGENT_PANEL_ZOOM_SCALE_STEP = 0.1;
 
 let elements = [];
 let lastState = null;
+let currentExperiencePreference = null;
 let wallet = null;
 let walletAddr = null;
 let walletRecoveryIntentAttempts = 0;
@@ -425,6 +476,99 @@ const districtViews = {
   brain: { title: 'Connect Brain', viewPath: '/views/brain.html' },
   sigil: { title: 'Sigil Test', viewPath: '/views/sigil.html' }
 };
+
+function setNodeText(id, key, vars = {}) {
+  const node = el(id);
+  if (node) node.textContent = tApp(key, vars);
+}
+
+function setNodePlaceholder(id, key) {
+  const node = el(id);
+  if (node) node.placeholder = tApp(key);
+}
+
+function refreshDistrictViewTitles() {
+  districtViews.brain.title = tApp('brain.title');
+  districtViews.sigil.title = tApp('sigil.title');
+}
+
+function applyExperiencePreferenceToUi() {
+  const preference = getCurrentExperiencePreference();
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(preference);
+  }
+  refreshDistrictViewTitles();
+
+  setNodeText('townHallGateHint', 'townhall.gate_hint');
+  setNodeText('townhallHumanTitle', 'townhall.human.title');
+  setNodeText('townhallHumanHelp', 'townhall.human.help');
+  setNodeText('townhallHumanNameLabel', 'townhall.human.name');
+  setNodePlaceholder('townhallHumanName', 'townhall.human.name_placeholder');
+  setNodeText('townhallHumanAvatarLabel', 'townhall.human.avatar');
+  setNodeText('townhallHumanPromptLabel', 'townhall.prompt');
+  setNodeText('townhallHumanPromptHelp', 'townhall.prompt.help');
+  setNodePlaceholder('townhallHumanPrompt', 'townhall.prompt.placeholder');
+  setNodeText('townhallHumanImageLabel', 'townhall.upload');
+  setNodeText('townhallHumanSubmitBtn', 'townhall.submit');
+  setNodeText('townhallAgentTitle', 'townhall.agent.title');
+  setNodeText('townhallAgentHelp', 'townhall.agent.help');
+  setNodeText('townhallAgentNameLabel', 'townhall.agent.name');
+  setNodePlaceholder('townhallAgentName', 'townhall.agent.name_placeholder');
+  setNodeText('townhallAgentAvatarLabel', 'townhall.agent.avatar');
+  setNodeText('townhallAgentPromptLabel', 'townhall.prompt');
+  setNodeText('townhallAgentPromptHelp', 'townhall.prompt.help');
+  setNodePlaceholder('townhallAgentPrompt', 'townhall.prompt.placeholder');
+  setNodeText('townhallAgentImageLabel', 'townhall.upload');
+  setNodeText('townhallAgentBackBtn', 'townhall.back');
+  setNodeText('townhallAgentSubmitBtn', 'townhall.submit');
+  setNodeText('townhallProcessingTitle', 'townhall.processing.title');
+  setNodeText('townhallMintUserEvmLabel', 'townhall.processing.user_evm');
+  setNodeText('townhallMintUserSolanaLabel', 'townhall.processing.user_solana');
+  setNodeText('townhallMintAgentEvmLabel', 'townhall.processing.agent_evm');
+  setNodeText('townhallMintAgentSolanaLabel', 'townhall.processing.agent_solana');
+  setNodeText('townhallRegisterBtn', 'townhall.retry');
+  setNodeText('townhallContinueBtn', 'townhall.continue_sigil');
+  setNodeText('townhallSinglePathTitle', 'townhall.single_path.title');
+  setNodeText('townhallSinglePathHelp', 'townhall.single_path.help');
+  setNodeText('reconnectTitle', 'townhall.reconnect.title');
+  setNodeText('reconnectIntro', 'townhall.reconnect.help');
+  setNodeText('copyHouse', 'townhall.copy_house');
+  setNodeText('houseSnippet', 'townhall.house_snippet');
+  setNodeText('openHouseLink', 'townhall.open_house');
+  setNodeText('sigilWorkerStepTitle', 'sigil.worker_step');
+  setNodeText('step1Intro', 'sigil.worker_help');
+  setNodeText('connectWalletBtn', 'sigil.connect_wallet');
+  setNodeText('workerReconnectBtn', 'sigil.reconnect_worker');
+  setNodeText('sigilHeading', 'sigil.heading');
+  setNodeText('sigilHelp', 'sigil.help');
+  setNodeText('sigilModalTitle', 'sigil.title');
+  setNodeText('sigilModalHeading', 'sigil.title');
+  setNodeText('sigilModalIntro', 'sigil.modal_intro');
+  setNodeText('sigilModalHelp', 'sigil.help');
+  setNodeText('openBtn', 'sigil.open');
+  setNodeText('openWaiting', 'sigil.waiting');
+  setNodeText('matchDetail', 'sigil.match_detail');
+
+  const customizeButtons = ['townhallHumanCustomizeBtn', 'townhallAgentCustomizeBtn'];
+  for (const id of customizeButtons) {
+    setNodeText(id, 'townhall.customize');
+  }
+
+  const providerWarning = el('llmProviderWarning');
+  if (providerWarning) {
+    const provider = String(el('llmProviderSelect')?.value || '').trim();
+    const message = getLlmProviderWarningText(provider, preference);
+    providerWarning.textContent = message || '';
+  }
+}
+
+async function bootstrapExperiencePreferenceForApp() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap({ fetchImpl: fetch.bind(window) });
+  currentExperiencePreference = normalizeExperiencePreferenceClient(bootstrap.current);
+  applyExperiencePreferenceToUi();
+  return bootstrap;
+}
 const districtViewCache = new Map();
 let currentDistrict = null;
 let lastDistrictLoad = 0;
@@ -778,9 +922,9 @@ function isTownHubDistrictGateLocked(state) {
 
 function getTownHubDistrictGateStatusText() {
   const reason = getTownHubDistrictGateReason(lastState);
-  if (reason === 'onboarding') return 'Town Hall is required until onboarding is complete.';
-  if (reason === 'brain') return 'A brain must be configured before continuing.';
-  if (reason === 'sigil') return 'Complete your sigil test before continuing.';
+  if (reason === 'onboarding') return tApp('townhall.gate_hint');
+  if (reason === 'brain') return tApp('brain.help');
+  if (reason === 'sigil') return tApp('sigil.match_detail');
   return '';
 }
 
@@ -3075,7 +3219,11 @@ function syncTownhallRegistrationUI(state) {
   }
 
   const registerState = el('townhallRegisterState');
-  if (registerState) registerState.textContent = registrationComplete ? 'Registered' : 'Not registered';
+  if (registerState) {
+    registerState.textContent = registrationComplete
+      ? tApp('townhall.registered')
+      : tApp('townhall.not_registered');
+  }
 
   const continueBtn = el('townhallContinueBtn');
   if (continueBtn) {
@@ -5161,11 +5309,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
       || !sessionPane?.textContent;
 
     const runtimeStateInput = lastState && typeof lastState === 'object' ? lastState : null;
-    const runtimeContextInput = {
-      origin: window.location.origin,
-      teamCode: String(lastState?.teamCode || ''),
-      houseId: String(lastState?.houseId || ''),
-    };
+    const runtimeContextInput = buildExperienceRuntimeContext(lastState);
 
     const transcriptToolStatsPromise = debugApi && typeof debugApi.getTranscriptToolStats === 'function'
       ? withDebugTimeout(() => withAgentTrafficMuted(async () => {
@@ -5344,6 +5488,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const sessionHeader = {
       refreshedAt: nowIso,
       reason,
+      experiencePreference: getCurrentExperiencePreference(),
       runtimeState: {
         teamCode: String(lastState?.teamCode || ''),
         houseId: String(lastState?.houseId || ''),
@@ -5529,6 +5674,8 @@ function setReconnectMode({ houseReady = false, role = 'human' } = {}) {
 
 async function updateUI(state) {
   lastState = state;
+  currentExperiencePreference = normalizeExperiencePreferenceClient(state?.experiencePreference || currentExperiencePreference);
+  applyExperiencePreferenceToUi();
 
   const houseId = state.houseId || walletHouseId || null;
   const signupMode = state.signup?.mode || (state.signup?.complete ? 'agent' : null);
@@ -5572,11 +5719,11 @@ async function updateUI(state) {
 
   if (houseId) {
     if (walletRecovered) {
-      safeSetText('reconnectTitle', 'Welcome back');
-      safeSetText('reconnectIntro', 'We found a house for this wallet. Continue with your worker in this session.');
+      safeSetText('reconnectTitle', tApp('townhall.reconnect.title'));
+      safeSetText('reconnectIntro', tApp('townhall.reconnect.help'));
     } else {
-      safeSetText('reconnectTitle', 'Reconnect to House');
-      safeSetText('reconnectIntro', 'Your house is ready. Continue in this town session.');
+      safeSetText('reconnectTitle', tApp('townhall.reconnect.title'));
+      safeSetText('reconnectIntro', tApp('townhall.reconnect.help'));
     }
     safeSetText('houseSnippet', `Reconnect worker session ${teamCode} to your house.`);
     const openHouseLink = el('openHouseLink');
@@ -5596,13 +5743,13 @@ async function updateUI(state) {
   const matched = !!state.match?.matched;
   const matchState = el('matchState');
   if (matchState) {
-    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.textContent = matched ? tApp('sigil.unlocked') : tApp('sigil.locked');
     matchState.className = `state ${matched ? 'good' : 'bad'}`;
   }
 
   safeSetText('matchDetail', matched
     ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
-    : 'Pick the same sigil to unlock.'
+    : tApp('sigil.match_detail')
   );
 
   const openBtn = el('openBtn');
@@ -5730,50 +5877,47 @@ function liteState(state) {
   return state.lite;
 }
 
-const LLM_MODEL_OPTIONS_BY_PROVIDER = Object.freeze({
-  openai: Object.freeze(['gpt-5.1-codex', 'gpt-4o', 'gpt-4o-mini']),
-  ollama: Object.freeze(['gpt-oss:20b', 'gpt-oss:120b', 'llama3.3', 'llama3.2:latest', 'qwen2.5:7b']),
-  'openai-codex': Object.freeze(['gpt-5.3-codex', 'gpt-5-codex']),
-  anthropic: Object.freeze(['claude-opus-4-6', 'claude-3-5-sonnet-20240620', 'claude-3-5-haiku-20241022']),
-  openrouter: Object.freeze(['anthropic/claude-sonnet-4-5']),
-  litellm: Object.freeze(['claude-opus-4-6']),
-  'amazon-bedrock': Object.freeze(['us.anthropic.claude-opus-4-6-v1:0']),
-  'vercel-ai-gateway': Object.freeze(['anthropic/claude-opus-4.6']),
-  moonshot: Object.freeze(['kimi-k2.5', 'kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'kimi-k2-thinking', 'kimi-k2-thinking-turbo']),
-  'kimi-coding': Object.freeze(['k2p5']),
-  minimax: Object.freeze(['MiniMax-M2.1', 'MiniMax-M2.1-lightning']),
-  opencode: Object.freeze(['claude-opus-4-6']),
-  zai: Object.freeze(['glm-5']),
-  glm: Object.freeze(['glm-5']),
-  synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
-  qianfan: Object.freeze(['model-id']),
-  'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
-  qwen: Object.freeze(['coder-model', 'vision-model']),
-  together: Object.freeze(['moonshotai/Kimi-K2.5']),
-  'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
-  xiaomi: Object.freeze(['mimo-v2-flash']),
-  venice: Object.freeze(['llama-3.3-70b', 'claude-opus-45', 'venice-uncensored', 'qwen3-vl-235b-a22b', 'qwen3-coder-480b-a35b-instruct']),
-  huggingface: Object.freeze(['Qwen/Qwen3-235B-A22B-Instruct-2507', 'meta-llama/Llama-3.3-70B-Instruct', 'openai/gpt-oss-120b']),
-  vllm: Object.freeze(['your-model-id']),
-  nvidia: Object.freeze(['model-id']),
-  google: Object.freeze(['gemini-1.5-flash', 'gemini-1.5-pro']),
-  groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
-  'test-local': Object.freeze(['deterministic'])
-});
-
-const LLM_PROVIDER_ALIASES = Object.freeze({
-  glm: 'zai',
-  qwen: 'qwen-portal'
-});
-
 const OPENAI_CODEX_OAUTH_PROVIDERS = new Set(['openai', 'openai-codex']);
 const OPENAI_CODEX_OAUTH_MESSAGE_TYPE = 'agenttown:openai-codex-oauth-callback';
 
 function getSupportedLlmModels(provider) {
-  const raw = String(provider || '').trim();
-  const key = LLM_MODEL_OPTIONS_BY_PROVIDER[raw] ? raw : (LLM_PROVIDER_ALIASES[raw] || raw);
-  const options = LLM_MODEL_OPTIONS_BY_PROVIDER[key];
-  return Array.isArray(options) ? [...options] : [];
+  if (LlmCatalog && typeof LlmCatalog.getSupportedModels === 'function') {
+    return LlmCatalog.getSupportedModels(provider);
+  }
+  return [];
+}
+
+function getOrderedLlmProviders() {
+  if (LlmCatalog && typeof LlmCatalog.getProviderOrder === 'function') {
+    return LlmCatalog.getProviderOrder(getCurrentExperiencePreference());
+  }
+  return ['openai'];
+}
+
+function getDefaultLlmProviderForExperience() {
+  if (LlmCatalog && typeof LlmCatalog.getDefaultProvider === 'function') {
+    return LlmCatalog.getDefaultProvider(getCurrentExperiencePreference());
+  }
+  return 'openai';
+}
+
+function getLlmProviderWarningText(provider, preference = getCurrentExperiencePreference()) {
+  const message = LlmCatalog && typeof LlmCatalog.getProviderWarning === 'function'
+    ? LlmCatalog.getProviderWarning(provider, preference)
+    : '';
+  if (!message) return '';
+  if (String(preference?.presetId || '') === 'cn-mainland') {
+    return tApp('brain.warning.cn_openai');
+  }
+  return message;
+}
+
+function updateLlmProviderWarning() {
+  const warningNode = el('llmProviderWarning');
+  if (!warningNode) return;
+  const provider = String(el('llmProviderSelect')?.value || '').trim();
+  const message = getLlmProviderWarningText(provider, getCurrentExperiencePreference());
+  warningNode.textContent = message || '';
 }
 
 function replaceSelectOptions(select, values) {
@@ -5804,16 +5948,18 @@ function ensureSelectOption(select, value, label) {
 
 function applyLlmProviderSelection(preferredProvider) {
   const providerSelect = el('llmProviderSelect');
-  const fallbackProvider = 'openai';
+  const fallbackProvider = getDefaultLlmProviderForExperience();
   const selected = String(preferredProvider || providerSelect?.value || fallbackProvider).trim() || fallbackProvider;
   if (!providerSelect) return selected;
   if (providerSelect.tagName === 'SELECT') {
-    const providers = Object.keys(LLM_MODEL_OPTIONS_BY_PROVIDER);
+    const providers = getOrderedLlmProviders();
     replaceSelectOptions(providerSelect, providers);
     providerSelect.value = providers.includes(selected) ? selected : fallbackProvider;
+    updateLlmProviderWarning();
     return String(providerSelect.value || fallbackProvider).trim() || fallbackProvider;
   }
   providerSelect.value = selected;
+  updateLlmProviderWarning();
   return selected;
 }
 
@@ -5828,13 +5974,16 @@ function applyLlmModelSelection(provider, preferredModel) {
     replaceSelectOptions(modelSelect, baseOptions);
     const resolved = baseOptions.includes(selected) ? selected : (baseOptions[0] || fallbackModel);
     modelSelect.value = resolved;
+    updateLlmProviderWarning();
     return String(modelSelect.value || fallbackModel).trim() || fallbackModel;
   }
   if (selected) {
     modelSelect.value = selected;
+    updateLlmProviderWarning();
     return selected;
   }
   modelSelect.value = fallbackModel;
+  updateLlmProviderWarning();
   return fallbackModel;
 }
 
@@ -5848,7 +5997,8 @@ function updateLlmOauthLaunchUi() {
   const launchBtn = el('llmOauthLaunchBtn');
   const completeBtn = el('llmOauthCompleteBtn');
   if (!launchBtn) return;
-  const provider = String(el('llmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const fallbackProvider = getDefaultLlmProviderForExperience();
+  const provider = String(el('llmProviderSelect')?.value || fallbackProvider).trim() || fallbackProvider;
   const mode = readLlmAuthMode();
   const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
   launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
@@ -5932,7 +6082,7 @@ async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
   if (openAiCodexOAuthExchangeInFlight) return;
   openAiCodexOAuthExchangeInFlight = true;
   try {
-    const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+    const provider = String(el('llmProviderSelect')?.value || getDefaultLlmProviderForExperience()).trim().toLowerCase();
     if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
       throw new Error('OAuth completion is available for OpenAI providers only.');
     }
@@ -5994,7 +6144,7 @@ function startOpenAiCodexOAuthPoll() {
 }
 
 async function launchLlmOauthInNewTab() {
-  const provider = String(el('llmProviderSelect')?.value || 'openai').trim().toLowerCase();
+  const provider = String(el('llmProviderSelect')?.value || getDefaultLlmProviderForExperience()).trim().toLowerCase();
   if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
     setLiteLlmStatus('OAuth launch is available for OpenAI providers only.');
     return;
@@ -6023,21 +6173,24 @@ async function launchLlmOauthInNewTab() {
 }
 
 function getDefaultLlmModelForProvider(provider) {
-  const supported = getSupportedLlmModels(provider);
-  if (supported.length > 0) return supported[0];
+  if (LlmCatalog && typeof LlmCatalog.getDefaultModel === 'function') {
+    return LlmCatalog.getDefaultModel(provider);
+  }
   return 'gpt-4o-mini';
 }
 
 function defaultProviderApi(provider) {
-  const p = String(provider || '').trim();
-  if (p === 'openai' || p === 'ollama') return 'openai-completions';
-  return '';
+  if (LlmCatalog && typeof LlmCatalog.defaultProviderApi === 'function') {
+    return LlmCatalog.defaultProviderApi(provider);
+  }
+  const normalized = String(provider || '').trim();
+  return normalized === 'openai' || normalized === 'ollama' ? 'openai-completions' : '';
 }
 
 function defaultProviderBaseUrl(provider) {
-  const p = String(provider || '').trim();
-  if (p === 'openai') return new URL('/api/llm/openai/v1', window.location.origin).toString();
-  if (p === 'ollama') return 'http://127.0.0.1:11434/v1';
+  if (LlmCatalog && typeof LlmCatalog.defaultProviderBaseUrl === 'function') {
+    return LlmCatalog.defaultProviderBaseUrl(provider, window.location.origin);
+  }
   return '';
 }
 
@@ -6077,12 +6230,15 @@ function setLlmAuthModeUI(mode) {
 }
 
 function resolveLlmModelRefFromInputs(provider, model) {
-  const providerInput = String(provider || 'openai').trim();
-  const normalizedProvider = LLM_PROVIDER_ALIASES[providerInput] || providerInput || 'openai';
+  const fallbackProvider = getDefaultLlmProviderForExperience();
+  const providerInput = String(provider || fallbackProvider).trim();
+  const normalizedProvider = LlmCatalog && typeof LlmCatalog.normalizeProvider === 'function'
+    ? (LlmCatalog.normalizeProvider(providerInput) || providerInput || fallbackProvider)
+    : (providerInput || fallbackProvider);
   const modelTrim = String(model || '').trim();
 
   if (normalizedProvider === 'custom') {
-    return parseModelRefFromText(modelTrim || 'gpt-4o-mini', 'openai', 'gpt-4o-mini');
+    return parseModelRefFromText(modelTrim || 'gpt-4o-mini', fallbackProvider, 'gpt-4o-mini');
   }
 
   const resolvedModel = modelTrim || getDefaultLlmModelForProvider(normalizedProvider);
@@ -6093,7 +6249,7 @@ function resolveLlmModelRefFromInputs(provider, model) {
   };
 }
 
-function parseModelRefFromText(text, fallbackProvider = 'openai', fallbackModelId = 'gpt-4o-mini') {
+function parseModelRefFromText(text, fallbackProvider = getDefaultLlmProviderForExperience(), fallbackModelId = 'gpt-4o-mini') {
   const ref = String(text || '').trim();
   if (!ref) {
     return {
@@ -6381,7 +6537,8 @@ function resolveLlmConfigFromUi() {
   const keyInput = el('llmKeyInput');
   const oauthInput = el('llmOauthProfileInput');
 
-  const provider = String(providerSel?.value || 'openai').trim() || 'openai';
+  const fallbackProvider = getDefaultLlmProviderForExperience();
+  const provider = String(providerSel?.value || fallbackProvider).trim() || fallbackProvider;
   const modelText = String(modelInput?.value || '').trim();
   const mode = readLlmAuthMode();
 
@@ -6710,11 +6867,7 @@ async function runHomeSkillStep(reason = 'state') {
       timeoutMs: 60_000,
       recordToTranscript: false,
       emitChat: false,
-      runtimeContext: {
-        origin: window.location.origin,
-        teamCode: String(lastState?.teamCode || ''),
-        houseId: String(lastState?.houseId || '')
-      },
+      runtimeContext: buildExperienceRuntimeContext(lastState),
       runtimeState: lastState
     });
     if (run?.ok === false) {
@@ -7011,7 +7164,7 @@ function initAdvancedLlmUi() {
   if (!providerSel || !modelInput || !refInput) return;
   if (providerSel.dataset.listening) return;
   providerSel.dataset.listening = 'true';
-  const initialized = applyLlmProviderModelSelection(providerSel.value || 'openai', modelInput.value || '');
+  const initialized = applyLlmProviderModelSelection(providerSel.value || getDefaultLlmProviderForExperience(), modelInput.value || '');
   providerSel.value = initialized.provider;
   modelInput.value = initialized.model;
 
@@ -7020,7 +7173,7 @@ function initAdvancedLlmUi() {
   };
 
   providerSel.addEventListener('change', () => {
-    const selectedProvider = applyLlmProviderSelection(providerSel.value || 'openai');
+    const selectedProvider = applyLlmProviderSelection(providerSel.value || getDefaultLlmProviderForExperience());
     applyLlmModelSelection(selectedProvider, modelInput.value || '');
     updateRef();
     setLlmAuthModeUI(readLlmAuthMode());
@@ -7081,7 +7234,7 @@ function syncModelRefFromInputs() {
   const modelInput = el('llmModelIdInput');
   const refInput = el('llmModelRefInput');
   if (!providerSel || !modelInput || !refInput) return;
-  const p = String(providerSel.value || 'openai').trim();
+  const p = String(providerSel.value || getDefaultLlmProviderForExperience()).trim();
   const m = String(modelInput.value || '').trim();
   const resolved = resolveLlmModelRefFromInputs(p, m);
   refInput.value = m ? resolved.modelRef : '';
@@ -7119,7 +7272,8 @@ function updateAgentLlmOauthLaunchUi() {
   const launchBtn = el('agentLlmOauthLaunchBtn');
   const completeBtn = el('agentLlmOauthCompleteBtn');
   if (!launchBtn) return;
-  const provider = String(el('agentLlmProviderSelect')?.value || 'openai').trim() || 'openai';
+  const fallbackProvider = getDefaultLlmProviderForExperience();
+  const provider = String(el('agentLlmProviderSelect')?.value || fallbackProvider).trim() || fallbackProvider;
   const mode = readAgentLlmAuthMode();
   const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
   launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
@@ -7349,7 +7503,7 @@ async function readLocalLiteLlmConfig() {
   const modelRefRaw = typeof localCfg?.modelRef === 'string' ? localCfg.modelRef.trim() : '';
   const reasoning = normalizeThinkingLevel(localCfg?.reasoning);
   const useProxy = localCfg?.useProxy !== false;
-  const defaultProvider = providerRaw || 'openai';
+  const defaultProvider = providerRaw || getDefaultLlmProviderForExperience();
   const defaultModel = modelRaw || getDefaultLlmModelForProvider(defaultProvider);
   const parsed = parseModelRefFromText(
     modelRefRaw || `${defaultProvider}/${defaultModel}`,
@@ -7387,7 +7541,7 @@ function applyLocalLiteLlmToInputs(config) {
   const reasoning = normalizeThinkingLevel(config?.reasoning);
 
   if (providerSel && modelInput) {
-    const selected = applyLlmProviderModelSelection(config?.provider || 'openai', config?.model || '');
+    const selected = applyLlmProviderModelSelection(config?.provider || getDefaultLlmProviderForExperience(), config?.model || '');
     providerSel.value = selected.provider;
     modelInput.value = selected.model;
   }
@@ -7587,13 +7741,14 @@ async function clearLiteLlmConfig() {
       setLlmAuthModeUI('api-key');
     }
     if (providerInput && modelInput) {
-      const selected = applyLlmProviderModelSelection('openai', getDefaultLlmModelForProvider('openai'));
+      const fallbackProvider = getDefaultLlmProviderForExperience();
+      const selected = applyLlmProviderModelSelection(fallbackProvider, getDefaultLlmModelForProvider(fallbackProvider));
       providerInput.value = selected.provider;
       modelInput.value = selected.model;
     }
     if (keyInput) keyInput.value = '';
     if (modelRefInput) {
-      const resolved = resolveLlmModelRefFromInputs(providerInput?.value || 'openai', modelInput?.value || '');
+      const resolved = resolveLlmModelRefFromInputs(providerInput?.value || getDefaultLlmProviderForExperience(), modelInput?.value || '');
       modelRefInput.value = resolved.modelRef;
     }
     if (oauthInput) oauthInput.value = '';
@@ -7706,13 +7861,13 @@ function updateMatchUi(state) {
   const complete = !!state?.signup?.complete && state?.signup?.mode === 'agent';
 
   if (matchState) {
-    matchState.textContent = matched ? 'UNLOCKED' : 'LOCKED';
+    matchState.textContent = matched ? tApp('sigil.unlocked') : tApp('sigil.locked');
     matchState.className = `state ${matched ? 'good' : 'bad'}`;
   }
   if (matchDetail) {
     matchDetail.textContent = matched
       ? `Matched on "${state.match.elementId}". Press Open.`
-      : 'Pick the same sigil to unlock.';
+      : tApp('sigil.match_detail');
   }
   if (openBtn) {
     openBtn.disabled = !matched || complete;
@@ -8222,11 +8377,7 @@ async function handleChat() {
     await gateway.send({
       type: 'chat',
       text: outgoingText,
-      runtimeContext: {
-        origin: window.location.origin,
-        teamCode: String(lastState?.teamCode || ''),
-        houseId: String(lastState?.houseId || '')
-      },
+      runtimeContext: buildExperienceRuntimeContext(lastState),
       runtimeState: lastState && typeof lastState === 'object' ? lastState : null
     });
   } catch (e) {
@@ -8350,6 +8501,8 @@ async function poll() {
 }
 
 async function bootstrapInitialRouteState() {
+  await bootstrapExperiencePreferenceForApp().catch(() => null);
+
   const params = new URLSearchParams(window.location.search);
   const ref = params.get('ref');
   if (ref) {
@@ -8417,6 +8570,7 @@ async function bootstrapInitialRouteState() {
       match: { matched: false },
       signup: { complete: false, mode: null },
       share: { id: null },
+      experiencePreference: session.experiencePreference || currentExperiencePreference,
       onboarding: session.onboarding || {
         required: false,
         registrationComplete: true,
@@ -8438,6 +8592,7 @@ async function bootstrapInitialRouteState() {
             match: { matched: false },
             signup: { complete: false, mode: null },
             share: { id: null },
+            experiencePreference: recovered.experiencePreference || session.experiencePreference || currentExperiencePreference,
             onboarding: recovered.onboarding || session.onboarding || {
               required: false,
               registrationComplete: true,

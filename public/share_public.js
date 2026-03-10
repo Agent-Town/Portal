@@ -425,7 +425,24 @@ function setLink(linkId, missingId, url) {
   }
 }
 
+function isLinkFirstShare(share) {
+  return String(share?.experiencePreference?.sharePolicy || '').trim() === 'link-first'
+    || String(share?.experiencePreference?.presetId || '').trim() === 'cn-mainland';
+}
+
+function applyShareLinkPolicy(share) {
+  const humanLink = el('xPostLink');
+  const humanMissing = el('xPostMissing');
+  if (humanLink) {
+    humanLink.textContent = isLinkFirstShare(share) ? 'Public post' : 'X post';
+  }
+  if (humanMissing) {
+    humanMissing.textContent = isLinkFirstShare(share) ? 'No public post' : 'No X post';
+  }
+}
+
 function setLinks(share) {
+  applyShareLinkPolicy(share);
   setLink('xPostLink', 'xPostMissing', share.xPostUrl);
   const posts = share.agentPosts || {};
   setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);

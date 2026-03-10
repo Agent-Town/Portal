@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { selectStartPreset } = require('./helpers/experience');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -40,6 +41,7 @@ test('start page enters app even when Privy wallet auto-create fails', async ({ 
   });
 
   await page.goto('/start');
+  await selectStartPreset(page, 'global-default');
   await page.getByRole('button', { name: 'Enter' }).click();
   await page.locator('#privyEmailInput').fill('wallet-fail@example.com');
   await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();
