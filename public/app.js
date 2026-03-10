@@ -503,6 +503,12 @@ let houseSurfaceState = {
     selectedExperienceId: '',
     emptyStateText: 'No House experiences available yet.'
   },
+  tracks: {
+    loaded: false,
+    items: [],
+    selectedTrackId: '',
+    emptyStateText: 'No track progress recorded yet.'
+  },
   workshop: {
     loaded: false,
     activeConfigVersionId: '',
@@ -1288,6 +1294,9 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
     houseSurfaceState.experiences.selectedExperienceId = '';
+    houseSurfaceState.tracks.loaded = false;
+    houseSurfaceState.tracks.items = [];
+    houseSurfaceState.tracks.selectedTrackId = '';
     houseSurfaceState.workshop.loaded = false;
     houseSurfaceState.workshop.activeConfigVersionId = '';
     houseSurfaceState.workshop.activeConfigHash = '';
@@ -1376,6 +1385,8 @@ async function setHouseActiveTeam(teamId) {
     await loadHouseArchiveSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'experiences') {
     await loadHouseExperiencesSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'tracks') {
+    await loadHouseTracksSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'workshop') {
     await loadHouseWorkshopSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'trainer') {
@@ -1393,21 +1404,25 @@ function buildHousePlatformSnapshot() {
 }
 
 function setHouseSurfaceMode(mode) {
-  const activeMode = mode === 'experiences' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
+  const activeMode = mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
   const experiencesPanel = el('houseExperiencesPanel');
+  const tracksPanel = el('houseTracksPanel');
   const workshopPanel = el('houseWorkshopPanel');
   const archivePanel = el('houseArchivePanel');
   const trainerPanel = el('houseTrainerPanel');
   const experiencesBtn = el('houseExperiencesBtn');
+  const tracksBtn = el('houseTracksBtn');
   const workshopBtn = el('houseWorkshopBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
   if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
+  if (tracksPanel) tracksPanel.classList.toggle('is-hidden', activeMode !== 'tracks');
   if (workshopPanel) workshopPanel.classList.toggle('is-hidden', activeMode !== 'workshop');
   if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
   if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
   if (experiencesBtn) experiencesBtn.classList.toggle('primary', activeMode === 'experiences');
+  if (tracksBtn) tracksBtn.classList.toggle('primary', activeMode === 'tracks');
   if (workshopBtn) workshopBtn.classList.toggle('primary', activeMode === 'workshop');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
   if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
@@ -1512,6 +1527,45 @@ function renderHouseExperiencesSurface() {
     });
     actionsNode.appendChild(button);
   });
+}
+
+function renderHouseTracksSurface() {
+  const listNode = el('houseTracksList');
+  const detailNode = el('houseTracksDetail');
+  const emptyNode = el('houseTracksEmpty');
+  if (!listNode || !detailNode || !emptyNode) return;
+  const items = Array.isArray(houseSurfaceState.tracks.items) ? houseSurfaceState.tracks.items : [];
+  listNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.tracks.emptyStateText || 'No track progress recorded yet.';
+  emptyNode.classList.toggle('is-hidden', items.length > 0);
+  if (!items.length) {
+    detailNode.textContent = 'Select a track to inspect deterministic progress.';
+    return;
+  }
+
+  const selectedTrackId = houseSurfaceState.tracks.selectedTrackId || String(items[0]?.trackId || '');
+  houseSurfaceState.tracks.selectedTrackId = selectedTrackId;
+  const selectedItem = items.find((item) => String(item?.trackId || '') === selectedTrackId) || items[0];
+
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(item?.trackId || '') === String(selectedItem?.trackId || '') ? ' primary' : ''}`;
+    button.dataset.trackId = String(item?.trackId || '');
+    const progressPercent = Math.round(Number(item?.progress || 0) * 100);
+    button.textContent = `${String(item?.title || item?.trackId || '')} · ${progressPercent}%`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.tracks.selectedTrackId = String(item?.trackId || '');
+      renderHouseTracksSurface();
+    });
+    listNode.appendChild(button);
+  });
+
+  const progressCount = Number(selectedItem?.progressCount || 0);
+  const targetCount = Math.max(1, Number(selectedItem?.targetCount || 1));
+  const progressPercent = Math.round(Number(selectedItem?.progress || 0) * 100);
+  const sourceKinds = Array.isArray(selectedItem?.sourceKinds) ? selectedItem.sourceKinds.filter(Boolean) : [];
+  detailNode.textContent = `Track ${String(selectedItem?.title || selectedItem?.trackId || '')} · ${progressCount} / ${targetCount} · ${progressPercent}% · sources ${sourceKinds.join(', ') || '—'} · active team ${String(houseSurfaceState.context.activeTeamId || '').trim() || '—'}`;
 }
 
 function renderHouseWorkshopSurface() {
@@ -1782,6 +1836,35 @@ async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
     houseSurfaceState.experiences.items = [];
     renderHouseExperiencesSurface();
     setHouseSurfaceStatus(`House experiences unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseTracksSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('tracks');
+  setHouseSurfaceStatus('Loading House tracks...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/tracks');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.tracks.loaded = true;
+    houseSurfaceState.tracks.items = Array.isArray(data.tracks) ? data.tracks : [];
+    houseSurfaceState.tracks.emptyStateText = String(data.emptyStateText || 'No track progress recorded yet.');
+    if (!houseSurfaceState.tracks.items.some((item) => String(item?.trackId || '') === String(houseSurfaceState.tracks.selectedTrackId || ''))) {
+      houseSurfaceState.tracks.selectedTrackId = '';
+    }
+    if (!houseSurfaceState.tracks.selectedTrackId && houseSurfaceState.tracks.items[0]?.trackId) {
+      houseSurfaceState.tracks.selectedTrackId = String(houseSurfaceState.tracks.items[0].trackId);
+    }
+    renderHouseTracksSurface();
+    setHouseSurfaceStatus(houseSurfaceState.tracks.items.length ? '' : houseSurfaceState.tracks.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.tracks.loaded = true;
+    houseSurfaceState.tracks.items = [];
+    renderHouseTracksSurface();
+    setHouseSurfaceStatus(`House tracks unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
 }
 
@@ -4149,6 +4232,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseTracksBtn = el('houseTracksBtn');
+  if (houseTracksBtn) {
+    houseTracksBtn.onclick = async () => {
+      houseTracksBtn.disabled = true;
+      try {
+        await loadHouseTracksSurface();
+      } finally {
+        houseTracksBtn.disabled = false;
+      }
+    };
+  }
+
   const houseWorkshopBtn = el('houseWorkshopBtn');
   if (houseWorkshopBtn) {
     houseWorkshopBtn.onclick = async () => {
@@ -4243,6 +4338,7 @@ function bindTownDistrictControls() {
   setHouseSurfaceMode(houseSurfaceState.activeSurface);
   renderHouseSurfaceContext();
   renderHouseExperiencesSurface();
+  renderHouseTracksSurface();
   renderHouseWorkshopSurface();
   renderHouseArchiveSurface();
   renderHouseTrainerSurface();

@@ -422,7 +422,8 @@ Phase 6 begins from a deterministic base:
 
 1. track progress is read through one House-compatible surface,
 2. reward hooks are durable and source-linked rather than transient counters,
-3. duplicate-action suppression remains explicit and measurable.
+3. duplicate-action suppression remains explicit and measurable,
+4. track terminology stays `track` across API and UI surfaces.
 
 Future new competitive experiences are outside the scope of this document.
 These are explicit later phases, not hidden requirements for Phases 1 through 5.

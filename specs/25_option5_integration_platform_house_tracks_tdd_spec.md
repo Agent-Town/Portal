@@ -331,6 +331,12 @@ GREEN gate:
 2. UI terminology uses `track`,
 3. progress changes deterministically from seeded actions.
 
+Implementation notes:
+
+1. The progression surface reuses `GET /api/platform/tracks`; it does not invent a second read model.
+2. The first UI surface lives inside the existing House shell and preserves modal continuity.
+3. Detail copy must stay neutral and avoid points, badges, or gamified language.
+
 ### M25.10 - Experience-pack and editor compatibility contract
 
 Primary test:
