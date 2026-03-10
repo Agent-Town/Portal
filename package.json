@@ -28,6 +28,7 @@
     "gen:erc8004-images:nano:oauth": "node scripts/generate_nano_banana_images_oauth.js",
     "test": "playwright test",
     "test:live": "node scripts/test_live.js",
+    "test:live:status": "node scripts/test_live.js --status",
     "test:privy-live": "PRIVY_LIVE_REQUIRED=1 playwright test -c playwright.privy.config.js",
     "test:privy-live:headed": "PRIVY_LIVE_REQUIRED=1 playwright test -c playwright.privy.config.js --headed",
     "test:privy-email-live": "PRIVY_EMAIL_OTP_REQUIRED=1 playwright test -c playwright.privy.email.config.js",

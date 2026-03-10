@@ -91,7 +91,7 @@ const {
   upsertPokerSubmission,
   writeCheckpoint,
 } = require('./web_poker_store');
-const { getLiveSuiteManifest } = require('./live_suite_manifest');
+const { getLiveSuiteManifest, getLiveSuiteStatuses } = require('./live_suite_manifest');
 const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = require('./route_manifest');
 const { registerPlatformReadRoutes } = require('./platform_read_routes');
 const { registerWebRoutes } = require('./web_routes');
@@ -10647,6 +10647,7 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       suites: getLiveSuiteManifest(),
+      statuses: getLiveSuiteStatuses(),
     });
   });
 

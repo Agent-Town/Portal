@@ -25,6 +25,29 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   },
 ]);
 
+function isTruthy(value) {
+  return /^(1|true|yes|on)$/i.test(String(value || '').trim());
+}
+
+function parseRequiredEnvEntry(raw) {
+  const value = String(raw || '').trim();
+  const eqIndex = value.indexOf('=');
+  if (eqIndex < 0) {
+    return {
+      raw: value,
+      name: value,
+      expectedValue: '',
+      expectsExactValue: false,
+    };
+  }
+  return {
+    raw: value,
+    name: value.slice(0, eqIndex).trim(),
+    expectedValue: value.slice(eqIndex + 1).trim(),
+    expectsExactValue: true,
+  };
+}
+
 function getLiveSuiteManifest() {
   return LIVE_SUITE_MANIFEST.map((entry) => ({
     ...entry,
@@ -32,6 +55,64 @@ function getLiveSuiteManifest() {
   }));
 }
 
+function inspectLiveSuiteEnv(suite, env = process.env) {
+  const requiredEnv = Array.isArray(suite?.requiredEnv) ? suite.requiredEnv : [];
+  const requirements = requiredEnv
+    .map(parseRequiredEnvEntry)
+    .filter((entry) => entry.name);
+  const missing = [];
+  const mismatched = [];
+  for (const requirement of requirements) {
+    const actualValue = String(env?.[requirement.name] || '').trim();
+    if (!actualValue) {
+      missing.push(requirement.expectsExactValue ? requirement.raw : requirement.name);
+      continue;
+    }
+    if (requirement.expectsExactValue && actualValue !== requirement.expectedValue) {
+      mismatched.push(requirement.raw);
+    }
+  }
+  return {
+    ok: missing.length === 0 && mismatched.length === 0,
+    missing,
+    mismatched,
+    requirements: requirements.map((entry) => ({
+      name: entry.name,
+      expectsExactValue: entry.expectsExactValue,
+      expectedValue: entry.expectsExactValue ? entry.expectedValue : null,
+      present: String(env?.[entry.name] || '').trim().length > 0,
+      matchesExpected: entry.expectsExactValue
+        ? String(env?.[entry.name] || '').trim() === entry.expectedValue
+        : String(env?.[entry.name] || '').trim().length > 0,
+    })),
+  };
+}
+
+function getLiveSuiteStatuses(env = process.env) {
+  return getLiveSuiteManifest().map((suite) => {
+    const validation = inspectLiveSuiteEnv(suite, env);
+    const requiredFlag = String(suite?.requiredFlag || '').trim();
+    const requiredFlagEnabled = requiredFlag ? isTruthy(env?.[requiredFlag]) : false;
+    return {
+      suiteId: String(suite?.suiteId || ''),
+      command: String(suite?.command || ''),
+      description: String(suite?.description || ''),
+      defaultMode: String(suite?.defaultMode || ''),
+      requiredFlag,
+      requiredFlagEnabled,
+      ready: validation.ok,
+      mode: validation.ok ? 'ready' : (requiredFlagEnabled ? 'blocked' : 'skip'),
+      missing: validation.missing,
+      mismatched: validation.mismatched,
+      requirements: validation.requirements,
+    };
+  });
+}
+
 module.exports = {
   getLiveSuiteManifest,
+  getLiveSuiteStatuses,
+  inspectLiveSuiteEnv,
+  isTruthy,
+  parseRequiredEnvEntry,
 };

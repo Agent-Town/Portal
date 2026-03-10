@@ -2,20 +2,24 @@
 
 const { spawnSync } = require('child_process');
 
-const { getLiveSuiteManifest } = require('../server/live_suite_manifest');
-
-function parseEnvName(raw) {
-  const value = String(raw || '').trim();
-  const eqIndex = value.indexOf('=');
-  return eqIndex >= 0 ? value.slice(0, eqIndex).trim() : value;
-}
-
-function isTruthy(value) {
-  return /^(1|true|yes|on)$/i.test(String(value || '').trim());
-}
+const {
+  getLiveSuiteManifest,
+  getLiveSuiteStatuses,
+  inspectLiveSuiteEnv,
+  isTruthy,
+} = require('../server/live_suite_manifest');
 
 function listManifest() {
   process.stdout.write(`${JSON.stringify(getLiveSuiteManifest(), null, 2)}\n`);
+}
+
+function listStatus(suiteId = '') {
+  const normalized = String(suiteId || '').trim();
+  const statuses = getLiveSuiteStatuses(process.env);
+  const payload = normalized
+    ? statuses.filter((entry) => String(entry.suiteId || '') === normalized)
+    : statuses;
+  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function findSuite(suiteId) {
@@ -24,21 +28,13 @@ function findSuite(suiteId) {
 }
 
 function validateSuiteEnv(suite) {
-  const requiredEnv = Array.isArray(suite?.requiredEnv) ? suite.requiredEnv : [];
-  const missing = requiredEnv
-    .map(parseEnvName)
-    .filter(Boolean)
-    .filter((name) => !String(process.env[name] || '').trim());
-  return {
-    ok: missing.length === 0,
-    missing,
-  };
+  return inspectLiveSuiteEnv(suite, process.env);
 }
 
-function failSetup(suite, missing) {
+function failSetup(suite, issues) {
   const suiteId = String(suite?.suiteId || '').trim() || 'unknown';
-  const missingText = missing.join(',');
-  process.stderr.write(`LIVE_SUITE_SETUP_REQUIRED:${suiteId}:${missingText}\n`);
+  const issueText = issues.join(',');
+  process.stderr.write(`LIVE_SUITE_SETUP_REQUIRED:${suiteId}:${issueText}\n`);
   process.exit(1);
 }
 
@@ -57,8 +53,13 @@ if (args.includes('--list') || args.length === 0) {
   process.exit(0);
 }
 
+const statusOnly = args.includes('--status');
 const checkOnly = args.includes('--check');
 const suiteId = args.find((arg) => !arg.startsWith('--')) || '';
+if (statusOnly) {
+  listStatus(suiteId);
+  process.exit(0);
+}
 const suite = findSuite(suiteId);
 if (!suite) {
   process.stderr.write(`LIVE_SUITE_UNKNOWN:${suiteId}\n`);
@@ -68,10 +69,10 @@ if (!suite) {
 const validation = validateSuiteEnv(suite);
 const strictRequired = isTruthy(process.env[String(suite.requiredFlag || '').trim()]) || checkOnly;
 if (!validation.ok && strictRequired) {
-  failSetup(suite, validation.missing);
+  failSetup(suite, [...validation.missing, ...validation.mismatched]);
 }
 if (!validation.ok) {
-  process.stdout.write(`LIVE_SUITE_SKIPPED:${suite.suiteId}:${validation.missing.join(',')}\n`);
+  process.stdout.write(`LIVE_SUITE_SKIPPED:${suite.suiteId}:${[...validation.missing, ...validation.mismatched].join(',')}\n`);
   process.exit(0);
 }
 if (checkOnly) {
