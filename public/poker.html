@@ -130,7 +130,8 @@
       gap: 6px;
     }
     .pokerForm input,
-    .pokerForm textarea {
+    .pokerForm textarea,
+    .pokerForm select {
       width: 100%;
       min-height: 44px;
       box-sizing: border-box;
@@ -145,6 +146,39 @@
       min-height: 96px;
       resize: vertical;
     }
+    .pokerInset {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      box-shadow: none;
+    }
+    .pokerLabel {
+      margin-bottom: 8px;
+      color: var(--poker-muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .pokerStack {
+      display: grid;
+      gap: 10px;
+    }
+    .pokerRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--poker-line);
+    }
+    .pokerSplit {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+    }
     .pokerSummary {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -153,6 +187,74 @@
     .pokerSummaryValue {
       font-size: 28px;
       color: var(--poker-accent);
+    }
+    .pokerCardStrip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .pokerMiniCard {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 42px;
+      min-height: 56px;
+      border-radius: 12px;
+      border: 1px solid rgba(247, 239, 216, 0.18);
+      background: rgba(247, 239, 216, 0.08);
+      font-weight: 700;
+    }
+    .pokerCountdown {
+      font-size: 34px;
+      color: var(--poker-accent);
+      letter-spacing: 0.04em;
+    }
+    .pokerMessage {
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--poker-line);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .pokerMessage.is-agent {
+      border-color: rgba(210, 162, 76, 0.28);
+      background: rgba(210, 162, 76, 0.08);
+    }
+    .pokerChipRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 14px;
+    }
+    .pokerChip {
+      border-radius: 999px;
+      border: 1px solid rgba(247, 239, 216, 0.18);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 8px 12px;
+    }
+    .pokerChatLog {
+      display: grid;
+      gap: 10px;
+    }
+    .pokerChatLine {
+      display: grid;
+      gap: 8px;
+      border-radius: 14px;
+      border: 1px solid var(--poker-line);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px 14px;
+    }
+    .pokerList {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--poker-muted);
+      line-height: 1.5;
+    }
+    .pokerMuted {
+      color: var(--poker-muted);
+    }
+    .pokerEmpty {
+      color: var(--poker-muted);
+      padding: 8px 0;
     }
     @media (max-width: 720px) {
       .pokerFrame {
@@ -173,6 +275,7 @@
     <div id="pokerStatus" class="pokerStatus" aria-live="polite"></div>
     <section id="pokerContent" class="pokerGrid" aria-live="polite"></section>
   </main>
-  <script src="/poker.js?v=20260309"></script>
+  <script src="/wallet_client.js"></script>
+  <script src="/poker.js?v=20260310-centaur"></script>
 </body>
 </html>

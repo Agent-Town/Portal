@@ -3981,6 +3981,8 @@ function inferPokerModalTitle(pathname) {
     parsed = null;
   }
   const path = parsed ? parsed.pathname : String(pathname || '').trim();
+  if (path === '/poker/centaur') return 'Centaur Poker';
+  if (path.startsWith('/poker/centaur/')) return 'Centaur Table';
   if (path.startsWith('/poker/seasons/')) return 'Poker Season';
   if (path.startsWith('/poker/leaderboards/')) return 'Poker Leaderboard';
   if (path.startsWith('/poker/replays/')) return 'Poker Replay';

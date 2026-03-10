@@ -40,6 +40,87 @@ async function bindMockSolanaWallet(request, address = 'So1anaMockResume11111111
   return address;
 }
 
+async function attachHouse(request, { houseId = 'house_test', teamId = '' } = {}) {
+  const resp = await request.post('/__test__/session/attach-house', {
+    headers: { 'x-test-reset': resetToken },
+    data: {
+      houseId,
+      teamId,
+    },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`ATTACH_HOUSE_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function seedStreamflowLocks(request, fixture) {
+  const resp = await request.post('/__test__/streamflow/locks/seed', {
+    headers: { 'x-test-reset': resetToken },
+    data: fixture,
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`STREAMFLOW_FIXTURE_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function verifyStreamflowLock(request, {
+  streamId,
+  minLockAmountAtomic = '0',
+  signature = 'test-signature',
+  asOf = undefined,
+  walletAddress = '',
+} = {}) {
+  const challengeResp = await request.post('/api/poker/streamflow/challenge', {
+    headers: walletAddress ? { 'x-wallet-solana-address': walletAddress } : undefined,
+    data: {
+      streamId,
+      minLockAmountAtomic,
+    },
+  });
+  const challengeBody = await challengeResp.json().catch(() => ({}));
+  if (!challengeResp.ok()) {
+    throw new Error(`STREAMFLOW_CHALLENGE_FAILED:${challengeResp.status()}:${JSON.stringify(challengeBody)}`);
+  }
+  const nonce = String(challengeBody?.data?.challenge?.nonce || '');
+  const verifyResp = await request.post('/api/poker/streamflow/verify', {
+    headers: walletAddress ? { 'x-wallet-solana-address': walletAddress } : undefined,
+    data: {
+      streamId,
+      minLockAmountAtomic,
+      nonce,
+      signature,
+      asOf,
+    },
+  });
+  const verifyBody = await verifyResp.json().catch(() => ({}));
+  if (!verifyResp.ok()) {
+    throw new Error(`STREAMFLOW_VERIFY_FAILED:${verifyResp.status()}:${JSON.stringify(verifyBody)}`);
+  }
+  return verifyBody;
+}
+
+async function processOilSnapshots(request, {
+  walletSubject,
+  asOf,
+} = {}) {
+  const resp = await request.post('/__test__/poker/oil/process', {
+    headers: { 'x-test-reset': resetToken },
+    data: {
+      walletSubject,
+      asOf,
+    },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`OIL_PROCESS_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
 async function createWebSession(request, {
   url = 'https://github.com/openai/openai-codex/issues/1',
   integrationRegistryId = 'wi_github_issue_reply',
@@ -95,13 +176,17 @@ async function getPokerSubmissionRow(request, submissionId) {
 }
 
 module.exports = {
+  attachHouse,
   bindMockSolanaWallet,
   createWebSession,
   getPokerSubmissionRow,
   getPortalState,
   getTableCount,
+  processOilSnapshots,
   resetPortalWebState,
   resetToken,
   seedPokerOperatorFixture,
+  seedStreamflowLocks,
   syncPokerMirror,
+  verifyStreamflowLock,
 };

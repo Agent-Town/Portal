@@ -45,20 +45,30 @@ const {
 const {
   activateCredentialGrant,
   countTableRows,
+  computeOilBalance,
+  createCentaurAction,
+  createCentaurMessage,
   createApprovalRequest,
   createCredentialGrant,
   createImportJob,
   createEvidence,
   createInvocation,
+  createOilLedgerEntry,
   createWebSession,
   decideApproval,
   getActiveCredentialGrant,
   getApprovalById,
+  getCentaurEntryById,
+  getCentaurEntryByWalletSubject,
+  getCentaurHandById,
+  getCentaurTournamentById,
   getCredentialGrantById,
   getImportJobById,
   getInvocationByIdempotency,
   getLatestCheckpointForSession,
   getLatestPokerLeaderboardSnapshot,
+  getCurrentCentaurHandForEntry,
+  getOilSnapshotEventByVerificationAndScheduledFor,
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
   getPokerReplayArtifactByRunId,
@@ -67,21 +77,34 @@ const {
   getPokerSeasonById,
   getPokerSubmissionById,
   getPokerSubmissionByRequest,
+  getStreamflowVerificationById,
+  getStreamflowVerificationByWalletAndStream,
+  getStreamflowVerificationByWalletSubject,
   getWebSessionById,
   listApprovalsForSession,
+  listCentaurActionsByHand,
+  listCentaurMessagesByHand,
+  listCentaurTournaments,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listOilLedgerEntriesByWalletSubject,
+  listOilSnapshotEventsByVerificationAndHour,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  upsertCentaurEntry,
+  upsertCentaurHand,
+  upsertCentaurTournament,
+  upsertOilSnapshotEvent,
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
   upsertPokerReplayArtifact,
   upsertPokerRun,
   upsertPokerSeason,
   upsertPokerSubmission,
+  upsertStreamflowVerification,
   writeCheckpoint,
 } = require('./web_poker_store');
 const { getLiveSuiteManifest } = require('./live_suite_manifest');
@@ -172,6 +195,7 @@ const {
   importPlatformStateSnapshot,
   verifyPlatformStateSnapshot,
 } = require('./platform_export');
+const { resetStreamflowFixtureState } = require('./streamflow_adapter');
 
 const PORTAL_WEB_API_VERSION = '2026-03-09';
 
@@ -4168,28 +4192,56 @@ registerPlatformV1Routes(app, {
 registerPokerRoutes(app, {
   buildPortalRequestId,
   computePokerArtifactSha256,
+  computeOilBalance,
+  createCentaurAction,
+  createCentaurMessage,
+  createOilLedgerEntry,
   createPortalPokerOperatorClient,
   express,
+  getCentaurEntryById,
+  getCentaurEntryByWalletSubject,
+  getCentaurHandById,
+  getCentaurTournamentById,
   getLatestPokerLeaderboardSnapshot,
+  getCurrentCentaurHandForEntry,
+  getOilSnapshotEventByVerificationAndScheduledFor,
   getPokerOperatorServiceToken,
   getPokerReplayArtifactByRunId,
   getPokerRunById,
   getPokerSeasonById,
   getPokerSubmissionById,
   getPokerSubmissionByRequest,
+  getStreamflowVerificationById,
+  getStreamflowVerificationByWalletAndStream,
+  getStreamflowVerificationByWalletSubject,
+  isTestMockAddress,
+  listCentaurActionsByHand,
+  listCentaurMessagesByHand,
+  listCentaurTournaments,
+  listOilLedgerEntriesByWalletSubject,
+  listOilSnapshotEventsByVerificationAndHour,
   listPokerSeasons,
   normalizePortalIdempotencyKey,
   nowIso,
   randomHex,
+  readStore,
   requireBoundHumanSession,
+  resolveHouseAddress,
+  resolveHumanSessionWithRecovery,
   resolvePrimaryWalletSubject,
   respondPokerOperatorTransport,
   sendPortalApiError,
   sendPortalApiSuccess,
   summarizeMirroredPokerSeason,
   syncPokerMirrorFromOperator,
+  upsertCentaurEntry,
+  upsertCentaurHand,
+  upsertCentaurTournament,
+  upsertOilSnapshotEvent,
   upsertPokerSeason,
   upsertPokerSubmission,
+  upsertStreamflowVerification,
+  verifySolanaSignature,
 });
 
 // Rotates the human session cookie to a fresh session/team code.
@@ -9629,6 +9681,7 @@ if (process.env.NODE_ENV === 'test') {
     resetExtendedStore();
     resetUnifiedPlatformStore();
     resetPokerOperatorState();
+    resetStreamflowFixtureState();
     resetEmailOtpAdapter();
     invalidateAtlasStoreCaches();
     resetAllSessions();
@@ -11365,7 +11418,7 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (req, res) => {
+app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }

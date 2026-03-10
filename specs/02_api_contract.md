@@ -390,6 +390,118 @@ Stable failure codes:
 - `POKER_REPLAY_NOT_READY`
 - `POKER_OPERATOR_SCHEMA_MISMATCH`
 
+### GET `/api/poker/centaur/tournaments`
+Returns the centaur lobby payload with:
+- `data.items[]`
+- `data.houseId`
+- `data.wallet`
+- `data.verification`
+- `data.oilBalance`
+- `data.currentHourSnapshots.slots[]`
+
+### GET `/api/poker/centaur/tournaments/:tournamentId`
+Returns one human + AI centaur tournament payload with:
+- `data.tournament`
+- `data.entry`
+- `data.hand`
+- `data.messages[]`
+- `data.actions[]`
+- `data.verification`
+- `data.oilBalance`
+- `data.currentHourSnapshots.slots[]`
+
+### POST `/api/poker/streamflow/challenge`
+Prepares a wallet-sign message for Streamflow lock verification.
+
+Request shape:
+```json
+{
+  "streamId": "stream-centaur-01",
+  "minLockAmountAtomic": "1000000"
+}
+```
+
+Response fields:
+- `data.challenge.provider === "streamflow"`
+- `data.challenge.address`
+- `data.challenge.houseId`
+- `data.challenge.streamId`
+- `data.challenge.nonce`
+- `data.challenge.message`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `SOLANA_WALLET_REQUIRED`
+- `HOUSE_REQUIRED`
+
+### POST `/api/poker/streamflow/verify`
+Verifies the signed Streamflow lock challenge and starts offchain OIL accrual.
+
+Request shape:
+```json
+{
+  "streamId": "stream-centaur-01",
+  "minLockAmountAtomic": "1000000",
+  "nonce": "sfvnonce_abc123",
+  "signature": "<base64>"
+}
+```
+
+Response fields:
+- `data.verification`
+- `data.oilBalance`
+- `data.processed.processedSnapshots`
+- `data.processed.creditedOil`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `HOUSE_REQUIRED`
+- `SOLANA_WALLET_REQUIRED`
+- `STREAMFLOW_VERIFY_CONTEXT_REQUIRED`
+- `STREAMFLOW_VERIFY_NONCE_EXPIRED`
+- `STREAMFLOW_SIGNATURE_INVALID`
+- `STREAMFLOW_LOCK_NOT_FOUND`
+
+### GET `/api/poker/oil/balance`
+Returns the current offchain OIL ledger summary for the bound wallet.
+
+Response fields:
+- `data.walletSubject`
+- `data.verification`
+- `data.oilBalance`
+- `data.snapshotEvents[]`
+- `data.ledgerEntries[]`
+
+### POST `/api/poker/centaur/tournaments/:tournamentId/join`
+Enters the current wallet + house into a centaur tournament and debits the tournament buy-in from the offchain OIL ledger.
+
+Request shape:
+```json
+{
+  "displayName": "Centaur House"
+}
+```
+
+Failure codes:
+- `UNAUTHORIZED`
+- `HOUSE_REQUIRED`
+- `WALLET_SUBJECT_REQUIRED`
+- `STREAMFLOW_VERIFICATION_REQUIRED`
+- `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/centaur/hands/:handId/messages`
+Posts a human discussion note to the centaur hand log and appends the latest agent suggestion.
+
+### POST `/api/poker/centaur/hands/:handId/actions`
+Locks the shared centaur action for the current hand and debits any required OIL wager.
+
+Failure codes:
+- `UNAUTHORIZED`
+- `FORBIDDEN`
+- `CENTAUR_CLOCK_EXPIRED`
+- `POKER_CENTAUR_ACTION_INVALID`
+- `OIL_BALANCE_TOO_LOW`
+
 ---
 
 ## Agent solo session

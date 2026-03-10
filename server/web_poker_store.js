@@ -280,11 +280,169 @@ function ensureDb() {
 
     CREATE INDEX IF NOT EXISTS poker_leaderboard_snapshots_season_created_idx
       ON poker_leaderboard_snapshots(season_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_centaur_tournaments (
+      tournament_id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      buy_in_oil INTEGER NOT NULL DEFAULT 0,
+      required_lock_amount_atomic TEXT NOT NULL,
+      token_symbol TEXT NOT NULL,
+      entry_deadline_at TEXT,
+      rules_json TEXT NOT NULL,
+      summary_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_centaur_tournaments_status_created_idx
+      ON poker_centaur_tournaments(status, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_centaur_entries (
+      entry_id TEXT PRIMARY KEY,
+      tournament_id TEXT NOT NULL,
+      portal_session_id TEXT,
+      house_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      wager_oil INTEGER NOT NULL DEFAULT 0,
+      streamflow_verification_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (tournament_id, wallet_subject),
+      FOREIGN KEY (tournament_id) REFERENCES poker_centaur_tournaments(tournament_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_centaur_entries_tournament_created_idx
+      ON poker_centaur_entries(tournament_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_centaur_hands (
+      hand_id TEXT PRIMARY KEY,
+      tournament_id TEXT NOT NULL,
+      entry_id TEXT NOT NULL,
+      hand_number INTEGER NOT NULL,
+      phase TEXT NOT NULL,
+      status TEXT NOT NULL,
+      decision_expires_at TEXT,
+      table_state_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (entry_id, hand_number),
+      FOREIGN KEY (tournament_id) REFERENCES poker_centaur_tournaments(tournament_id),
+      FOREIGN KEY (entry_id) REFERENCES poker_centaur_entries(entry_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_centaur_hands_entry_created_idx
+      ON poker_centaur_hands(entry_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_centaur_messages (
+      message_id TEXT PRIMARY KEY,
+      tournament_id TEXT NOT NULL,
+      entry_id TEXT NOT NULL,
+      hand_id TEXT NOT NULL,
+      author_role TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (tournament_id) REFERENCES poker_centaur_tournaments(tournament_id),
+      FOREIGN KEY (entry_id) REFERENCES poker_centaur_entries(entry_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_centaur_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_centaur_messages_hand_created_idx
+      ON poker_centaur_messages(hand_id, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS poker_centaur_actions (
+      action_id TEXT PRIMARY KEY,
+      tournament_id TEXT NOT NULL,
+      entry_id TEXT NOT NULL,
+      hand_id TEXT NOT NULL,
+      actor_role TEXT NOT NULL,
+      action_kind TEXT NOT NULL,
+      amount_oil INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (tournament_id) REFERENCES poker_centaur_tournaments(tournament_id),
+      FOREIGN KEY (entry_id) REFERENCES poker_centaur_entries(entry_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_centaur_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_centaur_actions_hand_created_idx
+      ON poker_centaur_actions(hand_id, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS poker_streamflow_lock_verifications (
+      verification_id TEXT PRIMARY KEY,
+      portal_session_id TEXT,
+      house_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      chain TEXT NOT NULL,
+      address TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      stream_id TEXT NOT NULL,
+      min_lock_amount_atomic TEXT NOT NULL,
+      verified_amount_atomic TEXT NOT NULL,
+      token_symbol TEXT NOT NULL,
+      signature_message TEXT NOT NULL,
+      status TEXT NOT NULL,
+      verified_at TEXT NOT NULL,
+      last_checked_at TEXT,
+      raw_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (wallet_subject, provider, stream_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_streamflow_verifications_wallet_verified_idx
+      ON poker_streamflow_lock_verifications(wallet_subject, verified_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_oil_snapshot_events (
+      snapshot_id TEXT PRIMARY KEY,
+      verification_id TEXT NOT NULL,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      hour_bucket TEXT NOT NULL,
+      scheduled_for TEXT NOT NULL,
+      checked_at TEXT,
+      status TEXT NOT NULL,
+      amount_awarded INTEGER NOT NULL DEFAULT 0,
+      provider_status_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (verification_id, scheduled_for),
+      FOREIGN KEY (verification_id) REFERENCES poker_streamflow_lock_verifications(verification_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_oil_snapshot_events_wallet_hour_idx
+      ON poker_oil_snapshot_events(wallet_subject, hour_bucket, scheduled_for ASC);
+
+    CREATE TABLE IF NOT EXISTS poker_oil_ledger_entries (
+      ledger_entry_id TEXT PRIMARY KEY,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      verification_id TEXT,
+      snapshot_id TEXT UNIQUE,
+      tournament_id TEXT,
+      entry_id TEXT,
+      entry_kind TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      memo TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (verification_id) REFERENCES poker_streamflow_lock_verifications(verification_id),
+      FOREIGN KEY (snapshot_id) REFERENCES poker_oil_snapshot_events(snapshot_id),
+      FOREIGN KEY (tournament_id) REFERENCES poker_centaur_tournaments(tournament_id),
+      FOREIGN KEY (entry_id) REFERENCES poker_centaur_entries(entry_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_oil_ledger_wallet_created_idx
+      ON poker_oil_ledger_entries(wallet_subject, created_at DESC);
   `);
   ensureColumnExists(db, 'poker_setup_submissions', 'wallet_subject', 'TEXT');
   ensureColumnExists(db, 'poker_setup_submissions', 'declared_capabilities_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumnExists(db, 'poker_setup_submissions', 'raw_json', "TEXT NOT NULL DEFAULT '{}'");
   seedRegistryEntities();
+  seedCentaurTournaments();
   return db;
 }
 
@@ -387,6 +545,52 @@ function seedRegistryEntities() {
   }
 }
 
+function seedCentaurTournaments() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM poker_centaur_tournaments').get();
+  if (Number(count?.count || 0) > 0) return;
+  const now = sqlNow();
+  database.prepare(`
+    INSERT INTO poker_centaur_tournaments (
+      tournament_id,
+      slug,
+      title,
+      status,
+      buy_in_oil,
+      required_lock_amount_atomic,
+      token_symbol,
+      entry_deadline_at,
+      rules_json,
+      summary_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'pkt_centaur_01',
+    'centaur-open',
+    'Centaur Open',
+    'open',
+    300,
+    '1000000',
+    '$AGENTTOWN',
+    null,
+    toJson({
+      mode: 'centaur_no_limit_holdem',
+      tableSize: 6,
+      snapshotsPerHour: 15,
+      oilPerEligibleSnapshot: 100,
+      decisionCountdownSeconds: 45,
+    }, {}),
+    toJson({
+      headline: 'Human + AI centaurs make one decision together under a live countdown.',
+      stage: 'open',
+      buyInOil: 300,
+    }, {}),
+    now,
+    now
+  );
+}
+
 function makeId(prefix) {
   return `${prefix}_${randomHex(10)}`;
 }
@@ -409,6 +613,14 @@ function countTableRows(tableName) {
     'poker_runs',
     'poker_replay_artifacts',
     'poker_leaderboard_snapshots',
+    'poker_centaur_tournaments',
+    'poker_centaur_entries',
+    'poker_centaur_hands',
+    'poker_centaur_messages',
+    'poker_centaur_actions',
+    'poker_streamflow_lock_verifications',
+    'poker_oil_snapshot_events',
+    'poker_oil_ledger_entries',
   ]);
   if (!allowed.has(tableName)) return 0;
   const row = database.prepare(`SELECT COUNT(1) AS count FROM ${tableName}`).get();
@@ -430,6 +642,14 @@ function resetExtendedStore() {
     'poker_setup_submissions',
     'poker_divisions',
     'poker_leaderboard_snapshots',
+    'poker_centaur_messages',
+    'poker_centaur_actions',
+    'poker_oil_ledger_entries',
+    'poker_oil_snapshot_events',
+    'poker_centaur_hands',
+    'poker_centaur_entries',
+    'poker_streamflow_lock_verifications',
+    'poker_centaur_tournaments',
     'web_sessions',
     'poker_seasons',
     'registry_entities',
@@ -440,6 +660,7 @@ function resetExtendedStore() {
     }
   });
   seedRegistryEntities();
+  seedCentaurTournaments();
 }
 
 function createImportJob({
@@ -1808,18 +2029,757 @@ function upsertPokerLeaderboardSnapshot({
   });
 }
 
+function hydrateCentaurTournament(row) {
+  if (!row) return null;
+  return {
+    tournamentId: row.tournament_id,
+    slug: row.slug,
+    title: row.title,
+    status: row.status,
+    buyInOil: Number(row.buy_in_oil || 0),
+    requiredLockAmountAtomic: String(row.required_lock_amount_atomic || '0'),
+    tokenSymbol: row.token_symbol || '$AGENTTOWN',
+    entryDeadlineAt: row.entry_deadline_at || null,
+    rules: fromJson(row.rules_json, {}),
+    summary: fromJson(row.summary_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listCentaurTournaments() {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_centaur_tournaments
+    ORDER BY created_at DESC, tournament_id DESC
+  `).all();
+  return rows.map(hydrateCentaurTournament).filter(Boolean);
+}
+
+function getCentaurTournamentById(tournamentId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_centaur_tournaments WHERE tournament_id = ?').get(tournamentId);
+  return hydrateCentaurTournament(row);
+}
+
+function upsertCentaurTournament({
+  tournamentId,
+  slug,
+  title,
+  status = 'scheduled',
+  buyInOil = 0,
+  requiredLockAmountAtomic = '0',
+  tokenSymbol = '$AGENTTOWN',
+  entryDeadlineAt = null,
+  rules = {},
+  summary = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_centaur_tournaments WHERE tournament_id = ?').get(tournamentId);
+    database.prepare(`
+      INSERT INTO poker_centaur_tournaments (
+        tournament_id,
+        slug,
+        title,
+        status,
+        buy_in_oil,
+        required_lock_amount_atomic,
+        token_symbol,
+        entry_deadline_at,
+        rules_json,
+        summary_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tournament_id) DO UPDATE SET
+        slug = excluded.slug,
+        title = excluded.title,
+        status = excluded.status,
+        buy_in_oil = excluded.buy_in_oil,
+        required_lock_amount_atomic = excluded.required_lock_amount_atomic,
+        token_symbol = excluded.token_symbol,
+        entry_deadline_at = excluded.entry_deadline_at,
+        rules_json = excluded.rules_json,
+        summary_json = excluded.summary_json,
+        updated_at = excluded.updated_at
+    `).run(
+      tournamentId,
+      slug,
+      title,
+      status,
+      Number(buyInOil || 0),
+      String(requiredLockAmountAtomic || '0'),
+      tokenSymbol,
+      entryDeadlineAt,
+      toJson(rules, {}),
+      toJson(summary, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getCentaurTournamentById(tournamentId);
+  });
+}
+
+function hydrateCentaurEntry(row) {
+  if (!row) return null;
+  return {
+    entryId: row.entry_id,
+    tournamentId: row.tournament_id,
+    portalSessionId: row.portal_session_id || null,
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject,
+    displayName: row.display_name,
+    status: row.status,
+    wagerOil: Number(row.wager_oil || 0),
+    streamflowVerificationId: row.streamflow_verification_id || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getCentaurEntryById(entryId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_centaur_entries WHERE entry_id = ?').get(entryId);
+  return hydrateCentaurEntry(row);
+}
+
+function getCentaurEntryByWalletSubject(tournamentId, walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_centaur_entries
+    WHERE tournament_id = ? AND wallet_subject = ?
+    LIMIT 1
+  `).get(tournamentId, walletSubject);
+  return hydrateCentaurEntry(row);
+}
+
+function upsertCentaurEntry({
+  entryId,
+  tournamentId,
+  portalSessionId = null,
+  houseId = null,
+  walletSubject,
+  displayName,
+  status = 'joined',
+  wagerOil = 0,
+  streamflowVerificationId = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_centaur_entries WHERE entry_id = ?').get(entryId);
+    database.prepare(`
+      INSERT INTO poker_centaur_entries (
+        entry_id,
+        tournament_id,
+        portal_session_id,
+        house_id,
+        wallet_subject,
+        display_name,
+        status,
+        wager_oil,
+        streamflow_verification_id,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(entry_id) DO UPDATE SET
+        tournament_id = excluded.tournament_id,
+        portal_session_id = excluded.portal_session_id,
+        house_id = excluded.house_id,
+        wallet_subject = excluded.wallet_subject,
+        display_name = excluded.display_name,
+        status = excluded.status,
+        wager_oil = excluded.wager_oil,
+        streamflow_verification_id = excluded.streamflow_verification_id,
+        updated_at = excluded.updated_at
+    `).run(
+      entryId,
+      tournamentId,
+      portalSessionId,
+      houseId,
+      walletSubject,
+      displayName,
+      status,
+      Number(wagerOil || 0),
+      streamflowVerificationId,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getCentaurEntryById(entryId);
+  });
+}
+
+function hydrateCentaurHand(row) {
+  if (!row) return null;
+  return {
+    handId: row.hand_id,
+    tournamentId: row.tournament_id,
+    entryId: row.entry_id,
+    handNumber: Number(row.hand_number || 0),
+    phase: row.phase,
+    status: row.status,
+    decisionExpiresAt: row.decision_expires_at || null,
+    tableState: fromJson(row.table_state_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getCentaurHandById(handId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_centaur_hands WHERE hand_id = ?').get(handId);
+  return hydrateCentaurHand(row);
+}
+
+function getCurrentCentaurHandForEntry(entryId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_centaur_hands
+    WHERE entry_id = ?
+    ORDER BY hand_number DESC, created_at DESC
+    LIMIT 1
+  `).get(entryId);
+  return hydrateCentaurHand(row);
+}
+
+function upsertCentaurHand({
+  handId,
+  tournamentId,
+  entryId,
+  handNumber = 1,
+  phase = 'preflop',
+  status = 'live',
+  decisionExpiresAt = null,
+  tableState = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_centaur_hands WHERE hand_id = ?').get(handId);
+    database.prepare(`
+      INSERT INTO poker_centaur_hands (
+        hand_id,
+        tournament_id,
+        entry_id,
+        hand_number,
+        phase,
+        status,
+        decision_expires_at,
+        table_state_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(hand_id) DO UPDATE SET
+        tournament_id = excluded.tournament_id,
+        entry_id = excluded.entry_id,
+        hand_number = excluded.hand_number,
+        phase = excluded.phase,
+        status = excluded.status,
+        decision_expires_at = excluded.decision_expires_at,
+        table_state_json = excluded.table_state_json,
+        updated_at = excluded.updated_at
+    `).run(
+      handId,
+      tournamentId,
+      entryId,
+      Number(handNumber || 1),
+      phase,
+      status,
+      decisionExpiresAt,
+      toJson(tableState, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getCentaurHandById(handId);
+  });
+}
+
+function hydrateCentaurMessage(row) {
+  if (!row) return null;
+  return {
+    messageId: row.message_id,
+    tournamentId: row.tournament_id,
+    entryId: row.entry_id,
+    handId: row.hand_id,
+    authorRole: row.author_role,
+    body: row.body,
+    createdAt: row.created_at,
+  };
+}
+
+function listCentaurMessagesByHand(handId) {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_centaur_messages
+    WHERE hand_id = ?
+    ORDER BY created_at ASC, message_id ASC
+  `).all(handId);
+  return rows.map(hydrateCentaurMessage).filter(Boolean);
+}
+
+function createCentaurMessage({
+  messageId = null,
+  tournamentId,
+  entryId,
+  handId,
+  authorRole,
+  body,
+  createdAt = null,
+}) {
+  const database = ensureDb();
+  const nextMessageId = messageId || makeId('pkmsg');
+  const now = createdAt || sqlNow();
+  database.prepare(`
+    INSERT INTO poker_centaur_messages (
+      message_id,
+      tournament_id,
+      entry_id,
+      hand_id,
+      author_role,
+      body,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    nextMessageId,
+    tournamentId,
+    entryId,
+    handId,
+    authorRole,
+    body,
+    now
+  );
+  return hydrateCentaurMessage(database.prepare('SELECT * FROM poker_centaur_messages WHERE message_id = ?').get(nextMessageId));
+}
+
+function hydrateCentaurAction(row) {
+  if (!row) return null;
+  return {
+    actionId: row.action_id,
+    tournamentId: row.tournament_id,
+    entryId: row.entry_id,
+    handId: row.hand_id,
+    actorRole: row.actor_role,
+    actionKind: row.action_kind,
+    amountOil: Number(row.amount_oil || 0),
+    payload: fromJson(row.payload_json, {}),
+    createdAt: row.created_at,
+  };
+}
+
+function listCentaurActionsByHand(handId) {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_centaur_actions
+    WHERE hand_id = ?
+    ORDER BY created_at ASC, action_id ASC
+  `).all(handId);
+  return rows.map(hydrateCentaurAction).filter(Boolean);
+}
+
+function createCentaurAction({
+  actionId = null,
+  tournamentId,
+  entryId,
+  handId,
+  actorRole,
+  actionKind,
+  amountOil = 0,
+  payload = {},
+  createdAt = null,
+}) {
+  const database = ensureDb();
+  const nextActionId = actionId || makeId('pkact');
+  const now = createdAt || sqlNow();
+  database.prepare(`
+    INSERT INTO poker_centaur_actions (
+      action_id,
+      tournament_id,
+      entry_id,
+      hand_id,
+      actor_role,
+      action_kind,
+      amount_oil,
+      payload_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    nextActionId,
+    tournamentId,
+    entryId,
+    handId,
+    actorRole,
+    actionKind,
+    Number(amountOil || 0),
+    toJson(payload, {}),
+    now
+  );
+  return hydrateCentaurAction(database.prepare('SELECT * FROM poker_centaur_actions WHERE action_id = ?').get(nextActionId));
+}
+
+function hydrateStreamflowVerification(row) {
+  if (!row) return null;
+  return {
+    verificationId: row.verification_id,
+    portalSessionId: row.portal_session_id || null,
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject,
+    chain: row.chain,
+    address: row.address,
+    provider: row.provider,
+    streamId: row.stream_id,
+    minLockAmountAtomic: String(row.min_lock_amount_atomic || '0'),
+    verifiedAmountAtomic: String(row.verified_amount_atomic || '0'),
+    tokenSymbol: row.token_symbol || '$AGENTTOWN',
+    signatureMessage: row.signature_message,
+    status: row.status,
+    verifiedAt: row.verified_at,
+    lastCheckedAt: row.last_checked_at || null,
+    raw: fromJson(row.raw_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getStreamflowVerificationById(verificationId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_streamflow_lock_verifications WHERE verification_id = ?').get(verificationId);
+  return hydrateStreamflowVerification(row);
+}
+
+function getStreamflowVerificationByWalletSubject(walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_streamflow_lock_verifications
+    WHERE wallet_subject = ?
+    ORDER BY verified_at DESC, created_at DESC
+    LIMIT 1
+  `).get(walletSubject);
+  return hydrateStreamflowVerification(row);
+}
+
+function getStreamflowVerificationByWalletAndStream(walletSubject, provider, streamId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_streamflow_lock_verifications
+    WHERE wallet_subject = ? AND provider = ? AND stream_id = ?
+    ORDER BY verified_at DESC, created_at DESC
+    LIMIT 1
+  `).get(walletSubject, provider, streamId);
+  return hydrateStreamflowVerification(row);
+}
+
+function upsertStreamflowVerification({
+  verificationId,
+  portalSessionId = null,
+  houseId = null,
+  walletSubject,
+  chain = 'solana',
+  address,
+  provider = 'streamflow',
+  streamId,
+  minLockAmountAtomic = '0',
+  verifiedAmountAtomic = '0',
+  tokenSymbol = '$AGENTTOWN',
+  signatureMessage = '',
+  status = 'verified',
+  verifiedAt = null,
+  lastCheckedAt = null,
+  raw = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_streamflow_lock_verifications WHERE verification_id = ?').get(verificationId);
+    database.prepare(`
+      INSERT INTO poker_streamflow_lock_verifications (
+        verification_id,
+        portal_session_id,
+        house_id,
+        wallet_subject,
+        chain,
+        address,
+        provider,
+        stream_id,
+        min_lock_amount_atomic,
+        verified_amount_atomic,
+        token_symbol,
+        signature_message,
+        status,
+        verified_at,
+        last_checked_at,
+        raw_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(verification_id) DO UPDATE SET
+        portal_session_id = excluded.portal_session_id,
+        house_id = excluded.house_id,
+        wallet_subject = excluded.wallet_subject,
+        chain = excluded.chain,
+        address = excluded.address,
+        provider = excluded.provider,
+        stream_id = excluded.stream_id,
+        min_lock_amount_atomic = excluded.min_lock_amount_atomic,
+        verified_amount_atomic = excluded.verified_amount_atomic,
+        token_symbol = excluded.token_symbol,
+        signature_message = excluded.signature_message,
+        status = excluded.status,
+        verified_at = excluded.verified_at,
+        last_checked_at = excluded.last_checked_at,
+        raw_json = excluded.raw_json,
+        updated_at = excluded.updated_at
+    `).run(
+      verificationId,
+      portalSessionId,
+      houseId,
+      walletSubject,
+      chain,
+      address,
+      provider,
+      streamId,
+      String(minLockAmountAtomic || '0'),
+      String(verifiedAmountAtomic || '0'),
+      tokenSymbol,
+      signatureMessage,
+      status,
+      verifiedAt || now,
+      lastCheckedAt,
+      toJson(raw, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getStreamflowVerificationById(verificationId);
+  });
+}
+
+function hydrateOilSnapshotEvent(row) {
+  if (!row) return null;
+  return {
+    snapshotId: row.snapshot_id,
+    verificationId: row.verification_id,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    hourBucket: row.hour_bucket,
+    scheduledFor: row.scheduled_for,
+    checkedAt: row.checked_at || null,
+    status: row.status,
+    amountAwarded: Number(row.amount_awarded || 0),
+    providerStatus: fromJson(row.provider_status_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getOilSnapshotEventByVerificationAndScheduledFor(verificationId, scheduledFor) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_oil_snapshot_events
+    WHERE verification_id = ? AND scheduled_for = ?
+    LIMIT 1
+  `).get(verificationId, scheduledFor);
+  return hydrateOilSnapshotEvent(row);
+}
+
+function listOilSnapshotEventsByVerificationAndHour(verificationId, hourBucket) {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_oil_snapshot_events
+    WHERE verification_id = ? AND hour_bucket = ?
+    ORDER BY scheduled_for ASC, snapshot_id ASC
+  `).all(verificationId, hourBucket);
+  return rows.map(hydrateOilSnapshotEvent).filter(Boolean);
+}
+
+function upsertOilSnapshotEvent({
+  snapshotId,
+  verificationId,
+  walletSubject,
+  houseId = null,
+  hourBucket,
+  scheduledFor,
+  checkedAt = null,
+  status = 'pending',
+  amountAwarded = 0,
+  providerStatus = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_oil_snapshot_events WHERE snapshot_id = ?').get(snapshotId);
+    database.prepare(`
+      INSERT INTO poker_oil_snapshot_events (
+        snapshot_id,
+        verification_id,
+        wallet_subject,
+        house_id,
+        hour_bucket,
+        scheduled_for,
+        checked_at,
+        status,
+        amount_awarded,
+        provider_status_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(snapshot_id) DO UPDATE SET
+        verification_id = excluded.verification_id,
+        wallet_subject = excluded.wallet_subject,
+        house_id = excluded.house_id,
+        hour_bucket = excluded.hour_bucket,
+        scheduled_for = excluded.scheduled_for,
+        checked_at = excluded.checked_at,
+        status = excluded.status,
+        amount_awarded = excluded.amount_awarded,
+        provider_status_json = excluded.provider_status_json,
+        updated_at = excluded.updated_at
+    `).run(
+      snapshotId,
+      verificationId,
+      walletSubject,
+      houseId,
+      hourBucket,
+      scheduledFor,
+      checkedAt,
+      status,
+      Number(amountAwarded || 0),
+      toJson(providerStatus, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return hydrateOilSnapshotEvent(database.prepare('SELECT * FROM poker_oil_snapshot_events WHERE snapshot_id = ?').get(snapshotId));
+  });
+}
+
+function hydrateOilLedgerEntry(row) {
+  if (!row) return null;
+  return {
+    ledgerEntryId: row.ledger_entry_id,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    verificationId: row.verification_id || null,
+    snapshotId: row.snapshot_id || null,
+    tournamentId: row.tournament_id || null,
+    entryId: row.entry_id || null,
+    entryKind: row.entry_kind,
+    direction: row.direction,
+    amount: Number(row.amount || 0),
+    memo: row.memo || null,
+    createdAt: row.created_at,
+  };
+}
+
+function createOilLedgerEntry({
+  ledgerEntryId = null,
+  walletSubject,
+  houseId = null,
+  verificationId = null,
+  snapshotId = null,
+  tournamentId = null,
+  entryId = null,
+  entryKind,
+  direction,
+  amount = 0,
+  memo = null,
+  createdAt = null,
+}) {
+  return withTransaction((database) => {
+    if (snapshotId) {
+      const existing = database.prepare('SELECT * FROM poker_oil_ledger_entries WHERE snapshot_id = ?').get(snapshotId);
+      if (existing) return hydrateOilLedgerEntry(existing);
+    }
+    const nextLedgerEntryId = ledgerEntryId || makeId('oil');
+    const now = createdAt || sqlNow();
+    database.prepare(`
+      INSERT INTO poker_oil_ledger_entries (
+        ledger_entry_id,
+        wallet_subject,
+        house_id,
+        verification_id,
+        snapshot_id,
+        tournament_id,
+        entry_id,
+        entry_kind,
+        direction,
+        amount,
+        memo,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      nextLedgerEntryId,
+      walletSubject,
+      houseId,
+      verificationId,
+      snapshotId,
+      tournamentId,
+      entryId,
+      entryKind,
+      direction,
+      Number(amount || 0),
+      memo,
+      now
+    );
+    return hydrateOilLedgerEntry(database.prepare('SELECT * FROM poker_oil_ledger_entries WHERE ledger_entry_id = ?').get(nextLedgerEntryId));
+  });
+}
+
+function listOilLedgerEntriesByWalletSubject(walletSubject, { limit = 50 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 50)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_oil_ledger_entries
+    WHERE wallet_subject = ?
+    ORDER BY created_at DESC, ledger_entry_id DESC
+    LIMIT ?
+  `).all(walletSubject, safeLimit);
+  return rows.map(hydrateOilLedgerEntry).filter(Boolean);
+}
+
+function computeOilBalance(walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT
+      COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE 0 END), 0) AS credits,
+      COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE 0 END), 0) AS debits
+    FROM poker_oil_ledger_entries
+    WHERE wallet_subject = ?
+  `).get(walletSubject);
+  const credits = Number(row?.credits || 0);
+  const debits = Number(row?.debits || 0);
+  return {
+    walletSubject,
+    credits,
+    debits,
+    balance: credits - debits,
+  };
+}
+
 module.exports = {
   activateCredentialGrant,
   countTableRows,
+  computeOilBalance,
   createApprovalRequest,
+  createCentaurAction,
+  createCentaurMessage,
   createCredentialGrant,
   createEvidence,
   createImportJob,
   createInvocation,
+  createOilLedgerEntry,
   createWebSession,
   decideApproval,
   getActiveCredentialGrant,
   getApprovalById,
+  getCentaurEntryById,
+  getCentaurEntryByWalletSubject,
+  getCentaurHandById,
+  getCentaurTournamentById,
   getCheckpointByRef,
   getCredentialGrantById,
   getEvidenceById,
@@ -1836,20 +2796,35 @@ module.exports = {
   getPokerSeasonById,
   getPokerSubmissionById,
   getPokerSubmissionByRequest,
+  getCurrentCentaurHandForEntry,
+  getOilSnapshotEventByVerificationAndScheduledFor,
   getWebSessionById,
+  getStreamflowVerificationById,
+  getStreamflowVerificationByWalletAndStream,
+  getStreamflowVerificationByWalletSubject,
   listApprovalsForSession,
+  listCentaurActionsByHand,
+  listCentaurMessagesByHand,
+  listCentaurTournaments,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listOilLedgerEntriesByWalletSubject,
+  listOilSnapshotEventsByVerificationAndHour,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  upsertCentaurEntry,
+  upsertCentaurHand,
+  upsertCentaurTournament,
+  upsertOilSnapshotEvent,
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
   upsertPokerReplayArtifact,
   upsertPokerRun,
   upsertPokerSeason,
   upsertPokerSubmission,
+  upsertStreamflowVerification,
   writeCheckpoint,
 };
