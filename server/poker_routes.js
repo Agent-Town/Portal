@@ -49,12 +49,14 @@ function registerPokerRoutes(app, deps) {
     createPortalPokerOperatorClient,
     express,
     getLatestPokerLeaderboardSnapshot,
+    getPokerBatchById,
     getPokerOperatorServiceToken,
     getPokerReplayArtifactByRunId,
     getPokerRunById,
     getPokerSeasonById,
     getPokerSubmissionById,
     getPokerSubmissionByRequest,
+    listPokerLeaderboardSnapshots,
     listPokerSeasons,
     normalizePortalIdempotencyKey,
     nowIso,
@@ -264,6 +266,66 @@ function registerPokerRoutes(app, deps) {
       snapshotId: snapshot?.snapshotId || null,
       createdAt: snapshot?.createdAt || null,
       rankings: Array.isArray(snapshot?.rankings) ? snapshot.rankings : [],
+    }, { requestId });
+  });
+
+  app.get('/api/poker/leaderboards/:seasonId/snapshots', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const season = getPokerSeasonById(req.params.seasonId);
+    if (!season) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker season not found.', { requestId });
+    }
+    const items = listPokerLeaderboardSnapshots(req.params.seasonId).map((snapshot) => ({
+      snapshotId: snapshot.snapshotId,
+      seasonId: snapshot.seasonId,
+      createdAt: snapshot.createdAt,
+      rankingsCount: Array.isArray(snapshot.rankings) ? snapshot.rankings.length : 0,
+      topSubmissionId: Array.isArray(snapshot.rankings) && snapshot.rankings[0]
+        ? String(snapshot.rankings[0].submissionId || '')
+        : '',
+    }));
+    return sendPortalApiSuccess(res, {
+      seasonId: req.params.seasonId,
+      items,
+    }, { requestId });
+  });
+
+  app.get('/api/poker/runs/:runId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const run = getPokerRunById(req.params.runId);
+    if (!run) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker run not found.', { requestId });
+    }
+    const batch = getPokerBatchById(run.batchId);
+    const summary = run.summary && typeof run.summary === 'object' ? run.summary : {};
+    const raw = run.raw && typeof run.raw === 'object' ? run.raw : {};
+    const submissionId = typeof raw.submissionId === 'string' && raw.submissionId.trim()
+      ? raw.submissionId.trim()
+      : typeof summary.submissionId === 'string' && summary.submissionId.trim()
+        ? summary.submissionId.trim()
+        : Array.isArray(batch?.submissionIds) && batch.submissionIds.length === 1
+          ? String(batch.submissionIds[0] || '').trim()
+          : null;
+    const seatResults = Array.isArray(summary.seatResults)
+      ? summary.seatResults
+      : Array.isArray(raw.seatResults)
+        ? raw.seatResults
+        : Array.isArray(batch?.submissionIds) && batch.submissionIds.length === 1
+          ? []
+          : [];
+    return sendPortalApiSuccess(res, {
+      run: {
+        runId: run.runId,
+        seasonId: run.seasonId,
+        batchId: run.batchId,
+        submissionId,
+        fingerprint: typeof summary.fingerprint === 'string' ? summary.fingerprint : null,
+        winnerSeat: summary.winnerSeat ?? null,
+        turns: summary.turns ?? null,
+        seed: typeof summary.seed === 'string' ? summary.seed : null,
+        seatResults,
+        replayReady: !!getPokerReplayArtifactByRunId(run.runId),
+      },
     }, { requestId });
   });
 

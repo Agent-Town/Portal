@@ -76,6 +76,7 @@ const {
   listApprovalsForSession,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listPokerLeaderboardSnapshots,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryFamilyGroups,
@@ -162,6 +163,7 @@ const {
   createSubmission: createPokerOperatorSubmission,
   getBatchDetail: getPokerOperatorBatchDetail,
   getLeaderboardSnapshotDetail: getPokerOperatorLeaderboardSnapshotDetail,
+  listLeaderboardSnapshotHistory: listPokerOperatorLeaderboardSnapshotHistory,
   getLatestLeaderboardDetail: getPokerOperatorLatestLeaderboardDetail,
   getPokerOperatorSnapshot,
   getReplayDetail: getPokerOperatorReplayDetail,
@@ -4202,7 +4204,9 @@ registerPokerRoutes(app, {
   getPokerSeasonById,
   getPokerSubmissionById,
   getPokerSubmissionByRequest,
+  getPokerBatchById,
   listPokerSeasons,
+  listPokerLeaderboardSnapshots,
   normalizePortalIdempotencyKey,
   nowIso,
   randomHex,
@@ -5807,6 +5811,17 @@ function invokePokerOperatorTransport({
       };
     }
 
+    const leaderboardHistoryMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/snapshots$/);
+    if (normalizedMethod === 'GET' && leaderboardHistoryMatch) {
+      return {
+        status: 200,
+        body: makePortalApiSuccessBody(
+          listPokerOperatorLeaderboardSnapshotHistory(decodeURIComponent(leaderboardHistoryMatch[1])),
+          { requestId }
+        ),
+      };
+    }
+
     const leaderboardLatestMatch = normalizedPath.match(/^\/v1\/leaderboards\/([^/]+)\/latest$/);
     if (normalizedMethod === 'GET' && leaderboardLatestMatch) {
       return {
@@ -5950,15 +5965,19 @@ async function syncPokerMirrorFromOperator({ seasonId = '' } = {}) {
     counts.seasons += 1;
 
     if (season?.latestLeaderboardSnapshot?.snapshotId) {
-      const latest = await client.getLatestLeaderboard(season.seasonId);
-      if (latest?.snapshotId) {
+      const history = await client.listLeaderboardSnapshots(season.seasonId);
+      const snapshotItems = Array.isArray(history?.items) && history.items.length
+        ? history.items
+        : [await client.getLatestLeaderboard(season.seasonId)].filter(Boolean);
+      for (const snapshot of snapshotItems) {
+        if (!snapshot?.snapshotId) continue;
         upsertPokerLeaderboardSnapshot({
-          snapshotId: latest.snapshotId,
+          snapshotId: snapshot.snapshotId,
           seasonId: season.seasonId,
-          rankings: latest.rankings,
-          raw: latest,
-          createdAt: latest.createdAt || nowIso(),
-          updatedAt: latest.createdAt || nowIso(),
+          rankings: snapshot.rankings,
+          raw: snapshot,
+          createdAt: snapshot.createdAt || nowIso(),
+          updatedAt: snapshot.createdAt || nowIso(),
         });
         counts.leaderboards += 1;
       }
@@ -11747,7 +11766,15 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (req, res) => {
+app.get([
+  '/poker',
+  '/poker/seasons/:seasonId',
+  '/poker/leaderboards/:seasonId',
+  '/poker/leaderboards/:seasonId/snapshots',
+  '/poker/runs/:runId',
+  '/poker/replays/:runId',
+  '/poker/submissions/:submissionId'
+], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }

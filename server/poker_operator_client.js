@@ -112,6 +112,17 @@ function createPokerOperatorClient({ transport }) {
     return payload.data;
   }
 
+  async function listLeaderboardSnapshots(seasonId) {
+    const payload = await request({
+      method: 'GET',
+      path: `/v1/leaderboards/${encodeURIComponent(seasonId)}/snapshots`,
+    });
+    if (!Array.isArray(payload?.data?.items)) {
+      throw makeClientError(502, 'POKER_OPERATOR_SCHEMA_MISMATCH', 'Leaderboard snapshot history is missing.');
+    }
+    return payload.data;
+  }
+
   async function createSeason(payload, { bearerToken, idempotencyKey }) {
     const envelope = await request({
       method: 'POST',
@@ -148,6 +159,7 @@ function createPokerOperatorClient({ transport }) {
     createSubmission,
     getBatch,
     getLeaderboardSnapshot,
+    listLeaderboardSnapshots,
     getLatestLeaderboard,
     getReplay,
     getRun,

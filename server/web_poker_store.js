@@ -2648,6 +2648,17 @@ function getLatestPokerLeaderboardSnapshot(seasonId) {
   return hydratePokerLeaderboardSnapshot(row);
 }
 
+function listPokerLeaderboardSnapshots(seasonId) {
+  if (!seasonId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_leaderboard_snapshots
+    WHERE season_id = ?
+    ORDER BY created_at DESC, snapshot_id DESC
+  `).all(seasonId);
+  return rows.map((row) => hydratePokerLeaderboardSnapshot(row)).filter(Boolean);
+}
+
 function upsertPokerLeaderboardSnapshot({
   snapshotId,
   seasonId,
@@ -2722,6 +2733,7 @@ module.exports = {
   listApprovalsForSession,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listPokerLeaderboardSnapshots,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryFamilyGroups,

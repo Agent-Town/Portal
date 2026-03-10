@@ -524,6 +524,17 @@ Returns the owning Portal session’s submission status page payload.
 ### GET `/api/poker/leaderboards/:seasonId/latest`
 Returns the latest mirrored leaderboard snapshot.
 
+### GET `/api/poker/leaderboards/:seasonId/snapshots`
+Returns mirrored leaderboard snapshot history ordered newest-first with stable `snapshotId`, `createdAt`, `seasonId`, and `rankingsCount` fields.
+
+### GET `/api/poker/runs/:runId`
+Returns the mirrored Portal run detail payload with:
+- `data.run.runId`
+- `data.run.submissionId`
+- `data.run.seasonId`
+- `data.run.seatResults`
+- `data.run.replayReady`
+
 ### GET `/api/poker/runs/:runId/replay`
 Returns the mirrored replay manifest after format and artifact-hash verification.
 

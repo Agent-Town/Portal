@@ -150,6 +150,7 @@ function normalizeRun(input = {}) {
     runId: typeof input.runId === 'string' && input.runId.trim() ? input.runId.trim() : makeId('pkr'),
     batchId: typeof input.batchId === 'string' ? input.batchId.trim() : '',
     seasonId: typeof input.seasonId === 'string' ? input.seasonId.trim() : null,
+    submissionId: typeof input.submissionId === 'string' && input.submissionId.trim() ? input.submissionId.trim() : null,
     summary: clone(input.summary, {}),
     createdAt: typeof input.createdAt === 'string' ? input.createdAt : now,
     updatedAt: typeof input.updatedAt === 'string' ? input.updatedAt : now,
@@ -365,6 +366,19 @@ function getLeaderboardSnapshotDetail(seasonId, snapshotId) {
   };
 }
 
+function listLeaderboardSnapshotHistory(seasonId) {
+  requireSeason(seasonId);
+  const snapshots = operatorState.leaderboards.get(seasonId) || [];
+  return {
+    seasonId,
+    items: snapshots.slice().sort(compareNewestFirst).map((snapshot) => ({
+      snapshotId: snapshot.snapshotId,
+      createdAt: snapshot.createdAt,
+      rankings: clone(snapshot.rankings, []),
+    })),
+  };
+}
+
 function buildIdempotencyKey(kind, idempotencyKey) {
   return `${kind}:${String(idempotencyKey || '').trim()}`;
 }
@@ -469,6 +483,7 @@ module.exports = {
   createSubmission,
   getBatchDetail,
   getLeaderboardSnapshotDetail,
+  listLeaderboardSnapshotHistory,
   getLatestLeaderboardDetail,
   getPokerOperatorSnapshot,
   getReplayDetail,

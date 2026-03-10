@@ -190,6 +190,8 @@
         </div>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref(`/poker/leaderboards/${encodeURIComponent(season.seasonId)}`))}">Latest leaderboard</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/leaderboards/${encodeURIComponent(season.seasonId)}/snapshots`))}">Snapshot history</a>
+          ${season?.latestReplayHighlight?.runId ? `<a href="${escapeHtml(buildPokerHref(`/poker/runs/${encodeURIComponent(season.latestReplayHighlight.runId)}`))}">Run detail</a>` : ''}
           ${season?.latestReplayHighlight?.runId ? `<a href="${escapeHtml(buildPokerHref(`/poker/replays/${encodeURIComponent(season.latestReplayHighlight.runId)}`))}">Replay</a>` : ''}
         </div>
       `,
@@ -358,6 +360,9 @@
           <span class="pokerBadge">season ${escapeHtml(seasonId)}</span>
           <span class="pokerBadge">snapshot ${escapeHtml(snapshotId || 'latest')}</span>
         </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref(`/poker/leaderboards/${encodeURIComponent(seasonId)}/snapshots`))}">Snapshot history</a>
+        </div>
         <table class="pokerTable">
           <thead>
             <tr>
@@ -384,6 +389,124 @@
         </table>
       `,
     ]);
+  }
+
+  async function loadSnapshotHistory(seasonId) {
+    setTitle('Poker Snapshot History', `Mirrored snapshot history for ${seasonId}.`);
+    setStatus('Loading snapshot history...');
+    const payload = await api(`/api/poker/leaderboards/${encodeURIComponent(seasonId)}/snapshots`);
+    const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    if (!items.length) {
+      setStatus('No mirrored snapshot history yet.');
+      renderCards([
+        '<h2>No snapshot history yet.</h2><p>The page stays stable and empty until mirrored snapshots arrive.</p>',
+      ]);
+      return;
+    }
+    setStatus(`${items.length} snapshot${items.length === 1 ? '' : 's'} loaded.`);
+    renderCards([
+      `
+        <h2>Snapshot History</h2>
+        <div class="pokerMeta">
+          <span class="pokerBadge">season ${escapeHtml(seasonId)}</span>
+        </div>
+        <table class="pokerTable">
+          <thead>
+            <tr>
+              <th>Snapshot</th>
+              <th>Created At</th>
+              <th>Rows</th>
+            </tr>
+          </thead>
+          <tbody id="pokerSnapshotHistoryRows">
+            ${
+              items.map((entry) => `
+                <tr data-snapshot-id="${escapeHtml(entry.snapshotId)}">
+                  <td class="snapshot-history-id">${escapeHtml(entry.snapshotId)}</td>
+                  <td>${escapeHtml(entry.createdAt)}</td>
+                  <td>${escapeHtml(entry.rankingsCount)}</td>
+                </tr>
+              `).join('')
+            }
+          </tbody>
+        </table>
+      `,
+    ]);
+  }
+
+  async function loadRun(runId) {
+    setTitle('Poker Run', `Mirrored operator run detail for ${runId}.`);
+    setStatus('Loading run detail...');
+    try {
+      const payload = await api(`/api/poker/runs/${encodeURIComponent(runId)}`);
+      const run = payload?.data?.run || null;
+      if (!run) throw new Error('NOT_FOUND');
+      const seatResults = Array.isArray(run.seatResults) ? run.seatResults : [];
+      setStatus(`Run ${runId} loaded.`);
+      renderCards([
+        `
+          <h2>Run Detail</h2>
+          <div class="pokerMeta">
+            <span class="pokerBadge">${escapeHtml(run.runId)}</span>
+            <span id="runSubmissionId" class="pokerBadge">${escapeHtml(run.submissionId || 'submission unavailable')}</span>
+            <span class="pokerBadge">${escapeHtml(run.seasonId || 'season')}</span>
+          </div>
+          <div class="pokerMeta">
+            <span class="pokerBadge">fingerprint</span>
+            <span id="runDetailFingerprint">${escapeHtml(run.fingerprint || 'unavailable')}</span>
+          </div>
+          <div class="pokerSummary">
+            <div>
+              <div>Winner Seat</div>
+              <div class="pokerSummaryValue">${escapeHtml(run.winnerSeat)}</div>
+            </div>
+            <div>
+              <div>Turns</div>
+              <div class="pokerSummaryValue">${escapeHtml(run.turns)}</div>
+            </div>
+            <div>
+              <div>Seed</div>
+              <div class="pokerSummaryValue">${escapeHtml(run.seed)}</div>
+            </div>
+          </div>
+          <div class="pokerLinks">
+            ${run.replayReady ? `<a id="runReplayLink" href="${escapeHtml(buildPokerHref(`/poker/replays/${encodeURIComponent(run.runId)}`))}">Replay</a>` : '<span class="pokerBadge">Replay unavailable</span>'}
+          </div>
+        `,
+        `
+          <h3>Seat Results</h3>
+          ${
+            seatResults.length
+              ? `
+                <table class="pokerTable">
+                  <thead>
+                    <tr>
+                      <th>Seat</th>
+                      <th>Placement</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pokerRunSeatRows">
+                    ${
+                      seatResults.map((entry) => `
+                        <tr>
+                          <td>${escapeHtml(entry.seat)}</td>
+                          <td>${escapeHtml(entry.finishRank ?? entry.placement)}</td>
+                          <td>${escapeHtml(entry.chips ?? entry.chipDelta)}</td>
+                        </tr>
+                      `).join('')
+                    }
+                  </tbody>
+                </table>
+              `
+              : '<p>No seat results mirrored for this run.</p>'
+          }
+        `,
+      ]);
+    } catch (err) {
+      setStatus(`Run unavailable: ${err.code || err.message || 'UNKNOWN'}`);
+      renderCards(['<h2>Run unavailable.</h2>']);
+    }
   }
 
   async function loadReplay(runId) {
@@ -461,8 +584,12 @@
       if (path === '/poker') return await loadIndex();
       const seasonMatch = path.match(/^\/poker\/seasons\/([^/]+)$/);
       if (seasonMatch) return await loadSeason(decodeURIComponent(seasonMatch[1]));
+      const snapshotHistoryMatch = path.match(/^\/poker\/leaderboards\/([^/]+)\/snapshots$/);
+      if (snapshotHistoryMatch) return await loadSnapshotHistory(decodeURIComponent(snapshotHistoryMatch[1]));
       const leaderboardMatch = path.match(/^\/poker\/leaderboards\/([^/]+)$/);
       if (leaderboardMatch) return await loadLeaderboard(decodeURIComponent(leaderboardMatch[1]));
+      const runMatch = path.match(/^\/poker\/runs\/([^/]+)$/);
+      if (runMatch) return await loadRun(decodeURIComponent(runMatch[1]));
       const replayMatch = path.match(/^\/poker\/replays\/([^/]+)$/);
       if (replayMatch) return await loadReplay(decodeURIComponent(replayMatch[1]));
       const submissionMatch = path.match(/^\/poker\/submissions\/([^/]+)$/);
