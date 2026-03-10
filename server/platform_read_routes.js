@@ -11,6 +11,8 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersionByIdempotency,
     getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
+    listTrackDefinitions,
+    listTrackProgressEvents,
     getTrainerJobById,
     getTrainerJobByIdempotency,
     getTrainerResultById,
@@ -81,6 +83,59 @@ function registerPlatformReadRoutes(app, deps) {
         actions,
       };
     }).filter(Boolean);
+  }
+
+  function getTrackAntiFarmingPolicy() {
+    const fixture = getUnifiedPlatformTestFixture('tracks_core_seed') || {};
+    const threshold = Number(fixture?.antiFarming?.duplicateActionThreshold || 1);
+    return {
+      duplicateActionThreshold: Number.isFinite(threshold) && threshold > 0 ? Math.floor(threshold) : 1,
+      mode: 'dedupe_key_cap',
+    };
+  }
+
+  function buildTrackReadPayload({ houseId = '', teamId = '' } = {}) {
+    const definitions = Array.isArray(listTrackDefinitions()) ? listTrackDefinitions() : [];
+    const events = listTrackProgressEvents({ houseId, teamId }).map((event) => ({
+      trackProgressEventId: event.trackProgressEventId,
+      trackId: event.trackId,
+      title: event.title,
+      sourceKind: event.sourceKind,
+      sourceId: event.sourceId,
+      sourceTraceId: event.sourceTraceId,
+      sourceEventId: event.sourceEventId,
+      sourceRef: event.sourceRef,
+      progressDelta: event.progressDelta,
+      dedupeKey: event.dedupeKey,
+      createdAt: event.createdAt,
+    }));
+    const eventsByTrackId = events.reduce((acc, event) => {
+      if (!acc.has(event.trackId)) acc.set(event.trackId, []);
+      acc.get(event.trackId).push(event);
+      return acc;
+    }, new Map());
+    const tracks = definitions.map((definition) => {
+      const trackEvents = eventsByTrackId.get(definition.trackId) || [];
+      const progressCount = trackEvents.reduce((sum, event) => sum + Number(event.progressDelta || 0), 0);
+      const targetCount = Math.max(1, Number(definition.targetCount || 1));
+      const normalizedProgress = Math.min(targetCount, progressCount) / targetCount;
+      return {
+        trackId: definition.trackId,
+        title: definition.title,
+        progressCount,
+        targetCount,
+        progress: Number(normalizedProgress.toFixed(4)),
+        sourceKinds: [...new Set(trackEvents.map((event) => String(event.sourceKind || '')).filter(Boolean))],
+        latestSourceId: trackEvents.length ? trackEvents[trackEvents.length - 1].sourceId : null,
+        latestSourceTraceId: trackEvents.length ? trackEvents[trackEvents.length - 1].sourceTraceId : null,
+      };
+    });
+    return {
+      tracks,
+      events,
+      antiFarming: getTrackAntiFarmingPolicy(),
+      emptyStateText: 'No track progress recorded yet.',
+    };
   }
 
   app.get('/api/platform/default-skill-pack', (_req, res) => {
@@ -287,6 +342,37 @@ function registerPlatformReadRoutes(app, deps) {
       offices: Array.isArray(fixture?.offices) ? fixture.offices : [],
       staffAgents: Array.isArray(fixture?.staffAgents) ? fixture.staffAgents : [],
       modelVersion: 'house_scaffold_v1',
+    }, { requestId });
+  });
+
+  app.get('/api/platform/tracks', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const basePayload = {
+      houseId: houseId || null,
+      teamId: teamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+    };
+    if (!houseId) {
+      return sendPortalApiSuccess(res, {
+        ...basePayload,
+        tracks: [],
+        events: [],
+        antiFarming: getTrackAntiFarmingPolicy(),
+        emptyStateText: 'No track progress recorded yet.',
+      }, { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      ...basePayload,
+      ...buildTrackReadPayload({ houseId, teamId }),
     }, { requestId });
   });
 

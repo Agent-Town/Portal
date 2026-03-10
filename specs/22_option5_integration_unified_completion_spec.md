@@ -418,6 +418,12 @@ Scope:
 2. fuller experience-editor compatibility,
 3. broader House HQ object model expansion.
 
+Phase 6 begins from a deterministic base:
+
+1. track progress is read through one House-compatible surface,
+2. reward hooks are durable and source-linked rather than transient counters,
+3. duplicate-action suppression remains explicit and measurable.
+
 Future new competitive experiences are outside the scope of this document.
 These are explicit later phases, not hidden requirements for Phases 1 through 5.
 

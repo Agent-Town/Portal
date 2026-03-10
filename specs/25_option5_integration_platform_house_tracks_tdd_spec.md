@@ -307,6 +307,13 @@ GREEN gate:
 2. reward hooks are trace-backed,
 3. anti-farming and fair-play rules are enforceable.
 
+Implementation notes:
+
+1. `GET /api/platform/tracks` is the read route for this milestone.
+2. The durable core model is append-only track progress events, not transient counters.
+3. Config creation may seed `Builder`, accepted web and poker trace events may seed `Web Ops` and `Poker Mastery`, and trainer results may seed `Analyst`.
+4. Duplicate suppression must key off a stable dedupe fingerprint and respect the configured threshold.
+
 ### M25.9 - Tracks progression surface
 
 Primary test:

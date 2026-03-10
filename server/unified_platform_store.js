@@ -21,6 +21,7 @@ const PLATFORM_TABLES = Object.freeze([
   'integration_executions',
   'trainer_jobs',
   'trainer_results',
+  'track_progress_events',
   'sealed_contexts',
   'sealed_context_violations',
   'approvals',
@@ -53,6 +54,29 @@ const FIXTURE_FILES = Object.freeze({
   editor_pack_compat_seed: 'editor_pack_compat_seed.json',
   joined_completion_smoke_seed: 'joined_completion_smoke_seed.json',
 });
+
+const TRACK_DEFINITIONS = Object.freeze([
+  {
+    trackId: 'track_poker_mastery',
+    title: 'Poker Mastery',
+    targetCount: 4,
+  },
+  {
+    trackId: 'track_web_ops',
+    title: 'Web Ops',
+    targetCount: 4,
+  },
+  {
+    trackId: 'track_builder',
+    title: 'Builder',
+    targetCount: 4,
+  },
+  {
+    trackId: 'track_analyst',
+    title: 'Analyst',
+    targetCount: 5,
+  },
+]);
 
 let db = null;
 const fixtureCache = new Map();
@@ -243,6 +267,23 @@ function ensureDb() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS track_progress_events (
+      track_progress_event_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      track_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      source_trace_id TEXT,
+      source_event_id TEXT,
+      source_ref_json TEXT NOT NULL DEFAULT '{}',
+      dedupe_key TEXT NOT NULL,
+      progress_delta REAL NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, track_id, source_kind, source_id)
+    );
+
     CREATE TABLE IF NOT EXISTS sealed_contexts (
       sealed_context_id TEXT PRIMARY KEY,
       house_id TEXT,
@@ -378,6 +419,45 @@ function parseJsonColumn(raw, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function getTrackDefinition(trackId = '') {
+  const normalizedTrackId = String(trackId || '').trim();
+  if (!normalizedTrackId) return null;
+  const found = TRACK_DEFINITIONS.find((entry) => entry.trackId === normalizedTrackId);
+  if (!found) return null;
+  return {
+    trackId: found.trackId,
+    title: found.title,
+    targetCount: Number(found.targetCount || 0),
+  };
+}
+
+function listTrackDefinitions() {
+  return TRACK_DEFINITIONS.map((entry) => ({
+    trackId: entry.trackId,
+    title: entry.title,
+    targetCount: Number(entry.targetCount || 0),
+  }));
+}
+
+function mapTrackProgressEventRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    trackProgressEventId: String(row.track_progress_event_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    trackId: String(row.track_id || ''),
+    title: String(row.title || ''),
+    sourceKind: String(row.source_kind || ''),
+    sourceId: String(row.source_id || ''),
+    sourceTraceId: row.source_trace_id ? String(row.source_trace_id) : null,
+    sourceEventId: row.source_event_id ? String(row.source_event_id) : null,
+    sourceRef: parseJsonColumn(row.source_ref_json, {}),
+    dedupeKey: String(row.dedupe_key || ''),
+    progressDelta: Number(row.progress_delta || 0),
+    createdAt: String(row.created_at || ''),
+  };
 }
 
 function mapConfigVersionRow(row) {
@@ -1181,6 +1261,157 @@ function listTrainerResults({
     ORDER BY r.created_at DESC, r.trainer_result_id DESC
   `).all(...args);
   return rows.map(mapTrainerResultRow).filter(Boolean);
+}
+
+function countTrackProgressEventsByDedupe({
+  houseId = '',
+  teamId = '',
+  trackId = '',
+  dedupeKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTrackId = String(trackId || '').trim();
+  const normalizedDedupeKey = String(dedupeKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedTrackId || !normalizedDedupeKey) {
+    return 0;
+  }
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT COUNT(1) AS count
+    FROM track_progress_events
+    WHERE house_id = ?
+      AND team_id = ?
+      AND track_id = ?
+      AND dedupe_key = ?
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedTrackId,
+    normalizedDedupeKey,
+  );
+  return Number(row?.count || 0);
+}
+
+function listTrackProgressEvents({
+  houseId = '',
+  teamId = '',
+  trackId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTrackId = String(trackId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  if (normalizedTrackId) {
+    clauses.push('track_id = ?');
+    args.push(normalizedTrackId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM track_progress_events
+    ${whereSql}
+    ORDER BY created_at ASC, track_id ASC, source_kind ASC, source_id ASC
+  `).all(...args);
+  return rows.map(mapTrackProgressEventRow).filter(Boolean);
+}
+
+function createTrackProgressEvent({
+  trackProgressEventId = '',
+  houseId = '',
+  teamId = '',
+  trackId = '',
+  sourceKind = '',
+  sourceId = '',
+  sourceTraceId = '',
+  sourceEventId = '',
+  sourceRef = null,
+  dedupeKey = '',
+  progressDelta = 1,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedTrackProgressEventId = String(trackProgressEventId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTrackId = String(trackId || '').trim();
+  const normalizedSourceKind = String(sourceKind || '').trim();
+  const normalizedSourceId = String(sourceId || '').trim();
+  const normalizedDedupeKey = String(dedupeKey || '').trim();
+  const normalizedProgressDelta = Number(progressDelta || 0);
+  const track = getTrackDefinition(normalizedTrackId);
+  if (
+    !normalizedTrackProgressEventId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !track
+    || !normalizedSourceKind
+    || !normalizedSourceId
+    || !normalizedDedupeKey
+    || !Number.isFinite(normalizedProgressDelta)
+    || normalizedProgressDelta <= 0
+  ) {
+    throw new Error('TRACK_PROGRESS_EVENT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO track_progress_events (
+      track_progress_event_id,
+      house_id,
+      team_id,
+      track_id,
+      title,
+      source_kind,
+      source_id,
+      source_trace_id,
+      source_event_id,
+      source_ref_json,
+      dedupe_key,
+      progress_delta,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(house_id, team_id, track_id, source_kind, source_id) DO NOTHING
+  `).run(
+    normalizedTrackProgressEventId,
+    normalizedHouseId,
+    normalizedTeamId,
+    track.trackId,
+    track.title,
+    normalizedSourceKind,
+    normalizedSourceId,
+    String(sourceTraceId || '').trim() || null,
+    String(sourceEventId || '').trim() || null,
+    JSON.stringify(sourceRef && typeof sourceRef === 'object' ? sourceRef : {}),
+    normalizedDedupeKey,
+    normalizedProgressDelta,
+    nowIso,
+  );
+  const row = database.prepare(`
+    SELECT *
+    FROM track_progress_events
+    WHERE house_id = ?
+      AND team_id = ?
+      AND track_id = ?
+      AND source_kind = ?
+      AND source_id = ?
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    track.trackId,
+    normalizedSourceKind,
+    normalizedSourceId,
+  );
+  return mapTrackProgressEventRow(row);
 }
 
 function createTrainerResult({
@@ -2048,6 +2279,8 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  countTrackProgressEventsByDedupe,
+  createTrackProgressEvent,
   createTraceArtifact,
   createTrainerJob,
   createTrainerResult,
@@ -2071,6 +2304,7 @@ module.exports = {
   getRunByIdempotency,
   getSealedContextById,
   getTeamConfigBinding,
+  getTrackDefinition,
   listHouseTeamIds,
   getTrainerJobById,
   getTrainerJobByIdempotency,
@@ -2084,6 +2318,8 @@ module.exports = {
   getPlatformTableCounts,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listTrackDefinitions,
+  listTrackProgressEvents,
   listRuns,
   listTrainerJobs,
   listTrainerResults,

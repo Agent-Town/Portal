@@ -42,6 +42,7 @@ test('M19.0 harness exposes deterministic platform counts, fixtures, and worker 
     integration_executions: 0,
     trainer_jobs: 0,
     trainer_results: 0,
+    track_progress_events: 0,
     sealed_contexts: 0,
     sealed_context_violations: 0,
     approvals: 0,

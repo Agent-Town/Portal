@@ -24,6 +24,8 @@ function registerPlatformV1Routes(app, deps) {
     createTraceIntakeRecord,
     createTrainerJob,
     createTrainerResult,
+    countTrackProgressEventsByDedupe,
+    createTrackProgressEvent,
     decodeTraceCursor,
     deriveDeterministicSealId,
     encodeTraceCursor,
@@ -40,6 +42,7 @@ function registerPlatformV1Routes(app, deps) {
     getRunByTraceId,
     getSealedContextById,
     getTeamConfigBinding,
+    getTrackDefinition,
     getTraceIntakeRecord,
     getTrainerJobById,
     getTrainerJobByIdempotency,
@@ -116,6 +119,145 @@ function registerPlatformV1Routes(app, deps) {
       return { allowed: false, reason: 'reader_source_forbidden' };
     }
     return { allowed: true, reason: 'reader_allowed' };
+  }
+
+  function getTrackDuplicateThreshold() {
+    const fixture = deps.getUnifiedPlatformTestFixture('tracks_core_seed') || {};
+    const threshold = Number(fixture?.antiFarming?.duplicateActionThreshold || 1);
+    return Number.isFinite(threshold) && threshold > 0 ? Math.floor(threshold) : 1;
+  }
+
+  function maybeCreateTrackProgressEvent({
+    houseId = '',
+    teamId = '',
+    trackId = '',
+    sourceKind = '',
+    sourceId = '',
+    sourceTraceId = '',
+    sourceEventId = '',
+    sourceRef = null,
+    dedupeKey = '',
+    progressDelta = 1,
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedTrackId = String(trackId || '').trim();
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    const normalizedSourceId = String(sourceId || '').trim();
+    const normalizedDedupeKey = String(dedupeKey || '').trim();
+    if (
+      !normalizedHouseId
+      || !normalizedTeamId
+      || !normalizedTrackId
+      || !normalizedSourceKind
+      || !normalizedSourceId
+      || !normalizedDedupeKey
+      || !getTrackDefinition(normalizedTrackId)
+    ) {
+      return null;
+    }
+    if (countTrackProgressEventsByDedupe({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      trackId: normalizedTrackId,
+      dedupeKey: normalizedDedupeKey,
+    }) >= getTrackDuplicateThreshold()) {
+      return null;
+    }
+    return createTrackProgressEvent({
+      trackProgressEventId: `trk_${randomHex(10)}`,
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      trackId: normalizedTrackId,
+      sourceKind: normalizedSourceKind,
+      sourceId: normalizedSourceId,
+      sourceTraceId,
+      sourceEventId,
+      sourceRef,
+      dedupeKey: normalizedDedupeKey,
+      progressDelta,
+      nowIso: nowIso(),
+    });
+  }
+
+  function maybeCreateTraceTrackProgressEvent(run, event) {
+    const experienceId = String(run?.experienceId || '').trim();
+    let trackId = '';
+    if (experienceId === 'poker.season') {
+      trackId = 'track_poker_mastery';
+    } else if (experienceId === 'web.agent') {
+      trackId = 'track_web_ops';
+    } else {
+      return null;
+    }
+    const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
+    const payloadSchema = typeof payload?.payloadSchema === 'string' ? payload.payloadSchema.trim() : '';
+    const payloadBody = payload?.payload && typeof payload.payload === 'object' && !Array.isArray(payload.payload)
+      ? payload.payload
+      : {};
+    const dedupeKey = sha256PrefixedHex(stableJsonStringify({
+      trackId,
+      payloadSchema,
+      payload: payloadBody,
+      traceId: String(run?.traceId || '').trim(),
+    }));
+    return maybeCreateTrackProgressEvent({
+      houseId: run?.houseId,
+      teamId: run?.teamId,
+      trackId,
+      sourceKind: 'trace_event',
+      sourceId: event?.eventId,
+      sourceTraceId: run?.traceId,
+      sourceEventId: event?.eventId,
+      sourceRef: {
+        experienceId,
+        runId: run?.runId || null,
+        traceId: run?.traceId || null,
+        eventKind: event?.eventKind || null,
+        payloadSchema: payloadSchema || null,
+      },
+      dedupeKey,
+      progressDelta: 1,
+    });
+  }
+
+  function maybeCreateBuilderTrackProgressEvent(config) {
+    const configVersionId = String(config?.configVersionId || '').trim();
+    if (!configVersionId) return null;
+    return maybeCreateTrackProgressEvent({
+      houseId: config?.houseId,
+      teamId: config?.teamId,
+      trackId: 'track_builder',
+      sourceKind: 'config_version',
+      sourceId: configVersionId,
+      sourceRef: {
+        configVersionId,
+        configHash: config?.configHash || null,
+        experienceId: config?.experienceId || null,
+      },
+      dedupeKey: configVersionId,
+      progressDelta: 1,
+    });
+  }
+
+  function maybeCreateAnalystTrackProgressEvent(job, result) {
+    const trainerResultId = String(result?.trainerResultId || '').trim();
+    if (!trainerResultId) return null;
+    return maybeCreateTrackProgressEvent({
+      houseId: job?.houseId,
+      teamId: job?.teamId,
+      trackId: 'track_analyst',
+      sourceKind: 'trainer_result',
+      sourceId: trainerResultId,
+      sourceRef: {
+        trainerJobId: job?.trainerJobId || null,
+        trainerResultId,
+        jobKind: job?.jobKind || null,
+        linkedConfigVersionId: result?.linkedConfigVersionId || null,
+      },
+      dedupeKey: trainerResultId,
+      progressDelta: 1,
+    });
   }
 
   function buildRedactedTraceEvent(event, {
@@ -332,6 +474,7 @@ function registerPlatformV1Routes(app, deps) {
       },
       nowIso: now,
     });
+    maybeCreateBuilderTrackProgressEvent(config);
     const componentVersions = replaceConfigComponentVersions({
       configVersionId,
       components: resolvedComponentsPayload.componentVersions.map((component, index) => ({
@@ -896,6 +1039,7 @@ function registerPlatformV1Routes(app, deps) {
         },
         createdAt: nowIso(),
       });
+      maybeCreateTraceTrackProgressEvent(run, latestEvent);
       accepted += 1;
     }
 
@@ -1142,6 +1286,7 @@ function registerPlatformV1Routes(app, deps) {
         approvalNeeded: resultSeed.approvalNeeded,
         nowIso: nowIso(),
       });
+      maybeCreateAnalystTrackProgressEvent(job, result);
       job = updateTrainerJobStatus({
         trainerJobId: job.trainerJobId,
         status: 'succeeded',

@@ -886,6 +886,42 @@ Response fields:
 - `data.staffAgents[].officeId`
 - `data.modelVersion`
 
+### GET `/api/platform/tracks` (human)
+Returns deterministic track progress and durable reward-hook references for the currently attached House and active team.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.tracks[]`
+- `data.tracks[].trackId`
+- `data.tracks[].title`
+- `data.tracks[].progressCount`
+- `data.tracks[].targetCount`
+- `data.tracks[].progress`
+- `data.tracks[].sourceKinds[]`
+- `data.tracks[].latestSourceId`
+- `data.tracks[].latestSourceTraceId`
+- `data.events[]`
+- `data.events[].trackProgressEventId`
+- `data.events[].trackId`
+- `data.events[].title`
+- `data.events[].sourceKind`
+- `data.events[].sourceId`
+- `data.events[].sourceTraceId`
+- `data.events[].sourceEventId`
+- `data.events[].sourceRef`
+- `data.events[].progressDelta`
+- `data.events[].dedupeKey`
+- `data.events[].createdAt`
+- `data.antiFarming.duplicateActionThreshold`
+- `data.antiFarming.mode`
+- `data.emptyStateText`
+
 ### GET `/api/platform/trainer` (human)
 Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
 
