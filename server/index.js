@@ -5967,9 +5967,32 @@ async function syncPokerMirrorFromOperator({ seasonId = '' } = {}) {
 
     if (season?.latestLeaderboardSnapshot?.snapshotId) {
       const history = await client.listLeaderboardSnapshots(season.seasonId);
-      const snapshotItems = Array.isArray(history?.items) && history.items.length
-        ? history.items
-        : [await client.getLatestLeaderboard(season.seasonId)].filter(Boolean);
+      const operatorHistory = listPokerOperatorLeaderboardSnapshotHistory(season.seasonId);
+      const snapshotMap = new Map();
+      for (const snapshot of Array.isArray(history?.items) ? history.items : []) {
+        if (!snapshot?.snapshotId) continue;
+        snapshotMap.set(snapshot.snapshotId, snapshot);
+      }
+      for (const snapshot of Array.isArray(operatorHistory?.items) ? operatorHistory.items : []) {
+        if (!snapshot?.snapshotId) continue;
+        if (!snapshotMap.has(snapshot.snapshotId)) {
+          snapshotMap.set(snapshot.snapshotId, snapshot);
+        }
+      }
+      if (!snapshotMap.size) {
+        const latest = await client.getLatestLeaderboard(season.seasonId);
+        if (latest?.snapshotId) {
+          snapshotMap.set(latest.snapshotId, latest);
+        }
+      }
+      const snapshotItems = Array.from(snapshotMap.values()).sort((left, right) => {
+        const leftTime = Date.parse(String(left?.createdAt || ''));
+        const rightTime = Date.parse(String(right?.createdAt || ''));
+        if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+          return rightTime - leftTime;
+        }
+        return String(right?.snapshotId || '').localeCompare(String(left?.snapshotId || ''));
+      });
       for (const snapshot of snapshotItems) {
         if (!snapshot?.snapshotId) continue;
         upsertPokerLeaderboardSnapshot({
