@@ -235,32 +235,48 @@ function setHouseEconomyError(msg) {
   if (node) node.textContent = msg || '';
 }
 
-function setHouseEconomyVerifyEnabled(enabled) {
-  const streamIdInput = el('houseEconomyStreamId');
-  const minLockInput = el('houseEconomyMinLockAtomic');
-  const verifyBtn = el('houseEconomyVerifyBtn');
-  if (streamIdInput) streamIdInput.disabled = !enabled;
-  if (minLockInput) minLockInput.disabled = !enabled;
-  if (verifyBtn) verifyBtn.disabled = !enabled;
+function setHouseEconomyExpandState(data = null) {
+  const btn = el('houseEconomyExpandBtn');
+  if (!btn) return;
+  const footprint = data?.footprint || null;
+  const nextCost = Number(footprint?.nextExpansionCostOil || 0);
+  const balance = Number(data?.oilBalance?.balance || 0);
+  if (!footprint?.canExpand || nextCost <= 0) {
+    btn.textContent = 'Footprint maxed';
+    btn.disabled = true;
+    return;
+  }
+  btn.textContent = `Expand footprint (${nextCost} OIL)`;
+  btn.disabled = !(currentHouseId() && KauthKey && walletAddr && balance >= nextCost);
 }
 
 function renderHouseEconomySummary(data = null) {
   const node = el('houseEconomySummary');
   if (!node) return;
+  const footprint = data?.footprint || null;
   const verification = data?.verification || null;
-  const oilBalance = Number(data?.oilBalance?.balance || 0);
+  const oilBalance = data?.oilBalance && typeof data.oilBalance.balance === 'number'
+    ? Number(data.oilBalance.balance || 0)
+    : null;
   const walletSubject = String(data?.walletSubject || walletAddr || '').trim();
-  const snapshotEvents = Array.isArray(data?.snapshotEvents) ? data.snapshotEvents : [];
-  const creditedCount = snapshotEvents.filter((event) => String(event?.status || '') === 'credited').length;
   const lines = [
-    `House: ${verification?.houseId || currentHouseId() || 'pending'}`,
+    `House: ${data?.houseId || verification?.houseId || currentHouseId() || 'pending'}`,
     `Wallet: ${verification?.address || walletSubject || 'pending'}`,
-    `OIL balance: ${oilBalance}`,
+    `OIL balance: ${oilBalance == null ? 'pending' : oilBalance}`,
   ];
+  if (footprint) {
+    lines.push(`Footprint: ${Number(footprint.tiles || 1)}/${Number(footprint.maxTiles || 1)} tiles`);
+    if (footprint.canExpand && Number(footprint.nextExpansionCostOil || 0) > 0) {
+      lines.push(`Next expansion: ${Number(footprint.nextExpansionCostOil || 0)} OIL`);
+    } else {
+      lines.push('Footprint is at the current maximum size.');
+    }
+  } else {
+    lines.push('Footprint: unlock this house to inspect the current size.');
+  }
   if (verification) {
     lines.push(`Verified stake: ${verification.streamId || 'pending'} (${verification.tokenSymbol || '$AGENTTOWN'})`);
     lines.push(`Verified amount: ${String(verification.verifiedAmountAtomic || '0')} atomic`);
-    lines.push(`Current hour credited snapshots: ${creditedCount}/${snapshotEvents.length || 15}`);
   } else {
     lines.push('No verified Streamflow lock is bound to this house wallet yet.');
   }
@@ -275,39 +291,92 @@ function describeHouseEconomyError(error) {
   if (code === 'HOUSE_REQUIRED') {
     return 'Attach this wallet session to a house before verifying a Streamflow lock.';
   }
+  if (code === 'HOUSE_AUTH_NOT_READY' || code === 'HOUSE_AUTH_REQUIRED') {
+    return 'Unlock this house before spending OIL.';
+  }
+  if (code === 'OIL_BALANCE_TOO_LOW') {
+    const required = Number(error?.data?.requiredOil || 0);
+    const balance = Number(error?.data?.balance || 0);
+    if (required > 0 || balance >= 0) {
+      return `Not enough OIL for the next footprint expansion (${balance}/${required}).`;
+    }
+    return 'Not enough OIL for the next footprint expansion.';
+  }
+  if (code === 'HOUSE_FOOTPRINT_MAXED') {
+    return 'This house is already at the current maximum footprint.';
+  }
+  if (code === 'STREAMFLOW_STAKE_BOUND_TO_OTHER_HOUSE') {
+    return 'The connected staked wallet is verified for a different house.';
+  }
   return String(error?.data?.error?.message || code || 'Unable to load house economy state.');
 }
 
 async function refreshHouseEconomyPanel({ preserveStatus = false } = {}) {
-  const streamIdInput = el('houseEconomyStreamId');
-  if (streamIdInput && !streamIdInput.value) {
-    streamIdInput.value = readHouseEconomyStreamId();
-  }
   setHouseEconomyError('');
-  if (!walletAddr) {
-    renderHouseEconomySummary(null);
-    setHouseEconomyVerifyEnabled(false);
-    if (!preserveStatus) setHouseEconomyStatus('Connect the house wallet to inspect the bound Streamflow stake and current OIL.');
+  const houseId = currentHouseId();
+  if (!houseId) {
+    renderHouseEconomySummary({
+      houseId: null,
+      walletSubject: walletAddr || '',
+      footprint: null,
+      oilBalance: null,
+      verification: null,
+    });
+    setHouseEconomyExpandState(null);
+    if (!preserveStatus) setHouseEconomyStatus('Open a house to inspect the bound stake, OIL balance, and footprint.');
     return;
   }
-  setHouseEconomyVerifyEnabled(true);
+  if (!KauthKey) {
+    try {
+      const payload = walletAddr ? await api('/api/oil/balance') : {};
+      const data = payload?.data || payload || {};
+      renderHouseEconomySummary({
+        houseId,
+        walletSubject: data?.walletSubject || walletAddr || '',
+        verification: data?.verification || null,
+        oilBalance: data?.oilBalance || null,
+        footprint: null,
+      });
+      setHouseEconomyExpandState(null);
+      if (!preserveStatus) {
+        setHouseEconomyStatus(
+          data?.verification
+            ? 'Verified lock detected. Unlock this house to spend OIL on footprint growth.'
+            : 'Unlock this house to inspect footprint details. Verify the staked wallet in Centaur Poker to start OIL accrual.'
+        );
+      }
+    } catch (error) {
+      renderHouseEconomySummary({
+        houseId,
+        walletSubject: walletAddr || '',
+        footprint: null,
+        oilBalance: null,
+        verification: null,
+      });
+      setHouseEconomyExpandState(null);
+      if (!preserveStatus) setHouseEconomyStatus('Unlock this house to inspect the bound stake, OIL balance, and footprint.');
+      setHouseEconomyError(describeHouseEconomyError(error));
+    }
+    return;
+  }
   try {
-    const payload = await api('/api/oil/balance');
-    const data = payload?.data || payload || {};
+    const payload = await houseApi(houseId, `/api/house/${encodeURIComponent(houseId)}/economy`);
+    const data = payload?.economy || payload?.data || payload || {};
     if (data?.verification?.streamId) {
       saveHouseEconomyStreamId(data.verification.streamId);
-      if (streamIdInput && !streamIdInput.value) streamIdInput.value = data.verification.streamId;
     }
     renderHouseEconomySummary(data);
+    setHouseEconomyExpandState(data);
     if (!preserveStatus) {
       setHouseEconomyStatus(
         data?.verification
-          ? 'Verified Streamflow lock is active for this house wallet.'
+          ? 'Verified Streamflow lock is active for this house wallet. OIL can fund Centaur Poker or footprint growth.'
           : 'No verified lock yet. Use Centaur Poker to verify the staked wallet and start OIL accrual.'
       );
     }
   } catch (error) {
     renderHouseEconomySummary(null);
+    setHouseEconomyExpandState(null);
     if (!preserveStatus) setHouseEconomyStatus('');
     setHouseEconomyError(describeHouseEconomyError(error));
   }
@@ -3970,67 +4039,33 @@ async function init() {
     }
   });
 
-  const houseEconomyStreamId = el('houseEconomyStreamId');
-  if (houseEconomyStreamId) {
-    houseEconomyStreamId.value = readHouseEconomyStreamId();
-    houseEconomyStreamId.addEventListener('input', () => {
-      saveHouseEconomyStreamId(houseEconomyStreamId.value);
+  const houseEconomyExpandBtn = el('houseEconomyExpandBtn');
+  if (houseEconomyExpandBtn) {
+    houseEconomyExpandBtn.addEventListener('click', async () => {
+      const houseId = currentHouseId();
+      if (!houseId || !KauthKey) {
+        setHouseEconomyError('Unlock this house before spending OIL.');
+        return;
+      }
       setHouseEconomyError('');
-    });
-  }
-
-  const houseEconomyVerifyForm = el('houseEconomyVerifyForm');
-  if (houseEconomyVerifyForm) {
-    houseEconomyVerifyForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      setHouseEconomyError('');
-      setHouseEconomyStatus('');
+      setHouseEconomyStatus('Expanding house footprint...');
       try {
-        if (!walletAddr) await connectWallet();
-        const streamId = String(el('houseEconomyStreamId')?.value || '').trim();
-        const minLockAmountAtomic = String(el('houseEconomyMinLockAtomic')?.value || '').trim() || '0';
-        if (!streamId) throw new Error('STREAMFLOW_LOCK_ID_REQUIRED');
-        saveHouseEconomyStreamId(streamId);
-        setHouseEconomyStatus('Requesting Streamflow verification challenge...');
-        const challengePayload = await api('/api/oil/streamflow/challenge', {
-          method: 'POST',
-          body: JSON.stringify({
-            streamId,
-            minLockAmountAtomic,
-          }),
-        });
-        const challenge = challengePayload?.data?.challenge || challengePayload?.challenge || null;
-        const nonce = String(challenge?.nonce || '').trim();
-        const message = String(challenge?.message || '').trim();
-        if (!nonce || !message) throw new Error('STREAMFLOW_CHALLENGE_INVALID');
-        setHouseEconomyStatus(`Signing Streamflow challenge with ${walletAddr}...`);
-        const signature = b64(await signMessageBytes(message));
-        await api('/api/oil/streamflow/verify', {
-          method: 'POST',
-          body: JSON.stringify({
-            streamId,
-            minLockAmountAtomic,
-            nonce,
-            signature,
-          }),
-        });
-        setHouseEconomyStatus('Streamflow lock verified. OIL accrual is active for this house wallet.');
-        await refreshHouseEconomyPanel({ preserveStatus: true });
+        const payload = await houseApi(
+          houseId,
+          `/api/house/${encodeURIComponent(houseId)}/economy/footprint/expand`,
+          {
+            method: 'POST',
+            body: JSON.stringify({}),
+          }
+        );
+        const data = payload?.economy || payload?.data || payload || {};
+        renderHouseEconomySummary(data);
+        setHouseEconomyExpandState(data);
+        setHouseEconomyStatus(`Footprint expanded to ${Number(data?.footprint?.tiles || 0)} tiles.`);
       } catch (error) {
-        if (String(error?.message || '') === 'STREAMFLOW_LOCK_ID_REQUIRED') {
-          setHouseEconomyError('Enter the Streamflow lock ID first.');
-          return;
-        }
-        if (String(error?.message || '') === 'NO_SOLANA_WALLET') {
-          setHouseEconomyError('No Privy-connected Solana wallet found.');
-          return;
-        }
-        if (String(error?.message || '') === 'NO_SOLANA_SIGN') {
-          setHouseEconomyError('Wallet does not support message signing.');
-          return;
-        }
         setHouseEconomyStatus('');
         setHouseEconomyError(describeHouseEconomyError(error));
+        await refreshHouseEconomyPanel({ preserveStatus: true });
       }
     });
   }

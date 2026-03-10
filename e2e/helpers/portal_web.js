@@ -1,3 +1,4 @@
+const { houseAuthHeadersFromKeyB64 } = require('./phase1');
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
 async function resetPortalWebState(request) {
@@ -118,6 +119,49 @@ async function getOilBalance(request, {
   return body;
 }
 
+async function getHouseEconomy(request, {
+  houseId,
+  houseAuthKey = '',
+  walletAddress = '',
+  asOf = '',
+} = {}) {
+  const path = `/api/house/${encodeURIComponent(houseId)}/economy${asOf ? `?asOf=${encodeURIComponent(asOf)}` : ''}`;
+  const headers = {
+    ...houseAuthHeadersFromKeyB64(houseId, 'GET', `/api/house/${encodeURIComponent(houseId)}/economy`, '', houseAuthKey),
+    ...(walletAddress ? { 'x-wallet-solana-address': walletAddress } : {}),
+  };
+  const resp = await request.get(path, { headers });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`HOUSE_ECONOMY_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
+async function expandHouseFootprint(request, {
+  houseId,
+  houseAuthKey = '',
+  walletAddress = '',
+  asOf = '',
+} = {}) {
+  const path = `/api/house/${encodeURIComponent(houseId)}/economy/footprint/expand`;
+  const bodyJson = asOf ? JSON.stringify({ asOf }) : '{}';
+  const headers = {
+    'content-type': 'application/json',
+    ...houseAuthHeadersFromKeyB64(houseId, 'POST', path, bodyJson, houseAuthKey),
+    ...(walletAddress ? { 'x-wallet-solana-address': walletAddress } : {}),
+  };
+  const resp = await request.post(path, {
+    headers,
+    data: asOf ? { asOf } : {},
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`HOUSE_FOOTPRINT_EXPAND_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
 async function processOilSnapshots(request, {
   walletSubject,
   asOf,
@@ -213,9 +257,11 @@ module.exports = {
   bindMockSolanaWallet,
   createWebSession,
   getPokerSubmissionRow,
+  getHouseEconomy,
   getPortalState,
   getTableCount,
   getOilBalance,
+  expandHouseFootprint,
   processOilSnapshots,
   resetPortalWebState,
   resetToken,

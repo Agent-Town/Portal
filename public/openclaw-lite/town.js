@@ -13,6 +13,7 @@ function renderHouseTile(h) {
   const displayName = h.housePublicJson?.displayName || "House";
   const tagline = h.housePublicJson?.tagline || "";
   const updatedAt = h.updatedAt || null;
+  const footprintTiles = Number(h?.footprint?.tiles || 1) || 1;
   const tile = document.createElement("div");
   tile.className = "panel";
   tile.style.margin = "0";
@@ -39,7 +40,7 @@ function renderHouseTile(h) {
   meta.className = "small";
   meta.style.color = "var(--muted)";
   meta.style.marginTop = "10px";
-  meta.textContent = updatedAt ? `Updated ${updatedAt}` : "";
+  meta.textContent = updatedAt ? `${footprintTiles} tile${footprintTiles === 1 ? "" : "s"} \xB7 Updated ${updatedAt}` : `${footprintTiles} tile${footprintTiles === 1 ? "" : "s"}`;
   const open = document.createElement("a");
   open.className = "btn";
   open.href = `/house?house=${encodeURIComponent(houseId)}`;

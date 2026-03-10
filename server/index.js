@@ -117,6 +117,7 @@ const { registerRegistryRoutes } = require('./registry_routes');
 const { registerPlatformV1Routes } = require('./platform_v1_routes');
 const { registerPokerRoutes } = require('./poker_routes');
 const { createPokerOilScheduler } = require('./poker_oil_scheduler');
+const { processOilSnapshotsForVerification } = require('./poker_oil');
 const {
   createTrainerJob,
   createTrainerResult,
@@ -1581,6 +1582,15 @@ const ONBOARDING_STEP_BRAIN = 'brain';
 const ONBOARDING_STEP_SIGIL = 'sigil';
 const ONBOARDING_STEP_CEREMONY = 'ceremony';
 const ONBOARDING_STEP_DONE = 'done';
+const HOUSE_FOOTPRINT_BASE_TILES = 1;
+const HOUSE_FOOTPRINT_MAX_TILES = Math.max(
+  HOUSE_FOOTPRINT_BASE_TILES,
+  Number.parseInt(process.env.HOUSE_FOOTPRINT_MAX_TILES || '', 10) || 9
+);
+const HOUSE_FOOTPRINT_BASE_COST_OIL = Math.max(
+  100,
+  Number.parseInt(process.env.HOUSE_FOOTPRINT_BASE_COST_OIL || '', 10) || 500
+);
 
 function normalizeOnboardingStep(value) {
   switch (String(value || '').trim()) {
@@ -3523,6 +3533,100 @@ function serializePublicMedia(house) {
   };
 }
 
+function normalizeHouseFootprintState(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  const parsedTiles = Number.parseInt(String(raw.tiles ?? ''), 10);
+  const parsedSpentOil = Number.parseInt(String(raw.spentOil ?? ''), 10);
+  return {
+    tiles: Number.isFinite(parsedTiles)
+      ? Math.max(HOUSE_FOOTPRINT_BASE_TILES, Math.min(HOUSE_FOOTPRINT_MAX_TILES, parsedTiles))
+      : HOUSE_FOOTPRINT_BASE_TILES,
+    spentOil: Number.isFinite(parsedSpentOil) ? Math.max(0, parsedSpentOil) : 0,
+    updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
+  };
+}
+
+function ensureHouseEconomyState(house) {
+  if (!house || typeof house !== 'object') {
+    return {
+      footprint: normalizeHouseFootprintState(null),
+      updatedAt: null,
+    };
+  }
+  if (!house.economy || typeof house.economy !== 'object' || Array.isArray(house.economy)) {
+    house.economy = {};
+  }
+  house.economy.footprint = normalizeHouseFootprintState(house.economy.footprint);
+  house.economy.updatedAt = typeof house.economy.updatedAt === 'string'
+    ? house.economy.updatedAt
+    : house.economy.footprint.updatedAt;
+  return house.economy;
+}
+
+function getNextHouseFootprintExpansionCostOil(tiles) {
+  const normalizedTiles = normalizeHouseFootprintState({ tiles }).tiles;
+  if (normalizedTiles >= HOUSE_FOOTPRINT_MAX_TILES) return null;
+  return normalizedTiles * HOUSE_FOOTPRINT_BASE_COST_OIL;
+}
+
+function serializeHouseEconomy(house, {
+  walletSubject = null,
+  oilBalance = null,
+  verification = null,
+} = {}) {
+  const economy = ensureHouseEconomyState(house);
+  const footprint = normalizeHouseFootprintState(economy.footprint);
+  const nextExpansionCostOil = getNextHouseFootprintExpansionCostOil(footprint.tiles);
+  return {
+    houseId: house?.id || null,
+    walletSubject: walletSubject || null,
+    verification: verification || null,
+    oilBalance: oilBalance || null,
+    footprint: {
+      tiles: footprint.tiles,
+      spentOil: footprint.spentOil,
+      baseTiles: HOUSE_FOOTPRINT_BASE_TILES,
+      maxTiles: HOUSE_FOOTPRINT_MAX_TILES,
+      nextExpansionCostOil,
+      canExpand: nextExpansionCostOil !== null,
+    },
+    updatedAt: economy.updatedAt || footprint.updatedAt || house?.createdAt || null,
+  };
+}
+
+function deriveTownGridDisplayName(house) {
+  const profile = house?.onboarding?.profile && typeof house.onboarding.profile === 'object'
+    ? house.onboarding.profile
+    : {};
+  const humanName = normalizeTownhallName(profile.humanName || '');
+  const agentName = normalizeTownhallName(profile.agentName || '');
+  if (humanName && agentName) return `${humanName} + ${agentName}`;
+  if (humanName) return humanName;
+  if (agentName) return agentName;
+  const fallbackId = typeof house?.id === 'string' ? house.id.trim() : '';
+  return fallbackId ? `House ${fallbackId.slice(0, 6)}` : 'House';
+}
+
+function deriveTownGridTagline(house) {
+  const footprint = serializeHouseEconomy(house).footprint;
+  return footprint.tiles === 1
+    ? '1 tile claimed'
+    : `${footprint.tiles} tiles claimed`;
+}
+
+function serializeTownGridHouse(house) {
+  return {
+    houseId: house?.id || null,
+    updatedAt: house?.economy?.updatedAt || house?.createdAt || null,
+    housePublicJson: {
+      displayName: deriveTownGridDisplayName(house),
+      tagline: deriveTownGridTagline(house),
+    },
+    publicMedia: serializePublicMedia(house),
+    footprint: serializeHouseEconomy(house).footprint,
+  };
+}
+
 function isRecordObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -4249,14 +4353,18 @@ registerPokerRoutes(app, {
   verifySolanaSignature,
 });
 
+const pokerOilProcessingDeps = {
+  createOilLedgerEntry,
+  getOilSnapshotEventByVerificationAndScheduledFor,
+  nowIso,
+  upsertOilSnapshotEvent,
+  upsertStreamflowVerification,
+};
+
 const pokerOilScheduler = createPokerOilScheduler({
   deps: {
-    createOilLedgerEntry,
-    getOilSnapshotEventByVerificationAndScheduledFor,
+    ...pokerOilProcessingDeps,
     listActiveStreamflowVerifications,
-    nowIso,
-    upsertOilSnapshotEvent,
-    upsertStreamflowVerification,
   },
 });
 
@@ -11164,6 +11272,114 @@ app.get('/api/house/:id/rewards', (req, res) => {
   res.json({ ok: true, ...summary });
 });
 
+app.get('/api/house/:id/economy', async (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const session = ensureHumanSession(req, res);
+  const walletBinding = resolvePrimaryWalletSubject(session, req);
+  let verification = null;
+  let oilBalance = null;
+  let ledgerEntries = [];
+
+  if (walletBinding?.walletSubject) {
+    const candidate = getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
+    if (candidate && candidate.houseId === house.id) {
+      await processOilSnapshotsForVerification(pokerOilProcessingDeps, candidate, { asOf: req.query?.asOf });
+      verification = getStreamflowVerificationById(candidate.verificationId) || candidate;
+      oilBalance = computeOilBalance(walletBinding.walletSubject);
+      ledgerEntries = listOilLedgerEntriesByWalletSubject(walletBinding.walletSubject, { limit: 25 });
+    }
+  }
+
+  res.json({
+    ok: true,
+    economy: serializeHouseEconomy(house, {
+      walletSubject: walletBinding?.walletSubject || null,
+      oilBalance,
+      verification,
+    }),
+    ledgerEntries,
+  });
+});
+
+app.post('/api/house/:id/economy/footprint/expand', express.json({ limit: '64kb' }), async (req, res) => {
+  const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
+  if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
+  const store = readStore();
+  const house = store.houses.find((r) => r.id === houseId);
+  if (!house) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+  const auth = verifyHouseAuth(req, house);
+  if (!auth.ok) return res.status(401).json({ ok: false, error: auth.error });
+
+  const session = ensureHumanSession(req, res);
+  const walletBinding = resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding?.walletSubject || walletBinding.submitterWallet?.chain !== 'solana') {
+    return res.status(409).json({ ok: false, error: 'SOLANA_WALLET_REQUIRED' });
+  }
+
+  const verification = getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
+  if (!verification) {
+    return res.status(409).json({ ok: false, error: 'STREAMFLOW_VERIFICATION_REQUIRED' });
+  }
+  if (verification.houseId !== house.id) {
+    return res.status(409).json({ ok: false, error: 'STREAMFLOW_STAKE_BOUND_TO_OTHER_HOUSE' });
+  }
+
+  await processOilSnapshotsForVerification(pokerOilProcessingDeps, verification, { asOf: req.body?.asOf });
+  const balance = computeOilBalance(walletBinding.walletSubject);
+  const economy = serializeHouseEconomy(house);
+  const nextCost = Number(economy.footprint.nextExpansionCostOil || 0);
+  if (!economy.footprint.canExpand || nextCost <= 0) {
+    return res.status(409).json({ ok: false, error: 'HOUSE_FOOTPRINT_MAXED' });
+  }
+  if (balance.balance < nextCost) {
+    return res.status(409).json({
+      ok: false,
+      error: 'OIL_BALANCE_TOO_LOW',
+      requiredOil: nextCost,
+      balance: balance.balance,
+    });
+  }
+
+  const houseEconomy = ensureHouseEconomyState(house);
+  const footprint = normalizeHouseFootprintState(houseEconomy.footprint);
+  const nextTiles = Math.min(HOUSE_FOOTPRINT_MAX_TILES, footprint.tiles + 1);
+  const updatedAt = nowIso();
+  houseEconomy.footprint = {
+    tiles: nextTiles,
+    spentOil: footprint.spentOil + nextCost,
+    updatedAt,
+  };
+  houseEconomy.updatedAt = updatedAt;
+  writeStore(store);
+
+  createOilLedgerEntry({
+    walletSubject: walletBinding.walletSubject,
+    houseId: house.id,
+    verificationId: verification.verificationId,
+    entryKind: 'house_footprint_expand',
+    direction: 'debit',
+    amount: nextCost,
+    memo: `House footprint expanded to ${nextTiles} tiles`,
+  });
+
+  const nextBalance = computeOilBalance(walletBinding.walletSubject);
+  res.json({
+    ok: true,
+    economy: serializeHouseEconomy(house, {
+      walletSubject: walletBinding.walletSubject,
+      oilBalance: nextBalance,
+      verification: getStreamflowVerificationById(verification.verificationId) || verification,
+    }),
+  });
+});
+
 app.get('/api/house/:id/public-media/image', (req, res) => {
   const houseId = typeof req.params?.id === 'string' ? req.params.id.trim() : '';
   if (!houseId) return res.status(400).json({ ok: false, error: 'MISSING_HOUSE_ID' });
@@ -11243,6 +11459,20 @@ app.post('/api/house/:id/public-media', (req, res) => {
   upsertHouseMediaSlot(house, 'shareHero', nextSlot);
   writeStore(store);
   res.json({ ok: true, publicMedia: serializePublicMedia(house), media: serializeHouseMedia(house) });
+});
+
+app.get('/api/town/grid', (_req, res) => {
+  const store = readStore();
+  const houses = store.houses
+    .map((house) => serializeTownGridHouse(house))
+    .sort((a, b) => {
+      const byTiles = Number(b?.footprint?.tiles || 0) - Number(a?.footprint?.tiles || 0);
+      if (byTiles) return byTiles;
+      const byUpdated = Date.parse(String(b?.updatedAt || '')) - Date.parse(String(a?.updatedAt || ''));
+      if (Number.isFinite(byUpdated) && byUpdated) return byUpdated;
+      return String(a?.houseId || '').localeCompare(String(b?.houseId || ''));
+    });
+  res.json({ ok: true, houses });
 });
 
 app.get('/api/house/:id/agent-state', (req, res) => {

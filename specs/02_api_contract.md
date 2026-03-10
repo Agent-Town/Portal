@@ -485,6 +485,59 @@ Response fields:
 - `data.snapshotEvents[]`
 - `data.ledgerEntries[]`
 
+### GET `/api/house/:id/economy`
+Returns the current House economy view for an unlocked house.
+
+Response fields:
+- `economy.houseId`
+- `economy.walletSubject`
+- `economy.verification`
+- `economy.oilBalance`
+- `economy.footprint.tiles`
+- `economy.footprint.maxTiles`
+- `economy.footprint.nextExpansionCostOil`
+- `ledgerEntries[]`
+
+Failure codes:
+- `MISSING_HOUSE_ID`
+- `NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+
+### POST `/api/house/:id/economy/footprint/expand`
+Debits offchain OIL from the verified bound wallet and increases the house footprint by one tile.
+
+Response fields:
+- `economy.houseId`
+- `economy.oilBalance`
+- `economy.footprint.tiles`
+- `economy.footprint.nextExpansionCostOil`
+
+Failure codes:
+- `MISSING_HOUSE_ID`
+- `NOT_FOUND`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `SOLANA_WALLET_REQUIRED`
+- `STREAMFLOW_VERIFICATION_REQUIRED`
+- `STREAMFLOW_STAKE_BOUND_TO_OTHER_HOUSE`
+- `HOUSE_FOOTPRINT_MAXED`
+- `OIL_BALANCE_TOO_LOW`
+
+### GET `/api/town/grid`
+Returns the public town projection for published house cards and footprint size.
+
+Response fields:
+- `houses[].houseId`
+- `houses[].updatedAt`
+- `houses[].housePublicJson.displayName`
+- `houses[].housePublicJson.tagline`
+- `houses[].publicMedia`
+- `houses[].footprint.tiles`
+- `houses[].footprint.maxTiles`
+
 ### POST `/api/poker/centaur/tournaments/:tournamentId/join`
 Enters the current wallet + house into a centaur tournament and debits the tournament buy-in from the offchain OIL ledger.
 
