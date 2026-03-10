@@ -462,6 +462,7 @@ Goal:
   - all reserved completion specs are green
   - the implementation matches the scope and non-goals in Phase 22
   - there is still one implementation path, not several conflicting ones
+  - one deterministic seeded journey can be replayed twice with the same ordered checkpoints
 - Suggested tests:
   - `e2e/194_unified_completion_full_smoke.spec.js`
 

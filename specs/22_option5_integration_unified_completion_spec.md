@@ -466,7 +466,9 @@ The joined-completion program is done when all of the following are true:
 4. Poker has run detail, snapshot history, Portal-side hash computation, Registry proof linkage, Browser Class wiring where applicable, and config pinning on shared-platform runs,
 5. trainer results and seal behavior are materially real rather than mostly scaffold,
 6. House can expose the completed shared surfaces without breaking modal or worker continuity,
-7. there is still only one forward implementation plan.
+7. there is still only one forward implementation plan,
+8. one deterministic final smoke can exercise House, Web, Registry, Poker, trainer, and tracks from the same shell without hidden manual steps,
+9. the Phase 22 through Phase 25 doc set remains aligned on the same non-Werewolf implementation path.
 
 # 10. Final Direction
 

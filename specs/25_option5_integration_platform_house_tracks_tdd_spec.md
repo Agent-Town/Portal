@@ -378,6 +378,12 @@ GREEN gate:
 2. final smoke is deterministic and offline-safe,
 3. the Phase 22 through Phase 25 doc set is internally consistent.
 
+Implementation notes:
+
+1. The final smoke replays one seeded journey twice and compares the ordered checkpoints exactly.
+2. The journey must stay inside `/app` modal or House-shell navigation rules whenever user-facing surfaces open.
+3. The final checkpoint list must expose proof, artifact, and track visibility before the run can be considered complete.
+
 ## 6. Bundle Gate
 
 This Phase 25 program is complete only when:
