@@ -210,6 +210,9 @@ Response fields:
 - `data.registryEntityId`
 - `data.entity`
 - `data.proofCards[]`
+- `data.proofCards[].poker` for poker-linked proof cards
+- `data.proofCards[].safety` when mirrored safety flags exist
+- `data.proofCards[].browserClass` when Browser Class metadata exists
 - `data.loadouts[]`
 - `data.bundles[]`
 - `data.summary.proofCardCount`

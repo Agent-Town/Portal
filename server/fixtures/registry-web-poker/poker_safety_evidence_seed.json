@@ -5,8 +5,16 @@
       "evidenceId": "poker_evidence_fixture_01",
       "sourceKind": "poker",
       "flags": [
-        "anti_collusion_checked"
-      ]
+        "anti_collusion_checked",
+        "fair_play_passed"
+      ],
+      "policyLabels": [
+        "operator_authoritative"
+      ],
+      "browserClass": {
+        "divisionSlug": "browser-class",
+        "runnerKind": "browser"
+      }
     }
   ]
 }

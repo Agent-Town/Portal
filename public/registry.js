@@ -112,6 +112,33 @@
         <div>${escapeHtml(String(proof?.summary || 'Evidence linked into the Registry storefront.'))}</div>
         <div><strong>Evidence:</strong> ${escapeHtml(String(proof?.evidenceId || ''))}</div>
         <div><strong>Linked:</strong> ${escapeHtml(String(proof?.linkedAt || ''))}</div>
+        ${
+          proof?.poker
+            ? `
+              <div><strong>Season:</strong> ${escapeHtml(String(proof.poker.seasonId || ''))}</div>
+              <div><strong>Run:</strong> ${escapeHtml(String(proof.poker.runId || ''))}</div>
+              <div><strong>Rank:</strong> ${escapeHtml(String(proof.poker.rank ?? 'n/a'))}</div>
+              <div><strong>Rating:</strong> ${escapeHtml(String(proof.poker.rating ?? 'n/a'))}</div>
+            `
+            : ''
+        }
+        ${
+          proof?.browserClass
+            ? `<div><strong>Browser Class:</strong> ${escapeHtml(String(proof.browserClass.divisionSlug || proof.browserClass.runnerKind || ''))}</div>`
+            : ''
+        }
+        ${
+          proof?.safety
+            ? `
+              <div><strong>Safety:</strong> ${escapeHtml((Array.isArray(proof.safety.flags) ? proof.safety.flags : []).join(', ') || String(proof.safety.sourceKind || ''))}</div>
+              ${
+                Array.isArray(proof?.safety?.policyLabels) && proof.safety.policyLabels.length
+                  ? `<div><strong>Policy:</strong> ${escapeHtml(proof.safety.policyLabels.join(', '))}</div>`
+                  : ''
+              }
+            `
+            : ''
+        }
       `;
       list.appendChild(card);
     }

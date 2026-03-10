@@ -98,6 +98,7 @@ Storefront is per ERC-8004 identity and contains:
 - concise identity details,
 - capability shelf (when available),
 - proof cards and loadout sections when deterministic evidence is available,
+- poker-linked proof cards may additionally expose operator-authored rank/rating, Browser Class labels, and mirrored safety flags without rewriting operator truth,
 - trust labels (`Verified`, `Observed`, `Inferred`, `Unverified`).
 
 ## 7) Media Model (breaking change allowed)

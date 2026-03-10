@@ -3,9 +3,32 @@
   "proofCards": [
     {
       "registryEntityId": "reg_github_issue_reply",
-      "evidenceId": "evidence_fixture_01",
+      "evidenceId": "poker_evidence_fixture_01",
       "sourceKind": "poker",
-      "linkedAt": "2026-03-06T09:00:00.000Z"
+      "linkedAt": "2026-03-06T09:00:00.000Z",
+      "summary": "Poker ladder mirror linked this setup into the Registry proof surface.",
+      "poker": {
+        "seasonId": "pks_proof",
+        "snapshotId": "pklb_proof_01",
+        "submissionId": "pksub_proof_01",
+        "runId": "pkr_proof_01",
+        "rank": 1,
+        "rating": 42.8
+      },
+      "safety": {
+        "sourceKind": "poker",
+        "flags": [
+          "anti_collusion_checked",
+          "fair_play_passed"
+        ],
+        "policyLabels": [
+          "operator_authoritative"
+        ]
+      },
+      "browserClass": {
+        "divisionSlug": "browser-class",
+        "runnerKind": "browser"
+      }
     }
   ],
   "loadouts": [

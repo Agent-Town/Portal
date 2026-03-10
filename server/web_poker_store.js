@@ -596,10 +596,27 @@ function seedRegistryProofs() {
       registryEntityId: 'reg_github_issue_reply',
       sourceKind: 'poker',
       evidence: {
-        evidenceId: 'evidence_fixture_01',
+        evidenceId: 'poker_evidence_fixture_01',
         sourceKind: 'poker',
         linkedAt: '2026-03-06T09:00:00.000Z',
         summary: 'Poker ladder mirror linked this setup into the Registry proof surface.',
+        poker: {
+          seasonId: 'pks_proof',
+          snapshotId: 'pklb_proof_01',
+          submissionId: 'pksub_proof_01',
+          runId: 'pkr_proof_01',
+          rank: 1,
+          rating: 42.8,
+        },
+        safety: {
+          sourceKind: 'poker',
+          flags: ['anti_collusion_checked', 'fair_play_passed'],
+          policyLabels: ['operator_authoritative'],
+        },
+        browserClass: {
+          divisionSlug: 'browser-class',
+          runnerKind: 'browser',
+        },
       },
     },
   ];
@@ -1838,6 +1855,41 @@ function listRegistryProofCards(registryEntityId) {
     ORDER BY proof_id ASC
   `).all(normalizedRegistryEntityId).map((row) => {
     const evidence = fromJson(row.evidence_json, {});
+    const evidencePoker = evidence?.poker && typeof evidence.poker === 'object' && !Array.isArray(evidence.poker)
+      ? evidence.poker
+      : {};
+    const seasonId = typeof evidencePoker.seasonId === 'string' ? evidencePoker.seasonId.trim() : '';
+    const requestedSnapshotId = typeof evidencePoker.snapshotId === 'string' ? evidencePoker.snapshotId.trim() : '';
+    const submissionId = typeof evidencePoker.submissionId === 'string' ? evidencePoker.submissionId.trim() : '';
+    const snapshot = seasonId
+      ? (
+        requestedSnapshotId
+          ? getPokerLeaderboardSnapshotById(seasonId, requestedSnapshotId)
+          : getLatestPokerLeaderboardSnapshot(seasonId)
+      )
+      : null;
+    const ranking = Array.isArray(snapshot?.rankings)
+      ? (
+        snapshot.rankings.find((entry) => String(entry?.submissionId || '').trim() === submissionId)
+        || (snapshot.rankings.length === 1 ? snapshot.rankings[0] : null)
+      )
+      : null;
+    const runId = typeof evidencePoker.runId === 'string' ? evidencePoker.runId.trim() : '';
+    const run = runId ? getPokerRunById(runId) : null;
+    const rawSafety = evidence?.safety && typeof evidence.safety === 'object' && !Array.isArray(evidence.safety)
+      ? evidence.safety
+      : {};
+    const safetyFlags = Array.isArray(rawSafety.flags)
+      ? rawSafety.flags.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const policyLabels = Array.isArray(rawSafety.policyLabels)
+      ? rawSafety.policyLabels.map((item) => String(item || '').trim()).filter(Boolean)
+      : [];
+    const rawBrowserClass = evidence?.browserClass && typeof evidence.browserClass === 'object' && !Array.isArray(evidence.browserClass)
+      ? evidence.browserClass
+      : rawSafety?.browserClass && typeof rawSafety.browserClass === 'object' && !Array.isArray(rawSafety.browserClass)
+        ? rawSafety.browserClass
+        : null;
     return {
       proofId: row.proof_id,
       registryEntityId: row.registry_entity_id,
@@ -1847,6 +1899,32 @@ function listRegistryProofCards(registryEntityId) {
         ? evidence.linkedAt.trim()
         : row.created_at,
       summary: typeof evidence.summary === 'string' ? evidence.summary : null,
+      poker: seasonId
+        ? {
+          seasonId,
+          snapshotId: snapshot?.snapshotId || requestedSnapshotId || null,
+          submissionId: submissionId || null,
+          runId: run?.runId || runId || null,
+          rank: ranking?.rank ?? evidencePoker.rank ?? null,
+          rating: ranking?.rating ?? evidencePoker.rating ?? null,
+          games: ranking?.games ?? evidencePoker.games ?? null,
+          wins: ranking?.wins ?? evidencePoker.wins ?? null,
+          winnerSeat: run?.summary?.winnerSeat ?? null,
+        }
+        : null,
+      safety: safetyFlags.length || policyLabels.length || rawSafety?.sourceKind
+        ? {
+          sourceKind: String(rawSafety.sourceKind || evidence.sourceKind || row.source_kind || ''),
+          flags: safetyFlags,
+          policyLabels,
+        }
+        : null,
+      browserClass: rawBrowserClass
+        ? {
+          divisionSlug: typeof rawBrowserClass.divisionSlug === 'string' ? rawBrowserClass.divisionSlug : null,
+          runnerKind: typeof rawBrowserClass.runnerKind === 'string' ? rawBrowserClass.runnerKind : null,
+        }
+        : null,
     };
   });
 }
