@@ -97,6 +97,7 @@ Storefront is per ERC-8004 identity and contains:
 - visual hero,
 - concise identity details,
 - capability shelf (when available),
+- proof cards and loadout sections when deterministic evidence is available,
 - trust labels (`Verified`, `Observed`, `Inferred`, `Unverified`).
 
 ## 7) Media Model (breaking change allowed)

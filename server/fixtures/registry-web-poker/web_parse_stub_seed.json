@@ -1,0 +1,19 @@
+{
+  "family": "web_parse_stub_seed",
+  "parseCandidate": {
+    "candidateId": "parse_candidate_fixture_01",
+    "sourceKind": "parse",
+    "sourceUrl": "https://example.com/threaded-feed"
+  },
+  "compiledPack": {
+    "packVersionId": "packv_parse_fixture_01",
+    "contentHash": "sha256:parse-pack-fixture",
+    "fileHashes": {
+      "manifest.json": "sha256:fixture-manifest",
+      "overlay.json": "sha256:fixture-overlay",
+      "policy.json": "sha256:fixture-policy",
+      "verification.json": "sha256:fixture-verification",
+      "provenance.json": "sha256:fixture-provenance"
+    }
+  }
+}

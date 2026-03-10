@@ -1,0 +1,11 @@
+{
+  "family": "poker_season_detail_seed",
+  "season": {
+    "seasonId": "pks_fixture_01",
+    "rulesSummary": "Standard season with deterministic setup bundle verification.",
+    "submissionWindow": {
+      "opensAt": "2026-04-01T00:00:00.000Z",
+      "closesAt": "2026-04-15T00:00:00.000Z"
+    }
+  }
+}

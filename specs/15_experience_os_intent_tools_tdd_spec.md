@@ -88,8 +88,9 @@ Define explicit tools and parameters for at least:
 1. `agent_town_ui_open_modal({ modal, params })`
 2. `agent_town_ui_atlas_search({ q, family, searchType })`
 3. `agent_town_ui_registry_search({ q, family })`
-4. `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
-5. selected `agent_town_state_*` tools listed in section 7.
+4. `agent_town_ui_web_open({ webSessionId, sessionId, url, title })`
+5. `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
+6. selected `agent_town_state_*` tools listed in section 7.
 
 Tool docs in `skill.md` must include:
 
@@ -220,6 +221,25 @@ Behavior:
 2. Applies filter/search state through existing Atlas UI state model.
 3. Returns snapshot containing active Atlas filter state.
 
+### `agent_town_ui_web_open`
+
+Input:
+
+```json
+{
+  "webSessionId": "optional we_* id",
+  "sessionId": "optional alias for webSessionId",
+  "url": "optional http(s) URL or same-origin relative path",
+  "title": "optional string"
+}
+```
+
+Behavior:
+
+1. Opens a Web target inside the hub modal frame without replacing `/app`.
+2. Accepts either a durable Web session id or a direct URL.
+3. Returns snapshot containing the stable Web target state.
+
 ### `agent_town_ui_pony_compose`
 
 Input:
@@ -271,6 +291,24 @@ Maps to `GET /api/house/:id/meta` or current house context endpoint.
 
 Maps to `GET /api/pony/inbox?houseId=...`.
 
+### `agent_town_state_get_registry_entity`
+
+Maps to `GET /api/registry/entities/:id`.
+
+Required durable fields:
+
+1. `registryId`
+2. `entityVersionId`
+
+### `agent_town_state_get_web_session`
+
+Maps to `GET /api/web/sessions/:id`.
+
+Required durable fields:
+
+1. `sessionId`
+2. `lastCheckpointIdentity`
+
 State tool envelope:
 
 ```json
@@ -285,7 +323,7 @@ State tool envelope:
 
 No confirmation required:
 
-1. view/navigation intents (`open_modal`, `atlas_search`, `registry_search`, `pony_compose`),
+1. view/navigation intents (`open_modal`, `atlas_search`, `registry_search`, `web_open`, `pony_compose`),
 2. read-only state tools.
 
 Confirmation required:
@@ -326,6 +364,7 @@ Suggested test files:
 2. `e2e/59_experience_intent_atlas_search.spec.js`
 3. `e2e/60_experience_intent_pony_compose.spec.js`
 4. `e2e/61_experience_intent_worker_continuity.spec.js`
+5. `e2e/172_web_tool_state_surface.spec.js`
 
 Required acceptance criteria:
 
@@ -372,6 +411,14 @@ Required acceptance criteria:
 5. AC-61.5: No full-page route replacement occurred (`pathname` remained `/app` for all steps).
 6. AC-61.6: Worker traffic/debug trace contains one success record per intent call.
 
+### Test 62: worker-visible Web and Registry tool/state surface
+
+1. AC-62.1: Worker tool registry exposes `agent_town_ui_web_open`, `agent_town_state_get_registry_entity`, and `agent_town_state_get_web_session`.
+2. AC-62.2: Invoking those tools from the hub leaves the root path at `/app`.
+3. AC-62.3: `agent_town_state_get_registry_entity` returns stable `registryId` and `entityVersionId`.
+4. AC-62.4: `agent_town_state_get_web_session` returns stable `sessionId` and `lastCheckpointIdentity`.
+5. AC-62.5: `agent_town_ui_web_open` returns `ok === true`, `applied === true`, and a snapshot containing the requested Web target.
+
 ### Negative and policy tests (required for same phase)
 
 1. AC-N1: Unknown UI intent returns `ok === false`, `applied === false`, `error.code === "UI_INTENT_UNKNOWN"`.
@@ -401,7 +448,7 @@ Phase C: Coverage
 
 1. `skill.md` defines both tool families and their strict parameters.
 2. UI tools cannot execute arbitrary selector/DOM actions.
-3. `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_registry_search`, and `agent_town_ui_pony_compose` work end-to-end.
+3. `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_registry_search`, `agent_town_ui_web_open`, and `agent_town_ui_pony_compose` work end-to-end.
 4. Worker session remains connected across UI intent flow.
 5. Confirmation gate is enforced for irreversible actions.
 6. Each new Playwright test includes explicit AC IDs and measurable assertions (no narrative-only checks).

@@ -211,7 +211,7 @@ Primary test:
 GREEN gate:
 
 1. Claim-start accepts valid wallet-bound requests.
-2. Invalid claim requests fail with stable codes.
+2. Invalid claim requests fail with stable codes: `wallet_required`, `claim_target_missing`, and `claim_conflict`.
 3. Review queue returns deterministic duplicate and claim-review rows.
 
 ### M24.4 - Proof cards and loadouts

@@ -259,6 +259,10 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
   - Reads `GET /api/house/:id/meta` (uses runtime houseId when omitted).
 - `agent_town_state_get_pony_inbox`
   - Reads `GET /api/pony/inbox?houseId=...` (uses runtime houseId when omitted).
+- `agent_town_state_get_registry_entity({ registryId, registryEntityId })`
+  - Reads durable Registry entity state from `GET /api/registry/entities/:id` and returns stable `registryId` plus latest `entityVersionId`.
+- `agent_town_state_get_web_session({ webSessionId, sessionId })`
+  - Reads durable Web session state from `GET /api/web/sessions/:id` and returns stable `sessionId` plus last checkpoint identity.
 
 ### UI tools
 
@@ -268,6 +272,8 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
   - Opens Atlas in modal and applies search/filter state.
 - `agent_town_ui_registry_search({ q, family })`
   - Opens Registry in modal and applies registry discovery filters without changing Atlas district state.
+- `agent_town_ui_web_open({ webSessionId, sessionId, url, title })`
+  - Opens a Web target inside the hub modal frame without replacing the root `/app` route.
 - `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
   - Opens Pony modal compose panel with prefilled values.
 

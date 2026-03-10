@@ -1,0 +1,37 @@
+{
+  "family": "registry_family_seed",
+  "registryFamilies": [
+    {
+      "familySlug": "developer_workflows",
+      "displayName": "Developer Workflows",
+      "status": "ready"
+    },
+    {
+      "familySlug": "registry",
+      "displayName": "Registry",
+      "status": "ready"
+    }
+  ],
+  "groupedSearch": [
+    {
+      "familySlug": "developer_workflows",
+      "familyTitle": "Developer Workflows",
+      "members": [
+        {
+          "registryEntityId": "reg_github_issue_reply",
+          "slug": "github-issue-reply"
+        }
+      ]
+    },
+    {
+      "familySlug": "registry",
+      "familyTitle": "Registry",
+      "members": [
+        {
+          "registryEntityId": "reg_registry_catalog",
+          "slug": "registry-catalog"
+        }
+      ]
+    }
+  ]
+}

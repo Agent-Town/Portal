@@ -50,6 +50,7 @@ const {
   createImportJob,
   createEvidence,
   createInvocation,
+  createRegistryClaimStart,
   createWebSession,
   decideApproval,
   getActiveCredentialGrant,
@@ -62,7 +63,11 @@ const {
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
   getPokerReplayArtifactByRunId,
+  getRegistryFamilyBySlug,
+  getRegistryHealth,
   getRegistryEntityById,
+  getRegistryProofByRegistryId,
+  getRegistryReviewQueue,
   getPokerRunById,
   getPokerSeasonById,
   getPokerSubmissionById,
@@ -73,6 +78,7 @@ const {
   listEvidenceForSession,
   listPokerSeasons,
   resetExtendedStore,
+  searchRegistryFamilyGroups,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
@@ -89,8 +95,14 @@ const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = r
 const { registerPlatformReadRoutes } = require('./platform_read_routes');
 const { registerWebRoutes } = require('./web_routes');
 const { registerRegistryRoutes } = require('./registry_routes');
+const { registerRegistryWebPokerTestRoutes } = require('./registry_web_poker_test_routes');
 const { registerPlatformV1Routes } = require('./platform_v1_routes');
 const { registerPokerRoutes } = require('./poker_routes');
+const {
+  getRegistryWebPokerTestFixture,
+  getRegistryWebPokerTestStats,
+  listRegistryWebPokerFixtureFamilies,
+} = require('./registry_web_poker_fixtures');
 const {
   createTrainerJob,
   createTrainerResult,
@@ -4075,16 +4087,28 @@ registerRegistryRoutes(app, {
   assertPortalContractTargetAllowed,
   buildPortalRequestId,
   collectWalletSubjectsForSession,
+  createRegistryClaimStart,
   createImportJob,
+  getRegistryFamilyBySlug,
+  getRegistryHealth,
   getRegistryEntityById,
+  getRegistryProofByRegistryId,
+  getRegistryReviewQueue,
   invalidateAtlasStoreCaches,
   normalizePortalIdempotencyKey,
   proxyPolicyErrorCode,
   requireBoundHumanSession,
+  searchRegistryFamilyGroups,
   searchRegistryEntities,
   sendPortalApiError,
   sendPortalApiSuccess,
   sendProxyPolicyContractError,
+});
+
+registerRegistryWebPokerTestRoutes(app, {
+  getRegistryWebPokerTestFixture,
+  getRegistryWebPokerTestStats,
+  listRegistryWebPokerFixtureFamilies,
 });
 
 registerPlatformV1Routes(app, {
@@ -9651,6 +9675,20 @@ if (process.env.NODE_ENV === 'test') {
       ok: true,
       table: tableName,
       count: Number(count || 0)
+    });
+  });
+
+  app.get('/__test__/registry/grouped-preview', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    return res.json({
+      ok: true,
+      groups: searchRegistryFamilyGroups({
+        query: typeof req.query?.q === 'string' ? req.query.q : '',
+        family: typeof req.query?.family === 'string' ? req.query.family : '',
+      }),
     });
   });
 

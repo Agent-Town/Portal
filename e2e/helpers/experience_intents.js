@@ -37,6 +37,38 @@ async function invokeExperienceTool(page, tool, params = {}) {
   }, { toolName: String(tool || ''), toolParams: params || {} });
 }
 
+async function invokeLiteTool(page, tool, params = {}) {
+  return await page.evaluate(async ({ toolName, toolParams }) => {
+    const api = window.__openclawLiteTest;
+    if (!api || typeof api.invokeLiteTool !== 'function') {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: 'LITE_TOOL_BRIDGE_MISSING',
+          message: 'window.__openclawLiteTest.invokeLiteTool is not available'
+        },
+        meta: null,
+        details: null,
+      };
+    }
+    try {
+      return await api.invokeLiteTool({ tool: toolName, params: toolParams || {} });
+    } catch (err) {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: 'LITE_TOOL_THROW',
+          message: String(err?.message || err || 'invokeLiteTool failed')
+        },
+        meta: null,
+        details: null,
+      };
+    }
+  }, { toolName: String(tool || ''), toolParams: params || {} });
+}
+
 async function readSessionState(page) {
   return await page.evaluate(async () => {
     const resp = await fetch('/api/state', { credentials: 'include' });
@@ -62,6 +94,7 @@ async function readExperienceIntentTrace(page) {
 
 module.exports = {
   bootstrapExperienceIntentHarness,
+  invokeLiteTool,
   invokeExperienceTool,
   readExperienceIntentTrace,
   readPathname,

@@ -1,0 +1,17 @@
+{
+  "family": "poker_run_history_seed",
+  "run": {
+    "runId": "pkrun_fixture_01",
+    "submissionId": "pksub_fixture_01"
+  },
+  "snapshots": [
+    {
+      "snapshotId": "snapshot_fixture_02",
+      "createdAt": "2026-03-10T10:00:00.000Z"
+    },
+    {
+      "snapshotId": "snapshot_fixture_01",
+      "createdAt": "2026-03-09T10:00:00.000Z"
+    }
+  ]
+}

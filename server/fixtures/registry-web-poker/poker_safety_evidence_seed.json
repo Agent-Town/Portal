@@ -1,0 +1,12 @@
+{
+  "family": "poker_safety_evidence_seed",
+  "evidence": [
+    {
+      "evidenceId": "poker_evidence_fixture_01",
+      "sourceKind": "poker",
+      "flags": [
+        "anti_collusion_checked"
+      ]
+    }
+  ]
+}

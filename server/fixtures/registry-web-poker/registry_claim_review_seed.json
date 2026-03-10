@@ -1,0 +1,23 @@
+{
+  "family": "registry_claim_review_seed",
+  "claimTarget": {
+    "registryEntityId": "reg_github_issue_reply",
+    "walletSubject": "solana:So1anaMockResume11111111111111111111111111111"
+  },
+  "expectedErrorCodes": [
+    "wallet_required",
+    "claim_target_missing",
+    "claim_conflict"
+  ],
+  "expectedReviewKinds": [
+    "duplicate_check",
+    "claim_validation"
+  ],
+  "expectedQueueCounts": {
+    "queued": 2,
+    "byKind": {
+      "duplicate_check": 1,
+      "claim_validation": 1
+    }
+  }
+}

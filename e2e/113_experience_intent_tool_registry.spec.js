@@ -18,7 +18,11 @@ test('AC-62: worker tool registry exposes experience state/ui tool families', as
   const names = Array.isArray(registry?.names) ? registry.names : [];
   expect(names).toContain('agent_town_state_get_session');
   expect(names).toContain('agent_town_state_get_agent_state');
+  expect(names).toContain('agent_town_state_get_registry_entity');
+  expect(names).toContain('agent_town_state_get_web_session');
   expect(names).toContain('agent_town_ui_open_modal');
   expect(names).toContain('agent_town_ui_atlas_search');
+  expect(names).toContain('agent_town_ui_registry_search');
+  expect(names).toContain('agent_town_ui_web_open');
   expect(names).toContain('agent_town_ui_pony_compose');
 });

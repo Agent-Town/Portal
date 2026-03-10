@@ -478,6 +478,11 @@ let experienceIntentPonyState = {
   subject: '',
   draft: ''
 };
+let experienceIntentWebState = {
+  sessionId: '',
+  url: '',
+  title: ''
+};
 let houseSurfaceState = {
   activeSurface: '',
   context: {
@@ -4693,6 +4698,11 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     poker: {
       route: String(experienceIntentPokerState.route || '/poker')
     },
+    web: {
+      sessionId: String(experienceIntentWebState.sessionId || ''),
+      url: String(experienceIntentWebState.url || ''),
+      title: String(experienceIntentWebState.title || '')
+    },
     pony: {
       composeOpen: experienceIntentPonyState.composeOpen === true,
       composeTo: String(experienceIntentPonyState.toHouseId || ''),
@@ -4708,6 +4718,7 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
     registry: isPlainRecord(overrides.registry) ? { ...base.registry, ...overrides.registry } : base.registry,
     poker: isPlainRecord(overrides.poker) ? { ...base.poker, ...overrides.poker } : base.poker,
+    web: isPlainRecord(overrides.web) ? { ...base.web, ...overrides.web } : base.web,
     pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
   };
 }
@@ -4748,6 +4759,49 @@ function isSafeExperienceToken(value, { allowEmpty = false, maxLen = 72 } = {}) 
   if (!text) return allowEmpty;
   if (text.length > maxLen) return false;
   return /^[a-zA-Z0-9:_\-./ ]+$/.test(text);
+}
+
+function normalizeExperienceWebSessionId(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return /^we_[A-Za-z0-9]+$/.test(text) ? text : '';
+}
+
+function normalizeExperienceWebUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    if (parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+    return parsed.toString();
+  } catch {
+    return '';
+  }
+}
+
+async function readPortalJson(url, { method = 'GET', body = null } = {}) {
+  const response = await fetch(String(url || ''), {
+    method,
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json'
+    },
+    body: body == null ? undefined : JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || payload?.ok === false) {
+    const code = String(payload?.error?.code || `HTTP_${response.status}`);
+    const message = String(payload?.error?.message || code || 'Portal request failed');
+    const err = new Error(message);
+    err.code = code;
+    throw err;
+  }
+  return isPlainRecord(payload?.data) ? payload.data : {};
 }
 
 function setPonyComposePanelOpen(open) {
@@ -4985,6 +5039,81 @@ async function runExperienceUiRegistrySearch(rawParams) {
   });
 }
 
+async function runExperienceUiWebOpen(rawParams) {
+  if (!validateStrictKeys(rawParams, new Set(['webSessionId', 'sessionId', 'url', 'title']))) {
+    return invalidExperienceParam('web_open accepts only { webSessionId, sessionId, url, title }');
+  }
+  const requestedSessionId = normalizeExperienceWebSessionId(rawParams.webSessionId || rawParams.sessionId);
+  if ((rawParams.webSessionId || rawParams.sessionId) && !requestedSessionId) {
+    return invalidExperienceParam('webSessionId must be a valid we_* id');
+  }
+  const explicitUrl = normalizeExperienceWebUrl(rawParams.url);
+  if (rawParams.url != null && !explicitUrl) {
+    return invalidExperienceParam('url must be a valid http(s) URL');
+  }
+  const title = String(rawParams.title || '').trim();
+  if (!isSafeExperienceToken(title, { allowEmpty: true, maxLen: 120 })) {
+    return invalidExperienceParam('title contains unsupported characters');
+  }
+  if (!requestedSessionId && !explicitUrl) {
+    return invalidExperienceParam('web_open requires webSessionId or url');
+  }
+
+  let targetUrl = explicitUrl;
+  let session = null;
+  let lastCheckpoint = null;
+  if (requestedSessionId) {
+    try {
+      const payload = await readPortalJson(`/api/web/sessions/${encodeURIComponent(requestedSessionId)}`);
+      session = isPlainRecord(payload.session) ? payload.session : null;
+      lastCheckpoint = isPlainRecord(payload.lastCheckpoint) ? payload.lastCheckpoint : null;
+      if (!targetUrl) {
+        targetUrl = normalizeExperienceWebUrl(session?.url || '');
+      }
+    } catch (err) {
+      return makeExperienceIntentEnvelope({
+        ok: false,
+        applied: false,
+        error: {
+          code: String(err?.code || 'UI_INTENT_UNAVAILABLE'),
+          message: String(err?.message || 'Web session could not be opened')
+        }
+      });
+    }
+  }
+  if (!targetUrl) {
+    return makeExperienceIntentEnvelope({
+      ok: false,
+      applied: false,
+      error: {
+        code: 'UI_INTENT_UNAVAILABLE',
+        message: 'Web target could not be resolved'
+      }
+    });
+  }
+
+  const safeTitle = title || 'Web Session';
+  openRouteInModalFrame(targetUrl, safeTitle);
+  experienceIntentWebState = {
+    sessionId: String(session?.webSessionId || requestedSessionId || ''),
+    url: targetUrl,
+    title: safeTitle
+  };
+  await waitForDistrictModalOpen();
+  return makeExperienceIntentEnvelope({
+    ok: true,
+    applied: true,
+    stateSnapshot: buildExperienceIntentStateSnapshot({
+      web: {
+        sessionId: String(session?.webSessionId || requestedSessionId || ''),
+        url: targetUrl,
+        title: safeTitle,
+        lastCheckpointIdentity: String(lastCheckpoint?.checkpointRef || '')
+      }
+    })
+  });
+}
+
 async function runExperienceUiPonyCompose(rawParams) {
   if (!validateStrictKeys(rawParams, new Set(['toHouseId', 'subject', 'draft']))) {
     return invalidExperienceParam('pony_compose accepts only { toHouseId, subject, draft }');
@@ -5064,6 +5193,8 @@ async function dispatchExperienceIntent(tool, rawParams = {}, options = {}) {
       envelope = await runExperienceUiAtlasSearch(params);
     } else if (toolName === 'agent_town_ui_registry_search') {
       envelope = await runExperienceUiRegistrySearch(params);
+    } else if (toolName === 'agent_town_ui_web_open') {
+      envelope = await runExperienceUiWebOpen(params);
     } else if (toolName === 'agent_town_ui_pony_compose') {
       envelope = await runExperienceUiPonyCompose(params);
     } else {

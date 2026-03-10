@@ -1,0 +1,24 @@
+{
+  "family": "web_adapter_expected_actions",
+  "adapters": {
+    "threaded_feed_v1": [
+      "read_feed",
+      "read_thread",
+      "draft_reply",
+      "send_reply"
+    ],
+    "deliberation_v1": [
+      "list_boards",
+      "read_item",
+      "comment_item",
+      "change_status"
+    ],
+    "repo_workbench_v1": [
+      "list_repo",
+      "read_file",
+      "search_code",
+      "stage_patch",
+      "draft_pr"
+    ]
+  }
+}

@@ -1043,6 +1043,17 @@ async function resolveAgentTownHouseId(rawHouseId) {
   return inferred;
 }
 
+function normalizeAgentTownRegistryEntityId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return /^[A-Za-z0-9:_-]+$/.test(raw) ? raw : "";
+}
+
+function normalizeAgentTownWebSessionId(value) {
+  const raw = String(value || "").trim();
+  return /^we_[A-Za-z0-9]+$/.test(raw) ? raw : "";
+}
+
 function makeCeremonyRevealKeyInfo({ direction = "", teamCode = "" }) {
   return `elizatown-ceremony-reveal-v1|dir=${direction}|team=${teamCode || ""}`;
 }
@@ -1402,6 +1413,68 @@ async function runAgentTownStateGetPonyInbox(params, toolName = "agent_town_stat
     const message = String(e?.message || "STATE_GET_PONY_INBOX_FAILED");
     const code = normalizeToolErrorCode(message, "UNSUPPORTED");
     return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { houseId: houseId || null }));
+  }
+}
+
+async function runAgentTownStateGetRegistryEntity(params, toolName = "agent_town_state_get_registry_entity") {
+  const startedAtMs = nowMs();
+  const registryEntityId = normalizeAgentTownRegistryEntityId(params?.registryId || params?.registryEntityId);
+  if (!registryEntityId) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("INVALID_ARGUMENTS", "registryId or registryEntityId is required"),
+    );
+  }
+  try {
+    const payload = await apiJson(`/api/registry/entities/${encodeURIComponent(registryEntityId)}`, { method: "GET" });
+    const entity = isPlainObject(payload?.data?.entity) ? payload.data.entity : {};
+    const resolvedRegistryId = String(entity?.registryId || entity?.registryEntityId || registryEntityId);
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      registryId: resolvedRegistryId,
+      registryEntityId: String(entity?.registryEntityId || resolvedRegistryId),
+      entityVersionId: entity?.entityVersionId || null,
+      versionLabel: entity?.versionLabel || null,
+      familySlug: entity?.familySlug || entity?.family || null,
+      slug: entity?.slug || null,
+      storefront: isPlainObject(entity?.storefront) ? entity.storefront : null,
+      entity,
+    }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_REGISTRY_ENTITY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { registryId: registryEntityId }));
+  }
+}
+
+async function runAgentTownStateGetWebSession(params, toolName = "agent_town_state_get_web_session") {
+  const startedAtMs = nowMs();
+  const webSessionId = normalizeAgentTownWebSessionId(params?.webSessionId || params?.sessionId);
+  if (!webSessionId) {
+    return withToolMeta(
+      toolName,
+      startedAtMs,
+      makeToolFailure("INVALID_ARGUMENTS", "webSessionId or sessionId is required"),
+    );
+  }
+  try {
+    const payload = await apiJson(`/api/web/sessions/${encodeURIComponent(webSessionId)}`, { method: "GET" });
+    const session = isPlainObject(payload?.data?.session) ? payload.data.session : {};
+    const lastCheckpoint = isPlainObject(payload?.data?.lastCheckpoint) ? payload.data.lastCheckpoint : null;
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      sessionId: String(session?.webSessionId || webSessionId),
+      webSessionId: String(session?.webSessionId || webSessionId),
+      activeRevision: Number(session?.activeRevision || 0),
+      runtimeState: session?.runtimeState || null,
+      url: session?.url || null,
+      lastCheckpointIdentity: lastCheckpoint?.checkpointRef || null,
+      lastCheckpoint,
+      session,
+    }));
+  } catch (e) {
+    const message = String(e?.message || "STATE_GET_WEB_SESSION_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { webSessionId }));
   }
 }
 
@@ -2781,6 +2854,18 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { houseId: "hs_example_house" },
   },
   {
+    name: "agent_town_state_get_registry_entity",
+    label: "Agent Town State Registry Entity",
+    description: "Reads durable Registry entity state, including latest entityVersionId.",
+    sampleArgs: { registryId: "reg_github_issue_reply" },
+  },
+  {
+    name: "agent_town_state_get_web_session",
+    label: "Agent Town State Web Session",
+    description: "Reads durable /api/web/sessions/:id state and latest checkpoint identity.",
+    sampleArgs: { webSessionId: "we_1234567890" },
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -2791,6 +2876,18 @@ const LITE_TOOL_SPECS = [
     label: "Agent Town UI Atlas Search",
     description: "Opens Atlas modal and applies query/family/searchType intent state.",
     sampleArgs: { q: "sentinel", family: "ethereum", searchType: "keyword" },
+  },
+  {
+    name: "agent_town_ui_registry_search",
+    label: "Agent Town UI Registry Search",
+    description: "Opens Registry modal and applies registry query/family intent state.",
+    sampleArgs: { q: "registry", family: "registry" },
+  },
+  {
+    name: "agent_town_ui_web_open",
+    label: "Agent Town UI Web Open",
+    description: "Opens a Web target inside the hub modal frame without replacing /app.",
+    sampleArgs: { url: "/skill.md", title: "Skill Sheet" },
   },
   {
     name: "agent_town_ui_pony_compose",
@@ -3113,8 +3210,18 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       const envelope = await runAgentTownStateGetPonyInbox(params || {}, "agent_town_state_get_pony_inbox");
       return envelopeToToolResult(envelope, "agent_town_state_get_pony_inbox");
     }
+    case "agent_town_state_get_registry_entity": {
+      const envelope = await runAgentTownStateGetRegistryEntity(params || {}, "agent_town_state_get_registry_entity");
+      return envelopeToToolResult(envelope, "agent_town_state_get_registry_entity");
+    }
+    case "agent_town_state_get_web_session": {
+      const envelope = await runAgentTownStateGetWebSession(params || {}, "agent_town_state_get_web_session");
+      return envelopeToToolResult(envelope, "agent_town_state_get_web_session");
+    }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":
+    case "agent_town_ui_registry_search":
+    case "agent_town_ui_web_open":
     case "agent_town_ui_pony_compose":
     case "agent_town_ui_publish_post": {
       const envelope = await runAgentTownUiIntentTool(params || {}, normalizedName);
@@ -8436,6 +8543,23 @@ self.addEventListener("message", async (ev) => {
         requestId: String(msg.requestId || ""),
         ok: true,
         info: getToolRegistryInfo(),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.tools.invokeLite") {
+      const result = await dispatchLiteTool(
+        String(msg.toolName || ""),
+        isPlainObject(msg.params) ? msg.params : {},
+        null,
+        null,
+        String(msg.toolCallId || ""),
+      );
+      post({
+        type: "worker.tools.invokeLite",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result,
       });
       return;
     }

@@ -3,12 +3,18 @@ function registerRegistryRoutes(app, deps) {
     assertPortalContractTargetAllowed,
     buildPortalRequestId,
     collectWalletSubjectsForSession,
+    createRegistryClaimStart,
     createImportJob,
+    getRegistryFamilyBySlug,
+    getRegistryHealth,
     getRegistryEntityById,
+    getRegistryProofByRegistryId,
+    getRegistryReviewQueue,
     invalidateAtlasStoreCaches,
     normalizePortalIdempotencyKey,
     proxyPolicyErrorCode,
     requireBoundHumanSession,
+    searchRegistryFamilyGroups,
     searchRegistryEntities,
     sendPortalApiError,
     sendPortalApiSuccess,
@@ -89,12 +95,104 @@ function registerRegistryRoutes(app, deps) {
     }
   });
 
+  app.post('/api/registry/claim/start', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    const walletSubjects = collectWalletSubjectsForSession(session, req);
+    const primaryWallet = Array.isArray(walletSubjects)
+      ? walletSubjects.find((entry) => entry && typeof entry === 'object' && entry.chain && (entry.normalizedAddress || entry.address))
+      : null;
+    if (!primaryWallet) {
+      return sendPortalApiError(
+        res,
+        400,
+        'wallet_required',
+        'A bound wallet is required to start a Registry claim.',
+        { requestId }
+      );
+    }
+    const registryEntityId = typeof req.body?.registryEntityId === 'string'
+      ? req.body.registryEntityId.trim()
+      : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(
+        res,
+        400,
+        'claim_target_missing',
+        'registryEntityId is required.',
+        { requestId }
+      );
+    }
+    try {
+      const normalizedAddress = typeof primaryWallet.normalizedAddress === 'string' && primaryWallet.normalizedAddress.trim()
+        ? primaryWallet.normalizedAddress.trim()
+        : String(primaryWallet.address || '').trim();
+      const result = createRegistryClaimStart({
+        registryEntityId,
+        claimantWalletSubject: `${String(primaryWallet.chain || '').trim().toLowerCase()}:${normalizedAddress}`,
+        claimantWallet: {
+          chain: String(primaryWallet.chain || '').trim().toLowerCase(),
+          address: normalizedAddress,
+          boundAt: typeof primaryWallet.boundAt === 'string' ? primaryWallet.boundAt : null,
+        },
+        request: {
+          note: typeof req.body?.note === 'string' ? req.body.note.trim() : '',
+          source: 'api/registry/claim/start',
+        },
+      });
+      return sendPortalApiSuccess(res, result, { status: 201, requestId });
+    } catch (err) {
+      if (err?.code === 'CLAIM_TARGET_MISSING') {
+        return sendPortalApiError(
+          res,
+          400,
+          'claim_target_missing',
+          'Registry claim target was not found.',
+          { requestId }
+        );
+      }
+      if (err?.code === 'CLAIM_CONFLICT') {
+        return sendPortalApiError(
+          res,
+          409,
+          'claim_conflict',
+          'An active claim already exists for this wallet and Registry entity.',
+          {
+            requestId,
+            details: {
+              claimId: err?.claim?.claimId || null,
+              registryEntityId,
+            },
+          }
+        );
+      }
+      return sendPortalApiError(res, 500, 'INTERNAL_ERROR', 'Registry claim creation failed.', {
+        requestId,
+        retryable: true,
+      });
+    }
+  });
+
+  app.get('/api/registry/review-queue', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    return sendPortalApiSuccess(res, getRegistryReviewQueue(), { requestId });
+  });
+
+  app.get('/api/registry/health', (_req, res) => {
+    const requestId = buildPortalRequestId();
+    return sendPortalApiSuccess(res, getRegistryHealth(), { requestId });
+  });
+
   app.get('/api/registry/search', (req, res) => {
     const requestId = buildPortalRequestId();
-    const items = searchRegistryEntities({
+    const search = {
       query: typeof req.query?.q === 'string' ? req.query.q : '',
       family: typeof req.query?.family === 'string' ? req.query.family : '',
-    });
+    };
+    const items = searchRegistryFamilyGroups(search);
     return sendPortalApiSuccess(res, { items }, { requestId });
   });
 
@@ -105,6 +203,33 @@ function registerRegistryRoutes(app, deps) {
       return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry entity not found.', { requestId });
     }
     return sendPortalApiSuccess(res, { entity }, { requestId });
+  });
+
+  app.get('/api/registry/proof/:registryId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const proof = getRegistryProofByRegistryId(req.params.registryId);
+    if (!proof) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry proof target not found.', { requestId });
+    }
+    return sendPortalApiSuccess(res, proof, { requestId });
+  });
+
+  app.get('/api/registry/families/:familySlug', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const family = getRegistryFamilyBySlug(req.params.familySlug);
+    if (!family) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry family not found.', { requestId });
+    }
+    return sendPortalApiSuccess(res, { family }, { requestId });
+  });
+
+  app.get('/api/registry/family/:familySlug', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const family = getRegistryFamilyBySlug(req.params.familySlug);
+    if (!family) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'Registry family not found.', { requestId });
+    }
+    return sendPortalApiSuccess(res, { family }, { requestId });
   });
 }
 

@@ -25,26 +25,127 @@
       return;
     }
     for (const item of items) {
-      const article = document.createElement('article');
-      article.className = 'registryCard';
-      const displayName = String(item?.displayName || 'Unnamed entity');
-      const entityKind = String(item?.entityKind || 'entity');
-      const description = String(item?.description || '');
-      const family = String(item?.family || 'unscoped');
-      const projection = JSON.stringify(item?.projection || {}, null, 2);
-      article.innerHTML = `
-        <div class="registryCardHeader">
-          <div>
-            <h2>${escapeHtml(displayName)}</h2>
-            <div>${escapeHtml(description)}</div>
-          </div>
-          <span class="registryBadge">${escapeHtml(entityKind)}</span>
-        </div>
-        <div><strong>Family:</strong> ${escapeHtml(family)}</div>
-        <pre class="registryProjection">${escapeHtml(projection)}</pre>
-      `;
-      list.appendChild(article);
+      if (Array.isArray(item?.members)) {
+        list.appendChild(renderFamilyGroup(item));
+      } else {
+        list.appendChild(renderEntityCard(item));
+      }
     }
+  }
+
+  function renderEntityCard(item) {
+    const article = document.createElement('article');
+    article.className = 'registryCard';
+    const displayName = String(item?.displayName || item?.storefront?.title || 'Unnamed entity');
+    const entityKind = String(item?.entityKind || 'entity');
+    const description = String(item?.description || item?.storefront?.summary || '');
+    const family = String(item?.familySlug || item?.family || 'unscoped');
+    const projection = JSON.stringify(item?.projection || {}, null, 2);
+    article.innerHTML = `
+      <div class="registryCardHeader">
+        <div>
+          <h2>${escapeHtml(displayName)}</h2>
+          <div>${escapeHtml(description)}</div>
+        </div>
+        <span class="registryBadge">${escapeHtml(entityKind)}</span>
+      </div>
+      <div><strong>Family:</strong> ${escapeHtml(family)}</div>
+      <pre class="registryProjection">${escapeHtml(projection)}</pre>
+    `;
+    appendProofAndLoadouts(article, item);
+    return article;
+  }
+
+  function renderFamilyGroup(group) {
+    const article = document.createElement('article');
+    article.className = 'registryCard';
+    const familyTitle = String(group?.familyTitle || group?.storefront?.title || group?.familySlug || 'Unnamed family');
+    const familyDescription = String(group?.familyDescription || group?.storefront?.summary || '');
+    const familySlug = String(group?.familySlug || group?.family || 'unscoped');
+    const members = Array.isArray(group?.members) ? group.members : [];
+    article.innerHTML = `
+      <div class="registryCardHeader">
+        <div>
+          <h2>${escapeHtml(familyTitle)}</h2>
+          <div>${escapeHtml(familyDescription)}</div>
+        </div>
+        <span class="registryBadge">${escapeHtml(`${members.length} member${members.length === 1 ? '' : 's'}`)}</span>
+      </div>
+      <div><strong>Family:</strong> ${escapeHtml(familySlug)}</div>
+    `;
+    for (const member of members) {
+      const memberBlock = document.createElement('div');
+      memberBlock.style.marginTop = '0.85rem';
+      memberBlock.innerHTML = `
+        <div><strong>${escapeHtml(String(member?.displayName || member?.storefront?.title || member?.slug || 'Unnamed entity'))}</strong></div>
+        <div>${escapeHtml(String(member?.description || member?.storefront?.summary || ''))}</div>
+        <pre class="registryProjection">${escapeHtml(JSON.stringify(member?.projection || {}, null, 2))}</pre>
+      `;
+      appendProofAndLoadouts(memberBlock, member);
+      article.appendChild(memberBlock);
+    }
+    return article;
+  }
+
+  function appendProofAndLoadouts(container, item) {
+    if (!container) return;
+    const proofSection = renderProofCardsSection(item?.proofCards);
+    if (proofSection) container.appendChild(proofSection);
+    const loadoutSection = renderLoadoutsSection(item?.loadouts);
+    if (loadoutSection) container.appendChild(loadoutSection);
+  }
+
+  function renderProofCardsSection(proofCards) {
+    const items = Array.isArray(proofCards) ? proofCards : [];
+    if (!items.length) return null;
+    const section = document.createElement('section');
+    section.className = 'registrySection';
+    section.innerHTML = `<h3>Proof Cards</h3>`;
+    const list = document.createElement('div');
+    list.className = 'registryMiniList';
+    for (const proof of items) {
+      const card = document.createElement('article');
+      card.className = 'registryMiniCard';
+      card.dataset.registryProofCard = 'true';
+      card.innerHTML = `
+        <div><strong>${escapeHtml(String(proof?.sourceKind || 'proof'))}</strong></div>
+        <div>${escapeHtml(String(proof?.summary || 'Evidence linked into the Registry storefront.'))}</div>
+        <div><strong>Evidence:</strong> ${escapeHtml(String(proof?.evidenceId || ''))}</div>
+        <div><strong>Linked:</strong> ${escapeHtml(String(proof?.linkedAt || ''))}</div>
+      `;
+      list.appendChild(card);
+    }
+    section.appendChild(list);
+    return section;
+  }
+
+  function renderLoadoutsSection(loadouts) {
+    const items = Array.isArray(loadouts) ? loadouts : [];
+    if (!items.length) return null;
+    const section = document.createElement('section');
+    section.className = 'registrySection';
+    section.innerHTML = `<h3>Loadouts</h3>`;
+    const list = document.createElement('div');
+    list.className = 'registryMiniList';
+    for (const loadout of items) {
+      const card = document.createElement('article');
+      card.className = 'registryMiniCard';
+      card.dataset.registryLoadout = 'true';
+      const componentRefs = Array.isArray(loadout?.componentRefs)
+        ? loadout.componentRefs.map((entry) => String(entry || '')).filter(Boolean)
+        : [];
+      const bundles = Array.isArray(loadout?.bundles) ? loadout.bundles : [];
+      const bundleHash = bundles[0]?.contentHash ? String(bundles[0].contentHash) : '';
+      card.innerHTML = `
+        <div><strong>${escapeHtml(String(loadout?.displayName || loadout?.loadoutId || 'Loadout'))}</strong></div>
+        <div><strong>Loadout:</strong> ${escapeHtml(String(loadout?.loadoutId || ''))}</div>
+        <div><strong>Components:</strong> ${escapeHtml(componentRefs.join(', '))}</div>
+        ${bundleHash ? `<div><strong>Bundle hash:</strong> ${escapeHtml(bundleHash)}</div>` : ''}
+      `;
+      list.appendChild(card);
+    }
+    section.appendChild(list);
+    return section;
   }
 
   function escapeHtml(value) {

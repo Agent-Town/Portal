@@ -93,6 +93,134 @@ Failure codes:
 ### POST `/api/registry/import`
 Queues a human-authenticated Registry import request with the same idempotency and unsafe-target policy as `/api/web/import`.
 
+### GET `/api/registry/health`
+Returns deterministic Registry readiness and family-schema status for the current Portal build.
+
+Response fields:
+- `data.ok === true`
+- `data.schemaVersion === "registry-family-core/v1"`
+- `data.familyModelReady === true`
+- `data.familyCount`
+- `data.entityCount`
+- `data.families[]`
+
+Notes:
+- This route is public and deterministic in test mode.
+- `data.families[]` is ordered by `familySlug` ascending.
+- This route reports the family-aware Registry schema status without requiring a search query.
+
+### GET `/api/registry/search`
+Returns Registry search results for the provided `q` and optional `family` filter.
+
+Query params:
+- `q` optional free-text search
+- `family` optional family slug filter
+
+Response fields:
+- `data.items[]`
+
+Notes:
+- `data.items[]` is the grouped family-first search surface.
+- Each top-level item includes `family`, `familySlug`, `familyTitle`, and `members[]`.
+- Each member may include both `family` and `familySlug` for forward compatibility.
+- Each group is ordered by `familySlug` ascending and each member is ordered by `slug` ascending.
+
+### GET `/api/registry/entities/:id`
+Returns one Registry entity by `registryEntityId`.
+
+Response fields:
+- `data.entity.registryId`
+- `data.entity.registryEntityId`
+- `data.entity.entityVersionId`
+- `data.entity.versionLabel`
+- `data.entity.entityKind`
+- `data.entity.family`
+- `data.entity.familySlug`
+- `data.entity.slug`
+- `data.entity.displayName`
+- `data.entity.description`
+- `data.entity.projection`
+- `data.entity.familyInfo`
+- `data.entity.storefront`
+
+### GET `/api/registry/family/:familySlug`
+### GET `/api/registry/families/:familySlug`
+Returns one Registry family storefront payload by family slug.
+
+Response fields:
+- `data.family.family`
+- `data.family.familySlug`
+- `data.family.displayName`
+- `data.family.description`
+- `data.family.status`
+- `data.family.storefront`
+- `data.family.entityCount`
+- `data.family.members[]`
+
+Notes:
+- `data.family.members[]` is ordered by `slug` ascending.
+- `data.entity.familyInfo`
+
+### POST `/api/registry/claim/start`
+Starts one wallet-bound Registry claim for the provided `registryEntityId`.
+
+Request shape:
+```json
+{
+  "registryEntityId": "reg_github_issue_reply",
+  "note": "Optional human-visible claim note"
+}
+```
+
+Response fields:
+- `data.claim.claimId`
+- `data.claim.registryEntityId`
+- `data.claim.claimantWalletSubject`
+- `data.claim.status === "pending_validation"`
+- `data.reviews[]`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `wallet_required`
+- `claim_target_missing`
+- `claim_conflict`
+
+Notes:
+- The request must resolve to one bound wallet in the current Portal session.
+- A successful claim creates deterministic `duplicate_check` and `claim_validation` review rows.
+
+### GET `/api/registry/review-queue`
+Returns the deterministic Registry review queue for the current Portal session.
+
+Response fields:
+- `data.items[]`
+- `data.total`
+- `data.counts.byKind`
+- `data.counts.queued`
+
+Notes:
+- `data.items[]` is ordered by review kind first: `duplicate_check`, then `claim_validation`, then any future kinds.
+- Each queue item includes `reviewId`, `reviewKind`, `registryEntityId`, `claimId`, `claimantWalletSubject`, `status`, and `entity`.
+- Queue reads preserve the wallet-first claim anchor; they do not rewrite the stored wallet subject.
+
+### GET `/api/registry/proof/:registryId`
+Returns the deterministic proof and loadout surface for one Registry entity.
+
+Response fields:
+- `data.registryEntityId`
+- `data.entity`
+- `data.proofCards[]`
+- `data.loadouts[]`
+- `data.bundles[]`
+- `data.summary.proofCardCount`
+- `data.summary.loadoutCount`
+- `data.summary.bundleCount`
+
+Notes:
+- Each proof card exposes stable `evidenceId`, `sourceKind`, and `linkedAt`.
+- Each loadout exposes stable `loadoutId`, ordered `componentRefs`, and any linked bundle objects.
+- Each bundle exposes stable `bundleId`, ordered `componentRefs`, and `contentHash`.
+
 ### POST `/api/web/sessions`
 Creates a durable Web Experience session bound to the current Portal session.
 
@@ -121,9 +249,13 @@ Response fields:
 ### GET `/api/web/sessions/:id`
 Returns:
 - `data.session`
+- `data.session.webSessionId`
+- `data.session.url`
+- `data.session.activeRevision`
 - `data.activeIntegration`
 - `data.approvalQueue`
 - `data.lastCheckpoint`
+- `data.lastCheckpoint.checkpointRef`
 - `data.runtimeSnapshot`
 - `data.credentialStatusByOrigin`
 
@@ -3011,6 +3143,18 @@ Returns OTP adapter activity for local deterministic tests.
 
 ### GET `/__test__/platform-export`
 Returns a deterministic durable-platform export snapshot with per-table counts.
+
+### GET `/__test__/completion/stats`
+Returns deterministic completion-phase counts, fixture families, and inspectable surface labels.
+
+### GET `/__test__/completion/fixtures`
+Returns deterministic completion-fixture family names.
+
+### GET `/__test__/completion/fixtures/:family`
+Returns the named completion-fixture payload.
+
+### GET `/__test__/registry/grouped-preview`
+Returns grouped Registry preview rows using family-first grouping rules.
 
 ### POST `/__test__/platform-import`
 Imports one previously exported snapshot, optionally after a reset.

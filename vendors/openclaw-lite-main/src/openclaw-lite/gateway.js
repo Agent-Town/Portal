@@ -322,6 +322,21 @@ async function init() {
     };
   }
 
+  function normalizeLiteToolEnvelope(result) {
+    const raw = isPlainRecord(result) ? result : {};
+    const content = Array.isArray(raw.content) ? raw.content : [];
+    const textEntry = content.find((entry) => entry && entry.type === "text" && typeof entry.text === "string");
+    let envelope = null;
+    if (textEntry && typeof textEntry.text === "string") {
+      try {
+        envelope = JSON.parse(textEntry.text);
+      } catch {
+        envelope = null;
+      }
+    }
+    return isPlainRecord(envelope) ? envelope : null;
+  }
+
   function appendExperienceToolTrace({ source = "runtime", tool = "", result = null }) {
     const normalized = normalizeExperienceToolResult(result);
     experienceToolTrace.push({
@@ -1463,6 +1478,25 @@ async function init() {
     },
     async getToolRegistryInfo() {
       return toolRegistryRequest();
+    },
+    async invokeLiteTool({ tool, params = {} } = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.invokeLite",
+        responseType: "worker.tools.invokeLite",
+        payload: {
+          toolName: typeof tool === "string" ? tool : "",
+          params: isPlainRecord(params) ? params : {},
+        },
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "TOOLS_INVOKE_LITE_FAILED"));
+      const envelope = normalizeLiteToolEnvelope(res.result);
+      return {
+        ok: envelope?.ok === true,
+        data: isPlainRecord(envelope?.data) ? envelope.data : null,
+        error: isPlainRecord(envelope?.error) ? envelope.error : null,
+        meta: isPlainRecord(envelope?.meta) ? envelope.meta : null,
+        details: isPlainRecord(res?.result?.details) ? res.result.details : null,
+      };
     },
     async runToolSmoke({ count = 5 } = {}) {
       const res = await sendWorkerRequest({

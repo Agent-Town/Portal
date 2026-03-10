@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
@@ -6,6 +7,11 @@ const { nowIso, randomHex } = require('./util');
 const { getStorePath } = require('./store');
 
 let db = null;
+const REGISTRY_SCHEMA_VERSION = 'registry-family-core/v1';
+const REGISTRY_REVIEW_KIND_ORDER = Object.freeze({
+  duplicate_check: 0,
+  claim_validation: 1,
+});
 
 function ensureDb() {
   if (db) return db;
@@ -163,6 +169,19 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS credential_grants_origin_status_idx
       ON origin_credential_grants(origin, status, updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS registry_families (
+      family_slug TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      description TEXT,
+      status TEXT NOT NULL,
+      health_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS registry_families_status_slug_idx
+      ON registry_families(status, family_slug);
+
     CREATE TABLE IF NOT EXISTS registry_entities (
       registry_entity_id TEXT PRIMARY KEY,
       entity_kind TEXT NOT NULL,
@@ -177,6 +196,79 @@ function ensureDb() {
 
     CREATE INDEX IF NOT EXISTS registry_entities_kind_slug_idx
       ON registry_entities(entity_kind, slug);
+
+    CREATE TABLE IF NOT EXISTS registry_claims (
+      claim_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      claimant_wallet_subject TEXT NOT NULL,
+      claimant_wallet_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      request_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS registry_claims_entity_wallet_idx
+      ON registry_claims(registry_entity_id, claimant_wallet_subject, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS registry_entity_versions (
+      entity_version_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      version_label TEXT NOT NULL,
+      projection_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS registry_entity_versions_entity_idx
+      ON registry_entity_versions(registry_entity_id, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS registry_reviews (
+      review_id TEXT PRIMARY KEY,
+      review_kind TEXT NOT NULL,
+      registry_entity_id TEXT,
+      claim_id TEXT,
+      claimant_wallet_subject TEXT,
+      status TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS registry_proofs (
+      proof_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      evidence_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS registry_bundles (
+      bundle_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      component_refs_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS registry_loadouts (
+      loadout_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      component_refs_json TEXT NOT NULL,
+      bundle_refs_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (registry_entity_id) REFERENCES registry_entities(registry_entity_id)
+    );
 
     CREATE TABLE IF NOT EXISTS poker_seasons (
       season_id TEXT PRIMARY KEY,
@@ -284,7 +376,16 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_setup_submissions', 'wallet_subject', 'TEXT');
   ensureColumnExists(db, 'poker_setup_submissions', 'declared_capabilities_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumnExists(db, 'poker_setup_submissions', 'raw_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumnExists(db, 'registry_claims', 'claimant_wallet_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumnExists(db, 'registry_claims', 'request_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumnExists(db, 'registry_reviews', 'claim_id', 'TEXT');
+  ensureColumnExists(db, 'registry_reviews', 'claimant_wallet_subject', 'TEXT');
+  seedRegistryFamilies();
   seedRegistryEntities();
+  seedRegistryEntityVersions();
+  seedRegistryProofs();
+  seedRegistryBundles();
+  seedRegistryLoadouts();
   return db;
 }
 
@@ -325,6 +426,57 @@ function fromJson(value, fallback) {
     return JSON.parse(String(value || ''));
   } catch {
     return fallback;
+  }
+}
+
+function seedRegistryFamilies() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM registry_families').get();
+  if (Number(count?.count || 0) > 0) return;
+  const now = sqlNow();
+  const rows = [
+    {
+      familySlug: 'developer_workflows',
+      displayName: 'Developer Workflows',
+      description: 'Supported development and repository-oriented capability families.',
+      status: 'ready',
+      health: {
+        readiness: 'ready',
+        seededEntityCount: 1,
+      },
+    },
+    {
+      familySlug: 'registry',
+      displayName: 'Registry',
+      description: 'Registry-owned capability and storefront discovery surfaces.',
+      status: 'ready',
+      health: {
+        readiness: 'ready',
+        seededEntityCount: 1,
+      },
+    },
+  ];
+  const insert = database.prepare(`
+    INSERT INTO registry_families (
+      family_slug,
+      display_name,
+      description,
+      status,
+      health_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    insert.run(
+      row.familySlug,
+      row.displayName,
+      row.description,
+      row.status,
+      toJson(row.health, {}),
+      now,
+      now
+    );
   }
 }
 
@@ -387,6 +539,168 @@ function seedRegistryEntities() {
   }
 }
 
+function seedRegistryEntityVersions() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM registry_entity_versions').get();
+  if (Number(count?.count || 0) > 0) return;
+  const now = sqlNow();
+  const rows = [
+    {
+      entityVersionId: 'rev_github_issue_reply_v1',
+      registryEntityId: 'reg_github_issue_reply',
+      versionLabel: 'v1',
+      projection: {
+        origin: 'https://github.com',
+        pageClass: 'issue_detail',
+        capabilities: ['draft_reply', 'submit_reply'],
+      },
+    },
+    {
+      entityVersionId: 'rev_registry_catalog_v1',
+      registryEntityId: 'reg_registry_catalog',
+      versionLabel: 'v1',
+      projection: {
+        capabilities: ['search', 'filter', 'project'],
+      },
+    },
+  ];
+  const insert = database.prepare(`
+    INSERT INTO registry_entity_versions (
+      entity_version_id,
+      registry_entity_id,
+      version_label,
+      projection_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    insert.run(
+      row.entityVersionId,
+      row.registryEntityId,
+      row.versionLabel,
+      toJson(row.projection, {}),
+      now,
+      now
+    );
+  }
+}
+
+function seedRegistryProofs() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM registry_proofs').get();
+  if (Number(count?.count || 0) > 0) return;
+  const rows = [
+    {
+      proofId: 'proof_fixture_01',
+      registryEntityId: 'reg_github_issue_reply',
+      sourceKind: 'poker',
+      evidence: {
+        evidenceId: 'evidence_fixture_01',
+        sourceKind: 'poker',
+        linkedAt: '2026-03-06T09:00:00.000Z',
+        summary: 'Poker ladder mirror linked this setup into the Registry proof surface.',
+      },
+    },
+  ];
+  const insert = database.prepare(`
+    INSERT INTO registry_proofs (
+      proof_id,
+      registry_entity_id,
+      source_kind,
+      evidence_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    insert.run(
+      row.proofId,
+      row.registryEntityId,
+      row.sourceKind,
+      toJson(row.evidence, {}),
+      row.evidence.linkedAt,
+      row.evidence.linkedAt
+    );
+  }
+}
+
+function seedRegistryBundles() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM registry_bundles').get();
+  if (Number(count?.count || 0) > 0) return;
+  const now = '2026-03-06T09:05:00.000Z';
+  const rows = [
+    {
+      bundleId: 'bundle_fixture_01',
+      registryEntityId: 'reg_github_issue_reply',
+      displayName: 'GitHub Issue Reply Poker Bundle',
+      contentHash: 'sha256:bundle_fixture_01',
+      componentRefs: ['reg_github_issue_reply'],
+    },
+  ];
+  const insert = database.prepare(`
+    INSERT INTO registry_bundles (
+      bundle_id,
+      registry_entity_id,
+      display_name,
+      content_hash,
+      component_refs_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    insert.run(
+      row.bundleId,
+      row.registryEntityId,
+      row.displayName,
+      row.contentHash,
+      toJson(row.componentRefs, []),
+      now,
+      now
+    );
+  }
+}
+
+function seedRegistryLoadouts() {
+  const database = ensureDb();
+  const count = database.prepare('SELECT COUNT(1) AS count FROM registry_loadouts').get();
+  if (Number(count?.count || 0) > 0) return;
+  const now = '2026-03-06T09:10:00.000Z';
+  const rows = [
+    {
+      loadoutId: 'loadout_fixture_01',
+      registryEntityId: 'reg_github_issue_reply',
+      displayName: 'Issue Reply Ladder Loadout',
+      componentRefs: ['reg_github_issue_reply'],
+      bundleRefs: ['bundle_fixture_01'],
+    },
+  ];
+  const insert = database.prepare(`
+    INSERT INTO registry_loadouts (
+      loadout_id,
+      registry_entity_id,
+      display_name,
+      component_refs_json,
+      bundle_refs_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  for (const row of rows) {
+    insert.run(
+      row.loadoutId,
+      row.registryEntityId,
+      row.displayName,
+      toJson(row.componentRefs, []),
+      toJson(row.bundleRefs, []),
+      now,
+      now
+    );
+  }
+}
+
 function makeId(prefix) {
   return `${prefix}_${randomHex(10)}`;
 }
@@ -401,7 +715,14 @@ function countTableRows(tableName) {
     'web_evidence_items',
     'web_checkpoints',
     'origin_credential_grants',
+    'registry_families',
     'registry_entities',
+    'registry_claims',
+    'registry_entity_versions',
+    'registry_reviews',
+    'registry_proofs',
+    'registry_bundles',
+    'registry_loadouts',
     'poker_seasons',
     'poker_divisions',
     'poker_setup_submissions',
@@ -432,6 +753,13 @@ function resetExtendedStore() {
     'poker_leaderboard_snapshots',
     'web_sessions',
     'poker_seasons',
+    'registry_proofs',
+    'registry_loadouts',
+    'registry_bundles',
+    'registry_reviews',
+    'registry_claims',
+    'registry_entity_versions',
+    'registry_families',
     'registry_entities',
   ];
   withTransaction(() => {
@@ -439,7 +767,12 @@ function resetExtendedStore() {
       database.prepare(`DELETE FROM ${table}`).run();
     }
   });
+  seedRegistryFamilies();
   seedRegistryEntities();
+  seedRegistryEntityVersions();
+  seedRegistryProofs();
+  seedRegistryBundles();
+  seedRegistryLoadouts();
 }
 
 function createImportJob({
@@ -1267,33 +1600,577 @@ function searchRegistryEntities({ query = '', family = '' } = {}) {
   }
   sql += ' ORDER BY display_name ASC';
   const rows = database.prepare(sql).all(...params);
-  return rows.map((row) => ({
-    registryEntityId: row.registry_entity_id,
-    entityKind: row.entity_kind,
-    family: row.family || null,
-    slug: row.slug,
+  return rows.map((row) => {
+    const version = getLatestRegistryEntityVersion(row.registry_entity_id);
+    const proofCards = listRegistryProofCards(row.registry_entity_id);
+    const loadouts = listRegistryLoadouts(row.registry_entity_id);
+    return {
+      proofCards,
+      loadouts,
+      registryId: row.registry_entity_id,
+      registryEntityId: row.registry_entity_id,
+      entityVersionId: version?.entityVersionId || null,
+      versionLabel: version?.versionLabel || null,
+      versionProjection: version?.versionProjection || {},
+      entityKind: row.entity_kind,
+      family: row.family || null,
+      familySlug: row.family || null,
+      slug: row.slug,
+      displayName: row.display_name,
+      description: row.description || null,
+      projection: fromJson(row.projection_json, {}),
+      familyInfo: row.family ? getRegistryFamilySummary(row.family) : null,
+      storefront: {
+        title: row.display_name,
+        summary: row.description || null,
+        proofCount: proofCards.length,
+        loadoutCount: loadouts.length,
+      },
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
+}
+
+function getRegistryFamilySummary(familySlug) {
+  const normalizedFamilySlug = String(familySlug || '').trim().toLowerCase();
+  if (!normalizedFamilySlug) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT family_slug, display_name, description, status, updated_at
+    FROM registry_families
+    WHERE family_slug = ?
+    LIMIT 1
+  `).get(normalizedFamilySlug);
+  if (!row) return null;
+  return {
+    familySlug: row.family_slug,
     displayName: row.display_name,
     description: row.description || null,
-    projection: fromJson(row.projection_json, {}),
+    status: row.status,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getLatestRegistryEntityVersion(registryEntityId) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  if (!normalizedRegistryEntityId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT entity_version_id, version_label, projection_json, created_at, updated_at
+    FROM registry_entity_versions
+    WHERE registry_entity_id = ?
+    ORDER BY updated_at DESC, entity_version_id DESC
+    LIMIT 1
+  `).get(normalizedRegistryEntityId);
+  if (!row) return null;
+  return {
+    entityVersionId: row.entity_version_id,
+    versionLabel: row.version_label || null,
+    versionProjection: fromJson(row.projection_json, {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  }));
+  };
+}
+
+function searchRegistryFamilyGroups({ query = '', family = '' } = {}) {
+  const items = searchRegistryEntities({ query, family });
+  const groups = new Map();
+  for (const item of items) {
+    const familySlug = String(item.familySlug || item.family || 'unscoped').trim() || 'unscoped';
+    const familyInfo = item.familyInfo || getRegistryFamilySummary(familySlug) || {
+      familySlug,
+      displayName: familySlug,
+      description: null,
+      status: 'unknown',
+      updatedAt: item.updatedAt,
+    };
+    if (!groups.has(familySlug)) {
+      groups.set(familySlug, {
+        family: familySlug,
+        familySlug,
+        familyTitle: familyInfo.displayName,
+        familyDescription: familyInfo.description || null,
+        familyStatus: familyInfo.status || 'unknown',
+        storefront: {
+          title: familyInfo.displayName,
+          summary: familyInfo.description || null,
+        },
+        members: [],
+      });
+    }
+    groups.get(familySlug).members.push({
+      registryEntityId: item.registryEntityId,
+      entityKind: item.entityKind,
+      slug: item.slug,
+      displayName: item.displayName,
+      description: item.description || null,
+      projection: item.projection,
+      proofCards: item.proofCards,
+      loadouts: item.loadouts,
+      storefront: {
+        title: item.displayName,
+        summary: item.description || null,
+        proofCount: item.proofCards.length,
+        loadoutCount: item.loadouts.length,
+      },
+    });
+  }
+  return Array.from(groups.values())
+    .sort((a, b) => a.familySlug.localeCompare(b.familySlug))
+    .map((group) => ({
+      ...group,
+      memberCount: group.members.length,
+      members: group.members.sort((a, b) => a.slug.localeCompare(b.slug)),
+    }));
 }
 
 function getRegistryEntityById(registryEntityId) {
   const database = ensureDb();
   const row = database.prepare('SELECT * FROM registry_entities WHERE registry_entity_id = ?').get(registryEntityId);
   if (!row) return null;
+  const version = getLatestRegistryEntityVersion(row.registry_entity_id);
+  const familyInfo = row.family ? getRegistryFamilySummary(row.family) : null;
+  const proofCards = listRegistryProofCards(row.registry_entity_id);
+  const loadouts = listRegistryLoadouts(row.registry_entity_id);
   return {
+    registryId: row.registry_entity_id,
     registryEntityId: row.registry_entity_id,
+    entityVersionId: version?.entityVersionId || null,
+    versionLabel: version?.versionLabel || null,
+    versionProjection: version?.versionProjection || {},
     entityKind: row.entity_kind,
     family: row.family || null,
+    familySlug: row.family || null,
+    familyInfo,
     slug: row.slug,
     displayName: row.display_name,
     description: row.description || null,
     projection: fromJson(row.projection_json, {}),
+    proofCards,
+    loadouts,
+    storefront: {
+      title: row.display_name,
+      summary: row.description || null,
+      proofCount: proofCards.length,
+      loadoutCount: loadouts.length,
+    },
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function getRegistryFamilyBySlug(familySlug) {
+  const familyInfo = getRegistryFamilySummary(familySlug);
+  if (!familyInfo) return null;
+  const database = ensureDb();
+  const members = database.prepare(`
+    SELECT *
+    FROM registry_entities
+    WHERE lower(coalesce(family, '')) = ?
+    ORDER BY slug ASC, display_name ASC
+  `).all(String(familySlug || '').trim().toLowerCase()).map((row) => {
+    const version = getLatestRegistryEntityVersion(row.registry_entity_id);
+    return {
+      proofCards: listRegistryProofCards(row.registry_entity_id),
+      loadouts: listRegistryLoadouts(row.registry_entity_id),
+      registryId: row.registry_entity_id,
+      registryEntityId: row.registry_entity_id,
+      entityVersionId: version?.entityVersionId || null,
+      versionLabel: version?.versionLabel || null,
+      versionProjection: version?.versionProjection || {},
+      entityKind: row.entity_kind,
+      family: row.family || null,
+      familySlug: row.family || null,
+      slug: row.slug,
+      displayName: row.display_name,
+      description: row.description || null,
+      projection: fromJson(row.projection_json, {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
+  return {
+    ...familyInfo,
+    family: familyInfo.familySlug,
+    storefront: {
+      title: familyInfo.displayName,
+      summary: familyInfo.description || null,
+      memberCount: members.length,
+    },
+    entityCount: members.length,
+    members,
+  };
+}
+
+function getRegistryHealth() {
+  const database = ensureDb();
+  const familyCount = Number(database.prepare('SELECT COUNT(1) AS count FROM registry_families').get()?.count || 0);
+  const entityCount = Number(database.prepare('SELECT COUNT(1) AS count FROM registry_entities').get()?.count || 0);
+  const families = database.prepare(`
+    SELECT family_slug, display_name, status, updated_at
+    FROM registry_families
+    ORDER BY family_slug ASC
+  `).all().map((row) => ({
+    familySlug: row.family_slug,
+    displayName: row.display_name,
+    status: row.status,
+    updatedAt: row.updated_at,
+  }));
+  return {
+    ok: true,
+    schemaVersion: REGISTRY_SCHEMA_VERSION,
+    familyModelReady: true,
+    familyCount,
+    entityCount,
+    families,
+  };
+}
+
+function listRegistryProofCards(registryEntityId) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  if (!normalizedRegistryEntityId) return [];
+  const database = ensureDb();
+  return database.prepare(`
+    SELECT *
+    FROM registry_proofs
+    WHERE registry_entity_id = ?
+    ORDER BY proof_id ASC
+  `).all(normalizedRegistryEntityId).map((row) => {
+    const evidence = fromJson(row.evidence_json, {});
+    return {
+      proofId: row.proof_id,
+      registryEntityId: row.registry_entity_id,
+      evidenceId: String(evidence.evidenceId || row.proof_id),
+      sourceKind: String(evidence.sourceKind || row.source_kind || ''),
+      linkedAt: typeof evidence.linkedAt === 'string' && evidence.linkedAt.trim()
+        ? evidence.linkedAt.trim()
+        : row.created_at,
+      summary: typeof evidence.summary === 'string' ? evidence.summary : null,
+    };
+  });
+}
+
+function listRegistryBundles(registryEntityId) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  if (!normalizedRegistryEntityId) return [];
+  const database = ensureDb();
+  return database.prepare(`
+    SELECT *
+    FROM registry_bundles
+    WHERE registry_entity_id = ?
+    ORDER BY bundle_id ASC
+  `).all(normalizedRegistryEntityId).map((row) => ({
+    objectKind: 'bundle',
+    bundleId: row.bundle_id,
+    registryEntityId: row.registry_entity_id,
+    displayName: row.display_name,
+    contentHash: row.content_hash,
+    componentRefs: fromJson(row.component_refs_json, [])
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b)),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+function listRegistryLoadouts(registryEntityId) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  if (!normalizedRegistryEntityId) return [];
+  const bundleMap = new Map(listRegistryBundles(normalizedRegistryEntityId).map((bundle) => [bundle.bundleId, bundle]));
+  const database = ensureDb();
+  return database.prepare(`
+    SELECT *
+    FROM registry_loadouts
+    WHERE registry_entity_id = ?
+    ORDER BY loadout_id ASC
+  `).all(normalizedRegistryEntityId).map((row) => {
+    const bundleRefs = fromJson(row.bundle_refs_json, [])
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    return {
+      objectKind: 'loadout',
+      loadoutId: row.loadout_id,
+      registryEntityId: row.registry_entity_id,
+      displayName: row.display_name,
+      componentRefs: fromJson(row.component_refs_json, [])
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b)),
+      bundleRefs,
+      bundles: bundleRefs.map((bundleId) => bundleMap.get(bundleId)).filter(Boolean),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  });
+}
+
+function getRegistryProofByRegistryId(registryEntityId) {
+  const entity = getRegistryEntityById(registryEntityId);
+  if (!entity) return null;
+  const proofCards = listRegistryProofCards(registryEntityId);
+  const bundles = listRegistryBundles(registryEntityId);
+  const loadouts = listRegistryLoadouts(registryEntityId);
+  return {
+    registryEntityId: entity.registryEntityId,
+    entity: {
+      registryEntityId: entity.registryEntityId,
+      family: entity.family,
+      familySlug: entity.familySlug,
+      slug: entity.slug,
+      displayName: entity.displayName,
+    },
+    proofCards,
+    loadouts,
+    bundles,
+    summary: {
+      proofCardCount: proofCards.length,
+      loadoutCount: loadouts.length,
+      bundleCount: bundles.length,
+    },
+  };
+}
+
+function buildDeterministicRegistryScopedId(prefix, parts = []) {
+  const seed = Array.isArray(parts)
+    ? parts.map((part) => String(part == null ? '' : part).trim()).join('|')
+    : String(parts == null ? '' : parts).trim();
+  const digest = crypto.createHash('sha256').update(seed, 'utf8').digest('hex').slice(0, 16);
+  return `${prefix}_${digest}`;
+}
+
+function hydrateRegistryClaim(row) {
+  if (!row) return null;
+  return {
+    claimId: row.claim_id,
+    registryEntityId: row.registry_entity_id,
+    claimantWalletSubject: row.claimant_wallet_subject,
+    claimantWallet: fromJson(row.claimant_wallet_json, {}),
+    status: row.status,
+    request: fromJson(row.request_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function hydrateRegistryReview(row) {
+  if (!row) return null;
+  const payload = fromJson(row.payload_json, {});
+  return {
+    reviewId: row.review_id,
+    reviewKind: row.review_kind,
+    registryEntityId: row.registry_entity_id || payload.registryEntityId || null,
+    claimId: row.claim_id || payload.claimId || null,
+    claimantWalletSubject: row.claimant_wallet_subject || payload.claimantWalletSubject || null,
+    status: row.status,
+    payload,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listRegistryReviewsForClaim(claimId) {
+  const database = ensureDb();
+  return database.prepare(`
+    SELECT *
+    FROM registry_reviews
+    WHERE claim_id = ?
+    ORDER BY
+      CASE review_kind
+        WHEN 'duplicate_check' THEN 0
+        WHEN 'claim_validation' THEN 1
+        ELSE 9
+      END ASC,
+      created_at ASC,
+      review_id ASC
+  `).all(claimId).map(hydrateRegistryReview);
+}
+
+function createRegistryClaimStart({
+  registryEntityId,
+  claimantWalletSubject,
+  claimantWallet = {},
+  request = {},
+}) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  const normalizedWalletSubject = String(claimantWalletSubject || '').trim();
+  if (!normalizedRegistryEntityId) {
+    const err = new Error('CLAIM_TARGET_MISSING');
+    err.code = 'CLAIM_TARGET_MISSING';
+    throw err;
+  }
+  if (!normalizedWalletSubject) {
+    const err = new Error('WALLET_REQUIRED');
+    err.code = 'WALLET_REQUIRED';
+    throw err;
+  }
+  return withTransaction((database) => {
+    const entityRow = database.prepare(`
+      SELECT registry_entity_id
+      FROM registry_entities
+      WHERE registry_entity_id = ?
+      LIMIT 1
+    `).get(normalizedRegistryEntityId);
+    if (!entityRow) {
+      const err = new Error('CLAIM_TARGET_MISSING');
+      err.code = 'CLAIM_TARGET_MISSING';
+      throw err;
+    }
+
+    const existingClaimRow = database.prepare(`
+      SELECT *
+      FROM registry_claims
+      WHERE registry_entity_id = ?
+        AND claimant_wallet_subject = ?
+        AND status IN ('pending_validation', 'under_review', 'approved')
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get(normalizedRegistryEntityId, normalizedWalletSubject);
+    if (existingClaimRow) {
+      const err = new Error('CLAIM_CONFLICT');
+      err.code = 'CLAIM_CONFLICT';
+      err.claim = hydrateRegistryClaim(existingClaimRow);
+      throw err;
+    }
+
+    const now = sqlNow();
+    const claimId = buildDeterministicRegistryScopedId('claim', [
+      normalizedRegistryEntityId,
+      normalizedWalletSubject,
+    ]);
+    const claimRequest = request && typeof request === 'object' ? request : {};
+    const claimStatus = 'pending_validation';
+
+    database.prepare(`
+      INSERT INTO registry_claims (
+        claim_id,
+        registry_entity_id,
+        claimant_wallet_subject,
+        claimant_wallet_json,
+        status,
+        request_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      claimId,
+      normalizedRegistryEntityId,
+      normalizedWalletSubject,
+      toJson(claimantWallet, {}),
+      claimStatus,
+      toJson(claimRequest, {}),
+      now,
+      now
+    );
+
+    const reviewRows = [
+      {
+        reviewId: buildDeterministicRegistryScopedId('review', [claimId, 'duplicate_check']),
+        reviewKind: 'duplicate_check',
+        payload: {
+          claimId,
+          registryEntityId: normalizedRegistryEntityId,
+          claimantWalletSubject: normalizedWalletSubject,
+          matchStrategy: 'wallet_subject',
+          transition: 'queued',
+        },
+      },
+      {
+        reviewId: buildDeterministicRegistryScopedId('review', [claimId, 'claim_validation']),
+        reviewKind: 'claim_validation',
+        payload: {
+          claimId,
+          registryEntityId: normalizedRegistryEntityId,
+          claimantWalletSubject: normalizedWalletSubject,
+          verificationAnchor: 'wallet_subject',
+          transition: 'queued',
+        },
+      },
+    ];
+
+    const insertReview = database.prepare(`
+      INSERT INTO registry_reviews (
+        review_id,
+        review_kind,
+        registry_entity_id,
+        claim_id,
+        claimant_wallet_subject,
+        status,
+        payload_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const row of reviewRows) {
+      insertReview.run(
+        row.reviewId,
+        row.reviewKind,
+        normalizedRegistryEntityId,
+        claimId,
+        normalizedWalletSubject,
+        'queued',
+        toJson(row.payload, {}),
+        now,
+        now
+      );
+    }
+
+    return {
+      claim: hydrateRegistryClaim(database.prepare(`
+        SELECT *
+        FROM registry_claims
+        WHERE claim_id = ?
+        LIMIT 1
+      `).get(claimId)),
+      reviews: listRegistryReviewsForClaim(claimId),
+    };
+  });
+}
+
+function getRegistryReviewQueue() {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM registry_reviews
+    ORDER BY
+      CASE review_kind
+        WHEN 'duplicate_check' THEN 0
+        WHEN 'claim_validation' THEN 1
+        ELSE 9
+      END ASC,
+      created_at ASC,
+      review_id ASC
+  `).all();
+  const items = rows.map((row) => {
+    const review = hydrateRegistryReview(row);
+    const entity = review?.registryEntityId ? getRegistryEntityById(review.registryEntityId) : null;
+    return {
+      ...review,
+      entity: entity ? {
+        registryEntityId: entity.registryEntityId,
+        family: entity.family,
+        familySlug: entity.familySlug,
+        slug: entity.slug,
+        displayName: entity.displayName,
+      } : null,
+      queueOrder: REGISTRY_REVIEW_KIND_ORDER[review.reviewKind] ?? 9,
+    };
+  });
+  const countsByKind = items.reduce((acc, item) => {
+    const key = String(item.reviewKind || '').trim();
+    if (!key) return acc;
+    acc[key] = Number(acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  return {
+    items,
+    total: items.length,
+    counts: {
+      byKind: countsByKind,
+      queued: items.filter((item) => item.status === 'queued').length,
+    },
   };
 }
 
@@ -1831,7 +2708,12 @@ module.exports = {
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
   getPokerReplayArtifactByRunId,
+  createRegistryClaimStart,
+  getRegistryFamilyBySlug,
+  getRegistryHealth,
   getRegistryEntityById,
+  getRegistryProofByRegistryId,
+  getRegistryReviewQueue,
   getPokerRunById,
   getPokerSeasonById,
   getPokerSubmissionById,
@@ -1842,6 +2724,7 @@ module.exports = {
   listEvidenceForSession,
   listPokerSeasons,
   resetExtendedStore,
+  searchRegistryFamilyGroups,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,

@@ -29,6 +29,9 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   expect(skillContract).toContain('`webSessionId`');
   expect(skillContract).toContain('`atlas`, `registry`, `poker`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`');
   expect(skillContract).toContain('Do not navigate to direct standalone routes (for example `/poker`) when a modal intent exists.');
+  expect(skillContract).toContain('agent_town_ui_web_open({ webSessionId, sessionId, url, title })');
+  expect(skillContract).toContain('agent_town_state_get_registry_entity({ registryId, registryEntityId })');
+  expect(skillContract).toContain('agent_town_state_get_web_session({ webSessionId, sessionId })');
 
   const skillContractLine = readRepoFile('e2e/55_phase3_skill_contract_line.spec.js');
   expect(skillContractLine).toContain('trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.');
@@ -36,6 +39,9 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   expect(skillContractLine).toContain('`invocationId`');
   expect(skillContractLine).toContain('`evidenceId`');
   expect(skillContractLine).toContain('`webSessionId`');
+  expect(skillContractLine).toContain('agent_town_ui_web_open({ webSessionId, sessionId, url, title })');
+  expect(skillContractLine).toContain('agent_town_state_get_registry_entity({ registryId, registryEntityId })');
+  expect(skillContractLine).toContain('agent_town_state_get_web_session({ webSessionId, sessionId })');
 
   const internalTestline = readRepoFile('docs/internal-skill-testline.md');
   expect(internalTestline).toContain('Trainer namespace Web Experience parity');
@@ -43,6 +49,9 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   expect(internalTestline).toContain('`invocationId` / `evidenceId`');
   expect(internalTestline).toContain('Experience UI intent tools (modal open / Atlas search / Registry search / Poker modal / Pony compose)');
   expect(internalTestline).toContain('e2e/166_poker_modal_embed_policy.spec.js');
+  expect(internalTestline).toContain('Experience Web + Registry worker state tools');
+  expect(internalTestline).toContain('agent_town_ui_web_open');
+  expect(internalTestline).toContain('e2e/172_web_tool_state_surface.spec.js');
 
   const trainerSpec = readRepoFile('specs/14_trainer_namespace_tdd_spec.md');
   expect(trainerSpec).toContain('`webSessionId`');
@@ -60,6 +69,9 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   const intentSpec = readRepoFile('specs/15_experience_os_intent_tools_tdd_spec.md');
   expect(intentSpec).toContain('"modal": "atlas|registry|poker|pony|townhall|saloon|leaderboard|house|brain|sigil"');
   expect(intentSpec).toContain('registry` and `poker` render through the modal iframe/embed path');
+  expect(intentSpec).toContain('`agent_town_ui_web_open`');
+  expect(intentSpec).toContain('`agent_town_state_get_registry_entity`');
+  expect(intentSpec).toContain('`agent_town_state_get_web_session`');
 
   const implementationPack = readRepoFile('specs/16_portal_web_poker_v0.4_implementation_pack.md');
   expect(implementationPack).toContain('Portal Poker pages are modal-first from the town hub.');
