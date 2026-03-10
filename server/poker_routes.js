@@ -147,7 +147,7 @@ function ensureCentaurOwnership({
   return { entry, hand };
 }
 
-function processOilSnapshotsForVerification(deps, verification, { asOf = null } = {}) {
+async function processOilSnapshotsForVerification(deps, verification, { asOf = null } = {}) {
   if (!verification?.verificationId || !verification?.walletSubject || !verification?.address || !verification?.streamId) {
     return {
       processedSnapshots: 0,
@@ -182,7 +182,7 @@ function processOilSnapshotsForVerification(deps, verification, { asOf = null } 
         continue;
       }
 
-      const providerStatus = resolveStreamflowLockStatus({
+      const providerStatus = await resolveStreamflowLockStatus({
         address: verification.address,
         streamId: verification.streamId,
         minLockAmountAtomic: verification.minLockAmountAtomic,
@@ -246,7 +246,7 @@ function processOilSnapshotsForVerification(deps, verification, { asOf = null } 
   };
 }
 
-function buildCentaurTournamentPayload(deps, tournament, session, req, { processAt = null } = {}) {
+async function buildCentaurTournamentPayload(deps, tournament, session, req, { processAt = null } = {}) {
   const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const atIso = normalizeIsoOrNull(processAt) || deps.nowIso();
   const payload = {
@@ -270,7 +270,7 @@ function buildCentaurTournamentPayload(deps, tournament, session, req, { process
 
   let verification = deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
   if (verification) {
-    processOilSnapshotsForVerification(deps, verification, { asOf: processAt });
+    await processOilSnapshotsForVerification(deps, verification, { asOf: processAt });
     verification = deps.getStreamflowVerificationById(verification.verificationId) || verification;
     payload.verification = verification;
     payload.oilBalance = deps.computeOilBalance(walletBinding.walletSubject);
@@ -294,8 +294,8 @@ function buildCentaurTournamentPayload(deps, tournament, session, req, { process
   return payload;
 }
 
-function sendCentaurTournamentSuccess(deps, res, requestId, tournament, session, req, options = {}) {
-  const detail = buildCentaurTournamentPayload(deps, tournament, session, req, options);
+async function sendCentaurTournamentSuccess(deps, res, requestId, tournament, session, req, options = {}) {
+  const detail = await buildCentaurTournamentPayload(deps, tournament, session, req, options);
   return deps.sendPortalApiSuccess(res, detail, { requestId });
 }
 
@@ -602,7 +602,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.get('/api/poker/centaur/tournaments', (req, res) => {
+  app.get('/api/poker/centaur/tournaments', async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
     const walletBinding = session ? resolvePrimaryWalletSubject(session, req) : null;
@@ -610,7 +610,7 @@ function registerPokerRoutes(app, deps) {
     const atIso = normalizeIsoOrNull(req.query?.asOf) || nowIso();
     let currentHourSnapshots = buildCurrentHourSnapshotState(null, [], atIso);
     if (verification) {
-      processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.query?.asOf });
+      await processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.query?.asOf });
       const latestVerification = getStreamflowVerificationById(verification.verificationId) || verification;
       const snapshotEvents = listOilSnapshotEventsByVerificationAndHour(latestVerification.verificationId, toHourBucketStart(atIso));
       currentHourSnapshots = buildCurrentHourSnapshotState(latestVerification, snapshotEvents, atIso);
@@ -641,7 +641,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.get('/api/poker/centaur/tournaments/:tournamentId', (req, res) => {
+  app.get('/api/poker/centaur/tournaments/:tournamentId', async (req, res) => {
     const requestId = buildPortalRequestId();
     const tournament = getCentaurTournamentById(req.params.tournamentId);
     if (!tournament) {
@@ -769,7 +769,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.post('/api/poker/streamflow/verify', express.json({ limit: '128kb' }), (req, res) => {
+  app.post('/api/poker/streamflow/verify', express.json({ limit: '128kb' }), async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
@@ -816,7 +816,7 @@ function registerPokerRoutes(app, deps) {
       return sendPortalApiError(res, 401, 'STREAMFLOW_SIGNATURE_INVALID', 'Wallet signature could not be verified.', { requestId });
     }
 
-    const providerStatus = resolveStreamflowLockStatus({
+    const providerStatus = await resolveStreamflowLockStatus({
       address,
       streamId,
       minLockAmountAtomic,
@@ -857,7 +857,7 @@ function registerPokerRoutes(app, deps) {
       },
     });
     session.centaurPoker.streamflowVerify = null;
-    const processed = processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
+    const processed = await processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
     return sendPortalApiSuccess(res, {
       verification: getStreamflowVerificationById(verification.verificationId),
       oilBalance: computeOilBalance(walletBinding.walletSubject),
@@ -865,7 +865,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.get('/api/poker/oil/balance', (req, res) => {
+  app.get('/api/poker/oil/balance', async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
@@ -875,7 +875,7 @@ function registerPokerRoutes(app, deps) {
     }
     const verification = getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
     if (verification) {
-      processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.query?.asOf });
+      await processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.query?.asOf });
     }
     const latestVerification = verification ? getStreamflowVerificationById(verification.verificationId) : null;
     const balance = computeOilBalance(walletBinding.walletSubject);
@@ -893,7 +893,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.post('/api/poker/centaur/tournaments/:tournamentId/join', express.json({ limit: '128kb' }), (req, res) => {
+  app.post('/api/poker/centaur/tournaments/:tournamentId/join', express.json({ limit: '128kb' }), async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
@@ -913,7 +913,7 @@ function registerPokerRoutes(app, deps) {
     if (!verification) {
       return sendPortalApiError(res, 409, 'STREAMFLOW_VERIFICATION_REQUIRED', 'Verify a Streamflow lock before entering a centaur tournament.', { requestId });
     }
-    processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
+    await processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
     const wagerOil = Math.max(
       normalizeOilAmount(req.body?.wagerOil, tournament.buyInOil),
       normalizeOilAmount(tournament.buyInOil, 0)
@@ -1147,7 +1147,7 @@ function registerPokerRoutes(app, deps) {
     return res.json({ ok: true, snapshot });
   });
 
-  app.post('/__test__/poker/oil/process', express.json({ limit: '128kb' }), (req, res) => {
+  app.post('/__test__/poker/oil/process', express.json({ limit: '128kb' }), async (req, res) => {
     const token = process.env.TEST_RESET_TOKEN;
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
@@ -1162,7 +1162,7 @@ function registerPokerRoutes(app, deps) {
     if (!verification) {
       return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     }
-    const processed = processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
+    const processed = await processOilSnapshotsForVerification(routeDeps, verification, { asOf: req.body?.asOf });
     return res.json({
       ok: true,
       verificationId: verification.verificationId,
