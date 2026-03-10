@@ -283,6 +283,7 @@ GREEN gate:
 1. Parse-backed imports compile without live dependencies.
 2. Parse provenance is visible in compiled pack metadata.
 3. Runtime continues to consume only the internal compiled pack.
+4. Deterministic Parse tests use seeded stub metadata only, not live Parse requests.
 
 ### M24.8 - `threaded_feed_v1` adapter pack
 

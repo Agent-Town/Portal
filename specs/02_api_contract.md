@@ -1027,7 +1027,11 @@ Request shape:
 {
   "targetUrl": "https://github.com/openai/openai-codex/issues/1",
   "preferredMode": "auto",
-  "sourceHints": {}
+  "sourceHints": {
+    "parseStub": false,
+    "parseStubFamily": "optional test-only fixture family",
+    "adapterId": "optional parse adapter id"
+  }
 }
 ```
 
@@ -1053,7 +1057,8 @@ Response shape:
     "integration": {
       "integrationRegistryId": "wi_github_issue_reply",
       "versionId": "rv_github_issue_reply_v1"
-    }
+    },
+    "parse": null
   },
   "meta": {
     "requestId": "req_...",
@@ -1107,6 +1112,7 @@ Response shape:
         "experienceKind": "web.portal",
         "minClientVersion": "0.1.0"
       },
+      "provenanceSummary": null,
       "files": {
         "manifest.json": "manifest.json",
         "manual/skill.md": "manual/skill.md"

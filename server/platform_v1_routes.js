@@ -393,6 +393,7 @@ function registerPlatformV1Routes(app, deps) {
         requiresCompilation,
         website: resolved.website || null,
         integration: resolved.integration || null,
+        parse: resolved.parse || null,
         alternatives: Array.isArray(resolved.alternatives) ? resolved.alternatives : [],
         fallback: resolved.fallback || null,
         targetUrl: new URL(targetUrl).toString(),

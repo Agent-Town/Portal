@@ -4880,11 +4880,69 @@ function inferWebPageClass(parsedUrl, sourceHints = {}) {
   return 'generic_page';
 }
 
+function resolveParseStubCandidate(targetUrl, { preferredMode = 'auto', sourceHints = {} } = {}) {
+  const parseStubFamily = typeof sourceHints?.parseStubFamily === 'string'
+    ? sourceHints.parseStubFamily.trim()
+    : (
+      sourceHints?.parseStub === true || sourceHints?.parseStub === 'threaded_feed_v1'
+        ? 'web_parse_stub_seed'
+        : ''
+    );
+  if (!parseStubFamily) return null;
+  const fixture = getRegistryWebPokerTestFixture(parseStubFamily);
+  if (!fixture || typeof fixture !== 'object') return null;
+
+  const parseCandidate = fixture?.parseCandidate && typeof fixture.parseCandidate === 'object'
+    ? fixture.parseCandidate
+    : {};
+  const normalizedTargetUrl = new URL(String(targetUrl || '')).toString();
+  const expectedUrl = typeof parseCandidate?.sourceUrl === 'string' ? parseCandidate.sourceUrl.trim() : '';
+  if (expectedUrl && normalizedTargetUrl !== expectedUrl) return null;
+
+  const parsed = new URL(normalizedTargetUrl);
+  const mode = normalizeWebRenderMode(preferredMode, 'companion');
+  const adapterId = typeof sourceHints?.adapterId === 'string' && sourceHints.adapterId.trim()
+    ? sourceHints.adapterId.trim()
+    : 'threaded_feed_v1';
+  return {
+    resolutionState: 'supported',
+    website: {
+      origin: parsed.origin,
+      canonicalUrl: normalizedTargetUrl,
+      registryId: 'ws_parse_stub_example',
+      displayName: 'Parse Stub Website',
+      trustTier: 'stub',
+      domainProofState: 'stubbed',
+    },
+    integration: {
+      integrationRegistryId: 'wi_parse_threaded_feed_stub',
+      versionId: 'rv_parse_threaded_feed_stub_v1',
+      sourceType: 'parse',
+      authModel: 'none',
+      renderMode: mode === 'embedded' ? 'embedded' : 'companion',
+      pageClass: inferWebPageClass(parsed, sourceHints),
+      adapterId,
+    },
+    parse: {
+      fixtureFamily: parseStubFamily,
+      candidateId: typeof parseCandidate?.candidateId === 'string' ? parseCandidate.candidateId : null,
+      sourceUrl: expectedUrl || normalizedTargetUrl,
+      adapterId,
+    },
+    alternatives: [],
+    fallback: null,
+  };
+}
+
 function resolveWebTarget(targetUrl, { preferredMode = 'auto', sourceHints = {} } = {}) {
   const parsed = new URL(String(targetUrl || ''));
   const origin = parsed.origin;
   const pageClass = inferWebPageClass(parsed, sourceHints);
   const mode = normalizeWebRenderMode(preferredMode, 'companion');
+  const parseStubCandidate = resolveParseStubCandidate(targetUrl, { preferredMode, sourceHints });
+  if (parseStubCandidate) {
+    return parseStubCandidate;
+  }
   if (parsed.hostname === 'github.com') {
     return {
       resolutionState: 'supported',
@@ -4929,6 +4987,7 @@ function buildCompiledIntegrationPack(candidate) {
   const sourceKind = String(candidate?.sourceKind || '').trim() || 'parse';
   const website = candidate?.website && typeof candidate.website === 'object' ? candidate.website : {};
   const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
+  const parseMetadata = candidate?.parse && typeof candidate.parse === 'object' ? candidate.parse : {};
   const websiteName = String(website.displayName || website.registryId || 'Website').trim();
   const actionIds = sourceKind === 'native_pack'
     ? ['github.issue.read', 'github.issue.reply']
@@ -4949,6 +5008,7 @@ function buildCompiledIntegrationPack(candidate) {
     websiteRegistryId: String(website.registryId || ''),
     integrationRegistryId: String(integration.integrationRegistryId || ''),
     versionId: String(integration.versionId || ''),
+    adapterId: String(parseMetadata?.adapterId || integration?.adapterId || ''),
     sourceKind,
     actionIds,
   };
@@ -5005,6 +5065,7 @@ function buildCompiledIntegrationPack(candidate) {
       renderMode: String(integration.renderMode || 'companion'),
       pageClass: String(integration.pageClass || 'generic_page'),
       authModel: String(integration.authModel || 'none'),
+      adapterId: String(parseMetadata?.adapterId || integration?.adapterId || ''),
     },
     actions: actionPolicies,
   };
@@ -5029,6 +5090,14 @@ function buildCompiledIntegrationPack(candidate) {
       versionId: String(integration.versionId || ''),
     },
   };
+  if (sourceKind === 'parse') {
+    provenancePayload.parse = {
+      fixtureFamily: String(parseMetadata?.fixtureFamily || ''),
+      candidateId: String(parseMetadata?.candidateId || ''),
+      sourceUrl: String(parseMetadata?.sourceUrl || targetUrl || ''),
+      adapterId: String(parseMetadata?.adapterId || integration?.adapterId || ''),
+    };
+  }
   const jsonFileBodies = {
     'trace_map.json': traceMap,
     'overlay.json': `${JSON.stringify(overlayPayload, null, 2)}\n`,
@@ -5104,6 +5173,11 @@ function buildCompiledIntegrationPack(candidate) {
     contentHash,
     sourceRefs: [sourceRef],
     compatibility,
+    provenanceSummary: sourceKind === 'parse'
+      ? {
+        parse: provenancePayload.parse || null,
+      }
+      : null,
     fileHashes: derivedFileHashes,
     files: {
       'manifest.json': 'manifest.json',
