@@ -403,6 +403,7 @@ Exit criteria:
 1. House can expose Archive, Trainer, and at least one additional House-level surface without route or state fragmentation.
 2. The new surfaces do not break modal continuity or worker continuity.
 3. The minimal Experiences surface links into current Registry, Web, and Poker surfaces from the same shell.
+4. The minimal Workshop surface reflects active config lineage truth and can open Inbox from the same shell.
 
 ## 6.7 Phase 6 - Later platform surfaces
 

@@ -845,6 +845,26 @@ Response fields:
 - `data.items[].actions[].label`
 - `data.items[].actions[].entryPath`
 
+### GET `/api/platform/workshop` (human)
+Returns the minimal House Workshop/config lineage surface for the current active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.activeConfigVersionId`
+- `data.activeConfigHash`
+- `data.lineage.parentConfigVersionIds[]`
+- `data.lineage.createdBy`
+- `data.lineage.trainerJobId`
+- `data.lineage.trainerResultId`
+- `data.lineage.candidatePatchId`
+- `data.inboxPath`
+
 ### GET `/api/platform/trainer` (human)
 Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
 

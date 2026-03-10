@@ -503,6 +503,20 @@ let houseSurfaceState = {
     selectedExperienceId: '',
     emptyStateText: 'No House experiences available yet.'
   },
+  workshop: {
+    loaded: false,
+    activeConfigVersionId: '',
+    activeConfigHash: '',
+    lineage: {
+      parentConfigVersionIds: [],
+      createdBy: '',
+      trainerJobId: '',
+      trainerResultId: '',
+      candidatePatchId: '',
+    },
+    inboxPath: '',
+    emptyStateText: 'No active config is bound to this team yet.'
+  },
   trainer: {
     loaded: false,
     jobs: [],
@@ -1274,6 +1288,17 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
     houseSurfaceState.experiences.selectedExperienceId = '';
+    houseSurfaceState.workshop.loaded = false;
+    houseSurfaceState.workshop.activeConfigVersionId = '';
+    houseSurfaceState.workshop.activeConfigHash = '';
+    houseSurfaceState.workshop.lineage = {
+      parentConfigVersionIds: [],
+      createdBy: '',
+      trainerJobId: '',
+      trainerResultId: '',
+      candidatePatchId: '',
+    };
+    houseSurfaceState.workshop.inboxPath = '';
     houseSurfaceState.trainer.selectedResultId = '';
     resetHouseTrainerActionKeys();
   }
@@ -1351,6 +1376,8 @@ async function setHouseActiveTeam(teamId) {
     await loadHouseArchiveSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'experiences') {
     await loadHouseExperiencesSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'workshop') {
+    await loadHouseWorkshopSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'trainer') {
     await loadHouseTrainerSurface({ skipContext: true });
   }
@@ -1366,18 +1393,22 @@ function buildHousePlatformSnapshot() {
 }
 
 function setHouseSurfaceMode(mode) {
-  const activeMode = mode === 'experiences' || mode === 'archive' || mode === 'trainer' ? mode : '';
+  const activeMode = mode === 'experiences' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
   const experiencesPanel = el('houseExperiencesPanel');
+  const workshopPanel = el('houseWorkshopPanel');
   const archivePanel = el('houseArchivePanel');
   const trainerPanel = el('houseTrainerPanel');
   const experiencesBtn = el('houseExperiencesBtn');
+  const workshopBtn = el('houseWorkshopBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
   if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
+  if (workshopPanel) workshopPanel.classList.toggle('is-hidden', activeMode !== 'workshop');
   if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
   if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
   if (experiencesBtn) experiencesBtn.classList.toggle('primary', activeMode === 'experiences');
+  if (workshopBtn) workshopBtn.classList.toggle('primary', activeMode === 'workshop');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
   if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
 }
@@ -1481,6 +1512,36 @@ function renderHouseExperiencesSurface() {
     });
     actionsNode.appendChild(button);
   });
+}
+
+function renderHouseWorkshopSurface() {
+  const emptyNode = el('houseWorkshopEmpty');
+  const detailNode = el('houseWorkshopDetail');
+  const inboxBtn = el('houseWorkshopOpenInboxBtn');
+  if (!emptyNode || !detailNode || !inboxBtn) return;
+  const activeConfigVersionId = String(houseSurfaceState.workshop.activeConfigVersionId || '').trim();
+  const lineage = houseSurfaceState.workshop.lineage && typeof houseSurfaceState.workshop.lineage === 'object'
+    ? houseSurfaceState.workshop.lineage
+    : {};
+  const parentConfigVersionId = String(Array.isArray(lineage.parentConfigVersionIds) ? lineage.parentConfigVersionIds[0] || '' : '').trim();
+  const activeConfigHash = String(houseSurfaceState.workshop.activeConfigHash || '').trim();
+  const trainerJobId = String(lineage.trainerJobId || '').trim();
+  const trainerResultId = String(lineage.trainerResultId || '').trim();
+  const candidatePatchId = String(lineage.candidatePatchId || '').trim();
+  const createdBy = String(lineage.createdBy || '').trim();
+  const inboxPath = String(houseSurfaceState.workshop.inboxPath || '').trim();
+
+  emptyNode.textContent = houseSurfaceState.workshop.emptyStateText || 'No active config is bound to this team yet.';
+  emptyNode.classList.toggle('is-hidden', !!activeConfigVersionId);
+  inboxBtn.disabled = !inboxPath;
+  inboxBtn.dataset.entryPath = inboxPath;
+
+  if (!activeConfigVersionId) {
+    detailNode.textContent = 'Select a team with an active config binding to inspect Workshop lineage.';
+    return;
+  }
+
+  detailNode.textContent = `Active config ${activeConfigVersionId} · parent ${parentConfigVersionId || '—'} · hash ${activeConfigHash || '—'} · created by ${createdBy || '—'} · trainer job ${trainerJobId || '—'} · trainer result ${trainerResultId || '—'} · patch ${candidatePatchId || '—'}`;
 }
 
 function renderHouseArchiveSurface() {
@@ -1721,6 +1782,59 @@ async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
     houseSurfaceState.experiences.items = [];
     renderHouseExperiencesSurface();
     setHouseSurfaceStatus(`House experiences unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('workshop');
+  setHouseSurfaceStatus('Loading House Workshop...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/workshop');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.workshop.loaded = true;
+    houseSurfaceState.workshop.activeConfigVersionId = String(data.activeConfigVersionId || '').trim();
+    houseSurfaceState.workshop.activeConfigHash = String(data.activeConfigHash || '').trim();
+    houseSurfaceState.workshop.lineage = data.lineage && typeof data.lineage === 'object'
+      ? {
+        parentConfigVersionIds: Array.isArray(data.lineage.parentConfigVersionIds) ? data.lineage.parentConfigVersionIds : [],
+        createdBy: String(data.lineage.createdBy || '').trim(),
+        trainerJobId: String(data.lineage.trainerJobId || '').trim(),
+        trainerResultId: String(data.lineage.trainerResultId || '').trim(),
+        candidatePatchId: String(data.lineage.candidatePatchId || '').trim(),
+      }
+      : {
+        parentConfigVersionIds: [],
+        createdBy: '',
+        trainerJobId: '',
+        trainerResultId: '',
+        candidatePatchId: '',
+      };
+    houseSurfaceState.workshop.inboxPath = String(data.inboxPath || '').trim();
+    houseSurfaceState.workshop.emptyStateText = String(data.emptyStateText || 'No active config is bound to this team yet.');
+    renderHouseWorkshopSurface();
+    setHouseSurfaceStatus(
+      houseSurfaceState.workshop.activeConfigVersionId
+        ? ''
+        : houseSurfaceState.workshop.emptyStateText
+    );
+  } catch (err) {
+    houseSurfaceState.workshop.loaded = true;
+    houseSurfaceState.workshop.activeConfigVersionId = '';
+    houseSurfaceState.workshop.activeConfigHash = '';
+    houseSurfaceState.workshop.lineage = {
+      parentConfigVersionIds: [],
+      createdBy: '',
+      trainerJobId: '',
+      trainerResultId: '',
+      candidatePatchId: '',
+    };
+    houseSurfaceState.workshop.inboxPath = '';
+    renderHouseWorkshopSurface();
+    setHouseSurfaceStatus(`House Workshop unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
 }
 
@@ -4035,6 +4149,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseWorkshopBtn = el('houseWorkshopBtn');
+  if (houseWorkshopBtn) {
+    houseWorkshopBtn.onclick = async () => {
+      houseWorkshopBtn.disabled = true;
+      try {
+        await loadHouseWorkshopSurface();
+      } finally {
+        houseWorkshopBtn.disabled = false;
+      }
+    };
+  }
+
   const houseTeamSelect = el('houseTeamSelect');
   if (houseTeamSelect) {
     houseTeamSelect.onchange = async (event) => {
@@ -4062,6 +4188,22 @@ function bindTownDistrictControls() {
         await loadHouseTrainerSurface();
       } finally {
         houseTrainerBtn.disabled = false;
+      }
+    };
+  }
+
+  const houseWorkshopOpenInboxBtn = el('houseWorkshopOpenInboxBtn');
+  if (houseWorkshopOpenInboxBtn) {
+    houseWorkshopOpenInboxBtn.onclick = async () => {
+      const entryPath = String(houseWorkshopOpenInboxBtn.dataset.entryPath || '').trim();
+      if (!entryPath) return;
+      houseWorkshopOpenInboxBtn.disabled = true;
+      setHouseSurfaceStatus('Opening Inbox...');
+      try {
+        await openHouseExperienceEntry(entryPath);
+      } catch (err) {
+        setHouseSurfaceStatus(`Inbox open unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        houseWorkshopOpenInboxBtn.disabled = false;
       }
     };
   }
@@ -4101,6 +4243,7 @@ function bindTownDistrictControls() {
   setHouseSurfaceMode(houseSurfaceState.activeSurface);
   renderHouseSurfaceContext();
   renderHouseExperiencesSurface();
+  renderHouseWorkshopSurface();
   renderHouseArchiveSurface();
   renderHouseTrainerSurface();
   loadHousePlatformContext().catch(() => {

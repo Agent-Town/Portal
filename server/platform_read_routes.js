@@ -200,6 +200,63 @@ function registerPlatformReadRoutes(app, deps) {
     }, { requestId });
   });
 
+  app.get('/api/platform/workshop', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    if (!houseId) {
+      return sendPortalApiSuccess(res, {
+        houseId: null,
+        teamId: null,
+        activeTeamId: context.activeTeamId,
+        availableTeamIds: context.availableTeamIds,
+        activeConfigVersionId: null,
+        activeConfigHash: null,
+        lineage: {
+          parentConfigVersionIds: [],
+          createdBy: null,
+          trainerJobId: null,
+          trainerResultId: null,
+          candidatePatchId: null,
+        },
+        inboxPath: null,
+        emptyStateText: 'No active config is bound to this team yet.',
+      }, { requestId });
+    }
+    const binding = teamId
+      ? getTeamConfigBinding({ houseId, teamId })
+      : null;
+    const activeConfig = binding?.activeConfigVersionId
+      ? getConfigVersion(binding.activeConfigVersionId)
+      : null;
+    const lineage = activeConfig?.lineage && typeof activeConfig.lineage === 'object'
+      ? activeConfig.lineage
+      : {};
+    return sendPortalApiSuccess(res, {
+      houseId,
+      teamId: teamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      activeConfigVersionId: binding?.activeConfigVersionId || null,
+      activeConfigHash: activeConfig?.configHash || null,
+      lineage: {
+        parentConfigVersionIds: Array.isArray(lineage.parentConfigVersionIds) ? lineage.parentConfigVersionIds : [],
+        createdBy: typeof lineage.createdBy === 'string' ? lineage.createdBy : null,
+        trainerJobId: typeof lineage.trainerJobId === 'string' ? lineage.trainerJobId : null,
+        trainerResultId: typeof lineage.trainerResultId === 'string' ? lineage.trainerResultId : null,
+        candidatePatchId: typeof lineage.candidatePatchId === 'string' ? lineage.candidatePatchId : null,
+      },
+      inboxPath: houseId ? `/inbox/${encodeURIComponent(houseId)}` : null,
+      emptyStateText: 'No active config is bound to this team yet.',
+    }, { requestId });
+  });
+
   app.get('/api/platform/trainer', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });

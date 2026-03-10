@@ -101,6 +101,7 @@
   </div>
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseExperiencesBtn" type="button" data-testid="house-open-experiences">Open Experiences</button>
+    <button class="btn" id="houseWorkshopBtn" type="button" data-testid="house-open-workshop">Open Workshop</button>
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
   </div>
@@ -116,6 +117,18 @@
   <div class="kv stack" id="houseExperiencesList" data-testid="house-experiences-list"></div>
   <div class="small" id="houseExperiencesDetail" data-testid="house-experiences-detail">Select an experience to inspect available entry points.</div>
   <div class="kv" id="houseExperienceActions" data-testid="house-experience-actions" style="margin-top:8px;"></div>
+</div>
+
+<div class="panel is-hidden" id="houseWorkshopPanel" data-testid="house-workshop-panel">
+  <h2 style="margin:0 0 6px">House Workshop</h2>
+  <p class="small" style="margin-top:0">
+    Active config lineage stays visible in House and Inbox remains reachable from the same shell.
+  </p>
+  <div class="small" id="houseWorkshopEmpty" data-testid="house-workshop-empty">No active config is bound to this team yet.</div>
+  <div class="small" id="houseWorkshopDetail" data-testid="house-workshop-detail">Select a team with an active config binding to inspect Workshop lineage.</div>
+  <div class="kv" style="margin-top:8px;">
+    <button class="btn" id="houseWorkshopOpenInboxBtn" type="button" data-testid="house-workshop-open-inbox" data-entry-path="" disabled>Open Inbox</button>
+  </div>
 </div>
 
 <div class="panel is-hidden" id="houseArchivePanel" data-testid="house-archive-panel">

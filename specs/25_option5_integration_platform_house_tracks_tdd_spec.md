@@ -260,6 +260,12 @@ GREEN gate:
 2. House can open Inbox cleanly from the same shell,
 3. the Workshop reflects durable config lineage truth.
 
+Implementation notes:
+
+1. `GET /api/platform/workshop` is the read route for this milestone.
+2. Workshop reads the current active team binding and config lineage rather than a parallel House cache.
+3. Inbox linkage must reuse the same modal/frame continuity path as the rest of the hub shell.
+
 ### M25.7 - Office and staff scaffolding contract
 
 Primary test:
