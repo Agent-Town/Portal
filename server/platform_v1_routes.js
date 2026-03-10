@@ -76,6 +76,66 @@ function registerPlatformV1Routes(app, deps) {
     verifyHouseAuth,
   } = deps;
 
+  function normalizeTraceReadActorId(input, session) {
+    const requestedReaderId = typeof input === 'string' ? input.trim() : '';
+    if (requestedReaderId) return requestedReaderId;
+    const sessionReaderId = typeof session?.sessionId === 'string' ? session.sessionId.trim() : '';
+    return sessionReaderId || 'human_session_reader';
+  }
+
+  function normalizeTraceReadSource(input) {
+    const requestedSource = typeof input === 'string' ? input.trim() : '';
+    return requestedSource || 'trace.read';
+  }
+
+  function normalizeStringList(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries.map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean);
+  }
+
+  function resolveSealedTraceReadDecision(sealedContext, {
+    readerId = '',
+    readerSource = '',
+  } = {}) {
+    if (!sealedContext || typeof sealedContext !== 'object') {
+      return { allowed: true, reason: 'missing_sealed_context' };
+    }
+    if (String(sealedContext.status || '').trim() === 'released') {
+      return { allowed: true, reason: 'sealed_context_released' };
+    }
+    const allowedReaders = allowedReaderIdsFromSealedContext(sealedContext);
+    if (!allowedReaders.includes(readerId)) {
+      return { allowed: false, reason: 'reader_not_allowed' };
+    }
+    const forbiddenSources = normalizeStringList(sealedContext.forbiddenSources);
+    if (readerSource && forbiddenSources.includes(readerSource)) {
+      return { allowed: false, reason: 'reader_source_forbidden' };
+    }
+    return { allowed: true, reason: 'reader_allowed' };
+  }
+
+  function buildRedactedTraceEvent(event, {
+    sealedContextId = '',
+    auditKind = 'sealed_read_attempt',
+    reason = 'sealed_context_active',
+  } = {}) {
+    const payloadSchema = typeof event?.payload?.payloadSchema === 'string'
+      ? event.payload.payloadSchema.trim()
+      : '';
+    return {
+      ...event,
+      redacted: true,
+      payload: {
+        redacted: true,
+        auditKind,
+        reason,
+        sealedContextId: sealedContextId || null,
+        payloadSchema: payloadSchema || null,
+      },
+    };
+  }
+
   app.get('/v1/houses/:houseId/team', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -885,9 +945,54 @@ function registerPlatformV1Routes(app, deps) {
     const requestedLimit = Number(req.query?.limit || 50);
     const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(100, Math.floor(requestedLimit)) : 50;
     const afterSeq = decodeTraceCursor(typeof req.query?.cursor === 'string' ? req.query.cursor : '');
+    const readerId = normalizeTraceReadActorId(req.query?.readerId, session);
+    const readerSource = normalizeTraceReadSource(req.query?.readerSource);
     const allEvents = listTraceEvents(traceId);
     const filtered = allEvents.filter((event) => Number(event?.seq || 0) > afterSeq);
-    const items = filtered.slice(0, limit);
+    const auditKind = 'sealed_read_attempt';
+    const auditedSealedContexts = new Set();
+    const items = filtered.slice(0, limit).map((event) => {
+      const seal = event?.seal && typeof event.seal === 'object' ? event.seal : {};
+      const sealedContextId = typeof event?.sealedContextId === 'string' && event.sealedContextId.trim()
+        ? event.sealedContextId.trim()
+        : (typeof seal?.sealedContextId === 'string' ? seal.sealedContextId.trim() : '');
+      if (seal?.active !== true || !sealedContextId) {
+        return event;
+      }
+      const sealedContext = getSealedContextById(sealedContextId);
+      const decision = resolveSealedTraceReadDecision(sealedContext, {
+        readerId,
+        readerSource,
+      });
+      if (decision.allowed) {
+        return event;
+      }
+      if (!auditedSealedContexts.has(sealedContextId)) {
+        auditedSealedContexts.add(sealedContextId);
+        createSealedContextViolation({
+          sealedContextViolationId: `sealvio_${randomHex(10)}`,
+          sealedContextId,
+          actor: {
+            actorType: 'reader',
+            actorId: readerId,
+          },
+          details: {
+            auditKind,
+            reason: decision.reason,
+            traceId,
+            runId: run.runId,
+            readerId,
+            readerSource,
+          },
+          nowIso: nowIso(),
+        });
+      }
+      return buildRedactedTraceEvent(event, {
+        sealedContextId,
+        auditKind,
+        reason: decision.reason,
+      });
+    });
     const nextCursor = filtered.length > items.length
       ? encodeTraceCursor(items[items.length - 1]?.seq || 0)
       : null;
@@ -895,6 +1000,11 @@ function registerPlatformV1Routes(app, deps) {
       traceId,
       items,
       nextCursor,
+      readPolicy: {
+        readerId,
+        readerSource,
+        auditKind,
+      },
     }, { requestId });
   });
 

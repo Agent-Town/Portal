@@ -1386,11 +1386,22 @@ Returns canonical events in ascending `seq` order by default.
 Query params:
 - `limit`
 - `cursor`
+- `readerId` optional sealed-read actor id for deterministic policy evaluation
+- `readerSource` optional sealed-read source id such as `trainer_job.compare`
 
 Response fields:
 - `data.traceId`
 - `data.items[]`
 - `data.nextCursor`
+- `data.readPolicy.readerId`
+- `data.readPolicy.readerSource`
+- `data.readPolicy.auditKind`
+
+Seal policy:
+- active entrant-private events may be returned as redacted envelopes instead of raw payloads,
+- redacted entries preserve event metadata but replace `payload` with a redaction object carrying `auditKind`, `reason`, `sealedContextId`, and optional `payloadSchema`,
+- protected reads create at most one durable sealed-context violation per touched sealed context per request,
+- once a sealed context is `released`, the same route returns the raw event payload again.
 
 ### POST `/v1/trainer/jobs` (human + house-auth)
 Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one derived trainer result.

@@ -511,6 +511,8 @@ async function promotePlatformTrainerResultPatch(request, {
 
 async function seedPlatformSealedContext(request, {
   houseId = '',
+  traceId = '',
+  runId = '',
   releasePolicy = 'manual',
   status = 'active',
 } = {}) {
@@ -521,6 +523,8 @@ async function seedPlatformSealedContext(request, {
     },
     data: JSON.stringify({
       houseId,
+      traceId,
+      runId,
       releasePolicy,
       status,
     }),
@@ -686,6 +690,35 @@ async function getPlatformTraceSummary(request, {
   }
 }
 
+async function getPlatformLiveTraceEvents(request, {
+  houseId = '',
+  houseAuthKey = '',
+  traceId = '',
+  cursor = '',
+  limit = 50,
+  readerId = '',
+  readerSource = '',
+  includeAuth = true,
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (cursor) searchParams.set('cursor', String(cursor));
+  if (Number.isFinite(Number(limit)) && Number(limit) > 0) searchParams.set('limit', String(Math.floor(Number(limit))));
+  if (readerId) searchParams.set('readerId', String(readerId));
+  if (readerSource) searchParams.set('readerSource', String(readerSource));
+  const path = `/v1/traces/${encodeURIComponent(String(traceId || '').trim())}/events`;
+  const query = searchParams.toString();
+  const response = await request.get(query ? `${path}?${query}` : path, {
+    headers: includeAuth ? houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey) : {},
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function getPlatformConfigVersionRecord(request, configVersionId) {
   const response = await request.get(`/__test__/unified-platform/config-versions/${encodeURIComponent(String(configVersionId || ''))}`, {
     headers: { 'x-test-reset': resetToken },
@@ -731,6 +764,7 @@ module.exports = {
   getPlatformTrainerJob,
   getPlatformTrainerResult,
   getPlatformSealedContext,
+  getPlatformLiveTraceEvents,
   getPlatformTraceEvents,
   getPlatformTraceSummary,
   getRouteManifest,

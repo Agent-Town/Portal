@@ -165,6 +165,13 @@ GREEN gate:
 2. violations remain auditable,
 3. post-release reads behave differently from live-window reads where policy requires it.
 
+Implementation notes:
+
+1. `GET /v1/traces/:traceId/events` is the first mandatory seal-aware read surface.
+2. Active sealed reads must support deterministic policy evaluation from `readerId` and `readerSource`.
+3. Protected reads create at most one durable `sealed_context_violations` row per sealed context per request.
+4. Redacted payloads must preserve the event envelope and expose `auditKind = sealed_read_attempt`.
+
 ### M25.3 - Extended trainer job kinds
 
 Primary test:
