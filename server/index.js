@@ -4933,6 +4933,25 @@ function buildCompiledIntegrationPack(candidate) {
   const actionIds = sourceKind === 'native_pack'
     ? ['github.issue.read', 'github.issue.reply']
     : ['integration.generic.read'];
+  const targetUrl = String(candidate?.targetUrl || '').trim();
+  const sourceRef = {
+    url: targetUrl,
+    sourceKind,
+  };
+  const actionPolicies = actionIds.map((actionId) => ({
+    actionId,
+    approvalRequired: actionId.includes('reply'),
+    authModel: String(integration.authModel || 'none').trim() || 'none',
+  }));
+  const compatibility = {
+    experienceKind: 'web.portal',
+    minClientVersion: '0.1.0',
+    websiteRegistryId: String(website.registryId || ''),
+    integrationRegistryId: String(integration.integrationRegistryId || ''),
+    versionId: String(integration.versionId || ''),
+    sourceKind,
+    actionIds,
+  };
   const manualSkill = [
     '# INTEGRATION PACK MANUAL',
     '',
@@ -4968,82 +4987,163 @@ function buildCompiledIntegrationPack(candidate) {
     })),
   };
   const traceMap = `${JSON.stringify(traceMapPayload, null, 2)}\n`;
+  const overlayPayload = {
+    schema: 'agent-town-overlay/v1',
+    integrationId: String(candidate?.integrationCandidateId || ''),
+    displayName: `${websiteName} Integration Pack`,
+    website: {
+      registryId: String(website.registryId || ''),
+      origin: String(website.origin || ''),
+      canonicalUrl: String(website.canonicalUrl || targetUrl || ''),
+      displayName: websiteName,
+      trustTier: String(website.trustTier || 'unknown'),
+      domainProofState: String(website.domainProofState || 'unverified'),
+    },
+    integration: {
+      integrationRegistryId: String(integration.integrationRegistryId || ''),
+      versionId: String(integration.versionId || ''),
+      renderMode: String(integration.renderMode || 'companion'),
+      pageClass: String(integration.pageClass || 'generic_page'),
+      authModel: String(integration.authModel || 'none'),
+    },
+    actions: actionPolicies,
+  };
+  const policyPayload = {
+    schema: 'agent-town-policy/v1',
+    executionTrust: 'compiled_pack_only',
+    releasePolicy: 'fail_closed',
+    externalManualAuthoritative: false,
+    actionPolicies,
+  };
+  const provenancePayload = {
+    schema: 'agent-town-provenance/v1',
+    compiler: 'agent-town.integration-pack/v2',
+    sourceKind,
+    sourceRefs: [sourceRef],
+    website: {
+      registryId: String(website.registryId || ''),
+      origin: String(website.origin || ''),
+    },
+    integration: {
+      integrationRegistryId: String(integration.integrationRegistryId || ''),
+      versionId: String(integration.versionId || ''),
+    },
+  };
+  const jsonFileBodies = {
+    'trace_map.json': traceMap,
+    'overlay.json': `${JSON.stringify(overlayPayload, null, 2)}\n`,
+    'policy.json': `${JSON.stringify(policyPayload, null, 2)}\n`,
+    'provenance.json': `${JSON.stringify(provenancePayload, null, 2)}\n`,
+  };
+  const packIdSeed = stableJsonStringify({
+    websiteRegistryId: compatibility.websiteRegistryId,
+    integrationRegistryId: compatibility.integrationRegistryId,
+    sourceKind,
+  });
+  const packId = `pack_${sha256PrefixedHex(packIdSeed).slice('sha256:'.length, 'sha256:'.length + 16)}`;
   const fileBodies = {
     'skill.md': [
       '# INTEGRATION PACK',
       '',
+      '- manifest.json',
       '- manual/skill.md',
       '- heartbeat.md',
       '- tools.md',
       '- trace_map.json',
+      '- overlay.json',
+      '- policy.json',
+      '- verification.json',
+      '- provenance.json',
       '',
     ].join('\n'),
     'SKILL.md': [
       '# INTEGRATION PACK',
       '',
+      '- manifest.json',
       '- manual/skill.md',
       '- heartbeat.md',
       '- tools.md',
       '- trace_map.json',
+      '- overlay.json',
+      '- policy.json',
+      '- verification.json',
+      '- provenance.json',
       '',
     ].join('\n'),
     'manual/skill.md': manualSkill,
     'heartbeat.md': heartbeat,
     'tools.md': tools,
-    'trace_map.json': traceMap,
+    ...jsonFileBodies,
   };
-  const fileHashes = {
+  const derivedFileHashes = {
     'manual/skill.md': sha256PrefixedHex(fileBodies['manual/skill.md']),
     'heartbeat.md': sha256PrefixedHex(fileBodies['heartbeat.md']),
     'tools.md': sha256PrefixedHex(fileBodies['tools.md']),
     'trace_map.json': sha256PrefixedHex(fileBodies['trace_map.json']),
+    'overlay.json': sha256PrefixedHex(fileBodies['overlay.json']),
+    'policy.json': sha256PrefixedHex(fileBodies['policy.json']),
+    'provenance.json': sha256PrefixedHex(fileBodies['provenance.json']),
   };
   const manifestSeed = stableJsonStringify({
-    sourceRef: {
-      url: String(candidate?.targetUrl || ''),
-      sourceKind,
-    },
-    compatibility: {
-      websiteRegistryId: String(website.registryId || ''),
-      integrationRegistryId: String(integration.integrationRegistryId || ''),
-      versionId: String(integration.versionId || ''),
-      sourceKind,
-      actionIds,
-    },
-    fileHashes,
+    packId,
+    sourceRef,
+    compatibility,
+    derivedFileHashes,
+    overlay: overlayPayload,
+    policy: policyPayload,
+    provenance: provenancePayload,
   });
   const contentHash = sha256PrefixedHex(manifestSeed);
   const packVersionId = `intpackv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  const manifest = {
+    integrationId: String(candidate?.integrationCandidateId || ''),
+    packId,
+    displayName: `${websiteName} Integration Pack`,
+    sourceKind,
+    packVersionId,
+    contentHash,
+    sourceRefs: [sourceRef],
+    compatibility,
+    fileHashes: derivedFileHashes,
+    files: {
+      'manifest.json': 'manifest.json',
+      'manual/skill.md': 'manual/skill.md',
+      'heartbeat.md': 'heartbeat.md',
+      'tools.md': 'tools.md',
+      'trace_map.json': 'trace_map.json',
+      'overlay.json': 'overlay.json',
+      'policy.json': 'policy.json',
+      'verification.json': 'verification.json',
+      'provenance.json': 'provenance.json',
+    },
+  };
+  const verificationPayload = {
+    schema: 'agent-town-verification/v1',
+    verification: {
+      ok: true,
+      packVersionId,
+      contentHash,
+      sourceKind,
+      checks: [
+        { checkId: 'compiled_pack_manifest', ok: true },
+        { checkId: 'manual_non_authoritative', ok: true },
+        { checkId: 'action_inventory_explicit', ok: true, actionCount: actionIds.length },
+      ],
+    },
+    referencedFiles: Object.keys(manifest.files),
+  };
+  fileBodies['manifest.json'] = `${JSON.stringify(manifest, null, 2)}\n`;
+  fileBodies['verification.json'] = `${JSON.stringify(verificationPayload, null, 2)}\n`;
+  const fileHashes = {
+    ...derivedFileHashes,
+    'manifest.json': sha256PrefixedHex(fileBodies['manifest.json']),
+    'verification.json': sha256PrefixedHex(fileBodies['verification.json']),
+  };
   return {
     packVersionId,
     contentHash,
     fileHashes,
-    manifest: {
-      integrationId: String(candidate?.integrationCandidateId || ''),
-      sourceKind,
-      packVersionId,
-      contentHash,
-      sourceRefs: [
-        {
-          url: String(candidate?.targetUrl || ''),
-          sourceKind,
-        },
-      ],
-      compatibility: {
-        websiteRegistryId: String(website.registryId || ''),
-        integrationRegistryId: String(integration.integrationRegistryId || ''),
-        versionId: String(integration.versionId || ''),
-        sourceKind,
-        actionIds,
-      },
-      fileHashes,
-      files: {
-        'manual/skill.md': 'manual/skill.md',
-        'heartbeat.md': 'heartbeat.md',
-        'tools.md': 'tools.md',
-        'trace_map.json': 'trace_map.json',
-      },
-    },
+    manifest,
   };
 }
 

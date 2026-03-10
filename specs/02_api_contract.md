@@ -1072,6 +1072,62 @@ Stable failure codes:
 - `PRIVATE_NETWORK_BLOCKED`
 - `INVALID_ARGUMENT`
 
+### POST `/v1/integrations/:integrationId/compilations` (human + house-auth)
+Compiles one previously resolved integration candidate into the authoritative internal pack model and stores one durable pack version for idempotent replay.
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "packVersionId": "intpackv_01H...",
+    "contentHash": "sha256:...",
+    "fileHashes": {
+      "manifest.json": "sha256:...",
+      "manual/skill.md": "sha256:...",
+      "heartbeat.md": "sha256:...",
+      "tools.md": "sha256:...",
+      "trace_map.json": "sha256:...",
+      "overlay.json": "sha256:...",
+      "policy.json": "sha256:...",
+      "verification.json": "sha256:...",
+      "provenance.json": "sha256:..."
+    },
+    "manifest": {
+      "packId": "pack_01H...",
+      "packVersionId": "intpackv_01H...",
+      "contentHash": "sha256:...",
+      "sourceKind": "native_pack",
+      "compatibility": {
+        "experienceKind": "web.portal",
+        "minClientVersion": "0.1.0"
+      },
+      "files": {
+        "manifest.json": "manifest.json",
+        "manual/skill.md": "manual/skill.md"
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INTEGRATION_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
 Creates one durable run row for the requested experience and binds the run to one declared trace authority.
 

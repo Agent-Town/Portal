@@ -265,6 +265,7 @@ GREEN gate:
 1. Required pack outputs are present for supported integrations.
 2. `fileHashes` and `contentHash` remain stable under idempotent recompilation.
 3. Manifest, overlay, policy, verification, and provenance outputs are present.
+4. The required Phase 24 file set is explicit: `manifest.json`, `manual/skill.md`, `heartbeat.md`, `tools.md`, `trace_map.json`, `overlay.json`, `policy.json`, `verification.json`, and `provenance.json`.
 
 ### M24.7 - Parse import pipeline contract
 
