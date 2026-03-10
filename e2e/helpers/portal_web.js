@@ -121,6 +121,24 @@ async function processOilSnapshots(request, {
   return body;
 }
 
+async function runOilScheduler(request, {
+  asOf,
+  limit,
+} = {}) {
+  const resp = await request.post('/__test__/poker/oil/scheduler/run', {
+    headers: { 'x-test-reset': resetToken },
+    data: {
+      asOf,
+      limit,
+    },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`OIL_SCHEDULER_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
 async function createWebSession(request, {
   url = 'https://github.com/openai/openai-codex/issues/1',
   integrationRegistryId = 'wi_github_issue_reply',
@@ -185,6 +203,7 @@ module.exports = {
   processOilSnapshots,
   resetPortalWebState,
   resetToken,
+  runOilScheduler,
   seedPokerOperatorFixture,
   seedStreamflowLocks,
   syncPokerMirror,

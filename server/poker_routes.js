@@ -1,18 +1,21 @@
-const crypto = require('crypto');
 const {
   DEFAULT_CENTAUR_COUNTDOWN_SECONDS,
-  DEFAULT_OIL_AWARD_PER_SNAPSHOT,
   DEFAULT_SNAPSHOTS_PER_HOUR,
   STREAMFLOW_PROVIDER,
   STREAMFLOW_TOKEN_SYMBOL,
   applyCentaurActionToTableState,
-  buildDeterministicHourlySnapshotSchedule,
   buildInitialCentaurHandState,
   buildStreamflowLockVerifyMessage,
   deriveCentaurAgentSuggestion,
   normalizeOilAmount,
   toHourBucketStart,
 } = require('./poker_centaur');
+const {
+  buildCurrentHourSnapshotState,
+  normalizeIsoOrNull,
+  processOilSnapshotsForVerification,
+  runOilSnapshotSweep,
+} = require('./poker_oil');
 const {
   resetStreamflowFixtureState,
   resolveStreamflowLockStatus,
@@ -37,34 +40,6 @@ function normalizeCentaurDisplayName(value, fallback = 'Centaur Pilot') {
   return text.slice(0, 80);
 }
 
-function normalizeIsoOrNull(value) {
-  const text = normalizeTrimmedString(value);
-  const ms = Date.parse(text);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
-}
-
-function listHourBucketsBetween(startIso, endIso) {
-  const start = normalizeIsoOrNull(startIso);
-  const end = normalizeIsoOrNull(endIso);
-  if (!start || !end) return [];
-  const startMs = Date.parse(toHourBucketStart(start));
-  const endMs = Date.parse(toHourBucketStart(end));
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return [];
-  const out = [];
-  for (let cursor = startMs; cursor <= endMs; cursor += 60 * 60 * 1000) {
-    out.push(new Date(cursor).toISOString());
-  }
-  return out;
-}
-
-function makeOilSnapshotId(verificationId, scheduledFor) {
-  const digest = crypto
-    .createHash('sha256')
-    .update(`${String(verificationId || '').trim()}:${String(scheduledFor || '').trim()}`)
-    .digest('hex');
-  return `oilsnap_${digest.slice(0, 16)}`;
-}
-
 function buildCentaurHandForEntry({ tournament, entry, nowIso }) {
   const base = buildInitialCentaurHandState({
     tournamentTitle: tournament?.title || 'Centaur Invitational',
@@ -81,36 +56,6 @@ function buildCentaurHandForEntry({ tournament, entry, nowIso }) {
     potOil: Math.min(100, Math.max(25, Math.floor(startingStack / 4))),
     requiredCallOil,
     minRaiseToOil,
-  };
-}
-
-function buildCurrentHourSnapshotState(verification, snapshotEvents, atIso) {
-  if (!verification?.verificationId) {
-    return {
-      hourBucket: toHourBucketStart(atIso),
-      slots: [],
-    };
-  }
-  const hourBucket = toHourBucketStart(atIso);
-  const slots = buildDeterministicHourlySnapshotSchedule({
-    verificationId: verification.verificationId,
-    hourBucket,
-    count: Number(verification?.raw?.snapshotsPerHour || DEFAULT_SNAPSHOTS_PER_HOUR),
-  });
-  const eventByScheduledFor = new Map(
-    (Array.isArray(snapshotEvents) ? snapshotEvents : []).map((event) => [String(event.scheduledFor || ''), event])
-  );
-  return {
-    hourBucket,
-    slots: slots.map((slot) => {
-      const event = eventByScheduledFor.get(String(slot.scheduledFor || ''));
-      return {
-        index: slot.index,
-        scheduledFor: slot.scheduledFor,
-        status: event?.status || 'pending',
-        amountAwarded: Number(event?.amountAwarded || 0),
-      };
-    }),
   };
 }
 
@@ -145,105 +90,6 @@ function ensureCentaurOwnership({
     return null;
   }
   return { entry, hand };
-}
-
-async function processOilSnapshotsForVerification(deps, verification, { asOf = null } = {}) {
-  if (!verification?.verificationId || !verification?.walletSubject || !verification?.address || !verification?.streamId) {
-    return {
-      processedSnapshots: 0,
-      creditedOil: 0,
-      snapshotEvents: [],
-      latestProviderStatus: null,
-    };
-  }
-  const asOfIso = normalizeIsoOrNull(asOf) || deps.nowIso();
-  const verifiedAtIso = normalizeIsoOrNull(verification.verifiedAt || verification.createdAt || asOfIso) || asOfIso;
-  const hourBuckets = listHourBucketsBetween(verifiedAtIso, asOfIso);
-  let processedSnapshots = 0;
-  let creditedOil = 0;
-  let latestProviderStatus = null;
-  const snapshotEvents = [];
-
-  for (const hourBucket of hourBuckets) {
-    const schedule = buildDeterministicHourlySnapshotSchedule({
-      verificationId: verification.verificationId,
-      hourBucket,
-      count: Number(verification?.raw?.snapshotsPerHour || DEFAULT_SNAPSHOTS_PER_HOUR),
-    });
-    for (const slot of schedule) {
-      const scheduledMs = Date.parse(String(slot?.scheduledFor || ''));
-      const verifiedAtMs = Date.parse(verifiedAtIso);
-      const asOfMs = Date.parse(asOfIso);
-      if (!Number.isFinite(scheduledMs) || scheduledMs > asOfMs || scheduledMs < verifiedAtMs) continue;
-
-      const existing = deps.getOilSnapshotEventByVerificationAndScheduledFor(verification.verificationId, slot.scheduledFor);
-      if (existing) {
-        snapshotEvents.push(existing);
-        continue;
-      }
-
-      const providerStatus = await resolveStreamflowLockStatus({
-        address: verification.address,
-        streamId: verification.streamId,
-        minLockAmountAtomic: verification.minLockAmountAtomic,
-        atIso: slot.scheduledFor,
-      });
-      latestProviderStatus = providerStatus;
-      const amountAwarded = providerStatus.eligible ? DEFAULT_OIL_AWARD_PER_SNAPSHOT : 0;
-      const status = providerStatus.eligible
-        ? 'credited'
-        : providerStatus.locked
-          ? 'below_minimum'
-          : 'not_locked';
-      const snapshot = deps.upsertOilSnapshotEvent({
-        snapshotId: makeOilSnapshotId(verification.verificationId, slot.scheduledFor),
-        verificationId: verification.verificationId,
-        walletSubject: verification.walletSubject,
-        houseId: verification.houseId || null,
-        hourBucket,
-        scheduledFor: slot.scheduledFor,
-        checkedAt: providerStatus.checkedAt || asOfIso,
-        status,
-        amountAwarded,
-        providerStatus,
-      });
-      snapshotEvents.push(snapshot);
-      processedSnapshots += 1;
-      if (amountAwarded > 0) {
-        deps.createOilLedgerEntry({
-          walletSubject: verification.walletSubject,
-          houseId: verification.houseId || null,
-          verificationId: verification.verificationId,
-          snapshotId: snapshot.snapshotId,
-          entryKind: 'streamflow_snapshot',
-          direction: 'credit',
-          amount: amountAwarded,
-          memo: `Verified Streamflow lock at ${slot.scheduledFor}`,
-        });
-        creditedOil += amountAwarded;
-      }
-    }
-  }
-
-  if (latestProviderStatus) {
-    deps.upsertStreamflowVerification({
-      ...verification,
-      verifiedAmountAtomic: String(latestProviderStatus.lockedAmountAtomic || verification.verifiedAmountAtomic || '0'),
-      lastCheckedAt: latestProviderStatus.checkedAt || asOfIso,
-      raw: {
-        ...(verification.raw || {}),
-        latestProviderStatus,
-      },
-      updatedAt: deps.nowIso(),
-    });
-  }
-
-  return {
-    processedSnapshots,
-    creditedOil,
-    snapshotEvents,
-    latestProviderStatus,
-  };
 }
 
 async function buildCentaurTournamentPayload(deps, tournament, session, req, { processAt = null } = {}) {
@@ -326,6 +172,7 @@ function registerPokerRoutes(app, deps) {
     getStreamflowVerificationByWalletAndStream,
     getStreamflowVerificationByWalletSubject,
     isTestMockAddress,
+    listActiveStreamflowVerifications,
     listCentaurActionsByHand,
     listCentaurMessagesByHand,
     listCentaurTournaments,
@@ -360,6 +207,7 @@ function registerPokerRoutes(app, deps) {
     getCurrentCentaurHandForEntry,
     getStreamflowVerificationById,
     getStreamflowVerificationByWalletSubject,
+    listActiveStreamflowVerifications,
     listCentaurActionsByHand,
     listCentaurMessagesByHand,
     listOilLedgerEntriesByWalletSubject,
@@ -1168,6 +1016,20 @@ function registerPokerRoutes(app, deps) {
       verificationId: verification.verificationId,
       oilBalance: computeOilBalance(verification.walletSubject),
       processed,
+    });
+  });
+
+  app.post('/__test__/poker/oil/scheduler/run', express.json({ limit: '128kb' }), async (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const summary = await runOilSnapshotSweep(routeDeps, {
+      asOf: req.body?.asOf,
+      limit: req.body?.limit,
+    });
+    return res.json({
+      ok: true,
+      summary,
     });
   });
 

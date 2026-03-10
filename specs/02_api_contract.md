@@ -470,6 +470,7 @@ Failure codes:
 
 ### GET `/api/poker/oil/balance`
 Returns the current offchain OIL ledger summary for the bound wallet.
+Due snapshot credits are processed both on read and by the internal background sweep when enabled.
 
 Response fields:
 - `data.walletSubject`

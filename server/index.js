@@ -81,6 +81,7 @@ const {
   getStreamflowVerificationByWalletAndStream,
   getStreamflowVerificationByWalletSubject,
   getWebSessionById,
+  listActiveStreamflowVerifications,
   listApprovalsForSession,
   listCentaurActionsByHand,
   listCentaurMessagesByHand,
@@ -114,6 +115,7 @@ const { registerWebRoutes } = require('./web_routes');
 const { registerRegistryRoutes } = require('./registry_routes');
 const { registerPlatformV1Routes } = require('./platform_v1_routes');
 const { registerPokerRoutes } = require('./poker_routes');
+const { createPokerOilScheduler } = require('./poker_oil_scheduler');
 const {
   createTrainerJob,
   createTrainerResult,
@@ -4215,6 +4217,7 @@ registerPokerRoutes(app, {
   getStreamflowVerificationByWalletAndStream,
   getStreamflowVerificationByWalletSubject,
   isTestMockAddress,
+  listActiveStreamflowVerifications,
   listCentaurActionsByHand,
   listCentaurMessagesByHand,
   listCentaurTournaments,
@@ -4242,6 +4245,17 @@ registerPokerRoutes(app, {
   upsertPokerSubmission,
   upsertStreamflowVerification,
   verifySolanaSignature,
+});
+
+const pokerOilScheduler = createPokerOilScheduler({
+  deps: {
+    createOilLedgerEntry,
+    getOilSnapshotEventByVerificationAndScheduledFor,
+    listActiveStreamflowVerifications,
+    nowIso,
+    upsertOilSnapshotEvent,
+    upsertStreamflowVerification,
+  },
 });
 
 // Rotates the human session cookie to a fresh session/team code.
@@ -12109,6 +12123,10 @@ app.post('/api/tools/http_request', express.json(), async (req, res) => {
 const port = Number(process.env.PORT || 4173);
 const server = http.createServer(app);
 
+server.on('close', () => {
+  pokerOilScheduler.stop();
+});
+
 if (process.env.NODE_ENV === 'test' && WebSocketServer) {
   const testExperienceWss = new WebSocketServer({ noServer: true });
   testExperienceWss.on('connection', (socket) => {
@@ -12172,5 +12190,6 @@ if (process.env.NODE_ENV === 'test' && WebSocketServer) {
 }
 
 server.listen(port, () => {
+  pokerOilScheduler.start();
   console.log(`[agent-town] http://localhost:${port}`);
 });

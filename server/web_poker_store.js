@@ -2473,6 +2473,18 @@ function getStreamflowVerificationByWalletAndStream(walletSubject, provider, str
   return hydrateStreamflowVerification(row);
 }
 
+function listActiveStreamflowVerifications({ limit = 500 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(5000, Number(limit || 500)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_streamflow_lock_verifications
+    WHERE status = 'verified'
+    ORDER BY COALESCE(last_checked_at, verified_at, created_at) ASC, verification_id ASC
+    LIMIT ?
+  `).all(safeLimit);
+  return rows.map(hydrateStreamflowVerification).filter(Boolean);
+}
+
 function upsertStreamflowVerification({
   verificationId,
   portalSessionId = null,
@@ -2802,6 +2814,7 @@ module.exports = {
   getStreamflowVerificationById,
   getStreamflowVerificationByWalletAndStream,
   getStreamflowVerificationByWalletSubject,
+  listActiveStreamflowVerifications,
   listApprovalsForSession,
   listCentaurActionsByHand,
   listCentaurMessagesByHand,
