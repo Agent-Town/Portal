@@ -533,6 +533,7 @@ function registerPlatformV1Routes(app, deps) {
         status: replayed.status,
         actionId: replayed.actionId,
         requestedBy: replayed.requestedBy,
+        result: replayed.result,
       }, { requestId });
     }
 
@@ -549,6 +550,19 @@ function registerPlatformV1Routes(app, deps) {
       return sendPortalApiError(res, 409, 'APPROVAL_REQUIRED', 'This action requires explicit approval.', { requestId });
     }
 
+    const result = deps.buildPlatformIntegrationExecutionResult({
+      ...candidate.candidate,
+      integrationCandidateId: candidate.integrationCandidateId,
+      sourceKind: candidate.sourceKind,
+      website: candidate.candidate?.website || null,
+      integration: candidate.candidate?.integration || null,
+      parse: candidate.candidate?.parse || null,
+      targetUrl: candidate.targetUrl,
+    }, actionId, {
+      idempotencyKey,
+      request: executionRequest,
+      approvalId,
+    });
     const execution = createIntegrationExecution({
       integrationExecutionId: `exec_${randomHex(10)}`,
       integrationId,
@@ -561,6 +575,7 @@ function registerPlatformV1Routes(app, deps) {
         policy: {
           requiresApproval: policy.requiresApproval,
         },
+        ...result,
       },
       idempotencyKey,
       nowIso: nowIso(),
@@ -570,6 +585,7 @@ function registerPlatformV1Routes(app, deps) {
       status: execution.status,
       actionId: execution.actionId,
       requestedBy: execution.requestedBy,
+      result: execution.result,
     }, { status: 201, requestId });
   });
 

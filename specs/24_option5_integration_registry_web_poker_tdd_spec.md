@@ -296,6 +296,7 @@ GREEN gate:
 1. Adapter action inventory is explicit.
 2. Approval-gated actions fail closed without approval.
 3. Evidence and trace outputs are deterministic.
+4. Both `embedded` and `companion` render modes stay deterministic for Parse-backed threaded-feed candidates.
 
 ### M24.9 - `deliberation_v1` adapter pack
 

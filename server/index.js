@@ -4122,6 +4122,7 @@ registerPlatformV1Routes(app, {
   allowedReaderIdsFromSealedContext,
   assertPortalContractTargetAllowed,
   buildCompiledIntegrationPack,
+  buildPlatformIntegrationExecutionResult,
   buildPlatformTrainerResultPayload,
   buildPortalRequestId,
   buildSeededSealedContextRecord,
@@ -4983,25 +4984,109 @@ function resolveWebTarget(targetUrl, { preferredMode = 'auto', sourceHints = {} 
   };
 }
 
+function getPlatformAdapterActionNames(adapterId) {
+  const normalizedAdapterId = String(adapterId || '').trim();
+  if (!normalizedAdapterId) return [];
+  const fixture = getRegistryWebPokerTestFixture('web_adapter_expected_actions');
+  const raw = fixture?.adapters && typeof fixture.adapters === 'object'
+    ? fixture.adapters[normalizedAdapterId]
+    : null;
+  return Array.isArray(raw)
+    ? raw.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+}
+
+function getPlatformIntegrationAdapterId(candidate) {
+  const parseMetadata = candidate?.parse && typeof candidate.parse === 'object' ? candidate.parse : {};
+  const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
+  return String(parseMetadata?.adapterId || integration?.adapterId || '').trim();
+}
+
+function getPlatformIntegrationActionIds(candidate) {
+  const sourceKind = String(candidate?.sourceKind || '').trim();
+  const websiteRegistryId = String(candidate?.website?.registryId || '').trim();
+  if (sourceKind === 'native_pack' && websiteRegistryId === 'ws_github') {
+    return ['github.issue.read', 'github.issue.reply'];
+  }
+  const adapterId = getPlatformIntegrationAdapterId(candidate);
+  const adapterActionNames = getPlatformAdapterActionNames(adapterId);
+  if (adapterId && adapterActionNames.length > 0) {
+    return adapterActionNames.map((actionName) => `${adapterId}.${actionName}`);
+  }
+  return ['integration.generic.read'];
+}
+
+function buildPlatformIntegrationExecutionResult(candidate, actionId, { idempotencyKey = '', request = {}, approvalId = '' } = {}) {
+  const canonicalActionId = String(actionId || '').trim();
+  const adapterId = getPlatformIntegrationAdapterId(candidate);
+  const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
+  const seed = stableJsonStringify({
+    integrationId: String(candidate?.integrationCandidateId || ''),
+    targetUrl: String(candidate?.targetUrl || ''),
+    actionId: canonicalActionId,
+    idempotencyKey: String(idempotencyKey || ''),
+  });
+  const digest = sha256PrefixedHex(seed).slice('sha256:'.length, 'sha256:'.length + 16);
+  const normalizedActionName = adapterId && canonicalActionId.startsWith(`${adapterId}.`)
+    ? canonicalActionId.slice(adapterId.length + 1)
+    : canonicalActionId;
+  const eventTypeTail = normalizedActionName.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+  return {
+    adapter: {
+      adapterId: adapterId || null,
+      renderMode: String(integration?.renderMode || 'companion'),
+      supportedRenderModes: ['embedded', 'companion'],
+    },
+    trace: {
+      eventId: `intevt_${digest}`,
+      eventType: `integration.${adapterId || 'generic'}.${eventTypeTail}`,
+    },
+    evidence: {
+      items: [
+        {
+          evidenceId: `inev_${digest}`,
+          category: 'adapter_execution',
+          actionId: canonicalActionId,
+          approvalId: String(approvalId || '').trim() || null,
+          requestDigest: sha256PrefixedHex(stableJsonStringify(request && typeof request === 'object' ? request : {})),
+        },
+      ],
+    },
+  };
+}
+
 function buildCompiledIntegrationPack(candidate) {
   const sourceKind = String(candidate?.sourceKind || '').trim() || 'parse';
   const website = candidate?.website && typeof candidate.website === 'object' ? candidate.website : {};
   const integration = candidate?.integration && typeof candidate.integration === 'object' ? candidate.integration : {};
   const parseMetadata = candidate?.parse && typeof candidate.parse === 'object' ? candidate.parse : {};
   const websiteName = String(website.displayName || website.registryId || 'Website').trim();
-  const actionIds = sourceKind === 'native_pack'
-    ? ['github.issue.read', 'github.issue.reply']
-    : ['integration.generic.read'];
+  const actionIds = getPlatformIntegrationActionIds({
+    ...candidate,
+    website,
+    integration,
+    parse: parseMetadata,
+    sourceKind,
+  });
   const targetUrl = String(candidate?.targetUrl || '').trim();
   const sourceRef = {
     url: targetUrl,
     sourceKind,
   };
-  const actionPolicies = actionIds.map((actionId) => ({
-    actionId,
-    approvalRequired: actionId.includes('reply'),
-    authModel: String(integration.authModel || 'none').trim() || 'none',
-  }));
+  const actionPolicies = actionIds.map((actionId) => {
+    const policy = getPlatformIntegrationActionPolicy({
+      ...candidate,
+      sourceKind,
+      website,
+      integration,
+      parse: parseMetadata,
+    }, actionId);
+    return {
+      actionId,
+      approvalRequired: policy?.requiresApproval === true,
+      authModel: String(integration.authModel || 'none').trim() || 'none',
+    };
+  });
   const compatibility = {
     experienceKind: 'web.portal',
     minClientVersion: '0.1.0',
@@ -5241,6 +5326,18 @@ function getPlatformIntegrationActionPolicy(candidate, actionId) {
         status: 'queued',
       };
     }
+  }
+  const adapterId = getPlatformIntegrationAdapterId(candidate);
+  if (adapterId === 'threaded_feed_v1') {
+    const adapterActions = new Set(getPlatformIntegrationActionIds(candidate));
+    if (!adapterActions.has(canonicalActionId)) return null;
+    const actionName = canonicalActionId.slice(`${adapterId}.`.length);
+    const requiresApproval = actionName === 'draft_reply' || actionName === 'send_reply';
+    return {
+      actionId: canonicalActionId,
+      requiresApproval,
+      status: 'queued',
+    };
   }
   if (canonicalActionId === 'integration.generic.read') {
     return {

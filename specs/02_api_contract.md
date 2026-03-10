@@ -1107,15 +1107,48 @@ Response shape:
       "packId": "pack_01H...",
       "packVersionId": "intpackv_01H...",
       "contentHash": "sha256:...",
-      "sourceKind": "native_pack",
+      "sourceKind": "parse",
       "compatibility": {
         "experienceKind": "web.portal",
-        "minClientVersion": "0.1.0"
+        "minClientVersion": "0.1.0",
+        "websiteRegistryId": "ws_parse_stub_example",
+        "integrationRegistryId": "wi_parse_threaded_feed_stub",
+        "versionId": "rv_parse_threaded_feed_stub_v1",
+        "adapterId": "threaded_feed_v1",
+        "actionIds": [
+          "threaded_feed_v1.read_feed",
+          "threaded_feed_v1.read_thread",
+          "threaded_feed_v1.draft_reply",
+          "threaded_feed_v1.send_reply"
+        ]
       },
-      "provenanceSummary": null,
+      "provenanceSummary": {
+        "parse": {
+          "fixtureFamily": "web_parse_stub_seed",
+          "candidateId": "parse_candidate_fixture_01",
+          "sourceUrl": "https://example.com/threaded-feed",
+          "adapterId": "threaded_feed_v1"
+        }
+      },
       "files": {
         "manifest.json": "manifest.json",
-        "manual/skill.md": "manual/skill.md"
+        "manual/skill.md": "manual/skill.md",
+        "heartbeat.md": "heartbeat.md",
+        "tools.md": "tools.md",
+        "trace_map.json": "trace_map.json",
+        "overlay.json": "overlay.json",
+        "policy.json": "policy.json",
+        "verification.json": "verification.json",
+        "provenance.json": "provenance.json"
+      },
+      "fileHashes": {
+        "manual/skill.md": "sha256:...",
+        "heartbeat.md": "sha256:...",
+        "tools.md": "sha256:...",
+        "trace_map.json": "sha256:...",
+        "overlay.json": "sha256:...",
+        "policy.json": "sha256:...",
+        "provenance.json": "sha256:..."
       }
     }
   },
@@ -1132,6 +1165,86 @@ Stable failure codes:
 - `HOUSE_AUTH_INVALID`
 - `HOUSE_AUTH_EXPIRED`
 - `INTEGRATION_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+### POST `/v1/integrations/:integrationId/executions` (human + house-auth)
+Executes one previously resolved integration action through the authoritative internal adapter policy surface and stores a durable execution record for idempotent replay.
+
+Required headers:
+- `Idempotency-Key`
+- `x-house-ts`
+- `x-house-auth`
+
+Request shape:
+```json
+{
+  "actionId": "threaded_feed_v1.read_feed",
+  "requestedBy": {
+    "actorType": "worker",
+    "actorId": "worker_main"
+  },
+  "request": {
+    "params": {
+      "feedId": "feed_fixture_main"
+    },
+    "approvalId": "optional for approval-gated actions"
+  }
+}
+```
+
+Response shape:
+```json
+{
+  "ok": true,
+  "data": {
+    "executionId": "exec_01H...",
+    "status": "queued",
+    "actionId": "threaded_feed_v1.read_feed",
+    "requestedBy": {
+      "actorType": "worker",
+      "actorId": "worker_main"
+    },
+    "result": {
+      "policy": {
+        "requiresApproval": false
+      },
+      "adapter": {
+        "adapterId": "threaded_feed_v1",
+        "renderMode": "companion",
+        "supportedRenderModes": ["embedded", "companion"]
+      },
+      "trace": {
+        "eventId": "intevt_<hash-prefix>",
+        "eventType": "integration.threaded_feed_v1.read_feed"
+      },
+      "evidence": {
+        "items": [
+          {
+            "evidenceId": "inev_<hash-prefix>",
+            "category": "adapter_execution",
+            "actionId": "threaded_feed_v1.read_feed",
+            "approvalId": null,
+            "requestDigest": "sha256:..."
+          }
+        ]
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_...",
+    "apiVersion": "2026-03-09"
+  }
+}
+```
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_AUTH_REQUIRED`
+- `HOUSE_AUTH_INVALID`
+- `HOUSE_AUTH_EXPIRED`
+- `INTEGRATION_NOT_FOUND`
+- `EXECUTION_NOT_ALLOWED`
+- `APPROVAL_REQUIRED`
 - `INVALID_ARGUMENT`
 
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
