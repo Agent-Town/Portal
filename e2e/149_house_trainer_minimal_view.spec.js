@@ -6,6 +6,7 @@ const { waitForLiteApi } = require('./helpers/trainer');
 const {
   createPlatformConfigVersion,
   createPlatformTrainerJob,
+  getPlatformTrainerResult,
   promotePlatformConfigVersion,
 } = require('./helpers/unified_platform');
 
@@ -126,6 +127,14 @@ test('M19.18: House Trainer preserves worker continuity and shows durable jobs, 
   expect(trainerJob.status).toBe(201);
   const trainerResultId = String(trainerJob.json?.data?.result?.trainerResultId || '');
   expect(trainerResultId).toMatch(/^trr_/);
+  const trainerResult = await getPlatformTrainerResult(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    trainerResultId,
+  });
+  expect(trainerResult.status).toBe(200);
+  const candidatePatchId = String(trainerResult.json?.data?.candidatePatchIds?.[0] || '');
+  expect(candidatePatchId).toMatch(/^patch_/);
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
@@ -141,7 +150,7 @@ test('M19.18: House Trainer preserves worker continuity and shows durable jobs, 
   await expect(page.locator('#houseTrainerResults button')).toHaveCount(1);
   await expect(page.locator('#houseTrainerResults button')).toContainText(/approval needed/i);
   await page.locator(`#houseTrainerResults button[data-trainer-result-id="${trainerResultId}"]`).click();
-  await expect(page.getByTestId('house-trainer-detail')).toContainText('patch_fixture_01');
+  await expect(page.getByTestId('house-trainer-detail')).toContainText(candidatePatchId);
   await expect(page.getByTestId('house-trainer-detail')).toContainText('cfg_house_trainer_seed_01');
   const afterOpenSessionId = await readRuntimeWorkerSessionId(page);
   expect(afterOpenSessionId).toBe(initialSessionId);

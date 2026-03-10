@@ -1954,6 +1954,78 @@ function createTraceEvent({
   return mapTraceEventRow(row);
 }
 
+function mapTraceArtifactRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    traceArtifactId: String(row.trace_artifact_id || ''),
+    traceId: String(row.trace_id || ''),
+    runId: String(row.run_id || ''),
+    artifactKind: String(row.artifact_kind || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function getTraceArtifactById(traceArtifactId = '') {
+  const normalizedTraceArtifactId = String(traceArtifactId || '').trim();
+  if (!normalizedTraceArtifactId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM trace_artifacts
+    WHERE trace_artifact_id = ?
+    LIMIT 1
+  `).get(normalizedTraceArtifactId);
+  return mapTraceArtifactRow(row);
+}
+
+function createTraceArtifact({
+  traceArtifactId = '',
+  traceId = '',
+  runId = '',
+  artifactKind = '',
+  metadata = null,
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const normalizedTraceArtifactId = String(traceArtifactId || '').trim();
+  const normalizedTraceId = String(traceId || '').trim();
+  const normalizedRunId = String(runId || '').trim();
+  const normalizedArtifactKind = String(artifactKind || '').trim();
+  if (!normalizedTraceArtifactId || !normalizedTraceId || !normalizedRunId || !normalizedArtifactKind) {
+    throw new Error('TRACE_ARTIFACT_INVALID');
+  }
+  const database = ensureDb();
+  const existing = database.prepare(`
+    SELECT created_at
+    FROM trace_artifacts
+    WHERE trace_artifact_id = ?
+    LIMIT 1
+  `).get(normalizedTraceArtifactId);
+  database.prepare(`
+    INSERT INTO trace_artifacts (
+      trace_artifact_id,
+      trace_id,
+      run_id,
+      artifact_kind,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(trace_artifact_id) DO UPDATE SET
+      trace_id = excluded.trace_id,
+      run_id = excluded.run_id,
+      artifact_kind = excluded.artifact_kind,
+      metadata_json = excluded.metadata_json
+  `).run(
+    normalizedTraceArtifactId,
+    normalizedTraceId,
+    normalizedRunId,
+    normalizedArtifactKind,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    existing?.created_at || createdAt,
+  );
+  return getTraceArtifactById(normalizedTraceArtifactId);
+}
+
 function isUnifiedPlatformTable(tableName) {
   return PLATFORM_TABLES.includes(String(tableName || '').trim());
 }
@@ -1976,6 +2048,7 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  createTraceArtifact,
   createTrainerJob,
   createTrainerResult,
   createIntegrationCandidate,
@@ -2003,6 +2076,7 @@ module.exports = {
   getTrainerJobByIdempotency,
   getTrainerResultById,
   getTrainerResultByJobId,
+  getTraceArtifactById,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,

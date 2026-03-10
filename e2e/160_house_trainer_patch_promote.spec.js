@@ -9,6 +9,7 @@ const {
   createPlatformTrainerJob,
   getPlatformConfigVersionRecord,
   getPlatformTeamBinding,
+  getPlatformTrainerResult,
   promotePlatformConfigVersion,
 } = require('./helpers/unified_platform');
 
@@ -75,6 +76,14 @@ test('M20.4: House Trainer enforces approval and promotes one new config version
   expect(trainerJob.status).toBe(201);
   const trainerResultId = String(trainerJob.json?.data?.result?.trainerResultId || '');
   expect(trainerResultId).toMatch(/^trr_/);
+  const trainerResult = await getPlatformTrainerResult(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    trainerResultId,
+  });
+  expect(trainerResult.status).toBe(200);
+  const candidatePatchId = String(trainerResult.json?.data?.candidatePatchIds?.[0] || '');
+  expect(candidatePatchId).toMatch(/^patch_/);
 
   const configCountBefore = await getTableCount(request, 'config_versions');
   const parentConfigRecord = await getPlatformConfigVersionRecord(request, configVersionId);
@@ -118,5 +127,5 @@ test('M20.4: House Trainer enforces approval and promotes one new config version
   expect(String(parentConfigRecordAfter.json?.config?.configHash || '')).toBe(parentConfigHashBefore);
 
   await expect(page.getByTestId('house-trainer-detail')).toContainText(nextConfigVersionId);
-  await expect(page.getByTestId('house-trainer-detail')).toContainText('patch_fixture_01');
+  await expect(page.getByTestId('house-trainer-detail')).toContainText(candidatePatchId);
 });

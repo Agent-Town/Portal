@@ -264,7 +264,7 @@ test('M19.19: full-cycle smoke preserves skill compatibility, durable archive/tr
   expect(trainerResult.status).toBe(200);
   expect(String(trainerResult.json?.data?.linkedConfigVersionId || '')).toBe('cfg_full_cycle_base_01');
   const candidatePatchId = String(trainerResult.json?.data?.candidatePatchIds?.[0] || '');
-  expect(candidatePatchId).toBe('patch_fixture_01');
+  expect(candidatePatchId).toMatch(/^patch_/);
 
   const promotePatch = await promotePlatformTrainerResultPatch(request, {
     houseId: seededHouse.houseId,

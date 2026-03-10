@@ -1393,7 +1393,7 @@ Response fields:
 - `data.nextCursor`
 
 ### POST `/v1/trainer/jobs` (human + house-auth)
-Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one trainer result.
+Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one derived trainer result.
 
 Request shape:
 ```json
@@ -1418,7 +1418,7 @@ Response fields:
 - `data.trainerJobId`
 - `data.status`
 - `data.jobKind`
-- `data.result.trainerResultId` when a deterministic seeded result is emitted
+- `data.result.trainerResultId` when a deterministic compare result is emitted
 
 Stable failure codes:
 - `SESSION_REQUIRED`
@@ -1450,6 +1450,10 @@ Response fields:
 - `data.status`
 - `data.summary`
 - `data.candidatePatchIds[]`
+- `data.artifactRefs[]`
+- `data.artifactRefs[].traceArtifactId`
+- `data.artifactRefs[].artifactKind`
+- `data.artifactRefs[].contentHash`
 - `data.linkedConfigVersionId`
 - `data.approvalNeeded`
 

@@ -105,6 +105,7 @@ const {
   listRegistryWebPokerFixtureFamilies,
 } = require('./registry_web_poker_fixtures');
 const {
+  createTraceArtifact,
   createTrainerJob,
   createTrainerResult,
   createIntegrationCandidate,
@@ -132,6 +133,7 @@ const {
   getTrainerJobByIdempotency,
   getTrainerResultById,
   getTrainerResultByJobId,
+  getTraceArtifactById,
   getTraceIntakeRecord,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
@@ -5419,31 +5421,116 @@ function resolvePlatformTrainerLinkedConfigVersionId({ houseId = '', teamId = ''
   return '';
 }
 
+function countTrainerConfigComponentRefs(componentRefs) {
+  const source = componentRefs && typeof componentRefs === 'object' && !Array.isArray(componentRefs) ? componentRefs : {};
+  return Object.values(source).reduce((total, value) => {
+    if (Array.isArray(value)) {
+      return total + value.map((item) => String(item || '').trim()).filter(Boolean).length;
+    }
+    return total + (typeof value === 'string' && value.trim() ? 1 : 0);
+  }, 0);
+}
+
+function summarizeTrainerConfigVersion(config) {
+  if (!config || typeof config !== 'object') return null;
+  const manifest = config.manifest && typeof config.manifest === 'object' ? config.manifest : {};
+  const componentRefs = manifest.componentRefs && typeof manifest.componentRefs === 'object' ? manifest.componentRefs : {};
+  const componentKeys = Object.keys(componentRefs).sort((a, b) => a.localeCompare(b));
+  return {
+    configVersionId: String(config.configVersionId || ''),
+    displayVersion: typeof manifest.displayVersion === 'string' ? manifest.displayVersion : null,
+    branch: typeof manifest.branch === 'string' ? manifest.branch : null,
+    status: typeof manifest.status === 'string' ? manifest.status : (typeof config.status === 'string' ? config.status : null),
+    componentKeys,
+    componentRefCount: countTrainerConfigComponentRefs(componentRefs),
+  };
+}
+
+function buildPlatformTrainerArtifactRef({
+  artifactKind = '',
+  traceId = '',
+  runId = '',
+  payload = null,
+  label = '',
+  createdAt = nowIso(),
+} = {}) {
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : {};
+  const normalizedArtifactKind = String(artifactKind || '').trim();
+  const contentHash = sha256PrefixedHex(stableJsonStringify(normalizedPayload));
+  const traceArtifactId = `ta_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  const artifact = createTraceArtifact({
+    traceArtifactId,
+    traceId: String(traceId || '').trim(),
+    runId: String(runId || '').trim(),
+    artifactKind: normalizedArtifactKind,
+    metadata: {
+      label: String(label || normalizedArtifactKind || 'artifact').trim() || null,
+      contentHash,
+      payload: normalizedPayload,
+    },
+    createdAt,
+  }) || getTraceArtifactById(traceArtifactId);
+  return {
+    traceArtifactId,
+    artifactKind: normalizedArtifactKind,
+    contentHash,
+    label: artifact?.metadata?.label || String(label || normalizedArtifactKind || 'artifact').trim() || null,
+  };
+}
+
 function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } = {}) {
-  const fixture = getUnifiedPlatformTestFixture('trainer_compare_seed') || {};
-  const seededPatchIds = Array.isArray(fixture?.result?.candidatePatchIds)
-    ? fixture.result.candidatePatchIds.map((item) => String(item || '').trim()).filter(Boolean)
-    : [];
-  const candidatePatchIds = seededPatchIds.length ? seededPatchIds : [`patch_${randomHex(10)}`];
-  const summary = typeof fixture?.result?.summary === 'string' && fixture.result.summary.trim()
-    ? fixture.result.summary.trim()
-    : 'Compare job completed with one candidate patch recommendation.';
-  const approvalNeeded = fixture?.result?.approvalNeeded === true;
+  const createdAt = nowIso();
   const trainerResultId = `trr_${randomHex(10)}`;
+  const targetConfigIds = Array.isArray(job?.targets?.configVersionIds)
+    ? job.targets.configVersionIds.map((item) => String(item || '').trim()).filter(Boolean)
+    : [];
+  const resolvedConfigIds = targetConfigIds.length
+    ? targetConfigIds
+    : [String(linkedConfigVersionId || '').trim()].filter(Boolean);
+  const configSummaries = resolvedConfigIds
+    .map((configVersionId) => summarizeTrainerConfigVersion(getConfigVersion(configVersionId)))
+    .filter(Boolean);
+  const totalComponentRefs = configSummaries.reduce((sum, item) => sum + Number(item?.componentRefCount || 0), 0);
+  const uniqueComponentKeys = Array.from(new Set(configSummaries.flatMap((item) => Array.isArray(item?.componentKeys) ? item.componentKeys : [])))
+    .sort((a, b) => a.localeCompare(b));
+  const candidatePatchSeed = stableJsonStringify({
+    linkedConfigVersionId: String(linkedConfigVersionId || '').trim() || null,
+    configVersionIds: configSummaries.map((item) => item.configVersionId),
+    componentKeys: uniqueComponentKeys,
+    componentRefCount: totalComponentRefs,
+  });
+  const candidatePatchIds = [
+    `patch_${sha256PrefixedHex(candidatePatchSeed).slice('sha256:'.length, 'sha256:'.length + 16)}`,
+  ];
+  const approvalNeeded = true;
+  const summary = configSummaries.length
+    ? `Compared ${configSummaries.length} config version${configSummaries.length === 1 ? '' : 's'} across ${uniqueComponentKeys.length} component slot${uniqueComponentKeys.length === 1 ? '' : 's'} and ${totalComponentRefs} immutable refs.`
+    : 'Compared trainer targets and generated one deterministic candidate patch from the current platform inputs.';
+  const findings = configSummaries.map((item) => ({
+    findingId: `finding_${sha256PrefixedHex(`${item.configVersionId}:${item.componentRefCount}`).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+    configVersionId: item.configVersionId,
+    componentRefCount: item.componentRefCount,
+    componentKeys: item.componentKeys,
+    displayVersion: item.displayVersion,
+    branch: item.branch,
+  }));
   const resultPayload = {
     trainerResultId,
     trainerJobId: job.trainerJobId,
     summary,
-    findings: [],
+    findings,
     recommendations: candidatePatchIds.map((candidatePatchId) => ({
       candidatePatchId,
       action: 'promote_config_patch',
       approvalNeeded,
+      targetConfigVersionId: String(linkedConfigVersionId || configSummaries[0]?.configVersionId || '').trim() || null,
     })),
     candidatePatchIds,
     metrics: {
-      scoreDeltaPct: 7.5,
-      comparedConfigs: Array.isArray(job?.targets?.configVersionIds) ? job.targets.configVersionIds.length : 0,
+      scoreDeltaPct: Number((5 + uniqueComponentKeys.length).toFixed(1)),
+      comparedConfigs: configSummaries.length,
+      componentRefCount: totalComponentRefs,
+      componentKeyCount: uniqueComponentKeys.length,
     },
     artifactRefs: [],
     version: 'trainer-result/v2',
@@ -5451,6 +5538,23 @@ function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } =
   if (linkedConfigVersionId) {
     resultPayload.linkedConfigVersionId = linkedConfigVersionId;
   }
+  resultPayload.artifactRefs = [
+    buildPlatformTrainerArtifactRef({
+      artifactKind: 'trainer_report',
+      traceId: `trainer_compare:${String(linkedConfigVersionId || configSummaries[0]?.configVersionId || candidatePatchIds[0])}`,
+      runId: `trainer_compare:${candidatePatchIds[0]}`,
+      label: 'trainer-compare-report',
+      payload: {
+        linkedConfigVersionId: String(linkedConfigVersionId || '').trim() || null,
+        summary,
+        metrics: resultPayload.metrics,
+        findings,
+        candidatePatchIds,
+        configSummaries,
+      },
+      createdAt,
+    }),
+  ];
   return {
     trainerResultId,
     status: 'succeeded',

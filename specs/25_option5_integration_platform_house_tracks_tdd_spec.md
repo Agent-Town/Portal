@@ -145,7 +145,8 @@ GREEN gate:
 
 1. trainer compare produces materially real result content,
 2. artifact refs are persisted when derived output exists,
-3. lineage and promotion remain stable.
+3. artifact refs expose stable `traceArtifactId`, `artifactKind`, and `contentHash`,
+4. lineage and promotion remain stable.
 
 ### M25.2 - Seal-aware read filtering
 
