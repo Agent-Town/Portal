@@ -1,0 +1,25 @@
+{
+  "family": "tracks_progress_seed",
+  "tracks": [
+    {
+      "trackId": "track_poker_mastery",
+      "title": "Poker Mastery",
+      "progress": 0.75
+    },
+    {
+      "trackId": "track_web_ops",
+      "title": "Web Ops",
+      "progress": 0.5
+    },
+    {
+      "trackId": "track_builder",
+      "title": "Builder",
+      "progress": 0.25
+    },
+    {
+      "trackId": "track_analyst",
+      "title": "Analyst",
+      "progress": 0.4
+    }
+  ]
+}

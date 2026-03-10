@@ -1,0 +1,17 @@
+{
+  "family": "platform_experience_registration_seed",
+  "experiences": [
+    {
+      "experienceId": "web.agent",
+      "requiresConfigPinning": true
+    },
+    {
+      "experienceId": "poker.season",
+      "requiresConfigPinning": true
+    },
+    {
+      "experienceId": "trainer.compare",
+      "requiresConfigPinning": false
+    }
+  ]
+}

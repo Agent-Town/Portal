@@ -1,0 +1,15 @@
+{
+  "family": "trainer_real_result_seed",
+  "trainerJob": {
+    "trainerJobId": "trainer_job_real_fixture_01",
+    "jobKind": "trainer_job.compare",
+    "houseId": "house_fixture_alpha",
+    "teamId": "team_fixture_alpha"
+  },
+  "expectedArtifacts": [
+    {
+      "traceArtifactId": "artifact_fixture_compare_report_01",
+      "artifactKind": "trainer_report"
+    }
+  ]
+}

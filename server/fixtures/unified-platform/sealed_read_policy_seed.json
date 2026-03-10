@@ -1,0 +1,13 @@
+{
+  "family": "sealed_read_policy_seed",
+  "sealedContext": {
+    "sealedContextId": "seal_read_fixture_01",
+    "entrantId": "entrant_fixture_alpha",
+    "status": "active",
+    "releasePolicy": "manual"
+  },
+  "expectedReadPolicy": {
+    "mode": "redact",
+    "auditKind": "sealed_read_attempt"
+  }
+}

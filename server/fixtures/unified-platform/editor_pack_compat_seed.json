@@ -1,0 +1,12 @@
+{
+  "family": "editor_pack_compat_seed",
+  "pack": {
+    "packVersionId": "pack_editor_fixture_01",
+    "editorCompatible": true,
+    "requiredFiles": [
+      "manifest.json",
+      "overlay.json",
+      "policy.json"
+    ]
+  }
+}

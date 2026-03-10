@@ -1,0 +1,13 @@
+{
+  "family": "tracks_core_seed",
+  "tracks": [
+    {
+      "trackId": "track_poker_mastery",
+      "sourceTraceId": "trace_fixture_poker_01",
+      "progressDelta": 1
+    }
+  ],
+  "antiFarming": {
+    "duplicateActionThreshold": 1
+  }
+}

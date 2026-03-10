@@ -1,0 +1,15 @@
+{
+  "family": "house_experiences_seed",
+  "experiences": [
+    {
+      "experienceId": "web.agent",
+      "title": "Web Ops",
+      "entryPath": "/app?district=atlas"
+    },
+    {
+      "experienceId": "poker.season",
+      "title": "Poker",
+      "entryPath": "/app?district=poker"
+    }
+  ]
+}

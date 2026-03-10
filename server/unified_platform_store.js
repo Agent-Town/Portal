@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
@@ -41,6 +42,16 @@ const FIXTURE_FILES = Object.freeze({
   live_suite_manifest_expected: 'live_suite_manifest_expected.json',
   route_module_manifest_expected: 'route_module_manifest_expected.json',
   platform_export_roundtrip_seed: 'platform_export_roundtrip_seed.json',
+  trainer_real_result_seed: 'trainer_real_result_seed.json',
+  sealed_read_policy_seed: 'sealed_read_policy_seed.json',
+  platform_experience_registration_seed: 'platform_experience_registration_seed.json',
+  house_experiences_seed: 'house_experiences_seed.json',
+  house_workshop_seed: 'house_workshop_seed.json',
+  house_office_staff_seed: 'house_office_staff_seed.json',
+  tracks_core_seed: 'tracks_core_seed.json',
+  tracks_progress_seed: 'tracks_progress_seed.json',
+  editor_pack_compat_seed: 'editor_pack_compat_seed.json',
+  joined_completion_smoke_seed: 'joined_completion_smoke_seed.json',
 });
 
 let db = null;
@@ -349,6 +360,15 @@ function loadFixtureFamily(family) {
   const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   fixtureCache.set(key, parsed);
   return parsed;
+}
+
+function buildFixtureManifest() {
+  return listFixtureFamilies().reduce((acc, family) => {
+    const filePath = path.join(FIXTURE_DIR, FIXTURE_FILES[family]);
+    const raw = fs.readFileSync(filePath, 'utf8');
+    acc[family] = `sha256:${crypto.createHash('sha256').update(raw, 'utf8').digest('hex')}`;
+    return acc;
+  }, {});
 }
 
 function parseJsonColumn(raw, fallback) {
@@ -1939,9 +1959,19 @@ function isUnifiedPlatformTable(tableName) {
 }
 
 function getUnifiedPlatformTestStats() {
+  const fixtureFamilies = listFixtureFamilies();
+  const fixtureManifest = buildFixtureManifest();
   return {
     counts: getPlatformTableCounts(),
-    fixtureFamilies: listFixtureFamilies(),
+    fixtureFamilies,
+    fixtureManifest,
+    fixtureManifestHash: `sha256:${crypto.createHash('sha256').update(JSON.stringify(fixtureManifest), 'utf8').digest('hex')}`,
+    inspectors: {
+      artifacts: true,
+      seals: true,
+      house: true,
+      tracks: true,
+    },
   };
 }
 

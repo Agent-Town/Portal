@@ -15,6 +15,13 @@ async function getPlatformCounts(request) {
   };
 }
 
+async function getPlatformStats(request) {
+  const response = await request.get('/__test__/unified-platform/stats', {
+    headers: { 'x-test-reset': resetToken },
+  });
+  return await response.json();
+}
+
 async function getPlatformFixture(request, family) {
   const response = await request.get(`/__test__/unified-platform/fixtures/${encodeURIComponent(String(family || ''))}`, {
     headers: { 'x-test-reset': resetToken },
@@ -718,6 +725,7 @@ module.exports = {
   getPlatformConfigVersionRecord,
   getPlatformContextFromPage,
   getPlatformCounts,
+  getPlatformStats,
   getPlatformFixture,
   getPlatformTeamBinding,
   getPlatformTrainerJob,

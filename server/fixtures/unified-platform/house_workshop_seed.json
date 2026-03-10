@@ -1,0 +1,9 @@
+{
+  "family": "house_workshop_seed",
+  "activeConfig": {
+    "configVersionId": "cfg_house_fixture_01",
+    "parentConfigVersionId": "cfg_house_fixture_00",
+    "houseId": "house_fixture_alpha",
+    "teamId": "team_fixture_alpha"
+  }
+}

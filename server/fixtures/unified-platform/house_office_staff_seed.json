@@ -1,0 +1,17 @@
+{
+  "family": "house_office_staff_seed",
+  "offices": [
+    {
+      "officeId": "office_fixture_ops",
+      "slug": "ops",
+      "displayName": "Operations"
+    }
+  ],
+  "staffAgents": [
+    {
+      "staffAgentId": "staff_fixture_operator",
+      "role": "operator",
+      "officeId": "office_fixture_ops"
+    }
+  ]
+}

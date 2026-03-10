@@ -1,0 +1,11 @@
+{
+  "family": "joined_completion_smoke_seed",
+  "smoke": {
+    "registry": true,
+    "web": true,
+    "poker": true,
+    "trainer": true,
+    "house": true,
+    "tracks": true
+  }
+}

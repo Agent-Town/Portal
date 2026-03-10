@@ -97,6 +97,7 @@ Reserved tests:
 2. Track and reward fixtures must be resettable through the existing test reset path.
 3. Trainer-result fixtures may seed inputs, but the output under test must use the production path.
 4. Final smoke must cover Registry, Web, Poker, trainer, House, and tracks from one coherent shell.
+5. `/__test__/unified-platform/stats` must expose deterministic `fixtureManifest`, `fixtureManifestHash`, and `inspectors.artifacts|seals|house|tracks` for the late-phase harness.
 
 ## 4. Required Fixture Families
 
