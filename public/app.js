@@ -27,10 +27,10 @@ function normalizeOnboardingStep(value) {
 
 function getOnboardingStep(state) {
   const onboarding = state?.onboarding || {};
-  if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
-
   const explicitStep = normalizeOnboardingStep(onboarding.step);
   if (explicitStep) return explicitStep;
+
+  if (onboarding.required !== true) return ONBOARDING_STEP_DONE;
 
   if (onboarding.registrationComplete !== true) return ONBOARDING_STEP_TOWNHALL;
   if (!isTownhallBrainConfigured(state)) return ONBOARDING_STEP_BRAIN;
@@ -3635,8 +3635,16 @@ function syncTownhallRegistrationUI(state) {
   }
 
   const canUseSigil = canUseTownhallSigilFlow(state);
-  const showSigil = shouldShowSigilForOnboarding
-    || (canUseSigil && (townhallSigilUnlockedByContinue || !required));
+  const showSigil = (
+    shouldShowSigilForOnboarding
+    && !(
+      (onboardingStep === ONBOARDING_STEP_BRAIN || onboardingStep === ONBOARDING_STEP_SIGIL)
+      && !isBrainConfigured
+    )
+  ) || (
+    canUseSigil
+    && (townhallSigilUnlockedByContinue || !required)
+  );
   const sigilFlow = el('townhallSigilFlow');
   if (sigilFlow) sigilFlow.classList.toggle('is-hidden', !showSigil);
   const continueBtn = el('townhallContinueBtn');
@@ -3644,16 +3652,16 @@ function syncTownhallRegistrationUI(state) {
     const canContinue = (
       registrationComplete
       && !townhallMintInFlight
+      && !(
+        (onboardingStep === ONBOARDING_STEP_BRAIN || onboardingStep === ONBOARDING_STEP_SIGIL)
+        && !isBrainConfigured
+      )
       && (
         showSigil
-        || (
-          (
-            onboardingStep === ONBOARDING_STEP_BRAIN
-            || onboardingStep === ONBOARDING_STEP_SIGIL
-            || !required
-          )
-          && isBrainConfigured
-        )
+        || onboardingStep === ONBOARDING_STEP_BRAIN
+        || onboardingStep === ONBOARDING_STEP_SIGIL
+        || onboardingStep === ONBOARDING_STEP_CEREMONY
+        || onboardingStep === ONBOARDING_STEP_DONE
       )
     );
     continueBtn.disabled = !canContinue;

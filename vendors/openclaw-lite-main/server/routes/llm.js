@@ -274,12 +274,14 @@ function registerLlmRoutes(app) {
   }
 
   function normalizeProxyHostname(hostname) {
-    const host = String(hostname || "").trim().toLowerCase().replace(/\.$/, "");
+    let host = String(hostname || "").trim().toLowerCase();
     if (!host) return "";
     if (host.startsWith("[") && host.endsWith("]")) {
-      return host.slice(1, -1);
+      host = host.slice(1, -1);
     }
-    return host;
+    const zoneIndex = host.indexOf("%");
+    if (zoneIndex >= 0) host = host.slice(0, zoneIndex);
+    return host.replace(/\.$/, "");
   }
 
   function isBlockedProxyHost(hostname) {
