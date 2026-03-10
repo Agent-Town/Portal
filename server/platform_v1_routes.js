@@ -1083,7 +1083,12 @@ function registerPlatformV1Routes(app, deps) {
 
     let job = createdJob;
     let result = null;
-    if (jobKind === 'trainer_job.compare') {
+    if ([
+      'trainer_job.compare',
+      'trainer_job.replay',
+      'trainer_job.recommend',
+      'trainer_job.guardrails',
+    ].includes(jobKind)) {
       const linkedConfigVersionId = resolvePlatformTrainerLinkedConfigVersionId({
         houseId: resolvedHouse.houseId,
         teamId,

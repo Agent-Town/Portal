@@ -1404,7 +1404,7 @@ Seal policy:
 - once a sealed context is `released`, the same route returns the raw event payload again.
 
 ### POST `/v1/trainer/jobs` (human + house-auth)
-Creates one durable trainer job row. Compare jobs may complete synchronously in the current deterministic implementation and emit one derived trainer result.
+Creates one durable trainer job row. `trainer_job.compare`, `trainer_job.replay`, `trainer_job.recommend`, and `trainer_job.guardrails` currently complete synchronously in the deterministic implementation and emit one derived trainer result.
 
 Request shape:
 ```json
@@ -1429,7 +1429,8 @@ Response fields:
 - `data.trainerJobId`
 - `data.status`
 - `data.jobKind`
-- `data.result.trainerResultId` when a deterministic compare result is emitted
+- `data.result.trainerResultId` when a deterministic result is emitted
+- `data.result.approvalNeeded`
 
 Stable failure codes:
 - `SESSION_REQUIRED`
@@ -1458,15 +1459,23 @@ Returns one durable trainer result artifact.
 Response fields:
 - `data.trainerResultId`
 - `data.trainerJobId`
+- `data.jobKind`
 - `data.status`
 - `data.summary`
 - `data.candidatePatchIds[]`
+- `data.metrics`
 - `data.artifactRefs[]`
 - `data.artifactRefs[].traceArtifactId`
 - `data.artifactRefs[].artifactKind`
 - `data.artifactRefs[].contentHash`
 - `data.linkedConfigVersionId`
 - `data.approvalNeeded`
+
+Kind-specific result fields:
+- `trainer_job.compare`: `data.findings[]`, `data.recommendations[]`
+- `trainer_job.replay`: `data.replay`
+- `trainer_job.recommend`: `data.recommendations[]`
+- `trainer_job.guardrails`: `data.guardrails[]`
 
 ### POST `/v1/trainer/results/:trainerResultId/promote-patch` (human + house-auth)
 Promotes one approved candidate patch into a new durable config version and updates the active team binding.

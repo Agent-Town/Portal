@@ -189,6 +189,12 @@ GREEN gate:
 2. results are non-empty and meaningful,
 3. job/result persistence is deterministic.
 
+Implementation notes:
+
+1. All three job kinds may complete synchronously for seeded deterministic inputs.
+2. Each job kind must emit one non-empty durable result row plus one artifact ref.
+3. Idempotent replay must return the same `trainerJobId` and `trainerResultId`.
+
 ### M25.4 - Broader experience registration and config-pinning closure
 
 Primary test:

@@ -48,6 +48,7 @@ Success metrics:
 2. No backend hacks that fake co-op outcomes.
 3. No per-skill hardcoded tool code paths.
 4. No replacement of generic runtime tools (`http_request`, etc.); this is an additive namespace.
+5. No namespace collision with durable platform trainer jobs; runtime `trainer.*` tools remain distinct from house-auth `trainer_job.*` workflows.
 
 ## 4. Guardrails
 

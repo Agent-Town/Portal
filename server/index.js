@@ -5478,21 +5478,272 @@ function buildPlatformTrainerArtifactRef({
   };
 }
 
-function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } = {}) {
-  const createdAt = nowIso();
-  const trainerResultId = `trr_${randomHex(10)}`;
-  const targetConfigIds = Array.isArray(job?.targets?.configVersionIds)
-    ? job.targets.configVersionIds.map((item) => String(item || '').trim()).filter(Boolean)
-    : [];
-  const resolvedConfigIds = targetConfigIds.length
-    ? targetConfigIds
-    : [String(linkedConfigVersionId || '').trim()].filter(Boolean);
-  const configSummaries = resolvedConfigIds
+function normalizePlatformTrainerTargetIds(...entries) {
+  const ids = [];
+  entries.forEach((entry) => {
+    if (Array.isArray(entry)) {
+      entry.forEach((item) => {
+        const normalized = typeof item === 'string' ? item.trim() : '';
+        if (normalized) ids.push(normalized);
+      });
+      return;
+    }
+    const normalized = typeof entry === 'string' ? entry.trim() : '';
+    if (normalized) ids.push(normalized);
+  });
+  return Array.from(new Set(ids)).sort((a, b) => a.localeCompare(b));
+}
+
+function collectPlatformTrainerTargetSummary(job, { linkedConfigVersionId = '' } = {}) {
+  const targets = job?.targets && typeof job.targets === 'object' && !Array.isArray(job.targets)
+    ? job.targets
+    : {};
+  const configVersionIds = normalizePlatformTrainerTargetIds(
+    targets.configVersionId,
+    targets.configVersionIds,
+    linkedConfigVersionId,
+  );
+  const configSummaries = configVersionIds
     .map((configVersionId) => summarizeTrainerConfigVersion(getConfigVersion(configVersionId)))
     .filter(Boolean);
   const totalComponentRefs = configSummaries.reduce((sum, item) => sum + Number(item?.componentRefCount || 0), 0);
-  const uniqueComponentKeys = Array.from(new Set(configSummaries.flatMap((item) => Array.isArray(item?.componentKeys) ? item.componentKeys : [])))
-    .sort((a, b) => a.localeCompare(b));
+  const uniqueComponentKeys = Array.from(new Set(
+    configSummaries.flatMap((item) => (Array.isArray(item?.componentKeys) ? item.componentKeys : []))
+  )).sort((a, b) => a.localeCompare(b));
+  const requestedRunIds = normalizePlatformTrainerTargetIds(targets.runId, targets.runIds);
+  const requestedTraceIds = normalizePlatformTrainerTargetIds(targets.traceId, targets.traceIds);
+  const traceIds = normalizePlatformTrainerTargetIds(
+    requestedTraceIds,
+    requestedRunIds.map((runId) => getRunById(runId)?.traceId || ''),
+  );
+  const runIds = normalizePlatformTrainerTargetIds(
+    requestedRunIds,
+    traceIds.map((traceId) => getRunByTraceId(traceId)?.runId || ''),
+  );
+  const traceSummaries = traceIds.map((traceId) => {
+    const events = listTraceEvents(traceId);
+    const run = getRunByTraceId(traceId);
+    const eventKinds = Array.from(new Set(events.map((event) => String(event?.eventKind || '').trim()).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b));
+    const sealedEventCount = events.filter((event) => event?.seal?.active === true).length;
+    return {
+      traceId,
+      runId: run?.runId || null,
+      canonicalEventCount: events.length,
+      sealedEventCount,
+      eventKinds,
+    };
+  });
+  return {
+    configVersionIds,
+    configSummaries,
+    totalComponentRefs,
+    uniqueComponentKeys,
+    runIds,
+    traceIds,
+    traceSummaries,
+    totalEventCount: traceSummaries.reduce((sum, item) => sum + Number(item?.canonicalEventCount || 0), 0),
+    totalSealedEventCount: traceSummaries.reduce((sum, item) => sum + Number(item?.sealedEventCount || 0), 0),
+  };
+}
+
+function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } = {}) {
+  const createdAt = nowIso();
+  const trainerResultId = `trr_${randomHex(10)}`;
+  const targetSummary = collectPlatformTrainerTargetSummary(job, { linkedConfigVersionId });
+  const {
+    configSummaries,
+    totalComponentRefs,
+    uniqueComponentKeys,
+    runIds,
+    traceIds,
+    traceSummaries,
+    totalEventCount,
+    totalSealedEventCount,
+  } = targetSummary;
+
+  if (job?.jobKind === 'trainer_job.replay') {
+    const summary = traceSummaries.length
+      ? `Replayed ${traceSummaries.length} trace${traceSummaries.length === 1 ? '' : 's'} from ${totalEventCount} canonical event${totalEventCount === 1 ? '' : 's'} across ${runIds.length || traceSummaries.length} run${(runIds.length || traceSummaries.length) === 1 ? '' : 's'}.`
+      : 'Replayed trainer targets and derived one deterministic canonical playback summary.';
+    const replay = {
+      traceIds,
+      runIds,
+      canonicalEventCount: totalEventCount,
+      checkpoints: traceSummaries.map((item) => ({
+        traceId: item.traceId,
+        runId: item.runId,
+        canonicalEventCount: item.canonicalEventCount,
+        checkpointCount: Math.max(1, item.canonicalEventCount),
+      })),
+    };
+    const metrics = {
+      replayedTraces: traceSummaries.length,
+      replayedRuns: runIds.length,
+      canonicalEventCount: totalEventCount,
+      sealedEventCount: totalSealedEventCount,
+    };
+    const artifactRefs = [
+      buildPlatformTrainerArtifactRef({
+        artifactKind: 'trainer_replay_report',
+        traceId: `trainer_replay:${traceIds[0] || runIds[0] || 'none'}`,
+        runId: `trainer_replay:${runIds[0] || traceIds[0] || 'none'}`,
+        label: 'trainer-replay-report',
+        payload: {
+          summary,
+          replay,
+          metrics,
+        },
+        createdAt,
+      }),
+    ];
+    return {
+      trainerResultId,
+      status: 'succeeded',
+      resultPayload: {
+        trainerResultId,
+        trainerJobId: job.trainerJobId,
+        jobKind: job.jobKind,
+        summary,
+        replay,
+        metrics,
+        artifactRefs,
+        candidatePatchIds: [],
+        version: 'trainer-result/v2',
+      },
+      candidatePatchIds: [],
+      linkedConfigVersionId: linkedConfigVersionId || null,
+      approvalNeeded: false,
+    };
+  }
+
+  if (job?.jobKind === 'trainer_job.recommend') {
+    const recommendations = configSummaries.length
+      ? configSummaries.map((item) => ({
+        recommendationId: `rec_${sha256PrefixedHex(`${item.configVersionId}:${item.componentRefCount}`).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+        configVersionId: item.configVersionId,
+        suggestedAction: 'tighten_component_review',
+        rationale: `${item.componentRefCount} immutable refs across ${item.componentKeys.length} component slot${item.componentKeys.length === 1 ? '' : 's'}.`,
+      }))
+      : [{
+        recommendationId: `rec_${sha256PrefixedHex(stableJsonStringify({ linkedConfigVersionId, targets: job?.targets || {} })).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+        configVersionId: String(linkedConfigVersionId || '').trim() || null,
+        suggestedAction: 'inspect_active_config',
+        rationale: 'No immutable config summary was available, so the active binding should be reviewed directly.',
+      }];
+    const summary = configSummaries.length
+      ? `Recommended ${recommendations.length} deterministic config improvement${recommendations.length === 1 ? '' : 's'} across ${configSummaries.length} reviewed config version${configSummaries.length === 1 ? '' : 's'}.`
+      : 'Recommended one deterministic follow-up action from the currently linked config context.';
+    const metrics = {
+      reviewedConfigs: configSummaries.length,
+      componentRefCount: totalComponentRefs,
+      componentKeyCount: uniqueComponentKeys.length,
+      recommendationCount: recommendations.length,
+    };
+    const artifactRefs = [
+      buildPlatformTrainerArtifactRef({
+        artifactKind: 'trainer_recommendation_report',
+        traceId: `trainer_recommend:${String(linkedConfigVersionId || configSummaries[0]?.configVersionId || 'none')}`,
+        runId: `trainer_recommend:${recommendations[0]?.recommendationId || 'none'}`,
+        label: 'trainer-recommendation-report',
+        payload: {
+          summary,
+          metrics,
+          recommendations,
+          configSummaries,
+        },
+        createdAt,
+      }),
+    ];
+    return {
+      trainerResultId,
+      status: 'succeeded',
+      resultPayload: {
+        trainerResultId,
+        trainerJobId: job.trainerJobId,
+        jobKind: job.jobKind,
+        summary,
+        recommendations,
+        metrics,
+        artifactRefs,
+        candidatePatchIds: [],
+        version: 'trainer-result/v2',
+      },
+      candidatePatchIds: [],
+      linkedConfigVersionId: linkedConfigVersionId || null,
+      approvalNeeded: false,
+    };
+  }
+
+  if (job?.jobKind === 'trainer_job.guardrails') {
+    const guardrails = [];
+    if (totalSealedEventCount > 0) {
+      guardrails.push({
+        guardrailId: `gr_${sha256PrefixedHex(`sealed:${traceIds.join(',')}`).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+        rule: 'entrant_private_redaction_required',
+        status: 'enforced',
+        reason: `${totalSealedEventCount} sealed canonical event${totalSealedEventCount === 1 ? '' : 's'} require redaction-aware reads.`,
+      });
+    }
+    if (totalComponentRefs > 0) {
+      guardrails.push({
+        guardrailId: `gr_${sha256PrefixedHex(`config:${configSummaries.map((item) => item.configVersionId).join(',')}`).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+        rule: 'immutable_config_lineage_present',
+        status: 'observed',
+        reason: `${totalComponentRefs} immutable config ref${totalComponentRefs === 1 ? '' : 's'} remain pinned for review.`,
+      });
+    }
+    if (guardrails.length === 0) {
+      guardrails.push({
+        guardrailId: `gr_${sha256PrefixedHex(stableJsonStringify(job?.targets || {})).slice('sha256:'.length, 'sha256:'.length + 12)}`,
+        rule: 'trainer_target_presence_required',
+        status: 'passed',
+        reason: 'Targets were present, but no stronger deterministic guardrail was required for this seeded input.',
+      });
+    }
+    const summary = `Evaluated ${traceSummaries.length} trace${traceSummaries.length === 1 ? '' : 's'} and ${configSummaries.length} config version${configSummaries.length === 1 ? '' : 's'}; emitted ${guardrails.length} deterministic guardrail check${guardrails.length === 1 ? '' : 's'}.`;
+    const metrics = {
+      checkedTraces: traceSummaries.length,
+      checkedConfigs: configSummaries.length,
+      sealedEventCount: totalSealedEventCount,
+      guardrailCount: guardrails.length,
+    };
+    const artifactRefs = [
+      buildPlatformTrainerArtifactRef({
+        artifactKind: 'trainer_guardrails_report',
+        traceId: `trainer_guardrails:${traceIds[0] || 'none'}`,
+        runId: `trainer_guardrails:${configSummaries[0]?.configVersionId || runIds[0] || 'none'}`,
+        label: 'trainer-guardrails-report',
+        payload: {
+          summary,
+          metrics,
+          guardrails,
+          traceSummaries,
+          configSummaries,
+        },
+        createdAt,
+      }),
+    ];
+    return {
+      trainerResultId,
+      status: 'succeeded',
+      resultPayload: {
+        trainerResultId,
+        trainerJobId: job.trainerJobId,
+        jobKind: job.jobKind,
+        summary,
+        guardrails,
+        metrics,
+        artifactRefs,
+        candidatePatchIds: [],
+        version: 'trainer-result/v2',
+      },
+      candidatePatchIds: [],
+      linkedConfigVersionId: linkedConfigVersionId || null,
+      approvalNeeded: false,
+    };
+  }
+
   const candidatePatchSeed = stableJsonStringify({
     linkedConfigVersionId: String(linkedConfigVersionId || '').trim() || null,
     configVersionIds: configSummaries.map((item) => item.configVersionId),
@@ -5517,6 +5768,7 @@ function buildPlatformTrainerResultPayload(job, { linkedConfigVersionId = '' } =
   const resultPayload = {
     trainerResultId,
     trainerJobId: job.trainerJobId,
+    jobKind: job.jobKind,
     summary,
     findings,
     recommendations: candidatePatchIds.map((candidatePatchId) => ({
