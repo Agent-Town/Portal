@@ -5350,6 +5350,17 @@ function getPlatformIntegrationActionPolicy(candidate, actionId) {
       status: 'queued',
     };
   }
+  if (adapterId === 'repo_workbench_v1') {
+    const adapterActions = new Set(getPlatformIntegrationActionIds(candidate));
+    if (!adapterActions.has(canonicalActionId)) return null;
+    const actionName = canonicalActionId.slice(`${adapterId}.`.length);
+    const requiresApproval = actionName === 'stage_patch' || actionName === 'draft_pr';
+    return {
+      actionId: canonicalActionId,
+      requiresApproval,
+      status: 'queued',
+    };
+  }
   if (canonicalActionId === 'integration.generic.read') {
     return {
       actionId: canonicalActionId,

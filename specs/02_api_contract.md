@@ -1250,6 +1250,7 @@ Stable failure codes:
 Known adapter inventory examples:
 - `threaded_feed_v1`: `read_feed`, `read_thread`, `draft_reply`, `send_reply`
 - `deliberation_v1`: `list_boards`, `read_item`, `comment_item`, `change_status`
+- `repo_workbench_v1`: `list_repo`, `read_file`, `search_code`, `stage_patch`, `draft_pr`
 
 ### POST `/v1/experiences/:experienceId/runs` (human + house-auth)
 Creates one durable run row for the requested experience and binds the run to one declared trace authority.
