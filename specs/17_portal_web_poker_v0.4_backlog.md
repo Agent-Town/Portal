@@ -13,7 +13,7 @@ These rules apply to every ticket below.
 
 1. No ticket is done until its API contract, tests, and affected docs are updated in the same change set.
 2. No ticket may introduce a second authority for worker behavior. Worker-first rules in `AGENTS.md` remain binding.
-3. Atlas remains modal-first. Registry must not replace Atlas district semantics.
+3. Atlas remains modal-first. Registry and Poker must preserve hub-page worker continuity and must not replace Atlas district semantics.
 4. Town Hall and Town Board semantics remain unchanged. Poker ships as a separate module.
 5. Sensitive mutation or remote-fetch routes must ship with auth, quotas, audit visibility, and idempotency on day one.
 
@@ -26,7 +26,7 @@ When a ticket changes one of the following surfaces, these updates are required 
 | HTTP route or JSON envelope | `specs/02_api_contract.md` |
 | Worker-visible skill or tool behavior | `public/skill.md`, `e2e/55_phase3_skill_contract_line.spec.js`, `docs/internal-skill-testline.md` |
 | Trainer namespace or skill-action bridge | `public/skill.md`, `e2e/55_phase3_skill_contract_line.spec.js`, `docs/internal-skill-testline.md`, `specs/14_trainer_namespace_tdd_spec.md` |
-| Atlas navigation, intent, or deep-link contract | `specs/11_district_map_storefront_spec.md`, `specs/15_experience_os_intent_tools_tdd_spec.md` |
+| Atlas, Registry, or Poker modal/deep-link contract | `specs/11_district_map_storefront_spec.md`, `specs/15_experience_os_intent_tools_tdd_spec.md`, `specs/16_portal_web_poker_v0.4_implementation_pack.md` |
 | Poker operator wire contract | this backlog, `specs/16_portal_web_poker_v0.4_implementation_pack.md`, operator-side contract docs |
 
 ## 3. Reserved deterministic test block
@@ -45,6 +45,7 @@ To avoid file-number collisions, this program reserves the following new Playwri
 - `e2e/133_poker_leaderboard_mirror.spec.js`
 - `e2e/134_poker_replay_manifest.spec.js`
 - `e2e/135_docs_contract_sync.spec.js`
+- `e2e/136_poker_modal_embed_policy.spec.js`
 
 ## 4. Phase plan
 

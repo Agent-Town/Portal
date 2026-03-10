@@ -27,6 +27,8 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   expect(skillContract).toContain('`invocationId`');
   expect(skillContract).toContain('`evidenceId`');
   expect(skillContract).toContain('`webSessionId`');
+  expect(skillContract).toContain('`atlas`, `registry`, `poker`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`');
+  expect(skillContract).toContain('Do not navigate to direct standalone routes (for example `/poker`) when a modal intent exists.');
 
   const skillContractLine = readRepoFile('e2e/55_phase3_skill_contract_line.spec.js');
   expect(skillContractLine).toContain('trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.');
@@ -39,6 +41,8 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   expect(internalTestline).toContain('Trainer namespace Web Experience parity');
   expect(internalTestline).toContain('/api/web/*');
   expect(internalTestline).toContain('`invocationId` / `evidenceId`');
+  expect(internalTestline).toContain('Experience UI intent tools (modal open / Atlas search / Registry search / Poker modal / Pony compose)');
+  expect(internalTestline).toContain('e2e/136_poker_modal_embed_policy.spec.js');
 
   const trainerSpec = readRepoFile('specs/14_trainer_namespace_tdd_spec.md');
   expect(trainerSpec).toContain('`webSessionId`');
@@ -52,4 +56,12 @@ test('Phase 16 docs stay in sync with shipped web, poker, trainer, and Atlas con
   const atlasSpec = readRepoFile('specs/11_district_map_storefront_spec.md');
   expect(atlasSpec).toContain('Atlas is modal-first.');
   expect(atlasSpec).toContain('standalone `/atlas` access redirects back to the hub');
+
+  const intentSpec = readRepoFile('specs/15_experience_os_intent_tools_tdd_spec.md');
+  expect(intentSpec).toContain('"modal": "atlas|registry|poker|pony|townhall|saloon|leaderboard|house|brain|sigil"');
+  expect(intentSpec).toContain('registry` and `poker` render through the modal iframe/embed path');
+
+  const implementationPack = readRepoFile('specs/16_portal_web_poker_v0.4_implementation_pack.md');
+  expect(implementationPack).toContain('Portal Poker pages are modal-first from the town hub.');
+  expect(implementationPack).toContain('Standalone `/poker*` requests redirect back to the town hub modal entry route');
 });

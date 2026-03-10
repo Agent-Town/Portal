@@ -95,7 +95,7 @@ test('M16.13: replay manifests are hash-verified and fail deterministically on i
   const validSync = await syncPokerMirror(request);
   expect(validSync.resp.ok()).toBe(true);
 
-  await page.goto('/poker/replays/pkr_valid');
+  await page.goto('/poker/replays/pkr_valid?embed=1');
   await expect(page.locator('#replayWinnerSeat')).toHaveText('2');
   await expect(page.locator('#replayTurns')).toHaveText('184');
   await expect(page.locator('#replaySeed')).toHaveText('seed-v4-008');
@@ -114,7 +114,7 @@ test('M16.13: replay manifests are hash-verified and fail deterministically on i
   const badHashBody = await badHashResp.json();
   expect(String(badHashBody?.error?.code || '')).toBe('POKER_REPLAY_NOT_READY');
 
-  await page.goto('/poker/replays/pkr_bad_hash');
+  await page.goto('/poker/replays/pkr_bad_hash?embed=1');
   await expect(page.locator('#replayErrorCode')).toHaveText('POKER_REPLAY_NOT_READY');
 
   await resetPortalWebState(request);

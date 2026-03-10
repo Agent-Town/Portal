@@ -1626,6 +1626,8 @@ function setSecurityHeaders(req, res, next) {
     reqPath.startsWith('/s/')
     || reqPath === '/atlas'
     || reqPath === '/registry'
+    || reqPath === '/poker'
+    || reqPath.startsWith('/poker/')
     || reqPath === '/create'
     || reqPath === '/house'
     || reqPath === '/inbox'
@@ -10934,6 +10936,17 @@ function registryModalRedirectPath() {
   return `/?${params.toString()}`;
 }
 
+function pokerModalRedirectPath(req) {
+  const params = new URLSearchParams();
+  params.set('district', 'poker');
+  const requestPath = String(req.path || '/poker');
+  const query = new URLSearchParams(req.query || {});
+  query.delete('embed');
+  const search = query.toString();
+  params.set('pokerPath', `${requestPath}${search ? `?${search}` : ''}`);
+  return `/?${params.toString()}`;
+}
+
 app.get('/openclaw-lite/manifest.json', (_req, res) => {
   res.json(VENDOR_LITE_MANIFEST);
 });
@@ -10957,8 +10970,11 @@ app.get('/registry', (req, res) => {
   return res.redirect(302, registryModalRedirectPath());
 });
 
-app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (_req, res) => {
-  return sendHtmlNoStore(res, 'poker.html');
+app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId'], (req, res) => {
+  if (String(req.query?.embed || '').trim() === '1') {
+    return sendHtmlNoStore(res, 'poker.html');
+  }
+  return res.redirect(302, pokerModalRedirectPath(req));
 });
 
 app.use(

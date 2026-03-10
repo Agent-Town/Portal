@@ -89,7 +89,7 @@ Define explicit tools and parameters for at least:
 2. `agent_town_ui_atlas_search({ q, family, searchType })`
 3. `agent_town_ui_registry_search({ q, family })`
 4. `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
-4. selected `agent_town_state_*` tools listed in section 7.
+5. selected `agent_town_state_*` tools listed in section 7.
 
 Tool docs in `skill.md` must include:
 
@@ -188,7 +188,7 @@ Input:
 
 ```json
 {
-  "modal": "atlas|pony|townhall|saloon|leaderboard|house",
+  "modal": "atlas|registry|poker|pony|townhall|saloon|leaderboard|house|brain|sigil",
   "params": {
     "district": "optional",
     "agent": "optional"
@@ -200,6 +200,7 @@ Behavior:
 
 1. Opens selected modal in current `/app` experience.
 2. Must not hard-navigate away from `/app`.
+3. `registry` and `poker` render through the modal iframe/embed path so the worker runtime stays on the hub page.
 
 ### `agent_town_ui_atlas_search`
 

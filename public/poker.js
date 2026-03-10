@@ -3,6 +3,7 @@
   const subtitleEl = document.getElementById('pokerSubtitle');
   const statusEl = document.getElementById('pokerStatus');
   const contentEl = document.getElementById('pokerContent');
+  const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
 
   function setTitle(title, subtitle) {
     if (titleEl) titleEl.textContent = title;
@@ -20,6 +21,19 @@
       .replaceAll('>', '&gt;')
       .replaceAll('"', '&quot;')
       .replaceAll("'", '&#39;');
+  }
+
+  function buildPokerHref(path) {
+    let parsed;
+    try {
+      parsed = new URL(path, window.location.origin);
+    } catch {
+      return String(path || '/poker');
+    }
+    if (isEmbedded) {
+      parsed.searchParams.set('embed', '1');
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   }
 
   async function api(path, options = {}) {
@@ -81,9 +95,9 @@
           <span class="pokerBadge">${escapeHtml(item.operatorVersion || 'operator')}</span>
         </div>
         <div class="pokerLinks">
-          <a href="/poker/seasons/${encodeURIComponent(item.seasonId)}">Season</a>
-          <a href="/poker/leaderboards/${encodeURIComponent(item.seasonId)}">Leaderboard</a>
-          ${latestReplayRunId ? `<a href="/poker/replays/${encodeURIComponent(latestReplayRunId)}">Replay</a>` : ''}
+          <a href="${escapeHtml(buildPokerHref(`/poker/seasons/${encodeURIComponent(item.seasonId)}`))}">Season</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/leaderboards/${encodeURIComponent(item.seasonId)}`))}">Leaderboard</a>
+          ${latestReplayRunId ? `<a href="${escapeHtml(buildPokerHref(`/poker/replays/${encodeURIComponent(latestReplayRunId)}`))}">Replay</a>` : ''}
           ${latestLeaderboardSnapshotId ? `<span class="pokerBadge">snapshot ${escapeHtml(latestLeaderboardSnapshotId)}</span>` : ''}
         </div>
       `;
@@ -111,8 +125,8 @@
           <span class="pokerBadge">${escapeHtml(season.operatorVersion || 'operator')}</span>
         </div>
         <div class="pokerLinks">
-          <a href="/poker/leaderboards/${encodeURIComponent(season.seasonId)}">Latest leaderboard</a>
-          ${season?.latestReplayHighlight?.runId ? `<a href="/poker/replays/${encodeURIComponent(season.latestReplayHighlight.runId)}">Replay</a>` : ''}
+          <a href="${escapeHtml(buildPokerHref(`/poker/leaderboards/${encodeURIComponent(season.seasonId)}`))}">Latest leaderboard</a>
+          ${season?.latestReplayHighlight?.runId ? `<a href="${escapeHtml(buildPokerHref(`/poker/replays/${encodeURIComponent(season.latestReplayHighlight.runId)}`))}">Replay</a>` : ''}
         </div>
       `,
       `

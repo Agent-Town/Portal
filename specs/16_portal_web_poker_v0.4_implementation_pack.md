@@ -14,10 +14,11 @@ The following decisions are normative.
 1. Atlas remains the chain/district exploration surface.
 2. Registry becomes the capability and storefront discovery surface.
 3. Atlas is modal-first from the town hub. Standalone `/atlas` and `/atlas.html` are redirect entry points, not first-class full-page UX.
-4. The in-browser worker remains authoritative for agent planning, tool selection, and co-op behavior.
-5. The server is authoritative only for durable shared state, policy enforcement, persistence, and externally visible API contracts.
-6. Town Hall and Town Board keep their current product semantics. Poker is a separate module.
-7. Wallet continuity remains the primary human identity anchor. Cookie and Team Code are routing and recovery instruments, not identity replacements.
+4. Portal Poker pages are modal-first from the town hub. Standalone `/poker*` routes redirect back to the hub with an embedded poker target.
+5. The in-browser worker remains authoritative for agent planning, tool selection, and co-op behavior.
+6. The server is authoritative only for durable shared state, policy enforcement, persistence, and externally visible API contracts.
+7. Town Hall and Town Board keep their current product semantics. Poker is a separate module.
+8. Wallet continuity remains the primary human identity anchor. Cookie and Team Code are routing and recovery instruments, not identity replacements.
 
 ## 2. Cross-cutting API rules
 
@@ -186,7 +187,7 @@ If `et_session` is missing or stale:
 3. Recovery must not rotate `teamCode` or `houseId`.
 4. Web sessions linked to that Portal session become resumable via `checkpointRef`.
 
-## 5. Atlas, Registry, and modal-first UI rules
+## 5. Atlas, Registry, Poker, and modal-first UI rules
 
 Rules:
 
@@ -198,6 +199,10 @@ Rules:
    - `agent_town_ui_registry_search`
    - `agent_town_state_get_registry_entity`
 6. Registry must not replace Atlas district semantics.
+7. `/poker`, `/poker/seasons/:seasonId`, `/poker/leaderboards/:seasonId`, `/poker/replays/:runId`, and `/poker/submissions/:submissionId` are render routes only for same-origin modal/embed usage.
+8. Standalone `/poker*` requests redirect back to the town hub modal entry route with the requested poker path preserved.
+9. Poker links rendered inside the embed surface must preserve `embed=1` so navigation stays inside the modal frame.
+10. `agent_town_ui_open_modal({ modal: "poker" })` opens the poker index inside the town-hub modal without changing the top-level page path.
 
 ## 6. Web Experience runtime contract
 
