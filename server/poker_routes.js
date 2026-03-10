@@ -69,6 +69,7 @@ function registerPokerRoutes(app, deps) {
     sha256PrefixedHex,
     summarizeMirroredPokerSeason,
     syncPokerMirrorFromOperator,
+    upsertPokerLeaderboardSnapshot,
     upsertPokerSeason,
     upsertPokerSubmission,
   } = deps;
@@ -269,13 +270,37 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.get('/api/poker/leaderboards/:seasonId/snapshots', (req, res) => {
+  app.get('/api/poker/leaderboards/:seasonId/snapshots', async (req, res) => {
     const requestId = buildPortalRequestId();
     const season = getPokerSeasonById(req.params.seasonId);
     if (!season) {
       return sendPortalApiError(res, 404, 'NOT_FOUND', 'Poker season not found.', { requestId });
     }
-    const items = listPokerLeaderboardSnapshots(req.params.seasonId).map((snapshot) => ({
+    let snapshots = listPokerLeaderboardSnapshots(req.params.seasonId);
+    if (snapshots.length <= 1) {
+      try {
+        const client = createPortalPokerOperatorClient();
+        const history = await client.listLeaderboardSnapshots(req.params.seasonId);
+        const remoteItems = Array.isArray(history?.items) ? history.items : [];
+        if (remoteItems.length > snapshots.length) {
+          for (const snapshot of remoteItems) {
+            if (!snapshot?.snapshotId) continue;
+            upsertPokerLeaderboardSnapshot({
+              snapshotId: snapshot.snapshotId,
+              seasonId: req.params.seasonId,
+              rankings: snapshot.rankings,
+              raw: snapshot,
+              createdAt: snapshot.createdAt || nowIso(),
+              updatedAt: snapshot.createdAt || nowIso(),
+            });
+          }
+          snapshots = listPokerLeaderboardSnapshots(req.params.seasonId);
+        }
+      } catch {
+        // Keep the mirrored snapshots already available in Portal.
+      }
+    }
+    const items = snapshots.map((snapshot) => ({
       snapshotId: snapshot.snapshotId,
       seasonId: snapshot.seasonId,
       createdAt: snapshot.createdAt,

@@ -4218,6 +4218,7 @@ registerPokerRoutes(app, {
   sha256PrefixedHex,
   summarizeMirroredPokerSeason,
   syncPokerMirrorFromOperator,
+  upsertPokerLeaderboardSnapshot,
   upsertPokerSeason,
   upsertPokerSubmission,
 });
