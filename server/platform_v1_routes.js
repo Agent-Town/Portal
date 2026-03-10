@@ -7,6 +7,8 @@ function registerPlatformV1Routes(app, deps) {
     PLATFORM_TRACE_AUTHORITY_TYPE,
     PLATFORM_TRAINER_JOB_KINDS,
     SUPPORTED_PLATFORM_EXPERIENCE_IDS,
+    ensurePlatformExperiencePinnedConfig,
+    getPlatformExperienceDefinition,
     allowedReaderIdsFromSealedContext,
     assertPortalContractTargetAllowed,
     buildCompiledIntegrationPack,
@@ -45,6 +47,7 @@ function registerPlatformV1Routes(app, deps) {
     getTrainerResultByJobId,
     hasPlatformTrainerTargets,
     listConfigComponentVersions,
+    listPlatformExperienceDefinitions,
     listTraceEvents,
     normalizePlatformTrainerBudget,
     normalizePortalIdempotencyKey,
@@ -135,6 +138,24 @@ function registerPlatformV1Routes(app, deps) {
       },
     };
   }
+
+  app.get('/v1/experiences', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
+    const store = readStore();
+    const resolvedHouse = resolveHouseAddress(store, sessionHouseId);
+    const auth = verifyHouseAuth(req, resolvedHouse?.house || null);
+    if (!auth.ok) {
+      return sendPortalApiError(res, 401, auth.error, 'House authorization failed.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      experiences: listPlatformExperienceDefinitions(),
+    }, { requestId });
+  });
 
   app.get('/v1/houses/:houseId/team', (req, res) => {
     const requestId = buildPortalRequestId();
@@ -656,10 +677,12 @@ function registerPlatformV1Routes(app, deps) {
       return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
     }
 
-    const experienceId = typeof req.params?.experienceId === 'string' ? req.params.experienceId.trim() : '';
-    if (!SUPPORTED_PLATFORM_EXPERIENCE_IDS.has(experienceId)) {
+    const requestedExperienceId = typeof req.params?.experienceId === 'string' ? req.params.experienceId.trim() : '';
+    const experience = getPlatformExperienceDefinition(requestedExperienceId);
+    if (!experience || !SUPPORTED_PLATFORM_EXPERIENCE_IDS.has(requestedExperienceId)) {
       return sendPortalApiError(res, 404, 'EXPERIENCE_NOT_FOUND', 'Experience not found.', { requestId });
     }
+    const experienceId = experience.experienceId;
 
     const sessionHouseId = typeof session?.houseCeremony?.houseId === 'string' ? session.houseCeremony.houseId.trim() : '';
     const store = readStore();
@@ -676,28 +699,36 @@ function registerPlatformV1Routes(app, deps) {
     const metadata = req.body?.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata)
       ? req.body.metadata
       : {};
-    if (!idempotencyKey || !teamId || !configVersionId || !PLATFORM_RUN_ENTRY_MODES.has(entryMode)) {
+    if (
+      !idempotencyKey
+      || !teamId
+      || !PLATFORM_RUN_ENTRY_MODES.has(entryMode)
+      || (experience.requiresConfigPinning === true && !configVersionId)
+    ) {
       return sendPortalApiError(
         res,
         400,
         'INVALID_ARGUMENT',
-        'teamId, configVersionId, entryMode, and Idempotency-Key are required.',
+        'teamId, entryMode, and Idempotency-Key are required, and pinned experiences require configVersionId.',
         { requestId }
       );
     }
 
-    const configVersion = getConfigVersion(configVersionId);
-    if (!configVersion) {
-      return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
-    }
+    let configVersion = null;
+    if (configVersionId) {
+      configVersion = getConfigVersion(configVersionId);
+      if (!configVersion) {
+        return sendPortalApiError(res, 404, 'CONFIG_NOT_FOUND', 'Config version not found.', { requestId });
+      }
 
-    const configStatus = typeof configVersion?.manifest?.status === 'string' ? configVersion.manifest.status.trim() : '';
-    if (
-      configVersion.houseId !== resolvedHouse.houseId
-      || configVersion.teamId !== teamId
-      || (configStatus && !PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(configStatus))
-    ) {
-      return sendPortalApiError(res, 409, 'CONFIG_NOT_ELIGIBLE', 'Config version is not eligible for this run.', { requestId });
+      const configStatus = typeof configVersion?.manifest?.status === 'string' ? configVersion.manifest.status.trim() : '';
+      if (
+        configVersion.houseId !== resolvedHouse.houseId
+        || configVersion.teamId !== teamId
+        || (configStatus && !PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES.has(configStatus))
+      ) {
+        return sendPortalApiError(res, 409, 'CONFIG_NOT_ELIGIBLE', 'Config version is not eligible for this run.', { requestId });
+      }
     }
 
     const replayed = getRunByIdempotency({
@@ -707,6 +738,9 @@ function registerPlatformV1Routes(app, deps) {
     if (replayed) {
       return sendPortalApiSuccess(res, {
         runId: replayed.runId,
+        traceId: replayed.traceId,
+        experienceId: replayed.experienceId,
+        configVersionId: replayed.configVersionId || null,
         status: replayed.status,
         traceAuthorityType: replayed.traceAuthorityType,
       }, { requestId });
@@ -733,6 +767,9 @@ function registerPlatformV1Routes(app, deps) {
     });
     return sendPortalApiSuccess(res, {
       runId: run.runId,
+      traceId: run.traceId,
+      experienceId: run.experienceId,
+      configVersionId: run.configVersionId || null,
       status: run.status,
       traceAuthorityType: run.traceAuthorityType,
     }, { status: 201, requestId });
@@ -1494,6 +1531,8 @@ function registerPlatformV1Routes(app, deps) {
       return sendPortalApiSuccess(res, {
         runId: replayedRun.runId,
         traceId: replayedRun.traceId,
+        experienceId: replayedRun.experienceId,
+        configVersionId: replayedRun.configVersionId || null,
         eventCount: listTraceEvents(replayedRun.traceId).length,
         authority: {
           type: 'poker_operator',
@@ -1501,13 +1540,24 @@ function registerPlatformV1Routes(app, deps) {
       }, { requestId });
     }
 
+    const pinnedConfig = ensurePlatformExperiencePinnedConfig({
+      experienceId: 'poker.season',
+      houseId: resolvedHouse.houseId,
+      teamId,
+      requestId,
+      nowIso: nowIso(),
+    });
+    if (!pinnedConfig?.configVersionId) {
+      return sendPortalApiError(res, 409, 'CONFIG_NOT_ELIGIBLE', 'Pinned poker ingest requires a durable immutable config version.', { requestId });
+    }
+
     const run = createRun({
       runId: `run_${randomHex(10)}`,
       traceId: `trace_${randomHex(10)}`,
-      experienceId: 'arena.poker.season0',
+      experienceId: 'poker.season',
       houseId: resolvedHouse.houseId,
       teamId,
-      configVersionId: '',
+      configVersionId: pinnedConfig.configVersionId,
       entryMode: 'season_lock',
       status: 'queued',
       traceAuthorityType: 'poker_operator',
@@ -1635,6 +1685,8 @@ function registerPlatformV1Routes(app, deps) {
     return sendPortalApiSuccess(res, {
       runId: completedRun.runId,
       traceId: completedRun.traceId,
+      experienceId: completedRun.experienceId,
+      configVersionId: completedRun.configVersionId || null,
       eventCount: runWithCounters?.metadata?.archiveCounters?.accepted || eventCount,
       authority: {
         type: 'poker_operator',

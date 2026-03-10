@@ -214,6 +214,12 @@ GREEN gate:
 3. broader experience compatibility does not require a rewrite,
 4. all experience entry paths that require immutable config pinning enforce it.
 
+Implementation notes:
+
+1. `/v1/experiences` is the canonical registration surface for this milestone.
+2. Canonical experience ids may accept compatibility aliases, but stored runs must persist the canonical id.
+3. `poker_operator` ingest must stop creating `season_lock` runs with empty `configVersionId`.
+
 ### M25.5 - House Experiences surface
 
 Primary test:

@@ -1299,6 +1299,9 @@ Response shape:
   "ok": true,
   "data": {
     "runId": "run_01H...",
+    "traceId": "trace_01H...",
+    "experienceId": "web.agent",
+    "configVersionId": "cfg_01HR...",
     "status": "queued",
     "traceAuthorityType": "house_trace_ingester"
   },
@@ -1318,6 +1321,22 @@ Stable failure codes:
 - `CONFIG_NOT_FOUND`
 - `CONFIG_NOT_ELIGIBLE`
 - `INVALID_ARGUMENT`
+
+Notes:
+- experience support is defined by the explicit `/v1/experiences` registration surface,
+- compatibility aliases may resolve to a canonical `experienceId` in the response,
+- experiences with `requiresConfigPinning = true` reject missing `configVersionId`.
+
+### GET `/v1/experiences` (human + house-auth)
+Returns the deterministic supported-experience registration surface.
+
+Response fields:
+- `data.experiences[]`
+- `data.experiences[].experienceId`
+- `data.experiences[].displayName`
+- `data.experiences[].requiresConfigPinning`
+- `data.experiences[].supportedEntryModes[]`
+- `data.experiences[].aliases[]`
 
 ### POST `/v1/traces/ingestions` (house-auth)
 Accepts raw trace intake records for one run, dedupes by `ingestKey`, and emits canonical trace events through the run authority.
@@ -1569,6 +1588,8 @@ Required headers:
 Response fields:
 - `data.runId`
 - `data.traceId`
+- `data.experienceId`
+- `data.configVersionId`
 - `data.eventCount`
 - `data.authority.type`
 

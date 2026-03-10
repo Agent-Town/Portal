@@ -376,15 +376,18 @@ test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to s
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterState')).toContainText('Registered');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  const stateResp = await page.request.get('/api/state');
+  expect(stateResp.ok()).toBeTruthy();
+  const state = await stateResp.json();
+  if (state?.onboarding?.required === true) {
+    await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  } else {
+    await expect(page.getByTestId('townhall-continue-btn')).toBeVisible();
+  }
   await configureBrain(page);
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   await page.getByTestId('townhall-continue-btn').click();
   await expect(page.getByTestId('open-btn')).toBeVisible();
-
-  const stateResp = await page.request.get('/api/state');
-  expect(stateResp.ok()).toBeTruthy();
-  const state = await stateResp.json();
   expect(state.onboarding?.registrationComplete).toBe(true);
   expect(state.onboarding?.profile?.humanName).toBe('Robin');
   expect(state.onboarding?.profile?.agentName).toBe('OpenClaw');

@@ -294,6 +294,24 @@ async function createPlatformRun(request, {
   }
 }
 
+async function listPlatformExperiences(request, {
+  houseId = '',
+  houseAuthKey = '',
+  includeAuth = true,
+} = {}) {
+  const path = '/v1/experiences';
+  const response = await request.get(path, {
+    headers: includeAuth ? houseAuthHeadersFromKeyB64(houseId, 'GET', path, '', houseAuthKey) : {},
+    failOnStatusCode: false,
+  });
+  const text = await response.text();
+  try {
+    return { status: response.status(), json: JSON.parse(text) };
+  } catch {
+    return { status: response.status(), json: null, raw: text };
+  }
+}
+
 async function promotePlatformConfigVersion(request, {
   houseId = '',
   houseAuthKey = '',
@@ -770,6 +788,7 @@ module.exports = {
   getRouteManifest,
   importPlatformSnapshot,
   listPlatformFixtures,
+  listPlatformExperiences,
   attachHouseToPageSession,
   ingestPlatformPokerOperatorTrace,
   ingestPlatformTraceRecords,

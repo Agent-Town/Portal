@@ -3707,7 +3707,39 @@ const PLATFORM_CONFIG_COMPONENT_SPECS = Object.freeze([
 const PLATFORM_RUN_ENTRY_MODES = new Set(['normal', 'season_lock']);
 const PLATFORM_RUN_ELIGIBLE_CONFIG_STATUSES = new Set(['candidate', 'active']);
 const PLATFORM_TRACE_AUTHORITY_TYPE = 'house_trace_ingester';
-const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(['agent_town_coop_v1', 'web_portal_demo']);
+const PLATFORM_EXPERIENCE_REGISTRY = Object.freeze([
+  {
+    experienceId: 'agent_town_coop_v1',
+    displayName: 'Agent Town Co-op',
+    requiresConfigPinning: true,
+    supportedEntryModes: ['normal'],
+    aliases: [],
+  },
+  {
+    experienceId: 'web.agent',
+    displayName: 'Web Agent',
+    requiresConfigPinning: true,
+    supportedEntryModes: ['normal'],
+    aliases: ['web_portal_demo'],
+  },
+  {
+    experienceId: 'poker.season',
+    displayName: 'Poker Season',
+    requiresConfigPinning: true,
+    supportedEntryModes: ['season_lock'],
+    aliases: ['arena.poker.season0'],
+  },
+  {
+    experienceId: 'trainer.compare',
+    displayName: 'Trainer Compare',
+    requiresConfigPinning: false,
+    supportedEntryModes: ['normal'],
+    aliases: [],
+  },
+]);
+const SUPPORTED_PLATFORM_EXPERIENCE_IDS = new Set(
+  PLATFORM_EXPERIENCE_REGISTRY.flatMap((entry) => [entry.experienceId, ...(Array.isArray(entry.aliases) ? entry.aliases : [])])
+);
 const PLATFORM_TRAINER_JOB_KINDS = new Set([
   'trainer_job.ingest',
   'trainer_job.index',
@@ -3721,6 +3753,140 @@ const PLATFORM_TRAINER_JOB_KINDS = new Set([
 ]);
 const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
 const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
+
+function getPlatformExperienceDefinition(experienceId = '') {
+  const normalizedExperienceId = String(experienceId || '').trim();
+  if (!normalizedExperienceId) return null;
+  for (const entry of PLATFORM_EXPERIENCE_REGISTRY) {
+    if (entry.experienceId === normalizedExperienceId) {
+      return {
+        ...entry,
+        aliases: Array.isArray(entry.aliases) ? [...entry.aliases] : [],
+        supportedEntryModes: Array.isArray(entry.supportedEntryModes) ? [...entry.supportedEntryModes] : [],
+      };
+    }
+    if (Array.isArray(entry.aliases) && entry.aliases.includes(normalizedExperienceId)) {
+      return {
+        ...entry,
+        aliases: Array.isArray(entry.aliases) ? [...entry.aliases] : [],
+        supportedEntryModes: Array.isArray(entry.supportedEntryModes) ? [...entry.supportedEntryModes] : [],
+        requestedExperienceId: normalizedExperienceId,
+      };
+    }
+  }
+  return null;
+}
+
+function listPlatformExperienceDefinitions() {
+  return PLATFORM_EXPERIENCE_REGISTRY.map((entry) => ({
+    experienceId: entry.experienceId,
+    displayName: entry.displayName,
+    requiresConfigPinning: entry.requiresConfigPinning === true,
+    supportedEntryModes: Array.isArray(entry.supportedEntryModes) ? [...entry.supportedEntryModes] : [],
+    aliases: Array.isArray(entry.aliases) ? [...entry.aliases] : [],
+  }));
+}
+
+function sanitizePlatformExperienceKey(experienceId = '') {
+  const normalized = String(experienceId || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
+  return normalized.replace(/^_+|_+$/g, '') || 'experience';
+}
+
+function ensurePlatformExperiencePinnedConfig({
+  experienceId = '',
+  houseId = '',
+  teamId = '',
+  requestId = '',
+  nowIso: timestamp = nowIso(),
+} = {}) {
+  const experience = getPlatformExperienceDefinition(experienceId);
+  if (!experience || experience.requiresConfigPinning !== true) {
+    return null;
+  }
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId) {
+    return null;
+  }
+  const binding = getTeamConfigBinding({
+    houseId: normalizedHouseId,
+    teamId: normalizedTeamId,
+  });
+  if (binding?.activeConfigVersionId) {
+    const activeConfig = getConfigVersion(binding.activeConfigVersionId);
+    if (activeConfig) return activeConfig;
+  }
+
+  const configSeed = `${experience.experienceId}:${normalizedHouseId}:${normalizedTeamId}`;
+  const configVersionId = `cfg_${sha256PrefixedHex(configSeed).slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  let config = getConfigVersion(configVersionId);
+  if (!config) {
+    const experienceKey = sanitizePlatformExperienceKey(experience.experienceId);
+    const componentRefs = {
+      housePolicyVersionId: `hpv_${experienceKey}_01`,
+      teamCompositionVersionId: `tcv_${normalizedTeamId}_01`,
+      agentConfigVersionIds: [`agv_${experienceKey}_01`],
+      officePolicyVersionIds: [],
+      experiencePresetVersionId: `epv_${experienceKey}_01`,
+      integrationOverlayVersionIds: [],
+      trainerPresetVersionId: `tpv_${experienceKey}_01`,
+    };
+    const resolvedComponentsPayload = resolvePlatformConfigComponents(componentRefs, { requireImmutable: true });
+    const manifest = {
+      configVersionId,
+      experienceId: experience.experienceId,
+      teamId: normalizedTeamId,
+      displayVersion: `${experience.experienceId}@auto-pinned`,
+      branch: 'auto-pinned',
+      status: 'active',
+      componentRefs,
+      resolvedComponents: resolvedComponentsPayload.resolvedComponents,
+      resolvedComponentHashes: resolvedComponentsPayload.resolvedComponentHashes,
+    };
+    const configHash = sha256PrefixedHex(JSON.stringify(manifest));
+    manifest.integrity = { configHash };
+    config = upsertConfigVersion({
+      configVersionId,
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      experienceId: experience.experienceId,
+      status: 'active',
+      configHash,
+      manifest,
+      lineage: {
+        parentConfigVersionIds: [],
+        createdBy: 'v1.experience.auto_pin',
+        requestId: String(requestId || '').trim() || null,
+        autoPinned: true,
+      },
+      nowIso: timestamp,
+    });
+    replaceConfigComponentVersions({
+      configVersionId,
+      components: resolvedComponentsPayload.componentVersions.map((component, index) => ({
+        configComponentVersionId: `ccv_${sha256PrefixedHex(`${configVersionId}:${component.componentKey}`).slice('sha256:'.length, 'sha256:'.length + 16)}`,
+        componentKind: component.componentKind,
+        componentKey: component.componentKey,
+        immutableVersionId: component.immutableVersionId,
+        componentHash: component.componentHash,
+        metadata: {
+          ...(component.metadata && typeof component.metadata === 'object' ? component.metadata : {}),
+          ordinal: index,
+        },
+      })),
+      nowIso: timestamp,
+    });
+  }
+
+  upsertTeamConfigBinding({
+    teamBindingId: `tb_${sha256PrefixedHex(`${normalizedHouseId}:${normalizedTeamId}:${experience.experienceId}`).slice('sha256:'.length, 'sha256:'.length + 16)}`,
+    houseId: normalizedHouseId,
+    teamId: normalizedTeamId,
+    activeConfigVersionId: config.configVersionId,
+    nowIso: timestamp,
+  });
+  return config;
+}
 
 function isPlatformMutableComponentRef(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -4123,6 +4289,8 @@ registerPlatformV1Routes(app, {
   PLATFORM_TRACE_AUTHORITY_TYPE,
   PLATFORM_TRAINER_JOB_KINDS,
   SUPPORTED_PLATFORM_EXPERIENCE_IDS,
+  ensurePlatformExperiencePinnedConfig,
+  getPlatformExperienceDefinition,
   allowedReaderIdsFromSealedContext,
   assertPortalContractTargetAllowed,
   buildCompiledIntegrationPack,
@@ -4163,6 +4331,7 @@ registerPlatformV1Routes(app, {
   getTrainerResultByJobId,
   hasPlatformTrainerTargets,
   listConfigComponentVersions,
+  listPlatformExperienceDefinitions,
   listTraceEvents,
   normalizePlatformTrainerBudget,
   normalizePortalIdempotencyKey,
