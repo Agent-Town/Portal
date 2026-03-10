@@ -169,6 +169,7 @@ function registerPokerRoutes(app, deps) {
     getPokerSubmissionById,
     getPokerSubmissionByRequest,
     getStreamflowVerificationById,
+    getStreamflowVerificationByProviderAndStream,
     getStreamflowVerificationByWalletAndStream,
     getStreamflowVerificationByWalletSubject,
     isTestMockAddress,
@@ -554,7 +555,7 @@ function registerPokerRoutes(app, deps) {
     }, { requestId });
   });
 
-  app.post('/api/poker/streamflow/challenge', express.json({ limit: '128kb' }), (req, res) => {
+  const handleStreamflowChallenge = (req, res) => {
     req.query = {
       ...req.query,
       streamId: req.body?.streamId,
@@ -615,9 +616,11 @@ function registerPokerRoutes(app, deps) {
         message,
       },
     }, { requestId });
-  });
+  };
 
-  app.post('/api/poker/streamflow/verify', express.json({ limit: '128kb' }), async (req, res) => {
+  app.post(['/api/poker/streamflow/challenge', '/api/oil/streamflow/challenge'], express.json({ limit: '128kb' }), handleStreamflowChallenge);
+
+  const handleStreamflowVerify = async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
@@ -680,8 +683,61 @@ function registerPokerRoutes(app, deps) {
       );
     }
 
+    const existingStake = getStreamflowVerificationByProviderAndStream(STREAMFLOW_PROVIDER, streamId);
+    if (existingStake && (
+      existingStake.walletSubject !== walletBinding.walletSubject
+      || normalizeTrimmedString(existingStake.houseId) !== houseId
+    )) {
+      return sendPortalApiError(
+        res,
+        409,
+        'STREAMFLOW_STAKE_ALREADY_CLAIMED',
+        'This Streamflow stake is already bound to a different house.',
+        {
+          requestId,
+          details: {
+            verificationId: existingStake.verificationId,
+            houseId: existingStake.houseId || null,
+          },
+        }
+      );
+    }
+
+    const existingWallet = getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
+    if (existingWallet && normalizeTrimmedString(existingWallet.houseId) && normalizeTrimmedString(existingWallet.houseId) !== houseId) {
+      return sendPortalApiError(
+        res,
+        409,
+        'STREAMFLOW_WALLET_ALREADY_BOUND',
+        'This staked wallet is already bound to a different house for OIL accrual.',
+        {
+          requestId,
+          details: {
+            verificationId: existingWallet.verificationId,
+            houseId: existingWallet.houseId || null,
+          },
+        }
+      );
+    }
+    if (existingWallet && existingWallet.streamId && existingWallet.streamId !== streamId) {
+      return sendPortalApiError(
+        res,
+        409,
+        'STREAMFLOW_WALLET_ALREADY_VERIFIED',
+        'This wallet already has an active verified Streamflow stake.',
+        {
+          requestId,
+          details: {
+            verificationId: existingWallet.verificationId,
+            streamId: existingWallet.streamId,
+            houseId: existingWallet.houseId || null,
+          },
+        }
+      );
+    }
+
     const existing = getStreamflowVerificationByWalletAndStream(walletBinding.walletSubject, STREAMFLOW_PROVIDER, streamId)
-      || getStreamflowVerificationByWalletSubject(walletBinding.walletSubject);
+      || existingWallet;
     const verification = upsertStreamflowVerification({
       verificationId: existing?.verificationId || `sfv_${randomHex(10)}`,
       portalSessionId: session.sessionId,
@@ -711,9 +767,11 @@ function registerPokerRoutes(app, deps) {
       oilBalance: computeOilBalance(walletBinding.walletSubject),
       processed,
     }, { requestId });
-  });
+  };
 
-  app.get('/api/poker/oil/balance', async (req, res) => {
+  app.post(['/api/poker/streamflow/verify', '/api/oil/streamflow/verify'], express.json({ limit: '128kb' }), handleStreamflowVerify);
+
+  const handleOilBalance = async (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
@@ -739,7 +797,9 @@ function registerPokerRoutes(app, deps) {
       snapshotEvents,
       ledgerEntries,
     }, { requestId });
-  });
+  };
+
+  app.get(['/api/poker/oil/balance', '/api/oil/balance'], handleOilBalance);
 
   app.post('/api/poker/centaur/tournaments/:tournamentId/join', express.json({ limit: '128kb' }), async (req, res) => {
     const requestId = buildPortalRequestId();

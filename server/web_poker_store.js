@@ -2473,6 +2473,17 @@ function getStreamflowVerificationByWalletAndStream(walletSubject, provider, str
   return hydrateStreamflowVerification(row);
 }
 
+function getStreamflowVerificationByProviderAndStream(provider, streamId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_streamflow_lock_verifications
+    WHERE provider = ? AND stream_id = ?
+    ORDER BY verified_at DESC, created_at DESC
+    LIMIT 1
+  `).get(provider, streamId);
+  return hydrateStreamflowVerification(row);
+}
+
 function listActiveStreamflowVerifications({ limit = 500 } = {}) {
   const database = ensureDb();
   const safeLimit = Math.max(1, Math.min(5000, Number(limit || 500)));
@@ -2812,6 +2823,7 @@ module.exports = {
   getOilSnapshotEventByVerificationAndScheduledFor,
   getWebSessionById,
   getStreamflowVerificationById,
+  getStreamflowVerificationByProviderAndStream,
   getStreamflowVerificationByWalletAndStream,
   getStreamflowVerificationByWalletSubject,
   listActiveStreamflowVerifications,

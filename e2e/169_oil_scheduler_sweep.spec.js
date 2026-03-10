@@ -64,7 +64,7 @@ test('M22.3: background oil sweep credits due snapshots without a wallet-driven 
   expect(secondSweep?.summary?.processedSnapshots).toBe(0);
   expect(secondSweep?.summary?.creditedOil).toBe(0);
 
-  const balanceResp = await request.get('/api/poker/oil/balance', {
+  const balanceResp = await request.get('/api/poker/oil/balance?asOf=2026-03-10T12%3A59%3A59.000Z', {
     headers: { 'x-wallet-solana-address': address },
   });
   expect(balanceResp.ok()).toBe(true);

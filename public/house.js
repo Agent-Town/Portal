@@ -4,6 +4,7 @@ const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
 const WALLET_IDENTITY_HINT_STORAGE_KEY = 'agentTown:walletIdentityHint';
 const WALLET_RECOVERY_KEY_STORAGE_KEY = 'agentTown:walletRecoveryKey';
 const WALLET_STORAGE_KEY = 'agentTownWallet';
+const HOUSE_ECONOMY_STREAM_ID_STORAGE_KEY = 'agentTown:houseEconomy:streamId';
 const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
 const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
 const WALLET_RECOVERY_INTENT_HEADER = 'x-wallet-recovery-intent';
@@ -89,6 +90,7 @@ function collectWalletIdentitiesFromClient() {
   const walletIdentityHint = readWalletIdentityHint();
   if (walletIdentityHint.solana) add('solana', walletIdentityHint.solana);
   if (walletIdentityHint.evm) add('evm', walletIdentityHint.evm);
+  if (typeof walletAddr === 'string' && walletAddr) add('solana', walletAddr);
 
   try {
     const cacheRaw = localStorage.getItem(WALLET_STORAGE_KEY);
@@ -118,6 +120,13 @@ async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
   const walletIdentities = collectWalletIdentitiesFromClient();
   const walletRecoveryKey = readWalletRecoveryKey();
+  if (
+    typeof walletAddr === 'string'
+    && walletAddr
+    && headers[WALLET_IDENTITY_SOLANA_HEADER] === undefined
+  ) {
+    headers[WALLET_IDENTITY_SOLANA_HEADER] = walletAddr;
+  }
   for (const { chain, address } of walletIdentities) {
     if (chain === 'evm' && headers[WALLET_IDENTITY_EVM_HEADER] === undefined) {
       headers[WALLET_IDENTITY_EVM_HEADER] = address;
@@ -193,6 +202,115 @@ function setError(msg) {
     return;
   }
   node.textContent = ERROR_MESSAGES[msg] || msg;
+}
+
+function readHouseEconomyStreamId() {
+  try {
+    return String(localStorage.getItem(HOUSE_ECONOMY_STREAM_ID_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function saveHouseEconomyStreamId(value) {
+  const streamId = String(value || '').trim();
+  try {
+    if (!streamId) {
+      localStorage.removeItem(HOUSE_ECONOMY_STREAM_ID_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(HOUSE_ECONOMY_STREAM_ID_STORAGE_KEY, streamId);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function setHouseEconomyStatus(msg) {
+  const node = el('houseEconomyStatus');
+  if (node) node.textContent = msg || '';
+}
+
+function setHouseEconomyError(msg) {
+  const node = el('houseEconomyError');
+  if (node) node.textContent = msg || '';
+}
+
+function setHouseEconomyVerifyEnabled(enabled) {
+  const streamIdInput = el('houseEconomyStreamId');
+  const minLockInput = el('houseEconomyMinLockAtomic');
+  const verifyBtn = el('houseEconomyVerifyBtn');
+  if (streamIdInput) streamIdInput.disabled = !enabled;
+  if (minLockInput) minLockInput.disabled = !enabled;
+  if (verifyBtn) verifyBtn.disabled = !enabled;
+}
+
+function renderHouseEconomySummary(data = null) {
+  const node = el('houseEconomySummary');
+  if (!node) return;
+  const verification = data?.verification || null;
+  const oilBalance = Number(data?.oilBalance?.balance || 0);
+  const walletSubject = String(data?.walletSubject || walletAddr || '').trim();
+  const snapshotEvents = Array.isArray(data?.snapshotEvents) ? data.snapshotEvents : [];
+  const creditedCount = snapshotEvents.filter((event) => String(event?.status || '') === 'credited').length;
+  const lines = [
+    `House: ${verification?.houseId || currentHouseId() || 'pending'}`,
+    `Wallet: ${verification?.address || walletSubject || 'pending'}`,
+    `OIL balance: ${oilBalance}`,
+  ];
+  if (verification) {
+    lines.push(`Verified stake: ${verification.streamId || 'pending'} (${verification.tokenSymbol || '$AGENTTOWN'})`);
+    lines.push(`Verified amount: ${String(verification.verifiedAmountAtomic || '0')} atomic`);
+    lines.push(`Current hour credited snapshots: ${creditedCount}/${snapshotEvents.length || 15}`);
+  } else {
+    lines.push('No verified Streamflow lock is bound to this house wallet yet.');
+  }
+  node.textContent = lines.join('\n');
+}
+
+function describeHouseEconomyError(error) {
+  const code = String(error?.data?.error?.code || error?.message || '').trim();
+  if (code === 'WALLET_SUBJECT_REQUIRED' || code === 'SOLANA_WALLET_REQUIRED') {
+    return 'Connect the staked house wallet to inspect OIL.';
+  }
+  if (code === 'HOUSE_REQUIRED') {
+    return 'Attach this wallet session to a house before verifying a Streamflow lock.';
+  }
+  return String(error?.data?.error?.message || code || 'Unable to load house economy state.');
+}
+
+async function refreshHouseEconomyPanel({ preserveStatus = false } = {}) {
+  const streamIdInput = el('houseEconomyStreamId');
+  if (streamIdInput && !streamIdInput.value) {
+    streamIdInput.value = readHouseEconomyStreamId();
+  }
+  setHouseEconomyError('');
+  if (!walletAddr) {
+    renderHouseEconomySummary(null);
+    setHouseEconomyVerifyEnabled(false);
+    if (!preserveStatus) setHouseEconomyStatus('Connect the house wallet to inspect the bound Streamflow stake and current OIL.');
+    return;
+  }
+  setHouseEconomyVerifyEnabled(true);
+  try {
+    const payload = await api('/api/oil/balance');
+    const data = payload?.data || payload || {};
+    if (data?.verification?.streamId) {
+      saveHouseEconomyStreamId(data.verification.streamId);
+      if (streamIdInput && !streamIdInput.value) streamIdInput.value = data.verification.streamId;
+    }
+    renderHouseEconomySummary(data);
+    if (!preserveStatus) {
+      setHouseEconomyStatus(
+        data?.verification
+          ? 'Verified Streamflow lock is active for this house wallet.'
+          : 'No verified lock yet. Use Centaur Poker to verify the staked wallet and start OIL accrual.'
+      );
+    }
+  } catch (error) {
+    renderHouseEconomySummary(null);
+    if (!preserveStatus) setHouseEconomyStatus('');
+    setHouseEconomyError(describeHouseEconomyError(error));
+  }
 }
 
 function setPublicMediaError(msg) {
@@ -2122,6 +2240,7 @@ function updateWalletUI() {
   }
   const addr = el('walletAddr');
   if (addr) addr.textContent = connected ? walletAddr : '—';
+  void refreshHouseEconomyPanel();
 }
 
 function loadWalletCache() {
@@ -3022,6 +3141,7 @@ async function unlockExistingHouse(houseId) {
   setHousePanelButtonsEnabled(true);
   setDescriptorOpen(false);
   setErc8004Open(false);
+  await refreshHouseEconomyPanel();
   await refreshEntries();
   await loadPublicMedia();
   try {
@@ -3850,6 +3970,71 @@ async function init() {
     }
   });
 
+  const houseEconomyStreamId = el('houseEconomyStreamId');
+  if (houseEconomyStreamId) {
+    houseEconomyStreamId.value = readHouseEconomyStreamId();
+    houseEconomyStreamId.addEventListener('input', () => {
+      saveHouseEconomyStreamId(houseEconomyStreamId.value);
+      setHouseEconomyError('');
+    });
+  }
+
+  const houseEconomyVerifyForm = el('houseEconomyVerifyForm');
+  if (houseEconomyVerifyForm) {
+    houseEconomyVerifyForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setHouseEconomyError('');
+      setHouseEconomyStatus('');
+      try {
+        if (!walletAddr) await connectWallet();
+        const streamId = String(el('houseEconomyStreamId')?.value || '').trim();
+        const minLockAmountAtomic = String(el('houseEconomyMinLockAtomic')?.value || '').trim() || '0';
+        if (!streamId) throw new Error('STREAMFLOW_LOCK_ID_REQUIRED');
+        saveHouseEconomyStreamId(streamId);
+        setHouseEconomyStatus('Requesting Streamflow verification challenge...');
+        const challengePayload = await api('/api/oil/streamflow/challenge', {
+          method: 'POST',
+          body: JSON.stringify({
+            streamId,
+            minLockAmountAtomic,
+          }),
+        });
+        const challenge = challengePayload?.data?.challenge || challengePayload?.challenge || null;
+        const nonce = String(challenge?.nonce || '').trim();
+        const message = String(challenge?.message || '').trim();
+        if (!nonce || !message) throw new Error('STREAMFLOW_CHALLENGE_INVALID');
+        setHouseEconomyStatus(`Signing Streamflow challenge with ${walletAddr}...`);
+        const signature = b64(await signMessageBytes(message));
+        await api('/api/oil/streamflow/verify', {
+          method: 'POST',
+          body: JSON.stringify({
+            streamId,
+            minLockAmountAtomic,
+            nonce,
+            signature,
+          }),
+        });
+        setHouseEconomyStatus('Streamflow lock verified. OIL accrual is active for this house wallet.');
+        await refreshHouseEconomyPanel({ preserveStatus: true });
+      } catch (error) {
+        if (String(error?.message || '') === 'STREAMFLOW_LOCK_ID_REQUIRED') {
+          setHouseEconomyError('Enter the Streamflow lock ID first.');
+          return;
+        }
+        if (String(error?.message || '') === 'NO_SOLANA_WALLET') {
+          setHouseEconomyError('No Privy-connected Solana wallet found.');
+          return;
+        }
+        if (String(error?.message || '') === 'NO_SOLANA_SIGN') {
+          setHouseEconomyError('Wallet does not support message signing.');
+          return;
+        }
+        setHouseEconomyStatus('');
+        setHouseEconomyError(describeHouseEconomyError(error));
+      }
+    });
+  }
+
   el('toggleDescriptorBtn').addEventListener('click', () => {
     if (!unlocked) return;
     setDescriptorOpen(!descriptorOpen);
@@ -4176,6 +4361,7 @@ async function init() {
   setHousePanelButtonsEnabled(false);
   syncInboxNavLink();
   setStatus('Ready. Connect wallet, then create or unlock a house.');
+  void refreshHouseEconomyPanel();
   restoreWalletConnection({ houseIdFromUrl: !!houseId });
 }
 

@@ -73,8 +73,9 @@ async function verifyStreamflowLock(request, {
   signature = 'test-signature',
   asOf = undefined,
   walletAddress = '',
+  routePrefix = '/api/poker',
 } = {}) {
-  const challengeResp = await request.post('/api/poker/streamflow/challenge', {
+  const challengeResp = await request.post(`${routePrefix}/streamflow/challenge`, {
     headers: walletAddress ? { 'x-wallet-solana-address': walletAddress } : undefined,
     data: {
       streamId,
@@ -86,7 +87,7 @@ async function verifyStreamflowLock(request, {
     throw new Error(`STREAMFLOW_CHALLENGE_FAILED:${challengeResp.status()}:${JSON.stringify(challengeBody)}`);
   }
   const nonce = String(challengeBody?.data?.challenge?.nonce || '');
-  const verifyResp = await request.post('/api/poker/streamflow/verify', {
+  const verifyResp = await request.post(`${routePrefix}/streamflow/verify`, {
     headers: walletAddress ? { 'x-wallet-solana-address': walletAddress } : undefined,
     data: {
       streamId,
@@ -101,6 +102,20 @@ async function verifyStreamflowLock(request, {
     throw new Error(`STREAMFLOW_VERIFY_FAILED:${verifyResp.status()}:${JSON.stringify(verifyBody)}`);
   }
   return verifyBody;
+}
+
+async function getOilBalance(request, {
+  walletAddress = '',
+  routePath = '/api/oil/balance',
+} = {}) {
+  const resp = await request.get(routePath, {
+    headers: walletAddress ? { 'x-wallet-solana-address': walletAddress } : undefined,
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`OIL_BALANCE_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
 }
 
 async function processOilSnapshots(request, {
@@ -200,6 +215,7 @@ module.exports = {
   getPokerSubmissionRow,
   getPortalState,
   getTableCount,
+  getOilBalance,
   processOilSnapshots,
   resetPortalWebState,
   resetToken,

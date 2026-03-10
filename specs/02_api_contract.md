@@ -412,6 +412,7 @@ Returns one human + AI centaur tournament payload with:
 
 ### POST `/api/poker/streamflow/challenge`
 Prepares a wallet-sign message for Streamflow lock verification.
+Alias: `POST /api/oil/streamflow/challenge`
 
 Request shape:
 ```json
@@ -436,6 +437,7 @@ Failure codes:
 
 ### POST `/api/poker/streamflow/verify`
 Verifies the signed Streamflow lock challenge and starts offchain OIL accrual.
+Alias: `POST /api/oil/streamflow/verify`
 
 Request shape:
 ```json
@@ -465,11 +467,15 @@ Failure codes:
 - `STREAMFLOW_LOCK_RECIPIENT_MISMATCH`
 - `STREAMFLOW_TOKEN_MINT_MISMATCH`
 - `STREAMFLOW_LOCK_BELOW_MINIMUM`
+- `STREAMFLOW_STAKE_ALREADY_CLAIMED`
+- `STREAMFLOW_WALLET_ALREADY_BOUND`
+- `STREAMFLOW_WALLET_ALREADY_VERIFIED`
 - `STREAMFLOW_PROVIDER_TIMEOUT`
 - `STREAMFLOW_PROVIDER_UNAVAILABLE`
 
 ### GET `/api/poker/oil/balance`
 Returns the current offchain OIL ledger summary for the bound wallet.
+Alias: `GET /api/oil/balance`
 Due snapshot credits are processed both on read and by the internal background sweep when enabled.
 
 Response fields:
