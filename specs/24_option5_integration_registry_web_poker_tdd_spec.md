@@ -334,8 +334,9 @@ Primary test:
 GREEN gate:
 
 1. Season detail exposes rules and submission-window state.
-2. Portal computes stable bundle hashes.
+2. Portal computes stable `contentAddress` and `manifestHash` values from the displayed artifact URI, entrypoint, and declared capabilities.
 3. Submission UX no longer depends solely on manual hash entry.
+4. The season payload can seed the bundle draft shown in Portal without inventing new local season labels.
 
 ### M24.12 - Poker run detail and snapshot history
 

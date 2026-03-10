@@ -472,6 +472,10 @@ Returns mirrored season summaries for the Portal poker index.
 ### GET `/api/poker/seasons/:seasonId`
 Returns the mirrored season page payload with:
 - `data.season`
+- `data.season.rulesSummary.summary`
+- `data.season.submissionWindow.state`
+- `data.season.submissionWindow.acceptingSubmissions`
+- `data.season.bundleDraft` when operator-side draft defaults exist
 - `data.season.latestLeaderboardSnapshot`
 - `data.season.latestReplayHighlight`
 
@@ -494,6 +498,11 @@ Request shape:
   "idempotencyKey": "poker-submit-open-001"
 }
 ```
+
+Portal UX behavior:
+- the season page computes deterministic `bundle.contentAddress` and `bundle.manifestHash` from `bundle.artifactUri`, `bundle.entrypoint`, and `declaredCapabilities`,
+- callers may send placeholder or omitted hash fields because Portal recomputes them before proxying to the operator,
+- operator truth remains authoritative for submission validation and acceptance.
 
 Response fields:
 - `data.submission.submissionId`

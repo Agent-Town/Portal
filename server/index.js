@@ -4211,6 +4211,7 @@ registerPokerRoutes(app, {
   respondPokerOperatorTransport,
   sendPortalApiError,
   sendPortalApiSuccess,
+  sha256PrefixedHex,
   summarizeMirroredPokerSeason,
   syncPokerMirrorFromOperator,
   upsertPokerSeason,
@@ -6020,6 +6021,38 @@ function summarizeMirroredPokerSeason(season) {
   if (!season) return null;
   const latestSnapshot = getLatestPokerLeaderboardSnapshot(season.seasonId);
   const raw = season.raw && typeof season.raw === 'object' ? season.raw : {};
+  const openAt = typeof season.submissionOpenAt === 'string' && season.submissionOpenAt.trim()
+    ? season.submissionOpenAt
+    : null;
+  const closeAt = typeof season.submissionCloseAt === 'string' && season.submissionCloseAt.trim()
+    ? season.submissionCloseAt
+    : null;
+  const normalizedStatus = String(season.status || '').trim().toLowerCase();
+  const rulesSummary = raw.rulesSummary && typeof raw.rulesSummary === 'object' && !Array.isArray(raw.rulesSummary)
+    ? {
+      summary: typeof raw.rulesSummary.summary === 'string' && raw.rulesSummary.summary.trim()
+        ? raw.rulesSummary.summary.trim()
+        : `Mirrored ${String(season.rulesVersion || 'poker rules')} configuration.`,
+      highlights: Array.isArray(raw.rulesSummary.highlights)
+        ? raw.rulesSummary.highlights.map((item) => String(item || '').trim()).filter(Boolean)
+        : [],
+    }
+    : {
+      summary: typeof raw.rulesSummary === 'string' && raw.rulesSummary.trim()
+        ? raw.rulesSummary.trim()
+        : `Mirrored ${String(season.rulesVersion || 'poker rules')} configuration.`,
+      highlights: [],
+    };
+  let submissionWindowState = normalizedStatus || 'scheduled';
+  if (!submissionWindowState) {
+    submissionWindowState = 'scheduled';
+  }
+  const submissionWindow = {
+    opensAt: openAt,
+    closesAt: closeAt,
+    state: submissionWindowState,
+    acceptingSubmissions: submissionWindowState === 'open',
+  };
   return {
     seasonId: season.seasonId,
     seasonSlug: season.seasonSlug,
@@ -6029,6 +6062,24 @@ function summarizeMirroredPokerSeason(season) {
     status: season.status,
     submissionOpenAt: season.submissionOpenAt,
     submissionCloseAt: season.submissionCloseAt,
+    rulesSummary,
+    submissionWindow,
+    bundleDraft: raw.bundleDraft && typeof raw.bundleDraft === 'object'
+      ? {
+        contentAddress: typeof raw.bundleDraft.contentAddress === 'string' ? raw.bundleDraft.contentAddress : '',
+        artifactUri: typeof raw.bundleDraft.artifactUri === 'string' ? raw.bundleDraft.artifactUri : '',
+        entrypoint: typeof raw.bundleDraft.entrypoint === 'string' ? raw.bundleDraft.entrypoint : '',
+        declaredCapabilities: raw.bundleDraft.declaredCapabilities && typeof raw.bundleDraft.declaredCapabilities === 'object'
+          ? raw.bundleDraft.declaredCapabilities
+          : {},
+        expectedContentAddress: typeof raw.bundleDraft.expectedContentAddress === 'string'
+          ? raw.bundleDraft.expectedContentAddress
+          : '',
+        expectedManifestHash: typeof raw.bundleDraft.expectedManifestHash === 'string'
+          ? raw.bundleDraft.expectedManifestHash
+          : '',
+      }
+      : null,
     divisions: season.divisions,
     latestLeaderboardSnapshot: latestSnapshot ? {
       snapshotId: latestSnapshot.snapshotId,

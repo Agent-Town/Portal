@@ -2,10 +2,30 @@
   "family": "poker_season_detail_seed",
   "season": {
     "seasonId": "pks_fixture_01",
-    "rulesSummary": "Standard season with deterministic setup bundle verification.",
+    "rulesSummary": {
+      "summary": "Standard season with deterministic setup bundle verification.",
+      "highlights": [
+        "Browser Class labels remain operator-authored.",
+        "Portal computes the bundle descriptor before submit."
+      ]
+    },
     "submissionWindow": {
+      "state": "open",
+      "acceptingSubmissions": true,
       "opensAt": "2026-04-01T00:00:00.000Z",
       "closesAt": "2026-04-15T00:00:00.000Z"
-    }
+    },
+    "bundleDraft": {
+      "artifactUri": "s3://operator/submissions/detail-fixture.zip",
+      "entrypoint": "play.py",
+      "declaredCapabilities": {
+        "browserCompatible": false,
+        "runnerKind": "native"
+      },
+      "expectedContentAddress": "sha256:db991e5e11661b315476eea07452430aef9a3056cd636e52bd81cf5a2ffa7240",
+      "expectedManifestHash": "sha256:5ec3508fe1a2d707a9a736144b46f670cdb4fd907e62dcf03b8284de32569629"
+    },
+    "expectedContentAddress": "sha256:db991e5e11661b315476eea07452430aef9a3056cd636e52bd81cf5a2ffa7240",
+    "expectedManifestHash": "sha256:5ec3508fe1a2d707a9a736144b46f670cdb4fd907e62dcf03b8284de32569629"
   }
 }

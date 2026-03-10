@@ -36,6 +36,70 @@
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   }
 
+  function stableJsonValue(value) {
+    if (Array.isArray(value)) return value.map((item) => stableJsonValue(item));
+    if (value && typeof value === 'object') {
+      return Object.keys(value).sort().reduce((acc, key) => {
+        acc[key] = stableJsonValue(value[key]);
+        return acc;
+      }, {});
+    }
+    return value;
+  }
+
+  function stableJsonStringify(value) {
+    return JSON.stringify(stableJsonValue(value));
+  }
+
+  async function sha256PrefixedHex(value) {
+    if (!window.crypto?.subtle) throw new Error('CRYPTO_UNAVAILABLE');
+    const input = new TextEncoder().encode(String(value || ''));
+    const digest = await window.crypto.subtle.digest('SHA-256', input);
+    const hex = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `sha256:${hex}`;
+  }
+
+  async function computeSubmissionBundleHashes({ artifactUri, entrypoint, declaredCapabilities }) {
+    const normalizedCapabilities = stableJsonValue(declaredCapabilities || {});
+    const contentAddress = await sha256PrefixedHex(stableJsonStringify({
+      artifactUri,
+      entrypoint,
+      declaredCapabilities: normalizedCapabilities,
+    }));
+    const manifestHash = await sha256PrefixedHex(stableJsonStringify({
+      schema: 'agent-town-poker-bundle/v1',
+      bundle: {
+        contentAddress,
+        artifactUri,
+        entrypoint,
+      },
+      declaredCapabilities: normalizedCapabilities,
+    }));
+    return {
+      contentAddress,
+      manifestHash,
+    };
+  }
+
+  function renderRulesSummaryHtml(rulesSummary) {
+    const summary = rulesSummary && typeof rulesSummary === 'object' ? rulesSummary : {};
+    const highlights = Array.isArray(summary.highlights) ? summary.highlights : [];
+    return `
+      <div id="seasonRulesSummary">${escapeHtml(summary.summary || 'No mirrored rules summary.')}</div>
+      ${
+        highlights.length
+          ? `<ul>${highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+          : ''
+      }
+    `;
+  }
+
+  function formatSubmissionWindowText(submissionWindow) {
+    const state = String(submissionWindow?.state || 'scheduled');
+    const statusLabel = submissionWindow?.acceptingSubmissions ? 'accepting submissions' : 'not accepting submissions';
+    return `${state} · ${statusLabel}`;
+  }
+
   async function api(path, options = {}) {
     const headers = {
       Accept: 'application/json',
@@ -130,6 +194,21 @@
         </div>
       `,
       `
+        <h3>Season Rules</h3>
+        <p id="seasonRulesSummary">${escapeHtml(season?.rulesSummary?.summary || 'Rules summary unavailable.')}</p>
+        ${
+          Array.isArray(season?.rulesSummary?.highlights) && season.rulesSummary.highlights.length
+            ? `<ul id="seasonRulesHighlights">${season.rulesSummary.highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`
+            : ''
+        }
+        <div id="seasonSubmissionWindow" class="pokerMeta">
+          <span id="seasonWindowState" class="pokerBadge">${escapeHtml(season?.submissionWindow?.state || season.status || 'scheduled')}</span>
+          <span class="pokerBadge">${escapeHtml(season?.submissionWindow?.acceptingSubmissions ? 'accepting submissions' : 'submissions closed')}</span>
+          <span class="pokerBadge">${escapeHtml(season?.submissionWindow?.opensAt || season.submissionOpenAt || 'opens unknown')}</span>
+          <span class="pokerBadge">${escapeHtml(season?.submissionWindow?.closesAt || season.submissionCloseAt || 'closes unknown')}</span>
+        </div>
+      `,
+      `
         <h3>Divisions</h3>
         ${
           Array.isArray(season.divisions) && season.divisions.length
@@ -144,23 +223,24 @@
         <form id="pokerSubmissionForm" class="pokerForm">
           <label>
             Bundle Content Address
-            <input id="bundleContentAddress" name="contentAddress" placeholder="sha256:..." value="sha256:bundle-demo">
+            <input id="bundleContentAddress" name="contentAddress" placeholder="sha256:..." value="${escapeHtml(season?.bundleDraft?.expectedContentAddress || season?.bundleDraft?.contentAddress || '')}" readonly>
           </label>
           <label>
             Bundle Manifest Hash
-            <input id="bundleManifestHash" name="manifestHash" placeholder="sha256:..." value="sha256:manifest-demo">
+            <input id="bundleManifestHash" name="manifestHash" placeholder="sha256:..." value="${escapeHtml(season?.bundleDraft?.expectedManifestHash || '')}" readonly>
           </label>
+          <div class="pokerMeta"><span class="pokerBadge">Computed hash</span><span id="bundleComputedHash">${escapeHtml(season?.bundleDraft?.expectedManifestHash || 'Awaiting bundle fields...')}</span></div>
           <label>
             Artifact URI
-            <input id="bundleArtifactUri" name="artifactUri" placeholder="s3://..." value="s3://operator/submissions/demo.zip">
+            <input id="bundleArtifactUri" name="artifactUri" placeholder="s3://..." value="${escapeHtml(season?.bundleDraft?.artifactUri || 's3://operator/submissions/demo.zip')}">
           </label>
           <label>
             Entrypoint
-            <input id="bundleEntrypoint" name="entrypoint" value="play.py">
+            <input id="bundleEntrypoint" name="entrypoint" value="${escapeHtml(season?.bundleDraft?.entrypoint || 'play.py')}">
           </label>
           <label>
             Declared Capabilities JSON
-            <textarea id="bundleCapabilities">{ "browserCompatible": false }</textarea>
+            <textarea id="bundleCapabilities">${escapeHtml(JSON.stringify(season?.bundleDraft?.declaredCapabilities || { browserCompatible: false }, null, 2))}</textarea>
           </label>
           <button class="pokerButton" type="submit">Submit Bundle</button>
         </form>
@@ -172,14 +252,65 @@
   function bindSubmissionForm(seasonId) {
     const form = document.getElementById('pokerSubmissionForm');
     if (!form) return;
+    const contentAddressInput = document.getElementById('bundleContentAddress');
+    const manifestHashInput = document.getElementById('bundleManifestHash');
+    const artifactUriInput = document.getElementById('bundleArtifactUri');
+    const entrypointInput = document.getElementById('bundleEntrypoint');
+    const capabilitiesInput = document.getElementById('bundleCapabilities');
+    const computedHashEl = document.getElementById('bundleComputedHash');
+
+    async function recomputeBundleHash() {
+      let declaredCapabilities = {};
+      try {
+        declaredCapabilities = JSON.parse(String(capabilitiesInput?.value || '{}'));
+      } catch {
+        if (manifestHashInput) manifestHashInput.value = '';
+        if (computedHashEl) computedHashEl.textContent = 'Awaiting valid capabilities JSON';
+        return null;
+      }
+      const bundle = {
+        artifactUri: String(artifactUriInput?.value || '').trim(),
+        entrypoint: String(entrypointInput?.value || '').trim(),
+      };
+      if (!bundle.artifactUri || !bundle.entrypoint) {
+        if (contentAddressInput) contentAddressInput.value = '';
+        if (manifestHashInput) manifestHashInput.value = '';
+        if (computedHashEl) computedHashEl.textContent = 'Awaiting bundle fields';
+        return null;
+      }
+      const hashes = await computeSubmissionBundleHashes({
+        artifactUri: bundle.artifactUri,
+        entrypoint: bundle.entrypoint,
+        declaredCapabilities,
+      });
+      if (contentAddressInput) contentAddressInput.value = hashes.contentAddress;
+      if (manifestHashInput) manifestHashInput.value = hashes.manifestHash;
+      if (computedHashEl) computedHashEl.textContent = hashes.manifestHash;
+      return {
+        bundle,
+        contentAddress: hashes.contentAddress,
+        declaredCapabilities,
+        manifestHash: hashes.manifestHash,
+      };
+    }
+
+    for (const control of [artifactUriInput, entrypointInput, capabilitiesInput]) {
+      control?.addEventListener('input', () => {
+        recomputeBundleHash().catch(() => {
+          if (computedHashEl) computedHashEl.textContent = 'Bundle hash unavailable';
+        });
+      });
+    }
+    recomputeBundleHash().catch(() => {
+      if (computedHashEl) computedHashEl.textContent = 'Bundle hash unavailable';
+    });
+
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       setStatus('Submitting bundle...');
-      let declaredCapabilities = {};
-      try {
-        declaredCapabilities = JSON.parse(String(document.getElementById('bundleCapabilities')?.value || '{}'));
-      } catch {
-        setStatus('Declared capabilities must be valid JSON.');
+      const computed = await recomputeBundleHash();
+      if (!computed) {
+        setStatus('Bundle hash requires valid bundle fields and capabilities JSON.');
         return;
       }
       try {
@@ -190,12 +321,12 @@
           },
           body: JSON.stringify({
             bundle: {
-              contentAddress: String(document.getElementById('bundleContentAddress')?.value || '').trim(),
-              manifestHash: String(document.getElementById('bundleManifestHash')?.value || '').trim(),
-              artifactUri: String(document.getElementById('bundleArtifactUri')?.value || '').trim(),
-              entrypoint: String(document.getElementById('bundleEntrypoint')?.value || '').trim(),
+              contentAddress: computed.contentAddress,
+              manifestHash: computed.manifestHash,
+              artifactUri: computed.bundle.artifactUri,
+              entrypoint: computed.bundle.entrypoint,
             },
-            declaredCapabilities,
+            declaredCapabilities: computed.declaredCapabilities,
           }),
         });
         const submissionId = payload?.data?.submission?.submissionId || '';

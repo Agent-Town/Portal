@@ -1,3 +1,47 @@
+function stableJsonValue(value) {
+  if (Array.isArray(value)) return value.map((item) => stableJsonValue(item));
+  if (value && typeof value === 'object') {
+    return Object.keys(value).sort().reduce((acc, key) => {
+      acc[key] = stableJsonValue(value[key]);
+      return acc;
+    }, {});
+  }
+  return value;
+}
+
+function stableJsonStringify(value) {
+  return JSON.stringify(stableJsonValue(value));
+}
+
+function normalizePortalPokerSubmissionBundle(bundle, declaredCapabilities, deps) {
+  const artifactUri = typeof bundle?.artifactUri === 'string' ? bundle.artifactUri.trim() : '';
+  const entrypoint = typeof bundle?.entrypoint === 'string' ? bundle.entrypoint.trim() : '';
+  if (!artifactUri || !entrypoint) return null;
+  const normalizedCapabilities = declaredCapabilities && typeof declaredCapabilities === 'object' && !Array.isArray(declaredCapabilities)
+    ? declaredCapabilities
+    : {};
+  const contentAddress = deps.sha256PrefixedHex(stableJsonStringify({
+    artifactUri,
+    entrypoint,
+    declaredCapabilities: normalizedCapabilities,
+  }));
+  const manifestHash = deps.sha256PrefixedHex(stableJsonStringify({
+    schema: 'agent-town-poker-bundle/v1',
+    bundle: {
+      contentAddress,
+      artifactUri,
+      entrypoint,
+    },
+    declaredCapabilities: normalizedCapabilities,
+  }));
+  return {
+    contentAddress,
+    manifestHash,
+    artifactUri,
+    entrypoint,
+  };
+}
+
 function registerPokerRoutes(app, deps) {
   const {
     buildPortalRequestId,
@@ -20,6 +64,7 @@ function registerPokerRoutes(app, deps) {
     respondPokerOperatorTransport,
     sendPortalApiError,
     sendPortalApiSuccess,
+    sha256PrefixedHex,
     summarizeMirroredPokerSeason,
     syncPokerMirrorFromOperator,
     upsertPokerSeason,
@@ -112,6 +157,12 @@ function registerPokerRoutes(app, deps) {
     const declaredCapabilities = req.body?.declaredCapabilities && typeof req.body.declaredCapabilities === 'object'
       ? req.body.declaredCapabilities
       : {};
+    const normalizedBundle = normalizePortalPokerSubmissionBundle(bundle, declaredCapabilities, {
+      sha256PrefixedHex,
+    });
+    if (!normalizedBundle) {
+      return sendPortalApiError(res, 400, 'POKER_INVALID_BUNDLE', 'Submission bundle is invalid.', { requestId });
+    }
     const portalSubmissionId = typeof req.body?.portalSubmissionId === 'string' && req.body.portalSubmissionId.trim()
       ? req.body.portalSubmissionId.trim()
       : `psub_${randomHex(8)}`;
@@ -122,7 +173,7 @@ function registerPokerRoutes(app, deps) {
         {
           portalSubmissionId,
           submitterWallet: walletBinding.submitterWallet,
-          bundle,
+          bundle: normalizedBundle,
           declaredCapabilities,
         },
         {
@@ -154,7 +205,7 @@ function registerPokerRoutes(app, deps) {
         portalSessionId: session.sessionId,
         walletSubject: walletBinding.walletSubject,
         submitterWallet: walletBinding.submitterWallet,
-        bundle,
+        bundle: normalizedBundle,
         declaredCapabilities,
         validation: result.validation,
         status: result.status,
