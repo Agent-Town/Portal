@@ -821,6 +821,30 @@ Response fields:
 - `data.availableTeamIds[]`
 - `data.items[]`
 
+### GET `/api/platform/experiences` (human)
+Returns the minimal House Experiences surface for the current active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.items[]`
+- `data.items[].experienceId`
+- `data.items[].title`
+- `data.items[].displayName`
+- `data.items[].requiresConfigPinning`
+- `data.items[].supportedEntryModes[]`
+- `data.items[].aliases[]`
+- `data.items[].entryPath`
+- `data.items[].actions[]`
+- `data.items[].actions[].actionId`
+- `data.items[].actions[].label`
+- `data.items[].actions[].entryPath`
+
 ### GET `/api/platform/trainer` (human)
 Returns durable trainer jobs, results, and the currently bound active config for the active team when `teamId` is omitted.
 

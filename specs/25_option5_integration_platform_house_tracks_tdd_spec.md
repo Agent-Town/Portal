@@ -237,6 +237,12 @@ GREEN gate:
 2. experience entries link cleanly into current Registry, Web, and Poker surfaces,
 3. continuity rules are preserved.
 
+Implementation notes:
+
+1. `GET /api/platform/experiences` is the read route for this milestone.
+2. House Experiences stays a read-only shell surface in this slice.
+3. The seeded order from `house_experiences_seed` is the deterministic rendering order.
+
 ### M25.6 - House Workshop and Inbox linkage
 
 Primary test:

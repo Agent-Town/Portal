@@ -9,12 +9,14 @@ function registerPlatformReadRoutes(app, deps) {
     createTrainerResult,
     getConfigVersion,
     getConfigVersionByIdempotency,
+    getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
     getTrainerJobById,
     getTrainerJobByIdempotency,
     getTrainerResultById,
     getTrainerResultByJobId,
     listConfigComponentVersions,
+    listPlatformExperienceDefinitions,
     listRuns,
     listTraceEvents,
     listTrainerJobs,
@@ -37,6 +39,49 @@ function registerPlatformReadRoutes(app, deps) {
     upsertConfigVersion,
     upsertTeamConfigBinding,
   } = deps;
+
+  function buildHouseExperienceItems() {
+    const fixture = getUnifiedPlatformTestFixture('house_experiences_seed') || {};
+    const seededItems = Array.isArray(fixture?.experiences) ? fixture.experiences : [];
+    const definitions = new Map(
+      (Array.isArray(listPlatformExperienceDefinitions()) ? listPlatformExperienceDefinitions() : [])
+        .map((entry) => [String(entry?.experienceId || '').trim(), entry])
+        .filter(([experienceId]) => experienceId)
+    );
+    return seededItems.map((item) => {
+      const experienceId = String(item?.experienceId || '').trim();
+      if (!experienceId) return null;
+      const definition = definitions.get(experienceId) || null;
+      const title = String(item?.title || definition?.displayName || experienceId).trim() || experienceId;
+      const entryPath = String(item?.entryPath || '').trim();
+      const primaryLabel = experienceId === 'poker.season' ? 'Open Poker' : `Open ${title}`;
+      const actions = [];
+      if (entryPath) {
+        actions.push({
+          actionId: 'open_primary',
+          label: primaryLabel,
+          entryPath,
+        });
+      }
+      if (experienceId === 'web.agent' || experienceId === 'poker.season') {
+        actions.push({
+          actionId: 'open_registry',
+          label: 'Open Registry',
+          entryPath: '/app?district=registry',
+        });
+      }
+      return {
+        experienceId,
+        title,
+        displayName: String(definition?.displayName || title).trim() || title,
+        requiresConfigPinning: definition?.requiresConfigPinning === true,
+        supportedEntryModes: Array.isArray(definition?.supportedEntryModes) ? definition.supportedEntryModes : [],
+        aliases: Array.isArray(definition?.aliases) ? definition.aliases : [],
+        entryPath,
+        actions,
+      };
+    }).filter(Boolean);
+  }
 
   app.get('/api/platform/default-skill-pack', (_req, res) => {
     const requestId = buildPortalRequestId();
@@ -122,6 +167,36 @@ function registerPlatformReadRoutes(app, deps) {
       availableTeamIds: context.availableTeamIds,
       items,
       emptyStateText: 'No canonical traces archived yet.',
+    }, { requestId });
+  });
+
+  app.get('/api/platform/experiences', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    if (!houseId) {
+      return sendPortalApiSuccess(res, {
+        houseId: null,
+        teamId: null,
+        activeTeamId: context.activeTeamId,
+        availableTeamIds: context.availableTeamIds,
+        items: [],
+        emptyStateText: 'No House experiences available yet.',
+      }, { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      houseId,
+      teamId: teamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      items: buildHouseExperienceItems(),
+      emptyStateText: 'No House experiences available yet.',
     }, { requestId });
   });
 

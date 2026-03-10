@@ -497,6 +497,12 @@ let houseSurfaceState = {
     selectedTraceId: '',
     emptyStateText: 'No canonical traces archived yet.'
   },
+  experiences: {
+    loaded: false,
+    items: [],
+    selectedExperienceId: '',
+    emptyStateText: 'No House experiences available yet.'
+  },
   trainer: {
     loaded: false,
     jobs: [],
@@ -1267,6 +1273,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   houseSurfaceState.context.availableTeamIds = nextTeamIds;
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
+    houseSurfaceState.experiences.selectedExperienceId = '';
     houseSurfaceState.trainer.selectedResultId = '';
     resetHouseTrainerActionKeys();
   }
@@ -1342,6 +1349,8 @@ async function setHouseActiveTeam(teamId) {
   syncHouseSurfaceContextFromPayload(data);
   if (houseSurfaceState.activeSurface === 'archive') {
     await loadHouseArchiveSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'experiences') {
+    await loadHouseExperiencesSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'trainer') {
     await loadHouseTrainerSurface({ skipContext: true });
   }
@@ -1357,16 +1366,121 @@ function buildHousePlatformSnapshot() {
 }
 
 function setHouseSurfaceMode(mode) {
-  const activeMode = mode === 'archive' || mode === 'trainer' ? mode : '';
+  const activeMode = mode === 'experiences' || mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
+  const experiencesPanel = el('houseExperiencesPanel');
   const archivePanel = el('houseArchivePanel');
   const trainerPanel = el('houseTrainerPanel');
+  const experiencesBtn = el('houseExperiencesBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
+  if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
   if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
   if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
+  if (experiencesBtn) experiencesBtn.classList.toggle('primary', activeMode === 'experiences');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
   if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
+}
+
+function resolveHouseExperienceEntry(rawEntryPath) {
+  const raw = String(rawEntryPath || '').trim();
+  if (!raw) return null;
+  let parsed;
+  try {
+    parsed = new URL(raw, window.location.href);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== window.location.origin) return null;
+  if (parsed.pathname === '/app') {
+    const district = normalizeDistrict(parsed.searchParams.get('district'));
+    if (district) {
+      return { mode: 'district', district };
+    }
+    if (String(parsed.searchParams.get('modal') || '').trim().toLowerCase() === 'trainer') {
+      return { mode: 'trainer' };
+    }
+  }
+  return routeToPopupMode(`${parsed.pathname}${parsed.search}${parsed.hash}`);
+}
+
+async function openHouseExperienceEntry(rawEntryPath) {
+  const resolved = resolveHouseExperienceEntry(rawEntryPath);
+  if (!resolved) throw new Error('HOUSE_EXPERIENCE_ENTRY_INVALID');
+  if (resolved.mode === 'district') {
+    await showDistrict(resolved.district);
+    return resolved;
+  }
+  if (resolved.mode === 'frame') {
+    openRouteInModalFrame(resolved.url, resolved.title);
+    return resolved;
+  }
+  if (resolved.mode === 'trainer') {
+    await openTrainerModal();
+    return resolved;
+  }
+  if (resolved.mode === 'leave' && resolved.url) {
+    window.location.assign(resolved.url);
+    return resolved;
+  }
+  throw new Error('HOUSE_EXPERIENCE_ENTRY_INVALID');
+}
+
+function renderHouseExperiencesSurface() {
+  const listNode = el('houseExperiencesList');
+  const detailNode = el('houseExperiencesDetail');
+  const emptyNode = el('houseExperiencesEmpty');
+  const actionsNode = el('houseExperienceActions');
+  if (!listNode || !detailNode || !emptyNode || !actionsNode) return;
+  const items = Array.isArray(houseSurfaceState.experiences.items) ? houseSurfaceState.experiences.items : [];
+  listNode.innerHTML = '';
+  actionsNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.experiences.emptyStateText || 'No House experiences available yet.';
+  emptyNode.classList.toggle('is-hidden', items.length > 0);
+  if (!items.length) {
+    detailNode.textContent = 'Select an experience to inspect available entry points.';
+    return;
+  }
+
+  const selectedExperienceId = houseSurfaceState.experiences.selectedExperienceId || String(items[0]?.experienceId || '');
+  houseSurfaceState.experiences.selectedExperienceId = selectedExperienceId;
+  const selectedItem = items.find((item) => String(item?.experienceId || '') === selectedExperienceId) || items[0];
+
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(item?.experienceId || '') === String(selectedItem?.experienceId || '') ? ' primary' : ''}`;
+    button.dataset.experienceId = String(item?.experienceId || '');
+    button.textContent = `${String(item?.title || item?.displayName || item?.experienceId || '')} · ${String(item?.experienceId || '')}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.experiences.selectedExperienceId = String(item?.experienceId || '');
+      renderHouseExperiencesSurface();
+    });
+    listNode.appendChild(button);
+  });
+
+  detailNode.textContent = `Experience ${String(selectedItem?.title || selectedItem?.displayName || selectedItem?.experienceId || '')} · ${String(selectedItem?.experienceId || '')} · active team ${String(houseSurfaceState.context.activeTeamId || '').trim() || '—'}`;
+
+  const actions = Array.isArray(selectedItem?.actions) ? selectedItem.actions : [];
+  actions.forEach((action) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.dataset.actionId = String(action?.actionId || '');
+    button.dataset.entryPath = String(action?.entryPath || '');
+    button.textContent = String(action?.label || 'Open');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      setHouseSurfaceStatus(`Opening ${String(action?.label || 'experience')}...`);
+      try {
+        await openHouseExperienceEntry(action?.entryPath);
+      } catch (err) {
+        setHouseSurfaceStatus(`Experience open unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        button.disabled = false;
+      }
+    });
+    actionsNode.appendChild(button);
+  });
 }
 
 function renderHouseArchiveSurface() {
@@ -1578,6 +1692,35 @@ async function loadHouseArchiveSurface({ skipContext = false } = {}) {
     houseSurfaceState.archive.items = [];
     renderHouseArchiveSurface();
     setHouseSurfaceStatus(`Archive unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('experiences');
+  setHouseSurfaceStatus('Loading House experiences...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/experiences');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.experiences.loaded = true;
+    houseSurfaceState.experiences.items = Array.isArray(data.items) ? data.items : [];
+    houseSurfaceState.experiences.emptyStateText = String(data.emptyStateText || 'No House experiences available yet.');
+    if (!houseSurfaceState.experiences.items.some((item) => String(item?.experienceId || '') === String(houseSurfaceState.experiences.selectedExperienceId || ''))) {
+      houseSurfaceState.experiences.selectedExperienceId = '';
+    }
+    if (!houseSurfaceState.experiences.selectedExperienceId && houseSurfaceState.experiences.items[0]?.experienceId) {
+      houseSurfaceState.experiences.selectedExperienceId = String(houseSurfaceState.experiences.items[0].experienceId);
+    }
+    renderHouseExperiencesSurface();
+    setHouseSurfaceStatus(houseSurfaceState.experiences.items.length ? '' : houseSurfaceState.experiences.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.experiences.loaded = true;
+    houseSurfaceState.experiences.items = [];
+    renderHouseExperiencesSurface();
+    setHouseSurfaceStatus(`House experiences unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
 }
 
@@ -3880,6 +4023,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseExperiencesBtn = el('houseExperiencesBtn');
+  if (houseExperiencesBtn) {
+    houseExperiencesBtn.onclick = async () => {
+      houseExperiencesBtn.disabled = true;
+      try {
+        await loadHouseExperiencesSurface();
+      } finally {
+        houseExperiencesBtn.disabled = false;
+      }
+    };
+  }
+
   const houseTeamSelect = el('houseTeamSelect');
   if (houseTeamSelect) {
     houseTeamSelect.onchange = async (event) => {
@@ -3945,6 +4100,7 @@ function bindTownDistrictControls() {
   }
   setHouseSurfaceMode(houseSurfaceState.activeSurface);
   renderHouseSurfaceContext();
+  renderHouseExperiencesSurface();
   renderHouseArchiveSurface();
   renderHouseTrainerSurface();
   loadHousePlatformContext().catch(() => {
