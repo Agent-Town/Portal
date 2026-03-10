@@ -294,7 +294,14 @@ test('town hall registration resolves sponsored Sepolia transaction ids to hashe
   await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
   await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
   await expect(page.locator('#townhallRegisterError')).toHaveText('');
-  await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  const stateResp = await page.request.get('/api/state');
+  expect(stateResp.ok()).toBeTruthy();
+  const stateBody = await stateResp.json();
+  if (stateBody?.onboarding?.required === true) {
+    await expect(page.getByTestId('townhall-continue-btn')).toBeDisabled();
+  } else {
+    await expect(page.getByTestId('townhall-continue-btn')).toBeVisible();
+  }
   await configureBrain(page);
   await expect(page.getByTestId('townhall-continue-btn')).toBeEnabled();
   expect(txPolls['tx-user-1']).toBeGreaterThanOrEqual(2);

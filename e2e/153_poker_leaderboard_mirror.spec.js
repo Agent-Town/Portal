@@ -56,7 +56,7 @@ test('M16.12: leaderboard page renders mirrored operator ordering exactly and st
   const sync = await syncPokerMirror(request);
   expect(sync.resp.ok()).toBe(true);
 
-  await page.goto('/poker/leaderboards/pks_board');
+  await page.goto('/poker/leaderboards/pks_board?embed=1');
   await expect(page.locator('#leaderboardRows tr')).toHaveCount(3);
   await expect(page.locator('.leaderboard-rank')).toHaveText(['1', '2', '3']);
   await expect(page.locator('.leaderboard-rating')).toHaveText(['42.8', '39.4', '33.1']);
@@ -67,7 +67,7 @@ test('M16.12: leaderboard page renders mirrored operator ordering exactly and st
   const emptySync = await syncPokerMirror(request);
   expect(emptySync.resp.ok()).toBe(true);
 
-  await page.goto('/poker/leaderboards/pks_empty');
+  await page.goto('/poker/leaderboards/pks_empty?embed=1');
   await expect(page.locator('#pokerStatus')).toContainText('No leaderboard snapshot mirrored yet.');
   await expect(page.locator('text=No leaderboard snapshot yet.')).toHaveCount(1);
 });

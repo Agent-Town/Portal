@@ -432,6 +432,7 @@ const districtViews = {
   house: { title: 'Plan Wagons', viewPath: '/views/house.html' },
   atlas: { title: 'Atlas Depot', viewPath: '/atlas?embed=1' },
   registry: { title: 'Registry', viewPath: '/registry?embed=1' },
+  poker: { title: 'Portal Poker', viewPath: '/poker?embed=1' },
   townhall: { title: 'Town Hall', viewPath: '/views/townhall.html' },
   saloon: { title: 'Saloon', viewPath: '/views/saloon.html' },
   pony: { title: 'Pony Express', viewPath: '/views/pony.html' },
@@ -455,7 +456,7 @@ const popupDistrictByPath = {
   '/registry': 'registry',
   '/house': 'house'
 };
-const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
+const EXPERIENCE_UI_MODAL_NAMES = new Set(['atlas', 'registry', 'poker', 'pony', 'townhall', 'saloon', 'leaderboard', 'house', 'brain', 'sigil']);
 const EXPERIENCE_UI_CONFIRMATION_REQUIRED_TOOLS = new Set(['agent_town_ui_publish_post']);
 const EXPERIENCE_INTENT_TRACE_LIMIT = 200;
 const experienceIntentTrace = [];
@@ -467,6 +468,9 @@ let experienceIntentAtlasState = {
 let experienceIntentRegistryState = {
   query: '',
   family: ''
+};
+let experienceIntentPokerState = {
+  route: '/poker'
 };
 let experienceIntentPonyState = {
   composeOpen: false,
@@ -880,6 +884,7 @@ function districtStatusText(district) {
   if (!district) return 'Select a district on the map.';
   if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
   if (district === 'registry') return 'Registry selected: capability and storefront discovery.';
+  if (district === 'poker') return 'Portal Poker selected: mirrored seasons, submissions, leaderboards, and replay manifests.';
   if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
   if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
   if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
@@ -888,7 +893,7 @@ function districtStatusText(district) {
 }
 
 function setActiveDistrict(district) {
-  const next = district === 'atlas' || district === 'registry' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
+  const next = district === 'atlas' || district === 'registry' || district === 'poker' || district === 'townhall' || district === 'saloon' || district === 'pony' || district === 'leaderboard' || district === 'house'
     ? district
     : null;
   activeDistrict = next;
@@ -906,6 +911,7 @@ function setActiveDistrict(district) {
 function normalizeDistrict(district) {
   return district === 'atlas'
     || district === 'registry'
+    || district === 'poker'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -920,6 +926,7 @@ function normalizeDistrict(district) {
 function explicitDistrictFromInput(district) {
   return district === 'atlas'
     || district === 'registry'
+    || district === 'poker'
     || district === 'townhall'
     || district === 'saloon'
     || district === 'pony'
@@ -3953,6 +3960,50 @@ function routeHasSameOrigin(rawHref) {
   }
 }
 
+function isPokerRoutePath(pathname) {
+  const path = String(pathname || '').trim();
+  return path === '/poker' || path.startsWith('/poker/');
+}
+
+function inferPokerModalTitle(pathname) {
+  let parsed = null;
+  try {
+    parsed = new URL(String(pathname || ''), window.location.href);
+  } catch {
+    parsed = null;
+  }
+  const path = parsed ? parsed.pathname : String(pathname || '').trim();
+  if (path.startsWith('/poker/seasons/')) return 'Poker Season';
+  if (path.startsWith('/poker/leaderboards/')) return 'Poker Leaderboard';
+  if (path.startsWith('/poker/replays/')) return 'Poker Replay';
+  if (path.startsWith('/poker/submissions/')) return 'Poker Submission';
+  return 'Portal Poker';
+}
+
+function normalizePokerEmbedUrl(rawHref) {
+  try {
+    const parsed = new URL(rawHref, window.location.href);
+    if (parsed.origin !== window.location.origin || !isPokerRoutePath(parsed.pathname)) {
+      return '/poker?embed=1';
+    }
+    parsed.searchParams.set('embed', '1');
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/poker?embed=1';
+  }
+}
+
+function normalizePokerStateRoute(url) {
+  try {
+    const parsed = new URL(url, window.location.href);
+    if (!isPokerRoutePath(parsed.pathname)) return '/poker';
+    parsed.searchParams.delete('embed');
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/poker';
+  }
+}
+
 function resolveDistrictRoute(rawHref) {
   try {
     const url = new URL(rawHref, window.location.href);
@@ -4191,6 +4242,13 @@ function routeToPopupMode(rawHref) {
       mode: 'frame',
       url: embedUrl,
       title: 'Atlas Depot'
+    };
+  }
+  if (isPokerRoutePath(path)) {
+    return {
+      mode: 'frame',
+      url: normalizePokerEmbedUrl(`${parsed.pathname}${parsed.search}${parsed.hash}`),
+      title: inferPokerModalTitle(path)
     };
   }
   if (path === '/wall') {
@@ -4518,6 +4576,7 @@ const districtModalThemeByDistrict = {
   house: 'house',
   atlas: 'atlas',
   registry: 'atlas',
+  poker: 'leaderboard',
   townhall: 'townhall',
   saloon: 'saloon',
   pony: 'pony',
@@ -4546,6 +4605,7 @@ function inferDistrictModalThemeFromUrl(url) {
   const path = parsed.pathname || '';
   if (path === '/atlas') return 'atlas';
   if (path === '/registry') return 'atlas';
+  if (path === '/poker' || path.startsWith('/poker/')) return 'leaderboard';
   if (path === '/wall' || path === '/leaderboard') return 'leaderboard';
   if (path === '/house') return 'house';
   if (path === '/create' || path === '/claim' || path === '/claim-wallet' || path === '/trainer') return 'trainer';
@@ -4630,6 +4690,9 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
       query: String(experienceIntentRegistryState.query || ''),
       family: String(experienceIntentRegistryState.family || '')
     },
+    poker: {
+      route: String(experienceIntentPokerState.route || '/poker')
+    },
     pony: {
       composeOpen: experienceIntentPonyState.composeOpen === true,
       composeTo: String(experienceIntentPonyState.toHouseId || ''),
@@ -4644,6 +4707,7 @@ function buildExperienceIntentStateSnapshot(overrides = {}) {
     worker: isPlainRecord(overrides.worker) ? { ...base.worker, ...overrides.worker } : base.worker,
     atlas: isPlainRecord(overrides.atlas) ? { ...base.atlas, ...overrides.atlas } : base.atlas,
     registry: isPlainRecord(overrides.registry) ? { ...base.registry, ...overrides.registry } : base.registry,
+    poker: isPlainRecord(overrides.poker) ? { ...base.poker, ...overrides.poker } : base.poker,
     pony: isPlainRecord(overrides.pony) ? { ...base.pony, ...overrides.pony } : base.pony
   };
 }
@@ -4818,7 +4882,7 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   const modal = String(rawParams.modal || '').trim().toLowerCase();
   if (!EXPERIENCE_UI_MODAL_NAMES.has(modal)) {
-    return invalidExperienceParam('modal must be one of atlas|registry|pony|townhall|saloon|leaderboard|house|brain|sigil');
+    return invalidExperienceParam('modal must be one of atlas|registry|poker|pony|townhall|saloon|leaderboard|house|brain|sigil');
   }
   const params = rawParams.params;
   if (params != null && !isPlainRecord(params)) {
@@ -4826,6 +4890,9 @@ async function runExperienceUiOpenModal(rawParams) {
   }
   if (isPlainRecord(params) && ('selector' in params || 'html' in params)) {
     return invalidExperienceParam('selector/html payloads are not allowed');
+  }
+  if (modal === 'poker') {
+    experienceIntentPokerState = { route: '/poker' };
   }
   await showDistrict(modal);
   if (modal === 'pony') {
@@ -5090,8 +5157,22 @@ async function showDistrict(district) {
   currentDistrict = safeDistrict;
   setActiveDistrict(safeDistrict);
 
-  if (safeDistrict === 'atlas') {
-    openRouteInModalFrame('/atlas?embed=1', 'Atlas Depot');
+  if (safeDistrict === 'atlas' || safeDistrict === 'registry' || safeDistrict === 'poker') {
+    let frameUrl = '/atlas?embed=1';
+    let frameTitle = 'Atlas Depot';
+    if (safeDistrict === 'registry') {
+      frameUrl = '/registry?embed=1';
+      frameTitle = 'Registry';
+    } else if (safeDistrict === 'poker') {
+      const params = new URLSearchParams(window.location.search);
+      const requestedRoute = String(experienceIntentPokerState.route || params.get('pokerPath') || '/poker').trim();
+      frameUrl = normalizePokerEmbedUrl(requestedRoute || '/poker');
+      frameTitle = inferPokerModalTitle(frameUrl);
+      experienceIntentPokerState = {
+        route: normalizePokerStateRoute(frameUrl)
+      };
+    }
+    openRouteInModalFrame(frameUrl, frameTitle);
     return;
   }
 
@@ -9148,6 +9229,12 @@ async function bootstrapInitialRouteState() {
   const pathDistrict = popupDistrictByPath[window.location.pathname] || null;
   const explicitDistrict = explicitDistrictFromInput(districtParam) || explicitDistrictFromInput(pathDistrict);
   const initialModal = String(params.get('modal') || '').trim().toLowerCase();
+  if (explicitDistrict === 'poker') {
+    const requestedPokerPath = String(params.get('pokerPath') || '/poker').trim();
+    experienceIntentPokerState = {
+      route: normalizePokerStateRoute(normalizePokerEmbedUrl(requestedPokerPath))
+    };
+  }
   pathMode = loadPathMode();
   const initialDistrict = explicitDistrict;
   activeDistrict = initialDistrict;

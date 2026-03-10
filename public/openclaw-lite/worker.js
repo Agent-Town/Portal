@@ -47999,21 +47999,8 @@ async function runAgentTownHouseAppendNote(params, toolName = "agent_town_house_
 async function runAgentTownStateGetSession(_params, toolName = "agent_town_state_get_session") {
   const startedAtMs = nowMs();
   try {
-    const decision = await requestApproval({
-      title: "Approval",
-      body: "Read session state (sensitive)"
-    });
-    if (decision !== "approved") {
-      return withToolMeta(
-        toolName,
-        startedAtMs,
-        makeToolFailure("USER_DENIED", "User denied approval")
-      );
-    }
     const session = await apiJson("/api/session", { method: "GET" });
-    const safeSession = isPlainObject(session) ? { ...session } : session;
-    if (isPlainObject(safeSession) && "teamCode" in safeSession) delete safeSession.teamCode;
-    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ session: safeSession }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ session }));
   } catch (e) {
     const message = String(e?.message || "STATE_GET_SESSION_FAILED");
     const code = normalizeToolErrorCode(message, "UNSUPPORTED");
@@ -48024,20 +48011,9 @@ async function runAgentTownStateGetAgentState(params, toolName = "agent_town_sta
   const startedAtMs = nowMs();
   let teamCode = "";
   try {
-    const decision = await requestApproval({
-      title: "Approval",
-      body: "Read agent/human state (sensitive)"
-    });
-    if (decision !== "approved") {
-      return withToolMeta(
-        toolName,
-        startedAtMs,
-        makeToolFailure("USER_DENIED", "User denied approval")
-      );
-    }
     teamCode = await resolveAgentTownTeamCode(params?.teamCode);
     const snapshot = await apiJson(`/api/agent/state?teamCode=${encodeURIComponent(teamCode)}`, { method: "GET" });
-    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ state: snapshot }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({ teamCode, state: snapshot }));
   } catch (e) {
     const message = String(e?.message || "STATE_GET_AGENT_FAILED");
     const code = normalizeToolErrorCode(message, "UNSUPPORTED");

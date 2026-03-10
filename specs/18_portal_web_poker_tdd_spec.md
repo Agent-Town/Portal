@@ -66,7 +66,7 @@ Required for modal-driven behavior:
 
 1. Current page path remains `/app` or the current hub path during modal actions.
 2. Worker connectivity is preserved.
-3. Atlas and Registry actions do not trigger full-page navigation.
+3. Atlas, Registry, and Poker actions do not trigger full-page navigation.
 
 ### 2.5 Security metrics
 
