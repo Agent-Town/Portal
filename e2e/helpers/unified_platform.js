@@ -22,6 +22,30 @@ async function getPlatformStats(request) {
   return await response.json();
 }
 
+async function getPlatformPackCompatibility(request) {
+  const response = await request.get('/api/platform/pack-compatibility', {
+    failOnStatusCode: false,
+  });
+  return {
+    status: response.status(),
+    json: await response.json(),
+  };
+}
+
+async function verifyPlatformPackCompatibility(request, payload = {}) {
+  const response = await request.post('/api/platform/pack-compatibility/verify', {
+    headers: {
+      'content-type': 'application/json',
+    },
+    data: JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    failOnStatusCode: false,
+  });
+  return {
+    status: response.status(),
+    json: await response.json(),
+  };
+}
+
 async function getPlatformFixture(request, family) {
   const response = await request.get(`/__test__/unified-platform/fixtures/${encodeURIComponent(String(family || ''))}`, {
     headers: { 'x-test-reset': resetToken },
@@ -776,6 +800,7 @@ module.exports = {
   getPlatformConfigVersionRecord,
   getPlatformContextFromPage,
   getPlatformCounts,
+  getPlatformPackCompatibility,
   getPlatformStats,
   getPlatformFixture,
   getPlatformTeamBinding,
@@ -801,5 +826,6 @@ module.exports = {
   seedPlatformSealedContext,
   seedPlatformConfigVersion,
   setPlatformRunStatus,
+  verifyPlatformPackCompatibility,
   verifyPlatformSnapshot,
 };

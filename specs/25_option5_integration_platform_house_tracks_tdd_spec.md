@@ -354,6 +354,12 @@ GREEN gate:
 2. verification remains deterministic,
 3. House, Registry, Web, and trainer surfaces can all consume the same compatible pack shape.
 
+Implementation notes:
+
+1. The compatibility contract is exposed by one read route and one verification route under `/api/platform/pack-compatibility*`.
+2. `manifest.json` remains the only authoritative manifest root; compatibility does not add a second pack standard.
+3. Compatible-pack projections may be reused across House, Registry, Web, and trainer surfaces, but they must stay projections of the existing internal pack model.
+
 ### M25.11 - Final joined completion smoke
 
 Primary test:

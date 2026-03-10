@@ -1,12 +1,78 @@
 {
   "family": "editor_pack_compat_seed",
   "pack": {
+    "manifestRoot": "manifest.json",
     "packVersionId": "pack_editor_fixture_01",
+    "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
     "editorCompatible": true,
     "requiredFiles": [
       "manifest.json",
       "overlay.json",
       "policy.json"
+    ],
+    "optionalFiles": [
+      "manual/skill.md",
+      "heartbeat.md",
+      "tools.md",
+      "trace_map.json",
+      "verification.json",
+      "provenance.json"
+    ],
+    "files": {
+      "manifest.json": "manifest.json",
+      "overlay.json": "overlay.json",
+      "policy.json": "policy.json",
+      "manual/skill.md": "manual/skill.md",
+      "heartbeat.md": "heartbeat.md",
+      "tools.md": "tools.md",
+      "trace_map.json": "trace_map.json",
+      "verification.json": "verification.json",
+      "provenance.json": "provenance.json"
+    },
+    "surfaceBindings": [
+      {
+        "surfaceKey": "house",
+        "surfaceId": "house.workshop",
+        "route": "/api/platform/workshop",
+        "consumes": [
+          "packVersionId",
+          "contentHash",
+          "files",
+          "verification"
+        ]
+      },
+      {
+        "surfaceKey": "registry",
+        "surfaceId": "registry.proof",
+        "route": "/api/registry/proof/:registryId",
+        "consumes": [
+          "packVersionId",
+          "contentHash",
+          "files"
+        ]
+      },
+      {
+        "surfaceKey": "web",
+        "surfaceId": "web.integration",
+        "route": "/v1/integrations/:integrationId/compilations",
+        "consumes": [
+          "packVersionId",
+          "contentHash",
+          "files",
+          "manifestRoot"
+        ]
+      },
+      {
+        "surfaceKey": "trainer",
+        "surfaceId": "platform.trainer",
+        "route": "/api/platform/trainer",
+        "consumes": [
+          "packVersionId",
+          "contentHash",
+          "files",
+          "manifestRoot"
+        ]
+      }
     ]
   }
 }

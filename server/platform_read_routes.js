@@ -138,10 +138,214 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function normalizePackFileMap(fileMap) {
+    if (!fileMap || typeof fileMap !== 'object' || Array.isArray(fileMap)) return {};
+    return Object.entries(fileMap).reduce((acc, [rawKey, rawValue]) => {
+      const key = String(rawKey || '').trim();
+      const value = String(rawValue || '').trim();
+      if (!key || !value) return acc;
+      acc[key] = value;
+      return acc;
+    }, {});
+  }
+
+  function buildCompatiblePackShape({
+    manifest = null,
+    fileMap = null,
+    requiredFiles = [],
+    optionalFiles = [],
+  } = {}) {
+    const normalizedManifest = manifest && typeof manifest === 'object' && !Array.isArray(manifest)
+      ? manifest
+      : {};
+    const files = normalizePackFileMap(fileMap || normalizedManifest.files);
+    const normalizedRequiredFiles = Array.isArray(requiredFiles)
+      ? requiredFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    const normalizedOptionalFiles = Array.isArray(optionalFiles)
+      ? optionalFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    return {
+      schema: 'agent-town-compatible-pack/v1',
+      manifestRoot: 'manifest.json',
+      packVersionId: String(normalizedManifest.packVersionId || '').trim(),
+      contentHash: String(normalizedManifest.contentHash || '').trim(),
+      requiredFiles: normalizedRequiredFiles,
+      optionalFiles: normalizedOptionalFiles,
+      files,
+    };
+  }
+
+  function buildPackCompatibilityContract() {
+    const fixture = getUnifiedPlatformTestFixture('editor_pack_compat_seed') || {};
+    const fixturePack = fixture?.pack && typeof fixture.pack === 'object' && !Array.isArray(fixture.pack)
+      ? fixture.pack
+      : {};
+    const defaultPack = buildDefaultCompiledSkillPack();
+    const defaultManifest = defaultPack?.manifest && typeof defaultPack.manifest === 'object'
+      ? defaultPack.manifest
+      : {};
+    const requiredFiles = Array.isArray(fixturePack.requiredFiles)
+      ? fixturePack.requiredFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : ['manifest.json', 'overlay.json', 'policy.json'];
+    const optionalFiles = Array.isArray(fixturePack.optionalFiles)
+      ? fixturePack.optionalFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : ['manual/skill.md', 'heartbeat.md', 'tools.md', 'trace_map.json', 'verification.json', 'provenance.json'];
+    const fixtureFiles = normalizePackFileMap(fixturePack.files);
+    const baseContentHash = String(fixturePack.contentHash || '').trim()
+      || sha256PrefixedHex(stableJsonStringify({
+        files: fixtureFiles,
+        packVersionId: String(fixturePack.packVersionId || ''),
+        requiredFiles,
+      }));
+    const compatiblePack = buildCompatiblePackShape({
+      manifest: {
+        packVersionId: String(fixturePack.packVersionId || '').trim(),
+        contentHash: baseContentHash,
+        files: fixtureFiles,
+      },
+      requiredFiles,
+      optionalFiles,
+    });
+    const surfaceBindings = Array.isArray(fixturePack.surfaceBindings)
+      ? fixturePack.surfaceBindings.map((entry) => ({
+        surfaceKey: String(entry?.surfaceKey || '').trim(),
+        surfaceId: String(entry?.surfaceId || '').trim(),
+        route: String(entry?.route || '').trim(),
+        consumes: Array.isArray(entry?.consumes)
+          ? entry.consumes.map((item) => String(item || '').trim()).filter(Boolean)
+          : [],
+      })).filter((entry) => entry.surfaceKey && entry.surfaceId && entry.route)
+      : [];
+    const surfaces = surfaceBindings.reduce((acc, binding) => {
+      acc[binding.surfaceKey] = {
+        surfaceId: binding.surfaceId,
+        route: binding.route,
+        consumes: binding.consumes,
+        compatiblePack,
+      };
+      return acc;
+    }, {});
+    return {
+      schema: 'agent-town-pack-compatibility/v1',
+      authoritativeManifestRoot: 'manifest.json',
+      alternateManifestRootsAllowed: false,
+      compatiblePackKeys: Object.keys(compatiblePack),
+      requiredFiles,
+      optionalFiles,
+      compatiblePack,
+      surfaces,
+      verification: {
+        route: '/api/platform/pack-compatibility/verify',
+        accepts: ['manifestRoot', 'manifest', 'files'],
+        stableErrorCodes: [
+          'ALTERNATE_MANIFEST_ROOT',
+          'PACK_VERSION_REQUIRED',
+          'CONTENT_HASH_INVALID',
+          'MANIFEST_FILE_MISSING',
+        ],
+      },
+      internalPackExamples: {
+        defaultSkillPack: {
+          packVersionId: String(defaultManifest.packVersionId || '').trim(),
+          contentHash: String(defaultManifest.contentHash || '').trim(),
+          manifestRoot: 'manifest.json',
+          files: normalizePackFileMap(defaultManifest.files),
+        },
+        editorFixture: compatiblePack,
+      },
+    };
+  }
+
+  function verifyPackCompatibilityPayload(payload) {
+    const contract = buildPackCompatibilityContract();
+    const manifestRoot = typeof payload?.manifestRoot === 'string' && payload.manifestRoot.trim()
+      ? payload.manifestRoot.trim()
+      : contract.authoritativeManifestRoot;
+    const manifest = payload?.manifest && typeof payload.manifest === 'object' && !Array.isArray(payload.manifest)
+      ? payload.manifest
+      : {};
+    const files = normalizePackFileMap(payload?.files || manifest.files);
+    const errors = [];
+    if (manifestRoot !== contract.authoritativeManifestRoot) {
+      errors.push({
+        code: 'ALTERNATE_MANIFEST_ROOT',
+        path: 'manifestRoot',
+        message: 'Compatible packs must keep manifest.json as the authoritative manifest root.',
+      });
+    }
+    const packVersionId = String(manifest.packVersionId || payload?.packVersionId || '').trim();
+    if (!packVersionId) {
+      errors.push({
+        code: 'PACK_VERSION_REQUIRED',
+        path: 'manifest.packVersionId',
+        message: 'packVersionId is required.',
+      });
+    }
+    const contentHash = String(manifest.contentHash || payload?.contentHash || '').trim();
+    if (!/^sha256:[a-f0-9]+$/i.test(contentHash)) {
+      errors.push({
+        code: 'CONTENT_HASH_INVALID',
+        path: 'manifest.contentHash',
+        message: 'contentHash must be a sha256-prefixed hex digest.',
+      });
+    }
+    for (const filePath of contract.requiredFiles) {
+      if (!files[filePath]) {
+        errors.push({
+          code: 'MANIFEST_FILE_MISSING',
+          path: `files.${filePath}`,
+          message: `${filePath} is required for editor-compatible packs.`,
+        });
+      }
+    }
+    const compatiblePack = buildCompatiblePackShape({
+      manifest: {
+        packVersionId,
+        contentHash,
+        files,
+      },
+      requiredFiles: contract.requiredFiles,
+      optionalFiles: contract.optionalFiles,
+    });
+    const normalized = {
+      manifestRoot: contract.authoritativeManifestRoot,
+      compatiblePack,
+      compatiblePackKeys: contract.compatiblePackKeys,
+      surfaceBindings: Object.entries(contract.surfaces).map(([surfaceKey, surface]) => ({
+        surfaceKey,
+        surfaceId: surface.surfaceId,
+        route: surface.route,
+        consumes: surface.consumes,
+      })),
+    };
+    return {
+      compatible: errors.length === 0,
+      verificationHash: sha256PrefixedHex(stableJsonStringify({
+        compatible: errors.length === 0,
+        normalized,
+        errors,
+      })),
+      authoritativeManifestRoot: contract.authoritativeManifestRoot,
+      normalized,
+      errors,
+    };
+  }
+
   app.get('/api/platform/default-skill-pack', (_req, res) => {
     const requestId = buildPortalRequestId();
     const pack = buildDefaultCompiledSkillPack();
     return sendPortalApiSuccess(res, pack.manifest, { requestId });
+  });
+
+  app.get('/api/platform/pack-compatibility', (_req, res) => {
+    const requestId = buildPortalRequestId();
+    return sendPortalApiSuccess(res, buildPackCompatibilityContract(), { requestId });
+  });
+
+  app.post('/api/platform/pack-compatibility/verify', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    return sendPortalApiSuccess(res, verifyPackCompatibilityPayload(req.body || {}), { requestId });
   });
 
   app.get('/api/platform/context', (req, res) => {

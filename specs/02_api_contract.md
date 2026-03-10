@@ -776,6 +776,70 @@ Response shape:
 }
 ```
 
+### GET `/api/platform/pack-compatibility` (human)
+Returns the canonical editor-compatibility contract for the existing internal pack model. This route does not introduce a second pack standard; it explicitly keeps `manifest.json` as the authoritative manifest root and projects one compatible pack shape that House, Registry, Web, and trainer surfaces can all consume.
+
+Response fields:
+- `data.schema`
+- `data.authoritativeManifestRoot`
+- `data.alternateManifestRootsAllowed`
+- `data.compatiblePackKeys[]`
+- `data.requiredFiles[]`
+- `data.optionalFiles[]`
+- `data.compatiblePack`
+- `data.compatiblePack.schema`
+- `data.compatiblePack.manifestRoot`
+- `data.compatiblePack.packVersionId`
+- `data.compatiblePack.contentHash`
+- `data.compatiblePack.requiredFiles[]`
+- `data.compatiblePack.optionalFiles[]`
+- `data.compatiblePack.files`
+- `data.surfaces.house`
+- `data.surfaces.registry`
+- `data.surfaces.web`
+- `data.surfaces.trainer`
+- `data.verification.route`
+- `data.verification.accepts[]`
+- `data.verification.stableErrorCodes[]`
+
+### POST `/api/platform/pack-compatibility/verify` (human)
+Verifies one editor-generated or compiler-generated pack payload against the same internal compatibility contract. The route is deterministic: compatible and incompatible inputs both return one stable verification payload.
+
+Request shape:
+```json
+{
+  "manifestRoot": "manifest.json",
+  "manifest": {
+    "packVersionId": "intpackv_1234abcd",
+    "contentHash": "sha256:<hash>",
+    "files": {
+      "manifest.json": "manifest.json",
+      "overlay.json": "overlay.json",
+      "policy.json": "policy.json"
+    }
+  }
+}
+```
+
+Response fields:
+- `data.compatible`
+- `data.verificationHash`
+- `data.authoritativeManifestRoot`
+- `data.normalized.manifestRoot`
+- `data.normalized.compatiblePack`
+- `data.normalized.compatiblePackKeys[]`
+- `data.normalized.surfaceBindings[]`
+- `data.errors[]`
+- `data.errors[].code`
+- `data.errors[].path`
+- `data.errors[].message`
+
+Stable verification error codes:
+- `ALTERNATE_MANIFEST_ROOT`
+- `PACK_VERSION_REQUIRED`
+- `CONTENT_HASH_INVALID`
+- `MANIFEST_FILE_MISSING`
+
 ### GET `/api/platform/context` (human)
 Returns the explicit House/team context resolved from the current Portal session.
 
