@@ -225,7 +225,7 @@ function createSession({ flow } = {}) {
     onboarding: {
       required: false,
       registrationComplete: false,
-      step: 'townhall_profile',
+      step: null,
       registeredAt: null,
       profile: {
         humanName: null,
