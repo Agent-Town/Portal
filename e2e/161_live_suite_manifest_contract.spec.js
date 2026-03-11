@@ -61,7 +61,7 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
       PRIVY_LIVE_REQUIRED: '',
       PRIVY_EMAIL_OTP_REQUIRED: '',
       REAL_SEPOLIA_WALLET_TEST: '',
-      SEPOLIA_TEST_WALLET_ADDRESS: '',
+      LOCAL_SEPOLIA_WALLET_FILE: path.join(repoRoot, 'test-results', 'missing.sepolia.wallet.json'),
     },
     encoding: 'utf8',
   });
@@ -72,6 +72,14 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
     ready: false,
     mode: 'skip',
     missing: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=guest'],
+    mismatched: [],
+  });
+  const sepoliaStatus = listedStatuses.find((entry) => String(entry.suiteId || '') === 'sepolia-wallet');
+  expect(sepoliaStatus).toMatchObject({
+    suiteId: 'sepolia-wallet',
+    ready: false,
+    mode: 'skip',
+    missing: ['REAL_SEPOLIA_WALLET_TEST=1', 'LOCAL_SEPOLIA_WALLET_CONFIGURED'],
     mismatched: [],
   });
 
@@ -145,17 +153,18 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
       `const guest = require('./playwright.privy.config.js');
 const email = require('./playwright.privy.email.config.js');
 const sepolia = require('./playwright.sepolia.live.config.js');
+const isTruthy = (value) => /^(1|true|yes|on)$/i.test(String(value || ''));
 const payload = {
   guest: {
     nodeEnv: guest?.webServer?.env?.NODE_ENV || null,
     testResetToken: guest?.webServer?.env?.TEST_RESET_TOKEN || null,
-    enablePrivyInTest: guest?.webServer?.env?.ENABLE_PRIVY_IN_TEST || null,
+    enablePrivyInTest: isTruthy(guest?.webServer?.env?.ENABLE_PRIVY_IN_TEST),
     command: guest?.webServer?.command || '',
   },
   email: {
     nodeEnv: email?.webServer?.env?.NODE_ENV || null,
     testResetToken: email?.webServer?.env?.TEST_RESET_TOKEN || null,
-    enablePrivyInTest: email?.webServer?.env?.ENABLE_PRIVY_IN_TEST || null,
+    enablePrivyInTest: isTruthy(email?.webServer?.env?.ENABLE_PRIVY_IN_TEST),
     command: email?.webServer?.command || '',
   },
   sepolia: {
@@ -175,13 +184,13 @@ process.stdout.write(JSON.stringify(payload));`,
   expect(configAudit.guest).toMatchObject({
     nodeEnv: 'development',
     testResetToken: null,
-    enablePrivyInTest: null,
+    enablePrivyInTest: false,
   });
   expect(String(configAudit.guest.command || '')).toContain('scripts/start_live_server.js');
   expect(configAudit.email).toMatchObject({
     nodeEnv: 'development',
     testResetToken: null,
-    enablePrivyInTest: null,
+    enablePrivyInTest: false,
   });
   expect(String(configAudit.email.command || '')).toContain('scripts/start_live_server.js');
   expect(configAudit.sepolia).toMatchObject({

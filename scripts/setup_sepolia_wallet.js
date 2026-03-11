@@ -10,6 +10,7 @@ const {
   writeWalletConfig,
   isValidAddress,
   isValidPrivateKey,
+  isConfiguredWalletConfig,
   normalizePrivateKeyHex,
   addressFromPrivateKey,
   generateEvmWallet,
@@ -207,21 +208,10 @@ async function waitForBalanceTopUp(address, initialWei, minWei, waitSeconds) {
   return { toppedUp: false, balanceWei: last };
 }
 
-function hasConfiguredWallet(config) {
-  const keyOk = isValidPrivateKey(config.privateKey || '');
-  const addrOk = isValidAddress(config.address || '') && normalizeAddress(config.address) !== EVM_ADDR_PLACEHOLDER;
-  if (!keyOk || !addrOk) return false;
-  try {
-    return normalizeAddress(addressFromPrivateKey(config.privateKey)) === normalizeAddress(config.address);
-  } catch {
-    return false;
-  }
-}
-
 async function resolveWallet(args, existingConfig) {
   const existing = existingConfig || {};
 
-  if (!args.forceGenerate && hasConfiguredWallet(existing)) {
+  if (!args.forceGenerate && isConfiguredWalletConfig(existing)) {
     return {
       wallet: {
         privateKey: normalizePrivateKeyHex(existing.privateKey),

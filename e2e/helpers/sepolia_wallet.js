@@ -77,6 +77,18 @@ function readWalletConfig() {
   return { file, config: parsed };
 }
 
+function isConfiguredWalletConfig(config = {}) {
+  const privateKey = normalizePrivateKeyHex(config?.privateKey || '');
+  const address = isValidAddress(config?.address || '') ? String(config.address).toLowerCase() : '';
+  if (!privateKey || !isValidPrivateKey(privateKey)) return false;
+  if (!address || address === EVM_ADDR_PLACEHOLDER.toLowerCase()) return false;
+  try {
+    return addressFromPrivateKey(privateKey).toLowerCase() === address;
+  } catch {
+    return false;
+  }
+}
+
 function writeWalletConfig(file, config) {
   const next = {
     ...walletTemplate(),
@@ -251,11 +263,13 @@ module.exports = {
   DEFAULT_RPC_URL,
   EVM_ADDR_PLACEHOLDER,
   EVM_KEY_PLACEHOLDER,
+  walletFilePath,
   ensureWalletFile,
   readWalletConfig,
   writeWalletConfig,
   isValidAddress,
   isValidPrivateKey,
+  isConfiguredWalletConfig,
   normalizePrivateKeyHex,
   addressFromPrivateKey,
   generateEvmWallet,

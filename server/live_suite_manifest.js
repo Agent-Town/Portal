@@ -1,3 +1,8 @@
+const fs = require('fs');
+const path = require('path');
+
+const { isConfiguredWalletConfig } = require('../e2e/helpers/sepolia_wallet');
+
 const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'privy-guest',
@@ -18,7 +23,7 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'sepolia-wallet',
     command: 'npm run test:sepolia-live',
-    requiredEnv: ['REAL_SEPOLIA_WALLET_TEST=1', 'SEPOLIA_TEST_WALLET_ADDRESS'],
+    requiredEnv: ['REAL_SEPOLIA_WALLET_TEST=1'],
     requiredFlag: 'REAL_SEPOLIA_WALLET_TEST',
     defaultMode: 'skip',
     description: 'Optional real Sepolia wallet reuse and on-chain balance readiness check.',
@@ -88,11 +93,48 @@ function inspectLiveSuiteEnv(suite, env = process.env) {
   };
 }
 
+function inspectSepoliaWalletConfig(env = process.env) {
+  const configuredPath = typeof env?.LOCAL_SEPOLIA_WALLET_FILE === 'string' ? env.LOCAL_SEPOLIA_WALLET_FILE.trim() : '';
+  const filePath = configuredPath
+    ? path.resolve(configuredPath)
+    : path.join(process.cwd(), 'data', 'local.sepolia.wallet.json');
+  if (!fs.existsSync(filePath)) {
+    return {
+      ok: false,
+      missing: ['LOCAL_SEPOLIA_WALLET_CONFIGURED'],
+      mismatched: [],
+    };
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (isConfiguredWalletConfig(parsed)) {
+      return {
+        ok: true,
+        missing: [],
+        mismatched: [],
+      };
+    }
+  } catch {
+    // Fall through to stable local-config missing signal.
+  }
+  return {
+    ok: false,
+    missing: ['LOCAL_SEPOLIA_WALLET_CONFIGURED'],
+    mismatched: [],
+  };
+}
+
 function getLiveSuiteStatuses(env = process.env) {
   return getLiveSuiteManifest().map((suite) => {
     const validation = inspectLiveSuiteEnv(suite, env);
+    const localValidation = String(suite?.suiteId || '') === 'sepolia-wallet'
+      ? inspectSepoliaWalletConfig(env)
+      : { ok: true, missing: [], mismatched: [] };
+    const missing = [...validation.missing, ...localValidation.missing];
+    const mismatched = [...validation.mismatched, ...localValidation.mismatched];
     const requiredFlag = String(suite?.requiredFlag || '').trim();
     const requiredFlagEnabled = requiredFlag ? isTruthy(env?.[requiredFlag]) : false;
+    const ready = missing.length === 0 && mismatched.length === 0;
     return {
       suiteId: String(suite?.suiteId || ''),
       command: String(suite?.command || ''),
@@ -100,10 +142,10 @@ function getLiveSuiteStatuses(env = process.env) {
       defaultMode: String(suite?.defaultMode || ''),
       requiredFlag,
       requiredFlagEnabled,
-      ready: validation.ok,
-      mode: validation.ok ? 'ready' : (requiredFlagEnabled ? 'blocked' : 'skip'),
-      missing: validation.missing,
-      mismatched: validation.mismatched,
+      ready,
+      mode: ready ? 'ready' : (requiredFlagEnabled ? 'blocked' : 'skip'),
+      missing,
+      mismatched,
       requirements: validation.requirements,
     };
   });

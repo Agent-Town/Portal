@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { spawnSync } = require('child_process');
+const { loadDotEnv } = require('../server/env');
 
 const {
   getLiveSuiteManifest,
@@ -8,6 +9,8 @@ const {
   inspectLiveSuiteEnv,
   isTruthy,
 } = require('../server/live_suite_manifest');
+
+loadDotEnv(process.cwd());
 
 function listManifest() {
   process.stdout.write(`${JSON.stringify(getLiveSuiteManifest(), null, 2)}\n`);

@@ -112,6 +112,7 @@ Notes:
 npm run setup:sepolia-wallet
 ```
 - Fresh setup auto-generates an EVM private key + address and stores it in `data/local.sepolia.wallet.json`.
+- If that file is missing or still contains placeholder values, the live lane treats Sepolia as "not configured yet" instead of ready.
 - If balance is below threshold on fresh generation, setup attempts a Google Sepolia faucet request automatically.
 - Test checks on-chain Sepolia ETH balance and fails with the faucet URL if below threshold.
 - Override threshold with `MIN_SEPOLIA_ETH` (default `0.001`).

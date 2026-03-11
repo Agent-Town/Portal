@@ -74,6 +74,7 @@ What it verifies:
 
 - the local configured Sepolia wallet file is stable
 - the configured wallet address is valid
+- the configured private key matches that address
 - the wallet has at least the required Sepolia ETH balance over a real RPC endpoint
 
 What it does **not** verify:
@@ -83,6 +84,8 @@ What it does **not** verify:
 - it does not exercise Privy or wallet UI
 
 This suite is a readiness check for wallet-backed flows, not a complete product smoke.
+
+If `data/local.sepolia.wallet.json` is missing or still contains placeholder values, the lane should be treated as "private wallet not configured yet", not as a product failure.
 
 ## Removed false-live behavior
 
@@ -100,7 +103,7 @@ The code can now run the live lanes without built-in mocks or stubs, but this wo
 - `PRIVY_EMAIL_OTP_FETCH_URL`
 - `PRIVY_EMAIL_OTP_TEST_EMAIL`
 - `REAL_SEPOLIA_WALLET_TEST=1`
-- `SEPOLIA_TEST_WALLET_ADDRESS`
+- `data/local.sepolia.wallet.json` configured through `npm run setup:sepolia-wallet`
 
 Preflight commands:
 

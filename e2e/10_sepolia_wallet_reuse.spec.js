@@ -4,7 +4,7 @@ const {
   DEFAULT_FAUCET_URL,
   ensureWalletFile,
   readWalletConfig,
-  isValidAddress,
+  isConfiguredWalletConfig,
   getSepoliaBalanceWei,
   weiToEthString,
   minWeiFromEnv
@@ -23,15 +23,15 @@ test.describe('local sepolia wallet reuse', () => {
     expect(first.file).toBe(fileA);
     expect(second.file).toBe(fileA);
     expect(first.config.address).toBe(second.config.address);
-    if (!isValidAddress(first.config.address)) {
-      throw new Error(`Wallet address is not configured in ${first.file}. Run: npm run setup:sepolia-wallet`);
+    if (!isConfiguredWalletConfig(first.config)) {
+      throw new Error(`Wallet private key/address is not configured in ${first.file}. Run: npm run setup:sepolia-wallet`);
     }
   });
 
   test('checks sepolia balance before faucet use', async () => {
     const { file, config } = readWalletConfig();
-    if (!isValidAddress(config.address)) {
-      throw new Error(`Wallet address is not configured in ${file}. Run: npm run setup:sepolia-wallet`);
+    if (!isConfiguredWalletConfig(config)) {
+      throw new Error(`Wallet private key/address is not configured in ${file}. Run: npm run setup:sepolia-wallet`);
     }
 
     const minWei = minWeiFromEnv();
