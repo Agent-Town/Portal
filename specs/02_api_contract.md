@@ -1276,6 +1276,113 @@ Notes:
 Failure codes:
 - `FORBIDDEN`
 
+### GET `/api/poker/play/admin/ops` (admin)
+Returns one operator dashboard payload over live poker health, recent refund and payout ledger rows, and current reconciliation state.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Query fields:
+- `asOf`
+
+Response fields:
+- `data.processAt`
+- `data.summary.liveTableCount`
+- `data.summary.liveSeriesCount`
+- `data.summary.pausedTableCount`
+- `data.summary.disconnectedSeatCount`
+- `data.summary.openDisputeCount`
+- `data.summary.openIntegrityFlagCount`
+- `data.summary.recentRefundCount`
+- `data.summary.recentRefundTotalOil`
+- `data.summary.recentPayoutCount`
+- `data.summary.recentPayoutTotalOil`
+- `data.summary.reconciliationMismatchCount`
+- `data.cards[]`
+- `data.sections.liveTables[]`
+- `data.sections.liveSeries[]`
+- `data.sections.pausedTables[]`
+- `data.sections.disconnectedSeats[]`
+- `data.sections.openDisputes[]`
+- `data.sections.openIntegrityFlags[]`
+- `data.sections.recentRefunds[]`
+- `data.sections.recentPayoutJobs[]`
+- `data.sections.reconciliation`
+
+Dashboard card fields:
+- `data.cards[].metricKey`
+- `data.cards[].label`
+- `data.cards[].count`
+- `data.cards[].href`
+- `data.cards[].apiPath`
+
+Reconciliation summary fields:
+- `data.sections.reconciliation.summary.walletCount`
+- `data.sections.reconciliation.summary.mismatchCount`
+- `data.sections.reconciliation.summary.mismatchedWalletCount`
+- `data.sections.reconciliation.summary.byCategory`
+- `data.sections.reconciliation.wallets[]`
+- `data.sections.reconciliation.items[]`
+
+Notes:
+- every card exposes one page `href` and one JSON `apiPath` drill-down target
+- recent refunds read `poker_play_admin_refund`, `poker_play_tournament_refund`, and `poker_play_tournament_unregister`
+- recent payout jobs read `poker_play_tournament_prize`
+
+Failure codes:
+- `FORBIDDEN`
+
+### GET `/api/poker/play/admin/reconciliation` (admin)
+Returns the exact reconciliation view between durable player-result rows and poker-ledger rows.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Query fields:
+- `limit`; defaults to `200` and is clamped to `500`
+- `asOf`
+
+Response fields:
+- `data.processAt`
+- `data.summary.walletCount`
+- `data.summary.mismatchCount`
+- `data.summary.mismatchedWalletCount`
+- `data.summary.byCategory`
+- `data.wallets[]`
+- `data.items[]`
+
+Per-wallet fields:
+- `data.wallets[].walletSubject`
+- `data.wallets[].expectedBalance`
+- `data.wallets[].actualBalance`
+- `data.wallets[].balanceDelta`
+- `data.wallets[].mismatchCount`
+
+Per-mismatch fields:
+- `data.items[].mismatchId`
+- `data.items[].category`
+- `data.items[].ruleKey`
+- `data.items[].walletSubject`
+- `data.items[].houseId`
+- `data.items[].tableId`
+- `data.items[].seriesId`
+- `data.items[].ledgerEntryId`
+- `data.items[].entryKind`
+- `data.items[].expectedAmount`
+- `data.items[].actualAmount`
+- `data.items[].createdAt`
+- `data.items[].title`
+- `data.items[].seriesTitle`
+- `data.items[].note`
+
+Notes:
+- reconciliation currently covers poker buy-ins, reloads, cashouts, refunds, and tournament prizes
+- mismatch rows are exact and category-specific; there is no generic catch-all `"failed"` item
+- wallet balances are reported alongside row mismatches so operator review can confirm the precise delta per wallet subject
+
+Failure codes:
+- `FORBIDDEN`
+
 ### POST `/api/poker/play/admin/integrity/:flagId/resolve` (admin)
 Resolves or dismisses one open automated integrity signal and returns the refreshed integrity queue.
 

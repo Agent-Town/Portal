@@ -14,6 +14,40 @@ const {
 const DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS = 30;
 const DEFAULT_PLAY_RECONNECT_GRACE_SECONDS = 90;
 const DEFAULT_PLAY_TIME_BANK_SECONDS = 0;
+const POKER_PLAY_RECONCILE_RULES = [
+  {
+    key: 'buy_in',
+    statField: 'buyInOil',
+    direction: 'debit',
+    entryKinds: ['poker_play_buy_in', 'poker_play_waitlist_buy_in'],
+  },
+  {
+    key: 'reload',
+    statField: 'reloadOil',
+    direction: 'debit',
+    entryKinds: ['poker_play_reload'],
+  },
+  {
+    key: 'cashout',
+    statField: 'cashoutOil',
+    direction: 'credit',
+    entryKinds: ['poker_play_cashout'],
+  },
+  {
+    key: 'refund',
+    statField: 'refundOil',
+    direction: 'credit',
+    entryKinds: ['poker_play_admin_refund', 'poker_play_tournament_refund', 'poker_play_tournament_unregister'],
+  },
+  {
+    key: 'prize',
+    statField: 'prizeOil',
+    direction: 'credit',
+    entryKinds: ['poker_play_tournament_prize'],
+  },
+];
+const POKER_PLAY_REFUND_ENTRY_KINDS = ['poker_play_admin_refund', 'poker_play_tournament_refund', 'poker_play_tournament_unregister'];
+const POKER_PLAY_PAYOUT_ENTRY_KINDS = ['poker_play_tournament_prize'];
 
 function createRouteError(status, code, message, details = {}) {
   const err = new Error(message);
@@ -704,6 +738,8 @@ function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
       walletSubject,
       houseId: entry?.houseId || null,
       verificationId: deps.getStreamflowVerificationByWalletSubject(walletSubject)?.verificationId || null,
+      tableId: table.tableId,
+      seriesId: getTournamentSeriesRef(table).seriesId || null,
       entryKind: 'poker_play_waitlist_buy_in',
       direction: 'debit',
       amount: buyInOil,
@@ -1857,6 +1893,554 @@ function buildPokerPlayAdminSeriesExportPayload(deps, { seriesId, processAt } = 
   };
 }
 
+function buildLedgerTableTitleMatchers(tableEntries) {
+  const out = [];
+  for (const entry of Array.isArray(tableEntries) ? tableEntries : []) {
+    const table = entry?.table || entry || null;
+    const title = normalizeTrimmedString(table?.title).toLowerCase();
+    if (!table || !title) continue;
+    out.push({ title, table });
+  }
+  return out.sort((left, right) => right.title.length - left.title.length);
+}
+
+function resolveOilLedgerEntryContext(entry, { tableMap, tableTitleMatchers } = {}) {
+  const explicitTableId = normalizeTrimmedString(entry?.tableId);
+  const explicitSeriesId = normalizeTrimmedString(entry?.seriesId);
+  const directTable = explicitTableId ? tableMap.get(explicitTableId) || null : null;
+  if (directTable) {
+    const ref = getTournamentSeriesRef(directTable);
+    return {
+      tableId: directTable.tableId,
+      tableTitle: directTable.title,
+      table: directTable,
+      seriesId: explicitSeriesId || ref.seriesId || null,
+      seriesTitle: ref.seriesTitle || null,
+    };
+  }
+  const memoLower = normalizeTrimmedString(entry?.memo).toLowerCase();
+  const matched = memoLower
+    ? (Array.isArray(tableTitleMatchers) ? tableTitleMatchers : []).find((candidate) => memoLower.includes(candidate.title))
+    : null;
+  const inferredTable = matched?.table || null;
+  const ref = getTournamentSeriesRef(inferredTable);
+  return {
+    tableId: inferredTable?.tableId || explicitTableId || null,
+    tableTitle: inferredTable?.title || null,
+    table: inferredTable,
+    seriesId: explicitSeriesId || ref.seriesId || null,
+    seriesTitle: ref.seriesTitle || null,
+  };
+}
+
+function buildPokerPlayLedgerMismatchCategory(ruleKey, kind = 'amount') {
+  return `${normalizeTrimmedString(ruleKey, 'ledger').toLowerCase()}_${normalizeTrimmedString(kind, 'mismatch').toLowerCase()}`;
+}
+
+function buildPokerPlayUnexpectedLedgerCategory(entryKind) {
+  const kind = normalizeTrimmedString(entryKind).toLowerCase();
+  if (POKER_PLAY_REFUND_ENTRY_KINDS.includes(kind)) return 'unexpected_refund_entry';
+  if (POKER_PLAY_PAYOUT_ENTRY_KINDS.includes(kind)) return 'unexpected_prize_entry';
+  if (kind === 'poker_play_reload') return 'unexpected_reload_entry';
+  if (kind === 'poker_play_cashout') return 'unexpected_cashout_entry';
+  if (kind === 'poker_play_buy_in' || kind === 'poker_play_waitlist_buy_in') return 'unexpected_buy_in_entry';
+  return 'unexpected_ledger_entry';
+}
+
+function doesLedgerEntryMatchPlayerStat(entry, context, stat) {
+  if (!entry || !stat) return false;
+  if (normalizeTrimmedString(entry?.walletSubject) !== normalizeTrimmedString(stat?.walletSubject)) return false;
+  const statTableId = normalizeTrimmedString(stat?.tableId);
+  const statSeriesId = normalizeTrimmedString(stat?.seriesId);
+  const contextTableId = normalizeTrimmedString(context?.tableId);
+  const contextSeriesId = normalizeTrimmedString(context?.seriesId);
+  if (statTableId && contextTableId && statTableId === contextTableId) return true;
+  if (statSeriesId && contextSeriesId && statSeriesId === contextSeriesId) return true;
+  const memoLower = normalizeTrimmedString(entry?.memo).toLowerCase();
+  const titleLower = normalizeTrimmedString(stat?.title).toLowerCase();
+  const seriesTitleLower = normalizeTrimmedString(stat?.seriesTitle).toLowerCase();
+  if (titleLower && memoLower.includes(titleLower)) return true;
+  if (seriesTitleLower && memoLower.includes(seriesTitleLower)) return true;
+  return false;
+}
+
+function buildPokerPlayLedgerReconciliationPayload(deps, { processAt, limit = 200 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const relevantKinds = new Set(POKER_PLAY_RECONCILE_RULES.flatMap((rule) => rule.entryKinds));
+  const tableEntries = deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((entry) => entry?.table);
+  const tableMap = new Map(tableEntries.map((entry) => [normalizeTrimmedString(entry?.table?.tableId), entry.table]));
+  const tableTitleMatchers = buildLedgerTableTitleMatchers(tableEntries);
+  const stats = typeof deps.listPokerPlayPlayerStats === 'function'
+    ? deps.listPokerPlayPlayerStats({ limit: 5000 })
+    : [];
+  const ledgerEntries = typeof deps.listOilLedgerEntries === 'function'
+    ? deps.listOilLedgerEntries({ limit: 5000 })
+    : [];
+  const relevantLedgerEntries = ledgerEntries.filter((entry) => relevantKinds.has(normalizeTrimmedString(entry?.entryKind)));
+  const contextsByLedgerId = new Map(relevantLedgerEntries.map((entry) => [
+    entry.ledgerEntryId,
+    resolveOilLedgerEntryContext(entry, { tableMap, tableTitleMatchers }),
+  ]));
+  const matchedLedgerEntryIds = new Set();
+  const mismatches = [];
+  const expectedBalanceByWallet = new Map();
+  const actualBalanceByWallet = new Map();
+
+  const addExpectedWalletDelta = (walletSubject, delta) => {
+    const key = normalizeTrimmedString(walletSubject);
+    if (!key) return;
+    expectedBalanceByWallet.set(key, Number(expectedBalanceByWallet.get(key) || 0) + Number(delta || 0));
+  };
+  const addActualWalletDelta = (walletSubject, delta) => {
+    const key = normalizeTrimmedString(walletSubject);
+    if (!key) return;
+    actualBalanceByWallet.set(key, Number(actualBalanceByWallet.get(key) || 0) + Number(delta || 0));
+  };
+  const buildMismatchRow = ({
+    category,
+    ruleKey = '',
+    stat = null,
+    entry = null,
+    context = null,
+    expectedAmount = 0,
+    actualAmount = 0,
+    note = '',
+  } = {}) => ({
+    mismatchId: `${normalizeTrimmedString(category, 'ledger_mismatch')}:${normalizeTrimmedString(entry?.ledgerEntryId || stat?.resultId || entry?.createdAt || 'row')}:${normalizeTrimmedString(stat?.resultId || '')}`,
+    category,
+    ruleKey: ruleKey || null,
+    walletSubject: normalizeTrimmedString(stat?.walletSubject || entry?.walletSubject) || null,
+    houseId: stat?.houseId || entry?.houseId || null,
+    tableId: normalizeTrimmedString(stat?.tableId || context?.tableId) || null,
+    seriesId: normalizeTrimmedString(stat?.seriesId || context?.seriesId) || null,
+    ledgerEntryId: entry?.ledgerEntryId || null,
+    entryKind: entry?.entryKind || null,
+    expectedAmount: Number(expectedAmount || 0),
+    actualAmount: Number(actualAmount || 0),
+    createdAt: entry?.createdAt || stat?.updatedAt || null,
+    title: stat?.title || context?.tableTitle || null,
+    seriesTitle: stat?.seriesTitle || context?.seriesTitle || null,
+    note: note || null,
+  });
+
+  for (const entry of ledgerEntries) {
+    const signedAmount = normalizeTrimmedString(entry?.direction).toLowerCase() === 'debit'
+      ? -Number(entry?.amount || 0)
+      : Number(entry?.amount || 0);
+    addActualWalletDelta(entry?.walletSubject, signedAmount);
+    if (!relevantKinds.has(normalizeTrimmedString(entry?.entryKind))) {
+      addExpectedWalletDelta(entry?.walletSubject, signedAmount);
+    }
+  }
+
+  for (const stat of stats) {
+    for (const rule of POKER_PLAY_RECONCILE_RULES) {
+      const expectedAmount = Number(stat?.[rule.statField] || 0);
+      if (expectedAmount <= 0) continue;
+      addExpectedWalletDelta(stat.walletSubject, rule.direction === 'debit' ? -expectedAmount : expectedAmount);
+      const matches = relevantLedgerEntries.filter((entry) => {
+        if (!rule.entryKinds.includes(normalizeTrimmedString(entry?.entryKind))) return false;
+        const context = contextsByLedgerId.get(entry.ledgerEntryId) || {};
+        return doesLedgerEntryMatchPlayerStat(entry, context, stat);
+      });
+      if (!matches.length) {
+        mismatches.push(buildMismatchRow({
+          category: buildPokerPlayLedgerMismatchCategory(rule.key, 'missing_entry'),
+          ruleKey: rule.key,
+          stat,
+          expectedAmount,
+          actualAmount: 0,
+          note: 'Expected ledger row is missing for this player result.',
+        }));
+        continue;
+      }
+      const exactMatches = matches.filter((entry) => (
+        normalizeTrimmedString(entry?.direction).toLowerCase() === rule.direction
+        && Number(entry?.amount || 0) === expectedAmount
+      ));
+      if (exactMatches.length === 1) {
+        matchedLedgerEntryIds.add(exactMatches[0].ledgerEntryId);
+        continue;
+      }
+      const sameDirectionMatches = matches.filter((entry) => (
+        normalizeTrimmedString(entry?.direction).toLowerCase() === rule.direction
+      ));
+      if (sameDirectionMatches.length === 1) {
+        const entry = sameDirectionMatches[0];
+        const context = contextsByLedgerId.get(entry.ledgerEntryId) || {};
+        matchedLedgerEntryIds.add(entry.ledgerEntryId);
+        mismatches.push(buildMismatchRow({
+          category: buildPokerPlayLedgerMismatchCategory(rule.key, 'amount_mismatch'),
+          ruleKey: rule.key,
+          stat,
+          entry,
+          context,
+          expectedAmount,
+          actualAmount: Number(entry?.amount || 0),
+          note: 'Ledger amount does not match the durable player-result row.',
+        }));
+        continue;
+      }
+      if (matches.length > 1) {
+        for (const entry of matches) {
+          const context = contextsByLedgerId.get(entry.ledgerEntryId) || {};
+          mismatches.push(buildMismatchRow({
+            category: buildPokerPlayLedgerMismatchCategory(rule.key, 'ambiguous_entry'),
+            ruleKey: rule.key,
+            stat,
+            entry,
+            context,
+            expectedAmount,
+            actualAmount: Number(entry?.amount || 0),
+            note: 'Multiple ledger rows match the same player-result event.',
+          }));
+          matchedLedgerEntryIds.add(entry.ledgerEntryId);
+        }
+        continue;
+      }
+      const entry = matches[0];
+      const context = contextsByLedgerId.get(entry.ledgerEntryId) || {};
+      matchedLedgerEntryIds.add(entry.ledgerEntryId);
+      const actualDirection = normalizeTrimmedString(entry?.direction).toLowerCase();
+      if (actualDirection !== rule.direction) {
+        mismatches.push(buildMismatchRow({
+          category: buildPokerPlayLedgerMismatchCategory(rule.key, 'direction_mismatch'),
+          ruleKey: rule.key,
+          stat,
+          entry,
+          context,
+          expectedAmount,
+          actualAmount: Number(entry?.amount || 0),
+          note: `Expected ${rule.direction} but saw ${actualDirection || 'unknown'}.`,
+        }));
+      } else if (Number(entry?.amount || 0) !== expectedAmount) {
+        mismatches.push(buildMismatchRow({
+          category: buildPokerPlayLedgerMismatchCategory(rule.key, 'amount_mismatch'),
+          ruleKey: rule.key,
+          stat,
+          entry,
+          context,
+          expectedAmount,
+          actualAmount: Number(entry?.amount || 0),
+          note: 'Ledger amount does not match the durable player-result row.',
+        }));
+      }
+    }
+  }
+
+  for (const entry of relevantLedgerEntries) {
+    if (matchedLedgerEntryIds.has(entry.ledgerEntryId)) continue;
+    const context = contextsByLedgerId.get(entry.ledgerEntryId) || {};
+    mismatches.push(buildMismatchRow({
+      category: buildPokerPlayUnexpectedLedgerCategory(entry?.entryKind),
+      entry,
+      context,
+      actualAmount: Number(entry?.amount || 0),
+      note: 'Ledger row does not reconcile to any durable player-result event.',
+    }));
+  }
+
+  const walletSubjects = new Set([
+    ...expectedBalanceByWallet.keys(),
+    ...actualBalanceByWallet.keys(),
+  ]);
+  const wallets = Array.from(walletSubjects)
+    .sort((left, right) => left.localeCompare(right))
+    .map((walletSubject) => {
+      const expectedBalance = Number(expectedBalanceByWallet.get(walletSubject) || 0);
+      const actualBalance = Number(deps.computeOilBalance(walletSubject)?.balance || 0);
+      const walletMismatches = mismatches.filter((item) => normalizeTrimmedString(item?.walletSubject) === walletSubject);
+      return {
+        walletSubject,
+        expectedBalance,
+        actualBalance,
+        balanceDelta: actualBalance - expectedBalance,
+        mismatchCount: walletMismatches.length,
+      };
+    });
+  const safeLimit = Math.max(1, Math.min(500, normalizeOilAmount(limit, 200)));
+  const sortedItems = mismatches
+    .slice()
+    .sort((left, right) => compareIsoDesc(left?.createdAt || '', right?.createdAt || ''))
+    .slice(0, safeLimit);
+  const byCategory = {};
+  for (const item of mismatches) {
+    const key = normalizeTrimmedString(item?.category, 'unknown');
+    byCategory[key] = Number(byCategory[key] || 0) + 1;
+  }
+  return {
+    processAt: requestAt,
+    summary: {
+      walletCount: wallets.length,
+      mismatchCount: mismatches.length,
+      mismatchedWalletCount: wallets.filter((wallet) => Number(wallet?.mismatchCount || 0) > 0 || Number(wallet?.balanceDelta || 0) !== 0).length,
+      byCategory,
+    },
+    wallets,
+    items: sortedItems,
+  };
+}
+
+function buildPokerPlayOpsDashboardPayload(deps, { processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const tableEntries = deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((entry) => entry?.table);
+  const openTables = tableEntries.filter((entry) => !isSeriesClosedTable(entry?.table));
+  const liveTables = openTables
+    .map((entry) => ({
+      ...entry,
+      summary: computeTableSummary(entry?.table, entry?.seats, entry?.hand, entry?.viewerSeat || null),
+    }))
+    .filter((entry) => !isTableAdminClosed(entry?.table))
+    .filter((entry) => (
+      isTablePaused(entry?.table)
+      || !!entry?.summary?.liveHand
+      || Number(entry?.summary?.occupancy || 0) > 0
+    ));
+  const tournamentEntriesBySeriesId = new Map();
+  for (const entry of liveTables) {
+    if (normalizePokerPlayTableType(entry?.table?.tableType) !== 'tournament') continue;
+    const ref = getTournamentSeriesRef(entry.table);
+    if (!ref.seriesId) continue;
+    if (!tournamentEntriesBySeriesId.has(ref.seriesId)) tournamentEntriesBySeriesId.set(ref.seriesId, []);
+    tournamentEntriesBySeriesId.get(ref.seriesId).push(entry);
+  }
+  const liveSeries = Array.from(tournamentEntriesBySeriesId.values())
+    .map((entries) => buildPokerPlaySeriesSummary(entries, ''))
+    .filter((series) => series && series.stage !== 'completed' && series.stage !== 'cancelled');
+  const pausedTables = liveTables.filter((entry) => isTablePaused(entry?.table));
+  const disconnectedSeats = [];
+  const openDisputes = [];
+  for (const entry of liveTables) {
+    for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      if (getSeatPresenceStatus(seat) !== 'disconnected') continue;
+      disconnectedSeats.push({
+        tableId: entry.table.tableId,
+        tableTitle: entry.table.title,
+        seatNumber: normalizeSeatNumber(seat?.seatNumber),
+        displayName: seat?.displayName || '',
+        disconnectedAt: seat?.disconnectedAt || null,
+        href: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+        apiPath: `/api/poker/play/admin/tables/${encodeURIComponent(entry.table.tableId)}/review`,
+      });
+    }
+    const disputes = deps.listPokerPlayDisputesByTable(entry.table.tableId, { status: 'open', limit: 50 });
+    for (const dispute of disputes) {
+      openDisputes.push({
+        disputeId: dispute.disputeId,
+        tableId: entry.table.tableId,
+        tableTitle: entry.table.title,
+        handId: dispute.handId,
+        seatNumber: normalizeSeatNumber(dispute?.seatNumber),
+        category: dispute.category,
+        note: dispute.note,
+        href: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+        apiPath: `/api/poker/play/admin/tables/${encodeURIComponent(entry.table.tableId)}/review`,
+      });
+    }
+  }
+  const integrity = buildPokerPlayIntegrityQueuePayload(deps, {
+    processAt: requestAt,
+    status: 'open',
+    limit: 100,
+  });
+  const recentRefunds = (typeof deps.listOilLedgerEntries === 'function'
+    ? deps.listOilLedgerEntries({ entryKinds: POKER_PLAY_REFUND_ENTRY_KINDS, limit: 25 })
+    : [])
+    .map((entry) => {
+      const context = resolveOilLedgerEntryContext(entry, {
+        tableMap: new Map(tableEntries.map((item) => [normalizeTrimmedString(item?.table?.tableId), item.table])),
+        tableTitleMatchers: buildLedgerTableTitleMatchers(tableEntries),
+      });
+      return {
+        ledgerEntryId: entry.ledgerEntryId,
+        walletSubject: entry.walletSubject,
+        amount: Number(entry.amount || 0),
+        entryKind: entry.entryKind,
+        tableId: context.tableId,
+        tableTitle: context.tableTitle,
+        seriesId: context.seriesId,
+        seriesTitle: context.seriesTitle,
+        createdAt: entry.createdAt,
+        href: context.seriesId
+          ? `/poker/play/series/${encodeURIComponent(context.seriesId)}/timeline`
+          : (context.tableId ? `/poker/play/tables/${encodeURIComponent(context.tableId)}` : '/poker/play'),
+        apiPath: context.seriesId
+          ? `/api/poker/play/admin/series/${encodeURIComponent(context.seriesId)}/review`
+          : (context.tableId ? `/api/poker/play/admin/tables/${encodeURIComponent(context.tableId)}/review` : '/api/poker/play/admin/ops'),
+      };
+    });
+  const recentPayoutJobs = (typeof deps.listOilLedgerEntries === 'function'
+    ? deps.listOilLedgerEntries({ entryKinds: POKER_PLAY_PAYOUT_ENTRY_KINDS, limit: 25 })
+    : [])
+    .map((entry) => {
+      const context = resolveOilLedgerEntryContext(entry, {
+        tableMap: new Map(tableEntries.map((item) => [normalizeTrimmedString(item?.table?.tableId), item.table])),
+        tableTitleMatchers: buildLedgerTableTitleMatchers(tableEntries),
+      });
+      return {
+        ledgerEntryId: entry.ledgerEntryId,
+        walletSubject: entry.walletSubject,
+        amount: Number(entry.amount || 0),
+        entryKind: entry.entryKind,
+        tableId: context.tableId,
+        tableTitle: context.tableTitle,
+        seriesId: context.seriesId,
+        seriesTitle: context.seriesTitle,
+        createdAt: entry.createdAt,
+        href: context.seriesId
+          ? `/poker/play/series/${encodeURIComponent(context.seriesId)}/timeline`
+          : (context.tableId ? `/poker/play/tables/${encodeURIComponent(context.tableId)}` : '/poker/play'),
+        apiPath: context.seriesId
+          ? `/api/poker/play/admin/series/${encodeURIComponent(context.seriesId)}/review`
+          : (context.tableId ? `/api/poker/play/admin/tables/${encodeURIComponent(context.tableId)}/review` : '/api/poker/play/admin/ops'),
+      };
+    });
+  const reconciliation = buildPokerPlayLedgerReconciliationPayload(deps, {
+    processAt: requestAt,
+    limit: 50,
+  });
+  const firstLiveTable = liveTables[0]?.table || null;
+  const firstLiveSeries = liveSeries[0] || null;
+  const firstPausedTable = pausedTables[0]?.table || null;
+  const firstDisconnected = disconnectedSeats[0] || null;
+  const firstDispute = openDisputes[0] || null;
+  const firstIntegrity = Array.isArray(integrity?.items) ? integrity.items[0] : null;
+  const firstRefund = recentRefunds[0] || null;
+  const firstPayout = recentPayoutJobs[0] || null;
+  const cards = [
+    {
+      metricKey: 'live_tables',
+      label: 'Live Tables',
+      count: liveTables.length,
+      href: firstLiveTable ? `/poker/play/tables/${encodeURIComponent(firstLiveTable.tableId)}` : '/poker/play',
+      apiPath: firstLiveTable ? `/api/poker/play/admin/tables/${encodeURIComponent(firstLiveTable.tableId)}/review` : '/api/poker/play/tables',
+    },
+    {
+      metricKey: 'live_series',
+      label: 'Live Series',
+      count: liveSeries.length,
+      href: firstLiveSeries ? `/poker/play/series/${encodeURIComponent(firstLiveSeries.seriesId)}/timeline` : '/poker/play',
+      apiPath: firstLiveSeries ? `/api/poker/play/admin/series/${encodeURIComponent(firstLiveSeries.seriesId)}/review` : '/api/poker/play/tables',
+    },
+    {
+      metricKey: 'paused_tables',
+      label: 'Paused Tables',
+      count: pausedTables.length,
+      href: firstPausedTable ? `/poker/play/tables/${encodeURIComponent(firstPausedTable.tableId)}` : '/poker/play',
+      apiPath: firstPausedTable ? `/api/poker/play/admin/tables/${encodeURIComponent(firstPausedTable.tableId)}/review` : '/api/poker/play/admin/ops',
+    },
+    {
+      metricKey: 'disconnected_seats',
+      label: 'Disconnected Seats',
+      count: disconnectedSeats.length,
+      href: firstDisconnected?.href || '/poker/play',
+      apiPath: firstDisconnected?.apiPath || '/api/poker/play/admin/ops',
+    },
+    {
+      metricKey: 'open_disputes',
+      label: 'Open Disputes',
+      count: openDisputes.length,
+      href: firstDispute?.href || '/poker/play',
+      apiPath: firstDispute?.apiPath || '/api/poker/play/admin/ops',
+    },
+    {
+      metricKey: 'open_integrity_flags',
+      label: 'Open Integrity Flags',
+      count: Number(integrity?.summary?.openFlagCount || 0),
+      href: '/poker/play/admin/integrity',
+      apiPath: '/api/poker/play/admin/integrity',
+    },
+    {
+      metricKey: 'recent_refunds',
+      label: 'Recent Refunds',
+      count: recentRefunds.length,
+      href: firstRefund?.href || '/poker/play',
+      apiPath: firstRefund?.apiPath || '/api/poker/play/admin/ops',
+    },
+    {
+      metricKey: 'recent_payout_jobs',
+      label: 'Recent Payout Jobs',
+      count: recentPayoutJobs.length,
+      href: firstPayout?.href || '/poker/play',
+      apiPath: firstPayout?.apiPath || '/api/poker/play/admin/ops',
+    },
+    {
+      metricKey: 'reconciliation_mismatches',
+      label: 'Reconciliation Mismatches',
+      count: Number(reconciliation?.summary?.mismatchCount || 0),
+      href: '/poker/play/admin/ops?section=reconciliation',
+      apiPath: '/api/poker/play/admin/reconciliation',
+    },
+  ];
+  return {
+    processAt: requestAt,
+    summary: {
+      liveTableCount: liveTables.length,
+      liveSeriesCount: liveSeries.length,
+      pausedTableCount: pausedTables.length,
+      disconnectedSeatCount: disconnectedSeats.length,
+      openDisputeCount: openDisputes.length,
+      openIntegrityFlagCount: Number(integrity?.summary?.openFlagCount || 0),
+      recentRefundCount: recentRefunds.length,
+      recentRefundTotalOil: recentRefunds.reduce((sum, item) => sum + Number(item?.amount || 0), 0),
+      recentPayoutCount: recentPayoutJobs.length,
+      recentPayoutTotalOil: recentPayoutJobs.reduce((sum, item) => sum + Number(item?.amount || 0), 0),
+      reconciliationMismatchCount: Number(reconciliation?.summary?.mismatchCount || 0),
+    },
+    cards,
+    sections: {
+      liveTables: liveTables.map((entry) => ({
+        tableId: entry.table.tableId,
+        tableTitle: entry.table.title,
+        tableType: entry.table.tableType,
+        status: entry.table.status,
+        liveHand: !!entry?.summary?.liveHand,
+        occupancy: Number(entry?.summary?.occupancy || 0),
+        href: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+        apiPath: `/api/poker/play/admin/tables/${encodeURIComponent(entry.table.tableId)}/review`,
+      })),
+      liveSeries: liveSeries.map((series) => ({
+        seriesId: series.seriesId,
+        seriesTitle: series.seriesTitle,
+        stage: series.stage,
+        tableCount: Number(series.tableCount || 0),
+        liveTableCount: Number(series.liveTableCount || 0),
+        entryCount: Number(series.entryCount || 0),
+        href: `/poker/play/series/${encodeURIComponent(series.seriesId)}/timeline`,
+        apiPath: `/api/poker/play/admin/series/${encodeURIComponent(series.seriesId)}/review`,
+      })),
+      pausedTables: pausedTables.map((entry) => ({
+        tableId: entry.table.tableId,
+        tableTitle: entry.table.title,
+        reason: normalizeTrimmedString(entry?.table?.state?.pausedReason, 'Paused by operator'),
+        href: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+        apiPath: `/api/poker/play/admin/tables/${encodeURIComponent(entry.table.tableId)}/review`,
+      })),
+      disconnectedSeats,
+      openDisputes,
+      openIntegrityFlags: Array.isArray(integrity?.items)
+        ? integrity.items.map((item) => ({
+          flagId: item.flagId,
+          tableId: item.tableId,
+          tableTitle: item.tableTitle,
+          category: item.category,
+          summary: item.summary,
+          severity: item.severity,
+          href: item.tableId ? `/poker/play/tables/${encodeURIComponent(item.tableId)}` : '/poker/play/admin/integrity',
+          apiPath: item.tableId ? `/api/poker/play/admin/tables/${encodeURIComponent(item.tableId)}/review` : '/api/poker/play/admin/integrity',
+        }))
+        : [],
+      recentRefunds,
+      recentPayoutJobs,
+      reconciliation,
+    },
+  };
+}
+
 function buildPrivateAgentPrompt(table, handState, seatNumber) {
   const suggestion = derivePokerPlayAgentSuggestion({ table, handState, seatNumber });
   if (!suggestion) return null;
@@ -2807,6 +3391,8 @@ function settleTournamentIfComplete(deps, table, seats, hand, atIso) {
           walletSubject: seat.walletSubject,
           houseId: seat.houseId || null,
           verificationId: seat.streamflowVerificationId || null,
+          tableId: entry?.table?.tableId || table?.tableId || null,
+          seriesId: getTournamentSeriesRef(entry?.table || table).seriesId || null,
           entryKind: 'poker_play_tournament_prize',
           direction: 'credit',
           amount: payoutOil,
@@ -3350,6 +3936,8 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
           walletSubject: seat.walletSubject,
           houseId: seat.houseId || null,
           verificationId: seat.streamflowVerificationId || null,
+          tableId: table.tableId,
+          seriesId: getTournamentSeriesRef(table).seriesId || null,
           entryKind: 'poker_play_admin_refund',
           direction: 'credit',
           amount: refundAmount,
@@ -3385,6 +3973,8 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
         walletSubject: seat.walletSubject,
         houseId: seat.houseId || null,
         verificationId: seat.streamflowVerificationId || null,
+        tableId: table.tableId,
+        seriesId: getTournamentSeriesRef(table).seriesId || null,
         entryKind: 'poker_play_tournament_refund',
         direction: 'credit',
         amount: refundAmount,
@@ -4637,6 +5227,8 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     walletSubject: walletBinding.walletSubject,
     houseId,
     verificationId: deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject)?.verificationId || null,
+    tableId: table.tableId,
+    seriesId: getTournamentSeriesRef(table).seriesId || null,
     entryKind: 'poker_play_buy_in',
     direction: 'debit',
     amount: buyInOil,
@@ -4878,6 +5470,8 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
         walletSubject: walletBinding.walletSubject,
         houseId: seat.houseId || null,
         verificationId: seat.streamflowVerificationId || null,
+        tableId: synced.table.tableId,
+        seriesId: getTournamentSeriesRef(synced.table).seriesId || null,
         entryKind: 'poker_play_cashout',
         direction: 'credit',
         amount: Number(seat.stackOil || 0),
@@ -4904,6 +5498,8 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
           walletSubject: walletBinding.walletSubject,
           houseId: seat.houseId || null,
           verificationId: seat.streamflowVerificationId || null,
+          tableId: synced.table.tableId,
+          seriesId: getTournamentSeriesRef(synced.table).seriesId || null,
           entryKind: 'poker_play_tournament_unregister',
           direction: 'credit',
           amount: Number(seat.stackOil || 0),
@@ -4993,6 +5589,8 @@ function reloadTableSeat(deps, { tableId, session, req, body } = {}) {
     walletSubject: walletBinding.walletSubject,
     houseId: seat.houseId || null,
     verificationId: seat.streamflowVerificationId || null,
+    tableId: table.tableId,
+    seriesId: getTournamentSeriesRef(table).seriesId || null,
     entryKind: 'poker_play_reload',
     direction: 'debit',
     amount: amountOil,
@@ -5597,6 +6195,8 @@ function resolveHandDispute(deps, { disputeId, body, processAt } = {}) {
 module.exports = {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
+  buildPokerPlayLedgerReconciliationPayload,
+  buildPokerPlayOpsDashboardPayload,
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,

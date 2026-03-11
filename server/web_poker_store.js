@@ -646,6 +646,8 @@ function ensureDb() {
       snapshot_id TEXT UNIQUE,
       tournament_id TEXT,
       entry_id TEXT,
+      table_id TEXT,
+      series_id TEXT,
       entry_kind TEXT NOT NULL,
       direction TEXT NOT NULL,
       amount INTEGER NOT NULL,
@@ -668,6 +670,8 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_play_seats', 'eliminated_at', 'TEXT');
   ensureColumnExists(db, 'poker_play_seats', 'prize_oil', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumnExists(db, 'poker_play_seats', 'payout_settled_at', 'TEXT');
+  ensureColumnExists(db, 'poker_oil_ledger_entries', 'table_id', 'TEXT');
+  ensureColumnExists(db, 'poker_oil_ledger_entries', 'series_id', 'TEXT');
   seedRegistryEntities();
   seedCentaurTournaments();
   seedPokerPlayTables();
@@ -3748,6 +3752,36 @@ function listPokerPlayPlayerStatsByWalletSubject(walletSubject, { limit = 100 } 
   return rows.map(hydratePokerPlayPlayerStat).filter(Boolean);
 }
 
+function listPokerPlayPlayerStats({ walletSubject = '', tableId = '', seriesId = '', limit = 500 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(5000, Number(limit || 500)));
+  const clauses = [];
+  const params = [];
+  const normalizedWalletSubject = typeof walletSubject === 'string' ? walletSubject.trim() : '';
+  const normalizedTableId = typeof tableId === 'string' ? tableId.trim() : '';
+  const normalizedSeriesId = typeof seriesId === 'string' ? seriesId.trim() : '';
+  if (normalizedWalletSubject) {
+    clauses.push('wallet_subject = ?');
+    params.push(normalizedWalletSubject);
+  }
+  if (normalizedTableId) {
+    clauses.push('table_id = ?');
+    params.push(normalizedTableId);
+  }
+  if (normalizedSeriesId) {
+    clauses.push('series_id = ?');
+    params.push(normalizedSeriesId);
+  }
+  const whereClause = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_player_stats
+    ${whereClause}
+    ORDER BY COALESCE(closed_at, payout_settled_at, updated_at) DESC, updated_at DESC, created_at DESC, result_id DESC
+    LIMIT ?
+  `).all(...params, safeLimit);
+  return rows.map(hydratePokerPlayPlayerStat).filter(Boolean);
+}
+
 function upsertPokerPlayPlayerStat({
   resultId = null,
   walletSubject,
@@ -4206,6 +4240,8 @@ function hydrateOilLedgerEntry(row) {
     snapshotId: row.snapshot_id || null,
     tournamentId: row.tournament_id || null,
     entryId: row.entry_id || null,
+    tableId: row.table_id || null,
+    seriesId: row.series_id || null,
     entryKind: row.entry_kind,
     direction: row.direction,
     amount: Number(row.amount || 0),
@@ -4222,6 +4258,8 @@ function createOilLedgerEntry({
   snapshotId = null,
   tournamentId = null,
   entryId = null,
+  tableId = null,
+  seriesId = null,
   entryKind,
   direction,
   amount = 0,
@@ -4244,12 +4282,14 @@ function createOilLedgerEntry({
         snapshot_id,
         tournament_id,
         entry_id,
+        table_id,
+        series_id,
         entry_kind,
         direction,
         amount,
         memo,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       nextLedgerEntryId,
       walletSubject,
@@ -4258,6 +4298,8 @@ function createOilLedgerEntry({
       snapshotId,
       tournamentId,
       entryId,
+      tableId,
+      seriesId,
       entryKind,
       direction,
       Number(amount || 0),
@@ -4277,6 +4319,27 @@ function listOilLedgerEntriesByWalletSubject(walletSubject, { limit = 50 } = {})
     ORDER BY created_at DESC, ledger_entry_id DESC
     LIMIT ?
   `).all(walletSubject, safeLimit);
+  return rows.map(hydrateOilLedgerEntry).filter(Boolean);
+}
+
+function listOilLedgerEntries({ limit = 50, entryKinds = [] } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 50)));
+  const normalizedKinds = (Array.isArray(entryKinds) ? entryKinds : [])
+    .map((kind) => String(kind || '').trim())
+    .filter(Boolean);
+  const rows = normalizedKinds.length
+    ? database.prepare(`
+        SELECT * FROM poker_oil_ledger_entries
+        WHERE entry_kind IN (${normalizedKinds.map(() => '?').join(', ')})
+        ORDER BY created_at DESC, ledger_entry_id DESC
+        LIMIT ?
+      `).all(...normalizedKinds, safeLimit)
+    : database.prepare(`
+        SELECT * FROM poker_oil_ledger_entries
+        ORDER BY created_at DESC, ledger_entry_id DESC
+        LIMIT ?
+      `).all(safeLimit);
   return rows.map(hydrateOilLedgerEntry).filter(Boolean);
 }
 
@@ -4363,6 +4426,7 @@ module.exports = {
   listCentaurTournaments,
   listCredentialStatusByOrigin,
   listEvidenceForSession,
+  listOilLedgerEntries,
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
   listPokerPlayActionsByHand,
@@ -4374,6 +4438,7 @@ module.exports = {
   listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlayPlayerStats,
   listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,

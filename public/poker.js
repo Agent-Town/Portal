@@ -137,6 +137,10 @@
     return buildPokerApiPath('/api/poker/play/admin/integrity', { status });
   }
 
+  function buildPlayOpsDashboardApiPath() {
+    return buildPokerApiPath('/api/poker/play/admin/ops');
+  }
+
   function readWalletRecoveryKey() {
     try {
       return String(window.localStorage.getItem('agentTown:walletRecoveryKey') || '').trim();
@@ -456,6 +460,192 @@
               <button class="pokerButton" type="button" data-integrity-action="resolved" data-flag-id="${escapeHtml(item.flagId || '')}">Resolve</button>
               <button class="pokerButton" type="button" data-integrity-action="dismissed" data-flag-id="${escapeHtml(item.flagId || '')}">Dismiss</button>
             </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsMetricCards(cards) {
+    const items = Array.isArray(cards) ? cards : [];
+    if (!items.length) return '<p>No operator metrics available.</p>';
+    return `
+      <div class="pokerStack">
+        ${items.map((item) => `
+          <div class="pokerMessage" data-ops-card="${escapeHtml(item.metricKey || '')}">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.label || 'Metric')}</div>
+                <div class="pokerSummaryValue">${escapeHtml(`${Number(item.count || 0)}`)}</div>
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsTableRows(items, emptyText = 'No operator table rows.') {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.tableTitle || item.tableId || 'Poker Table')}</div>
+                <div>${escapeHtml(item.status || item.tableType || 'open')}${item.reason ? ` · ${escapeHtml(item.reason)}` : ''}</div>
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+              </div>
+            </div>
+            <div class="pokerMeta">
+              ${item.tableType ? `<span class="pokerBadge">${escapeHtml(item.tableType)}</span>` : ''}
+              ${item.liveHand ? '<span class="pokerBadge">live hand</span>' : ''}
+              ${item.occupancy != null ? `<span class="pokerBadge">${Number(item.occupancy || 0)} seated</span>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsSeriesRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No live tournament series.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.seriesTitle || item.seriesId || 'Tournament Series')}</div>
+                <div>${escapeHtml(item.stage || 'unknown')} · ${Number(item.entryCount || 0)} entrants</div>
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+              </div>
+            </div>
+            <div class="pokerMeta">
+              <span class="pokerBadge">${Number(item.tableCount || 0)} tables</span>
+              <span class="pokerBadge">${Number(item.liveTableCount || 0)} live</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsSeatRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No disconnected seats.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.tableTitle || item.tableId || 'Poker Table')}</div>
+                <div>${escapeHtml(`Seat ${Number(item.seatNumber || 0)}${item.displayName ? ` (${item.displayName})` : ''}`)}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(formatIso(item.disconnectedAt))}</div>
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsIssueRows(items, emptyText = 'No operator issue rows.') {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.tableTitle || item.tableId || 'Poker Table')}</div>
+                <div>${escapeHtml(item.category || item.summary || item.note || 'issue')}</div>
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+              </div>
+            </div>
+            ${item.summary ? `<div>${escapeHtml(item.summary)}</div>` : ''}
+            ${item.note ? `<div>${escapeHtml(item.note)}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsLedgerRows(items, emptyText = 'No recent ledger rows.') {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.tableTitle || item.seriesTitle || item.walletSubject || 'Ledger Row')}</div>
+                <div>${escapeHtml(item.entryKind || 'ledger')} · ${Number(item.amount || 0)} OIL</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(formatIso(item.createdAt))}</div>
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(item.href || '/poker/play'))}">Open</a>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsWalletRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No wallet reconciliation rows.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.walletSubject || 'wallet')}</div>
+                <div>${escapeHtml(`${Number(item.mismatchCount || 0)} mismatch${Number(item.mismatchCount || 0) === 1 ? '' : 'es'}`)}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(`${Number(item.balanceDelta || 0)} OIL delta`)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderOpsMismatchRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No reconciliation mismatches.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.category || 'mismatch')}</div>
+                <div>${escapeHtml(item.title || item.seriesTitle || item.walletSubject || 'Ledger')}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(item.ledgerEntryId || 'missing')}</div>
+            </div>
+            <div>${escapeHtml(`expected ${Number(item.expectedAmount || 0)} · actual ${Number(item.actualAmount || 0)}`)}</div>
           </div>
         `).join('')}
       </div>
@@ -1292,6 +1482,7 @@
           ${renderSummaryMetric('Tables', `${Number(summary?.tableCount || 0)}`)}
         </div>
         <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/ops'))}">Ops Dashboard</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Open</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity', { status: 'all' }))}">All</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity', { status: 'resolved' }))}">Resolved</a>
@@ -1306,6 +1497,102 @@
     ]);
     bindIntegrityQueueActions(filterStatus);
     setStatus(items.length ? `${items.length} integrity flag row${items.length === 1 ? '' : 's'} loaded.` : 'No integrity flags matched this filter.');
+  }
+
+  async function loadPlayOpsDashboard() {
+    clearLiveTableStream();
+    const adminToken = readStoredPokerAdminToken();
+    const focusSection = String(getRouteSearchParams().get('section') || '').trim();
+    setTitle('Poker Ops', 'One operator surface for live health and accounting state.');
+    if (!adminToken) {
+      setStatus('Poker admin token required.');
+      renderCards([
+        '<h2>Poker Ops</h2><p>Set `poker.adminToken` in local storage before opening the poker operations dashboard.</p>',
+      ]);
+      return;
+    }
+    setStatus('Loading poker operations dashboard...');
+    const payload = await api(buildPlayOpsDashboardApiPath(), {
+      headers: { 'x-admin-token': adminToken },
+    });
+    const data = payload?.data || {};
+    const summary = data?.summary || {};
+    const sections = data?.sections || {};
+    const reconciliation = sections?.reconciliation || {};
+    renderCards([
+      `
+        <h2>Poker Ops</h2>
+        <p>Live tables, disputes, integrity flags, refund/payout rows, and reconciliation mismatches in one operator view.${focusSection ? ` Focus: ${escapeHtml(focusSection)}.` : ''}</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Live Tables', `${Number(summary?.liveTableCount || 0)}`)}
+          ${renderSummaryMetric('Live Series', `${Number(summary?.liveSeriesCount || 0)}`)}
+          ${renderSummaryMetric('Paused Tables', `${Number(summary?.pausedTableCount || 0)}`)}
+          ${renderSummaryMetric('Disconnected Seats', `${Number(summary?.disconnectedSeatCount || 0)}`)}
+          ${renderSummaryMetric('Open Disputes', `${Number(summary?.openDisputeCount || 0)}`)}
+          ${renderSummaryMetric('Open Flags', `${Number(summary?.openIntegrityFlagCount || 0)}`)}
+          ${renderSummaryMetric('Refunds', `${Number(summary?.recentRefundCount || 0)}`)}
+          ${renderSummaryMetric('Payouts', `${Number(summary?.recentPayoutCount || 0)}`)}
+          ${renderSummaryMetric('Reconciliation', `${Number(summary?.reconciliationMismatchCount || 0)}`)}
+        </div>
+      `,
+      `
+        <h2>Dashboard Cards</h2>
+        ${renderOpsMetricCards(data?.cards)}
+      `,
+      `
+        <h2>Live Tables</h2>
+        ${renderOpsTableRows(sections?.liveTables, 'No live tables.')}
+      `,
+      `
+        <h2>Live Series</h2>
+        ${renderOpsSeriesRows(sections?.liveSeries)}
+      `,
+      `
+        <h2>Paused Tables</h2>
+        ${renderOpsTableRows(sections?.pausedTables, 'No paused tables.')}
+      `,
+      `
+        <h2>Disconnected Seats</h2>
+        ${renderOpsSeatRows(sections?.disconnectedSeats)}
+      `,
+      `
+        <h2>Open Disputes</h2>
+        ${renderOpsIssueRows(sections?.openDisputes, 'No open disputes.')}
+      `,
+      `
+        <h2>Open Integrity Flags</h2>
+        ${renderOpsIssueRows(sections?.openIntegrityFlags, 'No open integrity flags.')}
+      `,
+      `
+        <h2>Recent Refunds</h2>
+        ${renderOpsLedgerRows(sections?.recentRefunds, 'No recent refunds.')}
+      `,
+      `
+        <h2>Recent Payout Jobs</h2>
+        ${renderOpsLedgerRows(sections?.recentPayoutJobs, 'No recent payout jobs.')}
+      `,
+      `
+        <h2 id="reconciliation">Reconciliation</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Wallets', `${Number(reconciliation?.summary?.walletCount || 0)}`)}
+          ${renderSummaryMetric('Mismatches', `${Number(reconciliation?.summary?.mismatchCount || 0)}`)}
+          ${renderSummaryMetric('Mismatched Wallets', `${Number(reconciliation?.summary?.mismatchedWalletCount || 0)}`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Integrity Queue</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+        </div>
+      `,
+      `
+        <h2>Wallet Balances</h2>
+        ${renderOpsWalletRows(reconciliation?.wallets)}
+      `,
+      `
+        <h2>Mismatch Rows</h2>
+        ${renderOpsMismatchRows(reconciliation?.items)}
+      `,
+    ]);
+    setStatus(`Loaded ${Number(summary?.liveTableCount || 0)} live table${Number(summary?.liveTableCount || 0) === 1 ? '' : 's'} and ${Number(summary?.reconciliationMismatchCount || 0)} reconciliation mismatch${Number(summary?.reconciliationMismatchCount || 0) === 1 ? '' : 'es'}.`);
   }
 
   function bindPlayMatchmakeForm() {
@@ -2972,6 +3259,7 @@
       }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
+      if (path === '/poker/play/admin/ops') return await loadPlayOpsDashboard();
       if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
       if (path === '/poker/play/results') return await loadPlayResults();
       const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);

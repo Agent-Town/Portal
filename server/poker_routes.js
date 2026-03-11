@@ -25,6 +25,8 @@ const {
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
+  buildPokerPlayLedgerReconciliationPayload,
+  buildPokerPlayOpsDashboardPayload,
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
@@ -233,6 +235,7 @@ function registerPokerRoutes(app, deps) {
     listCentaurActionsByHand,
     listCentaurMessagesByHand,
     listCentaurTournaments,
+    listOilLedgerEntries,
     listOilLedgerEntriesByWalletSubject,
     listOilSnapshotEventsByVerificationAndHour,
     listPokerPlayActionsByHand,
@@ -244,6 +247,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlayPlayerStats,
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
@@ -291,6 +295,7 @@ function registerPokerRoutes(app, deps) {
     listCentaurActionsByHand,
     listCentaurMessagesByHand,
     listOilLedgerEntriesByWalletSubject,
+    listOilLedgerEntries,
     listOilSnapshotEventsByVerificationAndHour,
     nowIso,
     resolvePrimaryWalletSubject,
@@ -319,6 +324,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlayTableById,
     getPokerPlayWaitlistEntryByTableAndWalletSubject,
     getStreamflowVerificationByWalletSubject,
+    listOilLedgerEntries,
     listPokerPlayActionsByHand,
     listPokerPlayAuditEventsByHand,
     listPokerPlayAuditEventsByTable,
@@ -328,6 +334,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlayPlayerStats,
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
@@ -565,6 +572,20 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 2, address: 'So1anaHarnessStatsB11111111111111111111111', houseId: 'house_harness_stats_b', displayName: 'Stats Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessStatsC11111111111111111111111', houseId: 'house_harness_stats_c', displayName: 'Stats Charlie' },
       ],
+      ops_dashboard_story: [
+        { seatNumber: 1, address: 'So1anaHarnessOpsA1111111111111111111111111', houseId: 'house_harness_ops_a', displayName: 'Ops Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessOpsB1111111111111111111111111', houseId: 'house_harness_ops_b', displayName: 'Ops Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessOpsC1111111111111111111111111', houseId: 'house_harness_ops_c', displayName: 'Ops Charlie' },
+        { seatNumber: 4, address: 'So1anaHarnessOpsD1111111111111111111111111', houseId: 'house_harness_ops_d', displayName: 'Ops Delta' },
+      ],
+      ledger_reconciliation_story: [
+        { seatNumber: 1, address: 'So1anaHarnessReconA11111111111111111111111', houseId: 'house_harness_recon_a', displayName: 'Recon Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessReconB11111111111111111111111', houseId: 'house_harness_recon_b', displayName: 'Recon Bravo' },
+      ],
+      ledger_reconciliation_corrupt_story: [
+        { seatNumber: 1, address: 'So1anaHarnessReconA11111111111111111111111', houseId: 'house_harness_recon_a', displayName: 'Recon Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessReconB11111111111111111111111', houseId: 'house_harness_recon_b', displayName: 'Recon Bravo' },
+      ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
     if (!defaults) {
@@ -576,6 +597,28 @@ function registerPokerRoutes(app, deps) {
     const actionExpiresAt = addHarnessSeconds(requestAt, normalizedScenario === 'timebank_live' ? 10 : 45);
     let seededSeriesId = '';
     const seededTableIds = [];
+    let reconciliationDebug = null;
+    const buildHarnessTournamentRules = (seriesId, seriesTitle, overrides = {}) => ({
+      mode: 'no_limit_holdem',
+      format: 'tournament',
+      maxSeats: 6,
+      decisionCountdownSeconds: 45,
+      presenceTimeoutSeconds: 30,
+      reconnectGraceSeconds: 90,
+      timeBankSeconds: 15,
+      cashOutEnabled: false,
+      payoutModel: 'top2_70_30',
+      lateRegistrationHands: 0,
+      handsPerBlindLevel: 2,
+      blindLevels: [
+        { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+      ],
+      reentryLimit: 0,
+      seriesId,
+      seriesTitle,
+      matchKey: `tournament:harness:${seriesId}`,
+      ...overrides,
+    });
 
     if (normalizedScenario === 'sidepot_live') {
       const [seatOne, seatTwo, seatThree] = normalizedActors;
@@ -2871,6 +2914,959 @@ function registerPokerRoutes(app, deps) {
 
       seededSeriesId = winSeriesId;
       seededTableIds.push(liveCashTableId, closedCashTableId, winTableId, bustTableId);
+    } else if (normalizedScenario === 'ops_dashboard_story') {
+      const [seatOne, seatTwo, seatThree, seatFour] = normalizedActors;
+      const liveCashTableId = nextTableId;
+      const pausedCashTableId = `${nextTableId}_paused_cash`;
+      const liveSeriesId = `pkseries_harness_ops_live_${randomHex(6)}`;
+      const liveSeriesTableAId = `${nextTableId}_series_a`;
+      const liveSeriesTableBId = `${nextTableId}_series_b`;
+      const refundCashTableId = `${nextTableId}_refund_cash`;
+      const refundTournamentTableId = `${nextTableId}_refund_tournament`;
+      const refundTournamentSeriesId = `pkseries_harness_ops_refund_${randomHex(6)}`;
+      const payoutSeriesId = `pkseries_harness_ops_payout_${randomHex(6)}`;
+      const payoutTableId = `${nextTableId}_payout_tournament`;
+      const liveOpenedAt = addHarnessSeconds(requestAt, -900);
+      const pausedOpenedAt = addHarnessSeconds(requestAt, -780);
+      const seriesOpenedAt = addHarnessSeconds(requestAt, -660);
+      const refundCashClosedAt = addHarnessSeconds(requestAt, -240);
+      const refundTournamentClosedAt = addHarnessSeconds(requestAt, -180);
+      const payoutClosedAt = addHarnessSeconds(requestAt, -120);
+      const liveCashHandId = `${handId}_live_cash`;
+      const pausedCashHandId = `${handId}_paused_cash`;
+      const seriesHandId = `${handId}_series_live`;
+
+      upsertPokerPlayTable({
+        tableId: liveCashTableId,
+        slug: `${normalizedScenario}-live-cash-${randomHex(4)}`,
+        title: 'Harness Ops Live Cash Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          activeHandId: liveCashHandId,
+          activeHandNumber: 6,
+          lastButtonSeat: seatTwo.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness ops live cash table.',
+        },
+        createdAt: liveOpenedAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 420, disconnectedAt: null },
+        { actor: seatTwo, stackOil: 380, disconnectedAt: addHarnessSeconds(requestAt, -40) },
+      ].forEach(({ actor, stackOil, disconnectedAt }) => {
+        upsertPokerPlaySeat({
+          tableId: liveCashTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 400,
+          stackOil,
+          lastSeenAt: disconnectedAt ? addHarnessSeconds(requestAt, -45) : requestAt,
+          disconnectedAt,
+          createdAt: liveOpenedAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId: liveCashHandId,
+        tableId: liveCashTableId,
+        handNumber: 6,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 6,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatTwo.seatNumber,
+          smallBlindSeat: seatOne.seatNumber,
+          bigBlindSeat: seatTwo.seatNumber,
+          actingSeat: seatOne.seatNumber,
+          street: 'turn',
+          phase: 'turn',
+          status: 'live',
+          countdownSeconds: 45,
+          deck: [],
+          deckPosition: 0,
+          communityCards: ['Ah', 'Kd', '7c', '4s'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 420,
+              holeCards: ['As', 'Qc'],
+              committedStreetOil: 20,
+              committedHandOil: 80,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 380,
+              holeCards: ['Kh', 'Qh'],
+              committedStreetOil: 20,
+              committedHandOil: 80,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [seatOne.seatNumber],
+          potOil: 160,
+          currentBetOil: 20,
+          minRaiseToOil: 40,
+          lastAggressorSeat: seatTwo.seatNumber,
+          result: null,
+        },
+        createdAt: liveOpenedAt,
+        updatedAt: requestAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: pausedCashTableId,
+        slug: `${normalizedScenario}-paused-cash-${randomHex(4)}`,
+        title: 'Harness Ops Paused Cash Table',
+        tableType: 'cash',
+        status: 'paused',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          activeHandId: pausedCashHandId,
+          activeHandNumber: 8,
+          lastButtonSeat: seatThree.seatNumber,
+          pausedAt: addHarnessSeconds(requestAt, -12),
+          pausedBy: 'operator',
+          pausedReason: 'hand review',
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {
+            [String(seatThree.seatNumber)]: 15,
+            [String(seatFour.seatNumber)]: 15,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness ops paused cash table.',
+        },
+        createdAt: pausedOpenedAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatThree, stackOil: 390, disconnectedAt: null },
+        { actor: seatFour, stackOil: 410, disconnectedAt: addHarnessSeconds(requestAt, -25) },
+      ].forEach(({ actor, stackOil, disconnectedAt }) => {
+        upsertPokerPlaySeat({
+          tableId: pausedCashTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 400,
+          stackOil,
+          lastSeenAt: disconnectedAt ? addHarnessSeconds(requestAt, -35) : requestAt,
+          disconnectedAt,
+          createdAt: pausedOpenedAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId: pausedCashHandId,
+        tableId: pausedCashTableId,
+        handNumber: 8,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 8,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatThree.seatNumber,
+          smallBlindSeat: seatFour.seatNumber,
+          bigBlindSeat: seatThree.seatNumber,
+          actingSeat: seatFour.seatNumber,
+          street: 'river',
+          phase: 'river',
+          status: 'live',
+          countdownSeconds: 45,
+          deck: [],
+          deckPosition: 0,
+          communityCards: ['9h', '9d', '4c', '4d', '2s'],
+          seatOrder: [seatThree.seatNumber, seatFour.seatNumber],
+          seatStates: {
+            [String(seatThree.seatNumber)]: {
+              seatNumber: seatThree.seatNumber,
+              stackOil: 390,
+              holeCards: ['Qs', 'Qd'],
+              committedStreetOil: 40,
+              committedHandOil: 120,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatFour.seatNumber)]: {
+              seatNumber: seatFour.seatNumber,
+              stackOil: 410,
+              holeCards: ['7s', '7d'],
+              committedStreetOil: 40,
+              committedHandOil: 120,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+          },
+          pendingSeatNumbers: [seatFour.seatNumber],
+          potOil: 240,
+          currentBetOil: 40,
+          minRaiseToOil: 80,
+          lastAggressorSeat: seatThree.seatNumber,
+          result: null,
+        },
+        createdAt: pausedOpenedAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayDispute({
+        disputeId: `pkdisp_ops_${randomHex(8)}`,
+        tableId: pausedCashTableId,
+        handId: pausedCashHandId,
+        seatNumber: seatThree.seatNumber,
+        houseId: seatThree.houseId,
+        walletSubject: seatThree.address,
+        status: 'open',
+        category: 'turn_order',
+        note: 'Seat four disconnected while action was still pending.',
+        createdAt: addHarnessSeconds(requestAt, -11),
+        updatedAt: addHarnessSeconds(requestAt, -11),
+      });
+      upsertPokerPlayIntegrityFlag({
+        flagId: `pkflag_ops_${randomHex(8)}`,
+        signalKey: `ops-paused-cash-${randomHex(8)}`,
+        tableId: pausedCashTableId,
+        handId: pausedCashHandId,
+        seatNumber: seatFour.seatNumber,
+        houseId: seatFour.houseId,
+        walletSubject: seatFour.address,
+        status: 'open',
+        severity: 'medium',
+        category: 'disconnect_pattern',
+        summary: 'Paused table has a disconnected acting seat.',
+        details: {
+          reason: 'Harness ops paused cash flag.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -10),
+        updatedAt: addHarnessSeconds(requestAt, -10),
+      });
+
+      upsertPokerPlayTable({
+        tableId: liveSeriesTableAId,
+        slug: `${normalizedScenario}-series-a-${randomHex(4)}`,
+        title: 'Harness Ops Series Alpha',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: {
+          activeHandId: seriesHandId,
+          activeHandNumber: 3,
+          lastButtonSeat: seatOne.seatNumber,
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+          },
+        },
+        rules: buildHarnessTournamentRules(liveSeriesId, 'Harness Ops Live Series', {
+          lateRegistrationHands: 1,
+        }),
+        summary: {
+          headline: 'Harness ops live tournament series table A.',
+          seriesId: liveSeriesId,
+          seriesTitle: 'Harness Ops Live Series',
+        },
+        createdAt: seriesOpenedAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 320, status: 'active' },
+        { actor: seatTwo, stackOil: 280, status: 'active' },
+      ].forEach(({ actor, stackOil, status }) => {
+        upsertPokerPlaySeat({
+          tableId: liveSeriesTableAId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status,
+          buyInOil: 300,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: seriesOpenedAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId: seriesHandId,
+        tableId: liveSeriesTableAId,
+        handNumber: 3,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 3,
+          tableType: 'tournament',
+          blindLevel: 2,
+          handsPerBlindLevel: 2,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatTwo.seatNumber,
+          bigBlindSeat: seatOne.seatNumber,
+          actingSeat: seatTwo.seatNumber,
+          street: 'flop',
+          phase: 'flop',
+          status: 'live',
+          countdownSeconds: 45,
+          deck: [],
+          deckPosition: 0,
+          communityCards: ['Ad', 'Ts', '5c'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 320,
+              holeCards: ['Ac', 'Jc'],
+              committedStreetOil: 100,
+              committedHandOil: 100,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 280,
+              holeCards: ['Ks', 'Qh'],
+              committedStreetOil: 100,
+              committedHandOil: 100,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+          },
+          pendingSeatNumbers: [seatTwo.seatNumber],
+          potOil: 200,
+          currentBetOil: 100,
+          minRaiseToOil: 200,
+          lastAggressorSeat: seatOne.seatNumber,
+          result: null,
+        },
+        createdAt: seriesOpenedAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayDispute({
+        disputeId: `pkdisp_ops_${randomHex(8)}`,
+        tableId: liveSeriesTableAId,
+        handId: seriesHandId,
+        seatNumber: seatOne.seatNumber,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        status: 'open',
+        category: 'bet_size',
+        note: 'Tournament raise size needs operator confirmation.',
+        createdAt: addHarnessSeconds(requestAt, -9),
+        updatedAt: addHarnessSeconds(requestAt, -9),
+      });
+      upsertPokerPlayIntegrityFlag({
+        flagId: `pkflag_ops_${randomHex(8)}`,
+        signalKey: `ops-series-a-${randomHex(8)}`,
+        tableId: liveSeriesTableAId,
+        seriesId: liveSeriesId,
+        handId: seriesHandId,
+        seatNumber: seatOne.seatNumber,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        status: 'open',
+        severity: 'medium',
+        category: 'soft_play_pattern',
+        summary: 'Tournament table A triggered a soft-play heuristic.',
+        details: {
+          reason: 'Harness ops tournament flag A.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -8),
+        updatedAt: addHarnessSeconds(requestAt, -8),
+      });
+
+      upsertPokerPlayTable({
+        tableId: liveSeriesTableBId,
+        slug: `${normalizedScenario}-series-b-${randomHex(4)}`,
+        title: 'Harness Ops Series Bravo',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 2,
+          lastButtonSeat: seatThree.seatNumber,
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          timeBankRemainingBySeat: {},
+        },
+        rules: buildHarnessTournamentRules(liveSeriesId, 'Harness Ops Live Series', {
+          lateRegistrationHands: 1,
+        }),
+        summary: {
+          headline: 'Harness ops live tournament series table B.',
+          seriesId: liveSeriesId,
+          seriesTitle: 'Harness Ops Live Series',
+        },
+        createdAt: seriesOpenedAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: liveSeriesTableBId,
+        seatNumber: seatThree.seatNumber,
+        portalSessionId: `harness_${seatThree.address}`,
+        houseId: seatThree.houseId,
+        walletSubject: seatThree.address,
+        displayName: seatThree.displayName,
+        status: 'registered',
+        buyInOil: 300,
+        stackOil: 300,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        createdAt: seriesOpenedAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayIntegrityFlag({
+        flagId: `pkflag_ops_${randomHex(8)}`,
+        signalKey: `ops-series-b-${randomHex(8)}`,
+        tableId: liveSeriesTableBId,
+        seriesId: liveSeriesId,
+        seatNumber: seatThree.seatNumber,
+        houseId: seatThree.houseId,
+        walletSubject: seatThree.address,
+        status: 'open',
+        severity: 'low',
+        category: 'wallet_overlap',
+        summary: 'Tournament table B triggered a wallet-overlap heuristic.',
+        details: {
+          reason: 'Harness ops tournament flag B.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -7),
+        updatedAt: addHarnessSeconds(requestAt, -7),
+      });
+
+      upsertPokerPlayTable({
+        tableId: refundCashTableId,
+        slug: `${normalizedScenario}-refund-cash-${randomHex(4)}`,
+        title: 'Harness Ops Refund Cash Table',
+        tableType: 'cash',
+        status: 'admin_closed',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 500,
+        minPlayers: 2,
+        state: {
+          closedAt: refundCashClosedAt,
+          closedBy: 'operator',
+          closeReason: 'Harness refund audit complete.',
+          refundMode: 'cash_stack',
+          refundedSeatCount: 1,
+          refundedTotalOil: 500,
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness ops historical cash refund table.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -420),
+        updatedAt: refundCashClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: refundCashTableId,
+        tableType: 'cash',
+        title: 'Harness Ops Refund Cash Table',
+        seatNumber: seatOne.seatNumber,
+        displayName: seatOne.displayName,
+        buyInOil: 500,
+        refundOil: 500,
+        stackOil: 0,
+        status: 'closed_refund',
+        openedAt: addHarnessSeconds(requestAt, -420),
+        closedAt: refundCashClosedAt,
+        createdAt: addHarnessSeconds(requestAt, -420),
+        updatedAt: refundCashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: refundCashTableId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 500,
+        memo: 'Harness ops refund cash buy-in',
+        createdAt: addHarnessSeconds(requestAt, -420),
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: refundCashTableId,
+        entryKind: 'poker_play_admin_refund',
+        direction: 'credit',
+        amount: 500,
+        memo: 'Harness ops refund cash admin refund',
+        createdAt: refundCashClosedAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: refundTournamentTableId,
+        slug: `${normalizedScenario}-refund-tournament-${randomHex(4)}`,
+        title: 'Harness Ops Refund Tournament',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: {
+          completedAt: refundTournamentClosedAt,
+          refundedSeatCount: 1,
+          refundedTotalOil: 300,
+          refundMode: 'buy_in',
+        },
+        rules: buildHarnessTournamentRules(refundTournamentSeriesId, 'Harness Ops Refund Series'),
+        summary: {
+          headline: 'Harness ops historical tournament refund table.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -360),
+        updatedAt: refundTournamentClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: refundTournamentTableId,
+        seriesId: refundTournamentSeriesId,
+        seriesTitle: 'Harness Ops Refund Series',
+        tableType: 'tournament',
+        title: 'Harness Ops Refund Tournament',
+        seatNumber: seatTwo.seatNumber,
+        displayName: seatTwo.displayName,
+        buyInOil: 300,
+        refundOil: 300,
+        stackOil: 0,
+        status: 'void_refund',
+        openedAt: addHarnessSeconds(requestAt, -360),
+        closedAt: refundTournamentClosedAt,
+        createdAt: addHarnessSeconds(requestAt, -360),
+        updatedAt: refundTournamentClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: refundTournamentTableId,
+        seriesId: refundTournamentSeriesId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 300,
+        memo: 'Harness ops refund tournament buy-in',
+        createdAt: addHarnessSeconds(requestAt, -360),
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: refundTournamentTableId,
+        seriesId: refundTournamentSeriesId,
+        entryKind: 'poker_play_tournament_refund',
+        direction: 'credit',
+        amount: 300,
+        memo: 'Harness ops refund tournament credit',
+        createdAt: refundTournamentClosedAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: payoutTableId,
+        slug: `${normalizedScenario}-payout-${randomHex(4)}`,
+        title: 'Harness Ops Payout Tournament',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          completedAt: payoutClosedAt,
+          winnerSeatNumber: seatThree.seatNumber,
+          prizePoolOil: 1200,
+          payouts: [
+            { place: 1, percent: 70, amountOil: 840 },
+            { place: 2, percent: 30, amountOil: 360 },
+          ],
+          standings: [],
+          entryCount: 3,
+          reentryCount: 0,
+        },
+        rules: buildHarnessTournamentRules(payoutSeriesId, 'Harness Ops Payout Series'),
+        summary: {
+          headline: 'Harness ops historical payout tournament.',
+          seriesId: payoutSeriesId,
+          seriesTitle: 'Harness Ops Payout Series',
+        },
+        createdAt: addHarnessSeconds(requestAt, -300),
+        updatedAt: payoutClosedAt,
+      });
+      [
+        { actor: seatThree, finishPosition: 1, prizeOil: 840, eliminatedAt: null },
+        { actor: seatFour, finishPosition: 2, prizeOil: 360, eliminatedAt: addHarnessSeconds(payoutClosedAt, -10) },
+      ].forEach(({ actor, finishPosition, prizeOil, eliminatedAt }) => {
+        upsertPokerPlaySeat({
+          tableId: payoutTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'paid',
+          buyInOil: 400,
+          stackOil: 0,
+          lastSeenAt: payoutClosedAt,
+          disconnectedAt: null,
+          eliminatedAt,
+          prizeOil,
+          payoutSettledAt: payoutClosedAt,
+          createdAt: addHarnessSeconds(requestAt, -300),
+          updatedAt: payoutClosedAt,
+        });
+        upsertPokerPlayPlayerStat({
+          walletSubject: actor.address,
+          houseId: actor.houseId,
+          tableId: payoutTableId,
+          seriesId: payoutSeriesId,
+          seriesTitle: 'Harness Ops Payout Series',
+          tableType: 'tournament',
+          title: 'Harness Ops Payout Tournament',
+          seatNumber: actor.seatNumber,
+          displayName: actor.displayName,
+          buyInOil: 400,
+          prizeOil,
+          finishPosition,
+          stackOil: 0,
+          status: 'paid',
+          payoutSettledAt: payoutClosedAt,
+          openedAt: addHarnessSeconds(requestAt, -300),
+          closedAt: payoutClosedAt,
+          createdAt: addHarnessSeconds(requestAt, -300),
+          updatedAt: payoutClosedAt,
+        });
+        createOilLedgerEntry({
+          walletSubject: actor.address,
+          houseId: actor.houseId,
+          tableId: payoutTableId,
+          seriesId: payoutSeriesId,
+          entryKind: 'poker_play_buy_in',
+          direction: 'debit',
+          amount: 400,
+          memo: `Harness ops payout buy-in for ${actor.displayName}`,
+          createdAt: addHarnessSeconds(requestAt, -300),
+        });
+        createOilLedgerEntry({
+          walletSubject: actor.address,
+          houseId: actor.houseId,
+          tableId: payoutTableId,
+          seriesId: payoutSeriesId,
+          entryKind: 'poker_play_tournament_prize',
+          direction: 'credit',
+          amount: prizeOil,
+          memo: `Harness ops payout prize for ${actor.displayName}`,
+          createdAt: payoutClosedAt,
+        });
+      });
+
+      seededSeriesId = liveSeriesId;
+      seededTableIds.push(
+        liveCashTableId,
+        pausedCashTableId,
+        liveSeriesTableAId,
+        liveSeriesTableBId,
+        refundCashTableId,
+        refundTournamentTableId,
+        payoutTableId
+      );
+    } else if (normalizedScenario === 'ledger_reconciliation_story' || normalizedScenario === 'ledger_reconciliation_corrupt_story') {
+      const [seatOne, seatTwo] = normalizedActors;
+      const corrupt = normalizedScenario === 'ledger_reconciliation_corrupt_story';
+      const cashTableId = nextTableId;
+      const tournamentSeriesId = `pkseries_harness_reconcile_${randomHex(6)}`;
+      const tournamentTableId = `${nextTableId}_tournament`;
+      const cashOpenedAt = addHarnessSeconds(requestAt, -600);
+      const cashClosedAt = addHarnessSeconds(requestAt, -420);
+      const tournamentOpenedAt = addHarnessSeconds(requestAt, -360);
+      const tournamentClosedAt = addHarnessSeconds(requestAt, -180);
+
+      upsertPokerPlayTable({
+        tableId: cashTableId,
+        slug: `${normalizedScenario}-cash-${randomHex(4)}`,
+        title: 'Harness Reconcile Cash Table',
+        tableType: 'cash',
+        status: 'admin_closed',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          closedAt: cashClosedAt,
+          closedBy: 'operator',
+          closeReason: 'Harness reconciliation cash settled.',
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness reconciliation cash result.',
+        },
+        createdAt: cashOpenedAt,
+        updatedAt: cashClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: cashTableId,
+        tableType: 'cash',
+        title: 'Harness Reconcile Cash Table',
+        seatNumber: seatOne.seatNumber,
+        displayName: seatOne.displayName,
+        buyInOil: 400,
+        reloadOil: 50,
+        cashoutOil: 470,
+        stackOil: 0,
+        status: 'cashed_out',
+        openedAt: cashOpenedAt,
+        closedAt: cashClosedAt,
+        createdAt: cashOpenedAt,
+        updatedAt: cashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: cashTableId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 400,
+        memo: 'Harness reconcile cash buy-in',
+        createdAt: cashOpenedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: cashTableId,
+        entryKind: 'poker_play_reload',
+        direction: 'debit',
+        amount: corrupt ? 75 : 50,
+        memo: 'Harness reconcile cash reload',
+        createdAt: addHarnessSeconds(cashOpenedAt, 60),
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: cashTableId,
+        entryKind: 'poker_play_cashout',
+        direction: 'credit',
+        amount: 470,
+        memo: 'Harness reconcile cash cashout',
+        createdAt: cashClosedAt,
+      });
+      if (corrupt) {
+        createOilLedgerEntry({
+          walletSubject: seatOne.address,
+          houseId: seatOne.houseId,
+          tableId: cashTableId,
+          entryKind: 'poker_play_admin_refund',
+          direction: 'credit',
+          amount: 20,
+          memo: 'Harness reconcile unexpected refund',
+          createdAt: addHarnessSeconds(cashClosedAt, 5),
+        });
+      }
+
+      upsertPokerPlayTable({
+        tableId: tournamentTableId,
+        slug: `${normalizedScenario}-tournament-${randomHex(4)}`,
+        title: 'Harness Reconcile Tournament',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: {
+          completedAt: tournamentClosedAt,
+          winnerSeatNumber: seatTwo.seatNumber,
+          prizePoolOil: 600,
+          payouts: [
+            { place: 1, percent: 70, amountOil: 420 },
+            { place: 2, percent: 30, amountOil: 180 },
+          ],
+        },
+        rules: buildHarnessTournamentRules(tournamentSeriesId, 'Harness Reconcile Series'),
+        summary: {
+          headline: 'Harness reconciliation tournament result.',
+          seriesId: tournamentSeriesId,
+          seriesTitle: 'Harness Reconcile Series',
+        },
+        createdAt: tournamentOpenedAt,
+        updatedAt: tournamentClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: tournamentTableId,
+        seriesId: tournamentSeriesId,
+        seriesTitle: 'Harness Reconcile Series',
+        tableType: 'tournament',
+        title: 'Harness Reconcile Tournament',
+        seatNumber: seatTwo.seatNumber,
+        displayName: seatTwo.displayName,
+        buyInOil: 300,
+        prizeOil: 420,
+        finishPosition: 1,
+        stackOil: 0,
+        status: 'paid',
+        payoutSettledAt: tournamentClosedAt,
+        openedAt: tournamentOpenedAt,
+        closedAt: tournamentClosedAt,
+        createdAt: tournamentOpenedAt,
+        updatedAt: tournamentClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: tournamentTableId,
+        seriesId: tournamentSeriesId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 300,
+        memo: 'Harness reconcile tournament buy-in',
+        createdAt: tournamentOpenedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: tournamentTableId,
+        seriesId: tournamentSeriesId,
+        entryKind: 'poker_play_tournament_prize',
+        direction: 'credit',
+        amount: 420,
+        memo: 'Harness reconcile tournament prize',
+        createdAt: tournamentClosedAt,
+      });
+      if (corrupt) {
+        createOilLedgerEntry({
+          walletSubject: seatTwo.address,
+          houseId: seatTwo.houseId,
+          tableId: tournamentTableId,
+          seriesId: tournamentSeriesId,
+          entryKind: 'poker_play_tournament_prize',
+          direction: 'credit',
+          amount: 25,
+          memo: 'Harness reconcile unexpected bonus prize',
+          createdAt: addHarnessSeconds(tournamentClosedAt, 5),
+        });
+      }
+
+      seededSeriesId = tournamentSeriesId;
+      seededTableIds.push(cashTableId, tournamentTableId);
+      reconciliationDebug = {
+        corrupt,
+        expectedMismatchCount: corrupt ? 3 : 0,
+        expectedWalletBalanceDeltaByWallet: {
+          [seatOne.address]: corrupt ? -5 : 0,
+          [seatTwo.address]: corrupt ? 25 : 0,
+        },
+      };
     }
 
     return {
@@ -2880,6 +3876,9 @@ function registerPokerRoutes(app, deps) {
       seriesId: seededSeriesId || null,
       handId,
       actionExpiresAt,
+      debug: {
+        reconciliation: reconciliationDebug,
+      },
       actors: normalizedActors.map((actor) => ({
         seatNumber: actor.seatNumber,
         address: actor.address,
@@ -3873,6 +4872,55 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_INTEGRITY_QUEUE_FAILED',
         err?.message || 'Unable to load poker integrity queue.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/ops', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayOpsDashboardPayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_OPS_DASHBOARD_FAILED',
+        err?.message || 'Unable to load poker operations dashboard.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/reconciliation', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayLedgerReconciliationPayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RECONCILIATION_FAILED',
+        err?.message || 'Unable to reconcile poker ledger state.',
         {
           requestId,
           details: err?.details || {},
