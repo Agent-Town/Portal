@@ -755,6 +755,7 @@ Scope:
 Execution mapping:
 
 1. `M29.8` Registry publication contract
+   - `POST /api/platform/library/publications` publishes one curated Library item to Registry only after explicit approval and replays idempotently by `Idempotency-Key`
 2. `M29.9` Registry import contract
 3. `M29.10` Seal-aware Library policy
 4. `M29.11` House Library full smoke

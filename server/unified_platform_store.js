@@ -1068,6 +1068,32 @@ function listLibraryPublications({
   return database.prepare(query).all(...args).map(mapLibraryPublicationRow).filter(Boolean);
 }
 
+function getLibraryPublicationByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_publications
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryPublicationRow(row);
+}
+
 function createLibraryPublication({
   libraryPublicationId = '',
   houseId = '',
@@ -3106,6 +3132,7 @@ module.exports = {
   getApprovalRecordById,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPublicationByIdempotency,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,

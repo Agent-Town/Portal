@@ -108,6 +108,7 @@ const {
   countTrackProgressEventsByDedupe,
   createLibraryItem,
   createLibraryLink,
+  createLibraryPublication,
   createScopeSet,
   createTrackProgressEvent,
   createTraceArtifact,
@@ -131,6 +132,7 @@ const {
   getLatestTraceEvent,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPublicationByIdempotency,
   getRunByIdempotency,
   getRunById,
   getRunByTraceId,
@@ -3790,6 +3792,7 @@ const PLATFORM_TRAINER_JOB_KINDS = new Set([
 ]);
 const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
 const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
+const LIBRARY_PUBLICATION_FIXTURE_APPROVAL_ID = 'appr_fixture_library_publish_approved_01';
 
 function getPlatformExperienceDefinition(experienceId = '') {
   const normalizedExperienceId = String(experienceId || '').trim();
@@ -4404,6 +4407,7 @@ registerPlatformReadRoutes(app, {
   buildPortalRequestId,
   createLibraryItem,
   createLibraryLink,
+  createLibraryPublication,
   createScopeSet,
   createTrainerJob,
   createTrainerResult,
@@ -4411,6 +4415,7 @@ registerPlatformReadRoutes(app, {
   getConfigVersionByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPublicationByIdempotency,
   getScopeSetById,
   getScopeSetByIdempotency,
   getUnifiedPlatformTestFixture,
@@ -4437,6 +4442,7 @@ registerPlatformReadRoutes(app, {
   randomHex,
   replaceScopeSetItems,
   replaceConfigComponentVersions,
+  resolveApprovedLibraryPublicationApproval,
   resolveApprovedTrainerPatchPromotion,
   resolveHumanSessionWithRecovery,
   resolvePlatformTrainerLinkedConfigVersionId,
@@ -6250,6 +6256,41 @@ function resolveApprovedTrainerPatchPromotion(approvalId, {
     subject: {
       trainerResultId: String(trainerResultId || '').trim() || null,
       candidatePatchId: String(candidatePatchId || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
+}
+
+function resolveApprovedLibraryPublicationApproval(approvalId, {
+  houseId = '',
+  libraryItemId = '',
+  visibility = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== LIBRARY_PUBLICATION_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'library_publication',
+    subject: {
+      libraryItemId: String(libraryItemId || '').trim() || null,
+      visibility: String(visibility || '').trim() || null,
     },
     status: 'approved',
     requestedBy: {

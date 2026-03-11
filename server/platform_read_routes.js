@@ -8,6 +8,7 @@ function registerPlatformReadRoutes(app, deps) {
     buildPortalRequestId,
     createLibraryItem,
     createLibraryLink,
+    createLibraryPublication,
     createScopeSet,
     createTrainerJob,
     createTrainerResult,
@@ -15,6 +16,7 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersionByIdempotency,
     getLibraryItemById,
     getLibraryItemByIdempotency,
+    getLibraryPublicationByIdempotency,
     getScopeSetById,
     getScopeSetByIdempotency,
     getUnifiedPlatformTestFixture,
@@ -41,6 +43,7 @@ function registerPlatformReadRoutes(app, deps) {
     randomHex,
     replaceScopeSetItems,
     replaceConfigComponentVersions,
+    resolveApprovedLibraryPublicationApproval,
     resolveApprovedTrainerPatchPromotion,
     resolveHumanSessionWithRecovery,
     resolvePlatformTrainerLinkedConfigVersionId,
@@ -430,6 +433,48 @@ function registerPlatformReadRoutes(app, deps) {
       status: 201,
       item: item || getLibraryItemById(libraryItemId),
       links: listLibraryLinks({ libraryItemId }),
+    };
+  }
+
+  function persistLibraryPublicationRecord({
+    houseId = '',
+    teamId = '',
+    libraryItemId = '',
+    visibility = 'registry_public',
+    contentHash = '',
+    sourceRef = '',
+    registryId = '',
+    metadata = null,
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibraryPublicationByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        publication: existing,
+      };
+    }
+    const publication = createLibraryPublication({
+      libraryPublicationId: `pub_${randomHex(12)}`,
+      houseId,
+      teamId,
+      libraryItemId,
+      publicationState: 'published',
+      registryId,
+      visibility,
+      contentHash,
+      sourceRef,
+      idempotencyKey,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      publication,
     };
   }
 
@@ -1085,6 +1130,85 @@ function registerPlatformReadRoutes(app, deps) {
       },
       item: persisted.item,
       links: persisted.links,
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/publications', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before publishing a Library item.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before publishing a Library item.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to publish a Library item.', { requestId });
+    }
+    const existingPublication = getLibraryPublicationByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingPublication) {
+      return sendPortalApiSuccess(res, {
+        publication: existingPublication,
+      }, { requestId, status: 200 });
+    }
+    const libraryItemId = typeof req.body?.libraryItemId === 'string' ? req.body.libraryItemId.trim() : '';
+    const visibility = typeof req.body?.visibility === 'string' ? req.body.visibility.trim() : 'registry_public';
+    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+    if (!libraryItemId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ITEM_REQUIRED', 'libraryItemId is required to publish a Library item.', { requestId });
+    }
+    const item = getLibraryItemById(libraryItemId);
+    if (!item || item.houseId !== context.houseId || item.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'The requested Library item could not be found for this House team.', { requestId });
+    }
+    const approval = resolveApprovedLibraryPublicationApproval(approvalId, {
+      houseId: context.houseId,
+      libraryItemId,
+      visibility,
+    });
+    if (!approval) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLISH_APPROVAL_REQUIRED', 'Publishing a Library item requires explicit approval.', {
+        requestId,
+        details: {
+          approvalId: approvalId || null,
+          approvalKind: 'library_publication',
+          libraryItemId,
+          visibility,
+        },
+      });
+    }
+    const registryId = `regpub_${String(item.contentHash || '').replace(/^sha256:/, '').slice(0, 16) || randomHex(8)}`;
+    const persisted = persistLibraryPublicationRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryItemId,
+      visibility,
+      contentHash: item.contentHash,
+      sourceRef: item.sourceRef || item.libraryItemId,
+      registryId,
+      metadata: {
+        approvalId: approval.approvalId,
+        approvalKind: approval.approvalKind,
+        publishedFrom: 'portal.house.library',
+      },
+      idempotencyKey,
+    });
+    return sendPortalApiSuccess(res, {
+      publication: persisted.publication,
+      item: {
+        libraryItemId: item.libraryItemId,
+        contentHash: item.contentHash,
+        sourceRef: item.sourceRef,
+      },
     }, { requestId, status: persisted.status });
   });
 

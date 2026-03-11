@@ -1057,6 +1057,44 @@ Stable failure codes:
 - `TRACE_NOT_FOUND`
 - `TRAINER_RESULT_NOT_FOUND`
 
+### POST `/api/platform/library/publications` (human)
+Publishes one curated House Library item to Registry using an approval-gated, idempotent contract. The first pass keeps Registry as the canonical public surface and creates exactly one durable publication row per idempotency key.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "libraryItemId": "lib_1234abcd",
+  "visibility": "registry_public",
+  "approvalId": "appr_fixture_library_publish_approved_01"
+}
+```
+
+Response fields:
+- `data.publication`
+- `data.publication.libraryPublicationId`
+- `data.publication.libraryItemId`
+- `data.publication.registryId`
+- `data.publication.visibility`
+- `data.publication.contentHash`
+- `data.publication.sourceRef`
+- `data.publication.publicationState`
+- `data.item`
+- `data.item.libraryItemId`
+- `data.item.contentHash`
+- `data.item.sourceRef`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `LIBRARY_ITEM_REQUIRED`
+- `LIBRARY_ITEM_NOT_FOUND`
+- `LIBRARY_PUBLISH_APPROVAL_REQUIRED`
+
 ### GET `/api/platform/library/scope` (human)
 Returns the current active Library scope set and the resolved ordered items selected for chat.
 
