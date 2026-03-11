@@ -953,6 +953,7 @@ Response fields:
 ### GET `/api/platform/house-office` (human)
 Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and deterministic office fixtures.
 The same payload also drives the client-side House Office district shell; there is no separate district-shell route.
+House Office overview text is projection-safe: raw `prompt`, `callbackUrl`, `credential`, `accessToken`, and `sealedPayload` strings are redacted from assignment focus, presence, briefing, and attention summaries.
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)

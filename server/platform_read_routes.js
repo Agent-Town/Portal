@@ -175,6 +175,41 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function getHouseOfficePrivacyFixture() {
+    const fixture = getUnifiedPlatformTestFixture('house_office_privacy_seed');
+    return fixture && typeof fixture === 'object' && !Array.isArray(fixture) ? fixture : {};
+  }
+
+  function getHouseOfficeForbiddenMarkers() {
+    const fixture = getHouseOfficePrivacyFixture();
+    const markers = Array.isArray(fixture?.forbiddenFields)
+      ? fixture.forbiddenFields
+      : ['prompt', 'callbackUrl', 'credential', 'accessToken', 'sealedPayload'];
+    return markers
+      .map((entry) => String(entry || '').trim().toLowerCase())
+      .filter(Boolean);
+  }
+
+  function houseOfficeTextHasForbiddenMarker(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return getHouseOfficeForbiddenMarkers().some((marker) => normalized.includes(marker));
+  }
+
+  function sanitizeHouseOfficeText(value, fallback = 'Sensitive details redacted') {
+    const normalized = String(value || '').trim();
+    if (!normalized) return '';
+    if (!houseOfficeTextHasForbiddenMarker(normalized)) return normalized;
+    return String(fallback || 'Sensitive details redacted').trim() || 'Sensitive details redacted';
+  }
+
+  function isSafeHouseOfficeIdentifier(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return false;
+    if (!/^[A-Za-z0-9._:-]{1,160}$/.test(normalized)) return false;
+    return !houseOfficeTextHasForbiddenMarker(normalized);
+  }
+
   function buildHouseOfficeAssignmentEntryPath({
     sourceKind = '',
     office = null,
@@ -264,7 +299,7 @@ function registerPlatformReadRoutes(app, deps) {
           assignmentId: String(assignment?.assignmentId || '').trim(),
           staffAgentId,
           officeId,
-          focus: String(assignment?.focus || '').trim(),
+          focus: sanitizeHouseOfficeText(assignment?.focus, 'Sensitive assignment details redacted'),
           sourceKind: String(assignment?.sourceKind || '').trim(),
           sourceId: String(assignment?.sourceId || '').trim(),
           startedAt: String(assignment?.startedAt || '').trim(),
@@ -356,7 +391,7 @@ function registerPlatformReadRoutes(app, deps) {
         return {
           officeId,
           officeLabel,
-          focus: `Config ${String(binding.activeConfigVersionId || '').trim()}`,
+          focus: sanitizeHouseOfficeText(`Config ${String(binding.activeConfigVersionId || '').trim()}`, 'Sensitive activity redacted'),
           status: allowedStatuses.has('building') ? 'building' : 'idle',
           lastActivityAt: String(binding.updatedAt || binding.createdAt || '').trim() || null,
           deepLink: deeplinks.workshop || deeplinks.office,
@@ -375,7 +410,7 @@ function registerPlatformReadRoutes(app, deps) {
           return {
             officeId,
             officeLabel,
-            focus: `Approval needed for ${String(latestTrainerResult.trainerResultId || '').trim()}`,
+            focus: sanitizeHouseOfficeText(`Approval needed for ${String(latestTrainerResult.trainerResultId || '').trim()}`, 'Sensitive activity redacted'),
             status: allowedStatuses.has('alert') ? 'alert' : 'idle',
             lastActivityAt: String(latestTrainerResult.updatedAt || latestTrainerResult.createdAt || '').trim() || null,
             deepLink: deeplinks.trainer || deeplinks.office,
@@ -399,7 +434,10 @@ function registerPlatformReadRoutes(app, deps) {
           return {
             officeId,
             officeLabel,
-            focus: trainerResultId ? `Review ${trainerResultId}` : `Evaluate ${trainerJobId}`,
+            focus: sanitizeHouseOfficeText(
+              trainerResultId ? `Review ${trainerResultId}` : `Evaluate ${trainerJobId}`,
+              'Sensitive activity redacted'
+            ),
             status: allowedStatuses.has('evaluating') ? 'evaluating' : 'idle',
             lastActivityAt: String(
               latestTrainerResult?.updatedAt
@@ -434,7 +472,7 @@ function registerPlatformReadRoutes(app, deps) {
         return {
           officeId,
           officeLabel,
-          focus: `Run ${String(latestArchiveRun.runId || '').trim()}`,
+          focus: sanitizeHouseOfficeText(`Run ${String(latestArchiveRun.runId || '').trim()}`, 'Sensitive activity redacted'),
           status: allowedStatuses.has('researching') ? 'researching' : 'idle',
           lastActivityAt: String(
             latestArchiveRun.completedAt
@@ -460,7 +498,7 @@ function registerPlatformReadRoutes(app, deps) {
           return {
             officeId,
             officeLabel,
-            focus: 'Poker Mastery progress',
+            focus: sanitizeHouseOfficeText('Poker Mastery progress', 'Sensitive activity redacted'),
             status: allowedStatuses.has('competing') ? 'competing' : 'idle',
             lastActivityAt: String(
               latestOpsTrackEvent?.createdAt
@@ -491,7 +529,7 @@ function registerPlatformReadRoutes(app, deps) {
           return {
             officeId,
             officeLabel,
-            focus: 'Web Ops progress',
+            focus: sanitizeHouseOfficeText('Web Ops progress', 'Sensitive activity redacted'),
             status: allowedStatuses.has('researching') ? 'researching' : 'idle',
             lastActivityAt: String(
               latestOpsTrackEvent?.createdAt
@@ -593,8 +631,8 @@ function registerPlatformReadRoutes(app, deps) {
         return;
       }
       const briefingId = String(item?.briefingId || '').trim();
-      const title = String(item?.title || '').trim();
-      const summary = String(item?.summary || '').trim();
+      const title = sanitizeHouseOfficeText(item?.title, 'Sensitive briefing item');
+      const summary = sanitizeHouseOfficeText(item?.summary, 'Sensitive briefing details redacted');
       if (!briefingId || !title || !summary) return;
       groups.get(normalizedFamily).push({
         briefingId,
@@ -743,8 +781,11 @@ function registerPlatformReadRoutes(app, deps) {
       items.push({
         attentionId: `trainer:${trainerResultId}`,
         severity: 'critical',
-        title: 'Trainer approval required',
-        summary: `${String(trainerJob?.jobKind || 'trainer_job.compare').trim() || 'trainer_job.compare'} result ${trainerResultId} is awaiting approval.`,
+        title: sanitizeHouseOfficeText('Trainer approval required', 'Sensitive attention item'),
+        summary: sanitizeHouseOfficeText(
+          `${String(trainerJob?.jobKind || 'trainer_job.compare').trim() || 'trainer_job.compare'} result ${trainerResultId} is awaiting approval.`,
+          'Sensitive attention details redacted'
+        ),
         sourceKind: 'trainer_result',
         sourceId: trainerResultId,
         createdAt: String(result?.updatedAt || result?.createdAt || '').trim() || null,
@@ -758,8 +799,11 @@ function registerPlatformReadRoutes(app, deps) {
         items.push({
           attentionId: `workshop:${teamBindingId}`,
           severity: 'warn',
-          title: 'Workshop binding changed',
-          summary: `Team ${String(binding?.teamId || '').trim() || 'team'} points to ${String(binding?.activeConfigVersionId || 'the active config').trim() || 'the active config'}.`,
+          title: sanitizeHouseOfficeText('Workshop binding changed', 'Sensitive attention item'),
+          summary: sanitizeHouseOfficeText(
+            `Team ${String(binding?.teamId || '').trim() || 'team'} points to ${String(binding?.activeConfigVersionId || 'the active config').trim() || 'the active config'}.`,
+            'Sensitive attention details redacted'
+          ),
           sourceKind: 'team_config_binding',
           sourceId: teamBindingId,
           createdAt: String(binding?.updatedAt || binding?.createdAt || '').trim() || null,
@@ -775,8 +819,11 @@ function registerPlatformReadRoutes(app, deps) {
       items.push({
         attentionId: `tracks:${latestTrackEventId}`,
         severity: 'info',
-        title: 'Track progress updated',
-        summary: `${String(latestTrackEvent?.title || latestTrackEvent?.trackId || 'Track').trim() || 'Track'} recorded progress from ${String(latestTrackEvent?.sourceKind || 'track').trim() || 'track'}.`,
+        title: sanitizeHouseOfficeText('Track progress updated', 'Sensitive attention item'),
+        summary: sanitizeHouseOfficeText(
+          `${String(latestTrackEvent?.title || latestTrackEvent?.trackId || 'Track').trim() || 'Track'} recorded progress from ${String(latestTrackEvent?.sourceKind || 'track').trim() || 'track'}.`,
+          'Sensitive attention details redacted'
+        ),
         sourceKind: 'track_progress_event',
         sourceId: latestTrackEventId,
         createdAt: String(latestTrackEvent?.createdAt || '').trim() || null,
@@ -939,6 +986,7 @@ function registerPlatformReadRoutes(app, deps) {
           'house_office_staff_seed',
           'house_office_assignments_seed',
           'house_office_briefing_seed',
+          'house_office_privacy_seed',
         ],
         counts: {
           officeCount: offices.length,
@@ -1431,6 +1479,9 @@ function registerPlatformReadRoutes(app, deps) {
     if (!officeId || !staffAgentId || !focus || !sourceKind || !sourceId) {
       return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'officeId, staffAgentId, focus, sourceKind, and sourceId are required.', { requestId });
     }
+    if (!isSafeHouseOfficeIdentifier(sourceKind) || !isSafeHouseOfficeIdentifier(sourceId)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'sourceKind and sourceId must use safe identifier characters only.', { requestId });
+    }
 
     const overview = buildHouseOfficeOverviewPayload({
       context,
@@ -1459,7 +1510,7 @@ function registerPlatformReadRoutes(app, deps) {
       sourceId,
     }));
     const assignmentId = `assign_${assignmentIdentity.replace(/^sha256:/i, '').slice(0, 24)}`;
-    const assignment = createHouseStaffAssignment({
+    const assignmentRecord = createHouseStaffAssignment({
       assignmentId,
       houseId,
       teamId,
@@ -1477,14 +1528,23 @@ function registerPlatformReadRoutes(app, deps) {
       startedAt: createdAt,
       nowIso: createdAt,
     });
-    return sendPortalApiSuccess(res, {
-      assignmentId: String(assignment?.assignmentId || '').trim(),
-      staffAgentId: String(assignment?.staffAgentId || '').trim(),
-      officeId: String(assignment?.officeId || '').trim(),
-      focus: String(assignment?.focus || '').trim(),
-      sourceKind: String(assignment?.sourceKind || '').trim(),
-      sourceId: String(assignment?.sourceId || '').trim(),
-      startedAt: String(assignment?.startedAt || '').trim(),
+    const assignment = buildHouseOfficeAssignments({
+      houseId,
+      teamId,
+      offices,
+      staffAgents,
+      deeplinks: overview?.deeplinks && typeof overview.deeplinks === 'object'
+        ? overview.deeplinks
+        : buildHouseOfficeDeepLinks(),
+    }).find((entry) => String(entry?.assignmentId || '').trim() === String(assignmentRecord?.assignmentId || '').trim()) || null;
+    return sendPortalApiSuccess(res, assignment || {
+      assignmentId: String(assignmentRecord?.assignmentId || '').trim(),
+      staffAgentId: String(assignmentRecord?.staffAgentId || '').trim(),
+      officeId: String(assignmentRecord?.officeId || '').trim(),
+      focus: sanitizeHouseOfficeText(assignmentRecord?.focus, 'Sensitive assignment details redacted'),
+      sourceKind: String(assignmentRecord?.sourceKind || '').trim(),
+      sourceId: String(assignmentRecord?.sourceId || '').trim(),
+      startedAt: String(assignmentRecord?.startedAt || '').trim(),
       deepLink: buildHouseOfficeAssignmentDeepLink({
         sourceKind,
         office,
@@ -1492,6 +1552,13 @@ function registerPlatformReadRoutes(app, deps) {
           ? overview.deeplinks
           : buildHouseOfficeDeepLinks(),
       }),
+      sourceRefs: [
+        {
+          sourceKind: String(assignmentRecord?.sourceKind || '').trim(),
+          sourceId: String(assignmentRecord?.sourceId || '').trim(),
+          entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+        },
+      ],
     }, { requestId });
   });
 

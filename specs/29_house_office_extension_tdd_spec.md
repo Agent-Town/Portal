@@ -424,6 +424,7 @@ Implementation notes:
 
 1. The privacy test must assert absence of specific forbidden fields rather than vague non-leakage.
 2. Presence and briefing surfaces must avoid raw prompt, token, callback, secret, and sealed event payload fields.
+3. Assignment focus is part of the overview projection and must follow the same redaction contract as presence, briefing, and attention.
 
 ### M29.7 - Unified House Office smoke
 
