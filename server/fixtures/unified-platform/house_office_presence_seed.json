@@ -1,0 +1,21 @@
+{
+  "family": "house_office_presence_seed",
+  "schema": "agent-town-house-office-presence-seed/v1",
+  "allowedStatuses": [
+    "idle",
+    "building",
+    "researching",
+    "evaluating",
+    "competing",
+    "reviewing",
+    "alert"
+  ],
+  "precedence": [
+    "alert",
+    "trainer",
+    "workshop",
+    "archive",
+    "experience",
+    "idle"
+  ]
+}

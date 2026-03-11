@@ -950,6 +950,68 @@ Response fields:
 - `data.staffAgents[].officeId`
 - `data.modelVersion`
 
+### GET `/api/platform/house-office` (human)
+Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and deterministic office fixtures.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.offices[]`
+- `data.offices[].officeId`
+- `data.offices[].slug`
+- `data.offices[].displayName`
+- `data.offices[].purpose`
+- `data.offices[].order`
+- `data.offices[].mapColumn`
+- `data.offices[].mapRow`
+- `data.offices[].surface`
+- `data.offices[].deepLink.kind`
+- `data.offices[].deepLink.surface`
+- `data.offices[].deepLink.label`
+- `data.staffAgents[]`
+- `data.staffAgents[].staffAgentId`
+- `data.staffAgents[].displayName`
+- `data.staffAgents[].role`
+- `data.staffAgents[].officeId`
+- `data.staffAgents[].teamId`
+- `data.staffAgents[].deepLink.kind`
+- `data.staffAgents[].deepLink.surface`
+- `data.staffAgents[].deepLink.label`
+- `data.presence[]`
+- `data.briefing[]`
+- `data.attention[]`
+- `data.deeplinks.office`
+- `data.deeplinks.experiences`
+- `data.deeplinks.workshop`
+- `data.deeplinks.tracks`
+- `data.deeplinks.archive`
+- `data.deeplinks.trainer`
+- `data.sourceManifest.schema`
+- `data.sourceManifest.routes[]`
+- `data.sourceManifest.fixtures[]`
+- `data.sourceManifest.counts.officeCount`
+- `data.sourceManifest.counts.staffAgentCount`
+- `data.sourceManifest.counts.experienceCount`
+- `data.sourceManifest.counts.trackCount`
+- `data.sourceManifest.counts.trackEventCount`
+- `data.sourceManifest.counts.trainerJobCount`
+- `data.sourceManifest.counts.trainerResultCount`
+- `data.sourceManifest.counts.archiveRunCount`
+- `data.sourceManifest.activeConfigVersionId`
+- `data.summary.officeCount`
+- `data.summary.staffAgentCount`
+- `data.summary.experienceCount`
+- `data.summary.trackCount`
+- `data.summary.trainerJobCount`
+- `data.summary.trainerResultCount`
+- `data.summary.archiveRunCount`
+- `data.emptyStateText`
+
 ### GET `/api/platform/tracks` (human)
 Returns deterministic track progress and durable reward-hook references for the currently attached House and active team.
 

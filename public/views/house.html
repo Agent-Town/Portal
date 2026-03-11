@@ -90,7 +90,7 @@
 <div class="panel" id="houseConsolePanel" data-testid="house-console-panel">
   <h2 style="margin:0 0 6px">House Console</h2>
   <p class="small" style="margin-top:0">
-    Read-only access to the canonical archive and durable trainer outputs for this house.
+    Read-only access to the current House Office, archive, workshop, tracks, and trainer truth for this house.
   </p>
   <div class="kv" style="margin-bottom:8px;">
     <label class="small" for="houseTeamSelect">Team</label>
@@ -100,6 +100,7 @@
     Attach a house to inspect team-specific archive and trainer records.
   </div>
   <div class="kv" style="margin-bottom:8px;">
+    <button class="btn" id="houseOfficeBtn" type="button" data-testid="house-open-office">Open Office</button>
     <button class="btn" id="houseExperiencesBtn" type="button" data-testid="house-open-experiences">Open Experiences</button>
     <button class="btn" id="houseWorkshopBtn" type="button" data-testid="house-open-workshop">Open Workshop</button>
     <button class="btn" id="houseTracksBtn" type="button" data-testid="house-open-tracks">Open Tracks</button>
@@ -107,6 +108,19 @@
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
   </div>
   <div class="small" id="houseSurfaceStatus" style="min-height:1.4em;"></div>
+</div>
+
+<div class="panel is-hidden" id="houseOfficePanel" data-testid="house-office-panel">
+  <h2 style="margin:0 0 6px">House Office</h2>
+  <p class="small" style="margin-top:0">
+    A read-only operational overview that reuses the current House, trainer, archive, workshop, and tracks truth.
+  </p>
+  <div class="small" id="houseOfficeEmpty" data-testid="house-office-empty">Attach a house to inspect the House Office overview.</div>
+  <div class="small" id="houseOfficeSummary" data-testid="house-office-summary">No House Office overview loaded yet.</div>
+  <div id="houseOfficeMap" data-testid="house-office-map" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; margin-top:10px;"></div>
+  <div class="small" id="houseOfficeSourceManifest" data-testid="house-office-source-manifest" style="margin-top:10px;">
+    No House Office source manifest available yet.
+  </div>
 </div>
 
 <div class="panel is-hidden" id="houseExperiencesPanel" data-testid="house-experiences-panel">

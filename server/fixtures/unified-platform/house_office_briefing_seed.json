@@ -1,0 +1,13 @@
+{
+  "family": "house_office_briefing_seed",
+  "schema": "agent-town-house-office-briefing-seed/v1",
+  "defaultWindowHours": 24,
+  "groupOrder": [
+    "archive",
+    "trainer",
+    "workshop",
+    "tracks",
+    "experiences",
+    "poker_or_web"
+  ]
+}

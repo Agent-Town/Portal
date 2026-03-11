@@ -1,0 +1,31 @@
+{
+  "family": "house_office_assignments_seed",
+  "schema": "agent-town-house-office-assignments-seed/v1",
+  "offices": [
+    {
+      "officeId": "office_fixture_ops",
+      "slug": "ops",
+      "displayName": "Operations"
+    }
+  ],
+  "staffAgents": [
+    {
+      "staffAgentId": "staff_fixture_operator",
+      "displayName": "Operations Lead",
+      "role": "operator",
+      "officeId": "office_fixture_ops",
+      "teamId": "team_main"
+    }
+  ],
+  "assignments": [
+    {
+      "assignmentId": "assign_fixture_ops_01",
+      "staffAgentId": "staff_fixture_operator",
+      "officeId": "office_fixture_ops",
+      "focus": "reviewing",
+      "sourceKind": "trainer_job",
+      "sourceId": "trainer_fixture_ops_review",
+      "startedAt": "2026-03-10T09:00:00.000Z"
+    }
+  ]
+}

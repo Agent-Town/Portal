@@ -491,6 +491,19 @@ let houseSurfaceState = {
     activeTeamId: '',
     availableTeamIds: [],
   },
+  office: {
+    loaded: false,
+    offices: [],
+    staffAgents: [],
+    presence: [],
+    briefing: [],
+    attention: [],
+    deeplinks: {},
+    sourceManifest: null,
+    summary: null,
+    selectedOfficeId: '',
+    emptyStateText: 'Attach a house to inspect the House Office overview.',
+  },
   archive: {
     loaded: false,
     items: [],
@@ -1292,6 +1305,16 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   houseSurfaceState.context.activeTeamId = nextActiveTeamId;
   houseSurfaceState.context.availableTeamIds = nextTeamIds;
   if (previousActiveTeamId !== nextActiveTeamId) {
+    houseSurfaceState.office.loaded = false;
+    houseSurfaceState.office.staffAgents = [];
+    houseSurfaceState.office.presence = [];
+    houseSurfaceState.office.briefing = [];
+    houseSurfaceState.office.attention = [];
+    houseSurfaceState.office.deeplinks = {};
+    houseSurfaceState.office.sourceManifest = null;
+    houseSurfaceState.office.summary = null;
+    houseSurfaceState.office.selectedOfficeId = '';
+    houseSurfaceState.office.emptyStateText = 'Attach a house to inspect the House Office overview.';
     houseSurfaceState.archive.selectedTraceId = '';
     houseSurfaceState.experiences.selectedExperienceId = '';
     houseSurfaceState.tracks.loaded = false;
@@ -1381,7 +1404,9 @@ async function setHouseActiveTeam(teamId) {
   });
   const data = response?.data || response || {};
   syncHouseSurfaceContextFromPayload(data);
-  if (houseSurfaceState.activeSurface === 'archive') {
+  if (houseSurfaceState.activeSurface === 'office') {
+    await loadHouseOfficeSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'archive') {
     await loadHouseArchiveSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'experiences') {
     await loadHouseExperiencesSurface({ skipContext: true });
@@ -1404,28 +1429,164 @@ function buildHousePlatformSnapshot() {
 }
 
 function setHouseSurfaceMode(mode) {
-  const activeMode = mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
+  const activeMode = mode === 'office' || mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
+  const officePanel = el('houseOfficePanel');
   const experiencesPanel = el('houseExperiencesPanel');
   const tracksPanel = el('houseTracksPanel');
   const workshopPanel = el('houseWorkshopPanel');
   const archivePanel = el('houseArchivePanel');
   const trainerPanel = el('houseTrainerPanel');
+  const officeBtn = el('houseOfficeBtn');
   const experiencesBtn = el('houseExperiencesBtn');
   const tracksBtn = el('houseTracksBtn');
   const workshopBtn = el('houseWorkshopBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
+  if (officePanel) officePanel.classList.toggle('is-hidden', activeMode !== 'office');
   if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
   if (tracksPanel) tracksPanel.classList.toggle('is-hidden', activeMode !== 'tracks');
   if (workshopPanel) workshopPanel.classList.toggle('is-hidden', activeMode !== 'workshop');
   if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
   if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
+  if (officeBtn) officeBtn.classList.toggle('primary', activeMode === 'office');
   if (experiencesBtn) experiencesBtn.classList.toggle('primary', activeMode === 'experiences');
   if (tracksBtn) tracksBtn.classList.toggle('primary', activeMode === 'tracks');
   if (workshopBtn) workshopBtn.classList.toggle('primary', activeMode === 'workshop');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
   if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
+}
+
+async function openHouseOfficeDeepLink(rawDeepLink) {
+  const deepLink = rawDeepLink && typeof rawDeepLink === 'object' ? rawDeepLink : null;
+  const kind = String(deepLink?.kind || '').trim();
+  if (kind !== 'house_surface') {
+    throw new Error('HOUSE_OFFICE_DEEPLINK_INVALID');
+  }
+  const surface = String(deepLink?.surface || '').trim();
+  if (surface === 'office') {
+    await loadHouseOfficeSurface({ skipContext: true });
+    return;
+  }
+  if (surface === 'experiences') {
+    await loadHouseExperiencesSurface({ skipContext: true });
+    return;
+  }
+  if (surface === 'workshop') {
+    await loadHouseWorkshopSurface({ skipContext: true });
+    return;
+  }
+  if (surface === 'tracks') {
+    await loadHouseTracksSurface({ skipContext: true });
+    return;
+  }
+  if (surface === 'archive') {
+    await loadHouseArchiveSurface({ skipContext: true });
+    return;
+  }
+  if (surface === 'trainer') {
+    await loadHouseTrainerSurface({ skipContext: true });
+    return;
+  }
+  throw new Error('HOUSE_OFFICE_DEEPLINK_UNSUPPORTED');
+}
+
+function renderHouseOfficeSurface() {
+  const emptyNode = el('houseOfficeEmpty');
+  const summaryNode = el('houseOfficeSummary');
+  const mapNode = el('houseOfficeMap');
+  const sourceManifestNode = el('houseOfficeSourceManifest');
+  if (!emptyNode || !summaryNode || !mapNode || !sourceManifestNode) return;
+  const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
+  const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
+  const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
+  const briefing = Array.isArray(houseSurfaceState.office.briefing) ? houseSurfaceState.office.briefing : [];
+  const attention = Array.isArray(houseSurfaceState.office.attention) ? houseSurfaceState.office.attention : [];
+  const sourceManifest = houseSurfaceState.office.sourceManifest && typeof houseSurfaceState.office.sourceManifest === 'object'
+    ? houseSurfaceState.office.sourceManifest
+    : null;
+  const summary = houseSurfaceState.office.summary && typeof houseSurfaceState.office.summary === 'object'
+    ? houseSurfaceState.office.summary
+    : null;
+  const selectedOfficeId = String(houseSurfaceState.office.selectedOfficeId || offices[0]?.officeId || '').trim();
+  houseSurfaceState.office.selectedOfficeId = selectedOfficeId;
+  const selectedOffice = offices.find((item) => String(item?.officeId || '') === selectedOfficeId) || offices[0] || null;
+
+  emptyNode.textContent = String(houseSurfaceState.office.emptyStateText || 'Attach a house to inspect the House Office overview.');
+  emptyNode.classList.toggle('is-hidden', !houseSurfaceState.office.emptyStateText);
+  emptyNode.style.overflowWrap = 'anywhere';
+  summaryNode.style.overflowWrap = 'anywhere';
+
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const officeCount = Number(summary?.officeCount || offices.length || 0);
+  const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
+  const selectedOfficeLabel = String(selectedOffice?.displayName || selectedOffice?.slug || '—').trim() || '—';
+  const selectedOfficePurpose = String(selectedOffice?.purpose || '').trim();
+  const summaryParts = [
+    houseId ? `House ${houseId}` : 'No house attached',
+    activeTeamId ? `active team ${activeTeamId}` : 'no active team',
+    `${officeCount} offices`,
+    `${staffAgentCount} staff`,
+    `${presence.length} presence`,
+    `${briefing.length} briefing`,
+    `${attention.length} attention`,
+    `selected ${selectedOfficeLabel}`,
+  ];
+  if (selectedOfficePurpose) {
+    summaryParts.push(selectedOfficePurpose);
+  }
+  summaryNode.textContent = summaryParts.join(' · ');
+
+  mapNode.innerHTML = '';
+  mapNode.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+  mapNode.style.gap = '8px';
+  if (!offices.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No House Office areas are seeded yet.';
+    mapNode.appendChild(placeholder);
+  } else {
+    offices.forEach((office) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn${String(office?.officeId || '') === String(selectedOffice?.officeId || '') ? ' primary' : ''}`;
+      button.setAttribute('data-testid', 'house-office-map-office');
+      button.dataset.officeId = String(office?.officeId || '');
+      button.style.width = '100%';
+      button.style.minWidth = '0';
+      button.style.whiteSpace = 'normal';
+      button.style.overflowWrap = 'anywhere';
+      button.style.textAlign = 'left';
+      button.style.lineHeight = '1.35';
+      button.style.gridColumn = String(Math.max(1, Number(office?.mapColumn || 1)));
+      button.style.gridRow = String(Math.max(1, Number(office?.mapRow || 1)));
+      const displayName = String(office?.displayName || office?.slug || office?.officeId || '').trim();
+      const purpose = String(office?.purpose || '').trim();
+      button.textContent = purpose ? `${displayName} · ${purpose}` : displayName;
+      button.addEventListener('click', async () => {
+        houseSurfaceState.office.selectedOfficeId = String(office?.officeId || '').trim();
+        renderHouseOfficeSurface();
+      });
+      mapNode.appendChild(button);
+    });
+  }
+
+  const routeLines = Array.isArray(sourceManifest?.routes) ? sourceManifest.routes : [];
+  const fixtureLines = Array.isArray(sourceManifest?.fixtures) ? sourceManifest.fixtures : [];
+  const countEntries = sourceManifest?.counts && typeof sourceManifest.counts === 'object'
+    ? Object.entries(sourceManifest.counts)
+    : [];
+  const manifestLines = [
+    `Schema: ${String(sourceManifest?.schema || 'agent-town-house-office/v1')}`,
+    routeLines.length ? `Routes:\n${routeLines.map((route) => `- ${route}`).join('\n')}` : 'Routes: —',
+    fixtureLines.length ? `Fixtures:\n${fixtureLines.map((fixture) => `- ${fixture}`).join('\n')}` : 'Fixtures: —',
+    countEntries.length ? `Counts:\n${countEntries.map(([key, value]) => `- ${key}=${value}`).join('\n')}` : 'Counts: —',
+  ];
+  sourceManifestNode.style.whiteSpace = 'pre-wrap';
+  sourceManifestNode.style.wordBreak = 'break-word';
+  sourceManifestNode.style.overflowWrap = 'anywhere';
+  sourceManifestNode.textContent = manifestLines.join('\n');
 }
 
 function resolveHouseExperienceEntry(rawEntryPath) {
@@ -1779,6 +1940,49 @@ async function promoteSelectedHouseTrainerPatch() {
       : `Promoted patch ${candidatePatchId}.`
   );
   return data;
+}
+
+async function loadHouseOfficeSurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('office');
+  setHouseSurfaceStatus('Loading House Office...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/house-office');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.office.loaded = true;
+    houseSurfaceState.office.offices = Array.isArray(data.offices) ? data.offices : [];
+    houseSurfaceState.office.staffAgents = Array.isArray(data.staffAgents) ? data.staffAgents : [];
+    houseSurfaceState.office.presence = Array.isArray(data.presence) ? data.presence : [];
+    houseSurfaceState.office.briefing = Array.isArray(data.briefing) ? data.briefing : [];
+    houseSurfaceState.office.attention = Array.isArray(data.attention) ? data.attention : [];
+    houseSurfaceState.office.deeplinks = data.deeplinks && typeof data.deeplinks === 'object' ? data.deeplinks : {};
+    houseSurfaceState.office.sourceManifest = data.sourceManifest && typeof data.sourceManifest === 'object' ? data.sourceManifest : null;
+    houseSurfaceState.office.summary = data.summary && typeof data.summary === 'object' ? data.summary : null;
+    houseSurfaceState.office.emptyStateText = String(data.emptyStateText || '');
+    if (!houseSurfaceState.office.offices.some((item) => String(item?.officeId || '') === String(houseSurfaceState.office.selectedOfficeId || ''))) {
+      houseSurfaceState.office.selectedOfficeId = '';
+    }
+    if (!houseSurfaceState.office.selectedOfficeId && houseSurfaceState.office.offices[0]?.officeId) {
+      houseSurfaceState.office.selectedOfficeId = String(houseSurfaceState.office.offices[0].officeId);
+    }
+    renderHouseOfficeSurface();
+    setHouseSurfaceStatus('');
+  } catch (err) {
+    houseSurfaceState.office.loaded = true;
+    houseSurfaceState.office.staffAgents = [];
+    houseSurfaceState.office.presence = [];
+    houseSurfaceState.office.briefing = [];
+    houseSurfaceState.office.attention = [];
+    houseSurfaceState.office.deeplinks = {};
+    houseSurfaceState.office.sourceManifest = null;
+    houseSurfaceState.office.summary = null;
+    houseSurfaceState.office.emptyStateText = 'House Office overview unavailable.';
+    renderHouseOfficeSurface();
+    setHouseSurfaceStatus(`House Office unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
 }
 
 async function loadHouseArchiveSurface({ skipContext = false } = {}) {
@@ -4265,6 +4469,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseOfficeBtn = el('houseOfficeBtn');
+  if (houseOfficeBtn) {
+    houseOfficeBtn.onclick = async () => {
+      houseOfficeBtn.disabled = true;
+      try {
+        await loadHouseOfficeSurface();
+      } finally {
+        houseOfficeBtn.disabled = false;
+      }
+    };
+  }
+
   const houseExperiencesBtn = el('houseExperiencesBtn');
   if (houseExperiencesBtn) {
     houseExperiencesBtn.onclick = async () => {
@@ -4382,6 +4598,7 @@ function bindTownDistrictControls() {
   }
   setHouseSurfaceMode(houseSurfaceState.activeSurface);
   renderHouseSurfaceContext();
+  renderHouseOfficeSurface();
   renderHouseExperiencesSurface();
   renderHouseTracksSurface();
   renderHouseWorkshopSurface();

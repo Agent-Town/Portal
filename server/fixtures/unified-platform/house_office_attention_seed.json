@@ -1,0 +1,9 @@
+{
+  "family": "house_office_attention_seed",
+  "schema": "agent-town-house-office-attention-seed/v1",
+  "severityOrder": [
+    "critical",
+    "warn",
+    "info"
+  ]
+}

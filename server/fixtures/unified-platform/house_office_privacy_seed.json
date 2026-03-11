@@ -1,0 +1,18 @@
+{
+  "family": "house_office_privacy_seed",
+  "schema": "agent-town-house-office-privacy-seed/v1",
+  "forbiddenFields": [
+    "prompt",
+    "callbackUrl",
+    "credential",
+    "accessToken",
+    "sealedPayload"
+  ],
+  "safeSummaryFields": [
+    "status",
+    "focus",
+    "label",
+    "sourceKind",
+    "sourceId"
+  ]
+}

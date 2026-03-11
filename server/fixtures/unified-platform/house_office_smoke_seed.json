@@ -1,0 +1,11 @@
+{
+  "family": "house_office_smoke_seed",
+  "schema": "agent-town-house-office-smoke-seed/v1",
+  "checkpoints": [
+    "house_office_overview",
+    "house_office_briefing",
+    "house_office_attention",
+    "house_office_district",
+    "house_source_surface"
+  ]
+}

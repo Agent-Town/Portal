@@ -138,6 +138,167 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildHouseOfficeDeepLinks() {
+    return {
+      office: {
+        kind: 'house_surface',
+        surface: 'office',
+        label: 'Open House Office',
+      },
+      experiences: {
+        kind: 'house_surface',
+        surface: 'experiences',
+        label: 'Open Experiences',
+      },
+      workshop: {
+        kind: 'house_surface',
+        surface: 'workshop',
+        label: 'Open Workshop',
+      },
+      tracks: {
+        kind: 'house_surface',
+        surface: 'tracks',
+        label: 'Open Tracks',
+      },
+      archive: {
+        kind: 'house_surface',
+        surface: 'archive',
+        label: 'Open Archive',
+      },
+      trainer: {
+        kind: 'house_surface',
+        surface: 'trainer',
+        label: 'Open Trainer',
+      },
+    };
+  }
+
+  function buildHouseOfficeOverviewPayload({
+    context = {},
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const overviewFixture = getUnifiedPlatformTestFixture('house_office_overview_seed') || {};
+    const staffFixture = getUnifiedPlatformTestFixture('house_office_staff_seed') || {};
+    const deeplinks = buildHouseOfficeDeepLinks();
+    const offices = (Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [])
+      .map((entry, index) => {
+        const officeId = String(entry?.officeId || '').trim();
+        const slug = String(entry?.slug || '').trim();
+        const displayName = String(entry?.displayName || slug || officeId).trim() || officeId;
+        const surface = String(entry?.surface || '').trim();
+        const mapColumn = Number(entry?.mapColumn || ((index % 2) + 1));
+        const mapRow = Number(entry?.mapRow || (Math.floor(index / 2) + 1));
+        const order = Number(entry?.order || ((index + 1) * 10));
+        if (!officeId || !slug) return null;
+        return {
+          officeId,
+          slug,
+          displayName,
+          purpose: String(entry?.purpose || '').trim(),
+          order: Number.isFinite(order) ? order : ((index + 1) * 10),
+          mapColumn: Number.isFinite(mapColumn) && mapColumn > 0 ? Math.floor(mapColumn) : ((index % 2) + 1),
+          mapRow: Number.isFinite(mapRow) && mapRow > 0 ? Math.floor(mapRow) : (Math.floor(index / 2) + 1),
+          surface: surface || 'office',
+          deepLink: deeplinks[surface] || deeplinks.office,
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => {
+        const orderDelta = Number(left?.order || 0) - Number(right?.order || 0);
+        if (orderDelta !== 0) return orderDelta;
+        return String(left?.slug || '').localeCompare(String(right?.slug || ''));
+      });
+    const staffAgents = houseId
+      ? (Array.isArray(staffFixture?.staffAgents) ? staffFixture.staffAgents : [])
+        .map((entry) => {
+          const staffAgentId = String(entry?.staffAgentId || '').trim();
+          const officeId = String(entry?.officeId || '').trim();
+          if (!staffAgentId || !officeId) return null;
+          const office = offices.find((item) => item.officeId === officeId) || null;
+          const role = String(entry?.role || '').trim() || 'staff';
+          return {
+            staffAgentId,
+            displayName: String(entry?.displayName || role || staffAgentId).trim() || staffAgentId,
+            role,
+            officeId,
+            teamId: String(entry?.teamId || teamId || context.activeTeamId || '').trim() || null,
+            deepLink: office?.deepLink || deeplinks.office,
+          };
+        })
+        .filter(Boolean)
+      : [];
+    const experiences = buildHouseExperienceItems();
+    const tracksPayload = houseId
+      ? buildTrackReadPayload({ houseId, teamId })
+      : {
+        tracks: [],
+        events: [],
+        antiFarming: getTrackAntiFarmingPolicy(),
+        emptyStateText: 'No track progress recorded yet.',
+      };
+    const trainerJobs = houseId ? listTrainerJobs({ houseId, teamId }) : [];
+    const trainerResults = houseId ? listTrainerResults({ houseId, teamId }) : [];
+    const archiveRuns = houseId ? listRuns({ houseId, teamId }) : [];
+    const binding = houseId && teamId
+      ? getTeamConfigBinding({ houseId, teamId })
+      : null;
+    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length;
+    return {
+      houseId: houseId || null,
+      teamId: teamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      offices,
+      staffAgents,
+      presence: [],
+      briefing: [],
+      attention: [],
+      deeplinks,
+      sourceManifest: {
+        schema: 'agent-town-house-office/v1',
+        routes: [
+          '/api/platform/context',
+          '/api/platform/house-structure',
+          '/api/platform/experiences',
+          '/api/platform/workshop',
+          '/api/platform/tracks',
+          '/api/platform/archive',
+          '/api/platform/trainer',
+        ],
+        fixtures: [
+          'house_office_overview_seed',
+          'house_office_staff_seed',
+        ],
+        counts: {
+          officeCount: offices.length,
+          staffAgentCount: staffAgents.length,
+          experienceCount: experiences.length,
+          trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
+          trackEventCount: Array.isArray(tracksPayload?.events) ? tracksPayload.events.length : 0,
+          trainerJobCount: trainerJobs.length,
+          trainerResultCount: trainerResults.length,
+          archiveRunCount: archiveRuns.length,
+        },
+        activeConfigVersionId: binding?.activeConfigVersionId || null,
+      },
+      summary: {
+        officeCount: offices.length,
+        staffAgentCount: staffAgents.length,
+        experienceCount: experiences.length,
+        trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
+        trainerJobCount: trainerJobs.length,
+        trainerResultCount: trainerResults.length,
+        archiveRunCount: archiveRuns.length,
+      },
+      emptyStateText: !houseId
+        ? String(overviewFixture?.emptyStateText || 'Attach a house to inspect the House Office overview.')
+        : activityCount > 0
+          ? ''
+          : 'No recent House Office activity is available yet.',
+    };
+  }
+
   function normalizePackFileMap(fileMap) {
     if (!fileMap || typeof fileMap !== 'object' || Array.isArray(fileMap)) return {};
     return Object.entries(fileMap).reduce((acc, [rawKey, rawValue]) => {
@@ -547,6 +708,23 @@ function registerPlatformReadRoutes(app, deps) {
       staffAgents: Array.isArray(fixture?.staffAgents) ? fixture.staffAgents : [],
       modelVersion: 'house_scaffold_v1',
     }, { requestId });
+  });
+
+  app.get('/api/platform/house-office', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    return sendPortalApiSuccess(res, buildHouseOfficeOverviewPayload({
+      context,
+      houseId,
+      teamId,
+    }), { requestId });
   });
 
   app.get('/api/platform/tracks', (req, res) => {
