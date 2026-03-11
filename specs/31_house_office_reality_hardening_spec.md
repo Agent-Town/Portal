@@ -65,7 +65,7 @@ Normative rules:
    A. `house_offices`
    B. `house_staff_agents`
 4. The existing `house_staff_assignments` table remains the assignment truth.
-5. Test fixtures may still seed structure in test mode, but runtime routes must expose structure provenance as durable or canonical rather than pretending the fixture file is product truth.
+5. Test fixtures may still seed structure in test mode, but runtime routes must expose structure provenance through an explicit `structureSourceKind` field rather than pretending the fixture file is product truth.
 
 ## 3.2 Exact Record Opening
 

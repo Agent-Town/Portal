@@ -2093,6 +2093,7 @@ function renderHouseOfficeSurface() {
     : [];
   const manifestLines = [
     `Schema: ${String(sourceManifest?.schema || 'agent-town-house-office/v1')}`,
+    `Structure source: ${String(sourceManifest?.structureSourceKind || 'unattached_preview')}`,
     routeLines.length ? `Routes:\n${routeLines.map((route) => `- ${route}`).join('\n')}` : 'Routes: —',
     fixtureLines.length ? `Fixtures:\n${fixtureLines.map((fixture) => `- ${fixture}`).join('\n')}` : 'Fixtures: —',
     countEntries.length ? `Counts:\n${countEntries.map(([key, value]) => `- ${key}=${value}`).join('\n')}` : 'Counts: —',

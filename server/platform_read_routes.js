@@ -8,6 +8,7 @@ function registerPlatformReadRoutes(app, deps) {
     createHouseStaffAssignment,
     createTrainerJob,
     createTrainerResult,
+    ensureHouseOfficeStructure,
     getConfigVersion,
     getConfigVersionByIdempotency,
     getUnifiedPlatformTestFixture,
@@ -19,6 +20,8 @@ function registerPlatformReadRoutes(app, deps) {
     getTrainerResultById,
     getTrainerResultByJobId,
     listConfigComponentVersions,
+    listHouseOffices,
+    listHouseStaffAgents,
     listHouseStaffAssignments,
     listPlatformExperienceDefinitions,
     listRuns,
@@ -172,6 +175,43 @@ function registerPlatformReadRoutes(app, deps) {
         surface: 'trainer',
         label: 'Open Trainer',
       },
+    };
+  }
+
+  function buildHouseOfficeStructurePayload({
+    context = {},
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId) {
+      return {
+        houseId: null,
+        teamId: null,
+        activeTeamId: context.activeTeamId,
+        availableTeamIds: context.availableTeamIds,
+        offices: [],
+        staffAgents: [],
+        modelVersion: 'house_canonical_structure_v1',
+        structureSourceKind: 'unattached_preview',
+        seedFixtures: ['house_office_structure_seed'],
+      };
+    }
+    const ensuredStructure = ensureHouseOfficeStructure({
+      houseId: normalizedHouseId,
+      nowIso: nowIso(),
+    });
+    return {
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      offices: listHouseOffices({ houseId: normalizedHouseId }),
+      staffAgents: listHouseStaffAgents({ houseId: normalizedHouseId, teamId: normalizedTeamId }),
+      modelVersion: 'house_canonical_structure_v1',
+      structureSourceKind: String(ensuredStructure?.sourceKind || 'durable_house_structure').trim() || 'durable_house_structure',
+      seedFixtures: ['house_office_structure_seed'],
     };
   }
 
@@ -847,9 +887,8 @@ function registerPlatformReadRoutes(app, deps) {
     teamId = '',
   } = {}) {
     const overviewFixture = getUnifiedPlatformTestFixture('house_office_overview_seed') || {};
-    const staffFixture = getUnifiedPlatformTestFixture('house_office_staff_seed') || {};
     const deeplinks = buildHouseOfficeDeepLinks();
-    const offices = (Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [])
+    const previewOffices = (Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [])
       .map((entry, index) => {
         const officeId = String(entry?.officeId || '').trim();
         const slug = String(entry?.slug || '').trim();
@@ -877,8 +916,35 @@ function registerPlatformReadRoutes(app, deps) {
         if (orderDelta !== 0) return orderDelta;
         return String(left?.slug || '').localeCompare(String(right?.slug || ''));
       });
+    const structurePayload = buildHouseOfficeStructurePayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const structureSourceKind = String(structurePayload?.structureSourceKind || '').trim() || 'unattached_preview';
+    const offices = houseId
+      ? (Array.isArray(structurePayload?.offices) ? structurePayload.offices : [])
+        .map((entry) => {
+          const officeId = String(entry?.officeId || '').trim();
+          const slug = String(entry?.slug || '').trim();
+          if (!officeId || !slug) return null;
+          const surface = String(entry?.surface || '').trim() || 'office';
+          return {
+            officeId,
+            slug,
+            displayName: String(entry?.displayName || slug || officeId).trim() || officeId,
+            purpose: String(entry?.purpose || '').trim(),
+            order: Number.isFinite(Number(entry?.order)) ? Math.floor(Number(entry.order)) : 0,
+            mapColumn: Number.isFinite(Number(entry?.mapColumn)) ? Math.max(1, Math.floor(Number(entry.mapColumn))) : 1,
+            mapRow: Number.isFinite(Number(entry?.mapRow)) ? Math.max(1, Math.floor(Number(entry.mapRow))) : 1,
+            surface,
+            deepLink: deeplinks[surface] || deeplinks.office,
+          };
+        })
+        .filter(Boolean)
+      : previewOffices;
     const staffAgents = houseId
-      ? (Array.isArray(staffFixture?.staffAgents) ? staffFixture.staffAgents : [])
+      ? (Array.isArray(structurePayload?.staffAgents) ? structurePayload.staffAgents : [])
         .map((entry) => {
           const staffAgentId = String(entry?.staffAgentId || '').trim();
           const officeId = String(entry?.officeId || '').trim();
@@ -890,7 +956,7 @@ function registerPlatformReadRoutes(app, deps) {
             displayName: String(entry?.displayName || role || staffAgentId).trim() || staffAgentId,
             role,
             officeId,
-            teamId: String(teamId || entry?.teamId || context.activeTeamId || '').trim() || null,
+            teamId: String(entry?.teamId || teamId || context.activeTeamId || '').trim() || null,
             deepLink: office?.deepLink || deeplinks.office,
           };
         })
@@ -981,13 +1047,18 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/archive',
           '/api/platform/trainer',
         ],
-        fixtures: [
-          'house_office_overview_seed',
-          'house_office_staff_seed',
-          'house_office_assignments_seed',
-          'house_office_briefing_seed',
-          'house_office_privacy_seed',
-        ],
+        fixtures: houseId
+          ? [
+            'house_office_structure_seed',
+            'house_office_assignments_seed',
+            'house_office_briefing_seed',
+            'house_office_privacy_seed',
+          ]
+          : [
+            'house_office_overview_seed',
+            'house_office_structure_seed',
+          ],
+        structureSourceKind,
         counts: {
           officeCount: offices.length,
           staffAgentCount: staffAgents.length,
@@ -1003,7 +1074,7 @@ function registerPlatformReadRoutes(app, deps) {
           trainerResultCount: trainerResults.length,
           archiveRunCount: archiveRuns.length,
         },
-        activeConfigVersionId: binding?.activeConfigVersionId || null,
+      activeConfigVersionId: binding?.activeConfigVersionId || null,
       },
       summary: {
         officeCount: offices.length,
@@ -1575,27 +1646,11 @@ function registerPlatformReadRoutes(app, deps) {
     const houseId = typeof context.houseId === 'string' ? context.houseId : '';
     const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
     const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
-    const fixture = getUnifiedPlatformTestFixture('house_office_staff_seed') || {};
-    if (!houseId) {
-      return sendPortalApiSuccess(res, {
-        houseId: null,
-        teamId: null,
-        activeTeamId: context.activeTeamId,
-        availableTeamIds: context.availableTeamIds,
-        offices: [],
-        staffAgents: [],
-        modelVersion: 'house_scaffold_v1',
-      }, { requestId });
-    }
-    return sendPortalApiSuccess(res, {
+    return sendPortalApiSuccess(res, buildHouseOfficeStructurePayload({
+      context,
       houseId,
-      teamId: teamId || null,
-      activeTeamId: context.activeTeamId,
-      availableTeamIds: context.availableTeamIds,
-      offices: Array.isArray(fixture?.offices) ? fixture.offices : [],
-      staffAgents: Array.isArray(fixture?.staffAgents) ? fixture.staffAgents : [],
-      modelVersion: 'house_scaffold_v1',
-    }, { requestId });
+      teamId,
+    }), { requestId });
   });
 
   app.get('/api/platform/house-office', (req, res) => {

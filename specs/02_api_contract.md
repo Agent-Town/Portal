@@ -930,7 +930,8 @@ Response fields:
 - `data.inboxPath`
 
 ### GET `/api/platform/house-structure` (human)
-Returns deterministic office and staff-agent scaffolding for the currently attached House.
+Returns the canonical House Office structure for the currently attached House.
+With an attached house, the route exposes durable structure truth rather than a second fixture family posing as runtime truth.
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
@@ -944,14 +945,23 @@ Response fields:
 - `data.offices[].officeId`
 - `data.offices[].slug`
 - `data.offices[].displayName`
+- `data.offices[].purpose`
+- `data.offices[].order`
+- `data.offices[].mapColumn`
+- `data.offices[].mapRow`
+- `data.offices[].surface`
 - `data.staffAgents[]`
 - `data.staffAgents[].staffAgentId`
+- `data.staffAgents[].displayName`
 - `data.staffAgents[].role`
 - `data.staffAgents[].officeId`
+- `data.staffAgents[].teamId`
 - `data.modelVersion`
+- `data.structureSourceKind`
+- `data.seedFixtures[]`
 
 ### GET `/api/platform/house-office` (human)
-Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and deterministic office fixtures.
+Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and canonical House Office structure.
 The same payload also drives the client-side House Office district shell; there is no separate district-shell route.
 House Office overview text is projection-safe: raw `prompt`, `callbackUrl`, `credential`, `accessToken`, and `sealedPayload` strings are redacted from assignment focus, presence, briefing, and attention summaries.
 
@@ -1043,6 +1053,7 @@ Response fields:
 - `data.deeplinks.archive`
 - `data.deeplinks.trainer`
 - `data.sourceManifest.schema`
+- `data.sourceManifest.structureSourceKind`
 - `data.sourceManifest.routes[]`
 - `data.sourceManifest.fixtures[]`
 - `data.sourceManifest.counts.officeCount`

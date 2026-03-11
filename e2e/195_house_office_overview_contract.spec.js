@@ -53,8 +53,9 @@ test('M29.0: House Office overview is deterministic, mobile-safe, and reuses cur
   ]));
   expect(beforeAttachBody?.data?.sourceManifest?.fixtures).toEqual(expect.arrayContaining([
     'house_office_overview_seed',
-    'house_office_staff_seed',
+    'house_office_structure_seed',
   ]));
+  expect(beforeAttachBody?.data?.sourceManifest?.structureSourceKind).toBe('unattached_preview');
 
   await page.getByTestId('house-open-office').click();
   await expect(page.getByTestId('house-office-panel')).toBeVisible();
@@ -101,6 +102,7 @@ test('M29.0: House Office overview is deterministic, mobile-safe, and reuses cur
     'archive',
     'ops',
   ]);
+  expect(attachedBody?.data?.sourceManifest?.structureSourceKind).toBe('durable_house_structure');
   expect(Array.isArray(attachedBody?.data?.staffAgents)).toBe(true);
   expect(attachedBody.data.staffAgents).toHaveLength(1);
   expect(attachedBody?.data?.sourceManifest?.counts).toMatchObject({
@@ -113,7 +115,8 @@ test('M29.0: House Office overview is deterministic, mobile-safe, and reuses cur
   await expect(page.getByTestId('house-office-summary')).toContainText('active team team_main');
   await expect(page.getByTestId('house-office-summary')).toContainText('1 staff');
   await expect(page.getByTestId('house-office-source-manifest')).toContainText('/api/platform/trainer');
-  await expect(page.getByTestId('house-office-source-manifest')).toContainText('house_office_staff_seed');
+  await expect(page.getByTestId('house-office-source-manifest')).toContainText('durable_house_structure');
+  await expect(page.getByTestId('house-office-source-manifest')).toContainText('house_office_structure_seed');
 
   const postAttachLayout = await page.evaluate(() => {
     const panel = document.querySelector('[data-testid="house-office-panel"]');

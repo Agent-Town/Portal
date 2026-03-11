@@ -21,6 +21,8 @@ const PLATFORM_TABLES = Object.freeze([
   'integration_executions',
   'trainer_jobs',
   'trainer_results',
+  'house_offices',
+  'house_staff_agents',
   'house_staff_assignments',
   'track_progress_events',
   'sealed_contexts',
@@ -50,6 +52,7 @@ const FIXTURE_FILES = Object.freeze({
   house_experiences_seed: 'house_experiences_seed.json',
   house_workshop_seed: 'house_workshop_seed.json',
   house_office_staff_seed: 'house_office_staff_seed.json',
+  house_office_structure_seed: 'house_office_structure_seed.json',
   house_office_overview_seed: 'house_office_overview_seed.json',
   house_office_presence_seed: 'house_office_presence_seed.json',
   house_office_briefing_seed: 'house_office_briefing_seed.json',
@@ -273,6 +276,36 @@ function ensureDb() {
       approval_needed INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_offices (
+      house_office_row_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      office_id TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      purpose TEXT NOT NULL DEFAULT '',
+      office_order INTEGER NOT NULL DEFAULT 0,
+      map_column INTEGER NOT NULL DEFAULT 1,
+      map_row INTEGER NOT NULL DEFAULT 1,
+      surface TEXT NOT NULL DEFAULT 'office',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, office_id),
+      UNIQUE (house_id, slug)
+    );
+
+    CREATE TABLE IF NOT EXISTS house_staff_agents (
+      house_staff_agent_row_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL DEFAULT '',
+      staff_agent_id TEXT NOT NULL,
+      office_id TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, staff_agent_id)
     );
 
     CREATE TABLE IF NOT EXISTS house_staff_assignments (
@@ -1229,6 +1262,215 @@ function mapTrainerResultRow(row) {
     approvalNeeded: Number(row.approval_needed || 0) === 1,
     createdAt: String(row.created_at || ''),
     updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapHouseOfficeRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    houseOfficeRowId: String(row.house_office_row_id || ''),
+    houseId: String(row.house_id || ''),
+    officeId: String(row.office_id || ''),
+    slug: String(row.slug || ''),
+    displayName: String(row.display_name || ''),
+    purpose: String(row.purpose || ''),
+    order: Number(row.office_order || 0),
+    mapColumn: Number(row.map_column || 0),
+    mapRow: Number(row.map_row || 0),
+    surface: String(row.surface || ''),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapHouseStaffAgentRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    houseStaffAgentRowId: String(row.house_staff_agent_row_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    staffAgentId: String(row.staff_agent_id || ''),
+    officeId: String(row.office_id || ''),
+    displayName: String(row.display_name || ''),
+    role: String(row.role || ''),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function listHouseOffices({
+  houseId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_offices
+    WHERE house_id = ?
+    ORDER BY office_order ASC, slug ASC, office_id ASC
+  `).all(normalizedHouseId);
+  return rows.map(mapHouseOfficeRow).filter(Boolean);
+}
+
+function listHouseStaffAgents({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  let rows;
+  if (normalizedTeamId) {
+    rows = database.prepare(`
+      SELECT *
+      FROM house_staff_agents
+      WHERE house_id = ?
+        AND (team_id = '' OR team_id = ?)
+      ORDER BY CASE WHEN team_id = ? THEN 0 ELSE 1 END ASC, display_name ASC, staff_agent_id ASC
+    `).all(normalizedHouseId, normalizedTeamId, normalizedTeamId);
+  } else {
+    rows = database.prepare(`
+      SELECT *
+      FROM house_staff_agents
+      WHERE house_id = ?
+      ORDER BY CASE WHEN team_id = '' THEN 0 ELSE 1 END ASC, display_name ASC, staff_agent_id ASC
+    `).all(normalizedHouseId);
+  }
+  const seen = new Set();
+  return rows
+    .map(mapHouseStaffAgentRow)
+    .filter(Boolean)
+    .filter((entry) => {
+      const staffAgentId = String(entry?.staffAgentId || '').trim();
+      if (!staffAgentId || seen.has(staffAgentId)) return false;
+      seen.add(staffAgentId);
+      return true;
+    });
+}
+
+function buildDefaultHouseOfficeStructureSeed() {
+  const structureFixture = loadFixtureFamily('house_office_structure_seed');
+  if (structureFixture && typeof structureFixture === 'object' && !Array.isArray(structureFixture)) {
+    return structureFixture;
+  }
+  const overviewFixture = loadFixtureFamily('house_office_overview_seed') || {};
+  const staffFixture = loadFixtureFamily('house_office_staff_seed') || {};
+  return {
+    family: 'house_office_structure_seed',
+    schema: 'agent-town-house-office-structure-seed/v1',
+    offices: Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [],
+    staffAgents: Array.isArray(staffFixture?.staffAgents) ? staffFixture.staffAgents : [],
+  };
+}
+
+function ensureHouseOfficeStructure({
+  houseId = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedHouseId) return {
+    sourceKind: 'unattached_preview',
+    offices: [],
+    staffAgents: [],
+  };
+  const database = ensureDb();
+  const structureSeed = buildDefaultHouseOfficeStructureSeed();
+  const seededOffices = Array.isArray(structureSeed?.offices) ? structureSeed.offices : [];
+  const seededStaffAgents = Array.isArray(structureSeed?.staffAgents) ? structureSeed.staffAgents : [];
+
+  database.exec('BEGIN');
+  try {
+    for (const entry of seededOffices) {
+      const officeId = String(entry?.officeId || '').trim();
+      const slug = String(entry?.slug || '').trim();
+      if (!officeId || !slug) continue;
+      const rowId = `hoffice_${crypto.createHash('sha256').update(`${normalizedHouseId}:${officeId}`, 'utf8').digest('hex').slice(0, 24)}`;
+      database.prepare(`
+        INSERT INTO house_offices (
+          house_office_row_id,
+          house_id,
+          office_id,
+          slug,
+          display_name,
+          purpose,
+          office_order,
+          map_column,
+          map_row,
+          surface,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(house_id, office_id) DO UPDATE SET
+          slug = excluded.slug,
+          display_name = excluded.display_name,
+          purpose = excluded.purpose,
+          office_order = excluded.office_order,
+          map_column = excluded.map_column,
+          map_row = excluded.map_row,
+          surface = excluded.surface,
+          updated_at = excluded.updated_at
+      `).run(
+        rowId,
+        normalizedHouseId,
+        officeId,
+        slug,
+        String(entry?.displayName || slug || officeId).trim() || officeId,
+        String(entry?.purpose || '').trim(),
+        Number.isFinite(Number(entry?.order)) ? Math.floor(Number(entry.order)) : 0,
+        Number.isFinite(Number(entry?.mapColumn)) ? Math.max(1, Math.floor(Number(entry.mapColumn))) : 1,
+        Number.isFinite(Number(entry?.mapRow)) ? Math.max(1, Math.floor(Number(entry.mapRow))) : 1,
+        String(entry?.surface || 'office').trim() || 'office',
+        nowIso,
+        nowIso,
+      );
+    }
+
+    for (const entry of seededStaffAgents) {
+      const staffAgentId = String(entry?.staffAgentId || '').trim();
+      const officeId = String(entry?.officeId || '').trim();
+      if (!staffAgentId || !officeId) continue;
+      const teamId = String(entry?.teamId || '').trim();
+      const rowId = `hstaff_${crypto.createHash('sha256').update(`${normalizedHouseId}:${teamId}:${staffAgentId}`, 'utf8').digest('hex').slice(0, 24)}`;
+      database.prepare(`
+        INSERT INTO house_staff_agents (
+          house_staff_agent_row_id,
+          house_id,
+          team_id,
+          staff_agent_id,
+          office_id,
+          display_name,
+          role,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(house_id, team_id, staff_agent_id) DO UPDATE SET
+          office_id = excluded.office_id,
+          display_name = excluded.display_name,
+          role = excluded.role,
+          updated_at = excluded.updated_at
+      `).run(
+        rowId,
+        normalizedHouseId,
+        teamId,
+        staffAgentId,
+        officeId,
+        String(entry?.displayName || staffAgentId).trim() || staffAgentId,
+        String(entry?.role || 'staff').trim() || 'staff',
+        nowIso,
+        nowIso,
+      );
+    }
+    database.exec('COMMIT');
+  } catch (err) {
+    database.exec('ROLLBACK');
+    throw err;
+  }
+  return {
+    sourceKind: 'durable_house_structure',
+    offices: listHouseOffices({ houseId: normalizedHouseId }),
+    staffAgents: listHouseStaffAgents({ houseId: normalizedHouseId }),
   };
 }
 
@@ -2454,6 +2696,7 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  ensureHouseOfficeStructure,
   countTrackProgressEventsByDedupe,
   createTrackProgressEvent,
   createTraceArtifact,
@@ -2482,6 +2725,8 @@ module.exports = {
   getTeamConfigBinding,
   getTrackDefinition,
   listHouseTeamIds,
+  listHouseOffices,
+  listHouseStaffAgents,
   getTrainerJobById,
   getTrainerJobByIdempotency,
   getTrainerResultById,
