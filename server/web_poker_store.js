@@ -532,6 +532,8 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_setup_submissions', 'wallet_subject', 'TEXT');
   ensureColumnExists(db, 'poker_setup_submissions', 'declared_capabilities_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumnExists(db, 'poker_setup_submissions', 'raw_json', "TEXT NOT NULL DEFAULT '{}'");
+  ensureColumnExists(db, 'poker_play_seats', 'last_seen_at', 'TEXT');
+  ensureColumnExists(db, 'poker_play_seats', 'disconnected_at', 'TEXT');
   seedRegistryEntities();
   seedCentaurTournaments();
   seedPokerPlayTables();
@@ -729,6 +731,8 @@ function seedPokerPlayTables() {
       format: 'cash',
       maxSeats: 6,
       decisionCountdownSeconds: 45,
+      presenceTimeoutSeconds: 30,
+      reconnectGraceSeconds: 90,
       cashOutEnabled: true,
     }, {}),
     toJson({
@@ -761,6 +765,8 @@ function seedPokerPlayTables() {
       format: 'tournament',
       maxSeats: 6,
       decisionCountdownSeconds: 45,
+      presenceTimeoutSeconds: 30,
+      reconnectGraceSeconds: 90,
       cashOutEnabled: false,
       payoutModel: 'winner_take_all',
       handsPerBlindLevel: 2,
@@ -2745,6 +2751,8 @@ function hydratePokerPlaySeat(row) {
     buyInOil: Number(row.buy_in_oil || 0),
     stackOil: Number(row.stack_oil || 0),
     streamflowVerificationId: row.streamflow_verification_id || null,
+    lastSeenAt: row.last_seen_at || null,
+    disconnectedAt: row.disconnected_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -2802,6 +2810,8 @@ function upsertPokerPlaySeat({
   buyInOil = 0,
   stackOil = 0,
   streamflowVerificationId = null,
+  lastSeenAt = null,
+  disconnectedAt = null,
   createdAt = null,
   updatedAt = null,
 }) {
@@ -2824,9 +2834,11 @@ function upsertPokerPlaySeat({
         buy_in_oil,
         stack_oil,
         streamflow_verification_id,
+        last_seen_at,
+        disconnected_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(table_id, seat_number) DO UPDATE SET
         portal_session_id = excluded.portal_session_id,
         house_id = excluded.house_id,
@@ -2836,6 +2848,8 @@ function upsertPokerPlaySeat({
         buy_in_oil = excluded.buy_in_oil,
         stack_oil = excluded.stack_oil,
         streamflow_verification_id = excluded.streamflow_verification_id,
+        last_seen_at = excluded.last_seen_at,
+        disconnected_at = excluded.disconnected_at,
         updated_at = excluded.updated_at
     `).run(
       tableId,
@@ -2848,6 +2862,8 @@ function upsertPokerPlaySeat({
       Number(buyInOil || 0),
       Number(stackOil || 0),
       streamflowVerificationId,
+      lastSeenAt,
+      disconnectedAt,
       existing?.created_at || createdAt || now,
       updatedAt || now
     );

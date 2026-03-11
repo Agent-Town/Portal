@@ -397,6 +397,7 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[].tableType`
 - `data.items[].summary.occupancy`
 - `data.items[].summary.openSeatCount`
+- `data.items[].summary.disconnectedSeatCount`
 - `data.items[].summary.liveHand`
 - `data.items[].summary.blindLevel`
 - `data.items[].summary.nextBlindLevel`
@@ -422,6 +423,12 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.handsUntilBlindIncrease`
 - live tournament hands expose `data.hand.blindLevel`
 - tournament blind values are resolved server-side at hand start from `data.table.rules.handsPerBlindLevel` and `data.table.rules.blindLevels[]`
+
+Presence notes:
+- seated viewers heartbeat through authenticated table detail reads and table stream connects
+- seats expose `presenceStatus`, `lastSeenAt`, and `disconnectedAt`
+- `data.table.summary.disconnectedSeatCount` counts in-play seats currently marked disconnected
+- when the acting seat disconnects, the server may extend `data.hand.actionExpiresAt` once by the reconnect grace window before timeout action takes over
 
 Hole-card privacy rules:
 - `data.mySeat.holeCards[]` is only populated for the viewing seat.
@@ -449,6 +456,10 @@ Request shape:
 Tournament-only request fields:
 - `handsPerBlindLevel`
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
+
+Optional live-play request fields:
+- `presenceTimeoutSeconds`
+- `reconnectGraceSeconds`
 
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.

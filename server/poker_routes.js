@@ -699,6 +699,18 @@ function registerPokerRoutes(app, deps) {
         { requestId }
       );
     }
+    const streamAt = normalizeIsoOrNull(req.query?.asOf) || nowIso();
+    const walletBinding = resolvePrimaryWalletSubject(session, req);
+    if (walletBinding?.walletSubject) {
+      const seat = getPokerPlaySeatByWalletSubject(tableId, walletBinding.walletSubject);
+      if (seat) {
+        upsertPokerPlaySeat({
+          ...seat,
+          lastSeenAt: streamAt,
+          updatedAt: streamAt,
+        });
+      }
+    }
     res.status(200);
     res.setHeader('content-type', 'text/event-stream; charset=utf-8');
     res.setHeader('cache-control', 'no-cache, no-transform');

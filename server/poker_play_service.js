@@ -11,6 +11,9 @@ const {
   pickTimeoutAction,
 } = require('./poker_play');
 
+const DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS = 30;
+const DEFAULT_PLAY_RECONNECT_GRACE_SECONDS = 90;
+
 function createRouteError(status, code, message, details = {}) {
   const err = new Error(message);
   err.status = Number(status || 500);
@@ -105,6 +108,8 @@ function normalizeCreateTableConfig(input = {}) {
   const maxSeats = normalizeSeatCount(input?.maxSeats, POKER_PLAY_MAX_SEATS);
   const minPlayers = Math.max(2, Math.min(maxSeats, normalizeOilAmount(input?.minPlayers, 2)));
   const countdownSeconds = Math.max(10, normalizeOilAmount(input?.decisionCountdownSeconds, DEFAULT_PLAY_ACTION_COUNTDOWN_SECONDS));
+  const presenceTimeoutSeconds = Math.max(10, normalizeOilAmount(input?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS));
+  const reconnectGraceSeconds = Math.max(10, normalizeOilAmount(input?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
   const handsPerBlindLevel = tableType === 'tournament'
     ? Math.max(1, normalizeOilAmount(input?.handsPerBlindLevel, 2))
     : 0;
@@ -125,6 +130,8 @@ function normalizeCreateTableConfig(input = {}) {
     maxSeats,
     minPlayers,
     decisionCountdownSeconds: countdownSeconds,
+    presenceTimeoutSeconds,
+    reconnectGraceSeconds,
     handsPerBlindLevel,
     blindLevels,
     title,
@@ -175,6 +182,8 @@ function buildMatchKey(config) {
     base.push(`hbl${Math.max(1, normalizeOilAmount(config?.handsPerBlindLevel, 2))}`);
     base.push(`bl${blindLevels.map((level) => `${level.smallBlindOil}-${level.bigBlindOil}`).join('_')}`);
   }
+  base.push(`pt${Math.max(10, normalizeOilAmount(config?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS))}`);
+  base.push(`rg${Math.max(10, normalizeOilAmount(config?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS))}`);
   return base.join(':');
 }
 
@@ -197,6 +206,19 @@ function isTablePaused(table) {
 
 function isSeatInPlay(seat) {
   return !!seat && (seat.status === 'active' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
+}
+
+function getPokerPlayPresenceTimeoutSeconds(table) {
+  return Math.max(10, normalizeOilAmount(table?.rules?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS));
+}
+
+function getPokerPlayReconnectGraceSeconds(table) {
+  return Math.max(10, normalizeOilAmount(table?.rules?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
+}
+
+function getSeatPresenceStatus(seat) {
+  if (!isSeatInPlay(seat)) return 'inactive';
+  return seat?.disconnectedAt ? 'disconnected' : 'online';
 }
 
 function formatSeatLabel(seatNumber, displayName = '') {
@@ -240,11 +262,13 @@ function computeBuyInOil(table, requestedBuyInOil) {
 
 function computeTableSummary(table, seats, hand, viewerSeat) {
   const activeSeats = getActiveSeatRows(seats);
+  const disconnectedSeatCount = activeSeats.filter((seat) => getSeatPresenceStatus(seat) === 'disconnected').length;
   const handNumber = Number(hand?.handNumber || 0);
   const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
   return {
     occupancy: activeSeats.length,
     openSeatCount: Math.max(0, Number(table?.maxSeats || POKER_PLAY_MAX_SEATS) - activeSeats.length),
+    disconnectedSeatCount,
     liveHand: !!hand && hand.status === 'live',
     handNumber,
     actingSeat: normalizeSeatNumber(hand?.state?.actingSeat),
@@ -296,6 +320,9 @@ function sanitizeSeatForViewer({ seat, hand, viewerSeatNumber }) {
     folded: stateSeat?.folded === true,
     allIn: stateSeat?.allIn === true,
     eliminated: stateSeat?.eliminated === true,
+    presenceStatus: getSeatPresenceStatus(seat),
+    lastSeenAt: seat?.lastSeenAt || null,
+    disconnectedAt: seat?.disconnectedAt || null,
     isViewer: seatNumber === normalizeSeatNumber(viewerSeatNumber),
     isActing: seatNumber === normalizeSeatNumber(hand?.state?.actingSeat),
     holeCards: revealed ? rawCards : [],
@@ -364,6 +391,118 @@ function buildPrivateAgentPrompt(table, handState, seatNumber) {
   return {
     suggestion,
     body: suggestion.body || 'The agent does not have a strong line yet.',
+  };
+}
+
+function touchPokerPlaySeatPresence(deps, tableId, walletSubject, atIso) {
+  const normalizedTableId = normalizeTrimmedString(tableId);
+  const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
+  if (!normalizedTableId || !normalizedWalletSubject) return null;
+  const seat = deps.getPokerPlaySeatByWalletSubject(normalizedTableId, normalizedWalletSubject);
+  if (!seat) return null;
+  return deps.upsertPokerPlaySeat({
+    ...seat,
+    lastSeenAt: atIso,
+    updatedAt: atIso,
+  });
+}
+
+function touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, atIso) {
+  const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  if (!walletBinding?.walletSubject) return null;
+  return touchPokerPlaySeatPresence(deps, tableId, walletBinding.walletSubject, atIso);
+}
+
+function reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso) {
+  const atMs = Date.parse(String(atIso || ''));
+  if (!Number.isFinite(atMs)) {
+    return { table, seats, hand };
+  }
+  const presenceTimeoutMs = getPokerPlayPresenceTimeoutSeconds(table) * 1000;
+  const reconnectGraceSeconds = getPokerPlayReconnectGraceSeconds(table);
+  const reconnectGraceMs = reconnectGraceSeconds * 1000;
+  const nextSeats = [];
+  let nextHand = hand;
+  let graceSeats = new Set(
+    Array.isArray(hand?.state?.presenceGraceSeatNumbers)
+      ? hand.state.presenceGraceSeatNumbers.map((seatNumber) => normalizeSeatNumber(seatNumber)).filter(Boolean)
+      : []
+  );
+
+  for (const seat of Array.isArray(seats) ? seats : []) {
+    let nextSeat = seat;
+    if (!isSeatInPlay(seat)) {
+      nextSeats.push(nextSeat);
+      continue;
+    }
+    const lastSeenSource = normalizeTrimmedString(seat?.lastSeenAt, normalizeTrimmedString(seat?.updatedAt, normalizeTrimmedString(seat?.createdAt)));
+    const lastSeenMs = Date.parse(lastSeenSource);
+    const seatNumber = normalizeSeatNumber(seat?.seatNumber);
+    const stale = Number.isFinite(lastSeenMs) ? (atMs - lastSeenMs) > presenceTimeoutMs : false;
+    if (stale && !seat?.disconnectedAt) {
+      nextSeat = deps.upsertPokerPlaySeat({
+        ...seat,
+        disconnectedAt: atIso,
+        updatedAt: atIso,
+      });
+      if (nextHand && nextHand.status === 'live' && normalizeSeatNumber(nextHand?.state?.actingSeat) === seatNumber && !graceSeats.has(seatNumber)) {
+        const currentExpiresAtMs = Date.parse(String(nextHand.actionExpiresAt || nextHand?.state?.actionExpiresAt || ''));
+        const nextExpiresAtMs = Number.isFinite(currentExpiresAtMs)
+          ? Math.max(currentExpiresAtMs, atMs + reconnectGraceMs)
+          : (atMs + reconnectGraceMs);
+        const nextExpiresAt = new Date(nextExpiresAtMs).toISOString();
+        graceSeats = new Set([...graceSeats, seatNumber]);
+        nextHand = deps.upsertPokerPlayHand({
+          ...nextHand,
+          actionExpiresAt: nextExpiresAt,
+          state: {
+            ...(nextHand.state && typeof nextHand.state === 'object' ? nextHand.state : {}),
+            actionExpiresAt: nextExpiresAt,
+            reconnectGraceSeconds,
+            presenceGraceSeatNumbers: Array.from(graceSeats.values()),
+          },
+          updatedAt: atIso,
+        });
+        deps.createPokerPlayMessage({
+          tableId: table.tableId,
+          handId: nextHand.handId,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seatNumber, seat.displayName)} disconnected. Holding the clock for a ${reconnectGraceSeconds}s reconnect window.`,
+          createdAt: atIso,
+        });
+      } else {
+        deps.createPokerPlayMessage({
+          tableId: table.tableId,
+          handId: nextHand?.handId || null,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seatNumber, seat.displayName)} disconnected.`,
+          createdAt: atIso,
+        });
+      }
+    } else if (!stale && seat?.disconnectedAt) {
+      nextSeat = deps.upsertPokerPlaySeat({
+        ...seat,
+        disconnectedAt: null,
+        lastSeenAt: atIso,
+        updatedAt: atIso,
+      });
+      deps.createPokerPlayMessage({
+        tableId: table.tableId,
+        handId: nextHand?.handId || null,
+        seatNumber: null,
+        authorRole: 'system',
+        body: `${formatSeatLabel(seatNumber, seat.displayName)} reconnected.`,
+        createdAt: atIso,
+      });
+    }
+    nextSeats.push(nextSeat);
+  }
+  return {
+    table,
+    seats: nextSeats,
+    hand: nextHand,
   };
 }
 
@@ -694,14 +833,22 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   if (!table) return null;
   let seats = deps.listPokerPlaySeatsByTable(table.tableId);
   let hand = deps.getCurrentPokerPlayHandForTable(table.tableId);
+  const atIso = toProcessIso(deps, processAt);
+  let presence = reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso);
+  table = presence.table;
+  seats = presence.seats;
+  hand = presence.hand;
   if (isTablePaused(table)) {
     return { table, seats, hand };
   }
-  const atIso = toProcessIso(deps, processAt);
   let safety = 0;
 
   while (safety < 24) {
     safety += 1;
+    presence = reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso);
+    table = presence.table;
+    seats = presence.seats;
+    hand = presence.hand;
     const atMs = Date.parse(atIso);
     if (hand && hand.status === 'live') {
       const expiresAtMs = Date.parse(String(hand.actionExpiresAt || hand?.state?.actionExpiresAt || ''));
@@ -908,6 +1055,8 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
     },
     rules: {
       decisionCountdownSeconds: normalized.decisionCountdownSeconds,
+      presenceTimeoutSeconds: normalized.presenceTimeoutSeconds,
+      reconnectGraceSeconds: normalized.reconnectGraceSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'winner_take_all',
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
@@ -964,11 +1113,13 @@ function listTables(deps, { session, req, processAt } = {}) {
 }
 
 function getTableDetail(deps, { tableId, session, req, processAt } = {}) {
-  const synced = syncPokerPlayTable(deps, tableId, { processAt });
+  const requestAt = toProcessIso(deps, processAt);
+  touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, requestAt);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
   if (!synced?.table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
-  return buildPokerPlayTablePayload(deps, synced.table, synced.seats, synced.hand, { session, req, processAt });
+  return buildPokerPlayTablePayload(deps, synced.table, synced.seats, synced.hand, { session, req, processAt: requestAt });
 }
 
 function seatIntoTable(deps, { tableId, session, req, body } = {}) {
@@ -1050,6 +1201,8 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     buyInOil,
     stackOil: buyInOil,
     streamflowVerificationId: deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject)?.verificationId || null,
+    lastSeenAt: requestAt,
+    disconnectedAt: null,
     updatedAt: requestAt,
   });
 
@@ -1113,6 +1266,7 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
   }
   const synced = syncPokerPlayTable(deps, tableId, { processAt: body?.asOf });
   const { walletBinding, seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  touchPokerPlaySeatPresence(deps, tableId, walletBinding.walletSubject, requestAt);
   const liveHand = synced.hand && synced.hand.status === 'live' ? synced.hand : null;
 
   if (String(synced.table.tableType || 'cash') === 'cash') {
@@ -1172,6 +1326,7 @@ function postMessage(deps, { handId, session, req, body } = {}) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
   }
   const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, seat.walletSubject, toProcessIso(deps, body?.asOf)) || seat;
   const messageBody = normalizePokerPlayMessageBody(body?.body);
   if (!messageBody) {
     throw createRouteError(400, 'INVALID_ARGUMENT', 'Message body is required.');
@@ -1179,21 +1334,21 @@ function postMessage(deps, { handId, session, req, body } = {}) {
   const created = deps.createPokerPlayMessage({
     tableId: synced.table.tableId,
     handId: currentHand.handId,
-    seatNumber: seat.seatNumber,
+    seatNumber: touchedSeat.seatNumber,
     authorRole: 'human',
     body: messageBody,
   });
   let agentMessage = null;
   if (currentHand.status === 'live') {
-    const prompt = buildPrivateAgentPrompt(synced.table, currentHand.state, seat.seatNumber);
-    if (prompt) {
-      agentMessage = deps.createPokerPlayMessage({
-        tableId: synced.table.tableId,
-        handId: currentHand.handId,
-        seatNumber: seat.seatNumber,
-        authorRole: 'agent',
-        body: prompt.body,
-      });
+      const prompt = buildPrivateAgentPrompt(synced.table, currentHand.state, touchedSeat.seatNumber);
+      if (prompt) {
+        agentMessage = deps.createPokerPlayMessage({
+          tableId: synced.table.tableId,
+          handId: currentHand.handId,
+          seatNumber: touchedSeat.seatNumber,
+          authorRole: 'agent',
+          body: prompt.body,
+        });
     }
   }
   return {
@@ -1217,10 +1372,11 @@ function postAction(deps, { handId, session, req, body } = {}) {
     throw createRouteError(409, 'POKER_PLAY_HAND_NOT_LIVE', 'This poker hand is no longer live.');
   }
   const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
-  if (normalizeSeatNumber(currentHand.state?.actingSeat) !== normalizeSeatNumber(seat.seatNumber)) {
+  const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, seat.walletSubject, requestAt) || seat;
+  if (normalizeSeatNumber(currentHand.state?.actingSeat) !== normalizeSeatNumber(touchedSeat.seatNumber)) {
     throw createRouteError(409, 'POKER_PLAY_NOT_YOUR_TURN', 'It is not this seat’s turn to act.', {
       actingSeat: normalizeSeatNumber(currentHand.state?.actingSeat),
-      seatNumber: normalizeSeatNumber(seat.seatNumber),
+      seatNumber: normalizeSeatNumber(touchedSeat.seatNumber),
     });
   }
   const actionKind = normalizeTrimmedString(body?.actionKind).toLowerCase();
@@ -1233,7 +1389,7 @@ function postAction(deps, { handId, session, req, body } = {}) {
     outcome = applyPokerPlayActionToHandState({
       table: synced.table,
       handState: currentHand.state,
-      seatNumber: seat.seatNumber,
+      seatNumber: touchedSeat.seatNumber,
       actionKind,
       amountOil,
       nowIso: requestAt,
@@ -1254,7 +1410,7 @@ function postAction(deps, { handId, session, req, body } = {}) {
   const action = deps.createPokerPlayAction({
     tableId: synced.table.tableId,
     handId: currentHand.handId,
-    seatNumber: seat.seatNumber,
+    seatNumber: touchedSeat.seatNumber,
     actorRole: 'human',
     actionKind,
     amountOil: Number(outcome.normalizedAmountOil || outcome.debitOil || 0),
@@ -1268,7 +1424,7 @@ function postAction(deps, { handId, session, req, body } = {}) {
     handId: currentHand.handId,
     seatNumber: null,
     authorRole: 'system',
-    body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} ${buildActionNarrative(actionKind, outcome.normalizedAmountOil || outcome.debitOil || 0)}.`,
+    body: `${formatSeatLabel(touchedSeat.seatNumber, touchedSeat.displayName)} ${buildActionNarrative(actionKind, outcome.normalizedAmountOil || outcome.debitOil || 0)}.`,
     createdAt: requestAt,
   });
   deps.upsertPokerPlayHand({

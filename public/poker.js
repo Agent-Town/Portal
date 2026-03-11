@@ -178,6 +178,7 @@
               ${seat.isViewer ? '<span class="pokerBadge">you</span>' : ''}
               ${seat.isActing ? '<span class="pokerBadge">acting</span>' : ''}
               <span class="pokerBadge">${escapeHtml(seat.status || 'open')}</span>
+              ${seat.presenceStatus === 'disconnected' ? '<span class="pokerBadge">disconnected</span>' : ''}
               <span class="pokerBadge">${Number(seat.stackOil || 0)} OIL</span>
               ${seat.folded ? '<span class="pokerBadge">folded</span>' : ''}
               ${seat.allIn ? '<span class="pokerBadge">all-in</span>' : ''}
@@ -453,6 +454,7 @@
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item.buyInOil || 0)} OIL buy-in`,
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
                 item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
               ])}
             </div>
@@ -537,6 +539,7 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
+          ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
           ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
         ${renderMetaBadges([
@@ -619,6 +622,7 @@
             <div>${escapeHtml(hand?.result?.note || 'Hand is live.')}</div>
           </div>
         </div>
+        ${seats.some((seat) => seat.isActing && seat.presenceStatus === 'disconnected') ? '<p>The acting seat is disconnected. The reconnect grace window is holding the clock before timeout action takes over.</p>' : ''}
       `);
     }
 
