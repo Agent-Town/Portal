@@ -2444,6 +2444,11 @@ function getUnifiedPlatformTestStats() {
       seals: true,
       house: true,
       tracks: true,
+      houseOffice: true,
+      houseOfficePresence: true,
+      houseOfficeBriefing: true,
+      houseOfficeAttention: true,
+      houseOfficeAssignments: true,
     },
   };
 }

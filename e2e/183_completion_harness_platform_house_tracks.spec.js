@@ -41,6 +41,11 @@ test('M25.0: unified platform harness exposes deterministic late-phase fixtures 
     seals: true,
     house: true,
     tracks: true,
+    houseOffice: true,
+    houseOfficePresence: true,
+    houseOfficeBriefing: true,
+    houseOfficeAttention: true,
+    houseOfficeAssignments: true,
   });
   expect(String(statsA.stats?.fixtureManifestHash || '')).toMatch(/^sha256:/);
   expect(String(statsA.stats?.fixtureManifest?.trainer_real_result_seed || '')).toMatch(/^sha256:/);

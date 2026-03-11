@@ -189,7 +189,7 @@ The Office surface contains:
 
 1. `House Briefing`
    A. last 24-hour summary
-   B. each bullet linked to a real source
+   B. each bullet exposes one or more clickable citations that reopen a real House source surface
    C. no freeform LLM-only summary without citations
 2. `Presence Board`
    A. staff or office tiles

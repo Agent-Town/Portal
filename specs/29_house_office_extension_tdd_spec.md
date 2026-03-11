@@ -164,7 +164,7 @@ Required for every milestone and explicitly tested in `201`:
 
 1. All House Office tests must run offline with seeded fixtures.
 2. The existing test reset path remains authoritative.
-3. `/__test__/unified-platform/stats` must expose deterministic `inspectors.houseOffice`, `inspectors.houseOfficePresence`, `inspectors.houseOfficeBriefing`, and `inspectors.houseOfficeAttention` before this phase is complete.
+3. `/__test__/unified-platform/stats` must expose deterministic `inspectors.houseOffice`, `inspectors.houseOfficePresence`, `inspectors.houseOfficeBriefing`, `inspectors.houseOfficeAttention`, and `inspectors.houseOfficeAssignments` before this phase is complete.
 4. If Option 3 introduces assignments, test mode must expose deterministic assignment inspection without requiring live external state.
 5. Continuity-sensitive tests should reuse the current worker-session inspection helpers rather than inventing a second continuity check.
 6. House Office tests must verify both payload shape and visible in-shell rendering.

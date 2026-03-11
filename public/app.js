@@ -1506,6 +1506,51 @@ async function openHouseOfficeDeepLink(rawDeepLink) {
   throw new Error('HOUSE_OFFICE_DEEPLINK_UNSUPPORTED');
 }
 
+function resolveHouseOfficeSourceRefDeepLink(rawSourceRef) {
+  const sourceRef = rawSourceRef && typeof rawSourceRef === 'object' ? rawSourceRef : null;
+  const entryPath = String(sourceRef?.entryPath || '').trim();
+  const sourceKind = String(sourceRef?.sourceKind || '').trim();
+  if (entryPath === '/api/platform/archive') {
+    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive' };
+  }
+  if (entryPath === '/api/platform/trainer') {
+    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer' };
+  }
+  if (entryPath === '/api/platform/workshop') {
+    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop' };
+  }
+  if (entryPath === '/api/platform/tracks') {
+    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks' };
+  }
+  if (entryPath === '/api/platform/experiences') {
+    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences' };
+  }
+  if (sourceKind === 'trainer_job' || sourceKind === 'trainer_result') {
+    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer' };
+  }
+  if (sourceKind === 'team_config_binding' || sourceKind === 'config_version') {
+    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop' };
+  }
+  if (sourceKind === 'track_progress_event') {
+    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks' };
+  }
+  if (sourceKind === 'run') {
+    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive' };
+  }
+  if (sourceKind === 'experience') {
+    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences' };
+  }
+  return null;
+}
+
+async function openHouseOfficeSourceRef(rawSourceRef) {
+  const deepLink = resolveHouseOfficeSourceRefDeepLink(rawSourceRef);
+  if (!deepLink) {
+    throw new Error('HOUSE_OFFICE_SOURCE_REF_UNSUPPORTED');
+  }
+  await openHouseOfficeDeepLink(deepLink);
+}
+
 function renderHouseOfficeSurface() {
   const emptyNode = el('houseOfficeEmpty');
   const summaryNode = el('houseOfficeSummary');
@@ -1654,14 +1699,26 @@ function renderHouseOfficeSurface() {
         citationRow.style.marginTop = '6px';
         const citations = Array.isArray(item?.citations) ? item.citations : [];
         citations.forEach((citation) => {
-          const citationNode = document.createElement('span');
+          const citationNode = document.createElement('button');
+          citationNode.type = 'button';
           citationNode.setAttribute('data-testid', 'house-office-briefing-citation');
           citationNode.className = 'small';
           citationNode.style.padding = '2px 6px';
           citationNode.style.borderRadius = '999px';
           citationNode.style.border = '1px solid rgba(255,255,255,0.12)';
+          citationNode.style.background = 'transparent';
+          citationNode.style.color = 'inherit';
+          citationNode.style.cursor = 'pointer';
           citationNode.style.overflowWrap = 'anywhere';
           citationNode.textContent = `${String(citation?.sourceKind || '').trim() || 'source'}:${String(citation?.sourceId || '').trim() || 'unknown'}`;
+          citationNode.addEventListener('click', async () => {
+            setHouseSurfaceStatus(`Opening ${String(citation?.sourceKind || 'source')}...`);
+            try {
+              await openHouseOfficeSourceRef(citation);
+            } catch (err) {
+              setHouseSurfaceStatus(`House Office citation unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+            }
+          });
           citationRow.appendChild(citationNode);
         });
         itemNode.appendChild(citationRow);
