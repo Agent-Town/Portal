@@ -474,6 +474,19 @@ Returns the public spectator payload for one live table with:
 - `data.suggestion = null`
 - `data.oilBalance = null`
 
+### GET `/api/poker/play/rail/series/:seriesId`
+Returns the public spectator payload for one multi-table tournament series with:
+- `data.viewerMode = "public"`
+- `data.series`
+- `data.series.tableIds[]`
+- `data.series.activeTableId`
+- `data.tables[]`
+- `data.tables[].table`
+- `data.tables[].seats[]`
+- `data.tables[].hand`
+- `data.tables[].actions[]`
+- `data.tables[].review`
+
 Tournament blind progression notes:
 - tournaments expose `data.table.summary.blindLevel`
 - tournaments expose `data.table.summary.nextBlindLevel`
@@ -632,6 +645,10 @@ Stream notes:
 - no authenticated Portal session is required
 - the stream is still hint-only; browsers should re-read `GET /api/poker/play/rail/tables/:tableId`
 - the event shape and reasons match the authenticated player stream
+
+Series rail notes:
+- `GET /api/poker/play/rail/series/:seriesId` is intentionally poll-oriented and aggregates the current public payload for each still-open table in the series
+- closed tables roll out of `data.tables[]` but remain counted in `data.series.closedTableCount`
 
 ### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)
 Pauses a live table for operator review. While paused:

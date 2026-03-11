@@ -26,6 +26,7 @@ const {
   buildPokerPlayTablePayload,
   createTable,
   createRouteError,
+  getSeriesDetail,
   getTableDetail,
   leaveTable,
   listTables,
@@ -745,6 +746,31 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_RAIL_DETAIL_FAILED',
         err?.message || 'Unable to load poker rail table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/rail/series/:seriesId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = getSeriesDetail(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        publicViewer: true,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_SERIES_FAILED',
+        err?.message || 'Unable to load poker rail series.',
         {
           requestId,
           details: err?.details || {},

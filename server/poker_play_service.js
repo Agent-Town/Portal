@@ -2068,6 +2068,70 @@ function listTables(deps, { session, req, processAt, publicViewer = false } = {}
   return buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewer });
 }
 
+function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer = false } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const targetSeriesId = normalizeTrimmedString(seriesId);
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const entries = deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
+    .filter((synced) => normalizeTrimmedString(getTournamentSeriesRef(synced?.table).seriesId) === targetSeriesId);
+  if (!entries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+
+  const withViewerSeat = entries.map((entry) => {
+    const viewerSeat = walletBinding?.walletSubject
+      ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
+      : null;
+    return {
+      ...entry,
+      viewerSeat,
+      summary: computeTableSummary(entry.table, entry.seats, entry.hand, viewerSeat),
+    };
+  });
+  const series = buildPokerPlaySeriesSummary(withViewerSeat, walletBinding?.walletSubject || '');
+  if (!series) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+
+  const tables = withViewerSeat
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .sort((left, right) => {
+      const leftLive = left?.summary?.liveHand ? 1 : 0;
+      const rightLive = right?.summary?.liveHand ? 1 : 0;
+      if (leftLive !== rightLive) return rightLive - leftLive;
+      return String(left?.table?.tableId || '').localeCompare(String(right?.table?.tableId || ''));
+    })
+    .map((entry) => {
+      const payload = buildPokerPlayTablePayload(deps, entry.table, entry.seats, entry.hand, {
+        session,
+        req,
+        processAt: requestAt,
+        publicViewer,
+      });
+      return {
+        table: payload.table,
+        seats: payload.seats,
+        hand: payload.hand,
+        actions: payload.actions,
+        messages: payload.messages,
+        review: payload.review,
+        processAt: payload.processAt,
+      };
+    });
+
+  return {
+    viewerMode: publicViewer ? 'public' : 'player',
+    houseId: publicViewer ? null : getSessionHouseId(session),
+    wallet: walletBinding?.submitterWallet || null,
+    oilBalance: walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null,
+    series,
+    tables,
+    processAt: requestAt,
+  };
+}
+
 function getTableDetail(deps, { tableId, session, req, processAt, publicViewer = false } = {}) {
   const requestAt = toProcessIso(deps, processAt);
   if (!publicViewer) {
@@ -2618,6 +2682,7 @@ module.exports = {
   buildPokerPlayTablePayload,
   createTable,
   createRouteError,
+  getSeriesDetail,
   getTableDetail,
   listTables,
   leaveTable,

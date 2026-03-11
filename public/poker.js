@@ -206,6 +206,22 @@
     `;
   }
 
+  function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
+    const items = Array.isArray(actions) ? actions : [];
+    if (!items.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${items.slice(-10).map((action) => `
+          <div class="pokerRow">
+            <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
+            <span>${escapeHtml(action.actionKind || 'act')}</span>
+            <span>${Number(action.amountOil || 0)} OIL</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
   function renderSeatMarkers(seats) {
     const items = Array.isArray(seats) ? seats : [];
     if (!items.length) return '<p>No seats are filled yet.</p>';
@@ -250,6 +266,17 @@
       const path = window.location.pathname;
       if (path === expectedPath) {
         refreshLiveTable(tableId, { silent: true, rail }).catch(() => {});
+      }
+    }, 15000);
+  }
+
+  function scheduleRailSeriesRefresh(seriesId) {
+    clearLiveRefreshTimer();
+    if (!seriesId) return;
+    const expectedPath = `/poker/play/rail/series/${seriesId}`;
+    liveRefreshTimer = window.setTimeout(() => {
+      if (window.location.pathname === expectedPath) {
+        loadPlayRailSeries(seriesId, { silent: true }).catch(() => {});
       }
     }, 15000);
   }
@@ -598,7 +625,8 @@
               ])}
             </div>
             <div class="pokerLinks">
-              ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Rail Table</a>` : '<span class="pokerBadge">table pending</span>'}
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}`))}">Open Series Rail</a>
+              ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Active Table</a>` : '<span class="pokerBadge">table pending</span>'}
             </div>
           </div>
         `).join('')
@@ -629,6 +657,92 @@
         : '<h2>No live rail tables yet.</h2><p>Open the player lobby to seat the first cash or tournament table.</p>',
     ]);
     setStatus(items.length ? `${items.length} rail table${items.length === 1 ? '' : 's'} loaded.` : 'No live rail table available.');
+  }
+
+  async function loadPlayRailSeries(seriesId, { silent = false } = {}) {
+    clearLiveTableStream();
+    setTitle('Tournament Rail Series', `Public tournament-series view for ${seriesId}.`);
+    if (!silent) setStatus('Loading tournament series rail...');
+    const payload = await api(`/api/poker/play/rail/series/${encodeURIComponent(seriesId)}`);
+    const series = payload?.data?.series || null;
+    const tables = Array.isArray(payload?.data?.tables) ? payload.data.tables : [];
+    renderCards([
+      `
+        <h2>${escapeHtml(series?.seriesTitle || 'Tournament Series')}</h2>
+        <p>Follow the full multi-table tournament field without opening a seat. Table-break state, prize pool movement, and final placements stay public here.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Stage', series?.stage || 'seating')}
+          ${renderSummaryMetric('Tables', `${Number(series?.tableCount || 0)}`)}
+          ${renderSummaryMetric('Live Tables', `${Number(series?.liveTableCount || 0)}`)}
+          ${renderSummaryMetric('Entrants', `${Number(series?.entrantCount || 0)}`)}
+          ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+          ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
+        </div>
+        ${renderMetaBadges([
+          payload?.data?.viewerMode || 'public',
+          Number(series?.targetTableCount || 0) > 0 ? `target ${Number(series?.targetTableCount || 0)}` : '',
+          series?.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
+          series?.needsRebalance ? 'table break pending' : 'balanced',
+        ].filter(Boolean))}
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Back To Rail</a>
+          ${series?.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(series.activeTableId)}`))}">Open Active Table</a>` : ''}
+        </div>
+      `,
+      `
+        <h2>Series Director</h2>
+        ${series?.pendingBreakTableId
+          ? `<p>${escapeHtml(series.pendingBreakTableId)} is the current break candidate with ${Number(series?.pendingBreakSeatCount || 0)} active seat${Number(series?.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${series?.pendingBreakBlockedByLiveTable ? '; the table must finish its live hand before seats can move.' : '.'}</p>`
+          : (series?.needsRebalance
+            ? `<p>Director target: rebalance toward ${Number(series?.targetTableCount || 0)} table${Number(series?.targetTableCount || 0) === 1 ? '' : 's'} across the current live field.</p>`
+            : '<p>The tournament series is currently balanced for its active field.</p>')}
+        <div class="pokerLabel">Payout Ladder</div>
+        ${renderPayoutPlan(series?.payouts)}
+        ${Array.isArray(series?.standings) && series.standings.length ? `
+          <div class="pokerLabel">Final Placements</div>
+          ${renderSeriesStandings(series.standings)}
+        ` : ''}
+      `,
+      tables.length
+        ? tables.map((entry) => `
+          <div class="pokerSplit">
+            <div>
+              <h2>${escapeHtml(entry?.table?.title || entry?.table?.tableId || 'Tournament Table')}</h2>
+              <p>${escapeHtml(entry?.table?.summary?.headline || 'Public table state for the current tournament series.')}</p>
+              ${renderMetaBadges([
+                `${Number(entry?.table?.smallBlindOil || 0)} / ${Number(entry?.table?.bigBlindOil || 0)}`,
+                `${Number(entry?.table?.summary?.occupancy || 0)}/${Number(entry?.table?.maxSeats || 6)} seated`,
+                entry?.table?.summary?.liveHand ? `hand ${Number(entry?.table?.summary?.handNumber || 0)}` : 'waiting',
+                Number(entry?.review?.openDisputeCount || 0) > 0 ? `${Number(entry?.review?.openDisputeCount || 0)} reviews` : '',
+              ].filter(Boolean))}
+              ${entry?.hand ? `
+                <div class="pokerSplit">
+                  <div>
+                    <div class="pokerLabel">Board</div>
+                    ${renderPokerCards(entry.hand.communityCards || [])}
+                  </div>
+                  <div>
+                    <div class="pokerLabel">Acting Seat</div>
+                    <div>${escapeHtml(entry.hand.actingSeat ? `Seat ${Number(entry.hand.actingSeat || 0)}` : 'none')}</div>
+                  </div>
+                </div>
+              ` : '<p>No live hand on this table right now.</p>'}
+              <div class="pokerLabel">Seats</div>
+              ${renderSeatMarkers(entry?.seats)}
+              <div class="pokerLabel">Public Action Log</div>
+              ${renderPublicActionLog(entry?.actions)}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(entry?.table?.tableId || '')}`))}">Open Rail Table</a>
+            </div>
+          </div>
+        `).join('')
+        : '<h2>No active series tables.</h2><p>The series summary will stay here even after tables converge or close.</p>',
+    ]);
+    scheduleRailSeriesRefresh(seriesId);
+    if (!silent) {
+      setStatus(tables.length ? `${tables.length} tournament table${tables.length === 1 ? '' : 's'} loaded for rail.` : 'Tournament series rail ready.');
+    }
   }
 
   function bindPlayMatchmakeForm() {
@@ -949,15 +1063,7 @@
     } else if (publicRail || actions.length) {
       cards.push(`
         <h2>Public Action Log</h2>
-        <div class="pokerStack">
-          ${actions.length ? actions.slice(-10).map((action) => `
-            <div class="pokerRow">
-              <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
-              <span>${escapeHtml(action.actionKind || 'act')}</span>
-              <span>${Number(action.amountOil || 0)} OIL</span>
-            </div>
-          `).join('') : '<p>No public actions logged yet.</p>'}
-        </div>
+        ${renderPublicActionLog(actions)}
       `);
     }
 
@@ -1706,6 +1812,8 @@
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
       if (path === '/poker/play/rail') return await loadPlayRailLobby();
+      const seriesRailMatch = path.match(/^\/poker\/play\/rail\/series\/([^/]+)$/);
+      if (seriesRailMatch) return await loadPlayRailSeries(seriesRailMatch[1]);
       const railMatch = path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/);
       if (railMatch) return await loadPlayRailTable(railMatch[1]);
       const playMatch = path.match(/^\/poker\/play\/tables\/([^/]+)$/);
