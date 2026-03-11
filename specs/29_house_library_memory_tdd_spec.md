@@ -886,6 +886,10 @@ Verification:
 
 1. `npx playwright test e2e/206_house_library_full_smoke.spec.js`
 
+Implementation note:
+
+1. the first joined smoke may mix same-shell UI actions with stable House Library route updates, provided the worker session id stays stable, the browser remains on `/app`, and the visible Library state reflects the final scoped selection.
+
 ## 6. Final Delivery Rule
 
 This phase is complete only when all of the following are true:

@@ -764,6 +764,7 @@ Execution mapping:
 3. `M29.10` Seal-aware Library policy
    - sealed trace-derived Library items redact protected fields on read and `POST /api/platform/library/publications` returns `LIBRARY_SEAL_BLOCKED` while the inherited seal remains active
 4. `M29.11` House Library full smoke
+   - one same-shell House flow proves curated item creation, explicit scope reuse, Workshop approval-gated editing, Library snapshotting, and one approved Registry publication without leaving `/app`
 
 ## 17. Proposed Playwright Program
 

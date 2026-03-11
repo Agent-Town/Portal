@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-02-22
+Last updated: 2026-03-11
 
 ## Goal
 
@@ -47,6 +47,7 @@ Keep `skill.md` evolution testable as we:
 | Default Portal skill compiles to an internal pack without changing the public manual | `server/index.js`, `public/app.js`, `public/skill.md` | frontend resolves `/api/platform/default-skill-pack`, worker imports `/__compiled/default-skill-pack/skill.md`, and companion files stay hash-addressable with `/skill.md` as the source ref | `e2e/133_default_skill_pack_compile_bridge.spec.js` (`M19.2: default same-origin skill compiles into an internal pack before execution`) |
 | House Library skill pack compiles additively and active scope reaches worker prompt preview | `server/index.js`, `server/platform_read_routes.js`, `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | additive `/api/platform/library/skill-pack` manifest exposes router + specialized skills; House Library scope is injected into worker prompt context through gateway/runtime state rather than backend-built prompt text | `e2e/199_library_skill_pack_scope_prompt.spec.js` (`M29.4: House Library skill pack compiles, routes deterministically, and injects active scope into prompt preview`) |
 | House Workshop editor uses approval-gated writes and explicit Library snapshotting | `public/app.js`, `public/views/house.html` | same-shell Workshop draft pane shows deterministic diff preview, persistent file writes go through the worker approval surface, and explicit snapshot actions persist one `library_item` plus one source `library_link` | `e2e/201_workshop_editor_approval_snapshot.spec.js` (`M29.6: House Workshop writes require approval and can snapshot the approved file into Library`) |
+| House Library joined smoke keeps skill-aware scope continuity through Workshop and Registry | `public/app.js`, `server/platform_read_routes.js`, `public/views/house.html` | one same-shell flow preserves `/app`, keeps the worker session stable, reuses the same scope set deterministically across later turns, and completes Workshop approval plus Registry publication without silent scope widening | `e2e/206_house_library_full_smoke.spec.js` (`M29.11: House Library full smoke preserves same-shell continuity from curation through scoped reuse and Registry publication`) |
 | Website-scoped skill workspace layout | worker visit importer | canonical storage under `workspace/skills/<site>/...` plus active-site resolution | `e2e/56_phase3_skill_visit_worker.spec.js` (`visit imports portal skill and writes compatibility mirrors`) |
 | OpenClaw-style skills registry prompt contract | worker prompt builder + gateway/worker preview bridge | `runAgentTurn` prompt path emits `<available_skills>` metadata and no longer injects `SKILL.md` as workspace context; test API uses `gateway.command.systemPrompt.preview` | `e2e/56_phase3_skill_visit_worker.spec.js` (`system prompt exposes available_skills without inline SKILL context injection`) |
 | Multi-skill selection ordering + single upfront read contract | worker prompt builder + skills registry candidate selection | `<available_skills>` entries are sorted most-specific-first and system prompt explicitly enforces one upfront `workspace_read_file` after selection | `e2e/56_phase3_skill_visit_worker.spec.js` (`multi-skill prompt preview prefers most-specific imported skill and keeps single upfront read constraint`) |
@@ -96,6 +97,11 @@ Keep `skill.md` evolution testable as we:
 | Experience intent continuity + policy guards | `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js` | deterministic intent envelope + trace, team/worker continuity under multi-intent flow, deterministic rejection codes (`UI_INTENT_UNKNOWN`, `UI_INTENT_INVALID_PARAM`, `CONFIRMATION_REQUIRED`) | `e2e/111_experience_intent_worker_continuity.spec.js`, `e2e/112_experience_intent_policy_negative.spec.js` |
 
 ## Progress Log
+
+### 2026-03-11
+
+- Added House Library late-phase contract coverage for Registry import, seal-aware publication blocking, and the joined same-shell smoke (`e2e/204`, `e2e/205`, `e2e/206`).
+- Documented that House Library prompt continuity now stays deterministic across later scope updates while Workshop approval and Registry publication remain inside the `/app` shell.
 
 ### 2026-03-10
 
