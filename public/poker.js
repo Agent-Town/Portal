@@ -340,6 +340,7 @@
     const cards = [];
     if (playPayload?.data) {
       const tables = Array.isArray(playPayload.data.items) ? playPayload.data.items : [];
+      const series = Array.isArray(playPayload.data.series) ? playPayload.data.series : [];
       const oilBalance = Number(playPayload?.data?.oilBalance?.balance || 0);
       cards.push(`
         <h2>Live 6-Max Tables</h2>
@@ -348,6 +349,7 @@
           playPayload?.data?.houseId || 'house pending',
           playPayload?.data?.wallet?.address || 'wallet pending',
           `${oilBalance} OIL`,
+          series.length ? `${series.length} tournament series` : 'no tournament series',
           tables.length ? `${tables.length} tables` : 'no tables',
         ])}
         <div class="pokerLinks">
@@ -404,6 +406,7 @@
     setStatus('Loading live tables...');
     const payload = await api('/api/poker/play/tables');
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    const series = Array.isArray(payload?.data?.series) ? payload.data.series : [];
     const oilBalance = Number(payload?.data?.oilBalance?.balance || 0);
     renderCards([
       `
@@ -412,6 +415,7 @@
           ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
           ${renderSummaryMetric('Wallet', payload?.data?.wallet?.address || 'Bind wallet')}
           ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
+          ${renderSummaryMetric('Tournament Series', `${series.length}`)}
           ${renderSummaryMetric('Live Tables', `${items.length}`)}
         </div>
       `,
@@ -445,6 +449,25 @@
           <button class="pokerButton" type="submit">Join Or Create</button>
         </form>
       `,
+      series.length
+        ? series.map((item) => `
+          <div class="pokerSplit">
+            <div>
+              <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
+              <p>Shared tournament identity for multiple live 6-max tables before final-table convergence.</p>
+              ${renderMetaBadges([
+                item.stage || 'seating',
+                `${Number(item.tableCount || 0)} tables`,
+                `${Number(item.entrantCount || 0)} entrants`,
+                item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
+              ])}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
+            </div>
+          </div>
+        `).join('')
+        : '',
       items.length
         ? items.map((item) => `
           <div class="pokerSplit">

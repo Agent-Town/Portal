@@ -125,6 +125,12 @@ function normalizeCreateTableConfig(input = {}) {
       ? `6-Max Cash ${smallBlindOil}/${bigBlindOil}`
       : `6-Max Tournament ${smallBlindOil}/${bigBlindOil}`
   ).slice(0, 96);
+  const seriesId = tableType === 'tournament'
+    ? normalizeTrimmedString(input?.seriesId)
+    : '';
+  const seriesTitle = tableType === 'tournament'
+    ? normalizeTrimmedString(input?.seriesTitle, title).slice(0, 96)
+    : '';
   return {
     tableType,
     smallBlindOil,
@@ -139,6 +145,8 @@ function normalizeCreateTableConfig(input = {}) {
     handsPerBlindLevel,
     blindLevels,
     title,
+    seriesId,
+    seriesTitle,
   };
 }
 
@@ -206,6 +214,21 @@ function buildMatchKeyFromTable(table) {
     presenceTimeoutSeconds: table?.rules?.presenceTimeoutSeconds,
     reconnectGraceSeconds: table?.rules?.reconnectGraceSeconds,
   });
+}
+
+function getTournamentSeriesRef(table) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return {
+      seriesId: '',
+      seriesTitle: '',
+      matchKey: '',
+    };
+  }
+  return {
+    seriesId: normalizeTrimmedString(table?.rules?.seriesId || table?.summary?.seriesId),
+    seriesTitle: normalizeTrimmedString(table?.rules?.seriesTitle || table?.summary?.seriesTitle || table?.title, table?.title || 'Tournament Series'),
+    matchKey: normalizeTrimmedString(table?.rules?.matchKey || table?.summary?.matchKey || buildMatchKeyFromTable(table)),
+  };
 }
 
 function getSessionHouseId(session) {
@@ -338,13 +361,94 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
 }
 
 function buildDynamicTableSummary(config, matchKey) {
-  return {
+  const summary = {
     headline: config.tableType === 'cash'
       ? 'Open cash table with private human + agent seat threads.'
       : 'Single-table tournament with private human + agent seat threads.',
     matchKey,
     origin: 'dynamic',
   };
+  if (config.tableType === 'tournament') {
+    summary.seriesId = normalizeTrimmedString(config?.seriesId);
+    summary.seriesTitle = normalizeTrimmedString(config?.seriesTitle, config?.title);
+  }
+  return summary;
+}
+
+function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
+  const items = Array.isArray(entries) ? entries : [];
+  if (!items.length) return null;
+  const leadTable = items[0]?.table || null;
+  const ref = getTournamentSeriesRef(leadTable);
+  const uniqueWallets = new Set();
+  let tableCount = 0;
+  let liveTableCount = 0;
+  let completedTableCount = 0;
+  let openSeatCount = 0;
+  let lateRegistrationOpen = false;
+  let currentUserTableId = '';
+  const tableIds = [];
+
+  for (const entry of items) {
+    const table = entry?.table || null;
+    if (!table) continue;
+    const summary = entry?.summary || computeTableSummary(table, entry?.seats, entry?.hand, entry?.viewerSeat || null);
+    tableCount += 1;
+    tableIds.push(String(table.tableId || ''));
+    openSeatCount += Number(summary?.openSeatCount || 0);
+    if (summary?.liveHand) liveTableCount += 1;
+    if (summary?.completedAt) completedTableCount += 1;
+    if (summary?.lateRegistrationOpen && Number(summary?.openSeatCount || 0) > 0) {
+      lateRegistrationOpen = true;
+    }
+    for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+      if (walletSubject) uniqueWallets.add(walletSubject);
+    }
+    if (!currentUserTableId && normalizeTrimmedString(viewerWalletSubject) && normalizeTrimmedString(entry?.viewerSeat?.walletSubject) === normalizeTrimmedString(viewerWalletSubject)) {
+      currentUserTableId = String(table.tableId || '');
+    }
+  }
+
+  let stage = 'seating';
+  if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
+    stage = 'completed';
+  } else if (tableCount > 1 && liveTableCount <= 1 && !lateRegistrationOpen) {
+    stage = 'finalizing';
+  } else if (lateRegistrationOpen) {
+    stage = 'registration_open';
+  } else if (liveTableCount > 0) {
+    stage = 'in_play';
+  }
+
+  const activeTableId = currentUserTableId
+    || String(items.find((entry) => entry?.summary?.liveHand)?.table?.tableId || '')
+    || String(items.find((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)?.table?.tableId || '')
+    || String(leadTable?.tableId || '');
+
+  return {
+    seriesId: ref.seriesId || String(leadTable?.tableId || ''),
+    seriesTitle: ref.seriesTitle || String(leadTable?.title || 'Tournament Series'),
+    matchKey: ref.matchKey,
+    tableCount,
+    liveTableCount,
+    completedTableCount,
+    entrantCount: uniqueWallets.size,
+    openSeatCount,
+    lateRegistrationOpen,
+    stage,
+    currentUserTableId: currentUserTableId || null,
+    activeTableId: activeTableId || null,
+    tableIds: tableIds.filter(Boolean),
+  };
+}
+
+function listExistingTournamentSeriesTables(deps, matchKey, { processAt } = {}) {
+  const targetMatchKey = normalizeTrimmedString(matchKey);
+  return deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt }))
+    .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
+    .filter((synced) => getTournamentSeriesRef(synced.table).matchKey === targetMatchKey);
 }
 
 function shouldRevealCards({ viewerSeatNumber, hand, seatState }) {
@@ -530,14 +634,16 @@ function reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso) {
           createdAt: atIso,
         });
       } else {
-        deps.createPokerPlayMessage({
-          tableId: table.tableId,
-          handId: nextHand?.handId || null,
-          seatNumber: null,
-          authorRole: 'system',
-          body: `${formatSeatLabel(seatNumber, seat.displayName)} disconnected.`,
-          createdAt: atIso,
-        });
+        if (nextHand?.handId) {
+          deps.createPokerPlayMessage({
+            tableId: table.tableId,
+            handId: nextHand.handId,
+            seatNumber: null,
+            authorRole: 'system',
+            body: `${formatSeatLabel(seatNumber, seat.displayName)} disconnected.`,
+            createdAt: atIso,
+          });
+        }
       }
     } else if (!stale && seat?.disconnectedAt) {
       nextSeat = deps.upsertPokerPlaySeat({
@@ -546,14 +652,16 @@ function reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso) {
         lastSeenAt: atIso,
         updatedAt: atIso,
       });
-      deps.createPokerPlayMessage({
-        tableId: table.tableId,
-        handId: nextHand?.handId || null,
-        seatNumber: null,
-        authorRole: 'system',
-        body: `${formatSeatLabel(seatNumber, seat.displayName)} reconnected.`,
-        createdAt: atIso,
-      });
+      if (nextHand?.handId) {
+        deps.createPokerPlayMessage({
+          tableId: table.tableId,
+          handId: nextHand.handId,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seatNumber, seat.displayName)} reconnected.`,
+          createdAt: atIso,
+        });
+      }
     }
     nextSeats.push(nextSeat);
   }
@@ -1034,12 +1142,29 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   const suggestion = viewerSeat && hand && hand.status === 'live'
     ? derivePokerPlayAgentSuggestion({ table, handState: hand.state, seatNumber: viewerSeat.seatNumber })
     : null;
+  const seriesRef = getTournamentSeriesRef(table);
+  const series = seriesRef.seriesId
+    ? buildPokerPlaySeriesSummary(
+      listExistingTournamentSeriesTables(deps, seriesRef.matchKey, { processAt }).map((entry) => {
+        const currentViewerSeat = walletBinding?.walletSubject
+          ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
+          : null;
+        return {
+          ...entry,
+          viewerSeat: currentViewerSeat,
+          summary: computeTableSummary(entry.table, entry.seats, entry.hand, currentViewerSeat),
+        };
+      }),
+      walletBinding?.walletSubject || ''
+    )
+    : null;
 
   return {
     table: {
       ...table,
       summary: computeTableSummary(table, seats, hand, viewerSeat),
     },
+    series,
     houseId: getSessionHouseId(session),
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
@@ -1060,24 +1185,49 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
 function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
   const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
-  const items = deps.listPokerPlayTables().map((table) => {
+  const entries = deps.listPokerPlayTables().map((table) => {
     const synced = syncPokerPlayTable(deps, table.tableId, { processAt });
     const viewerSeat = walletBinding?.walletSubject
       ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
       : null;
+    const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
     return {
-      ...synced.table,
-      summary: computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat),
+      table: synced.table,
+      seats: synced.seats,
+      hand: synced.hand,
+      viewerSeat,
+      summary,
+    };
+  });
+  const items = entries.map((entry) => {
+    const seriesRef = getTournamentSeriesRef(entry.table);
+    return {
+      ...entry.table,
+      seriesId: seriesRef.seriesId || null,
+      seriesTitle: seriesRef.seriesTitle || null,
+      summary: entry.summary,
       currentUser: {
         walletSubject: walletBinding?.walletSubject || null,
         oilBalance: oilBalance?.balance ?? 0,
-        seated: !!viewerSeat,
-        seatNumber: normalizeSeatNumber(viewerSeat?.seatNumber),
+        seated: !!entry.viewerSeat,
+        seatNumber: normalizeSeatNumber(entry.viewerSeat?.seatNumber),
       },
     };
   });
+  const series = Array.from(entries.reduce((map, entry) => {
+    const ref = getTournamentSeriesRef(entry.table);
+    if (!ref.seriesId) return map;
+    const bucket = map.get(ref.seriesId) || [];
+    bucket.push(entry);
+    map.set(ref.seriesId, bucket);
+    return map;
+  }, new Map()).values())
+    .map((seriesEntries) => buildPokerPlaySeriesSummary(seriesEntries, walletBinding?.walletSubject || ''))
+    .filter(Boolean)
+    .sort((left, right) => String(left?.seriesTitle || '').localeCompare(String(right?.seriesTitle || '')));
   return {
     items,
+    series,
     houseId: getSessionHouseId(session),
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
@@ -1130,6 +1280,12 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
+      seriesId: normalized.tableType === 'tournament'
+        ? normalizeTrimmedString(normalized.seriesId, `pkseries_${deps.randomHex(8)}`)
+        : '',
+      seriesTitle: normalized.tableType === 'tournament'
+        ? normalizeTrimmedString(normalized.seriesTitle, normalized.title)
+        : '',
       matchKey,
       dynamic: true,
     },
@@ -1178,7 +1334,19 @@ function resolveMatchmakeTable(deps, config, { processAt } = {}) {
   if (candidates.length) {
     return candidates[0].table;
   }
-  return createDynamicTable(deps, normalized, { createdAt: toProcessIso(deps, processAt) });
+  let nextConfig = normalized;
+  if (normalized.tableType === 'tournament') {
+    const existingSeries = listExistingTournamentSeriesTables(deps, matchKey, { processAt })
+      .sort((left, right) => String(right?.table?.createdAt || '').localeCompare(String(left?.table?.createdAt || '')));
+    const leadSeriesTable = existingSeries[0]?.table || null;
+    const ref = getTournamentSeriesRef(leadSeriesTable);
+    nextConfig = {
+      ...normalized,
+      seriesId: ref.seriesId || `pkseries_${deps.randomHex(8)}`,
+      seriesTitle: ref.seriesTitle || normalized.title,
+    };
+  }
+  return createDynamicTable(deps, nextConfig, { createdAt: toProcessIso(deps, processAt) });
 }
 
 function listTables(deps, { session, req, processAt } = {}) {

@@ -395,6 +395,8 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[]`
 - `data.items[].tableId`
 - `data.items[].tableType`
+- `data.items[].seriesId` for tournament tables
+- `data.items[].seriesTitle` for tournament tables
 - `data.items[].summary.occupancy`
 - `data.items[].summary.openSeatCount`
 - `data.items[].summary.disconnectedSeatCount`
@@ -404,6 +406,12 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[].summary.handsUntilBlindIncrease`
 - `data.items[].summary.lateRegistrationOpen`
 - `data.items[].summary.lateRegistrationRemainingHands`
+- `data.series[]` aggregated tournament-series rows
+- `data.series[].seriesId`
+- `data.series[].tableCount`
+- `data.series[].entrantCount`
+- `data.series[].lateRegistrationOpen`
+- `data.series[].activeTableId`
 - `data.houseId`
 - `data.wallet`
 - `data.oilBalance`
@@ -411,6 +419,7 @@ Returns the live 6-max poker lobby payload with:
 ### GET `/api/poker/play/tables/:tableId`
 Returns one live cash or tournament table payload with:
 - `data.table`
+- `data.series` for tournament tables
 - `data.seats[]`
 - `data.mySeat`
 - `data.hand`
@@ -432,6 +441,7 @@ Tournament registration notes:
 - tournaments may accept new seats while `data.table.summary.lateRegistrationOpen === true`
 - a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
 - once the next hand starts, the registered seat becomes active automatically
+- tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
 
 Presence notes:
 - seated viewers heartbeat through authenticated table detail reads and table stream connects

@@ -769,6 +769,8 @@ function seedPokerPlayTables() {
       reconnectGraceSeconds: 90,
       cashOutEnabled: false,
       payoutModel: 'winner_take_all',
+      seriesId: 'pkseries_turbo_tournament_01',
+      seriesTitle: 'Six-Max Turbo Tournament',
       lateRegistrationHands: 2,
       handsPerBlindLevel: 2,
       blindLevels: [
@@ -781,6 +783,8 @@ function seedPokerPlayTables() {
     }, {}),
     toJson({
       headline: 'Winner-take-all six-max tournament play for human + AI teams.',
+      seriesId: 'pkseries_turbo_tournament_01',
+      seriesTitle: 'Six-Max Turbo Tournament',
       chips: 'Offchain OIL',
       stakes: '50 / 100 blinds',
     }, {}),
