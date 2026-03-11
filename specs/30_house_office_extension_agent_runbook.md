@@ -1,7 +1,7 @@
 # Phase 30 Spec: Detailed AI-Agent Runbook for House Office Extension
 
-Status: Draft
-Version: 1.0
+Status: Implemented
+Version: 1.1
 Depends on:
 1. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)
 2. [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md)
@@ -12,6 +12,12 @@ Purpose: convert the Phase 29 milestones into AI-agent-sized TDD work packets wi
 
 This is not a competing plan.
 It is the detailed execution layer for [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md).
+
+Execution status on `codex/house-office-options-v0-1` at `5244403`:
+
+1. `T29.0` through `T29.7` are implemented,
+2. all reserved House Office tests `195` through `202` are green,
+3. the runbook is now historical execution guidance plus maintenance reference for future changes to the House Office surface.
 
 ## 1. How AI Agents Must Use This Runbook
 

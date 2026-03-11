@@ -1,9 +1,9 @@
 # Phase 28 Spec: House Office Extension Inspired by Star Office
 
-Status: Draft
-Version: 1.0
+Status: Implemented
+Version: 1.1
 Audience: product, frontend, backend, runtime, AI-agent, benchmarking, security, UX, office-planning, QA, and AI coding agents
-Implementation baseline: `codex/house-office-options-v0-1` at commit `4221b02`
+Implementation baseline: `codex/house-office-options-v0-1` at commit `5244403`
 Primary external inspiration:
 1. `https://github.com/ringhyacinth/Star-Office-UI`
 2. `https://github.com/ringhyacinth/Star-Office-UI/blob/master/README.en.md`
@@ -39,6 +39,17 @@ The executable companion docs for this extension are:
 
 1. [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md)
 2. [specs/30_house_office_extension_agent_runbook.md](./30_house_office_extension_agent_runbook.md)
+
+# 1.1 Completion Status
+
+This extension is implemented on `codex/house-office-options-v0-1`.
+
+Acceptance evidence:
+
+1. Option 2 and Option 3 milestone tests `e2e/195` through `e2e/202` are implemented and green.
+2. The late continuity-sensitive regression block covering `e2e/57`, `e2e/58`, `e2e/60`, and `e2e/72` is green on the same branch.
+3. Full deterministic suite result on the implementation baseline is `320 passed, 4 skipped`.
+4. The implementation remains inside the existing House shell and current `/api/platform/*` route family.
 
 # 2. Product Thesis
 

@@ -1,7 +1,7 @@
 # Phase 29 Spec: House Office Extension (Option 2 -> Option 3, Contracts First, TDD)
 
-Status: Draft
-Version: 1.0
+Status: Implemented
+Version: 1.1
 Audience: frontend engineers, backend engineers, product engineers, UX engineers, security engineers, QA automation engineers, and AI agent implementers
 Depends on:
 1. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)
@@ -17,6 +17,12 @@ Goal: implement the House Office extension described in [specs/28_house_office_s
 1. Option 2 first as a read-only House Office view,
 2. Option 3 second as the native House Office district,
 3. while preserving the current House, Registry, Web, Poker, trainer, and tracks platform behavior.
+
+Completion status on `codex/house-office-options-v0-1` at `5244403`:
+
+1. reserved tests `195` through `202` are implemented and green,
+2. Stage A, Stage B, and Stage C are complete,
+3. the full deterministic suite is green with `320 passed, 4 skipped`.
 
 Implementation constraints:
 
