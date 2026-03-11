@@ -84,6 +84,12 @@ It is a House-native memory system that feels like the rest of Portal:
 1. `M29.11`
 2. one full House memory loop inside the existing shell
 
+#### Wave D+ - Same-shell continuation polish
+
+1. `M29.12`, `M29.13`, and `M29.15`
+2. same-shell Registry import and publish controls
+3. saved Reading Table reuse for later House turns without hidden scope expansion
+
 #### Wave E - Post-phase transport extension
 
 1. not in the default Phase 29 gate
@@ -92,7 +98,7 @@ It is a House-native memory system that feels like the rest of Portal:
 
 ### 1.2 Reserved Playwright block
 
-1. `195` to `206`
+1. `195` to `209`
 
 Reserved tests:
 
@@ -108,6 +114,9 @@ Reserved tests:
 10. `e2e/204_library_import_registry.spec.js`
 11. `e2e/205_library_seal_policy.spec.js`
 12. `e2e/206_house_library_full_smoke.spec.js`
+13. `e2e/207_house_library_registry_import_ui.spec.js`
+14. `e2e/208_house_library_registry_publish_ui.spec.js`
+15. `e2e/209_house_library_scope_reopen_ui.spec.js`
 
 ### 1.3 Current verified platform baseline
 
@@ -889,6 +898,49 @@ Verification:
 Implementation note:
 
 1. the first joined smoke may mix same-shell UI actions with stable House Library route updates, provided the worker session id stays stable, the browser remains on `/app`, and the visible Library state reflects the final scoped selection.
+
+### M29.15 - Saved Reading Table reopen shell
+
+Purpose:
+
+1. make later House returns practical for non-technical users,
+2. let users explicitly reopen a prior Reading Table instead of rebuilding scope manually,
+3. keep future conversation continuity visible and bounded.
+
+Primary test:
+
+1. `e2e/209_house_library_scope_reopen_ui.spec.js`
+
+RED gate:
+
+1. saved scope sets exist in durable data but cannot be reopened from the same-shell Library UI,
+2. reopening a prior Reading Table silently widens scope beyond the saved ordered item ids,
+3. later House reuse breaks worker continuity or leaves `/app`.
+
+GREEN gate:
+
+1. the Library panel shows saved Reading Tables for the active House team,
+2. a user can reopen one saved Reading Table directly from that list,
+3. the selected items for chat match the reopened Reading Table exactly and in order,
+4. a later reopen can switch to a different saved Reading Table without mutating the saved set titles,
+5. worker continuity stays stable through the reopen flow.
+
+Measurable metrics:
+
+1. saved Reading Table count matches the seeded expected total exactly,
+2. prompt preview exposes the reopened `activeScopeSetId` and exact ordered item ids,
+3. reopening a different Reading Table updates selected item ids exactly once with no extra ids,
+4. worker session id remains stable through Library -> Workshop -> Library reuse,
+5. the browser remains on `/app`.
+
+Required doc sync:
+
+1. `specs/28_house_library_memory_spec.md`
+2. `specs/29_house_library_memory_tdd_spec.md`
+
+Verification:
+
+1. `npx playwright test e2e/209_house_library_scope_reopen_ui.spec.js`
 
 ## 6. Final Delivery Rule
 

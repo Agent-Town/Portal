@@ -1752,6 +1752,20 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   }
 }
 
+function getHouseLibraryScopeSetById(scopeSetId = '') {
+  const normalizedScopeSetId = String(scopeSetId || '').trim();
+  if (!normalizedScopeSetId) return null;
+  const scopeSets = Array.isArray(houseSurfaceState.library.scopeSets) ? houseSurfaceState.library.scopeSets : [];
+  return scopeSets.find((entry) => String(entry?.scopeSetId || '').trim() === normalizedScopeSetId) || null;
+}
+
+function getActiveHouseLibraryScopeTitle() {
+  return String(
+    getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId)?.title
+    || 'Reading Table'
+  ).trim() || 'Reading Table';
+}
+
 async function syncHouseLibraryScopeContextToWorker(snapshot = null) {
   const source = snapshot && typeof snapshot === 'object'
     ? snapshot
@@ -1769,13 +1783,15 @@ async function syncHouseLibraryScopeContextToWorker(snapshot = null) {
   }).catch(() => null);
 }
 
-async function updateHouseLibraryScopeSelection(nextItemIds = []) {
-  const scopeSetId = String(houseSurfaceState.library.activeScopeSetId || '').trim();
+async function updateHouseLibraryScopeSelection(nextItemIds = [], {
+  scopeSetId = String(houseSurfaceState.library.activeScopeSetId || '').trim(),
+  title = getActiveHouseLibraryScopeTitle(),
+} = {}) {
   const response = await apiWithRetry('/api/platform/library/scope', {
     method: 'POST',
     body: JSON.stringify({
       scopeSetId,
-      title: 'Reading Table',
+      title,
       itemIds: Array.isArray(nextItemIds) ? nextItemIds : [],
     }),
   }, {
@@ -1790,6 +1806,34 @@ async function updateHouseLibraryScopeSelection(nextItemIds = []) {
       ? `Reading Table ready with ${houseSurfaceState.library.selectedItemIds.length} item${houseSurfaceState.library.selectedItemIds.length === 1 ? '' : 's'}.`
       : 'Selected for this chat: none.'
   );
+  return data;
+}
+
+async function reopenHouseLibraryScopeSet(scopeSet = null) {
+  const scopeSetId = String(scopeSet?.scopeSetId || '').trim();
+  const title = String(scopeSet?.title || 'Reading Table').trim() || 'Reading Table';
+  const orderedItemIds = Array.isArray(scopeSet?.orderedItemIds)
+    ? scopeSet.orderedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
+    : [];
+  if (!scopeSetId) {
+    throw new Error('SCOPE_SET_REQUIRED');
+  }
+  setHouseSurfaceStatus(`Reopening ${title}...`);
+  setHouseLibraryActionStatus(`Reopening ${title}...`);
+  const data = await updateHouseLibraryScopeSelection(orderedItemIds, {
+    scopeSetId,
+    title,
+  });
+  if (orderedItemIds.length) {
+    const nextSelectedItemId = orderedItemIds.find((itemId) => houseSurfaceState.library.items.some((item) => String(item?.libraryItemId || '') === itemId));
+    if (nextSelectedItemId) {
+      houseSurfaceState.library.selectedItemId = nextSelectedItemId;
+      renderHouseLibrarySurface();
+    }
+  }
+  const successText = `Reopened Reading Table ${title} for this chat.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
   return data;
 }
 
@@ -1916,6 +1960,8 @@ function renderHouseLibrarySurface() {
   const detailNode = el('houseLibraryDetail');
   const emptyNode = el('houseLibraryEmpty');
   const selectedNode = el('houseLibrarySelected');
+  const scopeSetsNode = el('houseLibraryScopeSets');
+  const scopeEmptyNode = el('houseLibraryScopeEmpty');
   const actionsNode = el('houseLibraryActions');
   const importInput = el('houseLibraryImportInput');
   const importBtn = el('houseLibraryImportBtn');
@@ -1926,6 +1972,8 @@ function renderHouseLibrarySurface() {
     || !detailNode
     || !emptyNode
     || !selectedNode
+    || !scopeSetsNode
+    || !scopeEmptyNode
     || !actionsNode
     || !importInput
     || !importBtn
@@ -1933,12 +1981,17 @@ function renderHouseLibrarySurface() {
     || !publishBtn
   ) return;
   const items = Array.isArray(houseSurfaceState.library.items) ? houseSurfaceState.library.items : [];
+  const itemsById = new Map(items.map((item) => [String(item?.libraryItemId || '').trim(), item]));
+  const scopeSets = Array.isArray(houseSurfaceState.library.scopeSets) ? houseSurfaceState.library.scopeSets : [];
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
   listNode.innerHTML = '';
+  scopeSetsNode.innerHTML = '';
   actionsNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.library.emptyStateText || 'No curated Library items yet.';
   emptyNode.classList.toggle('is-hidden', items.length > 0);
+  scopeEmptyNode.textContent = 'No saved Reading Tables yet.';
+  scopeEmptyNode.classList.toggle('is-hidden', scopeSets.length > 0);
   setHouseLibraryActionStatus(
     houseSurfaceState.library.actionStatusText,
     houseSurfaceState.library.actionStatusError
@@ -1948,6 +2001,39 @@ function renderHouseLibrarySurface() {
   selectedNode.textContent = selectedItems.length
     ? `Selected for this chat: ${selectedItems.map((item) => String(item?.title || item?.libraryItemId || '')).join(', ')}`
     : 'Selected for this chat: none.';
+
+  scopeSets.forEach((scopeSet) => {
+    const orderedItemIds = Array.isArray(scopeSet?.orderedItemIds)
+      ? scopeSet.orderedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
+      : [];
+    const previewTitles = orderedItemIds
+      .map((itemId) => String(itemsById.get(itemId)?.title || '').trim())
+      .filter(Boolean);
+    const itemCount = orderedItemIds.length;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(scopeSet?.scopeSetId || '') === String(houseSurfaceState.library.activeScopeSetId || '') ? ' primary' : ''}`;
+    button.dataset.scopeSetId = String(scopeSet?.scopeSetId || '');
+    button.textContent = [
+      String(scopeSet?.title || 'Reading Table').trim() || 'Reading Table',
+      `${itemCount} item${itemCount === 1 ? '' : 's'}`,
+      previewTitles[0] || '',
+      previewTitles.length > 1 ? `+${previewTitles.length - 1} more` : '',
+      String(scopeSet?.scopeSetId || '') === String(houseSurfaceState.library.activeScopeSetId || '') ? 'In chat' : '',
+    ].filter(Boolean).join(' · ');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await reopenHouseLibraryScopeSet(scopeSet);
+      } catch (err) {
+        button.disabled = false;
+        setHouseLibraryActionStatus(`Reading Table unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        setHouseSurfaceStatus(`Reading Table unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      }
+    });
+    scopeSetsNode.appendChild(button);
+  });
+
   if (!items.length) {
     detailNode.textContent = 'Select a Library item to inspect its shelf and source.';
     return;

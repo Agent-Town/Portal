@@ -765,6 +765,12 @@ Execution mapping:
    - sealed trace-derived Library items redact protected fields on read and `POST /api/platform/library/publications` returns `LIBRARY_SEAL_BLOCKED` while the inherited seal remains active
 4. `M29.11` House Library full smoke
    - one same-shell House flow proves curated item creation, explicit scope reuse, Workshop approval-gated editing, Library snapshotting, and one approved Registry publication without leaving `/app`
+5. `M29.12` House Library Registry import shell
+   - same-shell Library controls can import one Registry artifact and replay idempotently without leaving `/app`
+6. `M29.13` House Library Registry publish shell
+   - same-shell Library controls can publish the selected item to Registry with approval-gated replay
+7. `M29.15` Saved Reading Table reopen shell
+   - the Library panel exposes saved Reading Tables so a later House return can reopen one explicit prior scope set and bring it back into chat without silent scope widening
 
 ## 17. Proposed Playwright Program
 
@@ -784,6 +790,9 @@ Reserved late-phase test block recommendation:
 10. `e2e/204_library_import_registry.spec.js`
 11. `e2e/205_library_seal_policy.spec.js`
 12. `e2e/206_house_library_full_smoke.spec.js`
+13. `e2e/207_house_library_registry_import_ui.spec.js`
+14. `e2e/208_house_library_registry_publish_ui.spec.js`
+15. `e2e/209_house_library_scope_reopen_ui.spec.js`
 
 ### Required deterministic assertions
 
@@ -796,6 +805,7 @@ Reserved late-phase test block recommendation:
 7. Registry import preserves provenance and read-only imported state.
 8. Seal-aware publish blocking is auditable and deterministic.
 9. Full smoke preserves same-shell continuity from private curation through public exchange.
+10. Reopening one saved Reading Table reapplies only that explicit scope set during a later House turn.
 
 ## 18. Final Product Principle
 
