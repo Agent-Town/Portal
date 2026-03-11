@@ -1852,9 +1852,12 @@ function registerPlatformReadRoutes(app, deps) {
       activeTeamId: payload.activeTeamId,
       availableTeamIds: payload.availableTeamIds,
       activeScopeSetId: payload.activeScopeSetId,
+      selectedItemIds: payload.selectedItemIds,
       orderedItemIds: payload.selectedItemIds,
       selectedItems: payload.selectedItems,
       scopeSets: payload.scopeSets,
+      shelves: payload.shelves,
+      items: payload.items,
       emptyStateText: 'No Library items are selected for this chat.',
     }, { requestId });
   });
@@ -1949,9 +1952,12 @@ function registerPlatformReadRoutes(app, deps) {
       activeTeamId: payload.activeTeamId,
       availableTeamIds: payload.availableTeamIds,
       activeScopeSetId: payload.activeScopeSetId,
+      selectedItemIds: payload.selectedItemIds,
       orderedItemIds: payload.selectedItemIds,
       selectedItems: payload.selectedItems,
       scopeSets: payload.scopeSets,
+      shelves: payload.shelves,
+      items: payload.items,
       emptyStateText: 'No Library items are selected for this chat.',
     }, { requestId });
   });

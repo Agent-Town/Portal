@@ -204,8 +204,45 @@
   </div>
   <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
   <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
+  <div class="small" style="margin:10px 0 4px;">Shelves</div>
+  <div class="kv" data-testid="house-library-shelf-create-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibraryShelfTitleInput">New shelf</label>
+    <input
+      id="houseLibraryShelfTitleInput"
+      data-testid="house-library-shelf-title"
+      class="pixel-input"
+      type="text"
+      placeholder="Planning Shelf"
+      style="flex:1; min-width:0;"
+    />
+    <button class="btn" id="houseLibraryShelfCreateBtn" type="button" data-testid="house-library-shelf-create-button">Make Shelf</button>
+  </div>
+  <div class="kv" data-testid="house-library-filter-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibraryFacetFilterSelect">Filter</label>
+    <select id="houseLibraryFacetFilterSelect" data-testid="house-library-facet-filter" class="pixel-input" style="flex:1; min-width:0;">
+      <option value="all">All Library items</option>
+      <option value="local">Local</option>
+      <option value="imported">Imported</option>
+      <option value="conversation">From conversation</option>
+      <option value="workshop">From Workshop</option>
+      <option value="published">Published</option>
+    </select>
+  </div>
+  <div class="kv stack" id="houseLibraryShelves" data-testid="house-library-shelves" style="margin-bottom:8px;"></div>
   <div class="small" style="margin:10px 0 4px;">Reading Tables</div>
   <div class="small" id="houseLibraryScopeEmpty" data-testid="house-library-scope-empty">No saved Reading Tables yet.</div>
+  <div class="kv" data-testid="house-library-satchel-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibrarySatchelTitleInput">Save Satchel</label>
+    <input
+      id="houseLibrarySatchelTitleInput"
+      data-testid="house-library-satchel-title"
+      class="pixel-input"
+      type="text"
+      placeholder="Launch Satchel"
+      style="flex:1; min-width:0;"
+    />
+    <button class="btn" id="houseLibrarySaveSatchelBtn" type="button" data-testid="house-library-save-satchel">Save Satchel</button>
+  </div>
   <div class="kv stack" id="houseLibraryScopeSets" data-testid="house-library-scope-sets" style="margin-bottom:8px;"></div>
   <div class="kv" style="margin:8px 0;" data-testid="house-library-import-controls">
     <label class="small" for="houseLibraryImportInput">Registry ID</label>

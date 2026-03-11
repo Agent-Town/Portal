@@ -1107,6 +1107,61 @@ Stable failure codes:
 - `LIBRARY_IDEMPOTENCY_REQUIRED`
 - `INVALID_ARGUMENT`
 
+### GET `/api/platform/library/shelves` (human)
+Returns the current shelf list for the active House team, including each shelf’s ordered Library item ids.
+
+Response fields:
+- `data.shelves[]`
+- `data.shelves[].libraryShelfId`
+- `data.shelves[].title`
+- `data.shelves[].orderedItemIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### POST `/api/platform/library/shelves` (human)
+Creates one shelf and may optionally place the provided Library items on it in deterministic order.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "title": "Planning Shelf",
+  "itemIds": [
+    "lib_1234abcd"
+  ]
+}
+```
+
+Response fields:
+- `data.shelf`
+- `data.shelf.libraryShelfId`
+- `data.shelf.orderedItemIds[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `INVALID_ARGUMENT`
+
+### POST `/api/platform/library/shelves/:libraryShelfId/items` (human)
+Adds one or more Library items to an existing shelf without duplicating prior membership rows.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `LIBRARY_SHELF_NOT_FOUND`
+- `LIBRARY_ITEM_REQUIRED`
+
+### DELETE `/api/platform/library/shelves/:libraryShelfId/items/:libraryItemId` (human)
+Removes one Library item from an existing shelf.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `LIBRARY_SHELF_NOT_FOUND`
+
 ### POST `/api/platform/library/promotions` (human)
 Promotes one existing Archive trace or Trainer result into a curated House Library item using deterministic source-derived content. The route is idempotent and does not mutate the underlying source rows.
 
@@ -1235,9 +1290,13 @@ Response fields:
 - `data.activeTeamId`
 - `data.availableTeamIds[]`
 - `data.activeScopeSetId`
+- `data.selectedItemIds[]`
 - `data.orderedItemIds[]`
 - `data.selectedItems[]`
 - `data.scopeSets[]`
+- `data.scopeSets[].scopeKind`
+- `data.shelves[]`
+- `data.items[]`
 - `data.emptyStateText`
 
 Stable failure codes:
@@ -1251,6 +1310,7 @@ Request shape:
 {
   "scopeSetId": "optional existing scope set id",
   "title": "Reading Table",
+  "scopeKind": "reading_table",
   "itemIds": ["lib_1234", "lib_5678"]
 }
 ```
@@ -1258,8 +1318,12 @@ Request shape:
 Response fields:
 - `data.activeScopeSetId`
 - `data.selectedItemIds[]`
+- `data.orderedItemIds[]`
 - `data.selectedItems[]`
 - `data.scopeSets[]`
+- `data.scopeSets[].scopeKind`
+- `data.shelves[]`
+- `data.items[]`
 
 Stable failure codes:
 - `SESSION_REQUIRED`

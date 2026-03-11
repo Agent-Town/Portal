@@ -1866,6 +1866,10 @@ function getUnifiedPlatformScopesInspector({
 } = {}) {
   const scopeSets = listScopeSets({ houseId, teamId }).map((scopeSet) => ({
     ...scopeSet,
+    scopeKind: String(scopeSet?.metadata?.scopeKind || 'reading_table').trim() || 'reading_table',
+    sourceShelfId: typeof scopeSet?.metadata?.sourceShelfId === 'string' && scopeSet.metadata.sourceShelfId.trim()
+      ? scopeSet.metadata.sourceShelfId.trim()
+      : null,
     orderedItemIds: listScopeSetItems(scopeSet.scopeSetId).map((entry) => entry.libraryItemId),
   }));
   return {
