@@ -166,6 +166,19 @@
     />
     <button class="btn" id="houseLibraryImportBtn" type="button" data-testid="house-library-import-button" disabled>Import to Library</button>
   </div>
+  <div class="kv" style="margin:8px 0;" data-testid="house-library-publish-controls">
+    <label class="small" for="houseLibraryApprovalInput">Approval ID</label>
+    <input
+      id="houseLibraryApprovalInput"
+      data-testid="house-library-approval-input"
+      class="pixel-input"
+      type="text"
+      placeholder="appr_..."
+      style="flex:1; min-width:0;"
+      disabled
+    />
+    <button class="btn" id="houseLibraryPublishBtn" type="button" data-testid="house-library-publish-button" disabled>Publish Selected</button>
+  </div>
   <div class="kv stack" id="houseLibraryList" data-testid="house-library-list"></div>
   <div class="small" id="houseLibraryDetail" data-testid="house-library-detail">Select a Library item to inspect its shelf and source.</div>
   <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>

@@ -160,6 +160,48 @@ async function getPlatformContextFromPage(page) {
   });
 }
 
+async function callPageJson(page, url, {
+  method = 'GET',
+  headers = {},
+  data,
+} = {}) {
+  return await page.evaluate(async ({
+    requestUrl,
+    requestMethod,
+    requestHeaders,
+    requestBody,
+  }) => {
+    const response = await fetch(requestUrl, {
+      method: requestMethod,
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        'content-type': 'application/json',
+        ...(requestHeaders && typeof requestHeaders === 'object' ? requestHeaders : {}),
+      },
+      ...(typeof requestBody === 'string' ? { body: requestBody } : {}),
+    });
+    const text = await response.text();
+    let json = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    return {
+      status: response.status,
+      ok: response.ok,
+      json,
+      raw: text,
+    };
+  }, {
+    requestUrl: String(url || ''),
+    requestMethod: String(method || 'GET').toUpperCase(),
+    requestHeaders: headers && typeof headers === 'object' ? headers : {},
+    requestBody: data === undefined ? null : JSON.stringify(data),
+  });
+}
+
 async function readWorkerSessionId(page) {
   const hasRuntimeContext = await page.evaluate(() => {
     return !!(
@@ -815,6 +857,7 @@ module.exports = {
   listPlatformFixtures,
   listPlatformExperiences,
   attachHouseToPageSession,
+  callPageJson,
   ingestPlatformPokerOperatorTrace,
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,

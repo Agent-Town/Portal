@@ -5,6 +5,7 @@ const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
   attachHouseToPageSession,
+  callPageJson,
   readWorkerSessionId,
   seedPlatformConfigVersion,
 } = require('./helpers/unified_platform');
@@ -33,9 +34,9 @@ test('M29.1: House Library opens inside the same shell with deterministic empty 
 
   const initialSessionId = await readWorkerSessionId(page);
 
-  const emptyResponse = await page.request.get('/api/platform/library');
-  expect(emptyResponse.ok()).toBe(true);
-  const emptyBody = await emptyResponse.json();
+  const emptyResponse = await callPageJson(page, '/api/platform/library');
+  expect(emptyResponse.ok).toBe(true);
+  const emptyBody = emptyResponse.json;
   expect(emptyBody?.data).toMatchObject({
     houseId: seededHouse.houseId,
     teamId: 'team_main',
@@ -51,7 +52,8 @@ test('M29.1: House Library opens inside the same shell with deterministic empty 
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');
   expect(await readWorkerSessionId(page)).toBe(initialSessionId);
 
-  const createFirst = await page.request.post('/api/platform/library/items', {
+  const createFirst = await callPageJson(page, '/api/platform/library/items', {
+    method: 'POST',
     headers: {
       'Idempotency-Key': 'house-library-surface-001',
     },
@@ -63,11 +65,11 @@ test('M29.1: House Library opens inside the same shell with deterministic empty 
       sourceKind: 'trace',
       sourceRef: 'trace_library_surface_01',
     },
-    failOnStatusCode: false,
   });
-  expect(createFirst.status()).toBe(201);
+  expect(createFirst.status).toBe(201);
 
-  const createSecond = await page.request.post('/api/platform/library/items', {
+  const createSecond = await callPageJson(page, '/api/platform/library/items', {
+    method: 'POST',
     headers: {
       'Idempotency-Key': 'house-library-surface-002',
     },
@@ -79,13 +81,12 @@ test('M29.1: House Library opens inside the same shell with deterministic empty 
       sourceKind: 'conversation_excerpt',
       sourceRef: 'conv_library_surface_01#msg_01',
     },
-    failOnStatusCode: false,
   });
-  expect(createSecond.status()).toBe(201);
+  expect(createSecond.status).toBe(201);
 
-  const seededResponse = await page.request.get('/api/platform/library');
-  expect(seededResponse.ok()).toBe(true);
-  const seededBody = await seededResponse.json();
+  const seededResponse = await callPageJson(page, '/api/platform/library');
+  expect(seededResponse.ok).toBe(true);
+  const seededBody = seededResponse.json;
   expect(seededBody?.data?.items.map((item) => String(item?.title || ''))).toEqual([
     'Reading Table',
     'Modal Continuity',

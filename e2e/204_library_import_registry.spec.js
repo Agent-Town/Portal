@@ -5,6 +5,7 @@ const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
   attachHouseToPageSession,
+  callPageJson,
   getPlatformStats,
   seedPlatformConfigVersion,
 } = require('./helpers/unified_platform');
@@ -42,17 +43,17 @@ test('M29.9: Registry import creates one read-only Library artifact with determi
   const statsBefore = await getPlatformStats(request);
   expect(statsBefore?.ok).toBe(true);
 
-  const importResp = await page.request.post('/api/platform/library/imports', {
+  const importResp = await callPageJson(page, '/api/platform/library/imports', {
+    method: 'POST',
     headers: {
       'Idempotency-Key': 'library-import-registry-001',
     },
     data: {
       registryEntityId,
     },
-    failOnStatusCode: false,
   });
-  expect(importResp.status()).toBe(201);
-  const importBody = await importResp.json();
+  expect(importResp.status).toBe(201);
+  const importBody = importResp.json;
   expect(importBody?.data?.import).toMatchObject({
     registryEntityId,
     registryId: registryEntityId,
@@ -79,32 +80,28 @@ test('M29.9: Registry import creates one read-only Library artifact with determi
   expect(Number(statsAfterImport?.stats?.counts?.library_items || 0)).toBe(Number(statsBefore?.stats?.counts?.library_items || 0) + 1);
   expect(Number(statsAfterImport?.stats?.counts?.library_links || 0)).toBe(Number(statsBefore?.stats?.counts?.library_links || 0) + 1);
 
-  const replayResp = await page.request.post('/api/platform/library/imports', {
+  const replayResp = await callPageJson(page, '/api/platform/library/imports', {
+    method: 'POST',
     headers: {
       'Idempotency-Key': 'library-import-registry-001',
     },
     data: {
       registryEntityId,
     },
-    failOnStatusCode: false,
   });
-  expect(replayResp.status()).toBe(200);
-  const replayBody = await replayResp.json();
+  expect(replayResp.status).toBe(200);
+  const replayBody = replayResp.json;
   expect(String(replayBody?.data?.item?.libraryItemId || '')).toBe(String(importBody?.data?.item?.libraryItemId || ''));
 
   const statsAfterReplay = await getPlatformStats(request);
   expect(statsAfterReplay?.stats?.counts).toEqual(statsAfterImport?.stats?.counts);
 
-  const libraryReadA = await page.request.get('/api/platform/library', {
-    failOnStatusCode: false,
-  });
-  const libraryReadB = await page.request.get('/api/platform/library', {
-    failOnStatusCode: false,
-  });
-  expect(libraryReadA.status()).toBe(200);
-  expect(libraryReadB.status()).toBe(200);
-  const libraryBodyA = await libraryReadA.json();
-  const libraryBodyB = await libraryReadB.json();
+  const libraryReadA = await callPageJson(page, '/api/platform/library');
+  const libraryReadB = await callPageJson(page, '/api/platform/library');
+  expect(libraryReadA.status).toBe(200);
+  expect(libraryReadB.status).toBe(200);
+  const libraryBodyA = libraryReadA.json;
+  const libraryBodyB = libraryReadB.json;
   const importedA = Array.isArray(libraryBodyA?.data?.items)
     ? libraryBodyA.data.items.find((item) => String(item?.libraryItemId || '') === String(importBody?.data?.item?.libraryItemId || ''))
     : null;

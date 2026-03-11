@@ -1836,6 +1836,74 @@ async function importHouseLibraryRegistryArtifact() {
   return data;
 }
 
+function getSelectedHouseLibraryItem() {
+  const items = Array.isArray(houseSurfaceState.library.items) ? houseSurfaceState.library.items : [];
+  if (!items.length) return null;
+  const selectedItemId = String(houseSurfaceState.library.selectedItemId || items[0]?.libraryItemId || '').trim();
+  return items.find((item) => String(item?.libraryItemId || '').trim() === selectedItemId) || items[0] || null;
+}
+
+function syncHouseLibraryPublishControls(selectedItem = null) {
+  const approvalInput = el('houseLibraryApprovalInput');
+  const publishBtn = el('houseLibraryPublishBtn');
+  if (!approvalInput || !publishBtn) return;
+  const targetItem = selectedItem && typeof selectedItem === 'object'
+    ? selectedItem
+    : getSelectedHouseLibraryItem();
+  const hasSelection = !!String(targetItem?.libraryItemId || '').trim();
+  approvalInput.disabled = !hasSelection;
+  publishBtn.disabled = !hasSelection;
+  publishBtn.dataset.libraryItemId = hasSelection ? String(targetItem?.libraryItemId || '') : '';
+}
+
+async function publishSelectedHouseLibraryItemToRegistry() {
+  const selectedItem = getSelectedHouseLibraryItem();
+  const libraryItemId = String(selectedItem?.libraryItemId || '').trim();
+  if (!libraryItemId) {
+    throw new Error('LIBRARY_ITEM_REQUIRED');
+  }
+  const approvalInput = el('houseLibraryApprovalInput');
+  const approvalId = String(approvalInput?.value || '').trim();
+  const itemLabel = String(selectedItem?.title || libraryItemId).trim() || libraryItemId;
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const visibility = 'registry_public';
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_publish_registry', [
+    houseId,
+    teamId,
+    libraryItemId,
+    visibility,
+  ]);
+  setHouseSurfaceStatus(`Publishing ${itemLabel} to Registry...`);
+  setHouseLibraryActionStatus(`Publishing ${itemLabel} to Registry...`);
+  const response = await apiWithRetry('/api/platform/library/publications', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      libraryItemId,
+      visibility,
+      approvalId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const publication = data?.publication && typeof data.publication === 'object' ? data.publication : {};
+  const registryId = String(publication?.registryId || '').trim();
+  const successText = registryId
+    ? `Published ${itemLabel} to Registry as ${registryId}.`
+    : `Published ${itemLabel} to Registry.`;
+  if (approvalInput) {
+    approvalInput.value = '';
+  }
+  syncHouseLibraryPublishControls(selectedItem);
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return data;
+}
+
 function renderHouseLibrarySurface() {
   const listNode = el('houseLibraryList');
   const detailNode = el('houseLibraryDetail');
@@ -1844,7 +1912,19 @@ function renderHouseLibrarySurface() {
   const actionsNode = el('houseLibraryActions');
   const importInput = el('houseLibraryImportInput');
   const importBtn = el('houseLibraryImportBtn');
-  if (!listNode || !detailNode || !emptyNode || !selectedNode || !actionsNode || !importInput || !importBtn) return;
+  const approvalInput = el('houseLibraryApprovalInput');
+  const publishBtn = el('houseLibraryPublishBtn');
+  if (
+    !listNode
+    || !detailNode
+    || !emptyNode
+    || !selectedNode
+    || !actionsNode
+    || !importInput
+    || !importBtn
+    || !approvalInput
+    || !publishBtn
+  ) return;
   const items = Array.isArray(houseSurfaceState.library.items) ? houseSurfaceState.library.items : [];
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
@@ -1857,6 +1937,7 @@ function renderHouseLibrarySurface() {
     houseSurfaceState.library.actionStatusError
   );
   syncHouseLibraryImportControls();
+  syncHouseLibraryPublishControls(null);
   selectedNode.textContent = selectedItems.length
     ? `Selected for this chat: ${selectedItems.map((item) => String(item?.title || item?.libraryItemId || '')).join(', ')}`
     : 'Selected for this chat: none.';
@@ -1867,7 +1948,7 @@ function renderHouseLibrarySurface() {
 
   const selectedItemId = houseSurfaceState.library.selectedItemId || String(items[0]?.libraryItemId || '');
   houseSurfaceState.library.selectedItemId = selectedItemId;
-  const selectedItem = items.find((item) => String(item?.libraryItemId || '') === selectedItemId) || items[0];
+  const selectedItem = getSelectedHouseLibraryItem() || items[0];
   const selectedItemStateParts = [];
   if (String(selectedItem?.importedState || '') === 'imported_artifact') {
     selectedItemStateParts.push('Imported from Registry');
@@ -1875,6 +1956,7 @@ function renderHouseLibrarySurface() {
   if (selectedItem?.readOnly === true) {
     selectedItemStateParts.push('Read only');
   }
+  syncHouseLibraryPublishControls(selectedItem);
 
   items.forEach((item) => {
     const itemStateParts = [];
@@ -5271,6 +5353,34 @@ function bindTownDistrictControls() {
         await importHouseLibraryRegistryArtifact();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_IMPORT_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryApprovalInput = el('houseLibraryApprovalInput');
+  if (houseLibraryApprovalInput) {
+    houseLibraryApprovalInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryPublishBtn = el('houseLibraryPublishBtn');
+      if (houseLibraryPublishBtn && !houseLibraryPublishBtn.disabled) {
+        houseLibraryPublishBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryPublishBtn = el('houseLibraryPublishBtn');
+  if (houseLibraryPublishBtn) {
+    houseLibraryPublishBtn.onclick = async () => {
+      houseLibraryPublishBtn.disabled = true;
+      try {
+        await publishSelectedHouseLibraryItemToRegistry();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_PUBLISH_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {
