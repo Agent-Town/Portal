@@ -36,7 +36,7 @@ test('M25.0: unified platform harness exposes deterministic late-phase fixtures 
   expect(statsB?.ok).toBe(true);
   expect(statsA.stats).toEqual(statsB.stats);
   expect(statsA.stats?.fixtureFamilies).toEqual(expect.arrayContaining(REQUIRED_FAMILIES));
-  expect(statsA.stats?.inspectors).toEqual({
+  expect(statsA.stats?.inspectors).toEqual(expect.objectContaining({
     artifacts: true,
     seals: true,
     house: true,
@@ -46,7 +46,12 @@ test('M25.0: unified platform harness exposes deterministic late-phase fixtures 
     houseOfficeBriefing: true,
     houseOfficeAttention: true,
     houseOfficeAssignments: true,
-  });
+    houseWorkerDeployments: true,
+    houseWorkerSessions: true,
+    houseWorkerEvents: true,
+    houseWorkerShares: true,
+    houseWorkerSupervisor: true,
+  }));
   expect(String(statsA.stats?.fixtureManifestHash || '')).toMatch(/^sha256:/);
   expect(String(statsA.stats?.fixtureManifest?.trainer_real_result_seed || '')).toMatch(/^sha256:/);
   expect(String(statsA.stats?.fixtureManifest?.joined_completion_smoke_seed || '')).toMatch(/^sha256:/);

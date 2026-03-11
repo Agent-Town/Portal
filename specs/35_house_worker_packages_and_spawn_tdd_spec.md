@@ -24,7 +24,7 @@ Goal: convert Option B and Option C into one deterministic implementation path:
 Implementation baseline:
 
 1. House Office phases `28` through `33` are implemented.
-2. Current branch baseline is `84c218c`.
+2. Current branch baseline is `679c4ad`.
 3. Current repo already has:
    A. Registry entities, versions, bundles, and loadouts,
    B. House offices, staff agents, and assignments,
@@ -43,9 +43,10 @@ Current proof state:
 
 1. `215` through `228` are green.
 2. Skill/API sync is green in `e2e/55` and `e2e/135`.
-6. Default tests remain deterministic and offline-safe.
-7. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
-8. New worker-tool behavior must sync:
+3. Full deterministic suite is green at `347 passed, 4 skipped`.
+4. Default tests remain deterministic and offline-safe.
+5. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
+6. New worker-tool behavior must sync:
    A. [public/skill.md](../public/skill.md)
    B. [docs/internal-skill-testline.md](../docs/internal-skill-testline.md)
    C. `e2e/55_phase3_skill_contract_line.spec.js` or adjacent new tests.

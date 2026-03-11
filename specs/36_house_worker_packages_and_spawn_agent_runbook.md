@@ -16,6 +16,7 @@ Current proof state:
 
 1. `T35.0` through `T35.13` are implemented.
 2. `e2e/215` through `e2e/228` are green.
+3. Full deterministic suite is green at `347 passed, 4 skipped`.
 
 This is not a competing plan.
 It is the detailed execution layer for:
