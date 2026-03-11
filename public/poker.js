@@ -364,10 +364,13 @@
             </div>
             <div class="pokerSummary">
               ${renderSummaryMetric('Seat', `${Number(item.seatNumber || 0)}`)}
-              ${renderSummaryMetric('Buy-In', `${Number(item.buyInOil || 0)} OIL`)}
+              ${renderSummaryMetric('Invested', `${Number(item.investedOil || 0)} OIL`)}
+              ${renderSummaryMetric('Returned', `${Number(item.returnedOil || 0)} OIL`)}
               ${renderSummaryMetric('Prize', `${Number(item.prizeOil || 0)} OIL`)}
+              ${renderSummaryMetric('Net', `${Number(item.netOil || 0)} OIL`)}
               ${renderSummaryMetric('Finish', item.finishPosition ? `${Number(item.finishPosition || 0)}` : 'n/a')}
             </div>
+            <div class="pokerMuted">${escapeHtml(item.live ? `live stack ${Number(item.stackOil || 0)} OIL · ${formatPlaySeatStatus(item.status)}` : formatPlaySeatStatus(item.status))}</div>
             <div class="pokerLinks">
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}`))}">Open Table</a>
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}/history`, { status: 'completed' }))}">Hand History</a>
@@ -1121,6 +1124,7 @@
     const payload = await api(buildPlayResultsApiPath());
     const data = payload?.data || {};
     const summary = data?.summary || {};
+    const liveSeatSummary = data?.liveSeatSummary || {};
     const items = Array.isArray(data?.items) ? data.items : [];
     renderCards([
       `
@@ -1131,11 +1135,34 @@
           ${renderSummaryMetric('Cash', `${Number(summary?.cashCount || 0)}`)}
           ${renderSummaryMetric('Tournaments', `${Number(summary?.tournamentCount || 0)}`)}
           ${renderSummaryMetric('Buy-Ins', `${Number(summary?.buyInOil || 0)} OIL`)}
+          ${renderSummaryMetric('Reloads', `${Number(summary?.reloadOil || 0)} OIL`)}
+          ${renderSummaryMetric('Returned', `${Number(summary?.returnedOil || 0)} OIL`)}
           ${renderSummaryMetric('Prizes', `${Number(summary?.prizeOil || 0)} OIL`)}
           ${renderSummaryMetric('Net', `${Number(summary?.netOil || 0)} OIL`)}
         </div>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+        </div>
+      `,
+      `
+        <h2>Tournament Stats</h2>
+        <p>Native live-play tournament rollups for the current wallet only.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Entries', `${Number(summary?.tournamentEntries || 0)}`)}
+          ${renderSummaryMetric('Cashes', `${Number(summary?.tournamentCashes || 0)}`)}
+          ${renderSummaryMetric('Wins', `${Number(summary?.tournamentWins || 0)}`)}
+          ${renderSummaryMetric('ROI', `${Number(summary?.tournamentRoiPercent || 0)}%`)}
+          ${renderSummaryMetric('Cash Net', `${Number(summary?.cashNetOil || 0)} OIL`)}
+        </div>
+      `,
+      `
+        <h2>Live Seat Summary</h2>
+        <p>Current open seats for the bound wallet stay separate from the settled lifetime totals.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Active Seats', `${Number(liveSeatSummary?.activeSeatCount || 0)}`)}
+          ${renderSummaryMetric('Cash Seats', `${Number(liveSeatSummary?.cashSeatCount || 0)}`)}
+          ${renderSummaryMetric('Tournament Seats', `${Number(liveSeatSummary?.tournamentSeatCount || 0)}`)}
+          ${renderSummaryMetric('Live Stack', `${Number(liveSeatSummary?.stackOil || 0)} OIL`)}
         </div>
       `,
       `

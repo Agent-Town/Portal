@@ -536,6 +536,42 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_integrity_flags_table_status_idx
       ON poker_play_integrity_flags(table_id, status, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_player_stats (
+      result_id TEXT PRIMARY KEY,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      table_id TEXT NOT NULL,
+      series_id TEXT,
+      series_title TEXT,
+      table_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      seat_number INTEGER,
+      display_name TEXT NOT NULL,
+      buy_in_oil INTEGER NOT NULL DEFAULT 0,
+      reload_oil INTEGER NOT NULL DEFAULT 0,
+      cashout_oil INTEGER NOT NULL DEFAULT 0,
+      refund_oil INTEGER NOT NULL DEFAULT 0,
+      prize_oil INTEGER NOT NULL DEFAULT 0,
+      stack_oil INTEGER NOT NULL DEFAULT 0,
+      finish_position INTEGER,
+      status TEXT NOT NULL,
+      payout_settled_at TEXT,
+      opened_at TEXT NOT NULL,
+      closed_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_player_stats_wallet_updated_idx
+      ON poker_play_player_stats(wallet_subject, updated_at DESC, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_play_player_stats_table_wallet_idx
+      ON poker_play_player_stats(table_id, wallet_subject, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_play_player_stats_series_wallet_idx
+      ON poker_play_player_stats(series_id, wallet_subject, updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_play_audit_events (
       audit_event_id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -926,6 +962,7 @@ function countTableRows(tableName) {
     'poker_play_actions',
     'poker_play_disputes',
     'poker_play_integrity_flags',
+    'poker_play_player_stats',
     'poker_play_audit_events',
     'poker_streamflow_lock_verifications',
     'poker_oil_snapshot_events',
@@ -957,6 +994,7 @@ function resetExtendedStore() {
     'poker_play_audit_events',
     'poker_play_disputes',
     'poker_play_integrity_flags',
+    'poker_play_player_stats',
     'poker_play_messages',
     'poker_play_hands',
     'poker_play_seats',
@@ -3648,6 +3686,178 @@ function upsertPokerPlayDispute({
   });
 }
 
+function hydratePokerPlayPlayerStat(row) {
+  if (!row) return null;
+  return {
+    resultId: row.result_id,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    tableId: row.table_id,
+    seriesId: row.series_id || null,
+    seriesTitle: row.series_title || null,
+    tableType: row.table_type,
+    title: row.title,
+    seatNumber: Number(row.seat_number || 0) || null,
+    displayName: row.display_name,
+    buyInOil: Number(row.buy_in_oil || 0),
+    reloadOil: Number(row.reload_oil || 0),
+    cashoutOil: Number(row.cashout_oil || 0),
+    refundOil: Number(row.refund_oil || 0),
+    prizeOil: Number(row.prize_oil || 0),
+    stackOil: Number(row.stack_oil || 0),
+    finishPosition: Number(row.finish_position || 0) || null,
+    status: row.status,
+    payoutSettledAt: row.payout_settled_at || null,
+    openedAt: row.opened_at,
+    closedAt: row.closed_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerPlayPlayerStatById(resultId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_play_player_stats
+    WHERE result_id = ?
+    LIMIT 1
+  `).get(resultId);
+  return hydratePokerPlayPlayerStat(row);
+}
+
+function getOpenPokerPlayPlayerStatByTableAndWalletSubject(tableId, walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_play_player_stats
+    WHERE table_id = ? AND wallet_subject = ? AND closed_at IS NULL
+    ORDER BY updated_at DESC, created_at DESC
+    LIMIT 1
+  `).get(tableId, walletSubject);
+  return hydratePokerPlayPlayerStat(row);
+}
+
+function listPokerPlayPlayerStatsByWalletSubject(walletSubject, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_player_stats
+    WHERE wallet_subject = ?
+    ORDER BY COALESCE(closed_at, payout_settled_at, updated_at) DESC, updated_at DESC, created_at DESC, result_id DESC
+    LIMIT ?
+  `).all(walletSubject, safeLimit);
+  return rows.map(hydratePokerPlayPlayerStat).filter(Boolean);
+}
+
+function upsertPokerPlayPlayerStat({
+  resultId = null,
+  walletSubject,
+  houseId = null,
+  tableId,
+  seriesId = null,
+  seriesTitle = null,
+  tableType = 'cash',
+  title = 'Live Table',
+  seatNumber = null,
+  displayName = 'Seat',
+  buyInOil = 0,
+  reloadOil = 0,
+  cashoutOil = 0,
+  refundOil = 0,
+  prizeOil = 0,
+  stackOil = 0,
+  finishPosition = null,
+  status = 'open',
+  payoutSettledAt = null,
+  openedAt = null,
+  closedAt = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const nextResultId = resultId || makeId('pkrslt');
+    const existing = database.prepare(`
+      SELECT * FROM poker_play_player_stats
+      WHERE result_id = ?
+      LIMIT 1
+    `).get(nextResultId);
+    database.prepare(`
+      INSERT INTO poker_play_player_stats (
+        result_id,
+        wallet_subject,
+        house_id,
+        table_id,
+        series_id,
+        series_title,
+        table_type,
+        title,
+        seat_number,
+        display_name,
+        buy_in_oil,
+        reload_oil,
+        cashout_oil,
+        refund_oil,
+        prize_oil,
+        stack_oil,
+        finish_position,
+        status,
+        payout_settled_at,
+        opened_at,
+        closed_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(result_id) DO UPDATE SET
+        wallet_subject = excluded.wallet_subject,
+        house_id = excluded.house_id,
+        table_id = excluded.table_id,
+        series_id = excluded.series_id,
+        series_title = excluded.series_title,
+        table_type = excluded.table_type,
+        title = excluded.title,
+        seat_number = excluded.seat_number,
+        display_name = excluded.display_name,
+        buy_in_oil = excluded.buy_in_oil,
+        reload_oil = excluded.reload_oil,
+        cashout_oil = excluded.cashout_oil,
+        refund_oil = excluded.refund_oil,
+        prize_oil = excluded.prize_oil,
+        stack_oil = excluded.stack_oil,
+        finish_position = excluded.finish_position,
+        status = excluded.status,
+        payout_settled_at = excluded.payout_settled_at,
+        opened_at = excluded.opened_at,
+        closed_at = excluded.closed_at,
+        updated_at = excluded.updated_at
+    `).run(
+      nextResultId,
+      walletSubject,
+      houseId,
+      tableId,
+      seriesId,
+      seriesTitle,
+      tableType,
+      title,
+      seatNumber == null ? null : Number(seatNumber || 0),
+      displayName,
+      Number(buyInOil || 0),
+      Number(reloadOil || 0),
+      Number(cashoutOil || 0),
+      Number(refundOil || 0),
+      Number(prizeOil || 0),
+      Number(stackOil || 0),
+      finishPosition == null ? null : Number(finishPosition || 0),
+      status,
+      payoutSettledAt,
+      existing?.opened_at || openedAt || createdAt || now,
+      closedAt,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerPlayPlayerStatById(nextResultId);
+  });
+}
+
 function hydratePokerPlayAuditEvent(row) {
   if (!row) return null;
   return {
@@ -4127,6 +4337,8 @@ module.exports = {
   getPokerPlayHandById,
   getPokerPlayDisputeById,
   getPokerPlayIntegrityFlagById,
+  getPokerPlayPlayerStatById,
+  getOpenPokerPlayPlayerStatByTableAndWalletSubject,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -4162,6 +4374,7 @@ module.exports = {
   listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
@@ -4182,6 +4395,7 @@ module.exports = {
   upsertPokerPlayDispute,
   upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
+  upsertPokerPlayPlayerStat,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
   upsertPokerPlayWaitlistEntry,

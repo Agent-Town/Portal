@@ -2043,82 +2043,283 @@ function buildPokerPlaySeriesTimelinePayload(deps, { seriesId, session, req, pro
   };
 }
 
+function buildPokerPlayResultFinishPosition(deps, item, walletSubject, processAt) {
+  if (Number(item?.finishPosition || 0) > 0) {
+    return Number(item.finishPosition || 0);
+  }
+  const seriesId = normalizeTrimmedString(item?.seriesId);
+  const tableId = normalizeTrimmedString(item?.tableId);
+  if (!seriesId) return null;
+  const entries = listTournamentSeriesEntriesBySeriesId(deps, seriesId, {
+    processAt,
+    includeClosed: true,
+  });
+  const series = buildPokerPlaySeriesSummary(entries.map((entry) => ({
+    ...entry,
+    viewerSeat: null,
+    summary: computeTableSummary(entry?.table, entry?.seats, entry?.hand, null),
+  })), walletSubject);
+  const standings = Array.isArray(series?.standings) ? series.standings : [];
+  const walletMatch = standings.find((standing) => {
+    const standingWallet = normalizeTrimmedString(standing?.walletSubject);
+    return standingWallet && standingWallet === normalizeTrimmedString(walletSubject);
+  });
+  if (walletMatch) {
+    return Number(walletMatch.place || 0) || null;
+  }
+  const seatMatch = standings.find((standing) => (
+    normalizeTrimmedString(standing?.tableId) === tableId
+      && normalizeSeatNumber(standing?.seatNumber) === normalizeSeatNumber(item?.seatNumber)
+  ));
+  if (seatMatch) {
+    return Number(seatMatch.place || 0) || null;
+  }
+  const tableMatch = standings.find((standing) => normalizeTrimmedString(standing?.tableId) === tableId);
+  return Number(tableMatch?.place || 0) || null;
+}
+
+function buildPokerPlayResultItem(item, { currentSeat = null, finishPosition = null } = {}) {
+  const buyInOil = Number(item?.buyInOil || 0);
+  const reloadOil = Number(item?.reloadOil || 0);
+  const investedOil = buyInOil + reloadOil;
+  const cashoutOil = Number(item?.cashoutOil || 0);
+  const refundOil = Number(item?.refundOil || 0);
+  const returnedOil = cashoutOil + refundOil;
+  const prizeOil = Number(item?.prizeOil || 0);
+  const stackOil = Number(currentSeat?.stackOil ?? item?.stackOil ?? 0);
+  const live = !!currentSeat && !normalizeTrimmedString(item?.closedAt);
+  return {
+    resultId: item?.resultId || null,
+    tableId: item?.tableId || null,
+    tableType: item?.tableType || 'cash',
+    title: item?.title || 'Live Table',
+    seatNumber: normalizeSeatNumber(currentSeat?.seatNumber || item?.seatNumber),
+    displayName: currentSeat?.displayName || item?.displayName || 'Seat',
+    buyInOil,
+    reloadOil,
+    investedOil,
+    cashoutOil,
+    refundOil,
+    returnedOil,
+    stackOil,
+    prizeOil,
+    netOil: returnedOil + prizeOil - investedOil,
+    finishPosition: Number(finishPosition || item?.finishPosition || 0) || null,
+    payoutSettledAt: item?.payoutSettledAt || null,
+    completedAt: item?.closedAt || item?.payoutSettledAt || null,
+    openedAt: item?.openedAt || item?.createdAt || null,
+    updatedAt: item?.updatedAt || null,
+    status: currentSeat?.status || item?.status || 'open',
+    live,
+    seriesId: item?.seriesId || null,
+    seriesTitle: item?.seriesTitle || null,
+  };
+}
+
+function buildPokerPlaySeatResultFallback(deps, seat, walletSubject, processAt) {
+  const table = deps.getPokerPlayTableById(seat.tableId);
+  if (!table) return null;
+  const hand = deps.getCurrentPokerPlayHandForTable(seat.tableId);
+  const synced = syncPokerPlayTable(deps, seat.tableId, { processAt });
+  const viewerSeat = deps.getPokerPlaySeatByWalletSubject(seat.tableId, walletSubject) || seat;
+  const seriesRef = getTournamentSeriesRef(synced.table);
+  const fallback = {
+    resultId: null,
+    tableId: synced.table.tableId,
+    tableType: synced.table.tableType,
+    title: synced.table.title || 'Live Table',
+    seatNumber: viewerSeat.seatNumber,
+    displayName: viewerSeat.displayName,
+    buyInOil: Number(viewerSeat.buyInOil || 0),
+    reloadOil: 0,
+    cashoutOil: 0,
+    refundOil: 0,
+    stackOil: Number(viewerSeat.stackOil || 0),
+    prizeOil: Number(viewerSeat.prizeOil || 0),
+    finishPosition: null,
+    payoutSettledAt: viewerSeat.payoutSettledAt || null,
+    closedAt: null,
+    openedAt: viewerSeat.createdAt || null,
+    updatedAt: viewerSeat.updatedAt || null,
+    status: viewerSeat.status || 'active',
+    seriesId: seriesRef.seriesId || null,
+    seriesTitle: seriesRef.seriesTitle || null,
+  };
+  const finishPosition = buildPokerPlayResultFinishPosition(deps, fallback, walletSubject, processAt);
+  return buildPokerPlayResultItem(fallback, {
+    currentSeat: viewerSeat,
+    finishPosition,
+  });
+}
+
+function sortPokerPlayResultItems(items) {
+  return (Array.isArray(items) ? items.slice() : []).sort((left, right) => {
+    const leftAt = Date.parse(String(left?.completedAt || left?.payoutSettledAt || left?.updatedAt || left?.openedAt || ''));
+    const rightAt = Date.parse(String(right?.completedAt || right?.payoutSettledAt || right?.updatedAt || right?.openedAt || ''));
+    if (Number.isFinite(leftAt) && Number.isFinite(rightAt) && leftAt !== rightAt) {
+      return rightAt - leftAt;
+    }
+    return `${String(right?.tableId || '')}:${String(right?.resultId || '')}`
+      .localeCompare(`${String(left?.tableId || '')}:${String(left?.resultId || '')}`);
+  });
+}
+
 function buildPokerPlayMyResultsPayload(deps, { session, req, processAt, limit = 50 } = {}) {
   const requestAt = toProcessIso(deps, processAt);
   const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
   if (!walletBinding?.walletSubject) {
     throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before reading poker results.');
   }
-  const items = (typeof deps.listPokerPlaySeatsByWalletSubject === 'function'
-    ? deps.listPokerPlaySeatsByWalletSubject(walletBinding.walletSubject, { limit: Math.max(1, Number(limit || 50)) })
-    : [])
-    .map((seat) => {
-      const table = deps.getPokerPlayTableById(seat.tableId);
-      if (!table) return null;
-      const hand = deps.getCurrentPokerPlayHandForTable(seat.tableId);
-      const synced = table ? syncPokerPlayTable(deps, seat.tableId, { processAt: requestAt }) : { table, seats: [], hand };
-      const viewerSeat = deps.getPokerPlaySeatByWalletSubject(seat.tableId, walletBinding.walletSubject) || seat;
-      const seriesRef = getTournamentSeriesRef(synced.table);
-      const series = seriesRef.seriesId
-        ? buildPokerPlaySeriesSummary(
-          listExistingTournamentSeriesTables(deps, seriesRef.matchKey, { processAt: requestAt, includeClosed: true }).map((entry) => {
-            const currentViewerSeat = deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject) || null;
-            return {
-              ...entry,
-              viewerSeat: currentViewerSeat,
-              summary: computeTableSummary(entry.table, entry.seats, entry.hand, currentViewerSeat),
-            };
-          }),
-          walletBinding.walletSubject
-        )
-        : null;
-      const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
-      const finishPosition = normalizeTrimmedString(walletBinding.walletSubject)
-        ? Number(
-          (Array.isArray(series?.standings) ? series.standings : [])
-            .find((item) => normalizeTrimmedString(item?.walletSubject) === normalizeTrimmedString(walletBinding.walletSubject))
-            ?.place || 0
-        ) || null
-        : null;
-      return {
-        tableId: synced.table.tableId,
-        tableType: synced.table.tableType,
-        title: synced.table.title || 'Live Table',
-        seatNumber: Number(viewerSeat.seatNumber || 0),
-        buyInOil: Number(viewerSeat.buyInOil || 0),
-        stackOil: Number(viewerSeat.stackOil || 0),
-        prizeOil: Number(viewerSeat.prizeOil || 0),
-        finishPosition,
-        payoutSettledAt: viewerSeat.payoutSettledAt || null,
-        completedAt: summary?.completedAt || null,
-        status: String(viewerSeat.status || ''),
-        seriesId: seriesRef.seriesId || null,
-        seriesTitle: seriesRef.seriesTitle || null,
-      };
-    })
+  const requestedWalletSubject = normalizeTrimmedString(req?.query?.walletSubject);
+  if (requestedWalletSubject && requestedWalletSubject !== normalizeTrimmedString(walletBinding.walletSubject)) {
+    throw createRouteError(403, 'FORBIDDEN', 'This route only exposes poker results for the bound wallet subject.');
+  }
+  const effectiveWalletSubject = requestedWalletSubject || walletBinding.walletSubject;
+  const safeLimit = Math.max(1, Math.min(200, Number(limit || 50)));
+  const currentSeats = typeof deps.listPokerPlaySeatsByWalletSubject === 'function'
+    ? deps.listPokerPlaySeatsByWalletSubject(effectiveWalletSubject, { limit: Math.max(50, safeLimit) })
+    : [];
+  const liveSeats = currentSeats.filter((seat) => {
+    const status = normalizeTrimmedString(seat?.status).toLowerCase();
+    return isSeatOccupyingTable(seat) && status !== 'closed_refund';
+  });
+  const currentSeatByTableId = new Map(currentSeats.map((seat) => [normalizeTrimmedString(seat?.tableId), seat]));
+  const statRows = typeof deps.listPokerPlayPlayerStatsByWalletSubject === 'function'
+    ? deps.listPokerPlayPlayerStatsByWalletSubject(effectiveWalletSubject, { limit: Math.max(50, safeLimit) })
+    : [];
+  const items = statRows
+    .map((stat) => buildPokerPlayResultItem({
+      ...stat,
+      finishPosition: buildPokerPlayResultFinishPosition(deps, stat, effectiveWalletSubject, requestAt),
+    }, {
+      currentSeat: currentSeatByTableId.get(normalizeTrimmedString(stat?.tableId)) || null,
+    }))
     .filter(Boolean);
+  const representedTables = new Set(items.map((item) => normalizeTrimmedString(item?.tableId)).filter(Boolean));
+  for (const seat of currentSeats) {
+    const tableId = normalizeTrimmedString(seat?.tableId);
+    if (!tableId || representedTables.has(tableId)) continue;
+    const fallback = buildPokerPlaySeatResultFallback(deps, seat, effectiveWalletSubject, requestAt);
+    if (fallback) items.push(fallback);
+  }
+  const sortedItems = sortPokerPlayResultItems(items).slice(0, safeLimit);
+  const liveSeatSummary = liveSeats.reduce((acc, seat) => {
+    acc.activeSeatCount += 1;
+    acc.stackOil += Number(seat?.stackOil || 0);
+    if (normalizePokerPlayTableType(seat?.tableType || deps.getPokerPlayTableById(seat?.tableId)?.tableType) === 'tournament') {
+      acc.tournamentSeatCount += 1;
+    } else {
+      acc.cashSeatCount += 1;
+    }
+    return acc;
+  }, {
+    activeSeatCount: 0,
+    cashSeatCount: 0,
+    tournamentSeatCount: 0,
+    stackOil: 0,
+  });
   const summary = items.reduce((acc, item) => {
     acc.tableCount += 1;
     acc.buyInOil += Number(item?.buyInOil || 0);
+    acc.reloadOil += Number(item?.reloadOil || 0);
+    acc.investedOil += Number(item?.investedOil || 0);
+    acc.returnedOil += Number(item?.returnedOil || 0);
     acc.prizeOil += Number(item?.prizeOil || 0);
+    acc.netOil += Number(item?.netOil || 0);
     if (item?.tableType === 'tournament') acc.tournamentCount += 1;
-    if (item?.tableType === 'cash') acc.cashCount += 1;
+    if (item?.tableType === 'cash') {
+      acc.cashCount += 1;
+      if (!item?.live) {
+        acc.cashNetOil += Number(item?.netOil || 0);
+      }
+    }
+    if (item?.tableType === 'tournament') {
+      acc.tournamentEntries += 1;
+      acc.tournamentInvestedOil += Number(item?.investedOil || 0);
+      acc.tournamentPrizeOil += Number(item?.prizeOil || 0);
+      acc.tournamentNetOil += Number(item?.netOil || 0);
+      if (Number(item?.prizeOil || 0) > 0) acc.tournamentCashes += 1;
+      if (Number(item?.finishPosition || 0) === 1) acc.tournamentWins += 1;
+    }
     return acc;
   }, {
     tableCount: 0,
     cashCount: 0,
     tournamentCount: 0,
     buyInOil: 0,
+    reloadOil: 0,
+    investedOil: 0,
+    returnedOil: 0,
     prizeOil: 0,
     netOil: 0,
+    cashNetOil: 0,
+    tournamentEntries: 0,
+    tournamentCashes: 0,
+    tournamentWins: 0,
+    tournamentInvestedOil: 0,
+    tournamentPrizeOil: 0,
+    tournamentNetOil: 0,
   });
-  summary.netOil = Number(summary.prizeOil || 0) - Number(summary.buyInOil || 0);
+  summary.tournamentRoiPercent = summary.tournamentInvestedOil > 0
+    ? Number((((Number(summary.tournamentNetOil || 0)) / Number(summary.tournamentInvestedOil || 0)) * 100).toFixed(2))
+    : 0;
+  summary.liveSeatCount = liveSeatSummary.activeSeatCount;
+  summary.liveStackOil = liveSeatSummary.stackOil;
   return {
-    walletSubject: walletBinding.walletSubject,
-    items,
+    walletSubject: effectiveWalletSubject,
+    liveSeatSummary,
+    items: sortedItems,
     summary,
     processAt: requestAt,
   };
+}
+
+function upsertPokerPlayPlayerStatForSeat(deps, table, seat, {
+  processAt,
+  reloadOilDelta = 0,
+  cashoutOilDelta = 0,
+  refundOilDelta = 0,
+  prizeOil = null,
+  finishPosition = null,
+  status = '',
+  close = false,
+  closedAt = null,
+  payoutSettledAt = null,
+  stackOil = null,
+} = {}) {
+  if (typeof deps.upsertPokerPlayPlayerStat !== 'function' || typeof deps.getOpenPokerPlayPlayerStatByTableAndWalletSubject !== 'function') {
+    return null;
+  }
+  const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+  if (!walletSubject || !table?.tableId) return null;
+  const requestAt = toProcessIso(deps, processAt);
+  const existing = deps.getOpenPokerPlayPlayerStatByTableAndWalletSubject(table.tableId, walletSubject);
+  const seriesRef = getTournamentSeriesRef(table);
+  return deps.upsertPokerPlayPlayerStat({
+    resultId: existing?.resultId || null,
+    walletSubject,
+    houseId: seat?.houseId || existing?.houseId || null,
+    tableId: table.tableId,
+    seriesId: seriesRef.seriesId || existing?.seriesId || null,
+    seriesTitle: seriesRef.seriesTitle || existing?.seriesTitle || null,
+    tableType: normalizePokerPlayTableType(table?.tableType),
+    title: normalizeTrimmedString(table?.title, existing?.title || 'Live Table'),
+    seatNumber: normalizeSeatNumber(seat?.seatNumber),
+    displayName: normalizeTrimmedString(seat?.displayName, existing?.displayName || 'Seat'),
+    buyInOil: existing?.buyInOil != null ? Number(existing.buyInOil || 0) : Number(seat?.buyInOil || 0),
+    reloadOil: Number(existing?.reloadOil || 0) + Number(reloadOilDelta || 0),
+    cashoutOil: Number(existing?.cashoutOil || 0) + Number(cashoutOilDelta || 0),
+    refundOil: Number(existing?.refundOil || 0) + Number(refundOilDelta || 0),
+    prizeOil: prizeOil == null ? Math.max(Number(existing?.prizeOil || 0), Number(seat?.prizeOil || 0)) : Number(prizeOil || 0),
+    stackOil: stackOil == null ? Number(seat?.stackOil || 0) : Number(stackOil || 0),
+    finishPosition: finishPosition == null ? (existing?.finishPosition || null) : Number(finishPosition || 0),
+    status: status || existing?.status || normalizeTrimmedString(seat?.status, 'open'),
+    payoutSettledAt: payoutSettledAt || existing?.payoutSettledAt || seat?.payoutSettledAt || null,
+    openedAt: existing?.openedAt || seat?.createdAt || requestAt,
+    closedAt: close ? (closedAt || requestAt) : existing?.closedAt || null,
+    createdAt: existing?.createdAt || seat?.createdAt || requestAt,
+    updatedAt: requestAt,
+  });
 }
 
 function postSeatAgentProposal(deps, { handId, session, req, body } = {}) {
@@ -2460,6 +2661,13 @@ function settleQueuedCashouts(deps, table, seats, hand, atIso) {
         memo: `${table.title} queued cashout`,
       });
     }
+    upsertPokerPlayPlayerStatForSeat(deps, table, seat, {
+      processAt: atIso,
+      cashoutOilDelta: returnedOil,
+      status: 'cashed_out',
+      close: true,
+      stackOil: 0,
+    });
     deps.createPokerPlayMessage({
       tableId: table.tableId,
       handId: hand?.handId || null,
@@ -2482,10 +2690,14 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
   let nextSeats = Array.isArray(seats) ? seats.slice() : [];
   for (const seat of nextSeats) {
     if (normalizeTrimmedString(seat?.status).toLowerCase() !== 'registered') continue;
-    deps.upsertPokerPlaySeat({
+    const updatedSeat = deps.upsertPokerPlaySeat({
       ...seat,
       status: 'active',
       updatedAt: atIso,
+    });
+    upsertPokerPlayPlayerStatForSeat(deps, table, updatedSeat, {
+      processAt: atIso,
+      status: 'open',
     });
   }
   nextSeats = deps.listPokerPlaySeatsByTable(table.tableId);
@@ -2602,7 +2814,7 @@ function settleTournamentIfComplete(deps, table, seats, hand, atIso) {
         });
       }
       const isWinner = Number(placement.place || 0) === 1;
-      deps.upsertPokerPlaySeat({
+      const updatedSeat = deps.upsertPokerPlaySeat({
         ...seat,
         status: payoutOil > 0 ? 'paid' : 'busted',
         stackOil: 0,
@@ -2610,6 +2822,15 @@ function settleTournamentIfComplete(deps, table, seats, hand, atIso) {
         prizeOil: payoutOil,
         payoutSettledAt: payoutOil > 0 ? (seat?.payoutSettledAt || atIso) : seat?.payoutSettledAt || null,
         updatedAt: atIso,
+      });
+      upsertPokerPlayPlayerStatForSeat(deps, entry.table, updatedSeat, {
+        processAt: atIso,
+        prizeOil: payoutOil,
+        finishPosition: Number(placement.place || 0) || null,
+        status: payoutOil > 0 ? 'paid' : 'busted',
+        payoutSettledAt: payoutOil > 0 ? (seat?.payoutSettledAt || atIso) : null,
+        close: true,
+        stackOil: 0,
       });
       const resultHandId = entry?.hand?.handId || entry?.table?.state?.lastSettledHandId || entry?.table?.state?.activeHandId || hand?.handId || null;
       if (payoutOil > 0 && resultHandId && !seat?.payoutSettledAt) {
@@ -3138,12 +3359,19 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
         refundedTotalOil += refundAmount;
       }
       finalSeatStatusByNumber.set(seatNumber, 'closed_refund');
-      deps.upsertPokerPlaySeat({
+      const updatedSeat = deps.upsertPokerPlaySeat({
         ...seat,
         status: 'closed_refund',
         stackOil: 0,
         disconnectedAt: null,
         updatedAt: requestAt,
+      });
+      upsertPokerPlayPlayerStatForSeat(deps, table, updatedSeat, {
+        processAt: requestAt,
+        refundOilDelta: refundAmount,
+        status: 'closed_refund',
+        close: true,
+        stackOil: 0,
       });
       continue;
     }
@@ -3166,13 +3394,20 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
       refundedTotalOil += refundAmount;
     }
     finalSeatStatusByNumber.set(seatNumber, alreadySettled ? status : 'void_refund');
-    deps.upsertPokerPlaySeat({
+    const updatedSeat = deps.upsertPokerPlaySeat({
       ...seat,
       status: alreadySettled ? status : 'void_refund',
       stackOil: 0,
       disconnectedAt: null,
       eliminatedAt: alreadySettled ? (seat?.eliminatedAt || null) : (seat?.eliminatedAt || requestAt),
       updatedAt: requestAt,
+    });
+    upsertPokerPlayPlayerStatForSeat(deps, table, updatedSeat, {
+      processAt: requestAt,
+      refundOilDelta: refundAmount,
+      status: alreadySettled ? status : 'void_refund',
+      close: true,
+      stackOil: 0,
     });
   }
 
@@ -4415,7 +4650,7 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     });
   }
 
-  deps.upsertPokerPlaySeat({
+  const seatedSeat = deps.upsertPokerPlaySeat({
     tableId: table.tableId,
     seatNumber: openSeatNumber,
     portalSessionId: session.sessionId,
@@ -4432,6 +4667,12 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     prizeOil: 0,
     payoutSettledAt: null,
     updatedAt: requestAt,
+  });
+  upsertPokerPlayPlayerStatForSeat(deps, table, seatedSeat, {
+    processAt: requestAt,
+    status: normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live'
+      ? 'registered'
+      : 'open',
   });
   if (typeof deps.getPokerPlayWaitlistEntryByTableAndWalletSubject === 'function' && typeof deps.upsertPokerPlayWaitlistEntry === 'function') {
     const waitlistEntry = deps.getPokerPlayWaitlistEntryByTableAndWalletSubject(table.tableId, walletBinding.walletSubject);
@@ -4643,6 +4884,13 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
         memo: `${synced.table.title} cashout`,
       });
     }
+    upsertPokerPlayPlayerStatForSeat(deps, synced.table, seat, {
+      processAt: requestAt,
+      cashoutOilDelta: Number(seat.stackOil || 0),
+      status: 'cashed_out',
+      close: true,
+      stackOil: 0,
+    });
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
     deps.upsertPokerPlayTable({
       ...synced.table,
@@ -4670,6 +4918,13 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
         body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} cancels late registration before the next hand begins.`,
         createdAt: requestAt,
       });
+      upsertPokerPlayPlayerStatForSeat(deps, synced.table, seat, {
+        processAt: requestAt,
+        refundOilDelta: Number(seat.stackOil || 0),
+        status: 'unregistered',
+        close: true,
+        stackOil: 0,
+      });
       deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
       deps.upsertPokerPlayTable({
         ...synced.table,
@@ -4685,6 +4940,12 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
     if (seat.status === 'active' && Number(seat.stackOil || 0) > 0) {
       throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_STILL_ACTIVE', 'Tournament chips must finish the table; cashout is not available.');
     }
+    upsertPokerPlayPlayerStatForSeat(deps, synced.table, seat, {
+      processAt: requestAt,
+      status: normalizeTrimmedString(seat?.status, 'busted'),
+      close: true,
+      stackOil: 0,
+    });
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
     deps.upsertPokerPlayTable({
       ...synced.table,
@@ -4737,10 +4998,15 @@ function reloadTableSeat(deps, { tableId, session, req, body } = {}) {
     amount: amountOil,
     memo: `${table.title} reload`,
   });
-  deps.upsertPokerPlaySeat({
+  const updatedSeat = deps.upsertPokerPlaySeat({
     ...seat,
     stackOil: Number(seat.stackOil || 0) + amountOil,
     updatedAt: requestAt,
+  });
+  upsertPokerPlayPlayerStatForSeat(deps, table, updatedSeat, {
+    processAt: requestAt,
+    reloadOilDelta: amountOil,
+    status: 'open',
   });
   if (typeof deps.createPokerPlayAuditEvent === 'function') {
     deps.createPokerPlayAuditEvent({

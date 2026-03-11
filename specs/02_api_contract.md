@@ -554,17 +554,30 @@ Rail timeline notes:
 ### GET `/api/poker/play/results/me`
 Returns the bound wallet's live poker results surface with:
 - `data.walletSubject`
+- `data.liveSeatSummary.activeSeatCount`
+- `data.liveSeatSummary.cashSeatCount`
+- `data.liveSeatSummary.tournamentSeatCount`
+- `data.liveSeatSummary.stackOil`
 - `data.items[]`
+- `data.items[].resultId`
 - `data.items[].tableId`
 - `data.items[].tableType`
 - `data.items[].title`
 - `data.items[].seatNumber`
 - `data.items[].buyInOil`
+- `data.items[].reloadOil`
+- `data.items[].investedOil`
+- `data.items[].cashoutOil`
+- `data.items[].refundOil`
+- `data.items[].returnedOil`
 - `data.items[].stackOil`
 - `data.items[].prizeOil`
+- `data.items[].netOil`
 - `data.items[].finishPosition`
 - `data.items[].payoutSettledAt`
 - `data.items[].completedAt`
+- `data.items[].openedAt`
+- `data.items[].live`
 - `data.items[].status`
 - `data.items[].seriesId`
 - `data.items[].seriesTitle`
@@ -572,8 +585,26 @@ Returns the bound wallet's live poker results surface with:
 - `data.summary.cashCount`
 - `data.summary.tournamentCount`
 - `data.summary.buyInOil`
+- `data.summary.reloadOil`
+- `data.summary.investedOil`
+- `data.summary.returnedOil`
 - `data.summary.prizeOil`
 - `data.summary.netOil`
+- `data.summary.cashNetOil`
+- `data.summary.tournamentEntries`
+- `data.summary.tournamentCashes`
+- `data.summary.tournamentWins`
+- `data.summary.tournamentInvestedOil`
+- `data.summary.tournamentPrizeOil`
+- `data.summary.tournamentNetOil`
+- `data.summary.tournamentRoiPercent`
+- `data.summary.liveSeatCount`
+- `data.summary.liveStackOil`
+
+Results notes:
+- `walletSubject` query is optional for same-wallet replay/debug reads, but the route rejects any value that does not match the bound wallet subject with `FORBIDDEN`
+- `data.summary.cashNetOil` is realized cash-session net only and excludes still-open live cash seats
+- `data.summary.netOil` includes open live entries, so unresolved live buy-ins remain negative until they cash out, refund, or prize
 
 ### GET `/api/poker/play/rail/tables/:tableId`
 Returns the public spectator payload for one live table with:
