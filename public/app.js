@@ -576,6 +576,9 @@ const houseWorkerSupervisorState = {
   runtimes: new Map(),
   checkpoints: [],
   lastError: '',
+  localBrainReady: null,
+  localBrainStatusLabel: 'Checking local brain readiness...',
+  localBrainCheckedAt: 0,
 };
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
@@ -1713,6 +1716,51 @@ async function resolveHouseWorkerLlmConfig() {
   }
 }
 
+async function refreshHouseWorkerLocalBrainState({ force = false } = {}) {
+  const now = Date.now();
+  if (
+    force !== true
+    && houseWorkerSupervisorState.localBrainReady !== null
+    && (now - Number(houseWorkerSupervisorState.localBrainCheckedAt || 0)) < 3000
+  ) {
+    return houseWorkerSupervisorState.localBrainReady === true;
+  }
+  const llmConfig = await resolveHouseWorkerLlmConfig().catch(() => null);
+  const ready = !!llmConfig;
+  houseWorkerSupervisorState.localBrainReady = ready;
+  houseWorkerSupervisorState.localBrainCheckedAt = now;
+  houseWorkerSupervisorState.localBrainStatusLabel = ready
+    ? 'Local brain ready in this browser.'
+    : 'Configure your local brain in this browser before starting helpers.';
+  return ready;
+}
+
+function isHouseWorkerRuntimeAttached(houseWorkerSessionId = '') {
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedSessionId) return false;
+  return houseWorkerSupervisorState.runtimes.has(normalizedSessionId);
+}
+
+function buildHouseWorkerSessionPresentation(session = null) {
+  const source = session && typeof session === 'object' ? session : {};
+  const houseWorkerSessionId = String(source?.houseWorkerSessionId || '').trim();
+  const status = String(source?.status || '').trim();
+  const attached = isHouseWorkerRuntimeAttached(houseWorkerSessionId);
+  const active = HOUSE_WORKER_ACTIVE_STATUSES.has(status);
+  if (active && !attached) {
+    return {
+      attached: false,
+      statusLabel: 'Needs restart in this tab',
+      actionLabel: 'Helper runtime is not attached in this browser. Restart it to continue here.',
+    };
+  }
+  return {
+    attached,
+    statusLabel: String(source?.statusLabel || source?.status || 'Ready to help').trim() || 'Ready to help',
+    actionLabel: String(source?.statusLabel || 'Ready to help').trim() || 'Ready to help',
+  };
+}
+
 function buildHouseWorkerDefaultTask(deployment = null) {
   const displayName = String(deployment?.displayName || 'Helper').trim() || 'Helper';
   return `Introduce yourself in one short sentence and confirm how ${displayName} can help this House next.`;
@@ -1721,26 +1769,33 @@ function buildHouseWorkerDefaultTask(deployment = null) {
 function getHouseWorkerSupervisorSnapshot() {
   const primaryWorkerId = String(houseWorkerSupervisorState.primaryWorkerId || '').trim() || 'primary-runtime';
   const primaryStatus = String(houseWorkerSupervisorState.primaryStatus || 'ready').trim() || 'ready';
-  const sessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
+  const sessions = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+    .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
   return {
     primaryWorkerId,
     primaryStatus,
-    activeWorkerCount: 1 + sessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim())).length,
-    helpers: sessions.map((entry) => ({
-      houseWorkerSessionId: String(entry?.houseWorkerSessionId || '').trim(),
-      deploymentId: String(entry?.deploymentId || '').trim(),
-      displayName: String(entry?.displayName || entry?.deploymentLabel || 'Helper').trim() || 'Helper',
-      status: String(entry?.status || '').trim(),
-      statusLabel: String(entry?.statusLabel || '').trim(),
-      runtimeAgentId: String(entry?.runtimeAgentId || '').trim() || null,
-      runtimeSessionId: String(entry?.runtimeSessionId || '').trim() || null,
-      latestTask: String(entry?.latestTask || '').trim() || null,
-      latestReply: String(entry?.latestReply || '').trim() || null,
-      runtimeProfile: entry?.runtimeProfile && typeof entry.runtimeProfile === 'object' ? entry.runtimeProfile : {},
-      eventCount: Number(entry?.eventCount || 0),
-    })),
+    activeWorkerCount: 1 + Array.from(houseWorkerSupervisorState.runtimes.keys()).filter((entry) => String(entry || '').trim()).length,
+    helpers: sessions.map((entry) => {
+      const presentation = buildHouseWorkerSessionPresentation(entry);
+      return {
+        houseWorkerSessionId: String(entry?.houseWorkerSessionId || '').trim(),
+        deploymentId: String(entry?.deploymentId || '').trim(),
+        displayName: String(entry?.displayName || entry?.deploymentLabel || 'Helper').trim() || 'Helper',
+        status: String(entry?.status || '').trim(),
+        statusLabel: presentation.statusLabel,
+        attached: presentation.attached,
+        runtimeAgentId: String(entry?.runtimeAgentId || '').trim() || null,
+        runtimeSessionId: String(entry?.runtimeSessionId || '').trim() || null,
+        latestTask: String(entry?.latestTask || '').trim() || null,
+        latestReply: String(entry?.latestReply || '').trim() || null,
+        runtimeProfile: entry?.runtimeProfile && typeof entry.runtimeProfile === 'object' ? entry.runtimeProfile : {},
+        eventCount: Number(entry?.eventCount || 0),
+      };
+    }),
     checkpoints: houseWorkerSupervisorState.checkpoints.slice(),
     lastError: String(houseWorkerSupervisorState.lastError || '').trim() || null,
+    localBrainReady: houseWorkerSupervisorState.localBrainReady === true,
+    localBrainStatusLabel: String(houseWorkerSupervisorState.localBrainStatusLabel || '').trim() || null,
   };
 }
 
@@ -2242,8 +2297,14 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
 async function spawnHouseWorkerSession(payload = {}) {
   const llmConfig = await resolveHouseWorkerLlmConfig();
   if (!llmConfig) {
+    houseWorkerSupervisorState.localBrainReady = false;
+    houseWorkerSupervisorState.localBrainCheckedAt = Date.now();
+    houseWorkerSupervisorState.localBrainStatusLabel = 'Configure your local brain in this browser before starting helpers.';
     throw new Error('HOUSE_WORKER_LOCAL_BRAIN_REQUIRED');
   }
+  houseWorkerSupervisorState.localBrainReady = true;
+  houseWorkerSupervisorState.localBrainCheckedAt = Date.now();
+  houseWorkerSupervisorState.localBrainStatusLabel = 'Local brain ready in this browser.';
   await resolveHouseWorkerSupervisorPrimaryId();
   const normalizedPayload = payload && typeof payload === 'object' ? payload : {};
   const response = await api('/api/platform/house-workers/spawn', {
@@ -2609,6 +2670,7 @@ function renderHouseOfficeSurface() {
   const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
   const deployments = Array.isArray(houseSurfaceState.office.deployments) ? houseSurfaceState.office.deployments : [];
   const workerSessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
+  const activeWorkerSessions = workerSessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
   const briefing = Array.isArray(houseSurfaceState.office.briefing) ? houseSurfaceState.office.briefing : [];
   const attention = Array.isArray(houseSurfaceState.office.attention) ? houseSurfaceState.office.attention : [];
@@ -2633,7 +2695,7 @@ function renderHouseOfficeSurface() {
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
   const assignmentCount = Number(summary?.assignmentCount || assignments.length || 0);
   const deploymentCount = Number(summary?.deploymentCount || deployments.length || 0);
-  const workerSessionCount = Number(summary?.workerSessionCount || workerSessions.length || 0);
+  const workerSessionCount = activeWorkerSessions.length;
   const briefingItemCount = briefing.reduce((sum, group) => {
     const items = Array.isArray(group?.items) ? group.items : [];
     return sum + items.length;
@@ -2910,7 +2972,7 @@ function renderHouseOfficeSurface() {
   } else {
     deployments.forEach((deployment) => {
       const deploymentId = String(deployment?.deploymentId || '').trim();
-      const deploymentSessions = workerSessions.filter((entry) => String(entry?.deploymentId || '').trim() === deploymentId);
+      const deploymentSessions = activeWorkerSessions.filter((entry) => String(entry?.deploymentId || '').trim() === deploymentId);
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-deployment-item');
       card.style.border = '1px solid rgba(255,255,255,0.12)';
@@ -2959,9 +3021,13 @@ function renderHouseOfficeSurface() {
       actionStatus.style.marginTop = '8px';
       actionStatus.setAttribute('data-testid', 'house-office-helper-status');
       const deploymentSession = deploymentSessions[0] || null;
-      actionStatus.textContent = deploymentSession
-        ? `${String(deploymentSession?.statusLabel || deploymentSession?.status || 'Ready to help').trim() || 'Ready to help'}`
-        : 'Start Helper when your local brain is ready.';
+      const localBrainReady = houseWorkerSupervisorState.localBrainReady === true;
+      const sessionPresentation = buildHouseWorkerSessionPresentation(deploymentSession);
+      actionStatus.textContent = !localBrainReady
+        ? String(houseWorkerSupervisorState.localBrainStatusLabel || 'Configure your local brain in this browser before starting helpers.').trim()
+        : deploymentSession
+          ? sessionPresentation.actionLabel
+          : 'Start Helper when your local brain is ready.';
       card.appendChild(actionStatus);
 
       const messageInput = document.createElement('input');
@@ -2982,8 +3048,9 @@ function renderHouseOfficeSurface() {
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
       startBtn.className = 'btn';
-      startBtn.textContent = 'Start Helper';
+      startBtn.textContent = deploymentSession && !sessionPresentation.attached ? 'Restart Helper' : 'Start Helper';
       startBtn.setAttribute('data-testid', 'house-office-helper-start');
+      startBtn.disabled = !localBrainReady;
       actions.appendChild(startBtn);
 
       const askBtn = document.createElement('button');
@@ -2991,7 +3058,7 @@ function renderHouseOfficeSurface() {
       askBtn.className = 'btn';
       askBtn.textContent = 'Ask Helper';
       askBtn.setAttribute('data-testid', 'house-office-helper-ask');
-      askBtn.disabled = !deploymentSession;
+      askBtn.disabled = !deploymentSession || !sessionPresentation.attached;
       actions.appendChild(askBtn);
 
       const stopBtn = document.createElement('button');
@@ -3061,7 +3128,7 @@ function renderHouseOfficeSurface() {
         startBtn.disabled = true;
         askBtn.disabled = true;
         stopBtn.disabled = true;
-        actionStatus.textContent = 'Starting helper...';
+        actionStatus.textContent = deploymentSession && !sessionPresentation.attached ? 'Restarting helper in this tab...' : 'Starting helper...';
         const profileInputs = Array.from(advanced.querySelectorAll('input[data-field-key]'));
         const runtimeProfile = profileInputs.reduce((acc, input) => {
           const fieldKey = String(input?.dataset?.fieldKey || '').trim();
@@ -3071,6 +3138,12 @@ function renderHouseOfficeSurface() {
           return acc;
         }, {});
         try {
+          if (deploymentSession && !sessionPresentation.attached && deploymentSession.houseWorkerSessionId) {
+            await stopHouseWorkerSession({
+              houseWorkerSessionId: String(deploymentSession.houseWorkerSessionId || '').trim(),
+              reason: 'restart_in_tab',
+            });
+          }
           await spawnHouseWorkerSession({
             deploymentId,
             task: buildHouseWorkerDefaultTask(deployment),
@@ -3078,11 +3151,13 @@ function renderHouseOfficeSurface() {
             ...runtimeProfile,
           });
           const refreshedSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+            .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()))
             .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+          const refreshedPresentation = buildHouseWorkerSessionPresentation(refreshedSession);
           actionStatus.textContent = refreshedSession
-            ? String(refreshedSession?.statusLabel || 'Ready to help').trim()
+            ? refreshedPresentation.actionLabel
             : 'Helper started.';
-          askBtn.disabled = !refreshedSession;
+          askBtn.disabled = !refreshedSession || !refreshedPresentation.attached;
           stopBtn.disabled = !refreshedSession;
         } catch (err) {
           actionStatus.textContent = String(err?.detail || err?.message || 'Helper could not start.');
@@ -3094,6 +3169,7 @@ function renderHouseOfficeSurface() {
 
       askBtn.addEventListener('click', async () => {
         const activeSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+          .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()))
           .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
         const nextMessage = String(messageInput.value || '').trim() || 'Explain what you need next in one short sentence.';
         if (!activeSession?.houseWorkerSessionId) return;
@@ -3117,6 +3193,7 @@ function renderHouseOfficeSurface() {
 
       stopBtn.addEventListener('click', async () => {
         const activeSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+          .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()))
           .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
         if (!activeSession?.houseWorkerSessionId) return;
         stopBtn.disabled = true;
@@ -3141,13 +3218,14 @@ function renderHouseOfficeSurface() {
   }
 
   sessionsNode.innerHTML = '';
-  if (!workerSessions.length) {
+  if (!activeWorkerSessions.length) {
     const placeholder = document.createElement('div');
     placeholder.className = 'small';
     placeholder.textContent = 'No active helper sessions yet.';
     sessionsNode.appendChild(placeholder);
   } else {
-    workerSessions.forEach((session) => {
+    activeWorkerSessions.forEach((session) => {
+      const sessionPresentation = buildHouseWorkerSessionPresentation(session);
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-worker-session-item');
       card.style.border = '1px solid rgba(255,255,255,0.12)';
@@ -3165,7 +3243,7 @@ function renderHouseOfficeSurface() {
       statusLine.className = 'small';
       statusLine.style.marginTop = '4px';
       statusLine.setAttribute('data-testid', 'house-office-worker-session-status');
-      statusLine.textContent = `Status: ${String(session?.statusLabel || session?.status || 'Ready to help').trim() || 'Ready to help'}`;
+      statusLine.textContent = `Status: ${sessionPresentation.statusLabel}`;
       card.appendChild(statusLine);
 
       const meta = document.createElement('div');
@@ -3217,6 +3295,7 @@ function renderHouseOfficeSurface() {
       askBtn.className = 'btn';
       askBtn.textContent = 'Ask Helper';
       askBtn.setAttribute('data-testid', 'house-office-worker-session-ask');
+      askBtn.disabled = !sessionPresentation.attached;
       actions.appendChild(askBtn);
 
       const stopBtn = document.createElement('button');
@@ -3230,12 +3309,12 @@ function renderHouseOfficeSurface() {
       const actionStatus = document.createElement('div');
       actionStatus.className = 'small';
       actionStatus.style.marginTop = '6px';
-      actionStatus.textContent = String(session?.statusLabel || 'Ready to help').trim() || 'Ready to help';
+      actionStatus.textContent = sessionPresentation.actionLabel;
       card.appendChild(actionStatus);
 
       askBtn.addEventListener('click', async () => {
         const targetSessionId = String(session?.houseWorkerSessionId || '').trim();
-        if (!targetSessionId) return;
+        if (!targetSessionId || !sessionPresentation.attached) return;
         const nextMessage = String(messageInput.value || '').trim() || 'Reply with one short status update.';
         askBtn.disabled = true;
         actionStatus.textContent = 'Asking helper...';
@@ -3785,6 +3864,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     if (!houseSurfaceState.office.selectedOfficeId && houseSurfaceState.office.offices[0]?.officeId) {
       houseSurfaceState.office.selectedOfficeId = String(houseSurfaceState.office.offices[0].officeId);
     }
+    await refreshHouseWorkerLocalBrainState({ force: true }).catch(() => null);
     renderHouseOfficeSurface();
     setHouseSurfaceStatus('');
   } catch (err) {
