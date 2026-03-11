@@ -1,6 +1,6 @@
 # Phase 35 Spec: Registry-Backed House Workers and Spawnable Helper Sessions (Contracts First, TDD)
 
-Status: Planned
+Status: Implemented
 Version: 0.1
 Audience: frontend engineers, backend engineers, runtime engineers, UX engineers, security engineers, QA automation engineers, and AI-agent implementers
 Depends on:
@@ -24,7 +24,7 @@ Goal: convert Option B and Option C into one deterministic implementation path:
 Implementation baseline:
 
 1. House Office phases `28` through `33` are implemented.
-2. Current branch baseline is `c7ca3ac`.
+2. Current branch baseline is `84c218c`.
 3. Current repo already has:
    A. Registry entities, versions, bundles, and loadouts,
    B. House offices, staff agents, and assignments,
@@ -38,6 +38,11 @@ Implementation constraints:
 3. Keep worker-first architecture.
 4. Do not move child-agent thinking into the backend.
 5. New routes stay under `/api/platform/*`.
+
+Current proof state:
+
+1. `215` through `228` are green.
+2. Skill/API sync is green in `e2e/55` and `e2e/135`.
 6. Default tests remain deterministic and offline-safe.
 7. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
 8. New worker-tool behavior must sync:

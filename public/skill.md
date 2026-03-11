@@ -277,6 +277,24 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - `agent_town_ui_pony_compose({ toHouseId, subject, draft })`
   - Opens Pony modal compose panel with prefilled values.
 
+### House helper tools
+
+- `agent_town_worker_list()`
+  - Lists installed House helpers plus active helper sessions for the current House.
+- `agent_town_worker_spawn({ deploymentId, task, reason, brainProfileId?, workspaceSeedRef?, configVersionId?, loadoutId? })`
+  - Starts one installed helper as a real child worker session. Keep to the default path unless the human explicitly asks for advanced runtime settings.
+- `agent_town_worker_message({ houseWorkerSessionId, workerSessionId, message })`
+  - Sends one task message to a specific helper session and returns its latest reply.
+- `agent_town_worker_status({ houseWorkerSessionId, workerSessionId, deploymentId })`
+  - Reads helper status, latest task, latest reply, and runtime profile for the current House.
+
+### House helper policy
+
+- Prefer `agent_town_worker_list()` before naming a helper or session so you use the current House labels.
+- Do not invent `brainProfileId`, `workspaceSeedRef`, `configVersionId`, or `loadoutId`. Use defaults unless the human asks for an advanced override.
+- Do not invent `parentWorkerSessionId`; runtime-managed helper sessions fill that automatically when needed.
+- If a helper install or spawn result says local brain setup is still required, explain that plainly and ask the human to finish the House setup instead of guessing credentials.
+
 ### UI intent policy
 
 - UI tools are intent-dispatch only; never use arbitrary DOM selectors or HTML payloads.

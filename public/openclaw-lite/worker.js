@@ -48153,6 +48153,37 @@ async function runAgentTownUiIntentTool(params, toolName) {
     })
   );
 }
+function resolveCurrentHouseWorkerSessionId() {
+  const sessionKey = String(MAIN_SESSION_KEY || "").trim();
+  if (!sessionKey) return "";
+  const match = sessionKey.match(/^agent:[^:]+:(hws_[A-Za-z0-9]+)/);
+  return match ? String(match[1] || "").trim() : "";
+}
+async function runAgentTownWorkerBridgeTool(params, toolName) {
+  const startedAtMs = nowMs();
+  const safeParams = isPlainObject(params) ? { ...params } : {};
+  if (toolName === "agent_town_worker_spawn" && !safeParams.parentWorkerSessionId) {
+    const currentHouseWorkerSessionId = resolveCurrentHouseWorkerSessionId();
+    if (currentHouseWorkerSessionId) {
+      safeParams.parentWorkerSessionId = currentHouseWorkerSessionId;
+    }
+  }
+  const result = await requestHouseWorkerAction(toolName, safeParams);
+  if (result.ok === true) {
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess(result.data || {}));
+  }
+  const code = String(result?.error?.code || "HOUSE_WORKER_TOOL_INTERNAL");
+  const message = String(result?.error?.message || code || "House worker tool failed");
+  return withToolMeta(
+    toolName,
+    startedAtMs,
+    makeToolFailure(code, message, {
+      tool: toolName,
+      houseWorkerSessionId: String(safeParams?.houseWorkerSessionId || safeParams?.workerSessionId || safeParams?.parentWorkerSessionId || "").trim() || null,
+      deploymentId: String(safeParams?.deploymentId || "").trim() || null
+    })
+  );
+}
 function makeToolSuccess(data) {
   return { ok: true, data };
 }
@@ -49404,6 +49435,30 @@ var LITE_TOOL_SPECS = [
     sampleArgs: { toHouseId: "hs_receiver", subject: "Hello", draft: "Draft body" }
   },
   {
+    name: "agent_town_worker_list",
+    label: "Agent Town Worker List",
+    description: "Lists installed House helpers and active helper sessions for the current House.",
+    sampleArgs: {}
+  },
+  {
+    name: "agent_town_worker_spawn",
+    label: "Agent Town Worker Spawn",
+    description: "Starts one installed House helper as a real child worker session using optional advanced runtime references.",
+    sampleArgs: { deploymentId: "dep_front_desk_helper", task: "Summarize the latest House activity in one short sentence." }
+  },
+  {
+    name: "agent_town_worker_message",
+    label: "Agent Town Worker Message",
+    description: "Sends one task message to a specific helper session and returns its latest reply.",
+    sampleArgs: { houseWorkerSessionId: "hws_example", message: "Reply with one short status update." }
+  },
+  {
+    name: "agent_town_worker_status",
+    label: "Agent Town Worker Status",
+    description: "Reads helper session status, latest task, and latest reply for the current House.",
+    sampleArgs: { houseWorkerSessionId: "hws_example" }
+  },
+  {
     name: "secret_set",
     label: "Secret Set",
     description: "Store/update a secret value by reference name.",
@@ -49728,6 +49783,13 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
       const envelope = await runAgentTownUiIntentTool(params || {}, normalizedName);
       return envelopeToToolResult(envelope, normalizedName);
     }
+    case "agent_town_worker_list":
+    case "agent_town_worker_spawn":
+    case "agent_town_worker_message":
+    case "agent_town_worker_status": {
+      const envelope = await runAgentTownWorkerBridgeTool(params || {}, normalizedName);
+      return envelopeToToolResult(envelope, normalizedName);
+    }
     case "secret_set": {
       const envelope = await runSecretSet(params || {}, "secret_set");
       return envelopeToToolResult(envelope, "secret_set");
@@ -49803,7 +49865,7 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     }
     default: {
       const startedAtMs = nowMs();
-      const notFoundCode = normalizedName.startsWith("agent_town_ui_") ? "UI_INTENT_UNKNOWN" : normalizedName.startsWith("agent_town_state_") ? "STATE_TOOL_UNKNOWN" : "TOOL_NOT_FOUND";
+      const notFoundCode = normalizedName.startsWith("agent_town_ui_") ? "UI_INTENT_UNKNOWN" : normalizedName.startsWith("agent_town_state_") ? "STATE_TOOL_UNKNOWN" : normalizedName.startsWith("agent_town_worker_") ? "HOUSE_WORKER_TOOL_UNKNOWN" : "TOOL_NOT_FOUND";
       const envelope = withToolMeta(
         normalizedName,
         startedAtMs,
@@ -51943,6 +52005,8 @@ function resolveWalletResponse(msg) {
 }
 var uiIntentRequests = /* @__PURE__ */ new Map();
 var UI_INTENT_REQUEST_TIMEOUT_MS = 12e3;
+var houseWorkerRequests = /* @__PURE__ */ new Map();
+var HOUSE_WORKER_REQUEST_TIMEOUT_MS = 2e4;
 function normalizeUiIntentResult(value) {
   const payload = isPlainObject(value) ? value : {};
   const errorRaw = isPlainObject(payload.error) ? payload.error : null;
@@ -51988,6 +52052,50 @@ function resolveUiIntentResponse(msg) {
   uiIntentRequests.delete(id);
   clearTimeout(rec.timeoutId);
   rec.resolve(normalizeUiIntentResult(msg.result));
+}
+function normalizeHouseWorkerActionResult(value) {
+  const payload = isPlainObject(value) ? value : {};
+  const errorRaw = isPlainObject(payload.error) ? payload.error : null;
+  return {
+    ok: payload.ok === true,
+    data: isPlainObject(payload.data) ? payload.data : null,
+    error: errorRaw ? {
+      code: String(errorRaw.code || "HOUSE_WORKER_TOOL_INTERNAL"),
+      message: String(errorRaw.message || errorRaw.code || "House worker tool failed")
+    } : null
+  };
+}
+function requestHouseWorkerAction(tool, params = {}) {
+  const id = randomId("hwt");
+  post({
+    type: "worker.house_worker.request",
+    id,
+    tool: String(tool || ""),
+    params: isPlainObject(params) ? params : {}
+  });
+  return new Promise((resolve) => {
+    const timeoutId = setTimeout(() => {
+      houseWorkerRequests.delete(id);
+      resolve({
+        ok: false,
+        data: null,
+        error: {
+          code: "HOUSE_WORKER_UNAVAILABLE",
+          message: "House worker response timeout"
+        }
+      });
+    }, HOUSE_WORKER_REQUEST_TIMEOUT_MS);
+    houseWorkerRequests.set(id, { resolve, timeoutId });
+  });
+}
+function resolveHouseWorkerResponse(msg) {
+  const id = String(msg.id || "");
+  if (!id) return;
+  const rec = houseWorkerRequests.get(id);
+  if (!rec) return;
+  houseWorkerRequests.delete(id);
+  clearTimeout(rec.timeoutId);
+  rec.resolve(normalizeHouseWorkerActionResult(msg.result));
 }
 async function walletConnect() {
   const res = await walletRequest("connect", { chain: "solana" });
@@ -54250,6 +54358,10 @@ self.addEventListener("message", async (ev) => {
     }
     if (msg.type === "gateway.ui.intent.response") {
       resolveUiIntentResponse(msg);
+      return;
+    }
+    if (msg.type === "gateway.house_worker.response") {
+      resolveHouseWorkerResponse(msg);
       return;
     }
     if (msg.type === "gateway.approval.respond") {

@@ -46,7 +46,7 @@ test('M35.7: spawning a deployed helper creates one real child worker session in
   const session = sessionsPayload.json?.data?.sessions?.[0];
   expect(session).toMatchObject({
     deploymentId,
-    status: expect.stringMatching(/^(ready|idle|working)$/),
+    status: expect.stringMatching(/^(starting|ready|idle|working)$/),
     deploymentLabel: expect.any(String),
     runtimeAgentId: expect.any(String),
     runtimeProfile: expect.objectContaining({

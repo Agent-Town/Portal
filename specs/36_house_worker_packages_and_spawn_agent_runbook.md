@@ -1,6 +1,6 @@
 # Phase 36 Spec: Detailed AI-Agent Runbook for Registry-Backed House Workers and Spawnable Helper Sessions
 
-Status: Planned
+Status: Completed
 Version: 0.1
 Depends on:
 1. [specs/34_house_worker_packages_and_spawn_spec.md](./34_house_worker_packages_and_spawn_spec.md)
@@ -11,6 +11,11 @@ Depends on:
 6. [AGENTS.md](../AGENTS.md)
 
 Purpose: convert Phase 35 into AI-agent-sized TDD work packets with explicit measurable verification.
+
+Current proof state:
+
+1. `T35.0` through `T35.13` are implemented.
+2. `e2e/215` through `e2e/228` are green.
 
 This is not a competing plan.
 It is the detailed execution layer for:

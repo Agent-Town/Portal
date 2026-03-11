@@ -3190,14 +3190,13 @@ function registerPlatformReadRoutes(app, deps) {
     }
     if (parentWorkerSessionId) {
       const parentSession = getHouseWorkerSessionById(parentWorkerSessionId);
-      if (parentSession) {
-        if (String(parentSession?.houseId || '').trim() !== houseId || String(parentSession?.teamId || '').trim() !== teamId) {
-          return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
-        }
-        if (String(parentSession?.parentSessionId || '').trim()) {
-          return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
-        }
+      if (!parentSession) {
+        return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
       }
+      if (String(parentSession?.houseId || '').trim() !== houseId || String(parentSession?.teamId || '').trim() !== teamId) {
+        return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
+      }
+      return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
     }
     const runtimeProfile = buildHouseWorkerRuntimeProfile({
       deployment,

@@ -19,6 +19,18 @@ async function getHouseWorkerDeployments(request, { teamId = '' } = {}) {
   return readJsonResponse(response);
 }
 
+async function getHouseWorkerCollections(request, { teamId = '' } = {}) {
+  const search = new URLSearchParams();
+  if (teamId) search.set('teamId', String(teamId || '').trim());
+  const response = await request.get(
+    search.toString()
+      ? `/api/platform/house-workers?${search.toString()}`
+      : '/api/platform/house-workers',
+    { failOnStatusCode: false }
+  );
+  return readJsonResponse(response);
+}
+
 async function installHouseWorker(request, payload = {}) {
   const response = await request.post('/api/platform/house-workers/install', {
     data: payload,
@@ -95,7 +107,7 @@ async function readHouseWorkerSupervisorSnapshot(page) {
 }
 
 async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
-  return await page.evaluate(async ({ nextTeamId }) => {
+  return await page.evaluate(async () => {
     const api = window.__agentTownHouseWorkerSupervisor;
     if (!api || typeof api.sync !== 'function') {
       return {
@@ -103,7 +115,7 @@ async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
         json: null,
       };
     }
-    const sessions = await api.sync({ teamId: String(nextTeamId || '').trim() }).catch(() => null);
+    const sessions = await api.sync().catch(() => null);
     return {
       status: 200,
       json: {
@@ -113,10 +125,11 @@ async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
         },
       },
     };
-  }, { nextTeamId: String(teamId || '') });
+  });
 }
 
 module.exports = {
+  getHouseWorkerCollections,
   getHouseWorkerDeployments,
   getHouseWorkerShare,
   installHouseWorker,

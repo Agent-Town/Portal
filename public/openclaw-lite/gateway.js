@@ -360,6 +360,57 @@ async function init() {
     appendExperienceToolTrace({ source, tool: toolName, result: normalized });
     return normalized;
   }
+  function resolveHouseWorkerDispatcher() {
+    if (window.AgentTownHouseWorkerRuntime && typeof window.AgentTownHouseWorkerRuntime.dispatch === "function") {
+      return window.AgentTownHouseWorkerRuntime.dispatch.bind(window.AgentTownHouseWorkerRuntime);
+    }
+    if (typeof window.dispatchHouseWorkerRuntimeAction === "function") {
+      return window.dispatchHouseWorkerRuntimeAction.bind(window);
+    }
+    return null;
+  }
+  async function invokeHouseWorkerTool({ tool, params = {}, source = "runtime" } = {}) {
+    const toolName = String(tool || "").trim();
+    const safeParams = isPlainRecord(params) ? params : {};
+    const dispatch = resolveHouseWorkerDispatcher();
+    if (!dispatch) {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: "HOUSE_WORKER_UNAVAILABLE",
+          message: "House worker dispatcher is not available"
+        }
+      };
+    }
+    try {
+      const result = await dispatch(toolName, safeParams, { source });
+      return isPlainRecord(result) ? {
+        ok: result.ok === true,
+        data: isPlainRecord(result.data) ? result.data : null,
+        error: isPlainRecord(result.error) ? {
+          code: String(result.error.code || "HOUSE_WORKER_TOOL_INTERNAL"),
+          message: String(result.error.message || result.error.code || "House worker tool failed")
+        } : null
+      } : {
+        ok: false,
+        data: null,
+        error: {
+          code: "HOUSE_WORKER_TOOL_INTERNAL",
+          message: "House worker dispatcher returned an invalid payload"
+        }
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: "HOUSE_WORKER_TOOL_INTERNAL",
+          message: String(err?.message || err || "House worker dispatch failed")
+        }
+      };
+    }
+  }
   function parseModelRef(modelRef, fallbackProvider = "openai", fallbackModelId = "gpt-4o-mini") {
     const ref = String(modelRef || "").trim();
     if (!ref) return { provider: fallbackProvider, modelId: fallbackModelId, modelRef: `${fallbackProvider}/${fallbackModelId}` };
@@ -828,6 +879,23 @@ async function init() {
       });
       sendToWorker({
         type: "gateway.ui.intent.response",
+        id,
+        result
+      });
+      return;
+    }
+    if (msg.type === "worker.house_worker.request") {
+      const id = String(msg.id || "");
+      if (!id) return;
+      const tool = String(msg.tool || msg.action || "");
+      const params = isPlainRecord(msg.params) ? msg.params : {};
+      const result = await invokeHouseWorkerTool({
+        tool,
+        params,
+        source: "worker"
+      });
+      sendToWorker({
+        type: "gateway.house_worker.response",
         id,
         result
       });

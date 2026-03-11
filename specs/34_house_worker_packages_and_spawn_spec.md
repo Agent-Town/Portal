@@ -1,10 +1,13 @@
 # Phase 34 Spec: Registry-Backed House Workers and Spawnable Helper Sessions
 
-Status: Planned
+Status: Implemented
 Version: 0.1
 Audience: product, frontend, backend, runtime, UX, QA, security, benchmarking, store-and-growth, and AI-agent implementers
 Implementation branch target: `codex/house-office-options-v0-1`
-Implementation baseline: `c7ca3ac`
+Implementation baseline: `84c218c`
+Latest proof state:
+1. `e2e/215` through `e2e/228` are green.
+2. Worker-skill contract sync is green in [e2e/55_phase3_skill_contract_line.spec.js](../e2e/55_phase3_skill_contract_line.spec.js).
 Depends on:
 1. [specs/22_option5_integration_unified_completion_spec.md](./22_option5_integration_unified_completion_spec.md)
 2. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)

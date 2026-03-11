@@ -1266,6 +1266,159 @@ Response fields:
 - `data.deploymentsPath`
 - `data.houseOfficePath`
 
+### GET `/api/platform/house-workers` (human)
+Returns the current House helper collections payload: installed deployments plus active helper sessions.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.deployments[]`
+- `data.sessions[]`
+- `data.sessions[].houseWorkerSessionId`
+- `data.sessions[].deploymentId`
+- `data.sessions[].status`
+- `data.sessions[].statusLabel`
+- `data.sessions[].runtimeAgentId`
+- `data.sessions[].runtimeSessionId`
+- `data.sessions[].latestTask`
+- `data.sessions[].latestReply`
+- `data.sessions[].runtimeProfile`
+- `data.sessions[].recentEvents[]`
+- `data.concurrencyLimit`
+- `data.sourceManifest`
+- `data.emptyStateText`
+
+### GET `/api/platform/house-workers/sessions` (human)
+Returns active and recent helper sessions for the current House team.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.sessions[]`
+- `data.deployments[]`
+- `data.concurrencyLimit`
+- `data.sourceManifest`
+- `data.emptyStateText`
+
+### POST `/api/platform/house-workers/spawn` (human)
+Starts one installed House helper as a real child worker session.
+
+Request body:
+- `deploymentId` required
+- `task` required
+- `reason` required
+- `brainProfileId` optional
+- `workspaceSeedRef` optional
+- `configVersionId` optional
+- `loadoutId` optional
+- `officeId` optional
+- `parentWorkerSessionId` optional
+- `spawnSource` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `DEPLOYMENT_NOT_FOUND`
+- `WORKER_SESSION_NOT_FOUND`
+- `UNSUPPORTED_OVERRIDE`
+- `OVER_CONCURRENCY_LIMIT`
+- `RUNAWAY_SPAWN_BLOCKED`
+
+Response fields:
+- `data.workerSessionId`
+- `data.houseWorkerSessionId`
+- `data.deploymentId`
+- `data.status`
+- `data.runtimeProfile`
+- `data.spawnedAt`
+- `data.spawnSource`
+- `data.session`
+- `data.sessionsPath`
+
+Notes:
+- `parentWorkerSessionId` is reserved for helper-origin spawn provenance and currently fails closed with `RUNAWAY_SPAWN_BLOCKED` when it resolves to a real helper session.
+- Spawn accepts portable runtime references only; raw secrets are rejected as unsupported overrides.
+
+### POST `/api/platform/house-workers/message` (human)
+Writes one helper task or reply event and updates the current helper session status.
+
+Request body:
+- `houseWorkerSessionId` required when `workerSessionId` is omitted
+- `workerSessionId` accepted as alias for `houseWorkerSessionId`
+- `message` required
+- `actor` optional (`human`, `parent_worker`, `helper`, `system`)
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `WORKER_SESSION_NOT_FOUND`
+
+Response fields:
+- `data.session`
+- `data.event`
+
+### POST `/api/platform/house-workers/status` (human)
+Writes one helper status transition for the current House team.
+
+Request body:
+- `houseWorkerSessionId` required when `workerSessionId` is omitted
+- `workerSessionId` accepted as alias for `houseWorkerSessionId`
+- `status` required
+- `actor` optional (`runtime`, `human`, `parent_worker`, `system`)
+- `reason` optional
+- `runtimeSessionId` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `UNSUPPORTED_OVERRIDE`
+- `WORKER_SESSION_NOT_FOUND`
+
+Response fields:
+- `data.session`
+- `data.event`
+
+### POST `/api/platform/house-workers/stop` (human)
+Stops one helper session for the current House team.
+
+Request body:
+- `houseWorkerSessionId` required when `workerSessionId` is omitted
+- `workerSessionId` accepted as alias for `houseWorkerSessionId`
+- `actor` optional (`human`, `parent_worker`, `system`)
+- `reason` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `WORKER_SESSION_NOT_FOUND`
+
+Response fields:
+- `data.session`
+- `data.event`
+
 ### GET `/api/platform/house-readiness` (human)
 Returns a session-bound House flow readiness report for live-user validation inside the current shell.
 This route is intentionally not a fake external live lane: it reports whether House Office, Workshop, Tracks, Archive, Trainer, and Experiences are ready for an operator walkthrough and what to validate next.

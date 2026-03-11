@@ -74,9 +74,15 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('agent_town_ui_registry_search({ q, family })');
   expect(txt).toContain('agent_town_ui_web_open({ webSessionId, sessionId, url, title })');
   expect(txt).toContain('agent_town_ui_pony_compose({ toHouseId, subject, draft })');
+  expect(txt).toContain('agent_town_worker_list()');
+  expect(txt).toContain('agent_town_worker_spawn({ deploymentId, task, reason, brainProfileId?, workspaceSeedRef?, configVersionId?, loadoutId? })');
+  expect(txt).toContain('agent_town_worker_message({ houseWorkerSessionId, workerSessionId, message })');
+  expect(txt).toContain('agent_town_worker_status({ houseWorkerSessionId, workerSessionId, deploymentId })');
   expect(txt).toContain('agent_town_state_get_registry_entity({ registryId, registryEntityId })');
   expect(txt).toContain('agent_town_state_get_web_session({ webSessionId, sessionId })');
   expect(txt).toContain('`atlas`, `registry`, `poker`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`');
+  expect(txt).toContain('Prefer `agent_town_worker_list()` before naming a helper or session');
+  expect(txt).toContain('Do not invent `brainProfileId`, `workspaceSeedRef`, `configVersionId`, or `loadoutId`.');
   expect(txt).toContain('Do not navigate to direct standalone routes (for example `/poker`) when a modal intent exists.');
   expect(txt).toContain('trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.');
   expect(txt).toContain('Preserve backend ids exactly:');

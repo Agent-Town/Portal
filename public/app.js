@@ -1744,21 +1744,33 @@ function getHouseWorkerSupervisorSnapshot() {
   };
 }
 
-async function syncHouseWorkerSessions({ skipContext = false, render = true } = {}) {
+function applyHouseWorkerCollectionsState(data = {}, { render = true } = {}) {
+  const deployments = Array.isArray(data?.deployments) ? data.deployments : [];
+  const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+  if (deployments.length || houseSurfaceState.office.deployments.length) {
+    houseSurfaceState.office.deployments = deployments;
+  }
+  houseSurfaceState.office.workerSessions = sessions;
+  if (houseSurfaceState.office.summary && typeof houseSurfaceState.office.summary === 'object') {
+    houseSurfaceState.office.summary.deploymentCount = deployments.length || houseSurfaceState.office.summary.deploymentCount || 0;
+    houseSurfaceState.office.summary.workerSessionCount = sessions.length;
+  }
+  if (render && houseSurfaceState.activeSurface === 'office') {
+    renderHouseOfficeSurface();
+  }
+}
+
+async function readHouseWorkerCollections({ skipContext = false, render = true, teamId = '' } = {}) {
   try {
     if (!skipContext) {
       await loadHousePlatformContext();
     }
-    const response = await api('/api/platform/house-workers/sessions');
+    const normalizedTeamId = String(teamId || '').trim();
+    const search = normalizedTeamId ? `?teamId=${encodeURIComponent(normalizedTeamId)}` : '';
+    const response = await api(`/api/platform/house-workers${search}`);
     const data = response?.data || response || {};
-    houseSurfaceState.office.workerSessions = Array.isArray(data.sessions) ? data.sessions : [];
-    if (houseSurfaceState.office.summary && typeof houseSurfaceState.office.summary === 'object') {
-      houseSurfaceState.office.summary.workerSessionCount = houseSurfaceState.office.workerSessions.length;
-    }
-    if (render && houseSurfaceState.activeSurface === 'office') {
-      renderHouseOfficeSurface();
-    }
-    return houseSurfaceState.office.workerSessions;
+    applyHouseWorkerCollectionsState(data, { render });
+    return data;
   } catch (err) {
     houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_SESSIONS_FAILED');
     if (render && houseSurfaceState.activeSurface === 'office') {
@@ -1768,10 +1780,226 @@ async function syncHouseWorkerSessions({ skipContext = false, render = true } = 
   }
 }
 
+async function syncHouseWorkerSessions({ skipContext = false, render = true, teamId = '' } = {}) {
+  const data = await readHouseWorkerCollections({ skipContext, render, teamId });
+  return Array.isArray(data?.sessions) ? data.sessions : [];
+}
+
+function resolveHouseWorkerSessionEntry(entries = [], {
+  houseWorkerSessionId = '',
+  workerSessionId = '',
+  deploymentId = '',
+} = {}) {
+  const normalizedSessionId = String(houseWorkerSessionId || workerSessionId || '').trim();
+  if (normalizedSessionId) {
+    return (Array.isArray(entries) ? entries : []).find((entry) =>
+      String(entry?.houseWorkerSessionId || '').trim() === normalizedSessionId
+      || String(entry?.workerSessionId || '').trim() === normalizedSessionId
+      || String(entry?.runtimeSessionId || '').trim() === normalizedSessionId
+    ) || null;
+  }
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  if (normalizedDeploymentId) {
+    return (Array.isArray(entries) ? entries : []).find((entry) =>
+      String(entry?.deploymentId || '').trim() === normalizedDeploymentId
+    ) || null;
+  }
+  return null;
+}
+
+function makeHouseWorkerToolResult({
+  ok = false,
+  data = null,
+  error = null,
+} = {}) {
+  return {
+    ok: ok === true,
+    data: data && typeof data === 'object' ? data : null,
+    error: error && typeof error === 'object'
+      ? {
+        code: String(error.code || 'HOUSE_WORKER_TOOL_INTERNAL'),
+        message: String(error.message || error.code || 'House worker tool failed'),
+      }
+      : null,
+  };
+}
+
+async function runHouseWorkerToolList(params = {}) {
+  const data = await readHouseWorkerCollections({
+    skipContext: false,
+    render: houseSurfaceState.activeSurface === 'office',
+    teamId: params?.teamId,
+  });
+  const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+  return makeHouseWorkerToolResult({
+    ok: true,
+    data: {
+      houseId: String(data?.houseId || houseSurfaceState.context.houseId || '').trim() || null,
+      teamId: String(data?.teamId || houseSurfaceState.context.activeTeamId || '').trim() || null,
+      deployments: Array.isArray(data?.deployments) ? data.deployments : [],
+      sessions,
+      activeSessionCount: sessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim())).length,
+      concurrencyLimit: Number(data?.concurrencyLimit || 0),
+      supervisor: getHouseWorkerSupervisorSnapshot(),
+    },
+  });
+}
+
+async function runHouseWorkerToolSpawn(params = {}) {
+  const normalizedParams = isPlainRecord(params) ? { ...params } : {};
+  const deploymentId = String(normalizedParams?.deploymentId || '').trim();
+  if (!deploymentId) {
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'deploymentId is required to start a helper.',
+      },
+    });
+  }
+  const collections = await readHouseWorkerCollections({ skipContext: false, render: false }).catch(() => null);
+  const deployments = Array.isArray(collections?.deployments) ? collections.deployments : [];
+  const deployment = deployments.find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+  const task = String(normalizedParams?.task || '').trim() || buildHouseWorkerDefaultTask(deployment);
+  const result = await spawnHouseWorkerSession({
+    ...normalizedParams,
+    deploymentId,
+    task,
+    spawnSource: 'parent_worker',
+  });
+  return makeHouseWorkerToolResult({
+    ok: true,
+    data: {
+      ...(result && typeof result === 'object' ? result : {}),
+      supervisor: getHouseWorkerSupervisorSnapshot(),
+    },
+  });
+}
+
+async function runHouseWorkerToolMessage(params = {}) {
+  const normalizedParams = isPlainRecord(params) ? { ...params } : {};
+  const targetSessionId = String(
+    normalizedParams?.houseWorkerSessionId
+    || normalizedParams?.workerSessionId
+    || ''
+  ).trim();
+  const message = String(normalizedParams?.message || '').trim();
+  if (!targetSessionId || !message) {
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: 'INVALID_ARGUMENT',
+        message: 'houseWorkerSessionId and message are required.',
+      },
+    });
+  }
+  const result = await sendHouseWorkerMessage({
+    ...normalizedParams,
+    houseWorkerSessionId: targetSessionId,
+    actor: 'parent_worker',
+  });
+  const sessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
+  const session = resolveHouseWorkerSessionEntry(sessions, { houseWorkerSessionId: targetSessionId });
+  return makeHouseWorkerToolResult({
+    ok: true,
+    data: {
+      ...(result && typeof result === 'object' ? result : {}),
+      session,
+      supervisor: getHouseWorkerSupervisorSnapshot(),
+    },
+  });
+}
+
+async function runHouseWorkerToolStatus(params = {}) {
+  const normalizedParams = isPlainRecord(params) ? { ...params } : {};
+  const data = await readHouseWorkerCollections({
+    skipContext: false,
+    render: houseSurfaceState.activeSurface === 'office',
+    teamId: normalizedParams?.teamId,
+  });
+  const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+  const session = resolveHouseWorkerSessionEntry(sessions, normalizedParams);
+  if (
+    String(normalizedParams?.houseWorkerSessionId || normalizedParams?.workerSessionId || normalizedParams?.deploymentId || '').trim()
+    && !session
+  ) {
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: String(normalizedParams?.deploymentId ? 'DEPLOYMENT_NOT_FOUND' : 'WORKER_SESSION_NOT_FOUND'),
+        message: String(normalizedParams?.deploymentId
+          ? 'Helper deployment was not found in the current House.'
+          : 'Helper session was not found in the current House.'
+        ),
+      },
+    });
+  }
+  return makeHouseWorkerToolResult({
+    ok: true,
+    data: {
+      houseId: String(data?.houseId || houseSurfaceState.context.houseId || '').trim() || null,
+      teamId: String(data?.teamId || houseSurfaceState.context.activeTeamId || '').trim() || null,
+      sessions,
+      session,
+      supervisor: getHouseWorkerSupervisorSnapshot(),
+    },
+  });
+}
+
+async function dispatchHouseWorkerRuntimeAction(tool, rawParams = {}, options = {}) {
+  const toolName = String(tool || '').trim();
+  const params = isPlainRecord(rawParams) ? rawParams : {};
+  const source = String(options?.source || 'runtime');
+  if (!isTownHub) {
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: 'HOUSE_WORKER_UNAVAILABLE',
+        message: 'House worker runtime tools are unavailable on this route.',
+      },
+    });
+  }
+  try {
+    if (toolName === 'agent_town_worker_list') {
+      return await runHouseWorkerToolList(params);
+    }
+    if (toolName === 'agent_town_worker_spawn') {
+      return await runHouseWorkerToolSpawn(params);
+    }
+    if (toolName === 'agent_town_worker_message') {
+      return await runHouseWorkerToolMessage(params);
+    }
+    if (toolName === 'agent_town_worker_status') {
+      return await runHouseWorkerToolStatus(params);
+    }
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: 'HOUSE_WORKER_TOOL_UNKNOWN',
+        message: `Unknown House worker tool: ${toolName || '(empty)'}`,
+      },
+    });
+  } catch (err) {
+    houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_TOOL_INTERNAL');
+    return makeHouseWorkerToolResult({
+      ok: false,
+      error: {
+        code: 'HOUSE_WORKER_TOOL_INTERNAL',
+        message: `${source}: ${String(err?.detail || err?.message || 'House worker tool failed')}`,
+      },
+    });
+  }
+}
+
 function maybeExposeHouseWorkerSupervisor() {
+  window.AgentTownHouseWorkerRuntime = {
+    dispatch: dispatchHouseWorkerRuntimeAction,
+    getSnapshot: () => getHouseWorkerSupervisorSnapshot(),
+  };
+  window.dispatchHouseWorkerRuntimeAction = dispatchHouseWorkerRuntimeAction;
   window.__agentTownHouseWorkerSupervisor = {
     getSnapshot: () => getHouseWorkerSupervisorSnapshot(),
-    sync: async () => await syncHouseWorkerSessions({ skipContext: true, render: false }),
+    sync: async ({ teamId = '' } = {}) => await syncHouseWorkerSessions({ skipContext: true, render: false, teamId }),
     spawn: async (payload = {}) => await spawnHouseWorkerSession(payload),
     message: async (payload = {}) => await sendHouseWorkerMessage(payload),
     stop: async (payload = {}) => await stopHouseWorkerSession(payload),
@@ -1871,6 +2099,32 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
 
   worker.addEventListener('message', async (event) => {
     const msg = event?.data && typeof event.data === 'object' ? event.data : {};
+    if (msg.type === 'worker.house_worker.request') {
+      const id = String(msg?.id || '').trim();
+      if (id) {
+        const result = await dispatchHouseWorkerRuntimeAction(
+          String(msg?.tool || msg?.action || '').trim(),
+          isPlainRecord(msg?.params) ? msg.params : {},
+          {
+            source: 'child-worker',
+            houseWorkerSessionId,
+            runtimeAgentId,
+          }
+        ).catch((err) => makeHouseWorkerToolResult({
+          ok: false,
+          error: {
+            code: 'HOUSE_WORKER_TOOL_INTERNAL',
+            message: String(err?.detail || err?.message || 'House worker action failed'),
+          },
+        }));
+        worker.postMessage({
+          type: 'gateway.house_worker.response',
+          id,
+          result,
+        });
+      }
+      return;
+    }
     const requestId = String(msg?.requestId || '').trim();
     if (requestId) {
       const rec = pendingRequests.get(requestId);
@@ -1912,6 +2166,7 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
       const text = String(msg?.text || '').trim();
       if (role !== 'assistant' || !text || text === 'openclaw-lite boot') return;
       await persistReply(text).catch(() => null);
+      houseWorkerSupervisorState.checkpoints.push(`reply:${houseWorkerSessionId}`);
       const pending = pendingReplies.shift();
       if (pending) {
         clearTimeout(pending.timeoutId);
@@ -2903,11 +3158,15 @@ function renderHouseOfficeSurface() {
 
       const heading = document.createElement('div');
       heading.style.fontWeight = '600';
-      heading.textContent = [
-        String(session?.displayName || session?.deploymentLabel || 'Helper').trim() || 'Helper',
-        String(session?.statusLabel || session?.status || 'Ready to help').trim() || 'Ready to help',
-      ].join(' · ');
+      heading.textContent = String(session?.displayName || session?.deploymentLabel || 'Helper').trim() || 'Helper';
       card.appendChild(heading);
+
+      const statusLine = document.createElement('div');
+      statusLine.className = 'small';
+      statusLine.style.marginTop = '4px';
+      statusLine.setAttribute('data-testid', 'house-office-worker-session-status');
+      statusLine.textContent = `Status: ${String(session?.statusLabel || session?.status || 'Ready to help').trim() || 'Ready to help'}`;
+      card.appendChild(statusLine);
 
       const meta = document.createElement('div');
       meta.className = 'small';
@@ -2938,6 +3197,81 @@ function renderHouseOfficeSurface() {
       eventsLine.style.marginTop = '4px';
       eventsLine.textContent = `Events recorded: ${Number(session?.eventCount || 0)}`;
       card.appendChild(eventsLine);
+
+      const messageInput = document.createElement('input');
+      messageInput.type = 'text';
+      messageInput.className = 'input';
+      messageInput.placeholder = 'Ask this helper what it should do next.';
+      messageInput.setAttribute('data-testid', 'house-office-worker-session-message-input');
+      messageInput.style.marginTop = '8px';
+      messageInput.style.width = '100%';
+      messageInput.style.boxSizing = 'border-box';
+      card.appendChild(messageInput);
+
+      const actions = document.createElement('div');
+      actions.className = 'kv';
+      actions.style.marginTop = '8px';
+
+      const askBtn = document.createElement('button');
+      askBtn.type = 'button';
+      askBtn.className = 'btn';
+      askBtn.textContent = 'Ask Helper';
+      askBtn.setAttribute('data-testid', 'house-office-worker-session-ask');
+      actions.appendChild(askBtn);
+
+      const stopBtn = document.createElement('button');
+      stopBtn.type = 'button';
+      stopBtn.className = 'btn';
+      stopBtn.textContent = 'Stop Helper';
+      stopBtn.setAttribute('data-testid', 'house-office-worker-session-stop');
+      actions.appendChild(stopBtn);
+      card.appendChild(actions);
+
+      const actionStatus = document.createElement('div');
+      actionStatus.className = 'small';
+      actionStatus.style.marginTop = '6px';
+      actionStatus.textContent = String(session?.statusLabel || 'Ready to help').trim() || 'Ready to help';
+      card.appendChild(actionStatus);
+
+      askBtn.addEventListener('click', async () => {
+        const targetSessionId = String(session?.houseWorkerSessionId || '').trim();
+        if (!targetSessionId) return;
+        const nextMessage = String(messageInput.value || '').trim() || 'Reply with one short status update.';
+        askBtn.disabled = true;
+        actionStatus.textContent = 'Asking helper...';
+        try {
+          const result = await sendHouseWorkerMessage({
+            houseWorkerSessionId: targetSessionId,
+            message: nextMessage,
+            actor: 'human',
+          });
+          actionStatus.textContent = String(result?.reply || 'Helper replied.').trim() || 'Helper replied.';
+          messageInput.value = '';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper reply unavailable.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_MESSAGE_FAILED');
+        } finally {
+          askBtn.disabled = false;
+        }
+      });
+
+      stopBtn.addEventListener('click', async () => {
+        const targetSessionId = String(session?.houseWorkerSessionId || '').trim();
+        if (!targetSessionId) return;
+        stopBtn.disabled = true;
+        actionStatus.textContent = 'Stopping helper...';
+        try {
+          await stopHouseWorkerSession({
+            houseWorkerSessionId: targetSessionId,
+          });
+          actionStatus.textContent = 'Helper stopped.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper stop failed.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_STOP_FAILED');
+        } finally {
+          stopBtn.disabled = false;
+        }
+      });
       sessionsNode.appendChild(card);
     });
   }
