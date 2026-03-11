@@ -763,6 +763,14 @@ function seedPokerPlayTables() {
       decisionCountdownSeconds: 45,
       cashOutEnabled: false,
       payoutModel: 'winner_take_all',
+      handsPerBlindLevel: 2,
+      blindLevels: [
+        { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+        { level: 2, smallBlindOil: 75, bigBlindOil: 150 },
+        { level: 3, smallBlindOil: 100, bigBlindOil: 200 },
+        { level: 4, smallBlindOil: 150, bigBlindOil: 300 },
+        { level: 5, smallBlindOil: 200, bigBlindOil: 400 },
+      ],
     }, {}),
     toJson({
       headline: 'Winner-take-all six-max tournament play for human + AI teams.',

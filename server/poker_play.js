@@ -597,6 +597,8 @@ function createInitialPokerPlayHandState({
   const state = {
     handNumber: normalizeOilAmount(handNumber, 1),
     tableType: String(table?.tableType || 'cash'),
+    blindLevel: normalizeOilAmount(table?.state?.currentBlindLevel, 0),
+    handsPerBlindLevel: normalizeOilAmount(table?.state?.handsPerBlindLevel, 0),
     buttonSeat,
     smallBlindSeat,
     bigBlindSeat,

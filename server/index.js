@@ -4352,6 +4352,7 @@ registerPokerRoutes(app, {
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
+  isAdmin,
   getStreamflowVerificationById,
   getStreamflowVerificationByProviderAndStream,
   getStreamflowVerificationByWalletAndStream,

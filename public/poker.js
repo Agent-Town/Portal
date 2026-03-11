@@ -6,6 +6,9 @@
   const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
   let countdownTimer = null;
   let liveRefreshTimer = null;
+  let liveTableStream = null;
+  let liveTableStreamTableId = '';
+  let liveTableRefreshInFlight = false;
 
   function setTitle(title, subtitle) {
     if (titleEl) titleEl.textContent = title;
@@ -107,6 +110,14 @@
     }
   }
 
+  function clearLiveTableStream() {
+    if (liveTableStream) {
+      liveTableStream.close();
+      liveTableStream = null;
+    }
+    liveTableStreamTableId = '';
+  }
+
   function formatPlaySeatStatus(status) {
     const value = String(status || '').trim().toLowerCase();
     if (value === 'leaving_after_hand') return 'leaving after hand';
@@ -193,9 +204,38 @@
     liveRefreshTimer = window.setTimeout(() => {
       const path = window.location.pathname;
       if (path === `/poker/play/tables/${tableId}`) {
-        loadPlayTable(tableId, { silent: true }).catch(() => {});
+        refreshLiveTable(tableId, { silent: true }).catch(() => {});
       }
-    }, 4000);
+    }, 15000);
+  }
+
+  async function refreshLiveTable(tableId, { silent = false } = {}) {
+    if (!tableId || liveTableRefreshInFlight) return;
+    liveTableRefreshInFlight = true;
+    try {
+      await loadPlayTable(tableId, { silent });
+    } finally {
+      liveTableRefreshInFlight = false;
+    }
+  }
+
+  function bindLiveTableStream(tableId) {
+    if (!tableId || typeof window.EventSource !== 'function') return;
+    if (liveTableStream && liveTableStreamTableId === tableId) return;
+    clearLiveTableStream();
+    liveTableStreamTableId = tableId;
+    const stream = new window.EventSource(buildPokerHref(`/api/poker/play/tables/${encodeURIComponent(tableId)}/stream`), {
+      withCredentials: true,
+    });
+    liveTableStream = stream;
+    stream.addEventListener('table', () => {
+      if (window.location.pathname === `/poker/play/tables/${tableId}`) {
+        refreshLiveTable(tableId, { silent: true }).catch(() => {});
+      }
+    });
+    stream.addEventListener('error', () => {
+      scheduleLiveTableRefresh(tableId);
+    });
   }
 
   function renderSnapshotSlots(snapshotState) {
@@ -356,6 +396,7 @@
   }
 
   async function loadPlayLobby() {
+    clearLiveTableStream();
     setTitle('Live Poker Lobby', 'Cash and single-table tournament hold’em with private human + agent seat threads.');
     setStatus('Loading live tables...');
     const payload = await api('/api/poker/play/tables');
@@ -478,15 +519,24 @@
     const actions = Array.isArray(data?.actions) ? data.actions : [];
     const messages = Array.isArray(data?.messages) ? data.messages : [];
     const oilBalance = Number(data?.oilBalance?.balance || 0);
-    const canJoin = !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const paused = String(table?.status || 'open') === 'paused';
+    const canJoin = !paused && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
     const cards = [
       `
         <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
-        <p>${escapeHtml(table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))}</p>
+        <p>${escapeHtml(
+          paused
+            ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
+            : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
+        )}</p>
         <div class="pokerSummary">
           ${renderSummaryMetric('Type', table?.tableType || 'cash')}
+          ${renderSummaryMetric('Status', paused ? 'paused' : (table?.status || 'open'))}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
           ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
           ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
         ${renderMetaBadges([
@@ -600,7 +650,12 @@
       `);
     }
 
-    if (mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
+    if (mySeat && hand && paused) {
+      cards.push(`
+        <h2>Submit Action</h2>
+        <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
+      `);
+    } else if (mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
       cards.push(`
         <h2>Submit Action</h2>
         <div class="pokerStack">
@@ -737,6 +792,7 @@
     bindPlayMessageForm(tableId, data?.hand?.handId || '');
     bindPlayActionForm(tableId, data?.hand?.handId || '');
     bindCountdown(data?.hand?.actionExpiresAt || null);
+    bindLiveTableStream(tableId);
     scheduleLiveTableRefresh(tableId);
     if (!silent) {
       setStatus(data?.mySeat ? 'Live table synced.' : 'Live table ready.');
@@ -744,6 +800,7 @@
   }
 
   async function loadCentaurLobby() {
+    clearLiveTableStream();
     setTitle('Centaur Poker', 'Human + AI make one action together while the countdown runs.');
     setStatus('Loading centaur lobby...');
     const payload = await api('/api/poker/centaur/tournaments');
@@ -1240,6 +1297,7 @@
   }
 
   async function loadCentaurTournament(tournamentId) {
+    clearLiveTableStream();
     setTitle('Centaur Table', `Shared human + AI table state for ${tournamentId}.`);
     setStatus('Loading centaur table...');
     const payload = await api(`/api/poker/centaur/tournaments/${encodeURIComponent(tournamentId)}`);
@@ -1257,6 +1315,9 @@
     const url = new URL(window.location.href);
     const path = url.pathname;
     try {
+      if (!path.match(/^\/poker\/play\/tables\/([^/]+)$/)) {
+        clearLiveTableStream();
+      }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
       const playMatch = path.match(/^\/poker\/play\/tables\/([^/]+)$/);

@@ -22,14 +22,17 @@ const {
   seedStreamflowFixtureState,
 } = require('./streamflow_adapter');
 const {
+  buildPokerPlayTablePayload,
   createTable,
   createRouteError,
   getTableDetail,
   leaveTable,
   listTables,
   matchmakeIntoTable,
+  pauseTable,
   postAction,
   postMessage,
+  resumeTable,
   seatIntoTable,
 } = require('./poker_play_service');
 
@@ -191,6 +194,7 @@ function registerPokerRoutes(app, deps) {
     getStreamflowVerificationByProviderAndStream,
     getStreamflowVerificationByWalletAndStream,
     getStreamflowVerificationByWalletSubject,
+    isAdmin,
     isTestMockAddress,
     listActiveStreamflowVerifications,
     listCentaurActionsByHand,
@@ -272,6 +276,77 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
   };
+
+  const pokerPlayStreamClientsByTable = new Map();
+  let pokerPlayStreamEventCounter = 0;
+
+  function writePokerPlayStreamEvent(res, { event = 'table', data = {}, id = null } = {}) {
+    if (id != null) {
+      res.write(`id: ${String(id)}\n`);
+    }
+    res.write(`event: ${String(event || 'table')}\n`);
+    res.write(`data: ${JSON.stringify(data || {})}\n\n`);
+  }
+
+  function publishPokerPlayTableEvent(tableId, reason, details = {}) {
+    const normalizedTableId = normalizeTrimmedString(tableId);
+    if (!normalizedTableId) return;
+    const clients = pokerPlayStreamClientsByTable.get(normalizedTableId);
+    if (!clients || !clients.size) return;
+    pokerPlayStreamEventCounter += 1;
+    const payload = {
+      tableId: normalizedTableId,
+      reason: normalizeTrimmedString(reason, 'update'),
+      at: nowIso(),
+      ...((details && typeof details === 'object') ? details : {}),
+    };
+    for (const client of clients) {
+      try {
+        writePokerPlayStreamEvent(client.res, {
+          id: pokerPlayStreamEventCounter,
+          event: 'table',
+          data: payload,
+        });
+      } catch {
+        client.close();
+      }
+    }
+  }
+
+  function subscribePokerPlayTableStream(tableId, req, res) {
+    const normalizedTableId = normalizeTrimmedString(tableId);
+    const bucket = pokerPlayStreamClientsByTable.get(normalizedTableId) || new Set();
+    const client = {
+      res,
+      close() {},
+    };
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: keepalive ${Date.now()}\n\n`);
+      } catch {
+        client.close();
+      }
+    }, 15000);
+    client.close = () => {
+      clearInterval(heartbeat);
+      bucket.delete(client);
+      if (!bucket.size) {
+        pokerPlayStreamClientsByTable.delete(normalizedTableId);
+      }
+    };
+    bucket.add(client);
+    pokerPlayStreamClientsByTable.set(normalizedTableId, bucket);
+    req.on('close', client.close);
+    req.on('aborted', client.close);
+    writePokerPlayStreamEvent(res, {
+      id: `ready-${Date.now()}`,
+      event: 'ready',
+      data: {
+        tableId: normalizedTableId,
+        at: nowIso(),
+      },
+    });
+  }
 
   app.get('/v1/health', respondPokerOperatorTransport);
   app.get('/v1/seasons', respondPokerOperatorTransport);
@@ -537,6 +612,10 @@ function registerPokerRoutes(app, deps) {
         req,
         body: req.body,
       });
+      publishPokerPlayTableEvent(payload?.table?.tableId || '', payload?.mySeat ? 'seat' : 'create', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
       return sendPortalApiError(
@@ -561,6 +640,10 @@ function registerPokerRoutes(app, deps) {
         session,
         req,
         body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || '', 'seat', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
@@ -602,6 +685,108 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/tables/:tableId/stream', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    const tableId = normalizeTrimmedString(req.params.tableId);
+    if (!tableId || !getPokerPlayTableById(tableId)) {
+      return sendPortalApiError(
+        res,
+        404,
+        'NOT_FOUND',
+        'Poker table not found.',
+        { requestId }
+      );
+    }
+    res.status(200);
+    res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+    res.setHeader('cache-control', 'no-cache, no-transform');
+    res.setHeader('connection', 'keep-alive');
+    res.setHeader('x-accel-buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+    subscribePokerPlayTableStream(tableId, req, res);
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/pause', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = pauseTable(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'pause', {
+        handId: payload?.hand?.handId || null,
+        handNumber: payload?.hand?.handNumber || null,
+        actingSeat: payload?.hand?.state?.actingSeat || null,
+      });
+      return sendPortalApiSuccess(
+        res,
+        buildPokerPlayTablePayload(playRouteDeps, payload.table, payload.seats, payload.hand, {
+          req,
+          processAt: req.body?.asOf,
+        }),
+        { requestId }
+      );
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_PAUSE_FAILED',
+        err?.message || 'Unable to pause the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/resume', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = resumeTable(playRouteDeps, {
+        tableId: req.params.tableId,
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'resume', {
+        handId: payload?.hand?.handId || null,
+        handNumber: payload?.hand?.handNumber || null,
+        actingSeat: payload?.hand?.state?.actingSeat || null,
+      });
+      return sendPortalApiSuccess(
+        res,
+        buildPokerPlayTablePayload(playRouteDeps, payload.table, payload.seats, payload.hand, {
+          req,
+          processAt: req.body?.asOf,
+        }),
+        { requestId }
+      );
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RESUME_FAILED',
+        err?.message || 'Unable to resume the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/tables/:tableId/sit', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -612,6 +797,10 @@ function registerPokerRoutes(app, deps) {
         session,
         req,
         body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'seat', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
@@ -639,6 +828,10 @@ function registerPokerRoutes(app, deps) {
         req,
         body: req.body,
       });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'leave', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
       return sendPortalApiError(
@@ -665,6 +858,10 @@ function registerPokerRoutes(app, deps) {
         req,
         body: req.body,
       });
+      const hand = getPokerPlayHandById(req.params.handId);
+      publishPokerPlayTableEvent(hand?.tableId || '', 'message', {
+        handId: payload?.handId || req.params.handId,
+      });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
       return sendPortalApiError(
@@ -690,6 +887,11 @@ function registerPokerRoutes(app, deps) {
         session,
         req,
         body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || getPokerPlayHandById(req.params.handId)?.tableId || '', 'action', {
+        handId: payload?.hand?.handId || req.params.handId,
+        actingSeat: payload?.hand?.actingSeat || null,
+        handNumber: payload?.hand?.handNumber || null,
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {

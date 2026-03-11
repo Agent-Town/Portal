@@ -51,6 +51,44 @@ function normalizeSeatCount(value, fallback = POKER_PLAY_MAX_SEATS) {
   return Math.max(2, Math.min(POKER_PLAY_MAX_SEATS, seats || fallback));
 }
 
+function buildTournamentBlindLevels(smallBlindOil, bigBlindOil) {
+  const baseSmallBlind = Math.max(1, normalizeOilAmount(smallBlindOil, 50));
+  const baseBigBlind = Math.max(baseSmallBlind * 2, normalizeOilAmount(bigBlindOil, 100));
+  const levels = [
+    [baseSmallBlind, baseBigBlind],
+    [Math.ceil(baseSmallBlind * 1.5), Math.ceil(baseBigBlind * 1.5)],
+    [baseSmallBlind * 2, baseBigBlind * 2],
+    [baseSmallBlind * 3, baseBigBlind * 3],
+    [baseSmallBlind * 4, baseBigBlind * 4],
+    [baseSmallBlind * 6, baseBigBlind * 6],
+  ];
+  return levels.map(([levelSmallBlind, levelBigBlind], index) => ({
+    level: index + 1,
+    smallBlindOil: Math.max(1, normalizeOilAmount(levelSmallBlind, baseSmallBlind)),
+    bigBlindOil: Math.max(
+      Math.max(1, normalizeOilAmount(levelSmallBlind, baseSmallBlind)) * 2,
+      normalizeOilAmount(levelBigBlind, baseBigBlind)
+    ),
+  }));
+}
+
+function normalizeTournamentBlindLevels(levels, fallbackSmallBlind, fallbackBigBlind) {
+  const items = Array.isArray(levels) ? levels : [];
+  const normalized = items
+    .map((level, index) => {
+      const smallBlindOil = Math.max(1, normalizeOilAmount(level?.smallBlindOil, 0));
+      const bigBlindOil = Math.max(smallBlindOil * 2, normalizeOilAmount(level?.bigBlindOil, 0));
+      if (!smallBlindOil || !bigBlindOil) return null;
+      return {
+        level: index + 1,
+        smallBlindOil,
+        bigBlindOil,
+      };
+    })
+    .filter(Boolean);
+  return normalized.length ? normalized : buildTournamentBlindLevels(fallbackSmallBlind, fallbackBigBlind);
+}
+
 function slugifySegment(value, fallback = 'table') {
   const base = normalizeTrimmedString(value, fallback)
     .toLowerCase()
@@ -67,6 +105,12 @@ function normalizeCreateTableConfig(input = {}) {
   const maxSeats = normalizeSeatCount(input?.maxSeats, POKER_PLAY_MAX_SEATS);
   const minPlayers = Math.max(2, Math.min(maxSeats, normalizeOilAmount(input?.minPlayers, 2)));
   const countdownSeconds = Math.max(10, normalizeOilAmount(input?.decisionCountdownSeconds, DEFAULT_PLAY_ACTION_COUNTDOWN_SECONDS));
+  const handsPerBlindLevel = tableType === 'tournament'
+    ? Math.max(1, normalizeOilAmount(input?.handsPerBlindLevel, 2))
+    : 0;
+  const blindLevels = tableType === 'tournament'
+    ? normalizeTournamentBlindLevels(input?.blindLevels, smallBlindOil, bigBlindOil)
+    : [];
   const title = normalizeTrimmedString(
     input?.title,
     tableType === 'cash'
@@ -81,19 +125,57 @@ function normalizeCreateTableConfig(input = {}) {
     maxSeats,
     minPlayers,
     decisionCountdownSeconds: countdownSeconds,
+    handsPerBlindLevel,
+    blindLevels,
     title,
   };
 }
 
+function resolveTournamentBlindProgress(table, handNumber = 1) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return {
+      blindLevel: 0,
+      handsPerBlindLevel: 0,
+      smallBlindOil: Math.max(1, normalizeOilAmount(table?.smallBlindOil, 10)),
+      bigBlindOil: Math.max(2, normalizeOilAmount(table?.bigBlindOil, 20)),
+      levels: [],
+      handsUntilIncrease: 0,
+      nextBlindLevel: 0,
+    };
+  }
+  const currentHandNumber = Math.max(1, normalizeOilAmount(handNumber, 1));
+  const handsPerBlindLevel = Math.max(1, normalizeOilAmount(table?.rules?.handsPerBlindLevel, 2));
+  const levels = normalizeTournamentBlindLevels(table?.rules?.blindLevels, table?.smallBlindOil, table?.bigBlindOil);
+  const levelIndex = Math.min(levels.length - 1, Math.floor((currentHandNumber - 1) / handsPerBlindLevel));
+  const level = levels[levelIndex] || levels[0];
+  const nextLevel = levels[levelIndex + 1] || null;
+  const nextLevelStartsAtHand = nextLevel ? (levelIndex + 1) * handsPerBlindLevel + 1 : 0;
+  return {
+    blindLevel: Number(level?.level || levelIndex + 1),
+    handsPerBlindLevel,
+    smallBlindOil: Math.max(1, normalizeOilAmount(level?.smallBlindOil, table?.smallBlindOil)),
+    bigBlindOil: Math.max(2, normalizeOilAmount(level?.bigBlindOil, table?.bigBlindOil)),
+    levels,
+    handsUntilIncrease: nextLevelStartsAtHand ? Math.max(0, nextLevelStartsAtHand - currentHandNumber) : 0,
+    nextBlindLevel: nextLevel ? Number(nextLevel.level || levelIndex + 2) : 0,
+  };
+}
+
 function buildMatchKey(config) {
-  return [
+  const base = [
     normalizePokerPlayTableType(config?.tableType),
     `sb${Math.max(1, normalizeOilAmount(config?.smallBlindOil, 0))}`,
     `bb${Math.max(2, normalizeOilAmount(config?.bigBlindOil, 0))}`,
     `bi${Math.max(1, normalizeOilAmount(config?.buyInOil, 0))}`,
     `mx${normalizeSeatCount(config?.maxSeats, POKER_PLAY_MAX_SEATS)}`,
     `mn${Math.max(2, normalizeOilAmount(config?.minPlayers, 2))}`,
-  ].join(':');
+  ];
+  if (normalizePokerPlayTableType(config?.tableType) === 'tournament') {
+    const blindLevels = normalizeTournamentBlindLevels(config?.blindLevels, config?.smallBlindOil, config?.bigBlindOil);
+    base.push(`hbl${Math.max(1, normalizeOilAmount(config?.handsPerBlindLevel, 2))}`);
+    base.push(`bl${blindLevels.map((level) => `${level.smallBlindOil}-${level.bigBlindOil}`).join('_')}`);
+  }
+  return base.join(':');
 }
 
 function getSessionHouseId(session) {
@@ -107,6 +189,10 @@ function toProcessIso(deps, value) {
 
 function isSeatPendingCashout(seat) {
   return !!seat && seat.status === 'pending_cashout';
+}
+
+function isTablePaused(table) {
+  return normalizeTrimmedString(table?.status, 'open').toLowerCase() === 'paused';
 }
 
 function isSeatInPlay(seat) {
@@ -154,15 +240,20 @@ function computeBuyInOil(table, requestedBuyInOil) {
 
 function computeTableSummary(table, seats, hand, viewerSeat) {
   const activeSeats = getActiveSeatRows(seats);
+  const handNumber = Number(hand?.handNumber || 0);
+  const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
   return {
     occupancy: activeSeats.length,
     openSeatCount: Math.max(0, Number(table?.maxSeats || POKER_PLAY_MAX_SEATS) - activeSeats.length),
     liveHand: !!hand && hand.status === 'live',
-    handNumber: Number(hand?.handNumber || 0),
+    handNumber,
     actingSeat: normalizeSeatNumber(hand?.state?.actingSeat),
     viewerSeatNumber: normalizeSeatNumber(viewerSeat?.seatNumber),
     completedAt: table?.state?.completedAt || null,
     winnerSeatNumber: normalizeSeatNumber(table?.state?.winnerSeatNumber),
+    blindLevel: blindProgress.blindLevel,
+    nextBlindLevel: blindProgress.nextBlindLevel,
+    handsUntilBlindIncrease: blindProgress.handsUntilIncrease,
   };
 }
 
@@ -227,6 +318,8 @@ function sanitizeHandForViewer({ table, hand, seats, viewerSeatNumber }) {
     status: hand.status,
     street: hand?.state?.street || hand?.state?.phase || 'preflop',
     phase: hand?.state?.phase || hand?.state?.street || 'preflop',
+    blindLevel: Number(hand?.state?.blindLevel || 0),
+    handsPerBlindLevel: Number(hand?.state?.handsPerBlindLevel || 0),
     actingSeat,
     buttonSeat: normalizeSeatNumber(hand?.state?.buttonSeat),
     smallBlindSeat: normalizeSeatNumber(hand?.state?.smallBlindSeat),
@@ -339,18 +432,34 @@ function settleQueuedCashouts(deps, table, seats, hand, atIso) {
 
 function startNewTableHand(deps, table, seats, previousHand, atIso) {
   const nextHandNumber = previousHand ? Number(previousHand.handNumber || 0) + 1 : 1;
+  let nextTable = table;
+  if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
+    const blindProgress = resolveTournamentBlindProgress(table, nextHandNumber);
+    const nextTableState = {
+      ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+      currentBlindLevel: blindProgress.blindLevel,
+      handsPerBlindLevel: blindProgress.handsPerBlindLevel,
+    };
+    nextTable = deps.upsertPokerPlayTable({
+      ...table,
+      smallBlindOil: blindProgress.smallBlindOil,
+      bigBlindOil: blindProgress.bigBlindOil,
+      state: nextTableState,
+      updatedAt: atIso,
+    });
+  }
   const nextState = createInitialPokerPlayHandState({
-    table,
+    table: nextTable,
     seats,
     handNumber: nextHandNumber,
     nowIso: atIso,
-    previousTableState: table?.state || {},
+    previousTableState: nextTable?.state || {},
   });
-  if (!nextState) return { table, hand: previousHand };
+  if (!nextState) return { table: nextTable, hand: previousHand };
 
   const hand = deps.upsertPokerPlayHand({
     handId: `pkplayhand_${deps.randomHex(10)}`,
-    tableId: table.tableId,
+    tableId: nextTable.tableId,
     handNumber: nextHandNumber,
     status: 'live',
     actionExpiresAt: nextState.actionExpiresAt || null,
@@ -358,7 +467,7 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
     result: {},
   });
   const nextTableState = {
-    ...(table.state && typeof table.state === 'object' ? table.state : {}),
+    ...(nextTable.state && typeof nextTable.state === 'object' ? nextTable.state : {}),
     completedAt: null,
     winnerSeatNumber: 0,
     prizeOil: 0,
@@ -369,7 +478,7 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
     lastStartedAt: atIso,
   };
   const updatedTable = deps.upsertPokerPlayTable({
-    ...table,
+    ...nextTable,
     state: nextTableState,
     updatedAt: atIso,
   });
@@ -483,11 +592,111 @@ function maybeClearReusableTournamentSeats(deps, table) {
   });
 }
 
+function pauseTable(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const table = synced.table;
+  const hand = synced.hand;
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const alreadyPaused = isTablePaused(table);
+  const atMs = Date.parse(requestAt);
+  const expiresAtMs = Date.parse(String(hand?.actionExpiresAt || hand?.state?.actionExpiresAt || ''));
+  const pausedActionRemainingMs = hand && hand.status === 'live' && Number.isFinite(atMs) && Number.isFinite(expiresAtMs)
+    ? Math.max(0, expiresAtMs - atMs)
+    : 0;
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    status: 'paused',
+    state: {
+      ...state,
+      pausedAt: requestAt,
+      pausedReason: normalizeTrimmedString(reason, normalizeTrimmedString(state.pausedReason, 'Operator review')),
+      pausedBy: normalizeTrimmedString(actorLabel, 'operator'),
+      pausedActionRemainingMs,
+    },
+    updatedAt: requestAt,
+  });
+  if (!alreadyPaused) {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: hand?.handId || null,
+      seatNumber: null,
+      authorRole: 'system',
+      body: normalizeTrimmedString(reason)
+        ? `Table paused by operator: ${normalizeTrimmedString(reason)}.`
+        : 'Table paused by operator.',
+      createdAt: requestAt,
+    });
+  }
+  return {
+    table: updatedTable,
+    seats: synced.seats,
+    hand,
+  };
+}
+
+function resumeTable(deps, { tableId, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  let table = deps.getPokerPlayTableById(tableId);
+  if (!table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  let seats = deps.listPokerPlaySeatsByTable(table.tableId);
+  let hand = deps.getCurrentPokerPlayHandForTable(table.tableId);
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const remainingActionMs = Math.max(0, normalizeOilAmount(state.pausedActionRemainingMs, 0));
+  if (hand && hand.status === 'live' && remainingActionMs > 0) {
+    const resumeAtMs = Date.parse(requestAt);
+    const actionExpiresAt = Number.isFinite(resumeAtMs)
+      ? new Date(resumeAtMs + remainingActionMs).toISOString()
+      : requestAt;
+    hand = deps.upsertPokerPlayHand({
+      ...hand,
+      actionExpiresAt,
+      state: {
+        ...(hand.state && typeof hand.state === 'object' ? hand.state : {}),
+        actionExpiresAt,
+      },
+      updatedAt: requestAt,
+    });
+  }
+  table = deps.upsertPokerPlayTable({
+    ...table,
+    status: 'open',
+    state: {
+      ...state,
+      pausedAt: null,
+      pausedReason: null,
+      pausedBy: null,
+      pausedActionRemainingMs: 0,
+      lastResumedAt: requestAt,
+      lastResumedBy: normalizeTrimmedString(actorLabel, 'operator'),
+    },
+    updatedAt: requestAt,
+  });
+  deps.createPokerPlayMessage({
+    tableId: table.tableId,
+    handId: hand?.handId || null,
+    seatNumber: null,
+    authorRole: 'system',
+    body: 'Table resumed by operator.',
+    createdAt: requestAt,
+  });
+  const synced = syncPokerPlayTable(deps, table.tableId, { processAt: requestAt });
+  return synced || { table, seats, hand };
+}
+
 function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   let table = deps.getPokerPlayTableById(tableId);
   if (!table) return null;
   let seats = deps.listPokerPlaySeatsByTable(table.tableId);
   let hand = deps.getCurrentPokerPlayHandForTable(table.tableId);
+  if (isTablePaused(table)) {
+    return { table, seats, hand };
+  }
   const atIso = toProcessIso(deps, processAt);
   let safety = 0;
 
@@ -701,6 +910,8 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       decisionCountdownSeconds: normalized.decisionCountdownSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'winner_take_all',
+      handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
+      blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
       matchKey,
       dynamic: true,
     },
@@ -787,6 +998,9 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   table = synced.table;
   const seats = synced.seats;
   const currentHand = synced.hand;
+  if (isTablePaused(table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
+  }
   const sameTableSeat = deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject);
   if (sameTableSeat) {
     return buildPokerPlayTablePayload(deps, table, seats, currentHand, { session, req, processAt: requestAt });
@@ -996,6 +1210,9 @@ function postAction(deps, { handId, session, req, body } = {}) {
   }
   const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: body?.asOf });
   const currentHand = deps.getPokerPlayHandById(handId) || synced.hand;
+  if (isTablePaused(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
+  }
   if (!currentHand || currentHand.status !== 'live') {
     throw createRouteError(409, 'POKER_PLAY_HAND_NOT_LIVE', 'This poker hand is no longer live.');
   }
@@ -1092,8 +1309,10 @@ module.exports = {
   matchmakeIntoTable,
   normalizePokerPlayDisplayName,
   normalizePokerPlayMessageBody,
+  pauseTable,
   postAction,
   postMessage,
+  resumeTable,
   seatIntoTable,
   syncPokerPlayTable,
 };

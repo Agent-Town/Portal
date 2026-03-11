@@ -398,6 +398,9 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[].summary.occupancy`
 - `data.items[].summary.openSeatCount`
 - `data.items[].summary.liveHand`
+- `data.items[].summary.blindLevel`
+- `data.items[].summary.nextBlindLevel`
+- `data.items[].summary.handsUntilBlindIncrease`
 - `data.houseId`
 - `data.wallet`
 - `data.oilBalance`
@@ -412,6 +415,13 @@ Returns one live cash or tournament table payload with:
 - `data.actions[]`
 - `data.suggestion`
 - `data.oilBalance`
+
+Tournament blind progression notes:
+- tournaments expose `data.table.summary.blindLevel`
+- tournaments expose `data.table.summary.nextBlindLevel`
+- tournaments expose `data.table.summary.handsUntilBlindIncrease`
+- live tournament hands expose `data.hand.blindLevel`
+- tournament blind values are resolved server-side at hand start from `data.table.rules.handsPerBlindLevel` and `data.table.rules.blindLevels[]`
 
 Hole-card privacy rules:
 - `data.mySeat.holeCards[]` is only populated for the viewing seat.
@@ -435,6 +445,10 @@ Request shape:
   "displayName": "Alpha House"
 }
 ```
+
+Tournament-only request fields:
+- `handsPerBlindLevel`
+- `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
 
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
@@ -474,6 +488,7 @@ Request shape:
   "smallBlindOil": 75,
   "bigBlindOil": 150,
   "buyInOil": 600,
+  "handsPerBlindLevel": 2,
   "displayName": "Bravo House"
 }
 ```
@@ -483,6 +498,51 @@ Response fields:
 - `data.mySeat`
 - `data.hand`
 - `data.oilBalance`
+
+### GET `/api/poker/play/tables/:tableId/stream`
+Opens a server-sent event stream for one live table. The stream does not expose seat-private cards or thread content; it only notifies the browser that the table changed so the normal detail route can be reloaded immediately.
+
+Event shape:
+```json
+{
+  "tableId": "pkt_play_cash_01",
+  "reason": "action",
+  "at": "2026-03-11T10:00:00.000Z",
+  "handId": "pkplayhand_abc123",
+  "handNumber": 2,
+  "actingSeat": 1
+}
+```
+
+Event notes:
+- initial connect emits a `ready` event
+- update events use `event: table`
+- browsers should treat the stream as a push hint and re-read `GET /api/poker/play/tables/:tableId`
+- table events may use reasons such as `action`, `message`, `seat`, `leave`, `pause`, and `resume`
+
+### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)
+Pauses a live table for operator review. While paused:
+- the current hand stays visible
+- action countdown progression is frozen
+- new seats cannot join
+- poker actions fail with `POKER_PLAY_TABLE_PAUSED`
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "operator review",
+  "asOf": "2026-03-10T12:00:05.000Z"
+}
+```
+
+### POST `/api/poker/play/admin/tables/:tableId/resume` (admin)
+Resumes a paused table and restores the live hand clock using the remaining countdown captured at pause time.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
 
 ### POST `/api/poker/play/tables/:tableId/leave`
 Leaves a live table. Cash tables cash out immediately between hands, or queue a cash-out during a live hand and return the remaining stack to offchain OIL when that hand settles. Tournament tables only allow leaving after bust-out or payout.
@@ -525,6 +585,7 @@ Failure codes:
 - `FORBIDDEN`
 - `POKER_PLAY_HAND_NOT_LIVE`
 - `POKER_PLAY_NOT_YOUR_TURN`
+- `POKER_PLAY_TABLE_PAUSED`
 - `POKER_PLAY_RAISE_TOO_SMALL`
 - `POKER_PLAY_ACTION_INVALID`
 
