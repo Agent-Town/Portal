@@ -1,0 +1,14 @@
+{
+  "family": "worker_spawn_profile_seed",
+  "schema": "agent-town-worker-spawn-profile-seed/v1",
+  "brainProfileId": "brain:current-runtime",
+  "workspaceSeedRef": "workspace/house-workers/front-desk-helper",
+  "configVersionId": "cfg_house_worker_profile_01",
+  "loadoutId": "loadout_house_worker_front_desk_helper_v1",
+  "advancedFieldIds": [
+    "brainProfileId",
+    "workspaceSeedRef",
+    "configVersionId",
+    "loadoutId"
+  ]
+}

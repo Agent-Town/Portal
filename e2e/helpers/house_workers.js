@@ -50,10 +50,82 @@ async function installSharedHouseWorker(request, payload = {}) {
   return readJsonResponse(response);
 }
 
+async function listHouseWorkerSessions(request, { teamId = '' } = {}) {
+  const search = new URLSearchParams();
+  if (teamId) search.set('teamId', String(teamId || '').trim());
+  const response = await request.get(
+    search.toString()
+      ? `/api/platform/house-workers/sessions?${search.toString()}`
+      : '/api/platform/house-workers/sessions',
+    { failOnStatusCode: false }
+  );
+  return readJsonResponse(response);
+}
+
+async function spawnHouseWorker(request, payload = {}) {
+  const response = await request.post('/api/platform/house-workers/spawn', {
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
+async function messageHouseWorker(request, payload = {}) {
+  const response = await request.post('/api/platform/house-workers/message', {
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
+async function stopHouseWorker(request, payload = {}) {
+  const response = await request.post('/api/platform/house-workers/stop', {
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
+async function readHouseWorkerSupervisorSnapshot(page) {
+  return await page.evaluate(() => {
+    const api = window.__agentTownHouseWorkerSupervisor;
+    if (!api || typeof api.getSnapshot !== 'function') return null;
+    return api.getSnapshot();
+  });
+}
+
+async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
+  return await page.evaluate(async ({ nextTeamId }) => {
+    const api = window.__agentTownHouseWorkerSupervisor;
+    if (!api || typeof api.sync !== 'function') {
+      return {
+        status: 503,
+        json: null,
+      };
+    }
+    const sessions = await api.sync({ teamId: String(nextTeamId || '').trim() }).catch(() => null);
+    return {
+      status: 200,
+      json: {
+        ok: true,
+        data: {
+          sessions: Array.isArray(sessions) ? sessions : [],
+        },
+      },
+    };
+  }, { nextTeamId: String(teamId || '') });
+}
+
 module.exports = {
   getHouseWorkerDeployments,
   getHouseWorkerShare,
   installHouseWorker,
   installSharedHouseWorker,
+  listHouseWorkerSessions,
+  messageHouseWorker,
+  readHouseWorkerSessionsFromPage,
+  readHouseWorkerSupervisorSnapshot,
   shareHouseWorker,
+  spawnHouseWorker,
+  stopHouseWorker,
 };

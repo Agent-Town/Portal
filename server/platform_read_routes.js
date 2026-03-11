@@ -7,6 +7,8 @@ function registerPlatformReadRoutes(app, deps) {
     buildPortalRequestId,
     createHouseStaffAssignment,
     createHouseWorkerDeployment,
+    createHouseWorkerSession,
+    createHouseWorkerSessionEvent,
     createHouseWorkerShare,
     createTrainerJob,
     createTrainerResult,
@@ -15,6 +17,7 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersionByIdempotency,
     getHouseWorkerDeploymentById,
     getHouseWorkerShareById,
+    getHouseWorkerSessionById,
     getRegistryEntityById,
     getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
@@ -29,6 +32,8 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseStaffAgents,
     listHouseStaffAssignments,
     listHouseWorkerDeployments,
+    listHouseWorkerSessionEvents,
+    listHouseWorkerSessions,
     listPlatformExperienceDefinitions,
     listRuns,
     listTeamConfigBindings,
@@ -49,10 +54,30 @@ function registerPlatformReadRoutes(app, deps) {
     sha256PrefixedHex,
     stableJsonStringify,
     updateTrainerJobStatus,
+    updateHouseWorkerSession,
     updateTrainerResultLink,
     upsertConfigVersion,
     upsertTeamConfigBinding,
   } = deps;
+
+  const HOUSE_WORKER_ACTIVE_STATUSES = new Set(['starting', 'ready', 'idle', 'working', 'waiting', 'blocked']);
+  const HOUSE_WORKER_ALLOWED_SPAWN_KEYS = new Set([
+    'deploymentId',
+    'task',
+    'reason',
+    'brainProfileId',
+    'workspaceSeedRef',
+    'configVersionId',
+    'loadoutId',
+    'officeId',
+    'parentWorkerSessionId',
+    'spawnSource',
+  ]);
+  const HOUSE_WORKER_ALLOWED_STATUS_VALUES = new Set(['starting', 'ready', 'idle', 'working', 'waiting', 'blocked', 'stopped', 'failed']);
+  const HOUSE_WORKER_MAX_ACTIVE_SESSIONS = Math.max(
+    1,
+    Number(getUnifiedPlatformTestFixture('worker_spawn_guardrail_seed')?.maxActiveSessions || 3)
+  );
 
   function buildHouseExperienceItems() {
     const fixture = getUnifiedPlatformTestFixture('house_experiences_seed') || {};
@@ -573,6 +598,262 @@ function registerPlatformReadRoutes(app, deps) {
       emptyStateText: normalizedHouseId && normalizedTeamId
         ? 'No installed helpers are available for this team yet.'
         : 'Attach a house and choose an active team to inspect installed helpers.',
+    };
+  }
+
+  function normalizeHouseWorkerTaskText(value, fallback = '') {
+    const candidate = String(value || fallback || '').trim();
+    if (!candidate) return '';
+    if (candidate.length > 280) return '';
+    return candidate;
+  }
+
+  function normalizeHouseWorkerReason(value, fallback = 'house_office_start') {
+    const normalized = String(value || fallback || '').trim().toLowerCase();
+    if (!normalized) return 'house_office_start';
+    if (!/^[a-z0-9._:-]{1,80}$/.test(normalized)) return '';
+    return normalized;
+  }
+
+  function normalizeHouseWorkerSpawnSource(value, fallback = 'house_ui') {
+    const normalized = String(value || fallback || '').trim().toLowerCase();
+    if (!normalized) return 'house_ui';
+    if (!/^[a-z0-9._:-]{1,80}$/.test(normalized)) return 'house_ui';
+    return normalized;
+  }
+
+  function normalizeHouseWorkerStatus(value, fallback = 'starting') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (HOUSE_WORKER_ALLOWED_STATUS_VALUES.has(normalized)) return normalized;
+    return String(fallback || 'starting').trim().toLowerCase();
+  }
+
+  function buildHouseWorkerSessionStatusLabel(status = '') {
+    const normalized = normalizeHouseWorkerStatus(status, 'starting');
+    if (normalized === 'ready' || normalized === 'idle') return 'Ready to help';
+    if (normalized === 'working') return 'Working now';
+    if (normalized === 'waiting') return 'Waiting for the next step';
+    if (normalized === 'blocked') return 'Blocked and needs attention';
+    if (normalized === 'stopped') return 'Stopped';
+    if (normalized === 'failed') return 'Needs attention';
+    return 'Starting helper';
+  }
+
+  function buildHouseWorkerRuntimeProfile({
+    deployment = null,
+    overrides = null,
+  } = {}) {
+    const runtimeDefaults = deployment?.runtimeDefaults && typeof deployment.runtimeDefaults === 'object'
+      ? deployment.runtimeDefaults
+      : {};
+    const overrideSource = overrides && typeof overrides === 'object' && !Array.isArray(overrides)
+      ? overrides
+      : {};
+    const brainProfileId = String(
+      overrideSource?.brainProfileId
+      || runtimeDefaults?.brainProfileId
+      || 'brain:current-runtime'
+    ).trim() || 'brain:current-runtime';
+    const workspaceSeedRef = String(
+      overrideSource?.workspaceSeedRef
+      || runtimeDefaults?.workspaceSeedRef
+      || `workspace/house-workers/${String(deployment?.deploymentId || 'helper').trim() || 'helper'}`
+    ).trim();
+    const configVersionId = String(
+      overrideSource?.configVersionId
+      || runtimeDefaults?.configVersionId
+      || ''
+    ).trim() || null;
+    const loadoutId = String(
+      overrideSource?.loadoutId
+      || runtimeDefaults?.loadoutId
+      || deployment?.loadoutId
+      || ''
+    ).trim() || null;
+    return {
+      brainProfileId,
+      workspaceSeedRef: workspaceSeedRef || null,
+      configVersionId,
+      loadoutId,
+    };
+  }
+
+  function mergeHouseWorkerRuntime(existingRuntime = null, patch = null) {
+    const current = existingRuntime && typeof existingRuntime === 'object' && !Array.isArray(existingRuntime)
+      ? existingRuntime
+      : {};
+    const nextPatch = patch && typeof patch === 'object' && !Array.isArray(patch)
+      ? patch
+      : {};
+    return {
+      ...current,
+      ...nextPatch,
+    };
+  }
+
+  function buildHouseWorkerSessionId({
+    houseId = '',
+    teamId = '',
+    deploymentId = '',
+    sequence = 1,
+  } = {}) {
+    const digest = sha256PrefixedHex(stableJsonStringify({
+      houseId,
+      teamId,
+      deploymentId,
+      sequence: Number(sequence || 0),
+    })).replace(/^sha256:/i, '');
+    return `hws_${digest.slice(0, 24)}`;
+  }
+
+  function buildHouseWorkerRuntimeAgentId({
+    deploymentId = '',
+    sequence = 1,
+  } = {}) {
+    const digest = sha256PrefixedHex(stableJsonStringify({
+      deploymentId,
+      sequence: Number(sequence || 0),
+    })).replace(/^sha256:/i, '');
+    return `helper_${digest.slice(0, 16)}`;
+  }
+
+  function buildHouseWorkerSessionEventId({
+    houseWorkerSessionId = '',
+    eventKind = '',
+    sequence = 1,
+  } = {}) {
+    const digest = sha256PrefixedHex(stableJsonStringify({
+      houseWorkerSessionId,
+      eventKind,
+      sequence: Number(sequence || 0),
+    })).replace(/^sha256:/i, '');
+    return `hwse_${digest.slice(0, 24)}`;
+  }
+
+  function buildHouseWorkerSessionCards({
+    houseId = '',
+    teamId = '',
+    deployments = [],
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId) return [];
+    const deploymentList = Array.isArray(deployments) && deployments.length
+      ? deployments
+      : buildHouseWorkerDeploymentsPayload({
+        context: {},
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }).deployments;
+    const deploymentMap = new Map(
+      deploymentList
+        .map((entry) => [String(entry?.deploymentId || '').trim(), entry])
+        .filter(([deploymentId]) => deploymentId)
+    );
+    return listHouseWorkerSessions({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+      .map((session) => {
+        const deploymentId = String(session?.deploymentId || '').trim();
+        if (!deploymentId) return null;
+        const deployment = deploymentMap.get(deploymentId) || null;
+        const events = listHouseWorkerSessionEvents({
+          houseWorkerSessionId: String(session?.houseWorkerSessionId || '').trim(),
+        });
+        const lastTaskEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'task_message') || null;
+        const lastReplyEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'assistant_reply') || null;
+        const runtime = session?.runtime && typeof session.runtime === 'object' ? session.runtime : {};
+        return {
+          houseWorkerSessionId: String(session?.houseWorkerSessionId || '').trim(),
+          deploymentId,
+          deploymentLabel: String(deployment?.displayName || session?.label || 'Helper').trim() || 'Helper',
+          displayName: String(session?.label || deployment?.displayName || 'Helper').trim() || 'Helper',
+          officeId: String(deployment?.officeId || '').trim() || null,
+          officeLabel: String(deployment?.officeLabel || '').trim() || null,
+          status: normalizeHouseWorkerStatus(session?.status, 'starting'),
+          statusLabel: buildHouseWorkerSessionStatusLabel(session?.status),
+          runtimeAgentId: String(session?.runtimeAgentId || '').trim() || null,
+          runtimeSessionId: String(runtime?.runtimeSessionId || '').trim() || null,
+          parentSessionId: String(session?.parentSessionId || '').trim() || null,
+          spawnSource: String(runtime?.spawnSource || '').trim() || null,
+          latestTask: String(lastTaskEvent?.payload?.message || runtime?.task || '').trim() || null,
+          latestReply: String(lastReplyEvent?.payload?.message || runtime?.lastReply || '').trim() || null,
+          runtimeProfile: {
+            brainProfileId: String(session?.brainProfileId || runtime?.brainProfileId || '').trim() || null,
+            workspaceSeedRef: String(session?.workspaceSeedRef || runtime?.workspaceSeedRef || '').trim() || null,
+            configVersionId: String(session?.configVersionId || runtime?.configVersionId || '').trim() || null,
+            loadoutId: String(session?.loadoutId || runtime?.loadoutId || '').trim() || null,
+          },
+          eventCount: events.length,
+          recentEvents: events.slice(-10).map((event) => ({
+            houseWorkerSessionEventId: String(event?.houseWorkerSessionEventId || '').trim(),
+            eventKind: String(event?.eventKind || '').trim(),
+            actor: String(event?.actor || '').trim(),
+            payload: event?.payload && typeof event.payload === 'object' ? event.payload : {},
+            createdAt: String(event?.createdAt || '').trim(),
+          })),
+          createdAt: String(session?.createdAt || '').trim(),
+          updatedAt: String(session?.updatedAt || '').trim(),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function buildHouseWorkerCollectionsPayload({
+    context = {},
+    houseId = '',
+    teamId = '',
+    sourceKind = 'durable_house_workers',
+  } = {}) {
+    const deploymentsPayload = buildHouseWorkerDeploymentsPayload({
+      context,
+      houseId,
+      teamId,
+      sourceKind,
+    });
+    const sessions = buildHouseWorkerSessionCards({
+      houseId,
+      teamId,
+      deployments: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [],
+    });
+    return {
+      houseId: deploymentsPayload.houseId,
+      teamId: deploymentsPayload.teamId,
+      activeTeamId: deploymentsPayload.activeTeamId,
+      availableTeamIds: deploymentsPayload.availableTeamIds,
+      deployments: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [],
+      sessions,
+      concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
+      sourceManifest: {
+        ...(deploymentsPayload.sourceManifest && typeof deploymentsPayload.sourceManifest === 'object'
+          ? deploymentsPayload.sourceManifest
+          : {}),
+        schema: 'agent-town-house-workers/v1',
+        routes: [
+          '/api/platform/house-workers',
+          '/api/platform/house-workers/deployments',
+          '/api/platform/house-workers/sessions',
+          '/api/platform/house-workers/install',
+          '/api/platform/house-workers/share',
+          '/api/platform/house-workers/install-shared',
+          '/api/platform/house-workers/spawn',
+          '/api/platform/house-workers/message',
+          '/api/platform/house-workers/status',
+          '/api/platform/house-workers/stop',
+        ],
+        fixtures: [
+          'worker_package_registry_seed',
+          'worker_package_install_seed',
+          'worker_package_share_seed',
+          'worker_runtime_supervisor_seed',
+          'worker_spawn_profile_seed',
+          'worker_spawn_guardrail_seed',
+        ],
+        counts: {
+          deploymentCount: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments.length : 0,
+          sessionCount: sessions.length,
+          activeSessionCount: sessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim())).length,
+        },
+      },
+      emptyStateText: deploymentsPayload.emptyStateText,
     };
   }
 
@@ -1932,6 +2213,13 @@ function registerPlatformReadRoutes(app, deps) {
         staffAgents,
       })
       : [];
+    const workerSessions = houseId && teamId
+      ? buildHouseWorkerSessionCards({
+        houseId,
+        teamId,
+        deployments,
+      })
+      : [];
     const briefingItemCount = countHouseOfficeBriefingItems(briefing);
     const activityCount = trainerJobs.length
       + trainerResults.length
@@ -1939,6 +2227,7 @@ function registerPlatformReadRoutes(app, deps) {
       + tracksPayload.events.length
       + assignments.length
       + deployments.length
+      + workerSessions.length
       + briefingItemCount
       + attention.length;
     return {
@@ -1950,6 +2239,7 @@ function registerPlatformReadRoutes(app, deps) {
       staffAgents,
       assignments,
       deployments,
+      workerSessions,
       presence,
       briefing,
       attention,
@@ -1961,9 +2251,14 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-structure',
           '/api/platform/house-office/assignments',
           '/api/platform/house-workers/deployments',
+          '/api/platform/house-workers/sessions',
           '/api/platform/house-workers/install',
           '/api/platform/house-workers/share',
           '/api/platform/house-workers/install-shared',
+          '/api/platform/house-workers/spawn',
+          '/api/platform/house-workers/message',
+          '/api/platform/house-workers/status',
+          '/api/platform/house-workers/stop',
           '/api/platform/experiences',
           '/api/platform/workshop',
           '/api/platform/tracks',
@@ -1978,6 +2273,9 @@ function registerPlatformReadRoutes(app, deps) {
             'house_office_privacy_seed',
             'worker_package_registry_seed',
             'worker_package_install_seed',
+            'worker_runtime_supervisor_seed',
+            'worker_spawn_profile_seed',
+            'worker_spawn_guardrail_seed',
           ]
           : [
             'house_office_overview_seed',
@@ -1990,6 +2288,7 @@ function registerPlatformReadRoutes(app, deps) {
           staffAgentCount: staffAgents.length,
           assignmentCount: assignments.length,
           deploymentCount: deployments.length,
+          workerSessionCount: workerSessions.length,
           presenceCount: presence.length,
           briefingGroupCount: briefing.length,
           briefingItemCount,
@@ -2008,6 +2307,7 @@ function registerPlatformReadRoutes(app, deps) {
         staffAgentCount: staffAgents.length,
         assignmentCount: assignments.length,
         deploymentCount: deployments.length,
+        workerSessionCount: workerSessions.length,
         presenceCount: presence.length,
         briefingGroupCount: briefing.length,
         briefingItemCount,
@@ -2723,6 +3023,38 @@ function registerPlatformReadRoutes(app, deps) {
     }), { requestId });
   });
 
+  app.get('/api/platform/house-workers', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    return sendPortalApiSuccess(res, buildHouseWorkerCollectionsPayload({
+      context,
+      houseId,
+      teamId: String(teamResolution?.teamId || '').trim(),
+    }), { requestId });
+  });
+
   app.get('/api/platform/house-workers/deployments', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -2753,6 +3085,219 @@ function registerPlatformReadRoutes(app, deps) {
       houseId,
       teamId: String(teamResolution?.teamId || '').trim(),
     }), { requestId });
+  });
+
+  app.get('/api/platform/house-workers/sessions', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const payload = buildHouseWorkerCollectionsPayload({
+      context,
+      houseId,
+      teamId: String(teamResolution?.teamId || '').trim(),
+      sourceKind: 'durable_house_worker_sessions',
+    });
+    return sendPortalApiSuccess(res, {
+      houseId: payload.houseId,
+      teamId: payload.teamId,
+      activeTeamId: payload.activeTeamId,
+      availableTeamIds: payload.availableTeamIds,
+      sessions: payload.sessions,
+      deployments: payload.deployments,
+      concurrencyLimit: payload.concurrencyLimit,
+      sourceManifest: payload.sourceManifest,
+      emptyStateText: payload.emptyStateText,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/spawn', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before starting a helper.', { requestId });
+    }
+    if (!teamId) {
+      return sendPortalApiError(res, 409, 'ACTIVE_TEAM_REQUIRED', 'Select an active team before starting a helper.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const unsupportedKeys = Object.keys(body).filter((key) => !HOUSE_WORKER_ALLOWED_SPAWN_KEYS.has(String(key || '').trim()));
+    if (unsupportedKeys.length) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'Only supported helper runtime overrides are allowed.', {
+        requestId,
+        details: {
+          unsupportedKeys,
+        },
+      });
+    }
+    const deploymentId = typeof body?.deploymentId === 'string' ? body.deploymentId.trim() : '';
+    const task = normalizeHouseWorkerTaskText(body?.task, 'Introduce yourself in one short sentence and confirm you are ready to help this House.');
+    const reason = normalizeHouseWorkerReason(body?.reason, 'house_office_start');
+    const requestedOfficeId = typeof body?.officeId === 'string' ? body.officeId.trim() : '';
+    const parentWorkerSessionId = typeof body?.parentWorkerSessionId === 'string' ? body.parentWorkerSessionId.trim() : '';
+    if (!deploymentId || !task || !reason) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'deploymentId, task, and reason are required.', { requestId });
+    }
+    if (requestedOfficeId && !isSafeHouseOfficeIdentifier(requestedOfficeId)) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'officeId must use safe identifier characters only.', { requestId });
+    }
+    const deployment = getHouseWorkerDeploymentById(deploymentId);
+    if (!deployment) {
+      return sendPortalApiError(res, 404, 'DEPLOYMENT_NOT_FOUND', 'House helper deployment not found.', { requestId });
+    }
+    if (String(deployment?.houseId || '').trim() !== houseId || String(deployment?.teamId || '').trim() !== teamId) {
+      return sendPortalApiError(res, 404, 'DEPLOYMENT_NOT_FOUND', 'House helper deployment not found for the active team.', { requestId });
+    }
+    if (requestedOfficeId && requestedOfficeId !== String(deployment?.officeId || '').trim()) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'Helpers must stay inside their installed office scope.', { requestId });
+    }
+    const activeSessions = listHouseWorkerSessions({ houseId, teamId })
+      .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
+    if (activeSessions.length >= HOUSE_WORKER_MAX_ACTIVE_SESSIONS) {
+      return sendPortalApiError(res, 409, 'OVER_CONCURRENCY_LIMIT', 'This House already has the maximum number of active helpers running.', {
+        requestId,
+        details: {
+          concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
+          activeSessionCount: activeSessions.length,
+        },
+      });
+    }
+    if (parentWorkerSessionId) {
+      const parentSession = getHouseWorkerSessionById(parentWorkerSessionId);
+      if (parentSession) {
+        if (String(parentSession?.houseId || '').trim() !== houseId || String(parentSession?.teamId || '').trim() !== teamId) {
+          return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
+        }
+        if (String(parentSession?.parentSessionId || '').trim()) {
+          return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
+        }
+      }
+    }
+    const runtimeProfile = buildHouseWorkerRuntimeProfile({
+      deployment,
+      overrides: body,
+    });
+    const invalidProfileField = Object.entries(runtimeProfile).find(([key, value]) => {
+      const allowEmpty = key !== 'brainProfileId';
+      return !isSafeHouseWorkerReference(value, {
+        allowEmpty,
+        maxLen: key === 'workspaceSeedRef' ? 260 : 180,
+      });
+    });
+    if (invalidProfileField) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'One or more helper runtime overrides are invalid.', {
+        requestId,
+        details: {
+          field: invalidProfileField[0],
+        },
+      });
+    }
+    const sequence = listHouseWorkerSessions({ houseId, teamId }).length + 1;
+    const houseWorkerSessionId = buildHouseWorkerSessionId({
+      houseId,
+      teamId,
+      deploymentId,
+      sequence,
+    });
+    const runtimeAgentId = buildHouseWorkerRuntimeAgentId({
+      deploymentId,
+      sequence,
+    });
+    const now = nowIso();
+    const spawnSource = normalizeHouseWorkerSpawnSource(body?.spawnSource, parentWorkerSessionId ? 'parent_worker' : 'house_ui');
+    const sessionRecord = createHouseWorkerSession({
+      houseWorkerSessionId,
+      houseId,
+      teamId,
+      deploymentId,
+      parentSessionId: parentWorkerSessionId || null,
+      runtimeAgentId,
+      label: String(deployment?.displayName || 'Helper').trim() || 'Helper',
+      status: 'starting',
+      brainProfileId: runtimeProfile.brainProfileId,
+      workspaceSeedRef: runtimeProfile.workspaceSeedRef,
+      configVersionId: runtimeProfile.configVersionId,
+      loadoutId: runtimeProfile.loadoutId,
+      runtime: {
+        task,
+        reason,
+        requestedOfficeId: requestedOfficeId || null,
+        spawnSource,
+        spawnDepth: parentWorkerSessionId ? 1 : 0,
+        runtimeSessionId: null,
+        supervisorSource: 'browser_supervisor',
+        brainProfileId: runtimeProfile.brainProfileId,
+        workspaceSeedRef: runtimeProfile.workspaceSeedRef,
+        configVersionId: runtimeProfile.configVersionId,
+        loadoutId: runtimeProfile.loadoutId,
+      },
+      nowIso: now,
+    });
+    const spawnEventSequence = listHouseWorkerSessionEvents({
+      houseWorkerSessionId,
+    }).length + 1;
+    createHouseWorkerSessionEvent({
+      houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
+        houseWorkerSessionId,
+        eventKind: 'spawn_requested',
+        sequence: spawnEventSequence,
+      }),
+      houseWorkerSessionId,
+      eventKind: 'spawn_requested',
+      actor: parentWorkerSessionId ? 'parent_worker' : 'human',
+      payload: {
+        task,
+        reason,
+        runtimeProfile,
+        spawnSource,
+        parentWorkerSessionId: parentWorkerSessionId || null,
+      },
+      createdAt: now,
+    });
+    const sessionCard = buildHouseWorkerSessionCards({
+      houseId,
+      teamId,
+    }).find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || null;
+    return sendPortalApiSuccess(res, {
+      workerSessionId: houseWorkerSessionId,
+      houseWorkerSessionId,
+      deploymentId,
+      status: 'starting',
+      runtimeProfile,
+      spawnedAt: String(sessionRecord?.createdAt || now).trim(),
+      spawnSource,
+      session: sessionCard,
+      sessionsPath: '/api/platform/house-workers/sessions',
+    }, {
+      requestId,
+      status: 201,
+    });
   });
 
   app.post('/api/platform/house-workers/install', express.json({ limit: '24kb' }), (req, res) => {
@@ -3139,6 +3684,207 @@ function registerPlatformReadRoutes(app, deps) {
       },
       deploymentsPath: '/api/platform/house-workers/deployments',
       houseOfficePath: '/api/platform/house-office',
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/message', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId || !teamId) {
+      return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before messaging a helper.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const houseWorkerSessionId = typeof body?.houseWorkerSessionId === 'string' && body.houseWorkerSessionId.trim()
+      ? body.houseWorkerSessionId.trim()
+      : typeof body?.workerSessionId === 'string'
+        ? body.workerSessionId.trim()
+        : '';
+    const message = String(body?.message || '').trim();
+    const actor = String(body?.actor || 'human').trim().toLowerCase();
+    if (!houseWorkerSessionId || !message) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseWorkerSessionId and message are required.', { requestId });
+    }
+    if (!['human', 'parent_worker', 'helper', 'system'].includes(actor)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'actor must be human, parent_worker, helper, or system.', { requestId });
+    }
+    const workerSession = getHouseWorkerSessionById(houseWorkerSessionId);
+    if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
+      return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
+    }
+    const eventKind = actor === 'helper' ? 'assistant_reply' : 'task_message';
+    const nextStatus = actor === 'helper' ? 'idle' : 'working';
+    const runtimePatch = actor === 'helper'
+      ? {
+        lastReply: message,
+        lastReplyAt: nowIso(),
+      }
+      : {
+        task: message,
+        lastTask: message,
+        lastTaskAt: nowIso(),
+      };
+    const updatedSession = updateHouseWorkerSession({
+      houseWorkerSessionId,
+      status: nextStatus,
+      runtime: mergeHouseWorkerRuntime(workerSession?.runtime, runtimePatch),
+      updatedAt: nowIso(),
+    });
+    const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
+    const event = createHouseWorkerSessionEvent({
+      houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
+        houseWorkerSessionId,
+        eventKind,
+        sequence: eventSequence,
+      }),
+      houseWorkerSessionId,
+      eventKind,
+      actor,
+      payload: {
+        message,
+      },
+      createdAt: nowIso(),
+    });
+    const sessionCard = buildHouseWorkerSessionCards({ houseId, teamId })
+      .find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || updatedSession;
+    return sendPortalApiSuccess(res, {
+      session: sessionCard,
+      event,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/status', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId || !teamId) {
+      return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before updating helper status.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const houseWorkerSessionId = typeof body?.houseWorkerSessionId === 'string' && body.houseWorkerSessionId.trim()
+      ? body.houseWorkerSessionId.trim()
+      : typeof body?.workerSessionId === 'string'
+        ? body.workerSessionId.trim()
+        : '';
+    const status = normalizeHouseWorkerStatus(body?.status, '');
+    const actor = String(body?.actor || 'runtime').trim().toLowerCase();
+    const reason = String(body?.reason || '').trim();
+    const runtimeSessionId = String(body?.runtimeSessionId || '').trim();
+    if (!houseWorkerSessionId || !status) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseWorkerSessionId and status are required.', { requestId });
+    }
+    if (!['runtime', 'human', 'parent_worker', 'system'].includes(actor)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'actor must be runtime, human, parent_worker, or system.', { requestId });
+    }
+    if (reason && houseOfficeTextHasForbiddenMarker(reason)) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'status reason cannot include secret-like markers.', { requestId });
+    }
+    if (runtimeSessionId && !isSafeHouseWorkerReference(runtimeSessionId, { allowEmpty: true, maxLen: 180 })) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'runtimeSessionId must use safe reference characters only.', { requestId });
+    }
+    const workerSession = getHouseWorkerSessionById(houseWorkerSessionId);
+    if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
+      return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
+    }
+    const updatedSession = updateHouseWorkerSession({
+      houseWorkerSessionId,
+      status,
+      runtime: mergeHouseWorkerRuntime(workerSession?.runtime, {
+        statusReason: reason || null,
+        runtimeSessionId: runtimeSessionId || String(workerSession?.runtime?.runtimeSessionId || '').trim() || null,
+      }),
+      updatedAt: nowIso(),
+    });
+    const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
+    const event = createHouseWorkerSessionEvent({
+      houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
+        houseWorkerSessionId,
+        eventKind: 'status_changed',
+        sequence: eventSequence,
+      }),
+      houseWorkerSessionId,
+      eventKind: 'status_changed',
+      actor,
+      payload: {
+        status,
+        reason: reason || null,
+        runtimeSessionId: runtimeSessionId || null,
+      },
+      createdAt: nowIso(),
+    });
+    const sessionCard = buildHouseWorkerSessionCards({ houseId, teamId })
+      .find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || updatedSession;
+    return sendPortalApiSuccess(res, {
+      session: sessionCard,
+      event,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/stop', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId || !teamId) {
+      return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before stopping a helper.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const houseWorkerSessionId = typeof body?.houseWorkerSessionId === 'string' && body.houseWorkerSessionId.trim()
+      ? body.houseWorkerSessionId.trim()
+      : typeof body?.workerSessionId === 'string'
+        ? body.workerSessionId.trim()
+        : '';
+    const actor = String(body?.actor || 'human').trim().toLowerCase();
+    const reason = String(body?.reason || 'user_stop').trim();
+    if (!houseWorkerSessionId) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseWorkerSessionId is required.', { requestId });
+    }
+    const workerSession = getHouseWorkerSessionById(houseWorkerSessionId);
+    if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
+      return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
+    }
+    const updatedSession = updateHouseWorkerSession({
+      houseWorkerSessionId,
+      status: 'stopped',
+      runtime: mergeHouseWorkerRuntime(workerSession?.runtime, {
+        stopReason: reason || 'user_stop',
+      }),
+      updatedAt: nowIso(),
+    });
+    const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
+    const event = createHouseWorkerSessionEvent({
+      houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
+        houseWorkerSessionId,
+        eventKind: 'stopped',
+        sequence: eventSequence,
+      }),
+      houseWorkerSessionId,
+      eventKind: 'stopped',
+      actor: actor || 'human',
+      payload: {
+        reason: reason || 'user_stop',
+      },
+      createdAt: nowIso(),
+    });
+    const sessionCard = buildHouseWorkerSessionCards({ houseId, teamId })
+      .find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || updatedSession;
+    return sendPortalApiSuccess(res, {
+      session: sessionCard,
+      event,
     }, { requestId });
   });
 

@@ -506,6 +506,7 @@ let houseSurfaceState = {
     staffAgents: [],
     assignments: [],
     deployments: [],
+    workerSessions: [],
     presence: [],
     briefing: [],
     attention: [],
@@ -563,6 +564,18 @@ let houseSurfaceState = {
     actionStatusText: '',
     actionStatusError: false,
   }
+};
+const HOUSE_WORKER_ACTIVE_STATUSES = new Set(['starting', 'ready', 'idle', 'working', 'waiting', 'blocked']);
+const HOUSE_WORKER_RUNTIME_REQUEST_TIMEOUT_MS = 30000;
+const HOUSE_WORKER_REPLY_TIMEOUT_MS = 20000;
+const HOUSE_WORKER_TRAINER_NAMESPACE_QUERY_KEYS = ['trainerNamespace', 'trainer_namespace', 'trainer-tools', 'trainerTools'];
+let houseWorkerSupervisorSeq = 0;
+const houseWorkerSupervisorState = {
+  primaryWorkerId: '',
+  primaryStatus: 'starting',
+  runtimes: new Map(),
+  checkpoints: [],
+  lastError: '',
 };
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
@@ -1333,6 +1346,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.deployments = [];
+    houseSurfaceState.office.workerSessions = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];
@@ -1566,6 +1580,507 @@ function buildHousePlatformSnapshot() {
     availableTeamIds: normalizeHouseTeamIds(houseSurfaceState.context.availableTeamIds),
   };
 }
+
+function nextHouseWorkerSupervisorRequestId(prefix = 'hw') {
+  houseWorkerSupervisorSeq += 1;
+  return `${String(prefix || 'hw').trim() || 'hw'}_${Date.now()}_${houseWorkerSupervisorSeq}`;
+}
+
+function parseHouseWorkerBoolLike(value) {
+  if (value === true || value === false) return value;
+  const normalized = String(value == null ? '' : value).trim().toLowerCase();
+  if (!normalized) return null;
+  if (['1', 'true', 'yes', 'on', 'enable', 'enabled'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off', 'disable', 'disabled'].includes(normalized)) return false;
+  return null;
+}
+
+function resolveHouseWorkerTrainerNamespaceEnabled() {
+  let enabled = true;
+  try {
+    const params = new URLSearchParams(String(window.location.search || '').replace(/^\?/, ''));
+    for (const key of HOUSE_WORKER_TRAINER_NAMESPACE_QUERY_KEYS) {
+      if (!params.has(key)) continue;
+      const parsed = parseHouseWorkerBoolLike(params.get(key));
+      if (parsed !== null) {
+        enabled = parsed;
+        break;
+      }
+    }
+  } catch {
+    // ignore URL parse failures
+  }
+  try {
+    const stored = parseHouseWorkerBoolLike(window.localStorage.getItem('agentTown:feature:trainerNamespace'));
+    if (stored !== null) enabled = stored;
+  } catch {
+    // ignore storage failures
+  }
+  return enabled;
+}
+
+async function resolveHouseWorkerSupervisorPrimaryId() {
+  const cached = String(houseWorkerSupervisorState.primaryWorkerId || '').trim();
+  if (cached) return cached;
+  try {
+    if (window.__openclawLiteTest && typeof window.__openclawLiteTest.runtimeSessionContext === 'function') {
+      const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
+        runtimeContext: {
+          origin: window.location.origin,
+          teamCode: String(lastState?.teamCode || ''),
+          houseId: String(houseSurfaceState.context.houseId || ''),
+        },
+        runtimeState: lastState && typeof lastState === 'object' ? lastState : {},
+      });
+      const data = snapshot?.data && typeof snapshot.data === 'object' ? snapshot.data : snapshot || {};
+      const sessionId = String(data?.sessionId || '').trim();
+      if (sessionId) {
+        houseWorkerSupervisorState.primaryWorkerId = sessionId;
+        return sessionId;
+      }
+    }
+  } catch {
+    // ignore snapshot lookup failures
+  }
+  houseWorkerSupervisorState.primaryWorkerId = 'primary-runtime';
+  return houseWorkerSupervisorState.primaryWorkerId;
+}
+
+function setHouseWorkerSupervisorPrimaryStatus(status = '') {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (!normalized) return;
+  houseWorkerSupervisorState.primaryStatus = normalized;
+}
+
+function buildHouseWorkerRuntimeContextForChild() {
+  return {
+    origin: window.location.origin,
+    teamCode: String(lastState?.teamCode || '').trim(),
+    houseId: String(houseSurfaceState.context.houseId || '').trim(),
+  };
+}
+
+function buildHouseWorkerRuntimeStateForChild() {
+  return lastState && typeof lastState === 'object' ? lastState : {};
+}
+
+async function resolveHouseWorkerLlmConfig() {
+  if (isLocalLiteLlmConfigured()) {
+    return getLocalLiteLlm();
+  }
+  try {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('openclaw-lite', 1);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('HOUSE_WORKER_IDB_OPEN_FAILED'));
+    });
+    const readMeta = (key) => new Promise((resolve, reject) => {
+      const tx = db.transaction(['meta'], 'readonly');
+      const recordReq = tx.objectStore('meta').get(key);
+      recordReq.onsuccess = () => resolve(recordReq.result?.value ?? null);
+      recordReq.onerror = () => reject(recordReq.error || new Error('HOUSE_WORKER_IDB_READ_FAILED'));
+    });
+    const provider = String(await readMeta('llmProvider') || '').trim();
+    const model = String(await readMeta('llmModelId') || '').trim();
+    const modelRef = String(await readMeta('llmModelRef') || '').trim() || (provider && model ? `${provider}/${model}` : '');
+    const credential = String(await readMeta('llmApiKey') || '').trim();
+    const api = String(await readMeta('llmApi') || '').trim();
+    const baseUrl = String(await readMeta('llmBaseUrl') || '').trim();
+    const reasoning = String(await readMeta('llmReasoning') || '').trim();
+    const useProxy = await readMeta('llmUseProxy');
+    try {
+      db.close();
+    } catch {
+      // ignore close failures
+    }
+    if (!provider || !model || !modelRef || !credential) {
+      return null;
+    }
+    return {
+      configured: true,
+      loaded: true,
+      provider,
+      model,
+      modelRef,
+      credential,
+      api,
+      baseUrl,
+      reasoning,
+      useProxy: useProxy !== false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildHouseWorkerDefaultTask(deployment = null) {
+  const displayName = String(deployment?.displayName || 'Helper').trim() || 'Helper';
+  return `Introduce yourself in one short sentence and confirm how ${displayName} can help this House next.`;
+}
+
+function getHouseWorkerSupervisorSnapshot() {
+  const primaryWorkerId = String(houseWorkerSupervisorState.primaryWorkerId || '').trim() || 'primary-runtime';
+  const primaryStatus = String(houseWorkerSupervisorState.primaryStatus || 'ready').trim() || 'ready';
+  const sessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
+  return {
+    primaryWorkerId,
+    primaryStatus,
+    activeWorkerCount: 1 + sessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim())).length,
+    helpers: sessions.map((entry) => ({
+      houseWorkerSessionId: String(entry?.houseWorkerSessionId || '').trim(),
+      deploymentId: String(entry?.deploymentId || '').trim(),
+      displayName: String(entry?.displayName || entry?.deploymentLabel || 'Helper').trim() || 'Helper',
+      status: String(entry?.status || '').trim(),
+      statusLabel: String(entry?.statusLabel || '').trim(),
+      runtimeAgentId: String(entry?.runtimeAgentId || '').trim() || null,
+      runtimeSessionId: String(entry?.runtimeSessionId || '').trim() || null,
+      latestTask: String(entry?.latestTask || '').trim() || null,
+      latestReply: String(entry?.latestReply || '').trim() || null,
+      runtimeProfile: entry?.runtimeProfile && typeof entry.runtimeProfile === 'object' ? entry.runtimeProfile : {},
+      eventCount: Number(entry?.eventCount || 0),
+    })),
+    checkpoints: houseWorkerSupervisorState.checkpoints.slice(),
+    lastError: String(houseWorkerSupervisorState.lastError || '').trim() || null,
+  };
+}
+
+async function syncHouseWorkerSessions({ skipContext = false, render = true } = {}) {
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/house-workers/sessions');
+    const data = response?.data || response || {};
+    houseSurfaceState.office.workerSessions = Array.isArray(data.sessions) ? data.sessions : [];
+    if (houseSurfaceState.office.summary && typeof houseSurfaceState.office.summary === 'object') {
+      houseSurfaceState.office.summary.workerSessionCount = houseSurfaceState.office.workerSessions.length;
+    }
+    if (render && houseSurfaceState.activeSurface === 'office') {
+      renderHouseOfficeSurface();
+    }
+    return houseSurfaceState.office.workerSessions;
+  } catch (err) {
+    houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_SESSIONS_FAILED');
+    if (render && houseSurfaceState.activeSurface === 'office') {
+      renderHouseOfficeSurface();
+    }
+    throw err;
+  }
+}
+
+function maybeExposeHouseWorkerSupervisor() {
+  window.__agentTownHouseWorkerSupervisor = {
+    getSnapshot: () => getHouseWorkerSupervisorSnapshot(),
+    sync: async () => await syncHouseWorkerSessions({ skipContext: true, render: false }),
+    spawn: async (payload = {}) => await spawnHouseWorkerSession(payload),
+    message: async (payload = {}) => await sendHouseWorkerMessage(payload),
+    stop: async (payload = {}) => await stopHouseWorkerSession(payload),
+    getCheckpoints: () => houseWorkerSupervisorState.checkpoints.slice(),
+  };
+}
+
+function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
+  const houseWorkerSessionId = String(sessionCard?.houseWorkerSessionId || '').trim();
+  const runtimeAgentId = String(sessionCard?.runtimeAgentId || '').trim() || `helper_${houseWorkerSessionId || 'runtime'}`;
+  const workerUrl = new URL('/openclaw-lite/worker.js', window.location.href);
+  workerUrl.searchParams.set('trainerNamespace', resolveHouseWorkerTrainerNamespaceEnabled() ? '1' : '0');
+  workerUrl.searchParams.set('agentId', runtimeAgentId);
+  workerUrl.searchParams.set('sessionKey', `agent:${runtimeAgentId}:${houseWorkerSessionId}`);
+  workerUrl.searchParams.set('idbName', `openclaw-lite-${houseWorkerSessionId}`);
+  const worker = new Worker(`${workerUrl.pathname}${workerUrl.search}`, { type: 'module' });
+  const pendingRequests = new Map();
+  const pendingReplies = [];
+  let readyResolved = false;
+  let readyResolve = () => { };
+  let readyReject = () => { };
+  const readyPromise = new Promise((resolve, reject) => {
+    readyResolve = resolve;
+    readyReject = reject;
+  });
+
+  function settlePendingRequest(requestId, msg) {
+    const rec = pendingRequests.get(requestId);
+    if (!rec) return false;
+    pendingRequests.delete(requestId);
+    clearTimeout(rec.timeoutId);
+    rec.resolve(msg);
+    return true;
+  }
+
+  function sendRequest({ requestType, responseType, payload = null, timeoutMs = HOUSE_WORKER_RUNTIME_REQUEST_TIMEOUT_MS }) {
+    const requestId = nextHouseWorkerSupervisorRequestId('hwreq');
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        pendingRequests.delete(requestId);
+        reject(new Error(`${responseType || requestType || 'HOUSE_WORKER_REQUEST'}_TIMEOUT`));
+      }, Math.max(1000, Number(timeoutMs) || HOUSE_WORKER_RUNTIME_REQUEST_TIMEOUT_MS));
+      pendingRequests.set(requestId, {
+        responseType: String(responseType || '').trim(),
+        resolve,
+        reject,
+        timeoutId,
+      });
+      worker.postMessage({
+        type: requestType,
+        requestId,
+        ...(payload && typeof payload === 'object' ? payload : {}),
+      });
+    });
+  }
+
+  async function persistStatus(status, extra = {}) {
+    const runtimeSessionId = String(extra?.runtimeSessionId || '').trim();
+    const reason = String(extra?.reason || '').trim();
+    await api('/api/platform/house-workers/status', {
+      method: 'POST',
+      body: JSON.stringify({
+        houseWorkerSessionId,
+        status,
+        actor: 'runtime',
+        runtimeSessionId: runtimeSessionId || undefined,
+        reason: reason || undefined,
+      }),
+    });
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+  }
+
+  async function persistReply(message) {
+    await api('/api/platform/house-workers/message', {
+      method: 'POST',
+      body: JSON.stringify({
+        houseWorkerSessionId,
+        actor: 'helper',
+        message,
+      }),
+    });
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+  }
+
+  worker.addEventListener('error', async (event) => {
+    const message = String(event?.message || 'HOUSE_WORKER_RUNTIME_ERROR');
+    houseWorkerSupervisorState.lastError = message;
+    try {
+      await persistStatus('blocked', { reason: message });
+    } catch {
+      // ignore status update failures on worker crash
+    }
+    if (!readyResolved) {
+      readyReject(new Error(message));
+    }
+  });
+
+  worker.addEventListener('message', async (event) => {
+    const msg = event?.data && typeof event.data === 'object' ? event.data : {};
+    const requestId = String(msg?.requestId || '').trim();
+    if (requestId) {
+      const rec = pendingRequests.get(requestId);
+      if (rec && (!rec.responseType || rec.responseType === String(msg?.type || '').trim())) {
+        settlePendingRequest(requestId, msg);
+        return;
+      }
+    }
+    if (msg.type === 'worker.runtime.ready') {
+      try {
+        const contextResponse = await sendRequest({
+          requestType: 'gateway.command.runtime.sessionContext',
+          responseType: 'worker.runtime.sessionContext',
+          payload: {
+            params: {
+              runtimeContext: buildHouseWorkerRuntimeContextForChild(),
+              runtimeState: buildHouseWorkerRuntimeStateForChild(),
+            },
+          },
+        });
+        const runtimeSessionId = String(contextResponse?.result?.data?.sessionId || contextResponse?.result?.sessionId || '').trim();
+        await persistStatus('ready', { runtimeSessionId });
+      } catch {
+        await persistStatus('ready').catch(() => null);
+      }
+      if (!readyResolved) {
+        readyResolved = true;
+        readyResolve(true);
+      }
+      return;
+    }
+    if (msg.type === 'worker.runtime.status') {
+      const status = String(msg?.status || '').trim().toLowerCase() || 'ready';
+      await persistStatus(status).catch(() => null);
+      return;
+    }
+    if (msg.type === 'worker.chat.append') {
+      const role = String(msg?.role || '').trim().toLowerCase();
+      const text = String(msg?.text || '').trim();
+      if (role !== 'assistant' || !text || text === 'openclaw-lite boot') return;
+      await persistReply(text).catch(() => null);
+      const pending = pendingReplies.shift();
+      if (pending) {
+        clearTimeout(pending.timeoutId);
+        pending.resolve(text);
+      }
+    }
+  });
+
+  return {
+    houseWorkerSessionId,
+    runtimeAgentId,
+    async start() {
+      worker.postMessage({ type: 'gateway.boot' });
+      if (llmPayload && llmPayload.apiKey) {
+        await sendRequest({
+          requestType: 'gateway.command.setLlmConfig',
+          responseType: 'worker.llm.config.set',
+          payload: llmPayload,
+        }).catch(() => null);
+      }
+      await readyPromise;
+      return true;
+    },
+    async sendMessage(message, { actor = 'human', timeoutMs = HOUSE_WORKER_REPLY_TIMEOUT_MS } = {}) {
+      const normalizedMessage = String(message || '').trim();
+      if (!normalizedMessage) {
+        throw new Error('HOUSE_WORKER_MESSAGE_REQUIRED');
+      }
+      await readyPromise;
+      await api('/api/platform/house-workers/message', {
+        method: 'POST',
+        body: JSON.stringify({
+          houseWorkerSessionId,
+          actor,
+          message: normalizedMessage,
+        }),
+      });
+      await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+      await persistStatus('working').catch(() => null);
+      const replyPromise = new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('HOUSE_WORKER_REPLY_TIMEOUT'));
+        }, Math.max(1000, Number(timeoutMs) || HOUSE_WORKER_REPLY_TIMEOUT_MS));
+        pendingReplies.push({ resolve, reject, timeoutId });
+      });
+      worker.postMessage({
+        type: 'gateway.chat.send',
+        text: normalizedMessage,
+        runtimeContext: buildHouseWorkerRuntimeContextForChild(),
+        runtimeState: buildHouseWorkerRuntimeStateForChild(),
+      });
+      return await replyPromise;
+    },
+    async stop(reason = 'user_stop') {
+      try {
+        worker.terminate();
+      } catch {
+        // ignore terminate errors
+      }
+      await api('/api/platform/house-workers/stop', {
+        method: 'POST',
+        body: JSON.stringify({
+          houseWorkerSessionId,
+          actor: 'human',
+          reason,
+        }),
+      });
+      await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+    },
+  };
+}
+
+async function spawnHouseWorkerSession(payload = {}) {
+  const llmConfig = await resolveHouseWorkerLlmConfig();
+  if (!llmConfig) {
+    throw new Error('HOUSE_WORKER_LOCAL_BRAIN_REQUIRED');
+  }
+  await resolveHouseWorkerSupervisorPrimaryId();
+  const normalizedPayload = payload && typeof payload === 'object' ? payload : {};
+  const response = await api('/api/platform/house-workers/spawn', {
+    method: 'POST',
+    body: JSON.stringify(normalizedPayload),
+  });
+  const data = response?.data || response || {};
+  const sessionCard = data?.session && typeof data.session === 'object' ? data.session : null;
+  const houseWorkerSessionId = String(data?.houseWorkerSessionId || sessionCard?.houseWorkerSessionId || '').trim();
+  if (!houseWorkerSessionId || !sessionCard) {
+    throw new Error('HOUSE_WORKER_SPAWN_FAILED');
+  }
+  const llmPayload = buildGatewayLlmPayload(llmConfig);
+  const existing = houseWorkerSupervisorState.runtimes.get(houseWorkerSessionId);
+  if (existing && typeof existing.stop === 'function') {
+    await existing.stop('respawn').catch(() => null);
+  }
+  const controller = createHouseWorkerRuntimeController(sessionCard, llmPayload);
+  houseWorkerSupervisorState.runtimes.set(houseWorkerSessionId, controller);
+  houseWorkerSupervisorState.checkpoints.push(`spawn:${houseWorkerSessionId}`);
+  await controller.start();
+  houseWorkerSupervisorState.checkpoints.push(`ready:${houseWorkerSessionId}`);
+  const task = String(normalizedPayload?.task || '').trim();
+  if (task) {
+    const reply = await controller.sendMessage(task, {
+      actor: String(normalizedPayload?.spawnSource || '').trim() === 'parent_worker' ? 'parent_worker' : 'human',
+    });
+    houseWorkerSupervisorState.checkpoints.push(`reply:${houseWorkerSessionId}`);
+    return {
+      ...data,
+      reply,
+    };
+  }
+  return data;
+}
+
+async function sendHouseWorkerMessage({
+  houseWorkerSessionId = '',
+  workerSessionId = '',
+  message = '',
+  actor = 'human',
+} = {}) {
+  const targetSessionId = String(houseWorkerSessionId || workerSessionId || '').trim();
+  if (!targetSessionId) {
+    throw new Error('HOUSE_WORKER_SESSION_REQUIRED');
+  }
+  const controller = houseWorkerSupervisorState.runtimes.get(targetSessionId);
+  if (!controller || typeof controller.sendMessage !== 'function') {
+    throw new Error('HOUSE_WORKER_SESSION_NOT_ATTACHED');
+  }
+  houseWorkerSupervisorState.checkpoints.push(`message:${targetSessionId}`);
+  const reply = await controller.sendMessage(String(message || '').trim(), { actor });
+  await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+  return {
+    ok: true,
+    houseWorkerSessionId: targetSessionId,
+    reply,
+  };
+}
+
+async function stopHouseWorkerSession({
+  houseWorkerSessionId = '',
+  workerSessionId = '',
+  reason = 'user_stop',
+} = {}) {
+  const targetSessionId = String(houseWorkerSessionId || workerSessionId || '').trim();
+  if (!targetSessionId) {
+    throw new Error('HOUSE_WORKER_SESSION_REQUIRED');
+  }
+  const controller = houseWorkerSupervisorState.runtimes.get(targetSessionId);
+  if (controller && typeof controller.stop === 'function') {
+    await controller.stop(reason);
+  } else {
+    await api('/api/platform/house-workers/stop', {
+      method: 'POST',
+      body: JSON.stringify({
+        houseWorkerSessionId: targetSessionId,
+        actor: 'human',
+        reason,
+      }),
+    });
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+  }
+  houseWorkerSupervisorState.runtimes.delete(targetSessionId);
+  houseWorkerSupervisorState.checkpoints.push(`stop:${targetSessionId}`);
+  return {
+    ok: true,
+    houseWorkerSessionId: targetSessionId,
+  };
+}
+
+maybeExposeHouseWorkerSupervisor();
 
 function setHouseSurfaceMode(mode) {
   const activeMode = mode === 'office' || mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
@@ -1830,13 +2345,15 @@ function renderHouseOfficeSurface() {
   const attentionNode = el('houseOfficeAttention');
   const assignmentsNode = el('houseOfficeAssignments');
   const deploymentsNode = el('houseOfficeDeployments');
+  const sessionsNode = el('houseOfficeWorkerSessions');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !deploymentsNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !deploymentsNode || !sessionsNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
   const deployments = Array.isArray(houseSurfaceState.office.deployments) ? houseSurfaceState.office.deployments : [];
+  const workerSessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
   const briefing = Array.isArray(houseSurfaceState.office.briefing) ? houseSurfaceState.office.briefing : [];
   const attention = Array.isArray(houseSurfaceState.office.attention) ? houseSurfaceState.office.attention : [];
@@ -1861,6 +2378,7 @@ function renderHouseOfficeSurface() {
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
   const assignmentCount = Number(summary?.assignmentCount || assignments.length || 0);
   const deploymentCount = Number(summary?.deploymentCount || deployments.length || 0);
+  const workerSessionCount = Number(summary?.workerSessionCount || workerSessions.length || 0);
   const briefingItemCount = briefing.reduce((sum, group) => {
     const items = Array.isArray(group?.items) ? group.items : [];
     return sum + items.length;
@@ -1880,6 +2398,7 @@ function renderHouseOfficeSurface() {
     `${staffAgentCount} staff`,
     `${assignmentCount} assignments`,
     `${deploymentCount} helpers`,
+    `${workerSessionCount} active sessions`,
     `${presence.length} presence`,
     `${briefingItemCount} briefing`,
     `${attention.length} attention`,
@@ -2135,6 +2654,8 @@ function renderHouseOfficeSurface() {
     deploymentsNode.appendChild(placeholder);
   } else {
     deployments.forEach((deployment) => {
+      const deploymentId = String(deployment?.deploymentId || '').trim();
+      const deploymentSessions = workerSessions.filter((entry) => String(entry?.deploymentId || '').trim() === deploymentId);
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-deployment-item');
       card.style.border = '1px solid rgba(255,255,255,0.12)';
@@ -2165,6 +2686,7 @@ function renderHouseOfficeSurface() {
       staffLine.textContent = [
         `Staff: ${String(deployment?.staffAgentLabel || deployment?.staffAgentId || 'Unassigned').trim() || 'Unassigned'}`,
         supportedSurfaces.length ? `Surfaces: ${supportedSurfaces.join(', ')}` : '',
+        deploymentSessions.length ? `Live sessions: ${deploymentSessions.length}` : '',
       ].filter(Boolean).join(' · ');
       card.appendChild(staffLine);
 
@@ -2176,6 +2698,55 @@ function renderHouseOfficeSurface() {
         bestForLine.textContent = `Best for: ${bestFor.join(', ')}`;
         card.appendChild(bestForLine);
       }
+
+      const actionStatus = document.createElement('div');
+      actionStatus.className = 'small';
+      actionStatus.style.marginTop = '8px';
+      actionStatus.setAttribute('data-testid', 'house-office-helper-status');
+      const deploymentSession = deploymentSessions[0] || null;
+      actionStatus.textContent = deploymentSession
+        ? `${String(deploymentSession?.statusLabel || deploymentSession?.status || 'Ready to help').trim() || 'Ready to help'}`
+        : 'Start Helper when your local brain is ready.';
+      card.appendChild(actionStatus);
+
+      const messageInput = document.createElement('input');
+      messageInput.type = 'text';
+      messageInput.className = 'input';
+      messageInput.placeholder = 'Ask what this helper should do next';
+      messageInput.value = '';
+      messageInput.setAttribute('data-testid', 'house-office-helper-message-input');
+      messageInput.style.marginTop = '8px';
+      messageInput.style.width = '100%';
+      messageInput.style.boxSizing = 'border-box';
+      card.appendChild(messageInput);
+
+      const actions = document.createElement('div');
+      actions.className = 'kv';
+      actions.style.marginTop = '8px';
+
+      const startBtn = document.createElement('button');
+      startBtn.type = 'button';
+      startBtn.className = 'btn';
+      startBtn.textContent = 'Start Helper';
+      startBtn.setAttribute('data-testid', 'house-office-helper-start');
+      actions.appendChild(startBtn);
+
+      const askBtn = document.createElement('button');
+      askBtn.type = 'button';
+      askBtn.className = 'btn';
+      askBtn.textContent = 'Ask Helper';
+      askBtn.setAttribute('data-testid', 'house-office-helper-ask');
+      askBtn.disabled = !deploymentSession;
+      actions.appendChild(askBtn);
+
+      const stopBtn = document.createElement('button');
+      stopBtn.type = 'button';
+      stopBtn.className = 'btn';
+      stopBtn.textContent = 'Stop Helper';
+      stopBtn.setAttribute('data-testid', 'house-office-helper-stop');
+      stopBtn.disabled = !deploymentSession;
+      actions.appendChild(stopBtn);
+      card.appendChild(actions);
 
       const advanced = document.createElement('details');
       advanced.setAttribute('data-testid', 'house-office-deployment-advanced');
@@ -2189,20 +2760,185 @@ function renderHouseOfficeSurface() {
       advancedBody.className = 'small';
       advancedBody.style.marginTop = '6px';
       advancedBody.style.whiteSpace = 'pre-wrap';
-      advancedBody.textContent = [
+      advancedBody.textContent = '';
+      const advancedDetails = document.createElement('div');
+      advancedDetails.textContent = [
         `Deployment ID: ${String(deployment?.deploymentId || '—')}`,
         `Registry package: ${String(deployment?.registryEntityId || '—')}`,
         `Package version: ${String(deployment?.entityVersionId || '—')}`,
         `Loadout: ${String(deployment?.loadoutId || '—')}`,
         `Bundle hash: ${String(deployment?.bundleHash || '—')}`,
-        `Brain profile: ${String(deployment?.runtimeDefaults?.brainProfileId || '—')}`,
-        `Workspace seed: ${String(deployment?.runtimeDefaults?.workspaceSeedRef || '—')}`,
-        `Config version: ${String(deployment?.runtimeDefaults?.configVersionId || '—')}`,
       ].join('\n');
+      advancedBody.appendChild(advancedDetails);
+
+      const profileStack = document.createElement('div');
+      profileStack.className = 'stack';
+      profileStack.style.marginTop = '8px';
+      const profileFields = [
+        ['Brain profile', 'brainProfileId', String(deployment?.runtimeDefaults?.brainProfileId || 'brain:current-runtime').trim() || 'brain:current-runtime'],
+        ['Workspace seed', 'workspaceSeedRef', String(deployment?.runtimeDefaults?.workspaceSeedRef || `workspace/house-workers/${deploymentId}`).trim() || `workspace/house-workers/${deploymentId}`],
+        ['Config version', 'configVersionId', String(deployment?.runtimeDefaults?.configVersionId || '').trim()],
+        ['Loadout', 'loadoutId', String(deployment?.runtimeDefaults?.loadoutId || deployment?.loadoutId || '').trim()],
+      ];
+      for (const [label, fieldKey, value] of profileFields) {
+        const fieldWrap = document.createElement('label');
+        fieldWrap.className = 'small';
+        fieldWrap.style.display = 'block';
+        fieldWrap.style.marginTop = '4px';
+        fieldWrap.textContent = label;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'input';
+        input.value = value;
+        input.setAttribute('data-testid', `house-office-helper-${fieldKey}-input`);
+        input.dataset.fieldKey = fieldKey;
+        input.style.marginTop = '4px';
+        input.style.width = '100%';
+        input.style.boxSizing = 'border-box';
+        fieldWrap.appendChild(input);
+        profileStack.appendChild(fieldWrap);
+      }
+      advancedBody.appendChild(profileStack);
       advanced.appendChild(advancedBody);
       card.appendChild(advanced);
 
+      startBtn.addEventListener('click', async () => {
+        startBtn.disabled = true;
+        askBtn.disabled = true;
+        stopBtn.disabled = true;
+        actionStatus.textContent = 'Starting helper...';
+        const profileInputs = Array.from(advanced.querySelectorAll('input[data-field-key]'));
+        const runtimeProfile = profileInputs.reduce((acc, input) => {
+          const fieldKey = String(input?.dataset?.fieldKey || '').trim();
+          if (!fieldKey) return acc;
+          const value = String(input?.value || '').trim();
+          if (value) acc[fieldKey] = value;
+          return acc;
+        }, {});
+        try {
+          await spawnHouseWorkerSession({
+            deploymentId,
+            task: buildHouseWorkerDefaultTask(deployment),
+            reason: 'house_office_start',
+            ...runtimeProfile,
+          });
+          const refreshedSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+            .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+          actionStatus.textContent = refreshedSession
+            ? String(refreshedSession?.statusLabel || 'Ready to help').trim()
+            : 'Helper started.';
+          askBtn.disabled = !refreshedSession;
+          stopBtn.disabled = !refreshedSession;
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper could not start.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_SPAWN_FAILED');
+        } finally {
+          startBtn.disabled = false;
+        }
+      });
+
+      askBtn.addEventListener('click', async () => {
+        const activeSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+          .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+        const nextMessage = String(messageInput.value || '').trim() || 'Explain what you need next in one short sentence.';
+        if (!activeSession?.houseWorkerSessionId) return;
+        askBtn.disabled = true;
+        actionStatus.textContent = 'Asking helper...';
+        try {
+          const result = await sendHouseWorkerMessage({
+            houseWorkerSessionId: String(activeSession.houseWorkerSessionId || '').trim(),
+            message: nextMessage,
+            actor: 'human',
+          });
+          actionStatus.textContent = String(result?.reply || 'Helper replied.').trim() || 'Helper replied.';
+          messageInput.value = '';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper reply unavailable.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_MESSAGE_FAILED');
+        } finally {
+          askBtn.disabled = false;
+        }
+      });
+
+      stopBtn.addEventListener('click', async () => {
+        const activeSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+          .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+        if (!activeSession?.houseWorkerSessionId) return;
+        stopBtn.disabled = true;
+        actionStatus.textContent = 'Stopping helper...';
+        try {
+          await stopHouseWorkerSession({
+            houseWorkerSessionId: String(activeSession.houseWorkerSessionId || '').trim(),
+          });
+          actionStatus.textContent = 'Helper stopped.';
+          askBtn.disabled = true;
+          stopBtn.disabled = true;
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper stop failed.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_STOP_FAILED');
+        } finally {
+          stopBtn.disabled = false;
+        }
+      });
+
       deploymentsNode.appendChild(card);
+    });
+  }
+
+  sessionsNode.innerHTML = '';
+  if (!workerSessions.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No active helper sessions yet.';
+    sessionsNode.appendChild(placeholder);
+  } else {
+    workerSessions.forEach((session) => {
+      const card = document.createElement('article');
+      card.setAttribute('data-testid', 'house-office-worker-session-item');
+      card.style.border = '1px solid rgba(255,255,255,0.12)';
+      card.style.borderRadius = '12px';
+      card.style.padding = '10px';
+      card.style.background = 'rgba(255,255,255,0.02)';
+      card.style.overflowWrap = 'anywhere';
+
+      const heading = document.createElement('div');
+      heading.style.fontWeight = '600';
+      heading.textContent = [
+        String(session?.displayName || session?.deploymentLabel || 'Helper').trim() || 'Helper',
+        String(session?.statusLabel || session?.status || 'Ready to help').trim() || 'Ready to help',
+      ].join(' · ');
+      card.appendChild(heading);
+
+      const meta = document.createElement('div');
+      meta.className = 'small';
+      meta.style.marginTop = '4px';
+      meta.textContent = [
+        `Session: ${String(session?.houseWorkerSessionId || '—').trim() || '—'}`,
+        `Runtime: ${String(session?.runtimeAgentId || '—').trim() || '—'}`,
+        String(session?.officeLabel || '').trim() ? `Office: ${String(session.officeLabel || '').trim()}` : '',
+      ].filter(Boolean).join(' · ');
+      card.appendChild(meta);
+
+      const taskLine = document.createElement('div');
+      taskLine.className = 'small';
+      taskLine.style.marginTop = '4px';
+      taskLine.setAttribute('data-testid', 'house-office-worker-session-task');
+      taskLine.textContent = `Latest task: ${String(session?.latestTask || 'No task yet.').trim() || 'No task yet.'}`;
+      card.appendChild(taskLine);
+
+      const replyLine = document.createElement('div');
+      replyLine.className = 'small';
+      replyLine.style.marginTop = '4px';
+      replyLine.setAttribute('data-testid', 'house-office-worker-session-reply');
+      replyLine.textContent = `Latest reply: ${String(session?.latestReply || 'No reply yet.').trim() || 'No reply yet.'}`;
+      card.appendChild(replyLine);
+
+      const eventsLine = document.createElement('div');
+      eventsLine.className = 'small';
+      eventsLine.style.marginTop = '4px';
+      eventsLine.textContent = `Events recorded: ${Number(session?.eventCount || 0)}`;
+      card.appendChild(eventsLine);
+      sessionsNode.appendChild(card);
     });
   }
 
@@ -2701,6 +3437,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.staffAgents = Array.isArray(data.staffAgents) ? data.staffAgents : [];
     houseSurfaceState.office.assignments = Array.isArray(data.assignments) ? data.assignments : [];
     houseSurfaceState.office.deployments = Array.isArray(data.deployments) ? data.deployments : [];
+    houseSurfaceState.office.workerSessions = Array.isArray(data.workerSessions) ? data.workerSessions : [];
     houseSurfaceState.office.presence = Array.isArray(data.presence) ? data.presence : [];
     houseSurfaceState.office.briefing = Array.isArray(data.briefing) ? data.briefing : [];
     houseSurfaceState.office.attention = Array.isArray(data.attention) ? data.attention : [];
@@ -2721,6 +3458,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.deployments = [];
+    houseSurfaceState.office.workerSessions = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];
@@ -10517,6 +11255,7 @@ async function initGateway() {
     gateway.on('status', (status) => {
       const elStatus = el('agentStatus');
       if (elStatus) elStatus.textContent = status;
+      setHouseWorkerSupervisorPrimaryStatus(status);
       pushAgentDebugTraffic('in', 'worker.runtime.status', { status: String(status || '') });
       pushAgentDebugEvent(`status: ${status}`);
       scheduleAgentDebugRefresh('status');

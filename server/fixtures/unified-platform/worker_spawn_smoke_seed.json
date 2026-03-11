@@ -1,0 +1,13 @@
+{
+  "family": "worker_spawn_smoke_seed",
+  "schema": "agent-town-worker-spawn-smoke-seed/v1",
+  "checkpoints": [
+    "worker_package_install",
+    "worker_session_spawn",
+    "worker_runtime_ready",
+    "worker_task_message",
+    "worker_reply_received"
+  ],
+  "defaultTask": "Introduce yourself in one short sentence and confirm you are ready to help this House.",
+  "defaultReason": "house_office_start"
+}

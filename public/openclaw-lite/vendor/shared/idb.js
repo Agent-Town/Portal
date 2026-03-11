@@ -1,4 +1,16 @@
-const DB_NAME = "openclaw-lite";
+function resolveDbName() {
+  try {
+    const search = typeof globalThis?.location?.search === "string" ? globalThis.location.search : "";
+    const params = new URLSearchParams(search);
+    const value = String(params.get("idbName") || "").trim();
+    if (value) return value;
+  } catch {
+    // ignore worker-location parsing failures
+  }
+  return "openclaw-lite";
+}
+
+const DB_NAME = resolveDbName();
 const DB_VERSION = 1;
 
 export const OPENCLAW_LITE_DB_NAME = DB_NAME;
@@ -89,4 +101,3 @@ export async function listCheckpointCountByHouse(houseId) {
   const all = await getAllFromIndex("checkpoints", "by_house_createdAtMs", IDBKeyRange.bound([houseId, 0], [houseId, 9e15]));
   return all.length;
 }
-

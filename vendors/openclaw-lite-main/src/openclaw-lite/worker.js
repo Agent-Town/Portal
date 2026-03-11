@@ -27,8 +27,20 @@ import { vfsGetUtf8, vfsListPaths, vfsPutBytes, vfsPutUtf8, vfsReadAllBytes } fr
 const OPENCLAW_VERSION = __OPENCLAW_VERSION__;
 const PI_VERSIONS = __PI_VERSIONS__;
 
-const MAIN_AGENT_ID = "main";
-const MAIN_SESSION_KEY = "agent:main:main";
+function resolveWorkerLocationParam(name, fallback = "") {
+  try {
+    const search = typeof globalThis?.location?.search === "string" ? globalThis.location.search : "";
+    const params = new URLSearchParams(search);
+    const value = String(params.get(name) || "").trim();
+    if (value) return value;
+  } catch {
+    // ignore worker-location parsing failures
+  }
+  return String(fallback || "");
+}
+
+const MAIN_AGENT_ID = resolveWorkerLocationParam("agentId", "main");
+const MAIN_SESSION_KEY = resolveWorkerLocationParam("sessionKey", `agent:${MAIN_AGENT_ID}:main`);
 const TRANSCRIPT_DIGEST_QUEUE_META_KEY = "transcriptDigestQueueV1";
 const TRANSCRIPT_DIGEST_QUEUE_MAX = 500;
 const LITE_TOOL_DISPATCH_PATH = "lite_tool_dispatch_v1";

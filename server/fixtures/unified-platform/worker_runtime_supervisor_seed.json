@@ -1,0 +1,19 @@
+{
+  "family": "worker_runtime_supervisor_seed",
+  "schema": "agent-town-worker-runtime-supervisor-seed/v1",
+  "requiredStatuses": [
+    "starting",
+    "ready",
+    "working",
+    "idle",
+    "blocked",
+    "stopped"
+  ],
+  "requiredLabels": [
+    "Start Helper",
+    "Ask Helper",
+    "Active Helper Sessions",
+    "Advanced runtime settings"
+  ],
+  "minimumActiveWorkerCount": 2
+}

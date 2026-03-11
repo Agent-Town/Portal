@@ -46707,7 +46707,17 @@ async function sha256B64FromUtf8(str2) {
 
 // src/openclaw-lite/shared/idb.js
 init_define_PI_VERSIONS();
-var DB_NAME = "openclaw-lite";
+function resolveDbName() {
+  try {
+    const search = typeof globalThis?.location?.search === "string" ? globalThis.location.search : "";
+    const params = new URLSearchParams(search);
+    const value = String(params.get("idbName") || "").trim();
+    if (value) return value;
+  } catch {
+  }
+  return "openclaw-lite";
+}
+var DB_NAME = resolveDbName();
 var DB_VERSION = 1;
 function reqToPromise(req) {
   return new Promise((resolve, reject) => {
@@ -46847,8 +46857,18 @@ async function vfsReadAllBytes(prefix = "") {
 // src/openclaw-lite/worker.js
 var OPENCLAW_VERSION = "2026.2.26-beta.1";
 var PI_VERSIONS = define_PI_VERSIONS_default;
-var MAIN_AGENT_ID = "main";
-var MAIN_SESSION_KEY = "agent:main:main";
+function resolveWorkerLocationParam(name, fallback = "") {
+  try {
+    const search = typeof globalThis?.location?.search === "string" ? globalThis.location.search : "";
+    const params = new URLSearchParams(search);
+    const value = String(params.get(name) || "").trim();
+    if (value) return value;
+  } catch {
+  }
+  return String(fallback || "");
+}
+var MAIN_AGENT_ID = resolveWorkerLocationParam("agentId", "main");
+var MAIN_SESSION_KEY = resolveWorkerLocationParam("sessionKey", `agent:${MAIN_AGENT_ID}:main`);
 var TRANSCRIPT_DIGEST_QUEUE_META_KEY = "transcriptDigestQueueV1";
 var TRANSCRIPT_DIGEST_QUEUE_MAX = 500;
 var LITE_TOOL_DISPATCH_PATH = "lite_tool_dispatch_v1";

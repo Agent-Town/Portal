@@ -1,0 +1,12 @@
+{
+  "family": "worker_spawn_guardrail_seed",
+  "schema": "agent-town-worker-spawn-guardrail-seed/v1",
+  "maxActiveSessions": 3,
+  "stableErrorCodes": [
+    "DEPLOYMENT_NOT_FOUND",
+    "UNSUPPORTED_OVERRIDE",
+    "OVER_CONCURRENCY_LIMIT",
+    "RUNAWAY_SPAWN_BLOCKED",
+    "HOUSE_WORKER_LOCAL_BRAIN_REQUIRED"
+  ]
+}
