@@ -1009,6 +1009,26 @@ async function init() {
     return res.result || null;
   }
 
+  async function libraryScopeContextSetRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.library.scopeContext.set",
+      responseType: "worker.library.scopeContext.set",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "LIBRARY_SCOPE_CONTEXT_SET_FAILED"));
+    return res.result || null;
+  }
+
+  async function librarySkillRoutePreviewRequest(params = {}) {
+    const res = await sendWorkerRequest({
+      requestType: "gateway.command.library.skillRoutePreview",
+      responseType: "worker.library.skillRoutePreview",
+      payload: { params },
+    });
+    if (!res?.ok) throw new Error(String(res?.error || "LIBRARY_SKILL_ROUTE_PREVIEW_FAILED"));
+    return res.result || null;
+  }
+
   const DEFAULT_COMPILED_PACK_ROOT = "workspace/.agent-town/default-pack";
   const DEFAULT_COMPILED_PACK_MANIFEST_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/manifest.json`;
   const DEFAULT_COMPILED_PACK_MANUAL_PATH = `${DEFAULT_COMPILED_PACK_ROOT}/manual/skill.md`;
@@ -1772,6 +1792,12 @@ async function init() {
     async runtimeSessionContext(params = {}) {
       return runtimeSessionContextRequest(params);
     },
+    async setLibraryScopeContext(params = {}) {
+      return libraryScopeContextSetRequest(params);
+    },
+    async librarySkillRoutePreview(params = {}) {
+      return librarySkillRoutePreviewRequest(params);
+    },
     async compileDefaultSkillPack(params = {}) {
       return await ensureDefaultSkillPackCompiled({
         force: params?.force === true,
@@ -1878,6 +1904,8 @@ async function init() {
   gatewayEvents.skillState = skillStateRequest;
   gatewayEvents.systemPromptPreview = systemPromptPreviewRequest;
   gatewayEvents.runtimeSessionContext = runtimeSessionContextRequest;
+  gatewayEvents.setLibraryScopeContext = libraryScopeContextSetRequest;
+  gatewayEvents.librarySkillRoutePreview = librarySkillRoutePreviewRequest;
   gatewayEvents.experienceRun = experienceRunRequest;
   gatewayEvents.visitExperience = visitExperienceRequest;
   gatewayEvents.trainerListAttempts = trainerListAttemptsRequest;

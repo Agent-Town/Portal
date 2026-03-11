@@ -456,6 +456,12 @@ library-skill-pack/
     └── registry-curator/skill.md
 ```
 
+Implementation bridge in Portal:
+
+- manifest route: `/api/platform/library/skill-pack`
+- compiled entry: `/__compiled/library-skill-pack/skill.md`
+- active chat scope prompt context: `house-library/scope.md` inside worker prompt preview
+
 ### 10.1 Router skill
 
 Purpose:

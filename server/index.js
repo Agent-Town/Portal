@@ -3728,6 +3728,7 @@ function buildShareMeta({ shareId, shareHero, publicMedia, origin }) {
 }
 
 const DEFAULT_SKILL_PACK_BASE_PATH = '/__compiled/default-skill-pack';
+const HOUSE_LIBRARY_SKILL_PACK_BASE_PATH = '/__compiled/library-skill-pack';
 const PLATFORM_CONFIG_STATUSES = new Set(['draft', 'candidate', 'active', 'archived', 'blocked']);
 const PLATFORM_IMMUTABLE_CONFIG_STATUSES = new Set(['candidate', 'active', 'archived', 'blocked']);
 const PLATFORM_MUTABLE_COMPONENT_REFS = new Set(['latest', 'stable', 'main', 'master', 'experimental', 'season-lock']);
@@ -4126,6 +4127,186 @@ function buildDefaultCompiledSkillPack() {
   };
 }
 
+function buildHouseLibraryCompiledSkillPack() {
+  const specializedSkills = [
+    'House Librarian',
+    'Archive Clerk',
+    'Workshop Scribe',
+    'Registry Curator',
+  ];
+  const rules = [
+    '---',
+    'name: house-library-rules',
+    'description: Ground rules for House Library, Workshop, Archive, and Registry behavior.',
+    'version: 1',
+    '---',
+    '',
+    '# House Library Rules',
+    '',
+    '- Prefer explicit user scope over speculative retrieval.',
+    '- Treat unscoped private Library items as out of scope.',
+    '- Archive remains factual and append-only.',
+    '- Workshop edits require diff visibility and approval before persistent writes.',
+    '- Registry publishing is always explicit and opt-in.',
+    '',
+  ].join('\n');
+  const routerSkill = [
+    '---',
+    'name: house-library-router',
+    'description: Pick one House Library skill before taking action.',
+    'version: 1',
+    '---',
+    '',
+    '# House Library Router',
+    '',
+    'Use exactly one specialized skill before acting:',
+    '',
+    '- [House Librarian](./skills/librarian/skill.md)',
+    '- [Archive Clerk](./skills/archive-clerk/skill.md)',
+    '- [Workshop Scribe](./skills/workshop-scribe/skill.md)',
+    '- [Registry Curator](./skills/registry-curator/skill.md)',
+    '- [Rules](./rules.md)',
+    '',
+    'If the request is private memory or scope management, default to House Librarian.',
+    'If the request is about file reads/edits/diffs, choose Workshop Scribe.',
+    'If the request is about traces, runs, or trainer outputs, choose Archive Clerk.',
+    'If the request is about publishing or importing public artifacts, choose Registry Curator.',
+    '',
+  ].join('\n');
+  const librarianSkill = [
+    '---',
+    'name: House Librarian',
+    'description: Manage curated Library items, explicit scope, and saved notes for the current house team.',
+    'version: 1',
+    '---',
+    '',
+    '# House Librarian',
+    '',
+    'Use this skill when the user wants to find something, save a note, or control what the agent may use in chat.',
+    '',
+    'Preferred tool family:',
+    '',
+    '- `house_library_list_items`',
+    '- `house_library_read_scope`',
+    '- `house_library_set_scope`',
+    '- `house_library_create_item`',
+    '',
+    'Rules:',
+    '',
+    '- Prefer explicit selection over guessing.',
+    '- Never claim an item is in scope unless the active scope set confirms it.',
+    '- If multiple items could match, show the choices instead of silently deciding.',
+    '',
+  ].join('\n');
+  const archiveClerkSkill = [
+    '---',
+    'name: Archive Clerk',
+    'description: Inspect archive truth and trainer-derived provenance before anything is promoted into Library.',
+    'version: 1',
+    '---',
+    '',
+    '# Archive Clerk',
+    '',
+    'Use this skill for questions like "what happened", trace inspection, or promoting trace/trainer truth into Library.',
+    '',
+    'Rules:',
+    '',
+    '- Archive is factual and append-only.',
+    '- Derived summaries must preserve trace or trainer refs.',
+    '- If information is sealed or redacted, say so plainly.',
+    '',
+  ].join('\n');
+  const workshopScribeSkill = [
+    '---',
+    'name: Workshop Scribe',
+    'description: Read files, prepare diffable edits, and use approval-gated Workshop writes inside the House shell.',
+    'version: 1',
+    '---',
+    '',
+    '# Workshop Scribe',
+    '',
+    'Use this skill when the user wants to browse, edit, diff, or snapshot files in Workshop.',
+    '',
+    'Preferred tool family:',
+    '',
+    '- `workspace_list`',
+    '- `workspace_read_file`',
+    '- `workspace_edit_file`',
+    '- `workspace_write_file`',
+    '',
+    'Rules:',
+    '',
+    '- Editing happens in Workshop, not in Library.',
+    '- Show the diff preview before asking for a persistent write.',
+    '- Never perform persistent writes without approval.',
+    '',
+  ].join('\n');
+  const registryCuratorSkill = [
+    '---',
+    'name: Registry Curator',
+    'description: Publish or import Library artifacts with provenance, visibility, and trust labels preserved.',
+    'version: 1',
+    '---',
+    '',
+    '# Registry Curator',
+    '',
+    'Use this skill when the user explicitly wants to publish or import public artifacts.',
+    '',
+    'Rules:',
+    '',
+    '- Publishing is opt-in and private by default.',
+    '- Imported artifacts must keep source refs and trust labels.',
+    '- Do not auto-trust public artifacts merely because they exist.',
+    '',
+  ].join('\n');
+
+  const fileBodies = {
+    'skill.md': routerSkill,
+    'rules.md': rules,
+    'skills/librarian/skill.md': librarianSkill,
+    'skills/archive-clerk/skill.md': archiveClerkSkill,
+    'skills/workshop-scribe/skill.md': workshopScribeSkill,
+    'skills/registry-curator/skill.md': registryCuratorSkill,
+  };
+  const fileHashes = Object.fromEntries(
+    Object.entries(fileBodies).map(([filePath, body]) => [filePath, sha256PrefixedHex(body)])
+  );
+  const manifestSeed = JSON.stringify({
+    sourceRefs: [{ path: `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skill.md`, hash: fileHashes['skill.md'] }],
+    fileHashes,
+    specializedSkills,
+  });
+  const contentHash = sha256PrefixedHex(manifestSeed);
+  const packVersionId = `packv_${contentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
+
+  return {
+    manifest: {
+      experienceId: 'house_library_v1',
+      packId: 'pack_house_library_v1',
+      packVersionId,
+      contentHash,
+      sourceRefs: [
+        {
+          path: `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skill.md`,
+          hash: fileHashes['skill.md'],
+        },
+      ],
+      specializedSkills,
+      fileHashes,
+      entryUrl: `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skill.md`,
+      files: {
+        'skill.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skill.md`,
+        'rules.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/rules.md`,
+        'skills/librarian/skill.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skills/librarian/skill.md`,
+        'skills/archive-clerk/skill.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skills/archive-clerk/skill.md`,
+        'skills/workshop-scribe/skill.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skills/workshop-scribe/skill.md`,
+        'skills/registry-curator/skill.md': `${HOUSE_LIBRARY_SKILL_PACK_BASE_PATH}/skills/registry-curator/skill.md`,
+      },
+    },
+    fileBodies,
+  };
+}
+
 function verifyHouseAuth(req, house) {
   if (!house || !house.authKey) return { ok: false, error: 'HOUSE_AUTH_REQUIRED' };
   const ts = req.header('x-house-ts');
@@ -4217,6 +4398,7 @@ function buildPlatformContextResponse(session, overrides = {}) {
 registerPlatformReadRoutes(app, {
   express,
   buildDefaultCompiledSkillPack,
+  buildHouseLibraryCompiledSkillPack,
   buildPlatformContextResponse,
   buildPlatformTrainerResultPayload,
   buildPortalRequestId,
@@ -12403,6 +12585,18 @@ app.get('/registry', (req, res) => {
 
 app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   const pack = buildDefaultCompiledSkillPack();
+  const requestedPath = String(req.params?.[0] || '').trim().replace(/^\/+/, '');
+  const body = pack.fileBodies[requestedPath];
+  if (typeof body !== 'string') {
+    return res.status(404).type('text/plain').send('NOT_FOUND');
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.type(requestedPath.endsWith('.json') ? 'application/json' : 'text/markdown');
+  return res.send(body);
+});
+
+app.get(/^\/__compiled\/library-skill-pack\/(.+)$/, (req, res) => {
+  const pack = buildHouseLibraryCompiledSkillPack();
   const requestedPath = String(req.params?.[0] || '').trim().replace(/^\/+/, '');
   const body = pack.fileBodies[requestedPath];
   if (typeof body !== 'string') {

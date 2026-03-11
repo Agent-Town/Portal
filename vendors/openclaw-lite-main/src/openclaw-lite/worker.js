@@ -1478,6 +1478,162 @@ async function runAgentTownStateGetWebSession(params, toolName = "agent_town_sta
   }
 }
 
+function unwrapPortalData(payload) {
+  if (isPlainObject(payload?.data)) return payload.data;
+  return isPlainObject(payload) ? payload : {};
+}
+
+async function runHouseLibraryListItems(params, toolName = "house_library_list_items") {
+  const startedAtMs = nowMs();
+  const teamId = typeof params?.teamId === "string" ? params.teamId.trim() : "";
+  const query = teamId ? `?teamId=${encodeURIComponent(teamId)}` : "";
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library${query}`, { method: "GET" }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      houseId: payload.houseId || null,
+      teamId: payload.teamId || null,
+      activeScopeSetId: payload.activeScopeSetId || null,
+      selectedItemIds: Array.isArray(payload.selectedItemIds) ? payload.selectedItemIds : [],
+      items: Array.isArray(payload.items) ? payload.items : [],
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_LIST_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { teamId: teamId || null }));
+  }
+}
+
+async function runHouseLibraryReadScope(params, toolName = "house_library_read_scope") {
+  const startedAtMs = nowMs();
+  const teamId = typeof params?.teamId === "string" ? params.teamId.trim() : "";
+  const query = teamId ? `?teamId=${encodeURIComponent(teamId)}` : "";
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library/scope${query}`, { method: "GET" }));
+    setLibraryScopeContext({
+      activeScopeSetId: payload.activeScopeSetId || null,
+      selectedItemIds: Array.isArray(payload.orderedItemIds) ? payload.orderedItemIds : [],
+      selectedItems: Array.isArray(payload.selectedItems) ? payload.selectedItems : [],
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      houseId: payload.houseId || null,
+      teamId: payload.teamId || null,
+      activeScopeSetId: payload.activeScopeSetId || null,
+      orderedItemIds: Array.isArray(payload.orderedItemIds) ? payload.orderedItemIds : [],
+      selectedItems: Array.isArray(payload.selectedItems) ? payload.selectedItems : [],
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_SCOPE_READ_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { teamId: teamId || null }));
+  }
+}
+
+async function runHouseLibrarySetScope(params, toolName = "house_library_set_scope") {
+  const startedAtMs = nowMs();
+  const body = {
+    scopeSetId: typeof params?.scopeSetId === "string" ? params.scopeSetId.trim() : "",
+    title: typeof params?.title === "string" && params.title.trim() ? params.title.trim() : "Reading Table",
+    itemIds: Array.isArray(params?.itemIds) ? params.itemIds.map((itemId) => String(itemId || "").trim()).filter(Boolean) : [],
+  };
+  try {
+    const payload = unwrapPortalData(await apiJson("/api/platform/library/scope", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }));
+    setLibraryScopeContext({
+      activeScopeSetId: payload.activeScopeSetId || null,
+      selectedItemIds: Array.isArray(payload.orderedItemIds) ? payload.orderedItemIds : [],
+      selectedItems: Array.isArray(payload.selectedItems) ? payload.selectedItems : [],
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      activeScopeSetId: payload.activeScopeSetId || null,
+      orderedItemIds: Array.isArray(payload.orderedItemIds) ? payload.orderedItemIds : [],
+      selectedItems: Array.isArray(payload.selectedItems) ? payload.selectedItems : [],
+      scopeSets: Array.isArray(payload.scopeSets) ? payload.scopeSets : [],
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_SCOPE_SET_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, {
+      scopeSetId: body.scopeSetId || null,
+      itemIds: body.itemIds,
+    }));
+  }
+}
+
+async function runHouseLibraryCreateItem(params, toolName = "house_library_create_item") {
+  const startedAtMs = nowMs();
+  const idempotencyKey = typeof params?.idempotencyKey === "string" && params.idempotencyKey.trim()
+    ? params.idempotencyKey.trim()
+    : randomId("house_library_item");
+  const body = {
+    itemType: typeof params?.itemType === "string" ? params.itemType.trim() : "",
+    title: typeof params?.title === "string" ? params.title.trim() : "",
+    summary: typeof params?.summary === "string" ? params.summary.trim() : "",
+    contentText: typeof params?.contentText === "string" ? params.contentText : "",
+    contentRef: typeof params?.contentRef === "string" ? params.contentRef.trim() : "",
+    sourceKind: typeof params?.sourceKind === "string" ? params.sourceKind.trim() : "",
+    sourceRef: typeof params?.sourceRef === "string" ? params.sourceRef.trim() : "",
+    visibility: typeof params?.visibility === "string" ? params.visibility.trim() : "house_private",
+    links: Array.isArray(params?.links) ? params.links : [],
+  };
+  try {
+    const payload = unwrapPortalData(await apiJson("/api/platform/library/items", {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify(body),
+    }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      item: isPlainObject(payload.item) ? payload.item : null,
+      links: Array.isArray(payload.links) ? payload.links : [],
+      idempotencyKey,
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_CREATE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { idempotencyKey }));
+  }
+}
+
+function previewHouseLibrarySkillRoute(params = {}) {
+  const text = String(params?.text || params?.prompt || "").trim().toLowerCase();
+  if (!text) {
+    return {
+      selectedSkillName: "House Librarian",
+      reasonCode: "default_private_scope",
+      specializedSkillCount: 1,
+    };
+  }
+  if (/(publish|registry|import|public artifact|provenance|trust label|seal)/.test(text)) {
+    return {
+      selectedSkillName: "Registry Curator",
+      reasonCode: "registry_publish_import",
+      specializedSkillCount: 1,
+    };
+  }
+  if (/(workshop|edit file|write file|diff|patch|open file|browse file|workspace)/.test(text)) {
+    return {
+      selectedSkillName: "Workshop Scribe",
+      reasonCode: "workshop_file_edit",
+      specializedSkillCount: 1,
+    };
+  }
+  if (/(archive|trace|trainer result|trainer|what happened|run history|timeline)/.test(text)) {
+    return {
+      selectedSkillName: "Archive Clerk",
+      reasonCode: "archive_truth",
+      specializedSkillCount: 1,
+    };
+  }
+  return {
+    selectedSkillName: "House Librarian",
+    reasonCode: "private_library_scope",
+    specializedSkillCount: 1,
+  };
+}
+
 async function runAgentTownUiIntentTool(params, toolName) {
   const startedAtMs = nowMs();
   const safeParams = isPlainObject(params) ? params : {};
@@ -2866,6 +3022,36 @@ const LITE_TOOL_SPECS = [
     sampleArgs: { webSessionId: "we_1234567890" },
   },
   {
+    name: "house_library_list_items",
+    label: "House Library List Items",
+    description: "List House Library items and current selection for the active team.",
+    sampleArgs: {},
+  },
+  {
+    name: "house_library_read_scope",
+    label: "House Library Read Scope",
+    description: "Read the active House Library scope set for the active team.",
+    sampleArgs: {},
+  },
+  {
+    name: "house_library_set_scope",
+    label: "House Library Set Scope",
+    description: "Set the active House Library scope set for the current chat.",
+    sampleArgs: { title: "Reading Table", itemIds: ["lib_123", "lib_456"] },
+  },
+  {
+    name: "house_library_create_item",
+    label: "House Library Create Item",
+    description: "Create one curated House Library item with explicit source provenance.",
+    sampleArgs: {
+      itemType: "fact_note",
+      title: "Modal Continuity",
+      summary: "Atlas stays modal-first.",
+      sourceKind: "trace",
+      sourceRef: "trace_modal_01",
+    },
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -3217,6 +3403,22 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "agent_town_state_get_web_session": {
       const envelope = await runAgentTownStateGetWebSession(params || {}, "agent_town_state_get_web_session");
       return envelopeToToolResult(envelope, "agent_town_state_get_web_session");
+    }
+    case "house_library_list_items": {
+      const envelope = await runHouseLibraryListItems(params || {}, "house_library_list_items");
+      return envelopeToToolResult(envelope, "house_library_list_items");
+    }
+    case "house_library_read_scope": {
+      const envelope = await runHouseLibraryReadScope(params || {}, "house_library_read_scope");
+      return envelopeToToolResult(envelope, "house_library_read_scope");
+    }
+    case "house_library_set_scope": {
+      const envelope = await runHouseLibrarySetScope(params || {}, "house_library_set_scope");
+      return envelopeToToolResult(envelope, "house_library_set_scope");
+    }
+    case "house_library_create_item": {
+      const envelope = await runHouseLibraryCreateItem(params || {}, "house_library_create_item");
+      return envelopeToToolResult(envelope, "house_library_create_item");
     }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":
@@ -4983,6 +5185,120 @@ async function buildLiteSkillsPrompt() {
   return lines.join("\n");
 }
 
+function normalizeLibraryScopeItemRef(item) {
+  const source = isPlainObject(item) ? item : {};
+  const libraryItemId = String(source.libraryItemId || "").trim();
+  if (!libraryItemId) return null;
+  return {
+    libraryItemId,
+    title: String(source.title || "").trim() || libraryItemId,
+    itemType: String(source.itemType || "").trim() || "note",
+    sourceKind: String(source.sourceKind || "").trim() || "unknown",
+    sourceRef: String(source.sourceRef || "").trim() || "",
+    summary: String(source.summary || "").trim() || "",
+    contentText: String(source.contentText || "").trim() || "",
+  };
+}
+
+function buildLibraryScopePromptText(scopeContext) {
+  const activeScopeSetId = String(scopeContext?.activeScopeSetId || "").trim();
+  const itemRefs = Array.isArray(scopeContext?.itemRefs) ? scopeContext.itemRefs : [];
+  if (!activeScopeSetId && itemRefs.length === 0) return "";
+  const lines = [
+    "# House Library Scope",
+    "",
+    "Only the following curated House Library artifacts are explicitly in scope for this chat.",
+    "Do not assume unlisted private Library items are available.",
+    "",
+  ];
+  if (activeScopeSetId) {
+    lines.push(`- activeScopeSetId: ${activeScopeSetId}`);
+    lines.push("");
+  }
+  for (const item of itemRefs) {
+    if (!item || typeof item !== "object") continue;
+    lines.push(`## ${String(item.libraryItemId || "").trim()} · ${String(item.title || "").trim() || String(item.libraryItemId || "").trim()}`);
+    lines.push(`- itemType: ${String(item.itemType || "").trim() || "note"}`);
+    lines.push(`- source: ${String(item.sourceKind || "").trim() || "unknown"} ${String(item.sourceRef || "").trim() || "—"}`);
+    if (String(item.summary || "").trim()) {
+      lines.push(`- summary: ${String(item.summary || "").trim()}`);
+    }
+    if (String(item.contentText || "").trim()) {
+      lines.push("");
+      lines.push(String(item.contentText || "").trim());
+    }
+    lines.push("");
+  }
+  return lines.join("\n").trim();
+}
+
+function normalizeLibraryScopeContext(snapshot = null) {
+  const source = isPlainObject(snapshot) ? snapshot : {};
+  const activeScopeSetId = String(source.activeScopeSetId || "").trim() || null;
+  const selectedItemIds = Array.isArray(source.selectedItemIds)
+    ? source.selectedItemIds.map((itemId) => String(itemId || "").trim()).filter(Boolean)
+    : [];
+  const seenItemIds = new Set();
+  const itemRefs = [];
+  const pushItem = (value) => {
+    const normalized = normalizeLibraryScopeItemRef(value);
+    if (!normalized) return;
+    if (seenItemIds.has(normalized.libraryItemId)) return;
+    seenItemIds.add(normalized.libraryItemId);
+    itemRefs.push(normalized);
+  };
+  for (const item of Array.isArray(source.itemRefs) ? source.itemRefs : []) {
+    pushItem(item);
+  }
+  for (const item of Array.isArray(source.selectedItems) ? source.selectedItems : []) {
+    pushItem(item);
+  }
+  for (const libraryItemId of selectedItemIds) {
+    if (seenItemIds.has(libraryItemId)) continue;
+    pushItem({ libraryItemId });
+  }
+  const promptText = buildLibraryScopePromptText({
+    activeScopeSetId,
+    itemRefs,
+  });
+  return {
+    activeScopeSetId,
+    selectedItemIds,
+    itemRefs,
+    contextFiles: promptText
+      ? [{
+        path: "house-library/scope.md",
+        content: promptText,
+      }]
+      : [],
+  };
+}
+
+function setLibraryScopeContext(snapshot = null) {
+  state.libraryScopeContext = normalizeLibraryScopeContext(snapshot);
+  return state.libraryScopeContext;
+}
+
+function getLibraryScopeContext() {
+  return normalizeLibraryScopeContext(state.libraryScopeContext);
+}
+
+function buildEphemeralPromptContextFiles() {
+  const scopeContext = getLibraryScopeContext();
+  const contextFiles = Array.isArray(scopeContext.contextFiles) ? scopeContext.contextFiles : [];
+  return {
+    contextFiles: contextFiles.map((file) => ({
+      path: String(file?.path || "").trim(),
+      content: String(file?.content || ""),
+    })).filter((file) => file.path && file.content),
+    libraryScope: {
+      activeScopeSetId: scopeContext.activeScopeSetId || null,
+      selectedItemIds: Array.isArray(scopeContext.selectedItemIds) ? scopeContext.selectedItemIds.slice() : [],
+      itemRefs: Array.isArray(scopeContext.itemRefs) ? scopeContext.itemRefs.map((item) => ({ ...item })) : [],
+    },
+  };
+}
+
 async function buildWorkspaceContextFiles() {
   await ensureWorkspaceFiles({ recordEvents: false });
   const contextFiles = [];
@@ -5013,6 +5329,20 @@ async function buildWorkspaceContextFiles() {
     contextFiles,
     usedFiles,
     truncatedFiles,
+  };
+}
+
+async function buildMergedPromptContextFiles() {
+  const workspacePrompt = await buildWorkspaceContextFiles();
+  const ephemeralPrompt = buildEphemeralPromptContextFiles();
+  const extraPaths = Array.isArray(ephemeralPrompt.contextFiles)
+    ? ephemeralPrompt.contextFiles.map((file) => String(file?.path || "").trim()).filter(Boolean)
+    : [];
+  return {
+    contextFiles: [...(ephemeralPrompt.contextFiles || []), ...(workspacePrompt.contextFiles || [])],
+    usedFiles: [...extraPaths, ...(workspacePrompt.usedFiles || [])],
+    truncatedFiles: Array.isArray(workspacePrompt.truncatedFiles) ? workspacePrompt.truncatedFiles.slice() : [],
+    libraryScope: ephemeralPrompt.libraryScope,
   };
 }
 
@@ -5294,7 +5624,7 @@ function buildLiteSystemPrompt({ model, tools, contextFiles, skillsPrompt = "" }
 async function buildLitePromptPreview({ model, tools } = {}) {
   const resolvedModel = model || getConfiguredModel();
   const resolvedTools = Array.isArray(tools) ? tools : getLiteTools();
-  const workspacePrompt = await buildWorkspaceContextFiles();
+  const workspacePrompt = await buildMergedPromptContextFiles();
   const skillsPrompt = await buildLiteSkillsPrompt();
   const systemPrompt = buildLiteSystemPrompt({
     model: resolvedModel,
@@ -5309,6 +5639,7 @@ async function buildLitePromptPreview({ model, tools } = {}) {
     contextFilePaths: workspacePrompt.contextFiles.map((file) => String(file?.path || "")).filter(Boolean),
     usedFiles: workspacePrompt.usedFiles,
     truncatedFiles: workspacePrompt.truncatedFiles,
+    libraryScope: workspacePrompt.libraryScope,
   };
 }
 
@@ -8146,6 +8477,12 @@ const state = {
     importedPaths: [],
     importedFiles: [],
   },
+  libraryScopeContext: {
+    activeScopeSetId: null,
+    selectedItemIds: [],
+    itemRefs: [],
+    contextFiles: [],
+  },
 };
 
 async function persistSkillImportState() {
@@ -8979,6 +9316,32 @@ self.addEventListener("message", async (ev) => {
       return;
     }
 
+    if (msg.type === "gateway.command.library.scopeContext.set") {
+      const result = setLibraryScopeContext(msg.params || {});
+      post({
+        type: "worker.library.scopeContext.set",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess({
+          activeScopeSetId: result.activeScopeSetId || null,
+          selectedItemIds: Array.isArray(result.selectedItemIds) ? result.selectedItemIds : [],
+          itemRefs: Array.isArray(result.itemRefs) ? result.itemRefs : [],
+          contextFilePaths: Array.isArray(result.contextFiles) ? result.contextFiles.map((file) => file.path) : [],
+        }),
+      });
+      return;
+    }
+
+    if (msg.type === "gateway.command.library.skillRoutePreview") {
+      post({
+        type: "worker.library.skillRoutePreview",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result: makeToolSuccess(previewHouseLibrarySkillRoute(msg.params || {})),
+      });
+      return;
+    }
+
     if (msg.type === "gateway.command.permission.policy.get") {
       post({
         type: "worker.permission.policy.get",
@@ -9050,6 +9413,7 @@ self.addEventListener("message", async (ev) => {
           contextFilePaths: preview.contextFilePaths,
           usedFiles: preview.usedFiles,
           truncatedFiles: preview.truncatedFiles,
+          libraryScope: preview.libraryScope,
         }),
       });
       return;

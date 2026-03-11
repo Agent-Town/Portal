@@ -2,6 +2,7 @@ function registerPlatformReadRoutes(app, deps) {
   const {
     express,
     buildDefaultCompiledSkillPack,
+    buildHouseLibraryCompiledSkillPack,
     buildPlatformContextResponse,
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
@@ -121,6 +122,8 @@ function registerPlatformReadRoutes(app, deps) {
       itemType: item.itemType,
       title: item.title,
       summary: item.summary,
+      contentText: item.contentText,
+      contentRef: item.contentRef,
       sourceKind: item.sourceKind,
       sourceRef: item.sourceRef,
       visibility: item.visibility,
@@ -449,6 +452,12 @@ function registerPlatformReadRoutes(app, deps) {
     return sendPortalApiSuccess(res, pack.manifest, { requestId });
   });
 
+  app.get('/api/platform/library/skill-pack', (_req, res) => {
+    const requestId = buildPortalRequestId();
+    const pack = buildHouseLibraryCompiledSkillPack();
+    return sendPortalApiSuccess(res, pack.manifest, { requestId });
+  });
+
   app.get('/api/platform/pack-compatibility', (_req, res) => {
     const requestId = buildPortalRequestId();
     return sendPortalApiSuccess(res, buildPackCompatibilityContract(), { requestId });
@@ -707,25 +716,41 @@ function registerPlatformReadRoutes(app, deps) {
     }));
     const libraryItemId = `lib_${randomHex(12)}`;
     const createdAt = nowIso();
-    const item = createLibraryItem({
-      libraryItemId,
-      houseId: context.houseId,
-      teamId: context.activeTeamId,
-      itemType,
-      title,
-      summary,
-      contentText,
-      contentRef,
-      sourceKind,
-      sourceRef,
-      visibility,
-      contentHash,
-      idempotencyKey,
-      metadata: {
-        createdFrom: 'portal.house.library',
-      },
-      nowIso: createdAt,
-    });
+    let item;
+    try {
+      item = createLibraryItem({
+        libraryItemId,
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        itemType,
+        title,
+        summary,
+        contentText,
+        contentRef,
+        sourceKind,
+        sourceRef,
+        visibility,
+        contentHash,
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library',
+        },
+        nowIso: createdAt,
+      });
+    } catch (err) {
+      const replayed = getLibraryItemByIdempotency({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        idempotencyKey,
+      });
+      if (replayed) {
+        return sendPortalApiSuccess(res, {
+          item: replayed,
+          links: listLibraryLinks({ libraryItemId: replayed.libraryItemId }),
+        }, { requestId, status: 200 });
+      }
+      throw err;
+    }
     const normalizedLinks = links.length
       ? links
       : [{

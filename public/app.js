@@ -1311,6 +1311,11 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    void syncHouseLibraryScopeContextToWorker({
+      activeScopeSetId: '',
+      selectedItemIds: [],
+      selectedItems: [],
+    });
     houseSurfaceState.tracks.loaded = false;
     houseSurfaceState.tracks.items = [];
     houseSurfaceState.tracks.selectedTrackId = '';
@@ -1572,6 +1577,23 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   }
 }
 
+async function syncHouseLibraryScopeContextToWorker(snapshot = null) {
+  const source = snapshot && typeof snapshot === 'object'
+    ? snapshot
+    : {
+      activeScopeSetId: houseSurfaceState.library.activeScopeSetId,
+      selectedItemIds: houseSurfaceState.library.selectedItemIds,
+      selectedItems: houseSurfaceState.library.selectedItems,
+    };
+  const gatewayApi = await initGateway().catch(() => null);
+  if (!gatewayApi || typeof gatewayApi.setLibraryScopeContext !== 'function') return null;
+  return await gatewayApi.setLibraryScopeContext({
+    activeScopeSetId: String(source.activeScopeSetId || '').trim(),
+    selectedItemIds: Array.isArray(source.selectedItemIds) ? source.selectedItemIds : [],
+    selectedItems: Array.isArray(source.selectedItems) ? source.selectedItems : [],
+  }).catch(() => null);
+}
+
 async function updateHouseLibraryScopeSelection(nextItemIds = []) {
   const scopeSetId = String(houseSurfaceState.library.activeScopeSetId || '').trim();
   const response = await api('/api/platform/library/scope', {
@@ -1584,6 +1606,7 @@ async function updateHouseLibraryScopeSelection(nextItemIds = []) {
   });
   const data = response?.data || response || {};
   syncHouseLibraryStateFromPayload(data);
+  await syncHouseLibraryScopeContextToWorker(data);
   renderHouseLibrarySurface();
   setHouseSurfaceStatus(
     houseSurfaceState.library.selectedItemIds.length
@@ -2024,6 +2047,7 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     syncHouseLibraryStateFromPayload(data);
+    await syncHouseLibraryScopeContextToWorker(data);
     renderHouseLibrarySurface();
     setHouseSurfaceStatus(houseSurfaceState.library.items.length ? '' : houseSurfaceState.library.emptyStateText);
   } catch (err) {
@@ -2034,6 +2058,11 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    await syncHouseLibraryScopeContextToWorker({
+      activeScopeSetId: '',
+      selectedItemIds: [],
+      selectedItems: [],
+    });
     renderHouseLibrarySurface();
     setHouseSurfaceStatus(`House Library unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }

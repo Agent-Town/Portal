@@ -20,3 +20,18 @@ The file should stay:
 - **Stable** (don’t break backwards compatibility lightly)
 
 Source of truth: `public/skill.md`.
+
+## Additive Internal Packs
+
+Compiled internal packs may add product-specific skill families without changing `public/skill.md`.
+
+Current additive example:
+
+- House Library skill pack at `/api/platform/library/skill-pack`
+- compiled entry at `/__compiled/library-skill-pack/skill.md`
+
+These additive packs must:
+
+- preserve the existing internal pack model (`packVersionId`, `contentHash`, manifest file map),
+- stay opt-in and experience-specific,
+- keep `/skill.md` stable unless a separate milestone explicitly changes it.
