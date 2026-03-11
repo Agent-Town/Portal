@@ -791,6 +791,77 @@ function listLibraryItemRevisions({
   return rows.map(mapLibraryItemRevisionRow).filter(Boolean);
 }
 
+function createLibraryItemRevision({
+  libraryItemRevisionId = '',
+  libraryItemId = '',
+  houseId = '',
+  teamId = '',
+  revisionIndex = 1,
+  title = '',
+  summary = '',
+  contentText = '',
+  contentHash = '',
+  metadata = null,
+  createdBy = 'human',
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const normalizedRevisionId = String(libraryItemRevisionId || '').trim();
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTitle = String(title || '').trim();
+  const normalizedSummary = String(summary || '').trim();
+  const normalizedHash = String(contentHash || '').trim();
+  const normalizedCreatedBy = String(createdBy || 'human').trim() || 'human';
+  const normalizedRevisionIndex = Number.isFinite(Number(revisionIndex)) ? Number(revisionIndex) : 0;
+  if (
+    !normalizedRevisionId
+    || !normalizedLibraryItemId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedTitle
+    || normalizedRevisionIndex < 1
+    || !normalizedHash
+  ) {
+    throw new Error('LIBRARY_ITEM_REVISION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_item_revisions (
+      library_item_revision_id,
+      library_item_id,
+      house_id,
+      team_id,
+      revision_index,
+      title,
+      summary,
+      content_text,
+      content_hash,
+      metadata_json,
+      created_by,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedRevisionId,
+    normalizedLibraryItemId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedRevisionIndex,
+    normalizedTitle,
+    normalizedSummary,
+    String(contentText || ''),
+    normalizedHash,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    normalizedCreatedBy,
+    createdAt,
+  );
+  return listLibraryItemRevisions({
+    houseId: normalizedHouseId,
+    teamId: normalizedTeamId,
+    libraryItemId: normalizedLibraryItemId,
+  }).find((entry) => entry.libraryItemRevisionId === normalizedRevisionId) || null;
+}
+
 function createLibraryItem({
   libraryItemId = '',
   houseId = '',
@@ -886,6 +957,55 @@ function createLibraryItem({
   return getLibraryItemById(normalizedLibraryItemId);
 }
 
+function updateLibraryItem({
+  libraryItemId = '',
+  title = '',
+  summary = '',
+  contentText = '',
+  contentRef = '',
+  contentHash = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  const normalizedTitle = String(title || '').trim();
+  const normalizedSummary = String(summary || '').trim();
+  const normalizedContentHash = String(contentHash || '').trim();
+  if (!normalizedLibraryItemId || !normalizedTitle || !normalizedSummary || !normalizedContentHash) {
+    throw new Error('LIBRARY_ITEM_UPDATE_INVALID');
+  }
+  const existing = getLibraryItemById(normalizedLibraryItemId);
+  if (!existing) {
+    throw new Error('LIBRARY_ITEM_NOT_FOUND');
+  }
+  const mergedMetadata = {
+    ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+    ...(metadata && typeof metadata === 'object' ? metadata : {}),
+  };
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_items
+    SET title = ?,
+        summary = ?,
+        content_text = ?,
+        content_ref = ?,
+        content_hash = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_item_id = ?
+  `).run(
+    normalizedTitle,
+    normalizedSummary,
+    String(contentText || ''),
+    String(contentRef || '').trim() || null,
+    normalizedContentHash,
+    JSON.stringify(mergedMetadata),
+    nowIso,
+    normalizedLibraryItemId,
+  );
+  return getLibraryItemById(normalizedLibraryItemId);
+}
+
 function mapLibraryLinkRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -963,6 +1083,106 @@ function listConversationArtifacts({
   return rows.map(mapConversationArtifactRow).filter(Boolean);
 }
 
+function getConversationArtifactById(conversationArtifactId = '') {
+  const normalizedConversationArtifactId = String(conversationArtifactId || '').trim();
+  if (!normalizedConversationArtifactId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM conversation_artifacts
+    WHERE conversation_artifact_id = ?
+    LIMIT 1
+  `).get(normalizedConversationArtifactId);
+  return mapConversationArtifactRow(row);
+}
+
+function getConversationArtifactByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM conversation_artifacts
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapConversationArtifactRow(row);
+}
+
+function createConversationArtifact({
+  conversationArtifactId = '',
+  houseId = '',
+  teamId = '',
+  title = '',
+  transcriptText = '',
+  messageIds = [],
+  messages = [],
+  sourceScopeSetId = '',
+  createdBy = 'human',
+  metadata = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedConversationArtifactId = String(conversationArtifactId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTitle = String(title || '').trim();
+  const normalizedCreatedBy = String(createdBy || 'human').trim() || 'human';
+  if (!normalizedConversationArtifactId || !normalizedHouseId || !normalizedTeamId || !normalizedTitle) {
+    throw new Error('CONVERSATION_ARTIFACT_INVALID');
+  }
+  const normalizedMessageIds = Array.isArray(messageIds)
+    ? messageIds.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  const normalizedMessages = Array.isArray(messages)
+    ? messages.filter((entry) => entry && typeof entry === 'object')
+    : [];
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO conversation_artifacts (
+      conversation_artifact_id,
+      house_id,
+      team_id,
+      title,
+      transcript_text,
+      message_ids_json,
+      messages_json,
+      source_scope_set_id,
+      created_by,
+      metadata_json,
+      idempotency_key,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedConversationArtifactId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedTitle,
+    String(transcriptText || ''),
+    JSON.stringify(normalizedMessageIds),
+    JSON.stringify(normalizedMessages),
+    String(sourceScopeSetId || '').trim() || null,
+    normalizedCreatedBy,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+  );
+  return getConversationArtifactById(normalizedConversationArtifactId);
+}
+
 function mapLibraryShelfRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -1018,6 +1238,45 @@ function listLibraryShelves({
   return rows.map(mapLibraryShelfRow).filter(Boolean);
 }
 
+function getLibraryShelfById(libraryShelfId = '') {
+  const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
+  if (!normalizedLibraryShelfId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_shelves
+    WHERE library_shelf_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryShelfId);
+  return mapLibraryShelfRow(row);
+}
+
+function getLibraryShelfByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_shelves
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryShelfRow(row);
+}
+
 function listLibraryShelfItems(libraryShelfId = '') {
   const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
   if (!normalizedLibraryShelfId) return [];
@@ -1029,6 +1288,118 @@ function listLibraryShelfItems(libraryShelfId = '') {
     ORDER BY order_index ASC, created_at ASC, library_shelf_item_id ASC
   `).all(normalizedLibraryShelfId);
   return rows.map(mapLibraryShelfItemRow).filter(Boolean);
+}
+
+function createLibraryShelf({
+  libraryShelfId = '',
+  houseId = '',
+  teamId = '',
+  title = '',
+  description = '',
+  createdBy = 'human',
+  metadata = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTitle = String(title || '').trim();
+  const normalizedCreatedBy = String(createdBy || 'human').trim() || 'human';
+  if (!normalizedLibraryShelfId || !normalizedHouseId || !normalizedTeamId || !normalizedTitle) {
+    throw new Error('LIBRARY_SHELF_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_shelves (
+      library_shelf_id,
+      house_id,
+      team_id,
+      title,
+      description,
+      created_by,
+      metadata_json,
+      idempotency_key,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryShelfId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedTitle,
+    String(description || '').trim(),
+    normalizedCreatedBy,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getLibraryShelfById(normalizedLibraryShelfId);
+}
+
+function addLibraryShelfItem({
+  libraryShelfItemId = '',
+  libraryShelfId = '',
+  libraryItemId = '',
+  orderIndex = 0,
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedShelfItemId = String(libraryShelfItemId || '').trim();
+  const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  const normalizedOrderIndex = Number.isFinite(Number(orderIndex)) ? Number(orderIndex) : 0;
+  if (!normalizedShelfItemId || !normalizedLibraryShelfId || !normalizedLibraryItemId || normalizedOrderIndex < 0) {
+    throw new Error('LIBRARY_SHELF_ITEM_INVALID');
+  }
+  const database = ensureDb();
+  const existingByItem = database.prepare(`
+    SELECT *
+    FROM library_shelf_items
+    WHERE library_shelf_id = ?
+      AND library_item_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryShelfId, normalizedLibraryItemId);
+  if (existingByItem) {
+    return mapLibraryShelfItemRow(existingByItem);
+  }
+  database.prepare(`
+    INSERT INTO library_shelf_items (
+      library_shelf_item_id,
+      library_shelf_id,
+      library_item_id,
+      order_index,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedShelfItemId,
+    normalizedLibraryShelfId,
+    normalizedLibraryItemId,
+    normalizedOrderIndex,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+  );
+  return listLibraryShelfItems(normalizedLibraryShelfId).find((entry) => entry.libraryShelfItemId === normalizedShelfItemId) || null;
+}
+
+function removeLibraryShelfItem({
+  libraryShelfId = '',
+  libraryItemId = '',
+} = {}) {
+  const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  if (!normalizedLibraryShelfId || !normalizedLibraryItemId) {
+    throw new Error('LIBRARY_SHELF_ITEM_INVALID');
+  }
+  const database = ensureDb();
+  const info = database.prepare(`
+    DELETE FROM library_shelf_items
+    WHERE library_shelf_id = ?
+      AND library_item_id = ?
+  `).run(normalizedLibraryShelfId, normalizedLibraryItemId);
+  return Number(info?.changes || 0);
 }
 
 function createLibraryLink({
@@ -3445,9 +3816,13 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  addLibraryShelfItem,
   countTrackProgressEventsByDedupe,
+  createConversationArtifact,
   createLibraryItem,
+  createLibraryItemRevision,
   createLibraryLink,
+  createLibraryShelf,
   createLibraryPublication,
   createScopeSet,
   createTrackProgressEvent,
@@ -3469,8 +3844,12 @@ module.exports = {
   getIntegrationExecutionByIdempotency,
   getIntegrationPackVersionByIdempotency,
   getApprovalRecordById,
+  getConversationArtifactById,
+  getConversationArtifactByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryShelfById,
+  getLibraryShelfByIdempotency,
   getLibraryPublicationByIdempotency,
   getRunById,
   getRunByTraceId,
@@ -3521,6 +3900,7 @@ module.exports = {
   listFixtureFamilies,
   listUnifiedPlatformFixtureFamilies: listFixtureFamilies,
   loadFixtureFamily,
+  removeLibraryShelfItem,
   replaceScopeSetItems,
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
@@ -3538,4 +3918,5 @@ module.exports = {
   upsertApprovalRecord,
   upsertTeamConfigBinding,
   upsertConfigVersion,
+  updateLibraryItem,
 };

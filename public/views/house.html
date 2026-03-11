@@ -149,9 +149,35 @@
 
 <div class="panel is-hidden" id="houseLibraryPanel" data-testid="house-library-panel">
   <h2 style="margin:0 0 6px">House Library</h2>
-  <p class="small" style="margin-top:0">
-    Curated notes, facts, and playbooks stay readable here and can be brought into chat on purpose.
+  <p class="small" style="margin-top:0" data-testid="house-library-copy">
+    Choose what the agent may use in this chat.
   </p>
+  <div class="small" style="margin:10px 0 4px;">Librarian Desk</div>
+  <div class="kv stack" data-testid="house-library-note-composer" style="margin-bottom:8px;">
+    <label class="small" for="houseLibraryNoteTitleInput">Title</label>
+    <input
+      id="houseLibraryNoteTitleInput"
+      data-testid="house-library-note-title"
+      class="pixel-input"
+      type="text"
+      autocomplete="off"
+      placeholder="Memory title"
+    />
+    <label class="small" for="houseLibraryNoteBodyInput">What should the agent remember?</label>
+    <textarea
+      id="houseLibraryNoteBodyInput"
+      data-testid="house-library-note-body"
+      class="pixel-input"
+      rows="4"
+      style="width:100%; min-height:96px;"
+      placeholder="Write the note in plain language."
+    ></textarea>
+    <div class="kv">
+      <button class="btn primary" id="houseLibrarySaveNoteBtn" type="button" data-testid="house-library-save-note">Save Note to Library</button>
+      <button class="btn" id="houseLibraryCancelEditBtn" type="button" data-testid="house-library-cancel-edit">Start a New Note</button>
+    </div>
+    <div class="small" id="houseLibraryComposerStatus" data-testid="house-library-composer-status">Writing a new local note.</div>
+  </div>
   <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
   <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
   <div class="small" style="margin:10px 0 4px;">Reading Tables</div>

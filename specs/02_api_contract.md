@@ -976,6 +976,8 @@ Stable failure codes:
 ### POST `/api/platform/library/items` (human)
 Creates one durable House Library item with explicit source provenance. This is the same route the Workshop snapshot action uses after an approved file write.
 
+Phase 30 extends this same route for direct Library note authoring from the in-shell `Librarian Desk`. In that case the request uses `sourceKind: "user_note"`, keeps `visibility: "house_private"`, and returns the first stored revision snapshot for the new item.
+
 Request headers:
 - `Idempotency-Key` (required)
 
@@ -1005,6 +1007,9 @@ Response fields:
 - `data.item.contentHash`
 - `data.item.sourceKind`
 - `data.item.sourceRef`
+- `data.revision`
+- `data.revision.libraryItemRevisionId`
+- `data.revision.revisionIndex`
 - `data.links[]`
 - `data.links[].libraryLinkId`
 - `data.links[].linkKind`

@@ -538,11 +538,16 @@ let houseSurfaceState = {
   library: {
     loaded: false,
     items: [],
+    shelves: [],
     scopeSets: [],
     selectedItemId: '',
     activeScopeSetId: '',
     selectedItemIds: [],
     selectedItems: [],
+    composerMode: 'create',
+    editingItemId: '',
+    draftTitle: '',
+    draftBody: '',
     emptyStateText: 'No curated Library items yet.',
     actionStatusText: '',
     actionStatusError: false,
@@ -1464,11 +1469,13 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.experiences.selectedExperienceId = '';
     houseSurfaceState.library.loaded = false;
     houseSurfaceState.library.items = [];
+    houseSurfaceState.library.shelves = [];
     houseSurfaceState.library.scopeSets = [];
     houseSurfaceState.library.selectedItemId = '';
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    resetHouseLibraryComposer();
     void syncHouseLibraryScopeContextToWorker({
       activeScopeSetId: '',
       selectedItemIds: [],
@@ -1737,6 +1744,7 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   const selectedItems = Array.isArray(payload?.selectedItems) ? payload.selectedItems : [];
   houseSurfaceState.library.loaded = true;
   houseSurfaceState.library.items = items;
+  houseSurfaceState.library.shelves = Array.isArray(payload?.shelves) ? payload.shelves : [];
   houseSurfaceState.library.scopeSets = Array.isArray(payload?.scopeSets) ? payload.scopeSets : [];
   houseSurfaceState.library.activeScopeSetId = String(payload?.activeScopeSetId || '').trim();
   houseSurfaceState.library.selectedItemIds = Array.isArray(payload?.selectedItemIds)
@@ -1750,6 +1758,66 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   if (!houseSurfaceState.library.selectedItemId && items[0]?.libraryItemId) {
     houseSurfaceState.library.selectedItemId = String(items[0].libraryItemId);
   }
+  if (
+    houseSurfaceState.library.composerMode === 'edit'
+    && houseSurfaceState.library.editingItemId
+    && !items.some((item) => String(item?.libraryItemId || '') === String(houseSurfaceState.library.editingItemId || ''))
+  ) {
+    houseSurfaceState.library.composerMode = 'create';
+    houseSurfaceState.library.editingItemId = '';
+  }
+}
+
+function resetHouseLibraryComposer({
+  preserveDraft = false,
+} = {}) {
+  houseSurfaceState.library.composerMode = 'create';
+  houseSurfaceState.library.editingItemId = '';
+  if (!preserveDraft) {
+    houseSurfaceState.library.draftTitle = '';
+    houseSurfaceState.library.draftBody = '';
+  }
+}
+
+function loadHouseLibraryDraftFromSelectedItem(item = null) {
+  const target = item && typeof item === 'object' ? item : getSelectedHouseLibraryItem();
+  if (!target) return;
+  houseSurfaceState.library.composerMode = 'edit';
+  houseSurfaceState.library.editingItemId = String(target?.libraryItemId || '').trim();
+  houseSurfaceState.library.draftTitle = String(target?.title || '').trim();
+  houseSurfaceState.library.draftBody = String(target?.contentText || '').trim();
+}
+
+function syncHouseLibraryComposerControls() {
+  const titleInput = el('houseLibraryNoteTitleInput');
+  const bodyInput = el('houseLibraryNoteBodyInput');
+  const saveBtn = el('houseLibrarySaveNoteBtn');
+  const cancelBtn = el('houseLibraryCancelEditBtn');
+  const statusNode = el('houseLibraryComposerStatus');
+  if (!titleInput || !bodyInput || !saveBtn || !cancelBtn || !statusNode) return;
+  if (titleInput.value !== String(houseSurfaceState.library.draftTitle || '')) {
+    titleInput.value = String(houseSurfaceState.library.draftTitle || '');
+  }
+  if (bodyInput.value !== String(houseSurfaceState.library.draftBody || '')) {
+    bodyInput.value = String(houseSurfaceState.library.draftBody || '');
+  }
+  const isEditing = houseSurfaceState.library.composerMode === 'edit' && !!String(houseSurfaceState.library.editingItemId || '').trim();
+  saveBtn.textContent = isEditing ? 'Update Note' : 'Save Note to Library';
+  cancelBtn.disabled = !isEditing && !String(houseSurfaceState.library.draftTitle || '').trim() && !String(houseSurfaceState.library.draftBody || '').trim();
+  statusNode.textContent = isEditing
+    ? 'Editing a local Library note.'
+    : 'Writing a new local note.';
+}
+
+function readHouseLibraryComposerDraft() {
+  const titleInput = el('houseLibraryNoteTitleInput');
+  const bodyInput = el('houseLibraryNoteBodyInput');
+  houseSurfaceState.library.draftTitle = String(titleInput?.value || '').trim();
+  houseSurfaceState.library.draftBody = String(bodyInput?.value || '');
+  return {
+    title: houseSurfaceState.library.draftTitle,
+    body: houseSurfaceState.library.draftBody,
+  };
 }
 
 function getHouseLibraryScopeSetById(scopeSetId = '') {
@@ -1894,6 +1962,89 @@ function getSelectedHouseLibraryItem() {
   return items.find((item) => String(item?.libraryItemId || '').trim() === selectedItemId) || items[0] || null;
 }
 
+function buildHouseLibrarySummary(text = '', fallback = 'Saved in your Library.') {
+  const compact = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!compact) return String(fallback || 'Saved in your Library.').trim() || 'Saved in your Library.';
+  return compact.length > 140 ? `${compact.slice(0, 137).trimEnd()}...` : compact;
+}
+
+async function saveHouseLibraryNote() {
+  const draft = readHouseLibraryComposerDraft();
+  const title = String(draft?.title || '').trim();
+  const body = String(draft?.body || '');
+  if (!title) {
+    throw new Error('LIBRARY_NOTE_TITLE_REQUIRED');
+  }
+  if (!String(body || '').trim()) {
+    throw new Error('LIBRARY_NOTE_BODY_REQUIRED');
+  }
+  const isEditing = houseSurfaceState.library.composerMode === 'edit' && !!String(houseSurfaceState.library.editingItemId || '').trim();
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const summary = buildHouseLibrarySummary(body, title);
+  if (isEditing) {
+    const libraryItemId = String(houseSurfaceState.library.editingItemId || '').trim();
+    setHouseLibraryActionStatus(`Updating ${title}...`);
+    setHouseSurfaceStatus(`Updating ${title}...`);
+    const response = await apiWithRetry(`/api/platform/library/items/${encodeURIComponent(libraryItemId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        title,
+        summary,
+        contentText: body,
+      }),
+    }, {
+      retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+    });
+    const data = response?.data || response || {};
+    const updatedItemId = String(data?.item?.libraryItemId || libraryItemId).trim();
+    await loadHouseLibrarySurface({ skipContext: true });
+    if (updatedItemId) {
+      houseSurfaceState.library.selectedItemId = updatedItemId;
+      loadHouseLibraryDraftFromSelectedItem(
+        houseSurfaceState.library.items.find((entry) => String(entry?.libraryItemId || '') === updatedItemId) || null
+      );
+    }
+    renderHouseLibrarySurface();
+    const successText = `Updated ${title} in your Library.`;
+    setHouseLibraryActionStatus(successText);
+    setHouseSurfaceStatus(successText);
+    return data;
+  }
+  const idempotencyKey = makeHouseIdempotencyKey('house_library_note');
+  setHouseLibraryActionStatus(`Saving ${title} to your Library...`);
+  setHouseSurfaceStatus(`Saving ${title} to your Library...`);
+  const response = await apiWithRetry('/api/platform/library/items', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      itemType: 'library_note',
+      title,
+      summary,
+      contentText: body,
+      sourceKind: 'user_note',
+      sourceRef: `user_note:${houseId || 'house'}:${teamId || 'team'}:${idempotencyKey}`,
+      visibility: 'house_private',
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const savedItemId = String(data?.item?.libraryItemId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (savedItemId) {
+    houseSurfaceState.library.selectedItemId = savedItemId;
+  }
+  resetHouseLibraryComposer();
+  renderHouseLibrarySurface();
+  const successText = `Saved ${title} to your Library.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return data;
+}
+
 function syncHouseLibraryPublishControls(selectedItem = null) {
   const approvalInput = el('houseLibraryApprovalInput');
   const publishBtn = el('houseLibraryPublishBtn');
@@ -1960,6 +2111,10 @@ function renderHouseLibrarySurface() {
   const detailNode = el('houseLibraryDetail');
   const emptyNode = el('houseLibraryEmpty');
   const selectedNode = el('houseLibrarySelected');
+  const composerTitleInput = el('houseLibraryNoteTitleInput');
+  const composerBodyInput = el('houseLibraryNoteBodyInput');
+  const composerSaveBtn = el('houseLibrarySaveNoteBtn');
+  const composerCancelBtn = el('houseLibraryCancelEditBtn');
   const scopeSetsNode = el('houseLibraryScopeSets');
   const scopeEmptyNode = el('houseLibraryScopeEmpty');
   const actionsNode = el('houseLibraryActions');
@@ -1972,6 +2127,10 @@ function renderHouseLibrarySurface() {
     || !detailNode
     || !emptyNode
     || !selectedNode
+    || !composerTitleInput
+    || !composerBodyInput
+    || !composerSaveBtn
+    || !composerCancelBtn
     || !scopeSetsNode
     || !scopeEmptyNode
     || !actionsNode
@@ -1996,6 +2155,7 @@ function renderHouseLibrarySurface() {
     houseSurfaceState.library.actionStatusText,
     houseSurfaceState.library.actionStatusError
   );
+  syncHouseLibraryComposerControls();
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
   selectedNode.textContent = selectedItems.length
@@ -2043,6 +2203,9 @@ function renderHouseLibrarySurface() {
   houseSurfaceState.library.selectedItemId = selectedItemId;
   const selectedItem = getSelectedHouseLibraryItem() || items[0];
   const selectedItemStateParts = [];
+  if (String(selectedItem?.sourceKind || '') === 'user_note') {
+    selectedItemStateParts.push('Local note');
+  }
   if (String(selectedItem?.importedState || '') === 'imported_artifact') {
     selectedItemStateParts.push('Imported from Registry');
   }
@@ -2078,6 +2241,9 @@ function renderHouseLibrarySurface() {
   detailNode.textContent = [
     String(selectedItem?.title || selectedItem?.libraryItemId || ''),
     String(selectedItem?.itemType || ''),
+    Array.isArray(selectedItem?.shelfTitles) && selectedItem.shelfTitles.length
+      ? `Shelves: ${selectedItem.shelfTitles.join(', ')}`
+      : '',
     `${String(selectedItem?.sourceKind || '')} ${String(selectedItem?.sourceRef || '')}`.trim(),
     String(selectedItem?.visibility || ''),
     String(selectedItem?.registryId || ''),
@@ -2121,6 +2287,18 @@ function renderHouseLibrarySurface() {
     }
   });
   actionsNode.appendChild(removeBtn);
+
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'btn';
+  editBtn.dataset.actionId = 'edit_note';
+  editBtn.textContent = selectedItem?.readOnly === true ? 'This item is read only' : 'Edit in Librarian Desk';
+  editBtn.disabled = selectedItem?.readOnly === true;
+  editBtn.addEventListener('click', () => {
+    loadHouseLibraryDraftFromSelectedItem(selectedItem);
+    renderHouseLibrarySurface();
+  });
+  actionsNode.appendChild(editBtn);
 
   const workshopBtn = document.createElement('button');
   workshopBtn.type = 'button';
@@ -2735,11 +2913,13 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
   } catch (err) {
     houseSurfaceState.library.loaded = true;
     houseSurfaceState.library.items = [];
+    houseSurfaceState.library.shelves = [];
     houseSurfaceState.library.scopeSets = [];
     houseSurfaceState.library.selectedItemId = '';
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    resetHouseLibraryComposer();
     await syncHouseLibraryScopeContextToWorker({
       activeScopeSetId: '',
       selectedItemIds: [],
@@ -5435,6 +5615,62 @@ function bindTownDistrictControls() {
       const houseLibraryImportBtn = el('houseLibraryImportBtn');
       if (houseLibraryImportBtn && !houseLibraryImportBtn.disabled) {
         houseLibraryImportBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryNoteTitleInput = el('houseLibraryNoteTitleInput');
+  if (houseLibraryNoteTitleInput) {
+    houseLibraryNoteTitleInput.oninput = () => {
+      readHouseLibraryComposerDraft();
+      syncHouseLibraryComposerControls();
+    };
+    houseLibraryNoteTitleInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryNoteBodyInput = el('houseLibraryNoteBodyInput');
+      if (houseLibraryNoteBodyInput) {
+        houseLibraryNoteBodyInput.focus();
+      }
+    };
+  }
+
+  const houseLibraryNoteBodyInput = el('houseLibraryNoteBodyInput');
+  if (houseLibraryNoteBodyInput) {
+    houseLibraryNoteBodyInput.oninput = () => {
+      readHouseLibraryComposerDraft();
+      syncHouseLibraryComposerControls();
+    };
+    houseLibraryNoteBodyInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey || !(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      const houseLibrarySaveNoteBtn = el('houseLibrarySaveNoteBtn');
+      if (houseLibrarySaveNoteBtn && !houseLibrarySaveNoteBtn.disabled) {
+        houseLibrarySaveNoteBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryCancelEditBtn = el('houseLibraryCancelEditBtn');
+  if (houseLibraryCancelEditBtn) {
+    houseLibraryCancelEditBtn.onclick = () => {
+      resetHouseLibraryComposer();
+      renderHouseLibrarySurface();
+    };
+  }
+
+  const houseLibrarySaveNoteBtn = el('houseLibrarySaveNoteBtn');
+  if (houseLibrarySaveNoteBtn) {
+    houseLibrarySaveNoteBtn.onclick = async () => {
+      houseLibrarySaveNoteBtn.disabled = true;
+      try {
+        await saveHouseLibraryNote();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_NOTE_SAVE_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
       }
     };
   }

@@ -1,13 +1,17 @@
 function registerPlatformReadRoutes(app, deps) {
   const {
+    addLibraryShelfItem,
     express,
     buildDefaultCompiledSkillPack,
     buildHouseLibraryCompiledSkillPack,
     buildPlatformContextResponse,
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
+    createConversationArtifact,
     createLibraryItem,
+    createLibraryItemRevision,
     createLibraryLink,
+    createLibraryShelf,
     createLibraryPublication,
     createSealedContextViolation,
     createScopeSet,
@@ -15,17 +19,25 @@ function registerPlatformReadRoutes(app, deps) {
     createTrainerResult,
     getConfigVersion,
     getConfigVersionByIdempotency,
+    getConversationArtifactByIdempotency,
     getLibraryItemById,
     getLibraryItemByIdempotency,
+    getLibraryShelfById,
+    getLibraryShelfByIdempotency,
     getLibraryPublicationByIdempotency,
     getRegistryEntityById,
     getSealedContextById,
     getScopeSetById,
     getScopeSetByIdempotency,
     getUnifiedPlatformTestFixture,
+    listConversationArtifacts,
     getTeamConfigBinding,
     listLibraryItems,
+    listLibraryItemRevisions,
     listLibraryLinks,
+    listLibraryPublications,
+    listLibraryShelfItems,
+    listLibraryShelves,
     listScopeSetItems,
     listScopeSets,
     listTrackDefinitions,
@@ -44,6 +56,7 @@ function registerPlatformReadRoutes(app, deps) {
     normalizePortalIdempotencyKey,
     nowIso,
     randomHex,
+    removeLibraryShelfItem,
     replaceScopeSetItems,
     replaceConfigComponentVersions,
     resolveApprovedLibraryPublicationApproval,
@@ -56,6 +69,7 @@ function registerPlatformReadRoutes(app, deps) {
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
+    updateLibraryItem,
     updateTrainerJobStatus,
     updateTrainerResultLink,
     upsertConfigVersion,
@@ -131,7 +145,80 @@ function registerPlatformReadRoutes(app, deps) {
     return String(sealedContext.status || '').trim() !== 'released';
   }
 
+  function buildLibrarySummary(contentText = '', fallback = 'Saved in your Library.') {
+    const compact = String(contentText || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!compact) return String(fallback || 'Saved in your Library.').trim() || 'Saved in your Library.';
+    return compact.length > 140 ? `${compact.slice(0, 137).trimEnd()}...` : compact;
+  }
+
+  function buildDefaultLibraryLinks({
+    sourceKind = '',
+    sourceRef = '',
+    links = [],
+  } = {}) {
+    if (Array.isArray(links) && links.length) {
+      return links;
+    }
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    const normalizedSourceRef = String(sourceRef || '').trim();
+    if (!normalizedSourceKind || !normalizedSourceRef) return [];
+    if (normalizedSourceKind === 'user_note') {
+      return [];
+    }
+    return [{
+      linkKind: normalizedSourceKind === 'workspace_file'
+        ? 'derived_from_workshop_config'
+        : normalizedSourceKind === 'trainer_result'
+          ? 'derived_from_trainer_result'
+          : normalizedSourceKind === 'inbox_message'
+            ? 'replies_to_inbox_message'
+            : normalizedSourceKind === 'conversation_artifact'
+              ? 'derived_from_conversation'
+              : 'derived_from_trace',
+      sourceKind: normalizedSourceKind,
+      sourceRef: normalizedSourceRef,
+    }];
+  }
+
+  function createLibraryItemRevisionSnapshot({
+    item = null,
+    createdBy = 'human',
+    metadata = null,
+    now = nowIso(),
+  } = {}) {
+    if (!item || typeof item !== 'object') return null;
+    const revisions = listLibraryItemRevisions({
+      houseId: item.houseId,
+      teamId: item.teamId,
+      libraryItemId: item.libraryItemId,
+    });
+    return createLibraryItemRevision({
+      libraryItemRevisionId: `lrev_${randomHex(12)}`,
+      libraryItemId: item.libraryItemId,
+      houseId: item.houseId,
+      teamId: item.teamId,
+      revisionIndex: revisions.length + 1,
+      title: item.title,
+      summary: item.summary,
+      contentText: item.contentText,
+      contentHash: item.contentHash,
+      metadata,
+      createdBy,
+      createdAt: now,
+    });
+  }
+
   function projectLibraryItemForRead(item) {
+    const publications = listLibraryPublications({
+      houseId: item?.houseId,
+      teamId: item?.teamId,
+    }).filter((entry) => String(entry?.libraryItemId || '').trim() === String(item?.libraryItemId || '').trim());
+    const shelfMembership = listLibraryShelves({
+      houseId: item?.houseId,
+      teamId: item?.teamId,
+    }).filter((shelf) => listLibraryShelfItems(shelf.libraryShelfId).some((entry) => entry.libraryItemId === item?.libraryItemId));
     const projected = {
       libraryItemId: item?.libraryItemId,
       itemType: item?.itemType,
@@ -147,6 +234,10 @@ function registerPlatformReadRoutes(app, deps) {
       contentHash: item?.contentHash,
       readOnly: item?.readOnly,
       importedState: item?.importedState,
+      shelfIds: shelfMembership.map((entry) => entry.libraryShelfId),
+      shelfTitles: shelfMembership.map((entry) => entry.title),
+      publicationCount: publications.length,
+      published: publications.length > 0,
       createdAt: item?.createdAt,
       updatedAt: item?.updatedAt,
     };
@@ -191,9 +282,21 @@ function registerPlatformReadRoutes(app, deps) {
       scopeSets: listScopeSets({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((entry) => ({
         scopeSetId: entry.scopeSetId,
         title: entry.title,
+        scopeKind: String(entry?.metadata?.scopeKind || 'reading_table').trim() || 'reading_table',
+        sourceShelfId: typeof entry?.metadata?.sourceShelfId === 'string' && entry.metadata.sourceShelfId.trim()
+          ? entry.metadata.sourceShelfId.trim()
+          : null,
         createdAt: entry.createdAt,
         updatedAt: entry.updatedAt,
         orderedItemIds: listScopeSetItems(entry.scopeSetId).map((item) => item.libraryItemId),
+      })),
+      shelves: listLibraryShelves({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((shelf) => ({
+        libraryShelfId: shelf.libraryShelfId,
+        title: shelf.title,
+        description: shelf.description,
+        createdAt: shelf.createdAt,
+        updatedAt: shelf.updatedAt,
+        orderedItemIds: listLibraryShelfItems(shelf.libraryShelfId).map((item) => item.libraryItemId),
       })),
     };
   }
@@ -217,6 +320,7 @@ function registerPlatformReadRoutes(app, deps) {
         selectedItemIds: [],
         selectedItems: [],
         scopeSets: [],
+        shelves: [],
         items: [],
         emptyStateText: 'No curated Library items yet.',
       };
@@ -235,6 +339,7 @@ function registerPlatformReadRoutes(app, deps) {
       selectedItemIds: selection.selectedItemIds,
       selectedItems: selection.selectedItems,
       scopeSets: selection.scopeSets,
+      shelves: selection.shelves,
       items: selection.items,
       emptyStateText: 'No curated Library items yet.',
     };
@@ -452,7 +557,7 @@ function registerPlatformReadRoutes(app, deps) {
     readOnly = false,
     metadata = null,
     links = [],
-  } = {}) {
+    } = {}) {
     const existing = getLibraryItemByIdempotency({
       houseId,
       teamId,
@@ -520,13 +625,11 @@ function registerPlatformReadRoutes(app, deps) {
       }
       throw err;
     }
-    const normalizedLinks = Array.isArray(links) && links.length
-      ? links
-      : [{
-        linkKind: sourceKind === 'trainer_result' ? 'derived_from_trainer_result' : 'derived_from_trace',
-        sourceKind,
-        sourceRef,
-      }];
+    const normalizedLinks = buildDefaultLibraryLinks({
+      sourceKind,
+      sourceRef,
+      links,
+    });
     normalizedLinks.forEach((entry) => {
       const linkKind = typeof entry?.linkKind === 'string' ? entry.linkKind.trim() : '';
       const linkSourceKind = typeof entry?.sourceKind === 'string' ? entry.sourceKind.trim() : sourceKind;
@@ -543,10 +646,21 @@ function registerPlatformReadRoutes(app, deps) {
         nowIso: createdAt,
       });
     });
+    const revision = item ? createLibraryItemRevisionSnapshot({
+      item,
+      createdBy: 'human',
+      metadata: {
+        sourceKind,
+        sourceRef,
+        origin: metadata && typeof metadata === 'object' ? metadata.createdFrom || null : null,
+      },
+      now: createdAt,
+    }) : null;
     return {
       status: 201,
       item: item || getLibraryItemById(libraryItemId),
       links: listLibraryLinks({ libraryItemId }),
+      revision,
     };
   }
 
@@ -1117,104 +1231,139 @@ function registerPlatformReadRoutes(app, deps) {
     const sourceRef = typeof req.body?.sourceRef === 'string' ? req.body.sourceRef.trim() : '';
     const visibility = typeof req.body?.visibility === 'string' ? req.body.visibility.trim() : 'house_private';
     const links = Array.isArray(req.body?.links) ? req.body.links : [];
-    if (!sourceKind || !sourceRef) {
+    const normalizedSourceRef = sourceRef || (sourceKind === 'user_note' ? `user_note:${idempotencyKey}` : '');
+    const effectiveSummary = summary || buildLibrarySummary(contentText, 'Saved in your Library.');
+    if (!sourceKind || !normalizedSourceRef) {
       return sendPortalApiError(res, 400, 'LIBRARY_SOURCE_REQUIRED', 'sourceKind and sourceRef are required.', { requestId });
     }
-    if (!itemType || !title || !summary) {
+    if (!itemType || !title || !effectiveSummary) {
       return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'itemType, title, and summary are required.', { requestId });
     }
-    const existing = getLibraryItemByIdempotency({
+    const persisted = persistLibraryItemRecord({
       houseId: context.houseId,
       teamId: context.activeTeamId,
       idempotencyKey,
-    });
-    if (existing) {
-      return sendPortalApiSuccess(res, {
-        item: existing,
-        links: listLibraryLinks({ libraryItemId: existing.libraryItemId }),
-      }, { requestId, status: 200 });
-    }
-    const contentHash = sha256PrefixedHex(stableJsonStringify({
       itemType,
+      title,
+      summary: effectiveSummary,
+      contentText,
+      contentRef,
+      sourceKind,
+      sourceRef: normalizedSourceRef,
+      visibility,
+      metadata: {
+        createdFrom: 'portal.house.library',
+      },
+      links,
+    });
+    return sendPortalApiSuccess(res, {
+      item: persisted.item,
+      links: persisted.links,
+      revision: persisted.revision || null,
+    }, { requestId, status: persisted.status });
+  });
+
+  app.get('/api/platform/library/items/:libraryItemId/revisions', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const libraryItemId = typeof req.params?.libraryItemId === 'string' ? req.params.libraryItemId.trim() : '';
+    if (!libraryItemId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ITEM_REQUIRED', 'libraryItemId is required.', { requestId });
+    }
+    const item = getLibraryItemById(libraryItemId);
+    if (!item || item.houseId !== context.houseId || item.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'The requested Library item could not be found for this House team.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      item: projectLibraryItemForRead(item),
+      revisions: listLibraryItemRevisions({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryItemId,
+      }),
+    }, { requestId });
+  });
+
+  app.patch('/api/platform/library/items/:libraryItemId', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const libraryItemId = typeof req.params?.libraryItemId === 'string' ? req.params.libraryItemId.trim() : '';
+    if (!libraryItemId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ITEM_REQUIRED', 'libraryItemId is required.', { requestId });
+    }
+    const item = getLibraryItemById(libraryItemId);
+    if (!item || item.houseId !== context.houseId || item.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'The requested Library item could not be found for this House team.', { requestId });
+    }
+    if (item.readOnly === true || String(item.importedState || '').trim() === 'imported_artifact') {
+      return sendPortalApiError(res, 409, 'LIBRARY_ITEM_READ_ONLY', 'This Library item is imported and read only.', {
+        requestId,
+        details: {
+          libraryItemId,
+          importedState: item.importedState,
+          readOnly: item.readOnly === true,
+        },
+      });
+    }
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const contentText = typeof req.body?.contentText === 'string' ? req.body.contentText : '';
+    const summary = typeof req.body?.summary === 'string' ? req.body.summary.trim() : buildLibrarySummary(contentText, item.summary || 'Saved in your Library.');
+    if (!title || !summary) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'title and summary are required.', { requestId });
+    }
+    const contentRef = typeof req.body?.contentRef === 'string' ? req.body.contentRef.trim() : (item.contentRef || '');
+    const contentHash = sha256PrefixedHex(stableJsonStringify({
+      itemType: item.itemType,
       title,
       summary,
       contentText,
       contentRef,
-      sourceKind,
-      sourceRef,
-      visibility,
-      links: Array.isArray(links) ? links : [],
+      sourceKind: item.sourceKind,
+      sourceRef: item.sourceRef,
+      visibility: item.visibility,
+      links: listLibraryLinks({ libraryItemId }),
     }));
-    const libraryItemId = `lib_${randomHex(12)}`;
-    const createdAt = nowIso();
-    let item;
-    try {
-      item = createLibraryItem({
-        libraryItemId,
-        houseId: context.houseId,
-        teamId: context.activeTeamId,
-        itemType,
-        title,
-        summary,
-        contentText,
-        contentRef,
-        sourceKind,
-        sourceRef,
-        visibility,
-        contentHash,
-        idempotencyKey,
-        metadata: {
-          createdFrom: 'portal.house.library',
-        },
-        nowIso: createdAt,
-      });
-    } catch (err) {
-      const replayed = getLibraryItemByIdempotency({
-        houseId: context.houseId,
-        teamId: context.activeTeamId,
-        idempotencyKey,
-      });
-      if (replayed) {
-        return sendPortalApiSuccess(res, {
-          item: replayed,
-          links: listLibraryLinks({ libraryItemId: replayed.libraryItemId }),
-        }, { requestId, status: 200 });
-      }
-      throw err;
-    }
-    const normalizedLinks = links.length
-      ? links
-      : [{
-        linkKind: sourceKind === 'workspace_file'
-          ? 'derived_from_workshop_config'
-          : sourceKind === 'trainer_result'
-            ? 'derived_from_trainer_result'
-            : sourceKind === 'inbox_message'
-              ? 'replies_to_inbox_message'
-              : 'derived_from_trace',
-        sourceKind,
-        sourceRef,
-      }];
-    normalizedLinks.forEach((entry) => {
-      const linkKind = typeof entry?.linkKind === 'string' ? entry.linkKind.trim() : '';
-      const linkSourceKind = typeof entry?.sourceKind === 'string' ? entry.sourceKind.trim() : sourceKind;
-      const linkSourceRef = typeof entry?.sourceRef === 'string' ? entry.sourceRef.trim() : sourceRef;
-      if (!linkKind || !linkSourceKind || !linkSourceRef) return;
-      createLibraryLink({
-        libraryLinkId: `link_${randomHex(12)}`,
-        libraryItemId,
-        linkKind,
-        sourceKind: linkSourceKind,
-        sourceRef: linkSourceRef,
-        targetLibraryItemId: typeof entry?.targetLibraryItemId === 'string' ? entry.targetLibraryItemId.trim() : '',
-        metadata: entry?.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
-        nowIso: createdAt,
-      });
+    const updatedAt = nowIso();
+    const updated = updateLibraryItem({
+      libraryItemId,
+      title,
+      summary,
+      contentText,
+      contentRef,
+      contentHash,
+      metadata: {
+        updatedFrom: 'portal.house.library',
+      },
+      nowIso: updatedAt,
+    });
+    const revision = createLibraryItemRevisionSnapshot({
+      item: updated,
+      createdBy: 'human',
+      metadata: {
+        sourceKind: updated?.sourceKind || item.sourceKind,
+        sourceRef: updated?.sourceRef || item.sourceRef,
+        origin: 'portal.house.library.edit',
+      },
+      now: updatedAt,
     });
     return sendPortalApiSuccess(res, {
-      item: getLibraryItemById(libraryItemId),
+      item: projectLibraryItemForRead(updated),
       links: listLibraryLinks({ libraryItemId }),
-    }, { requestId, status: 201 });
+      revision,
+      revisions: listLibraryItemRevisions({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryItemId,
+      }),
+    }, { requestId });
   });
 
   app.post('/api/platform/library/promotions', express.json({ limit: '32kb' }), (req, res) => {
@@ -1438,6 +1587,248 @@ function registerPlatformReadRoutes(app, deps) {
     }, { requestId, status: persisted.status });
   });
 
+  app.post('/api/platform/library/conversation-artifacts', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before saving a conversation capture.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before saving a conversation capture.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to save a conversation capture.', { requestId });
+    }
+    const existingArtifact = getConversationArtifactByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingArtifact) {
+      const existingItem = listLibraryItems({ houseId: context.houseId, teamId: context.activeTeamId })
+        .find((entry) => String(entry?.sourceKind || '') === 'conversation_artifact' && String(entry?.sourceRef || '') === existingArtifact.conversationArtifactId) || null;
+      return sendPortalApiSuccess(res, {
+        artifact: existingArtifact,
+        item: existingItem ? projectLibraryItemForRead(existingItem) : null,
+        links: existingItem ? listLibraryLinks({ libraryItemId: existingItem.libraryItemId }) : [],
+      }, { requestId, status: 200 });
+    }
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const messages = Array.isArray(req.body?.messages)
+      ? req.body.messages.filter((entry) => entry && typeof entry === 'object')
+      : [];
+    const selectedMessageIds = normalizeLibraryItemIds(req.body?.messageIds || messages.map((entry) => entry.messageId));
+    const selectedMessages = selectedMessageIds.map((messageId) => {
+      return messages.find((entry) => String(entry?.messageId || '').trim() === messageId) || null;
+    }).filter(Boolean).map((entry) => ({
+      messageId: String(entry?.messageId || '').trim(),
+      role: String(entry?.role || 'note').trim() || 'note',
+      text: String(entry?.text || '').trim(),
+    })).filter((entry) => entry.messageId && entry.text);
+    if (!title || !selectedMessages.length) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'title and at least one selected message are required.', { requestId });
+    }
+    const conversationArtifactId = `convart_${randomHex(12)}`;
+    const transcriptText = selectedMessages.map((entry) => `${entry.role}: ${entry.text}`).join('\n');
+    const artifact = createConversationArtifact({
+      conversationArtifactId,
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      title,
+      transcriptText,
+      messageIds: selectedMessages.map((entry) => entry.messageId),
+      messages: selectedMessages,
+      sourceScopeSetId: typeof session.activeScopeSetId === 'string' && session.activeScopeSetId.trim()
+        ? session.activeScopeSetId.trim()
+        : '',
+      createdBy: 'human',
+      metadata: {
+        createdFrom: 'portal.house.library.capture',
+      },
+      idempotencyKey,
+      nowIso: nowIso(),
+    });
+    const persisted = persistLibraryItemRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey: `${idempotencyKey}_library_item`,
+      itemType: 'conversation_note',
+      title,
+      summary: buildLibrarySummary(transcriptText, 'Conversation capture'),
+      contentText: transcriptText,
+      contentRef: artifact.conversationArtifactId,
+      sourceKind: 'conversation_artifact',
+      sourceRef: artifact.conversationArtifactId,
+      visibility: 'house_private',
+      metadata: {
+        createdFrom: 'portal.house.library.capture',
+        conversationArtifactId: artifact.conversationArtifactId,
+      },
+      links: [{
+        linkKind: 'derived_from_conversation',
+        sourceKind: 'conversation_artifact',
+        sourceRef: artifact.conversationArtifactId,
+        metadata: {
+          messageIds: selectedMessages.map((entry) => entry.messageId),
+        },
+      }],
+    });
+    return sendPortalApiSuccess(res, {
+      artifact,
+      item: persisted.item,
+      links: persisted.links,
+      revision: persisted.revision || null,
+    }, { requestId, status: 201 });
+  });
+
+  app.get('/api/platform/library/shelves', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    return sendPortalApiSuccess(res, {
+      shelves: listLibraryShelves({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+      }).map((shelf) => ({
+        ...shelf,
+        orderedItemIds: listLibraryShelfItems(shelf.libraryShelfId).map((entry) => entry.libraryItemId),
+      })),
+    }, { requestId });
+  });
+
+  app.post('/api/platform/library/shelves', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before creating a shelf.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before creating a shelf.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to create a shelf.', { requestId });
+    }
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const description = typeof req.body?.description === 'string' ? req.body.description.trim() : '';
+    const itemIds = normalizeLibraryItemIds(req.body?.itemIds);
+    if (!title) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'title is required.', { requestId });
+    }
+    let shelf = getLibraryShelfByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (!shelf) {
+      shelf = createLibraryShelf({
+        libraryShelfId: `shelf_${randomHex(12)}`,
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        title,
+        description,
+        createdBy: 'human',
+        metadata: {
+          createdFrom: 'portal.house.library',
+        },
+        idempotencyKey,
+        nowIso: nowIso(),
+      });
+    }
+    const existingItems = new Set(listLibraryShelfItems(shelf.libraryShelfId).map((entry) => entry.libraryItemId));
+    itemIds.forEach((libraryItemId, index) => {
+      addLibraryShelfItem({
+        libraryShelfItemId: `shelfitem_${randomHex(12)}`,
+        libraryShelfId: shelf.libraryShelfId,
+        libraryItemId,
+        orderIndex: existingItems.size + index,
+        metadata: {
+          source: 'portal.house.library',
+        },
+        nowIso: nowIso(),
+      });
+    });
+    return sendPortalApiSuccess(res, {
+      shelf: {
+        ...getLibraryShelfById(shelf.libraryShelfId),
+        orderedItemIds: listLibraryShelfItems(shelf.libraryShelfId).map((entry) => entry.libraryItemId),
+      },
+    }, { requestId, status: 201 });
+  });
+
+  app.post('/api/platform/library/shelves/:libraryShelfId/items', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const libraryShelfId = typeof req.params?.libraryShelfId === 'string' ? req.params.libraryShelfId.trim() : '';
+    const shelf = getLibraryShelfById(libraryShelfId);
+    if (!shelf || shelf.houseId !== context.houseId || shelf.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_SHELF_NOT_FOUND', 'The requested shelf could not be found for this House team.', { requestId });
+    }
+    const itemIds = normalizeLibraryItemIds(req.body?.itemIds);
+    if (!itemIds.length) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ITEM_REQUIRED', 'At least one libraryItemId is required.', { requestId });
+    }
+    const existingRows = listLibraryShelfItems(libraryShelfId);
+    const existingItemIds = new Set(existingRows.map((entry) => entry.libraryItemId));
+    itemIds.forEach((libraryItemId, index) => {
+      addLibraryShelfItem({
+        libraryShelfItemId: `shelfitem_${randomHex(12)}`,
+        libraryShelfId,
+        libraryItemId,
+        orderIndex: existingRows.length + index,
+        metadata: {
+          source: 'portal.house.library',
+        },
+        nowIso: nowIso(),
+      });
+      existingItemIds.add(libraryItemId);
+    });
+    return sendPortalApiSuccess(res, {
+      shelf: {
+        ...getLibraryShelfById(libraryShelfId),
+        orderedItemIds: listLibraryShelfItems(libraryShelfId).map((entry) => entry.libraryItemId),
+      },
+    }, { requestId });
+  });
+
+  app.delete('/api/platform/library/shelves/:libraryShelfId/items/:libraryItemId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const libraryShelfId = typeof req.params?.libraryShelfId === 'string' ? req.params.libraryShelfId.trim() : '';
+    const libraryItemId = typeof req.params?.libraryItemId === 'string' ? req.params.libraryItemId.trim() : '';
+    const shelf = getLibraryShelfById(libraryShelfId);
+    if (!shelf || shelf.houseId !== context.houseId || shelf.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_SHELF_NOT_FOUND', 'The requested shelf could not be found for this House team.', { requestId });
+    }
+    removeLibraryShelfItem({ libraryShelfId, libraryItemId });
+    return sendPortalApiSuccess(res, {
+      shelf: {
+        ...getLibraryShelfById(libraryShelfId),
+        orderedItemIds: listLibraryShelfItems(libraryShelfId).map((entry) => entry.libraryItemId),
+      },
+    }, { requestId });
+  });
+
   app.get('/api/platform/library/scope', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -1500,6 +1891,8 @@ function registerPlatformReadRoutes(app, deps) {
     if (scopeSet && (scopeSet.houseId !== context.houseId || scopeSet.teamId !== context.activeTeamId)) {
       scopeSet = null;
     }
+    const scopeKind = typeof req.body?.scopeKind === 'string' ? req.body.scopeKind.trim() : 'reading_table';
+    const sourceShelfId = typeof req.body?.sourceShelfId === 'string' ? req.body.sourceShelfId.trim() : '';
     if (!scopeSet) {
       scopeSet = createScopeSet({
         scopeSetId: requestedScopeSetId || `scope_${randomHex(12)}`,
@@ -1512,6 +1905,8 @@ function registerPlatformReadRoutes(app, deps) {
         idempotencyKey: typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '',
         metadata: {
           source: 'portal.house.library.scope',
+          scopeKind: scopeKind || 'reading_table',
+          sourceShelfId: sourceShelfId || null,
         },
         nowIso: nowIso(),
       });
