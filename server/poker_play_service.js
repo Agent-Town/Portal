@@ -40,6 +40,11 @@ function normalizePokerPlayDisplayName(value, fallback = 'Table Player') {
   return normalizeTrimmedString(value, fallback).slice(0, 80);
 }
 
+function normalizeIsoString(value) {
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : '';
+}
+
 function normalizePokerPlayMessageBody(value) {
   const body = normalizeTrimmedString(value);
   return body ? body.slice(0, 800) : '';
@@ -189,6 +194,12 @@ function normalizeCreateTableConfig(input = {}) {
   const seriesTitle = tableType === 'tournament'
     ? normalizeTrimmedString(input?.seriesTitle, title).slice(0, 96)
     : '';
+  const scheduledStartAt = tableType === 'tournament'
+    ? normalizeIsoString(input?.scheduledStartAt)
+    : '';
+  const reentryLimit = tableType === 'tournament'
+    ? Math.max(0, normalizeOilAmount(input?.reentryLimit, 0))
+    : 0;
   return {
     tableType,
     smallBlindOil,
@@ -206,6 +217,8 @@ function normalizeCreateTableConfig(input = {}) {
     title,
     seriesId,
     seriesTitle,
+    scheduledStartAt,
+    reentryLimit,
   };
 }
 
@@ -253,6 +266,7 @@ function buildMatchKey(config) {
     base.push(`hbl${Math.max(1, normalizeOilAmount(config?.handsPerBlindLevel, 2))}`);
     base.push(`bl${blindLevels.map((level) => `${level.smallBlindOil}-${level.bigBlindOil}`).join('_')}`);
     base.push(`lr${Math.max(0, normalizeOilAmount(config?.lateRegistrationHands, 0))}`);
+    base.push(`re${Math.max(0, normalizeOilAmount(config?.reentryLimit, 0))}`);
   }
   base.push(`pt${Math.max(10, normalizeOilAmount(config?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS))}`);
   base.push(`rg${Math.max(10, normalizeOilAmount(config?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS))}`);
@@ -271,6 +285,7 @@ function buildMatchKeyFromTable(table) {
     handsPerBlindLevel: table?.rules?.handsPerBlindLevel,
     blindLevels: table?.rules?.blindLevels,
     lateRegistrationHands: table?.rules?.lateRegistrationHands,
+    reentryLimit: table?.rules?.reentryLimit,
     presenceTimeoutSeconds: table?.rules?.presenceTimeoutSeconds,
     reconnectGraceSeconds: table?.rules?.reconnectGraceSeconds,
   });
@@ -289,6 +304,101 @@ function getTournamentSeriesRef(table) {
     seriesTitle: normalizeTrimmedString(table?.rules?.seriesTitle || table?.summary?.seriesTitle || table?.title, table?.title || 'Tournament Series'),
     matchKey: normalizeTrimmedString(table?.rules?.matchKey || table?.summary?.matchKey || buildMatchKeyFromTable(table)),
   };
+}
+
+function getTournamentEntryCountsByWallet(table) {
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const raw = state.entryCountsByWallet && typeof state.entryCountsByWallet === 'object'
+    ? state.entryCountsByWallet
+    : {};
+  const normalized = {};
+  for (const [walletSubject, count] of Object.entries(raw)) {
+    const key = normalizeTrimmedString(walletSubject);
+    if (!key) continue;
+    normalized[key] = Math.max(0, normalizeOilAmount(count, 0));
+  }
+  return normalized;
+}
+
+function sumTournamentEntryCounts(entryCountsByWallet = {}) {
+  return Object.values(entryCountsByWallet).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+}
+
+function getTournamentTableEntryCount(table, seats) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return 0;
+  }
+  const countedSeats = (Array.isArray(seats) ? seats : [])
+    .filter((seat) => !isTournamentVoidedSeat(seat))
+    .length;
+  const stateCount = Math.max(
+    0,
+    normalizeOilAmount(
+      table?.state?.entryCount,
+      sumTournamentEntryCounts(getTournamentEntryCountsByWallet(table))
+    )
+  );
+  return Math.max(countedSeats, stateCount);
+}
+
+function getTournamentTableWalletEntryCount(table, walletSubject, seats = []) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return 0;
+  }
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  if (!normalizedWallet) return 0;
+  const entryCountsByWallet = getTournamentEntryCountsByWallet(table);
+  if (Object.prototype.hasOwnProperty.call(entryCountsByWallet, normalizedWallet)) {
+    return Math.max(0, Number(entryCountsByWallet[normalizedWallet] || 0));
+  }
+  return (Array.isArray(seats) ? seats : [])
+    .filter((seat) => normalizeTrimmedString(seat?.walletSubject) === normalizedWallet && !isTournamentVoidedSeat(seat))
+    .length;
+}
+
+function incrementTournamentEntryState(table, walletSubject, { reentry = false } = {}) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return cloneJson(table?.state, {});
+  }
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  const entryCountsByWallet = getTournamentEntryCountsByWallet(table);
+  if (normalizedWallet) {
+    entryCountsByWallet[normalizedWallet] = Math.max(0, Number(entryCountsByWallet[normalizedWallet] || 0)) + 1;
+  }
+  return {
+    ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+    entryCount: sumTournamentEntryCounts(entryCountsByWallet),
+    reentryCount: Math.max(0, normalizeOilAmount(table?.state?.reentryCount, 0)) + (reentry ? 1 : 0),
+    entryCountsByWallet,
+  };
+}
+
+function getTournamentSeriesWalletEntryCount(entries, walletSubject) {
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  if (!normalizedWallet) return 0;
+  return (Array.isArray(entries) ? entries : []).reduce((sum, entry) => (
+    sum + getTournamentTableWalletEntryCount(entry?.table, normalizedWallet, entry?.seats)
+  ), 0);
+}
+
+function getTournamentScheduledStartAt(table) {
+  return normalizeIsoString(table?.rules?.scheduledStartAt || table?.state?.scheduledStartAt);
+}
+
+function isScheduledTournamentPending(table, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return false;
+  if (normalizeTrimmedString(table?.status, 'open') !== 'scheduled') return false;
+  const scheduledStartAt = getTournamentScheduledStartAt(table);
+  if (!scheduledStartAt) return false;
+  const scheduledMs = Date.parse(scheduledStartAt);
+  const atMs = Date.parse(String(atIso || ''));
+  if (!Number.isFinite(scheduledMs) || !Number.isFinite(atMs)) return true;
+  if (normalizeTrimmedString(table?.state?.startedByDirectorAt)) return false;
+  return atMs < scheduledMs;
+}
+
+function getTournamentReentryLimit(table) {
+  return Math.max(0, normalizeOilAmount(table?.rules?.reentryLimit, 0));
 }
 
 function getSessionHouseId(session) {
@@ -427,6 +537,13 @@ function resolveTournamentLateRegistration(table, hand) {
     return {
       open: false,
       lateRegistrationHands: 0,
+      remainingHands: 0,
+    };
+  }
+  if (normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt)) {
+    return {
+      open: false,
+      lateRegistrationHands: Math.max(0, normalizeOilAmount(table?.rules?.lateRegistrationHands, 0)),
       remainingHands: 0,
     };
   }
@@ -819,6 +936,7 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const handNumber = Number(hand?.handNumber || 0);
   const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
   const lateRegistration = resolveTournamentLateRegistration(table, hand);
+  const scheduledStartAt = getTournamentScheduledStartAt(table);
   return {
     occupancy: occupiedSeats.length,
     activeSeatCount: activeSeats.length,
@@ -835,6 +953,12 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     handsUntilBlindIncrease: blindProgress.handsUntilIncrease,
     lateRegistrationOpen: lateRegistration.open,
     lateRegistrationRemainingHands: lateRegistration.remainingHands,
+    scheduledStartAt: scheduledStartAt || null,
+    scheduledStartPending: !!scheduledStartAt && isScheduledTournamentPending(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || ''),
+    reentryLimit: getTournamentReentryLimit(table),
+    entryCount: getTournamentTableEntryCount(table, seats),
+    acceptedReentryCount: Math.max(0, normalizeOilAmount(table?.state?.reentryCount, 0)),
+    registrationClosedByDirectorAt: normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt) || null,
   };
 }
 
@@ -849,24 +973,44 @@ function buildDynamicTableSummary(config, matchKey) {
   if (config.tableType === 'tournament') {
     summary.seriesId = normalizeTrimmedString(config?.seriesId);
     summary.seriesTitle = normalizeTrimmedString(config?.seriesTitle, config?.title);
+    summary.scheduledStartAt = normalizeIsoString(config?.scheduledStartAt) || null;
+    summary.reentryLimit = Math.max(0, normalizeOilAmount(config?.reentryLimit, 0));
   }
   return summary;
 }
 
 function buildTournamentEconomics(entries) {
   const seats = getTournamentAllSeats(entries).filter((seat) => !isTournamentVoidedSeat(seat));
-  const uniqueWallets = new Set();
-  for (const seat of seats) {
-    const walletSubject = normalizeTrimmedString(seat?.walletSubject);
-    if (walletSubject) uniqueWallets.add(walletSubject);
+  const entryCountsByWallet = {};
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const tableCounts = getTournamentEntryCountsByWallet(entry?.table);
+    if (Object.keys(tableCounts).length) {
+      for (const [walletSubject, count] of Object.entries(tableCounts)) {
+        entryCountsByWallet[walletSubject] = Math.max(0, Number(entryCountsByWallet[walletSubject] || 0)) + Math.max(0, Number(count || 0));
+      }
+      continue;
+    }
+    for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      if (isTournamentVoidedSeat(seat)) continue;
+      const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+      if (!walletSubject) continue;
+      entryCountsByWallet[walletSubject] = Math.max(0, Number(entryCountsByWallet[walletSubject] || 0)) + 1;
+    }
   }
+  const uniquePlayerCount = Object.keys(entryCountsByWallet).length;
+  const entryCount = Object.values(entryCountsByWallet).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+  const reentryCount = Object.values(entryCountsByWallet).reduce((sum, count) => sum + Math.max(0, Number(count || 0) - 1), 0);
+  const leadTable = (Array.isArray(entries) ? entries : []).find((entry) => entry?.table)?.table || null;
   const payoutPlan = buildTournamentPayoutPlan({
-    entrantCount: uniqueWallets.size,
-    prizePoolOil: computeTournamentPrizePoolOil(seats),
+    entrantCount: entryCount,
+    prizePoolOil: entryCount * Math.max(0, Number(leadTable?.buyInOil || 0)),
   });
   const completed = getActiveSeatRows(seats).length <= 1 && payoutPlan.entrantCount > 1;
   return {
     ...payoutPlan,
+    uniquePlayerCount,
+    entryCount,
+    reentryCount,
     completed,
     standings: completed ? buildCompletedTournamentPlacements(entries) : [],
   };
@@ -933,6 +1077,8 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   let closedTableCount = 0;
   let openSeatCount = 0;
   let lateRegistrationOpen = false;
+  let earliestScheduledStartAt = '';
+  let anyScheduledPending = false;
   let currentUserTableId = '';
   const tableIds = [];
   const navigableEntries = items.filter((entry) => !isSeriesClosedTable(entry?.table));
@@ -950,6 +1096,12 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     openSeatCount += Number(summary?.openSeatCount || 0);
     if (summary?.liveHand) liveTableCount += 1;
     if (summary?.completedAt) completedTableCount += 1;
+    if (summary?.scheduledStartAt && (!earliestScheduledStartAt || compareIsoAsc(summary.scheduledStartAt, earliestScheduledStartAt) < 0)) {
+      earliestScheduledStartAt = summary.scheduledStartAt;
+    }
+    if (summary?.scheduledStartPending) {
+      anyScheduledPending = true;
+    }
     if (summary?.lateRegistrationOpen && Number(summary?.openSeatCount || 0) > 0) {
       lateRegistrationOpen = true;
     }
@@ -966,6 +1118,8 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   let stage = 'seating';
   if (tableCount === 0 && closure.adminClosedTableCount > 0) {
     stage = 'cancelled';
+  } else if (anyScheduledPending && liveTableCount === 0) {
+    stage = 'scheduled';
   } else if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
     stage = 'completed';
   } else if (directorPolicy.needsRebalance && !lateRegistrationOpen) {
@@ -994,9 +1148,14 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     liveTableCount,
     completedTableCount,
     closedTableCount,
-    entrantCount: uniqueWallets.size,
+    entrantCount: economics.entryCount,
+    entryCount: economics.entryCount,
+    uniquePlayerCount: economics.uniquePlayerCount,
+    acceptedReentryCount: economics.reentryCount,
     openSeatCount,
     lateRegistrationOpen,
+    scheduledStartAt: earliestScheduledStartAt || null,
+    scheduledStartPending: anyScheduledPending,
     stage,
     targetTableCount: directorPolicy.targetTableCount,
     needsRebalance: directorPolicy.needsRebalance,
@@ -2270,12 +2429,23 @@ function sortSeatsForTournamentSeriesTransfer(seats) {
     });
 }
 
-function moveTournamentSeriesSeat(deps, seat, targetEntry, atIso) {
+function moveTournamentSeriesSeat(deps, seat, targetEntry, atIso, targetSeatNumber = 0) {
   const targetTable = targetEntry?.table || null;
   if (!targetTable || !seat) return null;
+  const sourceTable = deps.getPokerPlayTableById(seat.tableId);
   const targetSeats = deps.listPokerPlaySeatsByTable(targetTable.tableId);
-  const openSeatNumber = findNextOpenSeatNumber(targetTable, targetSeats);
+  const normalizedTargetSeatNumber = normalizeSeatNumber(targetSeatNumber);
+  const occupied = new Set(
+    targetSeats
+      .filter(isSeatOccupyingTable)
+      .map((targetSeat) => normalizeSeatNumber(targetSeat.seatNumber))
+      .filter(Boolean)
+  );
+  const openSeatNumber = normalizedTargetSeatNumber && !occupied.has(normalizedTargetSeatNumber)
+    ? normalizedTargetSeatNumber
+    : findNextOpenSeatNumber(targetTable, targetSeats);
   if (!openSeatNumber) return null;
+  const carriedTimeBank = sourceTable ? getSeatTimeBankRemainingSeconds(sourceTable, seat.seatNumber) : 0;
   const movedSeat = deps.upsertPokerPlaySeat({
     ...seat,
     tableId: targetTable.tableId,
@@ -2285,6 +2455,18 @@ function moveTournamentSeriesSeat(deps, seat, targetEntry, atIso) {
     updatedAt: atIso,
   });
   deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+  if (sourceTable) {
+    deps.upsertPokerPlayTable({
+      ...sourceTable,
+      state: removeSeatTimeBankState(sourceTable, seat.seatNumber),
+      updatedAt: atIso,
+    });
+  }
+  deps.upsertPokerPlayTable({
+    ...targetTable,
+    state: setSeatTimeBankRemainingSeconds(targetTable, openSeatNumber, carriedTimeBank),
+    updatedAt: atIso,
+  });
   return movedSeat;
 }
 
@@ -2786,17 +2968,419 @@ function closeTournamentSeries(deps, { seriesId, reason, actorLabel = 'operator'
   };
 }
 
+function getTournamentDirectorEntries(deps, seriesId, requestAt, { includeClosed = false } = {}) {
+  const targetSeriesId = normalizeTrimmedString(seriesId);
+  if (!targetSeriesId) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const entries = listTournamentSeriesEntriesBySeriesId(deps, targetSeriesId, {
+    processAt: requestAt,
+    includeClosed,
+  });
+  if (!entries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  return entries;
+}
+
+function getTournamentDirectorEntry(entries, tableId) {
+  const targetTableId = normalizeTrimmedString(tableId);
+  return (Array.isArray(entries) ? entries : []).find((entry) => String(entry?.table?.tableId || '') === targetTableId) || null;
+}
+
+function createDirectorAuditEvent(deps, {
+  seriesId,
+  tableId,
+  handId = null,
+  eventKind,
+  payload = {},
+  atIso,
+  actorLabel = 'operator',
+  reason = '',
+}) {
+  if (typeof deps.createPokerPlayAuditEvent !== 'function') return;
+  deps.createPokerPlayAuditEvent({
+    tableId,
+    handId,
+    seatNumber: null,
+    actorRole: normalizePokerPlayAuditActorRole(actorLabel, 'operator'),
+    eventKind,
+    payload: {
+      seriesId: normalizeTrimmedString(seriesId) || null,
+      actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+      reason: normalizeTrimmedString(reason) || null,
+      ...cloneJson(payload, {}),
+    },
+    createdAt: atIso,
+  });
+}
+
+function closeTournamentRegistration(deps, { seriesId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const activeEntries = entries.filter((entry) => !isSeriesClosedTable(entry?.table));
+  if (!activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'This tournament series is already closed.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director closed late registration.');
+  for (const entry of activeEntries) {
+    deps.upsertPokerPlayTable({
+      ...entry.table,
+      state: {
+        ...(entry?.table?.state && typeof entry.table.state === 'object' ? entry.table.state : {}),
+        registrationClosedByDirectorAt: requestAt,
+        registrationClosedByDirectorReason: targetReason,
+      },
+      updatedAt: requestAt,
+    });
+  }
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: activeEntries[0]?.table?.tableId || '',
+    eventKind: 'director_registration_closed',
+    payload: {
+      tableIds: activeEntries.map((entry) => String(entry?.table?.tableId || '')).filter(Boolean),
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
+function moveTournamentDirectorSeat(deps, {
+  seriesId,
+  sourceTableId,
+  seatNumber,
+  targetTableId,
+  targetSeatNumber,
+  reason,
+  actorLabel = 'operator',
+  asOf,
+} = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const sourceEntry = getTournamentDirectorEntry(entries, sourceTableId);
+  const targetEntry = getTournamentDirectorEntry(entries, targetTableId);
+  if (!sourceEntry || !targetEntry) {
+    throw createRouteError(404, 'NOT_FOUND', 'Tournament director move requires valid source and target tables.');
+  }
+  if (String(sourceEntry.table.tableId || '') === String(targetEntry.table.tableId || '')) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Source and target tables must differ for a director move.');
+  }
+  if (isSeriesClosedTable(sourceEntry.table) || isSeriesClosedTable(targetEntry.table)) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'Director moves only apply to active tournament tables.');
+  }
+  const sourceSeatNumber = normalizeSeatNumber(seatNumber);
+  const sourceSeat = sourceEntry.seats.find((seat) => normalizeSeatNumber(seat?.seatNumber) === sourceSeatNumber) || null;
+  if (!sourceSeat || !isSeatInPlay(sourceSeat)) {
+    throw createRouteError(404, 'NOT_FOUND', 'The requested tournament seat is not active.');
+  }
+  if (sourceEntry?.hand && sourceEntry.hand.status === 'live' && sourceEntry?.hand?.state?.seatStates?.[String(sourceSeatNumber)]) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_MOVE_LIVE_HAND', 'Director seat moves are only allowed between hands.');
+  }
+  const movedSeat = moveTournamentSeriesSeat(
+    deps,
+    sourceSeat,
+    targetEntry,
+    requestAt,
+    normalizeSeatNumber(targetSeatNumber)
+  );
+  if (!movedSeat) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_MOVE_FAILED', 'Unable to move the requested tournament seat.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director moved a tournament seat.');
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: sourceEntry.table.tableId,
+    handId: sourceEntry?.hand?.handId || null,
+    eventKind: 'director_seat_moved',
+    payload: {
+      sourceTableId: sourceEntry.table.tableId,
+      sourceSeatNumber,
+      targetTableId: targetEntry.table.tableId,
+      targetSeatNumber: normalizeSeatNumber(movedSeat?.seatNumber),
+      walletSubject: normalizeTrimmedString(sourceSeat?.walletSubject) || null,
+      buyInOil: Number(sourceSeat?.buyInOil || 0),
+      stackOil: Number(sourceSeat?.stackOil || 0),
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
+function rebalanceTournamentSeriesByDirector(deps, { seriesId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const openEntries = entries.filter((entry) => !isSeriesClosedTable(entry?.table));
+  const activeEntries = entries
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .map((entry) => ({
+      ...entry,
+      activeSeats: getActiveSeatRows(entry?.seats),
+      live: !!(entry?.hand && entry.hand.status === 'live'),
+    }));
+  if (!activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'This tournament series is already closed.');
+  }
+  const directorPolicy = buildTournamentSeriesDirectorPolicy(activeEntries);
+  if (directorPolicy.pendingBreakBlockedByLiveTable) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_REBALANCE_BLOCKED', 'The current break candidate must finish its live hand before rebalancing.');
+  }
+  const emptyOpenEntries = openEntries.filter((entry) => getActiveSeatRows(entry?.seats).length === 0);
+  if (!directorPolicy.needsRebalance && !emptyOpenEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_REBALANCE_NOT_NEEDED', 'This tournament series is already balanced.');
+  }
+  const beforeTableIds = new Set(activeEntries.map((entry) => String(entry?.table?.tableId || '')).filter(Boolean));
+  const leadTableId = activeEntries[0]?.table?.tableId || '';
+  if (directorPolicy.needsRebalance) {
+    maybeRebalanceTournamentSeries(deps, activeEntries[0].table, activeEntries[0].seats, activeEntries[0].hand, requestAt);
+  }
+  for (const entry of emptyOpenEntries) {
+    closeTournamentSeriesTable(deps, entry.table, {
+      mergedIntoTableId: activeEntries[0]?.table?.tableId || null,
+      atIso: requestAt,
+    });
+  }
+  const detail = getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+  const afterTableIds = new Set(
+    (Array.isArray(detail?.tables) ? detail.tables : [])
+      .map((entry) => String(entry?.table?.tableId || ''))
+      .filter(Boolean)
+  );
+  const closedTableIds = Array.from(beforeTableIds).filter((tableId) => !afterTableIds.has(tableId));
+  const activeTableHandId = (Array.isArray(detail?.tables) ? detail.tables : [])
+    .find((entry) => String(entry?.table?.tableId || '') === String(leadTableId || ''))?.hand?.handId
+    || (Array.isArray(detail?.tables) ? detail.tables : [])[0]?.hand?.handId
+    || null;
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: leadTableId,
+    handId: activeTableHandId,
+    eventKind: 'director_rebalanced',
+    payload: {
+      tableCountBefore: beforeTableIds.size,
+      tableCountAfter: afterTableIds.size,
+      closedTableIds,
+      pendingBreakTableId: detail?.series?.pendingBreakTableId || null,
+      targetTableCount: Number(detail?.series?.targetTableCount || 0),
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: normalizeTrimmedString(reason, 'Director rebalanced the tournament series.'),
+  });
+  return detail;
+}
+
+function breakTournamentSeriesTableByDirector(deps, {
+  seriesId,
+  tableId,
+  reason,
+  actorLabel = 'operator',
+  asOf,
+} = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const sourceEntry = getTournamentDirectorEntry(entries, tableId);
+  if (!sourceEntry || isSeriesClosedTable(sourceEntry.table)) {
+    throw createRouteError(404, 'NOT_FOUND', 'Tournament table not found.');
+  }
+  if (sourceEntry?.hand && sourceEntry.hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_LIVE_HAND', 'Director table breaks are only allowed between hands.');
+  }
+  const destinationEntries = entries
+    .filter((entry) => String(entry?.table?.tableId || '') !== String(sourceEntry.table.tableId || ''))
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .sort((left, right) => {
+      const leftSeats = getActiveSeatRows(left?.seats).length;
+      const rightSeats = getActiveSeatRows(right?.seats).length;
+      if (leftSeats !== rightSeats) return rightSeats - leftSeats;
+      return String(left?.table?.tableId || '').localeCompare(String(right?.table?.tableId || ''));
+    });
+  if (!destinationEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_FAILED', 'No destination table is available for this table break.');
+  }
+  const movableSeats = sortSeatsForTournamentSeriesTransfer(getActiveSeatRows(sourceEntry.seats));
+  if (!movableSeats.length) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_FAILED', 'The selected table has no active seats to move.');
+  }
+  let movedSeatCount = 0;
+  for (const seat of movableSeats) {
+    let moved = null;
+    for (const destinationEntry of destinationEntries) {
+      const currentDestinationSeats = deps.listPokerPlaySeatsByTable(destinationEntry.table.tableId);
+      if (findNextOpenSeatNumber(destinationEntry.table, currentDestinationSeats) <= 0) {
+        continue;
+      }
+      moved = moveTournamentSeriesSeat(deps, seat, {
+        ...destinationEntry,
+        seats: currentDestinationSeats,
+        hand: deps.getCurrentPokerPlayHandForTable(destinationEntry.table.tableId),
+      }, requestAt);
+      if (moved) break;
+    }
+    if (!moved) {
+      throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_FAILED', 'The destination tables do not have enough open seats for this break.');
+    }
+    movedSeatCount += 1;
+  }
+  closeTournamentSeriesTable(deps, sourceEntry.table, {
+    mergedIntoTableId: destinationEntries[0]?.table?.tableId || null,
+    atIso: requestAt,
+  });
+  const targetReason = normalizeTrimmedString(reason, 'Director broke a tournament table.');
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: sourceEntry.table.tableId,
+    handId: sourceEntry?.hand?.handId || null,
+    eventKind: 'director_table_broken',
+    payload: {
+      sourceTableId: sourceEntry.table.tableId,
+      mergedIntoTableId: destinationEntries[0]?.table?.tableId || null,
+      movedSeatCount,
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
+function startTournamentTableByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const table = synced.table;
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_START_UNAVAILABLE', 'Director start is only available for tournament tables.');
+  }
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    status: 'open',
+    state: {
+      ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+      startedByDirectorAt: requestAt,
+      startedByDirectorReason: normalizeTrimmedString(reason, 'Director started the tournament table.'),
+    },
+    updatedAt: requestAt,
+  });
+  const detail = syncPokerPlayTable(deps, updatedTable.tableId, { processAt: requestAt });
+  createDirectorAuditEvent(deps, {
+    seriesId: getTournamentSeriesRef(updatedTable).seriesId,
+    tableId: updatedTable.tableId,
+    handId: detail?.hand?.handId || null,
+    eventKind: 'director_table_started',
+    payload: {
+      scheduledStartAt: getTournamentScheduledStartAt(updatedTable) || null,
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: normalizeTrimmedString(reason, 'Director started the tournament table.'),
+  });
+  return buildPokerPlayTablePayload(deps, detail.table, detail.seats, detail.hand, {
+    session: null,
+    req: null,
+    processAt: requestAt,
+  });
+}
+
+function maybeActivateScheduledTournament(deps, table, seats, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return {
+      table,
+      seats,
+      changed: false,
+    };
+  }
+  if (normalizeTrimmedString(table?.status, 'open') !== 'scheduled') {
+    return {
+      table,
+      seats,
+      changed: false,
+    };
+  }
+  const scheduledStartAt = getTournamentScheduledStartAt(table);
+  if (!scheduledStartAt) {
+    return {
+      table,
+      seats,
+      changed: false,
+    };
+  }
+  const scheduledMs = Date.parse(scheduledStartAt);
+  const atMs = Date.parse(String(atIso || ''));
+  if (Number.isFinite(scheduledMs) && Number.isFinite(atMs) && atMs < scheduledMs && !normalizeTrimmedString(table?.state?.startedByDirectorAt)) {
+    return {
+      table,
+      seats,
+      changed: false,
+    };
+  }
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    status: 'open',
+    state: {
+      ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+      scheduledStartActivatedAt: atIso,
+    },
+    updatedAt: atIso,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: null,
+      seatNumber: null,
+      actorRole: normalizeTrimmedString(table?.state?.startedByDirectorAt) ? 'operator' : 'system',
+      eventKind: normalizeTrimmedString(table?.state?.startedByDirectorAt) ? 'director_table_started' : 'scheduled_table_started',
+      payload: {
+        scheduledStartAt: scheduledStartAt || null,
+        activatedAt: atIso,
+      },
+      createdAt: atIso,
+    });
+  }
+  return {
+    table: updatedTable,
+    seats,
+    changed: true,
+  };
+}
+
 function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   let table = deps.getPokerPlayTableById(tableId);
   if (!table) return null;
   let seats = deps.listPokerPlaySeatsByTable(table.tableId);
   let hand = deps.getCurrentPokerPlayHandForTable(table.tableId);
   const atIso = toProcessIso(deps, processAt);
+  const manualDirectorOnly = table?.state?.manualDirectorOnly === true;
   let presence = reconcilePokerPlaySeatPresence(deps, table, seats, hand, atIso);
   table = presence.table;
   seats = presence.seats;
   hand = presence.hand;
+  const scheduledActivation = maybeActivateScheduledTournament(deps, table, seats, atIso);
+  table = scheduledActivation.table;
+  seats = scheduledActivation.seats;
+  hand = deps.getCurrentPokerPlayHandForTable(table.tableId);
   if (isTablePaused(table) || isTableAdminClosed(table)) {
+    return { table, seats, hand };
+  }
+  if (isScheduledTournamentPending(table, atIso)) {
     return { table, seats, hand };
   }
   let waitlistPromotion = promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso);
@@ -2910,11 +3494,13 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       seats = tournamentSettlement.seats;
       if (tournamentSettlement.completed) break;
 
-      const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
-      table = seriesRebalance.table;
-      seats = seriesRebalance.seats;
-      hand = seriesRebalance.hand;
-      if (seriesRebalance.closed) break;
+      if (!manualDirectorOnly) {
+        const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
+        table = seriesRebalance.table;
+        seats = seriesRebalance.seats;
+        hand = seriesRebalance.hand;
+        if (seriesRebalance.closed) break;
+      }
 
       const readySeats = getActiveSeatRows(seats);
       if (readySeats.length >= Math.max(2, Number(table.minPlayers || 2))) {
@@ -2930,11 +3516,13 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       waitlistPromotion = promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso);
       table = waitlistPromotion.table;
       seats = waitlistPromotion.seats;
-      const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
-      table = seriesRebalance.table;
-      seats = seriesRebalance.seats;
-      hand = seriesRebalance.hand;
-      if (seriesRebalance.closed) break;
+      if (!manualDirectorOnly) {
+        const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
+        table = seriesRebalance.table;
+        seats = seriesRebalance.seats;
+        hand = seriesRebalance.hand;
+        if (seriesRebalance.closed) break;
+      }
     }
 
     if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= Math.max(2, Number(table.minPlayers || 2))) {
@@ -3139,12 +3727,17 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
   const matchKey = buildMatchKey(normalized);
   const tableId = `pkt_play_${normalized.tableType}_${deps.randomHex(8)}`;
   const slug = `${slugifySegment(normalized.title)}-${deps.randomHex(4)}`;
+  const scheduledStartAt = normalizeIsoString(normalized.scheduledStartAt);
+  const createdIso = createdAt || deps.nowIso();
+  const scheduledStartPending = normalizePokerPlayTableType(normalized.tableType) === 'tournament'
+    && !!scheduledStartAt
+    && Date.parse(scheduledStartAt) > Date.parse(createdIso);
   return deps.upsertPokerPlayTable({
     tableId,
     slug,
     title: normalized.title,
     tableType: normalized.tableType,
-    status: 'open',
+    status: scheduledStartPending ? 'scheduled' : 'open',
     maxSeats: normalized.maxSeats,
     smallBlindOil: normalized.smallBlindOil,
     bigBlindOil: normalized.bigBlindOil,
@@ -3157,6 +3750,11 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       winnerSeatNumber: 0,
       prizeOil: 0,
       prizeSettledAt: null,
+      scheduledStartAt: scheduledStartAt || null,
+      entryCount: 0,
+      reentryCount: 0,
+      entryCountsByWallet: {},
+      registrationClosedByDirectorAt: null,
       timeBankRemainingBySeat: {},
     },
     rules: {
@@ -3169,6 +3767,8 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
+      scheduledStartAt: normalized.tableType === 'tournament' ? (scheduledStartAt || null) : null,
+      reentryLimit: normalized.tableType === 'tournament' ? normalized.reentryLimit : 0,
       seriesId: normalized.tableType === 'tournament'
         ? normalizeTrimmedString(normalized.seriesId, `pkseries_${deps.randomHex(8)}`)
         : '',
@@ -3179,8 +3779,8 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       dynamic: true,
     },
     summary: buildDynamicTableSummary(normalized, matchKey),
-    createdAt,
-    updatedAt: createdAt || deps.nowIso(),
+    createdAt: createdIso,
+    updatedAt: createdIso,
   });
 }
 
@@ -3196,7 +3796,9 @@ function isTableMatchCandidate(synced, matchKey, tableType) {
   if (!tableMatchKey || tableMatchKey !== matchKey) return false;
   if (normalizePokerPlayTableType(table.tableType) !== normalizePokerPlayTableType(tableType)) return false;
   if (Number(summary.openSeatCount || 0) <= 0) return false;
-  if (String(table.status || 'open') !== 'open') return false;
+  const normalizedStatus = normalizeTrimmedString(table.status, 'open');
+  const tournamentPrestart = normalizePokerPlayTableType(tableType) === 'tournament' && normalizedStatus === 'scheduled';
+  if (normalizedStatus !== 'open' && !tournamentPrestart) return false;
   if (tableType === 'tournament') {
     if (Number(summary.occupancy || 0) >= Number(table.maxSeats || POKER_PLAY_MAX_SEATS)) return false;
     if (summary.liveHand) {
@@ -3382,6 +3984,7 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   table = synced.table;
   const seats = synced.seats;
   const currentHand = synced.hand;
+  const tournamentReentry = normalizePokerPlayTableType(table.tableType) === 'tournament' && body?.reentry === true;
   if (isTableAdminClosed(table)) {
     throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
   }
@@ -3390,7 +3993,9 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   }
   const sameTableSeat = deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject);
   if (sameTableSeat) {
-    return buildPokerPlayTablePayload(deps, table, seats, currentHand, { session, req, processAt: requestAt });
+    if (!tournamentReentry || isSeatInPlay(sameTableSeat)) {
+      return buildPokerPlayTablePayload(deps, table, seats, currentHand, { session, req, processAt: requestAt });
+    }
   }
   const lateRegistration = resolveTournamentLateRegistration(table, currentHand);
   if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live' && !lateRegistration.open) {
@@ -3398,6 +4003,11 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
       tableId: table.tableId,
       handId: currentHand.handId,
       lateRegistrationRemainingHands: lateRegistration.remainingHands,
+    });
+  }
+  if (normalizePokerPlayTableType(table.tableType) === 'tournament' && isScheduledTournamentPending(table, requestAt) && normalizeTrimmedString(table?.status, 'open') !== 'scheduled') {
+    throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_SCHEDULED', 'This tournament is scheduled and not open for hand start yet.', {
+      scheduledStartAt: getTournamentScheduledStartAt(table) || null,
     });
   }
 
@@ -3433,6 +4043,13 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     memo: `${table.title} buy-in`,
   });
 
+  let nextTableState = table?.state && typeof table.state === 'object' ? table.state : {};
+  if (normalizePokerPlayTableType(table.tableType) === 'tournament') {
+    nextTableState = incrementTournamentEntryState(table, walletBinding.walletSubject, {
+      reentry: tournamentReentry,
+    });
+  }
+
   deps.upsertPokerPlaySeat({
     tableId: table.tableId,
     seatNumber: openSeatNumber,
@@ -3446,6 +4063,9 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     streamflowVerificationId: deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject)?.verificationId || null,
     lastSeenAt: requestAt,
     disconnectedAt: null,
+    eliminatedAt: null,
+    prizeOil: 0,
+    payoutSettledAt: null,
     updatedAt: requestAt,
   });
   if (typeof deps.getPokerPlayWaitlistEntryByTableAndWalletSubject === 'function' && typeof deps.upsertPokerPlayWaitlistEntry === 'function') {
@@ -3462,7 +4082,14 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   }
   table = deps.upsertPokerPlayTable({
     ...table,
-    state: setSeatTimeBankRemainingSeconds(table, openSeatNumber, getSeatTimeBankRemainingSeconds(table, openSeatNumber)),
+    state: setSeatTimeBankRemainingSeconds(
+      {
+        ...table,
+        state: nextTableState,
+      },
+      openSeatNumber,
+      getSeatTimeBankRemainingSeconds(table, openSeatNumber)
+    ),
     updatedAt: requestAt,
   });
   if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live') {
@@ -3471,12 +4098,28 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
       handId: currentHand.handId,
       seatNumber: null,
       authorRole: 'system',
-      body: `${formatSeatLabel(openSeatNumber, normalizePokerPlayDisplayName(body?.displayName, session?.agent?.name || houseId || walletBinding.walletSubject.slice(0, 8)))} registers for the next hand.`,
+      body: `${formatSeatLabel(openSeatNumber, normalizePokerPlayDisplayName(body?.displayName, session?.agent?.name || houseId || walletBinding.walletSubject.slice(0, 8)))} ${tournamentReentry ? 're-enters for' : 'registers for'} the next hand.`,
       createdAt: requestAt,
     });
   }
 
   const refreshed = syncPokerPlayTable(deps, table.tableId, { processAt: requestAt });
+  if (normalizePokerPlayTableType(table.tableType) === 'tournament' && typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: table.tableId,
+      handId: refreshed?.hand?.handId || currentHand?.handId || null,
+      seatNumber: openSeatNumber,
+      actorRole: 'human',
+      eventKind: tournamentReentry ? 'tournament_reentered' : 'tournament_registered',
+      payload: {
+        walletSubject: walletBinding.walletSubject,
+        buyInOil,
+        reentry: tournamentReentry,
+        scheduledStartAt: getTournamentScheduledStartAt(table) || null,
+      },
+      createdAt: requestAt,
+    });
+  }
   return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
 }
 
@@ -3524,6 +4167,71 @@ function matchmakeIntoTable(deps, { session, req, body } = {}) {
     body: {
       ...body,
       asOf: requestAt,
+    },
+  });
+}
+
+function reenterTournamentSeries(deps, { seriesId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding?.walletSubject) {
+    throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before re-entering a live poker tournament.');
+  }
+  const houseId = getSessionHouseId(session);
+  if (!houseId) {
+    throw createRouteError(409, 'HOUSE_REQUIRED', 'Join a house before re-entering a live poker tournament.');
+  }
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const activeSeat = deps.getActivePokerPlaySeatByWalletSubject(walletBinding.walletSubject);
+  if (activeSeat && isSeatInPlay(activeSeat)) {
+    throw createRouteError(409, 'POKER_PLAY_SEAT_ALREADY_ACTIVE', 'This wallet is already seated at a live table.', {
+      tableId: activeSeat.tableId,
+      seatNumber: activeSeat.seatNumber,
+    });
+  }
+  const activeEntries = entries.filter((entry) => !isSeriesClosedTable(entry?.table));
+  const entryCount = getTournamentSeriesWalletEntryCount(entries, walletBinding.walletSubject);
+  if (entryCount <= 0) {
+    throw createRouteError(409, 'POKER_PLAY_REENTRY_UNAVAILABLE', 'This wallet does not have a prior tournament entry in the series.');
+  }
+  const leadTable = activeEntries[0]?.table || entries[0]?.table || null;
+  const reentryLimit = getTournamentReentryLimit(leadTable);
+  if (reentryLimit <= 0) {
+    throw createRouteError(409, 'POKER_PLAY_REENTRY_UNAVAILABLE', 'This tournament series is a freezeout and does not allow re-entry.');
+  }
+  if (entryCount >= (1 + reentryLimit)) {
+    throw createRouteError(409, 'POKER_PLAY_REENTRY_LIMIT_REACHED', 'This wallet has reached the tournament re-entry limit.', {
+      reentryLimit,
+      acceptedReentryCount: Math.max(0, entryCount - 1),
+    });
+  }
+  const candidates = activeEntries
+    .map((entry) => ({
+      ...entry,
+      summary: computeTableSummary(entry.table, entry.seats, entry.hand, null),
+    }))
+    .filter((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)
+    .filter((entry) => !entry?.hand || entry.hand.status !== 'live' || resolveTournamentLateRegistration(entry.table, entry.hand).open)
+    .sort((left, right) => {
+      const leftSameWallet = getTournamentTableWalletEntryCount(left?.table, walletBinding.walletSubject, left?.seats) > 0 ? 1 : 0;
+      const rightSameWallet = getTournamentTableWalletEntryCount(right?.table, walletBinding.walletSubject, right?.seats) > 0 ? 1 : 0;
+      if (leftSameWallet !== rightSameWallet) return rightSameWallet - leftSameWallet;
+      const occupancyDelta = Number(right?.summary?.occupancy || 0) - Number(left?.summary?.occupancy || 0);
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(left?.table?.tableId || '').localeCompare(String(right?.table?.tableId || ''));
+    });
+  const candidate = candidates[0] || null;
+  if (!candidate) {
+    throw createRouteError(409, 'POKER_PLAY_REENTRY_UNAVAILABLE', 'No open re-entry seat is currently available in this tournament series.');
+  }
+  return seatIntoTable(deps, {
+    tableId: candidate.table.tableId,
+    session,
+    req,
+    body: {
+      ...body,
+      asOf: requestAt,
+      reentry: true,
     },
   });
 }
@@ -4262,6 +4970,8 @@ module.exports = {
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
+  breakTournamentSeriesTableByDirector,
+  closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
   createTable,
@@ -4283,12 +4993,16 @@ module.exports = {
   postAction,
   postMessage,
   postSeatAgentProposal,
+  rebalanceTournamentSeriesByDirector,
   reloadTableSeat,
+  reenterTournamentSeries,
   returnTableSeat,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
   sitOutTableSeat,
+  startTournamentTableByDirector,
+  moveTournamentDirectorSeat,
   syncPokerPlayTable,
   useTimeBank,
 };

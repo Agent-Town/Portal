@@ -27,6 +27,8 @@ const {
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
+  breakTournamentSeriesTableByDirector,
+  closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
   createTable,
@@ -46,12 +48,16 @@ const {
   postAction,
   postMessage,
   postSeatAgentProposal,
+  rebalanceTournamentSeriesByDirector,
   reloadTableSeat,
+  reenterTournamentSeries,
   returnTableSeat,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
   sitOutTableSeat,
+  startTournamentTableByDirector,
+  moveTournamentDirectorSeat,
   useTimeBank,
 } = require('./poker_play_service');
 
@@ -505,6 +511,24 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessWaitlistA111111111111111111111', houseId: 'house_harness_waitlist_a', displayName: 'Waitlist Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessWaitlistB111111111111111111111', houseId: 'house_harness_waitlist_b', displayName: 'Waitlist Bravo' },
       ],
+      tournament_director_manual: [
+        { seatNumber: 1, address: 'So1anaHarnessDirectorA1111111111111111111111', houseId: 'house_harness_director_a', displayName: 'Director Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessDirectorB1111111111111111111111', houseId: 'house_harness_director_b', displayName: 'Director Bravo' },
+        { seatNumber: 1, address: 'So1anaHarnessDirectorC1111111111111111111111', houseId: 'house_harness_director_c', displayName: 'Director Charlie' },
+      ],
+      tournament_director_break: [
+        { seatNumber: 1, address: 'So1anaHarnessBreakA111111111111111111111111', houseId: 'house_harness_break_a', displayName: 'Break Alpha' },
+        { seatNumber: 1, address: 'So1anaHarnessBreakB111111111111111111111111', houseId: 'house_harness_break_b', displayName: 'Break Bravo' },
+        { seatNumber: 2, address: 'So1anaHarnessBreakC111111111111111111111111', houseId: 'house_harness_break_c', displayName: 'Break Charlie' },
+      ],
+      tournament_schedule_waiting: [
+        { seatNumber: 1, address: 'So1anaHarnessSchedA111111111111111111111111', houseId: 'house_harness_schedule_a', displayName: 'Schedule Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessSchedB111111111111111111111111', houseId: 'house_harness_schedule_b', displayName: 'Schedule Bravo' },
+      ],
+      tournament_reentry_waiting: [
+        { seatNumber: 1, address: 'So1anaHarnessReentryA11111111111111111111111', houseId: 'house_harness_reentry_a', displayName: 'Reentry Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessReentryB11111111111111111111111', houseId: 'house_harness_reentry_b', displayName: 'Reentry Bravo' },
+      ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
     if (!defaults) {
@@ -514,6 +538,8 @@ function registerPokerRoutes(app, deps) {
     const nextTableId = normalizeTrimmedString(tableId, `pkt_play_harness_${normalizedScenario}_${randomHex(6)}`);
     const handId = `pkplayhand_harness_${randomHex(8)}`;
     const actionExpiresAt = addHarnessSeconds(requestAt, normalizedScenario === 'timebank_live' ? 10 : 45);
+    let seededSeriesId = '';
+    const seededTableIds = [];
 
     if (normalizedScenario === 'sidepot_live') {
       const [seatOne, seatTwo, seatThree] = normalizedActors;
@@ -1008,11 +1034,447 @@ function registerPokerRoutes(app, deps) {
           updatedAt: requestAt,
         });
       });
+    } else if (normalizedScenario === 'tournament_director_manual') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_director_${randomHex(6)}`;
+      const tableAId = nextTableId;
+      const tableBId = `${nextTableId}_b`;
+      const blindLevels = [
+        { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+        { level: 2, smallBlindOil: 75, bigBlindOil: 150 },
+      ];
+      const tableRules = {
+        mode: 'no_limit_holdem',
+        format: 'tournament',
+        maxSeats: 3,
+        decisionCountdownSeconds: 45,
+        presenceTimeoutSeconds: 30,
+        reconnectGraceSeconds: 90,
+        timeBankSeconds: 15,
+        cashOutEnabled: false,
+        payoutModel: 'top2_70_30',
+        lateRegistrationHands: 2,
+        handsPerBlindLevel: 2,
+        blindLevels,
+        reentryLimit: 1,
+        seriesId,
+        seriesTitle: 'Harness Director Series',
+        matchKey: 'tournament:director:harness',
+      };
+      upsertPokerPlayTable({
+        tableId: tableAId,
+        slug: `${normalizedScenario}-a-${randomHex(4)}`,
+        title: 'Harness Director Table A',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 3,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 3,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          manualDirectorOnly: true,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+          },
+          entryCount: 2,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+          },
+        },
+        rules: tableRules,
+        summary: {
+          headline: 'Harness director override scenario.',
+          seriesId,
+          seriesTitle: 'Harness Director Series',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayTable({
+        tableId: tableBId,
+        slug: `${normalizedScenario}-b-${randomHex(4)}`,
+        title: 'Harness Director Table B',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 3,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 3,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          manualDirectorOnly: true,
+          timeBankRemainingBySeat: {
+            '1': 15,
+          },
+          entryCount: 1,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatThree.address]: 1,
+          },
+        },
+        rules: tableRules,
+        summary: {
+          headline: 'Harness director override scenario.',
+          seriesId,
+          seriesTitle: 'Harness Director Series',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { tableId: tableAId, actor: seatOne, buyInOil: 600, stackOil: 600 },
+        { tableId: tableAId, actor: seatTwo, buyInOil: 600, stackOil: 600 },
+        { tableId: tableBId, actor: seatThree, buyInOil: 600, stackOil: 600 },
+      ].forEach(({ tableId: seededTableId, actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: seededTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(tableAId, tableBId);
+    } else if (normalizedScenario === 'tournament_director_break') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_break_${randomHex(6)}`;
+      const tableAId = nextTableId;
+      const tableBId = `${nextTableId}_b`;
+      const tableRules = {
+        mode: 'no_limit_holdem',
+        format: 'tournament',
+        maxSeats: 4,
+        decisionCountdownSeconds: 45,
+        presenceTimeoutSeconds: 30,
+        reconnectGraceSeconds: 90,
+        timeBankSeconds: 15,
+        cashOutEnabled: false,
+        payoutModel: 'top2_70_30',
+        lateRegistrationHands: 1,
+        handsPerBlindLevel: 2,
+        blindLevels: [
+          { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+        ],
+        reentryLimit: 0,
+        seriesId,
+        seriesTitle: 'Harness Break Series',
+        matchKey: 'tournament:break:harness',
+      };
+      upsertPokerPlayTable({
+        tableId: tableAId,
+        slug: `${normalizedScenario}-a-${randomHex(4)}`,
+        title: 'Harness Break Table A',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 4,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 4,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          manualDirectorOnly: true,
+          timeBankRemainingBySeat: {
+            '1': 15,
+          },
+          entryCount: 1,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+          },
+        },
+        rules: tableRules,
+        summary: {
+          headline: 'Harness break-table scenario.',
+          seriesId,
+          seriesTitle: 'Harness Break Series',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayTable({
+        tableId: tableBId,
+        slug: `${normalizedScenario}-b-${randomHex(4)}`,
+        title: 'Harness Break Table B',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 4,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 4,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          manualDirectorOnly: true,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+          },
+          entryCount: 2,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+        },
+        rules: tableRules,
+        summary: {
+          headline: 'Harness break-table scenario.',
+          seriesId,
+          seriesTitle: 'Harness Break Series',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { tableId: tableAId, actor: seatOne, buyInOil: 600, stackOil: 600 },
+        { tableId: tableBId, actor: seatTwo, buyInOil: 600, stackOil: 600 },
+        { tableId: tableBId, actor: seatThree, buyInOil: 600, stackOil: 600 },
+      ].forEach(({ tableId: seededTableId, actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: seededTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(tableAId, tableBId);
+    } else if (normalizedScenario === 'tournament_schedule_waiting') {
+      const [seatOne, seatTwo] = normalizedActors;
+      const seriesId = `pkseries_harness_schedule_${randomHex(6)}`;
+      const scheduledStartAt = addHarnessSeconds(requestAt, 300);
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Scheduled Table',
+        tableType: 'tournament',
+        status: 'scheduled',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          scheduledStartAt,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+          },
+          entryCount: 2,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'tournament',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: false,
+          payoutModel: 'top2_70_30',
+          lateRegistrationHands: 2,
+          handsPerBlindLevel: 2,
+          blindLevels: [
+            { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+            { level: 2, smallBlindOil: 75, bigBlindOil: 150 },
+          ],
+          scheduledStartAt,
+          reentryLimit: 1,
+          seriesId,
+          seriesTitle: 'Harness Scheduled Series',
+          matchKey: 'tournament:schedule:harness',
+        },
+        summary: {
+          headline: 'Harness scheduled-start scenario.',
+          seriesId,
+          seriesTitle: 'Harness Scheduled Series',
+          scheduledStartAt,
+          reentryLimit: 1,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 600, stackOil: 600 },
+        { actor: seatTwo, buyInOil: 600, stackOil: 600 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'tournament_reentry_waiting') {
+      const [seatOne, seatTwo] = normalizedActors;
+      const seriesId = `pkseries_harness_reentry_${randomHex(6)}`;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Reentry Table',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+          },
+          entryCount: 2,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'tournament',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: false,
+          payoutModel: 'top2_70_30',
+          lateRegistrationHands: 2,
+          handsPerBlindLevel: 2,
+          blindLevels: [
+            { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+            { level: 2, smallBlindOil: 75, bigBlindOil: 150 },
+          ],
+          scheduledStartAt: null,
+          reentryLimit: 1,
+          seriesId,
+          seriesTitle: 'Harness Reentry Series',
+          matchKey: 'tournament:reentry:harness',
+        },
+        summary: {
+          headline: 'Harness re-entry scenario.',
+          seriesId,
+          seriesTitle: 'Harness Reentry Series',
+          reentryLimit: 1,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: nextTableId,
+        seatNumber: seatOne.seatNumber,
+        portalSessionId: `harness_${seatOne.address}`,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        displayName: seatOne.displayName,
+        status: 'busted',
+        buyInOil: 600,
+        stackOil: 0,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        eliminatedAt: requestAt,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: nextTableId,
+        seatNumber: seatTwo.seatNumber,
+        portalSessionId: `harness_${seatTwo.address}`,
+        houseId: seatTwo.houseId,
+        walletSubject: seatTwo.address,
+        displayName: seatTwo.displayName,
+        status: 'active',
+        buyInOil: 600,
+        stackOil: 600,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
     }
 
     return {
       scenario: normalizedScenario,
       tableId: nextTableId,
+      tableIds: seededTableIds.length ? seededTableIds : [nextTableId],
+      seriesId: seededSeriesId || null,
       handId,
       actionExpiresAt,
       actors: normalizedActors.map((actor) => ({
@@ -1771,6 +2233,170 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.post('/api/poker/play/admin/series/:seriesId/registration/close', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = closeTournamentRegistration(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const tableId of Array.isArray(payload?.series?.tableIds) ? payload.series.tableIds : []) {
+        publishPokerPlayTableEvent(tableId, 'series_registration_close', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+          registrationClosedByDirectorAt: payload?.tables?.[0]?.table?.summary?.registrationClosedByDirectorAt || req.body?.asOf || nowIso(),
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_REGISTRATION_CLOSE_FAILED',
+        err?.message || 'Unable to close tournament registration.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/move-seat', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = moveTournamentDirectorSeat(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        sourceTableId: normalizeTrimmedString(req.body?.sourceTableId),
+        seatNumber: req.body?.seatNumber,
+        targetTableId: normalizeTrimmedString(req.body?.targetTableId),
+        targetSeatNumber: req.body?.targetSeatNumber,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const tableId of Array.isArray(payload?.series?.tableIds) ? payload.series.tableIds : []) {
+        publishPokerPlayTableEvent(tableId, 'series_move_seat', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_MOVE_SEAT_FAILED',
+        err?.message || 'Unable to move the tournament seat.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/rebalance', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = rebalanceTournamentSeriesByDirector(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const tableId of Array.isArray(payload?.series?.tableIds) ? payload.series.tableIds : []) {
+        publishPokerPlayTableEvent(tableId, 'series_rebalance', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_REBALANCE_FAILED',
+        err?.message || 'Unable to rebalance the tournament series.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/break-table', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = breakTournamentSeriesTableByDirector(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        tableId: normalizeTrimmedString(req.body?.tableId),
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const tableId of Array.isArray(payload?.series?.tableIds) ? payload.series.tableIds : []) {
+        publishPokerPlayTableEvent(tableId, 'series_break_table', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_BREAK_TABLE_FAILED',
+        err?.message || 'Unable to break the tournament table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/start', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = startTournamentTableByDirector(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'director_start', {
+        handId: payload?.hand?.handId || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TABLE_START_FAILED',
+        err?.message || 'Unable to start the tournament table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/admin/tables/:tableId/review', (req, res) => {
     const requestId = buildPortalRequestId();
     if (!isAdmin(req)) {
@@ -1926,6 +2552,37 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_SIT_FAILED',
         err?.message || 'Unable to join the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/series/:seriesId/reenter', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = reenterTournamentSeries(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || '', 'reentry', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+        seriesId: payload?.series?.seriesId || req.params.seriesId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_REENTRY_FAILED',
+        err?.message || 'Unable to re-enter the poker tournament.',
         {
           requestId,
           details: err?.details || {},

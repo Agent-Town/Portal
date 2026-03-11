@@ -975,8 +975,11 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
+          ${table?.tableType === 'tournament' && table?.summary?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(table?.summary?.scheduledStartAt)) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Entries', `${Number(table?.summary?.entryCount || 0)}`) : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entry', `${Number(table?.summary?.acceptedReentryCount || 0)}/${Number(table?.summary?.reentryLimit || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
           ${Number(table?.summary?.waitlistCount || 0) > 0 ? renderSummaryMetric('Waitlist', `${Number(table?.summary?.waitlistCount || 0)}`) : ''}
@@ -1079,6 +1082,7 @@
           ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
+        ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? '<p>Your last tournament entry busted. Re-entry stays available until late registration closes or the table schedule locks.</p>' : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
         ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
@@ -1090,6 +1094,7 @@
             ${table?.tableType === 'cash' ? `<button id="pokerPlayAwayButton" class="pokerButton" type="button"${seatAway ? ' disabled' : ''}>Mark Away</button>` : ''}
             ${table?.tableType === 'cash' ? `<button id="pokerPlayReturnButton" class="pokerButton" type="button"${(!seatSittingOut && !seatAway) ? ' disabled' : ''}>Return To Table</button>` : ''}
             <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
+            ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? `<button id="pokerPlayReenterButton" class="pokerButton" type="button"${table?.summary?.lateRegistrationOpen || String(table?.status || '') === 'scheduled' ? '' : ' disabled'}>Re-Enter Tournament</button>` : ''}
           </div>
           ${table?.tableType === 'cash' ? `
             <form id="pokerPlayReloadForm" class="pokerForm">
@@ -1135,6 +1140,9 @@
           ${renderSummaryMetric('Target Tables', `${Number(series?.targetTableCount || 0)}`)}
           ${renderSummaryMetric('Stage', series?.stage || 'seating')}
           ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
+          ${series?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(series?.scheduledStartAt)) : ''}
+          ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
+          ${Number(series?.acceptedReentryCount || 0) > 0 || Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entries', `${Number(series?.acceptedReentryCount || 0)}`) : ''}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
           ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
           ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
@@ -1310,11 +1318,34 @@
         <div class="pokerLinks">
           ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
           ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
+          ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
+          ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
+          ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
+          ${!adminClosed && table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled' ? `<button class="pokerButton" type="button" data-admin-table-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Table</button>` : ''}
           ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
           <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
           ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
           ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
         </div>
+        ${series && table?.tableType === 'tournament' && Array.isArray(series?.tableIds) && series.tableIds.length > 1 ? `
+          <form id="pokerDirectorMoveSeatForm" class="pokerForm">
+            <label>
+              Move seat
+              <input id="pokerDirectorMoveSeatNumber" type="number" min="1" max="${Number(table?.maxSeats || 6)}" value="1">
+            </label>
+            <label>
+              Target table
+              <select id="pokerDirectorMoveTargetTable">
+                ${series.tableIds.filter((id) => String(id || '') !== String(table?.tableId || '')).map((id) => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('')}
+              </select>
+            </label>
+            <label>
+              Target seat
+              <input id="pokerDirectorMoveTargetSeat" type="number" min="1" max="6" value="1">
+            </label>
+            <button class="pokerButton" type="submit">Move Seat</button>
+          </form>
+        ` : ''}
         <div class="pokerStack">
           ${Array.isArray(adminReview?.disputes) && adminReview.disputes.length ? adminReview.disputes.map((dispute) => `
             <div class="pokerMessage">
@@ -1457,6 +1488,25 @@
         }
       });
     }
+  }
+
+  function bindTournamentReentryButton(seriesId, tableId) {
+    const button = document.getElementById('pokerPlayReenterButton');
+    if (!button || !seriesId) return;
+    button.addEventListener('click', async () => {
+      if (button.disabled) return;
+      setStatus('Re-entering tournament...');
+      try {
+        const payload = await api(`/api/poker/play/series/${encodeURIComponent(seriesId)}/reenter`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        const nextTableId = String(payload?.data?.table?.tableId || tableId || '');
+        await loadPlayTable(nextTableId);
+      } catch (err) {
+        setStatus(`Re-entry failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
   }
 
   function bindWaitlistControls(tableId) {
@@ -1675,6 +1725,71 @@
       });
     }
 
+    const registrationCloseButton = document.querySelector('[data-admin-series-registration-close="1"][data-admin-series-id]');
+    if (registrationCloseButton) {
+      registrationCloseButton.addEventListener('click', async () => {
+        const targetSeriesId = String(registrationCloseButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Closing tournament registration...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/registration/close`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director closed tournament registration.',
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Registration close failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const rebalanceButton = document.querySelector('[data-admin-series-rebalance="1"][data-admin-series-id]');
+    if (rebalanceButton) {
+      rebalanceButton.addEventListener('click', async () => {
+        const targetSeriesId = String(rebalanceButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Rebalancing tournament series...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/rebalance`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director rebalanced the tournament series.',
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Rebalance failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const breakButton = document.querySelector('[data-admin-series-break-table="1"][data-admin-series-id][data-admin-break-table-id]');
+    if (breakButton) {
+      breakButton.addEventListener('click', async () => {
+        const targetSeriesId = String(breakButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        const targetBreakTableId = String(breakButton.getAttribute('data-admin-break-table-id') || '').trim();
+        if (!targetSeriesId || !targetBreakTableId) return;
+        setStatus('Breaking tournament table...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/break-table`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              tableId: targetBreakTableId,
+              reason: 'Director broke the pending tournament table.',
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Break failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
     const closeButton = document.querySelector('[data-admin-table-close="1"][data-admin-table-id]');
     if (closeButton) {
       closeButton.addEventListener('click', async () => {
@@ -1755,6 +1870,53 @@
       });
     }
 
+    const startButton = document.querySelector('[data-admin-table-start="1"][data-admin-table-id]');
+    if (startButton) {
+      startButton.addEventListener('click', async () => {
+        const targetTableId = String(startButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Starting tournament table...');
+        try {
+          await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/start`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director started the tournament table.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+        } catch (err) {
+          setStatus(`Start failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const moveSeatForm = document.getElementById('pokerDirectorMoveSeatForm');
+    if (moveSeatForm) {
+      moveSeatForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const targetSeriesId = String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Moving tournament seat...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/move-seat`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              sourceTableId: tableId,
+              seatNumber: Number(document.getElementById('pokerDirectorMoveSeatNumber')?.value || 0),
+              targetTableId: String(document.getElementById('pokerDirectorMoveTargetTable')?.value || '').trim(),
+              targetSeatNumber: Number(document.getElementById('pokerDirectorMoveTargetSeat')?.value || 0),
+              reason: 'Director moved the tournament seat.',
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Move failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
     const resumeButton = document.querySelector('[data-admin-table-resume="1"][data-admin-table-id]');
     if (resumeButton) {
       resumeButton.addEventListener('click', async () => {
@@ -1798,6 +1960,7 @@
       bindWaitlistControls(tableId);
       bindPlayReloadForm(tableId);
       bindPlayLifecycleButtons(tableId);
+      bindTournamentReentryButton(data?.series?.seriesId || '', tableId);
       bindPlayLeaveButton(tableId);
       bindPlayMessageForm(tableId, data?.hand?.handId || '');
       bindPlayActionForm(tableId, data?.hand?.handId || '');

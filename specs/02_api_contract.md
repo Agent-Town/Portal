@@ -578,8 +578,14 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.blindLevel`
 - tournaments expose `data.table.summary.nextBlindLevel`
 - tournaments expose `data.table.summary.handsUntilBlindIncrease`
+- tournaments expose `data.table.summary.scheduledStartAt`
+- tournaments expose `data.table.summary.scheduledStartPending`
 - tournaments expose `data.table.summary.lateRegistrationOpen`
 - tournaments expose `data.table.summary.lateRegistrationRemainingHands`
+- tournaments expose `data.table.summary.entryCount`
+- tournaments expose `data.table.summary.reentryLimit`
+- tournaments expose `data.table.summary.acceptedReentryCount`
+- tournaments expose `data.table.summary.registrationClosedByDirectorAt`
 - tournaments expose `data.table.summary.prizePoolOil`
 - tournaments expose `data.table.summary.paidPlaces`
 - tournaments expose `data.table.summary.payoutModel`
@@ -589,6 +595,10 @@ Tournament blind progression notes:
 - `data.series.targetTableCount` exposes the current tournament-director target table count for the active field
 - `data.series.needsRebalance` flips on when the active series still needs table-break or seat-balancing work
 - `data.series.pendingBreakTableId` is populated when one specific overflow table is the next break candidate
+- `data.series.scheduledStartAt` exposes the earliest durable start timestamp in a scheduled series
+- `data.series.entryCount` exposes the total counted tournament entries, including accepted re-entries
+- `data.series.uniquePlayerCount` exposes the distinct wallet count across those entries
+- `data.series.acceptedReentryCount` exposes the counted re-entry total
 - `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
 - `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
@@ -599,6 +609,9 @@ Tournament blind progression notes:
 Tournament registration notes:
 - tournaments may accept new seats while `data.table.summary.lateRegistrationOpen === true`
 - a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
+- tournaments may remain in `data.table.status = "scheduled"` until `data.table.summary.scheduledStartAt`
+- once the scheduled start time arrives, the table becomes `open` and can start a live hand immediately if enough seats are ready
+- tournament series may allow one or more explicit re-entries; accepted re-entries increase `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
 - tournament settlement is offchain in the OIL ledger and can pay multiple places from the same prize pool
 - once the next hand starts, the registered seat becomes active automatically
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
@@ -812,6 +825,8 @@ Request shape:
   "bigBlindOil": 150,
   "buyInOil": 600,
   "lateRegistrationHands": 2,
+  "reentryLimit": 1,
+  "scheduledStartAt": "2026-03-11T13:25:00.000Z",
   "handsPerBlindLevel": 2,
   "displayName": "Bravo House"
 }
@@ -825,7 +840,36 @@ Response fields:
 
 Tournament matchmaking notes:
 - tournament matching includes `lateRegistrationHands` as part of the structure key
+- tournament matching also includes `reentryLimit` as part of the structure key
 - if a matching tournament table is already live but still within the late-registration window, matchmaking may seat the caller into that live table as `registered`
+- if a matching tournament table is still `scheduled`, matchmaking may seat the caller before cards are dealt and preserve the scheduled start timestamp in the returned table payload
+
+### POST `/api/poker/play/series/:seriesId/reenter`
+Lets a wallet with an earlier busted tournament entry buy back into the same series when the configured re-entry policy still allows it.
+
+Request shape:
+```json
+{
+  "displayName": "Bravo House",
+  "buyInOil": 600,
+  "asOf": "2026-03-11T13:10:10.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload for the chosen re-entry table
+- increments `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
+- may reuse the same table seat record or choose another live table in the same series, depending on seat availability
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `NOT_FOUND`
+- `POKER_PLAY_SEAT_ALREADY_ACTIVE`
+- `POKER_PLAY_REENTRY_UNAVAILABLE`
+- `POKER_PLAY_REENTRY_LIMIT_REACHED`
+- `OIL_BALANCE_TOO_LOW`
 
 ### GET `/api/poker/play/tables/:tableId/stream`
 Opens a server-sent event stream for one live table. The stream does not expose seat-private cards or thread content; it only notifies the browser that the table changed so the normal detail route can be reloaded immediately.
@@ -940,6 +984,94 @@ Series close notes:
 - this is tournament-only operator tooling; cash tables stay table-scoped
 - each newly closed member table publishes the same terminal state as the single-table close flow
 - once cancellation completes, the series remains addressable through `/api/poker/play/rail/series/:seriesId` for audit visibility even though no active tables remain
+
+### POST `/api/poker/play/admin/series/:seriesId/registration/close` (admin)
+Force-closes late registration across every still-open table in one tournament series.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director closed tournament registration.",
+  "asOf": "2026-03-11T12:00:10.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- sets `data.table.summary.registrationClosedByDirectorAt` on member tables
+- flips `data.series.lateRegistrationOpen = false`
+
+### POST `/api/poker/play/admin/series/:seriesId/move-seat` (admin)
+Moves one active tournament seat from one series table to another between hands.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "sourceTableId": "pkt_play_tournament_a",
+  "seatNumber": 1,
+  "targetTableId": "pkt_play_tournament_b",
+  "targetSeatNumber": 3,
+  "reason": "Director moved seat 1.",
+  "asOf": "2026-03-11T12:00:20.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- preserves wallet subject, buy-in, stack, and seat-private identity continuity for the moved seat
+
+### POST `/api/poker/play/admin/series/:seriesId/rebalance` (admin)
+Forces one manual tournament rebalance pass and closes any now-empty orphan series tables.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director rebalanced the tournament series.",
+  "asOf": "2026-03-11T12:00:30.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- updates `data.series.tableCount`, `data.series.targetTableCount`, and `data.series.pendingBreakTableId` deterministically for the post-override field
+
+### POST `/api/poker/play/admin/series/:seriesId/break-table` (admin)
+Breaks one pending tournament table and moves its remaining seats onto the surviving series tables.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "tableId": "pkt_play_tournament_overflow",
+  "reason": "Director broke the pending tournament table.",
+  "asOf": "2026-03-11T12:10:10.000Z"
+}
+```
+
+### POST `/api/poker/play/admin/tables/:tableId/start` (admin)
+Force-starts one scheduled tournament table before its scheduled timestamp.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director started the tournament table.",
+  "asOf": "2026-03-11T13:20:10.000Z"
+}
+```
 
 ### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
 Returns the operator review payload for one table.
