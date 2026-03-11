@@ -774,6 +774,39 @@ Response fields:
 - `data.summary`
 - `data.review`
 
+### GET `/api/poker/play/admin/series/:seriesId/review` (admin)
+Returns the aggregated operator review payload for one tournament series.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response fields:
+- `data.reviewVersion = "poker-play-admin-series-review-v1"`
+- `data.processAt`
+- `data.series`
+- `data.summary`
+- `data.tables[]`
+- `data.tables[].tableId`
+- `data.tables[].tableStatus`
+- `data.tables[].review`
+
+Series review notes:
+- this route includes closed historical member tables so operators can inspect breaks, converged finals, and cancelled series in one payload
+- `data.summary` totals `openDisputeCount`, `reviewDisputeCount`, `auditEventCount`, `messageCount`, and `actionCount` across the whole series
+
+### GET `/api/poker/play/admin/series/:seriesId/export` (admin)
+Returns an export-ready JSON payload for one tournament-series review.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response fields:
+- `data.exportVersion = "poker-play-admin-series-export-v1"`
+- `data.generatedAt`
+- `data.seriesId`
+- `data.summary`
+- `data.review`
+
 ### POST `/api/poker/play/admin/disputes/:disputeId/resolve` (admin)
 Resolves or dismisses a flagged hand review and can optionally resume the table if no open disputes remain.
 

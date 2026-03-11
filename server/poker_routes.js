@@ -24,6 +24,8 @@ const {
 const {
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminExportPayload,
+  buildPokerPlayAdminSeriesExportPayload,
+  buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
   closeTable,
   closeTournamentSeries,
@@ -1144,6 +1146,56 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_EXPORT_FAILED',
         err?.message || 'Unable to export poker review data.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/series/:seriesId/review', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminSeriesReviewPayload(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_REVIEW_FAILED',
+        err?.message || 'Unable to load poker tournament series review.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/series/:seriesId/export', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminSeriesExportPayload(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_EXPORT_FAILED',
+        err?.message || 'Unable to export poker tournament series review data.',
         {
           requestId,
           details: err?.details || {},

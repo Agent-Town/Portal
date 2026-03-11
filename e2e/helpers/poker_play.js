@@ -1,4 +1,4 @@
-const { processOilSnapshots, resetToken } = require('./portal_web');
+const { resetToken } = require('./portal_web');
 
 async function browserJson(page, path, { method = 'GET', data = null, headers = {} } = {}) {
   return await page.evaluate(async ({ path: requestPath, method: requestMethod, data: requestData, headers: requestHeaders }) => {
@@ -78,14 +78,15 @@ async function verifyStreamflowAndFundOil(page, request, {
     throw new Error(`STREAMFLOW_VERIFY_FAILED:${resp.status}:${JSON.stringify(resp.body)}`);
   }
   const verification = resp.body?.data?.verification || null;
-  const walletSubject = verification?.walletSubject || address;
-  const processed = await processOilSnapshots(request, {
-    walletSubject,
-    asOf: asOfProcess,
+  const balanceResp = await browserJson(page, `/api/oil/balance?asOf=${encodeURIComponent(asOfProcess)}`, {
+    headers: { 'x-wallet-solana-address': address },
   });
+  if (!balanceResp.ok) {
+    throw new Error(`OIL_BALANCE_FAILED:${balanceResp.status}:${JSON.stringify(balanceResp.body)}`);
+  }
   return {
     verification,
-    oilBalance: processed?.oilBalance || null,
+    oilBalance: balanceResp.body?.data?.oilBalance || null,
   };
 }
 

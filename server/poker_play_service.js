@@ -982,6 +982,78 @@ function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } =
   };
 }
 
+function buildPokerPlayAdminSeriesReviewPayload(deps, { seriesId, processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const entries = listTournamentSeriesEntriesBySeriesId(deps, seriesId, {
+    processAt: requestAt,
+    includeClosed: true,
+  });
+  if (!entries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const normalizedEntries = entries.map((entry) => ({
+    ...entry,
+    viewerSeat: null,
+    summary: computeTableSummary(entry?.table, entry?.seats, entry?.hand, null),
+  }));
+  const series = buildPokerPlaySeriesSummary(normalizedEntries, '');
+  if (!series) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const tableReviews = normalizedEntries
+    .slice()
+    .sort((left, right) => {
+      const leftClosed = isSeriesClosedTable(left?.table) ? 1 : 0;
+      const rightClosed = isSeriesClosedTable(right?.table) ? 1 : 0;
+      if (leftClosed !== rightClosed) return leftClosed - rightClosed;
+      const leftLive = left?.summary?.liveHand ? 1 : 0;
+      const rightLive = right?.summary?.liveHand ? 1 : 0;
+      if (leftLive !== rightLive) return rightLive - leftLive;
+      return String(left?.table?.tableId || '').localeCompare(String(right?.table?.tableId || ''));
+    })
+    .map((entry) => {
+      const review = buildPokerPlayAdminReviewPayload(deps, {
+        tableId: entry.table.tableId,
+        processAt: requestAt,
+      });
+      return {
+        tableId: review?.table?.tableId || entry.table.tableId,
+        tableStatus: review?.table?.status || entry?.table?.status || 'unknown',
+        review,
+      };
+    });
+
+  const summary = tableReviews.reduce((acc, entry) => {
+    const review = entry?.review || {};
+    acc.tableCount += 1;
+    if (String(entry?.tableStatus || '').toLowerCase() === 'admin_closed') {
+      acc.adminClosedTableCount += 1;
+    }
+    acc.openDisputeCount += Array.isArray(review?.openDisputes) ? review.openDisputes.length : 0;
+    acc.reviewDisputeCount += Array.isArray(review?.disputes) ? review.disputes.length : 0;
+    acc.auditEventCount += Array.isArray(review?.auditEvents) ? review.auditEvents.length : 0;
+    acc.messageCount += Array.isArray(review?.messages) ? review.messages.length : 0;
+    acc.actionCount += Array.isArray(review?.actions) ? review.actions.length : 0;
+    return acc;
+  }, {
+    tableCount: 0,
+    adminClosedTableCount: 0,
+    openDisputeCount: 0,
+    reviewDisputeCount: 0,
+    auditEventCount: 0,
+    messageCount: 0,
+    actionCount: 0,
+  });
+
+  return {
+    reviewVersion: 'poker-play-admin-series-review-v1',
+    processAt: requestAt,
+    series,
+    summary,
+    tables: tableReviews,
+  };
+}
+
 function buildPokerPlayAdminExportPayload(deps, { tableId, processAt, handId } = {}) {
   const review = buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId });
   return {
@@ -997,6 +1069,22 @@ function buildPokerPlayAdminExportPayload(deps, { tableId, processAt, handId } =
       auditEventCount: Array.isArray(review?.auditEvents) ? review.auditEvents.length : 0,
       messageCount: Array.isArray(review?.messages) ? review.messages.length : 0,
       actionCount: Array.isArray(review?.actions) ? review.actions.length : 0,
+    },
+    review,
+  };
+}
+
+function buildPokerPlayAdminSeriesExportPayload(deps, { seriesId, processAt } = {}) {
+  const review = buildPokerPlayAdminSeriesReviewPayload(deps, { seriesId, processAt });
+  return {
+    exportVersion: 'poker-play-admin-series-export-v1',
+    generatedAt: review.processAt,
+    seriesId: review?.series?.seriesId || normalizeTrimmedString(seriesId),
+    summary: {
+      ...cloneJson(review?.summary, {}),
+      stage: review?.series?.stage || 'unknown',
+      prizePoolOil: Number(review?.series?.prizePoolOil || 0),
+      paidPlaces: Number(review?.series?.paidPlaces || 0),
     },
     review,
   };
@@ -3048,6 +3136,8 @@ function resolveHandDispute(deps, { disputeId, body, processAt } = {}) {
 module.exports = {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayAdminReviewPayload,
+  buildPokerPlayAdminSeriesExportPayload,
+  buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
   closeTable,

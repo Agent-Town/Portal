@@ -216,6 +216,18 @@
     `;
   }
 
+  function triggerJsonDownload(filename, data) {
+    const blob = new Blob([JSON.stringify(data || {}, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
   function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
     const items = Array.isArray(actions) ? actions : [];
     if (!items.length) return `<p>${escapeHtml(emptyText)}</p>`;
@@ -1136,6 +1148,7 @@
         <div class="pokerLinks">
           ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
           ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
+          ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
           <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
           ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
           ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
@@ -1363,18 +1376,29 @@
             headers: { 'x-admin-token': token },
           });
           const filename = `poker-review-${targetTableId}.json`;
-          const blob = new Blob([JSON.stringify(payload?.data || {}, null, 2)], { type: 'application/json' });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
+          triggerJsonDownload(filename, payload?.data || {});
           setStatus(`Exported ${filename}`);
         } catch (err) {
           setStatus(`Export failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const seriesExportButton = document.querySelector('[data-admin-series-export="1"][data-admin-series-id]');
+    if (seriesExportButton) {
+      seriesExportButton.addEventListener('click', async () => {
+        const targetSeriesId = String(seriesExportButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Preparing tournament series export...');
+        try {
+          const payload = await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/export`, {
+            headers: { 'x-admin-token': token },
+          });
+          const filename = `poker-series-review-${targetSeriesId}.json`;
+          triggerJsonDownload(filename, payload?.data || {});
+          setStatus(`Exported ${filename}`);
+        } catch (err) {
+          setStatus(`Series export failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }
