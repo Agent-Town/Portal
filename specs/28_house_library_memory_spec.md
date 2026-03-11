@@ -297,7 +297,8 @@ Supported link kinds:
 5. `supersedes`
 6. `included_in_bundle`
 7. `published_as_registry_artifact`
-8. `contradicts`
+8. `imported_from_registry`
+9. `contradicts`
 
 ### 7.3 `scope_sets`
 
@@ -597,6 +598,7 @@ Recommended initial route family:
 4. `POST /api/platform/library/scope`
 5. `GET /api/platform/library/scope`
 6. `POST /api/platform/library/publications`
+7. `POST /api/platform/library/imports`
 
 Recommended initial tables:
 
@@ -757,6 +759,7 @@ Execution mapping:
 1. `M29.8` Registry publication contract
    - `POST /api/platform/library/publications` publishes one curated Library item to Registry only after explicit approval and replays idempotently by `Idempotency-Key`
 2. `M29.9` Registry import contract
+   - `POST /api/platform/library/imports` imports one Registry artifact into House Library as a read-only `imported_artifact` with visible Registry provenance
 3. `M29.10` Seal-aware Library policy
 4. `M29.11` House Library full smoke
 

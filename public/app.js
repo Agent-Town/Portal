@@ -1786,13 +1786,31 @@ function renderHouseLibrarySurface() {
   const selectedItemId = houseSurfaceState.library.selectedItemId || String(items[0]?.libraryItemId || '');
   houseSurfaceState.library.selectedItemId = selectedItemId;
   const selectedItem = items.find((item) => String(item?.libraryItemId || '') === selectedItemId) || items[0];
+  const selectedItemStateParts = [];
+  if (String(selectedItem?.importedState || '') === 'imported_artifact') {
+    selectedItemStateParts.push('Imported from Registry');
+  }
+  if (selectedItem?.readOnly === true) {
+    selectedItemStateParts.push('Read only');
+  }
 
   items.forEach((item) => {
+    const itemStateParts = [];
+    if (String(item?.importedState || '') === 'imported_artifact') {
+      itemStateParts.push('Imported');
+    }
+    if (item?.readOnly === true) {
+      itemStateParts.push('Read only');
+    }
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `btn${String(item?.libraryItemId || '') === String(selectedItem?.libraryItemId || '') ? ' primary' : ''}`;
     button.dataset.libraryItemId = String(item?.libraryItemId || '');
-    button.textContent = `${String(item?.title || item?.libraryItemId || '')} · ${String(item?.itemType || '')}`;
+    button.textContent = [
+      String(item?.title || item?.libraryItemId || ''),
+      String(item?.itemType || ''),
+      itemStateParts.join(' · '),
+    ].filter(Boolean).join(' · ');
     button.addEventListener('click', () => {
       houseSurfaceState.library.selectedItemId = String(item?.libraryItemId || '');
       renderHouseLibrarySurface();
@@ -1800,7 +1818,14 @@ function renderHouseLibrarySurface() {
     listNode.appendChild(button);
   });
 
-  detailNode.textContent = `${String(selectedItem?.title || selectedItem?.libraryItemId || '')} · ${String(selectedItem?.itemType || '')} · ${String(selectedItem?.sourceKind || '')} ${String(selectedItem?.sourceRef || '')} · ${String(selectedItem?.visibility || '')}`;
+  detailNode.textContent = [
+    String(selectedItem?.title || selectedItem?.libraryItemId || ''),
+    String(selectedItem?.itemType || ''),
+    `${String(selectedItem?.sourceKind || '')} ${String(selectedItem?.sourceRef || '')}`.trim(),
+    String(selectedItem?.visibility || ''),
+    String(selectedItem?.registryId || ''),
+    selectedItemStateParts.join(' · '),
+  ].filter(Boolean).join(' · ');
 
   const isSelectedForChat = selectedItemIds.includes(String(selectedItem?.libraryItemId || ''));
 

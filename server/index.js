@@ -4416,6 +4416,7 @@ registerPlatformReadRoutes(app, {
   getLibraryItemById,
   getLibraryItemByIdempotency,
   getLibraryPublicationByIdempotency,
+  getRegistryEntityById,
   getScopeSetById,
   getScopeSetByIdempotency,
   getUnifiedPlatformTestFixture,

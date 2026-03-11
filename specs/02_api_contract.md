@@ -958,6 +958,8 @@ Response fields:
 - `data.items[].sourceKind`
 - `data.items[].sourceRef`
 - `data.items[].visibility`
+- `data.items[].sealPolicy`
+- `data.items[].registryId`
 - `data.items[].contentHash`
 - `data.items[].readOnly`
 - `data.items[].importedState`
@@ -1056,6 +1058,42 @@ Stable failure codes:
 - `LIBRARY_PROMOTION_SOURCE_UNSUPPORTED`
 - `TRACE_NOT_FOUND`
 - `TRAINER_RESULT_NOT_FOUND`
+
+### POST `/api/platform/library/imports` (human)
+Imports one public Registry artifact into House Library as a local, read-only curated item with explicit Registry provenance. The first pass imports one Registry entity at a time and replays idempotently by `Idempotency-Key`.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "registryEntityId": "reg_registry_catalog"
+}
+```
+
+Response fields:
+- `data.import`
+- `data.import.registryEntityId`
+- `data.import.registryId`
+- `data.item`
+- `data.item.libraryItemId`
+- `data.item.itemType`
+- `data.item.sourceKind`
+- `data.item.sourceRef`
+- `data.item.registryId`
+- `data.item.importedState`
+- `data.item.readOnly`
+- `data.item.contentHash`
+- `data.links[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `REGISTRY_ENTITY_REQUIRED`
+- `REGISTRY_ENTITY_NOT_FOUND`
 
 ### POST `/api/platform/library/publications` (human)
 Publishes one curated House Library item to Registry using an approval-gated, idempotent contract. The first pass keeps Registry as the canonical public surface and creates exactly one durable publication row per idempotency key.

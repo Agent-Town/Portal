@@ -17,6 +17,7 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryItemById,
     getLibraryItemByIdempotency,
     getLibraryPublicationByIdempotency,
+    getRegistryEntityById,
     getScopeSetById,
     getScopeSetByIdempotency,
     getUnifiedPlatformTestFixture,
@@ -130,6 +131,8 @@ function registerPlatformReadRoutes(app, deps) {
       sourceKind: item.sourceKind,
       sourceRef: item.sourceRef,
       visibility: item.visibility,
+      sealPolicy: item.sealPolicy,
+      registryId: item.registryId,
       contentHash: item.contentHash,
       readOnly: item.readOnly,
       importedState: item.importedState,
@@ -332,6 +335,61 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildRegistryImportPayload({
+    registryEntityId = '',
+  } = {}) {
+    const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+    const entity = getRegistryEntityById(normalizedRegistryEntityId);
+    if (!entity) {
+      return {
+        ok: false,
+        code: 'REGISTRY_ENTITY_NOT_FOUND',
+        message: 'Registry artifact could not be found.',
+      };
+    }
+    const projection = entity?.versionProjection && typeof entity.versionProjection === 'object' && Object.keys(entity.versionProjection).length
+      ? entity.versionProjection
+      : (entity?.projection && typeof entity.projection === 'object' ? entity.projection : {});
+    return {
+      ok: true,
+      itemType: 'imported_artifact',
+      title: String(entity.displayName || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+      summary: `Imported from Registry · ${String(entity.description || entity.entityKind || 'artifact').trim() || 'artifact'}`,
+      contentText: [
+        `Registry ID: ${String(entity.registryId || normalizedRegistryEntityId).trim() || '—'}`,
+        `Entity kind: ${String(entity.entityKind || '').trim() || '—'}`,
+        `Family: ${String(entity.familySlug || entity.family || '').trim() || '—'}`,
+        `Version: ${String(entity.versionLabel || '').trim() || '—'}`,
+        `Description: ${String(entity.description || '').trim() || '—'}`,
+        `Projection: ${stableJsonStringify(projection)}`,
+      ].join('\n'),
+      contentRef: String(entity.registryId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+      sourceKind: 'registry_artifact',
+      sourceRef: String(entity.registryEntityId || entity.registryId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+      visibility: 'house_private',
+      registryId: String(entity.registryId || entity.registryEntityId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+      importedState: 'imported_artifact',
+      readOnly: true,
+      links: [{
+        linkKind: 'imported_from_registry',
+        sourceKind: 'registry_artifact',
+        sourceRef: String(entity.registryEntityId || entity.registryId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+        metadata: {
+          registryId: String(entity.registryId || entity.registryEntityId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+          entityVersionId: String(entity.entityVersionId || '').trim() || null,
+        },
+      }],
+      metadata: {
+        createdFrom: 'portal.house.library.import',
+        importKind: 'registry_artifact',
+        registryId: String(entity.registryId || entity.registryEntityId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+        entityVersionId: String(entity.entityVersionId || '').trim() || null,
+        versionLabel: String(entity.versionLabel || '').trim() || null,
+        family: String(entity.familySlug || entity.family || '').trim() || null,
+      },
+    };
+  }
+
   function persistLibraryItemRecord({
     houseId = '',
     teamId = '',
@@ -344,6 +402,10 @@ function registerPlatformReadRoutes(app, deps) {
     sourceKind = '',
     sourceRef = '',
     visibility = 'house_private',
+    sealPolicy = 'inherit',
+    importedState = 'local',
+    registryId = '',
+    readOnly = false,
     metadata = null,
     links = [],
   } = {}) {
@@ -368,6 +430,10 @@ function registerPlatformReadRoutes(app, deps) {
       sourceKind,
       sourceRef,
       visibility,
+      sealPolicy,
+      importedState,
+      registryId,
+      readOnly,
       links: Array.isArray(links) ? links : [],
     }));
     const libraryItemId = `lib_${randomHex(12)}`;
@@ -386,6 +452,10 @@ function registerPlatformReadRoutes(app, deps) {
         sourceKind,
         sourceRef,
         visibility,
+        sealPolicy,
+        importedState,
+        registryId,
+        readOnly,
         contentHash,
         idempotencyKey,
         metadata: metadata && typeof metadata === 'object' ? metadata : {},
@@ -1127,6 +1197,61 @@ function registerPlatformReadRoutes(app, deps) {
       promotion: {
         sourceKind,
         sourceRef,
+      },
+      item: persisted.item,
+      links: persisted.links,
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/imports', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before importing a Registry artifact.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before importing a Registry artifact.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to import a Registry artifact.', { requestId });
+    }
+    const registryEntityId = typeof req.body?.registryEntityId === 'string'
+      ? req.body.registryEntityId.trim()
+      : (typeof req.body?.registryId === 'string' ? req.body.registryId.trim() : '');
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to import a Registry artifact.', { requestId });
+    }
+    const imported = buildRegistryImportPayload({ registryEntityId });
+    if (!imported.ok) {
+      return sendPortalApiError(res, 404, imported.code || 'REGISTRY_ENTITY_NOT_FOUND', imported.message || 'Registry artifact not found.', { requestId });
+    }
+    const persisted = persistLibraryItemRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+      itemType: imported.itemType,
+      title: imported.title,
+      summary: imported.summary,
+      contentText: imported.contentText,
+      contentRef: imported.contentRef,
+      sourceKind: imported.sourceKind,
+      sourceRef: imported.sourceRef,
+      visibility: imported.visibility,
+      importedState: imported.importedState,
+      registryId: imported.registryId,
+      readOnly: imported.readOnly,
+      metadata: imported.metadata,
+      links: imported.links,
+    });
+    return sendPortalApiSuccess(res, {
+      import: {
+        registryEntityId,
+        registryId: imported.registryId,
       },
       item: persisted.item,
       links: persisted.links,
