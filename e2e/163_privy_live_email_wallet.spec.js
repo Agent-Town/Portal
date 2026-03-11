@@ -1,51 +1,19 @@
 const { test, expect } = require('@playwright/test');
 
 const { readWalletSnapshot } = require('./helpers/email_otp');
+const { fetchLiveEmailOtpCode, inspectLiveEmailOtpEnv } = require('../server/live_email_otp');
 
 const livePrivyAppId = String(process.env.PRIVY_APP_ID || '').trim();
 const livePrivyLoginMethod = String(process.env.PRIVY_LOGIN_METHOD || '').trim().toLowerCase();
 const liveEmail = String(process.env.PRIVY_EMAIL_OTP_TEST_EMAIL || '').trim();
-const liveProvider = String(process.env.PRIVY_EMAIL_OTP_PROVIDER || '').trim().toLowerCase();
-const liveFetchUrl = String(process.env.PRIVY_EMAIL_OTP_FETCH_URL || '').trim();
-const timeoutMs = Number(process.env.PRIVY_EMAIL_OTP_TIMEOUT_MS || 120000);
 const liveRequired = /^(1|true|yes|on)$/i.test(String(process.env.PRIVY_EMAIL_OTP_REQUIRED || '').trim());
+const liveEmailOtpStatus = inspectLiveEmailOtpEnv(process.env);
 const TEST_PRIVY_SOLANA_ADDRESS = 'So11111111111111111111111111111111111111112';
 const TEST_PRIVY_EVM_ADDRESS = '0x1111111111111111111111111111111111111111';
 
-function buildFetchUrl(email) {
-  const raw = String(liveFetchUrl || '').trim();
-  if (!raw) return '';
-  if (raw.includes('{email}')) {
-    return raw.replaceAll('{email}', encodeURIComponent(email));
-  }
-  const url = new URL(raw);
-  if (!url.searchParams.has('email')) {
-    url.searchParams.set('email', email);
-  }
-  return url.toString();
-}
-
-async function fetchEmailOtpCode(email) {
-  if (liveProvider !== 'http-json') {
-    throw new Error(`EMAIL_OTP_PROVIDER_UNSUPPORTED:${liveProvider || 'missing'}`);
-  }
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const url = buildFetchUrl(email);
-    const response = await fetch(url, { method: 'GET' });
-    if (response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      const code = String(payload?.code || '').trim();
-      if (code) return code;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-  throw new Error('EMAIL_OTP_TIMEOUT');
-}
-
 test.describe('live Privy email wallet smoke', () => {
   test.skip(
-    !liveRequired && (!livePrivyAppId || livePrivyLoginMethod !== 'email' || !liveEmail || !liveProvider || !liveFetchUrl),
+    !liveRequired && (!livePrivyAppId || livePrivyLoginMethod !== 'email' || !liveEmailOtpStatus.ok),
     'Live Privy email OTP env not configured; default suite skips this optional smoke.'
   );
 
@@ -54,8 +22,8 @@ test.describe('live Privy email wallet smoke', () => {
     expect(livePrivyAppId, 'Set PRIVY_APP_ID before running `npm run test:privy-email-live`.').toBeTruthy();
     expect(livePrivyLoginMethod).toBe('email');
     expect(liveEmail, 'Set PRIVY_EMAIL_OTP_TEST_EMAIL for the live email login lane.').toBeTruthy();
-    expect(liveProvider, 'Set PRIVY_EMAIL_OTP_PROVIDER=http-json for the live email login lane.').toBe('http-json');
-    expect(liveFetchUrl, 'Set PRIVY_EMAIL_OTP_FETCH_URL so the suite can fetch the OTP without manual input.').toBeTruthy();
+    expect(liveEmailOtpStatus.ok, `Configure one supported email OTP provider before running the live lane: ${[...liveEmailOtpStatus.missing, ...liveEmailOtpStatus.mismatched].join(', ')}`).toBe(true);
+    expect(liveEmailOtpStatus.provider, 'Set PRIVY_EMAIL_OTP_PROVIDER to one of http-json, imap, or gmail-imap.').toMatch(/^(http-json|imap|gmail-imap)$/);
 
     const configResponse = await request.get('/api/privy/config');
     expect(configResponse.ok()).toBe(true);
@@ -71,7 +39,7 @@ test.describe('live Privy email wallet smoke', () => {
     await page.locator('#privyEmailInput').fill(liveEmail);
     await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();
 
-    const otpCode = await fetchEmailOtpCode(liveEmail);
+    const otpCode = await fetchLiveEmailOtpCode(liveEmail, { env: process.env });
     expect(otpCode).toHaveLength(6);
     await page.locator('#privyCodeInput').fill(otpCode);
     await page.locator('#privyCodeForm').getByRole('button', { name: 'Verify code' }).click();

@@ -29,6 +29,12 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
     expect(suite.requiredEnv.length).toBeGreaterThan(0);
     expect(String(suite.defaultMode || '')).toBeTruthy();
   }
+  const emailSuite = suites.find((entry) => String(entry.suiteId || '') === 'privy-email-otp');
+  expect(emailSuite?.providerEnv).toMatchObject({
+    'http-json': expect.arrayContaining(['PRIVY_EMAIL_OTP_FETCH_URL']),
+    imap: expect.arrayContaining(['PRIVY_EMAIL_OTP_IMAP_HOST', 'PRIVY_EMAIL_OTP_IMAP_PASSWORD']),
+    'gmail-imap': expect.arrayContaining(['PRIVY_EMAIL_OTP_IMAP_PASSWORD']),
+  });
   for (const status of statuses) {
     expect(String(status.suiteId || '')).toBeTruthy();
     expect(typeof status.ready).toBe('boolean');
@@ -58,6 +64,8 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
       PRIVY_EMAIL_OTP_PROVIDER: '',
       PRIVY_EMAIL_OTP_FETCH_URL: '',
       PRIVY_EMAIL_OTP_TEST_EMAIL: '',
+      PRIVY_EMAIL_OTP_IMAP_HOST: '',
+      PRIVY_EMAIL_OTP_IMAP_PASSWORD: '',
       PRIVY_LIVE_REQUIRED: '',
       PRIVY_EMAIL_OTP_REQUIRED: '',
       REAL_SEPOLIA_WALLET_TEST: '',
@@ -82,6 +90,13 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
     missing: ['REAL_SEPOLIA_WALLET_TEST=1', 'LOCAL_SEPOLIA_WALLET_CONFIGURED'],
     mismatched: [],
   });
+  const emailStatus = listedStatuses.find((entry) => String(entry.suiteId || '') === 'privy-email-otp');
+  expect(emailStatus).toMatchObject({
+    suiteId: 'privy-email-otp',
+    ready: false,
+    mode: 'skip',
+    missing: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=email', 'PRIVY_EMAIL_OTP_PROVIDER', 'PRIVY_EMAIL_OTP_TEST_EMAIL'],
+  });
 
   const mismatchStatusOutput = execFileSync('node', ['scripts/test_live.js', '--status', 'privy-guest'], {
     cwd: repoRoot,
@@ -103,6 +118,53 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
     mismatched: ['PRIVY_LOGIN_METHOD=guest'],
   });
 
+  const emailImapStatusOutput = execFileSync('node', ['scripts/test_live.js', '--status', 'privy-email-otp'], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      PRIVY_APP_ID: 'app_live_fixture',
+      PRIVY_LOGIN_METHOD: 'email',
+      PRIVY_EMAIL_OTP_PROVIDER: 'gmail-imap',
+      PRIVY_EMAIL_OTP_TEST_EMAIL: 'elizatown.mail@gmail.com',
+      PRIVY_EMAIL_OTP_IMAP_PASSWORD: '',
+      PRIVY_EMAIL_OTP_REQUIRED: '1',
+    },
+    encoding: 'utf8',
+  });
+  const emailImapStatuses = JSON.parse(emailImapStatusOutput);
+  expect(emailImapStatuses).toHaveLength(1);
+  expect(emailImapStatuses[0]).toMatchObject({
+    suiteId: 'privy-email-otp',
+    provider: 'gmail-imap',
+    ready: false,
+    mode: 'blocked',
+    missing: ['PRIVY_EMAIL_OTP_IMAP_PASSWORD'],
+  });
+
+  const emailReadyOutput = execFileSync('node', ['scripts/test_live.js', '--status', 'privy-email-otp'], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      PRIVY_APP_ID: 'app_live_fixture',
+      PRIVY_LOGIN_METHOD: 'email',
+      PRIVY_EMAIL_OTP_PROVIDER: 'gmail-imap',
+      PRIVY_EMAIL_OTP_TEST_EMAIL: 'elizatown.mail@gmail.com',
+      PRIVY_EMAIL_OTP_IMAP_PASSWORD: 'app-password',
+      PRIVY_EMAIL_OTP_REQUIRED: '1',
+    },
+    encoding: 'utf8',
+  });
+  const emailReadyStatuses = JSON.parse(emailReadyOutput);
+  expect(emailReadyStatuses).toHaveLength(1);
+  expect(emailReadyStatuses[0]).toMatchObject({
+    suiteId: 'privy-email-otp',
+    provider: 'gmail-imap',
+    ready: true,
+    mode: 'ready',
+    missing: [],
+    mismatched: [],
+  });
+
   let setupError = null;
   try {
     execFileSync('node', ['scripts/test_live.js', '--check', 'privy-email-otp'], {
@@ -114,6 +176,8 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
         PRIVY_EMAIL_OTP_PROVIDER: '',
         PRIVY_EMAIL_OTP_FETCH_URL: '',
         PRIVY_EMAIL_OTP_TEST_EMAIL: '',
+        PRIVY_EMAIL_OTP_IMAP_HOST: '',
+        PRIVY_EMAIL_OTP_IMAP_PASSWORD: '',
       },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],

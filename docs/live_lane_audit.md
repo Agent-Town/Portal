@@ -58,9 +58,13 @@ What it does **not** use:
 Remaining local harness boundaries:
 
 - the app runs locally with an isolated store path
-- OTP retrieval is delegated to a caller-supplied HTTP JSON endpoint via `PRIVY_EMAIL_OTP_FETCH_URL`
+- OTP retrieval is delegated to one configured mailbox-backed provider:
+  - `PRIVY_EMAIL_OTP_PROVIDER=http-json` plus `PRIVY_EMAIL_OTP_FETCH_URL`
+  - `PRIVY_EMAIL_OTP_PROVIDER=imap` plus IMAP host/password settings
+  - `PRIVY_EMAIL_OTP_PROVIDER=gmail-imap` plus a Gmail app password
 
-The OTP endpoint is not shipped by this repo. It must be backed by a real mailbox or provider integration if this lane is used as a real-world release check.
+When IMAP or Gmail IMAP is used, the repo reads the mailbox directly during the live lane and no extra OTP bridge service is required.
+For Gmail, the intended setup is a dedicated test inbox plus a Gmail app password, not a primary account password.
 
 ### `sepolia-wallet`
 
@@ -138,8 +142,11 @@ The code can now run the live lanes without built-in mocks or stubs, but this wo
 - `PRIVY_APP_ID`
 - `PRIVY_LOGIN_METHOD`
 - `PRIVY_EMAIL_OTP_PROVIDER`
-- `PRIVY_EMAIL_OTP_FETCH_URL`
 - `PRIVY_EMAIL_OTP_TEST_EMAIL`
+- one provider-specific OTP configuration:
+  - `http-json`: `PRIVY_EMAIL_OTP_FETCH_URL`
+  - `imap`: `PRIVY_EMAIL_OTP_IMAP_HOST`, `PRIVY_EMAIL_OTP_IMAP_PASSWORD`
+  - `gmail-imap`: `PRIVY_EMAIL_OTP_IMAP_PASSWORD`
 - `REAL_SEPOLIA_WALLET_TEST=1`
 - `data/local.sepolia.wallet.json` configured through `npm run setup:sepolia-wallet`
 

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { isConfiguredWalletConfig } = require('../e2e/helpers/sepolia_wallet');
+const { getEmailOtpProviderEnvMap, inspectLiveEmailOtpEnv } = require('./live_email_otp');
 
 const LIVE_SUITE_MANIFEST = Object.freeze([
   {
@@ -15,7 +16,8 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'privy-email-otp',
     command: 'npm run test:privy-email-live',
-    requiredEnv: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=email', 'PRIVY_EMAIL_OTP_PROVIDER', 'PRIVY_EMAIL_OTP_FETCH_URL', 'PRIVY_EMAIL_OTP_TEST_EMAIL'],
+    requiredEnv: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=email'],
+    providerEnv: getEmailOtpProviderEnvMap(),
     requiredFlag: 'PRIVY_EMAIL_OTP_REQUIRED',
     defaultMode: 'skip',
     description: 'Optional real Privy email-code lane with automated OTP retrieval.',
@@ -57,6 +59,9 @@ function getLiveSuiteManifest() {
   return LIVE_SUITE_MANIFEST.map((entry) => ({
     ...entry,
     requiredEnv: Array.isArray(entry.requiredEnv) ? [...entry.requiredEnv] : [],
+    providerEnv: entry?.providerEnv && typeof entry.providerEnv === 'object'
+      ? Object.fromEntries(Object.entries(entry.providerEnv).map(([key, value]) => [key, Array.isArray(value) ? [...value] : []]))
+      : undefined,
   }));
 }
 
@@ -77,7 +82,7 @@ function inspectLiveSuiteEnv(suite, env = process.env) {
       mismatched.push(requirement.raw);
     }
   }
-  return {
+  const base = {
     ok: missing.length === 0 && mismatched.length === 0,
     missing,
     mismatched,
@@ -90,6 +95,18 @@ function inspectLiveSuiteEnv(suite, env = process.env) {
         ? String(env?.[entry.name] || '').trim() === entry.expectedValue
         : String(env?.[entry.name] || '').trim().length > 0,
     })),
+  };
+  if (String(suite?.suiteId || '').trim() !== 'privy-email-otp') {
+    return base;
+  }
+  const emailOtp = inspectLiveEmailOtpEnv(env);
+  return {
+    ok: base.ok && emailOtp.ok,
+    missing: [...base.missing, ...emailOtp.missing],
+    mismatched: [...base.mismatched, ...emailOtp.mismatched],
+    requirements: [...base.requirements, ...emailOtp.requirements],
+    provider: emailOtp.provider,
+    providerEnv: emailOtp.providerEnv,
   };
 }
 
@@ -142,6 +159,10 @@ function getLiveSuiteStatuses(env = process.env) {
       defaultMode: String(suite?.defaultMode || ''),
       requiredFlag,
       requiredFlagEnabled,
+      provider: typeof validation?.provider === 'string' ? validation.provider : '',
+      providerEnv: validation?.providerEnv && typeof validation.providerEnv === 'object'
+        ? Object.fromEntries(Object.entries(validation.providerEnv).map(([key, value]) => [key, Array.isArray(value) ? [...value] : []]))
+        : undefined,
       ready,
       mode: ready ? 'ready' : (requiredFlagEnabled ? 'blocked' : 'skip'),
       missing,

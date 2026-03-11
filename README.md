@@ -96,10 +96,13 @@ What `npm run test:privy-live` does:
 
 What `npm run test:privy-email-live` requires:
 - set `PRIVY_LOGIN_METHOD=email`
-- set `PRIVY_EMAIL_OTP_PROVIDER`
-- set `PRIVY_EMAIL_OTP_FETCH_URL`
 - set `PRIVY_EMAIL_OTP_TEST_EMAIL`
-- the OTP fetch endpoint must return one deterministic current code for that test inbox
+- set one supported `PRIVY_EMAIL_OTP_PROVIDER`
+- provider options:
+  - `http-json`: set `PRIVY_EMAIL_OTP_FETCH_URL`
+  - `imap`: set `PRIVY_EMAIL_OTP_IMAP_HOST` and `PRIVY_EMAIL_OTP_IMAP_PASSWORD`
+  - `gmail-imap`: set `PRIVY_EMAIL_OTP_IMAP_PASSWORD` and use a Gmail app password
+- `imap` and `gmail-imap` read the mailbox directly during the live lane, so no separate OTP bridge service is required
 
 Optional local integration check (reused Sepolia wallet):
 ```bash
