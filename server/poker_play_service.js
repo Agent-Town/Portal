@@ -248,6 +248,10 @@ function isTablePaused(table) {
   return normalizeTrimmedString(table?.status, 'open').toLowerCase() === 'paused';
 }
 
+function isSeriesClosedTable(table) {
+  return normalizeTrimmedString(table?.status).toLowerCase() === 'series_closed';
+}
+
 function isSeatInPlay(seat) {
   return !!seat && (seat.status === 'active' || seat.status === 'registered' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
 }
@@ -448,7 +452,21 @@ function listExistingTournamentSeriesTables(deps, matchKey, { processAt } = {}) 
   return deps.listPokerPlayTables()
     .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt }))
     .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
+    .filter((synced) => !isSeriesClosedTable(synced?.table))
     .filter((synced) => getTournamentSeriesRef(synced.table).matchKey === targetMatchKey);
+}
+
+function listTournamentSeriesEntriesDirect(deps, matchKey) {
+  const targetMatchKey = normalizeTrimmedString(matchKey);
+  return deps.listPokerPlayTables()
+    .filter((table) => normalizePokerPlayTableType(table?.tableType) === 'tournament')
+    .filter((table) => !isSeriesClosedTable(table))
+    .filter((table) => getTournamentSeriesRef(table).matchKey === targetMatchKey)
+    .map((table) => ({
+      table,
+      seats: deps.listPokerPlaySeatsByTable(table.tableId),
+      hand: deps.getCurrentPokerPlayHandForTable(table.tableId),
+    }));
 }
 
 function shouldRevealCards({ viewerSeatNumber, hand, seatState }) {
@@ -907,6 +925,149 @@ function maybeClearReusableTournamentSeats(deps, table) {
   });
 }
 
+function findNextOpenSeatNumber(table, seats) {
+  const occupied = new Set((Array.isArray(seats) ? seats : []).map((seat) => normalizeSeatNumber(seat?.seatNumber)).filter(Boolean));
+  return Array.from({ length: Number(table?.maxSeats || POKER_PLAY_MAX_SEATS) }, (_value, index) => index + 1)
+    .find((seatNumber) => !occupied.has(seatNumber)) || 0;
+}
+
+function closeTournamentSeriesTable(deps, table, { mergedIntoTableId, atIso }) {
+  return deps.upsertPokerPlayTable({
+    ...table,
+    status: 'series_closed',
+    state: {
+      ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+      seriesClosedAt: atIso,
+      mergedIntoTableId: normalizeTrimmedString(mergedIntoTableId) || null,
+    },
+    updatedAt: atIso,
+  });
+}
+
+function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
+  const seriesRef = getTournamentSeriesRef(table);
+  if (!seriesRef.seriesId || !seriesRef.matchKey) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+  const entries = listTournamentSeriesEntriesDirect(deps, seriesRef.matchKey);
+  if (entries.length <= 1) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+  if (entries.some((entry) => entry?.hand && entry.hand.status === 'live')) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+  const activeEntries = entries
+    .map((entry) => ({
+      ...entry,
+      activeSeats: getActiveSeatRows(entry.seats),
+    }))
+    .filter((entry) => entry.activeSeats.length > 0);
+  if (activeEntries.length <= 1) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+  const targetEntry = activeEntries
+    .slice()
+    .sort((left, right) => {
+      const occupancyDelta = right.activeSeats.length - left.activeSeats.length;
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(left?.table?.createdAt || '').localeCompare(String(right?.table?.createdAt || ''));
+    })[0];
+  const totalActiveSeats = activeEntries.reduce((sum, entry) => sum + entry.activeSeats.length, 0);
+  if (totalActiveSeats > Number(targetEntry?.table?.maxSeats || POKER_PLAY_MAX_SEATS)) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+
+  let targetSeats = deps.listPokerPlaySeatsByTable(targetEntry.table.tableId);
+  let movedCount = 0;
+  for (const entry of activeEntries) {
+    if (entry.table.tableId === targetEntry.table.tableId) continue;
+    for (const seat of entry.activeSeats) {
+      const openSeatNumber = findNextOpenSeatNumber(targetEntry.table, targetSeats);
+      if (!openSeatNumber) {
+        return {
+          table,
+          seats,
+          hand,
+          changed: false,
+          closed: false,
+        };
+      }
+      const movedSeat = deps.upsertPokerPlaySeat({
+        ...seat,
+        tableId: targetEntry.table.tableId,
+        seatNumber: openSeatNumber,
+        status: 'active',
+        createdAt: seat.createdAt,
+        updatedAt: atIso,
+      });
+      deps.deletePokerPlaySeat(entry.table.tableId, seat.seatNumber);
+      targetSeats = deps.listPokerPlaySeatsByTable(targetEntry.table.tableId);
+      movedCount += movedSeat ? 1 : 0;
+    }
+    closeTournamentSeriesTable(deps, entry.table, {
+      mergedIntoTableId: targetEntry.table.tableId,
+      atIso,
+    });
+  }
+
+  if (!movedCount) {
+    return {
+      table,
+      seats,
+      hand,
+      changed: false,
+      closed: false,
+    };
+  }
+
+  if (table.tableId === targetEntry.table.tableId) {
+    return {
+      table: deps.getPokerPlayTableById(table.tableId) || table,
+      seats: deps.listPokerPlaySeatsByTable(table.tableId),
+      hand: deps.getCurrentPokerPlayHandForTable(table.tableId),
+      changed: true,
+      closed: false,
+    };
+  }
+  return {
+    table: deps.getPokerPlayTableById(table.tableId) || table,
+    seats: deps.listPokerPlaySeatsByTable(table.tableId),
+    hand: deps.getCurrentPokerPlayHandForTable(table.tableId),
+    changed: true,
+    closed: true,
+  };
+}
+
 function pauseTable(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
   const requestAt = toProcessIso(deps, asOf);
   const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
@@ -1106,6 +1267,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       seats = tournamentSettlement.seats;
       if (tournamentSettlement.completed) break;
 
+      const seriesConvergence = maybeConvergeTournamentSeries(deps, table, seats, hand, atIso);
+      table = seriesConvergence.table;
+      seats = seriesConvergence.seats;
+      hand = seriesConvergence.hand;
+      if (seriesConvergence.closed) break;
+
       const readySeats = getActiveSeatRows(seats);
       if (readySeats.length >= Math.max(2, Number(table.minPlayers || 2))) {
         const started = startNewTableHand(deps, table, seats, hand, atIso);
@@ -1114,6 +1281,14 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
         continue;
       }
       break;
+    }
+
+    if (!hand || hand.status !== 'live') {
+      const seriesConvergence = maybeConvergeTournamentSeries(deps, table, seats, hand, atIso);
+      table = seriesConvergence.table;
+      seats = seriesConvergence.seats;
+      hand = seriesConvergence.hand;
+      if (seriesConvergence.closed) break;
     }
 
     if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= Math.max(2, Number(table.minPlayers || 2))) {
@@ -1185,7 +1360,9 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
 function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
   const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
-  const entries = deps.listPokerPlayTables().map((table) => {
+  const entries = deps.listPokerPlayTables()
+    .filter((table) => !isSeriesClosedTable(table))
+    .map((table) => {
     const synced = syncPokerPlayTable(deps, table.tableId, { processAt });
     const viewerSeat = walletBinding?.walletSubject
       ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
@@ -1198,7 +1375,7 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
       viewerSeat,
       summary,
     };
-  });
+    });
   const items = entries.map((entry) => {
     const seriesRef = getTournamentSeriesRef(entry.table);
     return {

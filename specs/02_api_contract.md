@@ -442,6 +442,7 @@ Tournament registration notes:
 - a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
 - once the next hand starts, the registered seat becomes active automatically
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
+- when a series can fit back onto one table, active seats may converge to a single final table between hands; overflow tables then fall out of the lobby payload
 
 Presence notes:
 - seated viewers heartbeat through authenticated table detail reads and table stream connects
