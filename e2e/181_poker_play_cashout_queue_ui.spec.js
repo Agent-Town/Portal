@@ -101,7 +101,7 @@ test('M23.7: live poker UI queues a cash-table exit during a live hand and reope
   await leaverPage.getByRole('button', { name: 'Leave After Hand' }).click();
   await expect(leaverPage.getByText('Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.')).toBeVisible();
   await expect(leaverPage.getByRole('button', { name: 'Cash Out Queued' })).toBeDisabled();
-  await expect(leaverPage.getByText('leaving after hand')).toBeVisible();
+  await expect(leaverPage.getByText('leaving after hand').first()).toBeVisible();
 
   const actorDetailResp = await browserJson(actorPage, '/api/poker/play/tables/pkt_play_cash_01', {
     headers: { 'x-wallet-solana-address': actorAddress },

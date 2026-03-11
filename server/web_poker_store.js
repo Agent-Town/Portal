@@ -769,6 +769,7 @@ function seedPokerPlayTables() {
       reconnectGraceSeconds: 90,
       cashOutEnabled: false,
       payoutModel: 'winner_take_all',
+      lateRegistrationHands: 2,
       handsPerBlindLevel: 2,
       blindLevels: [
         { level: 1, smallBlindOil: 50, bigBlindOil: 100 },

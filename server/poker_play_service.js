@@ -110,6 +110,9 @@ function normalizeCreateTableConfig(input = {}) {
   const countdownSeconds = Math.max(10, normalizeOilAmount(input?.decisionCountdownSeconds, DEFAULT_PLAY_ACTION_COUNTDOWN_SECONDS));
   const presenceTimeoutSeconds = Math.max(10, normalizeOilAmount(input?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS));
   const reconnectGraceSeconds = Math.max(10, normalizeOilAmount(input?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
+  const lateRegistrationHands = tableType === 'tournament'
+    ? Math.max(0, normalizeOilAmount(input?.lateRegistrationHands, 2))
+    : 0;
   const handsPerBlindLevel = tableType === 'tournament'
     ? Math.max(1, normalizeOilAmount(input?.handsPerBlindLevel, 2))
     : 0;
@@ -132,6 +135,7 @@ function normalizeCreateTableConfig(input = {}) {
     decisionCountdownSeconds: countdownSeconds,
     presenceTimeoutSeconds,
     reconnectGraceSeconds,
+    lateRegistrationHands,
     handsPerBlindLevel,
     blindLevels,
     title,
@@ -181,10 +185,27 @@ function buildMatchKey(config) {
     const blindLevels = normalizeTournamentBlindLevels(config?.blindLevels, config?.smallBlindOil, config?.bigBlindOil);
     base.push(`hbl${Math.max(1, normalizeOilAmount(config?.handsPerBlindLevel, 2))}`);
     base.push(`bl${blindLevels.map((level) => `${level.smallBlindOil}-${level.bigBlindOil}`).join('_')}`);
+    base.push(`lr${Math.max(0, normalizeOilAmount(config?.lateRegistrationHands, 0))}`);
   }
   base.push(`pt${Math.max(10, normalizeOilAmount(config?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS))}`);
   base.push(`rg${Math.max(10, normalizeOilAmount(config?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS))}`);
   return base.join(':');
+}
+
+function buildMatchKeyFromTable(table) {
+  return buildMatchKey({
+    tableType: table?.tableType,
+    smallBlindOil: table?.smallBlindOil,
+    bigBlindOil: table?.bigBlindOil,
+    buyInOil: table?.buyInOil,
+    maxSeats: table?.maxSeats,
+    minPlayers: table?.minPlayers,
+    handsPerBlindLevel: table?.rules?.handsPerBlindLevel,
+    blindLevels: table?.rules?.blindLevels,
+    lateRegistrationHands: table?.rules?.lateRegistrationHands,
+    presenceTimeoutSeconds: table?.rules?.presenceTimeoutSeconds,
+    reconnectGraceSeconds: table?.rules?.reconnectGraceSeconds,
+  });
 }
 
 function getSessionHouseId(session) {
@@ -205,7 +226,7 @@ function isTablePaused(table) {
 }
 
 function isSeatInPlay(seat) {
-  return !!seat && (seat.status === 'active' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
+  return !!seat && (seat.status === 'active' || seat.status === 'registered' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
 }
 
 function getPokerPlayPresenceTimeoutSeconds(table) {
@@ -214,6 +235,38 @@ function getPokerPlayPresenceTimeoutSeconds(table) {
 
 function getPokerPlayReconnectGraceSeconds(table) {
   return Math.max(10, normalizeOilAmount(table?.rules?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
+}
+
+function resolveTournamentLateRegistration(table, hand) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return {
+      open: false,
+      lateRegistrationHands: 0,
+      remainingHands: 0,
+    };
+  }
+  const lateRegistrationHands = Math.max(0, normalizeOilAmount(table?.rules?.lateRegistrationHands, 0));
+  if (!lateRegistrationHands) {
+    return {
+      open: false,
+      lateRegistrationHands,
+      remainingHands: 0,
+    };
+  }
+  const currentHandNumber = Math.max(0, normalizeOilAmount(hand?.handNumber, normalizeOilAmount(table?.state?.activeHandNumber, 0)));
+  if (!currentHandNumber) {
+    return {
+      open: true,
+      lateRegistrationHands,
+      remainingHands: lateRegistrationHands,
+    };
+  }
+  const remainingHands = Math.max(0, (lateRegistrationHands - currentHandNumber) + 1);
+  return {
+    open: remainingHands > 0,
+    lateRegistrationHands,
+    remainingHands,
+  };
 }
 
 function getSeatPresenceStatus(seat) {
@@ -265,6 +318,7 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const disconnectedSeatCount = activeSeats.filter((seat) => getSeatPresenceStatus(seat) === 'disconnected').length;
   const handNumber = Number(hand?.handNumber || 0);
   const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
+  const lateRegistration = resolveTournamentLateRegistration(table, hand);
   return {
     occupancy: activeSeats.length,
     openSeatCount: Math.max(0, Number(table?.maxSeats || POKER_PLAY_MAX_SEATS) - activeSeats.length),
@@ -278,6 +332,8 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     blindLevel: blindProgress.blindLevel,
     nextBlindLevel: blindProgress.nextBlindLevel,
     handsUntilBlindIncrease: blindProgress.handsUntilIncrease,
+    lateRegistrationOpen: lateRegistration.open,
+    lateRegistrationRemainingHands: lateRegistration.remainingHands,
   };
 }
 
@@ -308,7 +364,9 @@ function sanitizeSeatForViewer({ seat, hand, viewerSeatNumber }) {
   const stateSeat = hand?.state?.seatStates?.[String(seatNumber)] || null;
   const revealed = shouldRevealCards({ viewerSeatNumber, hand, seatState: stateSeat });
   const rawCards = Array.isArray(stateSeat?.holeCards) ? stateSeat.holeCards.slice(0, 2) : [];
-  const status = isSeatPendingCashout(seat) ? 'leaving_after_hand' : (seat?.status || 'empty');
+  const status = stateSeat && normalizeTrimmedString(seat?.status).toLowerCase() === 'registered'
+    ? 'active'
+    : (isSeatPendingCashout(seat) ? 'leaving_after_hand' : (seat?.status || 'empty'));
   return {
     seatNumber,
     displayName: seat?.displayName || `Seat ${seatNumber}`,
@@ -570,6 +628,16 @@ function settleQueuedCashouts(deps, table, seats, hand, atIso) {
 }
 
 function startNewTableHand(deps, table, seats, previousHand, atIso) {
+  let nextSeats = Array.isArray(seats) ? seats.slice() : [];
+  for (const seat of nextSeats) {
+    if (normalizeTrimmedString(seat?.status).toLowerCase() !== 'registered') continue;
+    deps.upsertPokerPlaySeat({
+      ...seat,
+      status: 'active',
+      updatedAt: atIso,
+    });
+  }
+  nextSeats = deps.listPokerPlaySeatsByTable(table.tableId);
   const nextHandNumber = previousHand ? Number(previousHand.handNumber || 0) + 1 : 1;
   let nextTable = table;
   if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
@@ -589,7 +657,7 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
   }
   const nextState = createInitialPokerPlayHandState({
     table: nextTable,
-    seats,
+    seats: nextSeats,
     handNumber: nextHandNumber,
     nowIso: atIso,
     previousTableState: nextTable?.state || {},
@@ -1059,6 +1127,7 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       reconnectGraceSeconds: normalized.reconnectGraceSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'winner_take_all',
+      lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
       matchKey,
@@ -1078,13 +1147,17 @@ function isTableMatchCandidate(synced, matchKey, tableType) {
     ...(table.summary && typeof table.summary === 'object' ? table.summary : {}),
     ...computedSummary,
   };
-  const tableMatchKey = normalizeTrimmedString(table?.rules?.matchKey || table?.summary?.matchKey || summary.matchKey);
+  const tableMatchKey = normalizeTrimmedString(table?.rules?.matchKey || table?.summary?.matchKey || summary.matchKey || buildMatchKeyFromTable(table));
   if (!tableMatchKey || tableMatchKey !== matchKey) return false;
   if (normalizePokerPlayTableType(table.tableType) !== normalizePokerPlayTableType(tableType)) return false;
   if (Number(summary.openSeatCount || 0) <= 0) return false;
   if (String(table.status || 'open') !== 'open') return false;
-  if (tableType === 'tournament' && (summary.liveHand || Number(summary.occupancy || 0) >= Number(table.maxSeats || POKER_PLAY_MAX_SEATS))) {
-    return false;
+  if (tableType === 'tournament') {
+    if (Number(summary.occupancy || 0) >= Number(table.maxSeats || POKER_PLAY_MAX_SEATS)) return false;
+    if (summary.liveHand) {
+      const lateRegistration = resolveTournamentLateRegistration(table, synced.hand);
+      if (!lateRegistration.open) return false;
+    }
   }
   return true;
 }
@@ -1156,10 +1229,12 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   if (sameTableSeat) {
     return buildPokerPlayTablePayload(deps, table, seats, currentHand, { session, req, processAt: requestAt });
   }
-  if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live') {
-    throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_ALREADY_STARTED', 'Tournament seats lock once the first live hand begins.', {
+  const lateRegistration = resolveTournamentLateRegistration(table, currentHand);
+  if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live' && !lateRegistration.open) {
+    throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_ALREADY_STARTED', 'Tournament seats lock once late registration closes.', {
       tableId: table.tableId,
       handId: currentHand.handId,
+      lateRegistrationRemainingHands: lateRegistration.remainingHands,
     });
   }
 
@@ -1197,7 +1272,7 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     houseId,
     walletSubject: walletBinding.walletSubject,
     displayName: normalizePokerPlayDisplayName(body?.displayName, session?.agent?.name || houseId || walletBinding.walletSubject.slice(0, 8)),
-    status: 'active',
+    status: normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live' ? 'registered' : 'active',
     buyInOil,
     stackOil: buyInOil,
     streamflowVerificationId: deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject)?.verificationId || null,
@@ -1205,6 +1280,16 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     disconnectedAt: null,
     updatedAt: requestAt,
   });
+  if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live') {
+    deps.createPokerPlayMessage({
+      tableId: table.tableId,
+      handId: currentHand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `${formatSeatLabel(openSeatNumber, normalizePokerPlayDisplayName(body?.displayName, session?.agent?.name || houseId || walletBinding.walletSubject.slice(0, 8)))} registers for the next hand.`,
+      createdAt: requestAt,
+    });
+  }
 
   const refreshed = syncPokerPlayTable(deps, table.tableId, { processAt: requestAt });
   return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
@@ -1302,6 +1387,30 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
     }
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
   } else {
+    if (liveHand && normalizeTrimmedString(seat?.status).toLowerCase() === 'registered') {
+      if (Number(seat.stackOil || 0) > 0) {
+        deps.createOilLedgerEntry({
+          walletSubject: walletBinding.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          entryKind: 'poker_play_tournament_unregister',
+          direction: 'credit',
+          amount: Number(seat.stackOil || 0),
+          memo: `${synced.table.title} late registration refund`,
+        });
+      }
+      deps.createPokerPlayMessage({
+        tableId: synced.table.tableId,
+        handId: liveHand.handId,
+        seatNumber: null,
+        authorRole: 'system',
+        body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} cancels late registration before the next hand begins.`,
+        createdAt: requestAt,
+      });
+      deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+      const refreshedRegistered = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+      return buildPokerPlayTablePayload(deps, refreshedRegistered.table, refreshedRegistered.seats, refreshedRegistered.hand, { session, req, processAt: requestAt });
+    }
     if (liveHand) {
       throw createRouteError(409, 'POKER_PLAY_HAND_IN_PROGRESS', 'Tournament seats can only leave after the current hand settles.');
     }

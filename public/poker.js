@@ -121,6 +121,8 @@
   function formatPlaySeatStatus(status) {
     const value = String(status || '').trim().toLowerCase();
     if (value === 'leaving_after_hand') return 'leaving after hand';
+    if (value === 'registered') return 'registered for next hand';
+    if (value.includes('_')) return value.replace(/_/g, ' ');
     return value || 'active';
   }
 
@@ -177,7 +179,7 @@
             <div class="pokerMeta">
               ${seat.isViewer ? '<span class="pokerBadge">you</span>' : ''}
               ${seat.isActing ? '<span class="pokerBadge">acting</span>' : ''}
-              <span class="pokerBadge">${escapeHtml(seat.status || 'open')}</span>
+              <span class="pokerBadge">${escapeHtml(formatPlaySeatStatus(seat.status || 'open'))}</span>
               ${seat.presenceStatus === 'disconnected' ? '<span class="pokerBadge">disconnected</span>' : ''}
               <span class="pokerBadge">${Number(seat.stackOil || 0)} OIL</span>
               ${seat.folded ? '<span class="pokerBadge">folded</span>' : ''}
@@ -456,6 +458,11 @@
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
                 Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
                 item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
+                item?.tableType === 'tournament'
+                  ? (item?.summary?.lateRegistrationOpen
+                    ? `late reg ${Number(item?.summary?.lateRegistrationRemainingHands || 0)}`
+                    : (item?.summary?.handNumber ? 'late reg closed' : 'late reg open'))
+                  : '',
               ])}
             </div>
             <div class="pokerLinks">
@@ -539,6 +546,8 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
           ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
@@ -592,6 +601,7 @@
           ${renderSummaryMetric('Status', seatStatus)}
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
         </div>
+        ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         <div class="pokerLinks">
           <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>

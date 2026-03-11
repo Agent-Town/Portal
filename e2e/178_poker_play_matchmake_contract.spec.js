@@ -14,7 +14,18 @@ test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
 });
 
-test('M23.4: matchmaking reuses matching live tables, creates new structures on demand, and avoids late tournament joins', async ({ browser, request }) => {
+async function getTable(page, address, tableId, { asOf } = {}) {
+  const path = asOf
+    ? `/api/poker/play/tables/${encodeURIComponent(tableId)}?asOf=${encodeURIComponent(asOf)}`
+    : `/api/poker/play/tables/${encodeURIComponent(tableId)}`;
+  const resp = await browserJson(page, path, {
+    headers: { 'x-wallet-solana-address': address },
+  });
+  expect(resp.ok).toBe(true);
+  return resp.body?.data || {};
+}
+
+test('M23.4: matchmaking reuses matching live tables, allows open late-registration seats, and creates new tournament tables once late registration closes', async ({ browser, request }) => {
   const users = [
     { address: 'So1anaMockMatchA11111111111111111111111111111', houseId: 'house_match_a', streamId: 'stream-match-a' },
     { address: 'So1anaMockMatchB11111111111111111111111111111', houseId: 'house_match_b', streamId: 'stream-match-b' },
@@ -89,6 +100,7 @@ test('M23.4: matchmaking reuses matching live tables, creates new structures on 
       smallBlindOil: 75,
       bigBlindOil: 150,
       buyInOil: 600,
+      lateRegistrationHands: 1,
       displayName: 'Charlie Tour',
     },
   });
@@ -106,6 +118,7 @@ test('M23.4: matchmaking reuses matching live tables, creates new structures on 
       smallBlindOil: 75,
       bigBlindOil: 150,
       buyInOil: 600,
+      lateRegistrationHands: 1,
       displayName: 'Delta Tour',
     },
   });
@@ -121,7 +134,50 @@ test('M23.4: matchmaking reuses matching live tables, creates new structures on 
       smallBlindOil: 75,
       bigBlindOil: 150,
       buyInOil: 600,
+      lateRegistrationHands: 1,
       displayName: 'Echo Tour',
+    },
+  });
+  expect(resp.ok).toBe(true);
+  expect(String(resp.body?.data?.table?.tableId || '')).toBe(tournamentTableId);
+  expect(resp.body?.data?.mySeat?.status).toBe('registered');
+  expect(Number(resp.body?.data?.table?.summary?.lateRegistrationRemainingHands || 0)).toBe(1);
+
+  const liveDetail = await getTable(pages[2], users[2].address, tournamentTableId, {
+    asOf: '2026-03-10T12:00:03.000Z',
+  });
+  const actingSeat = Number(liveDetail?.hand?.actingSeat || 0);
+  const actorPage = actingSeat === 1 ? pages[2] : pages[3];
+  const actorAddress = actingSeat === 1 ? users[2].address : users[3].address;
+  resp = await browserJson(actorPage, `/api/poker/play/hands/${encodeURIComponent(liveDetail?.hand?.handId || '')}/actions`, {
+    method: 'POST',
+    headers: { 'x-wallet-solana-address': actorAddress },
+    data: {
+      actionKind: 'fold',
+      amountOil: 0,
+      asOf: '2026-03-10T12:00:03.000Z',
+    },
+  });
+  expect(resp.ok).toBe(true);
+
+  const afterLateRegClose = await getTable(pages[4], users[4].address, tournamentTableId, {
+    asOf: '2026-03-10T12:00:03.000Z',
+  });
+  expect(Number(afterLateRegClose?.hand?.handNumber || 0)).toBe(2);
+  expect(afterLateRegClose?.mySeat?.status).toBe('active');
+  expect(afterLateRegClose?.table?.summary?.lateRegistrationOpen).toBe(false);
+
+  resp = await browserJson(pages[5], '/api/poker/play/matchmake', {
+    method: 'POST',
+    headers: { 'x-wallet-solana-address': users[5].address },
+    data: {
+      tableType: 'tournament',
+      smallBlindOil: 75,
+      bigBlindOil: 150,
+      buyInOil: 600,
+      lateRegistrationHands: 1,
+      displayName: 'Foxtrot Late Join',
+      asOf: '2026-03-10T12:00:04.000Z',
     },
   });
   expect(resp.ok).toBe(true);
@@ -129,18 +185,6 @@ test('M23.4: matchmaking reuses matching live tables, creates new structures on 
   expect(secondTournamentTableId).toBeTruthy();
   expect(secondTournamentTableId).not.toBe(tournamentTableId);
   expect(await getTableCount(request, 'poker_play_tables')).toBe(baselineTableCount + 3);
-
-  resp = await browserJson(pages[5], `/api/poker/play/tables/${encodeURIComponent(tournamentTableId)}/sit`, {
-    method: 'POST',
-    headers: { 'x-wallet-solana-address': users[5].address },
-    data: {
-      seatNumber: 3,
-      displayName: 'Foxtrot Late Join',
-    },
-  });
-  expect(resp.ok).toBe(false);
-  expect(resp.status).toBe(409);
-  expect(resp.body?.error?.code).toBe('POKER_PLAY_TOURNAMENT_ALREADY_STARTED');
 
   await Promise.all(contexts.map((context) => context.close()));
 });

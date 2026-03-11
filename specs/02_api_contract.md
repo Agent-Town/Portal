@@ -402,6 +402,8 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[].summary.blindLevel`
 - `data.items[].summary.nextBlindLevel`
 - `data.items[].summary.handsUntilBlindIncrease`
+- `data.items[].summary.lateRegistrationOpen`
+- `data.items[].summary.lateRegistrationRemainingHands`
 - `data.houseId`
 - `data.wallet`
 - `data.oilBalance`
@@ -421,8 +423,15 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.blindLevel`
 - tournaments expose `data.table.summary.nextBlindLevel`
 - tournaments expose `data.table.summary.handsUntilBlindIncrease`
+- tournaments expose `data.table.summary.lateRegistrationOpen`
+- tournaments expose `data.table.summary.lateRegistrationRemainingHands`
 - live tournament hands expose `data.hand.blindLevel`
 - tournament blind values are resolved server-side at hand start from `data.table.rules.handsPerBlindLevel` and `data.table.rules.blindLevels[]`
+
+Tournament registration notes:
+- tournaments may accept new seats while `data.table.summary.lateRegistrationOpen === true`
+- a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
+- once the next hand starts, the registered seat becomes active automatically
 
 Presence notes:
 - seated viewers heartbeat through authenticated table detail reads and table stream connects
@@ -454,6 +463,7 @@ Request shape:
 ```
 
 Tournament-only request fields:
+- `lateRegistrationHands`
 - `handsPerBlindLevel`
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
 
@@ -489,6 +499,10 @@ Failure codes:
 - `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
 - `OIL_BALANCE_TOO_LOW`
 
+Tournament seat notes:
+- if a tournament hand is already live and late registration is still open, the seat is accepted with `data.mySeat.status = "registered"`
+- if late registration is closed, the route fails with `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
+
 ### POST `/api/poker/play/matchmake`
 Finds an open live table with the same structure and seats the caller there. If no candidate exists, the server creates a new dynamic table and seats the caller into it.
 
@@ -499,6 +513,7 @@ Request shape:
   "smallBlindOil": 75,
   "bigBlindOil": 150,
   "buyInOil": 600,
+  "lateRegistrationHands": 2,
   "handsPerBlindLevel": 2,
   "displayName": "Bravo House"
 }
@@ -509,6 +524,10 @@ Response fields:
 - `data.mySeat`
 - `data.hand`
 - `data.oilBalance`
+
+Tournament matchmaking notes:
+- tournament matching includes `lateRegistrationHands` as part of the structure key
+- if a matching tournament table is already live but still within the late-registration window, matchmaking may seat the caller into that live table as `registered`
 
 ### GET `/api/poker/play/tables/:tableId/stream`
 Opens a server-sent event stream for one live table. The stream does not expose seat-private cards or thread content; it only notifies the browser that the table changed so the normal detail route can be reloaded immediately.
