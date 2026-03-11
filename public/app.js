@@ -214,6 +214,29 @@ async function api(url, opts = {}) {
   return data;
 }
 
+async function apiWithRetry(url, opts = {}, {
+  retryCodes = [],
+  maxAttempts = 2,
+  retryDelayMs = 50,
+} = {}) {
+  const allowedCodes = Array.isArray(retryCodes) ? retryCodes.map((code) => String(code || '').trim()).filter(Boolean) : [];
+  let attempt = 0;
+  while (attempt < Math.max(1, Number(maxAttempts || 1))) {
+    try {
+      return await api(url, opts);
+    } catch (err) {
+      attempt += 1;
+      const code = String(err?.code || err?.message || '').trim();
+      const canRetry = allowedCodes.includes(code) && attempt < Math.max(1, Number(maxAttempts || 1));
+      if (!canRetry) throw err;
+      await new Promise((resolve) => {
+        window.setTimeout(resolve, retryDelayMs);
+      });
+    }
+  }
+  return await api(url, opts);
+}
+
 function collectWalletIdentitiesFromClient() {
   const out = [];
   const seen = new Set();
@@ -495,7 +518,9 @@ let houseSurfaceState = {
     loaded: false,
     items: [],
     selectedTraceId: '',
-    emptyStateText: 'No canonical traces archived yet.'
+    emptyStateText: 'No canonical traces archived yet.',
+    actionStatusText: '',
+    actionStatusError: false,
   },
   experiences: {
     loaded: false,
@@ -1278,6 +1303,15 @@ function setHouseWorkshopActionStatus(text, isError = false) {
   node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
 }
 
+function setHouseArchiveActionStatus(text, isError = false) {
+  const node = el('houseArchiveActionStatus');
+  houseSurfaceState.archive.actionStatusText = String(text || '');
+  houseSurfaceState.archive.actionStatusError = !!isError;
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
 function houseWorkshopFileLabel(filePath = '') {
   const normalizedPath = String(filePath || '').trim();
   if (!normalizedPath) return 'Workshop file';
@@ -1393,6 +1427,8 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   houseSurfaceState.context.availableTeamIds = nextTeamIds;
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
+    houseSurfaceState.archive.actionStatusText = '';
+    houseSurfaceState.archive.actionStatusError = false;
     houseSurfaceState.experiences.selectedExperienceId = '';
     houseSurfaceState.library.loaded = false;
     houseSurfaceState.library.items = [];
@@ -1481,9 +1517,20 @@ function renderHouseSurfaceContext() {
   summaryNode.textContent = `Active team: ${activeTeamId}`;
 }
 
-async function loadHousePlatformContext() {
-  const response = await api('/api/platform/context');
-  const data = response?.data || response || {};
+async function loadHousePlatformContext({ requireHouse = false } = {}) {
+  const loadOnce = async () => {
+    const response = await apiWithRetry('/api/platform/context', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
+    return response?.data || response || {};
+  };
+  let data = await loadOnce();
+  if (requireHouse && !String(data?.houseId || '').trim()) {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 50);
+    });
+    data = await loadOnce();
+  }
   syncHouseSurfaceContextFromPayload(data);
   return data;
 }
@@ -1692,13 +1739,15 @@ async function syncHouseLibraryScopeContextToWorker(snapshot = null) {
 
 async function updateHouseLibraryScopeSelection(nextItemIds = []) {
   const scopeSetId = String(houseSurfaceState.library.activeScopeSetId || '').trim();
-  const response = await api('/api/platform/library/scope', {
+  const response = await apiWithRetry('/api/platform/library/scope', {
     method: 'POST',
     body: JSON.stringify({
       scopeSetId,
       title: 'Reading Table',
       itemIds: Array.isArray(nextItemIds) ? nextItemIds : [],
     }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
   });
   const data = response?.data || response || {};
   syncHouseLibraryStateFromPayload(data);
@@ -2031,7 +2080,7 @@ async function saveSelectedHouseWorkshopSnapshot() {
     ? 'playbook'
     : 'workshop_snapshot';
   const idempotencyKey = makeHouseIdempotencyKey('house_workshop_snapshot');
-  const response = await api('/api/platform/library/items', {
+  const response = await apiWithRetry('/api/platform/library/items', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -2054,6 +2103,8 @@ async function saveSelectedHouseWorkshopSnapshot() {
         },
       }],
     }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
   });
   const data = response?.data || response || {};
   const item = data?.item && typeof data.item === 'object' ? data.item : {};
@@ -2062,16 +2113,44 @@ async function saveSelectedHouseWorkshopSnapshot() {
   return data;
 }
 
+async function promoteHouseSourceToLibrary({
+  sourceKind = '',
+  sourceRef = '',
+} = {}) {
+  const normalizedSourceKind = String(sourceKind || '').trim();
+  const normalizedSourceRef = String(sourceRef || '').trim();
+  if (!normalizedSourceKind || !normalizedSourceRef) {
+    throw new Error('LIBRARY_PROMOTION_SOURCE_REQUIRED');
+  }
+  const idempotencyKey = makeHouseIdempotencyKey(`house_library_promote_${normalizedSourceKind}`);
+  const response = await apiWithRetry('/api/platform/library/promotions', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      sourceKind: normalizedSourceKind,
+      sourceRef: normalizedSourceRef,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  return response?.data || response || {};
+}
+
 function renderHouseArchiveSurface() {
   const listNode = el('houseArchiveList');
   const detailNode = el('houseArchiveDetail');
   const emptyNode = el('houseArchiveEmpty');
-  if (!listNode || !detailNode || !emptyNode) return;
+  const saveBtn = el('houseArchiveSaveLibraryBtn');
+  if (!listNode || !detailNode || !emptyNode || !saveBtn) return;
   const items = Array.isArray(houseSurfaceState.archive.items) ? houseSurfaceState.archive.items : [];
   listNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.archive.emptyStateText || 'No canonical traces archived yet.';
   emptyNode.classList.toggle('is-hidden', items.length > 0);
   if (!items.length) {
+    saveBtn.disabled = true;
+    setHouseArchiveActionStatus(houseSurfaceState.archive.actionStatusText, houseSurfaceState.archive.actionStatusError);
     detailNode.textContent = 'Select a trace to inspect archive counters.';
     return;
   }
@@ -2096,7 +2175,9 @@ function renderHouseArchiveSurface() {
   const counters = selectedItem?.archiveCounters && typeof selectedItem.archiveCounters === 'object'
     ? selectedItem.archiveCounters
     : { accepted: 0, ignored: 0, rejected: 0 };
+  saveBtn.disabled = !String(selectedItem?.traceId || '').trim();
   detailNode.textContent = `Trace ${String(selectedItem?.traceId || '')} · accepted ${Number(counters.accepted || 0)} · ignored ${Number(counters.ignored || 0)} · rejected ${Number(counters.rejected || 0)}`;
+  setHouseArchiveActionStatus(houseSurfaceState.archive.actionStatusText, houseSurfaceState.archive.actionStatusError);
 }
 
 function renderHouseTrainerSurface() {
@@ -2106,6 +2187,7 @@ function renderHouseTrainerSurface() {
   const emptyNode = el('houseTrainerEmpty');
   const createCompareBtn = el('houseTrainerCreateCompareBtn');
   const promotePatchBtn = el('houseTrainerPromotePatchBtn');
+  const saveLibraryBtn = el('houseTrainerSaveLibraryBtn');
   const approvalInput = el('houseTrainerApprovalIdInput');
   if (!jobsNode || !resultsNode || !detailNode || !emptyNode) return;
   const jobs = Array.isArray(houseSurfaceState.trainer.jobs) ? houseSurfaceState.trainer.jobs : [];
@@ -2117,6 +2199,7 @@ function renderHouseTrainerSurface() {
   if (!jobs.length && !results.length) {
     if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
     if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (saveLibraryBtn) saveLibraryBtn.disabled = true;
     if (approvalInput) approvalInput.disabled = true;
     setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
     detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
@@ -2153,6 +2236,7 @@ function renderHouseTrainerSurface() {
   if (!selectedResult) {
     if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
     if (promotePatchBtn) promotePatchBtn.disabled = true;
+    if (saveLibraryBtn) saveLibraryBtn.disabled = true;
     if (approvalInput) approvalInput.disabled = true;
     setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
     detailNode.textContent = 'Select a trainer result to inspect linked config refs.';
@@ -2169,17 +2253,35 @@ function renderHouseTrainerSurface() {
   if (promotePatchBtn) {
     promotePatchBtn.disabled = !candidatePatchId;
   }
+  if (saveLibraryBtn) {
+    saveLibraryBtn.disabled = !String(selectedResult?.trainerResultId || '').trim();
+  }
   if (approvalInput) {
     approvalInput.disabled = !candidatePatchId;
   }
   setHouseTrainerActionStatus(houseSurfaceState.trainer.actionStatusText, houseSurfaceState.trainer.actionStatusError);
 }
 
+async function promoteSelectedHouseArchiveTrace() {
+  const traceId = String(houseSurfaceState.archive.selectedTraceId || '').trim();
+  if (!traceId) {
+    throw new Error('TRACE_NOT_FOUND');
+  }
+  setHouseArchiveActionStatus(`Saving ${traceId} to Library...`);
+  const data = await promoteHouseSourceToLibrary({
+    sourceKind: 'trace',
+    sourceRef: traceId,
+  });
+  const itemTitle = String(data?.item?.title || traceId).trim();
+  setHouseArchiveActionStatus(`Saved ${itemTitle} to Library.`);
+  return data;
+}
+
 async function createHouseTrainerCompareJob() {
   const idempotencyKey = String(houseSurfaceState.trainer.submitIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_compare');
   houseSurfaceState.trainer.submitIdempotencyKey = idempotencyKey;
   setHouseTrainerActionStatus('Creating durable compare job...');
-  const response = await api('/api/platform/trainer/jobs', {
+  const response = await apiWithRetry('/api/platform/trainer/jobs', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -2190,6 +2292,8 @@ async function createHouseTrainerCompareJob() {
         maxUsd: 5,
       },
     }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'ACTIVE_TEAM_REQUIRED'],
   });
   const data = response?.data || response || {};
   await loadHouseTrainerSurface({ skipContext: true });
@@ -2207,6 +2311,21 @@ async function createHouseTrainerCompareJob() {
   return data;
 }
 
+async function promoteSelectedHouseTrainerResultToLibrary() {
+  const trainerResultId = String(houseSurfaceState.trainer.selectedResultId || '').trim();
+  if (!trainerResultId) {
+    throw new Error('TRAINER_RESULT_NOT_FOUND');
+  }
+  setHouseTrainerActionStatus(`Saving ${trainerResultId} to Library...`);
+  const data = await promoteHouseSourceToLibrary({
+    sourceKind: 'trainer_result',
+    sourceRef: trainerResultId,
+  });
+  const itemTitle = String(data?.item?.title || trainerResultId).trim();
+  setHouseTrainerActionStatus(`Saved ${itemTitle} to Library.`);
+  return data;
+}
+
 async function promoteSelectedHouseTrainerPatch() {
   const selectedResultId = String(houseSurfaceState.trainer.selectedResultId || '').trim();
   const selectedResult = Array.isArray(houseSurfaceState.trainer.results)
@@ -2220,7 +2339,7 @@ async function promoteSelectedHouseTrainerPatch() {
   const idempotencyKey = String(houseSurfaceState.trainer.promotionIdempotencyKey || '').trim() || makeHouseIdempotencyKey('house_promote');
   houseSurfaceState.trainer.promotionIdempotencyKey = idempotencyKey;
   setHouseTrainerActionStatus(`Promoting patch ${candidatePatchId}...`);
-  const response = await api(`/api/platform/trainer/results/${encodeURIComponent(selectedResultId)}/promote-patch`, {
+  const response = await apiWithRetry(`/api/platform/trainer/results/${encodeURIComponent(selectedResultId)}/promote-patch`, {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
@@ -2229,6 +2348,8 @@ async function promoteSelectedHouseTrainerPatch() {
       candidatePatchId,
       approvalId,
     }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED'],
   });
   const data = response?.data || response || {};
   await loadHouseTrainerSurface({ skipContext: true });
@@ -2250,14 +2371,20 @@ async function loadHouseArchiveSurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading canonical archive...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/archive');
+    const response = await apiWithRetry('/api/platform/archive', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.archive.loaded = true;
     houseSurfaceState.archive.items = Array.isArray(data.items) ? data.items : [];
     houseSurfaceState.archive.emptyStateText = String(data.emptyStateText || 'No canonical traces archived yet.');
+    if (!houseSurfaceState.archive.items.length) {
+      houseSurfaceState.archive.actionStatusText = '';
+      houseSurfaceState.archive.actionStatusError = false;
+    }
     if (!houseSurfaceState.archive.items.some((item) => String(item?.traceId || '') === String(houseSurfaceState.archive.selectedTraceId || ''))) {
       houseSurfaceState.archive.selectedTraceId = '';
     }
@@ -2269,6 +2396,8 @@ async function loadHouseArchiveSurface({ skipContext = false } = {}) {
   } catch (err) {
     houseSurfaceState.archive.loaded = true;
     houseSurfaceState.archive.items = [];
+    houseSurfaceState.archive.actionStatusText = '';
+    houseSurfaceState.archive.actionStatusError = false;
     renderHouseArchiveSurface();
     setHouseSurfaceStatus(`Archive unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
@@ -2279,9 +2408,11 @@ async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading House experiences...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/experiences');
+    const response = await apiWithRetry('/api/platform/experiences', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.experiences.loaded = true;
@@ -2308,9 +2439,11 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading House Library...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/library');
+    const response = await apiWithRetry('/api/platform/library', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     syncHouseLibraryStateFromPayload(data);
@@ -2340,9 +2473,11 @@ async function loadHouseTracksSurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading House tracks...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/tracks');
+    const response = await apiWithRetry('/api/platform/tracks', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.tracks.loaded = true;
@@ -2369,9 +2504,11 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading House Workshop...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/workshop');
+    const response = await apiWithRetry('/api/platform/workshop', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.workshop.loaded = true;
@@ -2459,9 +2596,11 @@ async function loadHouseTrainerSurface({ skipContext = false } = {}) {
   setHouseSurfaceStatus('Loading durable trainer records...');
   try {
     if (!skipContext) {
-      await loadHousePlatformContext();
+      await loadHousePlatformContext({ requireHouse: true });
     }
-    const response = await api('/api/platform/trainer');
+    const response = await apiWithRetry('/api/platform/trainer', {}, {
+      retryCodes: ['SESSION_REQUIRED'],
+    });
     const data = response?.data || response || {};
     syncHouseSurfaceContextFromPayload(data);
     houseSurfaceState.trainer.loaded = true;
@@ -4945,6 +5084,20 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseArchiveSaveLibraryBtn = el('houseArchiveSaveLibraryBtn');
+  if (houseArchiveSaveLibraryBtn) {
+    houseArchiveSaveLibraryBtn.onclick = async () => {
+      houseArchiveSaveLibraryBtn.disabled = true;
+      try {
+        await promoteSelectedHouseArchiveTrace();
+      } catch (err) {
+        setHouseArchiveActionStatus(String(err?.message || 'LIBRARY_PROMOTION_FAILED'), true);
+      } finally {
+        renderHouseArchiveSurface();
+      }
+    };
+  }
+
   const houseTrainerCreateCompareBtn = el('houseTrainerCreateCompareBtn');
   if (houseTrainerCreateCompareBtn) {
     houseTrainerCreateCompareBtn.onclick = async () => {
@@ -4968,6 +5121,20 @@ function bindTownDistrictControls() {
       } catch (err) {
         const code = String(err?.message || 'UNKNOWN_ERROR');
         setHouseTrainerActionStatus(code, true);
+      } finally {
+        renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  const houseTrainerSaveLibraryBtn = el('houseTrainerSaveLibraryBtn');
+  if (houseTrainerSaveLibraryBtn) {
+    houseTrainerSaveLibraryBtn.onclick = async () => {
+      houseTrainerSaveLibraryBtn.disabled = true;
+      try {
+        await promoteSelectedHouseTrainerResultToLibrary();
+      } catch (err) {
+        setHouseTrainerActionStatus(String(err?.message || 'LIBRARY_PROMOTION_FAILED'), true);
       } finally {
         renderHouseTrainerSurface();
       }

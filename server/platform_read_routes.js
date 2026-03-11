@@ -199,6 +199,240 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function describePromotedTraceEvent(event) {
+    const payload = event?.payload && typeof event.payload === 'object' ? event.payload : {};
+    const eventKind = String(event?.eventKind || event?.eventType || 'event').trim() || 'event';
+    const sourceType = String(event?.sourceType || 'unknown').trim() || 'unknown';
+    const payloadHint = String(
+      payload.kind
+      || payload.url
+      || payload.selector
+      || payload.target
+      || payload.action
+      || ''
+    ).trim();
+    return payloadHint
+      ? `${eventKind} (${sourceType}) ${payloadHint}`
+      : `${eventKind} (${sourceType})`;
+  }
+
+  function buildTracePromotionPayload({
+    houseId = '',
+    teamId = '',
+    traceId = '',
+  } = {}) {
+    const normalizedTraceId = String(traceId || '').trim();
+    const run = listRuns({ houseId, teamId }).find((entry) => String(entry?.traceId || '').trim() === normalizedTraceId) || null;
+    if (!run) {
+      return {
+        ok: false,
+        code: 'TRACE_NOT_FOUND',
+        message: 'Trace could not be found for this House team.',
+      };
+    }
+    const events = listTraceEvents(normalizedTraceId);
+    const firstEvent = events[0] || null;
+    const lastEvent = events.length ? events[events.length - 1] : null;
+    const eventKinds = Array.from(new Set(
+      events
+        .map((event) => String(event?.eventKind || event?.eventType || '').trim())
+        .filter(Boolean)
+    ));
+    const eventCount = events.length;
+    return {
+      ok: true,
+      itemType: 'episodic_note',
+      title: `Archive Promotion · ${normalizedTraceId}`,
+      summary: `Archived ${eventCount} canonical event${eventCount === 1 ? '' : 's'} from ${run.experienceId || 'unknown experience'} (${run.status || 'unknown status'}).`,
+      contentText: [
+        `Trace ID: ${normalizedTraceId}`,
+        `Run ID: ${String(run.runId || '').trim() || '—'}`,
+        `Experience: ${String(run.experienceId || '').trim() || '—'}`,
+        `Status: ${String(run.status || '').trim() || '—'}`,
+        `Event count: ${eventCount}`,
+        `First event: ${firstEvent ? describePromotedTraceEvent(firstEvent) : '—'}`,
+        `Last event: ${lastEvent ? describePromotedTraceEvent(lastEvent) : '—'}`,
+        `Event kinds: ${eventKinds.join(', ') || '—'}`,
+      ].join('\n'),
+      contentRef: normalizedTraceId,
+      sourceKind: 'trace',
+      sourceRef: normalizedTraceId,
+      links: [{
+        linkKind: 'derived_from_trace',
+        sourceKind: 'trace',
+        sourceRef: normalizedTraceId,
+        metadata: {
+          runId: String(run.runId || '').trim(),
+          eventCount,
+        },
+      }],
+      metadata: {
+        createdFrom: 'portal.house.library.promotion',
+        promotionKind: 'trace',
+        runId: String(run.runId || '').trim(),
+      },
+    };
+  }
+
+  function buildTrainerResultPromotionPayload({
+    houseId = '',
+    teamId = '',
+    trainerResultId = '',
+  } = {}) {
+    const normalizedTrainerResultId = String(trainerResultId || '').trim();
+    const result = getTrainerResultById(normalizedTrainerResultId);
+    const job = result ? getTrainerJobById(result.trainerJobId) : null;
+    if (!result || !job || job.houseId !== houseId || job.teamId !== teamId) {
+      return {
+        ok: false,
+        code: 'TRAINER_RESULT_NOT_FOUND',
+        message: 'Trainer result could not be found for this House team.',
+      };
+    }
+    const resultPayload = result.result && typeof result.result === 'object' ? result.result : {};
+    const summaryText = String(resultPayload.summary || '').trim()
+      || `Trainer result ${normalizedTrainerResultId} completed with ${Array.isArray(result.candidatePatchIds) ? result.candidatePatchIds.length : 0} candidate patch recommendation${Array.isArray(result.candidatePatchIds) && result.candidatePatchIds.length === 1 ? '' : 's'}.`;
+    const artifactKinds = Array.isArray(resultPayload.artifactRefs)
+      ? resultPayload.artifactRefs.map((entry) => String(entry?.artifactKind || '').trim()).filter(Boolean)
+      : [];
+    return {
+      ok: true,
+      itemType: 'semantic_note',
+      title: `Trainer Promotion · ${normalizedTrainerResultId}`,
+      summary: `Promoted trainer result ${normalizedTrainerResultId}: ${summaryText}`,
+      contentText: [
+        `Trainer result ID: ${normalizedTrainerResultId}`,
+        `Trainer job ID: ${String(result.trainerJobId || '').trim() || '—'}`,
+        `Job kind: ${String(job.jobKind || '').trim() || '—'}`,
+        `Status: ${String(result.status || '').trim() || '—'}`,
+        `Summary: ${summaryText}`,
+        `Linked config: ${String(result.linkedConfigVersionId || '').trim() || '—'}`,
+        `Candidate patches: ${Array.isArray(result.candidatePatchIds) && result.candidatePatchIds.length ? result.candidatePatchIds.join(', ') : '—'}`,
+        `Artifact kinds: ${artifactKinds.join(', ') || '—'}`,
+      ].join('\n'),
+      contentRef: normalizedTrainerResultId,
+      sourceKind: 'trainer_result',
+      sourceRef: normalizedTrainerResultId,
+      links: [{
+        linkKind: 'derived_from_trainer_result',
+        sourceKind: 'trainer_result',
+        sourceRef: normalizedTrainerResultId,
+        metadata: {
+          trainerJobId: String(result.trainerJobId || '').trim(),
+        },
+      }],
+      metadata: {
+        createdFrom: 'portal.house.library.promotion',
+        promotionKind: 'trainer_result',
+        trainerJobId: String(result.trainerJobId || '').trim(),
+      },
+    };
+  }
+
+  function persistLibraryItemRecord({
+    houseId = '',
+    teamId = '',
+    idempotencyKey = '',
+    itemType = '',
+    title = '',
+    summary = '',
+    contentText = '',
+    contentRef = '',
+    sourceKind = '',
+    sourceRef = '',
+    visibility = 'house_private',
+    metadata = null,
+    links = [],
+  } = {}) {
+    const existing = getLibraryItemByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        item: existing,
+        links: listLibraryLinks({ libraryItemId: existing.libraryItemId }),
+      };
+    }
+    const contentHash = sha256PrefixedHex(stableJsonStringify({
+      itemType,
+      title,
+      summary,
+      contentText,
+      contentRef,
+      sourceKind,
+      sourceRef,
+      visibility,
+      links: Array.isArray(links) ? links : [],
+    }));
+    const libraryItemId = `lib_${randomHex(12)}`;
+    const createdAt = nowIso();
+    let item;
+    try {
+      item = createLibraryItem({
+        libraryItemId,
+        houseId,
+        teamId,
+        itemType,
+        title,
+        summary,
+        contentText,
+        contentRef,
+        sourceKind,
+        sourceRef,
+        visibility,
+        contentHash,
+        idempotencyKey,
+        metadata: metadata && typeof metadata === 'object' ? metadata : {},
+        nowIso: createdAt,
+      });
+    } catch (err) {
+      const replayed = getLibraryItemByIdempotency({
+        houseId,
+        teamId,
+        idempotencyKey,
+      });
+      if (replayed) {
+        return {
+          status: 200,
+          item: replayed,
+          links: listLibraryLinks({ libraryItemId: replayed.libraryItemId }),
+        };
+      }
+      throw err;
+    }
+    const normalizedLinks = Array.isArray(links) && links.length
+      ? links
+      : [{
+        linkKind: sourceKind === 'trainer_result' ? 'derived_from_trainer_result' : 'derived_from_trace',
+        sourceKind,
+        sourceRef,
+      }];
+    normalizedLinks.forEach((entry) => {
+      const linkKind = typeof entry?.linkKind === 'string' ? entry.linkKind.trim() : '';
+      const linkSourceKind = typeof entry?.sourceKind === 'string' ? entry.sourceKind.trim() : sourceKind;
+      const linkSourceRef = typeof entry?.sourceRef === 'string' ? entry.sourceRef.trim() : sourceRef;
+      if (!linkKind || !linkSourceKind || !linkSourceRef) return;
+      createLibraryLink({
+        libraryLinkId: `link_${randomHex(12)}`,
+        libraryItemId,
+        linkKind,
+        sourceKind: linkSourceKind,
+        sourceRef: linkSourceRef,
+        targetLibraryItemId: typeof entry?.targetLibraryItemId === 'string' ? entry.targetLibraryItemId.trim() : '',
+        metadata: entry?.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
+        nowIso: createdAt,
+      });
+    });
+    return {
+      status: 201,
+      item: item || getLibraryItemById(libraryItemId),
+      links: listLibraryLinks({ libraryItemId }),
+    };
+  }
+
   function getTrackAntiFarmingPolicy() {
     const fixture = getUnifiedPlatformTestFixture('tracks_core_seed') || {};
     const threshold = Number(fixture?.antiFarming?.duplicateActionThreshold || 1);
@@ -784,6 +1018,74 @@ function registerPlatformReadRoutes(app, deps) {
       item: getLibraryItemById(libraryItemId),
       links: listLibraryLinks({ libraryItemId }),
     }, { requestId, status: 201 });
+  });
+
+  app.post('/api/platform/library/promotions', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before promoting a Library item.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before promoting a Library item.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to promote a Library item.', { requestId });
+    }
+    const sourceKind = typeof req.body?.sourceKind === 'string' ? req.body.sourceKind.trim() : '';
+    const sourceRef = typeof req.body?.sourceRef === 'string' ? req.body.sourceRef.trim() : '';
+    if (!sourceKind || !sourceRef) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PROMOTION_SOURCE_REQUIRED', 'sourceKind and sourceRef are required.', { requestId });
+    }
+    let promotion;
+    if (sourceKind === 'trace') {
+      promotion = buildTracePromotionPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        traceId: sourceRef,
+      });
+    } else if (sourceKind === 'trainer_result') {
+      promotion = buildTrainerResultPromotionPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        trainerResultId: sourceRef,
+      });
+    } else {
+      return sendPortalApiError(res, 400, 'LIBRARY_PROMOTION_SOURCE_UNSUPPORTED', 'Supported promotion sources are trace and trainer_result.', { requestId });
+    }
+    if (!promotion || promotion.ok !== true) {
+      const code = String(promotion?.code || 'LIBRARY_PROMOTION_SOURCE_NOT_FOUND');
+      const message = String(promotion?.message || 'Promotion source could not be found.');
+      return sendPortalApiError(res, 404, code, message, { requestId });
+    }
+    const persisted = persistLibraryItemRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+      itemType: promotion.itemType,
+      title: promotion.title,
+      summary: promotion.summary,
+      contentText: promotion.contentText,
+      contentRef: promotion.contentRef,
+      sourceKind: promotion.sourceKind,
+      sourceRef: promotion.sourceRef,
+      visibility: 'house_private',
+      metadata: promotion.metadata,
+      links: promotion.links,
+    });
+    return sendPortalApiSuccess(res, {
+      promotion: {
+        sourceKind,
+        sourceRef,
+      },
+      item: persisted.item,
+      links: persisted.links,
+    }, { requestId, status: persisted.status });
   });
 
   app.get('/api/platform/library/scope', (req, res) => {

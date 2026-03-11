@@ -1016,6 +1016,47 @@ Stable failure codes:
 - `LIBRARY_SOURCE_REQUIRED`
 - `INVALID_ARGUMENT`
 
+### POST `/api/platform/library/promotions` (human)
+Promotes one existing Archive trace or Trainer result into a curated House Library item using deterministic source-derived content. The route is idempotent and does not mutate the underlying source rows.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "sourceKind": "trace",
+  "sourceRef": "trace_1234abcd"
+}
+```
+
+Supported sources:
+- `trace`
+- `trainer_result`
+
+Response fields:
+- `data.promotion`
+- `data.promotion.sourceKind`
+- `data.promotion.sourceRef`
+- `data.item`
+- `data.item.libraryItemId`
+- `data.item.itemType`
+- `data.item.summary`
+- `data.item.contentText`
+- `data.item.sourceKind`
+- `data.item.sourceRef`
+- `data.links[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `LIBRARY_PROMOTION_SOURCE_REQUIRED`
+- `LIBRARY_PROMOTION_SOURCE_UNSUPPORTED`
+- `TRACE_NOT_FOUND`
+- `TRAINER_RESULT_NOT_FOUND`
+
 ### GET `/api/platform/library/scope` (human)
 Returns the current active Library scope set and the resolved ordered items selected for chat.
 

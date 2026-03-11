@@ -174,8 +174,12 @@
   <p class="small" style="margin-top:0">
     Canonical traces stay in the archive even if local trainer cache entries are deleted.
   </p>
+  <div class="kv" style="margin-bottom:8px;">
+    <button class="btn" id="houseArchiveSaveLibraryBtn" type="button" data-testid="house-archive-save-library" disabled>Save to Library</button>
+  </div>
   <div class="small" id="houseArchiveEmpty" data-testid="house-archive-empty">No canonical traces archived yet.</div>
   <div class="kv stack" id="houseArchiveList" data-testid="house-archive-list"></div>
+  <div class="small" id="houseArchiveActionStatus" data-testid="house-archive-action-status" style="min-height:1.4em;"></div>
   <div class="small" id="houseArchiveDetail" data-testid="house-archive-detail">Select a trace to inspect archive counters.</div>
 </div>
 
@@ -187,6 +191,7 @@
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseTrainerCreateCompareBtn" type="button" data-testid="house-trainer-create-compare">Create Compare Job</button>
     <button class="btn" id="houseTrainerPromotePatchBtn" type="button" data-testid="house-trainer-promote-patch">Promote Patch</button>
+    <button class="btn" id="houseTrainerSaveLibraryBtn" type="button" data-testid="house-trainer-save-library">Save to Library</button>
   </div>
   <div class="kv" style="margin-bottom:8px;">
     <label class="small" for="houseTrainerApprovalIdInput">Approval ID</label>

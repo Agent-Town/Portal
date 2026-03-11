@@ -740,6 +740,8 @@ Execution mapping:
    - same-shell draft pane shows a deterministic diff preview before the worker requests persistent-write approval
    - approved writes use the existing worker persistent storage policy path and optional snapshots persist through `POST /api/platform/library/items` with `workspace_file` provenance
 3. `M29.7` Archive or Trainer promotion into Library
+   - Archive and Trainer each expose an explicit `Save to Library` action inside the House shell
+   - promotions persist through `POST /api/platform/library/promotions` and derive content from canonical trace or trainer-result state instead of static fixtures
 
 ### L28.3 - Registry publication and import
 
