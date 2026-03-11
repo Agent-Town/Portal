@@ -44,8 +44,8 @@ test('M30.1: House Library saves a direct local note from the Librarian Desk wit
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
   await expect(page.getByTestId('house-library-copy')).toHaveText('Choose what the agent may use in this chat.');
   await expect(page.getByTestId('house-library-note-composer')).toBeVisible();
-  await expect(page.getByLabel(String(fixture?.fixture?.composer?.titleLabel || 'Title'))).toBeVisible();
-  await expect(page.getByLabel(String(fixture?.fixture?.composer?.bodyLabel || 'What should the agent remember?'))).toBeVisible();
+  await expect(page.getByTestId('house-library-note-title')).toBeVisible();
+  await expect(page.getByTestId('house-library-note-body')).toBeVisible();
 
   await page.getByTestId('house-library-note-title').fill('Portal Memory Rules');
   await page.getByTestId('house-library-note-body').fill('Keep Library notes private by default and only bring them into chat on purpose.');

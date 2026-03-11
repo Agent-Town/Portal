@@ -178,6 +178,30 @@
     </div>
     <div class="small" id="houseLibraryComposerStatus" data-testid="house-library-composer-status">Writing a new local note.</div>
   </div>
+  <div class="small" style="margin:10px 0 4px;">Conversation Capture</div>
+  <div class="kv stack" data-testid="house-library-capture-desk" style="margin-bottom:8px;">
+    <label class="small" for="houseLibraryCaptureTitleInput">Capture title</label>
+    <input
+      id="houseLibraryCaptureTitleInput"
+      data-testid="house-library-capture-title"
+      class="pixel-input"
+      type="text"
+      autocomplete="off"
+      placeholder="Saved chat excerpt"
+    />
+    <div class="small">Select the chat turns to keep.</div>
+    <div class="kv stack" id="houseLibraryCaptureMessages" data-testid="house-library-capture-messages"></div>
+    <label class="small" for="houseLibraryCaptureBringCheckbox" style="display:flex; align-items:center; gap:8px;">
+      <input
+        id="houseLibraryCaptureBringCheckbox"
+        data-testid="house-library-capture-bring"
+        type="checkbox"
+      />
+      Bring to chat now after saving
+    </label>
+    <button class="btn" id="houseLibraryCaptureSaveBtn" type="button" data-testid="house-library-capture-save">Save Selected Chat to Library</button>
+    <div class="small" id="houseLibraryCaptureStatus" data-testid="house-library-capture-status">No chat turns selected yet.</div>
+  </div>
   <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
   <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
   <div class="small" style="margin:10px 0 4px;">Reading Tables</div>
@@ -210,6 +234,8 @@
   </div>
   <div class="kv stack" id="houseLibraryList" data-testid="house-library-list"></div>
   <div class="small" id="houseLibraryDetail" data-testid="house-library-detail">Select a Library item to inspect its shelf and source.</div>
+  <div class="small" style="margin:10px 0 4px;">Revision History</div>
+  <div class="kv stack" id="houseLibraryRevisions" data-testid="house-library-revisions"></div>
   <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>
   <div class="small" id="houseLibraryActionStatus" data-testid="house-library-action-status" style="margin-top:8px; min-height:1.4em;"></div>
 </div>

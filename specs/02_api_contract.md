@@ -1024,6 +1024,89 @@ Stable failure codes:
 - `LIBRARY_SOURCE_REQUIRED`
 - `INVALID_ARGUMENT`
 
+### GET `/api/platform/library/items/:libraryItemId/revisions` (human)
+Returns the stored revision history for one House Library item in deterministic `revisionIndex` order.
+
+Response fields:
+- `data.item`
+- `data.revisions[]`
+- `data.revisions[].libraryItemRevisionId`
+- `data.revisions[].revisionIndex`
+- `data.revisions[].contentHash`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `LIBRARY_ITEM_REQUIRED`
+- `LIBRARY_ITEM_NOT_FOUND`
+
+### PATCH `/api/platform/library/items/:libraryItemId` (human)
+Updates one local editable House Library item and stores a new revision snapshot. Imported or read-only items reject the write.
+
+Request shape:
+```json
+{
+  "title": "House Rules",
+  "summary": "Keep the worker alive in /app and reopen the Reading Table before acting.",
+  "contentText": "Keep the worker alive in /app and reopen the Reading Table before acting."
+}
+```
+
+Response fields:
+- `data.item`
+- `data.revision`
+- `data.revisions[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `LIBRARY_ITEM_REQUIRED`
+- `LIBRARY_ITEM_NOT_FOUND`
+- `LIBRARY_ITEM_READ_ONLY`
+- `INVALID_ARGUMENT`
+
+### POST `/api/platform/library/conversation-artifacts` (human)
+Creates one reviewed conversation capture and saves the resulting local Library item with explicit conversation provenance.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "title": "Planner Notes",
+  "messageIds": [
+    "chatmsg_0001",
+    "chatmsg_0003"
+  ],
+  "messages": [
+    {
+      "messageId": "chatmsg_0001",
+      "role": "user",
+      "text": "Atlas stays inside the modal shell."
+    },
+    {
+      "messageId": "chatmsg_0003",
+      "role": "user",
+      "text": "Bring only the selected memories into chat."
+    }
+  ]
+}
+```
+
+Response fields:
+- `data.artifact`
+- `data.artifact.conversationArtifactId`
+- `data.artifact.messageIds[]`
+- `data.item`
+- `data.links[]`
+- `data.revision`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `INVALID_ARGUMENT`
+
 ### POST `/api/platform/library/promotions` (human)
 Promotes one existing Archive trace or Trainer result into a curated House Library item using deterministic source-derived content. The route is idempotent and does not mutate the underlying source rows.
 

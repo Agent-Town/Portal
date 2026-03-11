@@ -544,10 +544,14 @@ let houseSurfaceState = {
     activeScopeSetId: '',
     selectedItemIds: [],
     selectedItems: [],
+    revisionsByItemId: {},
     composerMode: 'create',
     editingItemId: '',
     draftTitle: '',
     draftBody: '',
+    captureTitle: '',
+    captureSelectedMessageIds: [],
+    captureBringToChatNow: false,
     emptyStateText: 'No curated Library items yet.',
     actionStatusText: '',
     actionStatusError: false,
@@ -597,6 +601,8 @@ let pendingTownhallAgentImage = null;
 let townhallMintConfig = null;
 let townhallMintConfigPromise = null;
 const townhallModuleCache = new Map();
+let chatTranscriptEntries = [];
+let chatTranscriptSeq = 0;
 
 function b64(bytes) {
   let bin = '';
@@ -1475,7 +1481,9 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    houseSurfaceState.library.revisionsByItemId = {};
     resetHouseLibraryComposer();
+    resetHouseLibraryCaptureDraft();
     void syncHouseLibraryScopeContextToWorker({
       activeScopeSetId: '',
       selectedItemIds: [],
@@ -1802,7 +1810,9 @@ function syncHouseLibraryComposerControls() {
     bodyInput.value = String(houseSurfaceState.library.draftBody || '');
   }
   const isEditing = houseSurfaceState.library.composerMode === 'edit' && !!String(houseSurfaceState.library.editingItemId || '').trim();
+  const hasDraft = !!String(houseSurfaceState.library.draftTitle || '').trim() && !!String(houseSurfaceState.library.draftBody || '').trim();
   saveBtn.textContent = isEditing ? 'Update Note' : 'Save Note to Library';
+  saveBtn.disabled = !hasDraft;
   cancelBtn.disabled = !isEditing && !String(houseSurfaceState.library.draftTitle || '').trim() && !String(houseSurfaceState.library.draftBody || '').trim();
   statusNode.textContent = isEditing
     ? 'Editing a local Library note.'
@@ -1818,6 +1828,110 @@ function readHouseLibraryComposerDraft() {
     title: houseSurfaceState.library.draftTitle,
     body: houseSurfaceState.library.draftBody,
   };
+}
+
+function getHouseLibraryRevisionList(libraryItemId = '') {
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  if (!normalizedLibraryItemId) return [];
+  const revisionsByItemId = houseSurfaceState.library.revisionsByItemId && typeof houseSurfaceState.library.revisionsByItemId === 'object'
+    ? houseSurfaceState.library.revisionsByItemId
+    : {};
+  return Array.isArray(revisionsByItemId[normalizedLibraryItemId]) ? revisionsByItemId[normalizedLibraryItemId] : [];
+}
+
+async function loadHouseLibraryRevisions(libraryItemId = '') {
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  if (!normalizedLibraryItemId) return [];
+  const response = await apiWithRetry(`/api/platform/library/items/${encodeURIComponent(normalizedLibraryItemId)}/revisions`, {}, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const revisions = Array.isArray(data?.revisions) ? data.revisions : [];
+  houseSurfaceState.library.revisionsByItemId = {
+    ...(houseSurfaceState.library.revisionsByItemId && typeof houseSurfaceState.library.revisionsByItemId === 'object'
+      ? houseSurfaceState.library.revisionsByItemId
+      : {}),
+    [normalizedLibraryItemId]: revisions,
+  };
+  return revisions;
+}
+
+function getHouseLibraryCaptureMessages() {
+  return Array.isArray(chatTranscriptEntries)
+    ? chatTranscriptEntries.map((entry) => ({
+      messageId: String(entry?.messageId || '').trim(),
+      role: String(entry?.role || 'note').trim() || 'note',
+      text: String(entry?.text || ''),
+    })).filter((entry) => entry.messageId && entry.text.trim())
+    : [];
+}
+
+function resetHouseLibraryCaptureDraft() {
+  houseSurfaceState.library.captureTitle = '';
+  houseSurfaceState.library.captureSelectedMessageIds = [];
+  houseSurfaceState.library.captureBringToChatNow = false;
+}
+
+function syncHouseLibraryCaptureControls() {
+  const titleInput = el('houseLibraryCaptureTitleInput');
+  const messagesNode = el('houseLibraryCaptureMessages');
+  const bringCheckbox = el('houseLibraryCaptureBringCheckbox');
+  const saveBtn = el('houseLibraryCaptureSaveBtn');
+  const statusNode = el('houseLibraryCaptureStatus');
+  if (!titleInput || !messagesNode || !bringCheckbox || !saveBtn || !statusNode) return;
+  const liveTitle = String(titleInput.value || '').trim();
+  if (liveTitle && liveTitle !== String(houseSurfaceState.library.captureTitle || '')) {
+    houseSurfaceState.library.captureTitle = liveTitle;
+  }
+  const messages = getHouseLibraryCaptureMessages();
+  const selectedIds = Array.isArray(houseSurfaceState.library.captureSelectedMessageIds)
+    ? houseSurfaceState.library.captureSelectedMessageIds
+    : [];
+  titleInput.value = String(houseSurfaceState.library.captureTitle || '');
+  bringCheckbox.checked = houseSurfaceState.library.captureBringToChatNow === true;
+  messagesNode.innerHTML = '';
+  if (!messages.length) {
+    const empty = document.createElement('div');
+    empty.className = 'small';
+    empty.textContent = 'No recent chat turns yet.';
+    messagesNode.appendChild(empty);
+  } else {
+    messages.forEach((entry) => {
+      const label = document.createElement('label');
+      label.className = 'small';
+      label.style.display = 'flex';
+      label.style.alignItems = 'flex-start';
+      label.style.gap = '8px';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.messageId = String(entry.messageId || '');
+      checkbox.checked = selectedIds.includes(String(entry.messageId || ''));
+      checkbox.addEventListener('change', () => {
+        const next = new Set(Array.isArray(houseSurfaceState.library.captureSelectedMessageIds)
+          ? houseSurfaceState.library.captureSelectedMessageIds
+          : []);
+        if (checkbox.checked) {
+          next.add(String(entry.messageId || ''));
+        } else {
+          next.delete(String(entry.messageId || ''));
+        }
+        houseSurfaceState.library.captureSelectedMessageIds = Array.from(next);
+        syncHouseLibraryCaptureControls();
+      });
+
+      const textNode = document.createElement('span');
+      textNode.textContent = `${String(entry.role || 'note')}: ${String(entry.text || '')}`;
+
+      label.appendChild(checkbox);
+      label.appendChild(textNode);
+      messagesNode.appendChild(label);
+    });
+  }
+  saveBtn.disabled = !messages.length || !selectedIds.length;
+  statusNode.textContent = selectedIds.length
+    ? `${selectedIds.length} chat turn${selectedIds.length === 1 ? '' : 's'} selected.`
+    : 'No chat turns selected yet.';
 }
 
 function getHouseLibraryScopeSetById(scopeSetId = '') {
@@ -2045,6 +2159,58 @@ async function saveHouseLibraryNote() {
   return data;
 }
 
+async function saveHouseLibraryConversationCapture() {
+  const titleInput = el('houseLibraryCaptureTitleInput');
+  const bringCheckbox = el('houseLibraryCaptureBringCheckbox');
+  houseSurfaceState.library.captureTitle = String(titleInput?.value || '').trim();
+  houseSurfaceState.library.captureBringToChatNow = bringCheckbox?.checked === true;
+  const title = String(houseSurfaceState.library.captureTitle || '').trim();
+  const selectedIds = Array.isArray(houseSurfaceState.library.captureSelectedMessageIds)
+    ? houseSurfaceState.library.captureSelectedMessageIds.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  const messages = getHouseLibraryCaptureMessages().filter((entry) => selectedIds.includes(String(entry?.messageId || '')));
+  if (!title) {
+    throw new Error('LIBRARY_CAPTURE_TITLE_REQUIRED');
+  }
+  if (!messages.length) {
+    throw new Error('LIBRARY_CAPTURE_SELECTION_REQUIRED');
+  }
+  const idempotencyKey = makeHouseIdempotencyKey('house_library_capture');
+  setHouseLibraryActionStatus(`Saving ${title} to your Library...`);
+  setHouseSurfaceStatus(`Saving ${title} to your Library...`);
+  const response = await apiWithRetry('/api/platform/library/conversation-artifacts', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      title,
+      messageIds: messages.map((entry) => entry.messageId),
+      messages,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const savedItemId = String(data?.item?.libraryItemId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (savedItemId) {
+    houseSurfaceState.library.selectedItemId = savedItemId;
+  }
+  if (savedItemId && houseSurfaceState.library.captureBringToChatNow === true) {
+    await updateHouseLibraryScopeSelection([
+      ...houseSurfaceState.library.selectedItemIds,
+      savedItemId,
+    ]);
+  }
+  resetHouseLibraryCaptureDraft();
+  renderHouseLibrarySurface();
+  const successText = `Saved ${title} to your Library.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return data;
+}
+
 function syncHouseLibraryPublishControls(selectedItem = null) {
   const approvalInput = el('houseLibraryApprovalInput');
   const publishBtn = el('houseLibraryPublishBtn');
@@ -2115,6 +2281,11 @@ function renderHouseLibrarySurface() {
   const composerBodyInput = el('houseLibraryNoteBodyInput');
   const composerSaveBtn = el('houseLibrarySaveNoteBtn');
   const composerCancelBtn = el('houseLibraryCancelEditBtn');
+  const captureTitleInput = el('houseLibraryCaptureTitleInput');
+  const captureMessagesNode = el('houseLibraryCaptureMessages');
+  const captureBringCheckbox = el('houseLibraryCaptureBringCheckbox');
+  const captureSaveBtn = el('houseLibraryCaptureSaveBtn');
+  const revisionsNode = el('houseLibraryRevisions');
   const scopeSetsNode = el('houseLibraryScopeSets');
   const scopeEmptyNode = el('houseLibraryScopeEmpty');
   const actionsNode = el('houseLibraryActions');
@@ -2131,6 +2302,11 @@ function renderHouseLibrarySurface() {
     || !composerBodyInput
     || !composerSaveBtn
     || !composerCancelBtn
+    || !captureTitleInput
+    || !captureMessagesNode
+    || !captureBringCheckbox
+    || !captureSaveBtn
+    || !revisionsNode
     || !scopeSetsNode
     || !scopeEmptyNode
     || !actionsNode
@@ -2145,6 +2321,7 @@ function renderHouseLibrarySurface() {
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
   listNode.innerHTML = '';
+  revisionsNode.innerHTML = '';
   scopeSetsNode.innerHTML = '';
   actionsNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.library.emptyStateText || 'No curated Library items yet.';
@@ -2156,6 +2333,7 @@ function renderHouseLibrarySurface() {
     houseSurfaceState.library.actionStatusError
   );
   syncHouseLibraryComposerControls();
+  syncHouseLibraryCaptureControls();
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
   selectedNode.textContent = selectedItems.length
@@ -2196,6 +2374,7 @@ function renderHouseLibrarySurface() {
 
   if (!items.length) {
     detailNode.textContent = 'Select a Library item to inspect its shelf and source.';
+    revisionsNode.textContent = 'Select a local Library item to review its saved revisions.';
     return;
   }
 
@@ -2231,8 +2410,9 @@ function renderHouseLibrarySurface() {
       String(item?.itemType || ''),
       itemStateParts.join(' · '),
     ].filter(Boolean).join(' · ');
-    button.addEventListener('click', () => {
+    button.addEventListener('click', async () => {
       houseSurfaceState.library.selectedItemId = String(item?.libraryItemId || '');
+      await loadHouseLibraryRevisions(String(item?.libraryItemId || '').trim()).catch(() => []);
       renderHouseLibrarySurface();
     });
     listNode.appendChild(button);
@@ -2241,6 +2421,7 @@ function renderHouseLibrarySurface() {
   detailNode.textContent = [
     String(selectedItem?.title || selectedItem?.libraryItemId || ''),
     String(selectedItem?.itemType || ''),
+    String(selectedItem?.summary || '').trim(),
     Array.isArray(selectedItem?.shelfTitles) && selectedItem.shelfTitles.length
       ? `Shelves: ${selectedItem.shelfTitles.join(', ')}`
       : '',
@@ -2249,6 +2430,22 @@ function renderHouseLibrarySurface() {
     String(selectedItem?.registryId || ''),
     selectedItemStateParts.join(' · '),
   ].filter(Boolean).join(' · ');
+  const revisions = getHouseLibraryRevisionList(String(selectedItem?.libraryItemId || ''));
+  if (!revisions.length) {
+    revisionsNode.textContent = 'No saved revisions yet.';
+  } else {
+    revisions.forEach((revision) => {
+      const revisionRow = document.createElement('div');
+      revisionRow.className = 'small';
+      revisionRow.dataset.revisionIndex = String(revision?.revisionIndex || '');
+      revisionRow.textContent = [
+        `Revision ${String(revision?.revisionIndex || '0')}`,
+        String(revision?.title || ''),
+        String(revision?.contentHash || '').trim(),
+      ].filter(Boolean).join(' · ');
+      revisionsNode.appendChild(revisionRow);
+    });
+  }
 
   const isSelectedForChat = selectedItemIds.includes(String(selectedItem?.libraryItemId || ''));
 
@@ -2292,8 +2489,9 @@ function renderHouseLibrarySurface() {
   editBtn.type = 'button';
   editBtn.className = 'btn';
   editBtn.dataset.actionId = 'edit_note';
-  editBtn.textContent = selectedItem?.readOnly === true ? 'This item is read only' : 'Edit in Librarian Desk';
-  editBtn.disabled = selectedItem?.readOnly === true;
+  const noteReadOnly = selectedItem?.readOnly === true || String(selectedItem?.importedState || '') === 'imported_artifact';
+  editBtn.textContent = noteReadOnly ? 'This item is read only' : 'Edit in Librarian Desk';
+  editBtn.disabled = noteReadOnly;
   editBtn.addEventListener('click', () => {
     loadHouseLibraryDraftFromSelectedItem(selectedItem);
     renderHouseLibrarySurface();
@@ -2908,6 +3106,10 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
     syncHouseSurfaceContextFromPayload(data);
     syncHouseLibraryStateFromPayload(data);
     await syncHouseLibraryScopeContextToWorker(data);
+    const selectedItemId = String(houseSurfaceState.library.selectedItemId || '').trim();
+    if (selectedItemId) {
+      await loadHouseLibraryRevisions(selectedItemId).catch(() => []);
+    }
     renderHouseLibrarySurface();
     setHouseSurfaceStatus(houseSurfaceState.library.items.length ? '' : houseSurfaceState.library.emptyStateText);
   } catch (err) {
@@ -2919,7 +3121,9 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
     houseSurfaceState.library.activeScopeSetId = '';
     houseSurfaceState.library.selectedItemIds = [];
     houseSurfaceState.library.selectedItems = [];
+    houseSurfaceState.library.revisionsByItemId = {};
     resetHouseLibraryComposer();
+    resetHouseLibraryCaptureDraft();
     await syncHouseLibraryScopeContextToWorker({
       activeScopeSetId: '',
       selectedItemIds: [],
@@ -5667,6 +5871,38 @@ function bindTownDistrictControls() {
         await saveHouseLibraryNote();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_NOTE_SAVE_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryCaptureTitleInput = el('houseLibraryCaptureTitleInput');
+  if (houseLibraryCaptureTitleInput) {
+    houseLibraryCaptureTitleInput.oninput = () => {
+      houseSurfaceState.library.captureTitle = String(houseLibraryCaptureTitleInput.value || '').trim();
+      syncHouseLibraryCaptureControls();
+    };
+  }
+
+  const houseLibraryCaptureBringCheckbox = el('houseLibraryCaptureBringCheckbox');
+  if (houseLibraryCaptureBringCheckbox) {
+    houseLibraryCaptureBringCheckbox.onchange = () => {
+      houseSurfaceState.library.captureBringToChatNow = houseLibraryCaptureBringCheckbox.checked === true;
+      syncHouseLibraryCaptureControls();
+    };
+  }
+
+  const houseLibraryCaptureSaveBtn = el('houseLibraryCaptureSaveBtn');
+  if (houseLibraryCaptureSaveBtn) {
+    houseLibraryCaptureSaveBtn.onclick = async () => {
+      houseLibraryCaptureSaveBtn.disabled = true;
+      try {
+        await saveHouseLibraryConversationCapture();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_CAPTURE_SAVE_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {
@@ -10881,6 +11117,14 @@ async function initGateway() {
 
 function appendChatMessage(role, text) {
   const box = el('chatTranscript');
+  const messageId = `chatmsg_${String(chatTranscriptSeq + 1).padStart(4, '0')}`;
+  chatTranscriptSeq += 1;
+  const entry = {
+    messageId,
+    role: String(role || 'note').trim() || 'note',
+    text: String(text || ''),
+  };
+  chatTranscriptEntries.push(entry);
   if (!box) {
     scheduleAgentDebugRefresh('chat');
     return;
@@ -10888,9 +11132,12 @@ function appendChatMessage(role, text) {
 
   const div = document.createElement('div');
   div.className = `chat-message ${role}`;
-  div.textContent = text;
+  div.dataset.messageId = messageId;
+  div.dataset.role = entry.role;
+  div.textContent = entry.text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  syncHouseLibraryCaptureControls();
   scheduleAgentDebugRefresh('chat');
 }
 
@@ -10907,6 +11154,32 @@ function appendAgentLog(text) {
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
   scheduleAgentDebugRefresh('log');
+}
+
+function resetChatTranscriptEntries() {
+  chatTranscriptEntries = [];
+  chatTranscriptSeq = 0;
+  syncHouseLibraryCaptureControls();
+}
+
+function ensureAgentTownUiTestHooks() {
+  if (typeof window === 'undefined') return;
+  window.__agentTownUiTest = {
+    appendChatMessage(role = 'note', text = '') {
+      appendChatMessage(role, text);
+      syncHouseLibraryCaptureControls();
+      return getHouseLibraryCaptureMessages();
+    },
+    resetChatTranscript() {
+      const box = el('chatTranscript');
+      if (box) box.innerHTML = '';
+      resetChatTranscriptEntries();
+      return getHouseLibraryCaptureMessages();
+    },
+    readChatTranscript() {
+      return getHouseLibraryCaptureMessages();
+    },
+  };
 }
 
 async function handleVisit() {
@@ -10998,6 +11271,7 @@ async function handleNewSession() {
 
     const box = el('chatTranscript');
     if (box) box.innerHTML = '';
+    resetChatTranscriptEntries();
     appendChatMessage('system', 'New session started.');
     appendAgentLog('Started new session (worker transcript cleared).');
   } catch (e) {
@@ -11405,6 +11679,7 @@ async function init() {
   }
   updateUI(initial);
   scheduleAgentInterfaceSetup();
+  ensureAgentTownUiTestHooks();
   if (isVendorLite(initial)) {
     bootstrapVendorRuntime()
       .then(() => restoreLiteLlmConfigFromLocalIfNeeded(initial))
