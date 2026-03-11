@@ -1278,15 +1278,6 @@ function registerPlatformReadRoutes(app, deps) {
   } = {}) {
     const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
     const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
-    const overview = buildHouseOfficeOverviewPayload({
-      context,
-      houseId,
-      teamId,
-    });
-    const counts = overview?.sourceManifest?.counts && typeof overview.sourceManifest.counts === 'object'
-      ? overview.sourceManifest.counts
-      : {};
-    const activeConfigVersionId = String(overview?.sourceManifest?.activeConfigVersionId || '').trim();
     const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
     const blockers = [];
     if (!houseId) {
@@ -1310,80 +1301,181 @@ function registerPlatformReadRoutes(app, deps) {
       { sectionId: 'tracks_board', label: 'Tracks Board', surface: 'tracks' },
     ];
     const blockedBy = blockers.map((entry) => String(entry?.code || '').trim()).filter(Boolean);
-    const status = blockers.length ? 'action_required' : 'ready_for_manual_validation';
-    const summary = blockers.length
-      ? blockers.map((entry) => String(entry?.message || '').trim()).filter(Boolean).join(' ')
-      : 'House flows are ready for manual validation inside the current shell.';
+    const overview = buildHouseOfficeOverviewPayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const activeConfigVersionId = String(overview?.sourceManifest?.activeConfigVersionId || '').trim();
+    const counts = overview?.sourceManifest?.counts && typeof overview.sourceManifest.counts === 'object'
+      ? overview.sourceManifest.counts
+      : {};
+    const trackPayload = houseId && teamId
+      ? buildTrackReadPayload({ houseId, teamId })
+      : {
+        tracks: [],
+        events: [],
+      };
+    const archiveRuns = houseId && teamId ? listRuns({ houseId, teamId }) : [];
+    const trainerJobs = houseId && teamId ? listTrainerJobs({ houseId, teamId }) : [];
+    const trainerResults = houseId && teamId ? listTrainerResults({ houseId, teamId }) : [];
+    const experienceItems = houseId ? buildHouseExperienceItems() : [];
+    const selectionState = {
+      officeId: String(overview?.offices?.[0]?.officeId || '').trim(),
+      workshopKind: activeConfigVersionId ? 'config_version' : '',
+      workshopId: activeConfigVersionId,
+      trackId: String(trackPayload?.tracks?.[0]?.trackId || '').trim(),
+      traceId: String(archiveRuns?.[0]?.traceId || '').trim(),
+      runId: String(archiveRuns?.[0]?.runId || '').trim(),
+      trainerResultId: String(trainerResults?.[0]?.trainerResultId || '').trim(),
+      trainerJobId: String(trainerResults?.[0]?.trainerJobId || trainerJobs?.[0]?.trainerJobId || '').trim(),
+      experienceId: String(experienceItems?.[0]?.experienceId || '').trim(),
+    };
+
+    function buildReadinessSurface({
+      surface = '',
+      label = '',
+      route = '',
+      routeOk = false,
+      dataOk = false,
+      selectionOk = false,
+      browserValidationRequired = true,
+      summaryReady = '',
+      summaryBlocked = '',
+      missingDataCode = 'DATA_REQUIRED',
+      missingSelectionCode = 'SELECTION_REQUIRED',
+    } = {}) {
+      const surfaceBlockedBy = [...blockedBy];
+      if (!routeOk && !surfaceBlockedBy.includes('ROUTE_PROBE_FAILED')) {
+        surfaceBlockedBy.push('ROUTE_PROBE_FAILED');
+      }
+      if (routeOk && !dataOk && !surfaceBlockedBy.includes(missingDataCode)) {
+        surfaceBlockedBy.push(missingDataCode);
+      }
+      if (routeOk && dataOk && !selectionOk && !surfaceBlockedBy.includes(missingSelectionCode)) {
+        surfaceBlockedBy.push(missingSelectionCode);
+      }
+      const ready = surfaceBlockedBy.length === 0 && routeOk && dataOk && selectionOk;
+      return {
+        surface,
+        label,
+        route,
+        ready,
+        status: ready ? 'ready' : 'blocked',
+        blockedBy: surfaceBlockedBy,
+        summary: ready
+          ? String(summaryReady || '').trim() || 'Ready for manual browser validation.'
+          : String(summaryBlocked || '').trim() || 'Missing route evidence, data, or selection.',
+        routeOk,
+        dataOk,
+        selectionOk,
+        browserValidationRequired: browserValidationRequired === true,
+      };
+    }
+
     const surfaces = [
-      {
+      buildReadinessSurface({
         surface: 'office',
         label: 'House Office',
         route: '/api/platform/house-office',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? `${Number(counts.officeCount || 0)} offices · ${Number(counts.briefingItemCount || 0)} briefing items · ${Number(counts.attentionCount || 0)} attention items`
-          : 'Requires an attached house and active team.',
-      },
-      {
+        routeOk: !!houseId,
+        dataOk: Number(counts.officeCount || 0) > 0,
+        selectionOk: !!selectionState.officeId,
+        summaryReady: `${Number(counts.officeCount || 0)} offices · ${Number(counts.briefingItemCount || 0)} briefing items · selected ${selectionState.officeId}`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : 'House Office structure is not available yet.',
+        missingDataCode: 'OFFICE_STRUCTURE_REQUIRED',
+        missingSelectionCode: 'OFFICE_SELECTION_REQUIRED',
+      }),
+      buildReadinessSurface({
         surface: 'workshop',
         label: 'House Workshop',
         route: '/api/platform/workshop',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? (activeConfigVersionId
-            ? `Active config ${activeConfigVersionId} is bound for the current team.`
-            : 'No active config is currently bound to the selected team.')
-          : 'Requires an attached house and active team.',
-      },
-      {
+        routeOk: !!houseId && !!teamId,
+        dataOk: !!activeConfigVersionId,
+        selectionOk: !!selectionState.workshopKind && !!selectionState.workshopId,
+        summaryReady: `Active config ${activeConfigVersionId} is bound for the current team.`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : !teamId
+            ? 'Requires an active team.'
+            : 'No active config is currently bound to the selected team.',
+        missingDataCode: 'ACTIVE_CONFIG_REQUIRED',
+        missingSelectionCode: 'WORKSHOP_SELECTION_REQUIRED',
+      }),
+      buildReadinessSurface({
         surface: 'tracks',
         label: 'House Tracks',
         route: '/api/platform/tracks',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? `${Number(counts.trackCount || 0)} tracks · ${Number(counts.trackEventCount || 0)} track events`
-          : 'Requires an attached house and active team.',
-      },
-      {
+        routeOk: !!houseId && !!teamId,
+        dataOk: Number(trackPayload?.events?.length || 0) > 0,
+        selectionOk: Number(trackPayload?.events?.length || 0) > 0 && !!selectionState.trackId,
+        summaryReady: `${Number(trackPayload?.tracks?.length || 0)} tracks · ${Number(trackPayload?.events?.length || 0)} track events · selected ${selectionState.trackId}`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : !teamId
+            ? 'Requires an active team.'
+            : 'No track progress events are recorded for the selected team yet.',
+        missingDataCode: 'TRACK_ACTIVITY_REQUIRED',
+        missingSelectionCode: 'TRACK_SELECTION_REQUIRED',
+      }),
+      buildReadinessSurface({
         surface: 'archive',
         label: 'House Archive',
         route: '/api/platform/archive',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? `${Number(counts.archiveRunCount || 0)} canonical archive runs`
-          : 'Requires an attached house and active team.',
-      },
-      {
+        routeOk: !!houseId && !!teamId,
+        dataOk: archiveRuns.length > 0,
+        selectionOk: !!selectionState.traceId && !!selectionState.runId,
+        summaryReady: `${archiveRuns.length} canonical archive runs · selected ${selectionState.traceId}`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : !teamId
+            ? 'Requires an active team.'
+            : 'No canonical archive runs are available for the selected team yet.',
+        missingDataCode: 'ARCHIVE_RUN_REQUIRED',
+        missingSelectionCode: 'ARCHIVE_SELECTION_REQUIRED',
+      }),
+      buildReadinessSurface({
         surface: 'trainer',
         label: 'House Trainer',
         route: '/api/platform/trainer',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? `${Number(counts.trainerJobCount || 0)} trainer jobs · ${Number(counts.trainerResultCount || 0)} trainer results`
-          : 'Requires an attached house and active team.',
-      },
-      {
+        routeOk: !!houseId && !!teamId,
+        dataOk: trainerJobs.length > 0 || trainerResults.length > 0,
+        selectionOk: !!selectionState.trainerResultId || !!selectionState.trainerJobId,
+        summaryReady: `${trainerJobs.length} trainer jobs · ${trainerResults.length} trainer results · selected ${selectionState.trainerResultId || selectionState.trainerJobId}`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : !teamId
+            ? 'Requires an active team.'
+            : 'No trainer jobs or trainer results are available for the selected team yet.',
+        missingDataCode: 'TRAINER_RECORD_REQUIRED',
+        missingSelectionCode: 'TRAINER_SELECTION_REQUIRED',
+      }),
+      buildReadinessSurface({
         surface: 'experiences',
         label: 'House Experiences',
         route: '/api/platform/experiences',
-        ready: blockers.length === 0,
-        status: blockers.length === 0 ? 'ready' : 'blocked',
-        blockedBy,
-        summary: blockers.length === 0
-          ? `${Number(counts.experienceCount || 0)} experience entries available from the current House shell`
-          : 'Requires an attached house and active team.',
-      },
+        routeOk: !!houseId,
+        dataOk: experienceItems.length > 0,
+        selectionOk: !!selectionState.experienceId,
+        summaryReady: `${experienceItems.length} experience entries available from the current House shell · selected ${selectionState.experienceId}`,
+        summaryBlocked: !houseId
+          ? 'Requires an attached house.'
+          : 'No House experiences are available yet.',
+        missingDataCode: 'EXPERIENCE_ENTRY_REQUIRED',
+        missingSelectionCode: 'EXPERIENCE_SELECTION_REQUIRED',
+      }),
     ];
+    const readySurfaceCount = surfaces.filter((surface) => surface.ready).length;
+    const status = blockers.length === 0 && readySurfaceCount === surfaces.length
+      ? 'ready_for_manual_validation'
+      : 'action_required';
+    const summary = blockers.length
+      ? blockers.map((entry) => String(entry?.message || '').trim()).filter(Boolean).join(' ')
+      : status === 'ready_for_manual_validation'
+        ? 'House flows are ready for manual validation inside the current shell.'
+        : `${readySurfaceCount} of ${surfaces.length} House surfaces have route evidence; ${surfaces.length - readySurfaceCount} still need data or exact selection before manual validation.`;
     const checklist = [
       {
         stepId: 'open_house_office',
@@ -1429,6 +1521,7 @@ function registerPlatformReadRoutes(app, deps) {
         trainerJobCount: Number(counts.trainerJobCount || 0),
         trainerResultCount: Number(counts.trainerResultCount || 0),
         archiveRunCount: Number(counts.archiveRunCount || 0),
+        readySurfaceCount,
       },
     };
   }

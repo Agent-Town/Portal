@@ -1430,7 +1430,9 @@ function renderHouseReadiness() {
     readiness.summary
     || (blockers.length ? 'House readiness is blocked.' : 'House readiness will appear here once the shell context is available.')
   ).trim();
-  summaryNode.style.color = blockers.length ? 'var(--warn)' : 'var(--muted)';
+  summaryNode.style.color = String(readiness?.status || '').trim() === 'ready_for_manual_validation'
+    ? 'var(--ok)'
+    : (blockers.length || surfaces.some((surface) => surface?.ready !== true) ? 'var(--warn)' : 'var(--muted)');
   summaryNode.style.overflowWrap = 'anywhere';
 
   surfacesNode.innerHTML = '';
@@ -1451,7 +1453,7 @@ function renderHouseReadiness() {
       row.style.padding = '8px';
       row.style.background = 'rgba(255,255,255,0.02)';
       row.style.overflowWrap = 'anywhere';
-      row.textContent = `${String(surface?.label || surface?.surface || 'Surface').trim() || 'Surface'} · ${String(surface?.status || 'unknown').trim() || 'unknown'} · ${String(surface?.summary || '').trim() || 'No summary available.'}`;
+      row.textContent = `${String(surface?.label || surface?.surface || 'Surface').trim() || 'Surface'} · ${String(surface?.status || 'unknown').trim() || 'unknown'} · route ${surface?.routeOk === true ? 'ok' : 'blocked'} · data ${surface?.dataOk === true ? 'ok' : 'blocked'} · selection ${surface?.selectionOk === true ? 'ok' : 'blocked'} · ${String(surface?.summary || '').trim() || 'No summary available.'}`;
       surfacesNode.appendChild(row);
     });
   }

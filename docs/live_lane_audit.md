@@ -102,6 +102,12 @@ What that readiness report verifies:
 - whether the current live session has an attached house
 - whether an active team is selected
 - whether House Office, Workshop, Tracks, Archive, Trainer, and Experiences are ready for in-shell validation
+- per-surface route evidence:
+  - `routeOk`
+  - `dataOk`
+  - `selectionOk`
+  - `browserValidationRequired`
+  - `blockedBy[]`
 - which district sections should be reachable during the walkthrough
 - the exact manual validation steps and success metrics an operator should use
 

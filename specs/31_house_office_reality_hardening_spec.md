@@ -121,7 +121,8 @@ Normative rules:
    D. `browserValidationRequired`
    E. `blockedBy[]`
 3. `status = ready_for_manual_validation` is allowed only when all required route probes are green.
-4. A surface must stay `blocked` when:
+4. Partial seeded scenarios must remain `action_required` when any required surface lacks route evidence, data, or exact selection.
+5. A surface must stay `blocked` when:
    A. its route fails,
    B. required record data is absent,
    C. required exact-selection targets cannot be resolved.

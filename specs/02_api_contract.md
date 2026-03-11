@@ -1122,6 +1122,10 @@ Response fields:
 - `data.surfaces[].status`
 - `data.surfaces[].blockedBy[]`
 - `data.surfaces[].summary`
+- `data.surfaces[].routeOk`
+- `data.surfaces[].dataOk`
+- `data.surfaces[].selectionOk`
+- `data.surfaces[].browserValidationRequired`
 - `data.checklist[]`
 - `data.checklist[].stepId`
 - `data.checklist[].label`
@@ -1137,6 +1141,7 @@ Response fields:
 - `data.counts.trainerJobCount`
 - `data.counts.trainerResultCount`
 - `data.counts.archiveRunCount`
+- `data.counts.readySurfaceCount`
 
 Stable failure codes:
 - `SESSION_REQUIRED`

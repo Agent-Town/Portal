@@ -9,7 +9,7 @@ test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
 });
 
-test('House flow readiness reports live blockers before attach and a manual-validation checklist after attach', async ({ page, request }) => {
+test('House flow readiness reports live blockers before attach and an honest mixed state after attach', async ({ page, request }) => {
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
 
@@ -64,7 +64,7 @@ test('House flow readiness reports live blockers before attach and a manual-vali
   await page.reload();
   await waitForLiteApi(page);
   await expect(page.getByTestId('house-team-summary')).toContainText('team_main');
-  await expect(page.getByTestId('house-readiness-summary')).toContainText('ready for manual validation', { timeout: 10000 });
+  await expect(page.getByTestId('house-readiness-summary')).toContainText('2 of 6 House surfaces', { timeout: 10000 });
 
   const afterAttachResponse = await page.request.get('/api/platform/house-readiness');
   expect(afterAttachResponse.ok()).toBe(true);
@@ -74,25 +74,30 @@ test('House flow readiness reports live blockers before attach and a manual-vali
     schema: 'agent-town-house-readiness/v1',
     houseId: seededHouse.houseId,
     activeTeamId: 'team_main',
-    status: 'ready_for_manual_validation',
+    status: 'action_required',
   });
   expect(afterAttachData.blockers).toEqual([]);
   expect(afterAttachData.surfaces).toHaveLength(6);
-  afterAttachData.surfaces.forEach((surface) => {
-    expect(surface).toMatchObject({
-      ready: true,
-      status: 'ready',
-    });
-  });
   expect(afterAttachData.counts).toMatchObject({
     officeCount: 4,
     staffAgentCount: 1,
+    readySurfaceCount: 2,
   });
+  expect(afterAttachData.surfaces.map((surface) => String(surface?.status || ''))).toEqual([
+    'ready',
+    'blocked',
+    'blocked',
+    'blocked',
+    'blocked',
+    'ready',
+  ]);
   expect(afterAttachData.checklist).toHaveLength(4);
 
   await expect(page.getByTestId('house-readiness-surface').nth(0)).toContainText('House Office');
-  await expect(page.getByTestId('house-readiness-surface').nth(0)).toContainText('4 offices');
+  await expect(page.getByTestId('house-readiness-surface').nth(0)).toContainText('route ok');
+  await expect(page.getByTestId('house-readiness-surface').nth(0)).toContainText('selection ok');
   await expect(page.getByTestId('house-readiness-surface').nth(1)).toContainText('House Workshop');
+  await expect(page.getByTestId('house-readiness-surface').nth(1)).toContainText('blocked');
   await expect(page.getByTestId('house-readiness-check-item').nth(0)).toContainText('Open House Office');
   await expect(page.getByTestId('house-readiness-check-item').nth(1)).toContainText('Follow one House Briefing citation');
 });
