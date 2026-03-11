@@ -136,6 +136,15 @@
   <div class="kv stack" id="houseWorkshopFiles" data-testid="house-workshop-files"></div>
   <div class="small" id="houseWorkshopFilePath" data-testid="house-workshop-file-path" style="margin-top:8px;">Select a file to read.</div>
   <pre id="houseWorkshopFileContent" data-testid="house-workshop-file-content" class="small" style="margin:8px 0 0; white-space:pre-wrap; overflow:auto; max-height:280px;"></pre>
+  <div class="small" style="margin:10px 0 4px;">Draft</div>
+  <textarea id="houseWorkshopDraftInput" data-testid="house-workshop-draft-input" class="pixel-input" rows="10" style="width:100%; min-height:180px;" placeholder="Select a file to edit."></textarea>
+  <div class="small" style="margin:10px 0 4px;">Diff Preview</div>
+  <pre id="houseWorkshopDiffPreview" data-testid="house-workshop-diff-preview" class="small" style="margin:0; white-space:pre-wrap; overflow:auto; max-height:220px;">No pending changes.</pre>
+  <div class="kv" id="houseWorkshopActions" data-testid="house-workshop-actions" style="margin-top:8px;">
+    <button class="btn primary" id="houseWorkshopApplyDraftBtn" type="button" data-testid="house-workshop-apply-draft" disabled>Apply Draft</button>
+    <button class="btn" id="houseWorkshopSaveSnapshotBtn" type="button" data-testid="house-workshop-save-snapshot" disabled>Save Snapshot to Library</button>
+  </div>
+  <div class="small" id="houseWorkshopActionStatus" data-testid="house-workshop-action-status" style="margin-top:8px; min-height:1.4em;"></div>
 </div>
 
 <div class="panel is-hidden" id="houseLibraryPanel" data-testid="house-library-panel">

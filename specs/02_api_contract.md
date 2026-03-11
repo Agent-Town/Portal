@@ -912,7 +912,7 @@ Response fields:
 ### GET `/api/platform/workshop` (human)
 Returns the minimal House Workshop/config lineage surface for the current active team when `teamId` is omitted.
 
-House uses this response as the lineage anchor for the Workshop panel. When an active config is present, the in-shell Workshop read surface then uses the existing worker workspace tools against `workspace/.agent-town/` to enumerate files and read file content without leaving `/app` or rotating the worker session.
+House uses this response as the lineage anchor for the Workshop panel. When an active config is present, the in-shell Workshop read surface then uses the existing worker workspace tools against `workspace/.agent-town/` to enumerate files and read file content without leaving `/app` or rotating the worker session. Persistent Workshop edits stay inside the same shell, use the worker permission/approval path for `storage.local.persistent`, and may optionally be snapshotted into Library by calling `POST /api/platform/library/items` with `sourceKind: "workspace_file"` and the exact workspace `sourceRef`.
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
@@ -930,6 +930,135 @@ Response fields:
 - `data.lineage.trainerResultId`
 - `data.lineage.candidatePatchId`
 - `data.inboxPath`
+
+### GET `/api/platform/library` (human)
+Returns the current House Library shelf and active chat scope for the current active team when `teamId` is omitted.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.activeScopeSetId`
+- `data.selectedItemIds[]`
+- `data.selectedItems[]`
+- `data.selectedItems[].libraryItemId`
+- `data.selectedItems[].title`
+- `data.selectedItems[].itemType`
+- `data.items[]`
+- `data.items[].libraryItemId`
+- `data.items[].itemType`
+- `data.items[].title`
+- `data.items[].summary`
+- `data.items[].contentText`
+- `data.items[].contentRef`
+- `data.items[].sourceKind`
+- `data.items[].sourceRef`
+- `data.items[].visibility`
+- `data.items[].contentHash`
+- `data.items[].readOnly`
+- `data.items[].importedState`
+- `data.scopeSets[]`
+- `data.scopeSets[].scopeSetId`
+- `data.scopeSets[].title`
+- `data.scopeSets[].orderedItemIds[]`
+- `data.emptyStateText`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### POST `/api/platform/library/items` (human)
+Creates one durable House Library item with explicit source provenance. This is the same route the Workshop snapshot action uses after an approved file write.
+
+Request headers:
+- `Idempotency-Key` (required)
+
+Request shape:
+```json
+{
+  "itemType": "playbook",
+  "title": "Workshop Snapshot · scope.md",
+  "summary": "Snapshot of workspace/.agent-town/playbooks/scope.md from the active Workshop config.",
+  "contentText": "# Scope Playbook\n\nOnly use the two items the user selected.",
+  "contentRef": "workspace/.agent-town/playbooks/scope.md",
+  "sourceKind": "workspace_file",
+  "sourceRef": "workspace/.agent-town/playbooks/scope.md",
+  "links": [
+    {
+      "linkKind": "derived_from_workshop_config",
+      "sourceKind": "workspace_file",
+      "sourceRef": "workspace/.agent-town/playbooks/scope.md"
+    }
+  ]
+}
+```
+
+Response fields:
+- `data.item`
+- `data.item.libraryItemId`
+- `data.item.contentHash`
+- `data.item.sourceKind`
+- `data.item.sourceRef`
+- `data.links[]`
+- `data.links[].libraryLinkId`
+- `data.links[].linkKind`
+- `data.links[].sourceKind`
+- `data.links[].sourceRef`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_IDEMPOTENCY_REQUIRED`
+- `LIBRARY_SOURCE_REQUIRED`
+- `INVALID_ARGUMENT`
+
+### GET `/api/platform/library/scope` (human)
+Returns the current active Library scope set and the resolved ordered items selected for chat.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.activeScopeSetId`
+- `data.orderedItemIds[]`
+- `data.selectedItems[]`
+- `data.scopeSets[]`
+- `data.emptyStateText`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### POST `/api/platform/library/scope` (human)
+Creates or updates the active Library scope set for the current chat using one deterministic ordered list of Library item ids.
+
+Request shape:
+```json
+{
+  "scopeSetId": "optional existing scope set id",
+  "title": "Reading Table",
+  "itemIds": ["lib_1234", "lib_5678"]
+}
+```
+
+Response fields:
+- `data.activeScopeSetId`
+- `data.selectedItemIds[]`
+- `data.selectedItems[]`
+- `data.scopeSets[]`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+- `LIBRARY_ITEM_NOT_FOUND`
 
 ### GET `/api/platform/house-structure` (human)
 Returns deterministic office and staff-agent scaffolding for the currently attached House.

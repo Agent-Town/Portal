@@ -534,8 +534,11 @@ let houseSurfaceState = {
     files: [],
     selectedFilePath: '',
     selectedFileContent: '',
+    draftContent: '',
     filesEmptyStateText: 'No Workshop files available yet.',
-    emptyStateText: 'No active config is bound to this team yet.'
+    emptyStateText: 'No active config is bound to this team yet.',
+    actionStatusText: '',
+    actionStatusError: false,
   },
   trainer: {
     loaded: false,
@@ -1266,6 +1269,89 @@ function setHouseTrainerActionStatus(text, isError = false) {
   houseSurfaceState.trainer.actionStatusError = !!isError;
 }
 
+function setHouseWorkshopActionStatus(text, isError = false) {
+  const node = el('houseWorkshopActionStatus');
+  houseSurfaceState.workshop.actionStatusText = String(text || '');
+  houseSurfaceState.workshop.actionStatusError = !!isError;
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
+function houseWorkshopFileLabel(filePath = '') {
+  const normalizedPath = String(filePath || '').trim();
+  if (!normalizedPath) return 'Workshop file';
+  const segments = normalizedPath.split('/').filter(Boolean);
+  return segments[segments.length - 1] || normalizedPath;
+}
+
+function buildHouseWorkshopDiffPreview(previousContent = '', nextContent = '') {
+  const before = String(previousContent || '');
+  const after = String(nextContent || '');
+  if (before === after) return 'No pending changes.';
+  const beforeLines = before.split('\n');
+  const afterLines = after.split('\n');
+  const preview = [];
+  const maxLength = Math.max(beforeLines.length, afterLines.length);
+  for (let index = 0; index < maxLength; index += 1) {
+    const beforeLine = beforeLines[index];
+    const afterLine = afterLines[index];
+    if (beforeLine === afterLine) {
+      if (typeof beforeLine === 'string') {
+        preview.push(`  ${beforeLine}`);
+      }
+      continue;
+    }
+    if (typeof beforeLine === 'string') preview.push(`- ${beforeLine}`);
+    if (typeof afterLine === 'string') preview.push(`+ ${afterLine}`);
+  }
+  return preview.join('\n');
+}
+
+function buildHouseWorkshopPermissionManifest(existingPermissions = []) {
+  const entries = Array.isArray(existingPermissions) ? existingPermissions : [];
+  const byId = new Map();
+  entries.forEach((entry) => {
+    const permissionId = String(entry?.id || '').trim();
+    if (!permissionId) return;
+    byId.set(permissionId, {
+      id: permissionId,
+      ...(entry && typeof entry === 'object' ? entry : {}),
+    });
+  });
+  if (!byId.has('storage.local.persistent')) {
+    byId.set('storage.local.persistent', { id: 'storage.local.persistent' });
+  }
+  return {
+    type: 'https://agent.town/schemas/permission-manifest-v1',
+    version: '1.0.0',
+    permissions: Array.from(byId.values()),
+  };
+}
+
+async function ensureHouseWorkshopWriteApprovalPolicy(gatewayApi) {
+  if (!gatewayApi || typeof gatewayApi.getPermissionPolicy !== 'function' || typeof gatewayApi.setPermissionPolicy !== 'function') {
+    return null;
+  }
+  const policyEnvelope = await gatewayApi.getPermissionPolicy().catch(() => null);
+  const policy = policyEnvelope?.data || policyEnvelope || {};
+  const permissions = Array.isArray(policy?.permissions) ? policy.permissions : [];
+  const hasPersistentWritePermission = permissions.some((entry) => String(entry?.id || '').trim() === 'storage.local.persistent');
+  if (String(policy?.mode || '').trim() === 'manifest-enforced' && hasPersistentWritePermission) {
+    return policy;
+  }
+  const manifest = buildHouseWorkshopPermissionManifest(permissions);
+  const resultEnvelope = await gatewayApi.setPermissionPolicy({
+    manifest,
+    source: {
+      kind: 'house_workshop_editor',
+      feature: 'workshop_write',
+      loadedAtMs: Date.now(),
+    },
+  }).catch(() => null);
+  return resultEnvelope?.data?.policy || resultEnvelope?.policy || policy;
+}
+
 function makeHouseIdempotencyKey(prefix) {
   const safePrefix = String(prefix || 'house').trim() || 'house';
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -1337,6 +1423,9 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.workshop.files = [];
     houseSurfaceState.workshop.selectedFilePath = '';
     houseSurfaceState.workshop.selectedFileContent = '';
+    houseSurfaceState.workshop.draftContent = '';
+    houseSurfaceState.workshop.actionStatusText = '';
+    houseSurfaceState.workshop.actionStatusError = false;
     houseSurfaceState.trainer.selectedResultId = '';
     resetHouseTrainerActionKeys();
   }
@@ -1780,7 +1869,23 @@ function renderHouseWorkshopSurface() {
   const filesNode = el('houseWorkshopFiles');
   const filePathNode = el('houseWorkshopFilePath');
   const fileContentNode = el('houseWorkshopFileContent');
-  if (!emptyNode || !detailNode || !inboxBtn || !filesEmptyNode || !filesNode || !filePathNode || !fileContentNode) return;
+  const draftInput = el('houseWorkshopDraftInput');
+  const diffPreviewNode = el('houseWorkshopDiffPreview');
+  const applyDraftBtn = el('houseWorkshopApplyDraftBtn');
+  const saveSnapshotBtn = el('houseWorkshopSaveSnapshotBtn');
+  if (
+    !emptyNode
+    || !detailNode
+    || !inboxBtn
+    || !filesEmptyNode
+    || !filesNode
+    || !filePathNode
+    || !fileContentNode
+    || !draftInput
+    || !diffPreviewNode
+    || !applyDraftBtn
+    || !saveSnapshotBtn
+  ) return;
   const activeConfigVersionId = String(houseSurfaceState.workshop.activeConfigVersionId || '').trim();
   const lineage = houseSurfaceState.workshop.lineage && typeof houseSurfaceState.workshop.lineage === 'object'
     ? houseSurfaceState.workshop.lineage
@@ -1795,12 +1900,26 @@ function renderHouseWorkshopSurface() {
   const files = Array.isArray(houseSurfaceState.workshop.files) ? houseSurfaceState.workshop.files : [];
   const selectedFilePath = String(houseSurfaceState.workshop.selectedFilePath || '').trim();
   const selectedFileContent = String(houseSurfaceState.workshop.selectedFileContent || '');
+  const draftContent = String(houseSurfaceState.workshop.draftContent || '');
+  const diffPreview = buildHouseWorkshopDiffPreview(selectedFileContent, draftContent);
+  const canApplyDraft = !!selectedFilePath && draftContent !== selectedFileContent;
+  const canSaveSnapshot = !!selectedFilePath;
 
   emptyNode.textContent = houseSurfaceState.workshop.emptyStateText || 'No active config is bound to this team yet.';
   emptyNode.classList.toggle('is-hidden', !!activeConfigVersionId);
   inboxBtn.disabled = !inboxPath;
   inboxBtn.dataset.entryPath = inboxPath;
   filesNode.innerHTML = '';
+  draftInput.disabled = !selectedFilePath;
+  draftInput.placeholder = selectedFilePath ? `Edit ${selectedFilePath}` : 'Select a file to edit.';
+  draftInput.value = draftContent;
+  diffPreviewNode.textContent = diffPreview;
+  applyDraftBtn.disabled = !canApplyDraft;
+  saveSnapshotBtn.disabled = !canSaveSnapshot;
+  setHouseWorkshopActionStatus(
+    houseSurfaceState.workshop.actionStatusText,
+    houseSurfaceState.workshop.actionStatusError
+  );
 
   if (!activeConfigVersionId) {
     detailNode.textContent = 'Select a team with an active config binding to inspect Workshop lineage.';
@@ -1808,6 +1927,10 @@ function renderHouseWorkshopSurface() {
     filesEmptyNode.classList.remove('is-hidden');
     filePathNode.textContent = 'Select a file to read.';
     fileContentNode.textContent = '';
+    draftInput.value = '';
+    diffPreviewNode.textContent = 'No pending changes.';
+    applyDraftBtn.disabled = true;
+    saveSnapshotBtn.disabled = true;
     return;
   }
 
@@ -1818,6 +1941,10 @@ function renderHouseWorkshopSurface() {
   if (!files.length) {
     filePathNode.textContent = 'Select a file to read.';
     fileContentNode.textContent = '';
+    draftInput.value = '';
+    diffPreviewNode.textContent = 'No pending changes.';
+    applyDraftBtn.disabled = true;
+    saveSnapshotBtn.disabled = true;
     return;
   }
 
@@ -1854,8 +1981,84 @@ async function selectHouseWorkshopFile(filePath = '') {
   const data = envelope?.data || envelope || {};
   houseSurfaceState.workshop.selectedFilePath = String(data.path || normalizedPath).trim();
   houseSurfaceState.workshop.selectedFileContent = String(data.content || '');
+  houseSurfaceState.workshop.draftContent = String(data.content || '');
   renderHouseWorkshopSurface();
   setHouseSurfaceStatus('');
+  return data;
+}
+
+async function applyHouseWorkshopDraft() {
+  const filePath = String(houseSurfaceState.workshop.selectedFilePath || '').trim();
+  if (!filePath) {
+    throw new Error('WORKSHOP_FILE_REQUIRED');
+  }
+  const nextContent = String(houseSurfaceState.workshop.draftContent || '');
+  const currentContent = String(houseSurfaceState.workshop.selectedFileContent || '');
+  if (nextContent === currentContent) {
+    setHouseWorkshopActionStatus('No pending draft changes.');
+    return { ok: true, skipped: true };
+  }
+  const gatewayApi = window.__openclawLiteTest || await initGateway().catch(() => null);
+  if (!gatewayApi || typeof gatewayApi.workspaceWriteFile !== 'function') {
+    throw new Error('WORKSPACE_WRITE_UNAVAILABLE');
+  }
+  await ensureHouseWorkshopWriteApprovalPolicy(gatewayApi);
+  setHouseSurfaceStatus(`Applying draft for ${filePath}...`);
+  setHouseWorkshopActionStatus(`Waiting for approval to write ${houseWorkshopFileLabel(filePath)}...`);
+  const envelope = await gatewayApi.workspaceWriteFile({
+    path: filePath,
+    content: nextContent,
+  });
+  if (envelope?.ok !== true) {
+    const errorCode = String(envelope?.error?.code || 'WORKSPACE_WRITE_FAILED');
+    setHouseSurfaceStatus('');
+    setHouseWorkshopActionStatus(errorCode, true);
+    return envelope;
+  }
+  await selectHouseWorkshopFile(filePath);
+  setHouseSurfaceStatus('');
+  setHouseWorkshopActionStatus(`Saved ${houseWorkshopFileLabel(filePath)} in Workshop.`);
+  return envelope;
+}
+
+async function saveSelectedHouseWorkshopSnapshot() {
+  const filePath = String(houseSurfaceState.workshop.selectedFilePath || '').trim();
+  const fileContent = String(houseSurfaceState.workshop.selectedFileContent || '');
+  if (!filePath) {
+    throw new Error('WORKSHOP_SNAPSHOT_SOURCE_REQUIRED');
+  }
+  const itemType = filePath.includes('/playbooks/')
+    ? 'playbook'
+    : 'workshop_snapshot';
+  const idempotencyKey = makeHouseIdempotencyKey('house_workshop_snapshot');
+  const response = await api('/api/platform/library/items', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      itemType,
+      title: `Workshop Snapshot · ${houseWorkshopFileLabel(filePath)}`,
+      summary: `Snapshot of ${filePath} from the active Workshop config.`,
+      contentText: fileContent,
+      contentRef: filePath,
+      sourceKind: 'workspace_file',
+      sourceRef: filePath,
+      links: [{
+        linkKind: 'derived_from_workshop_config',
+        sourceKind: 'workspace_file',
+        sourceRef: filePath,
+        metadata: {
+          activeConfigVersionId: String(houseSurfaceState.workshop.activeConfigVersionId || '').trim(),
+          activeConfigHash: String(houseSurfaceState.workshop.activeConfigHash || '').trim(),
+        },
+      }],
+    }),
+  });
+  const data = response?.data || response || {};
+  const item = data?.item && typeof data.item === 'object' ? data.item : {};
+  const title = String(item?.title || houseWorkshopFileLabel(filePath) || 'snapshot');
+  setHouseWorkshopActionStatus(`Saved ${title} to Library.`);
   return data;
 }
 
@@ -2193,8 +2396,11 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
     houseSurfaceState.workshop.files = [];
     houseSurfaceState.workshop.selectedFilePath = '';
     houseSurfaceState.workshop.selectedFileContent = '';
+    houseSurfaceState.workshop.draftContent = '';
     houseSurfaceState.workshop.filesEmptyStateText = 'No Workshop files available yet.';
     houseSurfaceState.workshop.emptyStateText = String(data.emptyStateText || 'No active config is bound to this team yet.');
+    houseSurfaceState.workshop.actionStatusText = '';
+    houseSurfaceState.workshop.actionStatusError = false;
     if (houseSurfaceState.workshop.activeConfigVersionId) {
       const gatewayApi = window.__openclawLiteTest || await initGateway().catch(() => null);
       if (gatewayApi && typeof gatewayApi.workspaceList === 'function') {
@@ -2213,6 +2419,7 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
             const readData = readEnvelope?.data || readEnvelope || {};
             houseSurfaceState.workshop.selectedFilePath = String(readData.path || nextSelectedFilePath).trim();
             houseSurfaceState.workshop.selectedFileContent = String(readData.content || '');
+            houseSurfaceState.workshop.draftContent = String(readData.content || '');
           }
         }
       }
@@ -2238,7 +2445,10 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
     houseSurfaceState.workshop.files = [];
     houseSurfaceState.workshop.selectedFilePath = '';
     houseSurfaceState.workshop.selectedFileContent = '';
+    houseSurfaceState.workshop.draftContent = '';
     houseSurfaceState.workshop.filesEmptyStateText = 'No Workshop files available yet.';
+    houseSurfaceState.workshop.actionStatusText = '';
+    houseSurfaceState.workshop.actionStatusError = false;
     renderHouseWorkshopSurface();
     setHouseSurfaceStatus(`House Workshop unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
@@ -4681,6 +4891,56 @@ function bindTownDistrictControls() {
       } catch (err) {
         setHouseSurfaceStatus(`Inbox open unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
         houseWorkshopOpenInboxBtn.disabled = false;
+      }
+    };
+  }
+
+  const houseWorkshopDraftInput = el('houseWorkshopDraftInput');
+  if (houseWorkshopDraftInput) {
+    houseWorkshopDraftInput.oninput = (event) => {
+      houseSurfaceState.workshop.draftContent = String(event?.target?.value || '');
+      const diffPreviewNode = el('houseWorkshopDiffPreview');
+      const applyDraftBtn = el('houseWorkshopApplyDraftBtn');
+      if (diffPreviewNode) {
+        diffPreviewNode.textContent = buildHouseWorkshopDiffPreview(
+          houseSurfaceState.workshop.selectedFileContent,
+          houseSurfaceState.workshop.draftContent
+        );
+      }
+      if (applyDraftBtn) {
+        applyDraftBtn.disabled = (
+          !String(houseSurfaceState.workshop.selectedFilePath || '').trim()
+          || String(houseSurfaceState.workshop.draftContent || '') === String(houseSurfaceState.workshop.selectedFileContent || '')
+        );
+      }
+      setHouseWorkshopActionStatus('');
+    };
+  }
+
+  const houseWorkshopApplyDraftBtn = el('houseWorkshopApplyDraftBtn');
+  if (houseWorkshopApplyDraftBtn) {
+    houseWorkshopApplyDraftBtn.onclick = async () => {
+      houseWorkshopApplyDraftBtn.disabled = true;
+      try {
+        await applyHouseWorkshopDraft();
+      } catch (err) {
+        setHouseWorkshopActionStatus(String(err?.message || 'WORKSHOP_WRITE_FAILED'), true);
+      } finally {
+        renderHouseWorkshopSurface();
+      }
+    };
+  }
+
+  const houseWorkshopSaveSnapshotBtn = el('houseWorkshopSaveSnapshotBtn');
+  if (houseWorkshopSaveSnapshotBtn) {
+    houseWorkshopSaveSnapshotBtn.onclick = async () => {
+      houseWorkshopSaveSnapshotBtn.disabled = true;
+      try {
+        await saveSelectedHouseWorkshopSnapshot();
+      } catch (err) {
+        setHouseWorkshopActionStatus(String(err?.message || 'WORKSHOP_SNAPSHOT_FAILED'), true);
+      } finally {
+        renderHouseWorkshopSurface();
       }
     };
   }

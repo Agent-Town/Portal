@@ -737,6 +737,8 @@ Execution mapping:
 1. `M29.5` Workshop editor read surface
    - same-shell Workshop file browser backed by worker `workspace_list` and `workspace_read_file` over `workspace/.agent-town/`
 2. `M29.6` Workshop write approval and Library snapshotting
+   - same-shell draft pane shows a deterministic diff preview before the worker requests persistent-write approval
+   - approved writes use the existing worker persistent storage policy path and optional snapshots persist through `POST /api/platform/library/items` with `workspace_file` provenance
 3. `M29.7` Archive or Trainer promotion into Library
 
 ### L28.3 - Registry publication and import
