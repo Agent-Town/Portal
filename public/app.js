@@ -3504,6 +3504,36 @@ function setTownhallAvatarPreview(kind, imageUrl) {
   img.src = imageUrl;
 }
 
+function openTownhallBrainSetupPanel({ focus = true } = {}) {
+  const dock = el('agentSidebar');
+  const minimizeBtn = el('minimizeChatBtn');
+  const debugBtn = el('agentDebugToggleBtn');
+  if (dock) {
+    dock.classList.remove('minimized');
+    dock.classList.remove('debug-collapsed');
+    saveAgentPanelMinimized(false);
+    saveAgentPanelDebugVisible(true);
+    syncAgentPanelLayout(dock);
+    dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  if (minimizeBtn) {
+    minimizeBtn.textContent = '_';
+    minimizeBtn.title = 'Minimize panel';
+  }
+  if (debugBtn) {
+    debugBtn.setAttribute('aria-expanded', 'true');
+    debugBtn.title = 'Hide debug panel';
+  }
+  setAgentDebugTab('brain');
+  scheduleAgentDebugRefresh('townhall-brain-open');
+  if (focus) {
+    setTimeout(() => {
+      const target = el('llmProviderSelect') || el('llmOauthProfileInput') || el('llmKeyInput');
+      if (target && typeof target.focus === 'function') target.focus();
+    }, 40);
+  }
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -3740,7 +3770,8 @@ async function mintAllTownhallIdentitiesAndRegister() {
     setTownhallRegisterFeedback('Saving Town Hall registration...');
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
-    setTownhallRegisterFeedback('Registration complete. Configure your brain to continue.');
+    setTownhallRegisterFeedback('Registration complete. Open Brain on the right, connect it, then continue to the sigil test.');
+    openTownhallBrainSetupPanel();
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -3831,6 +3862,15 @@ function bindTownhallRegistrationControls() {
       if (sigilFlow && !sigilFlow.classList.contains('is-hidden')) {
         sigilFlow.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    });
+  }
+
+  const openBrainBtn = el('townhallOpenBrainBtn');
+  if (openBrainBtn && openBrainBtn.dataset.bound !== '1') {
+    openBrainBtn.dataset.bound = '1';
+    openBrainBtn.addEventListener('click', () => {
+      openTownhallBrainSetupPanel();
+      setTownhallRegisterFeedback('Brain panel opened on the right. Connect it there, then continue here.');
     });
   }
 
@@ -3965,7 +4005,7 @@ function syncTownhallRegistrationUI(state) {
   const gateHint = el('townHallGateHint');
   if (gateHint) {
     if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
-      gateHint.textContent = 'Registration complete. Configure your brain to continue.';
+      gateHint.textContent = 'Registration complete. Use Open Brain to configure the agent in the right-side panel, then continue here.';
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN && isBrainConfigured && !isWorkerConnected) {
       gateHint.textContent = 'Brain configured. Waiting for your worker agent to connect.';
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN) {
@@ -4002,6 +4042,11 @@ function syncTownhallRegistrationUI(state) {
       )
     );
     continueBtn.disabled = !canContinue;
+  }
+  const openBrainBtn = el('townhallOpenBrainBtn');
+  if (openBrainBtn) {
+    openBrainBtn.disabled = false;
+    openBrainBtn.textContent = isBrainConfigured ? 'Review Brain' : 'Open Brain';
   }
   panel.classList.toggle('is-hidden', required && !canShowRegistrationPanel && showSigil);
 
@@ -7156,6 +7201,26 @@ function updateLlmOauthLaunchUi() {
   }
 }
 
+function explainOpenAiCodexOauthStartError(err) {
+  const code = String(err?.code || err?.message || '').trim();
+  if (code === 'CALLBACK_SERVER_UNAVAILABLE') {
+    const callbackServer = err?.data?.callbackServer && typeof err.data.callbackServer === 'object'
+      ? err.data.callbackServer
+      : {};
+    const host = String(callbackServer.host || '127.0.0.1').trim() || '127.0.0.1';
+    const port = String(callbackServer.port || '1455').trim() || '1455';
+    const detail = String(callbackServer.error || '').trim();
+    if (detail === 'EADDRINUSE') {
+      return `OpenAI OAuth callback port ${host}:${port} is already in use. Close the other local callback listener or keep this browser flow manual by copying the final callback URL back into Agent Town.`;
+    }
+    return `OpenAI OAuth callback server is unavailable on ${host}:${port}.`;
+  }
+  if (code === 'POPUP_BLOCKED') {
+    return 'Popup blocked. Allow popups and retry OAuth launch.';
+  }
+  return code || 'OAuth start failed.';
+}
+
 function stopOpenAiCodexOAuthPoll() {
   if (!openAiCodexOAuthPollTimer) return;
   clearInterval(openAiCodexOAuthPollTimer);
@@ -7255,8 +7320,11 @@ async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
   } catch (err) {
     const code = String(err?.message || '').trim();
     if (code === 'CODE_PENDING') {
-      setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
-      setAgentLlmStatus('Waiting for OAuth callback.');
+      const pendingMessage = openAiCodexOAuthAttempt?.manualOnly === true
+        ? 'Waiting for pasted OAuth callback URL. Finish sign-in, copy the final callback URL from the browser, paste it here, then click Complete OAuth again.'
+        : 'Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.';
+      setLiteLlmStatus(pendingMessage);
+      setAgentLlmStatus(pendingMessage);
       return;
     }
     const msg = code || 'OAuth exchange failed.';
@@ -7299,14 +7367,27 @@ async function launchLlmOauthInNewTab() {
   const authorizeUrl = String(started?.authorizeUrl || '').trim();
   const attemptId = String(started?.attemptId || '').trim();
   const state = String(started?.state || '').trim();
+  const callbackServer = started?.callbackServer && typeof started.callbackServer === 'object'
+    ? started.callbackServer
+    : {};
+  const manualOnly = callbackServer.ready !== true && callbackServer.manualOnly === true;
   if (!authorizeUrl || !attemptId || !state) {
     throw new Error('OAUTH_START_FAILED');
   }
 
-  openAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
+  openAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now(), manualOnly };
   const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
   if (!popup) {
     throw new Error('POPUP_BLOCKED');
+  }
+  if (manualOnly) {
+    const host = String(callbackServer.host || '127.0.0.1').trim() || '127.0.0.1';
+    const port = String(callbackServer.port || '1455').trim() || '1455';
+    const message = `OAuth started. Automatic callback capture is unavailable because ${host}:${port} is already in use. After sign-in, copy the final callback URL from the browser, paste it here, then click Complete OAuth.`;
+    setLiteLlmStatus(message);
+    setAgentLlmStatus(message);
+    stopOpenAiCodexOAuthPoll();
+    return;
   }
   setLiteLlmStatus('OAuth started. Complete sign-in in the popup. If needed, paste callback URL and click Complete OAuth.');
   setAgentLlmStatus('OAuth started. Complete sign-in in the popup.');
@@ -8363,12 +8444,7 @@ function initAdvancedLlmUi() {
       try {
         await launchLlmOauthInNewTab();
       } catch (err) {
-        const msg = String(err?.message || 'OAUTH_START_FAILED');
-        if (msg === 'POPUP_BLOCKED') {
-          setLiteLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
-          return;
-        }
-        setLiteLlmStatus(`OAuth start failed: ${msg}`);
+        setLiteLlmStatus(`OAuth start failed: ${explainOpenAiCodexOauthStartError(err)}`);
       }
     });
   }
@@ -8609,12 +8685,7 @@ function initAgentLlmUi() {
       try {
         await launchLlmOauthInNewTab();
       } catch (err) {
-        const msg = String(err?.message || 'OAUTH_START_FAILED');
-        if (msg === 'POPUP_BLOCKED') {
-          setAgentLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
-          return;
-        }
-        setAgentLlmStatus(`OAuth start failed: ${msg}`);
+        setAgentLlmStatus(`OAuth start failed: ${explainOpenAiCodexOauthStartError(err)}`);
       }
     });
   }

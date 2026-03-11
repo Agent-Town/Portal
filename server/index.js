@@ -2661,8 +2661,16 @@ function normalizeTownhallMintProfile(profileInput, onboarding) {
   const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
   const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
 
-  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt || existingHumanAvatar.prompt || '');
-  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt || existingAgentAvatar.prompt || '');
+  const humanPrompt = normalizeTownhallPrompt(
+    humanAvatarInput.prompt
+    || existingHumanAvatar.prompt
+    || DEFAULT_TOWNHALL_HUMAN_PROMPT
+  );
+  const agentPrompt = normalizeTownhallPrompt(
+    agentAvatarInput.prompt
+    || existingAgentAvatar.prompt
+    || DEFAULT_TOWNHALL_AGENT_PROMPT
+  );
   if (!humanPrompt) return { error: 'MISSING_HUMAN_AVATAR_PROMPT' };
   if (!agentPrompt) return { error: 'MISSING_AGENT_AVATAR_PROMPT' };
 
@@ -3101,14 +3109,18 @@ function ensureSessionOnboarding(session) {
   humanAvatar.image = typeof humanAvatar.image === 'string' && humanAvatar.image.trim()
     ? humanAvatar.image
     : DEFAULT_TOWNHALL_HUMAN_IMAGE;
-  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' ? humanAvatar.prompt : '';
+  humanAvatar.prompt = typeof humanAvatar.prompt === 'string' && humanAvatar.prompt.trim()
+    ? humanAvatar.prompt
+    : DEFAULT_TOWNHALL_HUMAN_PROMPT;
   humanAvatar.source = humanAvatar.source === 'upload' ? 'upload' : 'default';
   humanAvatar.updatedAt = typeof humanAvatar.updatedAt === 'string' ? humanAvatar.updatedAt : null;
 
   agentAvatar.image = typeof agentAvatar.image === 'string' && agentAvatar.image.trim()
     ? agentAvatar.image
     : DEFAULT_TOWNHALL_AGENT_IMAGE;
-  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' ? agentAvatar.prompt : '';
+  agentAvatar.prompt = typeof agentAvatar.prompt === 'string' && agentAvatar.prompt.trim()
+    ? agentAvatar.prompt
+    : DEFAULT_TOWNHALL_AGENT_PROMPT;
   agentAvatar.source = agentAvatar.source === 'upload' ? 'upload' : 'default';
   agentAvatar.updatedAt = typeof agentAvatar.updatedAt === 'string' ? agentAvatar.updatedAt : null;
 
@@ -4600,7 +4612,9 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
   }));
 
-  if (!callbackServer.ready) {
+  const manualCallbackOnly = callbackServer.ready !== true && String(callbackServer?.error || '') === 'EADDRINUSE';
+
+  if (!callbackServer.ready && !manualCallbackOnly) {
     return res.status(503).json({
       ok: false,
       error: 'CALLBACK_SERVER_UNAVAILABLE',
@@ -4651,7 +4665,10 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     authorizeUrl: authUrl.toString(),
     redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
     expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
-    callbackServer
+    callbackServer: {
+      ...callbackServer,
+      manualOnly: manualCallbackOnly
+    }
   });
 });
 
@@ -7709,8 +7726,16 @@ app.post('/api/townhall/register', (req, res) => {
   const humanAvatarInput = profile.humanAvatar && typeof profile.humanAvatar === 'object' ? profile.humanAvatar : {};
   const agentAvatarInput = profile.agentAvatar && typeof profile.agentAvatar === 'object' ? profile.agentAvatar : {};
 
-  const humanPrompt = normalizeTownhallPrompt(humanAvatarInput.prompt);
-  const agentPrompt = normalizeTownhallPrompt(agentAvatarInput.prompt);
+  const humanPrompt = normalizeTownhallPrompt(
+    humanAvatarInput.prompt
+    || onboarding.profile?.humanAvatar?.prompt
+    || DEFAULT_TOWNHALL_HUMAN_PROMPT
+  );
+  const agentPrompt = normalizeTownhallPrompt(
+    agentAvatarInput.prompt
+    || onboarding.profile?.agentAvatar?.prompt
+    || DEFAULT_TOWNHALL_AGENT_PROMPT
+  );
   if (!humanPrompt) return res.status(400).json({ ok: false, error: 'MISSING_HUMAN_AVATAR_PROMPT' });
   if (!agentPrompt) return res.status(400).json({ ok: false, error: 'MISSING_AGENT_AVATAR_PROMPT' });
 

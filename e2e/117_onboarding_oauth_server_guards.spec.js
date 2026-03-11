@@ -149,6 +149,59 @@ test('oauth start uses callback host in redirect URI and fails closed when callb
   }
 });
 
+test('oauth start falls back to manual callback mode when the callback port is already in use', async () => {
+  const occupiedPort = randomPort(1960, 120);
+  const blocker = await new Promise((resolve, reject) => {
+    const server = require('http').createServer((req, res) => {
+      res.statusCode = 200;
+      res.end('occupied');
+    });
+    server.once('error', reject);
+    server.listen(occupiedPort, '127.0.0.1', () => resolve(server));
+  });
+
+  const port = randomPort(6200, 200);
+  const storePath = path.join(os.tmpdir(), `agent-town-oauth-manual-${Date.now()}-${Math.random().toString(16).slice(2)}.sqlite`);
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const launched = startServer({
+    port,
+    storePath,
+    callbackHost: '127.0.0.1',
+    callbackPort: occupiedPort
+  });
+
+  let api = null;
+  try {
+    await waitForServer(baseUrl, launched.readLogs);
+    api = await request.newContext({ baseURL: baseUrl });
+
+    const startResp = await api.post('/api/agent/lite/llm/oauth/openai-codex/start', { data: {} });
+    expect(startResp.ok()).toBeTruthy();
+    const startBody = await startResp.json();
+    expect(startBody?.ok).toBe(true);
+    expect(startBody?.callbackServer?.ready).toBe(false);
+    expect(startBody?.callbackServer?.error).toBe('EADDRINUSE');
+    expect(startBody?.callbackServer?.manualOnly).toBe(true);
+    expect(String(startBody?.redirectUri || '')).toBe(`http://127.0.0.1:${occupiedPort}/auth/callback`);
+    expect(String(startBody?.authorizeUrl || '')).toContain(encodeURIComponent(`http://127.0.0.1:${occupiedPort}/auth/callback`));
+
+    const pendingResp = await api.post('/api/agent/lite/llm/oauth/openai-codex/exchange', {
+      data: { attemptId: startBody.attemptId }
+    });
+    expect(pendingResp.status()).toBe(409);
+    await expect(pendingResp.json()).resolves.toMatchObject({ ok: false, error: 'CODE_PENDING' });
+  } finally {
+    if (api) await api.dispose();
+    await stopServer(launched.child);
+    await new Promise((resolve) => blocker.close(resolve));
+    try {
+      fs.unlinkSync(storePath);
+    } catch {
+      // ignore temp file cleanup errors
+    }
+  }
+});
+
 test('onboarding status endpoint uses current session schema', async () => {
   const port = randomPort(6000, 200);
   const cbPort = randomPort(1840, 120);

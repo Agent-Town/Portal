@@ -9,6 +9,9 @@ const MINT_IDS = {
   agentSolana: 'solana:agent-asset-790'
 };
 
+const DEFAULT_HUMAN_PROMPT = "Stylized 3D third-person game character concept: a gender-neutral, race-neutral wild west wizard known as a 'Promptmancer' with a friendly, approachable silhouette and expressive eyes.";
+const DEFAULT_AGENT_PROMPT = 'Stylized 3D prairie pup avatar doing a cute hat-tip emote with a wholesome mascot vibe in a cozy wild west frontier style.';
+
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -23,13 +26,13 @@ function makeOnboarding(complete = false) {
       agentName: complete ? 'OpenClaw' : null,
       humanAvatar: {
         image: '/brand-kit/default_user_avatar.png',
-        prompt: complete ? 'Human prompt' : '',
+        prompt: complete ? 'Human prompt' : DEFAULT_HUMAN_PROMPT,
         source: 'default',
         updatedAt: complete ? '2026-02-16T00:00:00.000Z' : null
       },
       agentAvatar: {
         image: '/brand-kit/default_agent_avatar.png',
-        prompt: complete ? 'Agent prompt' : '',
+        prompt: complete ? 'Agent prompt' : DEFAULT_AGENT_PROMPT,
         source: 'default',
         updatedAt: complete ? '2026-02-16T00:00:00.000Z' : null
       }
@@ -78,7 +81,7 @@ function makeOnboarding(complete = false) {
   };
 }
 
-async function mockTownhallMintFlow(page) {
+async function mockTownhallMintFlow(page, { onEvmPrepare = null, onSolanaPrepare = null } = {}) {
   const evmAddress = '0x000000000000000000000000000000000000dEaD';
   const solAddress = 'So1anaWalletMint11111111111111111111111111111';
 
@@ -208,6 +211,9 @@ async function mockTownhallMintFlow(page) {
 
   await page.route('**/api/townhall/mint/evm/prepare', async (route) => {
     const body = route.request().postDataJSON();
+    if (typeof onEvmPrepare === 'function') {
+      await onEvmPrepare(body);
+    }
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -228,6 +234,9 @@ async function mockTownhallMintFlow(page) {
 
   await page.route('**/api/townhall/mint/solana/prepare', async (route) => {
     const body = route.request().postDataJSON();
+    if (typeof onSolanaPrepare === 'function') {
+      await onSolanaPrepare(body);
+    }
     const isHuman = body.subject === 'human';
     await route.fulfill({
       status: 200,
@@ -362,6 +371,69 @@ test('town hall story enforces avatar prompts before advancing each onboarding s
   await page.getByTestId('townhall-agent-submit-btn').click();
   await expect(page.locator('#townhallStepAgent')).toBeVisible();
   await expect(page.locator('#townhallRegisterError')).toContainText('agent avatar prompt');
+});
+
+test('town hall preloads default avatar prompts and images so registration can proceed without customization', async ({ page }) => {
+  const seenEvmBodies = [];
+  const seenSolanaBodies = [];
+  await mockTownhallMintFlow(page, {
+    onEvmPrepare: async (body) => {
+      seenEvmBodies.push(body);
+    },
+    onSolanaPrepare: async (body) => {
+      seenSolanaBodies.push(body);
+    }
+  });
+
+  await page.goto('/app');
+  await openTownhallPanel(page);
+
+  await expect(page.locator('#townhallHumanPreview')).toBeVisible();
+  await expect(page.locator('#townhallHumanPrompt')).toHaveValue(DEFAULT_HUMAN_PROMPT);
+  await page.locator('#townhallHumanName').fill('Robin');
+  await page.getByTestId('townhall-human-submit-btn').click();
+
+  await expect(page.locator('#townhallStepAgent')).toBeVisible();
+  await expect(page.locator('#townhallAgentPreview')).toBeVisible();
+  await expect(page.locator('#townhallAgentPrompt')).toHaveValue(DEFAULT_AGENT_PROMPT);
+  await page.locator('#townhallAgentName').fill('OpenClaw');
+  await page.getByTestId('townhall-agent-submit-btn').click();
+
+  await expect(page.locator('#townhallMintUserEvmStatus')).toContainText('Done', { timeout: 12000 });
+  await expect(page.locator('#townhallMintUserSolanaStatus')).toContainText('Done');
+  await expect(page.locator('#townhallMintAgentEvmStatus')).toContainText('Done');
+  await expect(page.locator('#townhallMintAgentSolanaStatus')).toContainText('Done');
+  await expect(page.getByTestId('townhall-open-brain-btn')).toBeVisible();
+
+  expect(seenEvmBodies.map((body) => String(body?.subject || ''))).toEqual(['human', 'agent']);
+  expect(seenSolanaBodies.map((body) => String(body?.subject || ''))).toEqual(['human', 'agent']);
+  for (const body of [...seenEvmBodies, ...seenSolanaBodies]) {
+    expect(body?.profile?.humanName).toBe('Robin');
+    expect(body?.profile?.agentName).toBe('OpenClaw');
+    expect(body?.profile?.humanAvatar?.prompt).toBe(DEFAULT_HUMAN_PROMPT);
+    expect(body?.profile?.agentAvatar?.prompt).toBe(DEFAULT_AGENT_PROMPT);
+  }
+
+  const stateResp = await page.request.get('/api/state');
+  expect(stateResp.ok()).toBeTruthy();
+  const state = await stateResp.json();
+  expect(state?.onboarding?.profile?.humanAvatar?.prompt).toBe(DEFAULT_HUMAN_PROMPT);
+  expect(state?.onboarding?.profile?.agentAvatar?.prompt).toBe(DEFAULT_AGENT_PROMPT);
+});
+
+test('town hall brain handoff opens the right-side Brain panel after registration', async ({ page }) => {
+  await mockTownhallMintFlow(page);
+  await page.goto('/app');
+  await openTownhallPanel(page);
+  await completeTownhallStory(page);
+
+  await expect(page.locator('#townhallMintUserEvmStatus')).toContainText('Done', { timeout: 12000 });
+  await expect(page.locator('#townhallRegisterStatus')).toContainText('Open Brain');
+  await expect(page.getByTestId('townhall-open-brain-btn')).toBeVisible();
+  await expect(page.getByTestId('agent-debug-panel-brain')).not.toHaveClass(/is-hidden/);
+  await page.getByTestId('townhall-open-brain-btn').click();
+  await expect(page.getByTestId('agent-debug-panel-brain')).not.toHaveClass(/is-hidden/);
+  await expect(page.locator('#agentSidebar')).not.toHaveClass(/minimized/);
 });
 
 test('town hall one-click registration saves names/prompts/all ERC-8004 IDs to session state', async ({ page }) => {
