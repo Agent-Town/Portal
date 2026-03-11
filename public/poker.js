@@ -206,6 +206,16 @@
     `;
   }
 
+  function renderSeriesClosureNotice(series) {
+    if (!series || String(series?.stage || '') !== 'cancelled') return '';
+    const refundedSeatCount = Number(series?.refundedSeatCount || 0);
+    const refundedTotalOil = Number(series?.refundedTotalOil || 0);
+    const closeReason = String(series?.closeReason || 'Tournament series cancelled by operator.');
+    return `
+      <p>${escapeHtml(closeReason)}${refundedSeatCount ? ` ${refundedSeatCount} seat${refundedSeatCount === 1 ? '' : 's'} refunded for ${refundedTotalOil} OIL.` : ''}</p>
+    `;
+  }
+
   function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
     const items = Array.isArray(actions) ? actions : [];
     if (!items.length) return `<p>${escapeHtml(emptyText)}</p>`;
@@ -708,6 +718,7 @@
           ${renderSummaryMetric('Entrants', `${Number(series?.entrantCount || 0)}`)}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
           ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
+          ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderMetaBadges([
           payload?.data?.viewerMode || 'public',
@@ -722,7 +733,10 @@
       `,
       `
         <h2>Series Director</h2>
-        ${series?.pendingBreakTableId
+        ${renderSeriesClosureNotice(series)}
+        ${String(series?.stage || '') === 'cancelled'
+          ? '<p>No active tables remain. Closed tournament tables stay available through operator review and audit export.</p>'
+          : series?.pendingBreakTableId
           ? `<p>${escapeHtml(series.pendingBreakTableId)} is the current break candidate with ${Number(series?.pendingBreakSeatCount || 0)} active seat${Number(series?.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${series?.pendingBreakBlockedByLiveTable ? '; the table must finish its live hand before seats can move.' : '.'}</p>`
           : (series?.needsRebalance
             ? `<p>Director target: rebalance toward ${Number(series?.targetTableCount || 0)} table${Number(series?.targetTableCount || 0) === 1 ? '' : 's'} across the current live field.</p>`
@@ -973,8 +987,12 @@
           ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
           ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
+          ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
-        ${series?.pendingBreakTableId
+        ${renderSeriesClosureNotice(series)}
+        ${String(series?.stage || '') === 'cancelled'
+          ? '<p>No active tables remain in this series. Operator review and export stay available on the closed table records.</p>'
+          : series?.pendingBreakTableId
           ? `<p>${escapeHtml(series.pendingBreakTableId)} is the current break candidate with ${Number(series?.pendingBreakSeatCount || 0)} active seat${Number(series?.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${series?.pendingBreakBlockedByLiveTable ? '; the table must finish its live hand before seats can move.' : '.'}</p>`
           : (series?.needsRebalance
             ? `<p>Director target: rebalance toward ${Number(series?.targetTableCount || 0)} table${Number(series?.targetTableCount || 0) === 1 ? '' : 's'} across the current live field.</p>`
@@ -1117,6 +1135,7 @@
         </div>
         <div class="pokerLinks">
           ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
+          ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
           <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
           ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
           ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
@@ -1261,7 +1280,7 @@
     });
   }
 
-  function bindAdminReviewActions(tableId) {
+  function bindAdminReviewActions(tableId, seriesId = '') {
     const token = readStoredPokerAdminToken();
     if (!token) return;
     const buttons = Array.from(document.querySelectorAll('[data-dispute-action][data-dispute-id]'));
@@ -1286,6 +1305,28 @@
           await loadPlayTable(tableId);
         } catch (err) {
           setStatus(`Operator review failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const seriesCloseButton = document.querySelector('[data-admin-series-close="1"][data-admin-series-id]');
+    if (seriesCloseButton) {
+      seriesCloseButton.addEventListener('click', async () => {
+        const targetSeriesId = String(seriesCloseButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        const targetTableId = String(seriesCloseButton.getAttribute('data-admin-series-table-id') || '').trim() || String(tableId || '').trim();
+        if (!targetSeriesId || !targetTableId) return;
+        setStatus('Cancelling tournament series and issuing refunds...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/close`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Operator closed the tournament series.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+        } catch (err) {
+          setStatus(`Series close failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }
@@ -1405,7 +1446,7 @@
       bindPlayMessageForm(tableId, data?.hand?.handId || '');
       bindPlayActionForm(tableId, data?.hand?.handId || '');
       bindPlayDisputeForm(tableId, data?.hand?.handId || '');
-      bindAdminReviewActions(tableId);
+      bindAdminReviewActions(tableId, data?.series?.seriesId || '');
     }
     bindCountdown(data?.hand?.actionExpiresAt || null);
     bindLiveTableStream(tableId, { rail });

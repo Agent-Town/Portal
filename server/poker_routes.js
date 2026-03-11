@@ -26,6 +26,7 @@ const {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayTablePayload,
   closeTable,
+  closeTournamentSeries,
   createTable,
   createRouteError,
   getSeriesDetail,
@@ -1055,6 +1056,42 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_CLOSE_FAILED',
         err?.message || 'Unable to close the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/close', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = closeTournamentSeries(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        refundMode: req.body?.refundMode,
+        asOf: req.body?.asOf,
+      });
+      for (const entry of Array.isArray(payload?.newlyClosedTables) ? payload.newlyClosedTables : []) {
+        publishPokerPlayTableEvent(entry?.tableId || '', 'series_close', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+          refundMode: entry?.refundSummary?.refundMode || null,
+          refundedSeatCount: Number(entry?.refundSummary?.refundedSeatCount || 0),
+          refundedTotalOil: Number(entry?.refundSummary?.refundedTotalOil || 0),
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_CLOSE_FAILED',
+        err?.message || 'Unable to close the poker tournament series.',
         {
           requestId,
           details: err?.details || {},

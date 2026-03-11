@@ -423,6 +423,12 @@ Returns the live 6-max poker lobby payload with:
 - `data.series[].paidPlaces`
 - `data.series[].payouts[]`
 - `data.series[].standings[]`
+- `data.series[].adminClosedTableCount`
+- `data.series[].refundedSeatCount`
+- `data.series[].refundedTotalOil`
+- `data.series[].closeReason`
+- `data.series[].refundMode`
+- `data.series[].closedAt`
 - `data.series[].activeTableId`
 - `data.houseId`
 - `data.wallet`
@@ -506,6 +512,8 @@ Tournament blind progression notes:
 - `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
 - once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, and `prizeOil`
+- when an operator cancels the series, `data.series.stage = "cancelled"` and the series exposes `adminClosedTableCount`, `refundedSeatCount`, `refundedTotalOil`, `closeReason`, `refundMode`, and `closedAt`
+- cancelled series set `data.series.activeTableId = null` and `data.tables[] = []`
 
 Tournament registration notes:
 - tournaments may accept new seats while `data.table.summary.lateRegistrationOpen === true`
@@ -700,6 +708,36 @@ Close notes:
 - cash tables default to `refundMode = "cash_stack"` and credit each seated stack back to OIL
 - tournament tables default to `refundMode = "buy_in"` and void unresolved seats back to their buy-in
 - closed tables move to `data.table.status = "admin_closed"` and reject new seat joins plus new hand/thread actions with `POKER_PLAY_TABLE_CLOSED`
+
+### POST `/api/poker/play/admin/series/:seriesId/close` (admin)
+Cancels a whole tournament series, closes every still-open table in that series, and refunds unresolved tournament seats back to offchain OIL.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Operator closed the tournament series.",
+  "refundMode": "buy_in",
+  "asOf": "2026-03-11T14:05:00.000Z"
+}
+```
+
+Response fields:
+- `data.series`
+- `data.tables[]`
+- `data.refundSummary.refundMode`
+- `data.refundSummary.closedTableCount`
+- `data.refundSummary.refundedSeatCount`
+- `data.refundSummary.refundedTotalOil`
+- `data.closedTableIds[]`
+- `data.newlyClosedTables[]`
+
+Series close notes:
+- this is tournament-only operator tooling; cash tables stay table-scoped
+- each newly closed member table publishes the same terminal state as the single-table close flow
+- once cancellation completes, the series remains addressable through `/api/poker/play/rail/series/:seriesId` for audit visibility even though no active tables remain
 
 ### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
 Returns the operator review payload for one table.

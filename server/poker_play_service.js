@@ -587,6 +587,47 @@ function buildTournamentEconomics(entries) {
   };
 }
 
+function buildTournamentSeriesClosureSummary(entries) {
+  const items = Array.isArray(entries) ? entries : [];
+  let adminClosedTableCount = 0;
+  let refundedSeatCount = 0;
+  let refundedTotalOil = 0;
+  let closeReason = '';
+  let refundMode = '';
+  let closedAt = '';
+  let closedBy = '';
+  for (const entry of items) {
+    const table = entry?.table || null;
+    if (!table || !isTableAdminClosed(table)) continue;
+    adminClosedTableCount += 1;
+    const state = table?.state && typeof table.state === 'object' ? table.state : {};
+    refundedSeatCount += Number(state?.refundedSeatCount || 0);
+    refundedTotalOil += Number(state?.refundedTotalOil || 0);
+    if (!closeReason) {
+      closeReason = normalizeTrimmedString(state?.closeReason);
+    }
+    if (!refundMode) {
+      refundMode = normalizeTrimmedString(state?.refundMode);
+    }
+    if (!closedBy) {
+      closedBy = normalizeTrimmedString(state?.closedBy);
+    }
+    const candidateClosedAt = normalizeTrimmedString(state?.closedAt, normalizeTrimmedString(table?.updatedAt));
+    if (candidateClosedAt && (!closedAt || candidateClosedAt.localeCompare(closedAt) > 0)) {
+      closedAt = candidateClosedAt;
+    }
+  }
+  return {
+    adminClosedTableCount,
+    refundedSeatCount,
+    refundedTotalOil,
+    closeReason: closeReason || null,
+    refundMode: refundMode || null,
+    closedAt: closedAt || null,
+    closedBy: closedBy || null,
+  };
+}
+
 function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   const items = Array.isArray(entries) ? entries : [];
   if (!items.length) return null;
@@ -599,6 +640,7 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   }));
   const directorPolicy = buildTournamentSeriesDirectorPolicy(activeEntries);
   const economics = buildTournamentEconomics(items);
+  const closure = buildTournamentSeriesClosureSummary(items);
   const uniqueWallets = new Set();
   let tableCount = 0;
   let liveTableCount = 0;
@@ -637,7 +679,9 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   }
 
   let stage = 'seating';
-  if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
+  if (tableCount === 0 && closure.adminClosedTableCount > 0) {
+    stage = 'cancelled';
+  } else if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
     stage = 'completed';
   } else if (directorPolicy.needsRebalance && !lateRegistrationOpen) {
     stage = 'table_break';
@@ -649,10 +693,13 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     stage = 'in_play';
   }
 
-  const activeTableId = currentUserTableId
-    || String(navigableEntries.find((entry) => entry?.summary?.liveHand)?.table?.tableId || '')
-    || String(navigableEntries.find((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)?.table?.tableId || '')
-    || String(leadTable?.tableId || '');
+  const viewerNavigableEntry = navigableEntries.find((entry) => normalizeTrimmedString(entry?.viewerSeat?.walletSubject) === normalizeTrimmedString(viewerWalletSubject));
+  const activeTableId = String(
+    viewerNavigableEntry?.table?.tableId
+      || navigableEntries.find((entry) => entry?.summary?.liveHand)?.table?.tableId
+      || navigableEntries.find((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)?.table?.tableId
+      || ''
+  );
 
   return {
     seriesId: ref.seriesId || String(leadTable?.tableId || ''),
@@ -676,10 +723,26 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     paidPlaces: economics.paidPlaces,
     payouts: economics.payouts,
     standings: economics.standings,
+    adminClosedTableCount: closure.adminClosedTableCount,
+    refundedSeatCount: closure.refundedSeatCount,
+    refundedTotalOil: closure.refundedTotalOil,
+    closeReason: closure.closeReason,
+    refundMode: closure.refundMode,
+    closedAt: closure.closedAt,
+    closedBy: closure.closedBy,
     currentUserTableId: currentUserTableId || null,
     activeTableId: activeTableId || null,
     tableIds: tableIds.filter(Boolean),
   };
+}
+
+function listTournamentSeriesEntriesBySeriesId(deps, seriesId, { processAt, includeClosed = false } = {}) {
+  const targetSeriesId = normalizeTrimmedString(seriesId);
+  return deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt }))
+    .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
+    .filter((synced) => includeClosed || !isSeriesClosedTable(synced?.table))
+    .filter((synced) => normalizeTrimmedString(getTournamentSeriesRef(synced?.table).seriesId) === targetSeriesId);
 }
 
 function listExistingTournamentSeriesTables(deps, matchKey, { processAt, includeClosed = false } = {}) {
@@ -1857,14 +1920,16 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
     updatedAt: requestAt,
   });
 
-  deps.createPokerPlayMessage({
-    tableId: updatedTable.tableId,
-    handId: updatedHand?.handId || null,
-    seatNumber: null,
-    authorRole: 'system',
-    body: `${closeReason}${refundedSeatCount ? ` ${refundedSeatCount} seat${refundedSeatCount === 1 ? '' : 's'} refunded for ${refundedTotalOil} OIL.` : ''}`,
-    createdAt: requestAt,
-  });
+  if (updatedHand?.handId) {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: updatedHand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `${closeReason}${refundedSeatCount ? ` ${refundedSeatCount} seat${refundedSeatCount === 1 ? '' : 's'} refunded for ${refundedTotalOil} OIL.` : ''}`,
+      createdAt: requestAt,
+    });
+  }
   if (typeof deps.createPokerPlayAuditEvent === 'function') {
     deps.createPokerPlayAuditEvent({
       tableId: updatedTable.tableId,
@@ -1891,6 +1956,67 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
       refundedSeatCount,
       refundedTotalOil,
     },
+  };
+}
+
+function closeTournamentSeries(deps, { seriesId, reason, actorLabel = 'operator', refundMode, asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const targetSeriesId = normalizeTrimmedString(seriesId);
+  if (!targetSeriesId) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const existingEntries = listTournamentSeriesEntriesBySeriesId(deps, targetSeriesId, {
+    processAt: requestAt,
+    includeClosed: true,
+  });
+  if (!existingEntries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+
+  const closeReason = normalizeTrimmedString(reason, 'Operator closed the tournament series.');
+  const refundPolicy = normalizeAdminCloseRefundMode(refundMode, 'tournament');
+  const newlyClosedTables = [];
+  for (const entry of existingEntries) {
+    const table = entry?.table || null;
+    if (!table || isSeriesClosedTable(table)) continue;
+    const closed = closeTable(deps, {
+      tableId: table.tableId,
+      reason: closeReason,
+      actorLabel,
+      refundMode: refundPolicy,
+      asOf: requestAt,
+    });
+    newlyClosedTables.push({
+      tableId: closed?.table?.tableId || table.tableId,
+      refundSummary: {
+        refundMode: normalizeTrimmedString(closed?.refundSummary?.refundMode, refundPolicy),
+        refundedSeatCount: Number(closed?.refundSummary?.refundedSeatCount || 0),
+        refundedTotalOil: Number(closed?.refundSummary?.refundedTotalOil || 0),
+      },
+    });
+  }
+
+  const detail = getSeriesDetail(deps, {
+    seriesId: targetSeriesId,
+    processAt: requestAt,
+  });
+  const adminClosedEntries = listTournamentSeriesEntriesBySeriesId(deps, targetSeriesId, {
+    processAt: requestAt,
+    includeClosed: true,
+  }).filter((entry) => isTableAdminClosed(entry?.table));
+
+  return {
+    ...detail,
+    refundSummary: {
+      refundMode: normalizeTrimmedString(detail?.series?.refundMode, refundPolicy),
+      closedTableCount: Number(detail?.series?.adminClosedTableCount || adminClosedEntries.length || 0),
+      refundedSeatCount: Number(detail?.series?.refundedSeatCount || 0),
+      refundedTotalOil: Number(detail?.series?.refundedTotalOil || 0),
+    },
+    closedTableIds: adminClosedEntries
+      .map((entry) => String(entry?.table?.tableId || ''))
+      .filter(Boolean),
+    newlyClosedTables,
   };
 }
 
@@ -2925,6 +3051,7 @@ module.exports = {
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
   closeTable,
+  closeTournamentSeries,
   createTable,
   createRouteError,
   getSeriesDetail,
