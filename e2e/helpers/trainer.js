@@ -190,6 +190,50 @@ async function readVfsText(page, path) {
   }, path);
 }
 
+async function writeVfsText(page, path, content) {
+  return await page.evaluate(async ({ targetPath, nextContent }) => {
+    const openDb = () => new Promise((resolve, reject) => {
+      const req = indexedDB.open('openclaw-lite', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('checkpoints')) {
+          const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
+          s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
+        }
+        if (!db.objectStoreNames.contains('vfs')) db.createObjectStore('vfs', { keyPath: 'path' });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
+    });
+    const txDone = (tx) => new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
+      tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
+    });
+    const encode = (value) => {
+      const bytes = new TextEncoder().encode(String(value || ''));
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+      return btoa(binary);
+    };
+    const db = await openDb();
+    const tx = db.transaction(['vfs'], 'readwrite');
+    tx.objectStore('vfs').put({
+      path: String(targetPath || ''),
+      dataB64: encode(nextContent),
+      mime: 'text/plain',
+      updatedAtMs: Date.now(),
+    });
+    await txDone(tx);
+    db.close();
+    return true;
+  }, {
+    targetPath: path,
+    nextContent: content,
+  });
+}
+
 async function listVfsPaths(page, prefix) {
   return await page.evaluate(async (pathPrefix) => {
     const openDb = () => new Promise((resolve, reject) => {
@@ -308,7 +352,9 @@ module.exports = {
   listTrainerAttemptIds,
   readTrainerManifest,
   readTrainerEvents,
+  listVfsPaths,
   readVfsText,
+  writeVfsText,
   clearOpenClawDb,
   readMetaValue
 };

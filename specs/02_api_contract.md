@@ -912,6 +912,8 @@ Response fields:
 ### GET `/api/platform/workshop` (human)
 Returns the minimal House Workshop/config lineage surface for the current active team when `teamId` is omitted.
 
+House uses this response as the lineage anchor for the Workshop panel. When an active config is present, the in-shell Workshop read surface then uses the existing worker workspace tools against `workspace/.agent-town/` to enumerate files and read file content without leaving `/app` or rotating the worker session.
+
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
 

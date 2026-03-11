@@ -735,6 +735,7 @@ Scope:
 Execution mapping:
 
 1. `M29.5` Workshop editor read surface
+   - same-shell Workshop file browser backed by worker `workspace_list` and `workspace_read_file` over `workspace/.agent-town/`
 2. `M29.6` Workshop write approval and Library snapshotting
 3. `M29.7` Archive or Trainer promotion into Library
 

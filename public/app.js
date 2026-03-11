@@ -531,6 +531,10 @@ let houseSurfaceState = {
       candidatePatchId: '',
     },
     inboxPath: '',
+    files: [],
+    selectedFilePath: '',
+    selectedFileContent: '',
+    filesEmptyStateText: 'No Workshop files available yet.',
     emptyStateText: 'No active config is bound to this team yet.'
   },
   trainer: {
@@ -1330,6 +1334,9 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
       candidatePatchId: '',
     };
     houseSurfaceState.workshop.inboxPath = '';
+    houseSurfaceState.workshop.files = [];
+    houseSurfaceState.workshop.selectedFilePath = '';
+    houseSurfaceState.workshop.selectedFileContent = '';
     houseSurfaceState.trainer.selectedResultId = '';
     resetHouseTrainerActionKeys();
   }
@@ -1585,7 +1592,7 @@ async function syncHouseLibraryScopeContextToWorker(snapshot = null) {
       selectedItemIds: houseSurfaceState.library.selectedItemIds,
       selectedItems: houseSurfaceState.library.selectedItems,
     };
-  const gatewayApi = await initGateway().catch(() => null);
+  const gatewayApi = window.__openclawLiteTest || await initGateway().catch(() => null);
   if (!gatewayApi || typeof gatewayApi.setLibraryScopeContext !== 'function') return null;
   return await gatewayApi.setLibraryScopeContext({
     activeScopeSetId: String(source.activeScopeSetId || '').trim(),
@@ -1769,7 +1776,11 @@ function renderHouseWorkshopSurface() {
   const emptyNode = el('houseWorkshopEmpty');
   const detailNode = el('houseWorkshopDetail');
   const inboxBtn = el('houseWorkshopOpenInboxBtn');
-  if (!emptyNode || !detailNode || !inboxBtn) return;
+  const filesEmptyNode = el('houseWorkshopFilesEmpty');
+  const filesNode = el('houseWorkshopFiles');
+  const filePathNode = el('houseWorkshopFilePath');
+  const fileContentNode = el('houseWorkshopFileContent');
+  if (!emptyNode || !detailNode || !inboxBtn || !filesEmptyNode || !filesNode || !filePathNode || !fileContentNode) return;
   const activeConfigVersionId = String(houseSurfaceState.workshop.activeConfigVersionId || '').trim();
   const lineage = houseSurfaceState.workshop.lineage && typeof houseSurfaceState.workshop.lineage === 'object'
     ? houseSurfaceState.workshop.lineage
@@ -1781,18 +1792,71 @@ function renderHouseWorkshopSurface() {
   const candidatePatchId = String(lineage.candidatePatchId || '').trim();
   const createdBy = String(lineage.createdBy || '').trim();
   const inboxPath = String(houseSurfaceState.workshop.inboxPath || '').trim();
+  const files = Array.isArray(houseSurfaceState.workshop.files) ? houseSurfaceState.workshop.files : [];
+  const selectedFilePath = String(houseSurfaceState.workshop.selectedFilePath || '').trim();
+  const selectedFileContent = String(houseSurfaceState.workshop.selectedFileContent || '');
 
   emptyNode.textContent = houseSurfaceState.workshop.emptyStateText || 'No active config is bound to this team yet.';
   emptyNode.classList.toggle('is-hidden', !!activeConfigVersionId);
   inboxBtn.disabled = !inboxPath;
   inboxBtn.dataset.entryPath = inboxPath;
+  filesNode.innerHTML = '';
 
   if (!activeConfigVersionId) {
     detailNode.textContent = 'Select a team with an active config binding to inspect Workshop lineage.';
+    filesEmptyNode.textContent = 'No Workshop files available yet.';
+    filesEmptyNode.classList.remove('is-hidden');
+    filePathNode.textContent = 'Select a file to read.';
+    fileContentNode.textContent = '';
     return;
   }
 
   detailNode.textContent = `Active config ${activeConfigVersionId} · parent ${parentConfigVersionId || '—'} · hash ${activeConfigHash || '—'} · created by ${createdBy || '—'} · trainer job ${trainerJobId || '—'} · trainer result ${trainerResultId || '—'} · patch ${candidatePatchId || '—'}`;
+
+  filesEmptyNode.textContent = houseSurfaceState.workshop.filesEmptyStateText || 'No Workshop files available yet.';
+  filesEmptyNode.classList.toggle('is-hidden', files.length > 0);
+  if (!files.length) {
+    filePathNode.textContent = 'Select a file to read.';
+    fileContentNode.textContent = '';
+    return;
+  }
+
+  files.forEach((path) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(path || '') === selectedFilePath ? ' primary' : ''}`;
+    button.dataset.filePath = String(path || '');
+    button.textContent = String(path || '');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await selectHouseWorkshopFile(String(path || ''));
+      } finally {
+        button.disabled = false;
+      }
+    });
+    filesNode.appendChild(button);
+  });
+
+  filePathNode.textContent = selectedFilePath || 'Select a file to read.';
+  fileContentNode.textContent = selectedFileContent;
+}
+
+async function selectHouseWorkshopFile(filePath = '') {
+  const normalizedPath = String(filePath || '').trim();
+  if (!normalizedPath) return null;
+  const gatewayApi = window.__openclawLiteTest || await initGateway().catch(() => null);
+  if (!gatewayApi || typeof gatewayApi.workspaceReadFile !== 'function') {
+    throw new Error('WORKSPACE_READ_UNAVAILABLE');
+  }
+  setHouseSurfaceStatus(`Reading ${normalizedPath}...`);
+  const envelope = await gatewayApi.workspaceReadFile({ path: normalizedPath });
+  const data = envelope?.data || envelope || {};
+  houseSurfaceState.workshop.selectedFilePath = String(data.path || normalizedPath).trim();
+  houseSurfaceState.workshop.selectedFileContent = String(data.content || '');
+  renderHouseWorkshopSurface();
+  setHouseSurfaceStatus('');
+  return data;
 }
 
 function renderHouseArchiveSurface() {
@@ -2126,7 +2190,33 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
         candidatePatchId: '',
       };
     houseSurfaceState.workshop.inboxPath = String(data.inboxPath || '').trim();
+    houseSurfaceState.workshop.files = [];
+    houseSurfaceState.workshop.selectedFilePath = '';
+    houseSurfaceState.workshop.selectedFileContent = '';
+    houseSurfaceState.workshop.filesEmptyStateText = 'No Workshop files available yet.';
     houseSurfaceState.workshop.emptyStateText = String(data.emptyStateText || 'No active config is bound to this team yet.');
+    if (houseSurfaceState.workshop.activeConfigVersionId) {
+      const gatewayApi = window.__openclawLiteTest || await initGateway().catch(() => null);
+      if (gatewayApi && typeof gatewayApi.workspaceList === 'function') {
+        const listEnvelope = await gatewayApi.workspaceList({ path: 'workspace/.agent-town/' }).catch(() => null);
+        const listData = listEnvelope?.data || listEnvelope || {};
+        const paths = Array.isArray(listData.paths)
+          ? listData.paths.map((path) => String(path || '').trim()).filter((path) => path && !path.endsWith('/'))
+          : [];
+        houseSurfaceState.workshop.files = paths;
+        if (paths.length) {
+          const nextSelectedFilePath = paths.includes(String(houseSurfaceState.workshop.selectedFilePath || '').trim())
+            ? String(houseSurfaceState.workshop.selectedFilePath || '').trim()
+            : String(paths[0] || '').trim();
+          if (nextSelectedFilePath && typeof gatewayApi.workspaceReadFile === 'function') {
+            const readEnvelope = await gatewayApi.workspaceReadFile({ path: nextSelectedFilePath }).catch(() => null);
+            const readData = readEnvelope?.data || readEnvelope || {};
+            houseSurfaceState.workshop.selectedFilePath = String(readData.path || nextSelectedFilePath).trim();
+            houseSurfaceState.workshop.selectedFileContent = String(readData.content || '');
+          }
+        }
+      }
+    }
     renderHouseWorkshopSurface();
     setHouseSurfaceStatus(
       houseSurfaceState.workshop.activeConfigVersionId
@@ -2145,6 +2235,10 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
       candidatePatchId: '',
     };
     houseSurfaceState.workshop.inboxPath = '';
+    houseSurfaceState.workshop.files = [];
+    houseSurfaceState.workshop.selectedFilePath = '';
+    houseSurfaceState.workshop.selectedFileContent = '';
+    houseSurfaceState.workshop.filesEmptyStateText = 'No Workshop files available yet.';
     renderHouseWorkshopSurface();
     setHouseSurfaceStatus(`House Workshop unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
