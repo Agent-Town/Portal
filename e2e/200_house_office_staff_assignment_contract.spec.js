@@ -4,10 +4,32 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const {
   attachHouseToPageSession,
+  createPlatformConfigVersion,
+  createPlatformTrainerJob,
   getPlatformFixture,
+  promotePlatformConfigVersion,
   readWorkerSessionId,
 } = require('./helpers/unified_platform');
 const { waitForLiteApi } = require('./helpers/trainer');
+
+function buildConfigPayload(configVersionId) {
+  return {
+    configVersionId,
+    teamId: 'team_main',
+    displayVersion: `${configVersionId}@2026.03.11`,
+    branch: 'house-office-assignments-contract',
+    status: 'candidate',
+    componentRefs: {
+      housePolicyVersionId: 'hpv_house_office_assignments_contract_01',
+      teamCompositionVersionId: 'tcv_house_office_assignments_contract_01',
+      agentConfigVersionIds: ['agv_house_office_assignments_contract_01'],
+      officePolicyVersionIds: [],
+      experiencePresetVersionId: 'epv_house_office_assignments_contract_01',
+      integrationOverlayVersionIds: [],
+      trainerPresetVersionId: 'tpv_house_office_assignments_contract_01',
+    },
+  };
+}
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
@@ -122,12 +144,50 @@ test('M29.5: House Office staff assignments are deterministic, idempotent, and p
   expect(beforeCreateOverview?.data?.assignments || []).toEqual([]);
   expect(beforeCreateOverview?.data?.summary?.assignmentCount || 0).toBe(0);
 
+  const configVersionId = 'cfg_house_office_assignments_contract_01';
+  const createdConfig = await createPlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    idempotencyKey: 'house-office-assignments-config-001',
+    payload: buildConfigPayload(configVersionId),
+  });
+  expect(createdConfig.status).toBe(201);
+
+  const promotedConfig = await promotePlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    configVersionId,
+    teamId: 'team_main',
+    idempotencyKey: 'house-office-assignments-promote-001',
+  });
+  expect(promotedConfig.status).toBe(200);
+
+  const trainerJob = await createPlatformTrainerJob(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    idempotencyKey: 'house-office-assignments-trainer-001',
+    payload: {
+      teamId: 'team_main',
+      jobKind: 'trainer_job.compare',
+      targets: {
+        configVersionIds: [configVersionId],
+      },
+      budget: {
+        maxUsd: 5,
+      },
+    },
+  });
+  expect(trainerJob.status).toBe(201);
+  const trainerResultId = String(trainerJob.json?.data?.result?.trainerResultId || '');
+  const trainerJobId = String(trainerJob.json?.data?.trainerJobId || '');
+  expect(trainerResultId).toMatch(/^trr_/);
+
   const validPayload = {
     officeId,
     staffAgentId,
     focus: 'Review trainer readiness',
     sourceKind: 'trainer_result',
-    sourceId: 'trainer_result_fixture_ops_review',
+    sourceId: trainerResultId,
   };
   const createResponse = await page.request.post('/api/platform/house-office/assignments', {
     data: validPayload,
@@ -144,6 +204,11 @@ test('M29.5: House Office staff assignments are deterministic, idempotent, and p
     deepLink: expect.objectContaining({
       kind: 'house_surface',
       surface: 'trainer',
+      selection: {
+        kind: 'trainer_result',
+        trainerResultId,
+        trainerJobId,
+      },
     }),
   });
   expect(String(createBody?.data?.assignmentId || '')).toMatch(/^assign_[a-f0-9]{24}$/);
@@ -183,6 +248,11 @@ test('M29.5: House Office staff assignments are deterministic, idempotent, and p
         sourceKind: validPayload.sourceKind,
         sourceId: validPayload.sourceId,
         entryPath: '/api/platform/trainer',
+        selection: {
+          kind: 'trainer_result',
+          trainerResultId,
+          trainerJobId,
+        },
       }),
     ],
   });

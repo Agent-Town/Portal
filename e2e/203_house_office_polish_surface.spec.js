@@ -100,10 +100,14 @@ async function seedHouseOfficePolishScenario(request) {
     },
   });
   expect(trainerJob.status).toBe(201);
+  const trainerJobId = String(trainerJob.json?.data?.trainerJobId || '');
+  const trainerResultId = String(trainerJob.json?.data?.result?.trainerResultId || '');
 
   return {
     seededHouse,
     configVersionId,
+    trainerJobId,
+    trainerResultId,
   };
 }
 
@@ -149,7 +153,7 @@ test('House Office polish keeps selected-office context and glanceable per-offic
       staffAgentId: 'staff_fixture_operator',
       focus: 'Review House Office operational readiness',
       sourceKind: 'trainer_job',
-      sourceId: 'trainer_job_house_office_polish',
+      sourceId: scenario.trainerJobId,
     },
     failOnStatusCode: false,
   });

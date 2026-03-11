@@ -25,6 +25,7 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseStaffAssignments,
     listPlatformExperienceDefinitions,
     listRuns,
+    listTeamConfigBindings,
     listTraceEvents,
     listTrainerJobs,
     listTrainerResults,
@@ -415,6 +416,235 @@ function registerPlatformReadRoutes(app, deps) {
     return buildHouseOfficeDeepLinkWithSelection(deeplinks[officeSurface] || office?.deepLink || deeplinks.office, selection);
   }
 
+  function resolveHouseOfficeAssignmentSource({
+    houseId = '',
+    teamId = '',
+    sourceKind = '',
+    sourceId = '',
+    office = null,
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    const normalizedSourceId = String(sourceId || '').trim();
+    if (!normalizedSourceKind) {
+      return {
+        ok: false,
+        status: 400,
+        code: 'SOURCE_REF_KIND_UNSUPPORTED',
+        message: 'sourceKind must be one of the supported House Office source kinds.',
+      };
+    }
+    if (!normalizedSourceId) {
+      return {
+        ok: false,
+        status: 404,
+        code: 'SOURCE_REF_NOT_FOUND',
+        message: 'House Office could not resolve that source record.',
+      };
+    }
+
+    const buildResolved = (entryPath, selection) => ({
+      ok: true,
+      entryPath,
+      selection,
+      sourceRef: buildHouseOfficeSourceRef({
+        sourceKind: normalizedSourceKind,
+        sourceId: normalizedSourceId,
+        entryPath,
+        selection,
+      }),
+    });
+
+    if (normalizedSourceKind === 'trainer_result') {
+      const currentTeamResults = listTrainerResults({ houseId: normalizedHouseId, teamId: normalizedTeamId });
+      const matchedCurrent = currentTeamResults.find((entry) => String(entry?.trainerResultId || '').trim() === normalizedSourceId) || null;
+      if (matchedCurrent) {
+        return buildResolved('/api/platform/trainer', buildHouseOfficeSelection({
+          sourceKind: normalizedSourceKind,
+          sourceId: normalizedSourceId,
+          entryPath: '/api/platform/trainer',
+          trainerJobId: String(matchedCurrent?.trainerJobId || '').trim(),
+        }));
+      }
+      const inHouse = listTrainerResults({ houseId: normalizedHouseId }).some((entry) => String(entry?.trainerResultId || '').trim() === normalizedSourceId);
+      return inHouse
+        ? {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        }
+        : {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that trainer result.',
+        };
+    }
+
+    if (normalizedSourceKind === 'trainer_job') {
+      const currentTeamJobs = listTrainerJobs({ houseId: normalizedHouseId, teamId: normalizedTeamId });
+      const matchedCurrent = currentTeamJobs.find((entry) => String(entry?.trainerJobId || '').trim() === normalizedSourceId) || null;
+      if (matchedCurrent) {
+        return buildResolved('/api/platform/trainer', buildHouseOfficeSelection({
+          sourceKind: normalizedSourceKind,
+          sourceId: normalizedSourceId,
+          entryPath: '/api/platform/trainer',
+        }));
+      }
+      const inHouse = listTrainerJobs({ houseId: normalizedHouseId }).some((entry) => String(entry?.trainerJobId || '').trim() === normalizedSourceId);
+      return inHouse
+        ? {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        }
+        : {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that trainer job.',
+        };
+    }
+
+    if (normalizedSourceKind === 'team_config_binding') {
+      const currentBinding = listTeamConfigBindings({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+        .find((entry) => String(entry?.teamBindingId || '').trim() === normalizedSourceId) || null;
+      if (currentBinding) {
+        return buildResolved('/api/platform/workshop', buildHouseOfficeSelection({
+          sourceKind: normalizedSourceKind,
+          sourceId: normalizedSourceId,
+          entryPath: '/api/platform/workshop',
+        }));
+      }
+      const inHouse = listTeamConfigBindings({ houseId: normalizedHouseId }).some((entry) => String(entry?.teamBindingId || '').trim() === normalizedSourceId);
+      return inHouse
+        ? {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        }
+        : {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that team binding.',
+        };
+    }
+
+    if (normalizedSourceKind === 'config_version') {
+      const configVersion = getConfigVersion(normalizedSourceId);
+      if (!configVersion) {
+        return {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that config version.',
+        };
+      }
+      if (String(configVersion?.houseId || '').trim() !== normalizedHouseId || String(configVersion?.teamId || '').trim() !== normalizedTeamId) {
+        return {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        };
+      }
+      return buildResolved('/api/platform/workshop', buildHouseOfficeSelection({
+        sourceKind: normalizedSourceKind,
+        sourceId: normalizedSourceId,
+        entryPath: '/api/platform/workshop',
+      }));
+    }
+
+    if (normalizedSourceKind === 'track_progress_event') {
+      const currentEvents = listTrackProgressEvents({ houseId: normalizedHouseId, teamId: normalizedTeamId });
+      const matchedCurrent = currentEvents.find((entry) => String(entry?.trackProgressEventId || '').trim() === normalizedSourceId) || null;
+      if (matchedCurrent) {
+        return buildResolved('/api/platform/tracks', buildHouseOfficeSelection({
+          sourceKind: normalizedSourceKind,
+          sourceId: normalizedSourceId,
+          entryPath: '/api/platform/tracks',
+          trackId: String(matchedCurrent?.trackId || '').trim(),
+        }));
+      }
+      const inHouse = listTrackProgressEvents({ houseId: normalizedHouseId }).some((entry) => String(entry?.trackProgressEventId || '').trim() === normalizedSourceId);
+      return inHouse
+        ? {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        }
+        : {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that track progress event.',
+        };
+    }
+
+    if (normalizedSourceKind === 'run') {
+      const currentRuns = listRuns({ houseId: normalizedHouseId, teamId: normalizedTeamId });
+      const matchedCurrent = currentRuns.find((entry) => String(entry?.runId || '').trim() === normalizedSourceId) || null;
+      if (matchedCurrent) {
+        const entryPath = buildHouseOfficeAssignmentEntryPath({
+          sourceKind: normalizedSourceKind,
+          office,
+        });
+        return buildResolved(entryPath, buildHouseOfficeSelection({
+          sourceKind: normalizedSourceKind,
+          sourceId: normalizedSourceId,
+          entryPath,
+          runId: normalizedSourceId,
+          traceId: String(matchedCurrent?.traceId || '').trim(),
+          experienceId: String(matchedCurrent?.experienceId || '').trim(),
+        }));
+      }
+      const inHouse = listRuns({ houseId: normalizedHouseId }).some((entry) => String(entry?.runId || '').trim() === normalizedSourceId);
+      return inHouse
+        ? {
+          ok: false,
+          status: 409,
+          code: 'SOURCE_REF_SCOPE_MISMATCH',
+          message: 'The requested source record exists, but it is outside the active team scope.',
+        }
+        : {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that run.',
+        };
+    }
+
+    if (normalizedSourceKind === 'experience') {
+      const matchedExperience = buildHouseExperienceItems().find((entry) => String(entry?.experienceId || '').trim() === normalizedSourceId) || null;
+      if (!matchedExperience) {
+        return {
+          ok: false,
+          status: 404,
+          code: 'SOURCE_REF_NOT_FOUND',
+          message: 'House Office could not resolve that experience.',
+        };
+      }
+      return buildResolved('/api/platform/experiences', buildHouseOfficeSelection({
+        sourceKind: normalizedSourceKind,
+        sourceId: normalizedSourceId,
+        entryPath: '/api/platform/experiences',
+      }));
+    }
+
+    return {
+      ok: false,
+      status: 400,
+      code: 'SOURCE_REF_KIND_UNSUPPORTED',
+      message: 'sourceKind must be one of the supported House Office source kinds.',
+    };
+  }
+
   function buildHouseOfficeAssignments({
     houseId = '',
     teamId = '',
@@ -444,15 +674,18 @@ function registerPlatformReadRoutes(app, deps) {
         if (!office || !staffAgent) return null;
         const sourceKind = String(assignment?.sourceKind || '').trim();
         const sourceId = String(assignment?.sourceId || '').trim();
-        const entryPath = buildHouseOfficeAssignmentEntryPath({
+        const sourceRefEntryPath = String(assignment?.sourceRef?.entryPath || '').trim();
+        const entryPath = sourceRefEntryPath || buildHouseOfficeAssignmentEntryPath({
           sourceKind: assignment?.sourceKind,
           office,
         });
-        const selection = buildHouseOfficeSelection({
-          sourceKind,
-          sourceId,
-          entryPath,
-        });
+        const selection = assignment?.sourceRef?.selection && typeof assignment.sourceRef.selection === 'object'
+          ? assignment.sourceRef.selection
+          : buildHouseOfficeSelection({
+            sourceKind,
+            sourceId,
+            entryPath,
+          });
         return {
           assignmentId: String(assignment?.assignmentId || '').trim(),
           staffAgentId,
@@ -1993,6 +2226,22 @@ function registerPlatformReadRoutes(app, deps) {
     if (!staffAgent) {
       return sendPortalApiError(res, 404, 'STAFF_AGENT_NOT_FOUND', 'House Office does not know that staff agent.', { requestId });
     }
+    const sourceResolution = resolveHouseOfficeAssignmentSource({
+      houseId,
+      teamId,
+      sourceKind,
+      sourceId,
+      office,
+    });
+    if (!sourceResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(sourceResolution?.status || 400),
+        String(sourceResolution?.code || 'SOURCE_REF_NOT_FOUND'),
+        String(sourceResolution?.message || 'House Office could not resolve that source record.'),
+        { requestId }
+      );
+    }
 
     const createdAt = nowIso();
     const assignmentIdentity = sha256PrefixedHex(stableJsonStringify({
@@ -2014,7 +2263,7 @@ function registerPlatformReadRoutes(app, deps) {
       focus,
       sourceKind,
       sourceId,
-      sourceRef: {
+      sourceRef: sourceResolution.sourceRef || {
         sourceKind,
         sourceId,
         entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
@@ -2049,18 +2298,18 @@ function registerPlatformReadRoutes(app, deps) {
         selection: buildHouseOfficeSelection({
           sourceKind,
           sourceId,
-          entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+          entryPath: String(sourceResolution?.entryPath || buildHouseOfficeAssignmentEntryPath({ sourceKind, office })).trim(),
         }),
       }),
       sourceRefs: [
         buildHouseOfficeSourceRef({
           sourceKind: String(assignmentRecord?.sourceKind || '').trim(),
           sourceId: String(assignmentRecord?.sourceId || '').trim(),
-          entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
-          selection: buildHouseOfficeSelection({
+          entryPath: String(sourceResolution?.entryPath || buildHouseOfficeAssignmentEntryPath({ sourceKind, office })).trim(),
+          selection: sourceResolution?.selection || buildHouseOfficeSelection({
             sourceKind,
             sourceId,
-            entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+            entryPath: String(sourceResolution?.entryPath || buildHouseOfficeAssignmentEntryPath({ sourceKind, office })).trim(),
           }),
         }),
       ].filter(Boolean),

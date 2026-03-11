@@ -4,10 +4,32 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const {
   attachHouseToPageSession,
+  createPlatformConfigVersion,
+  createPlatformTrainerJob,
   getPlatformFixture,
+  promotePlatformConfigVersion,
   readWorkerSessionId,
 } = require('./helpers/unified_platform');
 const { waitForLiteApi } = require('./helpers/trainer');
+
+function buildConfigPayload(configVersionId) {
+  return {
+    configVersionId,
+    teamId: 'team_main',
+    displayVersion: `${configVersionId}@2026.03.11`,
+    branch: 'house-office-privacy',
+    status: 'candidate',
+    componentRefs: {
+      housePolicyVersionId: 'hpv_house_office_privacy_01',
+      teamCompositionVersionId: 'tcv_house_office_privacy_01',
+      agentConfigVersionIds: ['agv_house_office_privacy_01'],
+      officePolicyVersionIds: [],
+      experiencePresetVersionId: 'epv_house_office_privacy_01',
+      integrationOverlayVersionIds: [],
+      trainerPresetVersionId: 'tpv_house_office_privacy_01',
+    },
+  };
+}
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
@@ -35,11 +57,49 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
   await waitForLiteApi(page);
 
   const seededHouse = await seedRecoverableTokenHouse(request);
+  const configVersionId = 'cfg_house_office_privacy_01';
   const attached = await attachHouseToPageSession(page, {
     houseId: seededHouse.houseId,
     teamId: 'team_main',
   });
   expect(attached.status).toBe(200);
+
+  const createdConfig = await createPlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    idempotencyKey: 'house-office-privacy-config-001',
+    payload: buildConfigPayload(configVersionId),
+  });
+  expect(createdConfig.status).toBe(201);
+
+  const promotedConfig = await promotePlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    configVersionId,
+    teamId: 'team_main',
+    idempotencyKey: 'house-office-privacy-promote-001',
+  });
+  expect(promotedConfig.status).toBe(200);
+
+  const trainerJob = await createPlatformTrainerJob(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    idempotencyKey: 'house-office-privacy-trainer-001',
+    payload: {
+      teamId: 'team_main',
+      jobKind: 'trainer_job.compare',
+      targets: {
+        configVersionIds: [configVersionId],
+      },
+      budget: {
+        maxUsd: 5,
+      },
+    },
+  });
+  expect(trainerJob.status).toBe(201);
+  const trainerResultId = String(trainerJob.json?.data?.result?.trainerResultId || '');
+  const trainerJobId = String(trainerJob.json?.data?.trainerJobId || '');
+  expect(trainerResultId).toMatch(/^trr_/);
 
   const createResponse = await page.request.post('/api/platform/house-office/assignments', {
     data: {
@@ -47,7 +107,7 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
       staffAgentId,
       focus: unsafeAssignmentFocus,
       sourceKind: 'trainer_result',
-      sourceId: 'trainer_result_fixture_privacy_01',
+      sourceId: trainerResultId,
     },
     failOnStatusCode: false,
   });
@@ -57,11 +117,16 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
     officeId,
     staffAgentId,
     sourceKind: 'trainer_result',
-    sourceId: 'trainer_result_fixture_privacy_01',
+    sourceId: trainerResultId,
     focus: expectedRedactedFocus,
     deepLink: expect.objectContaining({
       kind: 'house_surface',
       surface: 'trainer',
+      selection: {
+        kind: 'trainer_result',
+        trainerResultId,
+        trainerJobId,
+      },
     }),
   });
 
@@ -77,12 +142,17 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
   expect(firstReadBody?.data?.assignments?.[0]).toMatchObject({
     focus: expectedRedactedFocus,
     sourceKind: 'trainer_result',
-    sourceId: 'trainer_result_fixture_privacy_01',
+    sourceId: trainerResultId,
     sourceRefs: [
       expect.objectContaining({
         sourceKind: 'trainer_result',
-        sourceId: 'trainer_result_fixture_privacy_01',
+        sourceId: trainerResultId,
         entryPath: '/api/platform/trainer',
+        selection: {
+          kind: 'trainer_result',
+          trainerResultId,
+          trainerJobId,
+        },
       }),
     ],
   });

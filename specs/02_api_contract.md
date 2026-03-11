@@ -1163,6 +1163,9 @@ Stable error codes:
 - `OFFICE_NOT_FOUND`
 - `STAFF_AGENT_NOT_FOUND`
 - `INVALID_ARGUMENT`
+- `SOURCE_REF_KIND_UNSUPPORTED`
+- `SOURCE_REF_NOT_FOUND`
+- `SOURCE_REF_SCOPE_MISMATCH`
 
 Response fields:
 - `data.assignmentId`
@@ -1176,6 +1179,14 @@ Response fields:
 - `data.deepLink.surface`
 - `data.deepLink.label`
 - `data.deepLink.selection.kind`
+- `data.deepLink.selection.trainerResultId`
+- `data.deepLink.selection.trainerJobId`
+- `data.deepLink.selection.teamBindingId`
+- `data.deepLink.selection.configVersionId`
+- `data.deepLink.selection.trackProgressEventId`
+- `data.deepLink.selection.trackId`
+- `data.deepLink.selection.traceId`
+- `data.deepLink.selection.runId`
 - `data.sourceRefs[]`
 - `data.sourceRefs[].sourceKind`
 - `data.sourceRefs[].sourceId`

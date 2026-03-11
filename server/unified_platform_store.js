@@ -640,6 +640,33 @@ function getTeamConfigBinding({
   return mapTeamConfigBindingRow(row);
 }
 
+function listTeamConfigBindings({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM team_config_bindings
+    ${whereSql}
+    ORDER BY created_at DESC, team_binding_id DESC
+  `).all(...args);
+  return rows.map(mapTeamConfigBindingRow).filter(Boolean);
+}
+
 function listHouseTeamIds(houseId = '') {
   const normalizedHouseId = String(houseId || '').trim();
   if (!normalizedHouseId) return [];
@@ -2727,6 +2754,7 @@ module.exports = {
   listHouseTeamIds,
   listHouseOffices,
   listHouseStaffAgents,
+  listTeamConfigBindings,
   getTrainerJobById,
   getTrainerJobByIdempotency,
   getTrainerResultById,
