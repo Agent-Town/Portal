@@ -186,11 +186,30 @@
 
   async function load() {
     const params = new URLSearchParams(window.location.search);
+    const entityId = params.get('entityId') || params.get('registryEntityId') || '';
     const q = params.get('q') || '';
     const family = params.get('family') || '';
     if (el('registryQuery')) el('registryQuery').value = q;
     if (el('registryFamily')) el('registryFamily').value = family;
     if (el('registryStatus')) el('registryStatus').textContent = 'Loading registry projection...';
+
+    if (entityId) {
+      try {
+        const payload = await api(`/api/registry/entities/${encodeURIComponent(entityId)}`);
+        if (!payload?.ok || !payload?.data?.entity) {
+          if (el('registryStatus')) el('registryStatus').textContent = `Registry entity load failed: ${payload?.error?.code || 'UNKNOWN'}`;
+          renderItems([]);
+          return;
+        }
+        if (el('registryStatus')) el('registryStatus').textContent = '1 result loaded.';
+        renderItems([payload.data.entity]);
+        return;
+      } catch (err) {
+        if (el('registryStatus')) el('registryStatus').textContent = `Registry entity load failed: ${String(err?.message || err || 'UNKNOWN')}`;
+        renderItems([]);
+        return;
+      }
+    }
 
     const requestParams = new URLSearchParams();
     if (q) requestParams.set('q', q);
@@ -221,6 +240,8 @@
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const params = new URLSearchParams(window.location.search);
+      params.delete('entityId');
+      params.delete('registryEntityId');
       const q = String(el('registryQuery')?.value || '').trim();
       const family = String(el('registryFamily')?.value || '').trim();
       if (q) params.set('q', q); else params.delete('q');

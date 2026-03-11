@@ -74,9 +74,10 @@ test('M30.0: unified platform harness exposes deterministic House Library author
   const browseFixture = await getPlatformFixture(request, 'library_registry_browse_seed');
   expect(browseFixture?.ok).toBe(true);
   expect(browseFixture?.fixture?.browse).toEqual(expect.objectContaining({
-    query: 'atlas',
+    query: 'Atlas Scout',
     family: 'skill',
-    expectedResultCount: 2,
+    expectedResultCount: 1,
+    expectedFirstRegistryId: 'reg_atlas_skill_01',
   }));
 
   const guidedFixture = await getPlatformFixture(request, 'library_guided_flow_seed');

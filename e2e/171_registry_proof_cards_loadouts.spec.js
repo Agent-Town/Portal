@@ -79,7 +79,7 @@ test('M24.4: registry proof cards and loadouts stay deterministic across API and
   expect(Array.isArray(entityPayload?.data?.entity?.proofCards)).toBe(true);
   expect(Array.isArray(entityPayload?.data?.entity?.loadouts)).toBe(true);
 
-  await page.goto('/registry.html');
+  await page.goto(`/registry.html?entityId=${encodeURIComponent(registryEntityId)}`);
   await expect(page.locator('[data-registry-proof-card]')).toHaveCount(expectedProofs.length);
   await expect(page.locator('[data-registry-loadout]')).toHaveCount(expectedLoadouts.length);
   await expect(page.locator('[data-registry-proof-card]').first()).toContainText(String(expectedProofs[0]?.evidenceId || ''));

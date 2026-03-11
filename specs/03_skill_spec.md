@@ -30,6 +30,13 @@ Current additive example:
 - House Library skill pack at `/api/platform/library/skill-pack`
 - compiled entry at `/__compiled/library-skill-pack/skill.md`
 
+Current House Library late-phase contract:
+
+- router keeps specialist routing inside the additive pack (`House Librarian`, `Workshop Scribe`, `Registry Curator`)
+- Librarian routing covers direct note authoring, revisions, conversation capture, and shelf management
+- Registry routing covers same-shell Public Stacks search and provenance preview before import
+- deterministic evaluation is exposed separately through `POST /api/platform/library/benchmarks/run`
+
 These additive packs must:
 
 - preserve the existing internal pack model (`packVersionId`, `contentHash`, manifest file map),

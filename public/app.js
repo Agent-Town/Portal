@@ -1942,17 +1942,29 @@ function syncHouseLibraryComposerControls() {
   const cancelBtn = el('houseLibraryCancelEditBtn');
   const statusNode = el('houseLibraryComposerStatus');
   if (!titleInput || !bodyInput || !saveBtn || !cancelBtn || !statusNode) return;
-  if (titleInput.value !== String(houseSurfaceState.library.draftTitle || '')) {
-    titleInput.value = String(houseSurfaceState.library.draftTitle || '');
+  const storedTitle = String(houseSurfaceState.library.draftTitle || '');
+  const storedBody = String(houseSurfaceState.library.draftBody || '');
+  const currentTitle = String(titleInput.value || '');
+  const currentBody = String(bodyInput.value || '');
+  const preferLiveTitle = titleInput === document.activeElement || (!storedTitle && currentTitle);
+  const preferLiveBody = bodyInput === document.activeElement || (!storedBody && currentBody);
+  if (preferLiveTitle) {
+    houseSurfaceState.library.draftTitle = currentTitle.trim();
+  } else if (currentTitle !== storedTitle) {
+    titleInput.value = storedTitle;
   }
-  if (bodyInput.value !== String(houseSurfaceState.library.draftBody || '')) {
-    bodyInput.value = String(houseSurfaceState.library.draftBody || '');
+  if (preferLiveBody) {
+    houseSurfaceState.library.draftBody = currentBody;
+  } else if (currentBody !== storedBody) {
+    bodyInput.value = storedBody;
   }
+  const effectiveTitle = String(houseSurfaceState.library.draftTitle || '').trim();
+  const effectiveBody = String(houseSurfaceState.library.draftBody || '');
   const isEditing = houseSurfaceState.library.composerMode === 'edit' && !!String(houseSurfaceState.library.editingItemId || '').trim();
-  const hasDraft = !!String(houseSurfaceState.library.draftTitle || '').trim() && !!String(houseSurfaceState.library.draftBody || '').trim();
+  const hasDraft = !!effectiveTitle && !!effectiveBody.trim();
   saveBtn.textContent = isEditing ? 'Update Note' : 'Save Note to Library';
   saveBtn.disabled = !hasDraft;
-  cancelBtn.disabled = !isEditing && !String(houseSurfaceState.library.draftTitle || '').trim() && !String(houseSurfaceState.library.draftBody || '').trim();
+  cancelBtn.disabled = !isEditing && !effectiveTitle && !effectiveBody.trim();
   statusNode.textContent = isEditing
     ? 'Editing a local Library note.'
     : 'Writing a new local note.';
@@ -6485,6 +6497,7 @@ function bindTownDistrictControls() {
   const houseLibrarySaveNoteBtn = el('houseLibrarySaveNoteBtn');
   if (houseLibrarySaveNoteBtn) {
     houseLibrarySaveNoteBtn.onclick = async () => {
+      readHouseLibraryComposerDraft();
       houseLibrarySaveNoteBtn.disabled = true;
       try {
         await saveHouseLibraryNote();
@@ -6619,6 +6632,10 @@ function bindTownDistrictControls() {
   const houseLibraryPublicStacksFamilySelect = el('houseLibraryPublicStacksFamilySelect');
   if (houseLibraryPublicStacksFamilySelect) {
     houseLibraryPublicStacksFamilySelect.onchange = () => {
+      const queryInput = el('houseLibraryPublicStacksQueryInput');
+      if (queryInput) {
+        houseSurfaceState.library.publicStacksQuery = String(queryInput.value || '').trim();
+      }
       houseSurfaceState.library.publicStacksFamily = String(houseLibraryPublicStacksFamilySelect.value || '').trim();
       syncHouseLibraryPublicStacksControls();
     };
@@ -6629,7 +6646,10 @@ function bindTownDistrictControls() {
     houseLibraryPublicStacksSearchBtn.onclick = async () => {
       houseLibraryPublicStacksSearchBtn.disabled = true;
       try {
-        await loadHouseLibraryPublicStacksSearch();
+        await loadHouseLibraryPublicStacksSearch({
+          query: String(el('houseLibraryPublicStacksQueryInput')?.value || '').trim(),
+          family: String(el('houseLibraryPublicStacksFamilySelect')?.value || '').trim(),
+        });
       } catch (err) {
         const code = String(err?.code || err?.message || 'PUBLIC_STACK_SEARCH_FAILED');
         setHouseLibraryActionStatus(code, true);
@@ -8389,6 +8409,12 @@ function pushAgentDebugTraffic(direction, channel, payload, options = {}) {
   if (agentDebugTraffic.length > AGENT_DEBUG_TRAFFIC_LIMIT) {
     agentDebugTraffic.splice(0, agentDebugTraffic.length - AGENT_DEBUG_TRAFFIC_LIMIT);
   }
+  renderAgentTrafficCards(new Date().toISOString());
+}
+if (typeof window !== 'undefined') {
+  window.__agentTownPushDebugTraffic = (direction, channel, payload, options = {}) => {
+    pushAgentDebugTraffic(direction, channel, payload, options);
+  };
 }
 
 async function lookupWalletHouse(houseIdOverride = null) {
@@ -8737,6 +8763,95 @@ function instrumentGatewayTraffic(gatewayApi) {
   return gatewayApi;
 }
 
+function instrumentLiteTestBridgeTraffic(debugApi) {
+  if (!debugApi || typeof debugApi !== 'object') return debugApi;
+  if (debugApi.__agentDebugLiteBridgeInstrumented === true) return debugApi;
+  Object.defineProperty(debugApi, '__agentDebugLiteBridgeInstrumented', {
+    value: true,
+    writable: false,
+    configurable: false,
+    enumerable: false,
+  });
+
+  const wrapCall = (name, fn) => {
+    return (...args) => {
+      pushAgentDebugTraffic('out', `gateway.${name}`, args.length <= 1 ? args[0] : { args });
+      try {
+        const value = fn(...args);
+        if (value && typeof value.then === 'function') {
+          return value.then((result) => {
+            pushAgentDebugTraffic('in', `gateway.${name}.result`, result);
+            return result;
+          }).catch((error) => {
+            pushAgentDebugTraffic('in', `gateway.${name}.error`, {
+              message: String(error?.message || error || 'UNKNOWN_ERROR'),
+            });
+            throw error;
+          });
+        }
+        pushAgentDebugTraffic('in', `gateway.${name}.result`, value);
+        return value;
+      } catch (error) {
+        pushAgentDebugTraffic('in', `gateway.${name}.error`, {
+          message: String(error?.message || error || 'UNKNOWN_ERROR'),
+        });
+        throw error;
+      }
+    };
+  };
+
+  const methodNames = [
+    'getToolRegistryInfo',
+    'librarySkillRoutePreview',
+    'skillState',
+    'systemPromptPreview',
+  ];
+  for (const methodName of methodNames) {
+    const value = debugApi[methodName];
+    if (typeof value !== 'function') continue;
+    debugApi[methodName] = wrapCall(methodName, value.bind(debugApi));
+  }
+
+  return debugApi;
+}
+
+function installLiteTestBridgeAccessor() {
+  if (typeof window === 'undefined') return;
+  if (window.__agentTownLiteTestBridgeAccessorInstalled === true) {
+    if (window.__openclawLiteTest && typeof window.__openclawLiteTest === 'object') {
+      instrumentLiteTestBridgeTraffic(window.__openclawLiteTest);
+    }
+    return;
+  }
+  let currentValue = window.__openclawLiteTest || null;
+  if (currentValue && typeof currentValue === 'object') {
+    currentValue = instrumentLiteTestBridgeTraffic(currentValue);
+  }
+  Object.defineProperty(window, '__openclawLiteTest', {
+    configurable: true,
+    enumerable: false,
+    get() {
+      return currentValue;
+    },
+    set(value) {
+      currentValue = value && typeof value === 'object'
+        ? instrumentLiteTestBridgeTraffic(value)
+        : value;
+    },
+  });
+  window.__agentTownLiteTestBridgeAccessorInstalled = true;
+}
+installLiteTestBridgeAccessor();
+
+function instrumentAgentDebugTrafficBridges() {
+  if (gateway && typeof gateway === 'object') {
+    instrumentGatewayTraffic(gateway);
+  }
+  if (typeof window !== 'undefined' && window.__openclawLiteTest && typeof window.__openclawLiteTest === 'object') {
+    instrumentLiteTestBridgeTraffic(window.__openclawLiteTest);
+  }
+}
+
 function setAgentDebugTab(tab) {
   const next = ['tools', 'skill', 'session', 'traffic', 'brain'].includes(String(tab || '')) ? String(tab) : 'tools';
   agentDebugActiveTab = next;
@@ -8830,6 +8945,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
 
   try {
     const gatewayApi = await withDebugTimeout(() => initGateway(), null, 6000);
+    instrumentAgentDebugTrafficBridges();
     const debugApi = window.__openclawLiteTest || null;
     const nowIso = new Date().toISOString();
     const shouldLoadSession =
@@ -11831,6 +11947,7 @@ async function initGateway() {
       gateway = await gateway;
     }
     instrumentGatewayTraffic(gateway);
+    instrumentAgentDebugTrafficBridges();
 
     // Subscribe to agent events
     gateway.on('message', (msg) => {

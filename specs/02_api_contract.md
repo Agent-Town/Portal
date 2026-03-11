@@ -1376,6 +1376,48 @@ Stable failure codes:
 - `TEAM_REQUIRED`
 - `LIBRARY_ITEM_NOT_FOUND`
 
+### POST `/api/platform/library/benchmarks/run` (human)
+Runs the deterministic House Library benchmark harness for the current attached House/team. This is the Phase 30 evaluation route used by the late full-loop smoke and by AI agent developers during implementation.
+
+Request shape:
+```json
+{
+  "copyAudit": {
+    "headingTexts": [
+      "Librarian Desk",
+      "Reading Table",
+      "Public Stacks"
+    ],
+    "panelText": "Librarian Desk Reading Table Public Stacks"
+  }
+}
+```
+
+Response fields:
+- `data.runId`
+- `data.outputHash`
+- `data.metrics`
+- `data.metrics.scopePrecision`
+- `data.metrics.scopeLeakRate`
+- `data.metrics.unsafePublishBlockRate`
+- `data.metrics.provenanceVisibilityRate`
+- `data.metrics.noviceCopyPassRate`
+- `data.scenarios[]`
+- `data.scenarios[].scenarioId`
+- `data.scenarios[].pass`
+- `data.scenarios[].actual`
+- `data.scenarios[].expected`
+
+Notes:
+- The route reads the current active scope set and prompt preview, then computes a deterministic scorecard for the attached House/team.
+- `outputHash` is stable for identical inputs and is suitable for test assertions.
+- The current benchmark covers scope precision, scope leakage, unsafe publish blocking, provenance visibility, and novice-friendly copy checks.
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `TEAM_REQUIRED`
+
 ### GET `/api/platform/house-structure` (human)
 Returns deterministic office and staff-agent scaffolding for the currently attached House.
 

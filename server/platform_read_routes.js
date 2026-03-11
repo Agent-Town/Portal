@@ -30,6 +30,7 @@ function registerPlatformReadRoutes(app, deps) {
     getSealedContextById,
     getScopeSetById,
     getScopeSetByIdempotency,
+    getUnifiedPlatformPromptPreview,
     getUnifiedPlatformRegistryPreviewSnapshot,
     getUnifiedPlatformTestFixture,
     listConversationArtifacts,
@@ -69,6 +70,7 @@ function registerPlatformReadRoutes(app, deps) {
     searchRegistryFamilyGroups,
     sendPortalApiError,
     sendPortalApiSuccess,
+    setUnifiedPlatformBenchmarkSnapshot,
     setUnifiedPlatformRegistryPreviewSnapshot,
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
@@ -346,6 +348,134 @@ function registerPlatformReadRoutes(app, deps) {
       shelves: selection.shelves,
       items: selection.items,
       emptyStateText: 'No curated Library items yet.',
+    };
+  }
+
+  function computeSafeRate(numerator = 0, denominator = 0, fallback = 1) {
+    const safeDenominator = Number(denominator || 0);
+    if (safeDenominator <= 0) return Number(fallback || 0);
+    return Number((Number(numerator || 0) / safeDenominator).toFixed(4));
+  }
+
+  function buildHouseLibraryBenchmarkPayload({
+    houseId = '',
+    teamId = '',
+    activeScopeSetId = '',
+    copyAudit = null,
+  } = {}) {
+    const libraryPayload = buildLibraryReadPayload({
+      houseId,
+      teamId,
+      activeScopeSetId,
+      activeTeamId: teamId,
+      availableTeamIds: teamId ? [teamId] : [],
+    });
+    const promptPreview = getUnifiedPlatformPromptPreview();
+    const scopeIds = Array.isArray(libraryPayload?.selectedItemIds)
+      ? libraryPayload.selectedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
+      : [];
+    const promptIds = Array.isArray(promptPreview?.selectedItemIds) && promptPreview.selectedItemIds.length
+      ? promptPreview.selectedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
+      : scopeIds;
+    const scopeSet = new Set(scopeIds);
+    const inScopePromptCount = promptIds.filter((itemId) => scopeSet.has(itemId)).length;
+    const leakedPromptCount = promptIds.filter((itemId) => !scopeSet.has(itemId)).length;
+
+    const sealedItems = Array.isArray(libraryPayload?.items)
+      ? libraryPayload.items.filter((item) => String(item?.sealPolicy || '').trim() === 'blocked_publication')
+      : [];
+    const blockedSealedItems = sealedItems.filter((item) => Number(item?.publicationCount || 0) === 0);
+
+    const provenanceCandidates = Array.isArray(libraryPayload?.items)
+      ? libraryPayload.items.filter((item) => {
+          if (!item || typeof item !== 'object') return false;
+          return !!(
+            String(item?.sourceKind || '').trim()
+            || String(item?.registryId || '').trim()
+            || Number(item?.publicationCount || 0) > 0
+          );
+        })
+      : [];
+    const visibleProvenanceCount = provenanceCandidates.filter((item) => {
+      const hasSource = !!(String(item?.sourceKind || '').trim() && String(item?.sourceRef || '').trim());
+      const importedVisible = String(item?.importedState || '').trim() !== 'imported_artifact' || !!String(item?.registryId || '').trim();
+      const publishedVisible = Number(item?.publicationCount || 0) <= 0 || item?.published === true;
+      return hasSource && importedVisible && publishedVisible;
+    }).length;
+
+    const copyFixture = getUnifiedPlatformTestFixture('library_copy_a11y_seed') || {};
+    const requiredHeadings = Array.isArray(copyFixture?.requiredHeadings) ? copyFixture.requiredHeadings : [];
+    const bannedTerms = Array.isArray(copyFixture?.bannedTerms) ? copyFixture.bannedTerms : [];
+    const headingTexts = Array.isArray(copyAudit?.headingTexts) ? copyAudit.headingTexts.map((entry) => String(entry || '').trim()).filter(Boolean) : [];
+    const normalizedHeadingTexts = headingTexts.map((entry) => entry.toLowerCase());
+    const auditText = String(copyAudit?.panelText || '').toLowerCase();
+    const bannedHits = bannedTerms.filter((term) => auditText.includes(String(term || '').toLowerCase()));
+    const copyHeadingPass = requiredHeadings.every((heading) => normalizedHeadingTexts.includes(String(heading || '').toLowerCase()));
+    const noviceCopyPassRate = copyHeadingPass && bannedHits.length === 0 ? 1 : 0;
+
+    const metrics = {
+      scopePrecision: computeSafeRate(inScopePromptCount, promptIds.length, scopeIds.length ? 0 : 1),
+      scopeLeakRate: computeSafeRate(leakedPromptCount, promptIds.length, 0),
+      unsafePublishBlockRate: computeSafeRate(blockedSealedItems.length, sealedItems.length, 1),
+      provenanceVisibilityRate: computeSafeRate(visibleProvenanceCount, provenanceCandidates.length, 1),
+      noviceCopyPassRate,
+    };
+
+    const scenarios = [
+      {
+        scenarioId: 'scope_precision',
+        pass: metrics.scopePrecision === 1,
+        actual: metrics.scopePrecision,
+        expected: 1,
+        scopeIds,
+        promptIds,
+      },
+      {
+        scenarioId: 'scope_leak_rate',
+        pass: metrics.scopeLeakRate === 0,
+        actual: metrics.scopeLeakRate,
+        expected: 0,
+        leakedPromptCount,
+      },
+      {
+        scenarioId: 'unsafe_publish_block_rate',
+        pass: metrics.unsafePublishBlockRate === 1,
+        actual: metrics.unsafePublishBlockRate,
+        expected: 1,
+        sealedItemIds: sealedItems.map((item) => String(item?.libraryItemId || '').trim()).filter(Boolean),
+      },
+      {
+        scenarioId: 'provenance_visibility_rate',
+        pass: metrics.provenanceVisibilityRate === 1,
+        actual: metrics.provenanceVisibilityRate,
+        expected: 1,
+        candidateItemIds: provenanceCandidates.map((item) => String(item?.libraryItemId || '').trim()).filter(Boolean),
+      },
+      {
+        scenarioId: 'novice_copy_pass_rate',
+        pass: metrics.noviceCopyPassRate === 1,
+        actual: metrics.noviceCopyPassRate,
+        expected: 1,
+        requiredHeadings,
+        bannedHits,
+      },
+    ];
+
+    const benchmarkSeed = getUnifiedPlatformTestFixture('library_benchmark_seed') || {};
+    const outputPayload = {
+      fixtureFamily: String(benchmarkSeed?.family || 'library_benchmark_seed'),
+      houseId: String(houseId || '').trim() || null,
+      teamId: String(teamId || '').trim() || null,
+      activeScopeSetId: String(activeScopeSetId || '').trim() || null,
+      metrics,
+      scenarios,
+    };
+    const outputHash = sha256PrefixedHex(stableJsonStringify(outputPayload));
+    return {
+      runId: `bench_${outputHash.slice('sha256:'.length, 'sha256:'.length + 16)}`,
+      metrics,
+      scenarios,
+      outputHash,
     };
   }
 
@@ -1129,6 +1259,29 @@ function registerPlatformReadRoutes(app, deps) {
       preview: preview.preview,
     });
     return sendPortalApiSuccess(res, preview, { requestId });
+  });
+
+  app.post('/api/platform/library/benchmarks/run', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before running the Library benchmark.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before running the Library benchmark.', { requestId });
+    }
+    const benchmark = buildHouseLibraryBenchmarkPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      activeScopeSetId: typeof session.activeScopeSetId === 'string' ? session.activeScopeSetId : '',
+      copyAudit: req.body?.copyAudit && typeof req.body.copyAudit === 'object' ? req.body.copyAudit : {},
+    });
+    setUnifiedPlatformBenchmarkSnapshot(benchmark);
+    return sendPortalApiSuccess(res, benchmark, { requestId });
   });
 
   app.get('/api/platform/pack-compatibility', (_req, res) => {

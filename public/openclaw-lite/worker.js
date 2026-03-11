@@ -48227,6 +48227,198 @@ async function runHouseLibraryCreateItem(params, toolName = "house_library_creat
     return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { idempotencyKey }));
   }
 }
+async function runHouseLibraryUpdateItem(params, toolName = "house_library_update_item") {
+  const startedAtMs = nowMs();
+  const libraryItemId = typeof params?.libraryItemId === "string" ? params.libraryItemId.trim() : "";
+  const body = {
+    title: typeof params?.title === "string" ? params.title.trim() : "",
+    summary: typeof params?.summary === "string" ? params.summary.trim() : "",
+    contentText: typeof params?.contentText === "string" ? params.contentText : ""
+  };
+  if (!libraryItemId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("LIBRARY_ITEM_REQUIRED", "libraryItemId is required.", { libraryItemId: null }));
+  }
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library/items/${encodeURIComponent(libraryItemId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body)
+    }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      item: isPlainObject(payload.item) ? payload.item : null,
+      revisions: Array.isArray(payload.revisions) ? payload.revisions : []
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_UPDATE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { libraryItemId }));
+  }
+}
+async function runHouseLibraryReadRevisions(params, toolName = "house_library_read_revisions") {
+  const startedAtMs = nowMs();
+  const libraryItemId = typeof params?.libraryItemId === "string" ? params.libraryItemId.trim() : "";
+  if (!libraryItemId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("LIBRARY_ITEM_REQUIRED", "libraryItemId is required.", { libraryItemId: null }));
+  }
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library/items/${encodeURIComponent(libraryItemId)}/revisions`, {
+      method: "GET"
+    }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      libraryItemId,
+      revisions: Array.isArray(payload.revisions) ? payload.revisions : []
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_REVISIONS_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { libraryItemId }));
+  }
+}
+async function runHouseLibraryCaptureConversation(params, toolName = "house_library_capture_conversation") {
+  const startedAtMs = nowMs();
+  const idempotencyKey = typeof params?.idempotencyKey === "string" && params.idempotencyKey.trim() ? params.idempotencyKey.trim() : randomId("house_library_capture");
+  const body = {
+    title: typeof params?.title === "string" ? params.title.trim() : "",
+    messageIds: Array.isArray(params?.messageIds) ? params.messageIds.map((entry) => String(entry || "").trim()).filter(Boolean) : [],
+    messages: Array.isArray(params?.messages) ? params.messages : []
+  };
+  try {
+    const payload = unwrapPortalData(await apiJson("/api/platform/library/conversation-artifacts", {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": idempotencyKey
+      },
+      body: JSON.stringify(body)
+    }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      conversationArtifact: isPlainObject(payload.conversationArtifact) ? payload.conversationArtifact : null,
+      item: isPlainObject(payload.item) ? payload.item : null,
+      idempotencyKey
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_CAPTURE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { idempotencyKey }));
+  }
+}
+async function runHouseLibraryListShelves(_params, toolName = "house_library_list_shelves") {
+  const startedAtMs = nowMs();
+  try {
+    const payload = unwrapPortalData(await apiJson("/api/platform/library/shelves", { method: "GET" }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      shelves: Array.isArray(payload.shelves) ? payload.shelves : []
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_SHELVES_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, null));
+  }
+}
+async function runHouseLibraryWriteShelf(params, toolName = "house_library_write_shelf") {
+  const startedAtMs = nowMs();
+  const mode = typeof params?.mode === "string" && params.mode.trim() ? params.mode.trim() : "create";
+  const libraryShelfId = typeof params?.libraryShelfId === "string" ? params.libraryShelfId.trim() : "";
+  const title = typeof params?.title === "string" ? params.title.trim() : "";
+  const itemIds = Array.isArray(params?.itemIds) ? params.itemIds.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
+  const idempotencyKey = typeof params?.idempotencyKey === "string" && params.idempotencyKey.trim() ? params.idempotencyKey.trim() : randomId("house_library_shelf");
+  try {
+    if (mode === "create") {
+      const payload = unwrapPortalData(await apiJson("/api/platform/library/shelves", {
+        method: "POST",
+        headers: {
+          "Idempotency-Key": idempotencyKey
+        },
+        body: JSON.stringify({ title, itemIds })
+      }));
+      return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+        mode,
+        shelf: isPlainObject(payload.shelf) ? payload.shelf : null,
+        idempotencyKey
+      }));
+    }
+    if (!libraryShelfId) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("LIBRARY_SHELF_NOT_FOUND", "libraryShelfId is required.", { mode, libraryShelfId: null }));
+    }
+    if (mode === "add") {
+      const payload = unwrapPortalData(await apiJson(`/api/platform/library/shelves/${encodeURIComponent(libraryShelfId)}/items`, {
+        method: "POST",
+        body: JSON.stringify({ itemIds })
+      }));
+      return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+        mode,
+        shelf: isPlainObject(payload.shelf) ? payload.shelf : null,
+        itemIds
+      }));
+    }
+    if (mode === "remove") {
+      const removed = [];
+      for (const libraryItemId of itemIds) {
+        const payload = unwrapPortalData(await apiJson(`/api/platform/library/shelves/${encodeURIComponent(libraryShelfId)}/items/${encodeURIComponent(libraryItemId)}`, {
+          method: "DELETE"
+        }));
+        removed.push(isPlainObject(payload.shelf) ? payload.shelf : { libraryShelfId, libraryItemId });
+      }
+      return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+        mode,
+        libraryShelfId,
+        removed
+      }));
+    }
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("LIBRARY_SHELF_WRITE_MODE_INVALID", "mode must be create, add, or remove.", {
+      mode,
+      libraryShelfId: libraryShelfId || null,
+      itemIds
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_SHELF_WRITE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, {
+      mode,
+      libraryShelfId: libraryShelfId || null,
+      itemIds,
+      idempotencyKey
+    }));
+  }
+}
+async function runHouseLibrarySearchPublicStacks(params, toolName = "house_library_search_public_stacks") {
+  const startedAtMs = nowMs();
+  const queryParams = new URLSearchParams();
+  const query = typeof params?.query === "string" ? params.query.trim() : "";
+  const family = typeof params?.family === "string" ? params.family.trim() : "";
+  if (query) queryParams.set("q", query);
+  if (family) queryParams.set("family", family);
+  const suffix = queryParams.toString() ? `?${queryParams.toString()}` : "";
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library/public-stacks/search${suffix}`, { method: "GET" }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      query: payload.query || query,
+      family: payload.family || family,
+      resultCount: Number(payload.resultCount || 0),
+      results: Array.isArray(payload.results) ? payload.results : [],
+      groups: Array.isArray(payload.groups) ? payload.groups : []
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_PUBLIC_STACK_SEARCH_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { query, family }));
+  }
+}
+async function runHouseLibraryPreviewRegistryArtifact(params, toolName = "house_library_preview_registry_artifact") {
+  const startedAtMs = nowMs();
+  const registryEntityId = typeof params?.registryEntityId === "string" ? params.registryEntityId.trim() : typeof params?.registryId === "string" ? params.registryId.trim() : "";
+  if (!registryEntityId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("REGISTRY_ENTITY_REQUIRED", "registryEntityId is required.", { registryEntityId: null }));
+  }
+  try {
+    const payload = unwrapPortalData(await apiJson(`/api/platform/library/public-stacks/preview/${encodeURIComponent(registryEntityId)}`, { method: "GET" }));
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      preview: isPlainObject(payload.preview) ? payload.preview : null
+    }));
+  } catch (e) {
+    const message = String(e?.message || "HOUSE_LIBRARY_REGISTRY_PREVIEW_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { registryEntityId }));
+  }
+}
 function previewHouseLibrarySkillRoute(params = {}) {
   const text = String(params?.text || params?.prompt || "").trim().toLowerCase();
   if (!text) {
@@ -48236,7 +48428,7 @@ function previewHouseLibrarySkillRoute(params = {}) {
       specializedSkillCount: 1
     };
   }
-  if (/(publish|registry|import|public artifact|provenance|trust label|seal)/.test(text)) {
+  if (/(publish|registry|import|public artifact|public stack|provenance|trust label|seal|preview)/.test(text)) {
     return {
       selectedSkillName: "Registry Curator",
       reasonCode: "registry_publish_import",
@@ -49532,6 +49724,61 @@ var LITE_TOOL_SPECS = [
     }
   },
   {
+    name: "house_library_update_item",
+    label: "House Library Update Item",
+    description: "Update one editable House Library item and return the new revision list.",
+    sampleArgs: {
+      libraryItemId: "lib_123",
+      title: "Updated Note",
+      summary: "Refined summary",
+      contentText: "Refined content"
+    }
+  },
+  {
+    name: "house_library_read_revisions",
+    label: "House Library Read Revisions",
+    description: "Read saved revisions for one House Library item.",
+    sampleArgs: { libraryItemId: "lib_123" }
+  },
+  {
+    name: "house_library_capture_conversation",
+    label: "House Library Capture Conversation",
+    description: "Save selected conversation turns into a reviewed Library artifact.",
+    sampleArgs: {
+      title: "Planner Notes",
+      messageIds: ["msg_a", "msg_b"],
+      messages: [{ messageId: "msg_a", role: "user", text: "Keep modal continuity." }]
+    }
+  },
+  {
+    name: "house_library_list_shelves",
+    label: "House Library List Shelves",
+    description: "List House Library shelves for the active team.",
+    sampleArgs: {}
+  },
+  {
+    name: "house_library_write_shelf",
+    label: "House Library Write Shelf",
+    description: "Create a shelf or add/remove Library items on a shelf.",
+    sampleArgs: {
+      mode: "create",
+      title: "Planning Shelf",
+      itemIds: ["lib_123"]
+    }
+  },
+  {
+    name: "house_library_search_public_stacks",
+    label: "House Library Search Public Stacks",
+    description: "Search Public Stacks from inside House Library without leaving the current shell.",
+    sampleArgs: { query: "atlas", family: "skill" }
+  },
+  {
+    name: "house_library_preview_registry_artifact",
+    label: "House Library Preview Registry Artifact",
+    description: "Preview one Public Stack with family and provenance details before import.",
+    sampleArgs: { registryEntityId: "reg_atlas_skill_01" }
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -49892,6 +50139,34 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "house_library_create_item": {
       const envelope = await runHouseLibraryCreateItem(params || {}, "house_library_create_item");
       return envelopeToToolResult(envelope, "house_library_create_item");
+    }
+    case "house_library_update_item": {
+      const envelope = await runHouseLibraryUpdateItem(params || {}, "house_library_update_item");
+      return envelopeToToolResult(envelope, "house_library_update_item");
+    }
+    case "house_library_read_revisions": {
+      const envelope = await runHouseLibraryReadRevisions(params || {}, "house_library_read_revisions");
+      return envelopeToToolResult(envelope, "house_library_read_revisions");
+    }
+    case "house_library_capture_conversation": {
+      const envelope = await runHouseLibraryCaptureConversation(params || {}, "house_library_capture_conversation");
+      return envelopeToToolResult(envelope, "house_library_capture_conversation");
+    }
+    case "house_library_list_shelves": {
+      const envelope = await runHouseLibraryListShelves(params || {}, "house_library_list_shelves");
+      return envelopeToToolResult(envelope, "house_library_list_shelves");
+    }
+    case "house_library_write_shelf": {
+      const envelope = await runHouseLibraryWriteShelf(params || {}, "house_library_write_shelf");
+      return envelopeToToolResult(envelope, "house_library_write_shelf");
+    }
+    case "house_library_search_public_stacks": {
+      const envelope = await runHouseLibrarySearchPublicStacks(params || {}, "house_library_search_public_stacks");
+      return envelopeToToolResult(envelope, "house_library_search_public_stacks");
+    }
+    case "house_library_preview_registry_artifact": {
+      const envelope = await runHouseLibraryPreviewRegistryArtifact(params || {}, "house_library_preview_registry_artifact");
+      return envelopeToToolResult(envelope, "house_library_preview_registry_artifact");
     }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":

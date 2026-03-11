@@ -1439,6 +1439,19 @@ async function init() {
     return res.result || null;
   }
 
+  function emitHostDebugTraffic(direction, channel, payload) {
+    try {
+      if (
+        typeof window !== "undefined"
+        && typeof window.__agentTownPushDebugTraffic === "function"
+      ) {
+        window.__agentTownPushDebugTraffic(direction, channel, payload);
+      }
+    } catch {
+      // Ignore host debug bridge failures in the runtime.
+    }
+  }
+
   // Test-only helpers (stable surface for Playwright).
   window.__openclawLiteTest = {
     async setLlmConfig(params = {}) {
@@ -1500,23 +1513,36 @@ async function init() {
       return toolRegistryRequest();
     },
     async invokeLiteTool({ tool, params = {} } = {}) {
+      const normalizedTool = typeof tool === "string" ? tool : "";
+      const normalizedParams = isPlainRecord(params) ? params : {};
+      emitHostDebugTraffic("out", "gateway.invokeLiteTool", {
+        tool: normalizedTool,
+        params: normalizedParams,
+      });
       const res = await sendWorkerRequest({
         requestType: "gateway.command.tools.invokeLite",
         responseType: "worker.tools.invokeLite",
         payload: {
-          toolName: typeof tool === "string" ? tool : "",
-          params: isPlainRecord(params) ? params : {},
+          toolName: normalizedTool,
+          params: normalizedParams,
         },
       });
-      if (!res?.ok) throw new Error(String(res?.error || "TOOLS_INVOKE_LITE_FAILED"));
+      if (!res?.ok) {
+        emitHostDebugTraffic("in", "gateway.invokeLiteTool.error", {
+          message: String(res?.error || "TOOLS_INVOKE_LITE_FAILED"),
+        });
+        throw new Error(String(res?.error || "TOOLS_INVOKE_LITE_FAILED"));
+      }
       const envelope = normalizeLiteToolEnvelope(res.result);
-      return {
+      const result = {
         ok: envelope?.ok === true,
         data: isPlainRecord(envelope?.data) ? envelope.data : null,
         error: isPlainRecord(envelope?.error) ? envelope.error : null,
         meta: isPlainRecord(envelope?.meta) ? envelope.meta : null,
         details: isPlainRecord(res?.result?.details) ? res.result.details : null,
       };
+      emitHostDebugTraffic("in", "gateway.invokeLiteTool.result", result);
+      return result;
     },
     async runToolSmoke({ count = 5 } = {}) {
       const res = await sendWorkerRequest({
