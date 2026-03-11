@@ -10,8 +10,10 @@
   "staffAgents": [
     {
       "staffAgentId": "staff_fixture_operator",
+      "displayName": "Operations Lead",
       "role": "operator",
-      "officeId": "office_fixture_ops"
+      "officeId": "office_fixture_ops",
+      "teamId": "team_main"
     }
   ]
 }

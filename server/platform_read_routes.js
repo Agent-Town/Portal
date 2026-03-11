@@ -5,6 +5,7 @@ function registerPlatformReadRoutes(app, deps) {
     buildPlatformContextResponse,
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
+    createHouseStaffAssignment,
     createTrainerJob,
     createTrainerResult,
     getConfigVersion,
@@ -18,6 +19,7 @@ function registerPlatformReadRoutes(app, deps) {
     getTrainerResultById,
     getTrainerResultByJobId,
     listConfigComponentVersions,
+    listHouseStaffAssignments,
     listPlatformExperienceDefinitions,
     listRuns,
     listTraceEvents,
@@ -171,6 +173,138 @@ function registerPlatformReadRoutes(app, deps) {
         label: 'Open Trainer',
       },
     };
+  }
+
+  function buildHouseOfficeAssignmentEntryPath({
+    sourceKind = '',
+    office = null,
+  } = {}) {
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    if (normalizedSourceKind === 'trainer_job' || normalizedSourceKind === 'trainer_result') {
+      return '/api/platform/trainer';
+    }
+    if (normalizedSourceKind === 'team_config_binding' || normalizedSourceKind === 'config_version') {
+      return '/api/platform/workshop';
+    }
+    if (normalizedSourceKind === 'track_progress_event') {
+      return '/api/platform/tracks';
+    }
+    if (normalizedSourceKind === 'experience') {
+      return '/api/platform/experiences';
+    }
+    if (normalizedSourceKind === 'run') {
+      return String(office?.surface || '').trim() === 'experiences'
+        ? '/api/platform/experiences'
+        : '/api/platform/archive';
+    }
+    const officeSurface = String(office?.surface || '').trim();
+    if (officeSurface === 'trainer') return '/api/platform/trainer';
+    if (officeSurface === 'workshop') return '/api/platform/workshop';
+    if (officeSurface === 'tracks') return '/api/platform/tracks';
+    if (officeSurface === 'archive') return '/api/platform/archive';
+    if (officeSurface === 'experiences') return '/api/platform/experiences';
+    return '/api/platform/house-office';
+  }
+
+  function buildHouseOfficeAssignmentDeepLink({
+    sourceKind = '',
+    office = null,
+    deeplinks = {},
+  } = {}) {
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    if (normalizedSourceKind === 'trainer_job' || normalizedSourceKind === 'trainer_result') {
+      return deeplinks.trainer || deeplinks.office;
+    }
+    if (normalizedSourceKind === 'team_config_binding' || normalizedSourceKind === 'config_version') {
+      return deeplinks.workshop || deeplinks.office;
+    }
+    if (normalizedSourceKind === 'track_progress_event') {
+      return deeplinks.tracks || deeplinks.office;
+    }
+    if (normalizedSourceKind === 'experience') {
+      return deeplinks.experiences || deeplinks.office;
+    }
+    if (normalizedSourceKind === 'run') {
+      return String(office?.surface || '').trim() === 'experiences'
+        ? (deeplinks.experiences || deeplinks.office)
+        : (deeplinks.archive || deeplinks.office);
+    }
+    const officeSurface = String(office?.surface || '').trim();
+    return deeplinks[officeSurface] || office?.deepLink || deeplinks.office;
+  }
+
+  function buildHouseOfficeAssignments({
+    houseId = '',
+    teamId = '',
+    offices = [],
+    staffAgents = [],
+    deeplinks = {},
+  } = {}) {
+    if (!houseId || !teamId) return [];
+    const officeList = Array.isArray(offices) ? offices : [];
+    const staffList = Array.isArray(staffAgents) ? staffAgents : [];
+    const officesById = new Map(
+      officeList
+        .map((office) => [String(office?.officeId || '').trim(), office])
+        .filter(([officeId]) => officeId)
+    );
+    const staffById = new Map(
+      staffList
+        .map((staffAgent) => [String(staffAgent?.staffAgentId || '').trim(), staffAgent])
+        .filter(([staffAgentId]) => staffAgentId)
+    );
+    return listHouseStaffAssignments({ houseId, teamId })
+      .map((assignment) => {
+        const officeId = String(assignment?.officeId || '').trim();
+        const staffAgentId = String(assignment?.staffAgentId || '').trim();
+        const office = officesById.get(officeId) || null;
+        const staffAgent = staffById.get(staffAgentId) || null;
+        if (!office || !staffAgent) return null;
+        return {
+          assignmentId: String(assignment?.assignmentId || '').trim(),
+          staffAgentId,
+          officeId,
+          focus: String(assignment?.focus || '').trim(),
+          sourceKind: String(assignment?.sourceKind || '').trim(),
+          sourceId: String(assignment?.sourceId || '').trim(),
+          startedAt: String(assignment?.startedAt || '').trim(),
+          deepLink: buildHouseOfficeAssignmentDeepLink({
+            sourceKind: assignment?.sourceKind,
+            office,
+            deeplinks,
+          }),
+          sourceRefs: [
+            {
+              sourceKind: String(assignment?.sourceKind || '').trim(),
+              sourceId: String(assignment?.sourceId || '').trim(),
+              entryPath: buildHouseOfficeAssignmentEntryPath({
+                sourceKind: assignment?.sourceKind,
+                office,
+              }),
+            },
+          ],
+        };
+      })
+      .filter((assignment) => {
+        return assignment
+          && assignment.assignmentId
+          && assignment.staffAgentId
+          && assignment.officeId
+          && assignment.focus
+          && assignment.sourceKind
+          && assignment.sourceId
+          && assignment.startedAt;
+      })
+      .sort((left, right) => {
+        const leftOrder = Number(officesById.get(left.officeId)?.order || 0);
+        const rightOrder = Number(officesById.get(right.officeId)?.order || 0);
+        const officeOrderDelta = leftOrder - rightOrder;
+        if (officeOrderDelta !== 0) return officeOrderDelta;
+        const startedAtDelta = parseHouseOfficeActivityTime(String(right.startedAt || ''))
+          - parseHouseOfficeActivityTime(String(left.startedAt || ''));
+        if (startedAtDelta !== 0) return startedAtDelta;
+        return String(left.assignmentId || '').localeCompare(String(right.assignmentId || ''));
+      });
   }
 
   function parseHouseOfficeActivityTime(value) {
@@ -709,7 +843,7 @@ function registerPlatformReadRoutes(app, deps) {
             displayName: String(entry?.displayName || role || staffAgentId).trim() || staffAgentId,
             role,
             officeId,
-            teamId: String(entry?.teamId || teamId || context.activeTeamId || '').trim() || null,
+            teamId: String(teamId || entry?.teamId || context.activeTeamId || '').trim() || null,
             deepLink: office?.deepLink || deeplinks.office,
           };
         })
@@ -730,6 +864,15 @@ function registerPlatformReadRoutes(app, deps) {
     const binding = houseId && teamId
       ? getTeamConfigBinding({ houseId, teamId })
       : null;
+    const assignments = houseId
+      ? buildHouseOfficeAssignments({
+        houseId,
+        teamId,
+        offices,
+        staffAgents,
+        deeplinks,
+      })
+      : [];
     const presence = houseId
       ? buildHouseOfficePresence({
         offices,
@@ -760,7 +903,13 @@ function registerPlatformReadRoutes(app, deps) {
       })
       : [];
     const briefingItemCount = countHouseOfficeBriefingItems(briefing);
-    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length + briefingItemCount + attention.length;
+    const activityCount = trainerJobs.length
+      + trainerResults.length
+      + archiveRuns.length
+      + tracksPayload.events.length
+      + assignments.length
+      + briefingItemCount
+      + attention.length;
     return {
       houseId: houseId || null,
       teamId: teamId || null,
@@ -768,6 +917,7 @@ function registerPlatformReadRoutes(app, deps) {
       availableTeamIds: context.availableTeamIds,
       offices,
       staffAgents,
+      assignments,
       presence,
       briefing,
       attention,
@@ -777,6 +927,7 @@ function registerPlatformReadRoutes(app, deps) {
         routes: [
           '/api/platform/context',
           '/api/platform/house-structure',
+          '/api/platform/house-office/assignments',
           '/api/platform/experiences',
           '/api/platform/workshop',
           '/api/platform/tracks',
@@ -786,11 +937,13 @@ function registerPlatformReadRoutes(app, deps) {
         fixtures: [
           'house_office_overview_seed',
           'house_office_staff_seed',
+          'house_office_assignments_seed',
           'house_office_briefing_seed',
         ],
         counts: {
           officeCount: offices.length,
           staffAgentCount: staffAgents.length,
+          assignmentCount: assignments.length,
           presenceCount: presence.length,
           briefingGroupCount: briefing.length,
           briefingItemCount,
@@ -807,6 +960,7 @@ function registerPlatformReadRoutes(app, deps) {
       summary: {
         officeCount: offices.length,
         staffAgentCount: staffAgents.length,
+        assignmentCount: assignments.length,
         presenceCount: presence.length,
         briefingGroupCount: briefing.length,
         briefingItemCount,
@@ -1251,6 +1405,94 @@ function registerPlatformReadRoutes(app, deps) {
       houseId,
       teamId,
     }), { requestId });
+  });
+
+  app.post('/api/platform/house-office/assignments', express.json({ limit: '16kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId : '';
+    if (!houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before assigning House Office staff.', { requestId });
+    }
+    if (!teamId) {
+      return sendPortalApiError(res, 409, 'ACTIVE_TEAM_REQUIRED', 'Select an active team before assigning House Office staff.', { requestId });
+    }
+
+    const officeId = typeof req.body?.officeId === 'string' ? req.body.officeId.trim() : '';
+    const staffAgentId = typeof req.body?.staffAgentId === 'string' ? req.body.staffAgentId.trim() : '';
+    const focus = typeof req.body?.focus === 'string' ? req.body.focus.trim() : '';
+    const sourceKind = typeof req.body?.sourceKind === 'string' ? req.body.sourceKind.trim() : '';
+    const sourceId = typeof req.body?.sourceId === 'string' ? req.body.sourceId.trim() : '';
+    if (!officeId || !staffAgentId || !focus || !sourceKind || !sourceId) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'officeId, staffAgentId, focus, sourceKind, and sourceId are required.', { requestId });
+    }
+
+    const overview = buildHouseOfficeOverviewPayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const offices = Array.isArray(overview?.offices) ? overview.offices : [];
+    const staffAgents = Array.isArray(overview?.staffAgents) ? overview.staffAgents : [];
+    const office = offices.find((entry) => String(entry?.officeId || '').trim() === officeId) || null;
+    if (!office) {
+      return sendPortalApiError(res, 404, 'OFFICE_NOT_FOUND', 'House Office does not know that office.', { requestId });
+    }
+    const staffAgent = staffAgents.find((entry) => String(entry?.staffAgentId || '').trim() === staffAgentId) || null;
+    if (!staffAgent) {
+      return sendPortalApiError(res, 404, 'STAFF_AGENT_NOT_FOUND', 'House Office does not know that staff agent.', { requestId });
+    }
+
+    const createdAt = nowIso();
+    const assignmentIdentity = sha256PrefixedHex(stableJsonStringify({
+      houseId,
+      teamId,
+      officeId,
+      staffAgentId,
+      focus,
+      sourceKind,
+      sourceId,
+    }));
+    const assignmentId = `assign_${assignmentIdentity.replace(/^sha256:/i, '').slice(0, 24)}`;
+    const assignment = createHouseStaffAssignment({
+      assignmentId,
+      houseId,
+      teamId,
+      officeId,
+      staffAgentId,
+      focus,
+      sourceKind,
+      sourceId,
+      sourceRef: {
+        sourceKind,
+        sourceId,
+        entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+      },
+      idempotencyKey: normalizePortalIdempotencyKey(req),
+      startedAt: createdAt,
+      nowIso: createdAt,
+    });
+    return sendPortalApiSuccess(res, {
+      assignmentId: String(assignment?.assignmentId || '').trim(),
+      staffAgentId: String(assignment?.staffAgentId || '').trim(),
+      officeId: String(assignment?.officeId || '').trim(),
+      focus: String(assignment?.focus || '').trim(),
+      sourceKind: String(assignment?.sourceKind || '').trim(),
+      sourceId: String(assignment?.sourceId || '').trim(),
+      startedAt: String(assignment?.startedAt || '').trim(),
+      deepLink: buildHouseOfficeAssignmentDeepLink({
+        sourceKind,
+        office,
+        deeplinks: overview?.deeplinks && typeof overview.deeplinks === 'object'
+          ? overview.deeplinks
+          : buildHouseOfficeDeepLinks(),
+      }),
+    }, { requestId });
   });
 
   app.get('/api/platform/tracks', (req, res) => {

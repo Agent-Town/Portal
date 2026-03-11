@@ -495,6 +495,7 @@ let houseSurfaceState = {
     loaded: false,
     offices: [],
     staffAgents: [],
+    assignments: [],
     presence: [],
     briefing: [],
     attention: [],
@@ -1307,6 +1308,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.office.loaded = false;
     houseSurfaceState.office.staffAgents = [];
+    houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];
@@ -1510,11 +1512,13 @@ function renderHouseOfficeSurface() {
   const presenceNode = el('houseOfficePresence');
   const briefingNode = el('houseOfficeBriefing');
   const attentionNode = el('houseOfficeAttention');
+  const assignmentsNode = el('houseOfficeAssignments');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !attentionNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
+  const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
   const briefing = Array.isArray(houseSurfaceState.office.briefing) ? houseSurfaceState.office.briefing : [];
   const attention = Array.isArray(houseSurfaceState.office.attention) ? houseSurfaceState.office.attention : [];
@@ -1537,6 +1541,7 @@ function renderHouseOfficeSurface() {
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
   const officeCount = Number(summary?.officeCount || offices.length || 0);
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
+  const assignmentCount = Number(summary?.assignmentCount || assignments.length || 0);
   const briefingItemCount = briefing.reduce((sum, group) => {
     const items = Array.isArray(group?.items) ? group.items : [];
     return sum + items.length;
@@ -1548,6 +1553,7 @@ function renderHouseOfficeSurface() {
     activeTeamId ? `active team ${activeTeamId}` : 'no active team',
     `${officeCount} offices`,
     `${staffAgentCount} staff`,
+    `${assignmentCount} assignments`,
     `${presence.length} presence`,
     `${briefingItemCount} briefing`,
     `${attention.length} attention`,
@@ -1702,6 +1708,55 @@ function renderHouseOfficeSurface() {
       itemSummaryNode.textContent = String(item?.summary || '').trim() || 'No summary available.';
       button.appendChild(itemSummaryNode);
       attentionNode.appendChild(button);
+    });
+  }
+
+  assignmentsNode.innerHTML = '';
+  if (!assignments.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No House Office staff assignments are active yet.';
+    assignmentsNode.appendChild(placeholder);
+  } else {
+    assignments.forEach((assignment) => {
+      const office = offices.find((entry) => String(entry?.officeId || '') === String(assignment?.officeId || '')) || null;
+      const staffAgent = staffAgents.find((entry) => String(entry?.staffAgentId || '') === String(assignment?.staffAgentId || '')) || null;
+      const labelParts = [
+        String(staffAgent?.displayName || assignment?.staffAgentId || 'Staff').trim() || 'Staff',
+        String(staffAgent?.role || 'staff').trim() || 'staff',
+        String(office?.displayName || assignment?.officeId || 'Office').trim() || 'Office',
+        String(assignment?.focus || '').trim() || 'No focus',
+      ];
+      const sourceKind = String(assignment?.sourceKind || '').trim();
+      if (sourceKind) {
+        labelParts.push(sourceKind);
+      }
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn';
+      button.setAttribute('data-testid', 'house-office-assignment-item');
+      button.style.width = '100%';
+      button.style.minWidth = '0';
+      button.style.whiteSpace = 'normal';
+      button.style.overflowWrap = 'anywhere';
+      button.style.textAlign = 'left';
+      button.style.lineHeight = '1.35';
+      button.textContent = labelParts.join(' · ');
+      button.addEventListener('click', async () => {
+        const officeId = String(assignment?.officeId || '').trim();
+        if (officeId) {
+          houseSurfaceState.office.selectedOfficeId = officeId;
+          renderHouseOfficeSurface();
+        }
+        if (!assignment?.deepLink) return;
+        setHouseSurfaceStatus(`Opening ${String(staffAgent?.displayName || 'staff assignment')}...`);
+        try {
+          await openHouseOfficeDeepLink(assignment.deepLink);
+        } catch (err) {
+          setHouseSurfaceStatus(`House Office assignment unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        }
+      });
+      assignmentsNode.appendChild(button);
     });
   }
 
@@ -2122,6 +2177,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.loaded = true;
     houseSurfaceState.office.offices = Array.isArray(data.offices) ? data.offices : [];
     houseSurfaceState.office.staffAgents = Array.isArray(data.staffAgents) ? data.staffAgents : [];
+    houseSurfaceState.office.assignments = Array.isArray(data.assignments) ? data.assignments : [];
     houseSurfaceState.office.presence = Array.isArray(data.presence) ? data.presence : [];
     houseSurfaceState.office.briefing = Array.isArray(data.briefing) ? data.briefing : [];
     houseSurfaceState.office.attention = Array.isArray(data.attention) ? data.attention : [];
@@ -2140,6 +2196,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
   } catch (err) {
     houseSurfaceState.office.loaded = true;
     houseSurfaceState.office.staffAgents = [];
+    houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];

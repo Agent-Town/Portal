@@ -983,6 +983,21 @@ Response fields:
 - `data.staffAgents[].deepLink.kind`
 - `data.staffAgents[].deepLink.surface`
 - `data.staffAgents[].deepLink.label`
+- `data.assignments[]`
+- `data.assignments[].assignmentId`
+- `data.assignments[].staffAgentId`
+- `data.assignments[].officeId`
+- `data.assignments[].focus`
+- `data.assignments[].sourceKind`
+- `data.assignments[].sourceId`
+- `data.assignments[].startedAt`
+- `data.assignments[].deepLink.kind`
+- `data.assignments[].deepLink.surface`
+- `data.assignments[].deepLink.label`
+- `data.assignments[].sourceRefs[]`
+- `data.assignments[].sourceRefs[].sourceKind`
+- `data.assignments[].sourceRefs[].sourceId`
+- `data.assignments[].sourceRefs[].entryPath`
 - `data.presence[]`
 - `data.presence[].officeId`
 - `data.presence[].officeLabel`
@@ -1031,6 +1046,7 @@ Response fields:
 - `data.sourceManifest.fixtures[]`
 - `data.sourceManifest.counts.officeCount`
 - `data.sourceManifest.counts.staffAgentCount`
+- `data.sourceManifest.counts.assignmentCount`
 - `data.sourceManifest.counts.presenceCount`
 - `data.sourceManifest.counts.briefingGroupCount`
 - `data.sourceManifest.counts.briefingItemCount`
@@ -1044,6 +1060,7 @@ Response fields:
 - `data.sourceManifest.activeConfigVersionId`
 - `data.summary.officeCount`
 - `data.summary.staffAgentCount`
+- `data.summary.assignmentCount`
 - `data.summary.presenceCount`
 - `data.summary.briefingGroupCount`
 - `data.summary.briefingItemCount`
@@ -1054,6 +1071,36 @@ Response fields:
 - `data.summary.trainerResultCount`
 - `data.summary.archiveRunCount`
 - `data.emptyStateText`
+
+### POST `/api/platform/house-office/assignments` (human)
+Creates one minimal, session-bound House Office staff assignment for the current attached House and active team.
+Repeated identical assignment requests return the same `assignmentId`.
+
+Request body:
+- `officeId`
+- `staffAgentId`
+- `focus`
+- `sourceKind`
+- `sourceId`
+
+Stable error codes:
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `OFFICE_NOT_FOUND`
+- `STAFF_AGENT_NOT_FOUND`
+- `INVALID_ARGUMENT`
+
+Response fields:
+- `data.assignmentId`
+- `data.staffAgentId`
+- `data.officeId`
+- `data.focus`
+- `data.sourceKind`
+- `data.sourceId`
+- `data.startedAt`
+- `data.deepLink.kind`
+- `data.deepLink.surface`
+- `data.deepLink.label`
 
 ### GET `/api/platform/tracks` (human)
 Returns deterministic track progress and durable reward-hook references for the currently attached House and active team.

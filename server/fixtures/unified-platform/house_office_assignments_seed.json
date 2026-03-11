@@ -27,5 +27,12 @@
       "sourceId": "trainer_fixture_ops_review",
       "startedAt": "2026-03-10T09:00:00.000Z"
     }
+  ],
+  "expectedErrorCodes": [
+    "HOUSE_REQUIRED",
+    "ACTIVE_TEAM_REQUIRED",
+    "OFFICE_NOT_FOUND",
+    "STAFF_AGENT_NOT_FOUND",
+    "INVALID_ARGUMENT"
   ]
 }

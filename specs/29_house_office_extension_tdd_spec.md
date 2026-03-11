@@ -393,6 +393,13 @@ Implementation notes:
 
 1. This milestone may remain additive and minimal; it does not authorize a second personnel system.
 2. The write contract, if used, should remain session-bound to the current live Portal session and active house or team context.
+3. The preferred payload extension is:
+   A. `GET /api/platform/house-office` adds `assignments[]`
+   B. `sourceManifest.counts.assignmentCount`
+   C. `summary.assignmentCount`
+4. The preferred write contract is:
+   A. `POST /api/platform/house-office/assignments`
+   B. one minimal additive table is acceptable when it keeps writes deterministic
 
 ### M29.6 - Presence privacy and sealed-data safety
 

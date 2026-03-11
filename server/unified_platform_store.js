@@ -21,6 +21,7 @@ const PLATFORM_TABLES = Object.freeze([
   'integration_executions',
   'trainer_jobs',
   'trainer_results',
+  'house_staff_assignments',
   'track_progress_events',
   'sealed_contexts',
   'sealed_context_violations',
@@ -272,6 +273,23 @@ function ensureDb() {
       approval_needed INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_staff_assignments (
+      assignment_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      office_id TEXT NOT NULL,
+      staff_agent_id TEXT NOT NULL,
+      focus TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      source_ref_json TEXT NOT NULL DEFAULT '{}',
+      idempotency_key TEXT,
+      started_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, office_id, staff_agent_id, focus, source_kind, source_id)
     );
 
     CREATE TABLE IF NOT EXISTS track_progress_events (
@@ -1212,6 +1230,151 @@ function mapTrainerResultRow(row) {
     createdAt: String(row.created_at || ''),
     updatedAt: String(row.updated_at || ''),
   };
+}
+
+function mapHouseStaffAssignmentRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    assignmentId: String(row.assignment_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    officeId: String(row.office_id || ''),
+    staffAgentId: String(row.staff_agent_id || ''),
+    focus: String(row.focus || ''),
+    sourceKind: String(row.source_kind || ''),
+    sourceId: String(row.source_id || ''),
+    sourceRef: parseJsonColumn(row.source_ref_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    startedAt: String(row.started_at || ''),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function listHouseStaffAssignments({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_staff_assignments
+    ${whereSql}
+    ORDER BY started_at DESC, created_at DESC, assignment_id ASC
+  `).all(...args);
+  return rows.map(mapHouseStaffAssignmentRow).filter(Boolean);
+}
+
+function createHouseStaffAssignment({
+  assignmentId = '',
+  houseId = '',
+  teamId = '',
+  officeId = '',
+  staffAgentId = '',
+  focus = '',
+  sourceKind = '',
+  sourceId = '',
+  sourceRef = null,
+  idempotencyKey = '',
+  startedAt = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedAssignmentId = String(assignmentId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedOfficeId = String(officeId || '').trim();
+  const normalizedStaffAgentId = String(staffAgentId || '').trim();
+  const normalizedFocus = String(focus || '').trim();
+  const normalizedSourceKind = String(sourceKind || '').trim();
+  const normalizedSourceId = String(sourceId || '').trim();
+  const normalizedStartedAt = String(startedAt || '').trim() || nowIso;
+  if (
+    !normalizedAssignmentId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedOfficeId
+    || !normalizedStaffAgentId
+    || !normalizedFocus
+    || !normalizedSourceKind
+    || !normalizedSourceId
+  ) {
+    throw new Error('HOUSE_STAFF_ASSIGNMENT_INVALID');
+  }
+  const database = ensureDb();
+  const existing = database.prepare(`
+    SELECT *
+    FROM house_staff_assignments
+    WHERE house_id = ?
+      AND team_id = ?
+      AND office_id = ?
+      AND staff_agent_id = ?
+      AND focus = ?
+      AND source_kind = ?
+      AND source_id = ?
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedOfficeId,
+    normalizedStaffAgentId,
+    normalizedFocus,
+    normalizedSourceKind,
+    normalizedSourceId,
+  );
+  if (existing) {
+    return mapHouseStaffAssignmentRow(existing);
+  }
+  database.prepare(`
+    INSERT INTO house_staff_assignments (
+      assignment_id,
+      house_id,
+      team_id,
+      office_id,
+      staff_agent_id,
+      focus,
+      source_kind,
+      source_id,
+      source_ref_json,
+      idempotency_key,
+      started_at,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedAssignmentId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedOfficeId,
+    normalizedStaffAgentId,
+    normalizedFocus,
+    normalizedSourceKind,
+    normalizedSourceId,
+    JSON.stringify(sourceRef && typeof sourceRef === 'object' ? sourceRef : {}),
+    String(idempotencyKey || '').trim() || null,
+    normalizedStartedAt,
+    nowIso,
+    nowIso,
+  );
+  const row = database.prepare(`
+    SELECT *
+    FROM house_staff_assignments
+    WHERE assignment_id = ?
+    LIMIT 1
+  `).get(normalizedAssignmentId);
+  return mapHouseStaffAssignmentRow(row);
 }
 
 function getTrainerResultById(trainerResultId = '') {
@@ -2291,6 +2454,7 @@ module.exports = {
   createTraceArtifact,
   createTrainerJob,
   createTrainerResult,
+  createHouseStaffAssignment,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -2324,6 +2488,7 @@ module.exports = {
   getLatestTraceEvent,
   getPlatformTableCounts,
   isUnifiedPlatformTable,
+  listHouseStaffAssignments,
   listConfigComponentVersions,
   listTrackDefinitions,
   listTrackProgressEvents,
