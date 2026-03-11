@@ -484,8 +484,15 @@ Cash lifecycle and waitlist notes:
 ### GET `/api/poker/play/tables/:tableId/history`
 Returns recent hand history for one table with:
 - `data.viewerMode`
-- `data.tableId`
-- `data.tableType`
+- `data.table`
+- `data.table.tableId`
+- `data.table.title`
+- `data.table.tableType`
+- `data.table.status`
+- `data.table.summary`
+- `data.viewerSeatNumber`
+- `data.filter.status`
+- `data.filter.limit`
 - `data.items[]`
 - `data.items[].handId`
 - `data.items[].handNumber`
@@ -501,15 +508,29 @@ Returns recent hand history for one table with:
 
 History notes:
 - player viewers receive the same seat-private `data.items[].agentProposal` rule as the live table route
-- player viewers receive only the recent action tail for each hand, while public/rail history is reserved for later dedicated routes
+- player viewers receive only the recent action tail for each hand
+- unauthenticated reads return `data.viewerMode = "public"` and never include private worker proposal bodies
+- supported filters:
+  - `status=completed`
+  - `status=live`
+  - `limit=<n>`
 
 ### GET `/api/poker/play/series/:seriesId/timeline`
 Returns the deterministic ordered audit timeline for one tournament series with:
 - `data.viewerMode`
+- `data.series`
+- `data.series.seriesId`
+- `data.series.seriesTitle`
+- `data.series.stage`
+- `data.series.entryCount`
+- `data.series.prizePoolOil`
 - `data.seriesId`
+- `data.summary.tableCount`
+- `data.summary.eventCount`
 - `data.items[]`
 - `data.items[].createdAt`
 - `data.items[].tableId`
+- `data.items[].tableTitle`
 - `data.items[].handId`
 - `data.items[].eventKind`
 - `data.items[].actorRole`
@@ -520,6 +541,15 @@ Returns the deterministic ordered audit timeline for one tournament series with:
 Timeline notes:
 - the timeline is stable-order by `createdAt` and table/hand/event identity
 - `data.items[].payload.body` is seat-private and only included when the event belongs to the bound wallet seat
+
+### GET `/api/poker/play/rail/series/:seriesId/timeline`
+Returns the public-safe tournament series timeline with:
+- `data.viewerMode = "public"`
+- the same `data.series`, `data.summary`, and `data.items[]` envelope as the player timeline route
+
+Rail timeline notes:
+- public rail timeline rows never include `data.items[].payload.body`
+- public rail is still stable-order by `createdAt` and table/hand/event identity
 
 ### GET `/api/poker/play/results/me`
 Returns the bound wallet's live poker results surface with:
@@ -543,6 +573,7 @@ Returns the bound wallet's live poker results surface with:
 - `data.summary.tournamentCount`
 - `data.summary.buyInOil`
 - `data.summary.prizeOil`
+- `data.summary.netOil`
 
 ### GET `/api/poker/play/rail/tables/:tableId`
 Returns the public spectator payload for one live table with:

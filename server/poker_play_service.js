@@ -1609,7 +1609,15 @@ function sanitizeTimelineEventPayload(payload = {}, { includePrivate = false } =
   return Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined && value !== null && value !== ''));
 }
 
-function buildPokerPlayHandHistoryPayload(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20 } = {}) {
+function buildPokerPlayHandHistoryPayload(deps, {
+  tableId,
+  session,
+  req,
+  processAt,
+  publicViewer = false,
+  limit = 20,
+  status = '',
+} = {}) {
   const requestAt = toProcessIso(deps, processAt);
   const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
   if (!synced?.table) {
@@ -1619,9 +1627,11 @@ function buildPokerPlayHandHistoryPayload(deps, { tableId, session, req, process
   const viewerSeat = walletBinding?.walletSubject
     ? deps.getPokerPlaySeatByWalletSubject(synced.table.tableId, walletBinding.walletSubject)
     : null;
+  const statusFilter = normalizeTrimmedString(status).toLowerCase();
   const items = (typeof deps.listPokerPlayHandsByTable === 'function'
     ? deps.listPokerPlayHandsByTable(synced.table.tableId, { limit: Math.max(1, Number(limit || 20)) })
     : [])
+    .filter((historyHand) => !statusFilter || normalizeTrimmedString(historyHand?.status).toLowerCase() === statusFilter)
     .map((historyHand) => {
       const actions = sanitizeActions(deps.listPokerPlayActionsByHand(historyHand.handId), synced.seats);
       const proposal = viewerSeat ? getLatestSeatAgentProposal(deps, historyHand.handId, viewerSeat.seatNumber) : null;
@@ -1641,8 +1651,18 @@ function buildPokerPlayHandHistoryPayload(deps, { tableId, session, req, process
     });
   return {
     viewerMode: publicViewer ? 'public' : 'player',
-    tableId: synced.table.tableId,
-    tableType: synced.table.tableType,
+    table: {
+      tableId: synced.table.tableId,
+      title: synced.table.title || 'Live Table',
+      tableType: synced.table.tableType,
+      status: synced.table.status,
+      summary: computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat),
+    },
+    viewerSeatNumber: viewerSeat ? normalizeSeatNumber(viewerSeat.seatNumber) : null,
+    filter: {
+      status: statusFilter || null,
+      limit: Math.max(1, Number(limit || 20)),
+    },
     items,
     processAt: requestAt,
   };
@@ -1652,6 +1672,7 @@ function buildPokerPlaySeriesTimelinePayload(deps, { seriesId, session, req, pro
   const requestAt = toProcessIso(deps, processAt);
   const targetSeriesId = normalizeTrimmedString(seriesId);
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
   const entries = listTournamentSeriesEntriesBySeriesId(deps, targetSeriesId, {
     processAt: requestAt,
     includeClosed: true,
@@ -1660,19 +1681,34 @@ function buildPokerPlaySeriesTimelinePayload(deps, { seriesId, session, req, pro
     throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
   }
   const viewerSeatByTableId = new Map(entries.map((entry) => {
-    const seat = walletBinding?.walletSubject
-      ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
-      : null;
+    const seat = (Array.isArray(entry?.seats) ? entry.seats : []).find((candidate) => {
+      const candidateWallet = normalizeTrimmedString(candidate?.walletSubject);
+      const candidateHouseId = normalizeTrimmedString(candidate?.houseId);
+      if (walletBinding?.walletSubject && candidateWallet === normalizeTrimmedString(walletBinding.walletSubject)) {
+        return true;
+      }
+      if (viewerHouseId && candidateHouseId === normalizeTrimmedString(viewerHouseId)) {
+        return true;
+      }
+      return false;
+    }) || null;
     return [entry.table.tableId, seat];
   }));
-  const seatMapByTableId = new Map(entries.map((entry) => [entry.table.tableId, getSeatMap(entry.seats)]));
-  const timeline = entries.flatMap((entry) => {
+  const normalizedEntries = entries.map((entry) => ({
+    ...entry,
+    viewerSeat: viewerSeatByTableId.get(entry.table.tableId) || null,
+    summary: computeTableSummary(entry?.table, entry?.seats, entry?.hand, viewerSeatByTableId.get(entry.table.tableId) || null),
+  }));
+  const seatMapByTableId = new Map(normalizedEntries.map((entry) => [entry.table.tableId, getSeatMap(entry.seats)]));
+  const series = buildPokerPlaySeriesSummary(normalizedEntries, walletBinding?.walletSubject || '');
+  const timeline = normalizedEntries.flatMap((entry) => {
     const seatMap = seatMapByTableId.get(entry.table.tableId) || new Map();
     const viewerSeat = viewerSeatByTableId.get(entry.table.tableId) || null;
     return deps.listPokerPlayAuditEventsByTable(entry.table.tableId, { limit: Math.max(50, Number(limit || 200)) })
       .map((event) => ({
         createdAt: event.createdAt || null,
         tableId: entry.table.tableId,
+        tableTitle: entry.table.title || 'Tournament Table',
         handId: event.handId || null,
         eventKind: String(event.eventKind || ''),
         actorRole: String(event.actorRole || 'system'),
@@ -1695,7 +1731,15 @@ function buildPokerPlaySeriesTimelinePayload(deps, { seriesId, session, req, pro
     .slice(-Math.max(1, Number(limit || 200)));
   return {
     viewerMode: publicViewer ? 'public' : 'player',
+    series: series || {
+      seriesId: targetSeriesId,
+      seriesTitle: targetSeriesId,
+    },
     seriesId: targetSeriesId,
+    summary: {
+      tableCount: normalizedEntries.length,
+      eventCount: timeline.length,
+    },
     items: timeline,
     processAt: requestAt,
   };
@@ -1716,8 +1760,28 @@ function buildPokerPlayMyResultsPayload(deps, { session, req, processAt, limit =
       const hand = deps.getCurrentPokerPlayHandForTable(seat.tableId);
       const synced = table ? syncPokerPlayTable(deps, seat.tableId, { processAt: requestAt }) : { table, seats: [], hand };
       const viewerSeat = deps.getPokerPlaySeatByWalletSubject(seat.tableId, walletBinding.walletSubject) || seat;
-      const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
       const seriesRef = getTournamentSeriesRef(synced.table);
+      const series = seriesRef.seriesId
+        ? buildPokerPlaySeriesSummary(
+          listExistingTournamentSeriesTables(deps, seriesRef.matchKey, { processAt: requestAt, includeClosed: true }).map((entry) => {
+            const currentViewerSeat = deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject) || null;
+            return {
+              ...entry,
+              viewerSeat: currentViewerSeat,
+              summary: computeTableSummary(entry.table, entry.seats, entry.hand, currentViewerSeat),
+            };
+          }),
+          walletBinding.walletSubject
+        )
+        : null;
+      const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
+      const finishPosition = normalizeTrimmedString(walletBinding.walletSubject)
+        ? Number(
+          (Array.isArray(series?.standings) ? series.standings : [])
+            .find((item) => normalizeTrimmedString(item?.walletSubject) === normalizeTrimmedString(walletBinding.walletSubject))
+            ?.place || 0
+        ) || null
+        : null;
       return {
         tableId: synced.table.tableId,
         tableType: synced.table.tableType,
@@ -1726,7 +1790,7 @@ function buildPokerPlayMyResultsPayload(deps, { session, req, processAt, limit =
         buyInOil: Number(viewerSeat.buyInOil || 0),
         stackOil: Number(viewerSeat.stackOil || 0),
         prizeOil: Number(viewerSeat.prizeOil || 0),
-        finishPosition: Number(viewerSeat.finishPosition || 0) || null,
+        finishPosition,
         payoutSettledAt: viewerSeat.payoutSettledAt || null,
         completedAt: summary?.completedAt || null,
         status: String(viewerSeat.status || ''),
@@ -1748,7 +1812,9 @@ function buildPokerPlayMyResultsPayload(deps, { session, req, processAt, limit =
     tournamentCount: 0,
     buyInOil: 0,
     prizeOil: 0,
+    netOil: 0,
   });
+  summary.netOil = Number(summary.prizeOil || 0) - Number(summary.buyInOil || 0);
   return {
     walletSubject: walletBinding.walletSubject,
     items,
@@ -3926,7 +3992,7 @@ function getTableDetail(deps, { tableId, session, req, processAt, publicViewer =
   });
 }
 
-function getHandHistory(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20 } = {}) {
+function getHandHistory(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20, status = '' } = {}) {
   return buildPokerPlayHandHistoryPayload(deps, {
     tableId,
     session,
@@ -3934,6 +4000,7 @@ function getHandHistory(deps, { tableId, session, req, processAt, publicViewer =
     processAt,
     publicViewer,
     limit,
+    status,
   });
 }
 

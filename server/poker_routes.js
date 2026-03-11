@@ -470,7 +470,7 @@ function registerPokerRoutes(app, deps) {
   function addHarnessSeconds(iso, seconds) {
     const baseMs = Date.parse(String(iso || ''));
     const safeBaseMs = Number.isFinite(baseMs) ? baseMs : Date.now();
-    return new Date(safeBaseMs + (Math.max(0, Number(seconds || 0)) * 1000)).toISOString();
+    return new Date(safeBaseMs + (Number(seconds || 0) * 1000)).toISOString();
   }
 
   function normalizeHarnessActors(rawActors, defaults) {
@@ -528,6 +528,16 @@ function registerPokerRoutes(app, deps) {
       tournament_reentry_waiting: [
         { seatNumber: 1, address: 'So1anaHarnessReentryA11111111111111111111111', houseId: 'house_harness_reentry_a', displayName: 'Reentry Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessReentryB11111111111111111111111', houseId: 'house_harness_reentry_b', displayName: 'Reentry Bravo' },
+      ],
+      history_results_story: [
+        { seatNumber: 1, address: 'So1anaHarnessHistoryA111111111111111111111', houseId: 'house_harness_history_a', displayName: 'History Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessHistoryB111111111111111111111', houseId: 'house_harness_history_b', displayName: 'History Bravo' },
+        { seatNumber: 2, address: 'So1anaHarnessHistoryC111111111111111111111', houseId: 'house_harness_history_c', displayName: 'History Charlie' },
+      ],
+      series_timeline_story: [
+        { seatNumber: 1, address: 'So1anaHarnessTimelineA11111111111111111111', houseId: 'house_harness_timeline_a', displayName: 'Timeline Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessTimelineB11111111111111111111', houseId: 'house_harness_timeline_b', displayName: 'Timeline Bravo' },
+        { seatNumber: 1, address: 'So1anaHarnessTimelineC11111111111111111111', houseId: 'house_harness_timeline_c', displayName: 'Timeline Charlie' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -1468,6 +1478,765 @@ function registerPokerRoutes(app, deps) {
       });
       seededSeriesId = seriesId;
       seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'history_results_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const tournamentTableId = `${nextTableId}_tournament`;
+      const tournamentSeriesId = `pkseries_harness_history_${randomHex(6)}`;
+      const firstHistoryAt = addHarnessSeconds(requestAt, -360);
+      const secondHistoryAt = addHarnessSeconds(requestAt, -240);
+      const liveHistoryAt = addHarnessSeconds(requestAt, -90);
+      const handOneId = `${handId}_1`;
+      const handTwoId = `${handId}_2`;
+      const resultSettledAt = addHarnessSeconds(requestAt, -30);
+
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness History Cash Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          activeHandId: handId,
+          activeHandNumber: 3,
+          lastButtonSeat: seatTwo.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness hand-history and results scenario.',
+        },
+        createdAt: firstHistoryAt,
+        updatedAt: requestAt,
+      });
+
+      [
+        { actor: seatOne, buyInOil: 400, stackOil: 420 },
+        { actor: seatTwo, buyInOil: 400, stackOil: 380 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: firstHistoryAt,
+          updatedAt: requestAt,
+        });
+      });
+
+      upsertPokerPlayHand({
+        handId: handOneId,
+        tableId: nextTableId,
+        handNumber: 1,
+        status: 'completed',
+        actionExpiresAt: addHarnessSeconds(firstHistoryAt, 45),
+        state: {
+          handNumber: 1,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatOne.seatNumber,
+          bigBlindSeat: seatTwo.seatNumber,
+          actingSeat: 0,
+          street: 'river',
+          phase: 'river',
+          status: 'completed',
+          countdownSeconds: 45,
+          communityCards: ['Ah', 'Qc', '9d', '6s', '2c'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 460,
+              holeCards: ['As', 'Ad'],
+              committedStreetOil: 0,
+              committedHandOil: 60,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 340,
+              holeCards: ['Kh', 'Qs'],
+              committedStreetOil: 0,
+              committedHandOil: 60,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [],
+          potOil: 120,
+          currentBetOil: 0,
+          lastRaiseSizeOil: 20,
+          minRaiseToOil: 40,
+          bigBlindOil: 20,
+          actionExpiresAt: addHarnessSeconds(firstHistoryAt, 45),
+          result: null,
+        },
+        result: {
+          winningSeatNumbers: [seatOne.seatNumber],
+          payouts: [
+            { seatNumber: seatOne.seatNumber, amountOil: 120 },
+          ],
+          note: `${seatOne.displayName} wins 120 OIL at showdown.`,
+        },
+        createdAt: firstHistoryAt,
+        updatedAt: addHarnessSeconds(firstHistoryAt, 50),
+      });
+      createPokerPlayAction({
+        tableId: nextTableId,
+        handId: handOneId,
+        seatNumber: seatOne.seatNumber,
+        actorRole: 'player',
+        actionKind: 'raise',
+        amountOil: 40,
+        createdAt: addHarnessSeconds(firstHistoryAt, 10),
+      });
+      createPokerPlayAction({
+        tableId: nextTableId,
+        handId: handOneId,
+        seatNumber: seatTwo.seatNumber,
+        actorRole: 'player',
+        actionKind: 'call',
+        amountOil: 40,
+        createdAt: addHarnessSeconds(firstHistoryAt, 20),
+      });
+
+      upsertPokerPlayHand({
+        handId: handTwoId,
+        tableId: nextTableId,
+        handNumber: 2,
+        status: 'completed',
+        actionExpiresAt: addHarnessSeconds(secondHistoryAt, 45),
+        state: {
+          handNumber: 2,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatTwo.seatNumber,
+          smallBlindSeat: seatTwo.seatNumber,
+          bigBlindSeat: seatOne.seatNumber,
+          actingSeat: 0,
+          street: 'turn',
+          phase: 'turn',
+          status: 'completed',
+          countdownSeconds: 45,
+          communityCards: ['Kd', 'Jd', '7s', '4h'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 420,
+              holeCards: ['Th', '9h'],
+              committedStreetOil: 0,
+              committedHandOil: 30,
+              folded: true,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 380,
+              holeCards: ['Ac', 'Kc'],
+              committedStreetOil: 0,
+              committedHandOil: 30,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [],
+          potOil: 60,
+          currentBetOil: 0,
+          lastRaiseSizeOil: 20,
+          minRaiseToOil: 40,
+          bigBlindOil: 20,
+          actionExpiresAt: addHarnessSeconds(secondHistoryAt, 45),
+          result: null,
+        },
+        result: {
+          winningSeatNumbers: [seatTwo.seatNumber],
+          payouts: [
+            { seatNumber: seatTwo.seatNumber, amountOil: 60 },
+          ],
+          note: `${seatTwo.displayName} takes the pot after a turn fold.`,
+        },
+        createdAt: secondHistoryAt,
+        updatedAt: addHarnessSeconds(secondHistoryAt, 50),
+      });
+      createPokerPlayAction({
+        tableId: nextTableId,
+        handId: handTwoId,
+        seatNumber: seatTwo.seatNumber,
+        actorRole: 'player',
+        actionKind: 'bet',
+        amountOil: 30,
+        createdAt: addHarnessSeconds(secondHistoryAt, 12),
+      });
+      createPokerPlayAction({
+        tableId: nextTableId,
+        handId: handTwoId,
+        seatNumber: seatOne.seatNumber,
+        actorRole: 'player',
+        actionKind: 'fold',
+        amountOil: 0,
+        createdAt: addHarnessSeconds(secondHistoryAt, 20),
+      });
+      createPokerPlayAuditEvent({
+        tableId: nextTableId,
+        handId: handTwoId,
+        seatNumber: seatOne.seatNumber,
+        actorRole: 'agent',
+        eventKind: 'seat_agent_proposal',
+        payload: {
+          schemaVersion: 'poker-seat-agent-proposal-v1',
+          source: 'worker-seat-agent-v1',
+          actionKind: 'call',
+          amountOil: 30,
+          confidence: 'medium',
+          body: 'Call once and re-evaluate on the river if the board pairs.',
+          tableId: nextTableId,
+          handId: handTwoId,
+        },
+        createdAt: addHarnessSeconds(secondHistoryAt, 24),
+      });
+
+      upsertPokerPlayHand({
+        handId,
+        tableId: nextTableId,
+        handNumber: 3,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 3,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatOne.seatNumber,
+          bigBlindSeat: seatTwo.seatNumber,
+          actingSeat: seatOne.seatNumber,
+          street: 'preflop',
+          phase: 'preflop',
+          status: 'live',
+          countdownSeconds: 45,
+          communityCards: [],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 420,
+              holeCards: ['Qh', 'Js'],
+              committedStreetOil: 10,
+              committedHandOil: 10,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 380,
+              holeCards: ['8d', '8c'],
+              committedStreetOil: 20,
+              committedHandOil: 20,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [seatOne.seatNumber],
+          potOil: 30,
+          currentBetOil: 20,
+          lastRaiseSizeOil: 20,
+          minRaiseToOil: 40,
+          bigBlindOil: 20,
+          actionExpiresAt,
+          result: null,
+        },
+        result: {},
+        createdAt: liveHistoryAt,
+        updatedAt: requestAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: tournamentTableId,
+        slug: `${normalizedScenario}-t-${randomHex(4)}`,
+        title: 'Harness Results Tournament Table',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 2,
+          completedAt: resultSettledAt,
+          winnerSeatNumber: seatThree.seatNumber,
+          prizeOil: 1500,
+          prizeSettledAt: resultSettledAt,
+          entryCount: 2,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatThree.address]: 1,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'tournament',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: false,
+          payoutModel: 'top2_70_30',
+          lateRegistrationHands: 0,
+          handsPerBlindLevel: 2,
+          blindLevels: [
+            { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+          ],
+          reentryLimit: 0,
+          seriesId: tournamentSeriesId,
+          seriesTitle: 'Harness Results Series',
+          matchKey: 'tournament:history-results:harness',
+        },
+        summary: {
+          headline: 'Harness results story.',
+          seriesId: tournamentSeriesId,
+          seriesTitle: 'Harness Results Series',
+        },
+        createdAt: addHarnessSeconds(requestAt, -600),
+        updatedAt: resultSettledAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: tournamentTableId,
+        seatNumber: seatOne.seatNumber,
+        portalSessionId: `harness_${seatOne.address}`,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        displayName: seatOne.displayName,
+        status: 'paid',
+        buyInOil: 600,
+        stackOil: 0,
+        prizeOil: 450,
+        finishPosition: 2,
+        payoutSettledAt: resultSettledAt,
+        eliminatedAt: addHarnessSeconds(resultSettledAt, -20),
+        lastSeenAt: resultSettledAt,
+        disconnectedAt: null,
+        createdAt: addHarnessSeconds(requestAt, -600),
+        updatedAt: resultSettledAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: tournamentTableId,
+        seatNumber: seatThree.seatNumber,
+        portalSessionId: `harness_${seatThree.address}`,
+        houseId: seatThree.houseId,
+        walletSubject: seatThree.address,
+        displayName: seatThree.displayName,
+        status: 'paid',
+        buyInOil: 600,
+        stackOil: 0,
+        prizeOil: 1050,
+        finishPosition: 1,
+        payoutSettledAt: resultSettledAt,
+        lastSeenAt: resultSettledAt,
+        disconnectedAt: null,
+        createdAt: addHarnessSeconds(requestAt, -600),
+        updatedAt: resultSettledAt,
+      });
+      seededSeriesId = tournamentSeriesId;
+      seededTableIds.push(nextTableId, tournamentTableId);
+    } else if (normalizedScenario === 'series_timeline_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_timeline_${randomHex(6)}`;
+      const tableAId = nextTableId;
+      const tableBId = `${nextTableId}_b`;
+      const handAId = `${handId}_a`;
+      const handBId = `${handId}_b`;
+      const timelineStartAt = addHarnessSeconds(requestAt, -120);
+      const closeAt = addHarnessSeconds(requestAt, -10);
+      const sharedRules = {
+        mode: 'no_limit_holdem',
+        format: 'tournament',
+        maxSeats: 6,
+        decisionCountdownSeconds: 45,
+        presenceTimeoutSeconds: 30,
+        reconnectGraceSeconds: 90,
+        timeBankSeconds: 15,
+        cashOutEnabled: false,
+        payoutModel: 'top2_70_30',
+        lateRegistrationHands: 0,
+        handsPerBlindLevel: 2,
+        blindLevels: [
+          { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+        ],
+        reentryLimit: 0,
+        seriesId,
+        seriesTitle: 'Harness Timeline Series',
+        matchKey: 'tournament:timeline:harness',
+      };
+      upsertPokerPlayTable({
+        tableId: tableAId,
+        slug: `${normalizedScenario}-a-${randomHex(4)}`,
+        title: 'Harness Timeline Table A',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 3,
+          completedAt: closeAt,
+          winnerSeatNumber: seatOne.seatNumber,
+          prizeOil: 1200,
+          prizeSettledAt: addHarnessSeconds(requestAt, -20),
+          closeReason: 'Harness timeline series closed after final review.',
+          closedBy: 'operator',
+          closedAt: closeAt,
+          refundedSeatCount: 1,
+          refundedTotalOil: 300,
+          refundMode: 'tournament_refund',
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+        },
+        rules: sharedRules,
+        summary: {
+          headline: 'Harness timeline story.',
+          seriesId,
+          seriesTitle: 'Harness Timeline Series',
+        },
+        createdAt: timelineStartAt,
+        updatedAt: closeAt,
+      });
+      upsertPokerPlayTable({
+        tableId: tableBId,
+        slug: `${normalizedScenario}-b-${randomHex(4)}`,
+        title: 'Harness Timeline Table B',
+        tableType: 'tournament',
+        status: 'admin_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 1,
+          completedAt: addHarnessSeconds(requestAt, -30),
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          closeReason: 'Harness table break complete.',
+          closedBy: 'operator',
+          closedAt: addHarnessSeconds(requestAt, -30),
+          refundedSeatCount: 0,
+          refundedTotalOil: 0,
+          refundMode: 'none',
+          entryCount: 1,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatThree.address]: 1,
+          },
+        },
+        rules: sharedRules,
+        summary: {
+          headline: 'Harness timeline story.',
+          seriesId,
+          seriesTitle: 'Harness Timeline Series',
+        },
+        createdAt: timelineStartAt,
+        updatedAt: addHarnessSeconds(requestAt, -30),
+      });
+      [
+        { tableId: tableAId, actor: seatOne, status: 'paid', prizeOil: 900, finishPosition: 1 },
+        { tableId: tableAId, actor: seatTwo, status: 'void_refund', prizeOil: 0, finishPosition: 2 },
+        { tableId: tableBId, actor: seatThree, status: 'busted', prizeOil: 0, finishPosition: 3 },
+      ].forEach(({ tableId: seededTableId, actor, status, prizeOil, finishPosition }) => {
+        upsertPokerPlaySeat({
+          tableId: seededTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status,
+          buyInOil: 600,
+          stackOil: 0,
+          prizeOil,
+          finishPosition,
+          payoutSettledAt: prizeOil > 0 ? addHarnessSeconds(requestAt, -20) : null,
+          eliminatedAt: status === 'paid' ? null : addHarnessSeconds(requestAt, -40),
+          lastSeenAt: closeAt,
+          disconnectedAt: null,
+          createdAt: timelineStartAt,
+          updatedAt: closeAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId: handAId,
+        tableId: tableAId,
+        handNumber: 3,
+        status: 'completed',
+        actionExpiresAt: addHarnessSeconds(requestAt, -80),
+        state: {
+          handNumber: 3,
+          tableType: 'tournament',
+          blindLevel: 2,
+          handsPerBlindLevel: 2,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatTwo.seatNumber,
+          bigBlindSeat: seatOne.seatNumber,
+          actingSeat: 0,
+          street: 'river',
+          phase: 'river',
+          status: 'completed',
+          countdownSeconds: 45,
+          communityCards: ['As', 'Kd', 'Qc', '7h', '2d'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 0,
+              holeCards: ['Ah', 'Ad'],
+              committedStreetOil: 0,
+              committedHandOil: 600,
+              folded: false,
+              allIn: true,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 0,
+              holeCards: ['Kh', 'Kd'],
+              committedStreetOil: 0,
+              committedHandOil: 300,
+              folded: false,
+              allIn: true,
+              eliminated: true,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [],
+          potOil: 900,
+          currentBetOil: 0,
+          lastRaiseSizeOil: 0,
+          minRaiseToOil: 0,
+          bigBlindOil: 100,
+          actionExpiresAt: addHarnessSeconds(requestAt, -80),
+          result: null,
+        },
+        result: {
+          winningSeatNumbers: [seatOne.seatNumber],
+          payouts: [
+            { seatNumber: seatOne.seatNumber, amountOil: 900 },
+          ],
+          note: `${seatOne.displayName} wins the final table.`,
+        },
+        createdAt: addHarnessSeconds(requestAt, -90),
+        updatedAt: addHarnessSeconds(requestAt, -70),
+      });
+      upsertPokerPlayHand({
+        handId: handBId,
+        tableId: tableBId,
+        handNumber: 1,
+        status: 'completed',
+        actionExpiresAt: addHarnessSeconds(requestAt, -105),
+        state: {
+          handNumber: 1,
+          tableType: 'tournament',
+          blindLevel: 1,
+          handsPerBlindLevel: 2,
+          buttonSeat: seatThree.seatNumber,
+          smallBlindSeat: seatThree.seatNumber,
+          bigBlindSeat: seatThree.seatNumber,
+          actingSeat: 0,
+          street: 'turn',
+          phase: 'turn',
+          status: 'completed',
+          countdownSeconds: 45,
+          communityCards: ['Td', '9d', '4s', '2h'],
+          seatOrder: [seatThree.seatNumber],
+          seatStates: {
+            [String(seatThree.seatNumber)]: {
+              seatNumber: seatThree.seatNumber,
+              stackOil: 0,
+              holeCards: ['7c', '7d'],
+              committedStreetOil: 0,
+              committedHandOil: 300,
+              folded: false,
+              allIn: true,
+              eliminated: true,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [],
+          potOil: 300,
+          currentBetOil: 0,
+          lastRaiseSizeOil: 0,
+          minRaiseToOil: 0,
+          bigBlindOil: 100,
+          actionExpiresAt: addHarnessSeconds(requestAt, -105),
+          result: null,
+        },
+        result: {
+          winningSeatNumbers: [seatThree.seatNumber],
+          payouts: [
+            { seatNumber: seatThree.seatNumber, amountOil: 300 },
+          ],
+          note: `${seatThree.displayName} wins the broken table.`,
+        },
+        createdAt: addHarnessSeconds(requestAt, -110),
+        updatedAt: addHarnessSeconds(requestAt, -95),
+      });
+      [
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: null,
+          actorRole: 'operator',
+          eventKind: 'director_table_started',
+          createdAt: addHarnessSeconds(requestAt, -120),
+          payload: { seriesId, tableId: tableAId, reason: 'Director started the final table.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: seatOne.seatNumber,
+          actorRole: 'agent',
+          eventKind: 'seat_agent_proposal',
+          createdAt: addHarnessSeconds(requestAt, -110),
+          payload: {
+            seriesId,
+            tableId: tableAId,
+            handId: handAId,
+            actionKind: 'raise',
+            amountOil: 300,
+            confidence: 'high',
+            body: 'Jam the turn and deny the redraw.',
+          },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: null,
+          actorRole: 'operator',
+          eventKind: 'director_registration_closed',
+          createdAt: addHarnessSeconds(requestAt, -100),
+          payload: { seriesId, tableId: tableAId, reason: 'Registration closed before final-table play.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: seatTwo.seatNumber,
+          actorRole: 'player',
+          eventKind: 'dispute_opened',
+          createdAt: addHarnessSeconds(requestAt, -90),
+          payload: { seriesId, handId: handAId, reason: 'Player challenged the action order.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: seatTwo.seatNumber,
+          actorRole: 'operator',
+          eventKind: 'dispute_resolved',
+          createdAt: addHarnessSeconds(requestAt, -80),
+          payload: { seriesId, handId: handAId, status: 'resolved', reason: 'Operator confirmed the action order.' },
+        },
+        {
+          tableId: tableBId,
+          handId: handBId,
+          seatNumber: seatThree.seatNumber,
+          actorRole: 'operator',
+          eventKind: 'director_seat_moved',
+          createdAt: addHarnessSeconds(requestAt, -70),
+          payload: { seriesId, tableId: tableBId, reason: 'Seat moved to the final table.', targetTableId: tableAId },
+        },
+        {
+          tableId: tableBId,
+          handId: handBId,
+          seatNumber: null,
+          actorRole: 'operator',
+          eventKind: 'director_table_broken',
+          createdAt: addHarnessSeconds(requestAt, -60),
+          payload: { seriesId, tableId: tableBId, reason: 'Table B collapsed into the final table.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: seatOne.seatNumber,
+          actorRole: 'system',
+          eventKind: 'tournament_payout_paid',
+          createdAt: addHarnessSeconds(requestAt, -50),
+          payload: { seriesId, handId: handAId, status: 'paid', amountOil: 900, reason: 'Final-table payout settled.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: seatTwo.seatNumber,
+          actorRole: 'system',
+          eventKind: 'tournament_refund_issued',
+          createdAt: addHarnessSeconds(requestAt, -40),
+          payload: { seriesId, handId: handAId, amountOil: 300, reason: 'Tournament refund issued after review.' },
+        },
+        {
+          tableId: tableAId,
+          handId: handAId,
+          seatNumber: null,
+          actorRole: 'operator',
+          eventKind: 'table_closed',
+          createdAt: addHarnessSeconds(requestAt, -30),
+          payload: { seriesId, tableId: tableAId, reason: 'Series closed after payout and refund review.' },
+        },
+      ].forEach((event) => createPokerPlayAuditEvent(event));
+      seededSeriesId = seriesId;
+      seededTableIds.push(tableAId, tableBId);
     }
 
     return {
@@ -1858,6 +2627,8 @@ function registerPokerRoutes(app, deps) {
         req,
         processAt: req.query?.asOf,
         limit: req.query?.limit,
+        status: req.query?.status,
+        publicViewer: !session,
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
@@ -1884,6 +2655,7 @@ function registerPokerRoutes(app, deps) {
         req,
         processAt: req.query?.asOf,
         limit: req.query?.limit,
+        publicViewer: !session,
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
@@ -1892,6 +2664,32 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_SERIES_TIMELINE_FAILED',
         err?.message || 'Unable to load poker series timeline.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/rail/series/:seriesId/timeline', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = getSeriesTimeline(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+        publicViewer: true,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_SERIES_TIMELINE_FAILED',
+        err?.message || 'Unable to load poker rail series timeline.',
         {
           requestId,
           details: err?.details || {},

@@ -30,12 +30,30 @@
       .replaceAll("'", '&#39;');
   }
 
-  function buildPokerHref(path) {
+  function getRouteSearchParams() {
+    return new URLSearchParams(window.location.search || '');
+  }
+
+  function buildPokerHref(path, extraParams = {}) {
     let parsed;
     try {
       parsed = new URL(path, window.location.origin);
     } catch {
       return String(path || '/poker');
+    }
+    const currentParams = getRouteSearchParams();
+    const asOf = String(currentParams.get('asOf') || '').trim();
+    if (asOf && !parsed.searchParams.has('asOf')) {
+      parsed.searchParams.set('asOf', asOf);
+    }
+    for (const [key, rawValue] of Object.entries(extraParams || {})) {
+      const value = rawValue == null ? '' : String(rawValue).trim();
+      if (!key) continue;
+      if (!value) {
+        parsed.searchParams.delete(key);
+        continue;
+      }
+      parsed.searchParams.set(key, value);
     }
     if (isEmbedded) {
       parsed.searchParams.set('embed', '1');
@@ -75,17 +93,44 @@
     return !!(getParentRuntimeGateway() || window.__AGENT_TOWN_POKER_GATEWAY__);
   }
 
+  function buildPokerApiPath(basePath, extraParams = {}) {
+    const params = new URLSearchParams();
+    const routeParams = getRouteSearchParams();
+    const asOf = String(routeParams.get('asOf') || '').trim();
+    if (asOf) params.set('asOf', asOf);
+    for (const [key, rawValue] of Object.entries(extraParams || {})) {
+      const value = rawValue == null ? '' : String(rawValue).trim();
+      if (!key || !value) continue;
+      params.set(key, value);
+    }
+    const query = params.toString();
+    return query ? `${basePath}?${query}` : basePath;
+  }
+
   function buildPlayTableApiPath(tableId, { rail = false } = {}) {
     const base = rail
       ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}`
       : `/api/poker/play/tables/${encodeURIComponent(tableId)}`;
-    const params = new URLSearchParams();
-    const routeParams = new URLSearchParams(window.location.search || '');
-    const asOf = String(routeParams.get('asOf') || '').trim();
-    if (asOf) params.set('asOf', asOf);
-    if (!rail && shouldUseWorkerSeatAgentMode()) params.set('seatAgentMode', 'worker');
-    const query = params.toString();
-    return query ? `${base}?${query}` : base;
+    const extra = {};
+    if (!rail && shouldUseWorkerSeatAgentMode()) extra.seatAgentMode = 'worker';
+    return buildPokerApiPath(base, extra);
+  }
+
+  function buildPlayTableHistoryApiPath(tableId, { status = '' } = {}) {
+    return buildPokerApiPath(`/api/poker/play/tables/${encodeURIComponent(tableId)}/history`, {
+      status,
+    });
+  }
+
+  function buildPlaySeriesTimelineApiPath(seriesId, { rail = false } = {}) {
+    const base = rail
+      ? `/api/poker/play/rail/series/${encodeURIComponent(seriesId)}/timeline`
+      : `/api/poker/play/series/${encodeURIComponent(seriesId)}/timeline`;
+    return buildPokerApiPath(base);
+  }
+
+  function buildPlayResultsApiPath() {
+    return buildPokerApiPath('/api/poker/play/results/me');
   }
 
   function readWalletRecoveryKey() {
@@ -260,6 +305,145 @@
     return `
       <p>${escapeHtml(closeReason)}${refundedSeatCount ? ` ${refundedSeatCount} seat${refundedSeatCount === 1 ? '' : 's'} refunded for ${refundedTotalOil} OIL.` : ''}</p>
     `;
+  }
+
+  function formatTimelineEventKind(eventKind) {
+    const value = String(eventKind || '').trim();
+    if (!value) return 'event';
+    return value.replaceAll('_', ' ');
+  }
+
+  function sortTimelineItems(items) {
+    return (Array.isArray(items) ? items.slice() : []).sort((left, right) => {
+      const leftAt = Date.parse(String(left?.createdAt || ''));
+      const rightAt = Date.parse(String(right?.createdAt || ''));
+      if (Number.isFinite(leftAt) && Number.isFinite(rightAt) && leftAt !== rightAt) {
+        return leftAt - rightAt;
+      }
+      return `${String(left?.tableId || '')}:${String(left?.handId || '')}:${String(left?.eventKind || '')}`
+        .localeCompare(`${String(right?.tableId || '')}:${String(right?.handId || '')}:${String(right?.eventKind || '')}`);
+    });
+  }
+
+  function renderTimelinePayload(payload) {
+    const body = typeof payload?.body === 'string' ? payload.body.trim() : '';
+    const parts = [];
+    if (body) parts.push(`<div>${escapeHtml(body)}</div>`);
+    if (typeof payload?.reason === 'string' && payload.reason.trim()) {
+      parts.push(`<div class="pokerMuted">Reason: ${escapeHtml(payload.reason)}</div>`);
+    }
+    if (typeof payload?.status === 'string' && payload.status.trim()) {
+      parts.push(`<div class="pokerMuted">Status: ${escapeHtml(payload.status)}</div>`);
+    }
+    if (Number(payload?.amountOil || 0) > 0) {
+      parts.push(`<div class="pokerMuted">${Number(payload.amountOil || 0)} OIL</div>`);
+    }
+    if (typeof payload?.actionKind === 'string' && payload.actionKind.trim()) {
+      parts.push(`<div class="pokerMuted">Action: ${escapeHtml(payload.actionKind)}</div>`);
+    }
+    return parts.join('') || '<div class="pokerMuted">No additional payload.</div>';
+  }
+
+  function renderPlayResultRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No completed or active seat history yet.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.title || 'Live Table')}</div>
+                <div>${escapeHtml(item.tableType || 'cash')}${item.seriesTitle ? ` · ${escapeHtml(item.seriesTitle)}` : ''}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(item.completedAt ? formatIso(item.completedAt) : 'in progress')}</div>
+            </div>
+            <div class="pokerSummary">
+              ${renderSummaryMetric('Seat', `${Number(item.seatNumber || 0)}`)}
+              ${renderSummaryMetric('Buy-In', `${Number(item.buyInOil || 0)} OIL`)}
+              ${renderSummaryMetric('Prize', `${Number(item.prizeOil || 0)} OIL`)}
+              ${renderSummaryMetric('Finish', item.finishPosition ? `${Number(item.finishPosition || 0)}` : 'n/a')}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}`))}">Open Table</a>
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}/history`, { status: 'completed' }))}">Hand History</a>
+              ${item.seriesId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId)}/timeline`))}">Series Timeline</a>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderPlayHandHistoryRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No hand history rows matched this filter.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">Hand ${Number(item.handNumber || 0)} · ${escapeHtml(item.status || 'unknown')}</div>
+                <div>${escapeHtml(item.result?.note || `${item.actionCount || 0} public actions recorded.`)}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(item.completedAt ? formatIso(item.completedAt) : formatIso(item.startedAt))}</div>
+            </div>
+            <div class="pokerMeta">
+              <span class="pokerBadge">${escapeHtml(item.street || 'preflop')}</span>
+              <span class="pokerBadge">${Number(item.actionCount || 0)} actions</span>
+              ${item.agentProposal ? '<span class="pokerBadge">worker line</span>' : ''}
+            </div>
+            <div class="pokerLabel">Board</div>
+            ${renderPokerCards(item.communityCards || [])}
+            ${item.agentProposal ? `<p>${escapeHtml(item.agentProposal.body || 'No worker note.')}</p>` : ''}
+            ${Array.isArray(item.actions) && item.actions.length ? renderPublicActionLog(item.actions, 'No public actions logged.') : '<p class="pokerMuted">No public actions logged.</p>'}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderTimelineRows(items, { emptyText = 'No timeline rows yet.' } = {}) {
+    const rows = sortTimelineItems(items);
+    if (!rows.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(formatTimelineEventKind(item.eventKind || 'event'))}</div>
+                <div>${escapeHtml(item.tableTitle || item.tableId || 'Tournament Table')} · ${escapeHtml(item.seatLabel || item.actorRole || 'system')}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(formatIso(item.createdAt))}</div>
+            </div>
+            ${renderTimelinePayload(item.payload || {})}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function buildAdminSeriesTimelineItems(review) {
+    const tables = Array.isArray(review?.tables) ? review.tables : [];
+    return sortTimelineItems(
+      tables.flatMap((entry) => {
+        const reviewData = entry?.review || {};
+        const table = reviewData?.table || {};
+        return (Array.isArray(reviewData?.auditEvents) ? reviewData.auditEvents : []).map((event) => ({
+          createdAt: event.createdAt || null,
+          tableId: entry?.tableId || table?.tableId || '',
+          tableTitle: table?.title || entry?.tableId || 'Tournament Table',
+          handId: event.handId || null,
+          eventKind: event.eventKind || 'event',
+          actorRole: event.actorRole || 'system',
+          seatNumber: event.seatNumber == null ? null : Number(event.seatNumber || 0),
+          seatLabel: event.seatLabel || event.actorRole || 'system',
+          payload: event.payload || {},
+        }));
+      })
+    );
   }
 
   function triggerJsonDownload(filename, data) {
@@ -641,6 +825,7 @@
         <p>Matchmake into an existing live table with the same structure, or create a new one instantly if no match exists.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
         <form id="pokerPlayMatchmakeForm" class="pokerForm">
           <label>
@@ -693,6 +878,7 @@
             </div>
             <div class="pokerLinks">
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
             </div>
           </div>
         `).join('')
@@ -722,6 +908,7 @@
             </div>
             <div class="pokerLinks">
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">${item?.currentUser?.seated ? 'Return To Seat' : 'Open Table'}</a>
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}/history`, { status: 'completed' }))}">History</a>
             </div>
           </div>
         `).join('')
@@ -768,6 +955,7 @@
             </div>
             <div class="pokerLinks">
               <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}`))}">Open Series Rail</a>
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
               ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Active Table</a>` : '<span class="pokerBadge">table pending</span>'}
             </div>
           </div>
@@ -892,6 +1080,126 @@
     }
   }
 
+  async function loadPlayResults() {
+    clearLiveTableStream();
+    setTitle('Poker Results', 'Wallet-bound results across cash and tournament seats.');
+    setStatus('Loading poker results...');
+    const payload = await api(buildPlayResultsApiPath());
+    const data = payload?.data || {};
+    const summary = data?.summary || {};
+    const items = Array.isArray(data?.items) ? data.items : [];
+    renderCards([
+      `
+        <h2>My Results</h2>
+        <p>Results stay wallet-bound and offchain. This view aggregates the tables your current house wallet has entered or settled.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Tables', `${Number(summary?.tableCount || 0)}`)}
+          ${renderSummaryMetric('Cash', `${Number(summary?.cashCount || 0)}`)}
+          ${renderSummaryMetric('Tournaments', `${Number(summary?.tournamentCount || 0)}`)}
+          ${renderSummaryMetric('Buy-Ins', `${Number(summary?.buyInOil || 0)} OIL`)}
+          ${renderSummaryMetric('Prizes', `${Number(summary?.prizeOil || 0)} OIL`)}
+          ${renderSummaryMetric('Net', `${Number(summary?.netOil || 0)} OIL`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+        </div>
+      `,
+      `
+        <h2>Seat History</h2>
+        ${renderPlayResultRows(items)}
+      `,
+    ]);
+    setStatus(items.length ? `${items.length} result row${items.length === 1 ? '' : 's'} loaded.` : 'No poker results available for this wallet yet.');
+  }
+
+  async function loadPlayTableHistory(tableId) {
+    clearLiveTableStream();
+    const filterStatus = String(getRouteSearchParams().get('status') || '').trim();
+    setTitle('Poker Hand History', `Hand history for ${tableId}.`);
+    setStatus('Loading hand history...');
+    const payload = await api(buildPlayTableHistoryApiPath(tableId, { status: filterStatus }));
+    const data = payload?.data || {};
+    const table = data?.table || {};
+    const items = Array.isArray(data?.items) ? data.items : [];
+    renderCards([
+      `
+        <h2>${escapeHtml(table?.title || 'Hand History')}</h2>
+        <p>Ordered hand history for one table. Only public action logs and viewer-allowed worker notes are exposed here.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Viewer Mode', data?.viewerMode || 'player')}
+          ${renderSummaryMetric('Table Type', table?.tableType || 'cash')}
+          ${renderSummaryMetric('Rows', `${items.length}`)}
+          ${renderSummaryMetric('Filter', filterStatus || 'all')}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}`))}">Back To Table</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}/history`))}">All Hands</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}/history`, { status: 'completed' }))}">Completed</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}/history`, { status: 'live' }))}">Live</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+        </div>
+      `,
+      `
+        <h2>Hands</h2>
+        ${renderPlayHandHistoryRows(items)}
+      `,
+    ]);
+    setStatus(items.length ? `${items.length} hand history row${items.length === 1 ? '' : 's'} loaded.` : 'No hand history rows matched this filter.');
+  }
+
+  async function loadPlaySeriesTimeline(seriesId, { rail = false } = {}) {
+    clearLiveTableStream();
+    setTitle(rail ? 'Tournament Rail Timeline' : 'Tournament Timeline', `${rail ? 'Public' : 'Player'} timeline for ${seriesId}.`);
+    setStatus('Loading series timeline...');
+    const payload = await api(buildPlaySeriesTimelineApiPath(seriesId, { rail }));
+    const data = payload?.data || {};
+    const series = data?.series || {};
+    const summary = data?.summary || {};
+    let adminTimeline = [];
+    if (!rail) {
+      const adminToken = readStoredPokerAdminToken();
+      if (adminToken) {
+        try {
+          const reviewPayload = await api(`/api/poker/play/admin/series/${encodeURIComponent(seriesId)}/review`, {
+            headers: { 'x-admin-token': adminToken },
+          });
+          adminTimeline = buildAdminSeriesTimelineItems(reviewPayload?.data || {});
+        } catch {
+          adminTimeline = [];
+        }
+      }
+    }
+    renderCards([
+      `
+        <h2>${escapeHtml(series?.seriesTitle || 'Tournament Timeline')}</h2>
+        <p>One ordered series-wide narrative across table starts, moves, disputes, payouts, refunds, and closure.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Viewer Mode', data?.viewerMode || (rail ? 'public' : 'player'))}
+          ${renderSummaryMetric('Stage', series?.stage || 'unknown')}
+          ${renderSummaryMetric('Tables', `${Number(series?.tableCount || summary?.tableCount || 0)}`)}
+          ${renderSummaryMetric('Events', `${Number(summary?.eventCount || 0)}`)}
+          ${renderSummaryMetric('Entrants', `${Number(series?.entryCount || 0)}`)}
+          ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref(rail ? '/poker/play/rail' : '/poker/play'))}">${rail ? 'Back To Rail' : 'Back To Lobby'}</a>
+          ${series?.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`${rail ? '/poker/play/rail/tables' : '/poker/play/tables'}/${encodeURIComponent(series.activeTableId)}`))}">${rail ? 'Open Rail Table' : 'Open Series Table'}</a>` : ''}
+          ${rail ? '' : `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(seriesId)}/timeline`))}">Open Public Timeline</a>`}
+        </div>
+      `,
+      `
+        <h2>${rail ? 'Public Timeline' : 'Player Timeline'}</h2>
+        ${renderTimelineRows(data?.items, { emptyText: 'No series timeline rows yet.' })}
+      `,
+      !rail && adminTimeline.length ? `
+        <h2>Operator Timeline</h2>
+        <p>Operator review uses the same durable audit rows, with private bodies visible only to admin review.</p>
+        ${renderTimelineRows(adminTimeline, { emptyText: 'No operator-only timeline rows yet.' })}
+      ` : '',
+    ].filter(Boolean));
+    setStatus(Number(summary?.eventCount || 0) > 0 ? `${Number(summary?.eventCount || 0)} series timeline row${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.` : 'No series timeline rows available.');
+  }
+
   function bindPlayMatchmakeForm() {
     const form = document.getElementById('pokerPlayMatchmakeForm');
     if (!form) return;
@@ -948,6 +1256,9 @@
     const waitlist = data?.waitlist || {};
     const myDisputes = Array.isArray(review?.myDisputes) ? review.myDisputes : [];
     const adminReview = data?.adminReview || null;
+    const adminOpenDisputes = Array.isArray(adminReview?.disputes)
+      ? adminReview.disputes.filter((dispute) => String(dispute?.status || '') === 'open')
+      : [];
     const oilBalance = Number(data?.oilBalance?.balance || 0);
     const viewerMode = rail ? 'public' : String(data?.viewerMode || 'player');
     const publicRail = viewerMode === 'public';
@@ -997,7 +1308,14 @@
             <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Back To Rail</a>
             <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || '')}`))}">Open Player Table</a>
           </div>
-        ` : ''}
+        ` : `
+          <div class="pokerLinks">
+            <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+            <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || '')}/history`, { status: 'completed' }))}">Hand History</a>
+            <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+            ${series && table?.tableType === 'tournament' ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>` : ''}
+          </div>
+        `}
       `,
       publicRail ? `
         <h2>Rail View</h2>
@@ -1161,6 +1479,10 @@
           <div class="pokerLabel">Final Placements</div>
           ${renderSeriesStandings(series.standings)}
         ` : ''}
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>
+          <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Public Timeline</a>
+        </div>
       `);
     }
 
@@ -1347,17 +1669,15 @@
           </form>
         ` : ''}
         <div class="pokerStack">
-          ${Array.isArray(adminReview?.disputes) && adminReview.disputes.length ? adminReview.disputes.map((dispute) => `
+          ${adminOpenDisputes.length ? adminOpenDisputes.map((dispute) => `
             <div class="pokerMessage">
               <div class="pokerLabel">${escapeHtml(dispute.seatLabel || 'Seat')} · ${escapeHtml(dispute.category || 'general')} · ${escapeHtml(dispute.status || 'open')}</div>
               <div>${escapeHtml(dispute.note || '')}</div>
-              ${String(dispute.status || '') === 'open' ? `
-                <div class="pokerLinks">
-                  <button class="pokerButton" type="button" data-dispute-action="resolved" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve</button>
-                  <button class="pokerButton" type="button" data-dispute-action="dismissed" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Dismiss</button>
-                  <button class="pokerButton" type="button" data-dispute-action="resolved_resume" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve + Resume</button>
-                </div>
-              ` : (dispute.resolutionNote ? `<div class="pokerLabel">Resolution: ${escapeHtml(dispute.resolutionNote)}</div>` : '')}
+              <div class="pokerLinks">
+                <button class="pokerButton" type="button" data-dispute-action="resolved" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve</button>
+                <button class="pokerButton" type="button" data-dispute-action="dismissed" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Dismiss</button>
+                <button class="pokerButton" type="button" data-dispute-action="resolved_resume" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve + Resume</button>
+              </div>
             </div>
           `).join('') : '<p>No disputes on the selected hand.</p>'}
         </div>
@@ -2505,7 +2825,14 @@
       }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
+      if (path === '/poker/play/results') return await loadPlayResults();
+      const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);
+      if (tableHistoryMatch) return await loadPlayTableHistory(tableHistoryMatch[1]);
+      const seriesTimelineMatch = path.match(/^\/poker\/play\/series\/([^/]+)\/timeline$/);
+      if (seriesTimelineMatch) return await loadPlaySeriesTimeline(seriesTimelineMatch[1]);
       if (path === '/poker/play/rail') return await loadPlayRailLobby();
+      const railSeriesTimelineMatch = path.match(/^\/poker\/play\/rail\/series\/([^/]+)\/timeline$/);
+      if (railSeriesTimelineMatch) return await loadPlaySeriesTimeline(railSeriesTimelineMatch[1], { rail: true });
       const seriesRailMatch = path.match(/^\/poker\/play\/rail\/series\/([^/]+)$/);
       if (seriesRailMatch) return await loadPlayRailSeries(seriesRailMatch[1]);
       const railMatch = path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/);
