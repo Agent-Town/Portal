@@ -412,7 +412,13 @@ function buildTournamentPayoutPlan({ entrantCount, prizePoolOil }) {
   const prizePool = Math.max(0, normalizeOilAmount(prizePoolOil, 0));
   let payoutModel = 'winner_take_all';
   let percents = [100];
-  if (entrants >= 6) {
+  if (entrants >= 18) {
+    payoutModel = 'top5_35_25_18_12_10';
+    percents = [35, 25, 18, 12, 10];
+  } else if (entrants >= 12) {
+    payoutModel = 'top4_40_27_18_15';
+    percents = [40, 27, 18, 15];
+  } else if (entrants >= 6) {
     payoutModel = 'top3_50_30_20';
     percents = [50, 30, 20];
   } else if (entrants >= 3) {

@@ -503,7 +503,7 @@ Tournament blind progression notes:
 - `data.series.needsRebalance` flips on when the active series still needs table-break or seat-balancing work
 - `data.series.pendingBreakTableId` is populated when one specific overflow table is the next break candidate
 - `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
-- `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, or `top3_50_30_20` from entrant count
+- `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
 - once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, and `prizeOil`
 
