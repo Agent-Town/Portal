@@ -1496,9 +1496,10 @@ function renderHouseOfficeSurface() {
   const summaryNode = el('houseOfficeSummary');
   const presenceNode = el('houseOfficePresence');
   const briefingNode = el('houseOfficeBriefing');
+  const attentionNode = el('houseOfficeAttention');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !attentionNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
@@ -1649,6 +1650,45 @@ function renderHouseOfficeSurface() {
       });
 
       briefingNode.appendChild(groupNode);
+    });
+  }
+
+  attentionNode.innerHTML = '';
+  if (!attention.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No House Office attention items are active right now.';
+    attentionNode.appendChild(placeholder);
+  } else {
+    attention.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn${String(item?.severity || '') === 'critical' ? ' danger' : ''}`;
+      button.setAttribute('data-testid', 'house-office-attention-item');
+      button.style.width = '100%';
+      button.style.minWidth = '0';
+      button.style.whiteSpace = 'normal';
+      button.style.overflowWrap = 'anywhere';
+      button.style.textAlign = 'left';
+      button.style.lineHeight = '1.35';
+      button.textContent = `${String(item?.severity || 'info').trim() || 'info'} · ${String(item?.title || '').trim() || 'Attention'} · ${String(item?.sourceKind || '').trim() || 'source'}`;
+      button.addEventListener('click', async () => {
+        if (!item?.deepLink) return;
+        setHouseSurfaceStatus(`Opening ${String(item?.title || 'House Office item')}...`);
+        try {
+          await openHouseOfficeDeepLink(item.deepLink);
+        } catch (err) {
+          setHouseSurfaceStatus(`House Office attention unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        }
+      });
+
+      const itemSummaryNode = document.createElement('div');
+      itemSummaryNode.className = 'small';
+      itemSummaryNode.style.marginTop = '4px';
+      itemSummaryNode.style.overflowWrap = 'anywhere';
+      itemSummaryNode.textContent = String(item?.summary || '').trim() || 'No summary available.';
+      button.appendChild(itemSummaryNode);
+      attentionNode.appendChild(button);
     });
   }
 

@@ -582,6 +582,84 @@ function registerPlatformReadRoutes(app, deps) {
     }).filter(Boolean);
   }
 
+  function buildHouseOfficeAttention({
+    binding = null,
+    trainerJobs = [],
+    trainerResults = [],
+    trackPayload = null,
+    deeplinks = {},
+  } = {}) {
+    const fixture = getUnifiedPlatformTestFixture('house_office_attention_seed') || {};
+    const severityOrder = Array.isArray(fixture?.severityOrder) && fixture.severityOrder.length
+      ? fixture.severityOrder.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : ['critical', 'warn', 'info'];
+    const severityRank = new Map(severityOrder.map((severity, index) => [severity, index]));
+    const trainerJobsById = new Map(
+      (Array.isArray(trainerJobs) ? trainerJobs : [])
+        .map((job) => [String(job?.trainerJobId || '').trim(), job])
+        .filter(([trainerJobId]) => trainerJobId)
+    );
+    const items = [];
+
+    (Array.isArray(trainerResults) ? trainerResults : []).forEach((result) => {
+      const trainerResultId = String(result?.trainerResultId || '').trim();
+      if (!trainerResultId || result?.approvalNeeded !== true) return;
+      const trainerJobId = String(result?.trainerJobId || '').trim();
+      const trainerJob = trainerJobsById.get(trainerJobId) || null;
+      items.push({
+        attentionId: `trainer:${trainerResultId}`,
+        severity: 'critical',
+        title: 'Trainer approval required',
+        summary: `${String(trainerJob?.jobKind || 'trainer_job.compare').trim() || 'trainer_job.compare'} result ${trainerResultId} is awaiting approval.`,
+        sourceKind: 'trainer_result',
+        sourceId: trainerResultId,
+        createdAt: String(result?.updatedAt || result?.createdAt || '').trim() || null,
+        deepLink: deeplinks.trainer || deeplinks.office,
+      });
+    });
+
+    if (binding) {
+      const teamBindingId = String(binding?.teamBindingId || '').trim();
+      if (teamBindingId) {
+        items.push({
+          attentionId: `workshop:${teamBindingId}`,
+          severity: 'warn',
+          title: 'Workshop binding changed',
+          summary: `Team ${String(binding?.teamId || '').trim() || 'team'} points to ${String(binding?.activeConfigVersionId || 'the active config').trim() || 'the active config'}.`,
+          sourceKind: 'team_config_binding',
+          sourceId: teamBindingId,
+          createdAt: String(binding?.updatedAt || binding?.createdAt || '').trim() || null,
+          deepLink: deeplinks.workshop || deeplinks.office,
+        });
+      }
+    }
+
+    const trackEvents = Array.isArray(trackPayload?.events) ? trackPayload.events : [];
+    const latestTrackEvent = trackEvents.length ? trackEvents[trackEvents.length - 1] : null;
+    const latestTrackEventId = String(latestTrackEvent?.trackProgressEventId || '').trim();
+    if (latestTrackEventId) {
+      items.push({
+        attentionId: `tracks:${latestTrackEventId}`,
+        severity: 'info',
+        title: 'Track progress updated',
+        summary: `${String(latestTrackEvent?.title || latestTrackEvent?.trackId || 'Track').trim() || 'Track'} recorded progress from ${String(latestTrackEvent?.sourceKind || 'track').trim() || 'track'}.`,
+        sourceKind: 'track_progress_event',
+        sourceId: latestTrackEventId,
+        createdAt: String(latestTrackEvent?.createdAt || '').trim() || null,
+        deepLink: deeplinks.tracks || deeplinks.office,
+      });
+    }
+
+    return items.sort((left, right) => {
+      const severityDelta = Number(severityRank.get(String(left?.severity || '')) ?? severityOrder.length)
+        - Number(severityRank.get(String(right?.severity || '')) ?? severityOrder.length);
+      if (severityDelta !== 0) return severityDelta;
+      const createdAtDelta = parseHouseOfficeActivityTime(String(right?.createdAt || '')) - parseHouseOfficeActivityTime(String(left?.createdAt || ''));
+      if (createdAtDelta !== 0) return createdAtDelta;
+      return String(left?.attentionId || '').localeCompare(String(right?.attentionId || ''));
+    });
+  }
+
   function buildHouseOfficeOverviewPayload({
     context = {},
     houseId = '',
@@ -672,8 +750,17 @@ function registerPlatformReadRoutes(app, deps) {
         trackPayload: tracksPayload,
       })
       : [];
+    const attention = houseId
+      ? buildHouseOfficeAttention({
+        binding,
+        trainerJobs,
+        trainerResults,
+        trackPayload: tracksPayload,
+        deeplinks,
+      })
+      : [];
     const briefingItemCount = countHouseOfficeBriefingItems(briefing);
-    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length + briefingItemCount;
+    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length + briefingItemCount + attention.length;
     return {
       houseId: houseId || null,
       teamId: teamId || null,
@@ -683,7 +770,7 @@ function registerPlatformReadRoutes(app, deps) {
       staffAgents,
       presence,
       briefing,
-      attention: [],
+      attention,
       deeplinks,
       sourceManifest: {
         schema: 'agent-town-house-office/v1',
@@ -707,6 +794,7 @@ function registerPlatformReadRoutes(app, deps) {
           presenceCount: presence.length,
           briefingGroupCount: briefing.length,
           briefingItemCount,
+          attentionCount: attention.length,
           experienceCount: experiences.length,
           trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
           trackEventCount: Array.isArray(tracksPayload?.events) ? tracksPayload.events.length : 0,
@@ -722,6 +810,7 @@ function registerPlatformReadRoutes(app, deps) {
         presenceCount: presence.length,
         briefingGroupCount: briefing.length,
         briefingItemCount,
+        attentionCount: attention.length,
         experienceCount: experiences.length,
         trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
         trainerJobCount: trainerJobs.length,

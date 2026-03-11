@@ -1009,6 +1009,16 @@ Response fields:
 - `data.briefing[].items[].citations[].sourceId`
 - `data.briefing[].items[].citations[].entryPath`
 - `data.attention[]`
+- `data.attention[].attentionId`
+- `data.attention[].severity`
+- `data.attention[].title`
+- `data.attention[].summary`
+- `data.attention[].sourceKind`
+- `data.attention[].sourceId`
+- `data.attention[].createdAt`
+- `data.attention[].deepLink.kind`
+- `data.attention[].deepLink.surface`
+- `data.attention[].deepLink.label`
 - `data.deeplinks.office`
 - `data.deeplinks.experiences`
 - `data.deeplinks.workshop`
@@ -1023,6 +1033,7 @@ Response fields:
 - `data.sourceManifest.counts.presenceCount`
 - `data.sourceManifest.counts.briefingGroupCount`
 - `data.sourceManifest.counts.briefingItemCount`
+- `data.sourceManifest.counts.attentionCount`
 - `data.sourceManifest.counts.experienceCount`
 - `data.sourceManifest.counts.trackCount`
 - `data.sourceManifest.counts.trackEventCount`
@@ -1035,6 +1046,7 @@ Response fields:
 - `data.summary.presenceCount`
 - `data.summary.briefingGroupCount`
 - `data.summary.briefingItemCount`
+- `data.summary.attentionCount`
 - `data.summary.experienceCount`
 - `data.summary.trackCount`
 - `data.summary.trainerJobCount`

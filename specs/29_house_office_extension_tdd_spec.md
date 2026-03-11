@@ -328,7 +328,8 @@ Implementation notes:
 1. Recommended UI ids:
    A. `house-office-attention`
    B. `house-office-attention-item`
-2. The test should verify the same worker session id before and after at least one attention deep-link action.
+2. The `/api/platform/house-office` payload should expose `attention[]` with stable severity, source identity, and deep-link fields.
+3. The test should verify the same worker session id before and after at least one attention deep-link action.
 
 ### M29.4 - Native House Office district shell
 

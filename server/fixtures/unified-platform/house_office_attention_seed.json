@@ -5,5 +5,10 @@
     "critical",
     "warn",
     "info"
+  ],
+  "expectedSurfaces": [
+    "trainer",
+    "workshop",
+    "tracks"
   ]
 }
