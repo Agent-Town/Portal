@@ -22,6 +22,7 @@ const {
   seedStreamflowFixtureState,
 } = require('./streamflow_adapter');
 const {
+  buildPokerPlayAdminReviewPayload,
   buildPokerPlayTablePayload,
   createTable,
   createRouteError,
@@ -29,9 +30,11 @@ const {
   leaveTable,
   listTables,
   matchmakeIntoTable,
+  openHandDispute,
   pauseTable,
   postAction,
   postMessage,
+  resolveHandDispute,
   resumeTable,
   seatIntoTable,
 } = require('./poker_play_service');
@@ -167,6 +170,7 @@ function registerPokerRoutes(app, deps) {
     createCentaurAction,
     createCentaurMessage,
     createOilLedgerEntry,
+    createPokerPlayAuditEvent,
     createPokerPlayAction,
     createPokerPlayMessage,
     createPortalPokerOperatorClient,
@@ -182,6 +186,7 @@ function registerPokerRoutes(app, deps) {
     getOilSnapshotEventByVerificationAndScheduledFor,
     getPokerOperatorServiceToken,
     getPokerPlayHandById,
+    getPokerPlayDisputeById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
@@ -203,6 +208,11 @@ function registerPokerRoutes(app, deps) {
     listOilLedgerEntriesByWalletSubject,
     listOilSnapshotEventsByVerificationAndHour,
     listPokerPlayActionsByHand,
+    listPokerPlayAuditEventsByHand,
+    listPokerPlayAuditEventsByTable,
+    listPokerPlayDisputesByHand,
+    listPokerPlayDisputesByTable,
+    listPokerPlayDisputesByWalletSubject,
     listPokerPlayMessagesByHand,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
@@ -224,6 +234,7 @@ function registerPokerRoutes(app, deps) {
     upsertCentaurTournament,
     upsertOilSnapshotEvent,
     upsertPokerPlayHand,
+    upsertPokerPlayDispute,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
     upsertPokerSeason,
@@ -255,17 +266,24 @@ function registerPokerRoutes(app, deps) {
   const playRouteDeps = {
     computeOilBalance,
     createOilLedgerEntry,
+    createPokerPlayAuditEvent,
     createPokerPlayAction,
     createPokerPlayMessage,
     deletePokerPlaySeat,
     getActivePokerPlaySeatByWalletSubject,
     getCurrentPokerPlayHandForTable,
     getPokerPlayHandById,
+    getPokerPlayDisputeById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
     getStreamflowVerificationByWalletSubject,
     listPokerPlayActionsByHand,
+    listPokerPlayAuditEventsByHand,
+    listPokerPlayAuditEventsByTable,
+    listPokerPlayDisputesByHand,
+    listPokerPlayDisputesByTable,
+    listPokerPlayDisputesByWalletSubject,
     listPokerPlayMessagesByHand,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
@@ -273,6 +291,7 @@ function registerPokerRoutes(app, deps) {
     randomHex,
     resolvePrimaryWalletSubject,
     upsertPokerPlayHand,
+    upsertPokerPlayDispute,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
   };
@@ -799,6 +818,63 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/admin/tables/:tableId/review', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminReviewPayload(playRouteDeps, {
+        tableId: req.params.tableId,
+        processAt: req.query?.asOf,
+        handId: req.query?.handId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_REVIEW_FAILED',
+        err?.message || 'Unable to load poker table review.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/disputes/:disputeId/resolve', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const result = resolveHandDispute(playRouteDeps, {
+        disputeId: req.params.disputeId,
+        body: req.body,
+        processAt: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(result?.review?.table?.tableId || '', 'review', {
+        disputeId: result?.dispute?.disputeId || req.params.disputeId,
+        handId: result?.dispute?.handId || null,
+        status: result?.dispute?.status || null,
+      });
+      return sendPortalApiSuccess(res, result.review, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_DISPUTE_RESOLUTION_FAILED',
+        err?.message || 'Unable to resolve the poker dispute.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/tables/:tableId/sit', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -881,6 +957,37 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_MESSAGE_FAILED',
         err?.message || 'Unable to post the poker discussion note.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/hands/:handId/disputes', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = openHandDispute(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || getPokerPlayHandById(req.params.handId)?.tableId || '', 'review', {
+        handId: payload?.hand?.handId || req.params.handId,
+        openDisputeCount: Number(payload?.review?.openDisputeCount || 0),
+        tableStatus: payload?.table?.status || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_DISPUTE_OPEN_FAILED',
+        err?.message || 'Unable to flag the poker hand for review.',
         {
           requestId,
           details: err?.details || {},

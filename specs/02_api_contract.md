@@ -410,7 +410,18 @@ Returns the live 6-max poker lobby payload with:
 - `data.series[].seriesId`
 - `data.series[].tableCount`
 - `data.series[].entrantCount`
+- `data.series[].closedTableCount`
 - `data.series[].lateRegistrationOpen`
+- `data.series[].targetTableCount`
+- `data.series[].needsRebalance`
+- `data.series[].pendingBreakTableId`
+- `data.series[].pendingBreakSeatCount`
+- `data.series[].pendingBreakBlockedByLiveTable`
+- `data.series[].prizePoolOil`
+- `data.series[].payoutModel`
+- `data.series[].paidPlaces`
+- `data.series[].payouts[]`
+- `data.series[].standings[]`
 - `data.series[].activeTableId`
 - `data.houseId`
 - `data.wallet`
@@ -425,6 +436,11 @@ Returns one live cash or tournament table payload with:
 - `data.hand`
 - `data.messages[]`
 - `data.actions[]`
+- `data.review.status`
+- `data.review.openDisputeCount`
+- `data.review.currentHandOpenDisputeCount`
+- `data.review.myDisputes[]`
+- `data.review.latestAuditEvent`
 - `data.suggestion`
 - `data.oilBalance`
 
@@ -434,12 +450,24 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.handsUntilBlindIncrease`
 - tournaments expose `data.table.summary.lateRegistrationOpen`
 - tournaments expose `data.table.summary.lateRegistrationRemainingHands`
+- tournaments expose `data.table.summary.prizePoolOil`
+- tournaments expose `data.table.summary.paidPlaces`
+- tournaments expose `data.table.summary.payoutModel`
+- tournaments expose `data.table.summary.payouts[]`
 - live tournament hands expose `data.hand.blindLevel`
 - tournament blind values are resolved server-side at hand start from `data.table.rules.handsPerBlindLevel` and `data.table.rules.blindLevels[]`
+- `data.series.targetTableCount` exposes the current tournament-director target table count for the active field
+- `data.series.needsRebalance` flips on when the active series still needs table-break or seat-balancing work
+- `data.series.pendingBreakTableId` is populated when one specific overflow table is the next break candidate
+- `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
+- `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, or `top3_50_30_20` from entrant count
+- `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
+- once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, and `prizeOil`
 
 Tournament registration notes:
 - tournaments may accept new seats while `data.table.summary.lateRegistrationOpen === true`
 - a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
+- tournament settlement is offchain in the OIL ledger and can pay multiple places from the same prize pool
 - once the next hand starts, the registered seat becomes active automatically
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
 - when a series can fit back onto one table, active seats may converge to a single final table between hands; overflow tables then fall out of the lobby payload
@@ -455,6 +483,7 @@ Hole-card privacy rules:
 - `data.mySeat.holeCards[]` is only populated for the viewing seat.
 - Opponent seats expose `hiddenCardCount` until showdown.
 - `data.messages[]` is seat-private: the viewer only receives their own human + agent thread plus public system notes.
+- `data.review.myDisputes[]` only returns disputes opened by the viewing wallet on this table.
 
 ### POST `/api/poker/play/tables`
 Creates a live table from the provided cash or tournament structure. By default the creator is also seated immediately.
@@ -560,7 +589,7 @@ Event notes:
 - initial connect emits a `ready` event
 - update events use `event: table`
 - browsers should treat the stream as a push hint and re-read `GET /api/poker/play/tables/:tableId`
-- table events may use reasons such as `action`, `message`, `seat`, `leave`, `pause`, and `resume`
+- table events may use reasons such as `action`, `message`, `seat`, `leave`, `pause`, `resume`, and `review`
 
 ### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)
 Pauses a live table for operator review. While paused:
@@ -586,6 +615,49 @@ Resumes a paused table and restores the live hand clock using the remaining coun
 Headers:
 - `x-admin-token: <ADMIN_TOKEN>`
 
+### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
+Returns the operator review payload for one table.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response fields:
+- `data.table`
+- `data.activeHand`
+- `data.reviewHand`
+- `data.seats[]`
+- `data.messages[]`
+- `data.actions[]`
+- `data.disputes[]`
+- `data.openDisputes[]`
+- `data.auditEvents[]`
+
+Notes:
+- if the caller does not pass `handId`, the route prefers the newest open-dispute hand, otherwise the current live hand
+- `data.reviewHand.seats[]` exposes full seat cards for operator inspection
+
+### POST `/api/poker/play/admin/disputes/:disputeId/resolve` (admin)
+Resolves or dismisses a flagged hand review and can optionally resume the table if no open disputes remain.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "status": "resolved",
+  "resolutionNote": "Verified the action order.",
+  "resumeTable": true,
+  "asOf": "2026-03-11T13:00:20.000Z"
+}
+```
+
+Failure codes:
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_DISPUTE_CLOSED`
+
 ### POST `/api/poker/play/tables/:tableId/leave`
 Leaves a live table. Cash tables cash out immediately between hands, or queue a cash-out during a live hand and return the remaining stack to offchain OIL when that hand settles. Tournament tables only allow leaving after bust-out or payout.
 
@@ -608,6 +680,23 @@ Failure codes:
 
 ### POST `/api/poker/play/hands/:handId/messages`
 Posts a seat-private human note to the current hand thread and returns the paired agent response.
+
+### POST `/api/poker/play/hands/:handId/disputes`
+Flags a live or just-settled hand for operator review. The server records the dispute, pauses the table, and returns the normal table payload with updated `data.review`.
+
+Request shape:
+```json
+{
+  "category": "turn_order",
+  "note": "Seat two acted before the countdown expired."
+}
+```
+
+Failure codes:
+- `UNAUTHORIZED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `INVALID_ARGUMENT`
 
 ### POST `/api/poker/play/hands/:handId/actions`
 Applies a live poker action for the bound seat.

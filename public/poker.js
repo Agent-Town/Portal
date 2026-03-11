@@ -4,6 +4,7 @@
   const statusEl = document.getElementById('pokerStatus');
   const contentEl = document.getElementById('pokerContent');
   const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
+  const POKER_ADMIN_TOKEN_KEY = 'poker.adminToken';
   let countdownTimer = null;
   let liveRefreshTimer = null;
   let liveTableStream = null;
@@ -44,6 +45,14 @@
   function readWalletRecoveryKey() {
     try {
       return String(window.localStorage.getItem('agentTown:walletRecoveryKey') || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function readStoredPokerAdminToken() {
+    try {
+      return String(window.localStorage.getItem(POKER_ADMIN_TOKEN_KEY) || '').trim();
     } catch {
       return '';
     }
@@ -163,6 +172,38 @@
     return items.length
       ? `<div class="pokerCardStrip">${items.map((card) => `<span class="pokerMiniCard">${escapeHtml(card)}</span>`).join('')}</div>`
       : '<div class="pokerCardStrip"><span class="pokerMiniCard">--</span></div>';
+  }
+
+  function renderPayoutPlan(payouts) {
+    const items = Array.isArray(payouts) ? payouts : [];
+    if (!items.length) return '<p>No payout ladder yet.</p>';
+    return `
+      <div class="pokerStack">
+        ${items.map((item) => `
+          <div class="pokerRow">
+            <span>${escapeHtml(`${Number(item.place || 0)} place`)}</span>
+            <span>${escapeHtml(`${Number(item.percent || 0)}%`)}</span>
+            <span>${Number(item.amountOil || 0)} OIL</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderSeriesStandings(standings) {
+    const items = Array.isArray(standings) ? standings : [];
+    if (!items.length) return '<p>No final placements yet.</p>';
+    return `
+      <div class="pokerStack">
+        ${items.map((item) => `
+          <div class="pokerRow">
+            <span>${escapeHtml(`${Number(item.place || 0)}.`)}</span>
+            <span>${escapeHtml(item.displayName || 'Seat')}</span>
+            <span>${Number(item.prizeOil || 0)} OIL</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   function renderSeatMarkers(seats) {
@@ -458,9 +499,18 @@
               ${renderMetaBadges([
                 item.stage || 'seating',
                 `${Number(item.tableCount || 0)} tables`,
+                Number(item.targetTableCount || 0) > 0 ? `target ${Number(item.targetTableCount || 0)}` : '',
                 `${Number(item.entrantCount || 0)} entrants`,
+                Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
                 item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
+                item.needsRebalance ? 'table break pending' : '',
               ])}
+              ${item.pendingBreakTableId
+                ? `<p>Director target: collapse toward ${Number(item.targetTableCount || 0)} table${Number(item.targetTableCount || 0) === 1 ? '' : 's'} by breaking ${escapeHtml(item.pendingBreakTableId)} with ${Number(item.pendingBreakSeatCount || 0)} seat${Number(item.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${item.pendingBreakBlockedByLiveTable ? ' once its live hand settles.' : '.'}</p>`
+                : (item.needsRebalance ? `<p>Director target: rebalance toward ${Number(item.targetTableCount || 0)} table${Number(item.targetTableCount || 0) === 1 ? '' : 's'} across the remaining live tables.</p>` : '')}
+              <div class="pokerLabel">Payout Ladder</div>
+              ${renderPayoutPlan(item.payouts)}
             </div>
             <div class="pokerLinks">
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
@@ -485,6 +535,9 @@
                   ? (item?.summary?.lateRegistrationOpen
                     ? `late reg ${Number(item?.summary?.lateRegistrationRemainingHands || 0)}`
                     : (item?.summary?.handNumber ? 'late reg closed' : 'late reg open'))
+                  : '',
+                item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
+                  ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
                   : '',
               ])}
             </div>
@@ -545,14 +598,19 @@
 
   function renderPlayTableCards(data) {
     const table = data?.table || {};
+    const series = data?.series || null;
     const hand = data?.hand || null;
     const mySeat = data?.mySeat || null;
     const seats = Array.isArray(data?.seats) ? data.seats : [];
     const actions = Array.isArray(data?.actions) ? data.actions : [];
     const messages = Array.isArray(data?.messages) ? data.messages : [];
+    const review = data?.review || {};
+    const myDisputes = Array.isArray(review?.myDisputes) ? review.myDisputes : [];
+    const adminReview = data?.adminReview || null;
     const oilBalance = Number(data?.oilBalance?.balance || 0);
     const paused = String(table?.status || 'open') === 'paused';
     const canJoin = !paused && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
       `
         <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
@@ -571,6 +629,8 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
           ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
@@ -623,12 +683,63 @@
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
           ${renderSummaryMetric('Status', seatStatus)}
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
+          ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
+          ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
+        ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}</p>` : ''}
         <div class="pokerLinks">
           <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
         </div>
+      `);
+    }
+
+    if (Number(review?.openDisputeCount || 0) > 0 || myDisputes.length) {
+      cards.push(`
+        <h2>Table Review</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Status', review?.status || 'clear')}
+          ${renderSummaryMetric('Open Disputes', `${Number(review?.openDisputeCount || 0)}`)}
+          ${renderSummaryMetric('Current Hand', `${Number(review?.currentHandOpenDisputeCount || 0)}`)}
+        </div>
+        ${review?.latestAuditEvent ? `<p>Latest audit event: <strong>${escapeHtml(review.latestAuditEvent.eventKind || 'review')}</strong> at ${escapeHtml(review.latestAuditEvent.createdAt || '')}</p>` : ''}
+        ${myDisputes.length ? `
+          <div class="pokerStack">
+            ${myDisputes.map((dispute) => `
+              <div class="pokerMessage">
+                <div class="pokerLabel">${escapeHtml(dispute.seatLabel || 'Seat')} · ${escapeHtml(dispute.category || 'general')} · ${escapeHtml(dispute.status || 'open')}</div>
+                <div>${escapeHtml(dispute.note || '')}</div>
+                ${dispute.resolutionNote ? `<div class="pokerLabel">Resolution: ${escapeHtml(dispute.resolutionNote)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : '<p>No seat dispute from you on this table.</p>'}
+      `);
+    }
+
+    if (series && table?.tableType === 'tournament') {
+      cards.push(`
+        <h2>Series Director</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Series Tables', `${Number(series?.tableCount || 0)}`)}
+          ${renderSummaryMetric('Target Tables', `${Number(series?.targetTableCount || 0)}`)}
+          ${renderSummaryMetric('Stage', series?.stage || 'seating')}
+          ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
+          ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+          ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
+        </div>
+        ${series?.pendingBreakTableId
+          ? `<p>${escapeHtml(series.pendingBreakTableId)} is the current break candidate with ${Number(series?.pendingBreakSeatCount || 0)} active seat${Number(series?.pendingBreakSeatCount || 0) === 1 ? '' : 's'}${series?.pendingBreakBlockedByLiveTable ? '; the table must finish its live hand before seats can move.' : '.'}</p>`
+          : (series?.needsRebalance
+            ? `<p>Director target: rebalance toward ${Number(series?.targetTableCount || 0)} table${Number(series?.targetTableCount || 0) === 1 ? '' : 's'} across the current live field.</p>`
+            : '<p>The tournament series is currently balanced for its active field.</p>')}
+        <div class="pokerLabel">Payout Ladder</div>
+        ${renderPayoutPlan(series?.payouts)}
+        ${Array.isArray(series?.standings) && series.standings.length ? `
+          <div class="pokerLabel">Final Placements</div>
+          ${renderSeriesStandings(series.standings)}
+        ` : ''}
       `);
     }
 
@@ -663,6 +774,34 @@
       cards.push(`
         <h2>Your Agent Line</h2>
         <p>${escapeHtml(data.suggestion.body || 'No suggestion yet.')}</p>
+      `);
+    }
+
+    if (mySeat && hand) {
+      cards.push(`
+        <h2>Flag Hand For Review</h2>
+        <p>Use this for rule, turn-order, disconnect, or settlement issues. Filing a review pauses the table for operator inspection.</p>
+        ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : ''}
+        <form id="pokerPlayDisputeForm" class="pokerForm">
+          <label>
+            Category
+            <select id="pokerPlayDisputeCategory">
+              <option value="general">General</option>
+              <option value="rule_misread">Rule Misread</option>
+              <option value="bet_size">Bet Size</option>
+              <option value="turn_order">Turn Order</option>
+              <option value="disconnect">Disconnect</option>
+              <option value="settlement">Settlement</option>
+              <option value="conduct">Conduct</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label>
+            Review note
+            <textarea id="pokerPlayDisputeNote" placeholder="Describe the issue and the seat/action involved."></textarea>
+          </label>
+          <button id="pokerPlayDisputeSubmit" class="pokerButton" type="submit"${hasOpenMyHandDispute ? ' disabled' : ''}>Flag Hand For Review</button>
+        </form>
       `);
     }
 
@@ -727,6 +866,41 @@
               <span>${Number(action.amountOil || 0)} OIL</span>
             </div>
           `).join('')}
+        </div>
+      `);
+    }
+
+    if (adminReview) {
+      cards.push(`
+        <h2>Operator Review</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Review Hand', adminReview?.reviewHand?.handId || adminReview?.activeHand?.handId || 'none')}
+          ${renderSummaryMetric('Open Disputes', `${Number(adminReview?.openDisputes?.length || 0)}`)}
+          ${renderSummaryMetric('Audit Events', `${Number(adminReview?.auditEvents?.length || 0)}`)}
+        </div>
+        <div class="pokerStack">
+          ${Array.isArray(adminReview?.disputes) && adminReview.disputes.length ? adminReview.disputes.map((dispute) => `
+            <div class="pokerMessage">
+              <div class="pokerLabel">${escapeHtml(dispute.seatLabel || 'Seat')} · ${escapeHtml(dispute.category || 'general')} · ${escapeHtml(dispute.status || 'open')}</div>
+              <div>${escapeHtml(dispute.note || '')}</div>
+              ${String(dispute.status || '') === 'open' ? `
+                <div class="pokerLinks">
+                  <button class="pokerButton" type="button" data-dispute-action="resolved" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve</button>
+                  <button class="pokerButton" type="button" data-dispute-action="dismissed" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Dismiss</button>
+                  <button class="pokerButton" type="button" data-dispute-action="resolved_resume" data-dispute-id="${escapeHtml(dispute.disputeId || '')}">Resolve + Resume</button>
+                </div>
+              ` : (dispute.resolutionNote ? `<div class="pokerLabel">Resolution: ${escapeHtml(dispute.resolutionNote)}</div>` : '')}
+            </div>
+          `).join('') : '<p>No disputes on the selected hand.</p>'}
+        </div>
+        <div class="pokerStack">
+          ${Array.isArray(adminReview?.auditEvents) && adminReview.auditEvents.length ? adminReview.auditEvents.slice(0, 12).map((event) => `
+            <div class="pokerRow">
+              <span>${escapeHtml(event.eventKind || 'event')}</span>
+              <span>${escapeHtml(event.seatLabel || event.actorRole || 'system')}</span>
+              <span>${escapeHtml(event.createdAt || '')}</span>
+            </div>
+          `).join('') : '<p>No audit events yet.</p>'}
         </div>
       `);
     }
@@ -818,16 +992,87 @@
     });
   }
 
+  function bindPlayDisputeForm(tableId, handId) {
+    const form = document.getElementById('pokerPlayDisputeForm');
+    if (!form || !handId) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const note = String(document.getElementById('pokerPlayDisputeNote')?.value || '').trim();
+      if (!note) {
+        setStatus('Add a short note before flagging the hand.');
+        return;
+      }
+      setStatus('Flagging hand for operator review...');
+      try {
+        await api(`/api/poker/play/hands/${encodeURIComponent(handId)}/disputes`, {
+          method: 'POST',
+          body: JSON.stringify({
+            category: String(document.getElementById('pokerPlayDisputeCategory')?.value || 'general'),
+            note,
+          }),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Review failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindAdminReviewActions(tableId) {
+    const token = readStoredPokerAdminToken();
+    if (!token) return;
+    const buttons = Array.from(document.querySelectorAll('[data-dispute-action][data-dispute-id]'));
+    if (!buttons.length) return;
+    for (const button of buttons) {
+      button.addEventListener('click', async () => {
+        const disputeId = String(button.getAttribute('data-dispute-id') || '').trim();
+        const action = String(button.getAttribute('data-dispute-action') || '').trim();
+        if (!disputeId || !action) return;
+        const status = action === 'dismissed' ? 'dismissed' : 'resolved';
+        const resumeTable = action === 'resolved_resume';
+        setStatus(resumeTable ? 'Resolving dispute and resuming table...' : 'Resolving dispute...');
+        try {
+          await api(`/api/poker/play/admin/disputes/${encodeURIComponent(disputeId)}/resolve`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              status,
+              resolutionNote: status === 'dismissed' ? 'Dismissed by operator review.' : 'Resolved by operator review.',
+              resumeTable,
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Operator review failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+  }
+
   async function loadPlayTable(tableId, { silent = false } = {}) {
     setTitle('Live Poker Table', `Shared 6-max table state for ${tableId}.`);
     if (!silent) setStatus('Loading live table...');
     const payload = await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}`);
-    const data = payload?.data || {};
+    const data = payload?.data && typeof payload.data === 'object' ? { ...payload.data } : {};
+    const adminToken = readStoredPokerAdminToken();
+    if (adminToken) {
+      try {
+        const reviewPayload = await api(`/api/poker/play/admin/tables/${encodeURIComponent(tableId)}/review`, {
+          headers: { 'x-admin-token': adminToken },
+        });
+        data.adminReview = reviewPayload?.data || null;
+      } catch (err) {
+        data.adminReview = null;
+        data.adminReviewError = err?.code || 'UNKNOWN';
+      }
+    }
     renderCards(renderPlayTableCards(data));
     bindPlayJoinForm(tableId);
     bindPlayLeaveButton(tableId);
     bindPlayMessageForm(tableId, data?.hand?.handId || '');
     bindPlayActionForm(tableId, data?.hand?.handId || '');
+    bindPlayDisputeForm(tableId, data?.hand?.handId || '');
+    bindAdminReviewActions(tableId);
     bindCountdown(data?.hand?.actionExpiresAt || null);
     bindLiveTableStream(tableId);
     scheduleLiveTableRefresh(tableId);

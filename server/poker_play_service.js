@@ -44,6 +44,36 @@ function normalizePokerPlayMessageBody(value) {
   return body ? body.slice(0, 800) : '';
 }
 
+function normalizePokerPlayDisputeCategory(value, fallback = 'general') {
+  const category = normalizeTrimmedString(value, fallback).toLowerCase();
+  const allowed = new Set([
+    'general',
+    'rule_misread',
+    'bet_size',
+    'turn_order',
+    'disconnect',
+    'settlement',
+    'conduct',
+    'other',
+  ]);
+  return allowed.has(category) ? category : fallback;
+}
+
+function normalizePokerPlayDisputeNote(value) {
+  const note = normalizeTrimmedString(value);
+  return note ? note.slice(0, 800) : '';
+}
+
+function normalizePokerPlayDisputeResolutionStatus(value, fallback = '') {
+  const status = normalizeTrimmedString(value, fallback).toLowerCase();
+  return status === 'resolved' || status === 'dismissed' ? status : fallback;
+}
+
+function normalizePokerPlayAuditActorRole(value, fallback = 'system') {
+  const role = normalizeTrimmedString(value, fallback).toLowerCase();
+  return ['human', 'agent', 'operator', 'system'].includes(role) ? role : fallback;
+}
+
 function normalizePokerPlayTableType(value, fallback = 'cash') {
   const type = normalizeTrimmedString(value, fallback).toLowerCase();
   return type === 'tournament' ? 'tournament' : 'cash';
@@ -331,6 +361,141 @@ function getActiveSeatRows(seats) {
   return (Array.isArray(seats) ? seats : []).filter(isSeatInPlay).sort((left, right) => left.seatNumber - right.seatNumber);
 }
 
+function compareIsoAsc(left, right) {
+  const leftMs = Date.parse(String(left || ''));
+  const rightMs = Date.parse(String(right || ''));
+  const leftFinite = Number.isFinite(leftMs);
+  const rightFinite = Number.isFinite(rightMs);
+  if (leftFinite && rightFinite && leftMs !== rightMs) return leftMs - rightMs;
+  if (leftFinite !== rightFinite) return leftFinite ? -1 : 1;
+  return String(left || '').localeCompare(String(right || ''));
+}
+
+function compareIsoDesc(left, right) {
+  return compareIsoAsc(right, left);
+}
+
+function getTournamentSeatIdentity(seat) {
+  return `${normalizeTrimmedString(seat?.walletSubject)}:${normalizeTrimmedString(seat?.tableId)}:${normalizeSeatNumber(seat?.seatNumber)}`;
+}
+
+function getTournamentAllSeats(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .flatMap((entry) => Array.isArray(entry?.seats) ? entry.seats : [])
+    .filter(Boolean);
+}
+
+function computeTournamentPrizePoolOil(seats) {
+  return (Array.isArray(seats) ? seats : []).reduce((sum, seat) => sum + Math.max(0, Number(seat?.buyInOil || 0)), 0);
+}
+
+function buildTournamentPayoutPlan({ entrantCount, prizePoolOil }) {
+  const entrants = Math.max(0, normalizeOilAmount(entrantCount, 0));
+  const prizePool = Math.max(0, normalizeOilAmount(prizePoolOil, 0));
+  let payoutModel = 'winner_take_all';
+  let percents = [100];
+  if (entrants >= 6) {
+    payoutModel = 'top3_50_30_20';
+    percents = [50, 30, 20];
+  } else if (entrants >= 3) {
+    payoutModel = 'top2_70_30';
+    percents = [70, 30];
+  }
+  const paidPlaces = Math.min(entrants, percents.length);
+  const payouts = [];
+  let allocated = 0;
+  for (let index = 0; index < paidPlaces; index += 1) {
+    const percent = Number(percents[index] || 0);
+    const isLast = index === paidPlaces - 1;
+    const amountOil = isLast
+      ? Math.max(0, prizePool - allocated)
+      : Math.max(0, Math.floor((prizePool * percent) / 100));
+    allocated += amountOil;
+    payouts.push({
+      place: index + 1,
+      percent,
+      amountOil,
+    });
+  }
+  return {
+    entrantCount: entrants,
+    prizePoolOil: prizePool,
+    payoutModel,
+    paidPlaces,
+    payouts,
+  };
+}
+
+function sortSeatsByTournamentElimination(seats) {
+  return (Array.isArray(seats) ? seats : [])
+    .slice()
+    .sort((left, right) => {
+      const eliminatedDelta = compareIsoDesc(
+        left?.eliminatedAt || left?.updatedAt || '',
+        right?.eliminatedAt || right?.updatedAt || ''
+      );
+      if (eliminatedDelta !== 0) return eliminatedDelta;
+      const prizeDelta = Number(right?.prizeOil || 0) - Number(left?.prizeOil || 0);
+      if (prizeDelta !== 0) return prizeDelta;
+      const tableDelta = String(left?.tableId || '').localeCompare(String(right?.tableId || ''));
+      if (tableDelta !== 0) return tableDelta;
+      return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+    });
+}
+
+function buildCompletedTournamentPlacements(entries) {
+  const seats = getTournamentAllSeats(entries);
+  if (!seats.length) return [];
+  const activeSeats = getActiveSeatRows(seats);
+  let winnerSeat = activeSeats[0] || null;
+  if (!winnerSeat) {
+    winnerSeat = seats
+      .filter((seat) => Number(seat?.prizeOil || 0) > 0)
+      .slice()
+      .sort((left, right) => {
+        const prizeDelta = Number(right?.prizeOil || 0) - Number(left?.prizeOil || 0);
+        if (prizeDelta !== 0) return prizeDelta;
+        return compareIsoAsc(left?.payoutSettledAt || left?.updatedAt || '', right?.payoutSettledAt || right?.updatedAt || '');
+      })[0] || null;
+  }
+  const seen = new Set();
+  const ordered = [];
+  if (winnerSeat) {
+    ordered.push(winnerSeat);
+    seen.add(getTournamentSeatIdentity(winnerSeat));
+  }
+  const paidSeats = seats
+    .filter((seat) => Number(seat?.prizeOil || 0) > 0 && !seen.has(getTournamentSeatIdentity(seat)))
+    .slice()
+    .sort((left, right) => {
+      const prizeDelta = Number(right?.prizeOil || 0) - Number(left?.prizeOil || 0);
+      if (prizeDelta !== 0) return prizeDelta;
+      return compareIsoAsc(left?.payoutSettledAt || left?.updatedAt || '', right?.payoutSettledAt || right?.updatedAt || '');
+    });
+  for (const seat of paidSeats) {
+    ordered.push(seat);
+    seen.add(getTournamentSeatIdentity(seat));
+  }
+  const eliminatedSeats = sortSeatsByTournamentElimination(
+    seats.filter((seat) => !seen.has(getTournamentSeatIdentity(seat)))
+  );
+  for (const seat of eliminatedSeats) {
+    ordered.push(seat);
+  }
+  return ordered.map((seat, index) => ({
+    place: index + 1,
+    tableId: seat.tableId,
+    seatNumber: normalizeSeatNumber(seat?.seatNumber),
+    displayName: seat?.displayName || formatSeatLabel(seat?.seatNumber),
+    houseId: seat?.houseId || null,
+    walletSubject: seat?.walletSubject || '',
+    status: seat?.status || 'busted',
+    prizeOil: Number(seat?.prizeOil || 0),
+    eliminatedAt: seat?.eliminatedAt || null,
+    payoutSettledAt: seat?.payoutSettledAt || null,
+  }));
+}
+
 function computeBuyInOil(table, requestedBuyInOil) {
   const minimum = Math.max(1, normalizeOilAmount(table?.buyInOil, 0));
   const requested = normalizeOilAmount(requestedBuyInOil, minimum);
@@ -368,7 +533,7 @@ function buildDynamicTableSummary(config, matchKey) {
   const summary = {
     headline: config.tableType === 'cash'
       ? 'Open cash table with private human + agent seat threads.'
-      : 'Single-table tournament with private human + agent seat threads.',
+      : 'Six-max tournament with a real payout ladder and private human + agent seat threads.',
     matchKey,
     origin: 'dynamic',
   };
@@ -379,23 +544,55 @@ function buildDynamicTableSummary(config, matchKey) {
   return summary;
 }
 
+function buildTournamentEconomics(entries) {
+  const seats = getTournamentAllSeats(entries);
+  const uniqueWallets = new Set();
+  for (const seat of seats) {
+    const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+    if (walletSubject) uniqueWallets.add(walletSubject);
+  }
+  const payoutPlan = buildTournamentPayoutPlan({
+    entrantCount: uniqueWallets.size,
+    prizePoolOil: computeTournamentPrizePoolOil(seats),
+  });
+  const completed = getActiveSeatRows(seats).length <= 1 && payoutPlan.entrantCount > 1;
+  return {
+    ...payoutPlan,
+    completed,
+    standings: completed ? buildCompletedTournamentPlacements(entries) : [],
+  };
+}
+
 function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   const items = Array.isArray(entries) ? entries : [];
   if (!items.length) return null;
-  const leadTable = items[0]?.table || null;
+  const leadTable = items.find((entry) => !isSeriesClosedTable(entry?.table))?.table || items[0]?.table || null;
   const ref = getTournamentSeriesRef(leadTable);
+  const activeEntries = items.map((entry) => ({
+    ...entry,
+    activeSeats: getActiveSeatRows(entry?.seats),
+    live: !!(entry?.hand && entry.hand.status === 'live'),
+  }));
+  const directorPolicy = buildTournamentSeriesDirectorPolicy(activeEntries);
+  const economics = buildTournamentEconomics(items);
   const uniqueWallets = new Set();
   let tableCount = 0;
   let liveTableCount = 0;
   let completedTableCount = 0;
+  let closedTableCount = 0;
   let openSeatCount = 0;
   let lateRegistrationOpen = false;
   let currentUserTableId = '';
   const tableIds = [];
+  const navigableEntries = items.filter((entry) => !isSeriesClosedTable(entry?.table));
 
   for (const entry of items) {
     const table = entry?.table || null;
     if (!table) continue;
+    if (isSeriesClosedTable(table)) {
+      closedTableCount += 1;
+      continue;
+    }
     const summary = entry?.summary || computeTableSummary(table, entry?.seats, entry?.hand, entry?.viewerSeat || null);
     tableCount += 1;
     tableIds.push(String(table.tableId || ''));
@@ -417,6 +614,8 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   let stage = 'seating';
   if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
     stage = 'completed';
+  } else if (directorPolicy.needsRebalance && !lateRegistrationOpen) {
+    stage = 'table_break';
   } else if (tableCount > 1 && liveTableCount <= 1 && !lateRegistrationOpen) {
     stage = 'finalizing';
   } else if (lateRegistrationOpen) {
@@ -426,8 +625,8 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   }
 
   const activeTableId = currentUserTableId
-    || String(items.find((entry) => entry?.summary?.liveHand)?.table?.tableId || '')
-    || String(items.find((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)?.table?.tableId || '')
+    || String(navigableEntries.find((entry) => entry?.summary?.liveHand)?.table?.tableId || '')
+    || String(navigableEntries.find((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)?.table?.tableId || '')
     || String(leadTable?.tableId || '');
 
   return {
@@ -437,30 +636,41 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     tableCount,
     liveTableCount,
     completedTableCount,
+    closedTableCount,
     entrantCount: uniqueWallets.size,
     openSeatCount,
     lateRegistrationOpen,
     stage,
+    targetTableCount: directorPolicy.targetTableCount,
+    needsRebalance: directorPolicy.needsRebalance,
+    pendingBreakTableId: directorPolicy.pendingBreakTableId,
+    pendingBreakSeatCount: directorPolicy.pendingBreakSeatCount,
+    pendingBreakBlockedByLiveTable: directorPolicy.pendingBreakBlockedByLiveTable,
+    prizePoolOil: economics.prizePoolOil,
+    payoutModel: economics.payoutModel,
+    paidPlaces: economics.paidPlaces,
+    payouts: economics.payouts,
+    standings: economics.standings,
     currentUserTableId: currentUserTableId || null,
     activeTableId: activeTableId || null,
     tableIds: tableIds.filter(Boolean),
   };
 }
 
-function listExistingTournamentSeriesTables(deps, matchKey, { processAt } = {}) {
+function listExistingTournamentSeriesTables(deps, matchKey, { processAt, includeClosed = false } = {}) {
   const targetMatchKey = normalizeTrimmedString(matchKey);
   return deps.listPokerPlayTables()
     .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt }))
     .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
-    .filter((synced) => !isSeriesClosedTable(synced?.table))
+    .filter((synced) => includeClosed || !isSeriesClosedTable(synced?.table))
     .filter((synced) => getTournamentSeriesRef(synced.table).matchKey === targetMatchKey);
 }
 
-function listTournamentSeriesEntriesDirect(deps, matchKey) {
+function listTournamentSeriesEntriesDirect(deps, matchKey, { includeClosed = false } = {}) {
   const targetMatchKey = normalizeTrimmedString(matchKey);
   return deps.listPokerPlayTables()
     .filter((table) => normalizePokerPlayTableType(table?.tableType) === 'tournament')
-    .filter((table) => !isSeriesClosedTable(table))
+    .filter((table) => includeClosed || !isSeriesClosedTable(table))
     .filter((table) => getTournamentSeriesRef(table).matchKey === targetMatchKey)
     .map((table) => ({
       table,
@@ -507,6 +717,9 @@ function sanitizeSeatForViewer({ seat, hand, viewerSeatNumber }) {
     isActing: seatNumber === normalizeSeatNumber(hand?.state?.actingSeat),
     holeCards: revealed ? rawCards : [],
     hiddenCardCount: revealed ? 0 : rawCards.length,
+    prizeOil: Number(seat?.prizeOil || 0),
+    payoutSettledAt: seat?.payoutSettledAt || null,
+    eliminatedAt: seat?.eliminatedAt || null,
   };
 }
 
@@ -563,6 +776,113 @@ function sanitizeActions(actions, seats) {
       ? 'System'
       : formatSeatLabel(action.seatNumber, seatMap.get(normalizeSeatNumber(action.seatNumber))?.displayName || ''),
   }));
+}
+
+function sanitizeDisputesForViewer(disputes, seats) {
+  const seatMap = getSeatMap(seats);
+  return (Array.isArray(disputes) ? disputes : []).map((dispute) => ({
+    ...dispute,
+    seatNumber: dispute.seatNumber == null ? null : normalizeSeatNumber(dispute.seatNumber),
+    seatLabel: dispute.seatNumber == null
+      ? 'Seat'
+      : formatSeatLabel(dispute.seatNumber, seatMap.get(normalizeSeatNumber(dispute.seatNumber))?.displayName || ''),
+  }));
+}
+
+function sanitizeAuditEventsForViewer(events, seats) {
+  const seatMap = getSeatMap(seats);
+  return (Array.isArray(events) ? events : []).map((event) => ({
+    ...event,
+    seatNumber: event.seatNumber == null ? null : normalizeSeatNumber(event.seatNumber),
+    seatLabel: event.seatNumber == null
+      ? null
+      : formatSeatLabel(event.seatNumber, seatMap.get(normalizeSeatNumber(event.seatNumber))?.displayName || ''),
+    payload: cloneJson(event.payload, {}),
+  }));
+}
+
+function buildPokerPlayReviewSummary(deps, table, seats, hand, walletSubject) {
+  const openDisputes = deps.listPokerPlayDisputesByTable(table.tableId, { status: 'open', limit: 50 });
+  const latestAuditEvent = deps.listPokerPlayAuditEventsByTable(table.tableId, { limit: 1 })[0] || null;
+  const myDisputes = normalizeTrimmedString(walletSubject)
+    ? deps.listPokerPlayDisputesByWalletSubject(walletSubject, { tableId: table.tableId, limit: 20 })
+    : [];
+  const currentHandId = normalizeTrimmedString(hand?.handId);
+  const myHandDisputes = currentHandId
+    ? myDisputes.filter((dispute) => normalizeTrimmedString(dispute?.handId) === currentHandId)
+    : myDisputes;
+  return {
+    status: openDisputes.length
+      ? 'under_review'
+      : (isTablePaused(table) ? 'paused' : 'clear'),
+    openDisputeCount: openDisputes.length,
+    currentHandOpenDisputeCount: currentHandId
+      ? openDisputes.filter((dispute) => normalizeTrimmedString(dispute?.handId) === currentHandId).length
+      : openDisputes.length,
+    myDisputes: sanitizeDisputesForViewer(myHandDisputes, seats),
+    latestAuditEvent: latestAuditEvent
+      ? sanitizeAuditEventsForViewer([latestAuditEvent], seats)[0]
+      : null,
+  };
+}
+
+function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const openDisputes = deps.listPokerPlayDisputesByTable(synced.table.tableId, { status: 'open', limit: 50 });
+  const selectedHandId = normalizeTrimmedString(handId)
+    || normalizeTrimmedString(openDisputes[0]?.handId)
+    || normalizeTrimmedString(synced.hand?.handId);
+  const reviewHand = selectedHandId ? deps.getPokerPlayHandById(selectedHandId) : null;
+  const reviewMessages = reviewHand ? deps.listPokerPlayMessagesByHand(reviewHand.handId) : [];
+  const reviewActions = reviewHand ? deps.listPokerPlayActionsByHand(reviewHand.handId) : [];
+  const reviewDisputes = reviewHand
+    ? deps.listPokerPlayDisputesByHand(reviewHand.handId, { limit: 50 })
+    : deps.listPokerPlayDisputesByTable(synced.table.tableId, { limit: 50 });
+  const auditEvents = reviewHand
+    ? deps.listPokerPlayAuditEventsByHand(reviewHand.handId, { limit: 100 })
+    : deps.listPokerPlayAuditEventsByTable(synced.table.tableId, { limit: 100 });
+  const seatMap = getSeatMap(synced.seats);
+  return {
+    table: {
+      ...synced.table,
+      summary: computeTableSummary(synced.table, synced.seats, synced.hand, null),
+    },
+    activeHand: synced.hand ? cloneJson(synced.hand, null) : null,
+    reviewHand: reviewHand
+      ? {
+        ...cloneJson(reviewHand, {}),
+        seats: (Array.isArray(synced.seats) ? synced.seats : []).map((seat) => sanitizeSeatForViewer({
+          seat,
+          hand: reviewHand,
+          viewerSeatNumber: normalizeSeatNumber(seat?.seatNumber),
+        })),
+      }
+      : null,
+    seats: (Array.isArray(synced.seats) ? synced.seats : []).map((seat) => ({
+      ...cloneJson(seat, {}),
+      seatNumber: normalizeSeatNumber(seat?.seatNumber),
+      seatLabel: formatSeatLabel(seat?.seatNumber, seat?.displayName || ''),
+      presenceStatus: getSeatPresenceStatus(seat),
+      lastSeenAt: seat?.lastSeenAt || null,
+      disconnectedAt: seat?.disconnectedAt || null,
+    })),
+    messages: reviewMessages.map((message) => ({
+      ...cloneJson(message, {}),
+      seatNumber: message.seatNumber == null ? null : normalizeSeatNumber(message.seatNumber),
+      seatLabel: message.seatNumber == null
+        ? 'System'
+        : formatSeatLabel(message.seatNumber, seatMap.get(normalizeSeatNumber(message.seatNumber))?.displayName || ''),
+    })),
+    actions: sanitizeActions(reviewActions, synced.seats),
+    disputes: sanitizeDisputesForViewer(reviewDisputes, synced.seats),
+    openDisputes: sanitizeDisputesForViewer(openDisputes, synced.seats),
+    auditEvents: sanitizeAuditEventsForViewer(auditEvents, synced.seats),
+    processAt: requestAt,
+  };
 }
 
 function buildPrivateAgentPrompt(table, handState, seatNumber) {
@@ -700,19 +1020,24 @@ function upsertSeatStacksFromHand(deps, table, seats, hand, atIso) {
     }
     let status = seat.status || 'active';
     const stackOil = Number(seatState.stackOil || 0);
+    let eliminatedAt = seat?.eliminatedAt || null;
     if (String(table?.tableType || 'cash') === 'tournament') {
       if (stackOil <= 0) {
         status = 'busted';
+        eliminatedAt = eliminatedAt || atIso;
       } else if (status !== 'paid') {
         status = 'active';
+        eliminatedAt = null;
       }
     } else if (status !== 'left' && !isSeatPendingCashout(seat)) {
       status = 'active';
+      eliminatedAt = null;
     }
     updated.push(deps.upsertPokerPlaySeat({
       ...seat,
       status,
       stackOil,
+      eliminatedAt,
       updatedAt: atIso,
     }));
   }
@@ -804,7 +1129,10 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
     completedAt: null,
     winnerSeatNumber: 0,
     prizeOil: 0,
+    prizePoolOil: 0,
     prizeSettledAt: null,
+    payouts: [],
+    standings: [],
     lastButtonSeat: normalizeSeatNumber(nextState.buttonSeat),
     activeHandId: hand.handId,
     activeHandNumber: hand.handNumber,
@@ -839,67 +1167,85 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
 
 function settleTournamentIfComplete(deps, table, seats, hand, atIso) {
   if (String(table?.tableType || 'cash') !== 'tournament') return { table, seats, completed: false };
-  const activeSeats = getActiveSeatRows(seats);
-  if (activeSeats.length > 1) return { table, seats, completed: false };
-  const winnerSeat = activeSeats[0] || null;
-  if (!winnerSeat && table?.state?.completedAt) {
-    return { table, seats, completed: true };
+  const seriesRef = getTournamentSeriesRef(table);
+  const tournamentEntries = seriesRef.seriesId && seriesRef.matchKey
+    ? listTournamentSeriesEntriesDirect(deps, seriesRef.matchKey, { includeClosed: true })
+    : [{ table, seats, hand }];
+  const activeSeatCount = tournamentEntries.reduce((sum, entry) => sum + getActiveSeatRows(entry?.seats).length, 0);
+  if (activeSeatCount > 1) return { table, seats, completed: false };
+  const economics = buildTournamentEconomics(tournamentEntries);
+  const standings = Array.isArray(economics.standings) ? economics.standings : [];
+  if (!standings.length) {
+    if (table?.state?.completedAt) {
+      return { table, seats, completed: true };
+    }
+    return { table, seats, completed: false };
   }
-  const nextState = {
-    ...(table.state && typeof table.state === 'object' ? table.state : {}),
-    completedAt: table?.state?.completedAt || atIso,
-    winnerSeatNumber: normalizeSeatNumber(winnerSeat?.seatNumber || table?.state?.winnerSeatNumber),
-    prizeOil: winnerSeat ? Number(winnerSeat.stackOil || 0) : Number(table?.state?.prizeOil || 0),
-    prizeSettledAt: table?.state?.prizeSettledAt || null,
-    activeHandId: hand?.handId || null,
-    activeHandNumber: Number(hand?.handNumber || 0),
-  };
-  let nextSeats = Array.isArray(seats) ? seats.slice() : [];
-  if (winnerSeat && !nextState.prizeSettledAt && Number(winnerSeat.stackOil || 0) > 0) {
-    deps.createOilLedgerEntry({
-      walletSubject: winnerSeat.walletSubject,
-      houseId: winnerSeat.houseId || null,
-      verificationId: winnerSeat.streamflowVerificationId || null,
-      entryKind: 'poker_play_tournament_prize',
-      direction: 'credit',
-      amount: Number(winnerSeat.stackOil || 0),
-      memo: `Tournament prize from ${table.title}`,
-    });
-    deps.createPokerPlayMessage({
-      tableId: table.tableId,
-      handId: hand.handId,
-      seatNumber: null,
-      authorRole: 'system',
-      body: `${formatSeatLabel(winnerSeat.seatNumber, winnerSeat.displayName)} wins ${Number(winnerSeat.stackOil || 0)} OIL.`,
-    });
-    nextState.prizeSettledAt = atIso;
-    nextSeats = nextSeats.map((seat) => {
-      if (normalizeSeatNumber(seat.seatNumber) === normalizeSeatNumber(winnerSeat.seatNumber)) {
-        return deps.upsertPokerPlaySeat({
-          ...seat,
-          status: 'paid',
-          stackOil: 0,
-          updatedAt: atIso,
+  const payoutByPlace = new Map((Array.isArray(economics.payouts) ? economics.payouts : []).map((item) => [Number(item.place || 0), Number(item.amountOil || 0)]));
+  const placementMap = new Map(standings.map((item) => [getTournamentSeatIdentity(item), item]));
+  for (const entry of tournamentEntries) {
+    for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      const identity = getTournamentSeatIdentity(seat);
+      const placement = placementMap.get(identity);
+      if (!placement) continue;
+      const payoutOil = Number(payoutByPlace.get(Number(placement.place || 0)) || 0);
+      if (payoutOil > 0 && !seat?.payoutSettledAt) {
+        deps.createOilLedgerEntry({
+          walletSubject: seat.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          entryKind: 'poker_play_tournament_prize',
+          direction: 'credit',
+          amount: payoutOil,
+          memo: `Tournament prize from ${entry?.table?.title || table?.title}`,
         });
       }
-      if (seat.status === 'active' && Number(seat.stackOil || 0) <= 0) {
-        return deps.upsertPokerPlaySeat({
-          ...seat,
-          status: 'busted',
-          updatedAt: atIso,
+      const isWinner = Number(placement.place || 0) === 1;
+      deps.upsertPokerPlaySeat({
+        ...seat,
+        status: payoutOil > 0 ? 'paid' : 'busted',
+        stackOil: 0,
+        eliminatedAt: isWinner ? seat?.eliminatedAt || null : (seat?.eliminatedAt || atIso),
+        prizeOil: payoutOil,
+        payoutSettledAt: payoutOil > 0 ? (seat?.payoutSettledAt || atIso) : seat?.payoutSettledAt || null,
+        updatedAt: atIso,
+      });
+      const resultHandId = entry?.hand?.handId || entry?.table?.state?.lastSettledHandId || entry?.table?.state?.activeHandId || hand?.handId || null;
+      if (payoutOil > 0 && resultHandId && !seat?.payoutSettledAt) {
+        deps.createPokerPlayMessage({
+          tableId: entry.table.tableId,
+          handId: resultHandId,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} finishes ${Number(placement.place || 0)} and is paid ${payoutOil} OIL.`,
+          createdAt: atIso,
         });
       }
-      return seat;
-    });
+    }
   }
+  const winner = standings[0] || null;
   const updatedTable = deps.upsertPokerPlayTable({
     ...table,
-    state: nextState,
+    state: {
+      ...(table.state && typeof table.state === 'object' ? table.state : {}),
+      completedAt: table?.state?.completedAt || atIso,
+      winnerSeatNumber: winner && String(winner.tableId || '') === String(table.tableId || '')
+        ? normalizeSeatNumber(winner.seatNumber)
+        : normalizeSeatNumber(table?.state?.winnerSeatNumber),
+      prizeOil: Number(economics?.payouts?.[0]?.amountOil || 0),
+      prizePoolOil: Number(economics.prizePoolOil || 0),
+      prizeSettledAt: table?.state?.prizeSettledAt || atIso,
+      payoutModel: economics.payoutModel,
+      payouts: cloneJson(economics.payouts, []),
+      standings: cloneJson(standings, []),
+      activeHandId: hand?.handId || null,
+      activeHandNumber: Number(hand?.handNumber || 0),
+    },
     updatedAt: atIso,
   });
   return {
     table: updatedTable,
-    seats: nextSeats,
+    seats: deps.listPokerPlaySeatsByTable(table.tableId),
     completed: true,
   };
 }
@@ -921,6 +1267,9 @@ function maybeClearReusableTournamentSeats(deps, table) {
       winnerSeatNumber: 0,
       prizeOil: 0,
       prizeSettledAt: null,
+      prizePoolOil: 0,
+      payouts: [],
+      standings: [],
     },
   });
 }
@@ -947,6 +1296,77 @@ function buildSeriesTargetOccupancies(totalActiveSeats, tableCount) {
   const base = Math.floor(total / count);
   const remainder = total % count;
   return Array.from({ length: count }, (_value, index) => base + (index < remainder ? 1 : 0));
+}
+
+function buildTournamentSeriesDirectorPolicy(entries) {
+  const activeEntries = (Array.isArray(entries) ? entries : [])
+    .map((entry) => ({
+      ...entry,
+      activeSeats: Array.isArray(entry?.activeSeats) ? entry.activeSeats : getActiveSeatRows(entry?.seats),
+      live: typeof entry?.live === 'boolean' ? entry.live : !!(entry?.hand && entry.hand.status === 'live'),
+    }))
+    .filter((entry) => entry.activeSeats.length > 0);
+  if (!activeEntries.length) {
+    return {
+      orderedEntries: [],
+      keepers: [],
+      targetByTableId: new Map(),
+      currentTableCount: 0,
+      targetTableCount: 0,
+      totalActiveSeats: 0,
+      targetOccupancies: [],
+      deficitSeatCount: 0,
+      surplusSeatCount: 0,
+      needsRebalance: false,
+      pendingBreakTableId: null,
+      pendingBreakSeatCount: 0,
+      pendingBreakBlockedByLiveTable: false,
+    };
+  }
+  const orderedEntries = sortTournamentSeriesEntriesByOccupancy(activeEntries);
+  const maxSeats = Math.max(
+    1,
+    ...orderedEntries.map((entry) => Number(entry?.table?.maxSeats || POKER_PLAY_MAX_SEATS)).filter((value) => Number.isFinite(value) && value > 0)
+  );
+  const totalActiveSeats = orderedEntries.reduce((sum, entry) => sum + entry.activeSeats.length, 0);
+  const targetTableCount = Math.max(1, Math.ceil(totalActiveSeats / maxSeats));
+  const keepers = orderedEntries.slice(0, targetTableCount);
+  const targetOccupancies = buildSeriesTargetOccupancies(totalActiveSeats, keepers.length);
+  const targetByTableId = new Map(keepers.map((entry, index) => [String(entry?.table?.tableId || ''), targetOccupancies[index] || 0]));
+  const deficitSeatCount = keepers.reduce((sum, entry) => {
+    const tableId = String(entry?.table?.tableId || '');
+    return sum + Math.max(0, Number(targetByTableId.get(tableId) || 0) - entry.activeSeats.length);
+  }, 0);
+  const surplusSeatCount = orderedEntries.reduce((sum, entry) => {
+    const tableId = String(entry?.table?.tableId || '');
+    const target = Number(targetByTableId.has(tableId) ? targetByTableId.get(tableId) : 0);
+    return sum + Math.max(0, entry.activeSeats.length - target);
+  }, 0);
+  const breakCandidates = orderedEntries
+    .filter((entry) => !targetByTableId.has(String(entry?.table?.tableId || '')))
+    .sort((left, right) => {
+      const liveDelta = Number(Boolean(left?.live)) - Number(Boolean(right?.live));
+      if (liveDelta !== 0) return liveDelta;
+      const occupancyDelta = Number(left?.activeSeats?.length || 0) - Number(right?.activeSeats?.length || 0);
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(right?.table?.createdAt || '').localeCompare(String(left?.table?.createdAt || ''));
+    });
+  const pendingBreak = breakCandidates[0] || null;
+  return {
+    orderedEntries,
+    keepers,
+    targetByTableId,
+    currentTableCount: orderedEntries.length,
+    targetTableCount,
+    totalActiveSeats,
+    targetOccupancies,
+    deficitSeatCount,
+    surplusSeatCount,
+    needsRebalance: breakCandidates.length > 0 || (deficitSeatCount > 0 && surplusSeatCount > 0),
+    pendingBreakTableId: pendingBreak?.table?.tableId || null,
+    pendingBreakSeatCount: pendingBreak ? Number(pendingBreak?.activeSeats?.length || 0) : 0,
+    pendingBreakBlockedByLiveTable: !!pendingBreak?.live,
+  };
 }
 
 function sortSeatsForTournamentSeriesTransfer(seats) {
@@ -1035,14 +1455,9 @@ function maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso) {
       closed: false,
     };
   }
-  const orderedEntries = sortTournamentSeriesEntriesByOccupancy(activeEntries);
-  const maxSeats = Math.max(
-    1,
-    ...orderedEntries.map((entry) => Number(entry?.table?.maxSeats || POKER_PLAY_MAX_SEATS)).filter((value) => Number.isFinite(value) && value > 0)
-  );
-  const totalActiveSeats = orderedEntries.reduce((sum, entry) => sum + entry.activeSeats.length, 0);
-  const desiredTableCount = Math.max(1, Math.ceil(totalActiveSeats / maxSeats));
-  if (desiredTableCount === 1 && orderedEntries.some((entry) => entry.live)) {
+  const directorPolicy = buildTournamentSeriesDirectorPolicy(activeEntries);
+  const orderedEntries = directorPolicy.orderedEntries;
+  if (directorPolicy.targetTableCount === 1 && orderedEntries.some((entry) => entry.live)) {
     return {
       table,
       seats,
@@ -1051,9 +1466,8 @@ function maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso) {
       closed: false,
     };
   }
-  const keepers = orderedEntries.slice(0, desiredTableCount);
-  const keeperTargets = buildSeriesTargetOccupancies(totalActiveSeats, keepers.length);
-  const targetByTableId = new Map(keepers.map((entry, index) => [String(entry.table.tableId || ''), keeperTargets[index] || 0]));
+  const keepers = directorPolicy.keepers;
+  const targetByTableId = directorPolicy.targetByTableId;
   const deficits = keepers.map((entry) => ({
     tableId: String(entry.table.tableId || ''),
     target: Number(targetByTableId.get(String(entry.table.tableId || '')) || 0),
@@ -1063,10 +1477,8 @@ function maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso) {
   for (const entry of orderedEntries) {
     if (entry.live) continue;
     const tableId = String(entry.table.tableId || '');
-    const targetOccupancy = Number(targetByTableId.get(tableId));
-    const moveCount = Number.isFinite(targetOccupancy)
-      ? Math.max(0, entry.activeSeats.length - targetOccupancy)
-      : entry.activeSeats.length;
+    const targetOccupancy = Number(targetByTableId.has(tableId) ? targetByTableId.get(tableId) : 0);
+    const moveCount = Math.max(0, entry.activeSeats.length - targetOccupancy);
     if (!moveCount) continue;
     movePool.push(...sortSeatsForTournamentSeriesTransfer(entry.activeSeats).slice(0, moveCount));
   }
@@ -1165,6 +1577,20 @@ function pauseTable(deps, { tableId, reason, actorLabel = 'operator', asOf } = {
         : 'Table paused by operator.',
       createdAt: requestAt,
     });
+    if (typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: updatedTable.tableId,
+        handId: hand?.handId || null,
+        actorRole: normalizePokerPlayAuditActorRole(actorLabel, actorLabel === 'operator' ? 'operator' : 'system'),
+        eventKind: 'table_paused',
+        payload: {
+          reason: normalizeTrimmedString(reason, normalizeTrimmedString(state.pausedReason, 'Operator review')),
+          pausedActionRemainingMs,
+          actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+        },
+        createdAt: requestAt,
+      });
+    }
   }
   return {
     table: updatedTable,
@@ -1220,6 +1646,19 @@ function resumeTable(deps, { tableId, actorLabel = 'operator', asOf } = {}) {
     body: 'Table resumed by operator.',
     createdAt: requestAt,
   });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: table.tableId,
+      handId: hand?.handId || null,
+      actorRole: normalizePokerPlayAuditActorRole(actorLabel, actorLabel === 'operator' ? 'operator' : 'system'),
+      eventKind: 'table_resumed',
+      payload: {
+        actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+        remainingActionMs,
+      },
+      createdAt: requestAt,
+    });
+  }
   const synced = syncPokerPlayTable(deps, table.tableId, { processAt: requestAt });
   return synced || { table, seats, hand };
 }
@@ -1376,10 +1815,11 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   const suggestion = viewerSeat && hand && hand.status === 'live'
     ? derivePokerPlayAgentSuggestion({ table, handState: hand.state, seatNumber: viewerSeat.seatNumber })
     : null;
+  const review = buildPokerPlayReviewSummary(deps, table, seats, hand, walletBinding?.walletSubject || '');
   const seriesRef = getTournamentSeriesRef(table);
   const series = seriesRef.seriesId
     ? buildPokerPlaySeriesSummary(
-      listExistingTournamentSeriesTables(deps, seriesRef.matchKey, { processAt }).map((entry) => {
+      listExistingTournamentSeriesTables(deps, seriesRef.matchKey, { processAt, includeClosed: true }).map((entry) => {
         const currentViewerSeat = walletBinding?.walletSubject
           ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
           : null;
@@ -1392,25 +1832,50 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
       walletBinding?.walletSubject || ''
     )
     : null;
+  const placementByWallet = new Map(
+    (Array.isArray(series?.standings) ? series.standings : [])
+      .filter((item) => normalizeTrimmedString(item?.walletSubject))
+      .map((item) => [normalizeTrimmedString(item.walletSubject), Number(item.place || 0)])
+  );
+  const summarizeSeat = (seat) => {
+    const base = sanitizeSeatForViewer({ seat, hand, viewerSeatNumber: viewerSeat?.seatNumber || 0 });
+    const finishPosition = placementByWallet.get(normalizeTrimmedString(seat?.walletSubject)) || null;
+    return {
+      ...base,
+      finishPosition,
+    };
+  };
+  const tableSummary = {
+    ...computeTableSummary(table, seats, hand, viewerSeat),
+    ...(series
+      ? {
+        prizePoolOil: Number(series?.prizePoolOil || 0),
+        payoutModel: series?.payoutModel || '',
+        paidPlaces: Number(series?.paidPlaces || 0),
+        payouts: cloneJson(series?.payouts, []),
+      }
+      : {}),
+  };
 
   return {
     table: {
       ...table,
-      summary: computeTableSummary(table, seats, hand, viewerSeat),
+      summary: tableSummary,
     },
     series,
     houseId: getSessionHouseId(session),
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     mySeat: viewerSeat
-      ? sanitizeSeatForViewer({ seat: viewerSeat, hand, viewerSeatNumber: viewerSeat.seatNumber })
+      ? summarizeSeat(viewerSeat)
       : null,
     seats: (Array.isArray(seats) ? seats : [])
-      .map((seat) => sanitizeSeatForViewer({ seat, hand, viewerSeatNumber: viewerSeat?.seatNumber || 0 }))
+      .map((seat) => summarizeSeat(seat))
       .sort((left, right) => left.seatNumber - right.seatNumber),
     hand: sanitizeHandForViewer({ table, hand, seats, viewerSeatNumber: viewerSeat?.seatNumber || 0 }),
     messages: sanitizeMessagesForViewer(messages, viewerSeat?.seatNumber || 0),
     actions: sanitizeActions(actions, seats),
+    review,
     suggestion,
     processAt: toProcessIso(deps, processAt),
   };
@@ -1453,9 +1918,21 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
   const series = Array.from(entries.reduce((map, entry) => {
     const ref = getTournamentSeriesRef(entry.table);
     if (!ref.seriesId) return map;
-    const bucket = map.get(ref.seriesId) || [];
-    bucket.push(entry);
-    map.set(ref.seriesId, bucket);
+    if (!map.has(ref.seriesId)) {
+      map.set(ref.seriesId, listExistingTournamentSeriesTables(deps, ref.matchKey, {
+        processAt,
+        includeClosed: true,
+      }).map((seriesEntry) => {
+        const currentViewerSeat = walletBinding?.walletSubject
+          ? deps.getPokerPlaySeatByWalletSubject(seriesEntry.table.tableId, walletBinding.walletSubject)
+          : null;
+        return {
+          ...seriesEntry,
+          viewerSeat: currentViewerSeat,
+          summary: computeTableSummary(seriesEntry.table, seriesEntry.seats, seriesEntry.hand, currentViewerSeat),
+        };
+      }));
+    }
     return map;
   }, new Map()).values())
     .map((seriesEntries) => buildPokerPlaySeriesSummary(seriesEntries, walletBinding?.walletSubject || ''))
@@ -1512,7 +1989,7 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       presenceTimeoutSeconds: normalized.presenceTimeoutSeconds,
       reconnectGraceSeconds: normalized.reconnectGraceSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
-      payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'winner_take_all',
+      payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'dynamic_ladder',
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
@@ -1967,7 +2444,167 @@ function postAction(deps, { handId, session, req, body } = {}) {
   return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
 }
 
+function openHandDispute(deps, { handId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const hand = deps.getPokerPlayHandById(handId);
+  if (!hand) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: requestAt });
+  const currentHand = deps.getPokerPlayHandById(handId) || hand;
+  if (!synced?.table || currentHand.tableId !== synced.table.tableId) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const { walletBinding, seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, walletBinding.walletSubject, requestAt) || seat;
+  const seatNumber = normalizeSeatNumber(touchedSeat.seatNumber);
+  if (!seatNumber || !currentHand?.state?.seatStates || !currentHand.state.seatStates[String(seatNumber)]) {
+    throw createRouteError(403, 'FORBIDDEN', 'Only a seated player from this hand can flag it for review.');
+  }
+  const note = normalizePokerPlayDisputeNote(body?.note);
+  if (!note) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'A review note is required.');
+  }
+  const category = normalizePokerPlayDisputeCategory(body?.category, 'general');
+  const existing = deps.listPokerPlayDisputesByHand(currentHand.handId, { status: 'open', limit: 50 })
+    .find((dispute) => normalizeTrimmedString(dispute?.walletSubject) === normalizeTrimmedString(walletBinding.walletSubject));
+  if (!existing) {
+    const dispute = deps.upsertPokerPlayDispute({
+      disputeId: `pkdp_${deps.randomHex(10)}`,
+      tableId: synced.table.tableId,
+      handId: currentHand.handId,
+      seatNumber,
+      houseId: touchedSeat.houseId || getSessionHouseId(session) || null,
+      walletSubject: walletBinding.walletSubject,
+      status: 'open',
+      category,
+      note,
+      createdAt: requestAt,
+      updatedAt: requestAt,
+    });
+    deps.createPokerPlayMessage({
+      tableId: synced.table.tableId,
+      handId: currentHand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `${formatSeatLabel(seatNumber, touchedSeat.displayName)} flagged the hand for operator review.`,
+      createdAt: requestAt,
+    });
+    if (typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: synced.table.tableId,
+        handId: currentHand.handId,
+        disputeId: dispute.disputeId,
+        seatNumber,
+        actorRole: 'human',
+        eventKind: 'dispute_opened',
+        payload: {
+          category,
+          note,
+          walletSubject: walletBinding.walletSubject,
+          houseId: touchedSeat.houseId || getSessionHouseId(session) || null,
+        },
+        createdAt: requestAt,
+      });
+    }
+  }
+  let refreshed = synced;
+  if (!isTablePaused(synced.table)) {
+    refreshed = pauseTable(deps, {
+      tableId: synced.table.tableId,
+      reason: 'hand review',
+      actorLabel: 'system',
+      asOf: requestAt,
+    });
+  } else {
+    refreshed = {
+      table: synced.table,
+      seats: synced.seats,
+      hand: currentHand,
+    };
+  }
+  return buildPokerPlayTablePayload(
+    deps,
+    refreshed.table,
+    refreshed.seats,
+    refreshed.hand,
+    { session, req, processAt: requestAt }
+  );
+}
+
+function resolveHandDispute(deps, { disputeId, body, processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt || body?.asOf);
+  const dispute = deps.getPokerPlayDisputeById(disputeId);
+  if (!dispute) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker dispute not found.');
+  }
+  if (normalizeTrimmedString(dispute.status).toLowerCase() !== 'open') {
+    throw createRouteError(409, 'POKER_PLAY_DISPUTE_CLOSED', 'This poker dispute is already closed.');
+  }
+  const status = normalizePokerPlayDisputeResolutionStatus(body?.status);
+  if (!status) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Resolution status must be resolved or dismissed.');
+  }
+  const resolutionNote = normalizePokerPlayDisputeNote(body?.resolutionNote);
+  const resolvedBy = normalizeTrimmedString(body?.resolvedBy, 'operator');
+  const updated = deps.upsertPokerPlayDispute({
+    ...dispute,
+    status,
+    resolutionNote: resolutionNote || null,
+    resolvedAt: requestAt,
+    resolvedBy,
+    updatedAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updated.tableId,
+      handId: updated.handId,
+      disputeId: updated.disputeId,
+      seatNumber: updated.seatNumber,
+      actorRole: 'operator',
+      eventKind: status === 'resolved' ? 'dispute_resolved' : 'dispute_dismissed',
+      payload: {
+        status,
+        resolutionNote: resolutionNote || null,
+        resolvedBy,
+      },
+      createdAt: requestAt,
+    });
+  }
+  const hand = deps.getPokerPlayHandById(updated.handId);
+  if (hand) {
+    deps.createPokerPlayMessage({
+      tableId: updated.tableId,
+      handId: hand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: status === 'resolved'
+        ? 'Operator resolved the hand review.'
+        : 'Operator dismissed the hand review.',
+      createdAt: requestAt,
+    });
+  }
+  const remainingOpen = deps.listPokerPlayDisputesByTable(updated.tableId, { status: 'open', limit: 50 });
+  const table = deps.getPokerPlayTableById(updated.tableId);
+  if (body?.resumeTable === true && table && isTablePaused(table) && !remainingOpen.length) {
+    resumeTable(deps, {
+      tableId: updated.tableId,
+      actorLabel: 'operator',
+      asOf: requestAt,
+    });
+  }
+  return {
+    dispute: updated,
+    review: buildPokerPlayAdminReviewPayload(deps, {
+      tableId: updated.tableId,
+      processAt: requestAt,
+      handId: updated.handId,
+    }),
+  };
+}
+
 module.exports = {
+  buildPokerPlayAdminReviewPayload,
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
   createTable,
@@ -1978,9 +2615,11 @@ module.exports = {
   matchmakeIntoTable,
   normalizePokerPlayDisplayName,
   normalizePokerPlayMessageBody,
+  openHandDispute,
   pauseTable,
   postAction,
   postMessage,
+  resolveHandDispute,
   resumeTable,
   seatIntoTable,
   syncPokerPlayTable,

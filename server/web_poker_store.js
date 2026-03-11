@@ -462,6 +462,52 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_actions_hand_created_idx
       ON poker_play_actions(hand_id, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_disputes (
+      dispute_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      hand_id TEXT NOT NULL,
+      seat_number INTEGER,
+      house_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      status TEXT NOT NULL,
+      category TEXT NOT NULL,
+      note TEXT NOT NULL,
+      resolution_note TEXT,
+      resolved_at TEXT,
+      resolved_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_play_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_disputes_table_status_idx
+      ON poker_play_disputes(table_id, status, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_play_disputes_hand_created_idx
+      ON poker_play_disputes(hand_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_play_audit_events (
+      audit_event_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      hand_id TEXT,
+      dispute_id TEXT,
+      seat_number INTEGER,
+      actor_role TEXT NOT NULL,
+      event_kind TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_play_hands(hand_id),
+      FOREIGN KEY (dispute_id) REFERENCES poker_play_disputes(dispute_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_audit_events_table_created_idx
+      ON poker_play_audit_events(table_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_play_audit_events_hand_created_idx
+      ON poker_play_audit_events(hand_id, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_streamflow_lock_verifications (
       verification_id TEXT PRIMARY KEY,
       portal_session_id TEXT,
@@ -534,6 +580,9 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_setup_submissions', 'raw_json', "TEXT NOT NULL DEFAULT '{}'");
   ensureColumnExists(db, 'poker_play_seats', 'last_seen_at', 'TEXT');
   ensureColumnExists(db, 'poker_play_seats', 'disconnected_at', 'TEXT');
+  ensureColumnExists(db, 'poker_play_seats', 'eliminated_at', 'TEXT');
+  ensureColumnExists(db, 'poker_play_seats', 'prize_oil', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumnExists(db, 'poker_play_seats', 'payout_settled_at', 'TEXT');
   seedRegistryEntities();
   seedCentaurTournaments();
   seedPokerPlayTables();
@@ -768,7 +817,7 @@ function seedPokerPlayTables() {
       presenceTimeoutSeconds: 30,
       reconnectGraceSeconds: 90,
       cashOutEnabled: false,
-      payoutModel: 'winner_take_all',
+      payoutModel: 'dynamic_ladder',
       seriesId: 'pkseries_turbo_tournament_01',
       seriesTitle: 'Six-Max Turbo Tournament',
       lateRegistrationHands: 2,
@@ -782,7 +831,7 @@ function seedPokerPlayTables() {
       ],
     }, {}),
     toJson({
-      headline: 'Winner-take-all six-max tournament play for human + AI teams.',
+      headline: 'Six-max tournament play for human + AI teams with a live payout ladder.',
       seriesId: 'pkseries_turbo_tournament_01',
       seriesTitle: 'Six-Max Turbo Tournament',
       chips: 'Offchain OIL',
@@ -825,6 +874,8 @@ function countTableRows(tableName) {
     'poker_play_hands',
     'poker_play_messages',
     'poker_play_actions',
+    'poker_play_disputes',
+    'poker_play_audit_events',
     'poker_streamflow_lock_verifications',
     'poker_oil_snapshot_events',
     'poker_oil_ledger_entries',
@@ -852,6 +903,8 @@ function resetExtendedStore() {
     'poker_centaur_messages',
     'poker_centaur_actions',
     'poker_play_actions',
+    'poker_play_audit_events',
+    'poker_play_disputes',
     'poker_play_messages',
     'poker_play_hands',
     'poker_play_seats',
@@ -2758,6 +2811,9 @@ function hydratePokerPlaySeat(row) {
     streamflowVerificationId: row.streamflow_verification_id || null,
     lastSeenAt: row.last_seen_at || null,
     disconnectedAt: row.disconnected_at || null,
+    eliminatedAt: row.eliminated_at || null,
+    prizeOil: Number(row.prize_oil || 0),
+    payoutSettledAt: row.payout_settled_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -2817,6 +2873,9 @@ function upsertPokerPlaySeat({
   streamflowVerificationId = null,
   lastSeenAt = null,
   disconnectedAt = null,
+  eliminatedAt = null,
+  prizeOil = 0,
+  payoutSettledAt = null,
   createdAt = null,
   updatedAt = null,
 }) {
@@ -2841,9 +2900,12 @@ function upsertPokerPlaySeat({
         streamflow_verification_id,
         last_seen_at,
         disconnected_at,
+        eliminated_at,
+        prize_oil,
+        payout_settled_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(table_id, seat_number) DO UPDATE SET
         portal_session_id = excluded.portal_session_id,
         house_id = excluded.house_id,
@@ -2855,6 +2917,9 @@ function upsertPokerPlaySeat({
         streamflow_verification_id = excluded.streamflow_verification_id,
         last_seen_at = excluded.last_seen_at,
         disconnected_at = excluded.disconnected_at,
+        eliminated_at = excluded.eliminated_at,
+        prize_oil = excluded.prize_oil,
+        payout_settled_at = excluded.payout_settled_at,
         updated_at = excluded.updated_at
     `).run(
       tableId,
@@ -2869,6 +2934,9 @@ function upsertPokerPlaySeat({
       streamflowVerificationId,
       lastSeenAt,
       disconnectedAt,
+      eliminatedAt,
+      Number(prizeOil || 0),
+      payoutSettledAt,
       existing?.created_at || createdAt || now,
       updatedAt || now
     );
@@ -3085,6 +3153,240 @@ function createPokerPlayAction({
     now
   );
   return hydratePokerPlayAction(database.prepare('SELECT * FROM poker_play_actions WHERE action_id = ?').get(nextActionId));
+}
+
+function hydratePokerPlayDispute(row) {
+  if (!row) return null;
+  return {
+    disputeId: row.dispute_id,
+    tableId: row.table_id,
+    handId: row.hand_id,
+    seatNumber: row.seat_number == null ? null : Number(row.seat_number || 0),
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject,
+    status: row.status,
+    category: row.category,
+    note: row.note,
+    resolutionNote: row.resolution_note || null,
+    resolvedAt: row.resolved_at || null,
+    resolvedBy: row.resolved_by || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerPlayDisputeById(disputeId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_play_disputes WHERE dispute_id = ?').get(disputeId);
+  return hydratePokerPlayDispute(row);
+}
+
+function listPokerPlayDisputesByTable(tableId, { status = '', limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE table_id = ? AND status = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(tableId, normalizedStatus, safeLimit)
+    : database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE table_id = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(tableId, safeLimit);
+  return rows.map(hydratePokerPlayDispute).filter(Boolean);
+}
+
+function listPokerPlayDisputesByHand(handId, { status = '', limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE hand_id = ? AND status = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(handId, normalizedStatus, safeLimit)
+    : database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE hand_id = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(handId, safeLimit);
+  return rows.map(hydratePokerPlayDispute).filter(Boolean);
+}
+
+function listPokerPlayDisputesByWalletSubject(walletSubject, { tableId = '', limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const normalizedTableId = typeof tableId === 'string' ? tableId.trim() : '';
+  const rows = normalizedTableId
+    ? database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE wallet_subject = ? AND table_id = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(walletSubject, normalizedTableId, safeLimit)
+    : database.prepare(`
+      SELECT * FROM poker_play_disputes
+      WHERE wallet_subject = ?
+      ORDER BY created_at DESC, dispute_id DESC
+      LIMIT ?
+    `).all(walletSubject, safeLimit);
+  return rows.map(hydratePokerPlayDispute).filter(Boolean);
+}
+
+function upsertPokerPlayDispute({
+  disputeId,
+  tableId,
+  handId,
+  seatNumber = null,
+  houseId = null,
+  walletSubject,
+  status = 'open',
+  category = 'general',
+  note = '',
+  resolutionNote = null,
+  resolvedAt = null,
+  resolvedBy = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_play_disputes WHERE dispute_id = ?').get(disputeId);
+    database.prepare(`
+      INSERT INTO poker_play_disputes (
+        dispute_id,
+        table_id,
+        hand_id,
+        seat_number,
+        house_id,
+        wallet_subject,
+        status,
+        category,
+        note,
+        resolution_note,
+        resolved_at,
+        resolved_by,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(dispute_id) DO UPDATE SET
+        table_id = excluded.table_id,
+        hand_id = excluded.hand_id,
+        seat_number = excluded.seat_number,
+        house_id = excluded.house_id,
+        wallet_subject = excluded.wallet_subject,
+        status = excluded.status,
+        category = excluded.category,
+        note = excluded.note,
+        resolution_note = excluded.resolution_note,
+        resolved_at = excluded.resolved_at,
+        resolved_by = excluded.resolved_by,
+        updated_at = excluded.updated_at
+    `).run(
+      disputeId,
+      tableId,
+      handId,
+      seatNumber == null ? null : Number(seatNumber || 0),
+      houseId,
+      walletSubject,
+      status,
+      category,
+      note,
+      resolutionNote,
+      resolvedAt,
+      resolvedBy,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerPlayDisputeById(disputeId);
+  });
+}
+
+function hydratePokerPlayAuditEvent(row) {
+  if (!row) return null;
+  return {
+    auditEventId: row.audit_event_id,
+    tableId: row.table_id,
+    handId: row.hand_id || null,
+    disputeId: row.dispute_id || null,
+    seatNumber: row.seat_number == null ? null : Number(row.seat_number || 0),
+    actorRole: row.actor_role,
+    eventKind: row.event_kind,
+    payload: fromJson(row.payload_json, {}),
+    createdAt: row.created_at,
+  };
+}
+
+function createPokerPlayAuditEvent({
+  auditEventId = null,
+  tableId,
+  handId = null,
+  disputeId = null,
+  seatNumber = null,
+  actorRole,
+  eventKind,
+  payload = {},
+  createdAt = null,
+}) {
+  const database = ensureDb();
+  const nextAuditEventId = auditEventId || makeId('pkau');
+  const now = createdAt || sqlNow();
+  database.prepare(`
+    INSERT INTO poker_play_audit_events (
+      audit_event_id,
+      table_id,
+      hand_id,
+      dispute_id,
+      seat_number,
+      actor_role,
+      event_kind,
+      payload_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    nextAuditEventId,
+    tableId,
+    handId,
+    disputeId,
+    seatNumber == null ? null : Number(seatNumber || 0),
+    actorRole,
+    eventKind,
+    toJson(payload, {}),
+    now
+  );
+  return hydratePokerPlayAuditEvent(database.prepare('SELECT * FROM poker_play_audit_events WHERE audit_event_id = ?').get(nextAuditEventId));
+}
+
+function listPokerPlayAuditEventsByTable(tableId, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_audit_events
+    WHERE table_id = ?
+    ORDER BY created_at DESC, audit_event_id DESC
+    LIMIT ?
+  `).all(tableId, safeLimit);
+  return rows.map(hydratePokerPlayAuditEvent).filter(Boolean);
+}
+
+function listPokerPlayAuditEventsByHand(handId, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_audit_events
+    WHERE hand_id = ?
+    ORDER BY created_at DESC, audit_event_id DESC
+    LIMIT ?
+  `).all(handId, safeLimit);
+  return rows.map(hydratePokerPlayAuditEvent).filter(Boolean);
 }
 
 function hydrateStreamflowVerification(row) {
@@ -3461,6 +3763,7 @@ module.exports = {
   createImportJob,
   createInvocation,
   createOilLedgerEntry,
+  createPokerPlayAuditEvent,
   createPokerPlayAction,
   createPokerPlayMessage,
   createWebSession,
@@ -3484,6 +3787,7 @@ module.exports = {
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
   getPokerPlayHandById,
+  getPokerPlayDisputeById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -3510,6 +3814,11 @@ module.exports = {
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
   listPokerPlayActionsByHand,
+  listPokerPlayAuditEventsByHand,
+  listPokerPlayAuditEventsByTable,
+  listPokerPlayDisputesByHand,
+  listPokerPlayDisputesByTable,
+  listPokerPlayDisputesByWalletSubject,
   listPokerPlayMessagesByHand,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
@@ -3525,6 +3834,7 @@ module.exports = {
   upsertOilSnapshotEvent,
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
+  upsertPokerPlayDispute,
   upsertPokerPlayHand,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
