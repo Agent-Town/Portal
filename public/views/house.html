@@ -154,9 +154,22 @@
   </p>
   <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
   <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
+  <div class="kv" style="margin:8px 0;" data-testid="house-library-import-controls">
+    <label class="small" for="houseLibraryImportInput">Registry ID</label>
+    <input
+      id="houseLibraryImportInput"
+      data-testid="house-library-import-input"
+      class="pixel-input"
+      type="text"
+      placeholder="reg_..."
+      style="flex:1; min-width:0;"
+    />
+    <button class="btn" id="houseLibraryImportBtn" type="button" data-testid="house-library-import-button" disabled>Import to Library</button>
+  </div>
   <div class="kv stack" id="houseLibraryList" data-testid="house-library-list"></div>
   <div class="small" id="houseLibraryDetail" data-testid="house-library-detail">Select a Library item to inspect its shelf and source.</div>
   <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>
+  <div class="small" id="houseLibraryActionStatus" data-testid="house-library-action-status" style="margin-top:8px; min-height:1.4em;"></div>
 </div>
 
 <div class="panel is-hidden" id="houseTracksPanel" data-testid="house-tracks-panel">

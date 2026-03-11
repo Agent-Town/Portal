@@ -536,7 +536,9 @@ let houseSurfaceState = {
     activeScopeSetId: '',
     selectedItemIds: [],
     selectedItems: [],
-    emptyStateText: 'No curated Library items yet.'
+    emptyStateText: 'No curated Library items yet.',
+    actionStatusText: '',
+    actionStatusError: false,
   },
   tracks: {
     loaded: false,
@@ -1294,6 +1296,15 @@ function setHouseTrainerActionStatus(text, isError = false) {
   houseSurfaceState.trainer.actionStatusError = !!isError;
 }
 
+function setHouseLibraryActionStatus(text, isError = false) {
+  const node = el('houseLibraryActionStatus');
+  houseSurfaceState.library.actionStatusText = String(text || '');
+  houseSurfaceState.library.actionStatusError = !!isError;
+  if (!node) return;
+  node.textContent = String(text || '');
+  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+}
+
 function setHouseWorkshopActionStatus(text, isError = false) {
   const node = el('houseWorkshopActionStatus');
   houseSurfaceState.workshop.actionStatusText = String(text || '');
@@ -1392,6 +1403,20 @@ function makeHouseIdempotencyKey(prefix) {
     return `${safePrefix}_${window.crypto.randomUUID()}`;
   }
   return `${safePrefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeHouseIdempotencyKeyPart(value = '') {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return normalized || 'x';
+}
+
+function makeStableHouseIdempotencyKey(prefix, parts = []) {
+  const safePrefix = normalizeHouseIdempotencyKeyPart(prefix || 'house');
+  const safeParts = (Array.isArray(parts) ? parts : [parts])
+    .map((part) => normalizeHouseIdempotencyKeyPart(part))
+    .filter(Boolean)
+    .slice(0, 8);
+  return [safePrefix, ...safeParts].join('_').slice(0, 180);
 }
 
 function resetHouseTrainerActionKeys() {
@@ -1761,13 +1786,65 @@ async function updateHouseLibraryScopeSelection(nextItemIds = []) {
   return data;
 }
 
+function syncHouseLibraryImportControls() {
+  const importInput = el('houseLibraryImportInput');
+  const importBtn = el('houseLibraryImportBtn');
+  if (!importBtn) return;
+  importBtn.disabled = !String(importInput?.value || '').trim();
+}
+
+async function importHouseLibraryRegistryArtifact() {
+  const importInput = el('houseLibraryImportInput');
+  const registryEntityId = String(importInput?.value || '').trim();
+  if (!registryEntityId) {
+    throw new Error('REGISTRY_ENTITY_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_import_registry', [
+    houseId,
+    teamId,
+    registryEntityId,
+  ]);
+  setHouseSurfaceStatus(`Importing ${registryEntityId} from Registry...`);
+  setHouseLibraryActionStatus(`Importing ${registryEntityId} from Registry...`);
+  const response = await apiWithRetry('/api/platform/library/imports', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      registryEntityId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const importedItemId = String(data?.item?.libraryItemId || '').trim();
+  const importedTitle = String(data?.item?.title || data?.import?.registryEntityId || registryEntityId).trim() || registryEntityId;
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (importedItemId) {
+    houseSurfaceState.library.selectedItemId = importedItemId;
+    renderHouseLibrarySurface();
+  }
+  if (importInput) {
+    importInput.value = '';
+  }
+  syncHouseLibraryImportControls();
+  setHouseLibraryActionStatus(`Imported ${importedTitle} from Registry.`);
+  setHouseSurfaceStatus(`Imported ${importedTitle} from Registry.`);
+  return data;
+}
+
 function renderHouseLibrarySurface() {
   const listNode = el('houseLibraryList');
   const detailNode = el('houseLibraryDetail');
   const emptyNode = el('houseLibraryEmpty');
   const selectedNode = el('houseLibrarySelected');
   const actionsNode = el('houseLibraryActions');
-  if (!listNode || !detailNode || !emptyNode || !selectedNode || !actionsNode) return;
+  const importInput = el('houseLibraryImportInput');
+  const importBtn = el('houseLibraryImportBtn');
+  if (!listNode || !detailNode || !emptyNode || !selectedNode || !actionsNode || !importInput || !importBtn) return;
   const items = Array.isArray(houseSurfaceState.library.items) ? houseSurfaceState.library.items : [];
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
@@ -1775,6 +1852,11 @@ function renderHouseLibrarySurface() {
   actionsNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.library.emptyStateText || 'No curated Library items yet.';
   emptyNode.classList.toggle('is-hidden', items.length > 0);
+  setHouseLibraryActionStatus(
+    houseSurfaceState.library.actionStatusText,
+    houseSurfaceState.library.actionStatusError
+  );
+  syncHouseLibraryImportControls();
   selectedNode.textContent = selectedItems.length
     ? `Selected for this chat: ${selectedItems.map((item) => String(item?.title || item?.libraryItemId || '')).join(', ')}`
     : 'Selected for this chat: none.';
@@ -5162,6 +5244,37 @@ function bindTownDistrictControls() {
         setHouseTrainerActionStatus(String(err?.message || 'LIBRARY_PROMOTION_FAILED'), true);
       } finally {
         renderHouseTrainerSurface();
+      }
+    };
+  }
+
+  const houseLibraryImportInput = el('houseLibraryImportInput');
+  if (houseLibraryImportInput) {
+    houseLibraryImportInput.oninput = () => {
+      syncHouseLibraryImportControls();
+    };
+    houseLibraryImportInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryImportBtn = el('houseLibraryImportBtn');
+      if (houseLibraryImportBtn && !houseLibraryImportBtn.disabled) {
+        houseLibraryImportBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryImportBtn = el('houseLibraryImportBtn');
+  if (houseLibraryImportBtn) {
+    houseLibraryImportBtn.onclick = async () => {
+      houseLibraryImportBtn.disabled = true;
+      try {
+        await importHouseLibraryRegistryArtifact();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_IMPORT_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
       }
     };
   }
