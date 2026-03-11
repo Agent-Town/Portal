@@ -129,11 +129,15 @@ async function runHouseOfficeJourney(page, fixture) {
   const initialWorkerSessionId = await readWorkerSessionId(page);
   const initialContext = await getPlatformContextFromPage(page);
   const initialUrl = page.url();
+  const overviewResponse = await page.request.get('/api/platform/house-office');
+  const overviewBody = await overviewResponse.json();
+  const briefingGroups = Array.isArray(overviewBody?.data?.briefing) ? overviewBody.data.briefing : [];
+  const attentionItems = Array.isArray(overviewBody?.data?.attention) ? overviewBody.data.attention : [];
 
   await page.getByTestId('house-open-office').click();
   await expect(page.getByTestId('house-office-panel')).toBeVisible();
-  await expect(page.getByTestId('house-office-briefing-group')).toHaveCount(4);
-  await expect(page.getByTestId('house-office-attention-item')).toHaveCount(3);
+  await expect(page.getByTestId('house-office-briefing-group')).toHaveCount(briefingGroups.length);
+  await expect(page.getByTestId('house-office-attention-item')).toHaveCount(attentionItems.length);
   checkpoints.push(`${fixture.checkpoints[0]}:${String(initialContext?.data?.activeTeamId || '')}`);
 
   const firstGroupText = await page.getByTestId('house-office-briefing-group').nth(0).innerText();

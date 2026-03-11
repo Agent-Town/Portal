@@ -4,11 +4,13 @@
   "severityOrder": [
     "critical",
     "warn",
+    "info",
     "info"
   ],
   "expectedSurfaces": [
     "trainer",
     "workshop",
-    "tracks"
+    "tracks",
+    "archive"
   ]
 }

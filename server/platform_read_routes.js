@@ -1001,12 +1001,22 @@ function registerPlatformReadRoutes(app, deps) {
     }, 0);
   }
 
+  function isHouseOfficeOpsExperienceId(experienceId = '') {
+    const normalizedExperienceId = String(experienceId || '').trim().toLowerCase();
+    if (!normalizedExperienceId) return false;
+    return normalizedExperienceId === 'web'
+      || normalizedExperienceId === 'poker'
+      || normalizedExperienceId.startsWith('web.')
+      || normalizedExperienceId.startsWith('poker.');
+  }
+
   function buildHouseOfficeBriefing({
     binding = null,
     trainerJobs = [],
     trainerResults = [],
     archiveRuns = [],
     trackPayload = null,
+    experiences = [],
   } = {}) {
     const fixture = getUnifiedPlatformTestFixture('house_office_briefing_seed') || {};
     const rawWindowHours = Number(fixture?.defaultWindowHours || 24);
@@ -1189,6 +1199,91 @@ function registerPlatformReadRoutes(app, deps) {
       });
     });
 
+    const experienceItemsById = new Map(
+      (Array.isArray(experiences) ? experiences : [])
+        .map((item) => [String(item?.experienceId || '').trim(), item])
+        .filter(([experienceId]) => experienceId)
+    );
+    const runsByExperienceId = new Map();
+    (Array.isArray(archiveRuns) ? archiveRuns : []).forEach((run) => {
+      const experienceId = String(run?.experienceId || '').trim();
+      if (!experienceId) return;
+      const entries = runsByExperienceId.get(experienceId) || [];
+      entries.push(run);
+      runsByExperienceId.set(experienceId, entries);
+    });
+
+    Array.from(runsByExperienceId.entries()).forEach(([experienceId, experienceRuns]) => {
+      const latestRun = [...experienceRuns].sort((left, right) => {
+        const createdAtDelta = parseHouseOfficeActivityTime(String(right?.completedAt || right?.updatedAt || right?.createdAt || ''))
+          - parseHouseOfficeActivityTime(String(left?.completedAt || left?.updatedAt || left?.createdAt || ''));
+        if (createdAtDelta !== 0) return createdAtDelta;
+        return String(right?.runId || '').localeCompare(String(left?.runId || ''));
+      })[0] || null;
+      const displayName = String(
+        experienceItemsById.get(experienceId)?.displayName
+        || experienceItemsById.get(experienceId)?.title
+        || experienceId
+      ).trim() || experienceId;
+      const latestRunId = String(latestRun?.runId || '').trim();
+      const latestTraceId = String(latestRun?.traceId || '').trim();
+      addBriefingItem('experiences', {
+        briefingId: `experience:${experienceId}`,
+        title: `${displayName} remains active`,
+        summary: `${experienceRuns.length} recent House run${experienceRuns.length === 1 ? '' : 's'} are attached to ${displayName}.`,
+        createdAt: String(latestRun?.completedAt || latestRun?.updatedAt || latestRun?.createdAt || '').trim(),
+        citations: [
+          {
+            sourceKind: 'experience',
+            sourceId: experienceId,
+            entryPath: '/api/platform/experiences',
+            selection: buildHouseOfficeSelection({
+              sourceKind: 'experience',
+              sourceId: experienceId,
+              entryPath: '/api/platform/experiences',
+            }),
+          },
+          latestRunId
+            ? {
+              sourceKind: 'run',
+              sourceId: latestRunId,
+              entryPath: '/api/platform/archive',
+              selection: buildHouseOfficeSelection({
+                sourceKind: 'run',
+                sourceId: latestRunId,
+                entryPath: '/api/platform/archive',
+                runId: latestRunId,
+                traceId: latestTraceId,
+                experienceId,
+              }),
+            }
+            : null,
+        ].filter(Boolean),
+      });
+      if (!isHouseOfficeOpsExperienceId(experienceId) || !latestRunId) return;
+      addBriefingItem('poker_or_web', {
+        briefingId: `ops:${latestRunId}`,
+        title: `${displayName} activity recorded`,
+        summary: `Run ${latestRunId} is available for operations review in the archive.`,
+        createdAt: String(latestRun?.completedAt || latestRun?.updatedAt || latestRun?.createdAt || '').trim(),
+        citations: [
+          {
+            sourceKind: 'run',
+            sourceId: latestRunId,
+            entryPath: '/api/platform/archive',
+            selection: buildHouseOfficeSelection({
+              sourceKind: 'run',
+              sourceId: latestRunId,
+              entryPath: '/api/platform/archive',
+              runId: latestRunId,
+              traceId: latestTraceId,
+              experienceId,
+            }),
+          },
+        ],
+      });
+    });
+
     return groupOrder.map((family) => {
       const items = (groups.get(family) || []).sort((left, right) => {
         const createdAtDelta = parseHouseOfficeActivityTime(String(right.createdAt || '')) - parseHouseOfficeActivityTime(String(left.createdAt || ''));
@@ -1209,6 +1304,8 @@ function registerPlatformReadRoutes(app, deps) {
     trainerJobs = [],
     trainerResults = [],
     trackPayload = null,
+    archiveRuns = [],
+    experiences = [],
     deeplinks = {},
   } = {}) {
     const fixture = getUnifiedPlatformTestFixture('house_office_attention_seed') || {};
@@ -1299,6 +1396,52 @@ function registerPlatformReadRoutes(app, deps) {
             sourceId: latestTrackEventId,
             entryPath: '/api/platform/tracks',
             trackId: String(latestTrackEvent?.trackId || '').trim(),
+          })
+        ),
+      });
+    }
+
+    const experienceItemsById = new Map(
+      (Array.isArray(experiences) ? experiences : [])
+        .map((item) => [String(item?.experienceId || '').trim(), item])
+        .filter(([experienceId]) => experienceId)
+    );
+    const latestOpsRun = [...(Array.isArray(archiveRuns) ? archiveRuns : [])]
+      .filter((run) => isHouseOfficeOpsExperienceId(run?.experienceId))
+      .sort((left, right) => {
+        const createdAtDelta = parseHouseOfficeActivityTime(String(right?.completedAt || right?.updatedAt || right?.createdAt || ''))
+          - parseHouseOfficeActivityTime(String(left?.completedAt || left?.updatedAt || left?.createdAt || ''));
+        if (createdAtDelta !== 0) return createdAtDelta;
+        return String(right?.runId || '').localeCompare(String(left?.runId || ''));
+      })[0] || null;
+    const latestOpsRunId = String(latestOpsRun?.runId || '').trim();
+    if (latestOpsRunId) {
+      const experienceId = String(latestOpsRun?.experienceId || '').trim();
+      const displayName = String(
+        experienceItemsById.get(experienceId)?.displayName
+        || experienceItemsById.get(experienceId)?.title
+        || experienceId
+      ).trim() || experienceId;
+      items.push({
+        attentionId: `ops:${latestOpsRunId}`,
+        severity: 'info',
+        title: sanitizeHouseOfficeText(`${displayName} activity captured`, 'Sensitive attention item'),
+        summary: sanitizeHouseOfficeText(
+          `Run ${latestOpsRunId} is ready for operations review in the archive.`,
+          'Sensitive attention details redacted'
+        ),
+        sourceKind: 'run',
+        sourceId: latestOpsRunId,
+        createdAt: '',
+        deepLink: buildHouseOfficeDeepLinkWithSelection(
+          deeplinks.archive || deeplinks.office,
+          buildHouseOfficeSelection({
+            sourceKind: 'run',
+            sourceId: latestOpsRunId,
+            entryPath: '/api/platform/archive',
+            runId: latestOpsRunId,
+            traceId: String(latestOpsRun?.traceId || '').trim(),
+            experienceId,
           })
         ),
       });
@@ -1437,6 +1580,7 @@ function registerPlatformReadRoutes(app, deps) {
         trainerResults,
         archiveRuns,
         trackPayload: tracksPayload,
+        experiences,
       })
       : [];
     const attention = houseId
@@ -1445,6 +1589,8 @@ function registerPlatformReadRoutes(app, deps) {
         trainerJobs,
         trainerResults,
         trackPayload: tracksPayload,
+        archiveRuns,
+        experiences,
         deeplinks,
       })
       : [];

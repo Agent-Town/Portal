@@ -1,0 +1,10 @@
+{
+  "family": "house_office_ops_breadth_seed",
+  "schema": "agent-town-house-office-ops-breadth-seed/v1",
+  "expectedBriefingFamilies": [
+    "experiences",
+    "poker_or_web"
+  ],
+  "expectedAttentionSourceKind": "run",
+  "expectedAttentionSurface": "archive"
+}

@@ -964,6 +964,7 @@ Response fields:
 Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and canonical House Office structure.
 The same payload also drives the client-side House Office district shell; there is no separate district-shell route.
 House Office overview text is projection-safe: raw `prompt`, `callbackUrl`, `credential`, `accessToken`, and `sealedPayload` strings are redacted from assignment focus, presence, briefing, and attention summaries.
+When eligible recent activity exists, briefing families can include `experiences` and `poker_or_web`, and attention can include archive-linked operational run items with exact selection.
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
@@ -1058,6 +1059,8 @@ Response fields:
 - `data.attention[].deepLink.surface`
 - `data.attention[].deepLink.label`
 - `data.attention[].deepLink.selection.kind`
+- `data.attention[].deepLink.selection.traceId`
+- `data.attention[].deepLink.selection.runId`
 - `data.deeplinks.office`
 - `data.deeplinks.experiences`
 - `data.deeplinks.workshop`
