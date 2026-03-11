@@ -396,6 +396,7 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[]`
 - `data.items[].tableId`
 - `data.items[].tableType`
+- `data.items[].accessMode`
 - `data.items[].seriesId` for tournament tables
 - `data.items[].seriesTitle` for tournament tables
 - `data.items[].summary.occupancy`
@@ -444,11 +445,20 @@ Response fields:
 - `data.houseId = null`
 - `data.wallet = null`
 - `data.oilBalance = null`
+- invite-only tables and invite-only tournament series do not appear in public rail discovery
 
 ### GET `/api/poker/play/tables/:tableId`
 Returns one live cash or tournament table payload with:
 - `data.viewerMode = "player"`
 - `data.table`
+- `data.table.access`
+- `data.table.access.mode` as `public` or `invite_only`
+- `data.table.access.inviteOnly`
+- `data.table.access.viewerAuthorized`
+- `data.table.access.viewerAuthorizedByInvite`
+- `data.table.access.viewerCanShareInvite`
+- `data.table.access.inviteCode` only for the invite-table creator
+- `data.table.access.inviteJoinPath` only for the invite-table creator
 - `data.series` for tournament tables
 - `data.waitlist`
 - `data.seats[]`
@@ -480,6 +490,7 @@ Cash lifecycle and waitlist notes:
 - `data.waitlist.viewerQueued` and `data.waitlist.viewerPosition` describe the bound wallet’s current queue state when it is not yet seated
 - cash-seat statuses may include `active`, `sitting_out`, `sitout_next_hand`, `away`, `away_next_hand`, and `leaving_after_hand`
 - `data.table.summary.occupancy` counts seats that still physically occupy the table, while `data.table.summary.activeSeatCount` excludes cash seats that are sitting out or away between hands
+- invite-only tables require a valid `inviteCode` on pre-join reads and seat/waitlist entry unless the wallet is already seated or created the table
 
 ### GET `/api/poker/play/tables/:tableId/history`
 Returns recent hand history for one table with:
@@ -708,6 +719,7 @@ Request shape:
 ```json
 {
   "tableType": "cash",
+  "accessMode": "invite_only",
   "title": "6-Max Cash 25/50",
   "smallBlindOil": 25,
   "bigBlindOil": 50,
@@ -728,6 +740,14 @@ Optional live-play request fields:
 - `presenceTimeoutSeconds`
 - `reconnectGraceSeconds`
 - `timeBankSeconds`
+- `accessMode`; defaults to `public`
+- `inviteCode`; optional creator-supplied invite code when `accessMode = "invite_only"`; otherwise the server generates one
+
+Invite-only table notes:
+- invite-only tables are created directly through this route, not through matchmaking
+- the creator response includes `data.table.access.inviteCode` and `data.table.access.inviteJoinPath`
+- invite-only tables stay out of public lobby and rail payloads
+- invite-only tables still support direct join and cash waitlist through the normal table routes when the caller supplies the valid invite code
 
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
@@ -737,7 +757,8 @@ Request shape:
 {
   "seatNumber": 1,
   "displayName": "Alpha House",
-  "buyInOil": 400
+  "buyInOil": 400,
+  "inviteCode": "PK-AB12CD34"
 }
 ```
 
@@ -755,6 +776,7 @@ Failure codes:
 - `POKER_PLAY_SEAT_ALREADY_ACTIVE`
 - `POKER_PLAY_TABLE_FULL`
 - `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
+- `POKER_PLAY_INVITE_REQUIRED`
 - `OIL_BALANCE_TOO_LOW`
 
 Tournament seat notes:
@@ -843,6 +865,7 @@ Request shape:
 {
   "displayName": "Queue One",
   "buyInOil": 250,
+  "inviteCode": "PK-AB12CD34",
   "asOf": "2026-03-11T10:00:30.000Z"
 }
 ```
@@ -862,6 +885,7 @@ Failure codes:
 - `POKER_PLAY_SEAT_ALREADY_ACTIVE`
 - `POKER_PLAY_ALREADY_SEATED`
 - `POKER_PLAY_WAITLIST_NOT_NEEDED`
+- `POKER_PLAY_INVITE_REQUIRED`
 - `OIL_BALANCE_TOO_LOW`
 
 ### DELETE `/api/poker/play/tables/:tableId/waitlist`
@@ -903,6 +927,7 @@ Response fields:
 Tournament matchmaking notes:
 - tournament matching includes `lateRegistrationHands` as part of the structure key
 - tournament matching also includes `reentryLimit` as part of the structure key
+- invite-only tables are out of scope for matchmaking and must be created directly with `POST /api/poker/play/tables`
 - if a matching tournament table is already live but still within the late-registration window, matchmaking may seat the caller into that live table as `registered`
 - if a matching tournament table is still `scheduled`, matchmaking may seat the caller before cards are dealt and preserve the scheduled start timestamp in the returned table payload
 

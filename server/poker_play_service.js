@@ -124,6 +124,20 @@ function normalizePokerPlayTableType(value, fallback = 'cash') {
   return type === 'tournament' ? 'tournament' : 'cash';
 }
 
+function normalizePokerPlayAccessMode(value, fallback = 'public') {
+  const mode = normalizeTrimmedString(value, fallback).toLowerCase();
+  return mode === 'invite_only' ? 'invite_only' : 'public';
+}
+
+function normalizePokerPlayInviteCode(value, fallback = '') {
+  const code = normalizeTrimmedString(value, fallback)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+  return code || fallback;
+}
+
 function normalizeCashLifecycleSeatStatus(value, fallback = 'active') {
   const status = normalizeTrimmedString(value, fallback).toLowerCase();
   const allowed = new Set([
@@ -198,6 +212,7 @@ function slugifySegment(value, fallback = 'table') {
 
 function normalizeCreateTableConfig(input = {}) {
   const tableType = normalizePokerPlayTableType(input?.tableType);
+  const accessMode = normalizePokerPlayAccessMode(input?.accessMode);
   const smallBlindOil = Math.max(1, normalizeOilAmount(input?.smallBlindOil, tableType === 'cash' ? 10 : 50));
   const bigBlindOil = Math.max(smallBlindOil * 2, normalizeOilAmount(input?.bigBlindOil, tableType === 'cash' ? 20 : 100));
   const buyInOil = Math.max(bigBlindOil * 10, normalizeOilAmount(input?.buyInOil, tableType === 'cash' ? 400 : 300));
@@ -236,6 +251,7 @@ function normalizeCreateTableConfig(input = {}) {
     : 0;
   return {
     tableType,
+    accessMode,
     smallBlindOil,
     bigBlindOil,
     buyInOil,
@@ -253,6 +269,9 @@ function normalizeCreateTableConfig(input = {}) {
     seriesTitle,
     scheduledStartAt,
     reentryLimit,
+    inviteCode: accessMode === 'invite_only' ? normalizePokerPlayInviteCode(input?.inviteCode) : '',
+    creatorWalletSubject: normalizeTrimmedString(input?.creatorWalletSubject),
+    creatorHouseId: normalizeTrimmedString(input?.creatorHouseId),
   };
 }
 
@@ -337,6 +356,154 @@ function getTournamentSeriesRef(table) {
     seriesId: normalizeTrimmedString(table?.rules?.seriesId || table?.summary?.seriesId),
     seriesTitle: normalizeTrimmedString(table?.rules?.seriesTitle || table?.summary?.seriesTitle || table?.title, table?.title || 'Tournament Series'),
     matchKey: normalizeTrimmedString(table?.rules?.matchKey || table?.summary?.matchKey || buildMatchKeyFromTable(table)),
+  };
+}
+
+function buildPokerPlayInviteCode(deps) {
+  return normalizePokerPlayInviteCode(`PK-${String(deps.randomHex(8) || '').slice(0, 8)}`);
+}
+
+function getPokerPlayTableAccess(table) {
+  const rules = table?.rules && typeof table.rules === 'object' ? table.rules : {};
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const mode = normalizePokerPlayAccessMode(rules.accessMode || state.accessMode, 'public');
+  return {
+    mode,
+    inviteOnly: mode === 'invite_only',
+    inviteCode: mode === 'invite_only'
+      ? normalizePokerPlayInviteCode(rules.inviteCode || state.inviteCode)
+      : '',
+    creatorWalletSubject: normalizeTrimmedString(
+      state.createdByWalletSubject,
+      normalizeTrimmedString(rules.createdByWalletSubject)
+    ),
+    creatorHouseId: normalizeTrimmedString(
+      state.createdByHouseId,
+      normalizeTrimmedString(rules.createdByHouseId)
+    ),
+  };
+}
+
+function sanitizePokerPlayTableRecord(table) {
+  const safe = cloneJson(table, {});
+  if (!safe || typeof safe !== 'object') return {};
+  if (safe.rules && typeof safe.rules === 'object') {
+    delete safe.rules.inviteCode;
+    delete safe.rules.createdByWalletSubject;
+    delete safe.rules.createdByHouseId;
+  }
+  if (safe.state && typeof safe.state === 'object') {
+    delete safe.state.inviteCode;
+    delete safe.state.createdByWalletSubject;
+    delete safe.state.createdByHouseId;
+  }
+  return safe;
+}
+
+function isInviteOnlyPokerPlayTable(table) {
+  return getPokerPlayTableAccess(table).inviteOnly;
+}
+
+function parsePokerPlayInviteCode(req, body = null) {
+  return normalizePokerPlayInviteCode(
+    body?.inviteCode
+      || req?.query?.inviteCode
+      || req?.headers?.['x-poker-invite-code']
+  );
+}
+
+function resolvePokerPlayInviteAuthorization(table, {
+  walletSubject = '',
+  houseId = '',
+  viewerSeat = null,
+  inviteCode = '',
+} = {}) {
+  const access = getPokerPlayTableAccess(table);
+  if (!access.inviteOnly) {
+    return {
+      access,
+      authorized: true,
+      bySeat: !!viewerSeat,
+      byCreator: false,
+      byInvite: false,
+    };
+  }
+  const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
+  const normalizedHouseId = normalizeTrimmedString(houseId);
+  const normalizedInviteCode = normalizePokerPlayInviteCode(inviteCode);
+  const bySeat = !!viewerSeat;
+  const byCreator = !!(
+    (normalizedWalletSubject && normalizedWalletSubject === access.creatorWalletSubject)
+      || (normalizedHouseId && normalizedHouseId === access.creatorHouseId)
+  );
+  const byInvite = !!(
+    normalizedInviteCode
+      && access.inviteCode
+      && normalizedInviteCode === access.inviteCode
+  );
+  return {
+    access,
+    authorized: bySeat || byCreator || byInvite,
+    bySeat,
+    byCreator,
+    byInvite,
+  };
+}
+
+function requirePokerPlayTableAccess(table, {
+  walletSubject = '',
+  houseId = '',
+  viewerSeat = null,
+  inviteCode = '',
+  publicViewer = false,
+} = {}) {
+  const authorization = resolvePokerPlayInviteAuthorization(table, {
+    walletSubject,
+    houseId,
+    viewerSeat,
+    inviteCode,
+  });
+  if (!authorization.access.inviteOnly) {
+    return authorization;
+  }
+  if (publicViewer) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (!authorization.authorized) {
+    throw createRouteError(403, 'POKER_PLAY_INVITE_REQUIRED', 'This poker table requires a valid invite code.');
+  }
+  return authorization;
+}
+
+function requirePokerPlaySeriesAccess(entries, {
+  walletSubject = '',
+  houseId = '',
+  inviteCode = '',
+  publicViewer = false,
+} = {}) {
+  const items = Array.isArray(entries) ? entries : [];
+  const inviteOnlyEntries = items.filter((entry) => isInviteOnlyPokerPlayTable(entry?.table));
+  if (!inviteOnlyEntries.length) {
+    return {
+      inviteOnly: false,
+      authorized: true,
+    };
+  }
+  if (publicViewer) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const authorized = inviteOnlyEntries.some((entry) => resolvePokerPlayInviteAuthorization(entry?.table, {
+    walletSubject,
+    houseId,
+    viewerSeat: entry?.viewerSeat || null,
+    inviteCode,
+  }).authorized);
+  if (!authorized) {
+    throw createRouteError(403, 'POKER_PLAY_INVITE_REQUIRED', 'This poker tournament requires a valid invite code.');
+  }
+  return {
+    inviteOnly: true,
+    authorized: true,
   };
 }
 
@@ -966,6 +1133,7 @@ function computeBuyInOil(table, requestedBuyInOil) {
 }
 
 function computeTableSummary(table, seats, hand, viewerSeat) {
+  const access = getPokerPlayTableAccess(table);
   const activeSeats = getActiveSeatRows(seats);
   const occupiedSeats = (Array.isArray(seats) ? seats : []).filter(isSeatOccupyingTable);
   const disconnectedSeatCount = activeSeats.filter((seat) => getSeatPresenceStatus(seat) === 'disconnected').length;
@@ -995,6 +1163,8 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     entryCount: getTournamentTableEntryCount(table, seats),
     acceptedReentryCount: Math.max(0, normalizeOilAmount(table?.state?.reentryCount, 0)),
     registrationClosedByDirectorAt: normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt) || null,
+    accessMode: access.mode,
+    inviteOnly: access.inviteOnly,
   };
 }
 
@@ -1005,6 +1175,8 @@ function buildDynamicTableSummary(config, matchKey) {
       : 'Six-max tournament with a real payout ladder and private human + agent seat threads.',
     matchKey,
     origin: 'dynamic',
+    accessMode: normalizePokerPlayAccessMode(config?.accessMode),
+    inviteOnly: normalizePokerPlayAccessMode(config?.accessMode) === 'invite_only',
   };
   if (config.tableType === 'tournament') {
     summary.seriesId = normalizeTrimmedString(config?.seriesId);
@@ -4731,9 +4903,16 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
 
 function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, processAt, publicViewer = false, seatAgentMode = '' } = {}) {
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
   const viewerSeat = walletBinding?.walletSubject
     ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
     : null;
+  const inviteAuthorization = resolvePokerPlayInviteAuthorization(table, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    viewerSeat,
+    inviteCode: parsePokerPlayInviteCode(req),
+  });
   const messages = hand ? deps.listPokerPlayMessagesByHand(hand.handId) : [];
   const actions = hand ? deps.listPokerPlayActionsByHand(hand.handId) : [];
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
@@ -4797,12 +4976,23 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   return {
     viewerMode: publicViewer ? 'public' : 'player',
     table: {
-      ...table,
+      ...sanitizePokerPlayTableRecord(table),
       summary: tableSummary,
+      access: {
+        mode: inviteAuthorization.access.mode,
+        inviteOnly: inviteAuthorization.access.inviteOnly,
+        viewerAuthorized: !publicViewer && inviteAuthorization.authorized,
+        viewerAuthorizedByInvite: !publicViewer && inviteAuthorization.byInvite,
+        viewerCanShareInvite: !publicViewer && inviteAuthorization.byCreator,
+        inviteCode: !publicViewer && inviteAuthorization.byCreator ? inviteAuthorization.access.inviteCode : null,
+        inviteJoinPath: !publicViewer && inviteAuthorization.byCreator && inviteAuthorization.access.inviteCode
+          ? `/poker/play/tables/${encodeURIComponent(table.tableId)}?inviteCode=${encodeURIComponent(inviteAuthorization.access.inviteCode)}`
+          : null,
+      },
     },
     series,
     waitlist,
-    houseId: publicViewer ? null : getSessionHouseId(session),
+    houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     mySeat: viewerSeat
@@ -4823,40 +5013,49 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
 
 function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewer = false } = {}) {
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
   const entries = deps.listPokerPlayTables()
     .filter((table) => !isSeriesClosedTable(table))
     .map((table) => {
-    const synced = syncPokerPlayTable(deps, table.tableId, { processAt });
-    const viewerSeat = walletBinding?.walletSubject
-      ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
-      : null;
-    const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
-    const waitlist = buildWaitlistSummary(
-      typeof deps.listPokerPlayWaitlistEntriesByTable === 'function'
-        ? deps.listPokerPlayWaitlistEntriesByTable(synced.table.tableId, { status: 'waiting' })
-        : [],
-      walletBinding?.walletSubject || ''
-    );
-    return {
-      table: synced.table,
-      seats: synced.seats,
-      hand: synced.hand,
-      viewerSeat,
-      summary: {
-        ...summary,
-        waitlistCount: Number(waitlist?.count || 0),
-        viewerWaitlistPosition: waitlist?.viewerPosition ?? null,
-      },
-    };
-    });
+      const synced = syncPokerPlayTable(deps, table.tableId, { processAt });
+      const viewerSeat = walletBinding?.walletSubject
+        ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
+        : null;
+      const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
+      const waitlist = buildWaitlistSummary(
+        typeof deps.listPokerPlayWaitlistEntriesByTable === 'function'
+          ? deps.listPokerPlayWaitlistEntriesByTable(synced.table.tableId, { status: 'waiting' })
+          : [],
+        walletBinding?.walletSubject || ''
+      );
+      const inviteAuthorization = resolvePokerPlayInviteAuthorization(synced.table, {
+        walletSubject: walletBinding?.walletSubject || '',
+        houseId: viewerHouseId,
+        viewerSeat,
+      });
+      return {
+        table: synced.table,
+        seats: synced.seats,
+        hand: synced.hand,
+        viewerSeat,
+        inviteAuthorization,
+        summary: {
+          ...summary,
+          waitlistCount: Number(waitlist?.count || 0),
+          viewerWaitlistPosition: waitlist?.viewerPosition ?? null,
+        },
+      };
+    })
+    .filter((entry) => !entry?.inviteAuthorization?.access?.inviteOnly || !!entry?.inviteAuthorization?.bySeat || !!entry?.inviteAuthorization?.byCreator);
   const items = entries.map((entry) => {
     const seriesRef = getTournamentSeriesRef(entry.table);
     return {
-      ...entry.table,
+      ...sanitizePokerPlayTableRecord(entry.table),
       seriesId: seriesRef.seriesId || null,
       seriesTitle: seriesRef.seriesTitle || null,
       summary: entry.summary,
+      accessMode: entry?.inviteAuthorization?.access?.mode || 'public',
       currentUser: {
         walletSubject: walletBinding?.walletSubject || null,
         oilBalance: oilBalance?.balance ?? 0,
@@ -4879,9 +5078,14 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
         return {
           ...seriesEntry,
           viewerSeat: currentViewerSeat,
+          inviteAuthorization: resolvePokerPlayInviteAuthorization(seriesEntry.table, {
+            walletSubject: walletBinding?.walletSubject || '',
+            houseId: viewerHouseId,
+            viewerSeat: currentViewerSeat,
+          }),
           summary: computeTableSummary(seriesEntry.table, seriesEntry.seats, seriesEntry.hand, currentViewerSeat),
         };
-      }));
+      }).filter((seriesEntry) => !seriesEntry?.inviteAuthorization?.access?.inviteOnly || !!seriesEntry?.inviteAuthorization?.bySeat || !!seriesEntry?.inviteAuthorization?.byCreator));
     }
     return map;
   }, new Map()).values())
@@ -4892,7 +5096,7 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
     viewerMode: publicViewer ? 'public' : 'player',
     items,
     series,
-    houseId: publicViewer ? null : getSessionHouseId(session),
+    houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     processAt: toProcessIso(deps, processAt),
@@ -4917,6 +5121,10 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
   const tableId = `pkt_play_${normalized.tableType}_${deps.randomHex(8)}`;
   const slug = `${slugifySegment(normalized.title)}-${deps.randomHex(4)}`;
   const scheduledStartAt = normalizeIsoString(normalized.scheduledStartAt);
+  const accessMode = normalizePokerPlayAccessMode(normalized.accessMode);
+  const inviteCode = accessMode === 'invite_only'
+    ? normalizePokerPlayInviteCode(normalized.inviteCode, buildPokerPlayInviteCode(deps))
+    : '';
   const createdIso = createdAt || deps.nowIso();
   const scheduledStartPending = normalizePokerPlayTableType(normalized.tableType) === 'tournament'
     && !!scheduledStartAt
@@ -4945,6 +5153,10 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       entryCountsByWallet: {},
       registrationClosedByDirectorAt: null,
       timeBankRemainingBySeat: {},
+      accessMode,
+      inviteCode: inviteCode || null,
+      createdByWalletSubject: normalized.creatorWalletSubject || null,
+      createdByHouseId: normalized.creatorHouseId || null,
     },
     rules: {
       decisionCountdownSeconds: normalized.decisionCountdownSeconds,
@@ -4966,6 +5178,10 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
         : '',
       matchKey,
       dynamic: true,
+      accessMode,
+      inviteCode: inviteCode || null,
+      createdByWalletSubject: normalized.creatorWalletSubject || null,
+      createdByHouseId: normalized.creatorHouseId || null,
     },
     summary: buildDynamicTableSummary(normalized, matchKey),
     createdAt: createdIso,
@@ -4976,6 +5192,7 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
 function isTableMatchCandidate(synced, matchKey, tableType) {
   if (!synced?.table) return false;
   const table = synced.table;
+  if (isInviteOnlyPokerPlayTable(table)) return false;
   const computedSummary = computeTableSummary(table, synced.seats, synced.hand, null);
   const summary = {
     ...(table.summary && typeof table.summary === 'object' ? table.summary : {}),
@@ -5037,6 +5254,8 @@ function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer
   const requestAt = toProcessIso(deps, processAt);
   const targetSeriesId = normalizeTrimmedString(seriesId);
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
+  const inviteCode = parsePokerPlayInviteCode(req);
   const entries = deps.listPokerPlayTables()
     .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
     .filter((synced) => normalizePokerPlayTableType(synced?.table?.tableType) === 'tournament')
@@ -5054,6 +5273,12 @@ function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer
       viewerSeat,
       summary: computeTableSummary(entry.table, entry.seats, entry.hand, viewerSeat),
     };
+  });
+  requirePokerPlaySeriesAccess(withViewerSeat, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    inviteCode,
+    publicViewer,
   });
   const series = buildPokerPlaySeriesSummary(withViewerSeat, walletBinding?.walletSubject || '');
   if (!series) {
@@ -5088,7 +5313,7 @@ function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer
 
   return {
     viewerMode: publicViewer ? 'public' : 'player',
-    houseId: publicViewer ? null : getSessionHouseId(session),
+    houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
     oilBalance: walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null,
     series,
@@ -5106,6 +5331,18 @@ function getTableDetail(deps, { tableId, session, req, processAt, publicViewer =
   if (!synced?.table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
+  const viewerSeat = walletBinding?.walletSubject
+    ? deps.getPokerPlaySeatByWalletSubject(synced.table.tableId, walletBinding.walletSubject)
+    : null;
+  requirePokerPlayTableAccess(synced.table, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    viewerSeat,
+    inviteCode: parsePokerPlayInviteCode(req),
+    publicViewer,
+  });
   return buildPokerPlayTablePayload(deps, synced.table, synced.seats, synced.hand, {
     session,
     req,
@@ -5116,6 +5353,22 @@ function getTableDetail(deps, { tableId, session, req, processAt, publicViewer =
 }
 
 function getHandHistory(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20, status = '' } = {}) {
+  const table = deps.getPokerPlayTableById(tableId);
+  if (!table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
+  const viewerSeat = walletBinding?.walletSubject
+    ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
+    : null;
+  requirePokerPlayTableAccess(table, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    viewerSeat,
+    inviteCode: parsePokerPlayInviteCode(req),
+    publicViewer,
+  });
   return buildPokerPlayHandHistoryPayload(deps, {
     tableId,
     session,
@@ -5128,11 +5381,32 @@ function getHandHistory(deps, { tableId, session, req, processAt, publicViewer =
 }
 
 function getSeriesTimeline(deps, { seriesId, session, req, processAt, publicViewer = false, limit = 200 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
+  const entries = listTournamentSeriesEntriesBySeriesId(deps, normalizeTrimmedString(seriesId), {
+    processAt: requestAt,
+    includeClosed: true,
+  }).map((entry) => ({
+    ...entry,
+    viewerSeat: walletBinding?.walletSubject
+      ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
+      : null,
+  }));
+  if (!entries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  requirePokerPlaySeriesAccess(entries, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    inviteCode: parsePokerPlayInviteCode(req),
+    publicViewer,
+  });
   return buildPokerPlaySeriesTimelinePayload(deps, {
     seriesId,
     session,
     req,
-    processAt,
+    processAt: requestAt,
     publicViewer,
     limit,
   });
@@ -5187,6 +5461,13 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
       return buildPokerPlayTablePayload(deps, table, seats, currentHand, { session, req, processAt: requestAt });
     }
   }
+  requirePokerPlayTableAccess(table, {
+    walletSubject: walletBinding.walletSubject,
+    houseId,
+    viewerSeat: sameTableSeat || null,
+    inviteCode: parsePokerPlayInviteCode(req, body),
+    publicViewer: false,
+  });
   const lateRegistration = resolveTournamentLateRegistration(table, currentHand);
   if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live' && !lateRegistration.open) {
     throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_ALREADY_STARTED', 'Tournament seats lock once late registration closes.', {
@@ -5331,7 +5612,11 @@ function createTable(deps, { session, req, body } = {}) {
   if (!houseId) {
     throw createRouteError(409, 'HOUSE_REQUIRED', 'Join a house before creating a live poker table.');
   }
-  const created = createDynamicTable(deps, body, { createdAt: requestAt });
+  const created = createDynamicTable(deps, {
+    ...body,
+    creatorWalletSubject: walletBinding.walletSubject,
+    creatorHouseId: houseId,
+  }, { createdAt: requestAt });
   if (body?.joinNow === false) {
     return buildPokerPlayTablePayload(deps, created, deps.listPokerPlaySeatsByTable(created.tableId), deps.getCurrentPokerPlayHandForTable(created.tableId), {
       session,
@@ -5356,6 +5641,9 @@ function matchmakeIntoTable(deps, { session, req, body } = {}) {
   const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
   if (!walletBinding?.walletSubject) {
     throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before match-making into live poker.');
+  }
+  if (normalizePokerPlayAccessMode(body?.accessMode) === 'invite_only') {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Invite-only tables must be created directly instead of through matchmaking.');
   }
   const table = resolveMatchmakeTable(deps, body, { processAt: requestAt });
   return seatIntoTable(deps, {
@@ -5747,6 +6035,13 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
   if (!table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
+  requirePokerPlayTableAccess(table, {
+    walletSubject: walletBinding.walletSubject,
+    houseId,
+    viewerSeat: deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject),
+    inviteCode: parsePokerPlayInviteCode(req, body),
+    publicViewer: false,
+  });
   if (normalizePokerPlayTableType(table?.tableType) !== 'cash') {
     throw createRouteError(409, 'POKER_PLAY_WAITLIST_UNAVAILABLE', 'Waitlists are only available at cash tables in this phase.');
   }

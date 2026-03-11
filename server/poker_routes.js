@@ -4455,13 +4455,23 @@ function registerPokerRoutes(app, deps) {
     const session = requireBoundHumanSession(req, res, { requestId });
     if (!session) return;
     const tableId = normalizeTrimmedString(req.params.tableId);
-    if (!tableId || !getPokerPlayTableById(tableId)) {
+    try {
+      getTableDetail(playRouteDeps, {
+        tableId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+      });
+    } catch (err) {
       return sendPortalApiError(
         res,
-        404,
-        'NOT_FOUND',
-        'Poker table not found.',
-        { requestId }
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_DETAIL_FAILED',
+        err?.message || 'Unable to load poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
       );
     }
     const streamAt = normalizeIsoOrNull(req.query?.asOf) || nowIso();
@@ -4490,13 +4500,24 @@ function registerPokerRoutes(app, deps) {
   app.get('/api/poker/play/rail/tables/:tableId/stream', (req, res) => {
     const requestId = buildPortalRequestId();
     const tableId = normalizeTrimmedString(req.params.tableId);
-    if (!tableId || !getPokerPlayTableById(tableId)) {
+    try {
+      getTableDetail(playRouteDeps, {
+        tableId,
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        publicViewer: true,
+      });
+    } catch (err) {
       return sendPortalApiError(
         res,
-        404,
-        'NOT_FOUND',
-        'Poker table not found.',
-        { requestId }
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_DETAIL_FAILED',
+        err?.message || 'Unable to load poker rail table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
       );
     }
     res.status(200);

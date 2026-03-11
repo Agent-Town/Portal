@@ -34,6 +34,15 @@
     return new URLSearchParams(window.location.search || '');
   }
 
+  function readRouteInviteCode() {
+    return String(getRouteSearchParams().get('inviteCode') || '').trim();
+  }
+
+  function shouldPreserveInviteCode(pathname) {
+    const path = String(pathname || '');
+    return /^\/(?:api\/)?poker\/play\/tables\/[^/]+(?:\/stream)?$/i.test(path);
+  }
+
   function buildPokerHref(path, extraParams = {}) {
     let parsed;
     try {
@@ -43,8 +52,12 @@
     }
     const currentParams = getRouteSearchParams();
     const asOf = String(currentParams.get('asOf') || '').trim();
+    const inviteCode = readRouteInviteCode();
     if (asOf && !parsed.searchParams.has('asOf')) {
       parsed.searchParams.set('asOf', asOf);
+    }
+    if (inviteCode && shouldPreserveInviteCode(parsed.pathname) && !parsed.searchParams.has('inviteCode')) {
+      parsed.searchParams.set('inviteCode', inviteCode);
     }
     for (const [key, rawValue] of Object.entries(extraParams || {})) {
       const value = rawValue == null ? '' : String(rawValue).trim();
@@ -97,7 +110,9 @@
     const params = new URLSearchParams();
     const routeParams = getRouteSearchParams();
     const asOf = String(routeParams.get('asOf') || '').trim();
+    const inviteCode = readRouteInviteCode();
     if (asOf) params.set('asOf', asOf);
+    if (inviteCode && shouldPreserveInviteCode(basePath)) params.set('inviteCode', inviteCode);
     for (const [key, rawValue] of Object.entries(extraParams || {})) {
       const value = rawValue == null ? '' : String(rawValue).trim();
       if (!key || !value) continue;
@@ -1049,12 +1064,19 @@
       `,
       `
         <h2>Quick Seat</h2>
-        <p>Matchmake into an existing live table with the same structure, or create a new one instantly if no match exists.</p>
+        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
         <form id="pokerPlayMatchmakeForm" class="pokerForm">
+          <label>
+            Access
+            <select id="pokerPlayMatchmakeAccess">
+              <option value="public">Public</option>
+              <option value="invite_only">Invite Only</option>
+            </select>
+          </label>
           <label>
             Table Type
             <select id="pokerPlayMatchmakeType">
@@ -1077,6 +1099,10 @@
           <label>
             Display Name
             <input id="pokerPlayMatchmakeDisplayName" maxlength="80" value="${escapeHtml(payload?.data?.houseId || 'House Seat')}">
+          </label>
+          <label>
+            Table Title
+            <input id="pokerPlayMatchmakeTitle" maxlength="96" placeholder="Optional custom title">
           </label>
           <button class="pokerButton" type="submit">Join Or Create</button>
         </form>
@@ -1118,6 +1144,7 @@
               <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
               ${renderMetaBadges([
                 item.tableType,
+                item.accessMode === 'invite_only' ? 'invite-only' : '',
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item.buyInOil || 0)} OIL buy-in`,
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
@@ -1598,6 +1625,7 @@
   function bindPlayMatchmakeForm() {
     const form = document.getElementById('pokerPlayMatchmakeForm');
     if (!form) return;
+    const accessEl = document.getElementById('pokerPlayMatchmakeAccess');
     const typeEl = document.getElementById('pokerPlayMatchmakeType');
     const smallBlindEl = document.getElementById('pokerPlayMatchmakeSmallBlind');
     const bigBlindEl = document.getElementById('pokerPlayMatchmakeBigBlind');
@@ -1618,17 +1646,21 @@
     if (typeEl) typeEl.addEventListener('change', applyDefaults);
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      setStatus('Finding a matching live table...');
+      const accessMode = String(accessEl?.value || 'public');
+      setStatus(accessMode === 'invite_only' ? 'Creating invite-only table...' : 'Finding a matching live table...');
       try {
-        const payload = await api('/api/poker/play/matchmake', {
+        const payloadBody = {
+          accessMode,
+          tableType: String(typeEl?.value || 'cash'),
+          smallBlindOil: Number(smallBlindEl?.value || 0),
+          bigBlindOil: Number(bigBlindEl?.value || 0),
+          buyInOil: Number(buyInEl?.value || 0),
+          displayName: String(document.getElementById('pokerPlayMatchmakeDisplayName')?.value || '').trim(),
+          title: String(document.getElementById('pokerPlayMatchmakeTitle')?.value || '').trim(),
+        };
+        const payload = await api(accessMode === 'invite_only' ? '/api/poker/play/tables' : '/api/poker/play/matchmake', {
           method: 'POST',
-          body: JSON.stringify({
-            tableType: String(typeEl?.value || 'cash'),
-            smallBlindOil: Number(smallBlindEl?.value || 0),
-            bigBlindOil: Number(bigBlindEl?.value || 0),
-            buyInOil: Number(buyInEl?.value || 0),
-            displayName: String(document.getElementById('pokerPlayMatchmakeDisplayName')?.value || '').trim(),
-          }),
+          body: JSON.stringify(payloadBody),
         });
         const tableId = String(payload?.data?.table?.tableId || '');
         if (!tableId) throw new Error('POKER_PLAY_MATCHMAKE_MISSING_TABLE');
@@ -1641,6 +1673,7 @@
 
   function renderPlayTableCards(data, { rail = false } = {}) {
     const table = data?.table || {};
+    const tableAccess = table?.access && typeof table.access === 'object' ? table.access : {};
     const series = data?.series || null;
     const hand = data?.hand || null;
     const mySeat = data?.mySeat || null;
@@ -1676,6 +1709,7 @@
         <div class="pokerSummary">
           ${renderSummaryMetric('Type', table?.tableType || 'cash')}
           ${renderSummaryMetric('Status', paused ? 'paused' : (table?.status || 'open'))}
+          ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
           ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
@@ -1694,6 +1728,7 @@
           ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderMetaBadges([
+          tableAccess?.inviteOnly ? 'invite-only' : '',
           `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
           table?.summary?.liveHand ? `hand ${Number(table?.summary?.handNumber || 0)}` : 'waiting',
           table?.summary?.winnerSeatNumber ? `winner seat ${Number(table?.summary?.winnerSeatNumber || 0)}` : '',
@@ -1722,6 +1757,30 @@
       `,
     ].filter(Boolean);
 
+    if (!publicRail && tableAccess?.inviteOnly) {
+      cards.push(`
+        <h2>Invite Access</h2>
+        <p>Only invited wallets can open or join this table. Public lobby and rail discovery stay disabled.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Mode', 'invite-only')}
+          ${tableAccess?.viewerAuthorizedByInvite ? renderSummaryMetric('Invite', 'validated') : ''}
+          ${tableAccess?.viewerCanShareInvite ? renderSummaryMetric('Share', 'creator controls') : ''}
+        </div>
+        ${tableAccess?.viewerCanShareInvite && tableAccess?.inviteJoinPath
+          ? `
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(tableAccess.inviteJoinPath))}">Open Invite Link</a>
+            </div>
+            <div class="pokerMessage">
+              <div class="pokerLabel">Invite Code</div>
+              <div>${escapeHtml(tableAccess?.inviteCode || '')}</div>
+              <div class="pokerLabel">${escapeHtml(tableAccess.inviteJoinPath)}</div>
+            </div>
+          `
+          : `<p>${mySeat ? 'Your seated wallet no longer needs the invite code to stay at the table.' : 'This page was opened with a valid invite code.'}</p>`}
+      `);
+    }
+
     if (canJoin) {
       const nextOpenSeat = seats.map((seat) => Number(seat.seatNumber || 0));
       const options = Array.from({ length: Number(table?.maxSeats || 6) }, (_value, index) => index + 1)
@@ -1730,7 +1789,7 @@
         .join('');
       cards.push(`
         <h2>Take A Seat</h2>
-        <p>Buying in starts a private human + agent thread for your seat. Other players only see your public actions, not your private discussion.</p>
+        <p>${tableAccess?.inviteOnly ? 'This invite-only table still gives your seat the same private human + agent thread. Other players only see your public actions.' : 'Buying in starts a private human + agent thread for your seat. Other players only see your public actions, not your private discussion.'}</p>
         <form id="pokerPlayJoinForm" class="pokerForm">
           <label>
             Seat
@@ -1752,7 +1811,7 @@
     if (canWaitlist) {
       cards.push(`
         <h2>Waitlist</h2>
-        <p>The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.</p>
+        <p>${tableAccess?.inviteOnly ? 'This invite-only table is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens.' : 'The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.'}</p>
         ${waitlist?.viewerQueued
           ? `
             <div class="pokerSummary">
@@ -2106,6 +2165,7 @@
     if (!form) return;
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      const inviteCode = readRouteInviteCode();
       setStatus('Joining live table...');
       try {
         await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/sit`, {
@@ -2114,6 +2174,7 @@
             seatNumber: Number(document.getElementById('pokerPlaySeatNumber')?.value || 0),
             displayName: String(document.getElementById('pokerPlayDisplayName')?.value || '').trim(),
             buyInOil: Number(document.getElementById('pokerPlayBuyInOil')?.value || 0),
+            inviteCode: inviteCode || undefined,
           }),
         });
         await loadPlayTable(tableId);
@@ -2239,6 +2300,7 @@
     if (form) {
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
+        const inviteCode = readRouteInviteCode();
         setStatus('Joining waitlist...');
         try {
           await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/waitlist`, {
@@ -2246,6 +2308,7 @@
             body: JSON.stringify({
               displayName: String(document.getElementById('pokerPlayWaitlistDisplayName')?.value || '').trim(),
               buyInOil: Number(document.getElementById('pokerPlayWaitlistBuyInOil')?.value || 0),
+              inviteCode: inviteCode || undefined,
             }),
           });
           await loadPlayTable(tableId);
