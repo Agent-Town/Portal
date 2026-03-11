@@ -1057,6 +1057,7 @@ Response fields:
 - `data.attention[].deepLink.kind`
 - `data.attention[].deepLink.surface`
 - `data.attention[].deepLink.label`
+- `data.attention[].deepLink.selection.kind`
 - `data.deeplinks.office`
 - `data.deeplinks.experiences`
 - `data.deeplinks.workshop`
@@ -1169,6 +1170,12 @@ Response fields:
 - `data.deepLink.kind`
 - `data.deepLink.surface`
 - `data.deepLink.label`
+- `data.deepLink.selection.kind`
+- `data.sourceRefs[]`
+- `data.sourceRefs[].sourceKind`
+- `data.sourceRefs[].sourceId`
+- `data.sourceRefs[].entryPath`
+- `data.sourceRefs[].selection.kind`
 
 ### GET `/api/platform/tracks` (human)
 Returns deterministic track progress and durable reward-hook references for the currently attached House and active team.

@@ -981,7 +981,15 @@ function registerPlatformReadRoutes(app, deps) {
         sourceKind: 'trainer_result',
         sourceId: trainerResultId,
         createdAt: String(result?.updatedAt || result?.createdAt || '').trim() || null,
-        deepLink: deeplinks.trainer || deeplinks.office,
+        deepLink: buildHouseOfficeDeepLinkWithSelection(
+          deeplinks.trainer || deeplinks.office,
+          buildHouseOfficeSelection({
+            sourceKind: 'trainer_result',
+            sourceId: trainerResultId,
+            entryPath: '/api/platform/trainer',
+            trainerJobId,
+          })
+        ),
       });
     });
 
@@ -999,7 +1007,14 @@ function registerPlatformReadRoutes(app, deps) {
           sourceKind: 'team_config_binding',
           sourceId: teamBindingId,
           createdAt: String(binding?.updatedAt || binding?.createdAt || '').trim() || null,
-          deepLink: deeplinks.workshop || deeplinks.office,
+          deepLink: buildHouseOfficeDeepLinkWithSelection(
+            deeplinks.workshop || deeplinks.office,
+            buildHouseOfficeSelection({
+              sourceKind: 'team_config_binding',
+              sourceId: teamBindingId,
+              entryPath: '/api/platform/workshop',
+            })
+          ),
         });
       }
     }
@@ -1019,7 +1034,15 @@ function registerPlatformReadRoutes(app, deps) {
         sourceKind: 'track_progress_event',
         sourceId: latestTrackEventId,
         createdAt: String(latestTrackEvent?.createdAt || '').trim() || null,
-        deepLink: deeplinks.tracks || deeplinks.office,
+        deepLink: buildHouseOfficeDeepLinkWithSelection(
+          deeplinks.tracks || deeplinks.office,
+          buildHouseOfficeSelection({
+            sourceKind: 'track_progress_event',
+            sourceId: latestTrackEventId,
+            entryPath: '/api/platform/tracks',
+            trackId: String(latestTrackEvent?.trackId || '').trim(),
+          })
+        ),
       });
     }
 
