@@ -77,6 +77,37 @@
       return window.__PRIVY_WALLET_BRIDGE__ || null;
     }
 
+    async _ensureBridge({ interactive = false } = {}) {
+      let bridge = this._bridge();
+      if (bridge && typeof bridge === 'object') return bridge;
+
+      if (typeof window.ensurePrivyWalletLogin === 'function') {
+        try {
+          await window.ensurePrivyWalletLogin({ interactive: false, requireSession: true });
+        } catch {
+          // Ignore silent bootstrap failures and fall back to interactive bootstrap only when requested.
+        }
+        bridge = this._bridge();
+        if (bridge && typeof bridge === 'object') return bridge;
+
+        if (interactive) {
+          await window.ensurePrivyWalletLogin({ interactive: true });
+          bridge = this._bridge();
+          if (bridge && typeof bridge === 'object') return bridge;
+        }
+      }
+
+      if (typeof window.installPrivyBridge === 'function') {
+        try {
+          await window.installPrivyBridge();
+        } catch {
+          // Ignore install failures and let the caller surface the wallet-specific error.
+        }
+      }
+      bridge = this._bridge();
+      return bridge && typeof bridge === 'object' ? bridge : null;
+    }
+
     _emit(event, payload) {
       const listeners = this.events[event];
       if (!listeners || !listeners.size) return;
@@ -228,7 +259,7 @@
     }
 
     async _connectSolana({ silent }) {
-      const bridge = this._bridge();
+      const bridge = await this._ensureBridge({ interactive: !silent });
       if (bridge && typeof bridge.connectSolana === 'function') {
         const out = await bridge.connectSolana({ silent: !!silent });
         const address = extractAddress(out?.address || out?.publicKey || out);
@@ -277,7 +308,7 @@
     }
 
     async _connectEvm({ silent = false } = {}) {
-      const bridge = this._bridge();
+      const bridge = await this._ensureBridge({ interactive: !silent });
       if (bridge && typeof bridge.connectEvm === 'function') {
         const out = await bridge.connectEvm({ silent: !!silent });
         const address = extractAddress(out?.address || out?.account || out?.signer || out);
