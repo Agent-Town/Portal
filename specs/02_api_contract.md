@@ -392,6 +392,7 @@ Stable failure codes:
 
 ### GET `/api/poker/play/tables`
 Returns the live 6-max poker lobby payload with:
+- `data.viewerMode = "player"`
 - `data.items[]`
 - `data.items[].tableId`
 - `data.items[].tableType`
@@ -427,8 +428,20 @@ Returns the live 6-max poker lobby payload with:
 - `data.wallet`
 - `data.oilBalance`
 
+### GET `/api/poker/play/rail`
+Returns the public spectator lobby for live poker. This route intentionally strips viewer identity and join-state so the browser can render a true rail page.
+
+Response fields:
+- `data.viewerMode = "public"`
+- `data.items[]`
+- `data.series[]`
+- `data.houseId = null`
+- `data.wallet = null`
+- `data.oilBalance = null`
+
 ### GET `/api/poker/play/tables/:tableId`
 Returns one live cash or tournament table payload with:
+- `data.viewerMode = "player"`
 - `data.table`
 - `data.series` for tournament tables
 - `data.seats[]`
@@ -443,6 +456,23 @@ Returns one live cash or tournament table payload with:
 - `data.review.latestAuditEvent`
 - `data.suggestion`
 - `data.oilBalance`
+
+### GET `/api/poker/play/rail/tables/:tableId`
+Returns the public spectator payload for one live table with:
+- `data.viewerMode = "public"`
+- `data.table`
+- `data.series` for tournament tables
+- `data.seats[]`
+- `data.mySeat = null`
+- `data.hand`
+- `data.messages[]` with only public system notes
+- `data.actions[]`
+- `data.review.status`
+- `data.review.openDisputeCount`
+- `data.review.currentHandOpenDisputeCount`
+- `data.review.myDisputes = []`
+- `data.suggestion = null`
+- `data.oilBalance = null`
 
 Tournament blind progression notes:
 - tournaments expose `data.table.summary.blindLevel`
@@ -484,6 +514,10 @@ Hole-card privacy rules:
 - Opponent seats expose `hiddenCardCount` until showdown.
 - `data.messages[]` is seat-private: the viewer only receives their own human + agent thread plus public system notes.
 - `data.review.myDisputes[]` only returns disputes opened by the viewing wallet on this table.
+
+Rail-view privacy rules:
+- `GET /api/poker/play/rail/tables/:tableId` never includes a private seat thread or actionable `data.hand.viewerAllowedActions`, even if the caller also has an authenticated player session in the browser.
+- rail viewers only receive public seat state, public action history, showdown-revealed cards, and aggregate review state.
 
 ### POST `/api/poker/play/tables`
 Creates a live table from the provided cash or tournament structure. By default the creator is also seated immediately.
@@ -590,6 +624,14 @@ Event notes:
 - update events use `event: table`
 - browsers should treat the stream as a push hint and re-read `GET /api/poker/play/tables/:tableId`
 - table events may use reasons such as `action`, `message`, `seat`, `leave`, `pause`, `resume`, and `review`
+
+### GET `/api/poker/play/rail/tables/:tableId/stream`
+Opens the anonymous spectator push stream for one live table.
+
+Stream notes:
+- no authenticated Portal session is required
+- the stream is still hint-only; browsers should re-read `GET /api/poker/play/rail/tables/:tableId`
+- the event shape and reasons match the authenticated player stream
 
 ### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)
 Pauses a live table for operator review. While paused:

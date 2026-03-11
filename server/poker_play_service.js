@@ -1804,8 +1804,8 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   return { table, seats, hand };
 }
 
-function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, processAt } = {}) {
-  const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
+function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, processAt, publicViewer = false } = {}) {
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const viewerSeat = walletBinding?.walletSubject
     ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
     : null;
@@ -1858,12 +1858,13 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   };
 
   return {
+    viewerMode: publicViewer ? 'public' : 'player',
     table: {
       ...table,
       summary: tableSummary,
     },
     series,
-    houseId: getSessionHouseId(session),
+    houseId: publicViewer ? null : getSessionHouseId(session),
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     mySeat: viewerSeat
@@ -1881,8 +1882,8 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   };
 }
 
-function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
-  const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
+function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewer = false } = {}) {
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
   const entries = deps.listPokerPlayTables()
     .filter((table) => !isSeriesClosedTable(table))
@@ -1939,9 +1940,10 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt } = {}) {
     .filter(Boolean)
     .sort((left, right) => String(left?.seriesTitle || '').localeCompare(String(right?.seriesTitle || '')));
   return {
+    viewerMode: publicViewer ? 'public' : 'player',
     items,
     series,
-    houseId: getSessionHouseId(session),
+    houseId: publicViewer ? null : getSessionHouseId(session),
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     processAt: toProcessIso(deps, processAt),
@@ -2062,18 +2064,25 @@ function resolveMatchmakeTable(deps, config, { processAt } = {}) {
   return createDynamicTable(deps, nextConfig, { createdAt: toProcessIso(deps, processAt) });
 }
 
-function listTables(deps, { session, req, processAt } = {}) {
-  return buildPokerPlayLobbyPayload(deps, { session, req, processAt });
+function listTables(deps, { session, req, processAt, publicViewer = false } = {}) {
+  return buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewer });
 }
 
-function getTableDetail(deps, { tableId, session, req, processAt } = {}) {
+function getTableDetail(deps, { tableId, session, req, processAt, publicViewer = false } = {}) {
   const requestAt = toProcessIso(deps, processAt);
-  touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, requestAt);
+  if (!publicViewer) {
+    touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, requestAt);
+  }
   const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
   if (!synced?.table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
-  return buildPokerPlayTablePayload(deps, synced.table, synced.seats, synced.hand, { session, req, processAt: requestAt });
+  return buildPokerPlayTablePayload(deps, synced.table, synced.seats, synced.hand, {
+    session,
+    req,
+    processAt: requestAt,
+    publicViewer,
+  });
 }
 
 function seatIntoTable(deps, { tableId, session, req, body } = {}) {

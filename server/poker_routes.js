@@ -621,6 +621,30 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/rail', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = listTables(playRouteDeps, {
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        publicViewer: true,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_LIST_FAILED',
+        err?.message || 'Unable to load poker rail tables.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/tables', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -704,6 +728,31 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/rail/tables/:tableId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = getTableDetail(playRouteDeps, {
+        tableId: req.params.tableId,
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        publicViewer: true,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_DETAIL_FAILED',
+        err?.message || 'Unable to load poker rail table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/tables/:tableId/stream', (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -729,6 +778,29 @@ function registerPokerRoutes(app, deps) {
           updatedAt: streamAt,
         });
       }
+    }
+    res.status(200);
+    res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+    res.setHeader('cache-control', 'no-cache, no-transform');
+    res.setHeader('connection', 'keep-alive');
+    res.setHeader('x-accel-buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+    subscribePokerPlayTableStream(tableId, req, res);
+  });
+
+  app.get('/api/poker/play/rail/tables/:tableId/stream', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const tableId = normalizeTrimmedString(req.params.tableId);
+    if (!tableId || !getPokerPlayTableById(tableId)) {
+      return sendPortalApiError(
+        res,
+        404,
+        'NOT_FOUND',
+        'Poker table not found.',
+        { requestId }
+      );
     }
     res.status(200);
     res.setHeader('content-type', 'text/event-stream; charset=utf-8');

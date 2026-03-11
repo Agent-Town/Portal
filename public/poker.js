@@ -8,7 +8,7 @@
   let countdownTimer = null;
   let liveRefreshTimer = null;
   let liveTableStream = null;
-  let liveTableStreamTableId = '';
+  let liveTableStreamKey = '';
   let liveTableRefreshInFlight = false;
 
   function setTitle(title, subtitle) {
@@ -124,7 +124,7 @@
       liveTableStream.close();
       liveTableStream = null;
     }
-    liveTableStreamTableId = '';
+    liveTableStreamKey = '';
   }
 
   function formatPlaySeatStatus(status) {
@@ -242,43 +242,49 @@
       : '<option value="">No actions</option>';
   }
 
-  function scheduleLiveTableRefresh(tableId) {
+  function scheduleLiveTableRefresh(tableId, { rail = false } = {}) {
     clearLiveRefreshTimer();
     if (!tableId) return;
+    const expectedPath = rail ? `/poker/play/rail/tables/${tableId}` : `/poker/play/tables/${tableId}`;
     liveRefreshTimer = window.setTimeout(() => {
       const path = window.location.pathname;
-      if (path === `/poker/play/tables/${tableId}`) {
-        refreshLiveTable(tableId, { silent: true }).catch(() => {});
+      if (path === expectedPath) {
+        refreshLiveTable(tableId, { silent: true, rail }).catch(() => {});
       }
     }, 15000);
   }
 
-  async function refreshLiveTable(tableId, { silent = false } = {}) {
+  async function refreshLiveTable(tableId, { silent = false, rail = false } = {}) {
     if (!tableId || liveTableRefreshInFlight) return;
     liveTableRefreshInFlight = true;
     try {
-      await loadPlayTable(tableId, { silent });
+      await loadPlayTable(tableId, { silent, rail });
     } finally {
       liveTableRefreshInFlight = false;
     }
   }
 
-  function bindLiveTableStream(tableId) {
+  function bindLiveTableStream(tableId, { rail = false } = {}) {
     if (!tableId || typeof window.EventSource !== 'function') return;
-    if (liveTableStream && liveTableStreamTableId === tableId) return;
+    const streamKey = `${rail ? 'rail' : 'player'}:${tableId}`;
+    if (liveTableStream && liveTableStreamKey === streamKey) return;
     clearLiveTableStream();
-    liveTableStreamTableId = tableId;
-    const stream = new window.EventSource(buildPokerHref(`/api/poker/play/tables/${encodeURIComponent(tableId)}/stream`), {
+    liveTableStreamKey = streamKey;
+    const expectedPath = rail ? `/poker/play/rail/tables/${tableId}` : `/poker/play/tables/${tableId}`;
+    const streamPath = rail
+      ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}/stream`
+      : `/api/poker/play/tables/${encodeURIComponent(tableId)}/stream`;
+    const stream = new window.EventSource(buildPokerHref(streamPath), {
       withCredentials: true,
     });
     liveTableStream = stream;
     stream.addEventListener('table', () => {
-      if (window.location.pathname === `/poker/play/tables/${tableId}`) {
-        refreshLiveTable(tableId, { silent: true }).catch(() => {});
+      if (window.location.pathname === expectedPath) {
+        refreshLiveTable(tableId, { silent: true, rail }).catch(() => {});
       }
     });
     stream.addEventListener('error', () => {
-      scheduleLiveTableRefresh(tableId);
+      scheduleLiveTableRefresh(tableId, { rail });
     });
   }
 
@@ -395,6 +401,7 @@
         ])}
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Open Live Lobby</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Rail</a>
           ${tables.slice(0, 2).map((table) => `<a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table.tableId)}`))}">${escapeHtml(table.title)}</a>`).join('')}
         </div>
       `);
@@ -463,6 +470,9 @@
       `
         <h2>Quick Seat</h2>
         <p>Matchmake into an existing live table with the same structure, or create a new one instantly if no match exists.</p>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
+        </div>
         <form id="pokerPlayMatchmakeForm" class="pokerForm">
           <label>
             Table Type
@@ -552,6 +562,75 @@
     setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
   }
 
+  async function loadPlayRailLobby() {
+    clearLiveTableStream();
+    setTitle('Live Poker Rail', 'Watch public 6-max table state, final-table convergence, and live action without opening a seat.');
+    setStatus('Loading rail tables...');
+    const payload = await api('/api/poker/play/rail');
+    const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    const series = Array.isArray(payload?.data?.series) ? payload.data.series : [];
+    renderCards([
+      `
+        <h2>Public Rail</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Tournament Series', `${series.length}`)}
+          ${renderSummaryMetric('Live Tables', `${items.length}`)}
+          ${renderSummaryMetric('Viewer Mode', payload?.data?.viewerMode || 'public')}
+        </div>
+        <p>Rail pages only expose public table state. Private human + agent seat threads, viewer-only actions, and unrevealed hole cards remain hidden.</p>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Open Player Lobby</a>
+        </div>
+      `,
+      series.length
+        ? series.map((item) => `
+          <div class="pokerSplit">
+            <div>
+              <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
+              <p>Watch table breaks, prize-pool movement, and the path to the final table in public mode.</p>
+              ${renderMetaBadges([
+                item.stage || 'seating',
+                `${Number(item.tableCount || 0)} tables`,
+                `${Number(item.entrantCount || 0)} entrants`,
+                Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
+                item.needsRebalance ? 'table break pending' : '',
+              ])}
+            </div>
+            <div class="pokerLinks">
+              ${item.activeTableId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.activeTableId)}`))}">Open Rail Table</a>` : '<span class="pokerBadge">table pending</span>'}
+            </div>
+          </div>
+        `).join('')
+        : '',
+      items.length
+        ? items.map((item) => `
+          <div class="pokerSplit">
+            <div>
+              <h2>${escapeHtml(item.title)}</h2>
+              <p>${escapeHtml(item?.summary?.headline || 'Public table state only.')}</p>
+              ${renderMetaBadges([
+                item.tableType,
+                `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
+                `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
+                Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
+                item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
+                  ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
+                  : '',
+              ].filter(Boolean))}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/tables/${encodeURIComponent(item.tableId)}`))}">Open Rail Table</a>
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">Open Player Table</a>
+            </div>
+          </div>
+        `).join('')
+        : '<h2>No live rail tables yet.</h2><p>Open the player lobby to seat the first cash or tournament table.</p>',
+    ]);
+    setStatus(items.length ? `${items.length} rail table${items.length === 1 ? '' : 's'} loaded.` : 'No live rail table available.');
+  }
+
   function bindPlayMatchmakeForm() {
     const form = document.getElementById('pokerPlayMatchmakeForm');
     if (!form) return;
@@ -596,7 +675,7 @@
     });
   }
 
-  function renderPlayTableCards(data) {
+  function renderPlayTableCards(data, { rail = false } = {}) {
     const table = data?.table || {};
     const series = data?.series || null;
     const hand = data?.hand || null;
@@ -608,8 +687,10 @@
     const myDisputes = Array.isArray(review?.myDisputes) ? review.myDisputes : [];
     const adminReview = data?.adminReview || null;
     const oilBalance = Number(data?.oilBalance?.balance || 0);
+    const viewerMode = rail ? 'public' : String(data?.viewerMode || 'player');
+    const publicRail = viewerMode === 'public';
     const paused = String(table?.status || 'open') === 'paused';
-    const canJoin = !paused && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const canJoin = !publicRail && !paused && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
       `
@@ -632,19 +713,29 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
-          ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
+          ${publicRail ? renderSummaryMetric('Viewer Mode', 'public rail') : renderSummaryMetric('Your OIL', `${oilBalance}`)}
         </div>
         ${renderMetaBadges([
           `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
           table?.summary?.liveHand ? `hand ${Number(table?.summary?.handNumber || 0)}` : 'waiting',
           table?.summary?.winnerSeatNumber ? `winner seat ${Number(table?.summary?.winnerSeatNumber || 0)}` : '',
         ].filter(Boolean))}
+        ${publicRail ? `
+          <div class="pokerLinks">
+            <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Back To Rail</a>
+            <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || '')}`))}">Open Player Table</a>
+          </div>
+        ` : ''}
       `,
+      publicRail ? `
+        <h2>Rail View</h2>
+        <p>Watching public table state only. Private seat-thread discussion and seat-only actions stay hidden here, even while the hand is live.</p>
+      ` : '',
       `
         <h2>Seats</h2>
         ${renderSeatMarkers(seats)}
       `,
-    ];
+    ].filter(Boolean);
 
     if (canJoin) {
       const nextOpenSeat = seats.map((seat) => Number(seat.seatNumber || 0));
@@ -777,7 +868,7 @@
       `);
     }
 
-    if (mySeat && hand) {
+    if (!publicRail && mySeat && hand) {
       cards.push(`
         <h2>Flag Hand For Review</h2>
         <p>Use this for rule, turn-order, disconnect, or settlement issues. Filing a review pauses the table for operator inspection.</p>
@@ -805,7 +896,7 @@
       `);
     }
 
-    if (mySeat && hand) {
+    if (!publicRail && mySeat && hand) {
       cards.push(`
         <h2>Seat Thread</h2>
         <div class="pokerStack">
@@ -826,12 +917,12 @@
       `);
     }
 
-    if (mySeat && hand && paused) {
+    if (!publicRail && mySeat && hand && paused) {
       cards.push(`
         <h2>Submit Action</h2>
         <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
       `);
-    } else if (mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
+    } else if (!publicRail && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
       cards.push(`
         <h2>Submit Action</h2>
         <div class="pokerStack">
@@ -855,17 +946,17 @@
           <button class="pokerButton" type="submit">Submit Action</button>
         </form>
       `);
-    } else if (actions.length) {
+    } else if (publicRail || actions.length) {
       cards.push(`
         <h2>Public Action Log</h2>
         <div class="pokerStack">
-          ${actions.slice(-10).map((action) => `
+          ${actions.length ? actions.slice(-10).map((action) => `
             <div class="pokerRow">
               <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
               <span>${escapeHtml(action.actionKind || 'act')}</span>
               <span>${Number(action.amountOil || 0)} OIL</span>
             </div>
-          `).join('')}
+          `).join('') : '<p>No public actions logged yet.</p>'}
         </div>
       `);
     }
@@ -1049,12 +1140,14 @@
     }
   }
 
-  async function loadPlayTable(tableId, { silent = false } = {}) {
-    setTitle('Live Poker Table', `Shared 6-max table state for ${tableId}.`);
+  async function loadPlayTable(tableId, { silent = false, rail = false } = {}) {
+    setTitle(rail ? 'Poker Rail Table' : 'Live Poker Table', rail ? `Public rail view for ${tableId}.` : `Shared 6-max table state for ${tableId}.`);
     if (!silent) setStatus('Loading live table...');
-    const payload = await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}`);
+    const payload = await api(rail
+      ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}`
+      : `/api/poker/play/tables/${encodeURIComponent(tableId)}`);
     const data = payload?.data && typeof payload.data === 'object' ? { ...payload.data } : {};
-    const adminToken = readStoredPokerAdminToken();
+    const adminToken = rail ? '' : readStoredPokerAdminToken();
     if (adminToken) {
       try {
         const reviewPayload = await api(`/api/poker/play/admin/tables/${encodeURIComponent(tableId)}/review`, {
@@ -1066,19 +1159,29 @@
         data.adminReviewError = err?.code || 'UNKNOWN';
       }
     }
-    renderCards(renderPlayTableCards(data));
-    bindPlayJoinForm(tableId);
-    bindPlayLeaveButton(tableId);
-    bindPlayMessageForm(tableId, data?.hand?.handId || '');
-    bindPlayActionForm(tableId, data?.hand?.handId || '');
-    bindPlayDisputeForm(tableId, data?.hand?.handId || '');
-    bindAdminReviewActions(tableId);
-    bindCountdown(data?.hand?.actionExpiresAt || null);
-    bindLiveTableStream(tableId);
-    scheduleLiveTableRefresh(tableId);
-    if (!silent) {
-      setStatus(data?.mySeat ? 'Live table synced.' : 'Live table ready.');
+    renderCards(renderPlayTableCards(data, { rail }));
+    if (!rail) {
+      bindPlayJoinForm(tableId);
+      bindPlayLeaveButton(tableId);
+      bindPlayMessageForm(tableId, data?.hand?.handId || '');
+      bindPlayActionForm(tableId, data?.hand?.handId || '');
+      bindPlayDisputeForm(tableId, data?.hand?.handId || '');
+      bindAdminReviewActions(tableId);
     }
+    bindCountdown(data?.hand?.actionExpiresAt || null);
+    bindLiveTableStream(tableId, { rail });
+    scheduleLiveTableRefresh(tableId, { rail });
+    if (!silent) {
+      if (rail) {
+        setStatus('Rail table ready.');
+      } else {
+        setStatus(data?.mySeat ? 'Live table synced.' : 'Live table ready.');
+      }
+    }
+  }
+
+  async function loadPlayRailTable(tableId, { silent = false } = {}) {
+    return await loadPlayTable(tableId, { silent, rail: true });
   }
 
   async function loadCentaurLobby() {
@@ -1597,11 +1700,14 @@
     const url = new URL(window.location.href);
     const path = url.pathname;
     try {
-      if (!path.match(/^\/poker\/play\/tables\/([^/]+)$/)) {
+      if (!path.match(/^\/poker\/play\/tables\/([^/]+)$/) && !path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/)) {
         clearLiveTableStream();
       }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
+      if (path === '/poker/play/rail') return await loadPlayRailLobby();
+      const railMatch = path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/);
+      if (railMatch) return await loadPlayRailTable(railMatch[1]);
       const playMatch = path.match(/^\/poker\/play\/tables\/([^/]+)$/);
       if (playMatch) return await loadPlayTable(playMatch[1]);
       if (path === '/poker/centaur') return await loadCentaurLobby();

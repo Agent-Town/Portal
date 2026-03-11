@@ -11733,7 +11733,7 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/play', '/poker/play/tables/:tableId', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
+app.get(['/poker', '/poker/play', '/poker/play/tables/:tableId', '/poker/play/rail', '/poker/play/rail/tables/:tableId', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }
