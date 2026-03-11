@@ -24,6 +24,10 @@ const PLATFORM_TABLES = Object.freeze([
   'house_offices',
   'house_staff_agents',
   'house_staff_assignments',
+  'house_worker_deployments',
+  'house_worker_shares',
+  'house_worker_sessions',
+  'house_worker_session_events',
   'track_progress_events',
   'sealed_contexts',
   'sealed_context_violations',
@@ -63,6 +67,11 @@ const FIXTURE_FILES = Object.freeze({
   house_office_team_guard_seed: 'house_office_team_guard_seed.json',
   house_office_reality_smoke_seed: 'house_office_reality_smoke_seed.json',
   house_office_smoke_seed: 'house_office_smoke_seed.json',
+  worker_package_registry_seed: 'worker_package_registry_seed.json',
+  worker_package_install_seed: 'worker_package_install_seed.json',
+  worker_package_share_seed: 'worker_package_share_seed.json',
+  worker_package_secret_boundary_seed: 'worker_package_secret_boundary_seed.json',
+  worker_package_guidance_seed: 'worker_package_guidance_seed.json',
   tracks_core_seed: 'tracks_core_seed.json',
   tracks_progress_seed: 'tracks_progress_seed.json',
   editor_pack_compat_seed: 'editor_pack_compat_seed.json',
@@ -326,6 +335,68 @@ function ensureDb() {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       UNIQUE (house_id, team_id, office_id, staff_agent_id, focus, source_kind, source_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_deployments (
+      deployment_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      office_id TEXT NOT NULL,
+      staff_agent_id TEXT NOT NULL,
+      registry_entity_id TEXT NOT NULL,
+      entity_version_id TEXT NOT NULL,
+      loadout_id TEXT NOT NULL DEFAULT '',
+      bundle_hash TEXT NOT NULL DEFAULT '',
+      display_name TEXT NOT NULL,
+      status TEXT NOT NULL,
+      summary_json TEXT NOT NULL DEFAULT '{}',
+      runtime_defaults_json TEXT NOT NULL DEFAULT '{}',
+      install_source_json TEXT NOT NULL DEFAULT '{}',
+      idempotency_key TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, office_id, registry_entity_id, entity_version_id, loadout_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_shares (
+      share_id TEXT PRIMARY KEY,
+      registry_entity_id TEXT NOT NULL,
+      entity_version_id TEXT NOT NULL,
+      loadout_id TEXT NOT NULL DEFAULT '',
+      bundle_hash TEXT NOT NULL DEFAULT '',
+      share_payload_json TEXT NOT NULL DEFAULT '{}',
+      created_by_house_id TEXT,
+      created_by_team_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (registry_entity_id, entity_version_id, loadout_id, bundle_hash)
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_sessions (
+      house_worker_session_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      deployment_id TEXT NOT NULL,
+      parent_session_id TEXT,
+      runtime_agent_id TEXT NOT NULL,
+      label TEXT NOT NULL,
+      status TEXT NOT NULL,
+      brain_profile_id TEXT,
+      workspace_seed_ref TEXT,
+      config_version_id TEXT,
+      loadout_id TEXT,
+      session_runtime_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_session_events (
+      house_worker_session_event_id TEXT PRIMARY KEY,
+      house_worker_session_id TEXT NOT NULL,
+      event_kind TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS track_progress_events (
@@ -1649,6 +1720,484 @@ function createHouseStaffAssignment({
   return mapHouseStaffAssignmentRow(row);
 }
 
+function mapHouseWorkerDeploymentRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    deploymentId: String(row.deployment_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    officeId: String(row.office_id || ''),
+    staffAgentId: String(row.staff_agent_id || ''),
+    registryEntityId: String(row.registry_entity_id || ''),
+    entityVersionId: String(row.entity_version_id || ''),
+    loadoutId: String(row.loadout_id || ''),
+    bundleHash: String(row.bundle_hash || ''),
+    displayName: String(row.display_name || ''),
+    status: String(row.status || ''),
+    summary: parseJsonColumn(row.summary_json, {}),
+    runtimeDefaults: parseJsonColumn(row.runtime_defaults_json, {}),
+    installSource: parseJsonColumn(row.install_source_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function listHouseWorkerDeployments({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_deployments
+    WHERE house_id = ?
+      AND (? = '' OR team_id = ?)
+    ORDER BY created_at ASC, deployment_id ASC
+  `).all(normalizedHouseId, normalizedTeamId, normalizedTeamId);
+  return rows.map(mapHouseWorkerDeploymentRow).filter(Boolean);
+}
+
+function getHouseWorkerDeploymentById(deploymentId = '') {
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  if (!normalizedDeploymentId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_deployments
+    WHERE deployment_id = ?
+    LIMIT 1
+  `).get(normalizedDeploymentId);
+  return mapHouseWorkerDeploymentRow(row);
+}
+
+function createHouseWorkerDeployment({
+  deploymentId = '',
+  houseId = '',
+  teamId = '',
+  officeId = '',
+  staffAgentId = '',
+  registryEntityId = '',
+  entityVersionId = '',
+  loadoutId = '',
+  bundleHash = '',
+  displayName = '',
+  status = '',
+  summary = null,
+  runtimeDefaults = null,
+  installSource = null,
+  idempotencyKey = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedOfficeId = String(officeId || '').trim();
+  const normalizedStaffAgentId = String(staffAgentId || '').trim();
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  const normalizedEntityVersionId = String(entityVersionId || '').trim();
+  const normalizedLoadoutId = String(loadoutId || '').trim();
+  const normalizedBundleHash = String(bundleHash || '').trim();
+  const normalizedDisplayName = String(displayName || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (
+    !normalizedDeploymentId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedOfficeId
+    || !normalizedStaffAgentId
+    || !normalizedRegistryEntityId
+    || !normalizedEntityVersionId
+    || !normalizedDisplayName
+    || !normalizedStatus
+  ) {
+    throw new Error('HOUSE_WORKER_DEPLOYMENT_INVALID');
+  }
+  const database = ensureDb();
+  const existing = database.prepare(`
+    SELECT *
+    FROM house_worker_deployments
+    WHERE house_id = ?
+      AND team_id = ?
+      AND office_id = ?
+      AND registry_entity_id = ?
+      AND entity_version_id = ?
+      AND loadout_id = ?
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedOfficeId,
+    normalizedRegistryEntityId,
+    normalizedEntityVersionId,
+    normalizedLoadoutId,
+  );
+  if (existing) {
+    return mapHouseWorkerDeploymentRow(existing);
+  }
+  database.prepare(`
+    INSERT INTO house_worker_deployments (
+      deployment_id,
+      house_id,
+      team_id,
+      office_id,
+      staff_agent_id,
+      registry_entity_id,
+      entity_version_id,
+      loadout_id,
+      bundle_hash,
+      display_name,
+      status,
+      summary_json,
+      runtime_defaults_json,
+      install_source_json,
+      idempotency_key,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedDeploymentId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedOfficeId,
+    normalizedStaffAgentId,
+    normalizedRegistryEntityId,
+    normalizedEntityVersionId,
+    normalizedLoadoutId,
+    normalizedBundleHash,
+    normalizedDisplayName,
+    normalizedStatus,
+    JSON.stringify(summary && typeof summary === 'object' ? summary : {}),
+    JSON.stringify(runtimeDefaults && typeof runtimeDefaults === 'object' ? runtimeDefaults : {}),
+    JSON.stringify(installSource && typeof installSource === 'object' ? installSource : {}),
+    String(idempotencyKey || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerDeploymentById(normalizedDeploymentId);
+}
+
+function mapHouseWorkerShareRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    shareId: String(row.share_id || ''),
+    registryEntityId: String(row.registry_entity_id || ''),
+    entityVersionId: String(row.entity_version_id || ''),
+    loadoutId: String(row.loadout_id || ''),
+    bundleHash: String(row.bundle_hash || ''),
+    payload: parseJsonColumn(row.share_payload_json, {}),
+    createdByHouseId: row.created_by_house_id ? String(row.created_by_house_id) : null,
+    createdByTeamId: row.created_by_team_id ? String(row.created_by_team_id) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getHouseWorkerShareById(shareId = '') {
+  const normalizedShareId = String(shareId || '').trim();
+  if (!normalizedShareId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_shares
+    WHERE share_id = ?
+    LIMIT 1
+  `).get(normalizedShareId);
+  return mapHouseWorkerShareRow(row);
+}
+
+function createHouseWorkerShare({
+  shareId = '',
+  registryEntityId = '',
+  entityVersionId = '',
+  loadoutId = '',
+  bundleHash = '',
+  payload = null,
+  createdByHouseId = '',
+  createdByTeamId = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedShareId = String(shareId || '').trim();
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  const normalizedEntityVersionId = String(entityVersionId || '').trim();
+  const normalizedLoadoutId = String(loadoutId || '').trim();
+  const normalizedBundleHash = String(bundleHash || '').trim();
+  if (!normalizedShareId || !normalizedRegistryEntityId || !normalizedEntityVersionId) {
+    throw new Error('HOUSE_WORKER_SHARE_INVALID');
+  }
+  const database = ensureDb();
+  const existing = database.prepare(`
+    SELECT *
+    FROM house_worker_shares
+    WHERE registry_entity_id = ?
+      AND entity_version_id = ?
+      AND loadout_id = ?
+      AND bundle_hash = ?
+    LIMIT 1
+  `).get(
+    normalizedRegistryEntityId,
+    normalizedEntityVersionId,
+    normalizedLoadoutId,
+    normalizedBundleHash,
+  );
+  if (existing) {
+    return mapHouseWorkerShareRow(existing);
+  }
+  database.prepare(`
+    INSERT INTO house_worker_shares (
+      share_id,
+      registry_entity_id,
+      entity_version_id,
+      loadout_id,
+      bundle_hash,
+      share_payload_json,
+      created_by_house_id,
+      created_by_team_id,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedShareId,
+    normalizedRegistryEntityId,
+    normalizedEntityVersionId,
+    normalizedLoadoutId,
+    normalizedBundleHash,
+    JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    String(createdByHouseId || '').trim() || null,
+    String(createdByTeamId || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerShareById(normalizedShareId);
+}
+
+function mapHouseWorkerSessionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    houseWorkerSessionId: String(row.house_worker_session_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    deploymentId: String(row.deployment_id || ''),
+    parentSessionId: row.parent_session_id ? String(row.parent_session_id) : null,
+    runtimeAgentId: String(row.runtime_agent_id || ''),
+    label: String(row.label || ''),
+    status: String(row.status || ''),
+    brainProfileId: row.brain_profile_id ? String(row.brain_profile_id) : null,
+    workspaceSeedRef: row.workspace_seed_ref ? String(row.workspace_seed_ref) : null,
+    configVersionId: row.config_version_id ? String(row.config_version_id) : null,
+    loadoutId: row.loadout_id ? String(row.loadout_id) : null,
+    runtime: parseJsonColumn(row.session_runtime_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getHouseWorkerSessionById(houseWorkerSessionId = '') {
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedSessionId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_sessions
+    WHERE house_worker_session_id = ?
+    LIMIT 1
+  `).get(normalizedSessionId);
+  return mapHouseWorkerSessionRow(row);
+}
+
+function listHouseWorkerSessions({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_sessions
+    WHERE house_id = ?
+      AND (? = '' OR team_id = ?)
+    ORDER BY created_at ASC, house_worker_session_id ASC
+  `).all(normalizedHouseId, normalizedTeamId, normalizedTeamId);
+  return rows.map(mapHouseWorkerSessionRow).filter(Boolean);
+}
+
+function createHouseWorkerSession({
+  houseWorkerSessionId = '',
+  houseId = '',
+  teamId = '',
+  deploymentId = '',
+  parentSessionId = '',
+  runtimeAgentId = '',
+  label = '',
+  status = '',
+  brainProfileId = '',
+  workspaceSeedRef = '',
+  configVersionId = '',
+  loadoutId = '',
+  runtime = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedHouseWorkerSessionId = String(houseWorkerSessionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  const normalizedRuntimeAgentId = String(runtimeAgentId || '').trim();
+  const normalizedLabel = String(label || '').trim();
+  const normalizedStatus = String(status || '').trim();
+  if (
+    !normalizedHouseWorkerSessionId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedDeploymentId
+    || !normalizedRuntimeAgentId
+    || !normalizedLabel
+    || !normalizedStatus
+  ) {
+    throw new Error('HOUSE_WORKER_SESSION_INVALID');
+  }
+  const database = ensureDb();
+  const existing = getHouseWorkerSessionById(normalizedHouseWorkerSessionId);
+  if (existing) return existing;
+  database.prepare(`
+    INSERT INTO house_worker_sessions (
+      house_worker_session_id,
+      house_id,
+      team_id,
+      deployment_id,
+      parent_session_id,
+      runtime_agent_id,
+      label,
+      status,
+      brain_profile_id,
+      workspace_seed_ref,
+      config_version_id,
+      loadout_id,
+      session_runtime_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedHouseWorkerSessionId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedDeploymentId,
+    String(parentSessionId || '').trim() || null,
+    normalizedRuntimeAgentId,
+    normalizedLabel,
+    normalizedStatus,
+    String(brainProfileId || '').trim() || null,
+    String(workspaceSeedRef || '').trim() || null,
+    String(configVersionId || '').trim() || null,
+    String(loadoutId || '').trim() || null,
+    JSON.stringify(runtime && typeof runtime === 'object' ? runtime : {}),
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerSessionById(normalizedHouseWorkerSessionId);
+}
+
+function updateHouseWorkerSession({
+  houseWorkerSessionId = '',
+  status = undefined,
+  runtime = undefined,
+  updatedAt = new Date().toISOString(),
+} = {}) {
+  const existing = getHouseWorkerSessionById(houseWorkerSessionId);
+  if (!existing) return null;
+  const nextStatus = status === undefined ? existing.status : String(status || '').trim();
+  const nextRuntime = runtime === undefined
+    ? existing.runtime
+    : (runtime && typeof runtime === 'object' ? runtime : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE house_worker_sessions
+    SET status = ?,
+        session_runtime_json = ?,
+        updated_at = ?
+    WHERE house_worker_session_id = ?
+  `).run(
+    nextStatus || existing.status,
+    JSON.stringify(nextRuntime),
+    String(updatedAt || '').trim() || new Date().toISOString(),
+    String(houseWorkerSessionId || '').trim(),
+  );
+  return getHouseWorkerSessionById(houseWorkerSessionId);
+}
+
+function mapHouseWorkerSessionEventRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    houseWorkerSessionEventId: String(row.house_worker_session_event_id || ''),
+    houseWorkerSessionId: String(row.house_worker_session_id || ''),
+    eventKind: String(row.event_kind || ''),
+    actor: String(row.actor || ''),
+    payload: parseJsonColumn(row.payload_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function listHouseWorkerSessionEvents({
+  houseWorkerSessionId = '',
+} = {}) {
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedSessionId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_session_events
+    WHERE house_worker_session_id = ?
+    ORDER BY created_at ASC, house_worker_session_event_id ASC
+  `).all(normalizedSessionId);
+  return rows.map(mapHouseWorkerSessionEventRow).filter(Boolean);
+}
+
+function createHouseWorkerSessionEvent({
+  houseWorkerSessionEventId = '',
+  houseWorkerSessionId = '',
+  eventKind = '',
+  actor = '',
+  payload = null,
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const normalizedEventId = String(houseWorkerSessionEventId || '').trim();
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  const normalizedEventKind = String(eventKind || '').trim();
+  const normalizedActor = String(actor || '').trim();
+  if (!normalizedEventId || !normalizedSessionId || !normalizedEventKind || !normalizedActor) {
+    throw new Error('HOUSE_WORKER_SESSION_EVENT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO house_worker_session_events (
+      house_worker_session_event_id,
+      house_worker_session_id,
+      event_kind,
+      actor,
+      payload_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedEventId,
+    normalizedSessionId,
+    normalizedEventKind,
+    normalizedActor,
+    JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    String(createdAt || '').trim() || new Date().toISOString(),
+  );
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_session_events
+    WHERE house_worker_session_event_id = ?
+    LIMIT 1
+  `).get(normalizedEventId);
+  return mapHouseWorkerSessionEventRow(row);
+}
+
 function getTrainerResultById(trainerResultId = '') {
   const normalizedTrainerResultId = String(trainerResultId || '').trim();
   if (!normalizedTrainerResultId) return null;
@@ -2721,6 +3270,11 @@ function getUnifiedPlatformTestStats() {
       houseOfficeBriefing: true,
       houseOfficeAttention: true,
       houseOfficeAssignments: true,
+      houseWorkerDeployments: true,
+      houseWorkerShares: true,
+      houseWorkerSupervisor: true,
+      houseWorkerSessions: true,
+      houseWorkerEvents: true,
     },
   };
 }
@@ -2733,6 +3287,10 @@ module.exports = {
   createTrainerJob,
   createTrainerResult,
   createHouseStaffAssignment,
+  createHouseWorkerDeployment,
+  createHouseWorkerSession,
+  createHouseWorkerSessionEvent,
+  createHouseWorkerShare,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -2758,6 +3316,9 @@ module.exports = {
   listHouseOffices,
   listHouseStaffAgents,
   listTeamConfigBindings,
+  getHouseWorkerDeploymentById,
+  getHouseWorkerShareById,
+  getHouseWorkerSessionById,
   getTrainerJobById,
   getTrainerJobByIdempotency,
   getTrainerResultById,
@@ -2770,6 +3331,9 @@ module.exports = {
   getPlatformTableCounts,
   isUnifiedPlatformTable,
   listHouseStaffAssignments,
+  listHouseWorkerDeployments,
+  listHouseWorkerSessionEvents,
+  listHouseWorkerSessions,
   listConfigComponentVersions,
   listTrackDefinitions,
   listTrackProgressEvents,
@@ -2784,6 +3348,7 @@ module.exports = {
   resetUnifiedPlatformStore,
   createSealedContextViolation,
   updateRunMetadata,
+  updateHouseWorkerSession,
   updateSealedContextStatus,
   upsertSealedContext,
   updateTrainerJobStatus,

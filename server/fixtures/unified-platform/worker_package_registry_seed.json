@@ -1,0 +1,24 @@
+{
+  "family": "worker_package_registry_seed",
+  "schema": "agent-town-worker-package-registry-seed/v1",
+  "familySlug": "workers",
+  "familyTitle": "Workers",
+  "registryEntityId": "reg_house_worker_front_desk_helper",
+  "entityVersionId": "rev_house_worker_front_desk_helper_v1",
+  "loadoutId": "loadout_house_worker_front_desk_helper_v1",
+  "bundleHash": "sha256:bundle_house_worker_front_desk_helper_v1",
+  "displayName": "Front Desk Helper",
+  "plainLanguageFields": [
+    "oneLineBenefit",
+    "whatItDoes",
+    "bestFor",
+    "recommendedOfficeLabel",
+    "supportedSurfaces"
+  ],
+  "supportedSurfaces": [
+    "house",
+    "archive",
+    "trainer",
+    "tracks"
+  ]
+}

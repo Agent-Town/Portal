@@ -123,6 +123,7 @@ Notes:
 - `data.items[]` is the grouped family-first search surface.
 - Each top-level item includes `family`, `familySlug`, `familyTitle`, and `members[]`.
 - Each member may include both `family` and `familySlug` for forward compatibility.
+- Worker-package members may additionally include `entityVersionId`, `versionLabel`, and `workerPackage`.
 - Each group is ordered by `familySlug` ascending and each member is ordered by `slug` ascending.
 
 ### GET `/api/registry/entities/:id`
@@ -142,6 +143,21 @@ Response fields:
 - `data.entity.projection`
 - `data.entity.familyInfo`
 - `data.entity.storefront`
+- `data.entity.workerPackage`
+
+Worker-package notes:
+- `data.entity.workerPackage.oneLineBenefit`
+- `data.entity.workerPackage.whatItDoes`
+- `data.entity.workerPackage.bestFor[]`
+- `data.entity.workerPackage.recommendedOfficeId`
+- `data.entity.workerPackage.recommendedOfficeLabel`
+- `data.entity.workerPackage.supportedSurfaces[]`
+- `data.entity.workerPackage.requiresLocalBrain`
+- `data.entity.workerPackage.runtimeDefaults`
+- `data.entity.workerPackage.portableArtifacts`
+- `data.entity.workerPackage.install.actionLabel`
+- `data.entity.workerPackage.install.shareLabel`
+- `data.entity.workerPackage.install.detailLabel`
 
 ### GET `/api/registry/family/:familySlug`
 ### GET `/api/registry/families/:familySlug`
@@ -1018,6 +1034,28 @@ Response fields:
 - `data.assignments[].sourceRefs[].sourceId`
 - `data.assignments[].sourceRefs[].entryPath`
 - `data.assignments[].sourceRefs[].selection.kind`
+- `data.deployments[]`
+- `data.deployments[].deploymentId`
+- `data.deployments[].houseId`
+- `data.deployments[].teamId`
+- `data.deployments[].officeId`
+- `data.deployments[].officeLabel`
+- `data.deployments[].staffAgentId`
+- `data.deployments[].staffAgentLabel`
+- `data.deployments[].registryEntityId`
+- `data.deployments[].entityVersionId`
+- `data.deployments[].loadoutId`
+- `data.deployments[].bundleHash`
+- `data.deployments[].displayName`
+- `data.deployments[].status`
+- `data.deployments[].statusLabel`
+- `data.deployments[].oneLineBenefit`
+- `data.deployments[].whatItDoes`
+- `data.deployments[].bestFor[]`
+- `data.deployments[].supportedSurfaces[]`
+- `data.deployments[].requiresLocalBrain`
+- `data.deployments[].runtimeDefaults`
+- `data.deployments[].shareable`
 - `data.presence[]`
 - `data.presence[].officeId`
 - `data.presence[].officeLabel`
@@ -1080,6 +1118,7 @@ Response fields:
 - `data.sourceManifest.counts.officeCount`
 - `data.sourceManifest.counts.staffAgentCount`
 - `data.sourceManifest.counts.assignmentCount`
+- `data.sourceManifest.counts.deploymentCount`
 - `data.sourceManifest.counts.presenceCount`
 - `data.sourceManifest.counts.briefingGroupCount`
 - `data.sourceManifest.counts.briefingItemCount`
@@ -1094,6 +1133,7 @@ Response fields:
 - `data.summary.officeCount`
 - `data.summary.staffAgentCount`
 - `data.summary.assignmentCount`
+- `data.summary.deploymentCount`
 - `data.summary.presenceCount`
 - `data.summary.briefingGroupCount`
 - `data.summary.briefingItemCount`
@@ -1104,6 +1144,127 @@ Response fields:
 - `data.summary.trainerResultCount`
 - `data.summary.archiveRunCount`
 - `data.emptyStateText`
+
+### GET `/api/platform/house-workers/deployments` (human)
+Returns installed helper deployments for the active or requested House team.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `TEAM_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.deployments[]`
+- `data.deployments[].deploymentId`
+- `data.deployments[].registryEntityId`
+- `data.deployments[].entityVersionId`
+- `data.deployments[].loadoutId`
+- `data.deployments[].bundleHash`
+- `data.deployments[].displayName`
+- `data.deployments[].officeId`
+- `data.deployments[].officeLabel`
+- `data.deployments[].staffAgentId`
+- `data.deployments[].staffAgentLabel`
+- `data.deployments[].status`
+- `data.deployments[].statusLabel`
+- `data.deployments[].oneLineBenefit`
+- `data.deployments[].whatItDoes`
+- `data.deployments[].bestFor[]`
+- `data.deployments[].supportedSurfaces[]`
+- `data.deployments[].requiresLocalBrain`
+- `data.deployments[].runtimeDefaults`
+- `data.sourceManifest`
+- `data.emptyStateText`
+
+### POST `/api/platform/house-workers/install` (human)
+Installs one Registry worker package into the active House and active team.
+
+Request body:
+- `registryEntityId` required
+- `officeId` optional
+- `displayName` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `WORKER_PACKAGE_NOT_FOUND`
+- `HOUSE_OFFICE_REQUIRED`
+- `HOUSE_STAFF_REQUIRED`
+
+Response fields:
+- `data.deployment`
+- `data.guidance.title`
+- `data.guidance.nextStep`
+- `data.guidance.plainLanguageSummary`
+- `data.deploymentsPath`
+- `data.houseOfficePath`
+
+Notes:
+- Install preserves exact package identity through `registryEntityId`, `entityVersionId`, `loadoutId`, and `bundleHash`.
+- Helpers that need local credentials install in `brain_binding_required` state with plain-language guidance.
+
+### POST `/api/platform/house-workers/share` (human)
+Creates a portable friend-install payload for one installed deployment or Registry worker package.
+
+Request body:
+- `deploymentId` optional
+- `registryEntityId` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `DEPLOYMENT_NOT_FOUND`
+- `WORKER_PACKAGE_NOT_FOUND`
+
+Response fields:
+- `data.shareId`
+- `data.sharePath`
+- `data.portable`
+- `data.installActionLabel`
+- `data.summary`
+- `data.secretBoundarySummary`
+
+### GET `/api/platform/house-workers/shares/:shareId`
+Returns one portable House worker share payload.
+
+Response fields:
+- `data.shareId`
+- `data.sharePath`
+- `data.portable`
+- `data.installActionLabel`
+- `data.summary`
+- `data.secretBoundarySummary`
+
+### POST `/api/platform/house-workers/install-shared` (human)
+Installs one shared helper payload into the active House and active team.
+
+Request body:
+- `shareId` required
+- `officeId` optional
+- `displayName` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `NOT_FOUND`
+- `WORKER_PACKAGE_NOT_FOUND`
+
+Response fields:
+- `data.deployment`
+- `data.share`
+- `data.guidance`
+- `data.deploymentsPath`
+- `data.houseOfficePath`
 
 ### GET `/api/platform/house-readiness` (human)
 Returns a session-bound House flow readiness report for live-user validation inside the current shell.

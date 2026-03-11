@@ -505,6 +505,7 @@ let houseSurfaceState = {
     offices: [],
     staffAgents: [],
     assignments: [],
+    deployments: [],
     presence: [],
     briefing: [],
     attention: [],
@@ -1331,6 +1332,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.office.loaded = false;
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
+    houseSurfaceState.office.deployments = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];
@@ -1827,12 +1829,14 @@ function renderHouseOfficeSurface() {
   const briefingNode = el('houseOfficeBriefing');
   const attentionNode = el('houseOfficeAttention');
   const assignmentsNode = el('houseOfficeAssignments');
+  const deploymentsNode = el('houseOfficeDeployments');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !deploymentsNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
+  const deployments = Array.isArray(houseSurfaceState.office.deployments) ? houseSurfaceState.office.deployments : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
   const briefing = Array.isArray(houseSurfaceState.office.briefing) ? houseSurfaceState.office.briefing : [];
   const attention = Array.isArray(houseSurfaceState.office.attention) ? houseSurfaceState.office.attention : [];
@@ -1856,6 +1860,7 @@ function renderHouseOfficeSurface() {
   const officeCount = Number(summary?.officeCount || offices.length || 0);
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
   const assignmentCount = Number(summary?.assignmentCount || assignments.length || 0);
+  const deploymentCount = Number(summary?.deploymentCount || deployments.length || 0);
   const briefingItemCount = briefing.reduce((sum, group) => {
     const items = Array.isArray(group?.items) ? group.items : [];
     return sum + items.length;
@@ -1874,6 +1879,7 @@ function renderHouseOfficeSurface() {
     `${officeCount} offices`,
     `${staffAgentCount} staff`,
     `${assignmentCount} assignments`,
+    `${deploymentCount} helpers`,
     `${presence.length} presence`,
     `${briefingItemCount} briefing`,
     `${attention.length} attention`,
@@ -2118,6 +2124,85 @@ function renderHouseOfficeSurface() {
         }
       });
       assignmentsNode.appendChild(button);
+    });
+  }
+
+  deploymentsNode.innerHTML = '';
+  if (!deployments.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No installed helpers are active yet.';
+    deploymentsNode.appendChild(placeholder);
+  } else {
+    deployments.forEach((deployment) => {
+      const card = document.createElement('article');
+      card.setAttribute('data-testid', 'house-office-deployment-item');
+      card.style.border = '1px solid rgba(255,255,255,0.12)';
+      card.style.borderRadius = '12px';
+      card.style.padding = '10px';
+      card.style.background = 'rgba(255,255,255,0.02)';
+      card.style.overflowWrap = 'anywhere';
+
+      const heading = document.createElement('div');
+      heading.style.fontWeight = '600';
+      heading.textContent = [
+        String(deployment?.displayName || 'Helper').trim() || 'Helper',
+        String(deployment?.officeLabel || 'Office').trim() || 'Office',
+        String(deployment?.statusLabel || deployment?.status || '').trim() || 'Setup status unavailable',
+      ].join(' · ');
+      card.appendChild(heading);
+
+      const summaryLine = document.createElement('div');
+      summaryLine.className = 'small';
+      summaryLine.style.marginTop = '4px';
+      summaryLine.textContent = String(deployment?.oneLineBenefit || deployment?.whatItDoes || 'Installed helper is ready to support this office.').trim();
+      card.appendChild(summaryLine);
+
+      const staffLine = document.createElement('div');
+      staffLine.className = 'small';
+      staffLine.style.marginTop = '4px';
+      const supportedSurfaces = Array.isArray(deployment?.supportedSurfaces) ? deployment.supportedSurfaces : [];
+      staffLine.textContent = [
+        `Staff: ${String(deployment?.staffAgentLabel || deployment?.staffAgentId || 'Unassigned').trim() || 'Unassigned'}`,
+        supportedSurfaces.length ? `Surfaces: ${supportedSurfaces.join(', ')}` : '',
+      ].filter(Boolean).join(' · ');
+      card.appendChild(staffLine);
+
+      const bestFor = Array.isArray(deployment?.bestFor) ? deployment.bestFor : [];
+      if (bestFor.length) {
+        const bestForLine = document.createElement('div');
+        bestForLine.className = 'small';
+        bestForLine.style.marginTop = '4px';
+        bestForLine.textContent = `Best for: ${bestFor.join(', ')}`;
+        card.appendChild(bestForLine);
+      }
+
+      const advanced = document.createElement('details');
+      advanced.setAttribute('data-testid', 'house-office-deployment-advanced');
+      advanced.style.marginTop = '8px';
+      const advancedSummary = document.createElement('summary');
+      advancedSummary.textContent = 'Advanced helper details';
+      advancedSummary.style.cursor = 'pointer';
+      advanced.appendChild(advancedSummary);
+      const advancedBody = document.createElement('div');
+      advancedBody.setAttribute('data-testid', 'house-office-deployment-advanced-body');
+      advancedBody.className = 'small';
+      advancedBody.style.marginTop = '6px';
+      advancedBody.style.whiteSpace = 'pre-wrap';
+      advancedBody.textContent = [
+        `Deployment ID: ${String(deployment?.deploymentId || '—')}`,
+        `Registry package: ${String(deployment?.registryEntityId || '—')}`,
+        `Package version: ${String(deployment?.entityVersionId || '—')}`,
+        `Loadout: ${String(deployment?.loadoutId || '—')}`,
+        `Bundle hash: ${String(deployment?.bundleHash || '—')}`,
+        `Brain profile: ${String(deployment?.runtimeDefaults?.brainProfileId || '—')}`,
+        `Workspace seed: ${String(deployment?.runtimeDefaults?.workspaceSeedRef || '—')}`,
+        `Config version: ${String(deployment?.runtimeDefaults?.configVersionId || '—')}`,
+      ].join('\n');
+      advanced.appendChild(advancedBody);
+      card.appendChild(advanced);
+
+      deploymentsNode.appendChild(card);
     });
   }
 
@@ -2615,6 +2700,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.offices = Array.isArray(data.offices) ? data.offices : [];
     houseSurfaceState.office.staffAgents = Array.isArray(data.staffAgents) ? data.staffAgents : [];
     houseSurfaceState.office.assignments = Array.isArray(data.assignments) ? data.assignments : [];
+    houseSurfaceState.office.deployments = Array.isArray(data.deployments) ? data.deployments : [];
     houseSurfaceState.office.presence = Array.isArray(data.presence) ? data.presence : [];
     houseSurfaceState.office.briefing = Array.isArray(data.briefing) ? data.briefing : [];
     houseSurfaceState.office.attention = Array.isArray(data.attention) ? data.attention : [];
@@ -2634,6 +2720,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.loaded = true;
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
+    houseSurfaceState.office.deployments = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];
     houseSurfaceState.office.attention = [];

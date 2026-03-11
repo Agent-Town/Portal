@@ -1,0 +1,16 @@
+{
+  "family": "worker_package_guidance_seed",
+  "schema": "agent-town-worker-package-guidance-seed/v1",
+  "requiredLabels": [
+    "Install to House",
+    "Send to Friend",
+    "View Details"
+  ],
+  "requiredGuidanceFragments": [
+    "Keeps your House organized and easy to understand.",
+    "Connect a local brain before this helper can start working.",
+    "Local brain setup stays local."
+  ],
+  "defaultInstallDecisionCountMax": 2,
+  "advancedFieldVisibleCountDefault": 0
+}

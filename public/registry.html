@@ -124,6 +124,39 @@
       font-size: 13px;
       line-height: 1.45;
     }
+    .registryActionRow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .registryActionRow button {
+      min-height: 40px;
+      border-radius: 999px;
+      border: 1px solid rgba(36, 21, 13, 0.18);
+      background: rgba(255, 248, 237, 0.9);
+      color: inherit;
+      padding: 0 14px;
+      font: inherit;
+      cursor: pointer;
+    }
+    .registryActionRow button.primary {
+      background: #24150d;
+      color: #f4ebdb;
+    }
+    .registryHint {
+      margin-top: 8px;
+      color: #6d4d33;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .registryAdvanced details {
+      margin-top: 10px;
+    }
+    .registryAdvanced summary {
+      cursor: pointer;
+      font-weight: 600;
+    }
     @media (max-width: 700px) {
       .registrySearch {
         grid-template-columns: 1fr;
@@ -145,10 +178,12 @@
         <option value="">All families</option>
         <option value="developer_workflows">Developer Workflows</option>
         <option value="registry">Registry</option>
+        <option value="workers">Workers</option>
       </select>
       <button type="submit">Search</button>
     </form>
     <div id="registryStatus" class="registryStatus"></div>
+    <section id="registryWorkerShare" class="registryCard" style="display:none;" data-testid="registry-worker-share-banner"></section>
     <section id="registryList" class="registryList" aria-live="polite"></section>
   </main>
   <script src="/registry.js?v=20260309"></script>

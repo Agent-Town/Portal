@@ -3,14 +3,53 @@
     return document.getElementById(id);
   }
 
-  async function api(path) {
+  async function api(path, options = {}) {
     const resp = await fetch(path, {
       credentials: 'include',
       headers: {
-        Accept: 'application/json'
-      }
+        Accept: 'application/json',
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(options.headers && typeof options.headers === 'object' ? options.headers : {}),
+      },
+      ...options,
     });
-    return await resp.json();
+    let json = null;
+    try {
+      json = await resp.json();
+    } catch {
+      json = null;
+    }
+    return {
+      ok: resp.ok,
+      status: resp.status,
+      json,
+    };
+  }
+
+  function createWorkerStatusNode(text, { error = false } = {}) {
+    const node = document.createElement('div');
+    node.className = 'registryHint';
+    node.textContent = String(text || '').trim();
+    if (error) {
+      node.style.color = '#8a291c';
+    }
+    return node;
+  }
+
+  function createActionButton(label, {
+    className = '',
+    testId = '',
+    onClick = null,
+  } = {}) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = String(label || '').trim();
+    if (className) button.className = className;
+    if (testId) button.setAttribute('data-testid', testId);
+    if (typeof onClick === 'function') {
+      button.addEventListener('click', onClick);
+    }
+    return button;
   }
 
   function renderItems(items) {
@@ -34,6 +73,9 @@
   }
 
   function renderEntityCard(item) {
+    if (item?.workerPackage) {
+      return renderWorkerPackageCard(item);
+    }
     const article = document.createElement('article');
     article.className = 'registryCard';
     const displayName = String(item?.displayName || item?.storefront?.title || 'Unnamed entity');
@@ -56,6 +98,186 @@
     return article;
   }
 
+  function renderWorkerPackageCard(item, {
+    shareEnvelope = null,
+    bannerMode = false,
+  } = {}) {
+    const workerPackage = item?.workerPackage && typeof item.workerPackage === 'object'
+      ? item.workerPackage
+      : {};
+    const article = document.createElement('article');
+    article.className = 'registryCard';
+    article.setAttribute('data-testid', bannerMode ? 'registry-worker-share-card' : 'registry-worker-package-card');
+
+    const displayName = String(workerPackage?.displayName || item?.displayName || item?.storefront?.title || 'Worker Package').trim() || 'Worker Package';
+    const family = String(item?.familySlug || item?.family || 'workers').trim() || 'workers';
+    const oneLineBenefit = String(workerPackage?.oneLineBenefit || item?.description || '').trim();
+    const whatItDoes = String(workerPackage?.whatItDoes || '').trim();
+    const bestFor = Array.isArray(workerPackage?.bestFor) ? workerPackage.bestFor : [];
+    const supportedSurfaces = Array.isArray(workerPackage?.supportedSurfaces) ? workerPackage.supportedSurfaces : [];
+    const recommendedOfficeLabel = String(workerPackage?.recommendedOfficeLabel || workerPackage?.recommendedOfficeId || '').trim();
+    const requiresLocalBrain = workerPackage?.requiresLocalBrain === true;
+    const statusNode = createWorkerStatusNode(
+      bannerMode
+        ? String(shareEnvelope?.summary || 'Install this shared helper into your House.').trim()
+        : (oneLineBenefit || 'Helper package details are ready.')
+    );
+
+    article.innerHTML = `
+      <div class="registryCardHeader">
+        <div>
+          <h2>${escapeHtml(displayName)}</h2>
+          <div>${escapeHtml(oneLineBenefit || String(item?.description || '').trim())}</div>
+        </div>
+        <span class="registryBadge">${escapeHtml(bannerMode ? 'shared helper' : 'worker package')}</span>
+      </div>
+      <div><strong>Family:</strong> ${escapeHtml(family)}</div>
+    `;
+
+    const copySection = document.createElement('section');
+    copySection.className = 'registrySection';
+    copySection.innerHTML = '<h3>What It Does</h3>';
+    const summary = document.createElement('div');
+    summary.className = 'registryHint';
+    summary.textContent = whatItDoes || 'This helper keeps work moving and explains next steps in plain language.';
+    copySection.appendChild(summary);
+    if (recommendedOfficeLabel) {
+      const office = document.createElement('div');
+      office.className = 'registryHint';
+      office.textContent = `Recommended office: ${recommendedOfficeLabel}`;
+      copySection.appendChild(office);
+    }
+    if (bestFor.length) {
+      const bestForNode = document.createElement('div');
+      bestForNode.className = 'registryHint';
+      bestForNode.textContent = `Best for: ${bestFor.join(', ')}`;
+      copySection.appendChild(bestForNode);
+    }
+    if (supportedSurfaces.length) {
+      const surfacesNode = document.createElement('div');
+      surfacesNode.className = 'registryHint';
+      surfacesNode.textContent = `Works across: ${supportedSurfaces.join(', ')}`;
+      copySection.appendChild(surfacesNode);
+    }
+    if (requiresLocalBrain) {
+      const setupNode = document.createElement('div');
+      setupNode.className = 'registryHint';
+      setupNode.textContent = 'Local brain setup stays local. Connect a brain after install inside the receiving House.';
+      copySection.appendChild(setupNode);
+    }
+    article.appendChild(copySection);
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'registryActionRow';
+    const installPath = bannerMode ? '/api/platform/house-workers/install-shared' : '/api/platform/house-workers/install';
+    const installPayload = bannerMode
+      ? { shareId: String(shareEnvelope?.shareId || '').trim() }
+      : { registryEntityId: String(workerPackage?.registryEntityId || item?.registryEntityId || '').trim() };
+    actionRow.appendChild(createActionButton(
+      bannerMode ? String(shareEnvelope?.installActionLabel || 'Install to My House') : String(workerPackage?.install?.actionLabel || 'Install to House'),
+      {
+        className: 'primary',
+        testId: 'registry-worker-package-install',
+        onClick: async () => {
+          statusNode.textContent = bannerMode
+            ? 'Installing shared helper into your House...'
+            : 'Installing helper into your House...';
+          statusNode.style.color = '';
+          const response = await api(installPath, {
+            method: 'POST',
+            body: JSON.stringify(installPayload),
+          });
+          if (!response.ok || response?.json?.ok !== true) {
+            statusNode.textContent = String(response?.json?.error?.message || 'Helper install failed. Attach a house and select an active team first.').trim();
+            statusNode.style.color = '#8a291c';
+            return;
+          }
+          const guidance = response?.json?.data?.guidance && typeof response.json.data.guidance === 'object'
+            ? response.json.data.guidance
+            : {};
+          statusNode.textContent = String(guidance?.nextStep || 'Helper installed into your House.').trim();
+          statusNode.style.color = '';
+        },
+      }
+    ));
+    actionRow.appendChild(createActionButton(
+      bannerMode ? 'Copy Share Link' : String(workerPackage?.install?.shareLabel || 'Send to Friend'),
+      {
+        testId: 'registry-worker-package-share',
+        onClick: async () => {
+          const response = bannerMode
+            ? {
+              ok: true,
+              json: {
+                ok: true,
+                data: shareEnvelope,
+              },
+            }
+            : await api('/api/platform/house-workers/share', {
+              method: 'POST',
+              body: JSON.stringify({
+                registryEntityId: String(workerPackage?.registryEntityId || item?.registryEntityId || '').trim(),
+              }),
+            });
+          if (!response.ok || response?.json?.ok !== true) {
+            statusNode.textContent = String(response?.json?.error?.message || 'Could not create a friend link right now.').trim();
+            statusNode.style.color = '#8a291c';
+            return;
+          }
+          const sharePath = String(response?.json?.data?.sharePath || '').trim();
+          const absoluteSharePath = sharePath
+            ? new URL(sharePath, window.location.origin).toString()
+            : '';
+          if (absoluteSharePath && navigator.clipboard?.writeText) {
+            try {
+              await navigator.clipboard.writeText(absoluteSharePath);
+            } catch {
+              // fall through to visible text below
+            }
+          }
+          statusNode.textContent = absoluteSharePath
+            ? `Friend link ready: ${absoluteSharePath}`
+            : 'Friend link is ready.';
+          statusNode.style.color = '';
+        },
+      }
+    ));
+    actionRow.appendChild(createActionButton(
+      bannerMode ? 'View Shared Details' : String(workerPackage?.install?.detailLabel || 'View Details'),
+      {
+        testId: 'registry-worker-package-details',
+        onClick: () => {
+          details.open = !details.open;
+        },
+      }
+    ));
+    article.appendChild(actionRow);
+    article.appendChild(statusNode);
+
+    const advanced = document.createElement('section');
+    advanced.className = 'registryAdvanced';
+    const details = document.createElement('details');
+    details.setAttribute('data-testid', 'registry-worker-package-advanced');
+    const summaryNode = document.createElement('summary');
+    summaryNode.textContent = 'Advanced runtime details';
+    details.appendChild(summaryNode);
+    const advancedBody = document.createElement('pre');
+    advancedBody.setAttribute('data-testid', 'registry-worker-package-advanced-body');
+    advancedBody.className = 'registryProjection';
+    advancedBody.style.marginTop = '8px';
+    advancedBody.textContent = JSON.stringify({
+      registryEntityId: String(workerPackage?.registryEntityId || item?.registryEntityId || '').trim() || null,
+      entityVersionId: String(workerPackage?.entityVersionId || item?.entityVersionId || '').trim() || null,
+      loadoutId: String(workerPackage?.portableArtifacts?.loadoutId || workerPackage?.runtimeDefaults?.loadoutId || '').trim() || null,
+      bundleHash: String(workerPackage?.portableArtifacts?.bundleHash || '').trim() || null,
+      runtimeDefaults: workerPackage?.runtimeDefaults || null,
+    }, null, 2);
+    details.appendChild(advancedBody);
+    advanced.appendChild(details);
+    article.appendChild(advanced);
+    return article;
+  }
+
   function renderFamilyGroup(group) {
     const article = document.createElement('article');
     article.className = 'registryCard';
@@ -74,15 +296,10 @@
       <div><strong>Family:</strong> ${escapeHtml(familySlug)}</div>
     `;
     for (const member of members) {
-      const memberBlock = document.createElement('div');
-      memberBlock.style.marginTop = '0.85rem';
-      memberBlock.innerHTML = `
-        <div><strong>${escapeHtml(String(member?.displayName || member?.storefront?.title || member?.slug || 'Unnamed entity'))}</strong></div>
-        <div>${escapeHtml(String(member?.description || member?.storefront?.summary || ''))}</div>
-        <pre class="registryProjection">${escapeHtml(JSON.stringify(member?.projection || {}, null, 2))}</pre>
-      `;
-      appendProofAndLoadouts(memberBlock, member);
-      article.appendChild(memberBlock);
+      const memberWrapper = document.createElement('div');
+      memberWrapper.style.marginTop = '0.85rem';
+      memberWrapper.appendChild(renderEntityCard(member));
+      article.appendChild(memberWrapper);
     }
     return article;
   }
@@ -100,7 +317,7 @@
     if (!items.length) return null;
     const section = document.createElement('section');
     section.className = 'registrySection';
-    section.innerHTML = `<h3>Proof Cards</h3>`;
+    section.innerHTML = '<h3>Proof Cards</h3>';
     const list = document.createElement('div');
     list.className = 'registryMiniList';
     for (const proof of items) {
@@ -151,7 +368,7 @@
     if (!items.length) return null;
     const section = document.createElement('section');
     section.className = 'registrySection';
-    section.innerHTML = `<h3>Loadouts</h3>`;
+    section.innerHTML = '<h3>Loadouts</h3>';
     const list = document.createElement('div');
     list.className = 'registryMiniList';
     for (const loadout of items) {
@@ -184,6 +401,57 @@
       .replaceAll("'", '&#39;');
   }
 
+  async function loadWorkerShareBanner() {
+    const banner = el('registryWorkerShare');
+    if (!banner) return null;
+    const params = new URLSearchParams(window.location.search);
+    const shareId = String(params.get('workerShare') || '').trim();
+    if (!shareId) {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+      return null;
+    }
+    banner.style.display = '';
+    banner.innerHTML = '<div class="registryHint">Loading shared helper…</div>';
+    const response = await api(`/api/platform/house-workers/shares/${encodeURIComponent(shareId)}`);
+    if (!response.ok || response?.json?.ok !== true) {
+      banner.innerHTML = '';
+      banner.appendChild(createWorkerStatusNode(
+        String(response?.json?.error?.message || 'Shared helper link is unavailable.').trim(),
+        { error: true }
+      ));
+      return null;
+    }
+    const data = response?.json?.data && typeof response.json.data === 'object' ? response.json.data : {};
+    const portable = data?.portable && typeof data.portable === 'object' ? data.portable : {};
+    banner.innerHTML = '';
+    banner.appendChild(renderWorkerPackageCard({
+      familySlug: 'workers',
+      family: 'workers',
+      workerPackage: {
+        ...portable,
+        registryEntityId: String(portable?.registryEntityId || '').trim() || null,
+        entityVersionId: String(portable?.entityVersionId || '').trim() || null,
+        displayName: String(portable?.displayName || 'Shared Helper').trim(),
+        portableArtifacts: {
+          loadoutId: String(portable?.loadoutId || portable?.runtimeDefaults?.loadoutId || '').trim() || null,
+          bundleHash: String(portable?.bundleHash || '').trim() || null,
+        },
+        install: {
+          actionLabel: String(data?.installActionLabel || 'Install to My House'),
+          shareLabel: 'Copy Share Link',
+          detailLabel: 'View Shared Details',
+        },
+      },
+      loadouts: [],
+      proofCards: [],
+    }, {
+      shareEnvelope: data,
+      bannerMode: true,
+    }));
+    return data;
+  }
+
   async function load() {
     const params = new URLSearchParams(window.location.search);
     const q = params.get('q') || '';
@@ -191,6 +459,8 @@
     if (el('registryQuery')) el('registryQuery').value = q;
     if (el('registryFamily')) el('registryFamily').value = family;
     if (el('registryStatus')) el('registryStatus').textContent = 'Loading registry projection...';
+
+    await loadWorkerShareBanner();
 
     const requestParams = new URLSearchParams();
     if (q) requestParams.set('q', q);
@@ -201,12 +471,12 @@
 
     try {
       const payload = await api(path);
-      if (!payload?.ok) {
-        if (el('registryStatus')) el('registryStatus').textContent = `Registry search failed: ${payload?.error?.code || 'UNKNOWN'}`;
+      if (!payload.ok || payload?.json?.ok !== true) {
+        if (el('registryStatus')) el('registryStatus').textContent = `Registry search failed: ${payload?.json?.error?.code || 'UNKNOWN'}`;
         renderItems([]);
         return;
       }
-      const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+      const items = Array.isArray(payload?.json?.data?.items) ? payload.json.data.items : [];
       if (el('registryStatus')) el('registryStatus').textContent = `${items.length} result${items.length === 1 ? '' : 's'} loaded.`;
       renderItems(items);
     } catch (err) {

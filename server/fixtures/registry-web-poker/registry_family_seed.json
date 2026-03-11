@@ -10,6 +10,11 @@
       "familySlug": "registry",
       "displayName": "Registry",
       "status": "ready"
+    },
+    {
+      "familySlug": "workers",
+      "displayName": "Workers",
+      "status": "ready"
     }
   ],
   "groupedSearch": [
@@ -30,6 +35,16 @@
         {
           "registryEntityId": "reg_registry_catalog",
           "slug": "registry-catalog"
+        }
+      ]
+    },
+    {
+      "familySlug": "workers",
+      "familyTitle": "Workers",
+      "members": [
+        {
+          "registryEntityId": "reg_house_worker_front_desk_helper",
+          "slug": "front-desk-helper"
         }
       ]
     }

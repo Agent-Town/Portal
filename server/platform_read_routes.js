@@ -6,11 +6,16 @@ function registerPlatformReadRoutes(app, deps) {
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
     createHouseStaffAssignment,
+    createHouseWorkerDeployment,
+    createHouseWorkerShare,
     createTrainerJob,
     createTrainerResult,
     ensureHouseOfficeStructure,
     getConfigVersion,
     getConfigVersionByIdempotency,
+    getHouseWorkerDeploymentById,
+    getHouseWorkerShareById,
+    getRegistryEntityById,
     getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
     listTrackDefinitions,
@@ -23,6 +28,7 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseOffices,
     listHouseStaffAgents,
     listHouseStaffAssignments,
+    listHouseWorkerDeployments,
     listPlatformExperienceDefinitions,
     listRuns,
     listTeamConfigBindings,
@@ -274,6 +280,300 @@ function registerPlatformReadRoutes(app, deps) {
     if (!normalized) return false;
     if (!/^[A-Za-z0-9._:-]{1,160}$/.test(normalized)) return false;
     return !houseOfficeTextHasForbiddenMarker(normalized);
+  }
+
+  function isSafeHouseWorkerReference(value, { allowEmpty = false, maxLen = 240 } = {}) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return allowEmpty === true;
+    if (normalized.length > Math.max(1, Number(maxLen) || 240)) return false;
+    if (!/^[A-Za-z0-9._:/-]+$/.test(normalized)) return false;
+    return !houseOfficeTextHasForbiddenMarker(normalized);
+  }
+
+  function resolveHouseWorkerPackage(entity = null) {
+    const source = entity && typeof entity === 'object' ? entity : null;
+    const workerPackage = source?.workerPackage && typeof source.workerPackage === 'object'
+      ? source.workerPackage
+      : null;
+    if (!source || !workerPackage || String(source?.entityKind || '').trim() !== 'worker_package') return null;
+    const portableArtifacts = workerPackage?.portableArtifacts && typeof workerPackage.portableArtifacts === 'object'
+      ? workerPackage.portableArtifacts
+      : {};
+    const runtimeDefaults = workerPackage?.runtimeDefaults && typeof workerPackage.runtimeDefaults === 'object'
+      ? workerPackage.runtimeDefaults
+      : {};
+    return {
+      registryEntityId: String(source?.registryEntityId || source?.registryId || '').trim(),
+      entityVersionId: String(source?.entityVersionId || '').trim(),
+      displayName: String(workerPackage?.displayName || source?.displayName || '').trim() || String(source?.registryEntityId || '').trim(),
+      oneLineBenefit: String(workerPackage?.oneLineBenefit || source?.description || '').trim(),
+      whatItDoes: String(workerPackage?.whatItDoes || source?.description || '').trim(),
+      bestFor: Array.isArray(workerPackage?.bestFor)
+        ? workerPackage.bestFor.map((entry) => String(entry || '').trim()).filter(Boolean)
+        : [],
+      recommendedOfficeId: String(workerPackage?.recommendedOfficeId || '').trim(),
+      recommendedOfficeLabel: String(workerPackage?.recommendedOfficeLabel || '').trim(),
+      supportedSurfaces: Array.isArray(workerPackage?.supportedSurfaces)
+        ? workerPackage.supportedSurfaces.map((entry) => String(entry || '').trim()).filter(Boolean)
+        : [],
+      defaultDisplayName: String(workerPackage?.defaultDisplayName || source?.displayName || '').trim() || String(source?.displayName || '').trim(),
+      requiresLocalBrain: workerPackage?.requiresLocalBrain === true,
+      brainBindingLabel: String(workerPackage?.brainBindingLabel || '').trim() || 'Needs local brain setup',
+      delegationAllowed: workerPackage?.delegationAllowed === true,
+      loadoutId: String(workerPackage?.portableArtifacts?.loadoutId || portableArtifacts?.loadoutId || runtimeDefaults?.loadoutId || '').trim(),
+      bundleHash: String(workerPackage?.portableArtifacts?.bundleHash || portableArtifacts?.bundleHash || '').trim(),
+      runtimeDefaults: {
+        brainProfileId: String(runtimeDefaults?.brainProfileId || '').trim() || null,
+        workspaceSeedRef: String(runtimeDefaults?.workspaceSeedRef || '').trim() || null,
+        configVersionId: String(runtimeDefaults?.configVersionId || '').trim() || null,
+        loadoutId: String(runtimeDefaults?.loadoutId || portableArtifacts?.loadoutId || '').trim() || null,
+        delegationAllowed: runtimeDefaults?.delegationAllowed === true || workerPackage?.delegationAllowed === true,
+      },
+    };
+  }
+
+  function buildHouseWorkerStatusExplanation(packageInfo = null, status = '') {
+    const normalizedStatus = String(status || '').trim();
+    const source = packageInfo && typeof packageInfo === 'object' ? packageInfo : {};
+    if (normalizedStatus === 'brain_binding_required') {
+      return 'Connect a local brain before this helper can start working.';
+    }
+    if (normalizedStatus === 'ready') {
+      return 'Installed and ready to start helping from this office.';
+    }
+    return String(source?.brainBindingLabel || 'Installed helper is waiting for setup.').trim();
+  }
+
+  function resolveHouseWorkerInstallTarget({
+    houseId = '',
+    teamId = '',
+    requestedOfficeId = '',
+    packageInfo = null,
+    offices = [],
+    staffAgents = [],
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRequestedOfficeId = String(requestedOfficeId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'HOUSE_TEAM_REQUIRED',
+        message: 'Attach a house and select an active team before installing a helper.',
+      };
+    }
+    const officeList = Array.isArray(offices) ? offices : [];
+    const staffList = Array.isArray(staffAgents) ? staffAgents : [];
+    const preferredOfficeId = normalizedRequestedOfficeId
+      || String(packageInfo?.recommendedOfficeId || '').trim();
+    const targetOffice = officeList.find((entry) => String(entry?.officeId || '').trim() === preferredOfficeId)
+      || officeList.find((entry) => String(entry?.officeId || '').trim() === String(packageInfo?.recommendedOfficeId || '').trim())
+      || officeList[0]
+      || null;
+    if (!targetOffice) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'HOUSE_OFFICE_REQUIRED',
+        message: 'No House Office areas are available yet for helper installs.',
+      };
+    }
+    const officeId = String(targetOffice?.officeId || '').trim();
+    const preferredStaff = staffList.find((entry) => String(entry?.officeId || '').trim() === officeId) || staffList[0] || null;
+    if (!preferredStaff) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'HOUSE_STAFF_REQUIRED',
+        message: 'No House staff member is available yet for that office.',
+      };
+    }
+    return {
+      ok: true,
+      office: targetOffice,
+      staffAgent: preferredStaff,
+    };
+  }
+
+  function buildHouseWorkerPortableSharePayload({
+    deployment = null,
+    packageInfo = null,
+  } = {}) {
+    const sourceDeployment = deployment && typeof deployment === 'object' ? deployment : {};
+    const sourcePackage = packageInfo && typeof packageInfo === 'object' ? packageInfo : {};
+    return {
+      schema: 'agent-town-house-worker-share/v1',
+      registryEntityId: String(sourceDeployment?.registryEntityId || sourcePackage?.registryEntityId || '').trim(),
+      entityVersionId: String(sourceDeployment?.entityVersionId || sourcePackage?.entityVersionId || '').trim(),
+      loadoutId: String(sourceDeployment?.loadoutId || sourcePackage?.loadoutId || '').trim() || null,
+      bundleHash: String(sourceDeployment?.bundleHash || sourcePackage?.bundleHash || '').trim() || null,
+      displayName: String(sourceDeployment?.displayName || sourcePackage?.defaultDisplayName || sourcePackage?.displayName || '').trim(),
+      oneLineBenefit: String(sourceDeployment?.summary?.oneLineBenefit || sourcePackage?.oneLineBenefit || '').trim(),
+      whatItDoes: String(sourceDeployment?.summary?.whatItDoes || sourcePackage?.whatItDoes || '').trim(),
+      bestFor: Array.isArray(sourceDeployment?.summary?.bestFor)
+        ? sourceDeployment.summary.bestFor
+        : (Array.isArray(sourcePackage?.bestFor) ? sourcePackage.bestFor : []),
+      recommendedOfficeId: String(sourceDeployment?.summary?.recommendedOfficeId || sourcePackage?.recommendedOfficeId || '').trim() || null,
+      recommendedOfficeLabel: String(sourceDeployment?.summary?.recommendedOfficeLabel || sourcePackage?.recommendedOfficeLabel || '').trim() || null,
+      supportedSurfaces: Array.isArray(sourceDeployment?.summary?.supportedSurfaces)
+        ? sourceDeployment.summary.supportedSurfaces
+        : (Array.isArray(sourcePackage?.supportedSurfaces) ? sourcePackage.supportedSurfaces : []),
+      requiresLocalBrain: sourceDeployment?.summary?.requiresLocalBrain === true || sourcePackage?.requiresLocalBrain === true,
+      delegationAllowed: sourceDeployment?.runtimeDefaults?.delegationAllowed === true || sourcePackage?.delegationAllowed === true,
+      runtimeDefaults: {
+        brainProfileId: String(sourceDeployment?.runtimeDefaults?.brainProfileId || sourcePackage?.runtimeDefaults?.brainProfileId || '').trim() || null,
+        workspaceSeedRef: String(sourceDeployment?.runtimeDefaults?.workspaceSeedRef || sourcePackage?.runtimeDefaults?.workspaceSeedRef || '').trim() || null,
+        configVersionId: String(sourceDeployment?.runtimeDefaults?.configVersionId || sourcePackage?.runtimeDefaults?.configVersionId || '').trim() || null,
+        loadoutId: String(sourceDeployment?.runtimeDefaults?.loadoutId || sourcePackage?.runtimeDefaults?.loadoutId || sourceDeployment?.loadoutId || sourcePackage?.loadoutId || '').trim() || null,
+        delegationAllowed: sourceDeployment?.runtimeDefaults?.delegationAllowed === true || sourcePackage?.runtimeDefaults?.delegationAllowed === true,
+      },
+    };
+  }
+
+  function buildHouseWorkerDeploymentCards({
+    houseId = '',
+    teamId = '',
+    offices = [],
+    staffAgents = [],
+  } = {}) {
+    const officeMap = new Map(
+      (Array.isArray(offices) ? offices : [])
+        .map((entry) => [String(entry?.officeId || '').trim(), entry])
+        .filter(([officeId]) => officeId)
+    );
+    const staffMap = new Map(
+      (Array.isArray(staffAgents) ? staffAgents : [])
+        .map((entry) => [String(entry?.staffAgentId || '').trim(), entry])
+        .filter(([staffAgentId]) => staffAgentId)
+    );
+    return listHouseWorkerDeployments({ houseId, teamId })
+      .map((deployment) => {
+        const office = officeMap.get(String(deployment?.officeId || '').trim()) || null;
+        const staffAgent = staffMap.get(String(deployment?.staffAgentId || '').trim()) || null;
+        const summary = deployment?.summary && typeof deployment.summary === 'object'
+          ? deployment.summary
+          : {};
+        const runtimeDefaults = deployment?.runtimeDefaults && typeof deployment.runtimeDefaults === 'object'
+          ? deployment.runtimeDefaults
+          : {};
+        return {
+          deploymentId: String(deployment?.deploymentId || '').trim(),
+          houseId: String(deployment?.houseId || '').trim(),
+          teamId: String(deployment?.teamId || '').trim(),
+          officeId: String(deployment?.officeId || '').trim(),
+          officeLabel: String(office?.displayName || summary?.recommendedOfficeLabel || deployment?.officeId || '').trim(),
+          staffAgentId: String(deployment?.staffAgentId || '').trim(),
+          staffAgentLabel: String(staffAgent?.displayName || deployment?.staffAgentId || '').trim(),
+          registryEntityId: String(deployment?.registryEntityId || '').trim(),
+          entityVersionId: String(deployment?.entityVersionId || '').trim(),
+          loadoutId: String(deployment?.loadoutId || '').trim() || null,
+          bundleHash: String(deployment?.bundleHash || '').trim() || null,
+          displayName: String(deployment?.displayName || '').trim(),
+          status: String(deployment?.status || '').trim(),
+          statusLabel: buildHouseWorkerStatusExplanation(summary, deployment?.status),
+          oneLineBenefit: String(summary?.oneLineBenefit || '').trim(),
+          whatItDoes: String(summary?.whatItDoes || '').trim(),
+          bestFor: Array.isArray(summary?.bestFor) ? summary.bestFor : [],
+          supportedSurfaces: Array.isArray(summary?.supportedSurfaces) ? summary.supportedSurfaces : [],
+          requiresLocalBrain: summary?.requiresLocalBrain === true,
+          delegationAllowed: runtimeDefaults?.delegationAllowed === true,
+          runtimeDefaults: {
+            brainProfileId: String(runtimeDefaults?.brainProfileId || '').trim() || null,
+            workspaceSeedRef: String(runtimeDefaults?.workspaceSeedRef || '').trim() || null,
+            configVersionId: String(runtimeDefaults?.configVersionId || '').trim() || null,
+            loadoutId: String(runtimeDefaults?.loadoutId || deployment?.loadoutId || '').trim() || null,
+            delegationAllowed: runtimeDefaults?.delegationAllowed === true,
+          },
+          shareable: true,
+          createdAt: String(deployment?.createdAt || '').trim(),
+          updatedAt: String(deployment?.updatedAt || '').trim(),
+        };
+      })
+      .filter((deployment) => deployment.deploymentId && deployment.displayName);
+  }
+
+  function normalizeHouseWorkerDisplayName(value, fallback = '') {
+    const normalizedValue = String(value || '').trim();
+    const normalizedFallback = String(fallback || '').trim();
+    const candidate = normalizedValue || normalizedFallback;
+    if (!candidate) return '';
+    if (candidate.length > 80) return '';
+    if (houseOfficeTextHasForbiddenMarker(candidate)) return '';
+    return candidate;
+  }
+
+  function buildHouseWorkerSharePath(shareId = '') {
+    const normalizedShareId = String(shareId || '').trim();
+    if (!normalizedShareId) return '/registry.html?family=workers';
+    return `/registry.html?workerShare=${encodeURIComponent(normalizedShareId)}`;
+  }
+
+  function buildHouseWorkerShareResponse(share = null) {
+    const payload = share?.payload && typeof share.payload === 'object' ? share.payload : {};
+    const shareId = String(share?.shareId || '').trim();
+    return {
+      shareId: shareId || null,
+      sharePath: buildHouseWorkerSharePath(shareId),
+      portable: payload,
+      installActionLabel: 'Install to My House',
+      summary: String(payload?.oneLineBenefit || '').trim()
+        || 'Install this helper into another House without copying secrets.',
+      secretBoundarySummary: 'Local brain setup stays local. Portable worker links do not carry live credentials, callbacks, or house session secrets.',
+    };
+  }
+
+  function buildHouseWorkerDeploymentsPayload({
+    context = {},
+    houseId = '',
+    teamId = '',
+    sourceKind = 'durable_house_deployments',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const structure = buildHouseOfficeStructurePayload({
+      context,
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    });
+    const offices = Array.isArray(structure?.offices) ? structure.offices : [];
+    const staffAgents = Array.isArray(structure?.staffAgents) ? structure.staffAgents : [];
+    const deployments = normalizedHouseId && normalizedTeamId
+      ? buildHouseWorkerDeploymentCards({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+        offices,
+        staffAgents,
+      })
+      : [];
+    return {
+      houseId: normalizedHouseId || null,
+      teamId: normalizedTeamId || null,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      deployments,
+      sourceManifest: {
+        schema: 'agent-town-house-worker-deployments/v1',
+        sourceKind: String(sourceKind || 'durable_house_deployments').trim() || 'durable_house_deployments',
+        routes: [
+          '/api/platform/house-workers/deployments',
+          '/api/platform/house-workers/install',
+          '/api/platform/house-workers/share',
+          '/api/platform/house-workers/install-shared',
+        ],
+        fixtures: [
+          'worker_package_registry_seed',
+          'worker_package_install_seed',
+          'worker_package_share_seed',
+        ],
+        counts: {
+          deploymentCount: deployments.length,
+        },
+      },
+      emptyStateText: normalizedHouseId && normalizedTeamId
+        ? 'No installed helpers are available for this team yet.'
+        : 'Attach a house and choose an active team to inspect installed helpers.',
+    };
   }
 
   function buildHouseOfficeSelection({
@@ -1624,12 +1924,21 @@ function registerPlatformReadRoutes(app, deps) {
         deeplinks,
       })
       : [];
+    const deployments = houseId && teamId
+      ? buildHouseWorkerDeploymentCards({
+        houseId,
+        teamId,
+        offices,
+        staffAgents,
+      })
+      : [];
     const briefingItemCount = countHouseOfficeBriefingItems(briefing);
     const activityCount = trainerJobs.length
       + trainerResults.length
       + archiveRuns.length
       + tracksPayload.events.length
       + assignments.length
+      + deployments.length
       + briefingItemCount
       + attention.length;
     return {
@@ -1640,6 +1949,7 @@ function registerPlatformReadRoutes(app, deps) {
       offices,
       staffAgents,
       assignments,
+      deployments,
       presence,
       briefing,
       attention,
@@ -1650,6 +1960,10 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/context',
           '/api/platform/house-structure',
           '/api/platform/house-office/assignments',
+          '/api/platform/house-workers/deployments',
+          '/api/platform/house-workers/install',
+          '/api/platform/house-workers/share',
+          '/api/platform/house-workers/install-shared',
           '/api/platform/experiences',
           '/api/platform/workshop',
           '/api/platform/tracks',
@@ -1662,16 +1976,20 @@ function registerPlatformReadRoutes(app, deps) {
             'house_office_assignments_seed',
             'house_office_briefing_seed',
             'house_office_privacy_seed',
+            'worker_package_registry_seed',
+            'worker_package_install_seed',
           ]
           : [
             'house_office_overview_seed',
             'house_office_structure_seed',
+            'worker_package_registry_seed',
           ],
         structureSourceKind,
         counts: {
           officeCount: offices.length,
           staffAgentCount: staffAgents.length,
           assignmentCount: assignments.length,
+          deploymentCount: deployments.length,
           presenceCount: presence.length,
           briefingGroupCount: briefing.length,
           briefingItemCount,
@@ -1683,12 +2001,13 @@ function registerPlatformReadRoutes(app, deps) {
           trainerResultCount: trainerResults.length,
           archiveRunCount: archiveRuns.length,
         },
-      activeConfigVersionId: binding?.activeConfigVersionId || null,
+        activeConfigVersionId: binding?.activeConfigVersionId || null,
       },
       summary: {
         officeCount: offices.length,
         staffAgentCount: staffAgents.length,
         assignmentCount: assignments.length,
+        deploymentCount: deployments.length,
         presenceCount: presence.length,
         briefingGroupCount: briefing.length,
         briefingItemCount,
@@ -2402,6 +2721,425 @@ function registerPlatformReadRoutes(app, deps) {
       houseId,
       teamId,
     }), { requestId });
+  });
+
+  app.get('/api/platform/house-workers/deployments', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    return sendPortalApiSuccess(res, buildHouseWorkerDeploymentsPayload({
+      context,
+      houseId,
+      teamId: String(teamResolution?.teamId || '').trim(),
+    }), { requestId });
+  });
+
+  app.post('/api/platform/house-workers/install', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before installing a helper.', { requestId });
+    }
+    if (!teamId) {
+      return sendPortalApiError(res, 409, 'ACTIVE_TEAM_REQUIRED', 'Select an active team before installing a helper.', { requestId });
+    }
+    const registryEntityId = typeof req.body?.registryEntityId === 'string' ? req.body.registryEntityId.trim() : '';
+    const requestedOfficeId = typeof req.body?.officeId === 'string' ? req.body.officeId.trim() : '';
+    const requestedDisplayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'registryEntityId is required.', { requestId });
+    }
+    if (requestedOfficeId && !isSafeHouseOfficeIdentifier(requestedOfficeId)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'officeId must use safe identifier characters only.', { requestId });
+    }
+    if (requestedDisplayName && !normalizeHouseWorkerDisplayName(requestedDisplayName)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'displayName must stay under 80 characters and cannot include secret-like markers.', { requestId });
+    }
+    const entity = getRegistryEntityById(registryEntityId);
+    const packageInfo = resolveHouseWorkerPackage(entity);
+    if (!entity || !packageInfo) {
+      return sendPortalApiError(res, 404, 'WORKER_PACKAGE_NOT_FOUND', 'Registry does not know that worker package.', { requestId });
+    }
+    const structure = buildHouseOfficeStructurePayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const offices = Array.isArray(structure?.offices) ? structure.offices : [];
+    const staffAgents = Array.isArray(structure?.staffAgents) ? structure.staffAgents : [];
+    const installTarget = resolveHouseWorkerInstallTarget({
+      houseId,
+      teamId,
+      requestedOfficeId,
+      packageInfo,
+      offices,
+      staffAgents,
+    });
+    if (!installTarget?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(installTarget?.status || 409),
+        String(installTarget?.code || 'HOUSE_WORKER_INSTALL_BLOCKED'),
+        String(installTarget?.message || 'House helper install is blocked.'),
+        { requestId }
+      );
+    }
+    const office = installTarget.office;
+    const staffAgent = installTarget.staffAgent;
+    const deploymentDisplayName = normalizeHouseWorkerDisplayName(
+      requestedDisplayName,
+      packageInfo.defaultDisplayName || packageInfo.displayName
+    );
+    if (!deploymentDisplayName) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'displayName could not be resolved for this helper.', { requestId });
+    }
+    const deploymentStatus = packageInfo.requiresLocalBrain ? 'brain_binding_required' : 'ready';
+    const deploymentIdentity = sha256PrefixedHex(stableJsonStringify({
+      houseId,
+      teamId,
+      officeId: String(office?.officeId || '').trim(),
+      registryEntityId: packageInfo.registryEntityId,
+      entityVersionId: packageInfo.entityVersionId,
+      loadoutId: packageInfo.loadoutId || '',
+    }));
+    const deploymentId = `hwd_${deploymentIdentity.replace(/^sha256:/i, '').slice(0, 24)}`;
+    const now = nowIso();
+    const deploymentRecord = createHouseWorkerDeployment({
+      deploymentId,
+      houseId,
+      teamId,
+      officeId: String(office?.officeId || '').trim(),
+      staffAgentId: String(staffAgent?.staffAgentId || '').trim(),
+      registryEntityId: packageInfo.registryEntityId,
+      entityVersionId: packageInfo.entityVersionId,
+      loadoutId: packageInfo.loadoutId || '',
+      bundleHash: packageInfo.bundleHash || '',
+      displayName: deploymentDisplayName,
+      status: deploymentStatus,
+      summary: {
+        oneLineBenefit: packageInfo.oneLineBenefit,
+        whatItDoes: packageInfo.whatItDoes,
+        bestFor: packageInfo.bestFor,
+        recommendedOfficeId: String(office?.officeId || packageInfo.recommendedOfficeId || '').trim() || null,
+        recommendedOfficeLabel: String(office?.displayName || packageInfo.recommendedOfficeLabel || '').trim() || null,
+        supportedSurfaces: packageInfo.supportedSurfaces,
+        requiresLocalBrain: packageInfo.requiresLocalBrain === true,
+        brainBindingLabel: packageInfo.brainBindingLabel,
+      },
+      runtimeDefaults: packageInfo.runtimeDefaults,
+      installSource: {
+        kind: 'registry_package',
+        registryEntityId: packageInfo.registryEntityId,
+        entityVersionId: packageInfo.entityVersionId,
+        requestSource: 'api/platform/house-workers/install',
+      },
+      idempotencyKey: normalizePortalIdempotencyKey(req),
+      nowIso: now,
+    });
+    const deploymentsPayload = buildHouseWorkerDeploymentsPayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const deploymentCard = (Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [])
+      .find((entry) => String(entry?.deploymentId || '').trim() === String(deploymentRecord?.deploymentId || '').trim()) || null;
+    return sendPortalApiSuccess(res, {
+      deployment: deploymentCard || {
+        deploymentId: String(deploymentRecord?.deploymentId || '').trim(),
+        houseId: String(deploymentRecord?.houseId || '').trim(),
+        teamId: String(deploymentRecord?.teamId || '').trim(),
+        officeId: String(deploymentRecord?.officeId || '').trim(),
+        officeLabel: String(office?.displayName || '').trim(),
+        staffAgentId: String(deploymentRecord?.staffAgentId || '').trim(),
+        staffAgentLabel: String(staffAgent?.displayName || '').trim(),
+        registryEntityId: String(deploymentRecord?.registryEntityId || '').trim(),
+        entityVersionId: String(deploymentRecord?.entityVersionId || '').trim(),
+        loadoutId: String(deploymentRecord?.loadoutId || '').trim() || null,
+        bundleHash: String(deploymentRecord?.bundleHash || '').trim() || null,
+        displayName: String(deploymentRecord?.displayName || '').trim(),
+        status: String(deploymentRecord?.status || '').trim(),
+        statusLabel: buildHouseWorkerStatusExplanation(packageInfo, deploymentRecord?.status),
+        oneLineBenefit: packageInfo.oneLineBenefit,
+        whatItDoes: packageInfo.whatItDoes,
+        bestFor: packageInfo.bestFor,
+        supportedSurfaces: packageInfo.supportedSurfaces,
+        requiresLocalBrain: packageInfo.requiresLocalBrain === true,
+        delegationAllowed: packageInfo.runtimeDefaults?.delegationAllowed === true,
+        runtimeDefaults: packageInfo.runtimeDefaults,
+        shareable: true,
+        createdAt: String(deploymentRecord?.createdAt || '').trim(),
+        updatedAt: String(deploymentRecord?.updatedAt || '').trim(),
+      },
+      guidance: {
+        title: packageInfo.requiresLocalBrain ? 'One more setup step is needed' : 'Helper installed',
+        nextStep: buildHouseWorkerStatusExplanation(packageInfo, deploymentStatus),
+        plainLanguageSummary: String(packageInfo.oneLineBenefit || '').trim()
+          || 'This helper is now installed in your House Office.',
+      },
+      deploymentsPath: '/api/platform/house-workers/deployments',
+      houseOfficePath: '/api/platform/house-office',
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/share', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    const deploymentId = typeof req.body?.deploymentId === 'string' ? req.body.deploymentId.trim() : '';
+    const registryEntityId = typeof req.body?.registryEntityId === 'string' ? req.body.registryEntityId.trim() : '';
+    let packageInfo = null;
+    let deployment = null;
+    if (deploymentId) {
+      if (!houseId || !teamId) {
+        return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before sharing an installed helper.', { requestId });
+      }
+      deployment = getHouseWorkerDeploymentById(deploymentId);
+      if (!deployment) {
+        return sendPortalApiError(res, 404, 'DEPLOYMENT_NOT_FOUND', 'House helper deployment not found.', { requestId });
+      }
+      if (String(deployment?.houseId || '').trim() !== houseId || String(deployment?.teamId || '').trim() !== teamId) {
+        return sendPortalApiError(res, 404, 'DEPLOYMENT_NOT_FOUND', 'House helper deployment not found for the active team.', { requestId });
+      }
+      const entity = getRegistryEntityById(String(deployment?.registryEntityId || '').trim());
+      packageInfo = resolveHouseWorkerPackage(entity);
+    } else if (registryEntityId) {
+      const entity = getRegistryEntityById(registryEntityId);
+      packageInfo = resolveHouseWorkerPackage(entity);
+      if (!packageInfo) {
+        return sendPortalApiError(res, 404, 'WORKER_PACKAGE_NOT_FOUND', 'Registry does not know that worker package.', { requestId });
+      }
+    } else {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'deploymentId or registryEntityId is required.', { requestId });
+    }
+    if (!packageInfo && !deployment) {
+      return sendPortalApiError(res, 404, 'WORKER_PACKAGE_NOT_FOUND', 'Registry does not know that worker package.', { requestId });
+    }
+    const portablePayload = buildHouseWorkerPortableSharePayload({
+      deployment,
+      packageInfo,
+    });
+    const shareIdentity = sha256PrefixedHex(stableJsonStringify({
+      registryEntityId: portablePayload.registryEntityId,
+      entityVersionId: portablePayload.entityVersionId,
+      loadoutId: portablePayload.loadoutId || '',
+      bundleHash: portablePayload.bundleHash || '',
+    }));
+    const shareId = `hws_${shareIdentity.replace(/^sha256:/i, '').slice(0, 24)}`;
+    const share = createHouseWorkerShare({
+      shareId,
+      registryEntityId: portablePayload.registryEntityId,
+      entityVersionId: portablePayload.entityVersionId,
+      loadoutId: portablePayload.loadoutId || '',
+      bundleHash: portablePayload.bundleHash || '',
+      payload: portablePayload,
+      createdByHouseId: houseId || null,
+      createdByTeamId: teamId || null,
+      nowIso: nowIso(),
+    });
+    return sendPortalApiSuccess(res, buildHouseWorkerShareResponse(share), { requestId });
+  });
+
+  app.get('/api/platform/house-workers/shares/:shareId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const share = getHouseWorkerShareById(req.params.shareId);
+    if (!share) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'House worker share not found.', { requestId });
+    }
+    return sendPortalApiSuccess(res, buildHouseWorkerShareResponse(share), { requestId });
+  });
+
+  app.post('/api/platform/house-workers/install-shared', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before installing a shared helper.', { requestId });
+    }
+    if (!teamId) {
+      return sendPortalApiError(res, 409, 'ACTIVE_TEAM_REQUIRED', 'Select an active team before installing a shared helper.', { requestId });
+    }
+    const shareId = typeof req.body?.shareId === 'string' ? req.body.shareId.trim() : '';
+    const requestedOfficeId = typeof req.body?.officeId === 'string' ? req.body.officeId.trim() : '';
+    const requestedDisplayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+    if (!shareId) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'shareId is required.', { requestId });
+    }
+    const share = getHouseWorkerShareById(shareId);
+    if (!share) {
+      return sendPortalApiError(res, 404, 'NOT_FOUND', 'House worker share not found.', { requestId });
+    }
+    const portablePayload = share?.payload && typeof share.payload === 'object' ? share.payload : {};
+    const entity = getRegistryEntityById(String(portablePayload?.registryEntityId || '').trim());
+    const canonicalPackage = resolveHouseWorkerPackage(entity);
+    if (!entity || !canonicalPackage) {
+      return sendPortalApiError(res, 404, 'WORKER_PACKAGE_NOT_FOUND', 'The shared helper no longer resolves to a Registry worker package.', { requestId });
+    }
+    if (requestedOfficeId && !isSafeHouseOfficeIdentifier(requestedOfficeId)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'officeId must use safe identifier characters only.', { requestId });
+    }
+    if (requestedDisplayName && !normalizeHouseWorkerDisplayName(requestedDisplayName)) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'displayName must stay under 80 characters and cannot include secret-like markers.', { requestId });
+    }
+    const packageInfo = {
+      ...canonicalPackage,
+      entityVersionId: String(portablePayload?.entityVersionId || canonicalPackage.entityVersionId || '').trim(),
+      loadoutId: String(portablePayload?.loadoutId || portablePayload?.runtimeDefaults?.loadoutId || canonicalPackage.loadoutId || '').trim(),
+      bundleHash: String(portablePayload?.bundleHash || canonicalPackage.bundleHash || '').trim(),
+      defaultDisplayName: String(portablePayload?.displayName || canonicalPackage.defaultDisplayName || '').trim(),
+      oneLineBenefit: String(portablePayload?.oneLineBenefit || canonicalPackage.oneLineBenefit || '').trim(),
+      whatItDoes: String(portablePayload?.whatItDoes || canonicalPackage.whatItDoes || '').trim(),
+      bestFor: Array.isArray(portablePayload?.bestFor) ? portablePayload.bestFor : canonicalPackage.bestFor,
+      recommendedOfficeId: String(portablePayload?.recommendedOfficeId || canonicalPackage.recommendedOfficeId || '').trim(),
+      recommendedOfficeLabel: String(portablePayload?.recommendedOfficeLabel || canonicalPackage.recommendedOfficeLabel || '').trim(),
+      supportedSurfaces: Array.isArray(portablePayload?.supportedSurfaces) ? portablePayload.supportedSurfaces : canonicalPackage.supportedSurfaces,
+      requiresLocalBrain: portablePayload?.requiresLocalBrain === true || canonicalPackage.requiresLocalBrain === true,
+      delegationAllowed: portablePayload?.delegationAllowed === true || canonicalPackage.delegationAllowed === true,
+      runtimeDefaults: {
+        ...canonicalPackage.runtimeDefaults,
+        ...(portablePayload?.runtimeDefaults && typeof portablePayload.runtimeDefaults === 'object'
+          ? portablePayload.runtimeDefaults
+          : {}),
+        loadoutId: String(
+          portablePayload?.runtimeDefaults?.loadoutId
+          || portablePayload?.loadoutId
+          || canonicalPackage.runtimeDefaults?.loadoutId
+          || canonicalPackage.loadoutId
+          || ''
+        ).trim() || null,
+      },
+    };
+    const structure = buildHouseOfficeStructurePayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const offices = Array.isArray(structure?.offices) ? structure.offices : [];
+    const staffAgents = Array.isArray(structure?.staffAgents) ? structure.staffAgents : [];
+    const installTarget = resolveHouseWorkerInstallTarget({
+      houseId,
+      teamId,
+      requestedOfficeId,
+      packageInfo,
+      offices,
+      staffAgents,
+    });
+    if (!installTarget?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(installTarget?.status || 409),
+        String(installTarget?.code || 'HOUSE_WORKER_INSTALL_BLOCKED'),
+        String(installTarget?.message || 'House helper install is blocked.'),
+        { requestId }
+      );
+    }
+    const office = installTarget.office;
+    const staffAgent = installTarget.staffAgent;
+    const deploymentDisplayName = normalizeHouseWorkerDisplayName(
+      requestedDisplayName,
+      packageInfo.defaultDisplayName || packageInfo.displayName
+    );
+    if (!deploymentDisplayName) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'displayName could not be resolved for this helper.', { requestId });
+    }
+    const deploymentStatus = packageInfo.requiresLocalBrain ? 'brain_binding_required' : 'ready';
+    const deploymentIdentity = sha256PrefixedHex(stableJsonStringify({
+      houseId,
+      teamId,
+      officeId: String(office?.officeId || '').trim(),
+      registryEntityId: packageInfo.registryEntityId,
+      entityVersionId: packageInfo.entityVersionId,
+      loadoutId: packageInfo.loadoutId || '',
+    }));
+    const deploymentId = `hwd_${deploymentIdentity.replace(/^sha256:/i, '').slice(0, 24)}`;
+    const deploymentRecord = createHouseWorkerDeployment({
+      deploymentId,
+      houseId,
+      teamId,
+      officeId: String(office?.officeId || '').trim(),
+      staffAgentId: String(staffAgent?.staffAgentId || '').trim(),
+      registryEntityId: packageInfo.registryEntityId,
+      entityVersionId: packageInfo.entityVersionId,
+      loadoutId: packageInfo.loadoutId || '',
+      bundleHash: packageInfo.bundleHash || '',
+      displayName: deploymentDisplayName,
+      status: deploymentStatus,
+      summary: {
+        oneLineBenefit: packageInfo.oneLineBenefit,
+        whatItDoes: packageInfo.whatItDoes,
+        bestFor: packageInfo.bestFor,
+        recommendedOfficeId: String(office?.officeId || packageInfo.recommendedOfficeId || '').trim() || null,
+        recommendedOfficeLabel: String(office?.displayName || packageInfo.recommendedOfficeLabel || '').trim() || null,
+        supportedSurfaces: packageInfo.supportedSurfaces,
+        requiresLocalBrain: packageInfo.requiresLocalBrain === true,
+        brainBindingLabel: packageInfo.brainBindingLabel,
+      },
+      runtimeDefaults: packageInfo.runtimeDefaults,
+      installSource: {
+        kind: 'worker_share',
+        shareId,
+        registryEntityId: packageInfo.registryEntityId,
+        entityVersionId: packageInfo.entityVersionId,
+        requestSource: 'api/platform/house-workers/install-shared',
+      },
+      idempotencyKey: normalizePortalIdempotencyKey(req),
+      nowIso: nowIso(),
+    });
+    const deploymentsPayload = buildHouseWorkerDeploymentsPayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const deploymentCard = (Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [])
+      .find((entry) => String(entry?.deploymentId || '').trim() === String(deploymentRecord?.deploymentId || '').trim()) || null;
+    return sendPortalApiSuccess(res, {
+      deployment: deploymentCard,
+      share: buildHouseWorkerShareResponse(share),
+      guidance: {
+        title: 'Shared helper installed',
+        nextStep: buildHouseWorkerStatusExplanation(packageInfo, deploymentStatus),
+        plainLanguageSummary: String(packageInfo.oneLineBenefit || '').trim()
+          || 'This shared helper is now installed in your House Office.',
+      },
+      deploymentsPath: '/api/platform/house-workers/deployments',
+      houseOfficePath: '/api/platform/house-office',
+    }, { requestId });
   });
 
   app.get('/api/platform/house-readiness', (req, res) => {

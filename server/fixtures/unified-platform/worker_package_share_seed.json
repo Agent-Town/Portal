@@ -1,0 +1,10 @@
+{
+  "family": "worker_package_share_seed",
+  "schema": "agent-town-worker-package-share-seed/v1",
+  "registryEntityId": "reg_house_worker_front_desk_helper",
+  "entityVersionId": "rev_house_worker_front_desk_helper_v1",
+  "loadoutId": "loadout_house_worker_front_desk_helper_v1",
+  "bundleHash": "sha256:bundle_house_worker_front_desk_helper_v1",
+  "sharePathPrefix": "/registry.html?workerShare=",
+  "installActionLabel": "Install to My House"
+}

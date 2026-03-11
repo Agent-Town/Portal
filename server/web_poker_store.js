@@ -446,6 +446,16 @@ function seedRegistryFamilies() {
       },
     },
     {
+      familySlug: 'workers',
+      displayName: 'Workers',
+      description: 'Helper agents that can be installed into a House and shared to a friend.',
+      status: 'ready',
+      health: {
+        readiness: 'ready',
+        seededEntityCount: 1,
+      },
+    },
+    {
       familySlug: 'registry',
       displayName: 'Registry',
       description: 'Registry-owned capability and storefront discovery surfaces.',
@@ -510,6 +520,35 @@ function seedRegistryEntities() {
         capabilities: ['search', 'filter', 'project'],
       },
     },
+    {
+      registryEntityId: 'reg_house_worker_front_desk_helper',
+      entityKind: 'worker_package',
+      family: 'workers',
+      slug: 'front-desk-helper',
+      displayName: 'Front Desk Helper',
+      description: 'Keeps your House Office organized, explains next steps, and hands work to the right helper when needed.',
+      projection: {
+        workerPackage: {
+          packageKind: 'worker_package',
+          oneLineBenefit: 'Keeps your House organized and easy to understand.',
+          whatItDoes: 'Explains what is happening in plain language, highlights what needs attention, and can delegate routine follow-up to other helpers.',
+          bestFor: ['House Office triage', 'Readiness follow-up', 'Non-technical coordination'],
+          recommendedOfficeId: 'office_fixture_ops',
+          recommendedOfficeLabel: 'Operations',
+          supportedSurfaces: ['house', 'archive', 'trainer', 'tracks'],
+          defaultDisplayName: 'Front Desk Helper',
+          requiresLocalBrain: true,
+          delegationAllowed: true,
+          runtimeDefaults: {
+            brainProfileId: 'local_default',
+            workspaceSeedRef: 'seed://house-workers/front-desk-helper-v1',
+            configVersionId: null,
+            loadoutId: 'loadout_house_worker_front_desk_helper_v1',
+            delegationAllowed: true,
+          },
+        },
+      },
+    },
   ];
   const insert = database.prepare(`
     INSERT INTO registry_entities (
@@ -561,6 +600,32 @@ function seedRegistryEntityVersions() {
       versionLabel: 'v1',
       projection: {
         capabilities: ['search', 'filter', 'project'],
+      },
+    },
+    {
+      entityVersionId: 'rev_house_worker_front_desk_helper_v1',
+      registryEntityId: 'reg_house_worker_front_desk_helper',
+      versionLabel: 'v1',
+      projection: {
+        workerPackage: {
+          packageKind: 'worker_package',
+          oneLineBenefit: 'Keeps your House organized and easy to understand.',
+          whatItDoes: 'Explains what is happening in plain language, highlights what needs attention, and can delegate routine follow-up to other helpers.',
+          bestFor: ['House Office triage', 'Readiness follow-up', 'Non-technical coordination'],
+          recommendedOfficeId: 'office_fixture_ops',
+          recommendedOfficeLabel: 'Operations',
+          supportedSurfaces: ['house', 'archive', 'trainer', 'tracks'],
+          defaultDisplayName: 'Front Desk Helper',
+          requiresLocalBrain: true,
+          delegationAllowed: true,
+          runtimeDefaults: {
+            brainProfileId: 'local_default',
+            workspaceSeedRef: 'seed://house-workers/front-desk-helper-v1',
+            configVersionId: null,
+            loadoutId: 'loadout_house_worker_front_desk_helper_v1',
+            delegationAllowed: true,
+          },
+        },
       },
     },
   ];
@@ -655,6 +720,13 @@ function seedRegistryBundles() {
       contentHash: 'sha256:bundle_fixture_01',
       componentRefs: ['reg_github_issue_reply'],
     },
+    {
+      bundleId: 'bundle_house_worker_front_desk_helper_v1',
+      registryEntityId: 'reg_house_worker_front_desk_helper',
+      displayName: 'Front Desk Helper Bundle',
+      contentHash: 'sha256:bundle_house_worker_front_desk_helper_v1',
+      componentRefs: ['reg_house_worker_front_desk_helper'],
+    },
   ];
   const insert = database.prepare(`
     INSERT INTO registry_bundles (
@@ -692,6 +764,13 @@ function seedRegistryLoadouts() {
       displayName: 'Issue Reply Ladder Loadout',
       componentRefs: ['reg_github_issue_reply'],
       bundleRefs: ['bundle_fixture_01'],
+    },
+    {
+      loadoutId: 'loadout_house_worker_front_desk_helper_v1',
+      registryEntityId: 'reg_house_worker_front_desk_helper',
+      displayName: 'Front Desk Helper Standard',
+      componentRefs: ['reg_house_worker_front_desk_helper'],
+      bundleRefs: ['bundle_house_worker_front_desk_helper_v1'],
     },
   ];
   const insert = database.prepare(`
@@ -1621,6 +1700,7 @@ function searchRegistryEntities({ query = '', family = '' } = {}) {
     const version = getLatestRegistryEntityVersion(row.registry_entity_id);
     const proofCards = listRegistryProofCards(row.registry_entity_id);
     const loadouts = listRegistryLoadouts(row.registry_entity_id);
+    const projection = fromJson(row.projection_json, {});
     return {
       proofCards,
       loadouts,
@@ -1635,7 +1715,7 @@ function searchRegistryEntities({ query = '', family = '' } = {}) {
       slug: row.slug,
       displayName: row.display_name,
       description: row.description || null,
-      projection: fromJson(row.projection_json, {}),
+      projection,
       familyInfo: row.family ? getRegistryFamilySummary(row.family) : null,
       storefront: {
         title: row.display_name,
@@ -1643,6 +1723,15 @@ function searchRegistryEntities({ query = '', family = '' } = {}) {
         proofCount: proofCards.length,
         loadoutCount: loadouts.length,
       },
+      workerPackage: buildRegistryWorkerPackage({
+        registryEntityId: row.registry_entity_id,
+        entityVersionId: version?.entityVersionId || null,
+        versionLabel: version?.versionLabel || null,
+        entityKind: row.entity_kind,
+        displayName: row.display_name,
+        description: row.description || null,
+        projection,
+      }, version),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -1690,6 +1779,81 @@ function getLatestRegistryEntityVersion(registryEntityId) {
   };
 }
 
+function buildRegistryWorkerPackage(storefrontEntity = {}, version = null) {
+  const entityKind = String(storefrontEntity?.entityKind || '').trim();
+  if (entityKind !== 'worker_package') return null;
+  const projection = storefrontEntity?.projection && typeof storefrontEntity.projection === 'object'
+    ? storefrontEntity.projection
+    : {};
+  const versionProjection = version?.versionProjection && typeof version.versionProjection === 'object'
+    ? version.versionProjection
+    : {};
+  const workerPackage = projection?.workerPackage && typeof projection.workerPackage === 'object'
+    ? projection.workerPackage
+    : versionProjection?.workerPackage && typeof versionProjection.workerPackage === 'object'
+      ? versionProjection.workerPackage
+      : {};
+  const registryEntityId = String(storefrontEntity?.registryEntityId || '').trim();
+  const loadouts = listRegistryLoadouts(registryEntityId);
+  const bundles = listRegistryBundles(registryEntityId);
+  const primaryLoadout = loadouts[0] || null;
+  const primaryBundle = (Array.isArray(primaryLoadout?.bundles) ? primaryLoadout.bundles[0] : null) || bundles[0] || null;
+  const bestFor = Array.isArray(workerPackage?.bestFor)
+    ? workerPackage.bestFor.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  const supportedSurfaces = Array.isArray(workerPackage?.supportedSurfaces)
+    ? workerPackage.supportedSurfaces.map((entry) => String(entry || '').trim()).filter(Boolean)
+    : [];
+  const runtimeDefaults = workerPackage?.runtimeDefaults && typeof workerPackage.runtimeDefaults === 'object'
+    ? workerPackage.runtimeDefaults
+    : {};
+  const loadoutId = String(runtimeDefaults?.loadoutId || primaryLoadout?.loadoutId || '').trim();
+  const recommendedOfficeId = String(workerPackage?.recommendedOfficeId || '').trim();
+  const recommendedOfficeLabel = String(workerPackage?.recommendedOfficeLabel || recommendedOfficeId || '').trim();
+  const defaultDisplayName = String(workerPackage?.defaultDisplayName || storefrontEntity?.displayName || '').trim();
+  const requiresLocalBrain = workerPackage?.requiresLocalBrain === true;
+  const delegationAllowed = workerPackage?.delegationAllowed === true;
+  return {
+    packageKind: 'worker_package',
+    registryEntityId,
+    entityVersionId: String(version?.entityVersionId || storefrontEntity?.entityVersionId || '').trim() || null,
+    versionLabel: String(version?.versionLabel || storefrontEntity?.versionLabel || '').trim() || null,
+    displayName: String(storefrontEntity?.displayName || '').trim(),
+    oneLineBenefit: String(workerPackage?.oneLineBenefit || storefrontEntity?.description || '').trim(),
+    whatItDoes: String(workerPackage?.whatItDoes || storefrontEntity?.description || '').trim(),
+    bestFor,
+    recommendedOfficeId: recommendedOfficeId || null,
+    recommendedOfficeLabel: recommendedOfficeLabel || null,
+    supportedSurfaces,
+    defaultDisplayName,
+    requiresLocalBrain,
+    brainBindingLabel: requiresLocalBrain ? 'Needs local brain setup' : 'Ready after install',
+    delegationAllowed,
+    runtimeDefaults: {
+      brainProfileId: String(runtimeDefaults?.brainProfileId || '').trim() || null,
+      workspaceSeedRef: String(runtimeDefaults?.workspaceSeedRef || '').trim() || null,
+      configVersionId: String(runtimeDefaults?.configVersionId || '').trim() || null,
+      loadoutId: loadoutId || null,
+      delegationAllowed,
+    },
+    portableArtifacts: {
+      loadoutId: loadoutId || null,
+      bundleId: String(primaryBundle?.bundleId || '').trim() || null,
+      bundleHash: String(primaryBundle?.contentHash || '').trim() || null,
+    },
+    install: {
+      actionLabel: 'Install to House',
+      shareLabel: 'Send to Friend',
+      detailLabel: 'View Details',
+      recommendedOfficeId: recommendedOfficeId || null,
+      recommendedOfficeLabel: recommendedOfficeLabel || null,
+      defaultDisplayName,
+      requiresLocalBrain,
+      delegationAllowed,
+    },
+  };
+}
+
 function searchRegistryFamilyGroups({ query = '', family = '' } = {}) {
   const items = searchRegistryEntities({ query, family });
   const groups = new Map();
@@ -1718,6 +1882,8 @@ function searchRegistryFamilyGroups({ query = '', family = '' } = {}) {
     }
     groups.get(familySlug).members.push({
       registryEntityId: item.registryEntityId,
+      entityVersionId: item.entityVersionId || null,
+      versionLabel: item.versionLabel || null,
       entityKind: item.entityKind,
       slug: item.slug,
       displayName: item.displayName,
@@ -1731,6 +1897,7 @@ function searchRegistryFamilyGroups({ query = '', family = '' } = {}) {
         proofCount: item.proofCards.length,
         loadoutCount: item.loadouts.length,
       },
+      workerPackage: item.workerPackage || null,
     });
   }
   return Array.from(groups.values())
@@ -1750,6 +1917,7 @@ function getRegistryEntityById(registryEntityId) {
   const familyInfo = row.family ? getRegistryFamilySummary(row.family) : null;
   const proofCards = listRegistryProofCards(row.registry_entity_id);
   const loadouts = listRegistryLoadouts(row.registry_entity_id);
+  const projection = fromJson(row.projection_json, {});
   return {
     registryId: row.registry_entity_id,
     registryEntityId: row.registry_entity_id,
@@ -1763,7 +1931,7 @@ function getRegistryEntityById(registryEntityId) {
     slug: row.slug,
     displayName: row.display_name,
     description: row.description || null,
-    projection: fromJson(row.projection_json, {}),
+    projection,
     proofCards,
     loadouts,
     storefront: {
@@ -1772,6 +1940,15 @@ function getRegistryEntityById(registryEntityId) {
       proofCount: proofCards.length,
       loadoutCount: loadouts.length,
     },
+    workerPackage: buildRegistryWorkerPackage({
+      registryEntityId: row.registry_entity_id,
+      entityVersionId: version?.entityVersionId || null,
+      versionLabel: version?.versionLabel || null,
+      entityKind: row.entity_kind,
+      displayName: row.display_name,
+      description: row.description || null,
+      projection,
+    }, version),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -1788,6 +1965,7 @@ function getRegistryFamilyBySlug(familySlug) {
     ORDER BY slug ASC, display_name ASC
   `).all(String(familySlug || '').trim().toLowerCase()).map((row) => {
     const version = getLatestRegistryEntityVersion(row.registry_entity_id);
+    const projection = fromJson(row.projection_json, {});
     return {
       proofCards: listRegistryProofCards(row.registry_entity_id),
       loadouts: listRegistryLoadouts(row.registry_entity_id),
@@ -1802,7 +1980,20 @@ function getRegistryFamilyBySlug(familySlug) {
       slug: row.slug,
       displayName: row.display_name,
       description: row.description || null,
-      projection: fromJson(row.projection_json, {}),
+      projection,
+      storefront: {
+        title: row.display_name,
+        summary: row.description || null,
+      },
+      workerPackage: buildRegistryWorkerPackage({
+        registryEntityId: row.registry_entity_id,
+        entityVersionId: version?.entityVersionId || null,
+        versionLabel: version?.versionLabel || null,
+        entityKind: row.entity_kind,
+        displayName: row.display_name,
+        description: row.description || null,
+        projection,
+      }, version),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

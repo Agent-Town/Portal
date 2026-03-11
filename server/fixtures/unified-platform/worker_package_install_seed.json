@@ -1,0 +1,14 @@
+{
+  "family": "worker_package_install_seed",
+  "schema": "agent-town-worker-package-install-seed/v1",
+  "officeId": "office_fixture_ops",
+  "officeLabel": "Operations",
+  "staffAgentId": "staff_fixture_operator",
+  "staffAgentLabel": "Operations Lead",
+  "registryEntityId": "reg_house_worker_front_desk_helper",
+  "entityVersionId": "rev_house_worker_front_desk_helper_v1",
+  "loadoutId": "loadout_house_worker_front_desk_helper_v1",
+  "bundleHash": "sha256:bundle_house_worker_front_desk_helper_v1",
+  "expectedStatus": "brain_binding_required",
+  "expectedStatusLabel": "Connect a local brain before this helper can start working."
+}
