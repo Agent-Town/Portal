@@ -174,6 +174,27 @@
     removeStorage(activeStorage, STORAGE_KEYS.full);
   }
 
+  function isMainlandChineseLocale(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return false;
+    const parts = normalized.split('-').filter(Boolean);
+    if (parts[0] !== 'zh') return false;
+    let script = '';
+    let region = '';
+    for (const part of parts.slice(1)) {
+      if (!script && part.length === 4) {
+        script = part;
+        continue;
+      }
+      if (!region && (part.length === 2 || /^[0-9]{3}$/.test(part))) {
+        region = part;
+        continue;
+      }
+    }
+    if (region === 'cn') return true;
+    return !region && script === 'hans';
+  }
+
   function browserSuggestedPresetId(languagesInput) {
     const values = Array.isArray(languagesInput)
       ? languagesInput
@@ -181,7 +202,7 @@
     const normalized = values
       .map((value) => String(value || '').trim().toLowerCase())
       .filter(Boolean);
-    if (normalized.some((value) => value === 'zh-cn' || value === 'zh-hans' || value.startsWith('zh'))) {
+    if (normalized.some((value) => isMainlandChineseLocale(value))) {
       return 'cn-mainland';
     }
     return DEFAULT_PRESET_ID;
@@ -226,6 +247,7 @@
     readLocalPreference,
     persistLocalPreference,
     clearLocalPreference,
+    isMainlandChineseLocale,
     browserSuggestedPresetId,
     resolveExperiencePreference
   };

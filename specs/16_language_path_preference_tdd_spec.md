@@ -1,8 +1,8 @@
 # Phase 6 Spec: Experience Preference Presets + Localized Onboarding (TDD)
 
-Status: Draft  
-Version: 1.0  
-Audience: AI agent developers, runtime engineers, frontend engineers, backend engineers, security engineers, QA automation engineers, UX engineers  
+Status: Draft
+Version: 1.0
+Audience: AI agent developers, runtime engineers, frontend engineers, backend engineers, security engineers, QA automation engineers, UX engineers
 Goal: introduce an early user-selected language/preference path that adapts onboarding, provider recommendations, copy, media, and agent guidance without forking the product into separate app flows.
 
 Implementation constraints:

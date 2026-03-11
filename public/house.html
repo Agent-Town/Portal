@@ -15,28 +15,28 @@
         <a class="logoLink" href="/" aria-label="Agent Town home">
           <img class="logoImg" src="/logo.jpg" alt="" />
         </a>
-        <strong>Agent Town</strong>
-        <span class="badge">house management</span>
+        <strong id="houseBrandTitle">Agent Town</strong>
+        <span class="badge" id="houseBrandBadge">house management</span>
       </div>
       <div class="kv">
         <button class="btn" id="connectWalletBtn">Connect wallet</button>
         <a class="btn is-hidden" id="inboxNavLink" href="#">Inbox</a>
-        <a class="btn" href="/leaderboard">Leaderboard</a>
-        <a class="btn" href="/atlas">Atlas</a>
-        <a class="btn" href="/">Home</a>
+        <a class="btn" id="houseNavLeaderboardLink" href="/leaderboard">Leaderboard</a>
+        <a class="btn" id="houseNavAtlasLink" href="/atlas">Atlas</a>
+        <a class="btn" id="houseNavHomeLink" href="/">Home</a>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
 
     <div class="panel hero">
-      <h1>House of Secrets</h1>
-      <p>
+      <h1 id="houseHeroTitle">House of Secrets</h1>
+      <p id="houseHeroHelp">
         Unlock with a <strong>wallet signature</strong>. No unencrypted house key is stored server-side.
       </p>
     </div>
 
     <div class="panel">
-      <h2 style="margin:0 0 6px">Unlock</h2>
+      <h2 style="margin:0 0 6px" id="houseUnlockTitle">Unlock</h2>
 
       <div class="kv" style="gap:10px; flex-wrap: wrap;">
         <button class="btn" id="unlockBtn">Sign to unlock</button>
@@ -49,8 +49,8 @@
     </div>
 
     <div class="panel" id="agentStatePanel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">Agent state backup</h2>
-      <p class="small" style="margin-top:0">Save and restore OpenClaw Lite config, memory, and LLM OAuth/API settings.</p>
+      <h2 style="margin:0 0 6px" id="houseAgentStateTitle">Agent state backup</h2>
+      <p class="small" style="margin-top:0" id="houseAgentStateHelp">Save and restore OpenClaw Lite config, memory, and LLM OAuth/API settings.</p>
       <div class="kv" style="gap:10px; flex-wrap: wrap;">
         <button class="btn" id="saveAgentStateBtn" disabled>Store in house</button>
         <button class="btn" id="restoreAgentStateBtn" disabled>Restore from house</button>
@@ -62,11 +62,11 @@
       <div class="small" id="agentStateError" style="margin-top:6px; color: var(--bad);"></div>
 
       <div class="divider" style="margin: 14px 0;"></div>
-      <h3 style="margin:0 0 6px">Mind configuration</h3>
-      <p class="small" style="margin-top:0">This is the same Brain block used on the index page. Saved settings are included in backup and restore.</p>
+      <h3 style="margin:0 0 6px" id="houseMindTitle">Mind configuration</h3>
+      <p class="small" style="margin-top:0" id="houseMindHelp">This is the same Brain block used on the index page. Saved settings are included in backup and restore.</p>
       <div class="brain-config">
         <div class="kv dense">
-          <label class="small-label">Provider</label>
+          <label class="small-label" id="houseProviderLabel">Provider</label>
           <select class="input" id="llmProviderSelect">
             <option value="openai">openai</option>
             <option value="ollama">ollama</option>
@@ -98,36 +98,36 @@
             <option value="test-local">test-local</option>
           </select>
 
-          <label class="small-label">Model ID</label>
+          <label class="small-label" id="houseModelLabel">Model ID</label>
           <select class="input" id="llmModelIdInput">
             <option value="gpt-4o">gpt-4o</option>
             <option value="gpt-4o-mini">gpt-4o-mini</option>
           </select>
 
-          <label class="small-label">Auth mode</label>
+          <label class="small-label" id="houseAuthModeLabel">Auth mode</label>
           <select class="input" id="llmAuthModeSelect">
             <option value="api-key">API Key</option>
             <option value="oauth-json">OpenAI OAuth Profile / Token</option>
           </select>
 
-          <label class="small-label">OAuth profile JSON / token</label>
+          <label class="small-label" id="houseOauthProfileLabel">OAuth profile JSON / token</label>
           <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
           <div class="small" id="llmOauthProfileHint"></div>
           <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
           <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;">Start OAuth in new tab</button>
           <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;">Complete OAuth</button>
 
-          <label class="small-label">API Key</label>
+          <label class="small-label" id="houseApiKeyLabel">API Key</label>
           <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." />
         </div>
 
         <details style="margin-top: 8px; border: 1px solid #444; border-radius: 4px; padding: 4px;">
-          <summary class="small" style="cursor: pointer; padding: 4px;">Advanced Settings</summary>
+          <summary class="small" id="houseAdvancedSummary" style="cursor: pointer; padding: 4px;">Advanced Settings</summary>
           <div class="kv dense" style="margin-top: 8px; padding: 4px;">
-            <label class="small-label">Base URL (Optional)</label>
+            <label class="small-label" id="houseBaseUrlLabel">Base URL (Optional)</label>
             <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
 
-            <label class="small-label">Thinking Level</label>
+            <label class="small-label" id="houseThinkingLabel">Thinking Level</label>
             <select class="input" id="llmThinkingInput">
               <option value="">Default</option>
               <option value="low">Low</option>
@@ -135,7 +135,7 @@
               <option value="xhigh">XHigh</option>
             </select>
 
-            <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <label class="small" id="houseUseProxyLabel" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
               <input id="llmUseProxyInput" type="checkbox" checked />
               Use Proxy (Recommended)
             </label>
@@ -154,18 +154,18 @@
     </div>
 
     <div class="panel is-hidden" id="descriptorPanel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">House QR (descriptor)</h2>
-      <p class="small" style="margin-top:0">Share this QR with your agent/client to locate the house. It contains no secrets.</p>
-      <p class="small" style="margin-top:0; color: var(--muted);">
+      <h2 style="margin:0 0 6px" id="houseDescriptorTitle">House QR (descriptor)</h2>
+      <p class="small" style="margin-top:0" id="houseDescriptorHelp">Share this QR with your agent/client to locate the house. It contains no secrets.</p>
+      <p class="small" style="margin-top:0; color: var(--muted);" id="houseDescriptorNote">
         Mailbox fields (`PDA_TODO` / `PROGRAM_TODO`) are placeholders only and not live messaging infrastructure.
       </p>
       <div class="row two" style="gap: 14px; align-items: start;">
         <div>
           <div id="qr" aria-label="House QR"></div>
-          <div class="small" style="margin-top:6px; color: var(--muted)">Encodes a JSON house descriptor.</div>
+          <div class="small" style="margin-top:6px; color: var(--muted)" id="houseDescriptorCaption">Encodes a JSON house descriptor.</div>
         </div>
         <div>
-          <label class="small" for="descriptor">Descriptor JSON</label>
+          <label class="small" id="houseDescriptorLabel" for="descriptor">Descriptor JSON</label>
           <textarea id="descriptor" rows="10" readonly></textarea>
           <div class="kv" style="margin-top:10px">
             <button class="btn" id="copyDescriptorBtn">Copy descriptor</button>
@@ -175,19 +175,19 @@
     </div>
 
     <div class="panel is-hidden" id="erc8004Panel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">ERC-8004 link (Phase 2)</h2>
-      <p class="small" style="margin-top:0">Copy this statement to create an ERC-8004 attestation later (Ethereum canonical).</p>
+      <h2 style="margin:0 0 6px" id="houseErc8004Title">ERC-8004 link (Phase 2)</h2>
+      <p class="small" style="margin-top:0" id="houseErc8004Help">Copy this statement to create an ERC-8004 attestation later (Ethereum canonical).</p>
       <textarea id="erc8004" rows="8" readonly></textarea>
       <div class="kv" style="margin-top:10px">
         <button class="btn" id="copyErc8004Btn">Copy ERC-8004 statement</button>
       </div>
 
       <div class="divider" style="margin: 14px 0;"></div>
-      <h3 style="margin:0 0 6px">Mint identity (Phase 3)</h3>
-      <p class="small" style="margin-top:0">Mints an ERC-8004 identity using the official Agent0 SDK and your connected EVM wallet. Default: Sepolia (cheap). You can switch to mainnet.</p>
+      <h3 style="margin:0 0 6px" id="houseErc8004MintTitle">Mint identity (Phase 3)</h3>
+      <p class="small" style="margin-top:0" id="houseErc8004MintHelp">Mints an ERC-8004 identity using the official Agent0 SDK and your connected EVM wallet. Default: Sepolia (cheap). You can switch to mainnet.</p>
       <div class="row" style="gap: 10px; align-items: end;">
         <div>
-          <label class="small" for="erc8004Chain">Chain</label>
+          <label class="small" id="houseErc8004ChainLabel" for="erc8004Chain">Chain</label>
           <select id="erc8004Chain">
             <option value="sepolia">sepolia</option>
             <option value="mainnet">mainnet</option>
@@ -201,18 +201,18 @@
     </div>
 
     <div class="panel is-hidden" id="anchorsPanel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">Anchors (private vault)</h2>
-      <p class="small" style="margin-top:0">
+      <h2 style="margin:0 0 6px" id="houseAnchorsTitle">Anchors (private vault)</h2>
+      <p class="small" style="margin-top:0" id="houseAnchorsHelp">
         Link this house to an ERC-8004 identity. The link is stored <strong>encrypted</strong> inside the house vault.
         The house mailbox exists regardless — publishing only makes this alias discoverable for routing.
       </p>
 
       <div class="row" style="gap: 10px; align-items: end;">
         <div style="flex: 1; min-width: 240px;">
-          <label class="small" for="anchorErc8004Id">ERC-8004 ID (Agent0 format)</label>
+          <label class="small" id="houseAnchorsIdLabel" for="anchorErc8004Id">ERC-8004 ID (Agent0 format)</label>
           <input id="anchorErc8004Id" type="text" placeholder="e.g. 11155111:123" />
-          <div class="small" style="margin-top:6px; color: var(--muted)">We store the ID exactly as Agent0 returns it (includes chainId).</div>
-          <label class="small" style="margin-top:10px; display:flex; gap:8px; align-items:center; color: var(--muted)">
+          <div class="small" style="margin-top:6px; color: var(--muted)" id="houseAnchorsIdHelp">We store the ID exactly as Agent0 returns it (includes chainId).</div>
+          <label class="small" id="houseAnchorsDiscoverableLabel" style="margin-top:10px; display:flex; gap:8px; align-items:center; color: var(--muted)">
             <input id="anchorDiscoverable" type="checkbox" checked />
             Publish ERC-8004 → house mapping (discoverable)
           </label>
@@ -228,20 +228,20 @@
       <div class="divider" style="margin: 14px 0;"></div>
       <div class="row two" style="gap: 14px; align-items: start;">
         <div class="panel" style="margin:0;">
-          <h3 style="margin:0 0 6px">Mainnets</h3>
+          <h3 style="margin:0 0 6px" id="houseAnchorsMainnetsTitle">Mainnets</h3>
           <div class="small" id="anchorsMainnet" style="white-space: pre-wrap; color: var(--muted)">—</div>
         </div>
         <div class="panel" style="margin:0;">
-          <h3 style="margin:0 0 6px">Devnets</h3>
+          <h3 style="margin:0 0 6px" id="houseAnchorsDevnetsTitle">Devnets</h3>
           <div class="small" id="anchorsDevnet" style="white-space: pre-wrap; color: var(--muted)">—</div>
         </div>
       </div>
     </div>
 
     <div class="panel" id="sharePanel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">Share</h2>
+      <h2 style="margin:0 0 6px" id="houseShareTitle">Share</h2>
       <div id="shareSetup">
-        <p class="small" style="margin-top:0">Generate a public share page. New signups count as referrals.</p>
+        <p class="small" style="margin-top:0" id="houseShareHelp">Generate a public share page. New signups count as referrals.</p>
         <div class="kv">
           <button class="btn primary" id="createShareBtn">Generate share link</button>
           <span class="pill" id="shareStatus" style="display:none">Working…</span>
@@ -276,7 +276,7 @@
           </div>
         </div>
         <div id="sharePosts" style="margin-top:12px; display:grid; gap:8px;">
-          <div class="small">Post links (optional)</div>
+          <div class="small" id="houseSharePostLinksLabel">Post links (optional)</div>
           <span class="pill status share-agent-only" id="shareAgentStatusActive">
             <span class="dot" id="shareAgentDotActive"></span>
             <span id="shareAgentStatusTextActive">Agent not connected</span>
@@ -299,11 +299,11 @@
     </div>
 
     <div class="panel" id="publicMediaPanel" style="margin-top: 14px;">
-      <h2 style="margin:0 0 6px">Public image</h2>
-      <p class="small" style="margin-top:0">Not encrypted. Visible on the leaderboard.</p>
-      <label class="small" for="publicPrompt">Prompt</label>
+      <h2 style="margin:0 0 6px" id="housePublicTitle">Public image</h2>
+      <p class="small" style="margin-top:0" id="housePublicHelp">Not encrypted. Visible on the leaderboard.</p>
+      <label class="small" id="housePublicPromptLabel" for="publicPrompt">Prompt</label>
       <textarea id="publicPrompt" rows="3" maxlength="280" placeholder="How did you generate it..."></textarea>
-      <label class="small" for="publicImage" style="margin-top:10px">Image (PNG/JPG/WebP, max 1 MB)</label>
+      <label class="small" id="housePublicImageLabel" for="publicImage" style="margin-top:10px">Image (PNG/JPG/WebP, max 1 MB)</label>
       <input id="publicImage" type="file" accept="image/png,image/jpeg,image/webp" />
       <div class="kv" style="margin-top:10px">
         <button class="btn primary" id="publicUploadBtn" disabled>Publish public image</button>
@@ -320,16 +320,16 @@
 
     <div class="row two" style="margin-top: 14px;">
       <div class="panel">
-        <h2 style="margin:0 0 6px">Write</h2>
-        <p class="small" style="margin-top:0">Append an encrypted entry. Agents will get an API client next.</p>
-        <label class="small" for="entryType">Type</label>
+        <h2 style="margin:0 0 6px" id="houseWriteTitle">Write</h2>
+        <p class="small" style="margin-top:0" id="houseWriteHelp">Append an encrypted entry. Agents will get an API client next.</p>
+        <label class="small" id="houseWriteTypeLabel" for="entryType">Type</label>
         <select id="entryType">
           <option value="note">note</option>
           <option value="secret">secret</option>
           <option value="link">link</option>
           <option value="task">task</option>
         </select>
-        <label class="small" for="entryText" style="margin-top:10px">Content</label>
+        <label class="small" id="houseWriteContentLabel" for="entryText" style="margin-top:10px">Content</label>
         <textarea id="entryText" rows="8" placeholder="Write something... (encrypted)"></textarea>
         <div class="kv" style="margin-top:10px">
           <button class="btn primary" id="appendBtn">Append</button>
@@ -338,25 +338,25 @@
       </div>
 
       <div class="panel">
-        <h2 style="margin:0 0 6px">Read</h2>
-        <p class="small" style="margin-top:0">Decrypted entries (local only).</p>
+        <h2 style="margin:0 0 6px" id="houseReadTitle">Read</h2>
+        <p class="small" style="margin-top:0" id="houseReadHelp">Decrypted entries (local only).</p>
         <div id="entries" class="small" style="white-space: pre-wrap;"></div>
       </div>
     </div>
 
     <footer>
-      <div>Made by humans &amp; agents for humans &amp; agents. <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
+      <div><span id="houseFooterByline">Made by humans &amp; agents for humans &amp; agents.</span> <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
     </footer>
   </div>
 
   <script src="/vendor/qrcode.js?v=20260203"></script>
   <script src="/experience_profiles.js?v=20260309a"></script>
   <script src="/experience_runtime.js?v=20260309a"></script>
-  <script src="/i18n.js?v=20260309a"></script>
+  <script src="/i18n.js?v=20260310c"></script>
   <script src="/llm_catalog.js?v=20260309a"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/house.js?v=20260309a"></script>
+  <script src="/house.js?v=20260310c"></script>
   <script src="/agent_panel.js?v=20260213"></script>
 </body>
 </html>

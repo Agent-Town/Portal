@@ -24,8 +24,8 @@
     glm: Object.freeze(['glm-5']),
     synthetic: Object.freeze(['hf:MiniMaxAI/MiniMax-M2.1', 'hf:moonshotai/Kimi-K2-Thinking', 'hf:zai-org/GLM-4.7']),
     qianfan: Object.freeze(['model-id']),
-    'qwen-portal': Object.freeze(['coder-model', 'vision-model']),
-    qwen: Object.freeze(['coder-model', 'vision-model']),
+    'qwen-portal': Object.freeze(['qwen3-coder-plus', 'qwen3-max', 'qwen3-vl-plus']),
+    qwen: Object.freeze(['qwen3-coder-plus', 'qwen3-max', 'qwen3-vl-plus']),
     together: Object.freeze(['moonshotai/Kimi-K2.5']),
     'cloudflare-ai-gateway': Object.freeze(['claude-sonnet-4-5']),
     xiaomi: Object.freeze(['mimo-v2-flash']),
@@ -37,6 +37,13 @@
     groq: Object.freeze(['llama3-8b-8192', 'llama3-70b-8192']),
     'test-local': Object.freeze(['deterministic'])
   });
+
+  const TEMPLATE_MODEL_IDS = Object.freeze(new Set([
+    'model-id',
+    'your-model-id',
+    'coder-model',
+    'vision-model'
+  ]));
 
   const PROVIDER_ALIASES = Object.freeze({
     glm: 'zai',
@@ -134,6 +141,14 @@
     return Array.isArray(models) ? [...models] : [];
   }
 
+  function isTemplateModelId(value) {
+    return TEMPLATE_MODEL_IDS.has(String(value || '').trim().toLowerCase());
+  }
+
+  function hasTemplateModels(provider) {
+    return getSupportedModels(provider).some((modelId) => isTemplateModelId(modelId));
+  }
+
   function getDefaultProvider(input) {
     return normalizePolicy(input) === 'cn-mainland' ? 'qwen' : 'openai';
   }
@@ -182,6 +197,8 @@
     normalizeProvider,
     getProviderOrder,
     getSupportedModels,
+    isTemplateModelId,
+    hasTemplateModels,
     getDefaultProvider,
     getDefaultModel,
     getRecommendedProviders,

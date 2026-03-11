@@ -3723,7 +3723,10 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
   }));
 
-  if (!callbackServer.ready) {
+  const callbackServerError = String(callbackServer?.error || '').trim().toUpperCase();
+  const allowManualOnlyOauthStart = callbackServer.ready !== true && callbackServerError === 'EADDRINUSE';
+
+  if (!callbackServer.ready && !allowManualOnlyOauthStart) {
     return res.status(503).json({
       ok: false,
       error: 'CALLBACK_SERVER_UNAVAILABLE',

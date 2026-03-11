@@ -92,6 +92,16 @@ function tHouse(key, vars = {}) {
   return HouseI18n.t(key, vars, preference.locale || 'en');
 }
 
+function setHouseNodeText(id, key, vars = {}) {
+  const node = el(id);
+  if (node) node.textContent = tHouse(key, vars);
+}
+
+function setHouseNodePlaceholder(id, key) {
+  const node = el(id);
+  if (node) node.placeholder = tHouse(key);
+}
+
 function isLinkFirstExperience(preference = getCurrentExperiencePreference()) {
   return String(preference?.sharePolicy || '').trim() === 'link-first'
     || String(preference?.presetId || '').trim() === 'cn-mainland';
@@ -126,6 +136,12 @@ function getDefaultMindModelForProvider(provider) {
 }
 
 function getMindProviderWarningText(provider, preference = getCurrentExperiencePreference()) {
+  const normalizedProvider = LlmCatalog && typeof LlmCatalog.normalizeProvider === 'function'
+    ? (LlmCatalog.normalizeProvider(provider) || String(provider || '').trim())
+    : String(provider || '').trim();
+  if (LlmCatalog && typeof LlmCatalog.hasTemplateModels === 'function' && LlmCatalog.hasTemplateModels(normalizedProvider)) {
+    return tHouse('brain.warning.provider_model_template', { provider: normalizedProvider });
+  }
   const message = LlmCatalog && typeof LlmCatalog.getProviderWarning === 'function'
     ? LlmCatalog.getProviderWarning(provider, preference)
     : '';
@@ -148,6 +164,87 @@ function applyExperiencePreferenceToHouseUi() {
   if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
     ExperienceRuntime.applyDocumentPreference(preference);
   }
+  document.title = `${tHouse('house.brand.title')} — House`;
+  setHouseNodeText('houseBrandTitle', 'house.brand.title');
+  setHouseNodeText('houseBrandBadge', 'house.brand.badge');
+  setHouseNodeText('houseNavLeaderboardLink', 'house.nav.leaderboard');
+  setHouseNodeText('houseNavAtlasLink', 'house.nav.atlas');
+  setHouseNodeText('houseNavHomeLink', 'house.nav.home');
+  setHouseNodeText('houseHeroTitle', 'house.hero.title');
+  setHouseNodeText('houseHeroHelp', 'house.hero.help');
+  setHouseNodeText('houseUnlockTitle', 'house.unlock.title');
+  setHouseNodeText('unlockBtn', 'house.unlock.sign');
+  setHouseNodeText('houseAgentStateTitle', 'house.agent_state.title');
+  setHouseNodeText('houseAgentStateHelp', 'house.agent_state.help');
+  setHouseNodeText('saveAgentStateBtn', 'house.agent_state.store');
+  setHouseNodeText('restoreAgentStateBtn', 'house.agent_state.restore');
+  setHouseNodeText('downloadAgentStateBtn', 'house.agent_state.download');
+  setHouseNodeText('uploadAgentStateBtn', 'house.agent_state.upload');
+  setHouseNodeText('houseMindTitle', 'house.mind.title');
+  setHouseNodeText('houseMindHelp', 'house.mind.help');
+  setHouseNodeText('houseProviderLabel', 'brain.provider');
+  setHouseNodeText('houseModelLabel', 'brain.model');
+  setHouseNodeText('houseAuthModeLabel', 'brain.auth');
+  setHouseNodeText('houseOauthProfileLabel', 'brain.oauth');
+  setHouseNodeText('houseApiKeyLabel', 'brain.api_key');
+  setHouseNodeText('houseAdvancedSummary', 'brain.advanced');
+  setHouseNodeText('houseBaseUrlLabel', 'brain.base_url');
+  setHouseNodeText('houseThinkingLabel', 'brain.thinking');
+  setHouseNodeText('houseUseProxyLabel', 'brain.use_proxy');
+  setHouseNodeText('llmOauthLaunchBtn', 'brain.oauth.start');
+  setHouseNodeText('llmOauthCompleteBtn', 'brain.oauth.complete');
+  setHouseNodeText('llmSaveBtn', 'brain.connect');
+  setHouseNodeText('llmClearBtn', 'brain.clear');
+  setHouseNodeText('houseDescriptorTitle', 'house.descriptor.title');
+  setHouseNodeText('houseDescriptorHelp', 'house.descriptor.help');
+  setHouseNodeText('houseDescriptorNote', 'house.descriptor.note');
+  setHouseNodeText('houseDescriptorCaption', 'house.descriptor.caption');
+  setHouseNodeText('houseDescriptorLabel', 'house.descriptor.label');
+  setHouseNodeText('copyDescriptorBtn', 'house.descriptor.copy');
+  setHouseNodeText('houseErc8004Title', 'house.erc8004.title');
+  setHouseNodeText('houseErc8004Help', 'house.erc8004.help');
+  setHouseNodeText('copyErc8004Btn', 'house.erc8004.copy');
+  setHouseNodeText('houseErc8004MintTitle', 'house.erc8004.mint_title');
+  setHouseNodeText('houseErc8004MintHelp', 'house.erc8004.mint_help');
+  setHouseNodeText('houseErc8004ChainLabel', 'house.erc8004.chain');
+  setHouseNodeText('mintErc8004Btn', 'house.erc8004.mint');
+  setHouseNodeText('houseAnchorsTitle', 'house.anchors.title');
+  setHouseNodeText('houseAnchorsHelp', 'house.anchors.help');
+  setHouseNodeText('houseAnchorsIdLabel', 'house.anchors.id_label');
+  setHouseNodeText('houseAnchorsIdHelp', 'house.anchors.id_help');
+  setHouseNodeText('houseAnchorsDiscoverableLabel', 'house.anchors.discoverable');
+  setHouseNodeText('linkAnchorBtn', 'house.anchors.link');
+  setHouseNodeText('houseAnchorsMainnetsTitle', 'house.anchors.mainnets');
+  setHouseNodeText('houseAnchorsDevnetsTitle', 'house.anchors.devnets');
+  setHouseNodeText('houseShareTitle', 'house.share.title');
+  setHouseNodeText('houseShareHelp', 'house.share.help');
+  setHouseNodeText('createShareBtn', 'house.share.generate');
+  setHouseNodeText('shareStatus', 'house.share.working');
+  setHouseNodeText('copyAgentMsg', 'house.share.copy_agent');
+  setHouseNodeText('copyShareLink', 'house.share.copy_link');
+  setHouseNodeText('openShareLink', 'house.share.open_link');
+  setHouseNodeText('houseSharePostLinksLabel', 'house.share.post_links');
+  setHouseNodeText('saveSharePosts', 'house.share.save_links');
+  setHouseNodeText('housePublicTitle', 'house.public.title');
+  setHouseNodeText('housePublicHelp', 'house.public.help');
+  setHouseNodeText('housePublicPromptLabel', 'house.public.prompt');
+  setHouseNodePlaceholder('publicPrompt', 'house.public.prompt_placeholder');
+  setHouseNodeText('housePublicImageLabel', 'house.public.image');
+  setHouseNodeText('publicUploadBtn', 'house.public.publish');
+  setHouseNodeText('publicClearBtn', 'house.public.clear');
+  setHouseNodeText('houseWriteTitle', 'house.write.title');
+  setHouseNodeText('houseWriteHelp', 'house.write.help');
+  setHouseNodeText('houseWriteTypeLabel', 'house.write.type');
+  setHouseNodeText('houseWriteContentLabel', 'house.write.content');
+  setHouseNodePlaceholder('entryText', 'house.write.placeholder');
+  setHouseNodeText('appendBtn', 'house.write.append');
+  setHouseNodeText('lockBtn', 'house.write.lock');
+  setHouseNodeText('houseReadTitle', 'house.read.title');
+  setHouseNodeText('houseReadHelp', 'house.read.help');
+  setHouseNodeText('houseFooterByline', 'house.footer.byline');
+  setHouseNodePlaceholder('llmOauthProfileInput', 'brain.oauth.placeholder');
+  setHouseNodePlaceholder('llmKeyInput', 'brain.api_key.placeholder');
+
   const providerSelect = el('llmProviderSelect');
   const modelInput = el('llmModelIdInput');
   if (providerSelect) {
@@ -171,6 +268,17 @@ function applyExperiencePreferenceToHouseUi() {
   if (shareAgentPostLabel) shareAgentPostLabel.textContent = tHouse('share.agent_label');
   const shareAgentPost = el('shareAgentPost');
   if (shareAgentPost) shareAgentPost.placeholder = tHouse('share.agent_placeholder');
+  const previewImage = el('publicPreviewImg');
+  if (previewImage && !previewImage.getAttribute('src')) {
+    previewImage.alt = tHouse('house.public.preview_alt');
+  }
+  const shareAgentMessage = el('shareAgentMsg');
+  if (shareAgentMessage && !String(shareAgentMessage.textContent || '').trim()) {
+    shareAgentMessage.textContent = tHouse('house.share.agent_message_missing', { skillUrl: `${window.location.origin}/skill.md` });
+  }
+  updateWalletUI();
+  if (typeof setDescriptorOpen === 'function') setDescriptorOpen(descriptorOpen);
+  if (typeof setErc8004Open === 'function') setErc8004Open(erc8004Open);
   updateMindProviderWarning();
 }
 
@@ -192,10 +300,39 @@ function setStatus(msg) {
   el('status').textContent = msg || '';
 }
 
-const ERROR_MESSAGES = {
-  AG0_SDK_NOT_BUNDLED: 'ERC-8004 minting is disabled until the local Agent0 SDK bundle is built.',
-  AG0_SDK_LOAD_FAILED: 'Unable to load the local Agent0 SDK bundle. Run: npm run build:agent0-sdk'
-};
+function mapHouseUiErrorMessage(error) {
+  const msg = String(error?.message || error || '').trim();
+  if (!msg) return '';
+  if (msg === 'AG0_SDK_NOT_BUNDLED') return tHouse('house.error.ag0_sdk_not_bundled');
+  if (msg === 'AG0_SDK_LOAD_FAILED') return tHouse('house.error.ag0_sdk_load_failed');
+  if (msg === 'LOCKED') return tHouse('house.error.locked');
+  if (msg === 'NO_HOUSE_ID') return tHouse('house.error.no_house_id');
+  if (msg === 'WALLET_NOT_CONNECTED') return tHouse('house.error.wallet_not_connected');
+  if (msg === 'NO_EVM_WALLET') return tHouse('house.error.no_evm_wallet');
+  if (msg === 'NO_EVM_ACCOUNT') return tHouse('house.error.no_evm_account');
+  if (msg === 'KEY_RECOVERY_REQUIRED') return tHouse('house.error.key_recovery_required');
+  if (msg === 'INVALID_KEY_WRAP') return tHouse('house.error.invalid_key_wrap');
+  if (msg === 'KEY_WRAP_DECRYPT_FAILED') return tHouse('house.error.key_wrap_decrypt_failed');
+  if (msg === 'HOUSE_ID_MISMATCH') return tHouse('house.error.house_id_mismatch');
+  if (msg === 'CEREMONY_ONLY') return tHouse('house.error.ceremony_only');
+  if (msg === 'RUNTIME_NOT_READY') return tHouse('house.error.runtime_not_ready');
+  if (msg === 'PUBLIC_IMAGE_REQUIRED') return tHouse('house.error.public_image_required');
+  if (msg === 'PUBLIC_PROMPT_REQUIRED') return tHouse('house.error.public_prompt_required');
+  if (msg === 'ERC8004_ID_REQUIRED') return tHouse('house.error.erc8004_id_required');
+  if (msg === 'WRONG_CHAIN') return tHouse('house.error.wrong_chain');
+  if (msg === 'ERC8004_DRAFT_FAILED') return tHouse('house.error.erc8004_draft_failed');
+  if (msg === 'MINT_CONFIRMATION_UNAVAILABLE') return tHouse('house.error.mint_confirmation_unavailable');
+  if (msg === 'INVALID_AGENT_ID') return tHouse('house.error.invalid_agent_id');
+  if (msg === 'INVALID_IDENTITY_REGISTRY') return tHouse('house.error.invalid_identity_registry');
+  if (msg === 'HOUSE_AUTH_NOT_READY') return tHouse('house.error.house_auth_not_ready');
+  if (msg === 'TOKEN_RESPONSE_INVALID') return tHouse('house.error.token_response_invalid');
+  if (msg === 'HOUSE_KEY_NOT_READY') return tHouse('house.agent_state.error_key_not_ready');
+  if (msg === 'INVALID_AGENT_STATE') return tHouse('house.agent_state.error_invalid_backup');
+  if (msg === 'AGENT_STATE_TOO_LARGE') return tHouse('house.agent_state.error_too_large');
+  if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return tHouse('house.agent_state.error_house_mismatch');
+  if (msg === 'UNSUPPORTED_ZIP_COMPRESSION') return tHouse('house.agent_state.error_unsupported_zip');
+  return msg;
+}
 
 function setError(msg) {
   const node = el('error');
@@ -204,12 +341,12 @@ function setError(msg) {
     node.textContent = '';
     return;
   }
-  node.textContent = ERROR_MESSAGES[msg] || msg;
+  node.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function setPublicMediaError(msg) {
   const node = el('publicUploadError');
-  if (node) node.textContent = msg || '';
+  if (node) node.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function setPublicMediaStatus(msg) {
@@ -241,7 +378,7 @@ function setAgentStateStatus(msg) {
 
 function setAgentStateError(msg) {
   const node = el('agentStateError');
-  if (node) node.textContent = msg || '';
+  if (node) node.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function setMindConfigStatus(msg) {
@@ -271,17 +408,17 @@ function renderPublicMediaPreview({ imageUrl, prompt, pending }) {
     return;
   }
   preview.classList.remove('is-hidden');
-  label.textContent = pending ? 'Preview (not saved)' : 'Current public image';
+  label.textContent = pending ? tHouse('house.public.preview_pending') : tHouse('house.public.preview_current');
   img.src = imageUrl;
-  img.alt = prompt ? `Public image: ${prompt}` : 'Public house image';
+  img.alt = prompt
+    ? tHouse('house.public.preview_alt_prompt', { prompt })
+    : tHouse('house.public.preview_alt');
   img.style.display = 'block';
   text.textContent = prompt || '';
 }
 
 const SHARE_CACHE_KEY = 'agentTownShareCache';
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
-const SHARE_COPY_LABEL = 'Copy share link';
-const AGENT_COPY_LABEL = 'Copy agent message';
 const TOKEN_MINT = 'CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS';
 const PATH_STORAGE_KEY = 'agentTownStartRole';
 const LEGACY_PATH_STORAGE_KEY = 'agentTownPathMode';
@@ -322,6 +459,14 @@ let mindOpenAiCodexOAuthAttempt = null;
 let mindOpenAiCodexOAuthPollTimer = null;
 let mindOpenAiCodexOAuthExchangeInFlight = false;
 let mindOpenAiCodexOAuthMessageListenerBound = false;
+
+function getShareCopyLabel() {
+  return tHouse('house.share.copy_link');
+}
+
+function getAgentCopyLabel() {
+  return tHouse('house.share.copy_agent');
+}
 
 function isErc8004AdvancedEnabled() {
   const params = new URLSearchParams(window.location.search);
@@ -870,14 +1015,14 @@ function updateMindOauthLaunchUi() {
   launchBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
   launchBtn.disabled = !supported;
   launchBtn.title = supported
-    ? 'Start OpenAI PKCE OAuth in a new tab.'
-    : 'OAuth launch is available for OpenAI providers only.';
+    ? tHouse('brain.oauth.start_title')
+    : tHouse('brain.oauth.start_title_disabled');
   if (completeBtn) {
     completeBtn.style.display = mode === MIND_AUTH_OAUTH ? 'inline-flex' : 'none';
     completeBtn.disabled = !supported;
     completeBtn.title = supported
-      ? 'Complete OAuth using pasted callback URL/code.'
-      : 'OAuth completion is available for OpenAI providers only.';
+      ? tHouse('brain.oauth.complete_title')
+      : tHouse('brain.oauth.complete_title_disabled');
   }
 }
 
@@ -974,16 +1119,18 @@ async function completeMindOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
     hydrateMindUiFromOAuthCredential(credential);
     stopMindOpenAiCodexOAuthPoll();
     mindOpenAiCodexOAuthAttempt = null;
-    setMindConfigStatus('OAuth exchange complete. Click Connect Brain.');
+    setMindConfigStatus(tHouse('house.mind.status.oauth_complete'));
     setMindConfigError('');
   } catch (err) {
     const code = String(err?.message || '').trim();
     if (code === 'CODE_PENDING') {
-      setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+      setMindConfigStatus(tHouse('house.mind.status.oauth_waiting'));
       setMindConfigError('');
       return;
     }
-    setMindConfigError(`OAuth exchange failed: ${code || 'OAUTH_EXCHANGE_FAILED'}`);
+    setMindConfigError(tHouse('house.mind.error.oauth_exchange_failed', {
+      message: code || 'OAUTH_EXCHANGE_FAILED'
+    }));
     throw err;
   } finally {
     mindOpenAiCodexOAuthExchangeInFlight = false;
@@ -1006,7 +1153,7 @@ async function launchMindOauthInNewTab() {
   const fallbackProvider = getDefaultMindProviderForExperience();
   const provider = String(el('llmProviderSelect')?.value || fallbackProvider).trim().toLowerCase();
   if (!MIND_OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
-    setMindConfigError('OAuth launch is available for OpenAI providers only.');
+    setMindConfigError(tHouse('house.mind.error.oauth_only_openai'));
     return;
   }
   bindMindOpenAiCodexOAuthMessageListener();
@@ -1023,24 +1170,24 @@ async function launchMindOauthInNewTab() {
   mindOpenAiCodexOAuthAttempt = { attemptId, state, startedAtMs: Date.now() };
   const popup = window.open(authorizeUrl, '_blank', 'noopener,noreferrer');
   if (!popup) throw new Error('POPUP_BLOCKED');
-  setMindConfigStatus('OAuth started. Complete sign-in in the popup. Then use Complete OAuth if needed.');
+  setMindConfigStatus(tHouse('house.mind.status.oauth_started'));
   setMindConfigError('');
   startMindOpenAiCodexOAuthPoll();
 }
 
 function mapMindConfigError(error) {
   const msg = String(error?.message || error || '');
-  if (msg === 'MISSING_LLM_PROVIDER') return 'Enter a provider.';
-  if (msg === 'MISSING_LLM_MODEL') return 'Enter a model.';
-  if (msg === 'MISSING_LLM_CREDENTIAL') return 'Enter an API key or OAuth token.';
-  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return 'Paste an OAuth profile JSON or token.';
-  if (msg === 'INVALID_OAUTH_PROFILE_JSON') return 'Invalid OAuth profile/token format.';
-  if (msg === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return 'No access token found in OAuth profile JSON.';
+  if (msg === 'MISSING_LLM_PROVIDER') return tHouse('house.mind.error.missing_provider');
+  if (msg === 'MISSING_LLM_MODEL') return tHouse('house.mind.error.missing_model');
+  if (msg === 'MISSING_LLM_CREDENTIAL') return tHouse('house.mind.error.missing_credential');
+  if (msg === 'MISSING_OAUTH_PROFILE_JSON') return tHouse('house.mind.error.missing_oauth_profile');
+  if (msg === 'INVALID_OAUTH_PROFILE_JSON') return tHouse('house.mind.error.invalid_oauth_profile');
+  if (msg === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return tHouse('house.mind.error.no_oauth_access_token');
   if (msg === 'UNSUPPORTED_OPENAI_ID_TOKEN') {
-    return 'OpenAI id_token callback URLs are not valid model credentials. Use an API key or OAuth profile with an access token.';
+    return tHouse('house.mind.error.unsupported_id_token');
   }
-  if (msg === 'IDB_OPEN_FAILED') return 'Local OpenClaw state is unavailable.';
-  return msg || 'Mind configuration failed.';
+  if (msg === 'IDB_OPEN_FAILED') return tHouse('house.mind.error.idb_open_failed');
+  return msg || tHouse('house.mind.error.failed');
 }
 
 function setMindAuthModeUi(mode) {
@@ -1053,12 +1200,12 @@ function setMindAuthModeUi(mode) {
   if (oauthInput) oauthInput.style.display = normalized === MIND_AUTH_OAUTH ? 'block' : 'none';
   if (keyInput) {
     keyInput.placeholder = normalized === MIND_AUTH_OAUTH
-      ? 'Optional override token (usually auto-derived from OAuth input)'
-      : 'LLM API key (stored locally)';
+      ? tHouse('brain.oauth.override_placeholder')
+      : tHouse('brain.api_key.placeholder.full');
   }
   if (oauthHint) {
     oauthHint.textContent = normalized === MIND_AUTH_OAUTH
-      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
+      ? tHouse('brain.oauth.hint')
       : '';
   }
   updateMindProviderWarning();
@@ -1407,9 +1554,12 @@ async function hydrateMindConfigFromLocal({ silent = false } = {}) {
   }
   if (!silent) {
     if (config.configured) {
-      setMindConfigStatus(`Mind loaded: ${config.provider}/${config.model}.`);
+      setMindConfigStatus(tHouse('house.mind.status.loaded', {
+        provider: config.provider,
+        model: config.model
+      }));
     } else {
-      setMindConfigStatus('Mind not configured yet.');
+      setMindConfigStatus(tHouse('house.mind.status.not_configured'));
     }
   }
   setMindConfigError('');
@@ -1480,7 +1630,12 @@ async function saveMindConfigToLocal({ silent = false } = {}) {
     await idbPutMetaRecords([['houseId', house.houseId]]);
   }
   await activateMindConfig(config);
-  if (!silent) setMindConfigStatus(`Mind saved: ${config.provider}/${config.model}.`);
+  if (!silent) {
+    setMindConfigStatus(tHouse('house.mind.status.saved', {
+      provider: config.provider,
+      model: config.model
+    }));
+  }
   setMindConfigError('');
   return config;
 }
@@ -1506,7 +1661,7 @@ async function clearMindConfigFromLocal() {
     authMode: MIND_AUTH_API_KEY
   });
   await deactivateMindConfig();
-  setMindConfigStatus('Mind config cleared.');
+  setMindConfigStatus(tHouse('house.mind.status.cleared'));
   setMindConfigError('');
 }
 
@@ -1951,16 +2106,16 @@ function formatBytes(value) {
 
 function mapAgentStateError(error) {
   const msg = String(error?.message || error || '');
-  if (!msg) return 'Agent state operation failed.';
-  if (msg === 'LOCKED') return 'Unlock the house first.';
-  if (msg === 'RUNTIME_NOT_READY') return 'Local OpenClaw runtime is not ready yet. Try again in a moment.';
-  if (msg === 'HOUSE_KEY_NOT_READY') return 'House key is not ready. Unlock again.';
-  if (msg === 'INVALID_AGENT_STATE') return 'Invalid agent backup format.';
-  if (msg === 'AGENT_STATE_TOO_LARGE') return 'Agent backup is too large.';
-  if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return 'Backup belongs to a different house.';
-  if (msg === 'UNSUPPORTED_ZIP_COMPRESSION') return 'Unsupported zip compression. Use a backup exported from this page.';
-  if (msg === 'NOT_FOUND') return 'House not found.';
-  if (msg === 'FILE_READ_FAILED') return 'Failed to read backup file.';
+  if (!msg) return tHouse('house.agent_state.error_failed');
+  if (msg === 'LOCKED') return tHouse('house.agent_state.error_unlock_first');
+  if (msg === 'RUNTIME_NOT_READY') return tHouse('house.agent_state.error_runtime_not_ready');
+  if (msg === 'HOUSE_KEY_NOT_READY') return tHouse('house.agent_state.error_key_not_ready');
+  if (msg === 'INVALID_AGENT_STATE') return tHouse('house.agent_state.error_invalid_backup');
+  if (msg === 'AGENT_STATE_TOO_LARGE') return tHouse('house.agent_state.error_too_large');
+  if (msg === 'AGENT_STATE_HOUSE_MISMATCH') return tHouse('house.agent_state.error_house_mismatch');
+  if (msg === 'UNSUPPORTED_ZIP_COMPRESSION') return tHouse('house.agent_state.error_unsupported_zip');
+  if (msg === 'NOT_FOUND') return tHouse('house.agent_state.error_not_found');
+  if (msg === 'FILE_READ_FAILED') return tHouse('house.agent_state.error_file_read');
   return msg;
 }
 
@@ -2108,7 +2263,7 @@ function updateWalletUI() {
   const connected = !!walletAddr;
   const btn = el('connectWalletBtn');
   if (btn) {
-    btn.textContent = connected ? 'Disconnect wallet' : 'Connect wallet';
+    btn.textContent = connected ? tHouse('common.disconnect_wallet') : tHouse('common.connect_wallet');
     btn.setAttribute('aria-pressed', connected ? 'true' : 'false');
   }
   const addr = el('walletAddr');
@@ -2189,7 +2344,7 @@ function bindWalletEvents() {
       if (unlocked) {
         // Switching accounts should lock immediately; the unlock UX is per-wallet.
         wipeKeys();
-        setStatus('Locked (wallet account changed).');
+        setStatus(tHouse('house.status.locked_account_changed'));
       }
     }
   };
@@ -2278,7 +2433,7 @@ async function disconnectWallet({ fromProvider = false, resetSession = false } =
   // This avoids "sticky" unlocked state on shared devices.
   if (unlocked) {
     wipeKeys();
-    setStatus('Locked (wallet disconnected).');
+    setStatus(tHouse('house.status.locked_wallet_disconnected'));
     if (resetSession) {
       await resetSessionAndGoHome();
     }
@@ -2423,7 +2578,7 @@ async function restoreWalletConnection({ houseIdFromUrl } = {}) {
   if (!houseIdFromUrl && cached.houseId) {
     walletHouseId = cached.houseId;
   }
-  setStatus('Wallet connected.');
+  setStatus(tHouse('common.wallet_connected'));
   saveWalletCache();
   syncInboxNavLink();
 }
@@ -2501,7 +2656,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
   const discoverable = !!el('anchorDiscoverable')?.checked;
 
   setAnchorError('');
-  setAnchorStatus('Requesting signature…');
+  setAnchorStatus(tHouse('house.anchor.status.request_signature'));
 
   const createdAtMs = Date.now();
   // Use a server-issued nonce if we are publishing to a server directory (prevents replay).
@@ -2525,7 +2680,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
 
   const { signer, signature, chainId } = await signEvmMessage(msg);
 
-  setAnchorStatus('Saving to encrypted vault…');
+  setAnchorStatus(tHouse('house.anchor.status.saving_vault'));
   await appendVaultObject({
     type: 'anchor',
     body: {
@@ -2553,7 +2708,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
   });
 
   if (discoverable) {
-    setAnchorStatus('Publishing mapping…');
+    setAnchorStatus(tHouse('house.anchor.status.publishing'));
     await api('/api/anchors/register', {
       method: 'POST',
       body: JSON.stringify({
@@ -2569,7 +2724,7 @@ async function linkErc8004AnchorToVault(erc8004Id) {
     });
   }
 
-  setAnchorStatus(discoverable ? 'Linked + published.' : 'Linked.');
+  setAnchorStatus(discoverable ? tHouse('house.anchor.status.linked_published') : tHouse('house.anchor.status.linked'));
   setTimeout(() => setAnchorStatus(''), 1200);
   await refreshEntries();
 }
@@ -2672,7 +2827,7 @@ async function mintErc8004Identity() {
   });
 
   const draftPayload = buildErc8004RegistrationDraftPayload({ houseId });
-  if (status) status.textContent = 'Creating ERC-8004 registration draft…';
+  if (status) status.textContent = tHouse('house.erc8004.status.creating_draft');
   const draft = await api('/api/erc8004/registration/draft', {
     method: 'POST',
     body: JSON.stringify(draftPayload)
@@ -2696,16 +2851,18 @@ async function mintErc8004Identity() {
     // ignore - metadata support may vary by SDK version
   }
 
-  if (status) status.textContent = `Submitting ERC-8004 registration on ${chain}…`;
+  if (status) status.textContent = tHouse('house.erc8004.status.submitting', { chain });
   const tx = await agent.registerHTTP(tokenUri);
 
   const txHash = tx?.hash;
   if (status) {
-    status.textContent = txHash ? `Submitted: ${txHash}` : 'Submitted.';
+    status.textContent = txHash
+      ? tHouse('house.erc8004.status.submitted_hash', { txHash })
+      : tHouse('house.erc8004.status.submitted');
   }
 
   if (typeof tx?.waitConfirmed !== 'function') throw new Error('MINT_CONFIRMATION_UNAVAILABLE');
-  if (status) status.textContent = 'Waiting for confirmation…';
+  if (status) status.textContent = tHouse('house.erc8004.status.waiting_confirmation');
 
   const { result } = await tx.waitConfirmed();
   const registryFromUri = parseEip155AgentRegistry(result?.agentRegistry);
@@ -2792,7 +2949,7 @@ function armAutoLock() {
   if (autoLockTimer) clearTimeout(autoLockTimer);
   autoLockTimer = setTimeout(() => {
     wipeKeys();
-    setStatus('Locked (inactive).');
+    setStatus(tHouse('house.status.locked_inactive'));
   }, AUTO_LOCK_MS);
 }
 
@@ -2810,7 +2967,7 @@ function setDescriptorOpen(open) {
   setPanelVisible('descriptorPanel', descriptorOpen);
   const btn = el('toggleDescriptorBtn');
   if (btn) {
-    btn.textContent = descriptorOpen ? 'Hide house QR' : 'Show house QR';
+    btn.textContent = descriptorOpen ? tHouse('house.unlock.hide_qr') : tHouse('house.unlock.show_qr');
     btn.setAttribute('aria-pressed', descriptorOpen ? 'true' : 'false');
   }
   if (unlocked) armAutoLock();
@@ -2824,7 +2981,7 @@ function setErc8004Open(open) {
   setPanelVisible('anchorsPanel', show);
   const btn = el('toggleErc8004Btn');
   if (btn) {
-    btn.textContent = erc8004Open ? 'Hide ERC-8004' : 'Show ERC-8004';
+    btn.textContent = erc8004Open ? tHouse('house.unlock.hide_erc8004') : tHouse('house.unlock.show_erc8004');
     btn.setAttribute('aria-pressed', erc8004Open ? 'true' : 'false');
   }
   if (unlocked) armAutoLock();
@@ -2850,7 +3007,7 @@ function setHousePanelButtonsEnabled(enabled) {
 function setUnlockButtonState(isUnlocked) {
   const btn = el('unlockBtn');
   if (!btn) return;
-  btn.textContent = isUnlocked ? 'Unlocked' : 'Sign to unlock';
+  btn.textContent = isUnlocked ? tHouse('house.status.unlocked') : tHouse('house.unlock.sign');
   btn.disabled = !!isUnlocked;
 }
 
@@ -2863,7 +3020,7 @@ async function initKeysFromKroot(Kroot) {
 
 async function recoverHouseKeyWithWallet(houseId) {
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
-  setStatus('Recovering house key…');
+  setStatus(tHouse('house.status.recovering_key'));
   const primaryWrapMsg = buildKeyWrapMessage({ houseId });
   const primaryWrapSig = await signMessageBytes(primaryWrapMsg);
   const lookup = await api('/api/wallet/lookup', {
@@ -2916,7 +3073,7 @@ async function recoverHouseKeyWithWallet(houseId) {
         break;
       } catch (e) {
         lastErr = e;
-        setStatus('Retrying key recovery…');
+        setStatus(tHouse('house.status.retrying_recovery'));
       }
     }
   }
@@ -2983,7 +3140,7 @@ async function deriveHouseEncKey(Kroot) {
 
 async function unlockExistingHouse(houseId) {
   setError('');
-  setStatus('Unlocking house…');
+  setStatus(tHouse('house.status.unlocking'));
   if (!walletAddr) throw new Error('WALLET_NOT_CONNECTED');
 
   const recoveredOk = await recoverHouseKeyWithWallet(houseId);
@@ -3005,7 +3162,7 @@ async function unlockExistingHouse(houseId) {
   saveWalletCache();
   cacheHouseAuthBytes(house.houseId, KauthBytes);
   syncInboxNavLink();
-  setStatus(recovered ? 'Unlocked (wallet recovery).' : 'Unlocked.');
+  setStatus(recovered ? tHouse('house.status.unlocked_recovery') : tHouse('house.status.unlocked'));
   setUnlockButtonState(true);
   armAutoLock();
 
@@ -3032,14 +3189,17 @@ async function restoreAgentStateFromHouse({ silent = false } = {}) {
   if (!unlocked || !house) throw new Error('LOCKED');
   const { snapshot, sizeBytes, updatedAt } = await getHouseAgentStateSnapshot(house.houseId);
   if (!snapshot) {
-    if (!silent) setAgentStateStatus('No saved agent state found in this house.');
+    if (!silent) setAgentStateStatus(tHouse('house.agent_state.status.none'));
     return { restored: false, sizeBytes: 0 };
   }
   const plainSnapshot = await resolveSnapshotForLocalImport(snapshot, house.houseId);
   const imported = await replaceLocalAgentStateSnapshot(plainSnapshot);
   await hydrateMindConfigFromLocal({ silent });
   const label = updatedAt ? `from ${new Date(updatedAt).toLocaleString()}` : 'from house';
-  setAgentStateStatus(`Agent state restored ${label} (${formatBytes(sizeBytes || imported.sizeBytes)}).`);
+  setAgentStateStatus(tHouse('house.agent_state.status.restored', {
+    label,
+    size: formatBytes(sizeBytes || imported.sizeBytes)
+  }));
   setAgentStateError('');
   return { restored: true, sizeBytes: sizeBytes || imported.sizeBytes };
 }
@@ -3052,7 +3212,10 @@ async function saveAgentStateToHouse() {
   const sealed = await sealAgentStateSnapshot(exported.snapshot, house.houseId);
   const response = await putHouseAgentStateSnapshot(house.houseId, sealed);
   const when = response?.updatedAt ? new Date(response.updatedAt).toLocaleString() : 'now';
-  setAgentStateStatus(`Saved encrypted agent state to house (${formatBytes(exported.sizeBytes)} at ${when}).`);
+  setAgentStateStatus(tHouse('house.agent_state.status.saved', {
+    size: formatBytes(exported.sizeBytes),
+    when
+  }));
   setAgentStateError('');
   return exported;
 }
@@ -3065,7 +3228,7 @@ async function downloadAgentStateBackup() {
   const gateway = await loadLiteGateway();
   if (!gateway || typeof gateway.send !== 'function') throw new Error('RUNTIME_NOT_READY');
   gateway.send({ type: 'gateway.command.exportZip' });
-  setAgentStateStatus('Downloaded OpenClaw-compatible ZIP from local runtime.');
+  setAgentStateStatus(tHouse('house.agent_state.status.downloaded_zip'));
   setAgentStateError('');
   return { format: AGENT_STATE_OPENCLAW_EXPORT_KIND };
 }
@@ -3093,7 +3256,9 @@ async function uploadAgentStateBackup(file) {
   await hydrateMindConfigFromLocal({ silent: true });
   const sealed = await sealAgentStateSnapshot(imported.snapshot, house.houseId);
   await putHouseAgentStateSnapshot(house.houseId, sealed);
-  setAgentStateStatus(`Uploaded and replaced agent state (${formatBytes(imported.sizeBytes)}).`);
+  setAgentStateStatus(tHouse('house.agent_state.status.uploaded', {
+    size: formatBytes(imported.sizeBytes)
+  }));
   setAgentStateError('');
   return imported;
 }
@@ -3130,7 +3295,7 @@ function setAnchorStatus(msg) {
 }
 function setAnchorError(msg) {
   const e = el('anchorError');
-  if (e) e.textContent = msg || '';
+  if (e) e.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function parseAgent0Erc8004Id(str) {
@@ -3231,7 +3396,7 @@ async function submitPublicMedia() {
   const body = { prompt };
   if (pendingPublicImage) body.image = pendingPublicImage;
 
-  setPublicMediaStatus('Saving…');
+  setPublicMediaStatus(tHouse('common.saving'));
   const res = await houseApi(
     house.houseId,
     `/api/house/${encodeURIComponent(house.houseId)}/public-media`,
@@ -3241,7 +3406,7 @@ async function submitPublicMedia() {
   pendingPublicImage = null;
   const fileEl = el('publicImage');
   if (fileEl) fileEl.value = '';
-  setPublicMediaStatus('Saved');
+  setPublicMediaStatus(tHouse('common.saved'));
   setTimeout(() => setPublicMediaStatus(''), 1200);
   refreshPublicPreview();
   setPublicMediaEnabled(true);
@@ -3250,7 +3415,7 @@ async function submitPublicMedia() {
 async function clearPublicMedia() {
   if (!unlocked || !house) throw new Error('LOCKED');
   armAutoLock();
-  setPublicMediaStatus('Clearing…');
+  setPublicMediaStatus(tHouse('house.public.clearing'));
   const res = await houseApi(
     house.houseId,
     `/api/house/${encodeURIComponent(house.houseId)}/public-media`,
@@ -3340,7 +3505,7 @@ async function copyToClipboard(text, btn, label) {
   if (!text || !btn) return;
   try {
     await navigator.clipboard.writeText(text);
-    btn.textContent = 'Copied ✓';
+    btn.textContent = tHouse('common.copied');
     setTimeout(() => {
       btn.textContent = label;
     }, 1200);
@@ -3449,7 +3614,7 @@ async function initSharePanel() {
         shareIdForPosts = null;
         sharePostsLoadedFor = null;
         clearShareCache();
-        setSharePostsError('Share not found. Regenerate the share link.');
+        setSharePostsError(tHouse('share.save.share_not_found_session'));
         setSharePanelMode(false);
       }
     }
@@ -3507,10 +3672,10 @@ async function initSharePanel() {
   function updateAgentMessage() {
     if (!shareAgentMsg) return;
     const hid = currentHouseId();
-    const origin = window.location.origin;
+    const skillUrl = `${window.location.origin}/skill.md`;
     agentMessage = hid
-      ? `Read ${origin}/skill.md and reconnect to house: ${hid}`
-      : `Read ${origin}/skill.md and reconnect to house: <houseId>`;
+      ? tHouse('house.share.agent_message', { skillUrl, houseId: hid })
+      : tHouse('house.share.agent_message_missing', { skillUrl });
     shareAgentMsg.textContent = agentMessage;
   }
 
@@ -3617,13 +3782,13 @@ async function initSharePanel() {
   }
 
   if (copyShareBtn) {
-    copyShareBtn.textContent = SHARE_COPY_LABEL;
-    copyShareBtn.addEventListener('click', () => copyToClipboard(sharePublicUrl, copyShareBtn, SHARE_COPY_LABEL));
+    copyShareBtn.textContent = getShareCopyLabel();
+    copyShareBtn.addEventListener('click', () => copyToClipboard(sharePublicUrl, copyShareBtn, getShareCopyLabel()));
   }
 
   if (copyAgentBtn) {
-    copyAgentBtn.textContent = AGENT_COPY_LABEL;
-    copyAgentBtn.addEventListener('click', () => copyToClipboard(agentMessage, copyAgentBtn, AGENT_COPY_LABEL));
+    copyAgentBtn.textContent = getAgentCopyLabel();
+    copyAgentBtn.addEventListener('click', () => copyToClipboard(agentMessage, copyAgentBtn, getAgentCopyLabel()));
   }
 
   if (saveSharePosts) {
@@ -3682,13 +3847,13 @@ async function initSharePanel() {
         setTimeout(() => setSharePostsStatus(''), 1200);
       } catch (e) {
         const msg = e.message === 'TEAM_CODE_MISSING'
-          ? 'Team code missing. Refresh the page and try again.'
+          ? tHouse('share.save.team_code_missing')
           : e.message === 'SHARE_NOT_FOUND'
-            ? 'Share not found for this session. Regenerate the share link.'
+            ? tHouse('share.save.share_not_found_session')
           : e.message === 'NOT_FOUND'
-            ? 'Share not found for this house. Generate a share link first.'
+            ? tHouse('share.save.share_not_found_house')
           : e.message === 'HTTP_404'
-            ? 'Missing /api/human/posts. Restart the server and try again.'
+            ? tHouse('share.save.posts_endpoint_missing')
           : e.message === 'INVALID_URL'
             ? (isLinkFirstExperience() ? tHouse('share.url_error.generic') : tHouse('share.url_error.global'))
             : e.message;
@@ -3740,32 +3905,32 @@ async function initSharePanel() {
       setShareRequirement(tHouse('share.requirement.active'));
     } catch (e) {
       const msg = e.message === 'AGENT_REQUIRED'
-        ? 'Agent approval required. Ask your agent to reconnect to this house.'
+        ? tHouse('share.create.error.agent_required')
         : e.message === 'HOUSE_NOT_READY'
-          ? 'Finish the co-op house ceremony first.'
+          ? tHouse('share.create.error.house_not_ready')
           : e.message === 'CEREMONY_INCOMPLETE'
-            ? (KauthKey ? 'Share is unlocked, but ceremony state is missing. Refresh and try again.'
-              : 'Waiting for agent ceremony exchange to complete.')
+            ? (KauthKey ? tHouse('share.create.error.ceremony_missing_unlocked')
+              : tHouse('share.create.error.ceremony_incomplete'))
         : e.message === 'NO_TOKEN'
-          ? 'No $ELIZATOWN found in this wallet.'
+          ? tHouse('share.create.error.no_token')
           : e.message === 'TOKEN_CHECK_REQUIRED'
-            ? 'Verify your wallet to continue.'
+            ? tHouse('share.create.error.token_check_required')
             : e.message === 'TOKEN_ADDRESS_MISMATCH'
-              ? 'Connect the same wallet used to create this house.'
+              ? tHouse('share.create.error.address_mismatch')
               : e.message === 'ADDRESS_MISMATCH'
-                ? 'Connect the same wallet used to create this house.'
+                ? tHouse('share.create.error.address_mismatch')
                 : e.message === 'BAD_SIGNATURE'
-                  ? 'Wallet signature failed.'
+                  ? tHouse('share.create.error.bad_signature')
                     : e.message === 'SIGNATURE_FORMAT'
-                    ? 'Wallet signature failed.'
+                    ? tHouse('share.create.error.bad_signature')
                     : e.message === 'NO_SOLANA_WALLET'
-                      ? 'No Privy-connected Solana wallet found.'
+                      ? tHouse('share.create.error.no_solana_wallet')
                       : e.message === 'NO_SOLANA_SIGN'
-                        ? 'Wallet does not support message signing.'
+                        ? tHouse('share.create.error.no_solana_sign')
         : e.message === 'EMPTY_CANVAS'
-          ? 'Add at least one pixel before generating a share link.'
+          ? tHouse('share.create.error.empty_canvas')
           : e.message === 'STORE_FULL'
-            ? 'Share limit reached. Try again later.'
+            ? tHouse('share.create.error.store_full')
             : e.message;
       setShareError(msg);
       if (e.message === 'AGENT_REQUIRED') {
@@ -3819,17 +3984,17 @@ async function init() {
       if (walletAddr) {
         const wasUnlocked = unlocked;
         await disconnectWallet({ resetSession: wasUnlocked });
-        if (!wasUnlocked) setStatus('Wallet disconnected.');
+        if (!wasUnlocked) setStatus(tHouse('common.wallet_disconnected'));
         return;
       }
       await connectWallet();
-      setStatus('Wallet connected.');
+      setStatus(tHouse('common.wallet_connected'));
     } catch (e) {
       setError(
         e.message === 'NO_SOLANA_WALLET'
-          ? 'No Privy-connected Solana wallet found.'
+          ? tHouse('house.error.no_solana_wallet')
           : e.message === 'NO_SOLANA_SIGN'
-            ? 'Wallet does not support message signing.'
+            ? tHouse('house.error.no_solana_sign')
             : e.message
       );
     }
@@ -3873,7 +4038,7 @@ async function init() {
 
   el('lockBtn').addEventListener('click', () => {
     wipeKeys();
-    setStatus('Locked (key wiped from memory).');
+    setStatus(tHouse('house.status.locked_key_wiped'));
   });
 
   const saveAgentStateBtn = el('saveAgentStateBtn');
@@ -3990,10 +4155,10 @@ async function init() {
       } catch (err) {
         const msg = String(err?.message || 'OAUTH_START_FAILED');
         if (msg === 'POPUP_BLOCKED') {
-          setMindConfigError('Popup blocked. Allow popups and retry OAuth launch.');
+          setMindConfigError(tHouse('house.mind.error.popup_blocked'));
           return;
         }
-        setMindConfigError(`OAuth start failed: ${msg}`);
+        setMindConfigError(tHouse('house.mind.error.oauth_start_failed', { message: msg }));
       }
     });
   }
@@ -4005,7 +4170,7 @@ async function init() {
       } catch (err) {
         const msg = String(err?.message || '').trim();
         if (msg === 'CODE_PENDING') {
-          setMindConfigStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+          setMindConfigStatus(tHouse('house.mind.status.oauth_waiting'));
           setMindConfigError('');
         }
       }
@@ -4049,8 +4214,8 @@ async function init() {
     try {
       const txt = el('descriptor').value;
       await navigator.clipboard.writeText(txt);
-      el('copyDescriptorBtn').textContent = 'Copied ✓';
-      setTimeout(() => (el('copyDescriptorBtn').textContent = 'Copy descriptor'), 1200);
+      el('copyDescriptorBtn').textContent = tHouse('common.copied');
+      setTimeout(() => (el('copyDescriptorBtn').textContent = tHouse('house.descriptor.copy')), 1200);
     } catch {
       // fallback
       alert(el('descriptor').value);
@@ -4062,8 +4227,8 @@ async function init() {
     try {
       const txt = el('erc8004').value;
       await navigator.clipboard.writeText(txt);
-      el('copyErc8004Btn').textContent = 'Copied ✓';
-      setTimeout(() => (el('copyErc8004Btn').textContent = 'Copy ERC-8004 statement'), 1200);
+      el('copyErc8004Btn').textContent = tHouse('common.copied');
+      setTimeout(() => (el('copyErc8004Btn').textContent = tHouse('house.erc8004.copy')), 1200);
     } catch {
       alert(el('erc8004').value);
     }
@@ -4107,14 +4272,14 @@ async function init() {
       if (!PUBLIC_MEDIA_TYPES.has(file.type)) {
         pendingPublicImage = null;
         publicImage.value = '';
-        setPublicMediaError('Unsupported file type. Use PNG, JPG, or WebP.');
+        setPublicMediaError(tHouse('house.public.error.type'));
         setPublicMediaEnabled(true);
         return;
       }
       if (file.size > PUBLIC_MEDIA_MAX_BYTES) {
         pendingPublicImage = null;
         publicImage.value = '';
-        setPublicMediaError('Image too large. Max 1 MB.');
+        setPublicMediaError(tHouse('house.public.error.size'));
         setPublicMediaEnabled(true);
         return;
       }

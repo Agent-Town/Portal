@@ -487,6 +487,72 @@ function setNodePlaceholder(id, key) {
   if (node) node.placeholder = tApp(key);
 }
 
+function setNodeTitle(id, key, vars = {}) {
+  const node = el(id);
+  if (node) node.title = tApp(key, vars);
+}
+
+function setNodeAriaLabel(id, key, vars = {}) {
+  const node = el(id);
+  if (node) node.setAttribute('aria-label', tApp(key, vars));
+}
+
+function formatBrainSavedLocalStatus(provider, model) {
+  return tApp('brain.status.saved_local', {
+    provider: String(provider || 'provider'),
+    model: String(model || 'model')
+  });
+}
+
+function formatBrainConfigFailedStatus(message) {
+  return tApp('brain.error.config_failed', { message: String(message || 'UNKNOWN') });
+}
+
+function formatBrainClearFailedStatus(message) {
+  return tApp('brain.error.clear_failed', { message: String(message || 'UNKNOWN') });
+}
+
+function formatHatchRuntimeFailedStatus(message) {
+  return tApp('hatch.status.runtime_failed', { message: String(message || 'UNKNOWN') });
+}
+
+function formatHatchAgentConnectFailedStatus(message) {
+  return tApp('hatch.status.agent_connect_failed', { message: String(message || 'UNKNOWN') });
+}
+
+function formatShareCardUnavailableStatus(message) {
+  return tApp('townhall.share_card.unavailable', { message: String(message || 'UNKNOWN_ERROR') });
+}
+
+function getAgentTrafficFilterLabel(value) {
+  const normalized = normalizeAgentTrafficFilter(value);
+  if (normalized === 'in') return tApp('agent.panel.debug.filter_in');
+  if (normalized === 'out') return tApp('agent.panel.debug.filter_out');
+  return tApp('agent.panel.debug.filter_all');
+}
+
+function formatDebugValue(value, fallbackKey = 'agent.panel.debug.none') {
+  const text = String(value ?? '').trim();
+  return text || tApp(fallbackKey);
+}
+
+function formatDebugListLabel(labelKey, values, vars = {}) {
+  return formatDebugList(tApp(labelKey, vars), values);
+}
+
+function formatMintChainLabel(chain = 'evm') {
+  return String(chain || '').trim().toLowerCase() === 'solana'
+    ? tApp('mint.chain.solana')
+    : tApp('mint.chain.sepolia');
+}
+
+function formatMintCodeFallback(chain = 'evm', message = '') {
+  return tApp('mint.error.failed_with_code', {
+    chain: formatMintChainLabel(chain),
+    message: String(message || 'UNKNOWN_ERROR')
+  });
+}
+
 function refreshDistrictViewTitles() {
   districtViews.brain.title = tApp('brain.title');
   districtViews.sigil.title = tApp('sigil.title');
@@ -530,14 +596,27 @@ function applyExperiencePreferenceToUi() {
   setNodeText('townhallContinueBtn', 'townhall.continue_sigil');
   setNodeText('townhallSinglePathTitle', 'townhall.single_path.title');
   setNodeText('townhallSinglePathHelp', 'townhall.single_path.help');
+  setNodeText('townhallPathTitle', 'townhall.path.title');
+  setNodeText('townhallPathHelp', 'townhall.path.help');
+  setNodeText('townhallWalletPrefix', 'townhall.wallet_prefix');
+  setNodeText('pathHumanBtn', 'townhall.path.human');
+  setNodeText('pathCoopBtn', 'townhall.path.coop');
+  setNodeText('pathAgentBtn', 'townhall.path.agent');
+  setNodeText('tokenVerifyBtn', 'common.check_wallet');
+  setNodeText('townhallTokenTitle', 'townhall.token.title');
+  setNodeText('townhallTokenHelp', 'townhall.token.help');
+  setNodeText('tokenCreateLink', 'townhall.token.create_house');
+  setNodeText('tokenStatusText', 'townhall.token.waiting');
   setNodeText('reconnectTitle', 'townhall.reconnect.title');
   setNodeText('reconnectIntro', 'townhall.reconnect.help');
   setNodeText('copyHouse', 'townhall.copy_house');
   setNodeText('houseSnippet', 'townhall.house_snippet');
   setNodeText('openHouseLink', 'townhall.open_house');
+  setNodeText('openShareCardBtn', 'townhall.open_share_card_preview');
   setNodeText('sigilWorkerStepTitle', 'sigil.worker_step');
   setNodeText('step1Intro', 'sigil.worker_help');
   setNodeText('connectWalletBtn', 'sigil.connect_wallet');
+  setNodeText('hatchWalletCheckBtn', 'common.check_wallet');
   setNodeText('workerReconnectBtn', 'sigil.reconnect_worker');
   setNodeText('sigilHeading', 'sigil.heading');
   setNodeText('sigilHelp', 'sigil.help');
@@ -548,6 +627,77 @@ function applyExperiencePreferenceToUi() {
   setNodeText('openBtn', 'sigil.open');
   setNodeText('openWaiting', 'sigil.waiting');
   setNodeText('matchDetail', 'sigil.match_detail');
+  setNodeText('brainPanelTitle', 'brain.title');
+  setNodeText('brainPanelHelp', 'brain.help');
+  setNodeText('brainProviderLabel', 'brain.provider');
+  setNodeText('brainModelLabel', 'brain.model');
+  setNodeText('brainAuthLabel', 'brain.auth');
+  setNodeText('brainAuthOauthOption', 'brain.auth_option.oauth');
+  setNodeText('brainOauthLabel', 'brain.oauth');
+  setNodeText('brainApiKeyLabel', 'brain.api_key');
+  setNodeText('brainAdvancedSummary', 'brain.advanced');
+  setNodeText('brainBaseUrlLabel', 'brain.base_url');
+  setNodeText('brainThinkingLabel', 'brain.thinking');
+  setNodeText('brainUseProxyLabel', 'brain.use_proxy');
+  setNodeText('brainContinueBtn', 'brain.continue');
+  setNodePlaceholder('llmOauthProfileInput', 'brain.oauth.placeholder');
+  setNodePlaceholder('llmKeyInput', 'brain.api_key.placeholder');
+  setNodeText('agentPanelTitle', 'agent.panel.title');
+  setNodePlaceholder('chatInput', 'agent.panel.chat_placeholder');
+  setNodeText('sendChatBtn', 'agent.panel.send');
+  setNodeText('newSessionBtn', 'agent.panel.new_session');
+  setNodeText('agentOpenTrainerBtn', 'agent.panel.trainer');
+  setNodeText('approvalsHeader', 'agent.panel.approvals');
+  setNodeText('agentLogsHeader', 'agent.panel.system_logs');
+  setNodeText('agentDebugTabTools', 'agent.panel.debug.tools');
+  setNodeText('agentDebugTabSkill', 'agent.panel.debug.skill');
+  setNodeText('agentDebugTabTraffic', 'agent.panel.debug.traffic');
+  setNodeText('agentDebugTabBrain', 'agent.panel.debug.brain');
+  setNodeText('agentDebugTabSession', 'agent.panel.debug.session');
+  setNodeText('agentDebugRefreshBtn', 'agent.panel.debug.refresh');
+  setNodeText('agentTrafficFilterAllBtn', 'agent.panel.debug.filter_all');
+  setNodeText('agentTrafficFilterInBtn', 'agent.panel.debug.filter_in');
+  setNodeText('agentTrafficFilterOutBtn', 'agent.panel.debug.filter_out');
+  setNodeTitle('agentDebugToggleBtn', 'agent.panel.debug.toggle');
+  setNodeAriaLabel('agentDebugToggleBtn', 'agent.panel.debug.toggle');
+  setNodeTitle('agentPanelZoomOutBtn', 'agent.panel.debug.zoom_out');
+  setNodeAriaLabel('agentPanelZoomOutBtn', 'agent.panel.debug.zoom_out');
+  setNodeTitle('agentPanelZoomInBtn', 'agent.panel.debug.zoom_in');
+  setNodeAriaLabel('agentPanelZoomInBtn', 'agent.panel.debug.zoom_in');
+  setNodeTitle('minimizeChatBtn', 'agent.panel.debug.minimize');
+  setNodeAriaLabel('minimizeChatBtn', 'agent.panel.debug.minimize');
+  const agentStatus = el('agentStatus');
+  if (agentStatus) {
+    const current = String(agentStatus.textContent || '').trim();
+    if (!current || current === 'Idle' || current === tApp('agent.panel.status.idle')) {
+      agentStatus.textContent = tApp('agent.panel.status.idle');
+    }
+  }
+  setNodeText('leaderboardPanelTitle', 'leaderboard.title');
+  setNodeText('leaderboardPanelHelp', 'leaderboard.help');
+  setNodeText('leaderboardSignupsLabel', 'leaderboard.signups');
+  setNodeText('leaderboardTeamsLabel', 'leaderboard.public_teams');
+  setNodeText('leaderboardReferralsLabel', 'leaderboard.referrals');
+  setNodeText('townBoardEmpty', 'leaderboard.empty');
+  setNodeText('leaderboardOpenLink', 'leaderboard.open');
+  setNodeText('ponyPanelTitle', 'pony.title');
+  setNodeText('ponyPanelHelp', 'pony.help');
+  setNodeText('ponyInboxLink', 'pony.open_inbox');
+  setNodeText('ponyTownBoardLink', 'pony.town_board');
+  setNodeText('ponyComposeOpenBtn', 'pony.compose_open');
+  setNodeText('ponyInboxHint', 'pony.compose_hint');
+  setNodeText('ponyComposeToLabel', 'pony.compose.to');
+  setNodeText('ponyComposeSubjectLabel', 'pony.compose.subject');
+  setNodeText('ponyComposeDraftLabel', 'pony.compose.draft');
+  setNodePlaceholder('ponyComposeToInput', 'pony.compose.to_placeholder');
+  setNodePlaceholder('ponyComposeSubjectInput', 'pony.compose.subject_placeholder');
+  setNodePlaceholder('ponyComposeDraftInput', 'pony.compose.draft_placeholder');
+  setNodeText('ponyComposeCloseBtn', 'pony.compose.close');
+  setNodeText('saloonPanelTitle', 'saloon.title');
+  setNodeText('saloonPanelHelp', 'saloon.help');
+  setNodeText('saloonItem1', 'saloon.item1');
+  setNodeText('saloonItem2', 'saloon.item2');
+  setNodeText('saloonItem3', 'saloon.item3');
 
   const customizeButtons = ['townhallHumanCustomizeBtn', 'townhallAgentCustomizeBtn'];
   for (const id of customizeButtons) {
@@ -751,7 +901,7 @@ function setHatchStatus(text) {
 function updateWalletUI() {
   const btn = el('connectWalletBtn');
   if (btn) {
-    btn.textContent = walletAddr ? 'Disconnect wallet' : 'Connect wallet';
+    btn.textContent = walletAddr ? tApp('common.disconnect_wallet') : tApp('common.connect_wallet');
     btn.setAttribute('aria-pressed', walletAddr ? 'true' : 'false');
   }
   const addr = el('walletAddr');
@@ -952,15 +1102,15 @@ function applyDistrictHotspotLocks(state) {
 function districtStatusText(district) {
   const statusText = getTownHubDistrictGateStatusText();
   if (statusText) {
-    return `Locked: ${statusText}`;
+    return tApp('district.status.locked', { status: statusText });
   }
-  if (!district) return 'Select a district on the map.';
-  if (district === 'atlas') return 'Atlas Depot selected: district map and storefront exploration.';
-  if (district === 'townhall') return 'Town Hall selected: identity, ceremony, and picture management.';
-  if (district === 'saloon') return 'Saloon selected: upcoming social and co-op experiences preview.';
-  if (district === 'pony') return 'Pony Express selected: inbox and message routing.';
-  if (district === 'leaderboard') return 'Town Board selected: public rankings and team snapshots.';
-  return 'Plan Wagons selected: unlock and enter your house flow.';
+  if (!district) return tApp('district.status.select');
+  if (district === 'atlas') return tApp('district.status.atlas');
+  if (district === 'townhall') return tApp('district.status.townhall');
+  if (district === 'saloon') return tApp('district.status.saloon');
+  if (district === 'pony') return tApp('district.status.pony');
+  if (district === 'leaderboard') return tApp('district.status.leaderboard');
+  return tApp('district.status.house');
 }
 
 function setActiveDistrict(district) {
@@ -1346,21 +1496,21 @@ function setTownhallMintStepStatus(step, kind) {
   const node = el(step.statusId);
   if (!node) return;
   if (kind === 'running') {
-    node.textContent = 'Registering...';
+    node.textContent = tApp('townhall.mint.running');
     node.style.color = 'var(--accent)';
     return;
   }
   if (kind === 'done') {
-    node.textContent = 'Done ✓';
+    node.textContent = tApp('townhall.mint.done');
     node.style.color = 'var(--good)';
     return;
   }
   if (kind === 'error') {
-    node.textContent = 'Failed';
+    node.textContent = tApp('townhall.mint.error');
     node.style.color = 'var(--bad)';
     return;
   }
-  node.textContent = 'Pending';
+  node.textContent = tApp('townhall.mint.pending');
   node.style.color = 'var(--muted)';
 }
 
@@ -1407,7 +1557,7 @@ function setTownhallCustomizeOpen(kind, open) {
   const btn = el(isHuman ? 'townhallHumanCustomizeBtn' : 'townhallAgentCustomizeBtn');
   if (panel) panel.classList.toggle('is-hidden', !open);
   if (btn) {
-    btn.textContent = open ? 'Hide customization' : 'Customize';
+    btn.textContent = open ? tApp('townhall.customize_hide') : tApp('townhall.customize');
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
   }
   if (isHuman) {
@@ -1516,8 +1666,8 @@ function applyTownhallMintConfig(config) {
   const allChainsReady = cfg.evm.enabled && cfg.solana.enabled;
   if (registerBtn) {
     registerBtn.disabled = townhallMintInFlight || !allChainsReady;
-    registerBtn.title = allChainsReady ? '' : 'Both Sepolia and Solana mint must be configured.';
-    registerBtn.textContent = townhallMintInFlight ? 'Processing registration...' : 'Retry registration';
+    registerBtn.title = allChainsReady ? '' : tApp('townhall.mint.error.all_chains_required');
+    registerBtn.textContent = townhallMintInFlight ? tApp('townhall.mint.processing') : tApp('townhall.retry');
   }
   const continueBtn = el('townhallContinueBtn');
   if (continueBtn && townhallMintInFlight) continueBtn.disabled = true;
@@ -1541,208 +1691,212 @@ function collectTownhallProfilePayload() {
 
 function knownMintErrorMessage(err, chain = 'evm') {
   const code = String(err?.message || err || '').trim();
-  if (!code) return chain === 'evm' ? 'Sepolia mint failed.' : 'Solana mint failed.';
+  const chainLabel = formatMintChainLabel(chain);
+  const assetLabel = String(chain || '').trim().toLowerCase() === 'solana' ? 'SOL' : 'ETH';
+  if (!code) return tApp('mint.error.failed_no_code', { chain: chainLabel });
   const lowerCode = code.toLowerCase();
   if (
     lowerCode.includes('wallet proxy not initialized')
     || lowerCode.includes('embedded_wallet_proxy_not_initialized')
     || lowerCode.includes('wallet_proxy_not_initialized')
   ) {
-    return 'Privy embedded wallet proxy did not initialize. Check third-party cookie blocking and Privy app origin allowlist, then retry.';
+    return tApp('mint.error.wallet_proxy_not_initialized');
   }
-  if (code === 'MINT_ALL_CHAINS_NOT_ENABLED') return 'Both Sepolia and Solana mint must be configured on this server.';
-  if (code === 'INVALID_MINT_SUBJECT') return 'Mint subject is invalid. Please refresh and try again.';
-  if (code === 'MINT_DISABLED') return 'Live mint is disabled on this server.';
-  if (code === 'PINATA_NOT_CONFIGURED') return 'Server is missing Pinata configuration.';
+  if (code === 'MINT_ALL_CHAINS_NOT_ENABLED') return tApp('mint.error.all_chains_not_enabled');
+  if (code === 'INVALID_MINT_SUBJECT') return tApp('mint.error.invalid_subject');
+  if (code === 'MINT_DISABLED') return tApp('mint.error.disabled');
+  if (code === 'PINATA_NOT_CONFIGURED') return tApp('mint.error.pinata_not_configured');
   if (code === 'PINATA_UPLOAD_FAILED') {
     const detailRaw = String(err?.data?.detail || err?.detail || '').trim();
     const detail = detailRaw.toUpperCase();
     if (detail.includes('NO_SCOPES_FOUND')) {
-      return 'Pinata JWT is missing required pinning scopes. Update PINATA_JWT permissions.';
+      return tApp('mint.error.pinata_scopes_missing');
     }
     if (detail.includes('UNAUTHORIZED') || detail.includes('FORBIDDEN') || err?.status === 401 || err?.status === 403) {
-      return 'Pinata rejected the JWT. Verify PINATA_JWT permissions and retry.';
+      return tApp('mint.error.pinata_rejected');
     }
-    return detailRaw ? `IPFS upload failed: ${detailRaw}` : 'IPFS upload failed on the server.';
+    return detailRaw
+      ? tApp('mint.error.ipfs_upload_failed_detail', { detail: detailRaw })
+      : tApp('mint.error.ipfs_upload_failed');
   }
-  if (code === 'MINT_EVM_NOT_CONFIGURED') return 'Sepolia mint is not configured on this server.';
-  if (code === 'MINT_SOLANA_NOT_CONFIGURED') return 'Solana mint is not configured on this server.';
-  if (code === 'MINT_EVM_CONTRACT_NOT_CONFIGURED') return 'Sepolia ERC-8004 contract address is not configured on this server.';
-  if (code === 'INVALID_EVM_ADDRESS') return 'Privy EVM wallet address is invalid.';
-  if (code === 'MISSING_HUMAN_NAME') return 'Enter your human name first.';
-  if (code === 'MISSING_AGENT_NAME') return 'Enter your agent name first.';
-  if (code === 'MISSING_HUMAN_AVATAR_PROMPT') return 'Add the exact human image prompt first.';
-  if (code === 'MISSING_AGENT_AVATAR_PROMPT') return 'Add the exact agent image prompt first.';
+  if (code === 'MINT_EVM_NOT_CONFIGURED' || code === 'MINT_SOLANA_NOT_CONFIGURED') {
+    return tApp('mint.error.chain_not_configured', { chain: chainLabel });
+  }
+  if (code === 'MINT_EVM_CONTRACT_NOT_CONFIGURED') return tApp('mint.error.evm_contract_not_configured');
+  if (code === 'INVALID_EVM_ADDRESS') return tApp('mint.error.invalid_evm_address');
+  if (code === 'MISSING_HUMAN_NAME') return tApp('mint.error.missing_name', { role: tApp('townhall.path.human') });
+  if (code === 'MISSING_AGENT_NAME') return tApp('mint.error.missing_name', { role: tApp('townhall.path.agent') });
+  if (code === 'MISSING_HUMAN_AVATAR_PROMPT') {
+    return tApp('mint.error.missing_avatar_prompt', { role: tApp('townhall.path.human') });
+  }
+  if (code === 'MISSING_AGENT_AVATAR_PROMPT') {
+    return tApp('mint.error.missing_avatar_prompt', { role: tApp('townhall.path.agent') });
+  }
   if (code === 'INVALID_TOWNHALL_IMAGE' || code === 'TOWNHALL_IMAGE_TOO_LARGE') {
-    return 'Avatar image must be PNG/JPG/WebP and up to 2 MB.';
+    return tApp('mint.error.invalid_townhall_image');
   }
-  if (code === 'NO_EVM_WALLET' || code === 'NO_EVM_ACCOUNT') return 'Connect your Privy EVM wallet first.';
-  if (code === 'NO_EVM_PROVIDER') return 'Could not access the Privy EVM provider.';
-  if (code === 'EVM_CHAIN_SWITCH_FAILED') return 'Switch to Sepolia in Privy wallet and retry.';
-  if (code === 'EVM_ACCOUNT_MISMATCH') return 'Privy EVM signer mismatch. Reconnect wallet and retry.';
-  if (code === 'NO_SOLANA_WALLET' || code === 'NO_SOLANA_PUBKEY') return 'Connect your Privy Solana wallet first.';
-  if (code === 'MISSING_SOLANA_ADDRESS') return 'Connect your Solana wallet first.';
-  if (code === 'MISSING_SOLANA_ASSET_PUBKEY') return 'Could not prepare Solana asset key.';
-  if (code === 'INVALID_SOLANA_ASSET_PUBKEY') return 'Solana asset key is invalid.';
-  if (code === 'SOLANA_SIGNER_MISMATCH') return 'Prepared Solana signer does not match your connected wallet.';
-  if (code === 'SOLANA_PREPARE_SIGNED') return 'Prepared Solana tx must be unsigned; refusing to send.';
+  if (code === 'NO_EVM_WALLET' || code === 'NO_EVM_ACCOUNT') return tApp('mint.error.evm_wallet_required');
+  if (code === 'NO_EVM_PROVIDER') return tApp('mint.error.evm_provider_unavailable');
+  if (code === 'EVM_CHAIN_SWITCH_FAILED') return tApp('mint.error.switch_sepolia');
+  if (code === 'EVM_ACCOUNT_MISMATCH') return tApp('mint.error.evm_account_mismatch');
+  if (code === 'NO_SOLANA_WALLET' || code === 'NO_SOLANA_PUBKEY') return tApp('mint.error.solana_wallet_required');
+  if (code === 'MISSING_SOLANA_ADDRESS') return tApp('mint.error.solana_address_required');
+  if (code === 'MISSING_SOLANA_ASSET_PUBKEY') return tApp('mint.error.solana_asset_key_prepare');
+  if (code === 'INVALID_SOLANA_ASSET_PUBKEY') return tApp('mint.error.solana_asset_key_invalid');
+  if (code === 'SOLANA_SIGNER_MISMATCH') return tApp('mint.error.solana_signer_mismatch');
+  if (code === 'SOLANA_PREPARE_SIGNED') return tApp('mint.error.solana_prepare_unsigned_required');
   if (code === 'SOLANA_PREPARE_FAILED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    return detailRaw ? `Could not prepare Solana mint transaction: ${detailRaw}` : 'Could not prepare Solana mint transaction.';
+    return detailRaw
+      ? tApp('mint.error.solana_prepare_failed_detail', { detail: detailRaw })
+      : tApp('mint.error.solana_prepare_failed');
   }
   if (code === 'SOLANA_SPONSOR_NOT_CONFIGURED') {
-    return 'Server-side Solana sponsorship is not configured. Add SOLANA_ERC8004_FEE_PAYER_SECRET on the server.';
+    return tApp('mint.error.solana_sponsor_not_configured');
   }
   if (code === 'SOLANA_SPONSOR_SECRET_INVALID') {
-    return 'Server-side Solana sponsor key is invalid. Fix SOLANA_ERC8004_FEE_PAYER_SECRET and retry.';
+    return tApp('mint.error.solana_sponsor_secret_invalid');
   }
-  if (code === 'INVALID_SOLANA_SPONSORED_TX') return 'Could not build the Solana sponsored transaction payload.';
+  if (code === 'INVALID_SOLANA_SPONSORED_TX') return tApp('mint.error.invalid_sponsored_tx');
   if (code === 'SOLANA_SPONSORED_WALLET_SIGNATURE_MISSING') {
-    return 'Privy wallet signature was missing on the Solana transaction.';
+    return tApp('mint.error.wallet_signature_missing');
   }
   if (code === 'SOLANA_SPONSORED_ASSET_SIGNATURE_MISSING') {
-    return 'Asset signature was missing on the Solana transaction.';
+    return tApp('mint.error.asset_signature_missing');
   }
   if (code === 'SOLANA_SPONSORED_TX_NOT_PREPARED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
     return detailRaw
-      ? `Solana sponsored transaction did not match the latest prepared registration. ${detailRaw}`
-      : 'Solana sponsored transaction did not match the latest prepared registration. Retry registration.';
+      ? tApp('mint.error.sponsored_tx_not_prepared_detail', { detail: detailRaw })
+      : tApp('mint.error.sponsored_tx_not_prepared');
   }
   if (code === 'SOLANA_SPONSORED_FEEPAYER_NOT_SIGNER') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    return detailRaw || 'Prepared Solana transaction is missing the sponsor fee payer signer.';
+    return detailRaw
+      ? tApp('mint.error.fee_payer_not_signer_detail', { detail: detailRaw })
+      : tApp('mint.error.fee_payer_not_signer');
   }
   if (code === 'SOLANA_SPONSOR_FEEPAYER_MATCHES_WALLET') {
-    return 'Server sponsor fee payer is set to the user wallet. Configure a separate funded devnet fee payer key.';
+    return tApp('mint.error.fee_payer_matches_wallet');
   }
   if (code === 'SOLANA_SPONSOR_FEEPAYER_UNFUNDED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    return detailRaw || 'Server sponsor fee payer does not have enough SOL to sponsor this Solana registration.';
+    return detailRaw
+      ? tApp('mint.error.fee_payer_unfunded_detail', { detail: detailRaw })
+      : tApp('mint.error.fee_payer_unfunded');
   }
   if (code === 'SOLANA_SPONSORED_OWNER_UNFUNDED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    return detailRaw || 'User Solana wallet needs temporary lamports for account creation and sponsor top-up failed.';
+    return detailRaw
+      ? tApp('mint.error.owner_unfunded_detail', { detail: detailRaw })
+      : tApp('mint.error.owner_unfunded');
   }
   if (code === 'SOLANA_SIGN_TX_UNSUPPORTED') {
-    return 'This Privy Solana wallet cannot sign transactions in the current session.';
+    return tApp('mint.error.solana_sign_unsupported');
   }
   if (code === 'SOLANA_SPONSOR_SEND_FAILED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
-    return detailRaw ? `Solana sponsored send failed: ${detailRaw}` : 'Solana sponsored send failed.';
+    return detailRaw
+      ? tApp('mint.error.sponsor_send_failed_detail', { detail: detailRaw })
+      : tApp('mint.error.sponsor_send_failed');
   }
-  if (code === 'SOLANA_WEB3_UNAVAILABLE') return 'Solana web3 module could not be loaded.';
+  if (code === 'SOLANA_WEB3_UNAVAILABLE') return tApp('mint.error.solana_web3_unavailable');
   if (code === 'SOLANA_TX_SEND_FAILED' || code === 'SOLANA_TX_SEND_UNSUPPORTED') {
-    return 'Could not sign/send the Solana transaction with Privy wallet.';
+    return tApp('mint.error.solana_tx_send_failed');
   }
-  if (code === 'MINT_EVM_FAILED') return 'Could not prepare Sepolia mint transaction.';
+  if (code === 'MINT_EVM_FAILED') return tApp('mint.error.evm_prepare_failed');
   if (code === 'PRIVY_SOLANA_SPONSORED_TX_UNAVAILABLE') {
-    return 'Privy sponsored Solana send is unavailable for this wallet/session. Check Privy gas sponsorship settings for Solana Devnet.';
+    return tApp('mint.error.privy_sponsored_unavailable', {
+      chain: formatMintChainLabel('solana'),
+      extra: tApp('mint.error.privy_sponsored_unavailable_solana_extra')
+    });
   }
   if (code === 'PRIVY_SPONSORED_TX_TEE_REQUIRED') {
-    return 'This Privy EVM wallet is still using on-device execution. Sponsored Sepolia sends require a Privy TEE/unified wallet. Log out and back in so Privy can migrate the wallet, or fund it via a Sepolia faucet.';
+    return tApp('mint.error.privy_tee_required');
   }
   if (code === 'PRIVY_SPONSORED_TX_UNAVAILABLE') {
-    return 'Privy sponsored Sepolia send is unavailable for this wallet/session. Check Privy gas sponsorship settings.';
+    return tApp('mint.error.privy_sponsored_unavailable', {
+      chain: formatMintChainLabel('evm'),
+      extra: tApp('mint.error.privy_sponsored_unavailable_evm_extra')
+    });
   }
   if (code === 'INVALID_PRIVY_WALLET_ID') {
-    return chain === 'solana'
-      ? 'Could not determine the Privy wallet id for sponsored Solana send.'
-      : 'Could not determine the Privy wallet id for sponsored Sepolia send.';
+    return tApp('mint.error.privy_wallet_id_missing', { chain: chainLabel });
   }
   if (code === 'PRIVY_WALLET_RPC_SIGN_UNAVAILABLE') {
-    return chain === 'solana'
-      ? 'Privy signer is unavailable for sponsored Solana send.'
-      : 'Privy signer is unavailable for sponsored Sepolia send.';
+    return tApp('mint.error.privy_signer_unavailable', { chain: chainLabel });
   }
   if (code === 'PRIVY_WALLET_RPC_SIGNING_PAYLOAD_MISSING') {
-    return 'Server did not return a valid sponsored transaction payload.';
+    return tApp('mint.error.invalid_sponsored_payload');
   }
   if (code === 'PRIVY_WALLET_RPC_SIGN_FAILED') {
     const detail = String(err?.detail || err?.cause?.message || '').trim();
-    if (chain === 'solana') {
-      return detail
-        ? `Privy could not authorize the sponsored Solana transaction: ${detail}`
-        : 'Privy could not authorize the sponsored Solana transaction.';
-    }
     return detail
-      ? `Privy could not authorize the sponsored Sepolia transaction: ${detail}`
-      : 'Privy could not authorize the sponsored Sepolia transaction.';
+      ? tApp('mint.error.privy_sign_failed_detail', { chain: chainLabel, detail })
+      : tApp('mint.error.privy_sign_failed', { chain: chainLabel });
   }
   if (code === 'PRIVY_WALLET_RPC_RELAY_FAILED') {
     const detailRaw = String(err?.detail || err?.data?.detail || '').trim();
     const detail = detailRaw.toLowerCase();
     if (detail.includes('does not support the method')) {
-      return chain === 'solana'
-        ? 'This Privy wallet cannot run sponsored Solana signAndSendTransaction in the current execution mode.'
-        : 'This Privy wallet cannot run sponsored eth_sendTransaction in the current execution mode.';
+      return tApp('mint.error.privy_execution_mode_unsupported', { chain: chainLabel });
     }
     if (
       detail.includes('insufficient funds')
       || detail.includes('exceeds the balance of the account')
       || detail.includes('total cost (gas * gas fee + value)')
     ) {
-      return chain === 'solana'
-        ? 'Privy gas sponsorship did not apply; this Solana wallet has insufficient SOL.'
-        : 'Privy gas sponsorship did not apply; this Sepolia wallet has insufficient ETH.';
+      return tApp('mint.error.privy_insufficient_funds', { chain: chainLabel, asset: assetLabel });
     }
-    return detailRaw ? `Privy sponsorship relay failed: ${detailRaw}` : 'Privy sponsorship relay failed.';
+    return detailRaw
+      ? tApp('mint.error.privy_relay_failed_detail', { detail: detailRaw })
+      : tApp('mint.error.privy_relay_failed');
   }
   if (code.startsWith('INVALID_PRIVY_WALLET_RPC_')) {
-    return chain === 'solana'
-      ? 'Sponsored Solana transaction payload is invalid.'
-      : 'Sponsored Sepolia transaction payload is invalid.';
+    return tApp('mint.error.invalid_sponsored_payload');
   }
   if (code === 'PRIVY_SOLANA_SPONSORED_TX_NO_RESULT') {
-    return 'Privy sponsored Solana send did not return a transaction handle. Retry once.';
+    return tApp('mint.error.privy_no_result', { chain: formatMintChainLabel('solana') });
   }
   if (code === 'PRIVY_SPONSORED_TX_NO_RESULT') {
-    return 'Privy sponsored Sepolia send did not return a transaction handle. Retry once.';
+    return tApp('mint.error.privy_no_result', { chain: formatMintChainLabel('evm') });
   }
-  if (code === 'MINT_EVM_SPONSORED_NO_HANDLE') {
-    return 'Privy sponsored Sepolia transaction handle was missing.';
-  }
+  if (code === 'MINT_EVM_SPONSORED_NO_HANDLE') return tApp('mint.error.evm_no_handle');
   if (code === 'PRIVY_SERVER_AUTH_NOT_CONFIGURED') {
-    return 'Server is missing PRIVY_APP_SECRET to track sponsored Sepolia transactions.';
+    return tApp('mint.error.privy_server_auth_missing');
   }
-  if (code === 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE') {
-    return 'Could not read Privy sponsored transaction status.';
-  }
-  if (code === 'MINT_EVM_SPONSORED_FAILED') {
-    return 'Privy sponsored Sepolia transaction failed before confirmation.';
-  }
-  if (code === 'MINT_EVM_SPONSORED_TIMEOUT') {
-    return 'Privy sponsored Sepolia transaction timed out before confirmation.';
-  }
-  if (code === 'MINT_EVM_REVERTED') return 'Sepolia registration transaction reverted on-chain.';
-  if (code === 'MINT_EVM_RECEIPT_TIMEOUT') return 'Sepolia registration transaction timed out before confirmation.';
-  if (code === 'MINT_EVM_NO_AGENT_ID') return 'Sepolia tx succeeded but no ERC-8004 ID was returned.';
-  if (code === 'MINT_SOLANA_NO_SIGNATURE') return 'Solana tx sent but no signature was returned.';
+  if (code === 'PRIVY_TRANSACTION_STATUS_UNAVAILABLE') return tApp('mint.error.privy_tx_status_unavailable');
+  if (code === 'MINT_EVM_SPONSORED_FAILED') return tApp('mint.error.evm_sponsored_failed');
+  if (code === 'MINT_EVM_SPONSORED_TIMEOUT') return tApp('mint.error.evm_sponsored_timeout');
+  if (code === 'MINT_EVM_REVERTED') return tApp('mint.error.evm_reverted');
+  if (code === 'MINT_EVM_RECEIPT_TIMEOUT') return tApp('mint.error.evm_receipt_timeout');
+  if (code === 'MINT_EVM_NO_AGENT_ID') return tApp('mint.error.evm_no_agent_id');
+  if (code === 'MINT_SOLANA_NO_SIGNATURE') return tApp('mint.error.solana_no_signature');
   const lower = code.toLowerCase();
   if (
     lower.includes('attempt to debit an account but found no record of a prior credit')
     || lower.includes('did not pass signature verification')
   ) {
-    return 'Solana registration failed before execution. Confirm Privy Solana Devnet gas sponsorship is enabled and retry.';
+    return tApp('mint.error.solana_pre_execution_failed');
   }
   if (lower.includes('insufficient funds for rent')) {
-    return chain === 'solana'
-      ? 'Solana sponsored send needs more temporary lamports for rent-exempt account creation. Increase the sponsor top-up threshold or fund the wallet and retry.'
-      : 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
+    return String(chain || '').trim().toLowerCase() === 'solana'
+      ? tApp('mint.error.insufficient_funds_rent_solana')
+      : tApp('mint.error.insufficient_funds_evm', { asset: assetLabel });
   }
   if (
     lower.includes('insufficient funds')
     || lower.includes('exceeds the balance of the account')
     || lower.includes('total cost (gas * gas fee + value)')
   ) {
-    return chain === 'solana'
-      ? 'Solana sponsored send ran out of lamports during simulation. Increase the sponsor top-up threshold or fund the wallet and retry.'
-      : 'Sepolia wallet has insufficient ETH for gas. Fund this Privy EVM wallet via a Sepolia faucet, or enable Privy gas sponsorship for this execution path.';
+    return String(chain || '').trim().toLowerCase() === 'solana'
+      ? tApp('mint.error.insufficient_funds_solana')
+      : tApp('mint.error.insufficient_funds_evm', { asset: assetLabel });
   }
   if (lower.includes('user rejected') || lower.includes('rejected') || lower.includes('denied')) {
-    return 'Wallet action was rejected.';
+    return tApp('mint.error.wallet_rejected');
   }
-  return chain === 'evm' ? `Sepolia mint failed: ${code}` : `Solana mint failed: ${code}`;
+  return formatMintCodeFallback(chain, code);
 }
 
 function isPrivyWalletProxyInitError(err) {
@@ -2786,11 +2940,11 @@ async function onTownhallImageChanged(kind, inputEl) {
   const file = inputEl && inputEl.files && inputEl.files[0] ? inputEl.files[0] : null;
   if (!file) return;
   if (!TOWNHALL_IMAGE_TYPES.has(file.type)) {
-    setTownhallRegisterFeedback('Use PNG, JPG, or WebP images for Town Hall avatars.', true);
+    setTownhallRegisterFeedback(tApp('townhall.feedback.avatar_type'), true);
     return;
   }
   if (file.size > TOWNHALL_IMAGE_MAX_BYTES) {
-    setTownhallRegisterFeedback('Avatar image is too large (max 2 MB).', true);
+    setTownhallRegisterFeedback(tApp('townhall.feedback.avatar_size'), true);
     return;
   }
   const dataUrl = await readFileAsDataUrl(file);
@@ -2845,7 +2999,7 @@ async function submitTownhallRegistration() {
     payload.wallet = walletIdentity;
   }
 
-  setTownhallRegisterFeedback('Saving Town Hall registration...');
+  setTownhallRegisterFeedback(tApp('townhall.feedback.saving'));
 
   try {
     const out = await api('/api/townhall/register', {
@@ -2859,33 +3013,33 @@ async function submitTownhallRegistration() {
     townhallMintDraftDirty = false;
     townhallMintLastErrorStep = null;
     syncTownhallMintChecklist(townhallMintDraft);
-    setTownhallRegisterFeedback('Registration saved. Continue with sigil unlock.');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.saved_continue'));
     if (lastState) {
       updateUI({ ...lastState, onboarding: out.onboarding || lastState.onboarding });
     }
     return out;
   } catch (e) {
     const message = e?.message === 'MISSING_HUMAN_NAME'
-      ? 'Enter your human name.'
+      ? tApp('townhall.feedback.missing_human_name')
       : e?.message === 'MISSING_AGENT_NAME'
-        ? 'Enter your agent name.'
+        ? tApp('townhall.feedback.missing_agent_name')
         : e?.message === 'MISSING_HUMAN_AVATAR_PROMPT'
-          ? 'Add the prompt used for the human avatar.'
+          ? tApp('townhall.feedback.missing_human_prompt')
           : e?.message === 'MISSING_AGENT_AVATAR_PROMPT'
-            ? 'Add the prompt used for the agent avatar.'
+            ? tApp('townhall.feedback.missing_agent_prompt')
             : e?.message === 'MISSING_ERC8004_USER_EVM_ID'
-              ? 'User Sepolia mint ID is missing.'
+              ? tApp('townhall.feedback.missing_user_evm_id')
               : e?.message === 'MISSING_ERC8004_USER_SOLANA_ID'
-                ? 'User Solana mint ID is missing.'
+                ? tApp('townhall.feedback.missing_user_solana_id')
                 : e?.message === 'MISSING_ERC8004_AGENT_EVM_ID'
-                  ? 'Agent Sepolia mint ID is missing.'
+                  ? tApp('townhall.feedback.missing_agent_evm_id')
                   : e?.message === 'MISSING_ERC8004_AGENT_SOLANA_ID'
-                    ? 'Agent Solana mint ID is missing.'
+                    ? tApp('townhall.feedback.missing_agent_solana_id')
                     : e?.message === 'TOWNHALL_IMAGE_TOO_LARGE'
-                      ? 'Avatar image is too large (max 2 MB).'
+                      ? tApp('townhall.feedback.avatar_size')
                       : e?.message === 'INVALID_TOWNHALL_IMAGE'
-                        ? 'Avatar upload must be PNG, JPG, or WebP.'
-                        : `Registration failed: ${e.message}`;
+                        ? tApp('townhall.feedback.invalid_image')
+                        : tApp('townhall.feedback.registration_failed', { message: e.message });
     setTownhallRegisterFeedback(message, true);
     throw new Error(message);
   } finally {
@@ -2901,7 +3055,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
   setTownhallStoryStep('processing');
   const registerBtn = el('townhallRegisterBtn');
   if (registerBtn) registerBtn.disabled = true;
-  setTownhallRegisterFeedback('Checking mint configuration...');
+  setTownhallRegisterFeedback(tApp('townhall.feedback.checking_mint'));
   syncTownhallMintChecklist(townhallMintDraft);
 
   try {
@@ -2910,7 +3064,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
     if (!config?.evm?.enabled || !config?.solana?.enabled) throw new Error('MINT_ALL_CHAINS_NOT_ENABLED');
 
     const profile = collectTownhallProfilePayload();
-    setTownhallRegisterFeedback('Preparing Privy wallets...');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.preparing_wallets'));
     let evmWallet;
     let solanaWallet;
     try {
@@ -2986,20 +3140,20 @@ async function mintAllTownhallIdentitiesAndRegister() {
       return agentSolana;
     };
 
-    setTownhallRegisterFeedback('User is registering on Ethereum and Solana...');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.user_registering'));
     const userMintResults = await Promise.allSettled([mintUserEvm(), mintUserSolana()]);
     const userMintError = combineRejectedTownhallMintErrors(userMintResults);
     if (userMintError) throw userMintError;
 
-    setTownhallRegisterFeedback('Agent is registering on Ethereum and Solana...');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.agent_registering'));
     const agentMintResults = await Promise.allSettled([mintAgentEvm(), mintAgentSolana()]);
     const agentMintError = combineRejectedTownhallMintErrors(agentMintResults);
     if (agentMintError) throw agentMintError;
 
-    setTownhallRegisterFeedback('Saving Town Hall registration...');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.saving'));
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
-    setTownhallRegisterFeedback('Registration complete. Configure your brain to continue.');
+    setTownhallRegisterFeedback(tApp('townhall.feedback.registration_complete_continue'));
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
     const raw = String(err?.message || err || 'Mint failed.');
@@ -3022,7 +3176,10 @@ function bindTownhallRegistrationControls() {
     const input = el(isHuman ? 'townhallHumanName' : 'townhallAgentName');
     const value = (input?.value || '').trim();
     if (value) return true;
-    setTownhallRegisterFeedback(isHuman ? 'Enter your name to continue.' : 'Enter your agent name to continue.', true);
+    setTownhallRegisterFeedback(
+      isHuman ? tApp('townhall.feedback.enter_human_name') : tApp('townhall.feedback.enter_agent_name'),
+      true
+    );
     if (input) input.focus();
     return false;
   };
@@ -3034,7 +3191,7 @@ function bindTownhallRegistrationControls() {
     if (value) return true;
     setTownhallCustomizeOpen(kind, true);
     setTownhallRegisterFeedback(
-      isHuman ? 'Add the exact human avatar prompt to continue.' : 'Add the exact agent avatar prompt to continue.',
+      isHuman ? tApp('townhall.feedback.add_human_prompt') : tApp('townhall.feedback.add_agent_prompt'),
       true
     );
     if (input) input.focus();
@@ -3072,7 +3229,7 @@ function bindTownhallRegistrationControls() {
       townhallAwaitingContinue = true;
       townhallSigilUnlockedByContinue = false;
       setTownhallStoryStep('processing');
-      setTownhallRegisterFeedback('Welcome to Agent Town, processing your registration.');
+      setTownhallRegisterFeedback(tApp('townhall.feedback.processing'));
       mintAllTownhallIdentitiesAndRegister();
     });
   }
@@ -3084,7 +3241,7 @@ function bindTownhallRegistrationControls() {
       if (continueBtn.disabled) return;
       townhallAwaitingContinue = false;
       townhallSigilUnlockedByContinue = true;
-      setTownhallRegisterFeedback('Continue with the sigil test.');
+      setTownhallRegisterFeedback(tApp('townhall.feedback.continue_sigil'));
       if (lastState) syncTownhallRegistrationUI(lastState);
       const sigilFlow = el('townhallSigilFlow');
       if (sigilFlow && !sigilFlow.classList.contains('is-hidden')) {
@@ -3128,7 +3285,7 @@ function bindTownhallRegistrationControls() {
     humanImageInput.dataset.bound = '1';
     humanImageInput.addEventListener('change', () => {
       onTownhallImageChanged('human', humanImageInput).catch((e) => {
-        setTownhallRegisterFeedback(`Avatar upload failed: ${e.message}`, true);
+        setTownhallRegisterFeedback(tApp('townhall.feedback.avatar_upload_failed', { message: e.message }), true);
       });
     });
   }
@@ -3138,7 +3295,7 @@ function bindTownhallRegistrationControls() {
     agentImageInput.dataset.bound = '1';
     agentImageInput.addEventListener('change', () => {
       onTownhallImageChanged('agent', agentImageInput).catch((e) => {
-        setTownhallRegisterFeedback(`Avatar upload failed: ${e.message}`, true);
+        setTownhallRegisterFeedback(tApp('townhall.feedback.avatar_upload_failed', { message: e.message }), true);
       });
     });
   }
@@ -3243,17 +3400,17 @@ function syncTownhallRegistrationUI(state) {
   const gateHint = el('townHallGateHint');
   if (gateHint) {
     if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
-      gateHint.textContent = 'Registration complete. Configure your brain to continue.';
+      gateHint.textContent = tApp('townhall.gate.brain_required');
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN && isBrainConfigured && !isWorkerConnected) {
-      gateHint.textContent = 'Brain configured. Waiting for your worker agent to connect.';
+      gateHint.textContent = tApp('townhall.gate.waiting_worker');
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN) {
-      gateHint.textContent = 'Registration complete. Open the sigil screen to continue.';
+      gateHint.textContent = tApp('townhall.gate.open_sigil');
     } else if (registrationComplete) {
-      gateHint.textContent = 'Registration complete.';
+      gateHint.textContent = tApp('townhall.gate.registration_complete');
     } else if (required) {
-      gateHint.textContent = 'Complete Town Hall onboarding to continue.';
+      gateHint.textContent = tApp('townhall.gate.complete_onboarding');
     } else {
-      gateHint.textContent = 'Town Hall onboarding is optional here.';
+      gateHint.textContent = tApp('townhall.gate.optional');
     }
   }
 
@@ -3312,11 +3469,11 @@ function bindTownDistrictControls() {
         }
       } catch (e) {
         const msg = e.message === 'NO_SOLANA_WALLET'
-          ? 'No Privy-connected Solana wallet found.'
+          ? tApp('wallet.error.no_solana_wallet')
           : e.message === 'NO_SOLANA_SIGN'
-            ? 'Wallet does not support message signing.'
+            ? tApp('wallet.error.no_solana_sign')
             : e.message === 'BAD_SIGNATURE'
-              ? 'Wallet signature failed.'
+              ? tApp('wallet.error.bad_signature')
               : e.message;
         setWalletStatus(msg, true);
       } finally {
@@ -3343,12 +3500,14 @@ function bindTownDistrictControls() {
   if (workerReconnectBtn) {
     workerReconnectBtn.onclick = async () => {
       workerReconnectBtn.disabled = true;
-      setTownhallRegisterFeedback('Reconnecting worker agent...');
+      setTownhallRegisterFeedback(tApp('townhall.feedback.worker_reconnecting'));
       try {
         await connectLiteAgent();
         requestHomeSkillStep('worker-reconnect');
       } catch (e) {
-        setTownhallRegisterFeedback(`Worker reconnect failed: ${String(e?.message || e || 'UNKNOWN_ERROR')}`, true);
+        setTownhallRegisterFeedback(tApp('townhall.feedback.worker_reconnect_failed', {
+          message: String(e?.message || e || 'UNKNOWN_ERROR')
+        }), true);
       } finally {
         workerReconnectBtn.disabled = false;
       }
@@ -3359,31 +3518,31 @@ function bindTownDistrictControls() {
   if (tokenVerifyBtn) {
     tokenVerifyBtn.onclick = async () => {
       setTokenError('');
-      setTokenStatus({ active: true, good: false, text: 'Checking wallet…' });
+      setTokenStatus({ active: true, good: false, text: tApp('token.status.checking') });
       tokenVerifyBtn.disabled = true;
       try {
         const result = await verifyTokenOwnership();
         if (result?.eligible) {
-          setTokenStatus({ active: true, good: true, text: 'Verified' });
+          setTokenStatus({ active: true, good: true, text: tApp('token.status.verified') });
         } else {
-          setTokenStatus({ active: true, good: false, text: 'No $ELIZATOWN found' });
+          setTokenStatus({ active: true, good: false, text: tApp('token.status.not_found') });
         }
       } catch (e) {
         const msg = e.message === 'ALREADY_SIGNED_UP'
-          ? 'This session already signed up.'
+          ? tApp('token.error.already_signed_up')
           : e.message === 'BAD_SIGNATURE'
-            ? 'Wallet signature failed.'
+            ? tApp('token.error.bad_signature')
             : e.message === 'SIGNATURE_FORMAT'
-              ? 'Wallet signature failed.'
+              ? tApp('token.error.bad_signature')
               : e.message === 'RPC_UNAVAILABLE'
                 ? 'Token check is unavailable. Try again.'
                 : e.message === 'NO_SOLANA_WALLET'
-                  ? 'No Privy-connected Solana wallet found.'
+                  ? tApp('wallet.error.no_solana_wallet')
                   : e.message === 'NO_SOLANA_SIGN'
-                    ? 'Wallet does not support message signing.'
+                    ? tApp('wallet.error.no_solana_sign')
                     : e.message;
         setTokenError(msg);
-        setTokenStatus({ active: true, good: false, text: 'Check failed' });
+        setTokenStatus({ active: true, good: false, text: tApp('token.status.failed') });
       } finally {
         tokenVerifyBtn.disabled = false;
       }
@@ -3396,8 +3555,8 @@ function bindTownDistrictControls() {
       const msg = readTextContent('houseSnippet');
       try {
         await navigator.clipboard.writeText(msg);
-        copyHouse.textContent = 'Copied ✓';
-        setTimeout(() => (copyHouse.textContent = 'Copy house message'), 1200);
+        copyHouse.textContent = tApp('common.copied');
+        setTimeout(() => (copyHouse.textContent = tApp('townhall.copy_house')), 1200);
       } catch {
         alert(msg);
       }
@@ -3409,7 +3568,7 @@ function bindTownDistrictControls() {
   if (openShareCardBtn) {
     openShareCardBtn.onclick = async () => {
       openShareCardBtn.disabled = true;
-      if (shareCardStatus) shareCardStatus.textContent = 'Resolving share card...';
+      if (shareCardStatus) shareCardStatus.textContent = tApp('townhall.share_card.resolving');
       try {
         let sharePath = resolveSharePathFromState(lastState);
         const houseId = String(lastState?.houseId || walletHouseId || '').trim();
@@ -3419,7 +3578,7 @@ function bindTownDistrictControls() {
         if (!sharePath) {
           sharePath = '/s/sh_missing';
           if (shareCardStatus) {
-            shareCardStatus.textContent = 'No share yet for this house. Opening placeholder card.';
+            shareCardStatus.textContent = tApp('townhall.share_card.placeholder_notice');
           }
         } else if (shareCardStatus) {
           shareCardStatus.textContent = '';
@@ -3427,7 +3586,7 @@ function bindTownDistrictControls() {
         routeToShareCard(sharePath);
       } catch (err) {
         if (shareCardStatus) {
-          shareCardStatus.textContent = `Share card unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`;
+          shareCardStatus.textContent = formatShareCardUnavailableStatus(err?.message || 'UNKNOWN_ERROR');
         }
       } finally {
         openShareCardBtn.disabled = false;
@@ -3590,7 +3749,7 @@ async function openTrainerModal() {
 
   const statusLine = document.getElementById('trainerStatusLine');
   if (statusLine && statusLine.textContent.includes('failed')) {
-    statusLine.textContent = 'Trainer loading...';
+    statusLine.textContent = tApp('trainer.status.loading');
     statusLine.style.color = 'var(--muted)';
   }
 
@@ -3599,7 +3758,7 @@ async function openTrainerModal() {
     await ensureTrainerScriptLoaded();
   } catch (err) {
     if (statusLine) {
-      statusLine.textContent = `Trainer failed to initialize: ${err?.message || 'UNKNOWN'}`;
+      statusLine.textContent = tApp('trainer.status.failed', { message: err?.message || 'UNKNOWN' });
       statusLine.style.color = 'var(--bad)';
     }
   }
@@ -4618,7 +4777,9 @@ async function showDistrict(district) {
     if (lastDistrictLoad !== currentLoad) return;
     if (body) {
       body.classList.remove('is-loading');
-      body.innerHTML = `<p class="small" style="color: var(--bad)">Could not load this district: ${e.message}</p>`;
+      body.innerHTML = `<p class="small" style="color: var(--bad)">${tApp('district.error.load_failed', {
+        message: String(e?.message || e || 'UNKNOWN_ERROR')
+      })}</p>`;
     }
     console.warn('Failed to load district view', e);
   }
@@ -4653,8 +4814,8 @@ function updateTownHubLinks(houseId) {
   const townHallStatus = el('townHallStatus');
   if (townHallStatus) {
     townHallStatus.textContent = houseId
-      ? `House ${houseId} is available. Continue ERC-8004 ceremony and image updates.`
-      : 'Connect or recover a house first, then continue ERC-8004 ceremony and picture updates.';
+      ? tApp('townhall.status.house_ready', { houseId })
+      : tApp('townhall.status.house_needed');
   }
 
   const ponyInboxLink = el('ponyInboxLink');
@@ -4666,8 +4827,8 @@ function updateTownHubLinks(houseId) {
   const ponyInboxHint = el('ponyInboxHint');
   if (ponyInboxHint) {
     ponyInboxHint.textContent = houseId
-      ? `Inbox route ready for house ${houseId}.`
-      : 'Connect or recover a house to open a house-scoped inbox directly.';
+      ? tApp('pony.inbox.ready', { houseId })
+      : tApp('pony.compose_hint');
   }
 }
 
@@ -4885,17 +5046,17 @@ async function lookupWalletHouse(houseIdOverride = null) {
 
 async function connectWalletAndLookup({ silent = false } = {}) {
   await connectWallet({ silent });
-  setWalletStatus('Wallet connected. Checking for houses…');
+  setWalletStatus(tApp('common.wallet_checking_houses'));
   const lookup = await lookupWalletHouse();
   if (lookup.houseId) {
     walletHouseId = lookup.houseId;
     walletRecovered = true;
-    setWalletStatus('Welcome back. House found.');
+    setWalletStatus(tApp('common.wallet_house_found'));
     if (lastState) updateUI({ ...lastState, houseId: lookup.houseId });
   } else {
     walletHouseId = null;
     walletRecovered = false;
-    setWalletStatus('No houses found for this wallet yet.');
+    setWalletStatus(tApp('common.wallet_no_houses'));
     if (lastState) updateUI({ ...lastState, houseId: null });
   }
 }
@@ -4926,7 +5087,9 @@ function updateAgentStatus(dotId, textId, connected, name) {
   const text = el(textId);
   if (!dot || !text) return;
   dot.className = `dot ${connected ? 'good' : ''}`;
-  text.textContent = connected ? `Agent connected${name ? `: ${name}` : ''}` : 'Agent not connected';
+  text.textContent = connected
+    ? tApp('agent.status.connected', { suffix: name ? `: ${name}` : '' })
+    : tApp('agent.status.disconnected');
 }
 
 async function restoreWalletConnection() {
@@ -4944,7 +5107,7 @@ async function restoreWalletConnection() {
     walletRecovered = true;
     if (lastState) updateUI({ ...lastState, houseId: cached.houseId });
   }
-  setWalletStatus('Wallet connected.');
+  setWalletStatus(tApp('common.wallet_connected'));
   saveWalletCache();
 }
 
@@ -4974,17 +5137,22 @@ function renderAgentTrafficCards(nowIso) {
   const filtered = agentDebugTraffic.filter((entry) => matchesAgentTrafficFilter(entry));
   const tail = filtered.slice(Math.max(0, filtered.length - AGENT_DEBUG_TRAFFIC_RENDER_LIMIT));
   const visible = tail.slice().reverse();
-  const modeLabel = normalizeAgentTrafficFilter(agentDebugTrafficFilter).toUpperCase();
+  const modeLabel = getAgentTrafficFilterLabel(agentDebugTrafficFilter);
 
   if (meta) {
-    meta.textContent = `Refreshed: ${nowIso} | Filter: ${modeLabel} | Showing ${visible.length}/${filtered.length}`;
+    meta.textContent = tApp('agent.panel.debug.traffic_meta', {
+      refreshedAt: nowIso,
+      filter: modeLabel,
+      shown: visible.length,
+      total: filtered.length
+    });
   }
 
   list.innerHTML = '';
   if (!visible.length) {
     const empty = document.createElement('div');
     empty.className = 'agent-traffic-empty';
-    empty.textContent = 'No traffic entries for this filter yet.';
+    empty.textContent = tApp('agent.panel.debug.no_traffic');
     list.appendChild(empty);
     return;
   }
@@ -5064,7 +5232,7 @@ function renderSigils(state) {
 
     const left = document.createElement('div');
     const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
-    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
+    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">${tApp('sigil.pick_hint')}</div>`;
 
     const right = document.createElement('div');
     right.style.display = 'grid';
@@ -5074,12 +5242,12 @@ function renderSigils(state) {
     const you = document.createElement('div');
     you.className = 'pill';
     you.style.padding = '4px 8px';
-    you.textContent = humanSel === item.id ? 'you' : '';
+    you.textContent = humanSel === item.id ? tApp('sigil.pick_you') : '';
 
     const agent = document.createElement('div');
     agent.className = 'pill';
     agent.style.padding = '4px 8px';
-    agent.textContent = agentSel === item.id ? 'agent' : '';
+    agent.textContent = agentSel === item.id ? tApp('sigil.pick_agent') : '';
 
     right.appendChild(you);
     right.appendChild(agent);
@@ -5115,7 +5283,7 @@ function renderSigils(state) {
       } catch (e) {
         pendingHumanSigilSelection = null;
         if (lastState) renderSigils(lastState);
-        setOpenError(`Select failed: ${e.message}`);
+        setOpenError(tApp('sigil.error.select_failed', { message: e.message }));
       }
     });
 
@@ -5227,7 +5395,7 @@ function setAgentDebugTab(tab) {
   if (next === 'session') {
     const node = el('agentDebugSession');
     if (node && !String(node.textContent || '').trim()) {
-      node.textContent = 'Loading session context...';
+      node.textContent = tApp('agent.panel.debug.loading_session');
     }
   }
 }
@@ -5409,50 +5577,78 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const permissionPolicyOriginLines = formatPermissionPolicyOriginAllowlist(permissionPolicyState);
 
     const toolsLines = [
-      `Refreshed: ${nowIso}`,
-      `Reason: ${reason}`,
-      `Worker tools count: ${Number(toolRegistry?.count || workerToolNames.length)}`,
-      `Skill action tools (plugin additions): ${pluginActionAddonToolNames.length}`,
-      `Trainer namespace tools (plugin additions): ${trainerNamespaceAddonToolNames.length}`,
-      `Trainer budget per turn remaining: ${trainerBudgetPerTurnRemaining === null || trainerBudgetPerTurnRemaining === undefined ? '(n/a)' : trainerBudgetPerTurnRemaining}`,
-      `Trainer budget per minute remaining: ${trainerBudgetPerMinuteRemaining === null || trainerBudgetPerMinuteRemaining === undefined ? '(n/a)' : trainerBudgetPerMinuteRemaining}`,
-      formatDebugList('Tools', workerToolNames),
-      formatDebugList('Skill action tools (plugin additions)', pluginActionAddonToolNames.slice(0, 60)),
-      formatDebugList('Trainer namespace tools (plugin additions)', trainerNamespaceAddonToolNames.slice(0, 60)),
+      tApp('agent.panel.debug.refreshed', { refreshedAt: nowIso }),
+      tApp('agent.panel.debug.reason', { reason }),
+      tApp('agent.panel.debug.tools_count', { count: Number(toolRegistry?.count || workerToolNames.length) }),
+      tApp('agent.panel.debug.skill_action_tools_count', { count: pluginActionAddonToolNames.length }),
+      tApp('agent.panel.debug.trainer_tools_count', { count: trainerNamespaceAddonToolNames.length }),
+      tApp('agent.panel.debug.trainer_budget_per_turn', {
+        value: trainerBudgetPerTurnRemaining === null || trainerBudgetPerTurnRemaining === undefined
+          ? tApp('agent.panel.debug.na')
+          : trainerBudgetPerTurnRemaining
+      }),
+      tApp('agent.panel.debug.trainer_budget_per_minute', {
+        value: trainerBudgetPerMinuteRemaining === null || trainerBudgetPerMinuteRemaining === undefined
+          ? tApp('agent.panel.debug.na')
+          : trainerBudgetPerMinuteRemaining
+      }),
+      formatDebugListLabel('agent.panel.debug.list.tools', workerToolNames),
+      formatDebugListLabel('agent.panel.debug.list.skill_action_tools', pluginActionAddonToolNames.slice(0, 60)),
+      formatDebugListLabel('agent.panel.debug.list.trainer_tools', trainerNamespaceAddonToolNames.slice(0, 60)),
       '',
-      `Dispatch path: ${String(toolRegistry?.dispatchPath || '(unknown)')}`,
-      `Active tab: ${agentDebugActiveTab}`,
+      tApp('agent.panel.debug.dispatch_path', {
+        value: formatDebugValue(toolRegistry?.dispatchPath, 'agent.panel.debug.unknown')
+      }),
+      tApp('agent.panel.debug.active_tab', { value: agentDebugActiveTab }),
       '',
-      'Recent worker events:',
+      tApp('agent.panel.debug.recent_worker_events'),
       ...agentDebugEventsTail(20),
     ];
     setAgentDebugText('agentDebugTools', toolsLines.filter(Boolean).join('\n'));
 
     const skillLines = [
-      `Refreshed: ${nowIso}`,
-      `Skill import status: ${String(skillSnapshot?.status || 'unknown')}`,
-      `Source URL: ${String(skillSnapshot?.sourceUrl || '(none)')}`,
-      `Active skill path: ${String(skillSnapshot?.activeSkillPath || '(none)')}`,
-      `Last error: ${String(skillSnapshot?.lastError || '(none)')}`,
-      `Imported paths: ${importedPaths.length}`,
-      `Imported files: ${importedFiles.length}`,
+      tApp('agent.panel.debug.refreshed', { refreshedAt: nowIso }),
+      tApp('agent.panel.debug.skill_import_status', {
+        value: formatDebugValue(skillSnapshot?.status, 'agent.panel.debug.unknown')
+      }),
+      tApp('agent.panel.debug.source_url', {
+        value: formatDebugValue(skillSnapshot?.sourceUrl)
+      }),
+      tApp('agent.panel.debug.active_skill_path', {
+        value: formatDebugValue(skillSnapshot?.activeSkillPath)
+      }),
+      tApp('agent.panel.debug.last_error', {
+        value: formatDebugValue(skillSnapshot?.lastError)
+      }),
+      tApp('agent.panel.debug.imported_paths_count', { count: importedPaths.length }),
+      tApp('agent.panel.debug.imported_files_count', { count: importedFiles.length }),
       '',
-      `Permission policy mode: ${permissionPolicyState.mode}`,
-      `Permission risk level: ${permissionPolicyState.risk.level}`,
-      `Permission risk rationale: ${permissionPolicyState.risk.rationale || '(none)'}`,
-      `Permission policy source: ${permissionPolicyState.source ? String(permissionPolicyState.source.kind || 'unknown') : '(none)'}`,
-      `Permission policy error: ${permissionPolicyState.lastError || '(none)'}`,
-      formatDebugList('Declared permissions', permissionPolicyPermissionLines),
-      formatDebugList('Origin allowlist', permissionPolicyOriginLines),
+      tApp('agent.panel.debug.permission_mode', { value: permissionPolicyState.mode }),
+      tApp('agent.panel.debug.permission_risk_level', { value: permissionPolicyState.risk.level }),
+      tApp('agent.panel.debug.permission_rationale', {
+        value: permissionPolicyState.risk.rationale || tApp('agent.panel.debug.none')
+      }),
+      tApp('agent.panel.debug.permission_source', {
+        value: permissionPolicyState.source ? String(permissionPolicyState.source.kind || tApp('agent.panel.debug.unknown')) : tApp('agent.panel.debug.none')
+      }),
+      tApp('agent.panel.debug.permission_error', {
+        value: permissionPolicyState.lastError || tApp('agent.panel.debug.none')
+      }),
+      formatDebugListLabel('agent.panel.debug.list.declared_permissions', permissionPolicyPermissionLines),
+      formatDebugListLabel('agent.panel.debug.list.origin_allowlist', permissionPolicyOriginLines),
       '',
-      formatDebugList('Imported paths', importedPaths.slice(0, 40)),
+      formatDebugListLabel('agent.panel.debug.list.imported_paths', importedPaths.slice(0, 40)),
       '',
-      `Skills extracted from prompt: ${availableSkills.length}`,
+      tApp('agent.panel.debug.skills_extracted', { count: availableSkills.length }),
       ...availableSkills.map((entry, idx) => `${idx + 1}. ${entry.name} @ ${entry.location}\n   ${entry.description}`),
       '',
-      `Skill actions extracted (plugin): ${pluginActions.length}`,
-      `Skill action parser: ${String(skillActionPluginState?.parserVersion || '(unknown)')}`,
-      `Skill action source: ${String(skillActionPluginState?.source || 'none')}`,
+      tApp('agent.panel.debug.skill_actions_extracted', { count: pluginActions.length }),
+      tApp('agent.panel.debug.skill_action_parser', {
+        value: formatDebugValue(skillActionPluginState?.parserVersion, 'agent.panel.debug.unknown')
+      }),
+      tApp('agent.panel.debug.skill_action_source', {
+        value: formatDebugValue(skillActionPluginState?.source)
+      }),
       ...pluginActions.slice(0, 30).map((entry, idx) => {
         const method = String(entry?.request?.method || 'GET');
         const urlTemplate = String(entry?.request?.urlTemplate || '');
@@ -5461,20 +5657,26 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         return `${idx + 1}. ${entry.id} [${source}, c=${confidence.toFixed(2)}] ${method} ${urlTemplate}`;
       }),
       '',
-      `Trainer namespace enabled (plugin): ${trainerNamespaceState?.enabled === true ? 'yes' : 'no'}`,
-      `Trainer namespace tools: ${trainerNamespaceToolNames.length}`,
-      `Trainer pending approvals: ${trainerPendingApprovals}`,
-      `Trainer recent block codes: ${trainerRecentBlockCodes.length}`,
+      tApp('agent.panel.debug.trainer_namespace_enabled', {
+        value: trainerNamespaceState?.enabled === true ? tApp('share.yes') : tApp('share.no')
+      }),
+      tApp('agent.panel.debug.trainer_namespace_tools', { count: trainerNamespaceToolNames.length }),
+      tApp('agent.panel.debug.trainer_pending_approvals', { count: trainerPendingApprovals }),
+      tApp('agent.panel.debug.trainer_recent_block_codes', { count: trainerRecentBlockCodes.length }),
       ...trainerNamespaceToolNames.map((name, idx) => `${idx + 1}. ${name}`),
       ...(trainerRecentBlockCodes.slice(0, 8).map((row, idx) => {
         const code = String(row?.code || '');
         const tool = String(row?.tool || '');
-        return `Block ${idx + 1}: ${code || '(none)'} @ ${tool || '(unknown)'}`;
+        return tApp('agent.panel.debug.block_item', {
+          index: idx + 1,
+          code: code || tApp('agent.panel.debug.none'),
+          tool: tool || tApp('agent.panel.debug.unknown')
+        });
       })),
       '',
-      formatDebugList('Prompt context files', contextPaths),
+      formatDebugListLabel('agent.panel.debug.list.prompt_context_files', contextPaths),
       '',
-      'Recent worker events:',
+      tApp('agent.panel.debug.recent_worker_events'),
       ...agentDebugEventsTail(16),
     ];
     setAgentDebugText('agentDebugSkill', skillLines.filter(Boolean).join('\n'));
@@ -5544,10 +5746,10 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const sessionLines = [
       JSON.stringify(sessionHeader, null, 2),
       '',
-      'Recent worker events:',
+      tApp('agent.panel.debug.recent_worker_events'),
       ...agentDebugEventsTail(25),
       '',
-      'Transcript integrity (repair-sensitive):',
+      tApp('agent.panel.debug.transcript_integrity_heading'),
       JSON.stringify({
         toolResultCount: Number(transcriptToolStats?.toolResultCount || 0),
         orphanToolResults: Number(transcriptToolStats?.orphanToolResults || 0),
@@ -5555,11 +5757,13 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         displacedToolResults: Number(transcriptToolStats?.displacedToolResults || 0),
       }, null, 2),
       '',
-      'Worker session context (authoritative for LLM input):',
-      workerSessionContext ? JSON.stringify(workerSessionContext, null, 2) : '(unavailable)',
-      workerSessionContextError ? `\nWorker session context warning: ${workerSessionContextError}` : '',
+      tApp('agent.panel.debug.worker_session_context_heading'),
+      workerSessionContext ? JSON.stringify(workerSessionContext, null, 2) : tApp('agent.panel.debug.unavailable'),
+      workerSessionContextError
+        ? `\n${tApp('agent.panel.debug.worker_session_context_warning', { message: workerSessionContextError })}`
+        : '',
       '',
-      'Skill action plugin diagnostics:',
+      tApp('agent.panel.debug.skill_action_plugin_diagnostics'),
       JSON.stringify({
         parserVersion: String(skillActionPluginState?.parserVersion || ''),
         source: String(skillActionPluginState?.source || ''),
@@ -5568,7 +5772,7 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         usage: pluginUsage,
       }, null, 2),
       '',
-      'Trainer namespace plugin diagnostics:',
+      tApp('agent.panel.debug.trainer_namespace_plugin_diagnostics'),
       JSON.stringify({
         enabled: trainerNamespaceState?.enabled === true,
         toolCount: trainerNamespaceToolNames.length,
@@ -5581,14 +5785,16 @@ async function refreshAgentDebugPanels(reason = 'poll') {
         recentBlockCodes: trainerRecentBlockCodes,
       }, null, 2),
       '',
-      'Permission policy diagnostics:',
+      tApp('agent.panel.debug.permission_policy_diagnostics'),
       JSON.stringify(permissionPolicyState, null, 2),
       '',
-      'Transcript dump:',
-      Array.isArray(transcript) ? JSON.stringify(transcript, null, 2) : '(refresh this tab to load transcript)',
+      tApp('agent.panel.debug.transcript_dump'),
+      Array.isArray(transcript)
+        ? JSON.stringify(transcript, null, 2)
+        : tApp('agent.panel.debug.refresh_to_load_transcript'),
       '',
-      'System prompt preview:',
-      String(promptPreview?.systemPrompt || '(unavailable)'),
+      tApp('agent.panel.debug.system_prompt_preview'),
+      String(promptPreview?.systemPrompt || tApp('agent.panel.debug.unavailable')),
     ];
     setAgentDebugText('agentDebugSession', sessionLines.join('\n'));
 
@@ -5597,12 +5803,12 @@ async function refreshAgentDebugPanels(reason = 'poll') {
     const message = String(err?.message || err || 'DEBUG_REFRESH_FAILED');
     const nowIso = new Date().toISOString();
     const fallbackLines = [
-      `Refreshed: ${nowIso}`,
-      `Reason: ${reason}`,
+      tApp('agent.panel.debug.refreshed', { refreshedAt: nowIso }),
+      tApp('agent.panel.debug.reason', { reason }),
       '',
-      `Debug refresh failed: ${message}`,
+      tApp('agent.panel.debug.refresh_failed', { message }),
       '',
-      'If this persists, click Refresh in the debug toolbar.',
+      tApp('agent.panel.debug.refresh_hint'),
     ];
     setAgentDebugText('agentDebugTools', fallbackLines.join('\n'));
     setAgentDebugText('agentDebugSkill', fallbackLines.join('\n'));
@@ -5725,7 +5931,7 @@ async function updateUI(state) {
       safeSetText('reconnectTitle', tApp('townhall.reconnect.title'));
       safeSetText('reconnectIntro', tApp('townhall.reconnect.help'));
     }
-    safeSetText('houseSnippet', `Reconnect worker session ${teamCode} to your house.`);
+    safeSetText('houseSnippet', tApp('townhall.house_snippet.team', { teamCode }));
     const openHouseLink = el('openHouseLink');
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
   }
@@ -5734,7 +5940,9 @@ async function updateUI(state) {
   const shareCardStatus = el('shareCardStatus');
   if (openShareCardBtn) {
     const sharePath = resolveSharePathFromState(state);
-    openShareCardBtn.textContent = sharePath ? 'Open share card' : 'Open share card (preview)';
+    openShareCardBtn.textContent = sharePath
+      ? tApp('townhall.open_share_card')
+      : tApp('townhall.open_share_card_preview');
     openShareCardBtn.disabled = !houseId;
   }
   if (shareCardStatus && !houseId) {
@@ -5748,7 +5956,7 @@ async function updateUI(state) {
   }
 
   safeSetText('matchDetail', matched
-    ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
+    ? tApp('sigil.matched_detail', { elementId: state.match?.elementId || '' })
     : tApp('sigil.match_detail')
   );
 
@@ -5757,7 +5965,10 @@ async function updateUI(state) {
 
   const complete = !!state.signup?.complete && signupMode === 'agent';
   const openReady = el('openReady');
-  if (openReady) openReady.style.display = complete ? 'inline-flex' : 'none';
+  if (openReady) {
+    openReady.style.display = complete ? 'inline-flex' : 'none';
+    openReady.innerHTML = `${tApp('sigil.open_ready_prefix')} <a href="/create">${tApp('sigil.open_ready_ceremony')}</a> · <a href="/house">${tApp('sigil.open_ready_house')}</a>`;
+  }
 
   const waiting = !!state.human?.openPressed && !complete;
   const waitingNode = el('openWaiting');
@@ -5902,6 +6113,12 @@ function getDefaultLlmProviderForExperience() {
 }
 
 function getLlmProviderWarningText(provider, preference = getCurrentExperiencePreference()) {
+  const normalizedProvider = LlmCatalog && typeof LlmCatalog.normalizeProvider === 'function'
+    ? (LlmCatalog.normalizeProvider(provider) || String(provider || '').trim())
+    : String(provider || '').trim();
+  if (LlmCatalog && typeof LlmCatalog.hasTemplateModels === 'function' && LlmCatalog.hasTemplateModels(normalizedProvider)) {
+    return tApp('brain.warning.provider_model_template', { provider: normalizedProvider });
+  }
   const message = LlmCatalog && typeof LlmCatalog.getProviderWarning === 'function'
     ? LlmCatalog.getProviderWarning(provider, preference)
     : '';
@@ -6004,14 +6221,14 @@ function updateLlmOauthLaunchUi() {
   launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
   launchBtn.disabled = !supported;
   launchBtn.title = supported
-    ? 'Start OpenAI PKCE OAuth in a new tab.'
-    : 'OAuth launch is available for OpenAI providers only.';
+    ? tApp('brain.oauth.start_title')
+    : tApp('brain.oauth.start_title_disabled');
   if (completeBtn) {
     completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
     completeBtn.disabled = !supported;
     completeBtn.title = supported
-      ? 'Complete OAuth using pasted callback URL/code.'
-      : 'OAuth completion is available for OpenAI providers only.';
+      ? tApp('brain.oauth.complete_title')
+      : tApp('brain.oauth.complete_title_disabled');
   }
 }
 
@@ -6084,12 +6301,12 @@ async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
   try {
     const provider = String(el('llmProviderSelect')?.value || getDefaultLlmProviderForExperience()).trim().toLowerCase();
     if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
-      throw new Error('OAuth completion is available for OpenAI providers only.');
+      throw new Error('OAUTH_ONLY_OPENAI');
     }
     const normalizedInput = String(callbackInput || '').trim();
     const attemptId = String(openAiCodexOAuthAttempt?.attemptId || '').trim();
     if (!attemptId && !normalizedInput) {
-      throw new Error('Start OAuth first.');
+      throw new Error('START_OAUTH_FIRST');
     }
     const result = await exchangeOpenAiCodexOAuthAttempt({
       attemptId,
@@ -6108,21 +6325,22 @@ async function completeOpenAiCodexOAuthFromUi({ callbackInput = '' } = {}) {
     if (!credential) throw new Error('TOKEN_RESPONSE_INVALID');
     await hydrateUiFromOpenAiCodexCredential(credential);
     stopOpenAiCodexOAuthPoll();
-    setLiteLlmStatus('OAuth exchange complete. Click Connect Brain.');
-    setAgentLlmStatus('OAuth exchange complete. Click Connect Brain.');
+    setLiteLlmStatus(tApp('brain.status.oauth_complete'));
+    setAgentLlmStatus(tApp('brain.status.oauth_complete'));
     openAiCodexOAuthAttempt = null;
   } catch (err) {
     const code = String(err?.message || '').trim();
     if (code === 'CODE_PENDING') {
-      setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
-      setAgentLlmStatus('Waiting for OAuth callback.');
+      setLiteLlmStatus(tApp('brain.status.oauth_waiting'));
+      setAgentLlmStatus(tApp('brain.status.oauth_waiting_short'));
       return;
     }
-    const msg = code || 'OAuth exchange failed.';
-    setLiteLlmStatus(`OAuth exchange failed: ${msg}`);
-    setAgentLlmStatus(`OAuth exchange failed: ${msg}`);
+    const msg = code || 'OAUTH_EXCHANGE_FAILED';
+    const localized = tApp('brain.error.oauth_exchange_failed', { message: msg });
+    setLiteLlmStatus(localized);
+    setAgentLlmStatus(localized);
     if (code !== 'CODE_PENDING') {
-      appendAgentLog(`OAuth exchange failed: ${msg}`);
+      appendAgentLog(localized);
     }
     throw err;
   } finally {
@@ -6146,7 +6364,7 @@ function startOpenAiCodexOAuthPoll() {
 async function launchLlmOauthInNewTab() {
   const provider = String(el('llmProviderSelect')?.value || getDefaultLlmProviderForExperience()).trim().toLowerCase();
   if (!OPENAI_CODEX_OAUTH_PROVIDERS.has(provider)) {
-    setLiteLlmStatus('OAuth launch is available for OpenAI providers only.');
+    setLiteLlmStatus(tApp('brain.error.oauth_only_openai'));
     return;
   }
   bindOpenAiCodexOAuthMessageListener();
@@ -6167,8 +6385,8 @@ async function launchLlmOauthInNewTab() {
   if (!popup) {
     throw new Error('POPUP_BLOCKED');
   }
-  setLiteLlmStatus('OAuth started. Complete sign-in in the popup. If needed, paste callback URL and click Complete OAuth.');
-  setAgentLlmStatus('OAuth started. Complete sign-in in the popup.');
+  setLiteLlmStatus(tApp('brain.status.oauth_started'));
+  setAgentLlmStatus(tApp('brain.status.oauth_started_short'));
   startOpenAiCodexOAuthPoll();
 }
 
@@ -6218,12 +6436,12 @@ function setLlmAuthModeUI(mode) {
   if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
   if (keyInput) {
     keyInput.placeholder = authMode === 'oauth-json'
-      ? 'Optional override token (usually auto-derived from OAuth input)'
-      : 'LLM API key (stored locally)';
+      ? tApp('brain.oauth.override_placeholder')
+      : tApp('brain.api_key.placeholder.full');
   }
   if (oauthHint) {
     oauthHint.textContent = authMode === 'oauth-json'
-      ? 'Use Start OAuth for PKCE exchange, or paste an OAuth profile/access token (id_token callback URLs are not supported).'
+      ? tApp('brain.oauth.hint')
       : '';
   }
   updateLlmOauthLaunchUi();
@@ -6360,9 +6578,17 @@ function validateOAuthCredentialForProvider({ provider, credential }) {
   if (!token || !isLikelyJwtToken(token)) return '';
   if (!isLikelyOpenAiIdToken(token)) return '';
   if (normalizedProvider === 'openai' || normalizedProvider === 'openai-codex') {
-    return 'Detected OpenAI id_token callback URL. This token type is not usable for model calls. Use an OpenAI API key or an OAuth profile with an access token.';
+    return tApp('brain.error.unsupported_id_token');
   }
   return '';
+}
+
+function mapLlmCredentialError(code) {
+  const normalized = String(code || '').trim();
+  if (normalized === 'MISSING_OAUTH_PROFILE_JSON') return tApp('brain.error.missing_oauth_profile');
+  if (normalized === 'INVALID_OAUTH_PROFILE_JSON') return tApp('brain.error.invalid_oauth_profile');
+  if (normalized === 'NO_OAUTH_ACCESS_TOKEN_FOUND') return tApp('brain.error.no_oauth_access_token');
+  return normalized;
 }
 
 function collectOAuthCandidatesFromUrl(rawUrl) {
@@ -6569,8 +6795,14 @@ function resolveLlmConfigFromUi() {
 
   if (!credential) {
     const msg = mode === 'oauth-json'
-      ? (oauthError || 'No access token found in OAuth profile JSON.')
-      : `Missing ${provider === 'openai-codex' ? 'API key or OAuth token' : 'API key'} for ${parsedModel.provider}/${parsedModel.modelId}.`;
+      ? (mapLlmCredentialError(oauthError) || tApp('brain.error.no_oauth_access_token'))
+      : tApp('brain.error.missing_api_key_with_model', {
+        credentialLabel: provider === 'openai-codex'
+          ? tApp('brain.credential.api_key_or_oauth')
+          : tApp('brain.credential.api_key'),
+        provider: parsedModel.provider,
+        model: parsedModel.modelId
+      });
     throw new Error(msg);
   }
 
@@ -6880,8 +7112,8 @@ async function runHomeSkillStep(reason = 'state') {
   } catch (err) {
     const msg = String(err?.message || 'EXPERIENCE_RUN_FAILED');
     if (/could not parse your authentication token/i.test(msg) || /failed to extract accountid from token/i.test(msg)) {
-      pauseLiteSkillLoop('llm-auth', 'Brain token rejected by provider. Update Brain credentials and save again.');
-      setLiteLlmStatus('Brain token rejected by provider. Update OAuth/API key and save Brain again.');
+      pauseLiteSkillLoop('llm-auth', tApp('brain.status.token_rejected'));
+      setLiteLlmStatus(tApp('brain.status.token_rejected'));
       return;
     }
     appendHomeSkillLoopError(reason, msg);
@@ -6906,19 +7138,19 @@ function updateLiteAgentStatus(state) {
   const liteActive = isLiteAgentActive(state);
   dot.className = `dot ${liteActive ? 'good' : ''}`;
   if (failed) {
-    text.textContent = `OpenClaw Lite error: ${lite.lastError}`;
+    text.textContent = tApp('agent.runtime.error', { message: lite.lastError });
   } else if (isVendorLite(state) && isAnyAgentConnected(state) && !isLocalLiteLlmConfigured()) {
-    text.textContent = 'Agent connected. Configure brain.';
+    text.textContent = tApp('agent.runtime.connected_configure_brain');
   } else if (isVendorLite(state) && isAnyAgentConnected(state)) {
     text.textContent = liteActive
-      ? 'Agent connected: OpenClaw Lite'
-      : 'Agent connected: OpenClaw Lite (skill import failed)';
+      ? tApp('agent.runtime.connected_openclaw')
+      : tApp('agent.runtime.connected_openclaw_import_failed');
   } else if (isAnyAgentConnected(state) && state?.agent?.source === 'external') {
-    text.textContent = 'External agent connected';
+    text.textContent = tApp('agent.runtime.external_connected');
   } else if (liteConnected && isVendorLite(state) && !liteActive) {
-    text.textContent = 'Agent connected: OpenClaw Lite (skill import failed)';
+    text.textContent = tApp('agent.runtime.connected_openclaw_import_failed');
   } else {
-    text.textContent = liteConnected ? 'Agent connected: OpenClaw Lite' : 'Agent offline';
+    text.textContent = liteConnected ? tApp('agent.runtime.connected_openclaw') : tApp('agent.runtime.offline');
   }
 }
 
@@ -6994,7 +7226,7 @@ async function checkWalletStep() {
 
   pendingWalletCheck = true;
   if (walletBtn) walletBtn.disabled = true;
-  if (walletStatus) walletStatus.textContent = 'Checking wallet...';
+  if (walletStatus) walletStatus.textContent = tApp('hatch.status.wallet_checking');
 
   const unlockStep2 = () => {
     if (step1) step1.classList.add('done');
@@ -7020,7 +7252,7 @@ async function checkWalletStep() {
       }
     }
     if (lookup?.houseId) {
-      statusOverride = 'House found! Redirecting...';
+      statusOverride = tApp('hatch.status.house_found_redirect');
       if (walletStatus) walletStatus.textContent = statusOverride;
       window.location.href = `/house?house=${encodeURIComponent(lookup.houseId)}`;
       return;
@@ -7028,28 +7260,28 @@ async function checkWalletStep() {
 
     // No house found - Proceed to Step 2 (LLM Config)
     if (walletStatus) {
-      walletStatus.textContent = 'Wallet verified. Configure brain.';
+      walletStatus.textContent = tApp('hatch.status.wallet_verified_brain');
       walletStatus.style.color = 'var(--good)';
     }
     unlockStep2();
 
-    statusOverride = 'No existing house found. Continue setting up your OpenClaw Lite agent.';
+    statusOverride = tApp('hatch.status.no_house_continue');
     setHatchStatus(statusOverride);
 
   } catch (e) {
     const raw = String(e?.message || '').trim();
     const hasConnectedWallet = !!walletAddr;
     const msg = raw === 'NO_SOLANA_WALLET'
-      ? 'No Solana wallet found.'
+      ? tApp('wallet.error.no_solana_wallet_short')
       : raw === 'NO_SOLANA_SIGN'
-        ? 'Wallet cannot sign messages.'
+        ? tApp('wallet.error.no_solana_sign_short')
         : raw === 'USER_REJECTED'
-          ? 'Wallet signature was cancelled.'
+          ? tApp('wallet.error.user_rejected')
           : raw.includes('USER_REJECTED')
-            ? 'Wallet signature was cancelled.'
+            ? tApp('wallet.error.user_rejected')
             : hasConnectedWallet
-              ? 'Wallet connected. Lookup skipped. Configure brain to continue.'
-              : 'Wallet check failed.';
+              ? tApp('hatch.status.wallet_lookup_skipped')
+              : tApp('hatch.status.wallet_check_failed');
     if (walletStatus) {
       walletStatus.textContent = msg;
       walletStatus.style.color = hasConnectedWallet ? 'var(--muted)' : 'var(--bad)';
@@ -7073,15 +7305,15 @@ async function runWalletProfileCheck() {
 async function connectLiteAgent() {
   if (pendingLiteConnect) return;
   if (isVendorLite(lastState) && !isLocalLiteLlmConfigured()) {
-    statusOverride = 'Configure your local brain settings before connecting OpenClaw Lite.';
+    statusOverride = tApp('hatch.status.configure_brain_before_connect');
     setHatchStatus(statusOverride);
     return;
   }
   if (isVendorLite(lastState)) {
     const booted = await bootstrapVendorRuntime();
     if (!booted) {
-      if (!String(statusOverride || '').startsWith('OpenClaw Lite runtime failed:')) {
-        statusOverride = 'OpenClaw Lite runtime is starting…';
+      if (!String(statusOverride || '').startsWith(tApp('hatch.status.runtime_failed_prefix'))) {
+        statusOverride = tApp('hatch.status.runtime_starting');
       }
       setHatchStatus(statusOverride);
       applyVisibility(lastState);
@@ -7089,7 +7321,7 @@ async function connectLiteAgent() {
     }
   }
   pendingLiteConnect = true;
-  setHatchStatus('Connecting OpenClaw Lite…');
+  setHatchStatus(tApp('hatch.status.connecting_openclaw'));
   try {
     await api('/api/agent/lite/connect', {
       method: 'POST',
@@ -7097,7 +7329,7 @@ async function connectLiteAgent() {
     });
     statusOverride = '';
   } catch (e) {
-    statusOverride = `Agent connect failed: ${e.message}`;
+    statusOverride = formatHatchAgentConnectFailedStatus(e.message);
   } finally {
     pendingLiteConnect = false;
     setHatchStatus(statusOverride);
@@ -7134,14 +7366,14 @@ async function bootstrapVendorRuntime() {
         await ensureVendorRuntimeBridge(lastState);
       }
       runtimeBootstrapDone = true;
-      setLiteLlmStatus('Runtime ready. Configure provider, model, and API key.');
+      setLiteLlmStatus(tApp('brain.status.runtime_ready'));
       return true;
     } catch (e) {
       runtimeBootstrapDone = false;
       const msg = e?.message || 'RUNTIME_BOOT_FAILED';
-      statusOverride = `OpenClaw Lite runtime failed: ${msg}`;
+      statusOverride = formatHatchRuntimeFailedStatus(msg);
       setHatchStatus(statusOverride);
-      setLiteLlmStatus(`Runtime failed: ${msg}`);
+      setLiteLlmStatus(tApp('brain.status.runtime_failed', { message: msg }));
       return false;
     } finally {
       pendingRuntimeBootstrap = false;
@@ -7203,10 +7435,10 @@ function initAdvancedLlmUi() {
       } catch (err) {
         const msg = String(err?.message || 'OAUTH_START_FAILED');
         if (msg === 'POPUP_BLOCKED') {
-          setLiteLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          setLiteLlmStatus(tApp('brain.error.popup_blocked'));
           return;
         }
-        setLiteLlmStatus(`OAuth start failed: ${msg}`);
+        setLiteLlmStatus(tApp('brain.error.oauth_start_failed', { message: msg }));
       }
     });
   }
@@ -7220,7 +7452,7 @@ function initAdvancedLlmUi() {
       } catch (err) {
         const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
         if (msg === 'CODE_PENDING') {
-          setLiteLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+          setLiteLlmStatus(tApp('brain.status.oauth_waiting'));
         }
       }
     });
@@ -7279,14 +7511,14 @@ function updateAgentLlmOauthLaunchUi() {
   launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
   launchBtn.disabled = !supported;
   launchBtn.title = supported
-    ? 'Start OpenAI PKCE OAuth in a new tab.'
-    : 'OAuth launch is available for OpenAI providers only.';
+    ? tApp('brain.oauth.start_title')
+    : tApp('brain.oauth.start_title_disabled');
   if (completeBtn) {
     completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
     completeBtn.disabled = !supported;
     completeBtn.title = supported
-      ? 'Complete OAuth using pasted callback URL/code.'
-      : 'OAuth completion is available for OpenAI providers only.';
+      ? tApp('brain.oauth.complete_title')
+      : tApp('brain.oauth.complete_title_disabled');
   }
 }
 
@@ -7299,8 +7531,8 @@ function setAgentLlmAuthModeUI(mode) {
   if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
   if (keyInput) {
     keyInput.placeholder = authMode === 'oauth-json'
-      ? 'Optional override token (usually auto-derived from OAuth input)'
-      : 'LLM API key (stored locally)';
+      ? tApp('brain.oauth.override_placeholder')
+      : tApp('brain.api_key.placeholder.full');
   }
   updateAgentLlmOauthLaunchUi();
 }
@@ -7450,10 +7682,10 @@ function initAgentLlmUi() {
       } catch (err) {
         const msg = String(err?.message || 'OAUTH_START_FAILED');
         if (msg === 'POPUP_BLOCKED') {
-          setAgentLlmStatus('Popup blocked. Allow popups and retry OAuth launch.');
+          setAgentLlmStatus(tApp('brain.error.popup_blocked'));
           return;
         }
-        setAgentLlmStatus(`OAuth start failed: ${msg}`);
+        setAgentLlmStatus(tApp('brain.error.oauth_start_failed', { message: msg }));
       }
     });
   }
@@ -7466,7 +7698,7 @@ function initAgentLlmUi() {
       } catch (err) {
         const msg = String(err?.message || 'OAUTH_EXCHANGE_FAILED');
         if (msg === 'CODE_PENDING') {
-          setAgentLlmStatus('Waiting for OAuth callback. Finish sign-in, then click Complete OAuth again.');
+          setAgentLlmStatus(tApp('brain.status.oauth_waiting'));
         }
       }
     });
@@ -7476,10 +7708,10 @@ function initAgentLlmUi() {
       syncPrimaryLlmUiFromAgent();
       const primarySave = el('llmSaveBtn');
       if (!primarySave) {
-        setAgentLlmStatus('Brain form unavailable.');
+        setAgentLlmStatus(tApp('brain.error.form_unavailable'));
         return;
       }
-      setLiteLlmStatus('Configuring brain...');
+      setLiteLlmStatus(tApp('brain.status.configuring'));
       primarySave.click();
       setTimeout(() => syncAgentLlmUiFromPrimary(), 80);
       setTimeout(() => syncAgentLlmUiFromPrimary(), 600);
@@ -7555,10 +7787,10 @@ function applyLocalLiteLlmToInputs(config) {
   if (oauthInput) {
     if (mode === 'oauth-json') {
       oauthInput.value = config?.credential || '';
-      oauthInput.placeholder = 'OAuth profile JSON/token used to derive this session credential.';
+      oauthInput.placeholder = tApp('brain.placeholder.oauth_session');
     } else {
       oauthInput.value = '';
-      oauthInput.placeholder = 'Paste OpenAI/OAuth profile JSON (or raw token) for OAuth mode.';
+      oauthInput.placeholder = tApp('brain.placeholder.oauth_mode');
     }
   }
   syncModelRefFromInputs();
@@ -7583,9 +7815,9 @@ async function restoreLiteLlmConfigFromLocalIfNeeded(state) {
       });
     }
     if (localCfg.configured) {
-      setLiteLlmStatus(`Brain saved locally: ${localCfg.provider}/${localCfg.model}. Auto-restored on return.`);
+      setLiteLlmStatus(formatBrainSavedLocalStatus(localCfg.provider, localCfg.model));
     } else {
-      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+      setLiteLlmStatus(tApp('brain.status.not_configured'));
     }
     if (lastState) updateUI(lastState);
   } catch (e) {
@@ -7611,12 +7843,12 @@ function initStep2Listener() {
     const clearBtn = el('llmClearBtn');
 
     if (!providerSel || !modelInput || !modelRefInput || !keyInput) {
-      if (status) status.textContent = 'LLM form missing fields.';
+      if (status) status.textContent = tApp('brain.error.form_missing_fields');
       return;
     }
 
-    if (status) status.textContent = 'Configuring brain...';
-    setAgentLlmStatus('Configuring brain...');
+    if (status) status.textContent = tApp('brain.status.configuring');
+    setAgentLlmStatus(tApp('brain.status.configuring'));
     if (clearBtn) clearBtn.disabled = true;
     btn.disabled = true;
 
@@ -7668,9 +7900,9 @@ function initStep2Listener() {
       }
 
       await new Promise(r => setTimeout(r, 300));
-      if (status) status.textContent = 'Brain configured.';
-      setAgentLlmStatus('Brain configured.');
-      setLiteLlmStatus(`Brain saved locally: ${config.provider}/${config.model}. Auto-restored on return.`);
+      if (status) status.textContent = tApp('brain.status.configured');
+      setAgentLlmStatus(tApp('brain.status.configured'));
+      setLiteLlmStatus(formatBrainSavedLocalStatus(config.provider, config.model));
       if (lastState) updateUI(lastState);
 
       const step2 = el('step2');
@@ -7678,19 +7910,20 @@ function initStep2Listener() {
         step2.classList.add('done');
         step2.classList.remove('active');
       }
-      setHatchStatus('Brain connected. Connecting agent...');
+      setHatchStatus(tApp('hatch.status.brain_connected_connecting_agent'));
       if (isVendorLite(lastState)) {
         const booted = await bootstrapVendorRuntime();
         if (booted) {
           await connectLiteAgent();
         } else {
-          setHatchStatus('Brain configured locally. Runtime boot failed.');
+          setHatchStatus(tApp('hatch.status.brain_configured_runtime_boot_failed'));
         }
       }
     } catch (e) {
-      if (status) status.textContent = `Brain config failed: ${e.message}`;
-      setAgentLlmStatus(`Brain config failed: ${e.message}`);
-      setHatchStatus(`Brain config failed: ${e.message}`);
+      const failed = formatBrainConfigFailedStatus(e.message);
+      if (status) status.textContent = failed;
+      setAgentLlmStatus(failed);
+      setHatchStatus(failed);
       if (e) console.error('LLM config failed', e);
     } finally {
       if (clearBtn) clearBtn.disabled = false;
@@ -7718,7 +7951,7 @@ async function clearLiteLlmConfig() {
   openAiCodexOAuthAttempt = null;
   stopOpenAiCodexOAuthPoll();
   clearBtn.disabled = true;
-  setLiteLlmStatus('Clearing LLM configuration…');
+  setLiteLlmStatus(tApp('brain.status.clearing'));
   try {
     const lib = await loadLiteLlmLibrary();
     await lib.clearLlmConfig();
@@ -7760,12 +7993,12 @@ async function clearLiteLlmConfig() {
       await ensureVendorRuntimeBridge(lastState);
       await runtimeBridge.setLlmConfig({ provider: '', model: '', apiKey: '' });
     }
-    statusOverride = 'OpenClaw Lite LLM config cleared.';
-    setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+    statusOverride = tApp('brain.status.cleared_local');
+    setLiteLlmStatus(tApp('brain.status.not_configured'));
     if (lastState) updateUI(lastState);
   } catch (e) {
-    statusOverride = `LLM clear failed: ${e.message}`;
-    setLiteLlmStatus(`LLM clear failed: ${e.message}`);
+    statusOverride = formatBrainClearFailedStatus(e.message);
+    setLiteLlmStatus(statusOverride);
   } finally {
     pendingLlmClear = false;
     clearBtn.disabled = false;
@@ -7793,7 +8026,7 @@ function renderSigilsLegacy(state) {
 
     const left = document.createElement('div');
     const icon = item.icon ? `<span class="sigilIcon" aria-hidden="true">${item.icon}</span>` : '';
-    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">click to pick</div>`;
+    left.innerHTML = `<div class="name">${icon}<span>${item.label}</span></div><div class="hint">${tApp('sigil.pick_hint')}</div>`;
 
     const right = document.createElement('div');
     right.style.display = 'grid';
@@ -7803,12 +8036,12 @@ function renderSigilsLegacy(state) {
     const you = document.createElement('div');
     you.className = 'pill';
     you.style.padding = '4px 8px';
-    you.textContent = humanSel === item.id ? 'you' : '';
+    you.textContent = humanSel === item.id ? tApp('sigil.pick_you') : '';
 
     const agent = document.createElement('div');
     agent.className = 'pill';
     agent.style.padding = '4px 8px';
-    agent.textContent = agentSel === item.id ? 'agent' : '';
+    agent.textContent = agentSel === item.id ? tApp('sigil.pick_agent') : '';
 
     right.appendChild(you);
     right.appendChild(agent);
@@ -7844,7 +8077,7 @@ function renderSigilsLegacy(state) {
       } catch (e) {
         pendingHumanSigilSelection = null;
         if (lastState) renderSigils(lastState);
-        setOpenError(`Select failed: ${e.message}`);
+        setOpenError(tApp('sigil.error.select_failed', { message: e.message }));
       }
     });
 
@@ -7981,13 +8214,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const percent = Math.round(scale * 100);
       if (zoomOutBtn) {
         zoomOutBtn.disabled = normalized <= AGENT_PANEL_ZOOM_STEP_MIN;
-        zoomOutBtn.title = `Decrease panel size (${percent}%)`;
-        zoomOutBtn.setAttribute('aria-label', `Decrease panel size (${percent}%)`);
+        const zoomOutTitle = tApp('agent.panel.debug.zoom_out_percent', { percent });
+        zoomOutBtn.title = zoomOutTitle;
+        zoomOutBtn.setAttribute('aria-label', zoomOutTitle);
       }
       if (zoomInBtn) {
         zoomInBtn.disabled = normalized >= AGENT_PANEL_ZOOM_STEP_MAX;
-        zoomInBtn.title = `Increase panel size (${percent}%)`;
-        zoomInBtn.setAttribute('aria-label', `Increase panel size (${percent}%)`);
+        const zoomInTitle = tApp('agent.panel.debug.zoom_in_percent', { percent });
+        zoomInBtn.title = zoomInTitle;
+        zoomInBtn.setAttribute('aria-label', zoomInTitle);
       }
 
       syncAgentPanelLayout(dock);
@@ -7998,7 +8233,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyMinimized = (minimized) => {
       dock.classList.toggle('minimized', minimized);
       btn.textContent = minimized ? '□' : '_';
-      btn.title = minimized ? 'Expand panel' : 'Minimize panel';
+      const nextTitle = minimized ? tApp('agent.panel.debug.expand') : tApp('agent.panel.debug.minimize');
+      btn.title = nextTitle;
+      btn.setAttribute('aria-label', nextTitle);
       saveAgentPanelMinimized(minimized);
       syncAgentPanelLayout(dock);
       scheduleAgentPanelLayoutSync(dock);
@@ -8008,7 +8245,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!debugBtn) return;
       dock.classList.toggle('debug-collapsed', !visible);
       debugBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
-      debugBtn.title = visible ? 'Hide debug panel' : 'Show debug panel';
+      debugBtn.title = visible ? tApp('agent.panel.debug.hide') : tApp('agent.panel.debug.show');
       saveAgentPanelDebugVisible(visible);
       syncAgentPanelLayout(dock);
       scheduleAgentPanelLayoutSync(dock);
@@ -8157,37 +8394,37 @@ function updateUILegacy(state) {
 
   if (vendor) {
     ensureVendorRuntimeBridge(state).catch((e) => {
-      setOpenError(`Runtime bridge failed: ${e.message}`);
+      setOpenError(tApp('agent.panel.log.runtime_bridge_failed', { message: e.message }));
     });
     if (lite.lastError) {
-      setLiteLlmStatus(`Runtime failed: ${lite.lastError}`);
+      setLiteLlmStatus(tApp('brain.status.runtime_failed', { message: lite.lastError }));
     } else if (localLlm.configured) {
-      setLiteLlmStatus(`Brain saved locally: ${localLlm.provider || 'provider'}/${localLlm.model || 'model'}. Auto-restored on return.`);
+      setLiteLlmStatus(formatBrainSavedLocalStatus(localLlm.provider || 'provider', localLlm.model || 'model'));
     } else {
-      setLiteLlmStatus('Not configured. Save provider, model, and API key.');
+      setLiteLlmStatus(tApp('brain.status.not_configured'));
     }
   }
 
-  if (statusOverride === 'OpenClaw Lite runtime is starting…' && runtimeBootstrapDone) {
+  if (statusOverride === tApp('hatch.status.runtime_starting') && runtimeBootstrapDone) {
     statusOverride = '';
   }
 
   if (statusOverride) {
     setHatchStatus(statusOverride);
   } else if (vendor && lite.lastError) {
-    setHatchStatus(`OpenClaw Lite runtime failed: ${lite.lastError}`);
+    setHatchStatus(formatHatchRuntimeFailedStatus(lite.lastError));
   } else if (vendor && !localLlm.configured) {
-    setHatchStatus('Configure LLM to continue.');
+    setHatchStatus(tApp('hatch.status.configure_llm'));
   } else if (vendor && localLlm.configured && !agentConnected) {
-    setHatchStatus(runtimeBootstrapDone ? 'Brain saved. Connecting agent…' : 'Starting local runtime…');
+    setHatchStatus(runtimeBootstrapDone ? tApp('hatch.status.brain_saved_connecting_agent') : tApp('hatch.status.starting_local_runtime'));
   } else if (vendor && agentConnected && !liteActive) {
-    setHatchStatus('Agent connected. Skill import failed.');
+    setHatchStatus(tApp('hatch.status.agent_connected_import_failed'));
   } else if (agentConnected) {
-    setHatchStatus('Agent ready.');
+    setHatchStatus(tApp('hatch.status.agent_ready'));
   } else if (walletAddr) {
-    setHatchStatus('Wallet connected. Continue setup.');
+    setHatchStatus(tApp('hatch.status.wallet_connected_continue'));
   } else {
-    setHatchStatus('Choose sign in or sign up to continue.');
+    setHatchStatus(tApp('hatch.status.choose_sign_in'));
   }
 
   const townNode = el('townPanel');
@@ -8280,7 +8517,9 @@ async function initGateway() {
         setLiteSkillState(runtimeState.skill);
         updateLiteAgentStatus(lastState);
         if (!statusOverride && isVendorLite(lastState) && isAnyAgentConnected(lastState)) {
-          setHatchStatus(isLiteAgentActive(lastState) ? 'Agent ready.' : 'Agent connected. Skill import failed.');
+          setHatchStatus(isLiteAgentActive(lastState)
+            ? tApp('hatch.status.agent_ready')
+            : tApp('hatch.status.agent_connected_import_failed'));
         }
       }
       scheduleAgentDebugRefresh('state');
@@ -8289,7 +8528,7 @@ async function initGateway() {
     return gateway;
   } catch (e) {
     console.error('Failed to load gateway:', e);
-    appendAgentLog(`Error: Failed to load agent gateway. ${e.message}`);
+    appendAgentLog(tApp('agent.panel.log.gateway_load_failed', { message: e.message }));
     return null;
   }
 }
@@ -8328,11 +8567,11 @@ async function handleVisit() {
   const selector = el('experienceSelector');
   const url = selector ? selector.value : '';
   if (!url) {
-    appendAgentLog('Please select a valid experience.');
+    appendAgentLog(tApp('agent.panel.log.select_valid_experience'));
     return;
   }
 
-  appendChatMessage('system', `Navigating agent to ${url}...`);
+  appendChatMessage('system', tApp('agent.panel.message.navigating', { url }));
   if (!gateway) await initGateway();
 
   try {
@@ -8340,10 +8579,10 @@ async function handleVisit() {
     // Depending on agent capability, this might be a 'tool' execution or a hard navigation
     // For now, we ask the agent to "visit" it.
     await gateway.send({ type: 'command', command: 'visit', url });
-    appendAgentLog(`Sent visit command for ${url}`);
+    appendAgentLog(tApp('agent.panel.log.visit_sent', { url }));
     await refreshLiteSkillState({ force: true });
   } catch (e) {
-    appendAgentLog(`Visit failed: ${e.message}`);
+    appendAgentLog(tApp('agent.panel.log.visit_failed', { message: e.message }));
     await refreshLiteSkillState({ force: true });
   }
 }
@@ -8381,7 +8620,7 @@ async function handleChat() {
       runtimeState: lastState && typeof lastState === 'object' ? lastState : null
     });
   } catch (e) {
-    appendChatMessage('system', `Failed to send: ${e.message}`);
+    appendChatMessage('system', tApp('agent.panel.message.failed_to_send', { message: e.message }));
   }
 }
 
@@ -8397,7 +8636,7 @@ async function handleNewSession() {
 
   try {
     if (!gateway) await initGateway();
-    if (!gateway) throw new Error('Gateway unavailable.');
+    if (!gateway) throw new Error(tApp('agent.panel.message.gateway_unavailable'));
 
     if (typeof gateway.clearTranscript === 'function') {
       await gateway.clearTranscript({ rotateSession: true, keepBootMessage: false });
@@ -8409,12 +8648,13 @@ async function handleNewSession() {
 
     const box = el('chatTranscript');
     if (box) box.innerHTML = '';
-    appendChatMessage('system', 'New session started.');
-    appendAgentLog('Started new session (worker transcript cleared).');
+    appendChatMessage('system', tApp('agent.panel.message.new_session_started'));
+    appendAgentLog(tApp('agent.panel.log.new_session_started'));
   } catch (e) {
     const msg = e?.message || 'UNKNOWN';
-    appendChatMessage('system', `New session failed: ${msg}`);
-    appendAgentLog(`New session failed: ${msg}`);
+    const failure = tApp('agent.panel.message.new_session_failed', { message: msg });
+    appendChatMessage('system', failure);
+    appendAgentLog(failure);
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -8723,7 +8963,7 @@ async function init() {
         if (openWaiting) openWaiting.style.display = 'inline-flex';
         requestHomeSkillStep('human-action');
       } catch (e) {
-        setOpenError(`Open failed: ${e.message}`);
+        setOpenError(tApp('sigil.error.open_failed', { message: e.message }));
       }
     });
   }
@@ -8755,5 +8995,5 @@ async function init() {
 
 init().catch((e) => {
   console.error(e);
-  setHatchStatus(`Init failed: ${e.message}`);
+  setHatchStatus(tApp('hatch.status.init_failed', { message: e.message }));
 });

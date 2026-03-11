@@ -17,20 +17,20 @@
         <a class="logoLink" href="/" aria-label="Agent Town home">
           <img class="logoImg" src="/logo.jpg" alt="" />
         </a>
-        <strong>Create</strong>
-        <span class="badge">human + agent canvas</span>
+        <strong id="createBrandTitle">Create</strong>
+        <span class="badge" id="createBrandBadge">human + agent canvas</span>
       </div>
       <div class="kv">
-        <a class="btn" href="/">Home</a>
+        <a class="btn" id="createNavHomeLink" href="/">Home</a>
         <a class="btn is-hidden" id="houseNavLink" href="/house">House</a>
-        <a class="btn" href="/leaderboard">Leaderboard</a>
+        <a class="btn" id="createNavLeaderboardLink" href="/leaderboard">Leaderboard</a>
         <a class="btn" id="inboxLink" href="#" style="display:none;">Inbox</a>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
 
     <div class="panel">
-      <h1 style="margin:0 0 8px">Create entropy for house key.</h1>
+      <h1 style="margin:0 0 8px" id="createHeading">Create entropy for house key.</h1>
       <p class="small" style="margin-top:0" id="createIntro">
         Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
       </p>
@@ -50,8 +50,8 @@
     </div>
 
     <footer>
-      The pixel image is going to be used to create your encryption key.
-      <div>Made by humans &amp; agents for humans &amp; agents. <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
+      <span id="createFooterNote">The pixel image is going to be used to create your encryption key.</span>
+      <div><span id="createFooterByline">Made by humans &amp; agents for humans &amp; agents.</span> <a href="https://github.com/Agent-Town" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://x.com/Agent_Town" target="_blank" rel="noreferrer">X</a> · <a href="https://x.com/i/communities/2012704394517659727" target="_blank" rel="noreferrer">X community</a> · <a href="https://www.moltbook.com/m/agenttown" target="_blank" rel="noreferrer">Moltbook community</a></div>
     </footer>
   </div>
 
@@ -59,9 +59,10 @@
   <script src="/openclaw-lite/runtime-bridge.js?v=20260213"></script>
   <script src="/experience_profiles.js?v=20260309a"></script>
   <script src="/experience_runtime.js?v=20260309a"></script>
+  <script src="/i18n.js?v=20260310b"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/create.js?v=20260309a"></script>
+  <script src="/create.js?v=20260310b"></script>
   <script src="/agent_panel.js?v=20260222a"></script>
 </body>
 </html>

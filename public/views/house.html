@@ -1,12 +1,12 @@
 <div class="panel spaced" id="pathPanel">
-  <h2 style="margin:0 0 6px">Plan Wagons</h2>
-  <p class="small" style="margin-top:0">
+  <h2 style="margin:0 0 6px" id="townhallPathTitle">Plan Wagons</h2>
+  <p class="small" style="margin-top:0" id="townhallPathHelp">
     The wagons are your house gate. Choose a role, then unlock together.
   </p>
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="connectWalletBtn" type="button" data-testid="hatch-wallet-connect">Connect wallet</button>
     <button class="btn" id="hatchWalletCheckBtn" type="button" data-testid="hatch-wallet-check">Check wallet</button>
-    <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
+    <span class="pill"><span id="townhallWalletPrefix">Wallet:</span> <strong id="walletAddr">—</strong></span>
   </div>
   <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
   <div class="kv" id="pathChoices">
@@ -20,8 +20,8 @@
 <div class="divider"></div>
 
 <div class="panel is-hidden" id="tokenPanel" data-testid="token-panel">
-  <h2 style="margin:0 0 6px">Human: solo house (token)</h2>
-  <p class="small" style="margin-top:0">
+  <h2 style="margin:0 0 6px" id="townhallTokenTitle">Human: solo house (token)</h2>
+  <p class="small" style="margin-top:0" id="townhallTokenHelp">
     Verify that your connected wallet holds <strong>$ELIZATOWN</strong> (CA: <code>CZRsbB6BrHsAmGKeoxyfwzCyhttXvhfEukXCWnseBAGS</code>).
     If it does, you can create a house without an agent.
   </p>

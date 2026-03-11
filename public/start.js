@@ -38,22 +38,22 @@ function explainPrivyError(err) {
     (err && (err.detail || err.message || err?.cause?.message || err?.cause?.detail || '')) || ''
   ).toLowerCase();
 
-  if (code === 'PRIVY_LOGIN_CANCELLED') return 'Login cancelled.';
-  if (code === 'PRIVY_WALLET_CREATE_FAILED') return 'Could not create/connect the Privy wallet. Try again.';
+  if (code === 'PRIVY_LOGIN_CANCELLED') return tStart('start.auth.error.cancelled');
+  if (code === 'PRIVY_WALLET_CREATE_FAILED') return tStart('start.auth.error.wallet_create_failed');
   if (detail.includes('invalid nativeappid') || detail.includes('invalid_native_app_id')) {
-    return 'Privy rejected your app/client ID. Verify PRIVY_APP_ID and remove PRIVY_CLIENT_ID unless it is a web app client.';
+    return tStart('start.auth.error.invalid_native_app_id');
   }
   if ((code === 'PRIVY_EMAIL_SEND_FAILED' || code === 'PRIVY_EMAIL_CODE_FAILED') && status === 403) {
-    return 'Privy rejected this request (403). Check App ID/Client ID, allowed domain, and enabled email auth.';
+    return tStart('start.auth.error.email_403');
   }
   if (code === 'PRIVY_BRIDGE_INIT_FAILED' || code === 'PRIVY_BRIDGE_MISSING') {
-    return 'Privy SDK failed to initialize. Disable blockers, allow third-party cookies for auth.privy.io, and reload.';
+    return tStart('start.auth.error.bridge_init_failed');
   }
-  if (code === 'PRIVY_EMAIL_SEND_FAILED') return 'Could not send the Privy code email. Check your Privy email auth setup.';
-  if (code === 'PRIVY_EMAIL_CODE_FAILED') return 'Could not verify the code. Please try again.';
-  if (code === 'PRIVY_GUEST_LOGIN_FAILED') return 'Privy guest login failed. Check app configuration.';
-  if (status === 403) return 'Privy request denied (403). Check credentials and origin/domain allowlist.';
-  return 'Could not complete Privy login.';
+  if (code === 'PRIVY_EMAIL_SEND_FAILED') return tStart('start.auth.error.email_send_failed');
+  if (code === 'PRIVY_EMAIL_CODE_FAILED') return tStart('start.auth.error.email_code_failed');
+  if (code === 'PRIVY_GUEST_LOGIN_FAILED') return tStart('start.auth.error.guest_login_failed');
+  if (status === 403) return tStart('start.auth.error.request_denied_403');
+  return tStart('start.auth.error.generic');
 }
 
 function updateHeroMedia() {
@@ -123,10 +123,10 @@ function applyStartCopy() {
   if (authTitle) authTitle.textContent = tStart('start.auth.title');
   if (authHelp && !authHelp.dataset.dynamic) authHelp.textContent = tStart('start.auth.help.email');
   if (emailLabel) emailLabel.textContent = tStart('start.auth.email');
-  if (emailInput) emailInput.placeholder = 'you@example.com';
+  if (emailInput) emailInput.placeholder = tStart('start.auth.email_placeholder');
   if (sendBtn) sendBtn.textContent = tStart('start.auth.send');
   if (codeLabel) codeLabel.textContent = tStart('start.auth.code');
-  if (codeInput) codeInput.placeholder = '123456';
+  if (codeInput) codeInput.placeholder = tStart('start.auth.code_placeholder');
   if (verifyBtn) verifyBtn.textContent = tStart('start.auth.verify');
   if (cancelBtn) cancelBtn.textContent = tStart('start.auth.cancel');
   if (prefTitle) prefTitle.textContent = tStart('start.pref.title');
@@ -553,7 +553,7 @@ function bindPreferenceButtons() {
       try {
         await selectExperiencePreset(presetId);
       } catch (err) {
-        setStatus(String(err?.message || 'Could not save path selection.'), true);
+        setStatus(String(err?.message || tStart('start.pref.error_save')), true);
       }
     });
   }

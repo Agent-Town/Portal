@@ -20,29 +20,29 @@
           <span class="badge shareIdBadge" id="shareIdBadge">…</span>
         </div>
         <div class="kv shareModalNav">
-          <a class="btn" href="/">Home</a>
+          <a class="btn" id="shareNavHomeLink" href="/">Home</a>
           <a class="btn is-hidden" id="houseNavLink" href="/house">House</a>
-          <a class="btn" href="/leaderboard">Leaderboard</a>
-          <a class="btn" href="/atlas">Atlas</a>
+          <a class="btn" id="shareNavLeaderboardLink" href="/leaderboard">Leaderboard</a>
+          <a class="btn" id="shareNavAtlasLink" href="/atlas">Atlas</a>
           <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
         </div>
       </header>
 
       <div class="shareModalBody">
-        <p class="small shareLead">High-distribution card for social sharing with generated house hero.</p>
+        <p class="small shareLead" id="shareLead">High-distribution card for social sharing with generated house hero.</p>
 
         <div class="shareGrid">
           <section class="panel shareHeroPanel">
-            <h2 class="sharePanelTitle">🎨 House Hero</h2>
+            <h2 class="sharePanelTitle" id="shareHeroTitle">🎨 House Hero</h2>
             <div class="public-media-preview is-hidden" id="shareMedia">
               <img id="shareMediaImg" data-testid="share-hero-image" alt="Public house image" />
               <div class="small" id="shareMediaPrompt"></div>
             </div>
-            <div class="shareHeroPlaceholder">🏠 Generated Wild-West house image</div>
+            <div class="shareHeroPlaceholder" id="shareHeroPlaceholder">🏠 Generated Wild-West house image</div>
           </section>
 
           <section class="panel shareTeamPanel">
-            <h2 class="sharePanelTitle">👤 Team</h2>
+            <h2 class="sharePanelTitle" id="shareTeamTitle">👤 Team</h2>
             <div class="shareTeamCard">
               <span class="pill" id="teamLine" data-testid="team-line">human: … | agent: …</span>
             </div>
@@ -68,7 +68,10 @@
     </section>
   </div>
 
-  <script src="/share_public.js?v=20260204"></script>
+  <script src="/experience_profiles.js?v=20260310c"></script>
+  <script src="/experience_runtime.js?v=20260310c"></script>
+  <script src="/i18n.js?v=20260310c"></script>
+  <script src="/share_public.js?v=20260310c"></script>
   <script src="/agent_panel.js?v=20260213"></script>
 </body>
 </html>
