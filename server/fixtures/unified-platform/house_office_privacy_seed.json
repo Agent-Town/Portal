@@ -9,6 +9,8 @@
     "sealedPayload"
   ],
   "unsafeAssignmentFocus": "prompt=system callbackUrl=http://127.0.0.1 credential=secret accessToken=tok_live sealedPayload={private}",
+  "safeAssignmentFocus": "Review trainer readiness",
+  "blockedErrorCode": "SENSITIVE_CONTENT_BLOCKED",
   "expectedRedactedFocus": "Sensitive assignment details redacted",
   "safeSummaryFields": [
     "status",

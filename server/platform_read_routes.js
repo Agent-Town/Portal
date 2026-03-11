@@ -231,10 +231,35 @@ function registerPlatformReadRoutes(app, deps) {
       .filter(Boolean);
   }
 
+  function findHouseOfficeSensitiveMarkers(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return [];
+    const lower = normalized.toLowerCase();
+    const matches = new Set();
+    const matcherByMarker = {
+      prompt: /\bprompt\s*[:=]/i,
+      callbackurl: /\bcallback(?:url)?\s*[:=]\s*https?:\/\/\S+/i,
+      credential: /\bcredential\s*[:=]/i,
+      accesstoken: /\baccess(?:[_ -]?token)?\s*[:=]/i,
+      sealedpayload: /\bsealed(?:[_ -]?payload)?\s*[:=]/i,
+    };
+    for (const marker of getHouseOfficeForbiddenMarkers()) {
+      const normalizedMarker = String(marker || '').trim().toLowerCase();
+      if (!normalizedMarker) continue;
+      const matcher = matcherByMarker[normalizedMarker];
+      if (matcher && matcher.test(normalized)) {
+        matches.add(normalizedMarker);
+        continue;
+      }
+      if (lower.includes(normalizedMarker)) {
+        matches.add(normalizedMarker);
+      }
+    }
+    return Array.from(matches);
+  }
+
   function houseOfficeTextHasForbiddenMarker(value) {
-    const normalized = String(value || '').trim().toLowerCase();
-    if (!normalized) return false;
-    return getHouseOfficeForbiddenMarkers().some((marker) => normalized.includes(marker));
+    return findHouseOfficeSensitiveMarkers(value).length > 0;
   }
 
   function sanitizeHouseOfficeText(value, fallback = 'Sensitive details redacted') {
@@ -2225,6 +2250,21 @@ function registerPlatformReadRoutes(app, deps) {
     const staffAgent = staffAgents.find((entry) => String(entry?.staffAgentId || '').trim() === staffAgentId) || null;
     if (!staffAgent) {
       return sendPortalApiError(res, 404, 'STAFF_AGENT_NOT_FOUND', 'House Office does not know that staff agent.', { requestId });
+    }
+    const blockedMarkers = findHouseOfficeSensitiveMarkers(focus);
+    if (blockedMarkers.length) {
+      return sendPortalApiError(
+        res,
+        400,
+        'SENSITIVE_CONTENT_BLOCKED',
+        'House Office focus cannot include secret-like markers or callback details.',
+        {
+          requestId,
+          details: {
+            blockedMarkers,
+          },
+        }
+      );
     }
     const sourceResolution = resolveHouseOfficeAssignmentSource({
       houseId,

@@ -87,6 +87,31 @@ async function exportPlatformSnapshot(request) {
   }
 }
 
+async function inspectHouseOfficePrivacyStorage(request, {
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const exported = await exportPlatformSnapshot(request);
+  const rows = Array.isArray(exported?.json?.snapshot?.tables?.house_staff_assignments)
+    ? exported.json.snapshot.tables.house_staff_assignments
+    : [];
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const filteredRows = rows.filter((row) => {
+    const rowHouseId = String(row?.house_id || '').trim();
+    const rowTeamId = String(row?.team_id || '').trim();
+    if (normalizedHouseId && rowHouseId !== normalizedHouseId) return false;
+    if (normalizedTeamId && rowTeamId !== normalizedTeamId) return false;
+    return true;
+  });
+  return {
+    ok: exported?.status === 200 && exported?.json?.ok === true,
+    rowCount: filteredRows.length,
+    rows: filteredRows,
+    snapshot: exported?.json?.snapshot || null,
+  };
+}
+
 async function importPlatformSnapshot(request, snapshot, { reset = true } = {}) {
   const response = await request.post('/__test__/platform-import', {
     headers: {
@@ -845,6 +870,7 @@ module.exports = {
   getPlatformTraceSummary,
   getRouteManifest,
   importPlatformSnapshot,
+  inspectHouseOfficePrivacyStorage,
   listPlatformFixtures,
   listPlatformExperiences,
   attachHouseToPageSession,

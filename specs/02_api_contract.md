@@ -1163,6 +1163,7 @@ Stable error codes:
 - `OFFICE_NOT_FOUND`
 - `STAFF_AGENT_NOT_FOUND`
 - `INVALID_ARGUMENT`
+- `SENSITIVE_CONTENT_BLOCKED`
 - `SOURCE_REF_KIND_UNSUPPORTED`
 - `SOURCE_REF_NOT_FOUND`
 - `SOURCE_REF_SCOPE_MISMATCH`
@@ -1192,6 +1193,7 @@ Response fields:
 - `data.sourceRefs[].sourceId`
 - `data.sourceRefs[].entryPath`
 - `data.sourceRefs[].selection.kind`
+- `error.details.blockedMarkers[]`
 
 ### GET `/api/platform/tracks` (human)
 Returns deterministic track progress and durable reward-hook references for the currently attached House and active team.

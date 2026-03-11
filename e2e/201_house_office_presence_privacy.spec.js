@@ -6,7 +6,9 @@ const {
   attachHouseToPageSession,
   createPlatformConfigVersion,
   createPlatformTrainerJob,
+  exportPlatformSnapshot,
   getPlatformFixture,
+  importPlatformSnapshot,
   promotePlatformConfigVersion,
   readWorkerSessionId,
 } = require('./helpers/unified_platform');
@@ -101,34 +103,36 @@ test('M29.6: House Office redacts unsafe focus text and keeps safe deep links de
   const trainerJobId = String(trainerJob.json?.data?.trainerJobId || '');
   expect(trainerResultId).toMatch(/^trr_/);
 
-  const createResponse = await page.request.post('/api/platform/house-office/assignments', {
-    data: {
-      officeId,
-      staffAgentId,
-      focus: unsafeAssignmentFocus,
+  const exported = await exportPlatformSnapshot(request);
+  expect(exported.status).toBe(200);
+  const snapshot = exported.json?.snapshot || null;
+  expect(snapshot?.schemaVersion).toBe('platform-export/v1');
+  snapshot.tables.house_staff_assignments.push({
+    assignment_id: 'assign_house_office_privacy_seed_01',
+    house_id: seededHouse.houseId,
+    team_id: 'team_main',
+    office_id: officeId,
+    staff_agent_id: staffAgentId,
+    focus: unsafeAssignmentFocus,
+    source_kind: 'trainer_result',
+    source_id: trainerResultId,
+    source_ref_json: JSON.stringify({
       sourceKind: 'trainer_result',
       sourceId: trainerResultId,
-    },
-    failOnStatusCode: false,
-  });
-  expect(createResponse.status()).toBe(200);
-  const createBody = await createResponse.json();
-  expect(createBody?.data).toMatchObject({
-    officeId,
-    staffAgentId,
-    sourceKind: 'trainer_result',
-    sourceId: trainerResultId,
-    focus: expectedRedactedFocus,
-    deepLink: expect.objectContaining({
-      kind: 'house_surface',
-      surface: 'trainer',
+      entryPath: '/api/platform/trainer',
       selection: {
         kind: 'trainer_result',
         trainerResultId,
         trainerJobId,
       },
     }),
+    idempotency_key: 'house-office-privacy-import-001',
+    started_at: '2026-03-11T00:00:00.000Z',
+    created_at: '2026-03-11T00:00:00.000Z',
+    updated_at: '2026-03-11T00:00:00.000Z',
   });
+  const imported = await importPlatformSnapshot(request, snapshot, { reset: false });
+  expect(imported.status).toBe(200);
 
   const firstReadResponse = await page.request.get('/api/platform/house-office');
   expect(firstReadResponse.ok()).toBe(true);
