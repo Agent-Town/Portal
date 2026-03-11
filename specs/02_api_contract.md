@@ -1203,8 +1203,53 @@ Stable failure codes:
 - `TRACE_NOT_FOUND`
 - `TRAINER_RESULT_NOT_FOUND`
 
+### GET `/api/platform/library/public-stacks/search` (human)
+Searches same-shell Public Stacks from inside House Library by reusing the Registry grouped search contract. The UI stays on `/app` while the results remain deterministic in seeded test mode.
+
+Query params:
+- `q` (optional search text)
+- `family` (optional Registry family slug)
+
+Response fields:
+- `data.query`
+- `data.family`
+- `data.resultCount`
+- `data.groups[]`
+- `data.groups[].familySlug`
+- `data.groups[].familyTitle`
+- `data.groups[].members[]`
+- `data.results[]`
+- `data.results[].registryId`
+- `data.results[].familySlug`
+- `data.results[].displayName`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
+### GET `/api/platform/library/public-stacks/preview/:registryEntityId` (human)
+Reads one same-shell Public Stack preview by reusing the Registry entity and proof surfaces before import. The preview is meant for guided import and provenance review, not for standalone page navigation.
+
+Response fields:
+- `data.preview`
+- `data.preview.registryId`
+- `data.preview.registryEntityId`
+- `data.preview.displayName`
+- `data.preview.family`
+- `data.preview.familyTitle`
+- `data.preview.entityVersionId`
+- `data.preview.provenance`
+- `data.preview.provenance.proofCardCount`
+- `data.preview.provenance.loadoutCount`
+- `data.preview.provenance.bundleCount`
+- `data.preview.provenance.summary`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+- `REGISTRY_ENTITY_REQUIRED`
+- `REGISTRY_ENTITY_NOT_FOUND`
+
 ### POST `/api/platform/library/imports` (human)
-Imports one public Registry artifact into House Library as a local, read-only curated item with explicit Registry provenance. The first pass imports one Registry entity at a time and replays idempotently by `Idempotency-Key`.
+Imports one public Registry artifact into House Library as a local, read-only curated item with explicit Registry provenance. The first pass imports one Registry entity at a time and replays idempotently by `Idempotency-Key`. In the guided House Library path, the human typically reaches this route from the Public Stacks preview rather than by typing a raw id first.
 
 Request headers:
 - `Idempotency-Key` (required)
@@ -1240,7 +1285,7 @@ Stable failure codes:
 - `REGISTRY_ENTITY_NOT_FOUND`
 
 ### POST `/api/platform/library/publications` (human)
-Publishes one curated House Library item to Registry using an approval-gated, idempotent contract. The first pass keeps Registry as the canonical public surface and creates exactly one durable publication row per idempotency key.
+Publishes one curated House Library item to Registry using an approval-gated, idempotent contract. The first pass keeps Registry as the canonical public surface and creates exactly one durable publication row per idempotency key. The guided House Library publish flow uses this route without changing the durable publication contract.
 
 Request headers:
 - `Idempotency-Key` (required)

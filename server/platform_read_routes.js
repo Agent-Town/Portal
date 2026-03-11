@@ -26,9 +26,11 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryShelfByIdempotency,
     getLibraryPublicationByIdempotency,
     getRegistryEntityById,
+    getRegistryProofByRegistryId,
     getSealedContextById,
     getScopeSetById,
     getScopeSetByIdempotency,
+    getUnifiedPlatformRegistryPreviewSnapshot,
     getUnifiedPlatformTestFixture,
     listConversationArtifacts,
     getTeamConfigBinding,
@@ -64,8 +66,10 @@ function registerPlatformReadRoutes(app, deps) {
     resolveHumanSessionWithRecovery,
     resolvePlatformTrainerLinkedConfigVersionId,
     resolveSessionPlatformContext,
+    searchRegistryFamilyGroups,
     sendPortalApiError,
     sendPortalApiSuccess,
+    setUnifiedPlatformRegistryPreviewSnapshot,
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
@@ -539,6 +543,79 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function flattenPublicStackSearchGroups(groups = []) {
+    const source = Array.isArray(groups) ? groups : [];
+    return source.flatMap((group) => {
+      const familySlug = String(group?.familySlug || group?.family || '').trim() || 'unscoped';
+      const familyTitle = String(group?.familyTitle || familySlug).trim() || familySlug;
+      const familyStatus = String(group?.familyStatus || 'unknown').trim() || 'unknown';
+      const members = Array.isArray(group?.members) ? group.members : [];
+      return members.map((member) => ({
+        registryId: String(member?.registryEntityId || member?.registryId || '').trim(),
+        registryEntityId: String(member?.registryEntityId || member?.registryId || '').trim(),
+        familySlug,
+        familyTitle,
+        familyStatus,
+        displayName: String(member?.displayName || member?.slug || member?.registryEntityId || '').trim(),
+        description: String(member?.description || '').trim() || null,
+        entityKind: String(member?.entityKind || '').trim() || null,
+        storefront: member?.storefront && typeof member.storefront === 'object'
+          ? member.storefront
+          : {},
+      })).filter((entry) => entry.registryEntityId);
+    });
+  }
+
+  function buildPublicStackPreviewPayload({
+    registryEntityId = '',
+  } = {}) {
+    const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+    const entity = getRegistryEntityById(normalizedRegistryEntityId);
+    if (!entity) {
+      return {
+        ok: false,
+        code: 'REGISTRY_ENTITY_NOT_FOUND',
+        message: 'Registry artifact not found.',
+      };
+    }
+    const proof = getRegistryProofByRegistryId(normalizedRegistryEntityId);
+    const proofCards = Array.isArray(proof?.proofCards) ? proof.proofCards : [];
+    const loadouts = Array.isArray(proof?.loadouts) ? proof.loadouts : [];
+    const bundles = Array.isArray(proof?.bundles) ? proof.bundles : [];
+    return {
+      ok: true,
+      preview: {
+        registryId: String(entity.registryId || entity.registryEntityId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+        registryEntityId: String(entity.registryEntityId || entity.registryId || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+        displayName: String(entity.displayName || entity.slug || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId,
+        description: String(entity.description || '').trim() || null,
+        entityKind: String(entity.entityKind || '').trim() || null,
+        family: String(entity.familySlug || entity.family || '').trim() || null,
+        familyTitle: String(entity?.familyInfo?.displayName || entity.familySlug || entity.family || '').trim() || null,
+        entityVersionId: String(entity.entityVersionId || '').trim() || null,
+        versionLabel: String(entity.versionLabel || '').trim() || null,
+        storefront: entity?.storefront && typeof entity.storefront === 'object'
+          ? entity.storefront
+          : {},
+        provenance: {
+          proofCardCount: proofCards.length,
+          loadoutCount: loadouts.length,
+          bundleCount: bundles.length,
+          proofSourceKinds: Array.from(new Set(
+            proofCards
+              .map((card) => String(card?.sourceKind || card?.evidence?.sourceKind || '').trim())
+              .filter(Boolean)
+          )),
+          summary: String(
+            proofCards[0]?.summary
+            || proofCards[0]?.evidence?.summary
+            || ''
+          ).trim() || `Proof cards ${proofCards.length}, loadouts ${loadouts.length}, bundles ${bundles.length}.`,
+        },
+      },
+    };
+  }
+
   function persistLibraryItemRecord({
     houseId = '',
     teamId = '',
@@ -1001,6 +1078,57 @@ function registerPlatformReadRoutes(app, deps) {
     const requestId = buildPortalRequestId();
     const pack = buildHouseLibraryCompiledSkillPack();
     return sendPortalApiSuccess(res, pack.manifest, { requestId });
+  });
+
+  app.get('/api/platform/library/public-stacks/search', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const query = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
+    const family = typeof req.query?.family === 'string' ? req.query.family.trim() : '';
+    const groups = searchRegistryFamilyGroups({ query, family });
+    const results = flattenPublicStackSearchGroups(groups);
+    setUnifiedPlatformRegistryPreviewSnapshot({
+      query,
+      family,
+      resultCount: results.length,
+      selectedRegistryId: null,
+      preview: null,
+    });
+    return sendPortalApiSuccess(res, {
+      query,
+      family,
+      resultCount: results.length,
+      groups,
+      results,
+    }, { requestId });
+  });
+
+  app.get('/api/platform/library/public-stacks/preview/:registryEntityId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to preview a Public Stack.', { requestId });
+    }
+    const preview = buildPublicStackPreviewPayload({ registryEntityId });
+    if (!preview.ok) {
+      return sendPortalApiError(res, 404, preview.code || 'REGISTRY_ENTITY_NOT_FOUND', preview.message || 'Registry artifact not found.', { requestId });
+    }
+    const priorPreview = getUnifiedPlatformRegistryPreviewSnapshot();
+    setUnifiedPlatformRegistryPreviewSnapshot({
+      query: String(priorPreview?.query || '').trim(),
+      family: String(priorPreview?.family || '').trim(),
+      resultCount: Math.max(0, Number(priorPreview?.resultCount || 0)),
+      selectedRegistryId: String(preview.preview?.registryId || preview.preview?.registryEntityId || registryEntityId).trim() || registryEntityId,
+      preview: preview.preview,
+    });
+    return sendPortalApiSuccess(res, preview, { requestId });
   });
 
   app.get('/api/platform/pack-compatibility', (_req, res) => {

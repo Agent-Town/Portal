@@ -10,6 +10,11 @@
       "familySlug": "registry",
       "displayName": "Registry",
       "status": "ready"
+    },
+    {
+      "familySlug": "skill",
+      "displayName": "Skills",
+      "status": "ready"
     }
   ],
   "groupedSearch": [
@@ -30,6 +35,20 @@
         {
           "registryEntityId": "reg_registry_catalog",
           "slug": "registry-catalog"
+        }
+      ]
+    },
+    {
+      "familySlug": "skill",
+      "familyTitle": "Skills",
+      "members": [
+        {
+          "registryEntityId": "reg_atlas_skill_02",
+          "slug": "atlas-planner"
+        },
+        {
+          "registryEntityId": "reg_atlas_skill_01",
+          "slug": "atlas-scout"
         }
       ]
     }

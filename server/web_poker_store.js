@@ -446,6 +446,16 @@ function seedRegistryFamilies() {
       },
     },
     {
+      familySlug: 'skill',
+      displayName: 'Skills',
+      description: 'Reusable public skill cards that can be previewed and imported into House Library.',
+      status: 'ready',
+      health: {
+        readiness: 'ready',
+        seededEntityCount: 2,
+      },
+    },
+    {
       familySlug: 'registry',
       displayName: 'Registry',
       description: 'Registry-owned capability and storefront discovery surfaces.',
@@ -497,6 +507,32 @@ function seedRegistryEntities() {
         origin: 'https://github.com',
         pageClass: 'issue_detail',
         capabilities: ['draft_reply', 'submit_reply'],
+      },
+    },
+    {
+      registryEntityId: 'reg_atlas_skill_01',
+      entityKind: 'skill',
+      family: 'skill',
+      slug: 'atlas-scout',
+      displayName: 'Atlas Scout',
+      description: 'Atlas scouting skill for opening safe district previews and keeping route notes in plain language.',
+      projection: {
+        district: 'atlas',
+        capabilities: ['search', 'preview', 'summarize'],
+        audience: 'non-technical',
+      },
+    },
+    {
+      registryEntityId: 'reg_atlas_skill_02',
+      entityKind: 'skill',
+      family: 'skill',
+      slug: 'atlas-planner',
+      displayName: 'Atlas Planner',
+      description: 'Atlas planning skill for comparing routes, checkpoints, and district readiness before a trip.',
+      projection: {
+        district: 'atlas',
+        capabilities: ['compare', 'plan', 'checkpoint'],
+        audience: 'non-technical',
       },
     },
     {
@@ -553,6 +589,26 @@ function seedRegistryEntityVersions() {
         origin: 'https://github.com',
         pageClass: 'issue_detail',
         capabilities: ['draft_reply', 'submit_reply'],
+      },
+    },
+    {
+      entityVersionId: 'rev_atlas_skill_01_v1',
+      registryEntityId: 'reg_atlas_skill_01',
+      versionLabel: 'v1',
+      projection: {
+        district: 'atlas',
+        capabilities: ['search', 'preview', 'summarize'],
+        audience: 'non-technical',
+      },
+    },
+    {
+      entityVersionId: 'rev_atlas_skill_02_v1',
+      registryEntityId: 'reg_atlas_skill_02',
+      versionLabel: 'v1',
+      projection: {
+        district: 'atlas',
+        capabilities: ['compare', 'plan', 'checkpoint'],
+        audience: 'non-technical',
       },
     },
     {
@@ -616,6 +672,48 @@ function seedRegistryProofs() {
         browserClass: {
           divisionSlug: 'browser-class',
           runnerKind: 'browser',
+        },
+      },
+    },
+    {
+      proofId: 'proof_atlas_skill_01',
+      registryEntityId: 'reg_atlas_skill_01',
+      sourceKind: 'library',
+      evidence: {
+        evidenceId: 'library_evidence_atlas_skill_01',
+        sourceKind: 'library',
+        linkedAt: '2026-03-07T10:00:00.000Z',
+        summary: 'Seeded public skill card with provenance suitable for Public Stacks preview.',
+        library: {
+          publicationId: 'pub_fixture_atlas_skill_01',
+          registryId: 'reg_atlas_skill_01',
+          trustLabels: ['public', 'provenance_shown'],
+        },
+        safety: {
+          sourceKind: 'library',
+          flags: ['human_reviewed'],
+          policyLabels: ['provenance_visible'],
+        },
+      },
+    },
+    {
+      proofId: 'proof_atlas_skill_02',
+      registryEntityId: 'reg_atlas_skill_02',
+      sourceKind: 'library',
+      evidence: {
+        evidenceId: 'library_evidence_atlas_skill_02',
+        sourceKind: 'library',
+        linkedAt: '2026-03-07T10:05:00.000Z',
+        summary: 'Seeded public planning card with visible provenance for import preview.',
+        library: {
+          publicationId: 'pub_fixture_atlas_skill_02',
+          registryId: 'reg_atlas_skill_02',
+          trustLabels: ['public', 'provenance_shown'],
+        },
+        safety: {
+          sourceKind: 'library',
+          flags: ['human_reviewed'],
+          policyLabels: ['provenance_visible'],
         },
       },
     },

@@ -148,11 +148,11 @@
 </div>
 
 <div class="panel is-hidden" id="houseLibraryPanel" data-testid="house-library-panel">
-  <h2 style="margin:0 0 6px">House Library</h2>
+  <h2 style="margin:0 0 6px">Library</h2>
   <p class="small" style="margin-top:0" data-testid="house-library-copy">
     Choose what the agent may use in this chat.
   </p>
-  <div class="small" style="margin:10px 0 4px;">Librarian Desk</div>
+  <h3 class="small" style="margin:10px 0 4px;">Librarian Desk</h3>
   <div class="kv stack" data-testid="house-library-note-composer" style="margin-bottom:8px;">
     <label class="small" for="houseLibraryNoteTitleInput">Title</label>
     <input
@@ -178,7 +178,7 @@
     </div>
     <div class="small" id="houseLibraryComposerStatus" data-testid="house-library-composer-status">Writing a new local note.</div>
   </div>
-  <div class="small" style="margin:10px 0 4px;">Conversation Capture</div>
+  <h3 class="small" style="margin:10px 0 4px;">Conversation Capture</h3>
   <div class="kv stack" data-testid="house-library-capture-desk" style="margin-bottom:8px;">
     <label class="small" for="houseLibraryCaptureTitleInput">Capture title</label>
     <input
@@ -204,7 +204,7 @@
   </div>
   <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
   <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
-  <div class="small" style="margin:10px 0 4px;">Shelves</div>
+  <h3 class="small" style="margin:10px 0 4px;">Shelves</h3>
   <div class="kv" data-testid="house-library-shelf-create-controls" style="margin:8px 0;">
     <label class="small" for="houseLibraryShelfTitleInput">New shelf</label>
     <input
@@ -229,7 +229,7 @@
     </select>
   </div>
   <div class="kv stack" id="houseLibraryShelves" data-testid="house-library-shelves" style="margin-bottom:8px;"></div>
-  <div class="small" style="margin:10px 0 4px;">Reading Tables</div>
+  <h3 class="small" style="margin:10px 0 4px;">Reading Table</h3>
   <div class="small" id="houseLibraryScopeEmpty" data-testid="house-library-scope-empty">No saved Reading Tables yet.</div>
   <div class="kv" data-testid="house-library-satchel-controls" style="margin:8px 0;">
     <label class="small" for="houseLibrarySatchelTitleInput">Save Satchel</label>
@@ -244,6 +244,51 @@
     <button class="btn" id="houseLibrarySaveSatchelBtn" type="button" data-testid="house-library-save-satchel">Save Satchel</button>
   </div>
   <div class="kv stack" id="houseLibraryScopeSets" data-testid="house-library-scope-sets" style="margin-bottom:8px;"></div>
+  <h3 class="small" style="margin:10px 0 4px;">Public Stacks</h3>
+  <div class="kv" data-testid="house-library-public-stacks-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibraryPublicStacksQueryInput">Search</label>
+    <input
+      id="houseLibraryPublicStacksQueryInput"
+      data-testid="house-library-public-stacks-query"
+      class="pixel-input"
+      type="text"
+      placeholder="atlas"
+      autocomplete="off"
+      style="flex:1; min-width:0;"
+    />
+    <label class="small" for="houseLibraryPublicStacksFamilySelect">Family</label>
+    <select id="houseLibraryPublicStacksFamilySelect" data-testid="house-library-public-stacks-family" class="pixel-input">
+      <option value="">All</option>
+      <option value="skill">Skills</option>
+      <option value="developer_workflows">Developer Workflows</option>
+      <option value="registry">Registry</option>
+    </select>
+    <button class="btn" id="houseLibraryPublicStacksSearchBtn" type="button" data-testid="house-library-public-stacks-search">Search Public Stacks</button>
+  </div>
+  <div class="small" id="houseLibraryPublicStacksEmpty" data-testid="house-library-public-stacks-empty">Search Public Stacks without leaving this room.</div>
+  <div class="kv stack" id="houseLibraryPublicStacksResults" data-testid="house-library-public-stacks-results" style="margin-bottom:8px;"></div>
+  <div class="small" id="houseLibraryRegistryPreview" data-testid="house-library-registry-preview">Select a Public Stack to preview its provenance.</div>
+  <h3 class="small" style="margin:10px 0 4px;">Exchange Counter</h3>
+  <div class="kv stack" id="houseLibraryExchangeWizard" data-testid="house-library-exchange-wizard" style="margin-bottom:8px;">
+    <div class="small" id="houseLibraryExchangeSummary" data-testid="house-library-exchange-summary">Choose a local Library item or a Public Stack to prepare an exchange.</div>
+    <div class="kv" data-testid="house-library-guided-publish-controls">
+      <label class="small" for="houseLibraryGuidedApprovalInput">Approval ID</label>
+      <input
+        id="houseLibraryGuidedApprovalInput"
+        data-testid="house-library-guided-approval-input"
+        class="pixel-input"
+        type="text"
+        placeholder="appr_..."
+        autocomplete="off"
+        style="flex:1; min-width:0;"
+      />
+      <button class="btn" id="houseLibraryGuidedPublishBtn" type="button" data-testid="house-library-guided-publish-button">Publish from Guide</button>
+    </div>
+    <div class="kv" data-testid="house-library-guided-import-controls">
+      <button class="btn" id="houseLibraryGuidedImportBtn" type="button" data-testid="house-library-guided-import-button">Import from Guide</button>
+    </div>
+  </div>
+  <div class="small" style="margin:10px 0 4px;">Direct Registry ID</div>
   <div class="kv" style="margin:8px 0;" data-testid="house-library-import-controls">
     <label class="small" for="houseLibraryImportInput">Registry ID</label>
     <input
@@ -256,6 +301,7 @@
     />
     <button class="btn" id="houseLibraryImportBtn" type="button" data-testid="house-library-import-button" disabled>Import to Library</button>
   </div>
+  <div class="small" style="margin:10px 0 4px;">Direct Publish</div>
   <div class="kv" style="margin:8px 0;" data-testid="house-library-publish-controls">
     <label class="small" for="houseLibraryApprovalInput">Approval ID</label>
     <input
@@ -271,10 +317,10 @@
   </div>
   <div class="kv stack" id="houseLibraryList" data-testid="house-library-list"></div>
   <div class="small" id="houseLibraryDetail" data-testid="house-library-detail">Select a Library item to inspect its shelf and source.</div>
-  <div class="small" style="margin:10px 0 4px;">Revision History</div>
+  <h3 class="small" style="margin:10px 0 4px;">Revision History</h3>
   <div class="kv stack" id="houseLibraryRevisions" data-testid="house-library-revisions"></div>
   <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>
-  <div class="small" id="houseLibraryActionStatus" data-testid="house-library-action-status" style="margin-top:8px; min-height:1.4em;"></div>
+  <div class="small" id="houseLibraryActionStatus" data-testid="house-library-action-status" role="status" aria-live="polite" style="margin-top:8px; min-height:1.4em;"></div>
 </div>
 
 <div class="panel is-hidden" id="houseTracksPanel" data-testid="house-tracks-panel">

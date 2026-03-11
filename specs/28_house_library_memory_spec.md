@@ -595,10 +595,12 @@ Recommended initial route family:
 1. `GET /api/platform/library`
 2. `POST /api/platform/library/items`
 3. `GET /api/platform/library/items/:libraryItemId`
-4. `POST /api/platform/library/scope`
-5. `GET /api/platform/library/scope`
-6. `POST /api/platform/library/publications`
-7. `POST /api/platform/library/imports`
+4. `GET /api/platform/library/public-stacks/search`
+5. `GET /api/platform/library/public-stacks/preview/:registryEntityId`
+6. `POST /api/platform/library/scope`
+7. `GET /api/platform/library/scope`
+8. `POST /api/platform/library/publications`
+9. `POST /api/platform/library/imports`
 
 Recommended initial tables:
 
@@ -768,6 +770,12 @@ Execution mapping:
 5. `M29.12` House Library Registry import shell
    - same-shell Library controls can import one Registry artifact and replay idempotently without leaving `/app`
 6. `M29.13` House Library Registry publish shell
+7. `M30.6` Public Stacks browse and preview
+   - same-shell Library controls can search Public Stacks and preview Registry provenance without leaving `/app` or rotating the worker session
+8. `M30.7` Guided exchange counter
+   - Library exposes a guided publish/import path with trust labels, duplicate handling, and approval state while the raw M29 controls remain available as a fallback
+9. `M30.8` Pixel-RPG copy and accessibility
+   - Library keeps plain-language `Library`, `Reading Table`, and `Public Stacks` headings while one live status region reports guided import/publish outcomes in assistive-friendly form
    - same-shell Library controls can publish the selected item to Registry with approval-gated replay
 7. `M29.15` Saved Reading Table reopen shell
    - the Library panel exposes saved Reading Tables so a later House return can reopen one explicit prior scope set and bring it back into chat without silent scope widening
