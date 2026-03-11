@@ -54,9 +54,12 @@ const {
   createEvidence,
   createInvocation,
   createOilLedgerEntry,
+  createPokerPlayAction,
+  createPokerPlayMessage,
   createWebSession,
   decideApproval,
   getActiveCredentialGrant,
+  getActivePokerPlaySeatByWalletSubject,
   getApprovalById,
   getCentaurEntryById,
   getCentaurEntryByWalletSubject,
@@ -68,9 +71,14 @@ const {
   getLatestCheckpointForSession,
   getLatestPokerLeaderboardSnapshot,
   getCurrentCentaurHandForEntry,
+  getCurrentPokerPlayHandForTable,
   getOilSnapshotEventByVerificationAndScheduledFor,
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
+  getPokerPlayHandById,
+  getPokerPlaySeatByTableAndNumber,
+  getPokerPlaySeatByWalletSubject,
+  getPokerPlayTableById,
   getPokerReplayArtifactByRunId,
   getRegistryEntityById,
   getPokerRunById,
@@ -91,17 +99,25 @@ const {
   listEvidenceForSession,
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
+  listPokerPlayActionsByHand,
+  listPokerPlayMessagesByHand,
+  listPokerPlaySeatsByTable,
+  listPokerPlayTables,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  deletePokerPlaySeat,
   upsertCentaurEntry,
   upsertCentaurHand,
   upsertCentaurTournament,
   upsertOilSnapshotEvent,
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
+  upsertPokerPlayHand,
+  upsertPokerPlaySeat,
+  upsertPokerPlayTable,
   upsertPokerReplayArtifact,
   upsertPokerRun,
   upsertPokerSeason,
@@ -4303,14 +4319,18 @@ registerPokerRoutes(app, {
   createCentaurAction,
   createCentaurMessage,
   createOilLedgerEntry,
+  createPokerPlayAction,
+  createPokerPlayMessage,
   createPortalPokerOperatorClient,
   express,
+  getActivePokerPlaySeatByWalletSubject,
   getCentaurEntryById,
   getCentaurEntryByWalletSubject,
   getCentaurHandById,
   getCentaurTournamentById,
   getLatestPokerLeaderboardSnapshot,
   getCurrentCentaurHandForEntry,
+  getCurrentPokerPlayHandForTable,
   getOilSnapshotEventByVerificationAndScheduledFor,
   getPokerOperatorServiceToken,
   getPokerReplayArtifactByRunId,
@@ -4318,6 +4338,10 @@ registerPokerRoutes(app, {
   getPokerSeasonById,
   getPokerSubmissionById,
   getPokerSubmissionByRequest,
+  getPokerPlayHandById,
+  getPokerPlaySeatByTableAndNumber,
+  getPokerPlaySeatByWalletSubject,
+  getPokerPlayTableById,
   getStreamflowVerificationById,
   getStreamflowVerificationByProviderAndStream,
   getStreamflowVerificationByWalletAndStream,
@@ -4329,6 +4353,10 @@ registerPokerRoutes(app, {
   listCentaurTournaments,
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
+  listPokerPlayActionsByHand,
+  listPokerPlayMessagesByHand,
+  listPokerPlaySeatsByTable,
+  listPokerPlayTables,
   listPokerSeasons,
   normalizePortalIdempotencyKey,
   nowIso,
@@ -4343,12 +4371,16 @@ registerPokerRoutes(app, {
   sendPortalApiSuccess,
   summarizeMirroredPokerSeason,
   syncPokerMirrorFromOperator,
+  deletePokerPlaySeat,
   upsertCentaurEntry,
   upsertCentaurHand,
   upsertCentaurTournament,
   upsertOilSnapshotEvent,
   upsertPokerSeason,
   upsertPokerSubmission,
+  upsertPokerPlayHand,
+  upsertPokerPlaySeat,
+  upsertPokerPlayTable,
   upsertStreamflowVerification,
   verifySolanaSignature,
 });
@@ -11664,7 +11696,7 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
+app.get(['/poker', '/poker/play', '/poker/play/tables/:tableId', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }
@@ -11710,6 +11742,7 @@ app.get('/inbox/:houseId', (_req, res) => sendHtmlNoStore(res, 'inbox.html'));
 app.get('/claim', (_req, res) => res.redirect(302, '/claim-wallet'));
 app.get('/claim-wallet', (_req, res) => sendHtmlNoStore(res, 'claim-wallet.html'));
 app.get('/house', (_req, res) => sendHtmlNoStore(res, 'house.html'));
+app.get('/town', (_req, res) => sendHtmlNoStore(res, 'town.html'));
 app.get('/leaderboard', (_req, res) => sendHtmlNoStore(res, 'leaderboard.html'));
 app.get('/trainer', (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {

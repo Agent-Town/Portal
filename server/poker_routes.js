@@ -21,6 +21,15 @@ const {
   resolveStreamflowLockStatus,
   seedStreamflowFixtureState,
 } = require('./streamflow_adapter');
+const {
+  createRouteError,
+  getTableDetail,
+  leaveTable,
+  listTables,
+  postAction,
+  postMessage,
+  seatIntoTable,
+} = require('./poker_play_service');
 
 const STREAMFLOW_VERIFY_NONCE_TTL_MS = 15 * 60 * 1000;
 
@@ -153,16 +162,24 @@ function registerPokerRoutes(app, deps) {
     createCentaurAction,
     createCentaurMessage,
     createOilLedgerEntry,
+    createPokerPlayAction,
+    createPokerPlayMessage,
     createPortalPokerOperatorClient,
     express,
+    getActivePokerPlaySeatByWalletSubject,
     getCentaurEntryById,
     getCentaurEntryByWalletSubject,
     getCentaurHandById,
     getCentaurTournamentById,
     getCurrentCentaurHandForEntry,
+    getCurrentPokerPlayHandForTable,
     getLatestPokerLeaderboardSnapshot,
     getOilSnapshotEventByVerificationAndScheduledFor,
     getPokerOperatorServiceToken,
+    getPokerPlayHandById,
+    getPokerPlaySeatByTableAndNumber,
+    getPokerPlaySeatByWalletSubject,
+    getPokerPlayTableById,
     getPokerReplayArtifactByRunId,
     getPokerRunById,
     getPokerSeasonById,
@@ -179,10 +196,15 @@ function registerPokerRoutes(app, deps) {
     listCentaurTournaments,
     listOilLedgerEntriesByWalletSubject,
     listOilSnapshotEventsByVerificationAndHour,
+    listPokerPlayActionsByHand,
+    listPokerPlayMessagesByHand,
+    listPokerPlaySeatsByTable,
+    listPokerPlayTables,
     listPokerSeasons,
     normalizePortalIdempotencyKey,
     nowIso,
     randomHex,
+    deletePokerPlaySeat,
     requireBoundHumanSession,
     resolveHumanSessionWithRecovery,
     resolvePrimaryWalletSubject,
@@ -195,6 +217,9 @@ function registerPokerRoutes(app, deps) {
     upsertCentaurHand,
     upsertCentaurTournament,
     upsertOilSnapshotEvent,
+    upsertPokerPlayHand,
+    upsertPokerPlaySeat,
+    upsertPokerPlayTable,
     upsertPokerSeason,
     upsertPokerSubmission,
     upsertStreamflowVerification,
@@ -219,6 +244,31 @@ function registerPokerRoutes(app, deps) {
     upsertOilSnapshotEvent,
     upsertStreamflowVerification,
     getOilSnapshotEventByVerificationAndScheduledFor,
+  };
+
+  const playRouteDeps = {
+    computeOilBalance,
+    createOilLedgerEntry,
+    createPokerPlayAction,
+    createPokerPlayMessage,
+    deletePokerPlaySeat,
+    getActivePokerPlaySeatByWalletSubject,
+    getCurrentPokerPlayHandForTable,
+    getPokerPlayHandById,
+    getPokerPlaySeatByTableAndNumber,
+    getPokerPlaySeatByWalletSubject,
+    getPokerPlayTableById,
+    getStreamflowVerificationByWalletSubject,
+    listPokerPlayActionsByHand,
+    listPokerPlayMessagesByHand,
+    listPokerPlaySeatsByTable,
+    listPokerPlayTables,
+    nowIso,
+    randomHex,
+    resolvePrimaryWalletSubject,
+    upsertPokerPlayHand,
+    upsertPokerPlaySeat,
+    upsertPokerPlayTable,
   };
 
   app.get('/v1/health', respondPokerOperatorTransport);
@@ -449,6 +499,159 @@ function registerPokerRoutes(app, deps) {
       },
       hashVerified: true,
     }, { requestId });
+  });
+
+  app.get('/api/poker/play/tables', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = listTables(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_LIST_FAILED',
+        err?.message || 'Unable to load poker tables.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/tables/:tableId', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = getTableDetail(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_DETAIL_FAILED',
+        err?.message || 'Unable to load poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/sit', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = seatIntoTable(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SIT_FAILED',
+        err?.message || 'Unable to join the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/leave', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = leaveTable(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_LEAVE_FAILED',
+        err?.message || 'Unable to leave the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/hands/:handId/messages', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = postMessage(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_MESSAGE_FAILED',
+        err?.message || 'Unable to post the poker discussion note.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/hands/:handId/actions', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = postAction(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_ACTION_FAILED',
+        err?.message || 'Unable to submit the poker action.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
   });
 
   app.get('/api/poker/centaur/tournaments', async (req, res) => {

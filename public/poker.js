@@ -5,6 +5,7 @@
   const contentEl = document.getElementById('pokerContent');
   const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
   let countdownTimer = null;
+  let liveRefreshTimer = null;
 
   function setTitle(title, subtitle) {
     if (titleEl) titleEl.textContent = title;
@@ -99,8 +100,16 @@
     }
   }
 
+  function clearLiveRefreshTimer() {
+    if (liveRefreshTimer) {
+      window.clearTimeout(liveRefreshTimer);
+      liveRefreshTimer = null;
+    }
+  }
+
   function renderCards(items) {
     clearCountdownTimer();
+    clearLiveRefreshTimer();
     if (!contentEl) return;
     contentEl.innerHTML = '';
     for (const item of items) {
@@ -128,6 +137,59 @@
         <div class="pokerSummaryValue">${escapeHtml(value)}</div>
       </div>
     `;
+  }
+
+  function renderPokerCards(cards) {
+    const items = Array.isArray(cards) ? cards : [];
+    return items.length
+      ? `<div class="pokerCardStrip">${items.map((card) => `<span class="pokerMiniCard">${escapeHtml(card)}</span>`).join('')}</div>`
+      : '<div class="pokerCardStrip"><span class="pokerMiniCard">--</span></div>';
+  }
+
+  function renderSeatMarkers(seats) {
+    const items = Array.isArray(seats) ? seats : [];
+    if (!items.length) return '<p>No seats are filled yet.</p>';
+    return `
+      <div class="pokerStack">
+        ${items.map((seat) => `
+          <div class="pokerRow">
+            <div>
+              <div class="pokerLabel">Seat ${Number(seat.seatNumber || 0)}</div>
+              <div>${escapeHtml(seat.displayName || `Seat ${seat.seatNumber}`)}</div>
+            </div>
+            <div class="pokerMeta">
+              ${seat.isViewer ? '<span class="pokerBadge">you</span>' : ''}
+              ${seat.isActing ? '<span class="pokerBadge">acting</span>' : ''}
+              <span class="pokerBadge">${escapeHtml(seat.status || 'open')}</span>
+              <span class="pokerBadge">${Number(seat.stackOil || 0)} OIL</span>
+              ${seat.folded ? '<span class="pokerBadge">folded</span>' : ''}
+              ${seat.allIn ? '<span class="pokerBadge">all-in</span>' : ''}
+            </div>
+            <div>
+              ${renderPokerCards(Array.isArray(seat.holeCards) && seat.holeCards.length ? seat.holeCards : Array.from({ length: Number(seat.hiddenCardCount || 0) }, () => '??'))}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderActionOptions(actions) {
+    const items = Array.isArray(actions) ? actions : [];
+    return items.length
+      ? items.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('')
+      : '<option value="">No actions</option>';
+  }
+
+  function scheduleLiveTableRefresh(tableId) {
+    clearLiveRefreshTimer();
+    if (!tableId) return;
+    liveRefreshTimer = window.setTimeout(() => {
+      const path = window.location.pathname;
+      if (path === `/poker/play/tables/${tableId}`) {
+        loadPlayTable(tableId, { silent: true }).catch(() => {});
+      }
+    }, 4000);
   }
 
   function renderSnapshotSlots(snapshotState) {
@@ -218,14 +280,33 @@
   }
 
   async function loadIndex() {
-    setTitle('Portal Poker', 'Operator-authoritative seasons and centaur tournaments share one hub.');
+    setTitle('Portal Poker', 'Live 6-max tables, mirrored seasons, and centaur tournaments share one hub.');
     setStatus('Loading poker overview...');
-    const [seasonsPayload, centaurPayload] = await Promise.all([
+    const [seasonsPayload, centaurPayload, playPayload] = await Promise.all([
       api('/api/poker/seasons'),
       api('/api/poker/centaur/tournaments').catch(() => null),
+      api('/api/poker/play/tables').catch(() => null),
     ]);
     const items = Array.isArray(seasonsPayload?.data?.items) ? seasonsPayload.data.items : [];
     const cards = [];
+    if (playPayload?.data) {
+      const tables = Array.isArray(playPayload.data.items) ? playPayload.data.items : [];
+      const oilBalance = Number(playPayload?.data?.oilBalance?.balance || 0);
+      cards.push(`
+        <h2>Live 6-Max Tables</h2>
+        <p>Play cash and single-table tournament hold’em with other users and their agents. Each seat gets a private agent thread and a live decision clock.</p>
+        ${renderMetaBadges([
+          playPayload?.data?.houseId || 'house pending',
+          playPayload?.data?.wallet?.address || 'wallet pending',
+          `${oilBalance} OIL`,
+          tables.length ? `${tables.length} tables` : 'no tables',
+        ])}
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Open Live Lobby</a>
+          ${tables.slice(0, 2).map((table) => `<a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table.tableId)}`))}">${escapeHtml(table.title)}</a>`).join('')}
+        </div>
+      `);
+    }
     if (centaurPayload?.data) {
       const tournaments = Array.isArray(centaurPayload.data.items) ? centaurPayload.data.items : [];
       const oilBalance = Number(centaurPayload?.data?.oilBalance?.balance || 0);
@@ -245,7 +326,7 @@
     }
     if (!items.length) {
       cards.push('<h2>No mirrored seasons yet.</h2><p>Run a mirror sync before opening classic poker pages.</p>');
-      setStatus('Centaur lobby ready. No mirrored operator seasons yet.');
+      setStatus('Live tables and centaur lobby ready. No mirrored operator seasons yet.');
       renderCards(cards);
       return;
     }
@@ -264,8 +345,317 @@
         </div>
       `;
     }));
-    setStatus(`Loaded ${items.length} mirrored season${items.length === 1 ? '' : 's'} and the centaur lobby.`);
+    setStatus(`Loaded ${items.length} mirrored season${items.length === 1 ? '' : 's'}, live tables, and the centaur lobby.`);
     renderCards(cards);
+  }
+
+  async function loadPlayLobby() {
+    setTitle('Live Poker Lobby', 'Cash and single-table tournament hold’em with private human + agent seat threads.');
+    setStatus('Loading live tables...');
+    const payload = await api('/api/poker/play/tables');
+    const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
+    const oilBalance = Number(payload?.data?.oilBalance?.balance || 0);
+    renderCards([
+      `
+        <h2>Eligibility</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
+          ${renderSummaryMetric('Wallet', payload?.data?.wallet?.address || 'Bind wallet')}
+          ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
+          ${renderSummaryMetric('Live Tables', `${items.length}`)}
+        </div>
+      `,
+      items.length
+        ? items.map((item) => `
+          <div class="pokerSplit">
+            <div>
+              <h2>${escapeHtml(item.title)}</h2>
+              <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
+              ${renderMetaBadges([
+                item.tableType,
+                `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
+                `${Number(item.buyInOil || 0)} OIL buy-in`,
+                `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
+              ])}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">${item?.currentUser?.seated ? 'Return To Seat' : 'Open Table'}</a>
+            </div>
+          </div>
+        `).join('')
+        : '<h2>No live tables seeded.</h2><p>The multiplayer lobby is ready, but no cash or tournament table is open yet.</p>',
+    ]);
+    setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
+  }
+
+  function renderPlayTableCards(data) {
+    const table = data?.table || {};
+    const hand = data?.hand || null;
+    const mySeat = data?.mySeat || null;
+    const seats = Array.isArray(data?.seats) ? data.seats : [];
+    const actions = Array.isArray(data?.actions) ? data.actions : [];
+    const messages = Array.isArray(data?.messages) ? data.messages : [];
+    const oilBalance = Number(data?.oilBalance?.balance || 0);
+    const canJoin = !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const cards = [
+      `
+        <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
+        <p>${escapeHtml(table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))}</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Type', table?.tableType || 'cash')}
+          ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
+          ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
+          ${renderSummaryMetric('Your OIL', `${oilBalance}`)}
+        </div>
+        ${renderMetaBadges([
+          `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
+          table?.summary?.liveHand ? `hand ${Number(table?.summary?.handNumber || 0)}` : 'waiting',
+          table?.summary?.winnerSeatNumber ? `winner seat ${Number(table?.summary?.winnerSeatNumber || 0)}` : '',
+        ].filter(Boolean))}
+      `,
+      `
+        <h2>Seats</h2>
+        ${renderSeatMarkers(seats)}
+      `,
+    ];
+
+    if (canJoin) {
+      const nextOpenSeat = seats.map((seat) => Number(seat.seatNumber || 0));
+      const options = Array.from({ length: Number(table?.maxSeats || 6) }, (_value, index) => index + 1)
+        .filter((seat) => !nextOpenSeat.includes(seat))
+        .map((seat) => `<option value="${seat}">Seat ${seat}</option>`)
+        .join('');
+      cards.push(`
+        <h2>Take A Seat</h2>
+        <p>Buying in starts a private human + agent thread for your seat. Other players only see your public actions, not your private discussion.</p>
+        <form id="pokerPlayJoinForm" class="pokerForm">
+          <label>
+            Seat
+            <select id="pokerPlaySeatNumber">${options}</select>
+          </label>
+          <label>
+            Display Name
+            <input id="pokerPlayDisplayName" maxlength="80" value="${escapeHtml(data?.houseId || 'House Seat')}">
+          </label>
+          <label>
+            Buy-In OIL
+            <input id="pokerPlayBuyInOil" type="number" min="${Number(table?.buyInOil || 0)}" value="${Number(table?.buyInOil || 0)}">
+          </label>
+          <button class="pokerButton" type="submit">Join Table</button>
+        </form>
+      `);
+    }
+
+    if (mySeat) {
+      cards.push(`
+        <h2>Your Seat</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Seat', `${Number(mySeat.seatNumber || 0)}`)}
+          ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
+          ${renderSummaryMetric('Status', mySeat.status || 'active')}
+          ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
+        </div>
+        <div class="pokerLinks">
+          <button id="pokerPlayLeaveButton" class="pokerButton" type="button">${table?.tableType === 'cash' ? 'Cash Out & Leave' : 'Leave Seat'}</button>
+        </div>
+      `);
+    }
+
+    if (hand) {
+      cards.push(`
+        <h2>Current Hand</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Hand', `${Number(hand.handNumber || 0)}`)}
+          ${renderSummaryMetric('Pot', `${Number(hand.potOil || 0)} OIL`)}
+          ${renderSummaryMetric('Street', hand.street || 'preflop')}
+          ${renderSummaryMetric('Acting Seat', hand.actingSeat ? `Seat ${Number(hand.actingSeat || 0)}` : 'none')}
+        </div>
+        <div class="pokerSplit">
+          <div>
+            <div class="pokerLabel">Board</div>
+            ${renderPokerCards(hand.communityCards || [])}
+          </div>
+          <div>
+            <div class="pokerLabel">Decision Clock</div>
+            <div id="centaurCountdownValue" class="pokerCountdown">--</div>
+          </div>
+          <div>
+            <div class="pokerLabel">Result</div>
+            <div>${escapeHtml(hand?.result?.note || 'Hand is live.')}</div>
+          </div>
+        </div>
+      `);
+    }
+
+    if (data?.suggestion && mySeat) {
+      cards.push(`
+        <h2>Your Agent Line</h2>
+        <p>${escapeHtml(data.suggestion.body || 'No suggestion yet.')}</p>
+      `);
+    }
+
+    if (mySeat && hand) {
+      cards.push(`
+        <h2>Seat Thread</h2>
+        <div class="pokerStack">
+          ${messages.length ? messages.map((message) => `
+            <div class="pokerMessage ${message.authorRole === 'agent' ? 'is-agent' : ''}">
+              <div class="pokerLabel">${escapeHtml(message.authorRole)}</div>
+              <div>${escapeHtml(message.body)}</div>
+            </div>
+          `).join('') : '<p>No private thread yet.</p>'}
+        </div>
+        <form id="pokerPlayMessageForm" class="pokerForm">
+          <label>
+            Discuss the next line
+            <textarea id="pokerPlayMessageBody" placeholder="What line are we taking into this spot?"></textarea>
+          </label>
+          <button class="pokerButton" type="submit">Send To Agent Thread</button>
+        </form>
+      `);
+    }
+
+    if (mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
+      cards.push(`
+        <h2>Submit Action</h2>
+        <div class="pokerStack">
+          ${actions.length ? actions.slice(-8).map((action) => `
+            <div class="pokerRow">
+              <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
+              <span>${escapeHtml(action.actionKind || 'act')}</span>
+              <span>${Number(action.amountOil || 0)} OIL</span>
+            </div>
+          `).join('') : '<p>No public actions logged yet.</p>'}
+        </div>
+        <form id="pokerPlayActionForm" class="pokerForm">
+          <label>
+            Action
+            <select id="pokerPlayActionKind">${renderActionOptions(hand.viewerAllowedActions)}</select>
+          </label>
+          <label>
+            Amount OIL
+            <input id="pokerPlayActionAmount" type="number" min="0" value="${Number(hand.minRaiseToOil || hand.requiredCallOil || 0)}">
+          </label>
+          <button class="pokerButton" type="submit">Submit Action</button>
+        </form>
+      `);
+    } else if (actions.length) {
+      cards.push(`
+        <h2>Public Action Log</h2>
+        <div class="pokerStack">
+          ${actions.slice(-10).map((action) => `
+            <div class="pokerRow">
+              <span>${escapeHtml(action.seatLabel || 'Seat')}</span>
+              <span>${escapeHtml(action.actionKind || 'act')}</span>
+              <span>${Number(action.amountOil || 0)} OIL</span>
+            </div>
+          `).join('')}
+        </div>
+      `);
+    }
+
+    return cards;
+  }
+
+  function bindPlayJoinForm(tableId) {
+    const form = document.getElementById('pokerPlayJoinForm');
+    if (!form) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setStatus('Joining live table...');
+      try {
+        await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/sit`, {
+          method: 'POST',
+          body: JSON.stringify({
+            seatNumber: Number(document.getElementById('pokerPlaySeatNumber')?.value || 0),
+            displayName: String(document.getElementById('pokerPlayDisplayName')?.value || '').trim(),
+            buyInOil: Number(document.getElementById('pokerPlayBuyInOil')?.value || 0),
+          }),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Join failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindPlayLeaveButton(tableId) {
+    const button = document.getElementById('pokerPlayLeaveButton');
+    if (!button) return;
+    button.addEventListener('click', async () => {
+      setStatus('Leaving table...');
+      try {
+        await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/leave`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Leave failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindPlayMessageForm(tableId, handId) {
+    const form = document.getElementById('pokerPlayMessageForm');
+    if (!form || !handId) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const body = String(document.getElementById('pokerPlayMessageBody')?.value || '').trim();
+      if (!body) {
+        setStatus('Enter a discussion note before sending.');
+        return;
+      }
+      setStatus('Sending seat thread note...');
+      try {
+        await api(`/api/poker/play/hands/${encodeURIComponent(handId)}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ body }),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Message failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindPlayActionForm(tableId, handId) {
+    const form = document.getElementById('pokerPlayActionForm');
+    if (!form || !handId) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setStatus('Submitting action...');
+      try {
+        await api(`/api/poker/play/hands/${encodeURIComponent(handId)}/actions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            actionKind: String(document.getElementById('pokerPlayActionKind')?.value || '').trim(),
+            amountOil: Number(document.getElementById('pokerPlayActionAmount')?.value || 0),
+          }),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Action failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  async function loadPlayTable(tableId, { silent = false } = {}) {
+    setTitle('Live Poker Table', `Shared 6-max table state for ${tableId}.`);
+    if (!silent) setStatus('Loading live table...');
+    const payload = await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}`);
+    const data = payload?.data || {};
+    renderCards(renderPlayTableCards(data));
+    bindPlayJoinForm(tableId);
+    bindPlayLeaveButton(tableId);
+    bindPlayMessageForm(tableId, data?.hand?.handId || '');
+    bindPlayActionForm(tableId, data?.hand?.handId || '');
+    bindCountdown(data?.hand?.actionExpiresAt || null);
+    scheduleLiveTableRefresh(tableId);
+    if (!silent) {
+      setStatus(data?.mySeat ? 'Live table synced.' : 'Live table ready.');
+    }
   }
 
   async function loadCentaurLobby() {
@@ -783,6 +1173,9 @@
     const path = url.pathname;
     try {
       if (path === '/poker') return await loadIndex();
+      if (path === '/poker/play') return await loadPlayLobby();
+      const playMatch = path.match(/^\/poker\/play\/tables\/([^/]+)$/);
+      if (playMatch) return await loadPlayTable(playMatch[1]);
       if (path === '/poker/centaur') return await loadCentaurLobby();
       const centaurMatch = path.match(/^\/poker\/centaur\/tournaments\/([^/]+)$/);
       if (centaurMatch) return await loadCentaurTournament(centaurMatch[1]);

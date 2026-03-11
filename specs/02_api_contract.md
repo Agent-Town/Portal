@@ -390,6 +390,96 @@ Stable failure codes:
 - `POKER_REPLAY_NOT_READY`
 - `POKER_OPERATOR_SCHEMA_MISMATCH`
 
+### GET `/api/poker/play/tables`
+Returns the live 6-max poker lobby payload with:
+- `data.items[]`
+- `data.items[].tableId`
+- `data.items[].tableType`
+- `data.items[].summary.occupancy`
+- `data.items[].summary.openSeatCount`
+- `data.items[].summary.liveHand`
+- `data.houseId`
+- `data.wallet`
+- `data.oilBalance`
+
+### GET `/api/poker/play/tables/:tableId`
+Returns one live cash or tournament table payload with:
+- `data.table`
+- `data.seats[]`
+- `data.mySeat`
+- `data.hand`
+- `data.messages[]`
+- `data.actions[]`
+- `data.suggestion`
+- `data.oilBalance`
+
+Hole-card privacy rules:
+- `data.mySeat.holeCards[]` is only populated for the viewing seat.
+- Opponent seats expose `hiddenCardCount` until showdown.
+- `data.messages[]` is seat-private: the viewer only receives their own human + agent thread plus public system notes.
+
+### POST `/api/poker/play/tables/:tableId/sit`
+Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
+
+Request shape:
+```json
+{
+  "seatNumber": 1,
+  "displayName": "Alpha House",
+  "buyInOil": 400
+}
+```
+
+Response fields:
+- `data.table`
+- `data.mySeat`
+- `data.hand`
+- `data.oilBalance`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `NOT_FOUND`
+- `POKER_PLAY_SEAT_ALREADY_ACTIVE`
+- `POKER_PLAY_TABLE_FULL`
+- `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/tables/:tableId/leave`
+Leaves a live table. Cash tables credit the current stack back to offchain OIL between hands. Tournament tables only allow leaving after bust-out or payout.
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `POKER_PLAY_HAND_IN_PROGRESS`
+- `POKER_PLAY_TOURNAMENT_STILL_ACTIVE`
+
+### POST `/api/poker/play/hands/:handId/messages`
+Posts a seat-private human note to the current hand thread and returns the paired agent response.
+
+### POST `/api/poker/play/hands/:handId/actions`
+Applies a live poker action for the bound seat.
+
+Request shape:
+```json
+{
+  "actionKind": "raise",
+  "amountOil": 300
+}
+```
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `POKER_PLAY_HAND_NOT_LIVE`
+- `POKER_PLAY_NOT_YOUR_TURN`
+- `POKER_PLAY_RAISE_TOO_SMALL`
+- `POKER_PLAY_ACTION_INVALID`
+
 ### GET `/api/poker/centaur/tournaments`
 Returns the centaur lobby payload with:
 - `data.items[]`
