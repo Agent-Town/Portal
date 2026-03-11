@@ -102,6 +102,7 @@
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseExperiencesBtn" type="button" data-testid="house-open-experiences">Open Experiences</button>
     <button class="btn" id="houseWorkshopBtn" type="button" data-testid="house-open-workshop">Open Workshop</button>
+    <button class="btn" id="houseLibraryBtn" type="button" data-testid="house-open-library">Open Library</button>
     <button class="btn" id="houseTracksBtn" type="button" data-testid="house-open-tracks">Open Tracks</button>
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
@@ -130,6 +131,18 @@
   <div class="kv" style="margin-top:8px;">
     <button class="btn" id="houseWorkshopOpenInboxBtn" type="button" data-testid="house-workshop-open-inbox" data-entry-path="" disabled>Open Inbox</button>
   </div>
+</div>
+
+<div class="panel is-hidden" id="houseLibraryPanel" data-testid="house-library-panel">
+  <h2 style="margin:0 0 6px">House Library</h2>
+  <p class="small" style="margin-top:0">
+    Curated notes, facts, and playbooks stay readable here and can be brought into chat on purpose.
+  </p>
+  <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
+  <div class="small" id="houseLibrarySelected" data-testid="house-library-selected" style="margin:8px 0;">Selected for this chat: none.</div>
+  <div class="kv stack" id="houseLibraryList" data-testid="house-library-list"></div>
+  <div class="small" id="houseLibraryDetail" data-testid="house-library-detail">Select a Library item to inspect its shelf and source.</div>
+  <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>
 </div>
 
 <div class="panel is-hidden" id="houseTracksPanel" data-testid="house-tracks-panel">

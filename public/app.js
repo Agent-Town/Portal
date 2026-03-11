@@ -503,6 +503,16 @@ let houseSurfaceState = {
     selectedExperienceId: '',
     emptyStateText: 'No House experiences available yet.'
   },
+  library: {
+    loaded: false,
+    items: [],
+    scopeSets: [],
+    selectedItemId: '',
+    activeScopeSetId: '',
+    selectedItemIds: [],
+    selectedItems: [],
+    emptyStateText: 'No curated Library items yet.'
+  },
   tracks: {
     loaded: false,
     items: [],
@@ -1294,6 +1304,13 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
     houseSurfaceState.experiences.selectedExperienceId = '';
+    houseSurfaceState.library.loaded = false;
+    houseSurfaceState.library.items = [];
+    houseSurfaceState.library.scopeSets = [];
+    houseSurfaceState.library.selectedItemId = '';
+    houseSurfaceState.library.activeScopeSetId = '';
+    houseSurfaceState.library.selectedItemIds = [];
+    houseSurfaceState.library.selectedItems = [];
     houseSurfaceState.tracks.loaded = false;
     houseSurfaceState.tracks.items = [];
     houseSurfaceState.tracks.selectedTrackId = '';
@@ -1385,6 +1402,8 @@ async function setHouseActiveTeam(teamId) {
     await loadHouseArchiveSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'experiences') {
     await loadHouseExperiencesSurface({ skipContext: true });
+  } else if (houseSurfaceState.activeSurface === 'library') {
+    await loadHouseLibrarySurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'tracks') {
     await loadHouseTracksSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'workshop') {
@@ -1404,24 +1423,28 @@ function buildHousePlatformSnapshot() {
 }
 
 function setHouseSurfaceMode(mode) {
-  const activeMode = mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
+  const activeMode = mode === 'experiences' || mode === 'library' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
   houseSurfaceState.activeSurface = activeMode;
   const experiencesPanel = el('houseExperiencesPanel');
+  const libraryPanel = el('houseLibraryPanel');
   const tracksPanel = el('houseTracksPanel');
   const workshopPanel = el('houseWorkshopPanel');
   const archivePanel = el('houseArchivePanel');
   const trainerPanel = el('houseTrainerPanel');
   const experiencesBtn = el('houseExperiencesBtn');
+  const libraryBtn = el('houseLibraryBtn');
   const tracksBtn = el('houseTracksBtn');
   const workshopBtn = el('houseWorkshopBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
   if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
+  if (libraryPanel) libraryPanel.classList.toggle('is-hidden', activeMode !== 'library');
   if (tracksPanel) tracksPanel.classList.toggle('is-hidden', activeMode !== 'tracks');
   if (workshopPanel) workshopPanel.classList.toggle('is-hidden', activeMode !== 'workshop');
   if (archivePanel) archivePanel.classList.toggle('is-hidden', activeMode !== 'archive');
   if (trainerPanel) trainerPanel.classList.toggle('is-hidden', activeMode !== 'trainer');
   if (experiencesBtn) experiencesBtn.classList.toggle('primary', activeMode === 'experiences');
+  if (libraryBtn) libraryBtn.classList.toggle('primary', activeMode === 'library');
   if (tracksBtn) tracksBtn.classList.toggle('primary', activeMode === 'tracks');
   if (workshopBtn) workshopBtn.classList.toggle('primary', activeMode === 'workshop');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
@@ -1527,6 +1550,157 @@ function renderHouseExperiencesSurface() {
     });
     actionsNode.appendChild(button);
   });
+}
+
+function syncHouseLibraryStateFromPayload(payload = {}) {
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const selectedItems = Array.isArray(payload?.selectedItems) ? payload.selectedItems : [];
+  houseSurfaceState.library.loaded = true;
+  houseSurfaceState.library.items = items;
+  houseSurfaceState.library.scopeSets = Array.isArray(payload?.scopeSets) ? payload.scopeSets : [];
+  houseSurfaceState.library.activeScopeSetId = String(payload?.activeScopeSetId || '').trim();
+  houseSurfaceState.library.selectedItemIds = Array.isArray(payload?.selectedItemIds)
+    ? payload.selectedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
+    : [];
+  houseSurfaceState.library.selectedItems = selectedItems;
+  houseSurfaceState.library.emptyStateText = String(payload?.emptyStateText || 'No curated Library items yet.');
+  if (!items.some((item) => String(item?.libraryItemId || '') === String(houseSurfaceState.library.selectedItemId || ''))) {
+    houseSurfaceState.library.selectedItemId = '';
+  }
+  if (!houseSurfaceState.library.selectedItemId && items[0]?.libraryItemId) {
+    houseSurfaceState.library.selectedItemId = String(items[0].libraryItemId);
+  }
+}
+
+async function updateHouseLibraryScopeSelection(nextItemIds = []) {
+  const scopeSetId = String(houseSurfaceState.library.activeScopeSetId || '').trim();
+  const response = await api('/api/platform/library/scope', {
+    method: 'POST',
+    body: JSON.stringify({
+      scopeSetId,
+      title: 'Reading Table',
+      itemIds: Array.isArray(nextItemIds) ? nextItemIds : [],
+    }),
+  });
+  const data = response?.data || response || {};
+  syncHouseLibraryStateFromPayload(data);
+  renderHouseLibrarySurface();
+  setHouseSurfaceStatus(
+    houseSurfaceState.library.selectedItemIds.length
+      ? `Reading Table ready with ${houseSurfaceState.library.selectedItemIds.length} item${houseSurfaceState.library.selectedItemIds.length === 1 ? '' : 's'}.`
+      : 'Selected for this chat: none.'
+  );
+  return data;
+}
+
+function renderHouseLibrarySurface() {
+  const listNode = el('houseLibraryList');
+  const detailNode = el('houseLibraryDetail');
+  const emptyNode = el('houseLibraryEmpty');
+  const selectedNode = el('houseLibrarySelected');
+  const actionsNode = el('houseLibraryActions');
+  if (!listNode || !detailNode || !emptyNode || !selectedNode || !actionsNode) return;
+  const items = Array.isArray(houseSurfaceState.library.items) ? houseSurfaceState.library.items : [];
+  const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
+  const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
+  listNode.innerHTML = '';
+  actionsNode.innerHTML = '';
+  emptyNode.textContent = houseSurfaceState.library.emptyStateText || 'No curated Library items yet.';
+  emptyNode.classList.toggle('is-hidden', items.length > 0);
+  selectedNode.textContent = selectedItems.length
+    ? `Selected for this chat: ${selectedItems.map((item) => String(item?.title || item?.libraryItemId || '')).join(', ')}`
+    : 'Selected for this chat: none.';
+  if (!items.length) {
+    detailNode.textContent = 'Select a Library item to inspect its shelf and source.';
+    return;
+  }
+
+  const selectedItemId = houseSurfaceState.library.selectedItemId || String(items[0]?.libraryItemId || '');
+  houseSurfaceState.library.selectedItemId = selectedItemId;
+  const selectedItem = items.find((item) => String(item?.libraryItemId || '') === selectedItemId) || items[0];
+
+  items.forEach((item) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(item?.libraryItemId || '') === String(selectedItem?.libraryItemId || '') ? ' primary' : ''}`;
+    button.dataset.libraryItemId = String(item?.libraryItemId || '');
+    button.textContent = `${String(item?.title || item?.libraryItemId || '')} · ${String(item?.itemType || '')}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.library.selectedItemId = String(item?.libraryItemId || '');
+      renderHouseLibrarySurface();
+    });
+    listNode.appendChild(button);
+  });
+
+  detailNode.textContent = `${String(selectedItem?.title || selectedItem?.libraryItemId || '')} · ${String(selectedItem?.itemType || '')} · ${String(selectedItem?.sourceKind || '')} ${String(selectedItem?.sourceRef || '')} · ${String(selectedItem?.visibility || '')}`;
+
+  const isSelectedForChat = selectedItemIds.includes(String(selectedItem?.libraryItemId || ''));
+
+  const bringBtn = document.createElement('button');
+  bringBtn.type = 'button';
+  bringBtn.className = 'btn';
+  bringBtn.dataset.actionId = 'bring_to_chat';
+  bringBtn.textContent = 'Bring to Chat';
+  bringBtn.disabled = isSelectedForChat;
+  bringBtn.addEventListener('click', async () => {
+    bringBtn.disabled = true;
+    setHouseSurfaceStatus(`Adding ${String(selectedItem?.title || 'item')} to this chat...`);
+    try {
+      await updateHouseLibraryScopeSelection([...selectedItemIds, String(selectedItem?.libraryItemId || '')]);
+    } catch (err) {
+      bringBtn.disabled = false;
+      setHouseSurfaceStatus(`Library scope unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+    }
+  });
+  actionsNode.appendChild(bringBtn);
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'btn';
+  removeBtn.dataset.actionId = 'remove_from_chat';
+  removeBtn.textContent = 'Remove from Chat';
+  removeBtn.disabled = !isSelectedForChat;
+  removeBtn.addEventListener('click', async () => {
+    removeBtn.disabled = true;
+    setHouseSurfaceStatus(`Removing ${String(selectedItem?.title || 'item')} from this chat...`);
+    try {
+      await updateHouseLibraryScopeSelection(selectedItemIds.filter((itemId) => itemId !== String(selectedItem?.libraryItemId || '')));
+    } catch (err) {
+      removeBtn.disabled = false;
+      setHouseSurfaceStatus(`Library scope unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+    }
+  });
+  actionsNode.appendChild(removeBtn);
+
+  const workshopBtn = document.createElement('button');
+  workshopBtn.type = 'button';
+  workshopBtn.className = 'btn';
+  workshopBtn.dataset.actionId = 'open_workshop';
+  workshopBtn.textContent = 'Open in Workshop';
+  workshopBtn.addEventListener('click', async () => {
+    workshopBtn.disabled = true;
+    try {
+      await loadHouseWorkshopSurface();
+    } finally {
+      workshopBtn.disabled = false;
+    }
+  });
+  actionsNode.appendChild(workshopBtn);
+
+  const archiveBtn = document.createElement('button');
+  archiveBtn.type = 'button';
+  archiveBtn.className = 'btn';
+  archiveBtn.dataset.actionId = 'open_archive';
+  archiveBtn.textContent = 'Open in Archive';
+  archiveBtn.addEventListener('click', async () => {
+    archiveBtn.disabled = true;
+    try {
+      await loadHouseArchiveSurface();
+    } finally {
+      archiveBtn.disabled = false;
+    }
+  });
+  actionsNode.appendChild(archiveBtn);
 }
 
 function renderHouseTracksSurface() {
@@ -1836,6 +2010,32 @@ async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
     houseSurfaceState.experiences.items = [];
     renderHouseExperiencesSurface();
     setHouseSurfaceStatus(`House experiences unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+  }
+}
+
+async function loadHouseLibrarySurface({ skipContext = false } = {}) {
+  setHouseSurfaceMode('library');
+  setHouseSurfaceStatus('Loading House Library...');
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+    }
+    const response = await api('/api/platform/library');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    syncHouseLibraryStateFromPayload(data);
+    renderHouseLibrarySurface();
+    setHouseSurfaceStatus(houseSurfaceState.library.items.length ? '' : houseSurfaceState.library.emptyStateText);
+  } catch (err) {
+    houseSurfaceState.library.loaded = true;
+    houseSurfaceState.library.items = [];
+    houseSurfaceState.library.scopeSets = [];
+    houseSurfaceState.library.selectedItemId = '';
+    houseSurfaceState.library.activeScopeSetId = '';
+    houseSurfaceState.library.selectedItemIds = [];
+    houseSurfaceState.library.selectedItems = [];
+    renderHouseLibrarySurface();
+    setHouseSurfaceStatus(`House Library unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
   }
 }
 
@@ -4277,6 +4477,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseLibraryBtn = el('houseLibraryBtn');
+  if (houseLibraryBtn) {
+    houseLibraryBtn.onclick = async () => {
+      houseLibraryBtn.disabled = true;
+      try {
+        await loadHouseLibrarySurface();
+      } finally {
+        houseLibraryBtn.disabled = false;
+      }
+    };
+  }
+
   const houseTracksBtn = el('houseTracksBtn');
   if (houseTracksBtn) {
     houseTracksBtn.onclick = async () => {
@@ -4331,6 +4543,8 @@ function bindTownDistrictControls() {
       }
     };
   }
+
+  renderHouseLibrarySurface();
 
   const houseWorkshopOpenInboxBtn = el('houseWorkshopOpenInboxBtn');
   if (houseWorkshopOpenInboxBtn) {

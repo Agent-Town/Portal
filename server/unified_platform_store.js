@@ -1383,8 +1383,23 @@ function listHouseTeamIds(houseId = '') {
     SELECT team_id AS team_id
     FROM trainer_jobs
     WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM library_items
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM scope_sets
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM library_publications
+    WHERE house_id = ?
     ORDER BY team_id ASC
   `).all(
+    normalizedHouseId,
+    normalizedHouseId,
+    normalizedHouseId,
     normalizedHouseId,
     normalizedHouseId,
     normalizedHouseId,
@@ -3090,6 +3105,7 @@ module.exports = {
   getIntegrationPackVersionByIdempotency,
   getApprovalRecordById,
   getLibraryItemById,
+  getLibraryItemByIdempotency,
   getRunById,
   getRunByTraceId,
   getRunByIdempotency,
@@ -3098,6 +3114,7 @@ module.exports = {
   getTrackDefinition,
   listHouseTeamIds,
   getScopeSetById,
+  getScopeSetByIdempotency,
   getTrainerJobById,
   getTrainerJobByIdempotency,
   getTrainerResultById,

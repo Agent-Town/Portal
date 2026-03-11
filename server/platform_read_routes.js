@@ -5,12 +5,23 @@ function registerPlatformReadRoutes(app, deps) {
     buildPlatformContextResponse,
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
+    createLibraryItem,
+    createLibraryLink,
+    createScopeSet,
     createTrainerJob,
     createTrainerResult,
     getConfigVersion,
     getConfigVersionByIdempotency,
+    getLibraryItemById,
+    getLibraryItemByIdempotency,
+    getScopeSetById,
+    getScopeSetByIdempotency,
     getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
+    listLibraryItems,
+    listLibraryLinks,
+    listScopeSetItems,
+    listScopeSets,
     listTrackDefinitions,
     listTrackProgressEvents,
     getTrainerJobById,
@@ -27,6 +38,7 @@ function registerPlatformReadRoutes(app, deps) {
     normalizePortalIdempotencyKey,
     nowIso,
     randomHex,
+    replaceScopeSetItems,
     replaceConfigComponentVersions,
     resolveApprovedTrainerPatchPromotion,
     resolveHumanSessionWithRecovery,
@@ -34,6 +46,7 @@ function registerPlatformReadRoutes(app, deps) {
     resolveSessionPlatformContext,
     sendPortalApiError,
     sendPortalApiSuccess,
+    setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
     updateTrainerJobStatus,
@@ -83,6 +96,104 @@ function registerPlatformReadRoutes(app, deps) {
         actions,
       };
     }).filter(Boolean);
+  }
+
+  function normalizeLibraryItemIds(itemIds) {
+    const source = Array.isArray(itemIds) ? itemIds : [];
+    const seen = new Set();
+    return source.map((itemId) => String(itemId || '').trim()).filter((itemId) => {
+      if (!itemId || seen.has(itemId)) return false;
+      seen.add(itemId);
+      return true;
+    });
+  }
+
+  function buildLibrarySelectionPayload({
+    houseId = '',
+    teamId = '',
+    activeScopeSetId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedActiveScopeSetId = String(activeScopeSetId || '').trim();
+    const items = listLibraryItems({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((item) => ({
+      libraryItemId: item.libraryItemId,
+      itemType: item.itemType,
+      title: item.title,
+      summary: item.summary,
+      sourceKind: item.sourceKind,
+      sourceRef: item.sourceRef,
+      visibility: item.visibility,
+      contentHash: item.contentHash,
+      readOnly: item.readOnly,
+      importedState: item.importedState,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    }));
+    const itemsById = new Map(items.map((item) => [item.libraryItemId, item]));
+    let scopeSet = normalizedActiveScopeSetId ? getScopeSetById(normalizedActiveScopeSetId) : null;
+    if (scopeSet && (scopeSet.houseId !== normalizedHouseId || scopeSet.teamId !== normalizedTeamId)) {
+      scopeSet = null;
+    }
+    const selectedItemIds = scopeSet
+      ? listScopeSetItems(scopeSet.scopeSetId).map((entry) => entry.libraryItemId)
+      : [];
+    const selectedItems = selectedItemIds.map((itemId) => itemsById.get(itemId)).filter(Boolean);
+    return {
+      activeScopeSetId: scopeSet?.scopeSetId || null,
+      selectedItemIds,
+      selectedItems,
+      items,
+      scopeSets: listScopeSets({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((entry) => ({
+        scopeSetId: entry.scopeSetId,
+        title: entry.title,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+        orderedItemIds: listScopeSetItems(entry.scopeSetId).map((item) => item.libraryItemId),
+      })),
+    };
+  }
+
+  function buildLibraryReadPayload({
+    houseId = '',
+    teamId = '',
+    activeTeamId = '',
+    availableTeamIds = [],
+    activeScopeSetId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId) {
+      return {
+        houseId: null,
+        teamId: null,
+        activeTeamId: activeTeamId || null,
+        availableTeamIds,
+        activeScopeSetId: null,
+        selectedItemIds: [],
+        selectedItems: [],
+        scopeSets: [],
+        items: [],
+        emptyStateText: 'No curated Library items yet.',
+      };
+    }
+    const selection = buildLibrarySelectionPayload({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      activeScopeSetId,
+    });
+    return {
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId || null,
+      activeTeamId: activeTeamId || null,
+      availableTeamIds,
+      activeScopeSetId: selection.activeScopeSetId,
+      selectedItemIds: selection.selectedItemIds,
+      selectedItems: selection.selectedItems,
+      scopeSets: selection.scopeSets,
+      items: selection.items,
+      emptyStateText: 'No curated Library items yet.',
+    };
   }
 
   function getTrackAntiFarmingPolicy() {
@@ -380,6 +491,7 @@ function registerPlatformReadRoutes(app, deps) {
       });
     }
     session.activeTeamId = teamId;
+    session.activeScopeSetId = '';
     return sendPortalApiSuccess(res, buildPlatformContextResponse(session), { requestId });
   });
 
@@ -513,6 +625,262 @@ function registerPlatformReadRoutes(app, deps) {
       },
       inboxPath: houseId ? `/inbox/${encodeURIComponent(houseId)}` : null,
       emptyStateText: 'No active config is bound to this team yet.',
+    }, { requestId });
+  });
+
+  app.get('/api/platform/library', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const payload = buildLibraryReadPayload({
+      houseId,
+      teamId,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      activeScopeSetId: typeof session.activeScopeSetId === 'string' ? session.activeScopeSetId : '',
+    });
+    if (houseId && !payload.activeScopeSetId && session.activeScopeSetId) {
+      session.activeScopeSetId = '';
+    }
+    return sendPortalApiSuccess(res, payload, { requestId });
+  });
+
+  app.post('/api/platform/library/items', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before creating a Library item.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before creating a Library item.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to create a Library item.', { requestId });
+    }
+    const itemType = typeof req.body?.itemType === 'string' ? req.body.itemType.trim() : '';
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const summary = typeof req.body?.summary === 'string' ? req.body.summary.trim() : '';
+    const contentText = typeof req.body?.contentText === 'string' ? req.body.contentText : '';
+    const contentRef = typeof req.body?.contentRef === 'string' ? req.body.contentRef.trim() : '';
+    const sourceKind = typeof req.body?.sourceKind === 'string' ? req.body.sourceKind.trim() : '';
+    const sourceRef = typeof req.body?.sourceRef === 'string' ? req.body.sourceRef.trim() : '';
+    const visibility = typeof req.body?.visibility === 'string' ? req.body.visibility.trim() : 'house_private';
+    const links = Array.isArray(req.body?.links) ? req.body.links : [];
+    if (!sourceKind || !sourceRef) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SOURCE_REQUIRED', 'sourceKind and sourceRef are required.', { requestId });
+    }
+    if (!itemType || !title || !summary) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'itemType, title, and summary are required.', { requestId });
+    }
+    const existing = getLibraryItemByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return sendPortalApiSuccess(res, {
+        item: existing,
+        links: listLibraryLinks({ libraryItemId: existing.libraryItemId }),
+      }, { requestId, status: 200 });
+    }
+    const contentHash = sha256PrefixedHex(stableJsonStringify({
+      itemType,
+      title,
+      summary,
+      contentText,
+      contentRef,
+      sourceKind,
+      sourceRef,
+      visibility,
+      links: Array.isArray(links) ? links : [],
+    }));
+    const libraryItemId = `lib_${randomHex(12)}`;
+    const createdAt = nowIso();
+    const item = createLibraryItem({
+      libraryItemId,
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      itemType,
+      title,
+      summary,
+      contentText,
+      contentRef,
+      sourceKind,
+      sourceRef,
+      visibility,
+      contentHash,
+      idempotencyKey,
+      metadata: {
+        createdFrom: 'portal.house.library',
+      },
+      nowIso: createdAt,
+    });
+    const normalizedLinks = links.length
+      ? links
+      : [{
+        linkKind: sourceKind === 'workspace_file'
+          ? 'derived_from_workshop_config'
+          : sourceKind === 'trainer_result'
+            ? 'derived_from_trainer_result'
+            : sourceKind === 'inbox_message'
+              ? 'replies_to_inbox_message'
+              : 'derived_from_trace',
+        sourceKind,
+        sourceRef,
+      }];
+    normalizedLinks.forEach((entry) => {
+      const linkKind = typeof entry?.linkKind === 'string' ? entry.linkKind.trim() : '';
+      const linkSourceKind = typeof entry?.sourceKind === 'string' ? entry.sourceKind.trim() : sourceKind;
+      const linkSourceRef = typeof entry?.sourceRef === 'string' ? entry.sourceRef.trim() : sourceRef;
+      if (!linkKind || !linkSourceKind || !linkSourceRef) return;
+      createLibraryLink({
+        libraryLinkId: `link_${randomHex(12)}`,
+        libraryItemId,
+        linkKind,
+        sourceKind: linkSourceKind,
+        sourceRef: linkSourceRef,
+        targetLibraryItemId: typeof entry?.targetLibraryItemId === 'string' ? entry.targetLibraryItemId.trim() : '',
+        metadata: entry?.metadata && typeof entry.metadata === 'object' ? entry.metadata : {},
+        nowIso: createdAt,
+      });
+    });
+    return sendPortalApiSuccess(res, {
+      item: getLibraryItemById(libraryItemId),
+      links: listLibraryLinks({ libraryItemId }),
+    }, { requestId, status: 201 });
+  });
+
+  app.get('/api/platform/library/scope', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const payload = buildLibraryReadPayload({
+      houseId,
+      teamId,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      activeScopeSetId: typeof session.activeScopeSetId === 'string' ? session.activeScopeSetId : '',
+    });
+    return sendPortalApiSuccess(res, {
+      houseId: payload.houseId,
+      teamId: payload.teamId,
+      activeTeamId: payload.activeTeamId,
+      availableTeamIds: payload.availableTeamIds,
+      activeScopeSetId: payload.activeScopeSetId,
+      orderedItemIds: payload.selectedItemIds,
+      selectedItems: payload.selectedItems,
+      scopeSets: payload.scopeSets,
+      emptyStateText: 'No Library items are selected for this chat.',
+    }, { requestId });
+  });
+
+  app.post('/api/platform/library/scope', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before setting Library scope.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before setting Library scope.', { requestId });
+    }
+    const itemIds = normalizeLibraryItemIds(req.body?.itemIds);
+    const existingItems = new Map(
+      listLibraryItems({ houseId: context.houseId, teamId: context.activeTeamId })
+        .map((item) => [item.libraryItemId, item])
+    );
+    const missingItemIds = itemIds.filter((itemId) => !existingItems.has(itemId));
+    if (missingItemIds.length) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'One or more Library items could not be found for this team.', {
+        requestId,
+        details: {
+          missingItemIds,
+        },
+      });
+    }
+    const requestedScopeSetId = typeof req.body?.scopeSetId === 'string' ? req.body.scopeSetId.trim() : '';
+    let scopeSet = requestedScopeSetId ? getScopeSetById(requestedScopeSetId) : null;
+    if (scopeSet && (scopeSet.houseId !== context.houseId || scopeSet.teamId !== context.activeTeamId)) {
+      scopeSet = null;
+    }
+    if (!scopeSet) {
+      scopeSet = createScopeSet({
+        scopeSetId: requestedScopeSetId || `scope_${randomHex(12)}`,
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        title: typeof req.body?.title === 'string' && req.body.title.trim()
+          ? req.body.title.trim()
+          : 'Reading Table',
+        createdBy: 'human',
+        idempotencyKey: typeof req.body?.idempotencyKey === 'string' ? req.body.idempotencyKey.trim() : '',
+        metadata: {
+          source: 'portal.house.library.scope',
+        },
+        nowIso: nowIso(),
+      });
+    }
+    replaceScopeSetItems({
+      scopeSetId: scopeSet.scopeSetId,
+      itemIds,
+      nowIso: nowIso(),
+    });
+    session.activeScopeSetId = scopeSet.scopeSetId;
+    setUnifiedPlatformPromptPreview({
+      activeScopeSetId: scopeSet.scopeSetId,
+      selectedItemIds: itemIds,
+      itemRefs: itemIds.map((itemId) => {
+        const item = existingItems.get(itemId);
+        return item
+          ? {
+            libraryItemId: item.libraryItemId,
+            title: item.title,
+            itemType: item.itemType,
+            sourceKind: item.sourceKind,
+            sourceRef: item.sourceRef,
+          }
+          : null;
+      }).filter(Boolean),
+      promptText: itemIds.length
+        ? `House Library scope: ${itemIds.join(', ')}`
+        : '',
+    });
+    const payload = buildLibraryReadPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      activeScopeSetId: scopeSet.scopeSetId,
+    });
+    return sendPortalApiSuccess(res, {
+      houseId: payload.houseId,
+      teamId: payload.teamId,
+      activeTeamId: payload.activeTeamId,
+      availableTeamIds: payload.availableTeamIds,
+      activeScopeSetId: payload.activeScopeSetId,
+      orderedItemIds: payload.selectedItemIds,
+      selectedItems: payload.selectedItems,
+      scopeSets: payload.scopeSets,
+      emptyStateText: 'No Library items are selected for this chat.',
     }, { requestId });
   });
 
