@@ -936,6 +936,9 @@ With an attached house, the route exposes durable structure truth rather than a 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
 
+Stable error codes:
+- `TEAM_NOT_FOUND`
+
 Response fields:
 - `data.houseId`
 - `data.teamId`
@@ -968,6 +971,9 @@ When eligible recent activity exists, briefing families can include `experiences
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `TEAM_NOT_FOUND`
 
 Response fields:
 - `data.houseId`
@@ -1102,6 +1108,12 @@ Response fields:
 ### GET `/api/platform/house-readiness` (human)
 Returns a session-bound House flow readiness report for live-user validation inside the current shell.
 This route is intentionally not a fake external live lane: it reports whether House Office, Workshop, Tracks, Archive, Trainer, and Experiences are ready for an operator walkthrough and what to validate next.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `TEAM_NOT_FOUND`
 
 Response fields:
 - `data.schema`

@@ -1001,6 +1001,36 @@ function registerPlatformReadRoutes(app, deps) {
     }, 0);
   }
 
+  function resolveValidatedHouseReadTeam({
+    context = {},
+    requestedTeamId = '',
+  } = {}) {
+    const normalizedRequestedTeamId = String(requestedTeamId || '').trim();
+    const activeTeamId = typeof context?.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
+    if (!normalizedRequestedTeamId) {
+      return {
+        ok: true,
+        teamId: activeTeamId,
+      };
+    }
+    if (!availableTeamIds.includes(normalizedRequestedTeamId)) {
+      return {
+        ok: false,
+        status: 404,
+        code: 'TEAM_NOT_FOUND',
+        message: 'The requested team is not available for this house.',
+        details: {
+          availableTeamIds,
+        },
+      };
+    }
+    return {
+      ok: true,
+      teamId: normalizedRequestedTeamId,
+    };
+  }
+
   function isHouseOfficeOpsExperienceId(experienceId = '') {
     const normalizedExperienceId = String(experienceId || '').trim().toLowerCase();
     if (!normalizedExperienceId) return false;
@@ -2317,7 +2347,23 @@ function registerPlatformReadRoutes(app, deps) {
     const context = resolveSessionPlatformContext(session);
     const houseId = typeof context.houseId === 'string' ? context.houseId : '';
     const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
-    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const teamId = String(teamResolution?.teamId || '').trim();
     return sendPortalApiSuccess(res, buildHouseOfficeStructurePayload({
       context,
       houseId,
@@ -2334,7 +2380,23 @@ function registerPlatformReadRoutes(app, deps) {
     const context = resolveSessionPlatformContext(session);
     const houseId = typeof context.houseId === 'string' ? context.houseId : '';
     const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
-    const teamId = requestedTeamId || (typeof context.activeTeamId === 'string' ? context.activeTeamId : '');
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const teamId = String(teamResolution?.teamId || '').trim();
     return sendPortalApiSuccess(res, buildHouseOfficeOverviewPayload({
       context,
       houseId,
@@ -2349,8 +2411,28 @@ function registerPlatformReadRoutes(app, deps) {
       return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
     }
     const context = resolveSessionPlatformContext(session);
-    return sendPortalApiSuccess(res, buildHouseFlowReadinessPayload({
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
       context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    return sendPortalApiSuccess(res, buildHouseFlowReadinessPayload({
+      context: {
+        ...context,
+        activeTeamId: String(teamResolution?.teamId || '').trim() || null,
+      },
     }), { requestId });
   });
 

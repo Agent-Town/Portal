@@ -60,6 +60,7 @@ const FIXTURE_FILES = Object.freeze({
   house_office_assignments_seed: 'house_office_assignments_seed.json',
   house_office_privacy_seed: 'house_office_privacy_seed.json',
   house_office_ops_breadth_seed: 'house_office_ops_breadth_seed.json',
+  house_office_team_guard_seed: 'house_office_team_guard_seed.json',
   house_office_smoke_seed: 'house_office_smoke_seed.json',
   tracks_core_seed: 'tracks_core_seed.json',
   tracks_progress_seed: 'tracks_progress_seed.json',
