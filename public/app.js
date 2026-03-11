@@ -1494,9 +1494,10 @@ async function openHouseOfficeDeepLink(rawDeepLink) {
 function renderHouseOfficeSurface() {
   const emptyNode = el('houseOfficeEmpty');
   const summaryNode = el('houseOfficeSummary');
+  const presenceNode = el('houseOfficePresence');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !presenceNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
@@ -1537,6 +1538,47 @@ function renderHouseOfficeSurface() {
     summaryParts.push(selectedOfficePurpose);
   }
   summaryNode.textContent = summaryParts.join(' · ');
+
+  presenceNode.innerHTML = '';
+  if (!presence.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No current House Office activity is available yet.';
+    presenceNode.appendChild(placeholder);
+  } else {
+    presence.forEach((item) => {
+      const office = offices.find((entry) => String(entry?.officeId || '') === String(item?.officeId || '')) || null;
+      const officeLabel = String(office?.displayName || item?.officeLabel || item?.officeId || 'Office').trim() || 'Office';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn${String(item?.status || '') === 'alert' ? ' danger' : ''}`;
+      button.setAttribute('data-testid', 'house-office-presence-item');
+      button.dataset.officeId = String(item?.officeId || '');
+      button.style.width = '100%';
+      button.style.minWidth = '0';
+      button.style.whiteSpace = 'normal';
+      button.style.overflowWrap = 'anywhere';
+      button.style.textAlign = 'left';
+      button.style.lineHeight = '1.35';
+      const sourceKind = String(item?.sourceRefs?.[0]?.sourceKind || '').trim();
+      button.textContent = `${officeLabel} · ${String(item?.status || '').trim() || 'idle'} · ${String(item?.focus || '').trim() || 'No focus'}${sourceKind ? ` · ${sourceKind}` : ''}`;
+      button.addEventListener('click', async () => {
+        const officeId = String(item?.officeId || '').trim();
+        if (officeId) {
+          houseSurfaceState.office.selectedOfficeId = officeId;
+          renderHouseOfficeSurface();
+        }
+        if (!item?.deepLink) return;
+        setHouseSurfaceStatus(`Opening ${officeLabel}...`);
+        try {
+          await openHouseOfficeDeepLink(item.deepLink);
+        } catch (err) {
+          setHouseSurfaceStatus(`House Office link unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+        }
+      });
+      presenceNode.appendChild(button);
+    });
+  }
 
   mapNode.innerHTML = '';
   mapNode.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';

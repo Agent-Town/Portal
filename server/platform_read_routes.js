@@ -173,6 +173,240 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function parseHouseOfficeActivityTime(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return 0;
+    const parsed = Date.parse(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function buildHouseOfficePresence({
+    offices = [],
+    deeplinks = {},
+    binding = null,
+    trainerJobs = [],
+    trainerResults = [],
+    archiveRuns = [],
+    trackPayload = null,
+  } = {}) {
+    const presenceFixture = getUnifiedPlatformTestFixture('house_office_presence_seed') || {};
+    const allowedStatuses = new Set(
+      (Array.isArray(presenceFixture?.allowedStatuses) ? presenceFixture.allowedStatuses : [])
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+    );
+    const officeList = Array.isArray(offices) ? offices : [];
+    const runs = Array.isArray(archiveRuns) ? archiveRuns : [];
+    const jobs = Array.isArray(trainerJobs) ? trainerJobs : [];
+    const results = Array.isArray(trainerResults) ? trainerResults : [];
+    const trackEvents = Array.isArray(trackPayload?.events) ? trackPayload.events : [];
+    const latestTrainerResult = results[0] || null;
+    const latestTrainerJob = jobs[0] || null;
+    const latestArchiveRun = runs[0] || null;
+    const latestOpsTrackEvent = [...trackEvents].reverse().find((event) => {
+      const trackId = String(event?.trackId || '').trim();
+      return trackId === 'track_poker_mastery' || trackId === 'track_web_ops';
+    }) || null;
+    const latestOpsRun = runs.find((run) => {
+      const experienceId = String(run?.experienceId || '').trim();
+      return experienceId === 'poker.season' || experienceId === 'web.agent';
+    }) || null;
+
+    const presenceItems = officeList.map((office) => {
+      const officeId = String(office?.officeId || '').trim();
+      const officeLabel = String(office?.displayName || office?.slug || officeId).trim() || officeId;
+      const officeSurface = String(office?.surface || '').trim();
+      if (!officeId) return null;
+
+      if (officeSurface === 'workshop' && binding?.activeConfigVersionId) {
+        return {
+          officeId,
+          officeLabel,
+          focus: `Config ${String(binding.activeConfigVersionId || '').trim()}`,
+          status: allowedStatuses.has('building') ? 'building' : 'idle',
+          lastActivityAt: String(binding.updatedAt || binding.createdAt || '').trim() || null,
+          deepLink: deeplinks.workshop || deeplinks.office,
+          sourceRefs: [
+            {
+              sourceKind: 'team_config_binding',
+              sourceId: String(binding.teamBindingId || '').trim(),
+              entryPath: '/api/platform/workshop',
+            },
+          ],
+        };
+      }
+
+      if (officeSurface === 'trainer') {
+        if (latestTrainerResult?.approvalNeeded === true) {
+          return {
+            officeId,
+            officeLabel,
+            focus: `Approval needed for ${String(latestTrainerResult.trainerResultId || '').trim()}`,
+            status: allowedStatuses.has('alert') ? 'alert' : 'idle',
+            lastActivityAt: String(latestTrainerResult.updatedAt || latestTrainerResult.createdAt || '').trim() || null,
+            deepLink: deeplinks.trainer || deeplinks.office,
+            sourceRefs: [
+              {
+                sourceKind: 'trainer_result',
+                sourceId: String(latestTrainerResult.trainerResultId || '').trim(),
+                entryPath: '/api/platform/trainer',
+              },
+              {
+                sourceKind: 'trainer_job',
+                sourceId: String(latestTrainerResult.trainerJobId || latestTrainerJob?.trainerJobId || '').trim(),
+                entryPath: '/api/platform/trainer',
+              },
+            ].filter((entry) => entry.sourceId),
+          };
+        }
+        if (latestTrainerResult || latestTrainerJob) {
+          const trainerResultId = String(latestTrainerResult?.trainerResultId || '').trim();
+          const trainerJobId = String(latestTrainerJob?.trainerJobId || latestTrainerResult?.trainerJobId || '').trim();
+          return {
+            officeId,
+            officeLabel,
+            focus: trainerResultId ? `Review ${trainerResultId}` : `Evaluate ${trainerJobId}`,
+            status: allowedStatuses.has('evaluating') ? 'evaluating' : 'idle',
+            lastActivityAt: String(
+              latestTrainerResult?.updatedAt
+              || latestTrainerResult?.createdAt
+              || latestTrainerJob?.updatedAt
+              || latestTrainerJob?.createdAt
+              || ''
+            ).trim() || null,
+            deepLink: deeplinks.trainer || deeplinks.office,
+            sourceRefs: [
+              trainerResultId
+                ? {
+                  sourceKind: 'trainer_result',
+                  sourceId: trainerResultId,
+                  entryPath: '/api/platform/trainer',
+                }
+                : null,
+              trainerJobId
+                ? {
+                  sourceKind: 'trainer_job',
+                  sourceId: trainerJobId,
+                  entryPath: '/api/platform/trainer',
+                }
+                : null,
+            ].filter(Boolean),
+          };
+        }
+        return null;
+      }
+
+      if (officeSurface === 'archive' && latestArchiveRun?.runId) {
+        return {
+          officeId,
+          officeLabel,
+          focus: `Run ${String(latestArchiveRun.runId || '').trim()}`,
+          status: allowedStatuses.has('researching') ? 'researching' : 'idle',
+          lastActivityAt: String(
+            latestArchiveRun.completedAt
+            || latestArchiveRun.updatedAt
+            || latestArchiveRun.createdAt
+            || ''
+          ).trim() || null,
+          deepLink: deeplinks.archive || deeplinks.office,
+          sourceRefs: [
+            {
+              sourceKind: 'run',
+              sourceId: String(latestArchiveRun.runId || '').trim(),
+              entryPath: '/api/platform/archive',
+            },
+          ],
+        };
+      }
+
+      if (officeSurface === 'experiences') {
+        const trackId = String(latestOpsTrackEvent?.trackId || '').trim();
+        const runExperienceId = String(latestOpsRun?.experienceId || '').trim();
+        if (trackId === 'track_poker_mastery' || runExperienceId === 'poker.season') {
+          return {
+            officeId,
+            officeLabel,
+            focus: 'Poker Mastery progress',
+            status: allowedStatuses.has('competing') ? 'competing' : 'idle',
+            lastActivityAt: String(
+              latestOpsTrackEvent?.createdAt
+              || latestOpsRun?.updatedAt
+              || latestOpsRun?.createdAt
+              || ''
+            ).trim() || null,
+            deepLink: deeplinks.experiences || deeplinks.office,
+            sourceRefs: [
+              latestOpsTrackEvent
+                ? {
+                  sourceKind: 'track_progress_event',
+                  sourceId: String(latestOpsTrackEvent.trackProgressEventId || '').trim(),
+                  entryPath: '/api/platform/tracks',
+                }
+                : null,
+              latestOpsRun
+                ? {
+                  sourceKind: 'run',
+                  sourceId: String(latestOpsRun.runId || '').trim(),
+                  entryPath: '/api/platform/experiences',
+                }
+                : null,
+            ].filter(Boolean),
+          };
+        }
+        if (trackId === 'track_web_ops' || runExperienceId === 'web.agent') {
+          return {
+            officeId,
+            officeLabel,
+            focus: 'Web Ops progress',
+            status: allowedStatuses.has('researching') ? 'researching' : 'idle',
+            lastActivityAt: String(
+              latestOpsTrackEvent?.createdAt
+              || latestOpsRun?.updatedAt
+              || latestOpsRun?.createdAt
+              || ''
+            ).trim() || null,
+            deepLink: deeplinks.experiences || deeplinks.office,
+            sourceRefs: [
+              latestOpsTrackEvent
+                ? {
+                  sourceKind: 'track_progress_event',
+                  sourceId: String(latestOpsTrackEvent.trackProgressEventId || '').trim(),
+                  entryPath: '/api/platform/tracks',
+                }
+                : null,
+              latestOpsRun
+                ? {
+                  sourceKind: 'run',
+                  sourceId: String(latestOpsRun.runId || '').trim(),
+                  entryPath: '/api/platform/experiences',
+                }
+                : null,
+            ].filter(Boolean),
+          };
+        }
+      }
+
+      return null;
+    }).filter((item) => {
+      return item
+        && String(item.officeId || '').trim()
+        && String(item.focus || '').trim()
+        && String(item.status || '').trim()
+        && Array.isArray(item.sourceRefs)
+        && item.sourceRefs.length > 0;
+    });
+
+    return presenceItems.sort((left, right) => {
+      const leftOfficeOrder = Number(officeList.find((office) => office.officeId === left.officeId)?.order || 0);
+      const rightOfficeOrder = Number(officeList.find((office) => office.officeId === right.officeId)?.order || 0);
+      const officeOrderDelta = leftOfficeOrder - rightOfficeOrder;
+      if (officeOrderDelta !== 0) return officeOrderDelta;
+      const lastActivityDelta = parseHouseOfficeActivityTime(String(right.lastActivityAt || '')) - parseHouseOfficeActivityTime(String(left.lastActivityAt || ''));
+      if (lastActivityDelta !== 0) return lastActivityDelta;
+      return String(left.officeId || '').localeCompare(String(right.officeId || ''));
+    });
+  }
+
   function buildHouseOfficeOverviewPayload({
     context = {},
     houseId = '',
@@ -243,6 +477,17 @@ function registerPlatformReadRoutes(app, deps) {
     const binding = houseId && teamId
       ? getTeamConfigBinding({ houseId, teamId })
       : null;
+    const presence = houseId
+      ? buildHouseOfficePresence({
+        offices,
+        deeplinks,
+        binding,
+        trainerJobs,
+        trainerResults,
+        archiveRuns,
+        trackPayload: tracksPayload,
+      })
+      : [];
     const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length;
     return {
       houseId: houseId || null,
@@ -251,7 +496,7 @@ function registerPlatformReadRoutes(app, deps) {
       availableTeamIds: context.availableTeamIds,
       offices,
       staffAgents,
-      presence: [],
+      presence,
       briefing: [],
       attention: [],
       deeplinks,
@@ -273,6 +518,7 @@ function registerPlatformReadRoutes(app, deps) {
         counts: {
           officeCount: offices.length,
           staffAgentCount: staffAgents.length,
+          presenceCount: presence.length,
           experienceCount: experiences.length,
           trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
           trackEventCount: Array.isArray(tracksPayload?.events) ? tracksPayload.events.length : 0,
@@ -285,6 +531,7 @@ function registerPlatformReadRoutes(app, deps) {
       summary: {
         officeCount: offices.length,
         staffAgentCount: staffAgents.length,
+        presenceCount: presence.length,
         experienceCount: experiences.length,
         trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
         trainerJobCount: trainerJobs.length,

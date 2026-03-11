@@ -262,7 +262,8 @@ GREEN gate:
 2. presence labels use only the allowed safe vocabulary,
 3. presence precedence is deterministic for the same seed,
 4. each presence item has `officeId`, `focus`, `status`, `lastActivityAt`, `deepLink`, and `sourceRefs`,
-5. the visible Presence Board matches the same deterministic ordering as the read payload.
+5. each `sourceRefs[]` entry exposes stable `sourceKind`, `sourceId`, and `entryPath`,
+6. the visible Presence Board matches the same deterministic ordering as the read payload.
 
 Implementation notes:
 

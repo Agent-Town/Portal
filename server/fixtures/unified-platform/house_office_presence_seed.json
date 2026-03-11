@@ -17,5 +17,27 @@
     "archive",
     "experience",
     "idle"
+  ],
+  "expectedPresence": [
+    {
+      "officeId": "office_fixture_workshop",
+      "status": "building",
+      "sourceKind": "team_config_binding"
+    },
+    {
+      "officeId": "office_fixture_analysis",
+      "status": "alert",
+      "sourceKind": "trainer_result"
+    },
+    {
+      "officeId": "office_fixture_archive",
+      "status": "researching",
+      "sourceKind": "run"
+    },
+    {
+      "officeId": "office_fixture_ops",
+      "status": "competing",
+      "sourceKind": "track_progress_event"
+    }
   ]
 }

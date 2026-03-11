@@ -983,6 +983,18 @@ Response fields:
 - `data.staffAgents[].deepLink.surface`
 - `data.staffAgents[].deepLink.label`
 - `data.presence[]`
+- `data.presence[].officeId`
+- `data.presence[].officeLabel`
+- `data.presence[].focus`
+- `data.presence[].status`
+- `data.presence[].lastActivityAt`
+- `data.presence[].deepLink.kind`
+- `data.presence[].deepLink.surface`
+- `data.presence[].deepLink.label`
+- `data.presence[].sourceRefs[]`
+- `data.presence[].sourceRefs[].sourceKind`
+- `data.presence[].sourceRefs[].sourceId`
+- `data.presence[].sourceRefs[].entryPath`
 - `data.briefing[]`
 - `data.attention[]`
 - `data.deeplinks.office`
@@ -996,6 +1008,7 @@ Response fields:
 - `data.sourceManifest.fixtures[]`
 - `data.sourceManifest.counts.officeCount`
 - `data.sourceManifest.counts.staffAgentCount`
+- `data.sourceManifest.counts.presenceCount`
 - `data.sourceManifest.counts.experienceCount`
 - `data.sourceManifest.counts.trackCount`
 - `data.sourceManifest.counts.trackEventCount`
@@ -1005,6 +1018,7 @@ Response fields:
 - `data.sourceManifest.activeConfigVersionId`
 - `data.summary.officeCount`
 - `data.summary.staffAgentCount`
+- `data.summary.presenceCount`
 - `data.summary.experienceCount`
 - `data.summary.trackCount`
 - `data.summary.trainerJobCount`
