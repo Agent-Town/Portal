@@ -1,0 +1,27 @@
+{
+  "family": "library_private_seed",
+  "houseId": "house_library_fixture_alpha",
+  "teamId": "team_library_alpha",
+  "items": [
+    {
+      "libraryItemId": "lib_fixture_story_01",
+      "itemType": "episodic_note",
+      "title": "First Build Story",
+      "summary": "A saved House memory about the first successful build.",
+      "sourceKind": "conversation_excerpt",
+      "sourceRef": "conv_fixture_alpha#msg_01",
+      "visibility": "house_private",
+      "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "libraryItemId": "lib_fixture_fact_01",
+      "itemType": "fact_note",
+      "title": "Atlas Uses Modal Continuity",
+      "summary": "A distilled fact that Atlas should stay modal-first.",
+      "sourceKind": "trace",
+      "sourceRef": "trace_fixture_alpha",
+      "visibility": "team_shared",
+      "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "family": "library_publish_seed",
+  "publication": {
+    "libraryItemId": "lib_fixture_publish_01",
+    "visibility": "registry_public",
+    "contentHash": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "registryId": "reg_fixture_library_01"
+  }
+}

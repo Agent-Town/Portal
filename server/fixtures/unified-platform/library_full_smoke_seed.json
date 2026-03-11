@@ -1,0 +1,10 @@
+{
+  "family": "library_full_smoke_seed",
+  "smoke": {
+    "library": true,
+    "scope": true,
+    "workshop": true,
+    "registry": true,
+    "seals": true
+  }
+}

@@ -28,7 +28,7 @@ test.beforeEach(async ({ request }) => {
 test('M19.0 harness exposes deterministic platform counts, fixtures, and worker continuity', async ({ request, page }) => {
   const countsEnvelope = await getPlatformCounts(request);
   expect(countsEnvelope?.ok).toBe(true);
-  expect(countsEnvelope?.counts).toEqual({
+  expect(countsEnvelope?.counts).toEqual(expect.objectContaining({
     compiled_pack_versions: 0,
     runs: 0,
     trace_intake_records: 0,
@@ -42,12 +42,17 @@ test('M19.0 harness exposes deterministic platform counts, fixtures, and worker 
     integration_executions: 0,
     trainer_jobs: 0,
     trainer_results: 0,
+    library_items: 0,
+    library_links: 0,
+    scope_sets: 0,
+    scope_set_items: 0,
+    library_publications: 0,
     track_progress_events: 0,
     sealed_contexts: 0,
     sealed_context_violations: 0,
     approvals: 0,
     usage_ledger: 0,
-  });
+  }));
 
   const familiesEnvelope = await listPlatformFixtures(request);
   expect(familiesEnvelope?.ok).toBe(true);

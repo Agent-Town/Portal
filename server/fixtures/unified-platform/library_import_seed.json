@@ -1,0 +1,9 @@
+{
+  "family": "library_import_seed",
+  "artifact": {
+    "registryId": "reg_fixture_import_01",
+    "title": "Shared Agent Checklist",
+    "itemType": "imported_artifact",
+    "contentHash": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+  }
+}

@@ -126,6 +126,7 @@ const {
   getIntegrationExecutionByIdempotency,
   getIntegrationPackVersionByIdempotency,
   getLatestTraceEvent,
+  getLibraryItemById,
   getRunByIdempotency,
   getRunById,
   getRunByTraceId,
@@ -138,11 +139,21 @@ const {
   getTrainerResultByJobId,
   getTraceArtifactById,
   getTraceIntakeRecord,
+  getUnifiedPlatformEditorSnapshot,
+  getUnifiedPlatformLibraryInspector,
+  getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicationsInspector,
+  getUnifiedPlatformScopesInspector,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
   listHouseTeamIds,
+  listLibraryItems,
+  listLibraryLinks,
+  listLibraryPublications,
+  listScopeSetItems,
+  listScopeSets,
   listTrackDefinitions,
   listTrackProgressEvents,
   listRuns,
@@ -10650,6 +10661,33 @@ if (process.env.NODE_ENV === 'test') {
     return res.json({
       ok: true,
       stats: getUnifiedPlatformTestStats(),
+    });
+  });
+
+  app.get('/__test__/unified-platform/inspect/:inspector', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const inspector = String(req.params.inspector || '').trim().toLowerCase();
+    let data = null;
+    if (inspector === 'library') {
+      data = getUnifiedPlatformLibraryInspector();
+    } else if (inspector === 'scopes') {
+      data = getUnifiedPlatformScopesInspector();
+    } else if (inspector === 'publications') {
+      data = getUnifiedPlatformPublicationsInspector();
+    } else if (inspector === 'prompt-preview') {
+      data = getUnifiedPlatformPromptPreview();
+    } else if (inspector === 'editor') {
+      data = getUnifiedPlatformEditorSnapshot();
+    } else {
+      return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    }
+    return res.json({
+      ok: true,
+      inspector,
+      data,
     });
   });
 

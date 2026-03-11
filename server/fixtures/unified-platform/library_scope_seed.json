@@ -1,0 +1,11 @@
+{
+  "family": "library_scope_seed",
+  "scopeSet": {
+    "scopeSetId": "scope_fixture_alpha",
+    "title": "Atlas continuity facts",
+    "orderedItemIds": [
+      "lib_fixture_fact_01",
+      "lib_fixture_story_01"
+    ]
+  }
+}

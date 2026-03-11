@@ -1,0 +1,11 @@
+{
+  "family": "library_trace_promotion_seed",
+  "trace": {
+    "traceId": "trace_fixture_library_promotion_01",
+    "summary": "The agent recovered a failed draft and produced a stable patch."
+  },
+  "trainerResult": {
+    "trainerResultId": "trainer_result_fixture_library_01",
+    "summary": "A trainer insight suitable for promotion into Library."
+  }
+}

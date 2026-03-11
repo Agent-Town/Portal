@@ -1,0 +1,11 @@
+{
+  "family": "library_skill_pack_seed",
+  "packVersionId": "pack_library_fixture_01",
+  "contentHash": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+  "specializedSkills": [
+    "House Librarian",
+    "Archive Clerk",
+    "Workshop Scribe",
+    "Registry Curator"
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "family": "library_prompt_scope_seed",
+  "activeScopeSetId": "scope_fixture_prompt_alpha",
+  "selectedItemIds": [
+    "lib_fixture_fact_01",
+    "lib_fixture_story_01"
+  ],
+  "expectedPromptRefs": [
+    "lib_fixture_fact_01",
+    "lib_fixture_story_01"
+  ]
+}

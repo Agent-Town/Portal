@@ -1,0 +1,11 @@
+{
+  "family": "library_seal_seed",
+  "item": {
+    "libraryItemId": "lib_fixture_sealed_01",
+    "sourceKind": "trace",
+    "sourceRef": "trace_fixture_sealed_01",
+    "visibility": "house_private",
+    "sealPolicy": "blocked_publication"
+  },
+  "expectedErrorCode": "LIBRARY_SEAL_BLOCKED"
+}

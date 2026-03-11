@@ -1,0 +1,24 @@
+{
+  "family": "library_item_link_seed",
+  "item": {
+    "libraryItemId": "lib_fixture_link_01",
+    "itemType": "playbook",
+    "title": "Workshop Recovery Playbook",
+    "summary": "A saved playbook linked back to a Workshop file and a trace.",
+    "sourceKind": "workspace_file",
+    "sourceRef": "workspace/.agent-town/playbooks/recovery.md",
+    "contentHash": "sha256:3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "links": [
+    {
+      "linkKind": "derived_from_workshop_config",
+      "sourceKind": "workspace_file",
+      "sourceRef": "workspace/.agent-town/playbooks/recovery.md"
+    },
+    {
+      "linkKind": "derived_from_trace",
+      "sourceKind": "trace",
+      "sourceRef": "trace_fixture_library_link_01"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "family": "library_workshop_seed",
+  "files": [
+    {
+      "path": "workspace/.agent-town/notes/library.md",
+      "content": "# Library Notes\n\nKeep House memory readable."
+    },
+    {
+      "path": "workspace/.agent-town/playbooks/scope.md",
+      "content": "# Scope Playbook\n\nOnly use what the user selected."
+    }
+  ]
+}
