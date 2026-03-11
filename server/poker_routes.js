@@ -23,7 +23,9 @@ const {
 } = require('./streamflow_adapter');
 const {
   buildPokerPlayAdminReviewPayload,
+  buildPokerPlayAdminExportPayload,
   buildPokerPlayTablePayload,
+  closeTable,
   createTable,
   createRouteError,
   getSeriesDetail,
@@ -916,6 +918,47 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.post('/api/poker/play/admin/tables/:tableId/close', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = closeTable(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        refundMode: req.body?.refundMode,
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'close', {
+        handId: payload?.hand?.handId || null,
+        refundMode: payload?.refundSummary?.refundMode || null,
+        refundedSeatCount: Number(payload?.refundSummary?.refundedSeatCount || 0),
+        refundedTotalOil: Number(payload?.refundSummary?.refundedTotalOil || 0),
+      });
+      return sendPortalApiSuccess(
+        res,
+        buildPokerPlayTablePayload(playRouteDeps, payload.table, payload.seats, payload.hand, {
+          req,
+          processAt: req.body?.asOf,
+        }),
+        { requestId }
+      );
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_CLOSE_FAILED',
+        err?.message || 'Unable to close the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/admin/tables/:tableId/review', (req, res) => {
     const requestId = buildPortalRequestId();
     if (!isAdmin(req)) {
@@ -934,6 +977,32 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_REVIEW_FAILED',
         err?.message || 'Unable to load poker table review.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/tables/:tableId/export', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminExportPayload(playRouteDeps, {
+        tableId: req.params.tableId,
+        processAt: req.query?.asOf,
+        handId: req.query?.handId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_EXPORT_FAILED',
+        err?.message || 'Unable to export poker review data.',
         {
           requestId,
           details: err?.details || {},

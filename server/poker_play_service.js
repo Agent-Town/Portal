@@ -278,12 +278,28 @@ function isTablePaused(table) {
   return normalizeTrimmedString(table?.status, 'open').toLowerCase() === 'paused';
 }
 
+function isTableAdminClosed(table) {
+  return normalizeTrimmedString(table?.status).toLowerCase() === 'admin_closed';
+}
+
 function isSeriesClosedTable(table) {
-  return normalizeTrimmedString(table?.status).toLowerCase() === 'series_closed';
+  const status = normalizeTrimmedString(table?.status).toLowerCase();
+  return status === 'series_closed' || status === 'admin_closed';
 }
 
 function isSeatInPlay(seat) {
   return !!seat && (seat.status === 'active' || seat.status === 'registered' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
+}
+
+function isTournamentVoidedSeat(seat) {
+  return normalizeTrimmedString(seat?.status).toLowerCase() === 'void_refund';
+}
+
+function normalizeAdminCloseRefundMode(value, tableType) {
+  const normalized = normalizeTrimmedString(value).toLowerCase();
+  if (normalized === 'none') return 'none';
+  if (normalized === 'cash_stack' || normalized === 'buy_in') return normalized;
+  return normalizePokerPlayTableType(tableType) === 'cash' ? 'cash_stack' : 'buy_in';
 }
 
 function getPokerPlayPresenceTimeoutSeconds(table) {
@@ -386,7 +402,9 @@ function getTournamentAllSeats(entries) {
 }
 
 function computeTournamentPrizePoolOil(seats) {
-  return (Array.isArray(seats) ? seats : []).reduce((sum, seat) => sum + Math.max(0, Number(seat?.buyInOil || 0)), 0);
+  return (Array.isArray(seats) ? seats : [])
+    .filter((seat) => !isTournamentVoidedSeat(seat))
+    .reduce((sum, seat) => sum + Math.max(0, Number(seat?.buyInOil || 0)), 0);
 }
 
 function buildTournamentPayoutPlan({ entrantCount, prizePoolOil }) {
@@ -444,7 +462,7 @@ function sortSeatsByTournamentElimination(seats) {
 }
 
 function buildCompletedTournamentPlacements(entries) {
-  const seats = getTournamentAllSeats(entries);
+  const seats = getTournamentAllSeats(entries).filter((seat) => !isTournamentVoidedSeat(seat));
   if (!seats.length) return [];
   const activeSeats = getActiveSeatRows(seats);
   let winnerSeat = activeSeats[0] || null;
@@ -545,7 +563,7 @@ function buildDynamicTableSummary(config, matchKey) {
 }
 
 function buildTournamentEconomics(entries) {
-  const seats = getTournamentAllSeats(entries);
+  const seats = getTournamentAllSeats(entries).filter((seat) => !isTournamentVoidedSeat(seat));
   const uniqueWallets = new Set();
   for (const seat of seats) {
     const walletSubject = normalizeTrimmedString(seat?.walletSubject);
@@ -603,6 +621,7 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
       lateRegistrationOpen = true;
     }
     for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      if (isTournamentVoidedSeat(seat)) continue;
       const walletSubject = normalizeTrimmedString(seat?.walletSubject);
       if (walletSubject) uniqueWallets.add(walletSubject);
     }
@@ -721,6 +740,15 @@ function sanitizeSeatForViewer({ seat, hand, viewerSeatNumber }) {
     payoutSettledAt: seat?.payoutSettledAt || null,
     eliminatedAt: seat?.eliminatedAt || null,
   };
+}
+
+function resolveEffectiveSeatStackOil(seat, hand) {
+  const seatNumber = normalizeSeatNumber(seat?.seatNumber);
+  const seatState = hand?.state?.seatStates?.[String(seatNumber)] || null;
+  if (seatState && Number.isFinite(Number(seatState?.stackOil))) {
+    return Math.max(0, Number(seatState.stackOil || 0));
+  }
+  return Math.max(0, Number(seat?.stackOil || 0));
 }
 
 function sanitizeHandForViewer({ table, hand, seats, viewerSeatNumber }) {
@@ -882,6 +910,26 @@ function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } =
     openDisputes: sanitizeDisputesForViewer(openDisputes, synced.seats),
     auditEvents: sanitizeAuditEventsForViewer(auditEvents, synced.seats),
     processAt: requestAt,
+  };
+}
+
+function buildPokerPlayAdminExportPayload(deps, { tableId, processAt, handId } = {}) {
+  const review = buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId });
+  return {
+    exportVersion: 'poker-play-admin-export-v1',
+    generatedAt: review.processAt,
+    tableId: review?.table?.tableId || normalizeTrimmedString(tableId),
+    handId: review?.reviewHand?.handId || review?.activeHand?.handId || null,
+    summary: {
+      tableStatus: review?.table?.status || 'unknown',
+      seatCount: Array.isArray(review?.seats) ? review.seats.length : 0,
+      openDisputeCount: Array.isArray(review?.openDisputes) ? review.openDisputes.length : 0,
+      reviewDisputeCount: Array.isArray(review?.disputes) ? review.disputes.length : 0,
+      auditEventCount: Array.isArray(review?.auditEvents) ? review.auditEvents.length : 0,
+      messageCount: Array.isArray(review?.messages) ? review.messages.length : 0,
+      actionCount: Array.isArray(review?.actions) ? review.actions.length : 0,
+    },
+    review,
   };
 }
 
@@ -1663,6 +1711,183 @@ function resumeTable(deps, { tableId, actorLabel = 'operator', asOf } = {}) {
   return synced || { table, seats, hand };
 }
 
+function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode, asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (isTableAdminClosed(synced.table)) {
+    return {
+      table: synced.table,
+      seats: synced.seats,
+      hand: synced.hand,
+      refundSummary: {
+        refundMode: normalizeTrimmedString(synced?.table?.state?.refundMode, normalizeAdminCloseRefundMode(refundMode, synced.table.tableType)),
+        refundedSeatCount: Number(synced?.table?.state?.refundedSeatCount || 0),
+        refundedTotalOil: Number(synced?.table?.state?.refundedTotalOil || 0),
+      },
+    };
+  }
+
+  const table = synced.table;
+  const hand = synced.hand;
+  const refundPolicy = normalizeAdminCloseRefundMode(refundMode, table.tableType);
+  const closeReason = normalizeTrimmedString(reason, 'Operator closed the table.');
+  let refundedSeatCount = 0;
+  let refundedTotalOil = 0;
+  const finalSeatStatusByNumber = new Map();
+
+  for (const seat of Array.isArray(synced.seats) ? synced.seats : []) {
+    const seatNumber = normalizeSeatNumber(seat?.seatNumber);
+    const status = normalizeTrimmedString(seat?.status).toLowerCase();
+    if (normalizePokerPlayTableType(table.tableType) === 'cash') {
+      const refundAmount = refundPolicy === 'none' ? 0 : resolveEffectiveSeatStackOil(seat, hand);
+      if (refundAmount > 0) {
+        deps.createOilLedgerEntry({
+          walletSubject: seat.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          entryKind: 'poker_play_admin_refund',
+          direction: 'credit',
+          amount: refundAmount,
+          memo: `${table.title} operator closure refund`,
+        });
+        refundedSeatCount += 1;
+        refundedTotalOil += refundAmount;
+      }
+      finalSeatStatusByNumber.set(seatNumber, 'closed_refund');
+      deps.upsertPokerPlaySeat({
+        ...seat,
+        status: 'closed_refund',
+        stackOil: 0,
+        disconnectedAt: null,
+        updatedAt: requestAt,
+      });
+      continue;
+    }
+
+    const alreadySettled = status === 'paid' || status === 'busted' || status === 'void_refund';
+    const refundAmount = refundPolicy === 'none' || alreadySettled
+      ? 0
+      : Math.max(0, Number(seat?.buyInOil || 0));
+    if (refundAmount > 0) {
+      deps.createOilLedgerEntry({
+        walletSubject: seat.walletSubject,
+        houseId: seat.houseId || null,
+        verificationId: seat.streamflowVerificationId || null,
+        entryKind: 'poker_play_tournament_refund',
+        direction: 'credit',
+        amount: refundAmount,
+        memo: `${table.title} operator tournament refund`,
+      });
+      refundedSeatCount += 1;
+      refundedTotalOil += refundAmount;
+    }
+    finalSeatStatusByNumber.set(seatNumber, alreadySettled ? status : 'void_refund');
+    deps.upsertPokerPlaySeat({
+      ...seat,
+      status: alreadySettled ? status : 'void_refund',
+      stackOil: 0,
+      disconnectedAt: null,
+      eliminatedAt: alreadySettled ? (seat?.eliminatedAt || null) : (seat?.eliminatedAt || requestAt),
+      updatedAt: requestAt,
+    });
+  }
+
+  let updatedHand = hand;
+  if (hand) {
+    const nextHandState = cloneJson(hand.state, {});
+    const rawSeatStates = nextHandState?.seatStates && typeof nextHandState.seatStates === 'object'
+      ? nextHandState.seatStates
+      : {};
+    const nextSeatStates = {};
+    for (const [key, seatState] of Object.entries(rawSeatStates)) {
+      const seatNumber = normalizeSeatNumber(key);
+      const nextSeatStatus = normalizeTrimmedString(finalSeatStatusByNumber.get(seatNumber));
+      nextSeatStates[key] = {
+        ...cloneJson(seatState, {}),
+        stackOil: 0,
+        committedStreetOil: 0,
+        committedHandOil: 0,
+        allIn: false,
+        eliminated: nextSeatStatus === 'void_refund' ? true : Boolean(seatState?.eliminated),
+      };
+    }
+    nextHandState.actionExpiresAt = null;
+    nextHandState.actingSeat = 0;
+    nextHandState.seatStates = nextSeatStates;
+    updatedHand = deps.upsertPokerPlayHand({
+      ...hand,
+      status: 'cancelled',
+      actionExpiresAt: null,
+      state: nextHandState,
+      result: {
+        ...(hand.result && typeof hand.result === 'object' ? hand.result : {}),
+        type: 'admin_closed',
+        note: closeReason,
+      },
+      updatedAt: requestAt,
+    });
+  }
+
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    status: 'admin_closed',
+    state: {
+      ...state,
+      closedAt: requestAt,
+      closeReason,
+      closedBy: normalizeTrimmedString(actorLabel, 'operator'),
+      refundMode: refundPolicy,
+      refundedSeatCount,
+      refundedTotalOil,
+      pausedAt: null,
+      pausedReason: null,
+      pausedBy: null,
+      pausedActionRemainingMs: 0,
+    },
+    updatedAt: requestAt,
+  });
+
+  deps.createPokerPlayMessage({
+    tableId: updatedTable.tableId,
+    handId: updatedHand?.handId || null,
+    seatNumber: null,
+    authorRole: 'system',
+    body: `${closeReason}${refundedSeatCount ? ` ${refundedSeatCount} seat${refundedSeatCount === 1 ? '' : 's'} refunded for ${refundedTotalOil} OIL.` : ''}`,
+    createdAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: updatedHand?.handId || null,
+      actorRole: normalizePokerPlayAuditActorRole(actorLabel, actorLabel === 'operator' ? 'operator' : 'system'),
+      eventKind: 'table_closed',
+      payload: {
+        reason: closeReason,
+        refundMode: refundPolicy,
+        refundedSeatCount,
+        refundedTotalOil,
+        actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+      },
+      createdAt: requestAt,
+    });
+  }
+
+  return {
+    table: updatedTable,
+    seats: deps.listPokerPlaySeatsByTable(updatedTable.tableId),
+    hand: updatedHand,
+    refundSummary: {
+      refundMode: refundPolicy,
+      refundedSeatCount,
+      refundedTotalOil,
+    },
+  };
+}
+
 function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   let table = deps.getPokerPlayTableById(tableId);
   if (!table) return null;
@@ -1673,7 +1898,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   table = presence.table;
   seats = presence.seats;
   hand = presence.hand;
-  if (isTablePaused(table)) {
+  if (isTablePaused(table) || isTableAdminClosed(table)) {
     return { table, seats, hand };
   }
   let safety = 0;
@@ -2176,6 +2401,9 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
   table = synced.table;
   const seats = synced.seats;
   const currentHand = synced.hand;
+  if (isTableAdminClosed(table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
   if (isTablePaused(table)) {
     throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
   }
@@ -2388,6 +2616,9 @@ function postMessage(deps, { handId, session, req, body } = {}) {
   if (!currentHand || currentHand.tableId !== synced.table.tableId) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
   }
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
   const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
   const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, seat.walletSubject, toProcessIso(deps, body?.asOf)) || seat;
   const messageBody = normalizePokerPlayMessageBody(body?.body);
@@ -2427,6 +2658,9 @@ function postAction(deps, { handId, session, req, body } = {}) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
   }
   const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: body?.asOf });
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
   const currentHand = deps.getPokerPlayHandById(handId) || synced.hand;
   if (isTablePaused(synced.table)) {
     throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
@@ -2527,6 +2761,9 @@ function openHandDispute(deps, { handId, session, req, body } = {}) {
   const currentHand = deps.getPokerPlayHandById(handId) || hand;
   if (!synced?.table || currentHand.tableId !== synced.table.tableId) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
   }
   const { walletBinding, seat } = requireSeatWriter(deps, { table: synced.table, session, req });
   const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, walletBinding.walletSubject, requestAt) || seat;
@@ -2677,9 +2914,11 @@ function resolveHandDispute(deps, { disputeId, body, processAt } = {}) {
 }
 
 module.exports = {
+  buildPokerPlayAdminExportPayload,
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
+  closeTable,
   createTable,
   createRouteError,
   getSeriesDetail,

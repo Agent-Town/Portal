@@ -674,6 +674,26 @@ Resumes a paused table and restores the live hand clock using the remaining coun
 Headers:
 - `x-admin-token: <ADMIN_TOKEN>`
 
+### POST `/api/poker/play/admin/tables/:tableId/close` (admin)
+Closes a live poker table, marks it terminal for gameplay, and optionally refunds offchain OIL.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Operator closed the table.",
+  "refundMode": "cash_stack",
+  "asOf": "2026-03-11T14:00:20.000Z"
+}
+```
+
+Close notes:
+- cash tables default to `refundMode = "cash_stack"` and credit each seated stack back to OIL
+- tournament tables default to `refundMode = "buy_in"` and void unresolved seats back to their buy-in
+- closed tables move to `data.table.status = "admin_closed"` and reject new seat joins plus new hand/thread actions with `POKER_PLAY_TABLE_CLOSED`
+
 ### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
 Returns the operator review payload for one table.
 
@@ -694,6 +714,20 @@ Response fields:
 Notes:
 - if the caller does not pass `handId`, the route prefers the newest open-dispute hand, otherwise the current live hand
 - `data.reviewHand.seats[]` exposes full seat cards for operator inspection
+
+### GET `/api/poker/play/admin/tables/:tableId/export` (admin)
+Returns an export-ready JSON payload for one table review.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Response fields:
+- `data.exportVersion = "poker-play-admin-export-v1"`
+- `data.generatedAt`
+- `data.tableId`
+- `data.handId`
+- `data.summary`
+- `data.review`
 
 ### POST `/api/poker/play/admin/disputes/:disputeId/resolve` (admin)
 Resolves or dismisses a flagged hand review and can optionally resume the table if no open disputes remain.
@@ -716,6 +750,7 @@ Failure codes:
 - `NOT_FOUND`
 - `INVALID_ARGUMENT`
 - `POKER_PLAY_DISPUTE_CLOSED`
+- `POKER_PLAY_TABLE_CLOSED`
 
 ### POST `/api/poker/play/tables/:tableId/leave`
 Leaves a live table. Cash tables cash out immediately between hands, or queue a cash-out during a live hand and return the remaining stack to offchain OIL when that hand settles. Tournament tables only allow leaving after bust-out or payout.

@@ -804,13 +804,17 @@
     const viewerMode = rail ? 'public' : String(data?.viewerMode || 'player');
     const publicRail = viewerMode === 'public';
     const paused = String(table?.status || 'open') === 'paused';
-    const canJoin = !publicRail && !paused && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
+    const tableOpen = String(table?.status || 'open') === 'open';
+    const canJoin = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
       `
         <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
         <p>${escapeHtml(
-          paused
+          adminClosed
+            ? (table?.state?.closeReason || 'Table closed by operator.')
+            : paused
             ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
             : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
         )}</p>
@@ -828,6 +832,7 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
           ${publicRail ? renderSummaryMetric('Viewer Mode', 'public rail') : renderSummaryMetric('Your OIL', `${oilBalance}`)}
+          ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderMetaBadges([
           `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
@@ -893,10 +898,13 @@
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
+        ${adminClosed ? `<p>This table was closed by an operator.${Number(table?.state?.refundedTotalOil || 0) > 0 ? ` Refunds issued: ${Number(table?.state?.refundedTotalOil || 0)} OIL total.` : ''}</p>` : ''}
         ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}</p>` : ''}
-        <div class="pokerLinks">
-          <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
-        </div>
+        ${adminClosed ? '' : `
+          <div class="pokerLinks">
+            <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
+          </div>
+        `}
       `);
     }
 
@@ -982,7 +990,7 @@
       `);
     }
 
-    if (!publicRail && mySeat && hand) {
+    if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(`
         <h2>Flag Hand For Review</h2>
         <p>Use this for rule, turn-order, disconnect, or settlement issues. Filing a review pauses the table for operator inspection.</p>
@@ -1010,7 +1018,7 @@
       `);
     }
 
-    if (!publicRail && mySeat && hand) {
+    if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(`
         <h2>Seat Thread</h2>
         <div class="pokerStack">
@@ -1031,12 +1039,12 @@
       `);
     }
 
-    if (!publicRail && mySeat && hand && paused) {
+    if (!publicRail && !adminClosed && mySeat && hand && paused) {
       cards.push(`
         <h2>Submit Action</h2>
         <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
       `);
-    } else if (!publicRail && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
+    } else if (!publicRail && !adminClosed && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
       cards.push(`
         <h2>Submit Action</h2>
         <div class="pokerStack">
@@ -1074,6 +1082,12 @@
           ${renderSummaryMetric('Review Hand', adminReview?.reviewHand?.handId || adminReview?.activeHand?.handId || 'none')}
           ${renderSummaryMetric('Open Disputes', `${Number(adminReview?.openDisputes?.length || 0)}`)}
           ${renderSummaryMetric('Audit Events', `${Number(adminReview?.auditEvents?.length || 0)}`)}
+        </div>
+        <div class="pokerLinks">
+          ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
+          <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
+          ${paused || adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-pause="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Pause Table</button>`}
+          ${paused ? `<button class="pokerButton" type="button" data-admin-table-resume="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Resume Table</button>` : ''}
         </div>
         <div class="pokerStack">
           ${Array.isArray(adminReview?.disputes) && adminReview.disputes.length ? adminReview.disputes.map((dispute) => `
@@ -1219,7 +1233,6 @@
     const token = readStoredPokerAdminToken();
     if (!token) return;
     const buttons = Array.from(document.querySelectorAll('[data-dispute-action][data-dispute-id]'));
-    if (!buttons.length) return;
     for (const button of buttons) {
       button.addEventListener('click', async () => {
         const disputeId = String(button.getAttribute('data-dispute-id') || '').trim();
@@ -1241,6 +1254,94 @@
           await loadPlayTable(tableId);
         } catch (err) {
           setStatus(`Operator review failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const closeButton = document.querySelector('[data-admin-table-close="1"][data-admin-table-id]');
+    if (closeButton) {
+      closeButton.addEventListener('click', async () => {
+        const targetTableId = String(closeButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Closing table and issuing refunds...');
+        try {
+          await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/close`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Operator closed the table.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+        } catch (err) {
+          setStatus(`Operator close failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const exportButton = document.querySelector('[data-admin-export="1"][data-admin-table-id]');
+    if (exportButton) {
+      exportButton.addEventListener('click', async () => {
+        const targetTableId = String(exportButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Preparing review export...');
+        try {
+          const payload = await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/export`, {
+            headers: { 'x-admin-token': token },
+          });
+          const filename = `poker-review-${targetTableId}.json`;
+          const blob = new Blob([JSON.stringify(payload?.data || {}, null, 2)], { type: 'application/json' });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          setStatus(`Exported ${filename}`);
+        } catch (err) {
+          setStatus(`Export failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const pauseButton = document.querySelector('[data-admin-table-pause="1"][data-admin-table-id]');
+    if (pauseButton) {
+      pauseButton.addEventListener('click', async () => {
+        const targetTableId = String(pauseButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Pausing table...');
+        try {
+          await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/pause`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'operator review',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+        } catch (err) {
+          setStatus(`Pause failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const resumeButton = document.querySelector('[data-admin-table-resume="1"][data-admin-table-id]');
+    if (resumeButton) {
+      resumeButton.addEventListener('click', async () => {
+        const targetTableId = String(resumeButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Resuming table...');
+        try {
+          await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/resume`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({}),
+          });
+          await loadPlayTable(targetTableId);
+        } catch (err) {
+          setStatus(`Resume failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }
