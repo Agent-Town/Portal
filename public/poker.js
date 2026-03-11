@@ -291,6 +291,16 @@
     }
   }
 
+  async function refreshRailSeries(seriesId, { silent = false } = {}) {
+    if (!seriesId || liveTableRefreshInFlight) return;
+    liveTableRefreshInFlight = true;
+    try {
+      await loadPlayRailSeries(seriesId, { silent });
+    } finally {
+      liveTableRefreshInFlight = false;
+    }
+  }
+
   function bindLiveTableStream(tableId, { rail = false } = {}) {
     if (!tableId || typeof window.EventSource !== 'function') return;
     const streamKey = `${rail ? 'rail' : 'player'}:${tableId}`;
@@ -312,6 +322,27 @@
     });
     stream.addEventListener('error', () => {
       scheduleLiveTableRefresh(tableId, { rail });
+    });
+  }
+
+  function bindRailSeriesStream(seriesId) {
+    if (!seriesId || typeof window.EventSource !== 'function') return;
+    const streamKey = `series:${seriesId}`;
+    if (liveTableStream && liveTableStreamKey === streamKey) return;
+    clearLiveTableStream();
+    liveTableStreamKey = streamKey;
+    const expectedPath = `/poker/play/rail/series/${seriesId}`;
+    const stream = new window.EventSource(buildPokerHref(`/api/poker/play/rail/series/${encodeURIComponent(seriesId)}/stream`), {
+      withCredentials: true,
+    });
+    liveTableStream = stream;
+    stream.addEventListener('series', () => {
+      if (window.location.pathname === expectedPath) {
+        refreshRailSeries(seriesId, { silent: true }).catch(() => {});
+      }
+    });
+    stream.addEventListener('error', () => {
+      scheduleRailSeriesRefresh(seriesId);
     });
   }
 
@@ -739,6 +770,7 @@
         `).join('')
         : '<h2>No active series tables.</h2><p>The series summary will stay here even after tables converge or close.</p>',
     ]);
+    bindRailSeriesStream(seriesId);
     scheduleRailSeriesRefresh(seriesId);
     if (!silent) {
       setStatus(tables.length ? `${tables.length} tournament table${tables.length === 1 ? '' : 's'} loaded for rail.` : 'Tournament series rail ready.');

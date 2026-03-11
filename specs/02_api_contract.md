@@ -646,8 +646,15 @@ Stream notes:
 - the stream is still hint-only; browsers should re-read `GET /api/poker/play/rail/tables/:tableId`
 - the event shape and reasons match the authenticated player stream
 
-Series rail notes:
-- `GET /api/poker/play/rail/series/:seriesId` is intentionally poll-oriented and aggregates the current public payload for each still-open table in the series
+### GET `/api/poker/play/rail/series/:seriesId/stream`
+Opens the anonymous spectator push stream for one tournament series.
+
+Stream notes:
+- no authenticated Portal session is required
+- initial connect emits a `ready` event
+- update events use `event: series`
+- browsers should treat the stream as a push hint and re-read `GET /api/poker/play/rail/series/:seriesId`
+- the payload includes `seriesId`, `tableId`, `reason`, `at`, and any table-scoped detail fields forwarded from the member table update
 - closed tables roll out of `data.tables[]` but remain counted in `data.series.closedTableCount`
 
 ### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)

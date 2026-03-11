@@ -300,6 +300,7 @@ function registerPokerRoutes(app, deps) {
   };
 
   const pokerPlayStreamClientsByTable = new Map();
+  const pokerPlayStreamClientsBySeries = new Map();
   let pokerPlayStreamEventCounter = 0;
 
   function writePokerPlayStreamEvent(res, { event = 'table', data = {}, id = null } = {}) {
@@ -313,8 +314,6 @@ function registerPokerRoutes(app, deps) {
   function publishPokerPlayTableEvent(tableId, reason, details = {}) {
     const normalizedTableId = normalizeTrimmedString(tableId);
     if (!normalizedTableId) return;
-    const clients = pokerPlayStreamClientsByTable.get(normalizedTableId);
-    if (!clients || !clients.size) return;
     pokerPlayStreamEventCounter += 1;
     const payload = {
       tableId: normalizedTableId,
@@ -322,12 +321,39 @@ function registerPokerRoutes(app, deps) {
       at: nowIso(),
       ...((details && typeof details === 'object') ? details : {}),
     };
-    for (const client of clients) {
+    const tableClients = pokerPlayStreamClientsByTable.get(normalizedTableId);
+    if (tableClients && tableClients.size) {
+      for (const client of tableClients) {
+        try {
+          writePokerPlayStreamEvent(client.res, {
+            id: pokerPlayStreamEventCounter,
+            event: 'table',
+            data: payload,
+          });
+        } catch {
+          client.close();
+        }
+      }
+    }
+
+    const table = getPokerPlayTableById(normalizedTableId);
+    const seriesId = normalizeTrimmedString(
+      table?.rules?.seriesId,
+      normalizeTrimmedString(table?.summary?.seriesId)
+    );
+    if (!seriesId) return;
+    const seriesClients = pokerPlayStreamClientsBySeries.get(seriesId);
+    if (!seriesClients || !seriesClients.size) return;
+    const seriesPayload = {
+      seriesId,
+      ...payload,
+    };
+    for (const client of seriesClients) {
       try {
         writePokerPlayStreamEvent(client.res, {
-          id: pokerPlayStreamEventCounter,
-          event: 'table',
-          data: payload,
+          id: `${pokerPlayStreamEventCounter}-series`,
+          event: 'series',
+          data: seriesPayload,
         });
       } catch {
         client.close();
@@ -365,6 +391,41 @@ function registerPokerRoutes(app, deps) {
       event: 'ready',
       data: {
         tableId: normalizedTableId,
+        at: nowIso(),
+      },
+    });
+  }
+
+  function subscribePokerPlaySeriesStream(seriesId, req, res) {
+    const normalizedSeriesId = normalizeTrimmedString(seriesId);
+    const bucket = pokerPlayStreamClientsBySeries.get(normalizedSeriesId) || new Set();
+    const client = {
+      res,
+      close() {},
+    };
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: keepalive ${Date.now()}\n\n`);
+      } catch {
+        client.close();
+      }
+    }, 15000);
+    client.close = () => {
+      clearInterval(heartbeat);
+      bucket.delete(client);
+      if (!bucket.size) {
+        pokerPlayStreamClientsBySeries.delete(normalizedSeriesId);
+      }
+    };
+    bucket.add(client);
+    pokerPlayStreamClientsBySeries.set(normalizedSeriesId, bucket);
+    req.on('close', client.close);
+    req.on('aborted', client.close);
+    writePokerPlayStreamEvent(res, {
+      id: `ready-${Date.now()}`,
+      event: 'ready',
+      data: {
+        seriesId: normalizedSeriesId,
         at: nowIso(),
       },
     });
@@ -779,6 +840,49 @@ function registerPokerRoutes(app, deps) {
         }
       );
     }
+  });
+
+  app.get('/api/poker/play/rail/series/:seriesId/stream', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const seriesId = normalizeTrimmedString(req.params.seriesId);
+    if (!seriesId) {
+      return sendPortalApiError(
+        res,
+        404,
+        'NOT_FOUND',
+        'Poker tournament series not found.',
+        { requestId }
+      );
+    }
+    try {
+      getSeriesDetail(playRouteDeps, {
+        seriesId,
+        session: null,
+        req,
+        processAt: req.query?.asOf,
+        publicViewer: true,
+      });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RAIL_SERIES_FAILED',
+        err?.message || 'Unable to load poker rail series.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+    res.status(200);
+    res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+    res.setHeader('cache-control', 'no-cache, no-transform');
+    res.setHeader('connection', 'keep-alive');
+    res.setHeader('x-accel-buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
+    subscribePokerPlaySeriesStream(seriesId, req, res);
   });
 
   app.get('/api/poker/play/tables/:tableId/stream', (req, res) => {
