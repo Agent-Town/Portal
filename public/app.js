@@ -1495,9 +1495,10 @@ function renderHouseOfficeSurface() {
   const emptyNode = el('houseOfficeEmpty');
   const summaryNode = el('houseOfficeSummary');
   const presenceNode = el('houseOfficePresence');
+  const briefingNode = el('houseOfficeBriefing');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !presenceNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const presence = Array.isArray(houseSurfaceState.office.presence) ? houseSurfaceState.office.presence : [];
@@ -1522,6 +1523,10 @@ function renderHouseOfficeSurface() {
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
   const officeCount = Number(summary?.officeCount || offices.length || 0);
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
+  const briefingItemCount = briefing.reduce((sum, group) => {
+    const items = Array.isArray(group?.items) ? group.items : [];
+    return sum + items.length;
+  }, 0);
   const selectedOfficeLabel = String(selectedOffice?.displayName || selectedOffice?.slug || '—').trim() || '—';
   const selectedOfficePurpose = String(selectedOffice?.purpose || '').trim();
   const summaryParts = [
@@ -1530,7 +1535,7 @@ function renderHouseOfficeSurface() {
     `${officeCount} offices`,
     `${staffAgentCount} staff`,
     `${presence.length} presence`,
-    `${briefing.length} briefing`,
+    `${briefingItemCount} briefing`,
     `${attention.length} attention`,
     `selected ${selectedOfficeLabel}`,
   ];
@@ -1577,6 +1582,73 @@ function renderHouseOfficeSurface() {
         }
       });
       presenceNode.appendChild(button);
+    });
+  }
+
+  briefingNode.innerHTML = '';
+  if (!briefingItemCount) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No recent House Briefing items are available yet.';
+    briefingNode.appendChild(placeholder);
+  } else {
+    briefing.forEach((group) => {
+      const groupNode = document.createElement('section');
+      groupNode.setAttribute('data-testid', 'house-office-briefing-group');
+      groupNode.style.border = '1px solid rgba(255,255,255,0.12)';
+      groupNode.style.borderRadius = '12px';
+      groupNode.style.padding = '10px';
+      groupNode.style.background = 'rgba(255,255,255,0.02)';
+
+      const heading = document.createElement('div');
+      heading.className = 'small';
+      heading.style.fontWeight = '600';
+      heading.style.marginBottom = '8px';
+      heading.textContent = String(group?.label || group?.family || 'Briefing').trim() || 'Briefing';
+      groupNode.appendChild(heading);
+
+      const items = Array.isArray(group?.items) ? group.items : [];
+      items.forEach((item) => {
+        const itemNode = document.createElement('article');
+        itemNode.setAttribute('data-testid', 'house-office-briefing-item');
+        itemNode.style.padding = '8px 0';
+        itemNode.style.borderTop = groupNode.childElementCount > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none';
+
+        const titleNode = document.createElement('div');
+        titleNode.style.fontWeight = '600';
+        titleNode.style.overflowWrap = 'anywhere';
+        titleNode.textContent = String(item?.title || '').trim() || 'Briefing item';
+        itemNode.appendChild(titleNode);
+
+        const summaryItemNode = document.createElement('div');
+        summaryItemNode.className = 'small';
+        summaryItemNode.style.marginTop = '4px';
+        summaryItemNode.style.overflowWrap = 'anywhere';
+        summaryItemNode.textContent = String(item?.summary || '').trim() || 'No summary available.';
+        itemNode.appendChild(summaryItemNode);
+
+        const citationRow = document.createElement('div');
+        citationRow.style.display = 'flex';
+        citationRow.style.flexWrap = 'wrap';
+        citationRow.style.gap = '6px';
+        citationRow.style.marginTop = '6px';
+        const citations = Array.isArray(item?.citations) ? item.citations : [];
+        citations.forEach((citation) => {
+          const citationNode = document.createElement('span');
+          citationNode.setAttribute('data-testid', 'house-office-briefing-citation');
+          citationNode.className = 'small';
+          citationNode.style.padding = '2px 6px';
+          citationNode.style.borderRadius = '999px';
+          citationNode.style.border = '1px solid rgba(255,255,255,0.12)';
+          citationNode.style.overflowWrap = 'anywhere';
+          citationNode.textContent = `${String(citation?.sourceKind || '').trim() || 'source'}:${String(citation?.sourceId || '').trim() || 'unknown'}`;
+          citationRow.appendChild(citationNode);
+        });
+        itemNode.appendChild(citationRow);
+        groupNode.appendChild(itemNode);
+      });
+
+      briefingNode.appendChild(groupNode);
     });
   }
 

@@ -300,7 +300,8 @@ Implementation notes:
    B. `house-office-briefing-item`
    C. `house-office-briefing-citation`
    D. `house-office-briefing-group`
-2. A briefing item without citations must fail the milestone.
+2. The `/api/platform/house-office` payload should expose `briefing[]` as grouped family envelopes with `items[]` and citation arrays.
+3. A briefing item without citations must fail the milestone.
 
 ### M29.3 - Attention queue and deep-link continuity
 

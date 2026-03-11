@@ -9,5 +9,11 @@
     "tracks",
     "experiences",
     "poker_or_web"
+  ],
+  "expectedFamilies": [
+    "archive",
+    "trainer",
+    "workshop",
+    "tracks"
   ]
 }

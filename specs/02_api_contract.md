@@ -996,6 +996,18 @@ Response fields:
 - `data.presence[].sourceRefs[].sourceId`
 - `data.presence[].sourceRefs[].entryPath`
 - `data.briefing[]`
+- `data.briefing[].family`
+- `data.briefing[].label`
+- `data.briefing[].items[]`
+- `data.briefing[].items[].briefingId`
+- `data.briefing[].items[].family`
+- `data.briefing[].items[].title`
+- `data.briefing[].items[].summary`
+- `data.briefing[].items[].createdAt`
+- `data.briefing[].items[].citations[]`
+- `data.briefing[].items[].citations[].sourceKind`
+- `data.briefing[].items[].citations[].sourceId`
+- `data.briefing[].items[].citations[].entryPath`
 - `data.attention[]`
 - `data.deeplinks.office`
 - `data.deeplinks.experiences`
@@ -1009,6 +1021,8 @@ Response fields:
 - `data.sourceManifest.counts.officeCount`
 - `data.sourceManifest.counts.staffAgentCount`
 - `data.sourceManifest.counts.presenceCount`
+- `data.sourceManifest.counts.briefingGroupCount`
+- `data.sourceManifest.counts.briefingItemCount`
 - `data.sourceManifest.counts.experienceCount`
 - `data.sourceManifest.counts.trackCount`
 - `data.sourceManifest.counts.trackEventCount`
@@ -1019,6 +1033,8 @@ Response fields:
 - `data.summary.officeCount`
 - `data.summary.staffAgentCount`
 - `data.summary.presenceCount`
+- `data.summary.briefingGroupCount`
+- `data.summary.briefingItemCount`
 - `data.summary.experienceCount`
 - `data.summary.trackCount`
 - `data.summary.trainerJobCount`

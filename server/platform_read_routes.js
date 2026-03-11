@@ -407,6 +407,181 @@ function registerPlatformReadRoutes(app, deps) {
     });
   }
 
+  function countHouseOfficeBriefingItems(groups = []) {
+    return (Array.isArray(groups) ? groups : []).reduce((sum, group) => {
+      const items = Array.isArray(group?.items) ? group.items : [];
+      return sum + items.length;
+    }, 0);
+  }
+
+  function buildHouseOfficeBriefing({
+    binding = null,
+    trainerJobs = [],
+    trainerResults = [],
+    archiveRuns = [],
+    trackPayload = null,
+  } = {}) {
+    const fixture = getUnifiedPlatformTestFixture('house_office_briefing_seed') || {};
+    const rawWindowHours = Number(fixture?.defaultWindowHours || 24);
+    const windowHours = Number.isFinite(rawWindowHours) && rawWindowHours > 0 ? rawWindowHours : 24;
+    const groupOrder = Array.isArray(fixture?.groupOrder) && fixture.groupOrder.length
+      ? fixture.groupOrder.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : ['archive', 'trainer', 'workshop', 'tracks', 'experiences', 'poker_or_web'];
+    const groupLabels = {
+      archive: 'Archive',
+      trainer: 'Trainer',
+      workshop: 'Workshop',
+      tracks: 'Tracks',
+      experiences: 'Experiences',
+      poker_or_web: 'Poker / Web',
+    };
+    const referenceNowMs = parseHouseOfficeActivityTime(nowIso());
+    const minimumTimestampMs = Math.max(0, referenceNowMs - (windowHours * 60 * 60 * 1000));
+    const groups = new Map(groupOrder.map((family) => [family, []]));
+    const trainerJobsById = new Map(
+      (Array.isArray(trainerJobs) ? trainerJobs : [])
+        .map((job) => [String(job?.trainerJobId || '').trim(), job])
+        .filter(([trainerJobId]) => trainerJobId)
+    );
+
+    const addBriefingItem = (family, item) => {
+      const normalizedFamily = String(family || '').trim();
+      if (!groups.has(normalizedFamily)) return;
+      const citations = (Array.isArray(item?.citations) ? item.citations : [])
+        .map((citation) => ({
+          sourceKind: String(citation?.sourceKind || '').trim(),
+          sourceId: String(citation?.sourceId || '').trim(),
+          entryPath: String(citation?.entryPath || '').trim(),
+        }))
+        .filter((citation) => citation.sourceKind && citation.sourceId && citation.entryPath);
+      const createdAt = String(item?.createdAt || '').trim();
+      if (!createdAt || parseHouseOfficeActivityTime(createdAt) < minimumTimestampMs || !citations.length) {
+        return;
+      }
+      const briefingId = String(item?.briefingId || '').trim();
+      const title = String(item?.title || '').trim();
+      const summary = String(item?.summary || '').trim();
+      if (!briefingId || !title || !summary) return;
+      groups.get(normalizedFamily).push({
+        briefingId,
+        family: normalizedFamily,
+        title,
+        summary,
+        createdAt,
+        citations,
+      });
+    };
+
+    (Array.isArray(archiveRuns) ? archiveRuns : []).forEach((run) => {
+      const runId = String(run?.runId || '').trim();
+      const experienceId = String(run?.experienceId || '').trim() || 'experience';
+      if (!runId) return;
+      addBriefingItem('archive', {
+        briefingId: `archive:${runId}`,
+        title: `Archive captured ${experienceId}`,
+        summary: `Run ${runId} is recorded with status ${String(run?.status || 'recorded').trim() || 'recorded'}.`,
+        createdAt: String(run?.completedAt || run?.updatedAt || run?.createdAt || '').trim(),
+        citations: [
+          {
+            sourceKind: 'run',
+            sourceId: runId,
+            entryPath: '/api/platform/archive',
+          },
+        ],
+      });
+    });
+
+    (Array.isArray(trainerResults) ? trainerResults : []).forEach((result) => {
+      const trainerResultId = String(result?.trainerResultId || '').trim();
+      const trainerJobId = String(result?.trainerJobId || '').trim();
+      if (!trainerResultId) return;
+      const trainerJob = trainerJobsById.get(trainerJobId) || null;
+      const jobKind = String(trainerJob?.jobKind || 'trainer_job.compare').trim() || 'trainer_job.compare';
+      addBriefingItem('trainer', {
+        briefingId: `trainer:${trainerResultId}`,
+        title: result?.approvalNeeded ? 'Trainer patch approval ready' : 'Trainer result recorded',
+        summary: `${jobKind} recorded result ${trainerResultId}.`,
+        createdAt: String(result?.updatedAt || result?.createdAt || '').trim(),
+        citations: [
+          {
+            sourceKind: 'trainer_result',
+            sourceId: trainerResultId,
+            entryPath: '/api/platform/trainer',
+          },
+          trainerJobId
+            ? {
+              sourceKind: 'trainer_job',
+              sourceId: trainerJobId,
+              entryPath: '/api/platform/trainer',
+            }
+            : null,
+        ].filter(Boolean),
+      });
+    });
+
+    if (binding) {
+      const teamBindingId = String(binding?.teamBindingId || '').trim();
+      const activeConfigVersionId = String(binding?.activeConfigVersionId || '').trim();
+      const configVersion = activeConfigVersionId ? getConfigVersion(activeConfigVersionId) : null;
+      addBriefingItem('workshop', {
+        briefingId: `workshop:${teamBindingId || activeConfigVersionId}`,
+        title: 'Workshop active config updated',
+        summary: `Team ${String(binding?.teamId || '').trim() || 'team'} now points to ${activeConfigVersionId || 'the active config'}.`,
+        createdAt: String(binding?.updatedAt || binding?.createdAt || configVersion?.updatedAt || configVersion?.createdAt || '').trim(),
+        citations: [
+          teamBindingId
+            ? {
+              sourceKind: 'team_config_binding',
+              sourceId: teamBindingId,
+              entryPath: '/api/platform/workshop',
+            }
+            : null,
+          activeConfigVersionId
+            ? {
+              sourceKind: 'config_version',
+              sourceId: activeConfigVersionId,
+              entryPath: '/api/platform/workshop',
+            }
+            : null,
+        ].filter(Boolean),
+      });
+    }
+
+    const trackEvents = Array.isArray(trackPayload?.events) ? trackPayload.events : [];
+    trackEvents.forEach((event) => {
+      const trackProgressEventId = String(event?.trackProgressEventId || '').trim();
+      const title = String(event?.title || event?.trackId || 'track progress').trim() || 'track progress';
+      if (!trackProgressEventId) return;
+      addBriefingItem('tracks', {
+        briefingId: `tracks:${trackProgressEventId}`,
+        title: `${title} updated`,
+        summary: `Progress delta ${Number(event?.progressDelta || 0)} was recorded from ${String(event?.sourceKind || 'track').trim() || 'track'}.`,
+        createdAt: String(event?.createdAt || '').trim(),
+        citations: [
+          {
+            sourceKind: 'track_progress_event',
+            sourceId: trackProgressEventId,
+            entryPath: '/api/platform/tracks',
+          },
+        ],
+      });
+    });
+
+    return groupOrder.map((family) => {
+      const items = (groups.get(family) || []).sort((left, right) => {
+        const createdAtDelta = parseHouseOfficeActivityTime(String(right.createdAt || '')) - parseHouseOfficeActivityTime(String(left.createdAt || ''));
+        if (createdAtDelta !== 0) return createdAtDelta;
+        return String(left.briefingId || '').localeCompare(String(right.briefingId || ''));
+      });
+      if (!items.length) return null;
+      return {
+        family,
+        label: String(groupLabels[family] || family).trim() || family,
+        items,
+      };
+    }).filter(Boolean);
+  }
+
   function buildHouseOfficeOverviewPayload({
     context = {},
     houseId = '',
@@ -488,7 +663,17 @@ function registerPlatformReadRoutes(app, deps) {
         trackPayload: tracksPayload,
       })
       : [];
-    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length;
+    const briefing = houseId
+      ? buildHouseOfficeBriefing({
+        binding,
+        trainerJobs,
+        trainerResults,
+        archiveRuns,
+        trackPayload: tracksPayload,
+      })
+      : [];
+    const briefingItemCount = countHouseOfficeBriefingItems(briefing);
+    const activityCount = trainerJobs.length + trainerResults.length + archiveRuns.length + tracksPayload.events.length + briefingItemCount;
     return {
       houseId: houseId || null,
       teamId: teamId || null,
@@ -497,7 +682,7 @@ function registerPlatformReadRoutes(app, deps) {
       offices,
       staffAgents,
       presence,
-      briefing: [],
+      briefing,
       attention: [],
       deeplinks,
       sourceManifest: {
@@ -514,11 +699,14 @@ function registerPlatformReadRoutes(app, deps) {
         fixtures: [
           'house_office_overview_seed',
           'house_office_staff_seed',
+          'house_office_briefing_seed',
         ],
         counts: {
           officeCount: offices.length,
           staffAgentCount: staffAgents.length,
           presenceCount: presence.length,
+          briefingGroupCount: briefing.length,
+          briefingItemCount,
           experienceCount: experiences.length,
           trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
           trackEventCount: Array.isArray(tracksPayload?.events) ? tracksPayload.events.length : 0,
@@ -532,6 +720,8 @@ function registerPlatformReadRoutes(app, deps) {
         officeCount: offices.length,
         staffAgentCount: staffAgents.length,
         presenceCount: presence.length,
+        briefingGroupCount: briefing.length,
+        briefingItemCount,
         experienceCount: experiences.length,
         trackCount: Array.isArray(tracksPayload?.tracks) ? tracksPayload.tracks.length : 0,
         trainerJobCount: trainerJobs.length,
