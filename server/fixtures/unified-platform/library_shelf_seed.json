@@ -1,0 +1,18 @@
+{
+  "family": "library_shelf_seed",
+  "shelves": [
+    {
+      "libraryShelfId": "shelf_fixture_planning",
+      "title": "Planning Shelf"
+    },
+    {
+      "libraryShelfId": "shelf_fixture_launch",
+      "title": "Launch Shelf"
+    }
+  ],
+  "expectedFilters": [
+    "Local",
+    "Imported",
+    "From conversation"
+  ]
+}

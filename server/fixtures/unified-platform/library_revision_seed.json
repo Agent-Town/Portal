@@ -1,0 +1,15 @@
+{
+  "family": "library_revision_seed",
+  "libraryItemId": "lib_revision_fixture_01",
+  "title": "House Rules",
+  "revisions": [
+    {
+      "revisionIndex": 1,
+      "contentHash": "sha256:rev_fixture_01"
+    },
+    {
+      "revisionIndex": 2,
+      "contentHash": "sha256:rev_fixture_02"
+    }
+  ]
+}

@@ -147,10 +147,15 @@ const {
   getTrainerResultByJobId,
   getTraceArtifactById,
   getTraceIntakeRecord,
+  getUnifiedPlatformBenchmarksSnapshot,
+  getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicationsInspector,
+  getUnifiedPlatformRegistryPreviewSnapshot,
+  getUnifiedPlatformRevisionsInspector,
+  getUnifiedPlatformShelvesInspector,
   getUnifiedPlatformScopesInspector,
   getUnifiedPlatformTestFixture,
   getUnifiedPlatformTestStats,
@@ -10923,6 +10928,12 @@ if (process.env.NODE_ENV === 'test') {
     let data = null;
     if (inspector === 'library') {
       data = getUnifiedPlatformLibraryInspector();
+    } else if (inspector === 'revisions') {
+      data = getUnifiedPlatformRevisionsInspector();
+    } else if (inspector === 'conversation-artifacts') {
+      data = getUnifiedPlatformConversationArtifactsInspector();
+    } else if (inspector === 'shelves') {
+      data = getUnifiedPlatformShelvesInspector();
     } else if (inspector === 'scopes') {
       data = getUnifiedPlatformScopesInspector();
     } else if (inspector === 'publications') {
@@ -10931,6 +10942,10 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {
       data = getUnifiedPlatformEditorSnapshot();
+    } else if (inspector === 'registry-preview') {
+      data = getUnifiedPlatformRegistryPreviewSnapshot();
+    } else if (inspector === 'benchmarks') {
+      data = getUnifiedPlatformBenchmarksSnapshot();
     } else {
       return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
     }

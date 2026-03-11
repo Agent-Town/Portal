@@ -1,0 +1,17 @@
+{
+  "family": "library_skill_contract_v2_seed",
+  "roles": [
+    "House Librarian",
+    "Archive Clerk",
+    "Workshop Scribe",
+    "Registry Curator"
+  ],
+  "requiredTools": [
+    "house_library_update_item",
+    "house_library_read_revisions",
+    "house_library_capture_conversation",
+    "house_library_list_shelves",
+    "house_library_write_shelf",
+    "house_library_preview_registry_artifact"
+  ]
+}

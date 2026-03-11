@@ -22,7 +22,11 @@ const PLATFORM_TABLES = Object.freeze([
   'trainer_jobs',
   'trainer_results',
   'library_items',
+  'library_item_revisions',
   'library_links',
+  'conversation_artifacts',
+  'library_shelves',
+  'library_shelf_items',
   'scope_sets',
   'scope_set_items',
   'library_publications',
@@ -69,6 +73,17 @@ const FIXTURE_FILES = Object.freeze({
   library_seal_seed: 'library_seal_seed.json',
   library_skill_pack_seed: 'library_skill_pack_seed.json',
   library_full_smoke_seed: 'library_full_smoke_seed.json',
+  library_authoring_seed: 'library_authoring_seed.json',
+  library_revision_seed: 'library_revision_seed.json',
+  library_conversation_capture_seed: 'library_conversation_capture_seed.json',
+  library_shelf_seed: 'library_shelf_seed.json',
+  library_satchel_seed: 'library_satchel_seed.json',
+  library_registry_browse_seed: 'library_registry_browse_seed.json',
+  library_guided_exchange_seed: 'library_guided_exchange_seed.json',
+  library_copy_a11y_seed: 'library_copy_a11y_seed.json',
+  library_skill_contract_v2_seed: 'library_skill_contract_v2_seed.json',
+  library_benchmark_seed: 'library_benchmark_seed.json',
+  library_guided_flow_seed: 'library_guided_flow_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -97,19 +112,10 @@ const TRACK_DEFINITIONS = Object.freeze([
 let db = null;
 const fixtureCache = new Map();
 let unifiedPlatformInspectors = {
-  promptPreview: {
-    activeScopeSetId: null,
-    selectedItemIds: [],
-    itemRefs: [],
-    promptText: '',
-  },
-  editor: {
-    openFilePath: null,
-    content: '',
-    diffPreview: '',
-    writeEvents: [],
-    lastApprovalId: null,
-  },
+  promptPreview: buildDefaultPromptPreviewInspector(),
+  editor: buildDefaultEditorInspector(),
+  registryPreview: buildDefaultRegistryPreviewInspector(),
+  benchmarks: buildDefaultBenchmarkInspector(),
 };
 
 function hasTableColumn(database, tableName, columnName) {
@@ -322,6 +328,22 @@ function ensureDb() {
       UNIQUE (house_id, team_id, idempotency_key)
     );
 
+    CREATE TABLE IF NOT EXISTS library_item_revisions (
+      library_item_revision_id TEXT PRIMARY KEY,
+      library_item_id TEXT NOT NULL,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      revision_index INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      content_text TEXT NOT NULL DEFAULT '',
+      content_hash TEXT NOT NULL,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_by TEXT NOT NULL DEFAULT 'human',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_item_id, revision_index)
+    );
+
     CREATE TABLE IF NOT EXISTS library_links (
       library_link_id TEXT PRIMARY KEY,
       library_item_id TEXT NOT NULL,
@@ -332,6 +354,47 @@ function ensureDb() {
       metadata_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
       UNIQUE (library_item_id, link_kind, source_kind, source_ref, target_library_item_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS conversation_artifacts (
+      conversation_artifact_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      transcript_text TEXT NOT NULL DEFAULT '',
+      message_ids_json TEXT NOT NULL DEFAULT '[]',
+      messages_json TEXT NOT NULL DEFAULT '[]',
+      source_scope_set_id TEXT,
+      created_by TEXT NOT NULL DEFAULT 'human',
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      idempotency_key TEXT,
+      created_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_shelves (
+      library_shelf_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      created_by TEXT NOT NULL DEFAULT 'human',
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      idempotency_key TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_shelf_items (
+      library_shelf_item_id TEXT PRIMARY KEY,
+      library_shelf_id TEXT NOT NULL,
+      library_item_id TEXT NOT NULL,
+      order_index INTEGER NOT NULL DEFAULT 0,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_shelf_id, order_index),
+      UNIQUE (library_shelf_id, library_item_id)
     );
 
     CREATE TABLE IF NOT EXISTS scope_sets (
@@ -556,10 +619,31 @@ function buildDefaultEditorInspector() {
   };
 }
 
+function buildDefaultRegistryPreviewInspector() {
+  return {
+    query: '',
+    family: '',
+    resultCount: 0,
+    selectedRegistryId: null,
+    preview: null,
+  };
+}
+
+function buildDefaultBenchmarkInspector() {
+  return {
+    runId: null,
+    metrics: {},
+    scenarios: [],
+    outputHash: '',
+  };
+}
+
 function resetUnifiedPlatformInspectors() {
   unifiedPlatformInspectors = {
     promptPreview: buildDefaultPromptPreviewInspector(),
     editor: buildDefaultEditorInspector(),
+    registryPreview: buildDefaultRegistryPreviewInspector(),
+    benchmarks: buildDefaultBenchmarkInspector(),
   };
 }
 
@@ -654,6 +738,57 @@ function listLibraryItems({
   }
   query += ' ORDER BY created_at DESC, library_item_id DESC';
   return database.prepare(query).all(...args).map(mapLibraryItemRow).filter(Boolean);
+}
+
+function mapLibraryItemRevisionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryItemRevisionId: String(row.library_item_revision_id || ''),
+    libraryItemId: String(row.library_item_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    revisionIndex: Number(row.revision_index || 0),
+    title: String(row.title || ''),
+    summary: String(row.summary || ''),
+    contentText: String(row.content_text || ''),
+    contentHash: String(row.content_hash || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdBy: String(row.created_by || 'human'),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function listLibraryItemRevisions({
+  houseId = '',
+  teamId = '',
+  libraryItemId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedLibraryItemId = String(libraryItemId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  if (normalizedLibraryItemId) {
+    clauses.push('library_item_id = ?');
+    args.push(normalizedLibraryItemId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM library_item_revisions
+    ${whereSql}
+    ORDER BY house_id ASC, team_id ASC, library_item_id ASC, revision_index ASC, created_at ASC
+  `).all(...args);
+  return rows.map(mapLibraryItemRevisionRow).filter(Boolean);
 }
 
 function createLibraryItem({
@@ -781,6 +916,119 @@ function listLibraryLinks({
   }
   query += ' ORDER BY created_at ASC, library_link_id ASC';
   return database.prepare(query).all(...args).map(mapLibraryLinkRow).filter(Boolean);
+}
+
+function mapConversationArtifactRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    conversationArtifactId: String(row.conversation_artifact_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    title: String(row.title || ''),
+    transcriptText: String(row.transcript_text || ''),
+    messageIds: parseJsonColumn(row.message_ids_json, []),
+    messages: parseJsonColumn(row.messages_json, []),
+    sourceScopeSetId: row.source_scope_set_id ? String(row.source_scope_set_id) : null,
+    createdBy: String(row.created_by || 'human'),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function listConversationArtifacts({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM conversation_artifacts
+    ${whereSql}
+    ORDER BY house_id ASC, team_id ASC, created_at ASC, conversation_artifact_id ASC
+  `).all(...args);
+  return rows.map(mapConversationArtifactRow).filter(Boolean);
+}
+
+function mapLibraryShelfRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryShelfId: String(row.library_shelf_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    title: String(row.title || ''),
+    description: String(row.description || ''),
+    createdBy: String(row.created_by || 'human'),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryShelfItemRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryShelfItemId: String(row.library_shelf_item_id || ''),
+    libraryShelfId: String(row.library_shelf_id || ''),
+    libraryItemId: String(row.library_item_id || ''),
+    orderIndex: Number(row.order_index || 0),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
+function listLibraryShelves({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  const whereSql = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT *
+    FROM library_shelves
+    ${whereSql}
+    ORDER BY house_id ASC, team_id ASC, created_at ASC, library_shelf_id ASC
+  `).all(...args);
+  return rows.map(mapLibraryShelfRow).filter(Boolean);
+}
+
+function listLibraryShelfItems(libraryShelfId = '') {
+  const normalizedLibraryShelfId = String(libraryShelfId || '').trim();
+  if (!normalizedLibraryShelfId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM library_shelf_items
+    WHERE library_shelf_id = ?
+    ORDER BY order_index ASC, created_at ASC, library_shelf_item_id ASC
+  `).all(normalizedLibraryShelfId);
+  return rows.map(mapLibraryShelfItemRow).filter(Boolean);
 }
 
 function createLibraryLink({
@@ -1190,6 +1438,43 @@ function getUnifiedPlatformEditorSnapshot() {
   return cloneStructuredData(unifiedPlatformInspectors.editor, buildDefaultEditorInspector());
 }
 
+function setUnifiedPlatformRegistryPreviewSnapshot(snapshot = null) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  unifiedPlatformInspectors.registryPreview = {
+    query: String(source.query || ''),
+    family: String(source.family || ''),
+    resultCount: Math.max(0, Number(source.resultCount || 0)),
+    selectedRegistryId: source.selectedRegistryId ? String(source.selectedRegistryId) : null,
+    preview: source.preview && typeof source.preview === 'object'
+      ? cloneStructuredData(source.preview, {})
+      : null,
+  };
+  return getUnifiedPlatformRegistryPreviewSnapshot();
+}
+
+function getUnifiedPlatformRegistryPreviewSnapshot() {
+  return cloneStructuredData(unifiedPlatformInspectors.registryPreview, buildDefaultRegistryPreviewInspector());
+}
+
+function setUnifiedPlatformBenchmarkSnapshot(snapshot = null) {
+  const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
+  unifiedPlatformInspectors.benchmarks = {
+    runId: source.runId ? String(source.runId) : null,
+    metrics: source.metrics && typeof source.metrics === 'object'
+      ? cloneStructuredData(source.metrics, {})
+      : {},
+    scenarios: Array.isArray(source.scenarios)
+      ? source.scenarios.map((entry) => (entry && typeof entry === 'object' ? cloneStructuredData(entry, {}) : entry)).filter(Boolean)
+      : [],
+    outputHash: String(source.outputHash || ''),
+  };
+  return getUnifiedPlatformBenchmarksSnapshot();
+}
+
+function getUnifiedPlatformBenchmarksSnapshot() {
+  return cloneStructuredData(unifiedPlatformInspectors.benchmarks, buildDefaultBenchmarkInspector());
+}
+
 function getUnifiedPlatformLibraryInspector({
   houseId = '',
   teamId = '',
@@ -1225,6 +1510,45 @@ function getUnifiedPlatformPublicationsInspector({
 } = {}) {
   return {
     publications: listLibraryPublications({ houseId, teamId }),
+  };
+}
+
+function getUnifiedPlatformRevisionsInspector({
+  houseId = '',
+  teamId = '',
+  libraryItemId = '',
+} = {}) {
+  const revisions = listLibraryItemRevisions({ houseId, teamId, libraryItemId });
+  const latestByItem = revisions.reduce((acc, revision) => {
+    const itemId = String(revision?.libraryItemId || '').trim();
+    if (!itemId) return acc;
+    acc[itemId] = revision;
+    return acc;
+  }, {});
+  return {
+    revisions,
+    latestByItem,
+  };
+}
+
+function getUnifiedPlatformConversationArtifactsInspector({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  return {
+    artifacts: listConversationArtifacts({ houseId, teamId }),
+  };
+}
+
+function getUnifiedPlatformShelvesInspector({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  return {
+    shelves: listLibraryShelves({ houseId, teamId }).map((shelf) => ({
+      ...shelf,
+      orderedItemIds: listLibraryShelfItems(shelf.libraryShelfId).map((entry) => entry.libraryItemId),
+    })),
   };
 }
 
@@ -1415,6 +1739,14 @@ function listHouseTeamIds(houseId = '') {
     WHERE house_id = ?
     UNION
     SELECT team_id AS team_id
+    FROM conversation_artifacts
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
+    FROM library_shelves
+    WHERE house_id = ?
+    UNION
+    SELECT team_id AS team_id
     FROM scope_sets
     WHERE house_id = ?
     UNION
@@ -1423,6 +1755,8 @@ function listHouseTeamIds(houseId = '') {
     WHERE house_id = ?
     ORDER BY team_id ASC
   `).all(
+    normalizedHouseId,
+    normalizedHouseId,
     normalizedHouseId,
     normalizedHouseId,
     normalizedHouseId,
@@ -3097,10 +3431,15 @@ function getUnifiedPlatformTestStats() {
       house: true,
       tracks: true,
       library: true,
+      revisions: true,
+      conversationArtifacts: true,
+      shelves: true,
       scopes: true,
       publications: true,
       promptPreview: true,
       editor: true,
+      registryPreview: true,
+      benchmarks: true,
     },
   };
 }
@@ -3148,10 +3487,15 @@ module.exports = {
   getTrainerResultByJobId,
   getTraceArtifactById,
   getTraceIntakeRecord,
+  getUnifiedPlatformBenchmarksSnapshot,
+  getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicationsInspector,
+  getUnifiedPlatformRegistryPreviewSnapshot,
+  getUnifiedPlatformRevisionsInspector,
+  getUnifiedPlatformShelvesInspector,
   getUnifiedPlatformScopesInspector,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
   getUnifiedPlatformTestStats,
@@ -3159,9 +3503,13 @@ module.exports = {
   getPlatformTableCounts,
   isUnifiedPlatformTable,
   listConfigComponentVersions,
+  listConversationArtifacts,
   listLibraryItems,
+  listLibraryItemRevisions,
   listLibraryLinks,
   listLibraryPublications,
+  listLibraryShelfItems,
+  listLibraryShelves,
   listScopeSetItems,
   listScopeSets,
   listTrackDefinitions,
@@ -3177,8 +3525,10 @@ module.exports = {
   replaceConfigComponentVersions,
   resetUnifiedPlatformStore,
   createSealedContextViolation,
+  setUnifiedPlatformBenchmarkSnapshot,
   setUnifiedPlatformEditorSnapshot,
   setUnifiedPlatformPromptPreview,
+  setUnifiedPlatformRegistryPreviewSnapshot,
   updateRunMetadata,
   updateSealedContextStatus,
   upsertSealedContext,

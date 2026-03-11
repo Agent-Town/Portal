@@ -1,0 +1,11 @@
+{
+  "family": "library_benchmark_seed",
+  "expectedMetrics": {
+    "scopePrecision": 1,
+    "scopeLeakRate": 0,
+    "unsafePublishBlockRate": 1,
+    "provenanceVisibilityRate": 1,
+    "noviceCopyPassRate": 1
+  },
+  "outputKey": "benchmark_output_hash"
+}

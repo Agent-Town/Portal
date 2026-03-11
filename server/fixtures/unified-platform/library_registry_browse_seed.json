@@ -1,0 +1,9 @@
+{
+  "family": "library_registry_browse_seed",
+  "browse": {
+    "query": "atlas",
+    "family": "skill",
+    "expectedResultCount": 2,
+    "expectedFirstRegistryId": "reg_atlas_skill_01"
+  }
+}

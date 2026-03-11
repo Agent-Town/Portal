@@ -1,0 +1,15 @@
+{
+  "family": "library_copy_a11y_seed",
+  "requiredHeadings": [
+    "Library",
+    "Reading Table",
+    "Public Stacks"
+  ],
+  "bannedTerms": [
+    "embedding",
+    "vector",
+    "RAG",
+    "retrieval",
+    "context window"
+  ]
+}

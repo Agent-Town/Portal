@@ -1,0 +1,11 @@
+{
+  "family": "library_guided_flow_seed",
+  "smoke": {
+    "authoring": true,
+    "capture": true,
+    "shelves": true,
+    "satchel": true,
+    "registry": true,
+    "benchmarks": true
+  }
+}

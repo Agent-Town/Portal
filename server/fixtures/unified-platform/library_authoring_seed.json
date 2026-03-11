@@ -1,0 +1,11 @@
+{
+  "family": "library_authoring_seed",
+  "houseId": "house_library_authoring_alpha",
+  "teamId": "team_library_authoring_alpha",
+  "composer": {
+    "deskLabel": "Librarian Desk",
+    "titleLabel": "Title",
+    "bodyLabel": "What should the agent remember?"
+  },
+  "expectedSourceKind": "user_note"
+}

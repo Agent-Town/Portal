@@ -1,0 +1,10 @@
+{
+  "family": "library_satchel_seed",
+  "satchelTitle": "Launch Satchel",
+  "orderedItemIds": [
+    "lib_satchel_alpha",
+    "lib_satchel_beta",
+    "lib_satchel_gamma"
+  ],
+  "usesScopeSets": true
+}

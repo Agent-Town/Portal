@@ -53,6 +53,17 @@ async function getPlatformFixture(request, family) {
   return await response.json();
 }
 
+async function getPlatformInspector(request, inspector) {
+  const response = await request.get(`/__test__/unified-platform/inspect/${encodeURIComponent(String(inspector || ''))}`, {
+    headers: { 'x-test-reset': resetToken },
+    failOnStatusCode: false,
+  });
+  return {
+    status: response.status(),
+    json: await response.json(),
+  };
+}
+
 async function listPlatformFixtures(request) {
   const response = await request.get('/__test__/unified-platform/fixtures', {
     headers: { 'x-test-reset': resetToken },
@@ -845,6 +856,7 @@ module.exports = {
   getPlatformPackCompatibility,
   getPlatformStats,
   getPlatformFixture,
+  getPlatformInspector,
   getPlatformTeamBinding,
   getPlatformTrainerJob,
   getPlatformTrainerResult,

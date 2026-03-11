@@ -1,0 +1,10 @@
+{
+  "family": "library_conversation_capture_seed",
+  "conversationId": "conv_capture_fixture_alpha",
+  "selectedMessageIds": [
+    "msg_capture_01",
+    "msg_capture_03"
+  ],
+  "artifactTitle": "Planner Notes",
+  "expectedSourceKind": "conversation_artifact"
+}

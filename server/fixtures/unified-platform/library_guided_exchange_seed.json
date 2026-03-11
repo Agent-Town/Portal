@@ -1,0 +1,12 @@
+{
+  "family": "library_guided_exchange_seed",
+  "localItemId": "lib_exchange_local_01",
+  "registryId": "reg_public_stack_01",
+  "requiresApproval": true,
+  "expectedTrustLabels": [
+    "Private",
+    "Public",
+    "Imported",
+    "Read only"
+  ]
+}
