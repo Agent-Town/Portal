@@ -931,6 +931,60 @@ function findNextOpenSeatNumber(table, seats) {
     .find((seatNumber) => !occupied.has(seatNumber)) || 0;
 }
 
+function sortTournamentSeriesEntriesByOccupancy(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .slice()
+    .sort((left, right) => {
+      const occupancyDelta = Number(right?.activeSeats?.length || 0) - Number(left?.activeSeats?.length || 0);
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(left?.table?.createdAt || '').localeCompare(String(right?.table?.createdAt || ''));
+    });
+}
+
+function buildSeriesTargetOccupancies(totalActiveSeats, tableCount) {
+  const total = Math.max(0, normalizeOilAmount(totalActiveSeats, 0));
+  const count = Math.max(1, normalizeOilAmount(tableCount, 1));
+  const base = Math.floor(total / count);
+  const remainder = total % count;
+  return Array.from({ length: count }, (_value, index) => base + (index < remainder ? 1 : 0));
+}
+
+function sortSeatsForTournamentSeriesTransfer(seats) {
+  const transferPriority = (seat) => {
+    const status = normalizeTrimmedString(seat?.status).toLowerCase();
+    if (status === 'registered') return 0;
+    if (status === 'active') return 1;
+    return 2;
+  };
+  return (Array.isArray(seats) ? seats : [])
+    .slice()
+    .sort((left, right) => {
+      const priorityDelta = transferPriority(left) - transferPriority(right);
+      if (priorityDelta !== 0) return priorityDelta;
+      const createdDelta = String(right?.createdAt || '').localeCompare(String(left?.createdAt || ''));
+      if (createdDelta !== 0) return createdDelta;
+      return normalizeSeatNumber(right?.seatNumber) - normalizeSeatNumber(left?.seatNumber);
+    });
+}
+
+function moveTournamentSeriesSeat(deps, seat, targetEntry, atIso) {
+  const targetTable = targetEntry?.table || null;
+  if (!targetTable || !seat) return null;
+  const targetSeats = deps.listPokerPlaySeatsByTable(targetTable.tableId);
+  const openSeatNumber = findNextOpenSeatNumber(targetTable, targetSeats);
+  if (!openSeatNumber) return null;
+  const movedSeat = deps.upsertPokerPlaySeat({
+    ...seat,
+    tableId: targetTable.tableId,
+    seatNumber: openSeatNumber,
+    status: targetEntry?.hand && targetEntry.hand.status === 'live' ? 'registered' : 'active',
+    createdAt: seat.createdAt,
+    updatedAt: atIso,
+  });
+  deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+  return movedSeat;
+}
+
 function closeTournamentSeriesTable(deps, table, { mergedIntoTableId, atIso }) {
   return deps.upsertPokerPlayTable({
     ...table,
@@ -944,7 +998,7 @@ function closeTournamentSeriesTable(deps, table, { mergedIntoTableId, atIso }) {
   });
 }
 
-function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
+function maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso) {
   const seriesRef = getTournamentSeriesRef(table);
   if (!seriesRef.seriesId || !seriesRef.matchKey) {
     return {
@@ -965,19 +1019,11 @@ function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
       closed: false,
     };
   }
-  if (entries.some((entry) => entry?.hand && entry.hand.status === 'live')) {
-    return {
-      table,
-      seats,
-      hand,
-      changed: false,
-      closed: false,
-    };
-  }
   const activeEntries = entries
     .map((entry) => ({
       ...entry,
       activeSeats: getActiveSeatRows(entry.seats),
+      live: !!(entry?.hand && entry.hand.status === 'live'),
     }))
     .filter((entry) => entry.activeSeats.length > 0);
   if (activeEntries.length <= 1) {
@@ -989,15 +1035,14 @@ function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
       closed: false,
     };
   }
-  const targetEntry = activeEntries
-    .slice()
-    .sort((left, right) => {
-      const occupancyDelta = right.activeSeats.length - left.activeSeats.length;
-      if (occupancyDelta !== 0) return occupancyDelta;
-      return String(left?.table?.createdAt || '').localeCompare(String(right?.table?.createdAt || ''));
-    })[0];
-  const totalActiveSeats = activeEntries.reduce((sum, entry) => sum + entry.activeSeats.length, 0);
-  if (totalActiveSeats > Number(targetEntry?.table?.maxSeats || POKER_PLAY_MAX_SEATS)) {
+  const orderedEntries = sortTournamentSeriesEntriesByOccupancy(activeEntries);
+  const maxSeats = Math.max(
+    1,
+    ...orderedEntries.map((entry) => Number(entry?.table?.maxSeats || POKER_PLAY_MAX_SEATS)).filter((value) => Number.isFinite(value) && value > 0)
+  );
+  const totalActiveSeats = orderedEntries.reduce((sum, entry) => sum + entry.activeSeats.length, 0);
+  const desiredTableCount = Math.max(1, Math.ceil(totalActiveSeats / maxSeats));
+  if (desiredTableCount === 1 && orderedEntries.some((entry) => entry.live)) {
     return {
       table,
       seats,
@@ -1006,41 +1051,63 @@ function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
       closed: false,
     };
   }
+  const keepers = orderedEntries.slice(0, desiredTableCount);
+  const keeperTargets = buildSeriesTargetOccupancies(totalActiveSeats, keepers.length);
+  const targetByTableId = new Map(keepers.map((entry, index) => [String(entry.table.tableId || ''), keeperTargets[index] || 0]));
+  const deficits = keepers.map((entry) => ({
+    tableId: String(entry.table.tableId || ''),
+    target: Number(targetByTableId.get(String(entry.table.tableId || '')) || 0),
+  }));
 
-  let targetSeats = deps.listPokerPlaySeatsByTable(targetEntry.table.tableId);
+  const movePool = [];
+  for (const entry of orderedEntries) {
+    if (entry.live) continue;
+    const tableId = String(entry.table.tableId || '');
+    const targetOccupancy = Number(targetByTableId.get(tableId));
+    const moveCount = Number.isFinite(targetOccupancy)
+      ? Math.max(0, entry.activeSeats.length - targetOccupancy)
+      : entry.activeSeats.length;
+    if (!moveCount) continue;
+    movePool.push(...sortSeatsForTournamentSeriesTransfer(entry.activeSeats).slice(0, moveCount));
+  }
+
   let movedCount = 0;
-  for (const entry of activeEntries) {
-    if (entry.table.tableId === targetEntry.table.tableId) continue;
-    for (const seat of entry.activeSeats) {
-      const openSeatNumber = findNextOpenSeatNumber(targetEntry.table, targetSeats);
-      if (!openSeatNumber) {
-        return {
-          table,
-          seats,
-          hand,
-          changed: false,
-          closed: false,
-        };
-      }
-      const movedSeat = deps.upsertPokerPlaySeat({
-        ...seat,
-        tableId: targetEntry.table.tableId,
-        seatNumber: openSeatNumber,
-        status: 'active',
-        createdAt: seat.createdAt,
-        updatedAt: atIso,
-      });
-      deps.deletePokerPlaySeat(entry.table.tableId, seat.seatNumber);
-      targetSeats = deps.listPokerPlaySeatsByTable(targetEntry.table.tableId);
-      movedCount += movedSeat ? 1 : 0;
+  for (const deficit of deficits) {
+    if (deficit.target <= 0) continue;
+    let targetEntry = {
+      table: deps.getPokerPlayTableById(deficit.tableId) || keepers.find((entry) => String(entry?.table?.tableId || '') === deficit.tableId)?.table,
+      seats: deps.listPokerPlaySeatsByTable(deficit.tableId),
+      hand: deps.getCurrentPokerPlayHandForTable(deficit.tableId),
+    };
+    while (movePool.length && getActiveSeatRows(targetEntry.seats).length < deficit.target) {
+      const nextSeat = movePool.shift();
+      if (!nextSeat || String(nextSeat.tableId || '') === deficit.tableId) continue;
+      const movedSeat = moveTournamentSeriesSeat(deps, nextSeat, targetEntry, atIso);
+      if (!movedSeat) continue;
+      targetEntry = {
+        table: deps.getPokerPlayTableById(deficit.tableId) || targetEntry.table,
+        seats: deps.listPokerPlaySeatsByTable(deficit.tableId),
+        hand: deps.getCurrentPokerPlayHandForTable(deficit.tableId),
+      };
+      movedCount += 1;
     }
+  }
+
+  let closedCount = 0;
+  for (const entry of orderedEntries) {
+    const tableId = String(entry.table.tableId || '');
+    if (targetByTableId.has(tableId)) continue;
+    if (entry.live) continue;
+    const remainingSeats = deps.listPokerPlaySeatsByTable(tableId);
+    if (getActiveSeatRows(remainingSeats).length > 0) continue;
     closeTournamentSeriesTable(deps, entry.table, {
-      mergedIntoTableId: targetEntry.table.tableId,
+      mergedIntoTableId: keepers[0]?.table?.tableId || null,
       atIso,
     });
+    closedCount += 1;
   }
 
-  if (!movedCount) {
+  if (!movedCount && !closedCount) {
     return {
       table,
       seats,
@@ -1050,21 +1117,13 @@ function maybeConvergeTournamentSeries(deps, table, seats, hand, atIso) {
     };
   }
 
-  if (table.tableId === targetEntry.table.tableId) {
-    return {
-      table: deps.getPokerPlayTableById(table.tableId) || table,
-      seats: deps.listPokerPlaySeatsByTable(table.tableId),
-      hand: deps.getCurrentPokerPlayHandForTable(table.tableId),
-      changed: true,
-      closed: false,
-    };
-  }
+  const refreshedTable = deps.getPokerPlayTableById(table.tableId) || table;
   return {
-    table: deps.getPokerPlayTableById(table.tableId) || table,
+    table: refreshedTable,
     seats: deps.listPokerPlaySeatsByTable(table.tableId),
     hand: deps.getCurrentPokerPlayHandForTable(table.tableId),
     changed: true,
-    closed: true,
+    closed: isSeriesClosedTable(refreshedTable),
   };
 }
 
@@ -1267,11 +1326,11 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       seats = tournamentSettlement.seats;
       if (tournamentSettlement.completed) break;
 
-      const seriesConvergence = maybeConvergeTournamentSeries(deps, table, seats, hand, atIso);
-      table = seriesConvergence.table;
-      seats = seriesConvergence.seats;
-      hand = seriesConvergence.hand;
-      if (seriesConvergence.closed) break;
+      const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
+      table = seriesRebalance.table;
+      seats = seriesRebalance.seats;
+      hand = seriesRebalance.hand;
+      if (seriesRebalance.closed) break;
 
       const readySeats = getActiveSeatRows(seats);
       if (readySeats.length >= Math.max(2, Number(table.minPlayers || 2))) {
@@ -1284,11 +1343,11 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
     }
 
     if (!hand || hand.status !== 'live') {
-      const seriesConvergence = maybeConvergeTournamentSeries(deps, table, seats, hand, atIso);
-      table = seriesConvergence.table;
-      seats = seriesConvergence.seats;
-      hand = seriesConvergence.hand;
-      if (seriesConvergence.closed) break;
+      const seriesRebalance = maybeRebalanceTournamentSeries(deps, table, seats, hand, atIso);
+      table = seriesRebalance.table;
+      seats = seriesRebalance.seats;
+      hand = seriesRebalance.hand;
+      if (seriesRebalance.closed) break;
     }
 
     if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= Math.max(2, Number(table.minPlayers || 2))) {

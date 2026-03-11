@@ -443,6 +443,7 @@ Tournament registration notes:
 - once the next hand starts, the registered seat becomes active automatically
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
 - when a series can fit back onto one table, active seats may converge to a single final table between hands; overflow tables then fall out of the lobby payload
+- when a series still needs multiple tables, non-live overflow seats may rebalance onto shorter tables between hands; if the destination table is already live, the moved seat arrives as `registered` and activates on that table's next hand
 
 Presence notes:
 - seated viewers heartbeat through authenticated table detail reads and table stream connects
