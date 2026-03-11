@@ -18,7 +18,7 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
     requiredEnv: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=email', 'PRIVY_EMAIL_OTP_PROVIDER', 'PRIVY_EMAIL_OTP_FETCH_URL', 'PRIVY_EMAIL_OTP_TEST_EMAIL'],
     requiredFlag: 'PRIVY_EMAIL_OTP_REQUIRED',
     defaultMode: 'skip',
-    description: 'Optional real Privy email-code lane with automated OTP retrieval.',
+    description: 'Optional real Privy email-code lane that proves wallet exposure plus Town Hall ERC-8004 registration with automated OTP retrieval.',
   },
   {
     suiteId: 'sepolia-wallet',

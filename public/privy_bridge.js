@@ -394,6 +394,26 @@
     return out;
   }
 
+  function createPrivyTimeoutError(code) {
+    const out = new Error(code);
+    out.code = code;
+    return out;
+  }
+
+  function withPrivySdkTimeout(promise, timeoutMs, code) {
+    const ms = Number(timeoutMs);
+    if (!Number.isFinite(ms) || ms <= 0) return Promise.resolve(promise);
+    let timer = null;
+    return Promise.race([
+      Promise.resolve(promise).finally(() => {
+        if (timer) clearTimeout(timer);
+      }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(createPrivyTimeoutError(code)), ms);
+      })
+    ]);
+  }
+
   function errorContains(err, needle) {
     const n = String(needle || '').trim().toLowerCase();
     if (!n) return false;
@@ -849,6 +869,13 @@
       evmProvider: null
     };
 
+    const PRIVY_USER_REFRESH_TIMEOUT_MS = 15000;
+    const PRIVY_GUEST_LOGIN_TIMEOUT_MS = 45000;
+    const PRIVY_EMAIL_SEND_TIMEOUT_MS = 45000;
+    const PRIVY_EMAIL_VERIFY_TIMEOUT_MS = 60000;
+    const PRIVY_WALLET_CREATE_TIMEOUT_MS = 60000;
+    const PRIVY_WALLET_PROVIDER_TIMEOUT_MS = 60000;
+
     async function downgradeClientIdIfNeeded(err) {
       if (!state.usingClientId) return false;
       if (!isInvalidNativeAppIdError(err)) return false;
@@ -942,7 +969,11 @@
 
     async function refreshUser() {
       try {
-        const out = await client.user.get();
+        const out = await withPrivySdkTimeout(
+          client.user.get(),
+          PRIVY_USER_REFRESH_TIMEOUT_MS,
+          'PRIVY_USER_REFRESH_TIMEOUT'
+        );
         state.user = out?.user || null;
       } catch {
         state.user = null;
@@ -954,7 +985,11 @@
       const method = normalizePrivyLoginMethod(config.loginMethod || 'email', 'email');
       if (method === 'guest') {
         try {
-          const out = await client.auth.guest.create(buildLoginOptions(preferred));
+          const out = await withPrivySdkTimeout(
+            client.auth.guest.create(buildLoginOptions(preferred)),
+            PRIVY_GUEST_LOGIN_TIMEOUT_MS,
+            'PRIVY_GUEST_LOGIN_TIMEOUT'
+          );
           state.user = out?.user || null;
           return state.user;
         } catch (err) {
@@ -964,7 +999,11 @@
 
       const email = await requestPrivyEmail(loginUi);
       try {
-        await client.auth.email.sendCode(email);
+        await withPrivySdkTimeout(
+          client.auth.email.sendCode(email),
+          PRIVY_EMAIL_SEND_TIMEOUT_MS,
+          'PRIVY_EMAIL_SEND_TIMEOUT'
+        );
         if (loginUi && typeof loginUi.notifyCodeSent === 'function') {
           loginUi.notifyCodeSent({ email });
         }
@@ -972,7 +1011,11 @@
         const downgraded = await downgradeClientIdIfNeeded(err);
         if (downgraded) {
           try {
-            await client.auth.email.sendCode(email);
+            await withPrivySdkTimeout(
+              client.auth.email.sendCode(email),
+              PRIVY_EMAIL_SEND_TIMEOUT_MS,
+              'PRIVY_EMAIL_SEND_TIMEOUT'
+            );
             if (loginUi && typeof loginUi.notifyCodeSent === 'function') {
               loginUi.notifyCodeSent({ email });
             }
@@ -986,11 +1029,15 @@
       const code = await requestPrivyCode(loginUi, email);
       let out;
       try {
-        out = await client.auth.email.loginWithCode(
-          email,
-          code,
-          'login-or-sign-up',
-          buildLoginOptions(preferred)
+        out = await withPrivySdkTimeout(
+          client.auth.email.loginWithCode(
+            email,
+            code,
+            'login-or-sign-up',
+            buildLoginOptions(preferred)
+          ),
+          PRIVY_EMAIL_VERIFY_TIMEOUT_MS,
+          'PRIVY_EMAIL_VERIFY_TIMEOUT'
         );
       } catch (err) {
         throw buildPrivyError('PRIVY_EMAIL_CODE_FAILED', err);
@@ -1036,7 +1083,11 @@
 
       let account = pickSolanaAccount(user);
       if (!account && interactive) {
-        const created = await client.embeddedWallet.createSolana();
+        const created = await withPrivySdkTimeout(
+          client.embeddedWallet.createSolana(),
+          PRIVY_WALLET_CREATE_TIMEOUT_MS,
+          'PRIVY_WALLET_CREATE_TIMEOUT'
+        );
         state.user = created?.user || state.user;
         account = pickSolanaAccount(state.user);
       }
@@ -1048,10 +1099,14 @@
 
       if (typeof sdk.getEntropyDetailsFromAccount !== 'function') throw new Error('PRIVY_ENTROPY_HELPER_MISSING');
       const entropy = sdk.getEntropyDetailsFromAccount(account);
-      const provider = await client.embeddedWallet.getSolanaProvider(
-        account,
-        entropy.entropyId,
-        entropy.entropyIdVerifier
+      const provider = await withPrivySdkTimeout(
+        client.embeddedWallet.getSolanaProvider(
+          account,
+          entropy.entropyId,
+          entropy.entropyIdVerifier
+        ),
+        PRIVY_WALLET_PROVIDER_TIMEOUT_MS,
+        'PRIVY_WALLET_PROVIDER_TIMEOUT'
       );
 
       state.solanaAccount = account;
@@ -1067,9 +1122,13 @@
       let account = pickEvmAccount(user);
       if (!account && interactive) {
         const maybeSolana = pickSolanaAccount(user);
-        const created = await client.embeddedWallet.create({
-          ...(maybeSolana ? { solanaAccount: maybeSolana } : {})
-        });
+        const created = await withPrivySdkTimeout(
+          client.embeddedWallet.create({
+            ...(maybeSolana ? { solanaAccount: maybeSolana } : {})
+          }),
+          PRIVY_WALLET_CREATE_TIMEOUT_MS,
+          'PRIVY_WALLET_CREATE_TIMEOUT'
+        );
         state.user = created?.user || state.user;
         account = pickEvmAccount(state.user);
       }
@@ -1081,11 +1140,15 @@
 
       if (typeof sdk.getEntropyDetailsFromAccount !== 'function') throw new Error('PRIVY_ENTROPY_HELPER_MISSING');
       const entropy = sdk.getEntropyDetailsFromAccount(account);
-      const provider = await client.embeddedWallet.getEthereumProvider({
-        wallet: account,
-        entropyId: entropy.entropyId,
-        entropyIdVerifier: entropy.entropyIdVerifier
-      });
+      const provider = await withPrivySdkTimeout(
+        client.embeddedWallet.getEthereumProvider({
+          wallet: account,
+          entropyId: entropy.entropyId,
+          entropyIdVerifier: entropy.entropyIdVerifier
+        }),
+        PRIVY_WALLET_PROVIDER_TIMEOUT_MS,
+        'PRIVY_WALLET_PROVIDER_TIMEOUT'
+      );
 
       state.evmAccount = account;
       state.evmProvider = provider;

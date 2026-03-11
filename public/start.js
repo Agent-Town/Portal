@@ -401,11 +401,7 @@ async function handleEnter() {
     while (true) {
       try {
         setStatus('Connecting to Privy...');
-        const ok = await withStartTimeout(
-          window.ensurePrivyLogin({ interactive: true, loginUi }),
-          START_PRIVY_LOGIN_TIMEOUT_MS,
-          'PRIVY_LOGIN_TIMEOUT'
-        );
+        const ok = await window.ensurePrivyLogin({ interactive: true, loginUi });
         if (!ok) {
           const out = new Error('PRIVY_LOGIN_FAILED');
           out.code = 'PRIVY_LOGIN_FAILED';
