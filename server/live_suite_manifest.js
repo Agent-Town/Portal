@@ -17,11 +17,11 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   },
   {
     suiteId: 'sepolia-wallet',
-    command: 'REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js',
+    command: 'npm run test:sepolia-live',
     requiredEnv: ['REAL_SEPOLIA_WALLET_TEST=1', 'SEPOLIA_TEST_WALLET_ADDRESS'],
     requiredFlag: 'REAL_SEPOLIA_WALLET_TEST',
     defaultMode: 'skip',
-    description: 'Optional real Sepolia wallet reuse and balance checks.',
+    description: 'Optional real Sepolia wallet reuse and on-chain balance readiness check.',
   },
 ]);
 

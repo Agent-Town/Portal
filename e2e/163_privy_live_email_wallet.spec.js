@@ -9,6 +9,8 @@ const liveProvider = String(process.env.PRIVY_EMAIL_OTP_PROVIDER || '').trim().t
 const liveFetchUrl = String(process.env.PRIVY_EMAIL_OTP_FETCH_URL || '').trim();
 const timeoutMs = Number(process.env.PRIVY_EMAIL_OTP_TIMEOUT_MS || 120000);
 const liveRequired = /^(1|true|yes|on)$/i.test(String(process.env.PRIVY_EMAIL_OTP_REQUIRED || '').trim());
+const TEST_PRIVY_SOLANA_ADDRESS = 'So11111111111111111111111111111111111111112';
+const TEST_PRIVY_EVM_ADDRESS = '0x1111111111111111111111111111111111111111';
 
 function buildFetchUrl(email) {
   const raw = String(liveFetchUrl || '').trim();
@@ -59,6 +61,7 @@ test.describe('live Privy email wallet smoke', () => {
     expect(configResponse.ok()).toBe(true);
     const configBody = await configResponse.json();
     expect(String(configBody?.config?.loginMethod || '')).toBe('email');
+    expect(Boolean(configBody?.config?.testMode)).toBe(false);
 
     await page.goto('/start');
     await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible({ timeout: 15000 });
@@ -80,8 +83,10 @@ test.describe('live Privy email wallet smoke', () => {
     expect(walletSnapshot.hasWalletClient).toBe(true);
     expect(walletSnapshot.solana.ok).toBe(true);
     expect(String(walletSnapshot.solana.address || '')).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,64}$/);
+    expect(String(walletSnapshot.solana.address || '')).not.toBe(TEST_PRIVY_SOLANA_ADDRESS);
     expect(walletSnapshot.evm.ok).toBe(true);
     expect(String(walletSnapshot.evm.address || '')).toMatch(/^0x[a-fA-F0-9]{40}$/);
+    expect(String(walletSnapshot.evm.address || '')).not.toBe(TEST_PRIVY_EVM_ADDRESS);
 
     await page.goto('/start');
     await page.waitForURL(/\/app(?:[?#].*)?$/, { timeout: 60000 });

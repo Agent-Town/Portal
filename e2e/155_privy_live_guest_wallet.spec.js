@@ -1,9 +1,10 @@
 const { test, expect } = require('@playwright/test');
 
-const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const livePrivyAppId = String(process.env.PRIVY_APP_ID || '').trim();
 const livePrivyLoginMethod = String(process.env.PRIVY_LOGIN_METHOD || '').trim().toLowerCase();
 const privyLiveRequired = /^(1|true|yes|on)$/i.test(String(process.env.PRIVY_LIVE_REQUIRED || '').trim());
+const TEST_PRIVY_SOLANA_ADDRESS = 'So11111111111111111111111111111111111111112';
+const TEST_PRIVY_EVM_ADDRESS = '0x1111111111111111111111111111111111111111';
 
 async function readOnboardingStatus(page) {
   return await page.evaluate(async () => {
@@ -61,12 +62,6 @@ test.describe('live Privy guest wallet smoke', () => {
     'Live Privy env not configured; default suite skips this optional smoke.'
   );
 
-  test.beforeEach(async ({ request }) => {
-    await request.post('/__test__/reset', {
-      headers: { 'x-test-reset': resetToken },
-    });
-  });
-
   test('live Privy guest login redirects to /app, creates wallets, and re-enters without OTP', async ({ page, request }) => {
     test.slow();
     expect(livePrivyAppId, 'Set PRIVY_APP_ID in .env/.env.local before running `npm run test:privy-live`.').toBeTruthy();
@@ -85,6 +80,7 @@ test.describe('live Privy guest wallet smoke', () => {
     });
     expect(String(configBody?.config?.appId || '')).toBe(livePrivyAppId);
     expect(String(configBody?.config?.loginMethod || '')).toBe('guest');
+    expect(Boolean(configBody?.config?.testMode)).toBe(false);
 
     await page.goto('/start');
     await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible({ timeout: 15000 });
@@ -110,8 +106,10 @@ test.describe('live Privy guest wallet smoke', () => {
     });
     expect(walletSnapshot.solana.ok).toBe(true);
     expect(String(walletSnapshot.solana.address || '')).toMatch(/^[1-9A-HJ-NP-Za-km-z]{32,64}$/);
+    expect(String(walletSnapshot.solana.address || '')).not.toBe(TEST_PRIVY_SOLANA_ADDRESS);
     expect(walletSnapshot.evm.ok).toBe(true);
     expect(String(walletSnapshot.evm.address || '')).toMatch(/^0x[a-fA-F0-9]{40}$/);
+    expect(String(walletSnapshot.evm.address || '')).not.toBe(TEST_PRIVY_EVM_ADDRESS);
 
     const onboarding = await readOnboardingStatus(page);
     expect(Number(onboarding?.step || 0)).toBeGreaterThan(1);

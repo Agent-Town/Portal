@@ -90,9 +90,9 @@ Requirements for the live Privy smoke:
 - optionally set `PRIVY_CLIENT_ID`
 
 What `npm run test:privy-live` does:
-- loads `.env*` even though the server runs under `NODE_ENV=test`
-- enables Privy in test mode (`ENABLE_PRIVY_IN_TEST=1`)
-- runs a dedicated live smoke that verifies `/start` login, redirect to `/app`, and real Privy-provided Solana + EVM wallet availability
+- loads `.env*` and starts an isolated local app server in development mode
+- deletes the dedicated live SQLite store before server boot so the run starts clean without `/__test__/reset`
+- verifies `/start` login, redirect to `/app`, and real Privy-provided Solana + EVM wallet availability without the deterministic test bridge
 
 What `npm run test:privy-email-live` requires:
 - set `PRIVY_LOGIN_METHOD=email`
@@ -103,7 +103,7 @@ What `npm run test:privy-email-live` requires:
 
 Optional local integration check (reused Sepolia wallet):
 ```bash
-REAL_SEPOLIA_WALLET_TEST=1 npx playwright test e2e/10_sepolia_wallet_reuse.spec.js
+npm run test:sepolia-live
 ```
 
 Notes:
@@ -119,6 +119,12 @@ npm run setup:sepolia-wallet
 ```bash
 npm run setup:sepolia-wallet -- --no-balance-check
 ```
+
+Live-lane boundary audit and remaining external prerequisites:
+```bash
+cat docs/live_lane_audit.md
+```
+
 - Provide your own wallet:
 ```bash
 npm run setup:sepolia-wallet -- --address 0x...

@@ -46,6 +46,8 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   const listedSuites = JSON.parse(manifestOutput);
   const listedIds = listedSuites.map((entry) => String(entry.suiteId || ''));
   expect(listedIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet']));
+  const sepoliaSuite = listedSuites.find((entry) => String(entry.suiteId || '') === 'sepolia-wallet');
+  expect(String(sepoliaSuite?.command || '')).toBe('npm run test:sepolia-live');
 
   const statusOutput = execFileSync('node', ['scripts/test_live.js', '--status'], {
     cwd: repoRoot,
@@ -135,4 +137,55 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   }
   expect(mismatchError).toBeTruthy();
   expect(String(mismatchError?.stderr || '')).toContain('LIVE_SUITE_SETUP_REQUIRED:privy-guest:PRIVY_LOGIN_METHOD=guest');
+
+  const configAuditOutput = execFileSync(
+    'node',
+    [
+      '-e',
+      `const guest = require('./playwright.privy.config.js');
+const email = require('./playwright.privy.email.config.js');
+const sepolia = require('./playwright.sepolia.live.config.js');
+const payload = {
+  guest: {
+    nodeEnv: guest?.webServer?.env?.NODE_ENV || null,
+    testResetToken: guest?.webServer?.env?.TEST_RESET_TOKEN || null,
+    enablePrivyInTest: guest?.webServer?.env?.ENABLE_PRIVY_IN_TEST || null,
+    command: guest?.webServer?.command || '',
+  },
+  email: {
+    nodeEnv: email?.webServer?.env?.NODE_ENV || null,
+    testResetToken: email?.webServer?.env?.TEST_RESET_TOKEN || null,
+    enablePrivyInTest: email?.webServer?.env?.ENABLE_PRIVY_IN_TEST || null,
+    command: email?.webServer?.command || '',
+  },
+  sepolia: {
+    hasWebServer: !!sepolia?.webServer,
+    testMatch: Array.isArray(sepolia?.testMatch) ? sepolia.testMatch : [],
+  },
+};
+process.stdout.write(JSON.stringify(payload));`,
+    ],
+    {
+      cwd: repoRoot,
+      env: { ...process.env },
+      encoding: 'utf8',
+    }
+  );
+  const configAudit = JSON.parse(configAuditOutput);
+  expect(configAudit.guest).toMatchObject({
+    nodeEnv: 'development',
+    testResetToken: null,
+    enablePrivyInTest: null,
+  });
+  expect(String(configAudit.guest.command || '')).toContain('scripts/start_live_server.js');
+  expect(configAudit.email).toMatchObject({
+    nodeEnv: 'development',
+    testResetToken: null,
+    enablePrivyInTest: null,
+  });
+  expect(String(configAudit.email.command || '')).toContain('scripts/start_live_server.js');
+  expect(configAudit.sepolia).toMatchObject({
+    hasWebServer: false,
+    testMatch: ['10_sepolia_wallet_reuse.spec.js'],
+  });
 });

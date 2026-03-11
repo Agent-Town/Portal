@@ -4,16 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const { loadDotEnv } = require('./server/env');
 
-process.env.LOAD_DOTENV_IN_TEST = process.env.LOAD_DOTENV_IN_TEST || '1';
+const LIVE_NODE_ENV = 'development';
+process.env.NODE_ENV = LIVE_NODE_ENV;
 loadDotEnv(process.cwd());
 
-if (!process.env.ENABLE_PRIVY_IN_TEST) process.env.ENABLE_PRIVY_IN_TEST = '1';
-if (!process.env.PRIVY_LOGIN_METHOD) process.env.PRIVY_LOGIN_METHOD = 'guest';
+process.env.PRIVY_LOGIN_METHOD = 'guest';
 if (!process.env.START_PAGE_ENABLED && process.env.PRIVY_APP_ID) process.env.START_PAGE_ENABLED = '1';
 
 const SYSTEM_CHROMIUM = ['/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => fs.existsSync(p));
 const PORT = Number(process.env.PW_PORT || 4175);
-const STORE_PATH = process.env.STORE_PATH || path.join(process.cwd(), 'data', 'store.e2e.privy.sqlite');
+const STORE_PATH = process.env.STORE_PATH || path.join(process.cwd(), 'data', 'store.e2e.privy-live.sqlite');
 process.env.STORE_PATH = STORE_PATH;
 
 module.exports = defineConfig({
@@ -48,18 +48,15 @@ module.exports = defineConfig({
     trace: 'on-first-retry'
   },
   webServer: {
-    command: 'exec node server/index.js',
+    command: 'exec node scripts/start_live_server.js',
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
     env: {
       ...process.env,
-      NODE_ENV: 'test',
+      NODE_ENV: LIVE_NODE_ENV,
       PORT: String(PORT),
-      TEST_RESET_TOKEN: process.env.TEST_RESET_TOKEN || 'test-reset',
       ADMIN_TOKEN: process.env.ADMIN_TOKEN || 'test-admin',
-      LOAD_DOTENV_IN_TEST: '1',
-      ENABLE_PRIVY_IN_TEST: '1',
-      PRIVY_LOGIN_METHOD: process.env.PRIVY_LOGIN_METHOD || 'guest',
+      PRIVY_LOGIN_METHOD: 'guest',
       START_PAGE_ENABLED: process.env.START_PAGE_ENABLED || (process.env.PRIVY_APP_ID ? '1' : '0'),
       STORE_PATH,
     }

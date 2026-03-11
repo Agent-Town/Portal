@@ -10,12 +10,7 @@ const {
   minWeiFromEnv
 } = require('./helpers/sepolia_wallet');
 
-const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const REAL_WALLET_TEST = process.env.REAL_SEPOLIA_WALLET_TEST === '1';
-
-test.beforeEach(async ({ request }) => {
-  await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
-});
 
 test.describe('local sepolia wallet reuse', () => {
   test.skip(!REAL_WALLET_TEST, 'Set REAL_SEPOLIA_WALLET_TEST=1 for local wallet integration checks.');
