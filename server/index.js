@@ -2042,8 +2042,9 @@ function sendPortalApiError(
 function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) {
   const cookies = parseCookies(req.header('cookie') || '');
   const cookieSid = typeof cookies.et_session === 'string' ? cookies.et_session.trim() : '';
-  let sid = cookieSid;
-  let session = sid ? getSessionById(sid) : null;
+  const cookieSession = cookieSid ? getSessionById(cookieSid) : null;
+  let sid = cookieSession?.sessionId || cookieSid;
+  let session = cookieSession;
   const walletCandidates = collectWalletCandidatesFromHeaders(req);
   const walletRecoveryKey = normalizeWalletRecoveryKeyInput(req.header('x-wallet-recovery-key'));
   const walletRecoveryIntentHeader = typeof req.header('x-wallet-recovery-intent') === 'string'
@@ -2128,6 +2129,8 @@ function resolveHumanSessionWithRecovery(req, res, { allowCreate = true } = {}) 
 
   if (session) {
     if (
+      !cookieSession
+      &&
       hintedSession
       && hintedSession.sessionId !== session.sessionId
       && hintedTeamCode

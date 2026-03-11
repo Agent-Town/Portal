@@ -371,6 +371,8 @@ let liteSkillLoopLastErrorFingerprint = '';
 let liteSkillLoopLastErrorAtMs = 0;
 let townPanelUnlocked = false;
 let pendingHumanSigilSelection = null;
+let stateMutationVersion = 0;
+let statePollRequestVersion = 0;
 let openAiCodexOAuthAttempt = null;
 let openAiCodexOAuthPollTimer = null;
 let openAiCodexOAuthExchangeInFlight = false;
@@ -388,6 +390,11 @@ const agentDebugEvents = [];
 const agentDebugTraffic = [];
 let agentDebugTrafficFilter = 'all';
 let agentDebugTrafficMuteDepth = 0;
+
+function markLocalStateMutation() {
+  stateMutationVersion += 1;
+  return stateMutationVersion;
+}
 let agentPanelLayoutObserver = null;
 let agentPanelLayoutResizeBound = false;
 let agentInterfaceSetupScheduled = false;
@@ -5093,6 +5100,7 @@ function bindTownDistrictControls() {
           method: 'POST',
           body: JSON.stringify({})
         });
+        markLocalStateMutation();
         if (result?.nextUrl) {
           const resolved = routeToPopupMode(result.nextUrl);
           if (resolved?.mode === 'district') {
@@ -7296,6 +7304,7 @@ function renderSigils(state) {
             match: resp.match || lastState.match
           };
         }
+        markLocalStateMutation();
         pendingHumanSigilSelection = null;
         if (lastState) {
           renderSigils(lastState);
@@ -10085,6 +10094,7 @@ function renderSigilsLegacy(state) {
             match: resp.match || lastState.match
           };
         }
+        markLocalStateMutation();
         pendingHumanSigilSelection = null;
         if (lastState) {
           renderSigils(lastState);
@@ -10807,8 +10817,12 @@ function startAgentInterfaceKeepalive() {
 // --------------------------
 
 async function poll() {
+  const requestVersion = ++statePollRequestVersion;
+  const mutationVersionAtRequest = stateMutationVersion;
   try {
     const state = await api('/api/state');
+    if (requestVersion !== statePollRequestVersion) return;
+    if (mutationVersionAtRequest !== stateMutationVersion) return;
     updateUI(state);
     scheduleAgentInterfaceSetup();
   } catch (e) {
@@ -11042,6 +11056,7 @@ async function init() {
           method: 'POST',
           body: JSON.stringify({})
         });
+        markLocalStateMutation();
         if (result?.nextUrl) {
           window.location.href = result.nextUrl;
           return;

@@ -47,6 +47,7 @@ const state = {
   agentsById: new Map(),
   searchRequestSeq: 0,
   districtAgentRequestSeq: 0,
+  districtDetailRequestSeq: 0,
   districtSearchDebounceTimer: null,
   districtAgentsObserver: null,
   districtTileImageObserver: null,
@@ -1242,6 +1243,7 @@ function scheduleDistrictSearch() {
 
 async function openDistrictDetail(key, opts = {}) {
   if (!key) return;
+  const seq = ++state.districtDetailRequestSeq;
 
   const detailPanel = el('atlasDistrictDetail');
   const searchInput = el('atlasDistrictSearch');
@@ -1276,6 +1278,7 @@ async function openDistrictDetail(key, opts = {}) {
     }
     state.districtDetailCache.set(summaryCacheKey, payload);
   }
+  if (seq !== state.districtDetailRequestSeq) return;
 
   const district = payload?.district || null;
   if (!district) throw new Error('DISTRICT_NOT_FOUND');
@@ -1291,6 +1294,7 @@ async function openDistrictDetail(key, opts = {}) {
   setModalOpen(true);
   ensureDistrictAgentsObserver();
   await loadDistrictAgentsPage({ reset: true });
+  if (seq !== state.districtDetailRequestSeq) return;
 
   if (!opts.silent) {
     setUrlState({ district: district.key, agent: opts.agent || null });
