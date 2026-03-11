@@ -518,6 +518,7 @@ let houseSurfaceState = {
     loaded: false,
     items: [],
     selectedTraceId: '',
+    selectedRunId: '',
     emptyStateText: 'No canonical traces archived yet.'
   },
   experiences: {
@@ -536,6 +537,8 @@ let houseSurfaceState = {
     loaded: false,
     activeConfigVersionId: '',
     activeConfigHash: '',
+    selectedKind: '',
+    selectedId: '',
     lineage: {
       parentConfigVersionIds: [],
       createdBy: '',
@@ -550,6 +553,7 @@ let houseSurfaceState = {
     loaded: false,
     jobs: [],
     results: [],
+    selectedJobId: '',
     selectedResultId: '',
     emptyStateText: 'No durable trainer jobs yet.',
     activeConfigVersionId: '',
@@ -1336,6 +1340,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.office.selectedOfficeId = '';
     houseSurfaceState.office.emptyStateText = 'Attach a house to inspect the House Office overview.';
     houseSurfaceState.archive.selectedTraceId = '';
+    houseSurfaceState.archive.selectedRunId = '';
     houseSurfaceState.experiences.selectedExperienceId = '';
     houseSurfaceState.tracks.loaded = false;
     houseSurfaceState.tracks.items = [];
@@ -1343,6 +1348,8 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
     houseSurfaceState.workshop.loaded = false;
     houseSurfaceState.workshop.activeConfigVersionId = '';
     houseSurfaceState.workshop.activeConfigHash = '';
+    houseSurfaceState.workshop.selectedKind = '';
+    houseSurfaceState.workshop.selectedId = '';
     houseSurfaceState.workshop.lineage = {
       parentConfigVersionIds: [],
       createdBy: '',
@@ -1351,6 +1358,7 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
       candidatePatchId: '',
     };
     houseSurfaceState.workshop.inboxPath = '';
+    houseSurfaceState.trainer.selectedJobId = '';
     houseSurfaceState.trainer.selectedResultId = '';
     resetHouseTrainerActionKeys();
   }
@@ -1604,28 +1612,37 @@ async function openHouseOfficeDeepLink(rawDeepLink) {
     throw new Error('HOUSE_OFFICE_DEEPLINK_INVALID');
   }
   const surface = String(deepLink?.surface || '').trim();
+  const selection = deepLink?.selection && typeof deepLink.selection === 'object'
+    ? deepLink.selection
+    : null;
   if (surface === 'office') {
     await loadHouseOfficeSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   if (surface === 'experiences') {
     await loadHouseExperiencesSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   if (surface === 'workshop') {
     await loadHouseWorkshopSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   if (surface === 'tracks') {
     await loadHouseTracksSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   if (surface === 'archive') {
     await loadHouseArchiveSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   if (surface === 'trainer') {
     await loadHouseTrainerSurface({ skipContext: true });
+    applyHouseSurfaceSelection(surface, selection);
     return;
   }
   throw new Error('HOUSE_OFFICE_DEEPLINK_UNSUPPORTED');
@@ -1635,35 +1652,38 @@ function resolveHouseOfficeSourceRefDeepLink(rawSourceRef) {
   const sourceRef = rawSourceRef && typeof rawSourceRef === 'object' ? rawSourceRef : null;
   const entryPath = String(sourceRef?.entryPath || '').trim();
   const sourceKind = String(sourceRef?.sourceKind || '').trim();
+  const selection = sourceRef?.selection && typeof sourceRef.selection === 'object'
+    ? sourceRef.selection
+    : null;
   if (entryPath === '/api/platform/archive') {
-    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive' };
+    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive', selection };
   }
   if (entryPath === '/api/platform/trainer') {
-    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer' };
+    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer', selection };
   }
   if (entryPath === '/api/platform/workshop') {
-    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop' };
+    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop', selection };
   }
   if (entryPath === '/api/platform/tracks') {
-    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks' };
+    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks', selection };
   }
   if (entryPath === '/api/platform/experiences') {
-    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences' };
+    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences', selection };
   }
   if (sourceKind === 'trainer_job' || sourceKind === 'trainer_result') {
-    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer' };
+    return { kind: 'house_surface', surface: 'trainer', label: 'Open Trainer', selection };
   }
   if (sourceKind === 'team_config_binding' || sourceKind === 'config_version') {
-    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop' };
+    return { kind: 'house_surface', surface: 'workshop', label: 'Open Workshop', selection };
   }
   if (sourceKind === 'track_progress_event') {
-    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks' };
+    return { kind: 'house_surface', surface: 'tracks', label: 'Open Tracks', selection };
   }
   if (sourceKind === 'run') {
-    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive' };
+    return { kind: 'house_surface', surface: 'archive', label: 'Open Archive', selection };
   }
   if (sourceKind === 'experience') {
-    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences' };
+    return { kind: 'house_surface', surface: 'experiences', label: 'Open Experiences', selection };
   }
   return null;
 }
@@ -1674,6 +1694,83 @@ async function openHouseOfficeSourceRef(rawSourceRef) {
     throw new Error('HOUSE_OFFICE_SOURCE_REF_UNSUPPORTED');
   }
   await openHouseOfficeDeepLink(deepLink);
+}
+
+function applyHouseSurfaceSelection(surface, rawSelection) {
+  const normalizedSurface = String(surface || '').trim();
+  const selection = rawSelection && typeof rawSelection === 'object' ? rawSelection : null;
+  const selectionKind = String(selection?.kind || '').trim();
+  if (!normalizedSurface || !selectionKind) return false;
+  if (normalizedSurface === 'archive') {
+    const items = Array.isArray(houseSurfaceState.archive.items) ? houseSurfaceState.archive.items : [];
+    const traceId = String(selection?.traceId || '').trim();
+    const runId = String(selection?.runId || '').trim();
+    const selectedItem = items.find((item) => (
+      (traceId && String(item?.traceId || '').trim() === traceId)
+      || (runId && String(item?.runId || '').trim() === runId)
+    )) || null;
+    if (!selectedItem) return false;
+    houseSurfaceState.archive.selectedTraceId = String(selectedItem.traceId || '').trim();
+    houseSurfaceState.archive.selectedRunId = String(selectedItem.runId || '').trim();
+    renderHouseArchiveSurface();
+    return true;
+  }
+  if (normalizedSurface === 'trainer') {
+    const jobs = Array.isArray(houseSurfaceState.trainer.jobs) ? houseSurfaceState.trainer.jobs : [];
+    const results = Array.isArray(houseSurfaceState.trainer.results) ? houseSurfaceState.trainer.results : [];
+    if (selectionKind === 'trainer_result') {
+      const trainerResultId = String(selection?.trainerResultId || '').trim();
+      const selectedResult = results.find((item) => String(item?.trainerResultId || '').trim() === trainerResultId) || null;
+      if (!selectedResult) return false;
+      houseSurfaceState.trainer.selectedResultId = trainerResultId;
+      houseSurfaceState.trainer.selectedJobId = String(selectedResult?.trainerJobId || '').trim();
+      renderHouseTrainerSurface();
+      return true;
+    }
+    if (selectionKind === 'trainer_job') {
+      const trainerJobId = String(selection?.trainerJobId || '').trim();
+      const selectedJob = jobs.find((item) => String(item?.trainerJobId || '').trim() === trainerJobId) || null;
+      if (!selectedJob) return false;
+      houseSurfaceState.trainer.selectedJobId = trainerJobId;
+      const linkedResult = results.find((item) => String(item?.trainerJobId || '').trim() === trainerJobId) || null;
+      if (linkedResult) {
+        houseSurfaceState.trainer.selectedResultId = String(linkedResult?.trainerResultId || '').trim();
+      }
+      renderHouseTrainerSurface();
+      return true;
+    }
+    return false;
+  }
+  if (normalizedSurface === 'workshop') {
+    if (selectionKind !== 'config_version' && selectionKind !== 'team_binding') return false;
+    houseSurfaceState.workshop.selectedKind = selectionKind;
+    houseSurfaceState.workshop.selectedId = String(
+      selectionKind === 'config_version' ? selection?.configVersionId : selection?.teamBindingId
+    || '').trim();
+    renderHouseWorkshopSurface();
+    return !!houseSurfaceState.workshop.selectedId;
+  }
+  if (normalizedSurface === 'tracks') {
+    if (selectionKind !== 'track' && selectionKind !== 'track_event') return false;
+    const trackId = String(selection?.trackId || '').trim();
+    if (trackId) {
+      houseSurfaceState.tracks.selectedTrackId = trackId;
+      renderHouseTracksSurface();
+      return true;
+    }
+    return false;
+  }
+  if (normalizedSurface === 'experiences') {
+    if (selectionKind !== 'experience' && selectionKind !== 'run') return false;
+    const experienceId = String(selection?.experienceId || '').trim();
+    if (experienceId) {
+      houseSurfaceState.experiences.selectedExperienceId = experienceId;
+      renderHouseExperiencesSurface();
+      return true;
+    }
+    return false;
+  }
+  return false;
 }
 
 function formatHouseOfficeCountLabel(count, singular, plural = '') {
@@ -2260,18 +2357,26 @@ function renderHouseWorkshopSurface() {
   const candidatePatchId = String(lineage.candidatePatchId || '').trim();
   const createdBy = String(lineage.createdBy || '').trim();
   const inboxPath = String(houseSurfaceState.workshop.inboxPath || '').trim();
+  const selectedKind = String(houseSurfaceState.workshop.selectedKind || '').trim();
+  const selectedId = String(houseSurfaceState.workshop.selectedId || '').trim();
 
   emptyNode.textContent = houseSurfaceState.workshop.emptyStateText || 'No active config is bound to this team yet.';
   emptyNode.classList.toggle('is-hidden', !!activeConfigVersionId);
   inboxBtn.disabled = !inboxPath;
   inboxBtn.dataset.entryPath = inboxPath;
+  detailNode.dataset.selectedKind = '';
+  detailNode.dataset.selectedId = '';
 
   if (!activeConfigVersionId) {
     detailNode.textContent = 'Select a team with an active config binding to inspect Workshop lineage.';
     return;
   }
 
-  detailNode.textContent = `Active config ${activeConfigVersionId} · parent ${parentConfigVersionId || '—'} · hash ${activeConfigHash || '—'} · created by ${createdBy || '—'} · trainer job ${trainerJobId || '—'} · trainer result ${trainerResultId || '—'} · patch ${candidatePatchId || '—'}`;
+  const effectiveSelectedKind = selectedKind || 'config_version';
+  const effectiveSelectedId = selectedId || (effectiveSelectedKind === 'team_binding' ? '' : activeConfigVersionId);
+  detailNode.dataset.selectedKind = effectiveSelectedKind;
+  detailNode.dataset.selectedId = effectiveSelectedId;
+  detailNode.textContent = `Active config ${activeConfigVersionId} · parent ${parentConfigVersionId || '—'} · hash ${activeConfigHash || '—'} · created by ${createdBy || '—'} · trainer job ${trainerJobId || '—'} · trainer result ${trainerResultId || '—'} · patch ${candidatePatchId || '—'} · selected ${effectiveSelectedKind} ${effectiveSelectedId || '—'}`;
 }
 
 function renderHouseArchiveSurface() {
@@ -2283,23 +2388,32 @@ function renderHouseArchiveSurface() {
   listNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.archive.emptyStateText || 'No canonical traces archived yet.';
   emptyNode.classList.toggle('is-hidden', items.length > 0);
+  detailNode.dataset.selectedTraceId = '';
+  detailNode.dataset.selectedRunId = '';
   if (!items.length) {
     detailNode.textContent = 'Select a trace to inspect archive counters.';
     return;
   }
 
-  const selectedTraceId = houseSurfaceState.archive.selectedTraceId || String(items[0]?.traceId || '');
-  houseSurfaceState.archive.selectedTraceId = selectedTraceId;
-  const selectedItem = items.find((item) => String(item?.traceId || '') === selectedTraceId) || items[0];
+  const selectedTraceId = String(houseSurfaceState.archive.selectedTraceId || '').trim();
+  const selectedRunId = String(houseSurfaceState.archive.selectedRunId || '').trim();
+  const selectedItem = items.find((item) => (
+    (selectedTraceId && String(item?.traceId || '').trim() === selectedTraceId)
+    || (selectedRunId && String(item?.runId || '').trim() === selectedRunId)
+  )) || items[0];
+  houseSurfaceState.archive.selectedTraceId = String(selectedItem?.traceId || '').trim();
+  houseSurfaceState.archive.selectedRunId = String(selectedItem?.runId || '').trim();
 
   items.forEach((item) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `btn${String(item?.traceId || '') === selectedItem.traceId ? ' primary' : ''}`;
     button.dataset.traceId = String(item?.traceId || '');
+    button.dataset.runId = String(item?.runId || '');
     button.textContent = `${String(item?.traceId || '')} · ${String(item?.status || '')}`;
     button.addEventListener('click', () => {
       houseSurfaceState.archive.selectedTraceId = String(item?.traceId || '');
+      houseSurfaceState.archive.selectedRunId = String(item?.runId || '');
       renderHouseArchiveSurface();
     });
     listNode.appendChild(button);
@@ -2308,7 +2422,9 @@ function renderHouseArchiveSurface() {
   const counters = selectedItem?.archiveCounters && typeof selectedItem.archiveCounters === 'object'
     ? selectedItem.archiveCounters
     : { accepted: 0, ignored: 0, rejected: 0 };
-  detailNode.textContent = `Trace ${String(selectedItem?.traceId || '')} · accepted ${Number(counters.accepted || 0)} · ignored ${Number(counters.ignored || 0)} · rejected ${Number(counters.rejected || 0)}`;
+  detailNode.dataset.selectedTraceId = String(selectedItem?.traceId || '').trim();
+  detailNode.dataset.selectedRunId = String(selectedItem?.runId || '').trim();
+  detailNode.textContent = `Trace ${String(selectedItem?.traceId || '')} · run ${String(selectedItem?.runId || '') || '—'} · accepted ${Number(counters.accepted || 0)} · ignored ${Number(counters.ignored || 0)} · rejected ${Number(counters.rejected || 0)}`;
 }
 
 function renderHouseTrainerSurface() {
@@ -2326,6 +2442,8 @@ function renderHouseTrainerSurface() {
   resultsNode.innerHTML = '';
   emptyNode.textContent = houseSurfaceState.trainer.emptyStateText || 'No durable trainer jobs yet.';
   emptyNode.classList.toggle('is-hidden', jobs.length > 0 || results.length > 0);
+  detailNode.dataset.selectedResultId = '';
+  detailNode.dataset.selectedJobId = '';
   if (!jobs.length && !results.length) {
     if (createCompareBtn) createCompareBtn.disabled = !String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
     if (promotePatchBtn) promotePatchBtn.disabled = true;
@@ -2335,16 +2453,36 @@ function renderHouseTrainerSurface() {
     return;
   }
 
-  const selectedResultId = houseSurfaceState.trainer.selectedResultId || String(results[0]?.trainerResultId || '');
+  const selectedJobId = String(houseSurfaceState.trainer.selectedJobId || '').trim();
+  let selectedResultId = String(houseSurfaceState.trainer.selectedResultId || '').trim();
+  let selectedResult = results.find((item) => String(item?.trainerResultId || '').trim() === selectedResultId) || null;
+  if (!selectedResult && selectedJobId) {
+    selectedResult = results.find((item) => String(item?.trainerJobId || '').trim() === selectedJobId) || null;
+    selectedResultId = String(selectedResult?.trainerResultId || '').trim();
+  }
+  if (!selectedResult) {
+    selectedResult = results[0] || null;
+    selectedResultId = String(selectedResult?.trainerResultId || '').trim();
+  }
   houseSurfaceState.trainer.selectedResultId = selectedResultId;
-  const selectedResult = results.find((item) => String(item?.trainerResultId || '') === selectedResultId) || results[0] || null;
+  if (!houseSurfaceState.trainer.selectedJobId && selectedResult?.trainerJobId) {
+    houseSurfaceState.trainer.selectedJobId = String(selectedResult.trainerJobId || '').trim();
+  }
 
   jobs.forEach((job) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'btn';
+    button.className = `btn${String(job?.trainerJobId || '').trim() === String(houseSurfaceState.trainer.selectedJobId || '').trim() ? ' primary' : ''}`;
     button.dataset.trainerJobId = String(job?.trainerJobId || '');
     button.textContent = `${String(job?.trainerJobId || '')} · ${String(job?.jobKind || '')} · ${String(job?.status || '')}`;
+    button.addEventListener('click', () => {
+      houseSurfaceState.trainer.selectedJobId = String(job?.trainerJobId || '').trim();
+      const linkedResult = results.find((item) => String(item?.trainerJobId || '').trim() === String(job?.trainerJobId || '').trim()) || null;
+      if (linkedResult) {
+        houseSurfaceState.trainer.selectedResultId = String(linkedResult?.trainerResultId || '').trim();
+      }
+      renderHouseTrainerSurface();
+    });
     jobsNode.appendChild(button);
   });
 
@@ -2356,7 +2494,8 @@ function renderHouseTrainerSurface() {
     const approvalLabel = result?.approvalNeeded === true ? 'approval needed' : 'read-only';
     button.textContent = `${String(result?.trainerResultId || '')} · ${approvalLabel}`;
     button.addEventListener('click', () => {
-      houseSurfaceState.trainer.selectedResultId = String(result?.trainerResultId || '');
+      houseSurfaceState.trainer.selectedResultId = String(result?.trainerResultId || '').trim();
+      houseSurfaceState.trainer.selectedJobId = String(result?.trainerJobId || '').trim();
       renderHouseTrainerSurface();
     });
     resultsNode.appendChild(button);
@@ -2374,7 +2513,10 @@ function renderHouseTrainerSurface() {
   const candidatePatchId = String(selectedResult?.candidatePatchIds?.[0] || '').trim();
   const approvalText = selectedResult?.approvalNeeded === true ? 'approval needed' : 'ready';
   const activeConfigVersionId = String(houseSurfaceState.trainer.activeConfigVersionId || '').trim();
-  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · ${approvalText} · active config ${activeConfigVersionId || '—'} · linked config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
+  const selectedJobIdValue = String(houseSurfaceState.trainer.selectedJobId || selectedResult?.trainerJobId || '').trim();
+  detailNode.dataset.selectedResultId = String(selectedResult?.trainerResultId || '').trim();
+  detailNode.dataset.selectedJobId = selectedJobIdValue;
+  detailNode.textContent = `Result ${String(selectedResult?.trainerResultId || '')} · job ${selectedJobIdValue || '—'} · ${approvalText} · active config ${activeConfigVersionId || '—'} · linked config ${linkedConfigVersionId || '—'} · patch ${candidatePatchId || '—'}`;
   if (createCompareBtn) {
     createCompareBtn.disabled = !activeConfigVersionId;
   }
@@ -2515,11 +2657,16 @@ async function loadHouseArchiveSurface({ skipContext = false } = {}) {
     houseSurfaceState.archive.loaded = true;
     houseSurfaceState.archive.items = Array.isArray(data.items) ? data.items : [];
     houseSurfaceState.archive.emptyStateText = String(data.emptyStateText || 'No canonical traces archived yet.');
-    if (!houseSurfaceState.archive.items.some((item) => String(item?.traceId || '') === String(houseSurfaceState.archive.selectedTraceId || ''))) {
+    if (!houseSurfaceState.archive.items.some((item) => (
+      String(item?.traceId || '').trim() === String(houseSurfaceState.archive.selectedTraceId || '').trim()
+      || String(item?.runId || '').trim() === String(houseSurfaceState.archive.selectedRunId || '').trim()
+    ))) {
       houseSurfaceState.archive.selectedTraceId = '';
+      houseSurfaceState.archive.selectedRunId = '';
     }
     if (!houseSurfaceState.archive.selectedTraceId && houseSurfaceState.archive.items[0]?.traceId) {
       houseSurfaceState.archive.selectedTraceId = String(houseSurfaceState.archive.items[0].traceId);
+      houseSurfaceState.archive.selectedRunId = String(houseSurfaceState.archive.items[0].runId || '').trim();
     }
     renderHouseArchiveSurface();
     setHouseSurfaceStatus(houseSurfaceState.archive.items.length ? '' : houseSurfaceState.archive.emptyStateText);
@@ -2619,6 +2766,12 @@ async function loadHouseWorkshopSurface({ skipContext = false } = {}) {
       };
     houseSurfaceState.workshop.inboxPath = String(data.inboxPath || '').trim();
     houseSurfaceState.workshop.emptyStateText = String(data.emptyStateText || 'No active config is bound to this team yet.');
+    if (!houseSurfaceState.workshop.selectedKind) {
+      houseSurfaceState.workshop.selectedKind = houseSurfaceState.workshop.activeConfigVersionId ? 'config_version' : '';
+    }
+    if (!houseSurfaceState.workshop.selectedId) {
+      houseSurfaceState.workshop.selectedId = houseSurfaceState.workshop.activeConfigVersionId || '';
+    }
     renderHouseWorkshopSurface();
     setHouseSurfaceStatus(
       houseSurfaceState.workshop.activeConfigVersionId
@@ -2657,8 +2810,14 @@ async function loadHouseTrainerSurface({ skipContext = false } = {}) {
     houseSurfaceState.trainer.results = Array.isArray(data.results) ? data.results : [];
     houseSurfaceState.trainer.emptyStateText = String(data.emptyStateText || 'No durable trainer jobs yet.');
     houseSurfaceState.trainer.activeConfigVersionId = String(data.activeConfigVersionId || '').trim();
+    if (!houseSurfaceState.trainer.jobs.some((item) => String(item?.trainerJobId || '').trim() === String(houseSurfaceState.trainer.selectedJobId || '').trim())) {
+      houseSurfaceState.trainer.selectedJobId = '';
+    }
     if (!houseSurfaceState.trainer.results.some((item) => String(item?.trainerResultId || '') === String(houseSurfaceState.trainer.selectedResultId || ''))) {
       houseSurfaceState.trainer.selectedResultId = '';
+    }
+    if (!houseSurfaceState.trainer.selectedJobId && houseSurfaceState.trainer.jobs[0]?.trainerJobId) {
+      houseSurfaceState.trainer.selectedJobId = String(houseSurfaceState.trainer.jobs[0].trainerJobId || '').trim();
     }
     if (!houseSurfaceState.trainer.selectedResultId && houseSurfaceState.trainer.results[0]?.trainerResultId) {
       houseSurfaceState.trainer.selectedResultId = String(houseSurfaceState.trainer.results[0].trainerResultId);

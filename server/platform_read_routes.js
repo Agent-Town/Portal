@@ -250,6 +250,109 @@ function registerPlatformReadRoutes(app, deps) {
     return !houseOfficeTextHasForbiddenMarker(normalized);
   }
 
+  function buildHouseOfficeSelection({
+    sourceKind = '',
+    sourceId = '',
+    entryPath = '',
+    runId = '',
+    traceId = '',
+    trainerJobId = '',
+    trackId = '',
+    experienceId = '',
+  } = {}) {
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    const normalizedSourceId = String(sourceId || '').trim();
+    const normalizedEntryPath = String(entryPath || '').trim();
+    const normalizedRunId = String(runId || '').trim();
+    const normalizedTraceId = String(traceId || '').trim();
+    const normalizedTrainerJobId = String(trainerJobId || '').trim();
+    const normalizedTrackId = String(trackId || '').trim();
+    const normalizedExperienceId = String(experienceId || '').trim();
+    if ((normalizedEntryPath === '/api/platform/archive' || normalizedSourceKind === 'run') && normalizedTraceId) {
+      return {
+        kind: 'trace',
+        traceId: normalizedTraceId,
+        runId: normalizedRunId || null,
+      };
+    }
+    if (normalizedSourceKind === 'trainer_result' && normalizedSourceId) {
+      return {
+        kind: 'trainer_result',
+        trainerResultId: normalizedSourceId,
+        trainerJobId: normalizedTrainerJobId || null,
+      };
+    }
+    if (normalizedSourceKind === 'trainer_job' && normalizedSourceId) {
+      return {
+        kind: 'trainer_job',
+        trainerJobId: normalizedSourceId,
+      };
+    }
+    if (normalizedSourceKind === 'team_config_binding' && normalizedSourceId) {
+      return {
+        kind: 'team_binding',
+        teamBindingId: normalizedSourceId,
+      };
+    }
+    if (normalizedSourceKind === 'config_version' && normalizedSourceId) {
+      return {
+        kind: 'config_version',
+        configVersionId: normalizedSourceId,
+      };
+    }
+    if (normalizedSourceKind === 'track_progress_event' && normalizedSourceId) {
+      return {
+        kind: 'track_event',
+        trackProgressEventId: normalizedSourceId,
+        trackId: normalizedTrackId || null,
+      };
+    }
+    if (normalizedSourceKind === 'experience' && normalizedSourceId) {
+      return {
+        kind: 'experience',
+        experienceId: normalizedSourceId,
+      };
+    }
+    if (normalizedSourceKind === 'run' && normalizedSourceId) {
+      return {
+        kind: 'run',
+        runId: normalizedSourceId,
+        experienceId: normalizedExperienceId || null,
+      };
+    }
+    return null;
+  }
+
+  function buildHouseOfficeSourceRef({
+    sourceKind = '',
+    sourceId = '',
+    entryPath = '',
+    selection = null,
+  } = {}) {
+    const normalizedSourceKind = String(sourceKind || '').trim();
+    const normalizedSourceId = String(sourceId || '').trim();
+    const normalizedEntryPath = String(entryPath || '').trim();
+    if (!normalizedSourceKind || !normalizedSourceId || !normalizedEntryPath) return null;
+    const sourceRef = {
+      sourceKind: normalizedSourceKind,
+      sourceId: normalizedSourceId,
+      entryPath: normalizedEntryPath,
+    };
+    if (selection && typeof selection === 'object') {
+      sourceRef.selection = selection;
+    }
+    return sourceRef;
+  }
+
+  function buildHouseOfficeDeepLinkWithSelection(deepLink, selection = null) {
+    if (!deepLink || typeof deepLink !== 'object') return deepLink;
+    if (!selection || typeof selection !== 'object') return deepLink;
+    return {
+      ...deepLink,
+      selection,
+    };
+  }
+
   function buildHouseOfficeAssignmentEntryPath({
     sourceKind = '',
     office = null,
@@ -285,27 +388,31 @@ function registerPlatformReadRoutes(app, deps) {
     sourceKind = '',
     office = null,
     deeplinks = {},
+    selection = null,
   } = {}) {
     const normalizedSourceKind = String(sourceKind || '').trim();
     if (normalizedSourceKind === 'trainer_job' || normalizedSourceKind === 'trainer_result') {
-      return deeplinks.trainer || deeplinks.office;
+      return buildHouseOfficeDeepLinkWithSelection(deeplinks.trainer || deeplinks.office, selection);
     }
     if (normalizedSourceKind === 'team_config_binding' || normalizedSourceKind === 'config_version') {
-      return deeplinks.workshop || deeplinks.office;
+      return buildHouseOfficeDeepLinkWithSelection(deeplinks.workshop || deeplinks.office, selection);
     }
     if (normalizedSourceKind === 'track_progress_event') {
-      return deeplinks.tracks || deeplinks.office;
+      return buildHouseOfficeDeepLinkWithSelection(deeplinks.tracks || deeplinks.office, selection);
     }
     if (normalizedSourceKind === 'experience') {
-      return deeplinks.experiences || deeplinks.office;
+      return buildHouseOfficeDeepLinkWithSelection(deeplinks.experiences || deeplinks.office, selection);
     }
     if (normalizedSourceKind === 'run') {
-      return String(office?.surface || '').trim() === 'experiences'
-        ? (deeplinks.experiences || deeplinks.office)
-        : (deeplinks.archive || deeplinks.office);
+      return buildHouseOfficeDeepLinkWithSelection(
+        String(office?.surface || '').trim() === 'experiences'
+          ? (deeplinks.experiences || deeplinks.office)
+          : (deeplinks.archive || deeplinks.office),
+        selection
+      );
     }
     const officeSurface = String(office?.surface || '').trim();
-    return deeplinks[officeSurface] || office?.deepLink || deeplinks.office;
+    return buildHouseOfficeDeepLinkWithSelection(deeplinks[officeSurface] || office?.deepLink || deeplinks.office, selection);
   }
 
   function buildHouseOfficeAssignments({
@@ -335,29 +442,39 @@ function registerPlatformReadRoutes(app, deps) {
         const office = officesById.get(officeId) || null;
         const staffAgent = staffById.get(staffAgentId) || null;
         if (!office || !staffAgent) return null;
+        const sourceKind = String(assignment?.sourceKind || '').trim();
+        const sourceId = String(assignment?.sourceId || '').trim();
+        const entryPath = buildHouseOfficeAssignmentEntryPath({
+          sourceKind: assignment?.sourceKind,
+          office,
+        });
+        const selection = buildHouseOfficeSelection({
+          sourceKind,
+          sourceId,
+          entryPath,
+        });
         return {
           assignmentId: String(assignment?.assignmentId || '').trim(),
           staffAgentId,
           officeId,
           focus: sanitizeHouseOfficeText(assignment?.focus, 'Sensitive assignment details redacted'),
-          sourceKind: String(assignment?.sourceKind || '').trim(),
-          sourceId: String(assignment?.sourceId || '').trim(),
+          sourceKind,
+          sourceId,
           startedAt: String(assignment?.startedAt || '').trim(),
           deepLink: buildHouseOfficeAssignmentDeepLink({
             sourceKind: assignment?.sourceKind,
             office,
             deeplinks,
+            selection,
           }),
           sourceRefs: [
-            {
-              sourceKind: String(assignment?.sourceKind || '').trim(),
-              sourceId: String(assignment?.sourceId || '').trim(),
-              entryPath: buildHouseOfficeAssignmentEntryPath({
-                sourceKind: assignment?.sourceKind,
-                office,
-              }),
-            },
-          ],
+            buildHouseOfficeSourceRef({
+              sourceKind,
+              sourceId,
+              entryPath,
+              selection,
+            }),
+          ].filter(Boolean),
         };
       })
       .filter((assignment) => {
@@ -660,12 +777,13 @@ function registerPlatformReadRoutes(app, deps) {
       const normalizedFamily = String(family || '').trim();
       if (!groups.has(normalizedFamily)) return;
       const citations = (Array.isArray(item?.citations) ? item.citations : [])
-        .map((citation) => ({
-          sourceKind: String(citation?.sourceKind || '').trim(),
-          sourceId: String(citation?.sourceId || '').trim(),
-          entryPath: String(citation?.entryPath || '').trim(),
+        .map((citation) => buildHouseOfficeSourceRef({
+          sourceKind: citation?.sourceKind,
+          sourceId: citation?.sourceId,
+          entryPath: citation?.entryPath,
+          selection: citation?.selection,
         }))
-        .filter((citation) => citation.sourceKind && citation.sourceId && citation.entryPath);
+        .filter(Boolean);
       const createdAt = String(item?.createdAt || '').trim();
       if (!createdAt || parseHouseOfficeActivityTime(createdAt) < minimumTimestampMs || !citations.length) {
         return;
@@ -698,6 +816,13 @@ function registerPlatformReadRoutes(app, deps) {
             sourceKind: 'run',
             sourceId: runId,
             entryPath: '/api/platform/archive',
+            selection: buildHouseOfficeSelection({
+              sourceKind: 'run',
+              sourceId: runId,
+              entryPath: '/api/platform/archive',
+              runId,
+              traceId: String(run?.traceId || '').trim(),
+            }),
           },
         ],
       });
@@ -719,12 +844,23 @@ function registerPlatformReadRoutes(app, deps) {
             sourceKind: 'trainer_result',
             sourceId: trainerResultId,
             entryPath: '/api/platform/trainer',
+            selection: buildHouseOfficeSelection({
+              sourceKind: 'trainer_result',
+              sourceId: trainerResultId,
+              entryPath: '/api/platform/trainer',
+              trainerJobId,
+            }),
           },
           trainerJobId
             ? {
               sourceKind: 'trainer_job',
               sourceId: trainerJobId,
               entryPath: '/api/platform/trainer',
+              selection: buildHouseOfficeSelection({
+                sourceKind: 'trainer_job',
+                sourceId: trainerJobId,
+                entryPath: '/api/platform/trainer',
+              }),
             }
             : null,
         ].filter(Boolean),
@@ -746,6 +882,11 @@ function registerPlatformReadRoutes(app, deps) {
               sourceKind: 'team_config_binding',
               sourceId: teamBindingId,
               entryPath: '/api/platform/workshop',
+              selection: buildHouseOfficeSelection({
+                sourceKind: 'team_config_binding',
+                sourceId: teamBindingId,
+                entryPath: '/api/platform/workshop',
+              }),
             }
             : null,
           activeConfigVersionId
@@ -753,6 +894,11 @@ function registerPlatformReadRoutes(app, deps) {
               sourceKind: 'config_version',
               sourceId: activeConfigVersionId,
               entryPath: '/api/platform/workshop',
+              selection: buildHouseOfficeSelection({
+                sourceKind: 'config_version',
+                sourceId: activeConfigVersionId,
+                entryPath: '/api/platform/workshop',
+              }),
             }
             : null,
         ].filter(Boolean),
@@ -774,6 +920,12 @@ function registerPlatformReadRoutes(app, deps) {
             sourceKind: 'track_progress_event',
             sourceId: trackProgressEventId,
             entryPath: '/api/platform/tracks',
+            selection: buildHouseOfficeSelection({
+              sourceKind: 'track_progress_event',
+              sourceId: trackProgressEventId,
+              entryPath: '/api/platform/tracks',
+              trackId: String(event?.trackId || '').trim(),
+            }),
           },
         ],
       });
@@ -1778,14 +1930,24 @@ function registerPlatformReadRoutes(app, deps) {
         deeplinks: overview?.deeplinks && typeof overview.deeplinks === 'object'
           ? overview.deeplinks
           : buildHouseOfficeDeepLinks(),
+        selection: buildHouseOfficeSelection({
+          sourceKind,
+          sourceId,
+          entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+        }),
       }),
       sourceRefs: [
-        {
+        buildHouseOfficeSourceRef({
           sourceKind: String(assignmentRecord?.sourceKind || '').trim(),
           sourceId: String(assignmentRecord?.sourceId || '').trim(),
           entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
-        },
-      ],
+          selection: buildHouseOfficeSelection({
+            sourceKind,
+            sourceId,
+            entryPath: buildHouseOfficeAssignmentEntryPath({ sourceKind, office }),
+          }),
+        }),
+      ].filter(Boolean),
     }, { requestId });
   });
 

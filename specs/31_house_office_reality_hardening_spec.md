@@ -86,6 +86,7 @@ Normative rules:
 2. `selection` must identify the exact record that should become active in the target panel.
 3. The target surface must accept that selection in-shell and render the selected record as active.
 4. Generic panel opening alone does not satisfy the citation requirement anymore.
+5. Briefing citations, attention deep links, and assignment source references must carry the same normalized `selection` envelope for the cited record.
 
 Stable selection shapes:
 
