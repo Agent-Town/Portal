@@ -9,6 +9,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryItem,
     createLibraryLink,
     createLibraryPublication,
+    createSealedContextViolation,
     createScopeSet,
     createTrainerJob,
     createTrainerResult,
@@ -18,6 +19,7 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryItemByIdempotency,
     getLibraryPublicationByIdempotency,
     getRegistryEntityById,
+    getSealedContextById,
     getScopeSetById,
     getScopeSetByIdempotency,
     getUnifiedPlatformTestFixture,
@@ -113,6 +115,56 @@ function registerPlatformReadRoutes(app, deps) {
     });
   }
 
+  function resolveLibraryItemSealedContextId(item) {
+    const metadata = item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+    return typeof metadata?.sealedContextId === 'string' && metadata.sealedContextId.trim()
+      ? metadata.sealedContextId.trim()
+      : '';
+  }
+
+  function isLibraryItemSealActive(item) {
+    if (String(item?.sealPolicy || '').trim() !== 'blocked_publication') return false;
+    const sealedContextId = resolveLibraryItemSealedContextId(item);
+    if (!sealedContextId) return true;
+    const sealedContext = getSealedContextById(sealedContextId);
+    if (!sealedContext) return true;
+    return String(sealedContext.status || '').trim() !== 'released';
+  }
+
+  function projectLibraryItemForRead(item) {
+    const projected = {
+      libraryItemId: item?.libraryItemId,
+      itemType: item?.itemType,
+      title: item?.title,
+      summary: item?.summary,
+      contentText: item?.contentText,
+      contentRef: item?.contentRef,
+      sourceKind: item?.sourceKind,
+      sourceRef: item?.sourceRef,
+      visibility: item?.visibility,
+      sealPolicy: item?.sealPolicy,
+      registryId: item?.registryId,
+      contentHash: item?.contentHash,
+      readOnly: item?.readOnly,
+      importedState: item?.importedState,
+      createdAt: item?.createdAt,
+      updatedAt: item?.updatedAt,
+    };
+    if (!isLibraryItemSealActive(item)) {
+      return {
+        ...projected,
+        redacted: false,
+      };
+    }
+    return {
+      ...projected,
+      summary: 'Sealed library item. Release required for full summary.',
+      contentText: '[redacted by seal policy]',
+      contentRef: null,
+      redacted: true,
+    };
+  }
+
   function buildLibrarySelectionPayload({
     houseId = '',
     teamId = '',
@@ -121,24 +173,7 @@ function registerPlatformReadRoutes(app, deps) {
     const normalizedHouseId = String(houseId || '').trim();
     const normalizedTeamId = String(teamId || '').trim();
     const normalizedActiveScopeSetId = String(activeScopeSetId || '').trim();
-    const items = listLibraryItems({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((item) => ({
-      libraryItemId: item.libraryItemId,
-      itemType: item.itemType,
-      title: item.title,
-      summary: item.summary,
-      contentText: item.contentText,
-      contentRef: item.contentRef,
-      sourceKind: item.sourceKind,
-      sourceRef: item.sourceRef,
-      visibility: item.visibility,
-      sealPolicy: item.sealPolicy,
-      registryId: item.registryId,
-      contentHash: item.contentHash,
-      readOnly: item.readOnly,
-      importedState: item.importedState,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    }));
+    const items = listLibraryItems({ houseId: normalizedHouseId, teamId: normalizedTeamId }).map((item) => projectLibraryItemForRead(item));
     const itemsById = new Map(items.map((item) => [item.libraryItemId, item]));
     let scopeSet = normalizedActiveScopeSetId ? getScopeSetById(normalizedActiveScopeSetId) : null;
     if (scopeSet && (scopeSet.houseId !== normalizedHouseId || scopeSet.teamId !== normalizedTeamId)) {
@@ -245,6 +280,12 @@ function registerPlatformReadRoutes(app, deps) {
         .filter(Boolean)
     ));
     const eventCount = events.length;
+    const sealedContextIds = Array.from(new Set(
+      events
+        .map((event) => String(event?.sealedContextId || event?.seal?.sealedContextId || '').trim())
+        .filter(Boolean)
+    ));
+    const sealPolicy = sealedContextIds.length ? 'blocked_publication' : 'inherit';
     return {
       ok: true,
       itemType: 'episodic_note',
@@ -263,6 +304,7 @@ function registerPlatformReadRoutes(app, deps) {
       contentRef: normalizedTraceId,
       sourceKind: 'trace',
       sourceRef: normalizedTraceId,
+      sealPolicy,
       links: [{
         linkKind: 'derived_from_trace',
         sourceKind: 'trace',
@@ -276,6 +318,8 @@ function registerPlatformReadRoutes(app, deps) {
         createdFrom: 'portal.house.library.promotion',
         promotionKind: 'trace',
         runId: String(run.runId || '').trim(),
+        sealedContextId: sealedContextIds[0] || null,
+        sealedContextIds,
       },
     };
   }
@@ -546,6 +590,44 @@ function registerPlatformReadRoutes(app, deps) {
       status: 201,
       publication,
     };
+  }
+
+  function recordBlockedLibraryPublicationViolation({
+    item = null,
+    session = null,
+    idempotencyKey = '',
+    visibility = '',
+    libraryItemId = '',
+  } = {}) {
+    const sealedContextId = resolveLibraryItemSealedContextId(item);
+    if (!sealedContextId) return null;
+    const sealedContextViolationId = `sealvio_${sha256PrefixedHex(stableJsonStringify({
+      sealedContextId,
+      libraryItemId,
+      idempotencyKey,
+      visibility,
+      auditKind: 'library_publish_blocked',
+    })).slice('sha256:'.length, 'sha256:'.length + 20)}`;
+    try {
+      return createSealedContextViolation({
+        sealedContextViolationId,
+        sealedContextId,
+        actor: {
+          actorType: 'human',
+          actorId: String(session?.sessionId || '').trim() || 'portal_session',
+        },
+        details: {
+          auditKind: 'library_publish_blocked',
+          libraryItemId,
+          visibility,
+          idempotencyKey,
+          sourceRef: String(item?.sourceRef || '').trim() || null,
+        },
+        nowIso: nowIso(),
+      });
+    } catch {
+      return null;
+    }
   }
 
   function getTrackAntiFarmingPolicy() {
@@ -1190,6 +1272,7 @@ function registerPlatformReadRoutes(app, deps) {
       sourceKind: promotion.sourceKind,
       sourceRef: promotion.sourceRef,
       visibility: 'house_private',
+      sealPolicy: promotion.sealPolicy || 'inherit',
       metadata: promotion.metadata,
       links: promotion.links,
     });
@@ -1294,6 +1377,24 @@ function registerPlatformReadRoutes(app, deps) {
     const item = getLibraryItemById(libraryItemId);
     if (!item || item.houseId !== context.houseId || item.teamId !== context.activeTeamId) {
       return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'The requested Library item could not be found for this House team.', { requestId });
+    }
+    if (isLibraryItemSealActive(item)) {
+      recordBlockedLibraryPublicationViolation({
+        item,
+        session,
+        idempotencyKey,
+        visibility,
+        libraryItemId,
+      });
+      return sendPortalApiError(res, 409, 'LIBRARY_SEAL_BLOCKED', 'This Library item cannot be published while its seal policy is active.', {
+        requestId,
+        details: {
+          libraryItemId,
+          visibility,
+          sealedContextId: resolveLibraryItemSealedContextId(item) || null,
+          sealPolicy: String(item.sealPolicy || '').trim() || 'inherit',
+        },
+      });
     }
     const approval = resolveApprovedLibraryPublicationApproval(approvalId, {
       houseId: context.houseId,

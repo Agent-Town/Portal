@@ -627,7 +627,8 @@ If a Library item is derived from sealed or restricted source material:
 
 1. the Library item must preserve seal policy,
 2. redaction behavior must remain deterministic,
-3. publication must be blocked unless policy allows it.
+3. publication must be blocked unless policy allows it,
+4. blocked publication attempts should write one stable audit record per idempotent attempt.
 
 ### 13.3 Provenance receipts
 
@@ -761,6 +762,7 @@ Execution mapping:
 2. `M29.9` Registry import contract
    - `POST /api/platform/library/imports` imports one Registry artifact into House Library as a read-only `imported_artifact` with visible Registry provenance
 3. `M29.10` Seal-aware Library policy
+   - sealed trace-derived Library items redact protected fields on read and `POST /api/platform/library/publications` returns `LIBRARY_SEAL_BLOCKED` while the inherited seal remains active
 4. `M29.11` House Library full smoke
 
 ## 17. Proposed Playwright Program

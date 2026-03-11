@@ -963,6 +963,7 @@ Response fields:
 - `data.items[].contentHash`
 - `data.items[].readOnly`
 - `data.items[].importedState`
+- `data.items[].redacted`
 - `data.scopeSets[]`
 - `data.scopeSets[].scopeSetId`
 - `data.scopeSets[].title`
@@ -1132,6 +1133,7 @@ Stable failure codes:
 - `LIBRARY_ITEM_REQUIRED`
 - `LIBRARY_ITEM_NOT_FOUND`
 - `LIBRARY_PUBLISH_APPROVAL_REQUIRED`
+- `LIBRARY_SEAL_BLOCKED`
 
 ### GET `/api/platform/library/scope` (human)
 Returns the current active Library scope set and the resolved ordered items selected for chat.
