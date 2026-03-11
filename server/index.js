@@ -965,6 +965,16 @@ let openAiCodexOAuthCallbackServerState = {
   port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
 };
 
+function isLoopbackCallbackHost(host) {
+  const value = String(host || '').trim().toLowerCase();
+  return value === '127.0.0.1'
+    || value === '0.0.0.0'
+    || value === '::1'
+    || value === '[::1]'
+    || value === 'localhost'
+    || value.endsWith('.localhost');
+}
+
 function safeReadJson(filePath) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -4593,7 +4603,11 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     port: OPENAI_CODEX_OAUTH_CALLBACK_PORT
   }));
 
-  if (!callbackServer.ready) {
+  const allowManualCallbackFallback = !callbackServer.ready
+    && callbackServer.error === 'EADDRINUSE'
+    && isLoopbackCallbackHost(callbackServer.host);
+
+  if (!callbackServer.ready && !allowManualCallbackFallback) {
     return res.status(503).json({
       ok: false,
       error: 'CALLBACK_SERVER_UNAVAILABLE',
@@ -4644,7 +4658,13 @@ app.post('/api/agent/lite/llm/oauth/openai-codex/start', async (req, res) => {
     authorizeUrl: authUrl.toString(),
     redirectUri: OPENAI_CODEX_OAUTH_REDIRECT_URI,
     expiresAtMs: createdAtMs + OPENAI_CODEX_OAUTH_ATTEMPT_TTL_MS,
-    callbackServer
+    callbackServer: allowManualCallbackFallback
+      ? {
+          ...callbackServer,
+          degraded: true,
+          message: 'OAuth callback port is already in use; continue with manual callback paste/exchange.'
+        }
+      : callbackServer
   });
 });
 

@@ -107,6 +107,12 @@
     }
   }
 
+  function formatPlaySeatStatus(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'leaving_after_hand') return 'leaving after hand';
+    return value || 'active';
+  }
+
   function renderCards(items) {
     clearCountdownTimer();
     clearLiveRefreshTimer();
@@ -523,16 +529,19 @@
     }
 
     if (mySeat) {
+      const seatStatus = formatPlaySeatStatus(mySeat.status);
+      const leaveQueued = String(mySeat.status || '') === 'leaving_after_hand';
       cards.push(`
         <h2>Your Seat</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Seat', `${Number(mySeat.seatNumber || 0)}`)}
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
-          ${renderSummaryMetric('Status', mySeat.status || 'active')}
+          ${renderSummaryMetric('Status', seatStatus)}
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
         </div>
+        ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         <div class="pokerLinks">
-          <button id="pokerPlayLeaveButton" class="pokerButton" type="button">${table?.tableType === 'cash' ? 'Cash Out & Leave' : 'Leave Seat'}</button>
+          <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
         </div>
       `);
     }
@@ -659,7 +668,8 @@
     const button = document.getElementById('pokerPlayLeaveButton');
     if (!button) return;
     button.addEventListener('click', async () => {
-      setStatus('Leaving table...');
+      setStatus(button.disabled ? 'Cash-out is already queued.' : 'Leaving table...');
+      if (button.disabled) return;
       try {
         await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/leave`, {
           method: 'POST',

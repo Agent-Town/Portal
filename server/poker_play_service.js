@@ -105,8 +105,12 @@ function toProcessIso(deps, value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : deps.nowIso();
 }
 
+function isSeatPendingCashout(seat) {
+  return !!seat && seat.status === 'pending_cashout';
+}
+
 function isSeatInPlay(seat) {
-  return !!seat && seat.status === 'active' && Number(seat.stackOil || 0) > 0;
+  return !!seat && (seat.status === 'active' || isSeatPendingCashout(seat)) && Number(seat.stackOil || 0) > 0;
 }
 
 function formatSeatLabel(seatNumber, displayName = '') {
@@ -189,10 +193,11 @@ function sanitizeSeatForViewer({ seat, hand, viewerSeatNumber }) {
   const stateSeat = hand?.state?.seatStates?.[String(seatNumber)] || null;
   const revealed = shouldRevealCards({ viewerSeatNumber, hand, seatState: stateSeat });
   const rawCards = Array.isArray(stateSeat?.holeCards) ? stateSeat.holeCards.slice(0, 2) : [];
+  const status = isSeatPendingCashout(seat) ? 'leaving_after_hand' : (seat?.status || 'empty');
   return {
     seatNumber,
     displayName: seat?.displayName || `Seat ${seatNumber}`,
-    status: seat?.status || 'empty',
+    status,
     stackOil: Number(stateSeat?.stackOil ?? seat?.stackOil ?? 0),
     buyInOil: Number(seat?.buyInOil || 0),
     committedStreetOil: Number(stateSeat?.committedStreetOil || 0),
@@ -285,7 +290,7 @@ function upsertSeatStacksFromHand(deps, table, seats, hand, atIso) {
       } else if (status !== 'paid') {
         status = 'active';
       }
-    } else if (status !== 'left') {
+    } else if (status !== 'left' && !isSeatPendingCashout(seat)) {
       status = 'active';
     }
     updated.push(deps.upsertPokerPlaySeat({
@@ -296,6 +301,40 @@ function upsertSeatStacksFromHand(deps, table, seats, hand, atIso) {
     }));
   }
   return updated;
+}
+
+function settleQueuedCashouts(deps, table, seats, hand, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'cash') {
+    return Array.isArray(seats) ? seats : [];
+  }
+  const queuedSeats = (Array.isArray(seats) ? seats : []).filter((seat) => isSeatPendingCashout(seat));
+  if (!queuedSeats.length) {
+    return Array.isArray(seats) ? seats : [];
+  }
+  for (const seat of queuedSeats) {
+    const returnedOil = Number(seat.stackOil || 0);
+    if (returnedOil > 0) {
+      deps.createOilLedgerEntry({
+        walletSubject: seat.walletSubject,
+        houseId: seat.houseId || null,
+        verificationId: seat.streamflowVerificationId || null,
+        entryKind: 'poker_play_cashout',
+        direction: 'credit',
+        amount: returnedOil,
+        memo: `${table.title} queued cashout`,
+      });
+    }
+    deps.createPokerPlayMessage({
+      tableId: table.tableId,
+      handId: hand?.handId || null,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} cashes out ${returnedOil} OIL and leaves after hand ${Number(hand?.handNumber || 0)}.`,
+      createdAt: atIso,
+    });
+    deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+  }
+  return deps.listPokerPlaySeatsByTable(table.tableId);
 }
 
 function startNewTableHand(deps, table, seats, previousHand, atIso) {
@@ -517,6 +556,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
 
     if (hand && hand.status === 'settled') {
       seats = upsertSeatStacksFromHand(deps, table, seats, hand, atIso);
+      seats = settleQueuedCashouts(deps, table, seats, hand, atIso);
       const nextTableState = {
         ...(table.state && typeof table.state === 'object' ? table.state : {}),
         lastButtonSeat: normalizeSeatNumber(hand?.state?.buttonSeat) || normalizeSeatNumber(table?.state?.lastButtonSeat),
@@ -731,7 +771,7 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     throw createRouteError(409, 'HOUSE_REQUIRED', 'Join a house before entering a live poker table.');
   }
   const existingSeat = deps.getActivePokerPlaySeatByWalletSubject(walletBinding.walletSubject);
-  if (existingSeat && existingSeat.tableId && existingSeat.tableId !== tableId && Number(existingSeat.stackOil || 0) > 0 && existingSeat.status === 'active') {
+  if (existingSeat && existingSeat.tableId && existingSeat.tableId !== tableId && isSeatInPlay(existingSeat)) {
     throw createRouteError(409, 'POKER_PLAY_SEAT_ALREADY_ACTIVE', 'This wallet is already seated at a different live table.', {
       tableId: existingSeat.tableId,
       seatNumber: existingSeat.seatNumber,
@@ -863,7 +903,23 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
 
   if (String(synced.table.tableType || 'cash') === 'cash') {
     if (liveHand) {
-      throw createRouteError(409, 'POKER_PLAY_HAND_IN_PROGRESS', 'Cashing out is only allowed between hands.');
+      if (!isSeatPendingCashout(seat)) {
+        deps.upsertPokerPlaySeat({
+          ...seat,
+          status: 'pending_cashout',
+          updatedAt: requestAt,
+        });
+        deps.createPokerPlayMessage({
+          tableId: synced.table.tableId,
+          handId: liveHand.handId,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} will cash out after this hand settles.`,
+          createdAt: requestAt,
+        });
+      }
+      const refreshedDuringHand = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+      return buildPokerPlayTablePayload(deps, refreshedDuringHand.table, refreshedDuringHand.seats, refreshedDuringHand.hand, { session, req, processAt: requestAt });
     }
     if (Number(seat.stackOil || 0) > 0) {
       deps.createOilLedgerEntry({

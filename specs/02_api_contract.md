@@ -485,7 +485,16 @@ Response fields:
 - `data.oilBalance`
 
 ### POST `/api/poker/play/tables/:tableId/leave`
-Leaves a live table. Cash tables credit the current stack back to offchain OIL between hands. Tournament tables only allow leaving after bust-out or payout.
+Leaves a live table. Cash tables cash out immediately between hands, or queue a cash-out during a live hand and return the remaining stack to offchain OIL when that hand settles. Tournament tables only allow leaving after bust-out or payout.
+
+Response fields:
+- `data.table`
+- `data.mySeat`
+- `data.oilBalance`
+
+Cash-table leave notes:
+- during a live hand, `data.mySeat.status` becomes `leaving_after_hand`
+- queued seats stay in the current hand, then are removed before the next hand can begin
 
 Failure codes:
 - `UNAUTHORIZED`
