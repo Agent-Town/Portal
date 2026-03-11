@@ -3799,6 +3799,7 @@ Response fields:
 - `suites[].suiteId`
 - `suites[].command`
 - `suites[].requiredEnv[]`
+- `suites[].forcedEnv[]` when a suite injects stable env at runtime instead of requiring the operator to export it
 - `suites[].providerEnv` when a suite supports multiple provider-specific env shapes
 - `suites[].requiredFlag`
 - `suites[].defaultMode`

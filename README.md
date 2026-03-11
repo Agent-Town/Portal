@@ -91,17 +91,18 @@ Requirements for the live Privy smoke:
 
 What `npm run test:privy-live` does:
 - loads `.env*` and starts an isolated local app server in development mode
+- forces `PRIVY_LOGIN_METHOD=guest` for the suite
 - deletes the dedicated live SQLite store before server boot so the run starts clean without `/__test__/reset`
 - verifies `/start` login, redirect to `/app`, and real Privy-provided Solana + EVM wallet availability without the deterministic test bridge
 
 What `npm run test:privy-email-live` requires:
-- set `PRIVY_LOGIN_METHOD=email`
 - set `PRIVY_EMAIL_OTP_TEST_EMAIL`
 - set one supported `PRIVY_EMAIL_OTP_PROVIDER`
 - provider options:
   - `http-json`: set `PRIVY_EMAIL_OTP_FETCH_URL`
   - `imap`: set `PRIVY_EMAIL_OTP_IMAP_HOST` and `PRIVY_EMAIL_OTP_IMAP_PASSWORD`
   - `gmail-imap`: set `PRIVY_EMAIL_OTP_IMAP_PASSWORD` and use a Gmail app password
+- the suite forces `PRIVY_LOGIN_METHOD=email` internally
 - `imap` and `gmail-imap` read the mailbox directly during the live lane, so no separate OTP bridge service is required
 
 Optional local integration check (reused Sepolia wallet):

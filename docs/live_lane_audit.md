@@ -18,6 +18,7 @@ What it verifies:
 - redirect into `/app`
 - creation and reuse of Privy-backed Solana and EVM wallets
 - session continuity when returning to `/start`
+- suite-enforced `PRIVY_LOGIN_METHOD=guest`
 
 What is deliberately **not** used anymore:
 
@@ -48,6 +49,7 @@ What it verifies:
 - redirect into `/app`
 - creation and reuse of Privy-backed Solana and EVM wallets
 - no second OTP prompt on re-entry during the same run
+- suite-enforced `PRIVY_LOGIN_METHOD=email`
 
 What it does **not** use:
 

@@ -8,7 +8,8 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'privy-guest',
     command: 'npm run test:privy-live',
-    requiredEnv: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=guest'],
+    requiredEnv: ['PRIVY_APP_ID'],
+    forcedEnv: ['PRIVY_LOGIN_METHOD=guest'],
     requiredFlag: 'PRIVY_LIVE_REQUIRED',
     defaultMode: 'skip',
     description: 'Real Privy guest login plus embedded Solana and EVM wallet smoke.',
@@ -16,8 +17,9 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'privy-email-otp',
     command: 'npm run test:privy-email-live',
-    requiredEnv: ['PRIVY_APP_ID', 'PRIVY_LOGIN_METHOD=email'],
+    requiredEnv: ['PRIVY_APP_ID'],
     providerEnv: getEmailOtpProviderEnvMap(),
+    forcedEnv: ['PRIVY_LOGIN_METHOD=email'],
     requiredFlag: 'PRIVY_EMAIL_OTP_REQUIRED',
     defaultMode: 'skip',
     description: 'Optional real Privy email-code lane with automated OTP retrieval.',
@@ -62,6 +64,7 @@ function getLiveSuiteManifest() {
     providerEnv: entry?.providerEnv && typeof entry.providerEnv === 'object'
       ? Object.fromEntries(Object.entries(entry.providerEnv).map(([key, value]) => [key, Array.isArray(value) ? [...value] : []]))
       : undefined,
+    forcedEnv: Array.isArray(entry?.forcedEnv) ? [...entry.forcedEnv] : undefined,
   }));
 }
 
@@ -163,6 +166,7 @@ function getLiveSuiteStatuses(env = process.env) {
       providerEnv: validation?.providerEnv && typeof validation.providerEnv === 'object'
         ? Object.fromEntries(Object.entries(validation.providerEnv).map(([key, value]) => [key, Array.isArray(value) ? [...value] : []]))
         : undefined,
+      forcedEnv: Array.isArray(suite?.forcedEnv) ? [...suite.forcedEnv] : undefined,
       ready,
       mode: ready ? 'ready' : (requiredFlagEnabled ? 'blocked' : 'skip'),
       missing,
