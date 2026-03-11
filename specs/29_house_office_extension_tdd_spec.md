@@ -361,13 +361,8 @@ GREEN gate:
 Implementation notes:
 
 1. Recommended UI ids:
-   A. `house-office-district-panel`
-   B. `house-office-front-desk`
-   C. `house-office-workshop-wing`
-   D. `house-office-analysis-wing`
-   E. `house-office-archive-wing`
-   F. `house-office-operations-wing`
-   G. `house-office-tracks-board`
+   A. `house-office-district-shell`
+   B. `house-office-district-section`
 
 ### M29.5 - Staff assignment contract
 

@@ -1430,6 +1430,14 @@ function buildHousePlatformSnapshot() {
 
 function setHouseSurfaceMode(mode) {
   const activeMode = mode === 'office' || mode === 'experiences' || mode === 'tracks' || mode === 'workshop' || mode === 'archive' || mode === 'trainer' ? mode : '';
+  const districtSectionBySurface = {
+    office: 'front_desk',
+    workshop: 'workshop_wing',
+    trainer: 'analysis_wing',
+    archive: 'archive_wing',
+    experiences: 'operations_wing',
+    tracks: 'tracks_board',
+  };
   houseSurfaceState.activeSurface = activeMode;
   const officePanel = el('houseOfficePanel');
   const experiencesPanel = el('houseExperiencesPanel');
@@ -1443,6 +1451,7 @@ function setHouseSurfaceMode(mode) {
   const workshopBtn = el('houseWorkshopBtn');
   const archiveBtn = el('houseArchiveBtn');
   const trainerBtn = el('houseTrainerBtn');
+  const districtButtons = Array.from(document.querySelectorAll('[data-testid="house-office-district-section"]'));
   if (officePanel) officePanel.classList.toggle('is-hidden', activeMode !== 'office');
   if (experiencesPanel) experiencesPanel.classList.toggle('is-hidden', activeMode !== 'experiences');
   if (tracksPanel) tracksPanel.classList.toggle('is-hidden', activeMode !== 'tracks');
@@ -1455,6 +1464,10 @@ function setHouseSurfaceMode(mode) {
   if (workshopBtn) workshopBtn.classList.toggle('primary', activeMode === 'workshop');
   if (archiveBtn) archiveBtn.classList.toggle('primary', activeMode === 'archive');
   if (trainerBtn) trainerBtn.classList.toggle('primary', activeMode === 'trainer');
+  districtButtons.forEach((button) => {
+    const sectionId = String(button?.dataset?.sectionId || '').trim();
+    button.classList.toggle('primary', sectionId === String(districtSectionBySurface[activeMode] || '').trim());
+  });
 }
 
 async function openHouseOfficeDeepLink(rawDeepLink) {
@@ -4634,6 +4647,38 @@ function bindTownDistrictControls() {
       }
     };
   }
+
+  const bindHouseDistrictSectionButton = (buttonId, loader) => {
+    const button = el(buttonId);
+    if (!button) return;
+    button.onclick = async () => {
+      button.disabled = true;
+      try {
+        await loader();
+      } finally {
+        button.disabled = false;
+      }
+    };
+  };
+
+  bindHouseDistrictSectionButton('houseDistrictFrontDeskBtn', async () => {
+    await loadHouseOfficeSurface();
+  });
+  bindHouseDistrictSectionButton('houseDistrictWorkshopBtn', async () => {
+    await loadHouseWorkshopSurface();
+  });
+  bindHouseDistrictSectionButton('houseDistrictAnalysisBtn', async () => {
+    await loadHouseTrainerSurface();
+  });
+  bindHouseDistrictSectionButton('houseDistrictArchiveBtn', async () => {
+    await loadHouseArchiveSurface();
+  });
+  bindHouseDistrictSectionButton('houseDistrictOperationsBtn', async () => {
+    await loadHouseExperiencesSurface();
+  });
+  bindHouseDistrictSectionButton('houseDistrictTracksBtn', async () => {
+    await loadHouseTracksSurface();
+  });
 
   const houseExperiencesBtn = el('houseExperiencesBtn');
   if (houseExperiencesBtn) {
