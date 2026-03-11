@@ -1551,16 +1551,61 @@ async function openHouseOfficeSourceRef(rawSourceRef) {
   await openHouseOfficeDeepLink(deepLink);
 }
 
+function formatHouseOfficeCountLabel(count, singular, plural = '') {
+  const normalizedCount = Number(count || 0);
+  const safeCount = Number.isFinite(normalizedCount) && normalizedCount >= 0
+    ? Math.floor(normalizedCount)
+    : 0;
+  const safeSingular = String(singular || '').trim() || 'item';
+  const safePlural = String(plural || '').trim() || `${safeSingular}s`;
+  return `${safeCount} ${safeCount === 1 ? safeSingular : safePlural}`;
+}
+
+function buildHouseOfficeOfficeMetrics({
+  officeId = '',
+  staffAgents = [],
+  assignments = [],
+  presence = [],
+} = {}) {
+  const normalizedOfficeId = String(officeId || '').trim();
+  const officeStaff = (Array.isArray(staffAgents) ? staffAgents : [])
+    .filter((entry) => String(entry?.officeId || '').trim() === normalizedOfficeId);
+  const officeAssignments = (Array.isArray(assignments) ? assignments : [])
+    .filter((entry) => String(entry?.officeId || '').trim() === normalizedOfficeId);
+  const officePresence = (Array.isArray(presence) ? presence : [])
+    .filter((entry) => String(entry?.officeId || '').trim() === normalizedOfficeId);
+  const primaryPresence = officePresence[0] || null;
+  const primaryAssignment = officeAssignments[0] || null;
+  return {
+    staffCount: officeStaff.length,
+    assignmentCount: officeAssignments.length,
+    presenceCount: officePresence.length,
+    primaryStatus: String(primaryPresence?.status || '').trim() || (officeAssignments.length ? 'assigned' : 'idle'),
+    primaryFocus: String(primaryPresence?.focus || primaryAssignment?.focus || '').trim(),
+  };
+}
+
+function applyHouseOfficePanelButtonStyle(button) {
+  if (!(button instanceof HTMLElement)) return;
+  button.style.width = '100%';
+  button.style.minWidth = '0';
+  button.style.whiteSpace = 'normal';
+  button.style.overflowWrap = 'anywhere';
+  button.style.textAlign = 'left';
+  button.style.lineHeight = '1.35';
+}
+
 function renderHouseOfficeSurface() {
   const emptyNode = el('houseOfficeEmpty');
   const summaryNode = el('houseOfficeSummary');
+  const selectedOfficeNode = el('houseOfficeSelectedOffice');
   const presenceNode = el('houseOfficePresence');
   const briefingNode = el('houseOfficeBriefing');
   const attentionNode = el('houseOfficeAttention');
   const assignmentsNode = el('houseOfficeAssignments');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
@@ -1593,6 +1638,12 @@ function renderHouseOfficeSurface() {
   }, 0);
   const selectedOfficeLabel = String(selectedOffice?.displayName || selectedOffice?.slug || '—').trim() || '—';
   const selectedOfficePurpose = String(selectedOffice?.purpose || '').trim();
+  const selectedOfficeMetrics = buildHouseOfficeOfficeMetrics({
+    officeId: selectedOffice?.officeId,
+    staffAgents,
+    assignments,
+    presence,
+  });
   const summaryParts = [
     houseId ? `House ${houseId}` : 'No house attached',
     activeTeamId ? `active team ${activeTeamId}` : 'no active team',
@@ -1609,6 +1660,50 @@ function renderHouseOfficeSurface() {
   }
   summaryNode.textContent = summaryParts.join(' · ');
 
+  selectedOfficeNode.innerHTML = '';
+  selectedOfficeNode.style.border = '1px solid rgba(255,255,255,0.12)';
+  selectedOfficeNode.style.borderRadius = '12px';
+  selectedOfficeNode.style.padding = '10px';
+  selectedOfficeNode.style.background = 'rgba(255,255,255,0.02)';
+  selectedOfficeNode.style.overflowWrap = 'anywhere';
+  if (!selectedOffice) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'Select a House Office area to inspect current focus and staffing.';
+    selectedOfficeNode.appendChild(placeholder);
+  } else {
+    const heading = document.createElement('div');
+    heading.style.fontWeight = '600';
+    heading.textContent = `${selectedOfficeLabel} · ${selectedOfficeMetrics.primaryStatus}`;
+    selectedOfficeNode.appendChild(heading);
+
+    if (selectedOfficePurpose) {
+      const purposeNode = document.createElement('div');
+      purposeNode.className = 'small';
+      purposeNode.style.marginTop = '4px';
+      purposeNode.textContent = selectedOfficePurpose;
+      selectedOfficeNode.appendChild(purposeNode);
+    }
+
+    const metricsNode = document.createElement('div');
+    metricsNode.className = 'small';
+    metricsNode.style.marginTop = '6px';
+    metricsNode.textContent = [
+      formatHouseOfficeCountLabel(selectedOfficeMetrics.staffCount, 'staff'),
+      formatHouseOfficeCountLabel(selectedOfficeMetrics.assignmentCount, 'assignment'),
+      formatHouseOfficeCountLabel(selectedOfficeMetrics.presenceCount, 'presence'),
+    ].join(' · ');
+    selectedOfficeNode.appendChild(metricsNode);
+
+    const focusNode = document.createElement('div');
+    focusNode.className = 'small';
+    focusNode.style.marginTop = '6px';
+    focusNode.textContent = selectedOfficeMetrics.primaryFocus
+      ? `Current focus: ${selectedOfficeMetrics.primaryFocus}`
+      : 'Current focus: No current focus recorded.';
+    selectedOfficeNode.appendChild(focusNode);
+  }
+
   presenceNode.innerHTML = '';
   if (!presence.length) {
     const placeholder = document.createElement('div');
@@ -1624,12 +1719,7 @@ function renderHouseOfficeSurface() {
       button.className = `btn${String(item?.status || '') === 'alert' ? ' danger' : ''}`;
       button.setAttribute('data-testid', 'house-office-presence-item');
       button.dataset.officeId = String(item?.officeId || '');
-      button.style.width = '100%';
-      button.style.minWidth = '0';
-      button.style.whiteSpace = 'normal';
-      button.style.overflowWrap = 'anywhere';
-      button.style.textAlign = 'left';
-      button.style.lineHeight = '1.35';
+      applyHouseOfficePanelButtonStyle(button);
       const sourceKind = String(item?.sourceRefs?.[0]?.sourceKind || '').trim();
       button.textContent = `${officeLabel} · ${String(item?.status || '').trim() || 'idle'} · ${String(item?.focus || '').trim() || 'No focus'}${sourceKind ? ` · ${sourceKind}` : ''}`;
       button.addEventListener('click', async () => {
@@ -1669,7 +1759,7 @@ function renderHouseOfficeSurface() {
       heading.className = 'small';
       heading.style.fontWeight = '600';
       heading.style.marginBottom = '8px';
-      heading.textContent = String(group?.label || group?.family || 'Briefing').trim() || 'Briefing';
+      heading.textContent = `${String(group?.label || group?.family || 'Briefing').trim() || 'Briefing'} · ${formatHouseOfficeCountLabel((Array.isArray(group?.items) ? group.items.length : 0), 'item')}`;
       groupNode.appendChild(heading);
 
       const items = Array.isArray(group?.items) ? group.items : [];
@@ -1741,12 +1831,7 @@ function renderHouseOfficeSurface() {
       button.type = 'button';
       button.className = `btn${String(item?.severity || '') === 'critical' ? ' danger' : ''}`;
       button.setAttribute('data-testid', 'house-office-attention-item');
-      button.style.width = '100%';
-      button.style.minWidth = '0';
-      button.style.whiteSpace = 'normal';
-      button.style.overflowWrap = 'anywhere';
-      button.style.textAlign = 'left';
-      button.style.lineHeight = '1.35';
+      applyHouseOfficePanelButtonStyle(button);
       button.textContent = `${String(item?.severity || 'info').trim() || 'info'} · ${String(item?.title || '').trim() || 'Attention'} · ${String(item?.sourceKind || '').trim() || 'source'}`;
       button.addEventListener('click', async () => {
         if (!item?.deepLink) return;
@@ -1792,12 +1877,7 @@ function renderHouseOfficeSurface() {
       button.type = 'button';
       button.className = 'btn';
       button.setAttribute('data-testid', 'house-office-assignment-item');
-      button.style.width = '100%';
-      button.style.minWidth = '0';
-      button.style.whiteSpace = 'normal';
-      button.style.overflowWrap = 'anywhere';
-      button.style.textAlign = 'left';
-      button.style.lineHeight = '1.35';
+      applyHouseOfficePanelButtonStyle(button);
       button.textContent = labelParts.join(' · ');
       button.addEventListener('click', async () => {
         const officeId = String(assignment?.officeId || '').trim();
@@ -1827,22 +1907,52 @@ function renderHouseOfficeSurface() {
     mapNode.appendChild(placeholder);
   } else {
     offices.forEach((office) => {
+      const officeMetrics = buildHouseOfficeOfficeMetrics({
+        officeId: office?.officeId,
+        staffAgents,
+        assignments,
+        presence,
+      });
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `btn${String(office?.officeId || '') === String(selectedOffice?.officeId || '') ? ' primary' : ''}`;
       button.setAttribute('data-testid', 'house-office-map-office');
       button.dataset.officeId = String(office?.officeId || '');
-      button.style.width = '100%';
-      button.style.minWidth = '0';
-      button.style.whiteSpace = 'normal';
-      button.style.overflowWrap = 'anywhere';
-      button.style.textAlign = 'left';
-      button.style.lineHeight = '1.35';
+      applyHouseOfficePanelButtonStyle(button);
       button.style.gridColumn = String(Math.max(1, Number(office?.mapColumn || 1)));
       button.style.gridRow = String(Math.max(1, Number(office?.mapRow || 1)));
       const displayName = String(office?.displayName || office?.slug || office?.officeId || '').trim();
       const purpose = String(office?.purpose || '').trim();
-      button.textContent = purpose ? `${displayName} · ${purpose}` : displayName;
+      const titleNode = document.createElement('div');
+      titleNode.style.fontWeight = '600';
+      titleNode.textContent = displayName;
+      button.appendChild(titleNode);
+
+      if (purpose) {
+        const purposeNode = document.createElement('div');
+        purposeNode.className = 'small';
+        purposeNode.style.marginTop = '4px';
+        purposeNode.textContent = purpose;
+        button.appendChild(purposeNode);
+      }
+
+      const metricsNode = document.createElement('div');
+      metricsNode.className = 'small';
+      metricsNode.style.marginTop = '6px';
+      metricsNode.textContent = [
+        formatHouseOfficeCountLabel(officeMetrics.presenceCount, 'presence'),
+        formatHouseOfficeCountLabel(officeMetrics.staffCount, 'staff'),
+        formatHouseOfficeCountLabel(officeMetrics.assignmentCount, 'assignment'),
+      ].join(' · ');
+      button.appendChild(metricsNode);
+
+      const focusNode = document.createElement('div');
+      focusNode.className = 'small';
+      focusNode.style.marginTop = '4px';
+      focusNode.textContent = officeMetrics.primaryFocus
+        ? `Focus: ${officeMetrics.primaryFocus}`
+        : 'Focus: No current focus recorded.';
+      button.appendChild(focusNode);
       button.addEventListener('click', async () => {
         houseSurfaceState.office.selectedOfficeId = String(office?.officeId || '').trim();
         renderHouseOfficeSurface();

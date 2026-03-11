@@ -50,6 +50,7 @@ Acceptance evidence:
 2. The late continuity-sensitive regression block covering `e2e/57`, `e2e/58`, `e2e/60`, and `e2e/72` is green on the same branch.
 3. Full deterministic suite result on the implementation baseline is `320 passed, 4 skipped`.
 4. The implementation remains inside the existing House shell and current `/api/platform/*` route family.
+5. Post-implementation polish keeps selected-office context and per-office metric chips visible without changing the House Office backend contract, covered by `e2e/203_house_office_polish_surface.spec.js`.
 
 # 2. Product Thesis
 
