@@ -41,7 +41,12 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('- `teamCode` (normal co-op flow)');
   expect(txt).toContain('- `houseId` (reconnect to an existing house)');
   expect(txt).toContain('If runtime/session context already includes one of these values, use it directly and do not ask again.');
+  expect(txt).toContain('If runtime/session context includes `experiencePreference`, honor it by default:');
+  expect(txt).toContain('- respond in the provided locale when reasonable,');
+  expect(txt).toContain('- use the provided provider/share/media policy hints,');
+  expect(txt).toContain('- do not ask the human to choose a language/path again unless they explicitly want to change it.');
   expect(txt).toContain('Do not ask for any other credential.');
+  expect(txt).toContain('Do not recommend blocked or discouraged services when `experiencePreference.agentPolicy` or related policy hints say to avoid them.');
 
   expect(txt).toContain('POST /api/agent/connect');
   expect(txt).toContain('GET /api/agent/state?teamCode=');

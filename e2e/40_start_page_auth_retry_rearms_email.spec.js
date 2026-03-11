@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { selectStartPreset } = require('./helpers/experience');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -41,6 +42,7 @@ test('start page retry keeps email form armed without page navigation', async ({
   });
 
   await page.goto('/start');
+  await selectStartPreset(page, 'global-default');
   await page.getByRole('button', { name: 'Enter' }).click();
   await page.locator('#privyEmailInput').fill('retry@example.com');
   await page.locator('#privyEmailForm').getByRole('button', { name: 'Send code' }).click();

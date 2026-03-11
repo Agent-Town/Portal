@@ -129,7 +129,7 @@
     <div id="agentSidebar" class="agent-sidebar minimized debug-collapsed" data-testid="agent-panel">
       <div class="sidebar-header">
         <div class="sidebar-header-main">
-          <h3>Agent Comms</h3>
+          <h3 id="agentPanelTitle">Agent Comms</h3>
           <div class="status-indicator" id="agentStatus">Idle</div>
         </div>
         <div class="sidebar-header-actions">
@@ -176,7 +176,7 @@
             </div>
 
             <div id="approvalsPanel" class="agent-approvals is-hidden" data-testid="approvals-panel">
-              <div class="approvals-header">Approvals</div>
+              <div class="approvals-header" id="approvalsHeader">Approvals</div>
               <div id="approvals" class="approvals-box" data-testid="approvals"></div>
             </div>
           </section>
@@ -264,6 +264,7 @@
                       <label class="small-label">OAuth profile JSON / token</label>
                       <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
                       <div class="small" id="llmOauthProfileHint"></div>
+                      <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
                       <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
                       <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-complete">Complete OAuth</button>
 
@@ -317,9 +318,13 @@
   <script src="/openclaw-lite/runtime-bridge.js?v=20260213"></script>
   <script src="/skill_actions_plugin.js?v=20260222a"></script>
   <script src="/trainer_namespace_plugin.js?v=20260222b"></script>
+  <script src="/experience_profiles.js?v=20260309a"></script>
+  <script src="/experience_runtime.js?v=20260309a"></script>
+  <script src="/i18n.js?v=20260309a"></script>
+  <script src="/llm_catalog.js?v=20260309a"></script>
   <script src="/wallet_client.js?v=20260217h"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/app.js?v=20260222l"></script>
+  <script src="/app.js?v=20260309a"></script>
 </body>
 
 </html>

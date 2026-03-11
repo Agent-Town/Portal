@@ -1,4 +1,5 @@
 (() => {
+  const PanelI18n = window.AgentTownI18n || null;
   const isCeremonyEmbed = (
     window.__agentTownCeremonyEmbed === true
     || document.documentElement.classList.contains('ceremony-embed')
@@ -15,6 +16,12 @@
 
   function el(id) {
     return document.getElementById(id);
+  }
+
+  function tPanel(key, vars = {}) {
+    if (!PanelI18n || typeof PanelI18n.t !== 'function') return key;
+    const locale = String(document.documentElement.lang || 'en').trim() || 'en';
+    return PanelI18n.t(key, vars, locale);
   }
 
   function loadMinimizedPreference() {
@@ -38,7 +45,7 @@
   function setStatus(text) {
     const node = el('agentStatus');
     if (!node) return;
-    node.textContent = text || 'Idle';
+    node.textContent = text || tPanel('agent.panel.status.idle');
   }
 
   function syncPanelLayout(panel = null) {
@@ -132,24 +139,24 @@
     panel.innerHTML = `
       <div class="sidebar-header">
         <div style="display:flex; align-items:center; gap:8px;">
-          <h3>Agent Comms</h3>
-          <div class="status-indicator" id="agentStatus">Idle</div>
+          <h3 id="agentPanelTitle">${tPanel('agent.panel.title')}</h3>
+          <div class="status-indicator" id="agentStatus">${tPanel('agent.panel.status.idle')}</div>
         </div>
-        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;">□</button>
+        <button id="minimizeChatBtn" class="btn small" style="padding: 2px 8px; font-size: 12px;" aria-label="${tPanel('agent.panel.debug.minimize')}" title="${tPanel('agent.panel.debug.minimize')}">□</button>
       </div>
 
       <div class="sidebar-content">
         <div id="chatTranscript" class="chat-box sidebar-chat"></div>
 
         <div class="chat-input-area">
-          <input type="text" id="chatInput" class="pixel-input" placeholder="Message agent..." />
-          <button id="sendChatBtn" class="btn primary small">Send</button>
-          <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">New session</button>
-          <button id="agentOpenTrainerBtn" class="btn small" type="button" data-testid="agent-open-trainer">Trainer</button>
+          <input type="text" id="chatInput" class="pixel-input" placeholder="${tPanel('agent.panel.chat_placeholder')}" />
+          <button id="sendChatBtn" class="btn primary small">${tPanel('agent.panel.send')}</button>
+          <button id="newSessionBtn" class="btn small" type="button" data-testid="agent-new-session">${tPanel('agent.panel.new_session')}</button>
+          <button id="agentOpenTrainerBtn" class="btn small" type="button" data-testid="agent-open-trainer">${tPanel('agent.panel.trainer')}</button>
         </div>
 
         <div class="divider"></div>
-        <div class="logs-header">System Logs</div>
+        <div class="logs-header" id="agentLogsHeader">${tPanel('agent.panel.system_logs')}</div>
         <div id="agentLogs" class="logs-box sidebar-logs"></div>
       </div>
     `;
@@ -162,6 +169,11 @@
     const btn = el('minimizeChatBtn');
     if (!panel || !btn) return;
     btn.textContent = panel.classList.contains('minimized') ? '□' : '_';
+    const nextTitle = panel.classList.contains('minimized')
+      ? tPanel('agent.panel.debug.expand')
+      : tPanel('agent.panel.debug.minimize');
+    btn.title = nextTitle;
+    btn.setAttribute('aria-label', nextTitle);
   }
 
   function setMinimized(minimized) {
@@ -202,15 +214,15 @@
             appendAgentLog(`[${entry?.level || 'info'}] ${entry?.message || ''}`);
           });
           gateway.on('status', (status) => {
-            setStatus(status || 'Idle');
+            setStatus(status || tPanel('agent.panel.status.idle'));
           });
         }
 
-        setStatus('Connected');
+        setStatus(tPanel('agent.panel.status.connected'));
         return gateway;
       } catch (e) {
-        appendAgentLog(`Gateway unavailable: ${e?.message || 'UNKNOWN'}`);
-        setStatus('Offline');
+        appendAgentLog(tPanel('agent.panel.log.gateway_unavailable', { message: e?.message || 'UNKNOWN' }));
+        setStatus(tPanel('agent.panel.status.offline'));
         return null;
       } finally {
         gatewayInitPromise = null;
@@ -231,14 +243,14 @@
 
     const liveGateway = await initGateway();
     if (!liveGateway) {
-      appendChatMessage('system', 'Agent gateway is unavailable on this page.');
+      appendChatMessage('system', tPanel('agent.panel.message.gateway_unavailable'));
       return;
     }
 
     try {
       await liveGateway.send({ type: 'chat', text });
     } catch (e) {
-      appendChatMessage('system', `Failed to send: ${e?.message || 'UNKNOWN'}`);
+      appendChatMessage('system', tPanel('agent.panel.message.failed_to_send', { message: e?.message || 'UNKNOWN' }));
     }
   }
 
@@ -249,7 +261,7 @@
     try {
       const liveGateway = await initGateway();
       if (!liveGateway) {
-        appendChatMessage('system', 'Agent gateway is unavailable on this page.');
+        appendChatMessage('system', tPanel('agent.panel.message.gateway_unavailable'));
         return;
       }
 
@@ -258,17 +270,18 @@
       } else if (window.__openclawLiteTest && typeof window.__openclawLiteTest.clearTranscript === 'function') {
         await window.__openclawLiteTest.clearTranscript({ rotateSession: true, keepBootMessage: false });
       } else {
-        throw new Error('Transcript reset is not available.');
+        throw new Error(tPanel('agent.panel.message.transcript_reset_unavailable'));
       }
 
       const box = el('chatTranscript');
       if (box) box.innerHTML = '';
-      appendChatMessage('system', 'New session started.');
-      appendAgentLog('Started new session (worker transcript cleared).');
+      appendChatMessage('system', tPanel('agent.panel.message.new_session_started'));
+      appendAgentLog(tPanel('agent.panel.log.new_session_started'));
     } catch (e) {
       const msg = e?.message || 'UNKNOWN';
-      appendChatMessage('system', `New session failed: ${msg}`);
-      appendAgentLog(`New session failed: ${msg}`);
+      const failure = tPanel('agent.panel.message.new_session_failed', { message: msg });
+      appendChatMessage('system', failure);
+      appendAgentLog(failure);
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -281,7 +294,7 @@
 
     setMinimized(loadMinimizedPreference());
     bindPanelLayout(panel);
-    setStatus('Idle');
+    setStatus(tPanel('agent.panel.status.idle'));
 
     const header = panel.querySelector('.sidebar-header');
     if (header) {

@@ -1,22 +1,22 @@
 <div class="panel">
-  <h2 style="margin:0 0 6px">Pony Express</h2>
-  <p class="small" style="margin-top:0">
+  <h2 style="margin:0 0 6px" id="ponyPanelTitle">Pony Express</h2>
+  <p class="small" style="margin-top:0" id="ponyPanelHelp">
     Mailbox and inbox for sealed notes between houses.
   </p>
   <div class="kv">
     <a class="btn primary" id="ponyInboxLink" href="/inbox">Open inbox</a>
-    <a class="btn" href="/leaderboard">Town board</a>
+    <a class="btn" id="ponyTownBoardLink" href="/leaderboard">Town board</a>
     <button class="btn" id="ponyComposeOpenBtn" type="button">Compose in modal</button>
   </div>
   <div class="small" id="ponyInboxHint" style="margin-top:8px">
     Connect or recover a house to open a house-scoped inbox directly.
   </div>
   <section class="pony-compose-panel is-hidden" id="ponyComposePanel" data-testid="pony-compose-panel" aria-hidden="true">
-    <div class="small pony-compose-label">To house</div>
+    <div class="small pony-compose-label" id="ponyComposeToLabel">To house</div>
     <input id="ponyComposeToInput" data-testid="pony-compose-to" type="text" placeholder="house id or erc8004 id" />
-    <div class="small pony-compose-label">Subject</div>
+    <div class="small pony-compose-label" id="ponyComposeSubjectLabel">Subject</div>
     <input id="ponyComposeSubjectInput" data-testid="pony-compose-subject" type="text" placeholder="subject" />
-    <div class="small pony-compose-label">Draft</div>
+    <div class="small pony-compose-label" id="ponyComposeDraftLabel">Draft</div>
     <textarea id="ponyComposeDraftInput" data-testid="pony-compose-draft" rows="4" placeholder="draft message"></textarea>
     <div class="kv pony-compose-actions">
       <button class="btn" id="ponyComposeCloseBtn" type="button">Hide compose</button>

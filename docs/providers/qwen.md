@@ -11,8 +11,9 @@ Use this alias if you prefer qwen naming in the UI.
 
 ## Supported Model ID options in current UI
 
-- `coder-model`
-- `vision-model`
+- `qwen3-coder-plus`
+- `qwen3-max`
+- `qwen3-vl-plus`
 
 ## Setup notes
 

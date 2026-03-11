@@ -1,4 +1,5 @@
 const { expect } = require('@playwright/test');
+const { selectStartPreset } = require('./experience');
 
 async function fetchSessionState(page) {
   return page.evaluate(async () => {
@@ -101,6 +102,7 @@ async function ensureAppShell(page, { navigate = true } = {}) {
     const target = enterBtn.first();
     try {
       if (await target.isVisible()) {
+        await selectStartPreset(page, 'global-default');
         await Promise.all([
           page.waitForURL((url) => {
             try {

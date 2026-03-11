@@ -1,10 +1,10 @@
 <div class="panel">
-    <h2>Connect Brain</h2>
-    <p class="small">Configure the Language Model (LLM) that powers your Agent. This is the "brain" of your agent.</p>
+    <h2 id="brainPanelTitle">Connect Brain</h2>
+    <p class="small" id="brainPanelHelp">Configure the Language Model (LLM) that powers your Agent. This is the "brain" of your agent.</p>
 
     <div class="brain-config" style="margin-top: 20px;">
         <div class="kv dense">
-            <label class="small-label">Provider</label>
+            <label class="small-label" id="brainProviderLabel">Provider</label>
             <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
                 <option value="openai">openai</option>
                 <option value="ollama">ollama</option>
@@ -36,39 +36,40 @@
                 <option value="test-local">test-local</option>
             </select>
 
-            <label class="small-label">Model ID</label>
+            <label class="small-label" id="brainModelLabel">Model ID</label>
             <select class="input" id="llmModelIdInput" data-testid="lite-llm-model">
                 <option value="gpt-4o">gpt-4o</option>
                 <option value="gpt-4o-mini">gpt-4o-mini</option>
             </select>
 
-            <label class="small-label">Auth mode</label>
+            <label class="small-label" id="brainAuthLabel">Auth mode</label>
             <select class="input" id="llmAuthModeSelect" data-testid="lite-llm-auth">
                 <option value="api-key">API Key</option>
-                <option value="oauth-json">OpenAI OAuth Profile / Token</option>
+                <option value="oauth-json" id="brainAuthOauthOption">OpenAI OAuth Profile / Token</option>
             </select>
 
-            <label class="small-label">OAuth profile JSON / token</label>
+            <label class="small-label" id="brainOauthLabel">OAuth profile JSON / token</label>
             <textarea class="input" id="llmOauthProfileInput" rows="3"
                 placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)."
                 style="display: none;"></textarea>
             <div class="small" id="llmOauthProfileHint"></div>
+            <div class="small" id="llmProviderWarning" style="color: var(--bad);"></div>
             <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;"
                 data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
             <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;"
                 data-testid="lite-llm-oauth-complete">Complete OAuth</button>
 
-            <label class="small-label">API Key</label>
+            <label class="small-label" id="brainApiKeyLabel">API Key</label>
             <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
         </div>
 
         <details style="margin-top: 14px; border: 1px solid #444; border-radius: 4px; padding: 10px;">
-            <summary class="small" style="cursor: pointer;">Advanced Settings</summary>
+            <summary class="small" id="brainAdvancedSummary" style="cursor: pointer;">Advanced Settings</summary>
             <div class="kv dense" style="margin-top: 10px;">
-                <label class="small-label">Base URL (Optional)</label>
+                <label class="small-label" id="brainBaseUrlLabel">Base URL (Optional)</label>
                 <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
 
-                <label class="small-label">Thinking Level</label>
+                <label class="small-label" id="brainThinkingLabel">Thinking Level</label>
                 <select class="input" id="llmThinkingInput">
                     <option value="">Default</option>
                     <option value="low">Low</option>
@@ -76,7 +77,7 @@
                     <option value="xhigh">XHigh</option>
                 </select>
 
-                <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                <label class="small" id="brainUseProxyLabel" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
                     <input id="llmUseProxyInput" type="checkbox" checked />
                     Use Proxy (Recommended)
                 </label>

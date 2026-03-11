@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { selectStartPreset } = require('./helpers/experience');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
@@ -6,7 +7,7 @@ test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
-test('start page renders logo/video embed/welcome and Enter opens app page', async ({ page }) => {
+test('start page renders chooser/video embed/welcome and Enter opens app page after a path is chosen', async ({ page }) => {
   await page.route('**/api/privy/config', async (route) => {
     await route.fulfill({
       status: 200,
@@ -24,10 +25,13 @@ test('start page renders logo/video embed/welcome and Enter opens app page', asy
   await page.goto('/start');
 
   await expect(page.getByText('Welcome to the Wild West!')).toBeVisible();
+  await expect(page.getByText('Choose your path')).toBeVisible();
   await expect(page.locator('img.startLogo')).toBeVisible();
   await expect(page.locator('iframe.startVideo')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enter' })).toBeDisabled();
 
+  await selectStartPreset(page, 'global-default');
+  await expect(page.getByRole('button', { name: 'Enter' })).toBeEnabled();
   await page.getByRole('button', { name: 'Enter' }).click();
   await expect(page).toHaveURL(/\/app$/);
   await expect(page.locator('#districtMap')).toBeVisible();

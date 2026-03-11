@@ -1,3 +1,19 @@
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
+const I18n = window.AgentTownI18n || null;
+
+let cachedPrivyConfig = null;
+let autoRedirecting = false;
+let currentExperiencePreference = null;
+let currentBootstrap = null;
+const walletClient = window.initWalletClient ? window.initWalletClient() : null;
+
+function tStart(key, vars = {}) {
+  const locale = currentExperiencePreference?.locale || 'en';
+  if (!I18n || typeof I18n.t !== 'function') return key;
+  return I18n.t(key, vars, locale);
+}
+
 function setStatus(msg, isError = false) {
   const statusNode = document.getElementById('startStatus');
   if (!statusNode) return;
@@ -5,9 +21,15 @@ function setStatus(msg, isError = false) {
   statusNode.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
 }
 
-let cachedPrivyConfig = null;
-let autoRedirecting = false;
-const walletClient = window.initWalletClient ? window.initWalletClient() : null;
+function hasExplicitExperiencePreference() {
+  return currentExperiencePreference?.source === 'user';
+}
+
+function setEntryButtonsDisabled(disabled) {
+  const enterBtn = document.getElementById('enterBtn');
+  if (!enterBtn) return;
+  enterBtn.disabled = !!disabled || !hasExplicitExperiencePreference();
+}
 
 function explainPrivyError(err) {
   const code = err && typeof err.code === 'string' ? err.code : '';
@@ -16,22 +38,111 @@ function explainPrivyError(err) {
     (err && (err.detail || err.message || err?.cause?.message || err?.cause?.detail || '')) || ''
   ).toLowerCase();
 
-  if (code === 'PRIVY_LOGIN_CANCELLED') return 'Login cancelled.';
-  if (code === 'PRIVY_WALLET_CREATE_FAILED') return 'Could not create/connect the Privy wallet. Try again.';
+  if (code === 'PRIVY_LOGIN_CANCELLED') return tStart('start.auth.error.cancelled');
+  if (code === 'PRIVY_WALLET_CREATE_FAILED') return tStart('start.auth.error.wallet_create_failed');
   if (detail.includes('invalid nativeappid') || detail.includes('invalid_native_app_id')) {
-    return 'Privy rejected your app/client ID. Verify PRIVY_APP_ID and remove PRIVY_CLIENT_ID unless it is a web app client.';
+    return tStart('start.auth.error.invalid_native_app_id');
   }
   if ((code === 'PRIVY_EMAIL_SEND_FAILED' || code === 'PRIVY_EMAIL_CODE_FAILED') && status === 403) {
-    return 'Privy rejected this request (403). Check App ID/Client ID, allowed domain, and enabled email auth.';
+    return tStart('start.auth.error.email_403');
   }
   if (code === 'PRIVY_BRIDGE_INIT_FAILED' || code === 'PRIVY_BRIDGE_MISSING') {
-    return 'Privy SDK failed to initialize. Disable blockers, allow third-party cookies for auth.privy.io, and reload.';
+    return tStart('start.auth.error.bridge_init_failed');
   }
-  if (code === 'PRIVY_EMAIL_SEND_FAILED') return 'Could not send the Privy code email. Check your Privy email auth setup.';
-  if (code === 'PRIVY_EMAIL_CODE_FAILED') return 'Could not verify the code. Please try again.';
-  if (code === 'PRIVY_GUEST_LOGIN_FAILED') return 'Privy guest login failed. Check app configuration.';
-  if (status === 403) return 'Privy request denied (403). Check credentials and origin/domain allowlist.';
-  return 'Could not complete Privy login.';
+  if (code === 'PRIVY_EMAIL_SEND_FAILED') return tStart('start.auth.error.email_send_failed');
+  if (code === 'PRIVY_EMAIL_CODE_FAILED') return tStart('start.auth.error.email_code_failed');
+  if (code === 'PRIVY_GUEST_LOGIN_FAILED') return tStart('start.auth.error.guest_login_failed');
+  if (status === 403) return tStart('start.auth.error.request_denied_403');
+  return tStart('start.auth.error.generic');
+}
+
+function updateHeroMedia() {
+  const frame = document.getElementById('startVideoFrame');
+  const poster = document.getElementById('startHeroPoster');
+  if (!frame || !poster) return;
+  const mainlandSafe = currentExperiencePreference?.mediaPolicy === 'mainland-safe';
+  const fallbackSrc = 'https://www.youtube.com/embed/ZW7tUUZqhdY?rel=0';
+  if (mainlandSafe) {
+    if (!frame.dataset.src && frame.getAttribute('src')) {
+      frame.dataset.src = frame.getAttribute('src');
+    }
+    frame.classList.add('is-hidden');
+    frame.setAttribute('hidden', 'hidden');
+    frame.removeAttribute('src');
+    poster.classList.remove('is-hidden');
+  } else {
+    poster.classList.add('is-hidden');
+    frame.classList.remove('is-hidden');
+    frame.removeAttribute('hidden');
+    if (!frame.getAttribute('src')) {
+      frame.setAttribute('src', frame.dataset.src || fallbackSrc);
+    }
+  }
+}
+
+function updatePreferenceSelectionUi() {
+  const globalBtn = document.getElementById('startPresetGlobalBtn');
+  const cnBtn = document.getElementById('startPresetCnBtn');
+  const currentNode = document.getElementById('startPreferenceCurrent');
+  const currentPresetId = String(currentExperiencePreference?.presetId || '').trim();
+  if (globalBtn) globalBtn.classList.toggle('is-selected', currentPresetId === 'global-default');
+  if (cnBtn) cnBtn.classList.toggle('is-selected', currentPresetId === 'cn-mainland');
+  if (currentNode) {
+    if (hasExplicitExperiencePreference() && ExperienceProfiles) {
+      const preset = ExperienceProfiles.getPreset(currentPresetId);
+      currentNode.textContent = tStart('start.pref.current', { label: preset.label });
+    } else {
+      currentNode.textContent = '';
+    }
+  }
+  setEntryButtonsDisabled(false);
+}
+
+function applyStartCopy() {
+  const authTitle = document.querySelector('.startAuthTitle');
+  const authHelp = document.getElementById('privyAuthHelp');
+  const emailLabel = document.querySelector('label[for="privyEmailInput"]');
+  const emailInput = document.getElementById('privyEmailInput');
+  const sendBtn = document.querySelector('#privyEmailForm button[type="submit"]');
+  const codeLabel = document.querySelector('label[for="privyCodeInput"]');
+  const codeInput = document.getElementById('privyCodeInput');
+  const verifyBtn = document.querySelector('#privyCodeForm button[type="submit"]');
+  const cancelBtn = document.getElementById('privyAuthCancelBtn');
+  const prefTitle = document.getElementById('startPreferenceTitle');
+  const prefHelp = document.getElementById('startPreferenceHelp');
+  const globalLabel = document.getElementById('startPresetGlobalLabel');
+  const globalHelp = document.getElementById('startPresetGlobalHelp');
+  const cnLabel = document.getElementById('startPresetCnLabel');
+  const cnHelp = document.getElementById('startPresetCnHelp');
+  const title = document.querySelector('.startTitle');
+  const enterBtn = document.getElementById('enterBtn');
+  const warning = document.querySelector('.startWarning');
+  const heroPoster = document.getElementById('startHeroPoster');
+  const heroFrame = document.getElementById('startVideoFrame');
+
+  if (authTitle) authTitle.textContent = tStart('start.auth.title');
+  if (authHelp && !authHelp.dataset.dynamic) authHelp.textContent = tStart('start.auth.help.email');
+  if (emailLabel) emailLabel.textContent = tStart('start.auth.email');
+  if (emailInput) emailInput.placeholder = tStart('start.auth.email_placeholder');
+  if (sendBtn) sendBtn.textContent = tStart('start.auth.send');
+  if (codeLabel) codeLabel.textContent = tStart('start.auth.code');
+  if (codeInput) codeInput.placeholder = tStart('start.auth.code_placeholder');
+  if (verifyBtn) verifyBtn.textContent = tStart('start.auth.verify');
+  if (cancelBtn) cancelBtn.textContent = tStart('start.auth.cancel');
+  if (prefTitle) prefTitle.textContent = tStart('start.pref.title');
+  if (prefHelp) prefHelp.textContent = tStart('start.pref.help');
+  if (globalLabel) globalLabel.textContent = tStart('start.pref.global.label');
+  if (globalHelp) globalHelp.textContent = tStart('start.pref.global.help');
+  if (cnLabel) cnLabel.textContent = tStart('start.pref.cn.label');
+  if (cnHelp) cnHelp.textContent = tStart('start.pref.cn.help');
+  if (title) title.textContent = tStart('start.title');
+  if (enterBtn) enterBtn.textContent = tStart('start.enter');
+  if (warning) warning.textContent = tStart('start.warning');
+  if (heroPoster) heroPoster.alt = tStart('start.hero.alt');
+  if (heroFrame) heroFrame.title = tStart('start.hero.alt');
+
+  updateHeroMedia();
+  updatePreferenceSelectionUi();
 }
 
 async function fetchPrivyConfig() {
@@ -48,6 +159,42 @@ async function getCachedPrivyConfig() {
   if (cachedPrivyConfig) return cachedPrivyConfig;
   cachedPrivyConfig = await fetchPrivyConfig();
   return cachedPrivyConfig;
+}
+
+async function bootstrapExperiencePreference() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap();
+  const preserveExplicitChoice = currentExperiencePreference?.source === 'user';
+  currentBootstrap = bootstrap;
+  if (preserveExplicitChoice) {
+    currentBootstrap = {
+      ...bootstrap,
+      current: currentExperiencePreference,
+      hasLocalChoice: true,
+      hasSessionChoice: true,
+      hasExplicitChoice: true
+    };
+    currentExperiencePreference = ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  } else {
+    currentExperiencePreference = ExperienceRuntime.applyDocumentPreference(currentBootstrap.current);
+  }
+  applyStartCopy();
+  return currentBootstrap;
+}
+
+async function selectExperiencePreset(presetId) {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.setPreference !== 'function') return;
+  currentExperiencePreference = await ExperienceRuntime.setPreference(presetId);
+  currentExperiencePreference = ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  currentBootstrap = {
+    ...(currentBootstrap || {}),
+    current: currentExperiencePreference,
+    hasLocalChoice: true,
+    hasSessionChoice: true,
+    hasExplicitChoice: true
+  };
+  applyStartCopy();
+  setStatus('');
 }
 
 function createLoginUi() {
@@ -78,7 +225,8 @@ function createLoginUi() {
     box.classList.remove('is-hidden');
     emailForm.classList.remove('is-hidden');
     codeForm.classList.add('is-hidden');
-    help.textContent = message || 'Enter your email to receive a one-time code.';
+    help.dataset.dynamic = '1';
+    help.textContent = message || tStart('start.auth.help.email');
     setTimeout(() => {
       emailInput.focus();
     }, 0);
@@ -88,7 +236,8 @@ function createLoginUi() {
     box.classList.remove('is-hidden');
     emailForm.classList.add('is-hidden');
     codeForm.classList.remove('is-hidden');
-    help.textContent = message || `Enter the code sent to ${email}.`;
+    help.dataset.dynamic = '1';
+    help.textContent = message || tStart('start.auth.help.code', { email });
     setTimeout(() => {
       codeInput.focus();
     }, 0);
@@ -96,7 +245,8 @@ function createLoginUi() {
 
   function hide() {
     box.classList.add('is-hidden');
-    help.textContent = 'Enter your email to receive a one-time code.';
+    help.dataset.dynamic = '';
+    help.textContent = tStart('start.auth.help.email');
     emailForm.classList.remove('is-hidden');
     codeForm.classList.add('is-hidden');
     codeInput.value = '';
@@ -189,7 +339,7 @@ function createLoginUi() {
     requestCode: ({ email }) => requestCode(email),
     notifyCodeSent: ({ email }) => {
       codePromise = null;
-      showCodeStep(email, `Code sent to ${email}. Enter it below.`);
+      showCodeStep(email, tStart('start.auth.help.sent', { email }));
     },
     close: () => {
       cancelPending();
@@ -204,11 +354,6 @@ function createLoginUi() {
       requestEmail().catch(() => { });
     }
   };
-}
-
-function setEntryButtonsDisabled(disabled) {
-  const enterBtn = document.getElementById('enterBtn');
-  if (enterBtn) enterBtn.disabled = !!disabled;
 }
 
 function getPrivyBridge() {
@@ -252,6 +397,9 @@ async function maybeAutoSkipStart() {
   if (pathname !== '/' && pathname !== '/start') return;
   if (autoRedirecting) return;
 
+  const bootstrap = currentBootstrap || await bootstrapExperiencePreference();
+  if (!bootstrap?.hasExplicitChoice) return;
+
   const cfg = await getCachedPrivyConfig();
   const appPath = appPathFromConfig(cfg);
 
@@ -269,7 +417,6 @@ async function maybeAutoSkipStart() {
     const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false });
     if (!alreadySignedIn) return;
 
-    // Check onboarding status before redirecting
     const res = await fetch('/api/onboarding/status', {
       method: 'GET',
       credentials: 'same-origin',
@@ -277,7 +424,6 @@ async function maybeAutoSkipStart() {
     });
     if (res.ok) {
       const { step } = await res.json();
-      // If step > 1, the user has completed the first step (wallet/login)
       if (step > 1) {
         autoRedirecting = true;
         window.location.replace(appPath);
@@ -289,6 +435,12 @@ async function maybeAutoSkipStart() {
 }
 
 async function handleEnter() {
+  if (!hasExplicitExperiencePreference()) {
+    setStatus(tStart('start.status.select_preset'), true);
+    setEntryButtonsDisabled(false);
+    return;
+  }
+
   setEntryButtonsDisabled(true);
 
   const loginUi = createLoginUi();
@@ -308,12 +460,11 @@ async function handleEnter() {
       throw out;
     }
 
-    setStatus('Connecting to Privy...');
+    setStatus(tStart('start.status.connecting_privy'));
     let alreadySignedIn = false;
     try {
       alreadySignedIn = !!(await window.ensurePrivyLogin({ interactive: false }));
     } catch (err) {
-      // Silent check should never block interactive login.
       console.warn('silent privy login check failed; falling back to interactive login', err);
       alreadySignedIn = false;
     }
@@ -322,7 +473,7 @@ async function handleEnter() {
         ensurePrivyWallet({ silent: true }).catch(() => false);
       }
       if (loginUi && typeof loginUi.close === 'function') loginUi.close();
-      setStatus('Success. Entering Agent Town...');
+      setStatus(tStart('start.status.entering'));
       window.location.assign(appPath);
       return;
     }
@@ -334,7 +485,7 @@ async function handleEnter() {
     let transientFailures = 0;
     while (true) {
       try {
-        setStatus('Connecting to Privy...');
+        setStatus(tStart('start.status.connecting_privy'));
         const ok = await window.ensurePrivyLogin({ interactive: true, loginUi });
         if (!ok) {
           const out = new Error('PRIVY_LOGIN_FAILED');
@@ -342,13 +493,12 @@ async function handleEnter() {
           throw out;
         }
 
-        // Wallet provisioning can lag/fail transiently; do not block app entry on /start.
         if (privyBridgeSupportsSolanaConnect()) {
           ensurePrivyWallet({ silent: true }).catch(() => false);
         }
 
         if (loginUi && typeof loginUi.close === 'function') loginUi.close();
-        setStatus('Success. Entering Agent Town...');
+        setStatus(tStart('start.status.entering'));
         window.location.assign(appPath);
         return;
       } catch (err) {
@@ -392,9 +542,29 @@ function maybeCanonicalizePrivyLoopbackHost() {
   return true;
 }
 
-function boot() {
+function bindPreferenceButtons() {
+  const buttons = Array.from(document.querySelectorAll('[data-preset-id]'));
+  for (const button of buttons) {
+    if (button.dataset.bound === '1') continue;
+    button.dataset.bound = '1';
+    button.addEventListener('click', async () => {
+      const presetId = String(button.getAttribute('data-preset-id') || '').trim();
+      if (!presetId) return;
+      try {
+        await selectExperiencePreset(presetId);
+      } catch (err) {
+        setStatus(String(err?.message || tStart('start.pref.error_save')), true);
+      }
+    });
+  }
+}
+
+async function boot() {
   if (maybeCanonicalizePrivyLoopbackHost()) return;
-  maybeAutoSkipStart().catch(() => { });
+
+  bindPreferenceButtons();
+  await bootstrapExperiencePreference().catch(() => null);
+  await maybeAutoSkipStart().catch(() => { });
 
   const enterBtn = document.getElementById('enterBtn');
   if (enterBtn) {

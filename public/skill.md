@@ -1,6 +1,6 @@
 ---
 name: agent-town-playbook
-version: 0.3.6
+version: 0.3.7
 description: Team up with a human browser session on the Agent Town landing-page teaser. Match a sigil, open the lock, co-create a 16×16 pixel artifact, then perform a two-party house-key ceremony (agent + human) to create an E2EE House (House Descriptor QR + Privy wallet-signature unlock).
 author: Agent Town Portal
 
@@ -23,10 +23,17 @@ Ask for exactly one of these:
 
 If runtime/session context already includes one of these values, use it directly and do not ask again.
 
+If runtime/session context includes `experiencePreference`, honor it by default:
+
+- respond in the provided locale when reasonable,
+- use the provided provider/share/media policy hints,
+- do not ask the human to choose a language/path again unless they explicitly want to change it.
+
 Do not ask for any other credential.
 
 Do not ask the human to repeat runtime-provided values.
 Do not substitute a different localhost port when `origin` is provided. 
+Do not recommend blocked or discouraged services when `experiencePreference.agentPolicy` or related policy hints say to avoid them.
 
 ## Mandatory Honesty Rule 
 - Never claim an API action is complete unless tool/API response confirms success. 

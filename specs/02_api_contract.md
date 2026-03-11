@@ -191,6 +191,17 @@ Response shape:
   "teamCode": "TEAM-ABCD-EFGH",
   "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "experiencePreference": {
+    "presetId": "global-default",
+    "locale": "en",
+    "market": "global",
+    "providerPolicy": "global-default",
+    "sharePolicy": "x-moltbook",
+    "mediaPolicy": "youtube",
+    "agentPolicy": "default",
+    "selectedAt": "2026-03-09T00:00:00.000Z",
+    "source": "server-default"
+  },
   "onboarding": {
     "required": true,
     "registrationComplete": false
@@ -211,6 +222,17 @@ Response shape (same fields as `/api/session`):
   "teamCode": "TEAM-ABCD-EFGH",
   "walletRecoveryKey": "wrk_<64 hex chars>",
   "elements": [{"id": "cookie", "label": "Cookie"}],
+  "experiencePreference": {
+    "presetId": "global-default",
+    "locale": "en",
+    "market": "global",
+    "providerPolicy": "global-default",
+    "sharePolicy": "x-moltbook",
+    "mediaPolicy": "youtube",
+    "agentPolicy": "default",
+    "selectedAt": "2026-03-09T00:00:00.000Z",
+    "source": "server-default"
+  },
   "onboarding": {
     "required": true,
     "registrationComplete": false
@@ -219,9 +241,70 @@ Response shape (same fields as `/api/session`):
 }
 ```
 
+### GET `/api/experience/bootstrap` (human)
+Returns the canonical preset registry summary and the current session preference.
+
+Response shape:
+```json
+{
+  "ok": true,
+  "defaultPresetId": "global-default",
+  "current": {
+    "presetId": "global-default",
+    "locale": "en",
+    "market": "global",
+    "providerPolicy": "global-default",
+    "sharePolicy": "x-moltbook",
+    "mediaPolicy": "youtube",
+    "agentPolicy": "default",
+    "selectedAt": "2026-03-09T00:00:00.000Z",
+    "source": "server-default"
+  },
+  "presets": [
+    { "id": "global-default", "label": "English / Global", "locale": "en", "market": "global" },
+    { "id": "cn-mainland", "label": "简体中文 / Mainland-friendly", "locale": "zh-CN", "market": "cn-mainland" }
+  ]
+}
+```
+
+Notes:
+- Used by `/start`, `/app`, `/house`, and `/create` to resolve the active preference without forking the co-op flow.
+- Browser-language suggestion is client-side only; this endpoint returns canonical session state plus registry metadata.
+
+### POST `/api/experience/preference` (human)
+Persists an explicit user-selected experience preset on the current session.
+
+Request shape:
+```json
+{ "presetId": "cn-mainland" }
+```
+
+Success response:
+```json
+{
+  "ok": true,
+  "experiencePreference": {
+    "presetId": "cn-mainland",
+    "locale": "zh-CN",
+    "market": "cn-mainland",
+    "providerPolicy": "cn-mainland",
+    "sharePolicy": "link-first",
+    "mediaPolicy": "mainland-safe",
+    "agentPolicy": "avoid-blocked-services",
+    "selectedAt": "2026-03-09T00:00:00.000Z",
+    "source": "user"
+  }
+}
+```
+
+Error:
+- `MISSING_PRESET_ID`
+- `INVALID_PRESET_ID`
+
 ### GET `/api/state` (human)
 Returns the full state needed for the UI.
 Includes:
+- `experiencePreference` — canonical session preference used for locale, provider ranking, share wording, and media policy.
 - `houseId` (string | null) — present after the house ceremony completes for this session.
 - `signup.mode` (`"agent"` | `"token"` | `"agent_solo"` | null) — how this session completed signup.
 - `signup.address` (string | null) — wallet address used for token-gated signup.

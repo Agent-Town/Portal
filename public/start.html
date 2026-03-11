@@ -16,6 +16,7 @@
 
       <div class="startHero">
         <iframe
+          id="startVideoFrame"
           class="startVideo"
           src="https://www.youtube.com/embed/ZW7tUUZqhdY?rel=0"
           title="Agent Town intro video"
@@ -23,6 +24,12 @@
           referrerpolicy="strict-origin-when-cross-origin"
           allowfullscreen
         ></iframe>
+        <img
+          id="startHeroPoster"
+          class="startVideo is-hidden"
+          src="/agenttown.jpeg"
+          alt="Agent Town intro"
+        />
 
         <section class="startAuthBox is-hidden" id="privyAuthBox" data-testid="privy-auth-box" aria-live="polite">
           <h2 class="startAuthTitle">Sign in with Privy</h2>
@@ -46,16 +53,37 @@
         </section>
       </div>
 
+      <section class="startPreferenceBox" id="startPreferenceBox" data-testid="start-preference-chooser">
+        <div class="small startPreferenceTitle" id="startPreferenceTitle">Choose your path</div>
+        <p class="small startPreferenceHelp" id="startPreferenceHelp">
+          Pick the setup that best matches your language and network environment.
+        </p>
+        <div class="startPreferenceOptions">
+          <button class="startPreferenceOption" id="startPresetGlobalBtn" data-testid="start-preset-global" type="button" data-preset-id="global-default">
+            <span class="startPreferenceOptionLabel" id="startPresetGlobalLabel">English / Global</span>
+            <span class="small startPreferenceOptionHelp" id="startPresetGlobalHelp">Current global path with the default recommendations.</span>
+          </button>
+          <button class="startPreferenceOption" id="startPresetCnBtn" data-testid="start-preset-cn" type="button" data-preset-id="cn-mainland">
+            <span class="startPreferenceOptionLabel" id="startPresetCnLabel">简体中文 / Mainland-friendly</span>
+            <span class="small startPreferenceOptionHelp" id="startPresetCnHelp">Chinese-first copy with mainland-safe recommendations and media.</span>
+          </button>
+        </div>
+        <div class="small startPreferenceCurrent" id="startPreferenceCurrent"></div>
+      </section>
+
       <h1 class="startTitle">Welcome to the Wild West!</h1>
       <div class="startEntryActions">
-        <button class="btn primary startEnterBtn" id="enterBtn" type="button">Enter</button>
+        <button class="btn primary startEnterBtn" id="enterBtn" type="button" disabled>Enter</button>
       </div>
       <p class="small startStatus" id="startStatus" aria-live="polite"></p>
     </section>
   </main>
   <p class="startWarning" aria-label="AI warning">WARNING! CONTAINS AND PRODUCES AI SLOP</p>
 
+  <script src="/experience_profiles.js?v=20260309a"></script>
+  <script src="/experience_runtime.js?v=20260309a"></script>
+  <script src="/i18n.js?v=20260309a"></script>
   <script src="/privy_bridge.js?v=20260218a"></script>
-  <script src="/start.js?v=20260217h"></script>
+  <script src="/start.js?v=20260309a"></script>
 </body>
 </html>

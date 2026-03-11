@@ -1,5 +1,8 @@
 const TEAM_CODE_HINT_STORAGE_KEY = 'agentTown:teamCodeHint';
 const CREATE_EMBED_QUERY_KEY = 'embed';
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
+const CreateI18n = window.AgentTownI18n || null;
 
 const isCeremonyEmbedMode = (() => {
   try {
@@ -14,6 +17,84 @@ if (isCeremonyEmbedMode) {
   document.documentElement.classList.add('ceremony-embed');
 }
 window.__agentTownCeremonyEmbed = isCeremonyEmbedMode;
+
+function normalizeExperiencePreferenceClient(value) {
+  if (ExperienceProfiles && typeof ExperienceProfiles.normalizePreference === 'function') {
+    return ExperienceProfiles.normalizePreference(
+      value && typeof value === 'object' ? value : { presetId: ExperienceProfiles.DEFAULT_PRESET_ID },
+      {
+        source: value?.source || 'server-default'
+      }
+    );
+  }
+  return value || {
+    presetId: 'global-default',
+    locale: 'en',
+    market: 'global',
+    providerPolicy: 'global-default',
+    sharePolicy: 'x-moltbook',
+    mediaPolicy: 'youtube',
+    agentPolicy: 'default',
+    selectedAt: new Date().toISOString(),
+    source: 'server-default'
+  };
+}
+
+let currentExperiencePreference = null;
+
+function getCurrentExperiencePreference() {
+  return normalizeExperiencePreferenceClient(currentExperiencePreference);
+}
+
+function tCreate(key, vars = {}) {
+  const preference = getCurrentExperiencePreference();
+  if (!CreateI18n || typeof CreateI18n.t !== 'function') return key;
+  return CreateI18n.t(key, vars, preference.locale || 'en');
+}
+
+function updateExperiencePreferenceFromPayload(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.experiencePreference) return;
+  currentExperiencePreference = normalizeExperiencePreferenceClient(payload.experiencePreference);
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  }
+}
+
+async function bootstrapExperiencePreferenceForCreate() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap({ fetchImpl: fetch.bind(window) });
+  currentExperiencePreference = normalizeExperiencePreferenceClient(bootstrap.current);
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(currentExperiencePreference);
+  }
+  return bootstrap;
+}
+
+function applyCreateCopy({ soloMode = false } = {}) {
+  document.title = `${tCreate('create.brand.title')} — Agent Town`;
+  const brandTitle = el('createBrandTitle');
+  if (brandTitle) brandTitle.textContent = tCreate('create.brand.title');
+  const brandBadge = el('createBrandBadge');
+  if (brandBadge) brandBadge.textContent = tCreate('create.brand.badge');
+  const navHome = el('createNavHomeLink');
+  if (navHome) navHome.textContent = tCreate('create.nav.home');
+  const navLeaderboard = el('createNavLeaderboardLink');
+  if (navLeaderboard) navLeaderboard.textContent = tCreate('create.nav.leaderboard');
+  const heading = el('createHeading');
+  if (heading) heading.textContent = tCreate('create.heading');
+  const intro = el('createIntro');
+  if (intro) intro.textContent = soloMode ? tCreate('create.intro.solo') : tCreate('create.intro.coop');
+  const shareBtn = el('shareBtn');
+  if (shareBtn) shareBtn.textContent = tCreate('create.generate');
+  const shareStatus = el('shareStatus');
+  if (shareStatus) shareStatus.textContent = tCreate('create.working');
+  const nextNote = el('createNextNote');
+  if (nextNote) nextNote.textContent = soloMode ? tCreate('create.next.solo') : tCreate('create.next.coop');
+  const footerNote = el('createFooterNote');
+  if (footerNote) footerNote.textContent = tCreate('create.footer.note');
+  const footerByline = el('createFooterByline');
+  if (footerByline) footerByline.textContent = tCreate('create.footer.byline');
+}
 
 function readTeamCodeHint() {
   try {
@@ -52,6 +133,7 @@ async function api(url, opts = {}) {
   if (typeof data?.teamCode === 'string') {
     saveTeamCodeHint(data.teamCode);
   }
+  updateExperiencePreferenceFromPayload(data);
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -195,7 +277,8 @@ async function runCreateSkillTurn({ goal = '', runtimeState = null } = {}) {
       runtimeContext: {
         origin: window.location.origin,
         teamCode: String(runtimeState?.teamCode || createTeamCode || ''),
-        houseId: String(runtimeState?.houseId || '')
+        houseId: String(runtimeState?.houseId || ''),
+        experiencePreference: getCurrentExperiencePreference()
       },
       runtimeState: runtimeState && typeof runtimeState === 'object' ? runtimeState : undefined
     });
@@ -429,6 +512,8 @@ async function pollCanvas() {
 }
 
 async function init() {
+  await bootstrapExperiencePreferenceForCreate().catch(() => null);
+  applyCreateCopy({ soloMode: false });
   // Gate: if not signed up, go home.
   const st = await api('/api/state');
   liteDriver = typeof st?.lite?.driver === 'string' ? st.lite.driver : 'vendor';
@@ -463,18 +548,7 @@ async function init() {
     window.location.href = '/';
     return;
   }
-  const intro = el('createIntro');
-  if (intro) {
-    intro.textContent = soloMode
-      ? 'Solo flow: paint a few pixels to seed your house key, then lock it in.'
-      : 'Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.';
-  }
-  const nextNote = el('createNextNote');
-  if (nextNote) {
-    nextNote.textContent = soloMode
-      ? 'Next: unlock the house with a wallet signature. You can invite an agent later.'
-      : 'Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.';
-  }
+  applyCreateCopy({ soloMode });
   startCreateSkillLoop({ enabled: !tokenMode });
 
   const state = await api('/api/canvas/state');
@@ -892,15 +966,22 @@ async function init() {
 
       window.location.href = `/house?house=${encodeURIComponent(housePubKey)}`;
     } catch (e) {
-      el('err').textContent = e.message === 'EMPTY_CANVAS'
-        ? 'Add at least one pixel before locking in.'
+      const message = e.message === 'EMPTY_CANVAS'
+        ? tCreate('create.error.empty_canvas')
         : e.message === 'WALLET_MISMATCH'
-          ? 'Connect the same wallet you verified on the home page.'
+          ? tCreate('create.error.wallet_mismatch')
         : e.message === 'SIGNATURE_FORMAT'
-          ? 'Wallet signature failed.'
+          ? tCreate('create.error.signature_format')
         : e.message === 'WAITING_AGENT_REVEAL'
-          ? 'Waiting for OpenClaw Lite runtime to finish the house ceremony.'
+          ? tCreate('create.error.waiting_agent_reveal')
+        : e.message === 'NO_SOLANA_WALLET'
+          ? tCreate('create.error.no_solana_wallet')
+        : e.message === 'NO_SOLANA_SIGN'
+          ? tCreate('create.error.no_solana_sign')
+        : e.message === 'NO_SOLANA_PUBKEY'
+          ? tCreate('create.error.no_solana_pubkey')
           : e.message;
+      el('err').textContent = message;
       el('shareStatus').style.display = 'none';
     }
   });

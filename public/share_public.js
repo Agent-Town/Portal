@@ -1,3 +1,7 @@
+const ExperienceProfiles = window.AgentTownExperienceProfiles || null;
+const ExperienceRuntime = window.AgentTownExperienceRuntime || null;
+const ShareI18n = window.AgentTownI18n || null;
+
 async function api(url, opts = {}) {
   const headers = { 'content-type': 'application/json', ...(opts.headers || {}) };
   const res = await fetch(url, {
@@ -6,6 +10,7 @@ async function api(url, opts = {}) {
     headers
   });
   const data = await res.json().catch(() => ({}));
+  updateExperiencePreferenceFromPayload(data);
   if (!res.ok) {
     const msg = data && data.error ? data.error : `HTTP_${res.status}`;
     const err = new Error(msg);
@@ -24,6 +29,94 @@ const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
 const houseAuthRecoveryInFlight = new Map();
 let cachedCurrentHouseId = null;
 let currentHouseLookup = null;
+let currentExperiencePreference = null;
+
+function normalizeExperiencePreferenceClient(value) {
+  if (ExperienceProfiles && typeof ExperienceProfiles.normalizePreference === 'function') {
+    return ExperienceProfiles.normalizePreference(
+      value && typeof value === 'object' ? value : { presetId: ExperienceProfiles.DEFAULT_PRESET_ID },
+      {
+        source: value?.source || 'server-default'
+      }
+    );
+  }
+  return value || {
+    presetId: 'global-default',
+    locale: 'en',
+    market: 'global',
+    providerPolicy: 'global-default',
+    sharePolicy: 'x-moltbook',
+    mediaPolicy: 'youtube',
+    agentPolicy: 'default',
+    selectedAt: new Date().toISOString(),
+    source: 'server-default'
+  };
+}
+
+function getCurrentExperiencePreference() {
+  return normalizeExperiencePreferenceClient(currentExperiencePreference);
+}
+
+function tShare(key, vars = {}) {
+  const preference = getCurrentExperiencePreference();
+  if (!ShareI18n || typeof ShareI18n.t !== 'function') return key;
+  return ShareI18n.t(key, vars, preference.locale || 'en');
+}
+
+function applyShareCopy(share = null) {
+  const preference = normalizeExperiencePreferenceClient(share?.experiencePreference || currentExperiencePreference);
+  if (ExperienceRuntime && typeof ExperienceRuntime.applyDocumentPreference === 'function') {
+    ExperienceRuntime.applyDocumentPreference(preference);
+  }
+  document.title = `${tShare('share.card.title')} — Agent Town`;
+  const title = el('shareCardTitle');
+  if (title) title.textContent = tShare('share.card.title');
+  const navHome = el('shareNavHomeLink');
+  if (navHome) navHome.textContent = tShare('share.card.nav.home');
+  const houseNav = el('houseNavLink');
+  if (houseNav) houseNav.textContent = tShare('share.card.nav.house');
+  const navLeaderboard = el('shareNavLeaderboardLink');
+  if (navLeaderboard) navLeaderboard.textContent = tShare('share.card.nav.leaderboard');
+  const navAtlas = el('shareNavAtlasLink');
+  if (navAtlas) navAtlas.textContent = tShare('share.card.nav.atlas');
+  const lead = el('shareLead');
+  if (lead) lead.textContent = tShare('share.card.lead');
+  const heroTitle = el('shareHeroTitle');
+  if (heroTitle) heroTitle.textContent = `🎨 ${tShare('share.card.hero_title')}`;
+  const heroPlaceholder = el('shareHeroPlaceholder');
+  if (heroPlaceholder) heroPlaceholder.textContent = `🏠 ${tShare('share.card.hero_placeholder')}`;
+  const teamTitle = el('shareTeamTitle');
+  if (teamTitle) teamTitle.textContent = `👤 ${tShare('share.card.team_title')}`;
+  const signupBtn = el('signupBtn');
+  if (signupBtn) signupBtn.textContent = tShare('share.card.signup');
+  const addFriendBtn = el('addFriendBtn');
+  if (addFriendBtn) addFriendBtn.textContent = tShare('share.card.add_friend');
+  const inboxLink = el('openInboxLink');
+  if (inboxLink) inboxLink.textContent = tShare('share.card.open_inbox');
+  applyShareLinkPolicy(share || { experiencePreference: preference });
+  const moltbookLink = el('moltbookLink');
+  if (moltbookLink) moltbookLink.textContent = tShare('share.card.agent_link');
+  const moltbookMissing = el('moltbookMissing');
+  if (moltbookMissing) moltbookMissing.textContent = tShare('share.card.agent_link_missing');
+  const heroImage = el('shareMediaImg');
+  if (heroImage && !heroImage.getAttribute('alt')) {
+    heroImage.alt = tShare('share.card.hero_alt');
+  }
+}
+
+function updateExperiencePreferenceFromPayload(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.experiencePreference) return;
+  currentExperiencePreference = normalizeExperiencePreferenceClient(payload.experiencePreference);
+  applyShareCopy();
+}
+
+async function bootstrapExperiencePreferenceForShare() {
+  if (!ExperienceRuntime || typeof ExperienceRuntime.bootstrap !== 'function') return null;
+  const bootstrap = await ExperienceRuntime.bootstrap({ fetchImpl: fetch.bind(window) });
+  currentExperiencePreference = normalizeExperiencePreferenceClient(bootstrap.current);
+  applyShareCopy();
+  return bootstrap;
+}
 
 function loadHouseIdFromCache() {
   try {
@@ -409,7 +502,7 @@ function setTeamLine(share) {
   const handle = share.humanHandle || handleFromUrl(share.xPostUrl);
   const human = handle ? `@${handle}` : '--';
   const agent = share.mode === 'token' ? (share.agentName || '$ELIZATOWN') : (share.agentName || 'OpenClaw');
-  el('teamLine').textContent = `human: ${human} | agent: ${agent}`;
+  el('teamLine').textContent = tShare('share.team_line', { human, agent });
 }
 
 function setLink(linkId, missingId, url) {
@@ -425,7 +518,28 @@ function setLink(linkId, missingId, url) {
   }
 }
 
+function isLinkFirstShare(share) {
+  return String(share?.experiencePreference?.sharePolicy || '').trim() === 'link-first'
+    || String(share?.experiencePreference?.presetId || '').trim() === 'cn-mainland';
+}
+
+function applyShareLinkPolicy(share) {
+  const humanLink = el('xPostLink');
+  const humanMissing = el('xPostMissing');
+  if (humanLink) {
+    humanLink.textContent = isLinkFirstShare(share)
+      ? tShare('share.card.human_link.generic')
+      : tShare('share.card.human_link.global');
+  }
+  if (humanMissing) {
+    humanMissing.textContent = isLinkFirstShare(share)
+      ? tShare('share.card.human_link_missing.generic')
+      : tShare('share.card.human_link_missing.global');
+  }
+}
+
 function setLinks(share) {
+  applyShareLinkPolicy(share);
   setLink('xPostLink', 'xPostMissing', share.xPostUrl);
   const posts = share.agentPosts || {};
   setLink('moltbookLink', 'moltbookMissing', posts.moltbookUrl);
@@ -444,7 +558,9 @@ function setPublicMedia(media) {
   }
   wrap.classList.remove('is-hidden');
   img.src = media.imageUrl;
-  img.alt = media.prompt ? `Public image: ${media.prompt}` : 'Public house image';
+  img.alt = media.prompt
+    ? tShare('house.public.preview_alt_prompt', { prompt: media.prompt })
+    : tShare('share.card.hero_alt');
   prompt.textContent = media.prompt || '';
 }
 
@@ -464,19 +580,19 @@ function setFriendAddStatus(msg, isError = false) {
 function mapFriendError(error) {
   const msg = String(error?.message || '');
   if (msg === 'HOUSE_AUTH_NOT_READY' || msg === 'HOUSE_AUTH_REQUIRED' || msg === 'HOUSE_AUTH_INVALID' || msg === 'HOUSE_AUTH_EXPIRED') {
-    return 'Unlock your house at /house, then try again.';
+    return tShare('share.friend.unlock_house');
   }
-  if (msg === 'NO_SOLANA_WALLET') return 'Connect a Solana wallet to continue.';
-  if (msg === 'NO_SOLANA_SIGN') return 'Wallet does not support message signing.';
-  if (msg === 'WALLET_NOT_CONNECTED') return 'Connect your Solana wallet, then try again.';
-  if (msg === 'KEY_WRAP_UNAVAILABLE') return 'This house has no wallet key-wrap; unlock it once at /house first.';
+  if (msg === 'NO_SOLANA_WALLET') return tShare('share.friend.connect_solana');
+  if (msg === 'NO_SOLANA_SIGN') return tShare('share.friend.no_sign');
+  if (msg === 'WALLET_NOT_CONNECTED') return tShare('share.friend.wallet_not_connected');
+  if (msg === 'KEY_WRAP_UNAVAILABLE') return tShare('share.friend.key_wrap_missing');
   if (msg === 'HOUSE_NOT_FOUND' || msg === 'HOUSE_ID_MISMATCH') {
-    return 'Connected wallet does not match this house.';
+    return tShare('share.friend.house_mismatch');
   }
-  if (msg === 'HOUSE_NOT_READY') return 'Create or reconnect to your house first.';
-  if (msg === 'FRIEND_NOT_FOUND') return 'Share target could not be resolved.';
-  if (msg === 'SELF_FRIEND') return 'That is already your house.';
-  return `Error: ${msg || 'UNKNOWN'}`;
+  if (msg === 'HOUSE_NOT_READY') return tShare('share.friend.house_not_ready');
+  if (msg === 'FRIEND_NOT_FOUND') return tShare('share.friend.target_not_found');
+  if (msg === 'SELF_FRIEND') return tShare('share.friend.self');
+  return tShare('common.error_prefix', { message: msg || 'UNKNOWN' });
 }
 
 async function addShareAsFriend(targetShareId) {
@@ -495,6 +611,8 @@ async function addShareAsFriend(targetShareId) {
 }
 
 async function init() {
+  await bootstrapExperiencePreferenceForShare().catch(() => null);
+  applyShareCopy();
   el('shareIdBadge').textContent = shareId;
   await initHouseNavLink();
   const signup = el('signupBtn');
@@ -505,11 +623,11 @@ async function init() {
   if (addBtn) {
     addBtn.onclick = async () => {
       addBtn.disabled = true;
-      setFriendAddStatus('Adding…');
+      setFriendAddStatus(tShare('share.friend.adding'));
       try {
         const houseId = await addShareAsFriend(shareId);
         syncInboxLink(houseId);
-        setFriendAddStatus('Added to Pony friends.');
+        setFriendAddStatus(tShare('share.friend.added'));
       } catch (error) {
         setFriendAddStatus(mapFriendError(error), true);
       } finally {
@@ -518,11 +636,16 @@ async function init() {
     };
   }
   const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
+  currentExperiencePreference = normalizeExperiencePreferenceClient(r?.share?.experiencePreference || currentExperiencePreference);
+  applyShareCopy(r.share || null);
   setTeamLine(r.share);
   setLinks(r.share);
   setPublicMedia(resolveShareHero(r.share));
 }
 
 init().catch((e) => {
-  el('err').textContent = e.message;
+  const message = e?.message === 'NOT_FOUND'
+    ? tShare('share.error.not_found')
+    : tShare('common.error_prefix', { message: e.message || 'UNKNOWN' });
+  el('err').textContent = message;
 });
