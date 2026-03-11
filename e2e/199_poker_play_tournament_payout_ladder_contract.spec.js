@@ -68,7 +68,7 @@ async function playAggressiveTournamentHand(tableId, seatActors, { asOfPrefix })
       actionKind = String(allowed[0] || 'check');
       amountOil = Number(actorDetail?.hand?.minRaiseToOil || 0);
     }
-    const resp = await browserJson(actor.page, `/api/poker/play/hands/${encodeURIComponent(handId)}/actions`, {
+    let resp = await browserJson(actor.page, `/api/poker/play/hands/${encodeURIComponent(handId)}/actions`, {
       method: 'POST',
       headers: { 'x-wallet-solana-address': actor.address },
       data: {
@@ -77,6 +77,21 @@ async function playAggressiveTournamentHand(tableId, seatActors, { asOfPrefix })
         asOf: atIso,
       },
     });
+    if (!resp.ok && actionKind === 'raise') {
+      const requiredOil = Number(resp.body?.error?.details?.requiredOil || 0);
+      if (resp.status === 409 && requiredOil > amountOil) {
+        amountOil = requiredOil;
+        resp = await browserJson(actor.page, `/api/poker/play/hands/${encodeURIComponent(handId)}/actions`, {
+          method: 'POST',
+          headers: { 'x-wallet-solana-address': actor.address },
+          data: {
+            actionKind,
+            amountOil,
+            asOf: atIso,
+          },
+        });
+      }
+    }
     if (!resp.ok) {
       throw new Error(`POKER_ACTION_FAILED:${resp.status}:${actionKind}:${amountOil}:${JSON.stringify(allowed)}:${JSON.stringify(resp.body)}`);
     }
@@ -167,14 +182,7 @@ test('M23.25: tournament payout ladders pay top two places for a three-entry fie
   expect(String(resp.body?.data?.table?.tableId || '')).toBe(tableId);
 
   let finalHandDetail = null;
-  for (const asOfPrefix of [
-    '2026-03-10T12:10',
-    '2026-03-10T12:11',
-    '2026-03-10T12:12',
-    '2026-03-10T12:13',
-    '2026-03-10T12:14',
-    '2026-03-10T12:15',
-  ]) {
+  for (const asOfPrefix of Array.from({ length: 20 }, (_value, index) => `2026-03-10T12:${String(10 + index).padStart(2, '0')}`)) {
     finalHandDetail = await playAggressiveTournamentHand(tableId, {
       1: { page: pages[0], address: users[0].address },
       2: { page: pages[1], address: users[1].address },

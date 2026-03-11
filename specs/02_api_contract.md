@@ -460,8 +460,81 @@ Returns one live cash or tournament table payload with:
 - `data.review.currentHandOpenDisputeCount`
 - `data.review.myDisputes[]`
 - `data.review.latestAuditEvent`
+- `data.agentProposal`
 - `data.suggestion`
 - `data.oilBalance`
+
+Optional query params:
+- `seatAgentMode=worker` suppresses the legacy backend `data.suggestion` field and returns `data.agentProposal` for the acting viewer seat when a worker-backed proposal was already persisted for the live hand
+- `asOf=<iso>` drives deterministic test-mode reads
+
+Worker seat-agent notes:
+- `data.agentProposal` is seat-private and only populated for the bound wallet seat that owns the proposal
+- rail viewers and opponent seats always receive `data.agentProposal = null`
+- worker-backed proposal payloads use `schemaVersion = "poker-seat-agent-proposal-v1"` and include `actionKind`, `amountOil`, `confidence`, `body`, `createdAt`, `handId`, `tableId`, and `seatNumber`
+
+### GET `/api/poker/play/tables/:tableId/history`
+Returns recent hand history for one table with:
+- `data.viewerMode`
+- `data.tableId`
+- `data.tableType`
+- `data.items[]`
+- `data.items[].handId`
+- `data.items[].handNumber`
+- `data.items[].status`
+- `data.items[].street`
+- `data.items[].startedAt`
+- `data.items[].completedAt`
+- `data.items[].communityCards[]`
+- `data.items[].result`
+- `data.items[].actionCount`
+- `data.items[].actions[]`
+- `data.items[].agentProposal`
+
+History notes:
+- player viewers receive the same seat-private `data.items[].agentProposal` rule as the live table route
+- player viewers receive only the recent action tail for each hand, while public/rail history is reserved for later dedicated routes
+
+### GET `/api/poker/play/series/:seriesId/timeline`
+Returns the deterministic ordered audit timeline for one tournament series with:
+- `data.viewerMode`
+- `data.seriesId`
+- `data.items[]`
+- `data.items[].createdAt`
+- `data.items[].tableId`
+- `data.items[].handId`
+- `data.items[].eventKind`
+- `data.items[].actorRole`
+- `data.items[].seatNumber`
+- `data.items[].seatLabel`
+- `data.items[].payload`
+
+Timeline notes:
+- the timeline is stable-order by `createdAt` and table/hand/event identity
+- `data.items[].payload.body` is seat-private and only included when the event belongs to the bound wallet seat
+
+### GET `/api/poker/play/results/me`
+Returns the bound wallet's live poker results surface with:
+- `data.walletSubject`
+- `data.items[]`
+- `data.items[].tableId`
+- `data.items[].tableType`
+- `data.items[].title`
+- `data.items[].seatNumber`
+- `data.items[].buyInOil`
+- `data.items[].stackOil`
+- `data.items[].prizeOil`
+- `data.items[].finishPosition`
+- `data.items[].payoutSettledAt`
+- `data.items[].completedAt`
+- `data.items[].status`
+- `data.items[].seriesId`
+- `data.items[].seriesTitle`
+- `data.summary.tableCount`
+- `data.summary.cashCount`
+- `data.summary.tournamentCount`
+- `data.summary.buyInOil`
+- `data.summary.prizeOil`
 
 ### GET `/api/poker/play/rail/tables/:tableId`
 Returns the public spectator payload for one live table with:
@@ -529,6 +602,11 @@ Presence notes:
 - seats expose `presenceStatus`, `lastSeenAt`, and `disconnectedAt`
 - `data.table.summary.disconnectedSeatCount` counts in-play seats currently marked disconnected
 - when the acting seat disconnects, the server may extend `data.hand.actionExpiresAt` once by the reconnect grace window before timeout action takes over
+- acting viewers may also receive `data.hand.timeBankRemainingSeconds` and `data.hand.canUseTimeBank` when a live time-bank reserve still exists for that seat
+
+Settlement notes:
+- settled hands may expose `data.hand.result.potSlices[]` with `potKind`, `totalOil`, `eligibleSeatNumbers[]`, `winningSeatNumbers[]`, `oddChipSeatNumbers[]`, and `payoutBySeat`
+- `data.hand.result.returnedUncalledBySeat` captures uncalled overbet chips returned to one seat before matched pots are awarded
 
 Hole-card privacy rules:
 - `data.mySeat.holeCards[]` is only populated for the viewing seat.
@@ -566,6 +644,7 @@ Tournament-only request fields:
 Optional live-play request fields:
 - `presenceTimeoutSeconds`
 - `reconnectGraceSeconds`
+- `timeBankSeconds`
 
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
@@ -644,7 +723,7 @@ Event notes:
 - initial connect emits a `ready` event
 - update events use `event: table`
 - browsers should treat the stream as a push hint and re-read `GET /api/poker/play/tables/:tableId`
-- table events may use reasons such as `action`, `message`, `seat`, `leave`, `pause`, `resume`, and `review`
+- table events may use reasons such as `action`, `message`, `proposal`, `seat`, `leave`, `pause`, `resume`, `review`, and `timebank`
 
 ### GET `/api/poker/play/rail/tables/:tableId/stream`
 Opens the anonymous spectator push stream for one live table.
@@ -853,6 +932,40 @@ Failure codes:
 ### POST `/api/poker/play/hands/:handId/messages`
 Posts a seat-private human note to the current hand thread and returns the paired agent response.
 
+### POST `/api/poker/play/hands/:handId/proposals`
+Persists a worker-backed seat-agent proposal for the live hand and returns:
+- `data.proposal`
+- `data.message`
+
+Request shape:
+```json
+{
+  "schemaVersion": "poker-seat-agent-proposal-v1",
+  "source": "worker-seat-agent-v1",
+  "actionKind": "call",
+  "amountOil": 10,
+  "confidence": "medium",
+  "body": "The price is controlled at 10 OIL. Call and continue with position-sensitive postflop decisions.",
+  "asOf": "2026-03-11T11:00:01.000Z"
+}
+```
+
+Proposal notes:
+- the server validates legality against the live hand before persisting the proposal
+- persisted proposals emit a player-table SSE update with `reason = "proposal"`
+- proposal message bodies are seat-private and do not appear in opponent or rail payloads
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_HAND_NOT_LIVE`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_RAISE_TOO_SMALL`
+- `POKER_PLAY_ACTION_INVALID`
+
 ### POST `/api/poker/play/hands/:handId/disputes`
 Flags a live or just-settled hand for operator review. The server records the dispute, pauses the table, and returns the normal table payload with updated `data.review`.
 
@@ -891,6 +1004,32 @@ Failure codes:
 - `POKER_PLAY_TABLE_PAUSED`
 - `POKER_PLAY_RAISE_TOO_SMALL`
 - `POKER_PLAY_ACTION_INVALID`
+
+### POST `/api/poker/play/hands/:handId/timebank`
+Consumes the acting seat’s remaining time bank, extends `data.hand.actionExpiresAt`, and returns the normal table payload.
+
+Request shape:
+```json
+{
+  "consumeSeconds": 15,
+  "asOf": "2026-03-11T10:20:01.000Z"
+}
+```
+
+Request notes:
+- `consumeSeconds` is optional; when omitted the route consumes the remaining reserve for the acting seat
+- if the acting seat times out before acting, the sync loop may auto-consume the remaining time bank once and write the same audit trail server-side
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+- `POKER_PLAY_HAND_NOT_LIVE`
+- `POKER_PLAY_NOT_YOUR_TURN`
+- `POKER_PLAY_TABLE_PAUSED`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_TIME_BANK_EMPTY`
 
 ### GET `/api/poker/centaur/tournaments`
 Returns the centaur lobby payload with:

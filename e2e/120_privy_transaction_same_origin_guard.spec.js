@@ -9,8 +9,21 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function randomPort(min = 6200, span = 300) {
-  return min + Math.floor(Math.random() * span);
+async function getFreePort() {
+  const probe = createServer();
+  const port = await new Promise((resolve, reject) => {
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      if (!address || typeof address === 'string') {
+        reject(new Error('FREE_PORT_RESOLVE_FAILED'));
+        return;
+      }
+      resolve(address.port);
+    });
+  });
+  await new Promise((resolve) => probe.close(() => resolve()));
+  return Number(port);
 }
 
 function startPrivyApiStub({ port, transactionId, transactionHash }) {
@@ -112,8 +125,8 @@ async function stopServer(child) {
 }
 
 test('privy transaction status accepts same-origin fetch metadata but still rejects explicit cross-origin headers', async () => {
-  const appPort = randomPort(6200, 200);
-  const stubPort = randomPort(6500, 200);
+  const appPort = await getFreePort();
+  const stubPort = await getFreePort();
   const transactionId = '11111111-2222-4333-8444-555555555555';
   const transactionHash = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const storePath = path.join(

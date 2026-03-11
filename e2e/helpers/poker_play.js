@@ -90,8 +90,31 @@ async function verifyStreamflowAndFundOil(page, request, {
   };
 }
 
+async function seedPokerPlayHarness(request, {
+  scenario,
+  asOf,
+  tableId,
+  actors,
+} = {}) {
+  const resp = await request.post('/__test__/poker/play/harness', {
+    headers: { 'x-test-reset': resetToken },
+    data: {
+      scenario,
+      asOf,
+      tableId,
+      actors,
+    },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`POKER_PLAY_HARNESS_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body?.seeded || null;
+}
+
 module.exports = {
   bindPageSession,
   browserJson,
+  seedPokerPlayHarness,
   verifyStreamflowAndFundOil,
 };

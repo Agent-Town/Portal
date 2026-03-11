@@ -73,6 +73,17 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('agent_town_ui_atlas_search({ q, family, searchType })');
   expect(txt).toContain('agent_town_ui_registry_search({ q, family })');
   expect(txt).toContain('agent_town_ui_pony_compose({ toHouseId, subject, draft })');
+  expect(txt).toContain('## Poker worker tools');
+  expect(txt).toContain('`poker_state_get_table`');
+  expect(txt).toContain('`poker_state_get_hand_history`');
+  expect(txt).toContain('`poker_state_get_series_timeline`');
+  expect(txt).toContain('`poker_state_get_my_results`');
+  expect(txt).toContain('`poker_thread_post_note`');
+  expect(txt).toContain('`poker_action_propose`');
+  expect(txt).toContain('`poker_action_commit`');
+  expect(txt).toContain('### Poker seat-agent policy');
+  expect(txt).toContain('Never propose an action that is not present in `viewerAllowedActions`.');
+  expect(txt).toContain('Keep seat-private poker thread notes and worker proposal text private to the acting seat.');
   expect(txt).toContain('`atlas`, `registry`, `poker`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`');
   expect(txt).toContain('Do not navigate to direct standalone routes (for example `/poker`) when a modal intent exists.');
   expect(txt).toContain('trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.');

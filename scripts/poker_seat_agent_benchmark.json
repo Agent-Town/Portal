@@ -1,0 +1,117 @@
+[
+  {
+    "id": "easy_pair_raise",
+    "state": {
+      "table": { "bigBlindOil": 100 },
+      "hand": {
+        "viewerAllowedActions": ["raise", "call", "fold"],
+        "requiredCallOil": 100,
+        "minRaiseToOil": 300
+      },
+      "mySeat": {
+        "stackOil": 1200,
+        "holeCards": ["Ah", "Ad"]
+      }
+    },
+    "expected": {
+      "difficulty": "easy",
+      "allowedActions": ["raise", "call", "fold"],
+      "minRaiseToOil": 300,
+      "maxCommitOil": 1200,
+      "preferredActionKind": "raise",
+      "safeActionKinds": ["raise"]
+    }
+  },
+  {
+    "id": "easy_free_check",
+    "state": {
+      "table": { "bigBlindOil": 100 },
+      "hand": {
+        "viewerAllowedActions": ["check", "bet"],
+        "requiredCallOil": 0,
+        "minRaiseToOil": 100
+      },
+      "mySeat": {
+        "stackOil": 900,
+        "holeCards": ["7c", "2d"]
+      }
+    },
+    "expected": {
+      "difficulty": "easy",
+      "allowedActions": ["check", "bet"],
+      "minRaiseToOil": 100,
+      "maxCommitOil": 900,
+      "preferredActionKind": "check",
+      "safeActionKinds": ["check", "bet"]
+    }
+  },
+  {
+    "id": "medium_priced_call",
+    "state": {
+      "table": { "bigBlindOil": 100 },
+      "hand": {
+        "viewerAllowedActions": ["call", "fold"],
+        "requiredCallOil": 150,
+        "minRaiseToOil": 0
+      },
+      "mySeat": {
+        "stackOil": 1000,
+        "holeCards": ["Qs", "Js"]
+      }
+    },
+    "expected": {
+      "difficulty": "medium",
+      "allowedActions": ["call", "fold"],
+      "minRaiseToOil": 0,
+      "maxCommitOil": 1000,
+      "preferredActionKind": "call",
+      "safeActionKinds": ["call", "fold"]
+    }
+  },
+  {
+    "id": "medium_fold_spot",
+    "state": {
+      "table": { "bigBlindOil": 100 },
+      "hand": {
+        "viewerAllowedActions": ["call", "fold"],
+        "requiredCallOil": 500,
+        "minRaiseToOil": 0
+      },
+      "mySeat": {
+        "stackOil": 900,
+        "holeCards": ["7h", "2c"]
+      }
+    },
+    "expected": {
+      "difficulty": "medium",
+      "allowedActions": ["call", "fold"],
+      "minRaiseToOil": 0,
+      "maxCommitOil": 900,
+      "preferredActionKind": "fold",
+      "safeActionKinds": ["fold"]
+    }
+  },
+  {
+    "id": "easy_suited_broadway_pressure",
+    "state": {
+      "table": { "bigBlindOil": 50 },
+      "hand": {
+        "viewerAllowedActions": ["raise", "call", "fold"],
+        "requiredCallOil": 50,
+        "minRaiseToOil": 150
+      },
+      "mySeat": {
+        "stackOil": 800,
+        "holeCards": ["Kh", "Qh"]
+      }
+    },
+    "expected": {
+      "difficulty": "easy",
+      "allowedActions": ["raise", "call", "fold"],
+      "minRaiseToOil": 150,
+      "maxCommitOil": 800,
+      "preferredActionKind": "raise",
+      "safeActionKinds": ["raise", "call"]
+    }
+  }
+]

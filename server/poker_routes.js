@@ -31,6 +31,9 @@ const {
   closeTournamentSeries,
   createTable,
   createRouteError,
+  getHandHistory,
+  getMyResults,
+  getSeriesTimeline,
   getSeriesDetail,
   getTableDetail,
   leaveTable,
@@ -40,9 +43,11 @@ const {
   pauseTable,
   postAction,
   postMessage,
+  postSeatAgentProposal,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
+  useTimeBank,
 } = require('./poker_play_service');
 
 const STREAMFLOW_VERIFY_NONCE_TTL_MS = 15 * 60 * 1000;
@@ -219,7 +224,9 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayDisputesByHand,
     listPokerPlayDisputesByTable,
     listPokerPlayDisputesByWalletSubject,
+    listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
     listPokerSeasons,
@@ -290,7 +297,9 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayDisputesByHand,
     listPokerPlayDisputesByTable,
     listPokerPlayDisputesByWalletSubject,
+    listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
     nowIso,
@@ -432,6 +441,451 @@ function registerPokerRoutes(app, deps) {
         at: nowIso(),
       },
     });
+  }
+
+  function normalizeHarnessSeatNumber(value, fallback = 0) {
+    const seatNumber = Number.parseInt(String(value == null ? '' : value), 10);
+    if (!Number.isFinite(seatNumber) || seatNumber < 1 || seatNumber > 6) return fallback;
+    return seatNumber;
+  }
+
+  function addHarnessSeconds(iso, seconds) {
+    const baseMs = Date.parse(String(iso || ''));
+    const safeBaseMs = Number.isFinite(baseMs) ? baseMs : Date.now();
+    return new Date(safeBaseMs + (Math.max(0, Number(seconds || 0)) * 1000)).toISOString();
+  }
+
+  function normalizeHarnessActors(rawActors, defaults) {
+    return (Array.isArray(defaults) ? defaults : []).map((fallback, index) => {
+      const source = Array.isArray(rawActors) ? rawActors[index] : null;
+      return {
+        seatNumber: normalizeHarnessSeatNumber(source?.seatNumber, fallback.seatNumber),
+        address: normalizeTrimmedString(source?.address, fallback.address),
+        houseId: normalizeTrimmedString(source?.houseId, fallback.houseId),
+        displayName: normalizeTrimmedString(source?.displayName, fallback.displayName),
+      };
+    });
+  }
+
+  function seedPokerPlayHarnessScenario({ scenario, requestAt, tableId, actors }) {
+    const normalizedScenario = normalizeTrimmedString(scenario).toLowerCase();
+    const defaultsByScenario = {
+      sidepot_live: [
+        { seatNumber: 1, address: 'So1anaHarnessSidepotA111111111111111111111111', houseId: 'house_harness_sidepot_a', displayName: 'Harness Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessSidepotB111111111111111111111111', houseId: 'house_harness_sidepot_b', displayName: 'Harness Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessSidepotC111111111111111111111111', houseId: 'house_harness_sidepot_c', displayName: 'Harness Charlie' },
+      ],
+      oddchip_live: [
+        { seatNumber: 1, address: 'Sq1anaHarnessQddChipA11111111111111111111111', houseId: 'house_harness_oddchip_a', displayName: 'Odd Alpha' },
+        { seatNumber: 2, address: 'Sq1anaHarnessQddChipB11111111111111111111111', houseId: 'house_harness_oddchip_b', displayName: 'Odd Bravo' },
+        { seatNumber: 3, address: 'Sq1anaHarnessQddChipC11111111111111111111111', houseId: 'house_harness_oddchip_c', displayName: 'Odd Charlie' },
+      ],
+      timebank_live: [
+        { seatNumber: 1, address: 'So1anaHarnessTimeBankA1111111111111111111111', houseId: 'house_harness_timebank_a', displayName: 'Clock Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessTimeBankB1111111111111111111111', houseId: 'house_harness_timebank_b', displayName: 'Clock Bravo' },
+      ],
+    };
+    const defaults = defaultsByScenario[normalizedScenario];
+    if (!defaults) {
+      throw createRouteError(400, 'INVALID_ARGUMENT', 'Unknown poker play harness scenario.');
+    }
+    const normalizedActors = normalizeHarnessActors(actors, defaults);
+    const nextTableId = normalizeTrimmedString(tableId, `pkt_play_harness_${normalizedScenario}_${randomHex(6)}`);
+    const handId = `pkplayhand_harness_${randomHex(8)}`;
+    const actionExpiresAt = addHarnessSeconds(requestAt, normalizedScenario === 'timebank_live' ? 10 : 45);
+
+    if (normalizedScenario === 'sidepot_live') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Side Pot Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 4,
+        state: {
+          activeHandId: handId,
+          activeHandNumber: 1,
+          lastButtonSeat: seatOne.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {},
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 0,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness side-pot showdown scenario.',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 100, stackOil: 0 },
+        { actor: seatTwo, buyInOil: 250, stackOil: 0 },
+        { actor: seatThree, buyInOil: 400, stackOil: 50 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId,
+        tableId: nextTableId,
+        handNumber: 1,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 1,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatTwo.seatNumber,
+          bigBlindSeat: seatThree.seatNumber,
+          actingSeat: seatThree.seatNumber,
+          street: 'river',
+          phase: 'river',
+          status: 'live',
+          countdownSeconds: 45,
+          deck: [],
+          deckPosition: 0,
+          communityCards: ['Ah', 'Kd', '7c', '4s', '2h'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber, seatThree.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 0,
+              holeCards: ['Ac', 'Ad'],
+              committedStreetOil: 100,
+              committedHandOil: 100,
+              folded: false,
+              allIn: true,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 0,
+              holeCards: ['Kc', 'Kh'],
+              committedStreetOil: 250,
+              committedHandOil: 250,
+              folded: false,
+              allIn: true,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatThree.seatNumber)]: {
+              seatNumber: seatThree.seatNumber,
+              stackOil: 50,
+              holeCards: ['Qc', 'Jh'],
+              committedStreetOil: 250,
+              committedHandOil: 350,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+          },
+          pendingSeatNumbers: [seatThree.seatNumber],
+          potOil: 700,
+          currentBetOil: 250,
+          lastRaiseSizeOil: 150,
+          minRaiseToOil: 400,
+          bigBlindOil: 20,
+          actionExpiresAt,
+          result: null,
+        },
+        result: {},
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+    } else if (normalizedScenario === 'oddchip_live') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Odd Chip Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 5,
+        bigBlindOil: 10,
+        buyInOil: 100,
+        minPlayers: 4,
+        state: {
+          activeHandId: handId,
+          activeHandNumber: 1,
+          lastButtonSeat: seatOne.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {},
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 0,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness odd-chip split scenario.',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 25, stackOil: 0 },
+        { actor: seatTwo, buyInOil: 25, stackOil: 0 },
+        { actor: seatThree, buyInOil: 35, stackOil: 10 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId,
+        tableId: nextTableId,
+        handNumber: 1,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 1,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatTwo.seatNumber,
+          bigBlindSeat: seatThree.seatNumber,
+          actingSeat: seatThree.seatNumber,
+          street: 'river',
+          phase: 'river',
+          status: 'live',
+          countdownSeconds: 45,
+          deck: [],
+          deckPosition: 0,
+          communityCards: ['As', 'Ks', 'Qd', 'Jh', '2c'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber, seatThree.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 0,
+              holeCards: ['Tc', '3d'],
+              committedStreetOil: 25,
+              committedHandOil: 25,
+              folded: false,
+              allIn: true,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 0,
+              holeCards: ['Th', '4d'],
+              committedStreetOil: 25,
+              committedHandOil: 25,
+              folded: false,
+              allIn: true,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatThree.seatNumber)]: {
+              seatNumber: seatThree.seatNumber,
+              stackOil: 10,
+              holeCards: ['9s', '8s'],
+              committedStreetOil: 25,
+              committedHandOil: 25,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+          },
+          pendingSeatNumbers: [seatThree.seatNumber],
+          potOil: 75,
+          currentBetOil: 25,
+          lastRaiseSizeOil: 10,
+          minRaiseToOil: 35,
+          bigBlindOil: 10,
+          actionExpiresAt,
+          result: null,
+        },
+        result: {},
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+    } else if (normalizedScenario === 'timebank_live') {
+      const [seatOne, seatTwo] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Time Bank Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 200,
+        minPlayers: 2,
+        state: {
+          activeHandId: handId,
+          activeHandNumber: 1,
+          lastButtonSeat: seatOne.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+          },
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 10,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness time-bank scenario.',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 200, stackOil: 190 },
+        { actor: seatTwo, buyInOil: 200, stackOil: 180 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId,
+        tableId: nextTableId,
+        handNumber: 1,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 1,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatOne.seatNumber,
+          smallBlindSeat: seatOne.seatNumber,
+          bigBlindSeat: seatTwo.seatNumber,
+          actingSeat: seatOne.seatNumber,
+          street: 'preflop',
+          phase: 'preflop',
+          status: 'live',
+          countdownSeconds: 10,
+          deck: [],
+          deckPosition: 0,
+          communityCards: [],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 190,
+              holeCards: ['Ah', 'Qs'],
+              committedStreetOil: 10,
+              committedHandOil: 10,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 180,
+              holeCards: ['Kd', 'Jc'],
+              committedStreetOil: 20,
+              committedHandOil: 20,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+          },
+          pendingSeatNumbers: [seatOne.seatNumber],
+          potOil: 30,
+          currentBetOil: 20,
+          lastRaiseSizeOil: 20,
+          minRaiseToOil: 40,
+          bigBlindOil: 20,
+          actionExpiresAt,
+          result: null,
+        },
+        result: {},
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+    }
+
+    return {
+      scenario: normalizedScenario,
+      tableId: nextTableId,
+      handId,
+      actionExpiresAt,
+      actors: normalizedActors.map((actor) => ({
+        seatNumber: actor.seatNumber,
+        address: actor.address,
+        houseId: actor.houseId,
+        displayName: actor.displayName,
+      })),
+    };
   }
 
   app.get('/v1/health', respondPokerOperatorTransport);
@@ -779,6 +1233,7 @@ function registerPokerRoutes(app, deps) {
         session,
         req,
         processAt: req.query?.asOf,
+        seatAgentMode: normalizeTrimmedString(req.query?.seatAgentMode),
       });
       return sendPortalApiSuccess(res, payload, { requestId });
     } catch (err) {
@@ -787,6 +1242,84 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_DETAIL_FAILED',
         err?.message || 'Unable to load poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/tables/:tableId/history', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = getHandHistory(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_HISTORY_FAILED',
+        err?.message || 'Unable to load poker hand history.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/series/:seriesId/timeline', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = getSeriesTimeline(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_TIMELINE_FAILED',
+        err?.message || 'Unable to load poker series timeline.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/results/me', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = getMyResults(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RESULTS_FAILED',
+        err?.message || 'Unable to load poker results.',
         {
           requestId,
           details: err?.details || {},
@@ -1325,6 +1858,37 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.post('/api/poker/play/hands/:handId/proposals', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = postSeatAgentProposal(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        body: req.body,
+      });
+      const hand = getPokerPlayHandById(req.params.handId);
+      publishPokerPlayTableEvent(hand?.tableId || '', 'proposal', {
+        handId: payload?.proposal?.handId || req.params.handId,
+        seatNumber: payload?.proposal?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_PROPOSAL_FAILED',
+        err?.message || 'Unable to persist the worker poker proposal.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/hands/:handId/disputes', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -1379,6 +1943,37 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_ACTION_FAILED',
         err?.message || 'Unable to submit the poker action.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/hands/:handId/timebank', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = useTimeBank(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || getPokerPlayHandById(req.params.handId)?.tableId || '', 'timebank', {
+        handId: payload?.hand?.handId || req.params.handId,
+        actingSeat: payload?.hand?.actingSeat || null,
+        remainingSeconds: Number(payload?.hand?.timeBankRemainingSeconds || 0),
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TIME_BANK_FAILED',
+        err?.message || 'Unable to use poker time bank.',
         {
           requestId,
           details: err?.details || {},
@@ -1989,6 +2584,31 @@ function registerPokerRoutes(app, deps) {
     if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
     const snapshot = seedStreamflowFixtureState(req.body && typeof req.body === 'object' ? req.body : {});
     return res.json({ ok: true, snapshot });
+  });
+
+  app.post('/__test__/poker/play/harness', express.json({ limit: '256kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    try {
+      const seeded = seedPokerPlayHarnessScenario({
+        scenario: req.body?.scenario,
+        requestAt: normalizeIsoOrNull(req.body?.asOf) || nowIso(),
+        tableId: req.body?.tableId,
+        actors: req.body?.actors,
+      });
+      return res.json({
+        ok: true,
+        seeded,
+      });
+    } catch (err) {
+      return res.status(Number(err?.status || 500)).json({
+        ok: false,
+        error: err?.code || 'POKER_PLAY_HARNESS_FAILED',
+        message: err?.message || 'Unable to seed the poker play harness.',
+        details: err?.details || {},
+      });
+    }
   });
 
   app.post('/__test__/poker/oil/process', express.json({ limit: '128kb' }), async (req, res) => {

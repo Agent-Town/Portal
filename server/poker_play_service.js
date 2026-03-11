@@ -13,6 +13,7 @@ const {
 
 const DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS = 30;
 const DEFAULT_PLAY_RECONNECT_GRACE_SECONDS = 90;
+const DEFAULT_PLAY_TIME_BANK_SECONDS = 0;
 
 function createRouteError(status, code, message, details = {}) {
   const err = new Error(message);
@@ -67,6 +68,11 @@ function normalizePokerPlayDisputeNote(value) {
 function normalizePokerPlayDisputeResolutionStatus(value, fallback = '') {
   const status = normalizeTrimmedString(value, fallback).toLowerCase();
   return status === 'resolved' || status === 'dismissed' ? status : fallback;
+}
+
+function normalizePokerPlayProposalConfidence(value, fallback = 'medium') {
+  const confidence = normalizeTrimmedString(value, fallback).toLowerCase();
+  return ['low', 'medium', 'high'].includes(confidence) ? confidence : fallback;
 }
 
 function normalizePokerPlayAuditActorRole(value, fallback = 'system') {
@@ -140,6 +146,7 @@ function normalizeCreateTableConfig(input = {}) {
   const countdownSeconds = Math.max(10, normalizeOilAmount(input?.decisionCountdownSeconds, DEFAULT_PLAY_ACTION_COUNTDOWN_SECONDS));
   const presenceTimeoutSeconds = Math.max(10, normalizeOilAmount(input?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS));
   const reconnectGraceSeconds = Math.max(10, normalizeOilAmount(input?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
+  const timeBankSeconds = Math.max(0, normalizeOilAmount(input?.timeBankSeconds, DEFAULT_PLAY_TIME_BANK_SECONDS));
   const lateRegistrationHands = tableType === 'tournament'
     ? Math.max(0, normalizeOilAmount(input?.lateRegistrationHands, 2))
     : 0;
@@ -171,6 +178,7 @@ function normalizeCreateTableConfig(input = {}) {
     decisionCountdownSeconds: countdownSeconds,
     presenceTimeoutSeconds,
     reconnectGraceSeconds,
+    timeBankSeconds,
     lateRegistrationHands,
     handsPerBlindLevel,
     blindLevels,
@@ -227,6 +235,7 @@ function buildMatchKey(config) {
   }
   base.push(`pt${Math.max(10, normalizeOilAmount(config?.presenceTimeoutSeconds, DEFAULT_PLAY_PRESENCE_TIMEOUT_SECONDS))}`);
   base.push(`rg${Math.max(10, normalizeOilAmount(config?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS))}`);
+  base.push(`tb${Math.max(0, normalizeOilAmount(config?.timeBankSeconds, DEFAULT_PLAY_TIME_BANK_SECONDS))}`);
   return base.join(':');
 }
 
@@ -308,6 +317,57 @@ function getPokerPlayPresenceTimeoutSeconds(table) {
 
 function getPokerPlayReconnectGraceSeconds(table) {
   return Math.max(10, normalizeOilAmount(table?.rules?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
+}
+
+function getPokerPlayTimeBankSeconds(table) {
+  return Math.max(0, normalizeOilAmount(table?.rules?.timeBankSeconds, DEFAULT_PLAY_TIME_BANK_SECONDS));
+}
+
+function getPokerPlayTimeBankState(table) {
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const bySeat = state.timeBankRemainingBySeat && typeof state.timeBankRemainingBySeat === 'object'
+    ? state.timeBankRemainingBySeat
+    : {};
+  return {
+    bySeat,
+  };
+}
+
+function getSeatTimeBankRemainingSeconds(table, seatNumber) {
+  const normalizedSeatNumber = normalizeSeatNumber(seatNumber);
+  if (!normalizedSeatNumber) return 0;
+  const defaults = getPokerPlayTimeBankSeconds(table);
+  const timeBankState = getPokerPlayTimeBankState(table);
+  if (Object.prototype.hasOwnProperty.call(timeBankState.bySeat, String(normalizedSeatNumber))) {
+    return Math.max(0, normalizeOilAmount(timeBankState.bySeat[String(normalizedSeatNumber)], defaults));
+  }
+  return defaults;
+}
+
+function setSeatTimeBankRemainingSeconds(table, seatNumber, remainingSeconds) {
+  const normalizedSeatNumber = normalizeSeatNumber(seatNumber);
+  if (!normalizedSeatNumber) {
+    return cloneJson(table?.state, {});
+  }
+  const nextState = {
+    ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+    timeBankRemainingBySeat: {
+      ...getPokerPlayTimeBankState(table).bySeat,
+      [String(normalizedSeatNumber)]: Math.max(0, normalizeOilAmount(remainingSeconds, 0)),
+    },
+  };
+  return nextState;
+}
+
+function removeSeatTimeBankState(table, seatNumber) {
+  const normalizedSeatNumber = normalizeSeatNumber(seatNumber);
+  const current = {
+    ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+  };
+  const nextBySeat = { ...getPokerPlayTimeBankState(table).bySeat };
+  delete nextBySeat[String(normalizedSeatNumber)];
+  current.timeBankRemainingBySeat = nextBySeat;
+  return current;
 }
 
 function resolveTournamentLateRegistration(table, hand) {
@@ -829,6 +889,9 @@ function sanitizeHandForViewer({ table, hand, seats, viewerSeatNumber }) {
   const viewerAllowedActions = actingSeat === normalizeSeatNumber(viewerSeatNumber)
     ? getSeatAllowedActions({ handState: hand.state, seatNumber: actingSeat })
     : [];
+  const viewerTimeBankRemainingSeconds = actingSeat === normalizeSeatNumber(viewerSeatNumber)
+    ? getSeatTimeBankRemainingSeconds(table, viewerSeatNumber)
+    : 0;
   return {
     handId: hand.handId,
     handNumber: Number(hand.handNumber || 0),
@@ -851,6 +914,8 @@ function sanitizeHandForViewer({ table, hand, seats, viewerSeatNumber }) {
     seats: seatList,
     result: hand.result && Object.keys(hand.result).length ? hand.result : null,
     viewerAllowedActions,
+    timeBankRemainingSeconds: viewerTimeBankRemainingSeconds,
+    canUseTimeBank: actingSeat === normalizeSeatNumber(viewerSeatNumber) && viewerTimeBankRemainingSeconds > 0,
   };
 }
 
@@ -886,7 +951,15 @@ function sanitizeDisputesForViewer(disputes, seats) {
   }));
 }
 
-function sanitizeAuditEventsForViewer(events, seats) {
+function sanitizeAuditPayloadForViewer(payload, { includePrivate = false } = {}) {
+  const next = cloneJson(payload, {});
+  if (!includePrivate && next && typeof next === 'object') {
+    delete next.body;
+  }
+  return next;
+}
+
+function sanitizeAuditEventsForViewer(events, seats, { includePrivate = false } = {}) {
   const seatMap = getSeatMap(seats);
   return (Array.isArray(events) ? events : []).map((event) => ({
     ...event,
@@ -894,7 +967,7 @@ function sanitizeAuditEventsForViewer(events, seats) {
     seatLabel: event.seatNumber == null
       ? null
       : formatSeatLabel(event.seatNumber, seatMap.get(normalizeSeatNumber(event.seatNumber))?.displayName || ''),
-    payload: cloneJson(event.payload, {}),
+    payload: sanitizeAuditPayloadForViewer(event.payload, { includePrivate }),
   }));
 }
 
@@ -918,7 +991,7 @@ function buildPokerPlayReviewSummary(deps, table, seats, hand, walletSubject) {
       : openDisputes.length,
     myDisputes: sanitizeDisputesForViewer(myHandDisputes, seats),
     latestAuditEvent: latestAuditEvent
-      ? sanitizeAuditEventsForViewer([latestAuditEvent], seats)[0]
+      ? sanitizeAuditEventsForViewer([latestAuditEvent], seats, { includePrivate: false })[0]
       : null,
   };
 }
@@ -977,7 +1050,7 @@ function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } =
     actions: sanitizeActions(reviewActions, synced.seats),
     disputes: sanitizeDisputesForViewer(reviewDisputes, synced.seats),
     openDisputes: sanitizeDisputesForViewer(openDisputes, synced.seats),
-    auditEvents: sanitizeAuditEventsForViewer(auditEvents, synced.seats),
+    auditEvents: sanitizeAuditEventsForViewer(auditEvents, synced.seats, { includePrivate: true }),
     processAt: requestAt,
   };
 }
@@ -1099,6 +1172,279 @@ function buildPrivateAgentPrompt(table, handState, seatNumber) {
   };
 }
 
+function getLatestSeatAgentProposal(deps, handId, seatNumber) {
+  if (!handId || !seatNumber || typeof deps.listPokerPlayAuditEventsByHand !== 'function') return null;
+  const events = deps.listPokerPlayAuditEventsByHand(handId, { limit: 100 });
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (String(event?.eventKind || '') !== 'seat_agent_proposal') continue;
+    if (normalizeSeatNumber(event?.seatNumber) !== normalizeSeatNumber(seatNumber)) continue;
+    const payload = cloneJson(event?.payload, {});
+    return {
+      schemaVersion: String(payload?.schemaVersion || 'poker-seat-agent-proposal-v1'),
+      source: String(payload?.source || 'worker-seat-agent-v1'),
+      actionKind: String(payload?.actionKind || ''),
+      amountOil: Number(payload?.amountOil || 0),
+      confidence: normalizePokerPlayProposalConfidence(payload?.confidence, 'medium'),
+      body: String(payload?.body || ''),
+      createdAt: event?.createdAt || null,
+      handId: String(payload?.handId || handId || ''),
+      tableId: String(payload?.tableId || ''),
+      seatNumber: normalizeSeatNumber(event?.seatNumber),
+    };
+  }
+  return null;
+}
+
+function sanitizeTimelineEventPayload(payload = {}, { includePrivate = false } = {}) {
+  const next = {
+    actionKind: typeof payload?.actionKind === 'string' ? payload.actionKind : undefined,
+    amountOil: Number(payload?.amountOil || 0) || undefined,
+    confidence: typeof payload?.confidence === 'string' ? payload.confidence : undefined,
+    status: typeof payload?.status === 'string' ? payload.status : undefined,
+    seriesId: typeof payload?.seriesId === 'string' ? payload.seriesId : undefined,
+    tableId: typeof payload?.tableId === 'string' ? payload.tableId : undefined,
+    handId: typeof payload?.handId === 'string' ? payload.handId : undefined,
+    reason: typeof payload?.reason === 'string' ? payload.reason : undefined,
+  };
+  if (includePrivate && typeof payload?.body === 'string' && payload.body.trim()) {
+    next.body = payload.body.trim();
+  }
+  return Object.fromEntries(Object.entries(next).filter(([, value]) => value !== undefined && value !== null && value !== ''));
+}
+
+function buildPokerPlayHandHistoryPayload(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerSeat = walletBinding?.walletSubject
+    ? deps.getPokerPlaySeatByWalletSubject(synced.table.tableId, walletBinding.walletSubject)
+    : null;
+  const items = (typeof deps.listPokerPlayHandsByTable === 'function'
+    ? deps.listPokerPlayHandsByTable(synced.table.tableId, { limit: Math.max(1, Number(limit || 20)) })
+    : [])
+    .map((historyHand) => {
+      const actions = sanitizeActions(deps.listPokerPlayActionsByHand(historyHand.handId), synced.seats);
+      const proposal = viewerSeat ? getLatestSeatAgentProposal(deps, historyHand.handId, viewerSeat.seatNumber) : null;
+      return {
+        handId: historyHand.handId,
+        handNumber: Number(historyHand.handNumber || 0),
+        status: String(historyHand.status || ''),
+        street: String(historyHand?.state?.street || historyHand?.state?.phase || 'preflop'),
+        startedAt: historyHand.createdAt || null,
+        completedAt: historyHand.updatedAt || null,
+        communityCards: Array.isArray(historyHand?.state?.communityCards) ? historyHand.state.communityCards.slice() : [],
+        result: historyHand.result && Object.keys(historyHand.result).length ? cloneJson(historyHand.result, {}) : null,
+        actionCount: actions.length,
+        actions: publicViewer ? actions : actions.slice(-12),
+        agentProposal: proposal,
+      };
+    });
+  return {
+    viewerMode: publicViewer ? 'public' : 'player',
+    tableId: synced.table.tableId,
+    tableType: synced.table.tableType,
+    items,
+    processAt: requestAt,
+  };
+}
+
+function buildPokerPlaySeriesTimelinePayload(deps, { seriesId, session, req, processAt, publicViewer = false, limit = 200 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const targetSeriesId = normalizeTrimmedString(seriesId);
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const entries = listTournamentSeriesEntriesBySeriesId(deps, targetSeriesId, {
+    processAt: requestAt,
+    includeClosed: true,
+  });
+  if (!entries.length) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
+  }
+  const viewerSeatByTableId = new Map(entries.map((entry) => {
+    const seat = walletBinding?.walletSubject
+      ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
+      : null;
+    return [entry.table.tableId, seat];
+  }));
+  const seatMapByTableId = new Map(entries.map((entry) => [entry.table.tableId, getSeatMap(entry.seats)]));
+  const timeline = entries.flatMap((entry) => {
+    const seatMap = seatMapByTableId.get(entry.table.tableId) || new Map();
+    const viewerSeat = viewerSeatByTableId.get(entry.table.tableId) || null;
+    return deps.listPokerPlayAuditEventsByTable(entry.table.tableId, { limit: Math.max(50, Number(limit || 200)) })
+      .map((event) => ({
+        createdAt: event.createdAt || null,
+        tableId: entry.table.tableId,
+        handId: event.handId || null,
+        eventKind: String(event.eventKind || ''),
+        actorRole: String(event.actorRole || 'system'),
+        seatNumber: event.seatNumber == null ? null : normalizeSeatNumber(event.seatNumber),
+        seatLabel: event.seatNumber == null
+          ? 'System'
+          : formatSeatLabel(event.seatNumber, seatMap.get(normalizeSeatNumber(event.seatNumber))?.displayName || ''),
+        payload: sanitizeTimelineEventPayload(event.payload, {
+          includePrivate: !!viewerSeat && normalizeSeatNumber(event.seatNumber) === normalizeSeatNumber(viewerSeat.seatNumber),
+        }),
+      }));
+  })
+    .sort((left, right) => {
+      const leftAt = Date.parse(String(left?.createdAt || ''));
+      const rightAt = Date.parse(String(right?.createdAt || ''));
+      if (Number.isFinite(leftAt) && Number.isFinite(rightAt) && leftAt !== rightAt) return leftAt - rightAt;
+      return `${String(left?.tableId || '')}:${String(left?.handId || '')}:${String(left?.eventKind || '')}`
+        .localeCompare(`${String(right?.tableId || '')}:${String(right?.handId || '')}:${String(right?.eventKind || '')}`);
+    })
+    .slice(-Math.max(1, Number(limit || 200)));
+  return {
+    viewerMode: publicViewer ? 'public' : 'player',
+    seriesId: targetSeriesId,
+    items: timeline,
+    processAt: requestAt,
+  };
+}
+
+function buildPokerPlayMyResultsPayload(deps, { session, req, processAt, limit = 50 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding?.walletSubject) {
+    throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before reading poker results.');
+  }
+  const items = (typeof deps.listPokerPlaySeatsByWalletSubject === 'function'
+    ? deps.listPokerPlaySeatsByWalletSubject(walletBinding.walletSubject, { limit: Math.max(1, Number(limit || 50)) })
+    : [])
+    .map((seat) => {
+      const table = deps.getPokerPlayTableById(seat.tableId);
+      if (!table) return null;
+      const hand = deps.getCurrentPokerPlayHandForTable(seat.tableId);
+      const synced = table ? syncPokerPlayTable(deps, seat.tableId, { processAt: requestAt }) : { table, seats: [], hand };
+      const viewerSeat = deps.getPokerPlaySeatByWalletSubject(seat.tableId, walletBinding.walletSubject) || seat;
+      const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
+      const seriesRef = getTournamentSeriesRef(synced.table);
+      return {
+        tableId: synced.table.tableId,
+        tableType: synced.table.tableType,
+        title: synced.table.title || 'Live Table',
+        seatNumber: Number(viewerSeat.seatNumber || 0),
+        buyInOil: Number(viewerSeat.buyInOil || 0),
+        stackOil: Number(viewerSeat.stackOil || 0),
+        prizeOil: Number(viewerSeat.prizeOil || 0),
+        finishPosition: Number(viewerSeat.finishPosition || 0) || null,
+        payoutSettledAt: viewerSeat.payoutSettledAt || null,
+        completedAt: summary?.completedAt || null,
+        status: String(viewerSeat.status || ''),
+        seriesId: seriesRef.seriesId || null,
+        seriesTitle: seriesRef.seriesTitle || null,
+      };
+    })
+    .filter(Boolean);
+  const summary = items.reduce((acc, item) => {
+    acc.tableCount += 1;
+    acc.buyInOil += Number(item?.buyInOil || 0);
+    acc.prizeOil += Number(item?.prizeOil || 0);
+    if (item?.tableType === 'tournament') acc.tournamentCount += 1;
+    if (item?.tableType === 'cash') acc.cashCount += 1;
+    return acc;
+  }, {
+    tableCount: 0,
+    cashCount: 0,
+    tournamentCount: 0,
+    buyInOil: 0,
+    prizeOil: 0,
+  });
+  return {
+    walletSubject: walletBinding.walletSubject,
+    items,
+    summary,
+    processAt: requestAt,
+  };
+}
+
+function postSeatAgentProposal(deps, { handId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const hand = deps.getPokerPlayHandById(handId);
+  if (!hand) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: body?.asOf });
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  const currentHand = deps.getPokerPlayHandById(handId) || synced.hand;
+  if (!currentHand || currentHand.status !== 'live') {
+    throw createRouteError(409, 'POKER_PLAY_HAND_NOT_LIVE', 'This poker hand is no longer live.');
+  }
+  const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, seat.walletSubject, requestAt) || seat;
+  const actionKind = normalizeTrimmedString(body?.actionKind).toLowerCase();
+  const proposalBody = normalizePokerPlayMessageBody(body?.body);
+  const confidence = normalizePokerPlayProposalConfidence(body?.confidence, 'medium');
+  if (!actionKind) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Proposal actionKind is required.');
+  }
+  if (!proposalBody) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Proposal body is required.');
+  }
+  let outcome;
+  try {
+    outcome = applyPokerPlayActionToHandState({
+      table: synced.table,
+      handState: currentHand.state,
+      seatNumber: touchedSeat.seatNumber,
+      actionKind,
+      amountOil: Number(body?.amountOil || 0),
+      nowIso: requestAt,
+    });
+  } catch (err) {
+    throw createRouteError(
+      err?.code === 'POKER_PLAY_RAISE_TOO_SMALL' ? 409 : 400,
+      err?.code || 'INVALID_ARGUMENT',
+      err?.code === 'POKER_PLAY_RAISE_TOO_SMALL'
+        ? 'The requested proposal size is smaller than the current minimum.'
+        : 'This proposed action is not legal for the current hand.',
+      err?.code === 'POKER_PLAY_RAISE_TOO_SMALL'
+        ? { requiredOil: err?.requiredOil }
+        : {}
+    );
+  }
+  const proposal = {
+    schemaVersion: 'poker-seat-agent-proposal-v1',
+    source: normalizeTrimmedString(body?.source, 'worker-seat-agent-v1'),
+    tableId: synced.table.tableId,
+    handId: currentHand.handId,
+    seatNumber: normalizeSeatNumber(touchedSeat.seatNumber),
+    actionKind,
+    amountOil: Number(outcome?.normalizedAmountOil || outcome?.debitOil || 0),
+    confidence,
+    body: proposalBody,
+    createdAt: requestAt,
+  };
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: synced.table.tableId,
+      handId: currentHand.handId,
+      seatNumber: touchedSeat.seatNumber,
+      actorRole: 'agent',
+      eventKind: 'seat_agent_proposal',
+      payload: proposal,
+      createdAt: requestAt,
+    });
+  }
+  const message = deps.createPokerPlayMessage({
+    tableId: synced.table.tableId,
+    handId: currentHand.handId,
+    seatNumber: touchedSeat.seatNumber,
+    authorRole: 'agent',
+    body: proposalBody,
+    createdAt: requestAt,
+  });
+  return {
+    proposal,
+    message,
+  };
+}
+
 function touchPokerPlaySeatPresence(deps, tableId, walletSubject, atIso) {
   const normalizedTableId = normalizeTrimmedString(tableId);
   const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
@@ -1110,6 +1456,90 @@ function touchPokerPlaySeatPresence(deps, tableId, walletSubject, atIso) {
     lastSeenAt: atIso,
     updatedAt: atIso,
   });
+}
+
+function applyTimeBankExtension(deps, {
+  table,
+  hand,
+  seatNumber,
+  consumeSeconds,
+  requestAt,
+  actorRole = 'human',
+  actorLabel = 'player',
+  auto = false,
+} = {}) {
+  const normalizedSeatNumber = normalizeSeatNumber(seatNumber);
+  const appliedSeconds = Math.max(0, normalizeOilAmount(consumeSeconds, 0));
+  if (!table || !hand || !normalizedSeatNumber || appliedSeconds <= 0) {
+    return { table, hand };
+  }
+  const remainingSeconds = getSeatTimeBankRemainingSeconds(table, normalizedSeatNumber);
+  const nextRemainingSeconds = Math.max(0, remainingSeconds - appliedSeconds);
+  const currentExpiresAtMs = Date.parse(String(hand.actionExpiresAt || hand?.state?.actionExpiresAt || ''));
+  const requestAtMs = Date.parse(String(requestAt || ''));
+  const baseMs = Number.isFinite(currentExpiresAtMs)
+    ? Math.max(currentExpiresAtMs, Number.isFinite(requestAtMs) ? requestAtMs : currentExpiresAtMs)
+    : (Number.isFinite(requestAtMs) ? requestAtMs : Date.now());
+  const nextExpiresAt = new Date(baseMs + (appliedSeconds * 1000)).toISOString();
+
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    state: setSeatTimeBankRemainingSeconds(table, normalizedSeatNumber, nextRemainingSeconds),
+    updatedAt: requestAt,
+  });
+  const updatedHand = deps.upsertPokerPlayHand({
+    ...hand,
+    actionExpiresAt: nextExpiresAt,
+    state: {
+      ...(hand.state && typeof hand.state === 'object' ? hand.state : {}),
+      actionExpiresAt: nextExpiresAt,
+      timeBankConsumedBySeat: {
+        ...((hand?.state?.timeBankConsumedBySeat && typeof hand.state.timeBankConsumedBySeat === 'object')
+          ? hand.state.timeBankConsumedBySeat
+          : {}),
+        [String(normalizedSeatNumber)]: normalizeOilAmount(
+          hand?.state?.timeBankConsumedBySeat?.[String(normalizedSeatNumber)],
+          0
+        ) + appliedSeconds,
+      },
+      lastTimeBankSeatNumber: normalizedSeatNumber,
+      lastTimeBankAppliedSeconds: appliedSeconds,
+      lastTimeBankAppliedAt: requestAt,
+      lastTimeBankAuto: auto === true,
+    },
+    updatedAt: requestAt,
+  });
+
+  deps.createPokerPlayMessage({
+    tableId: updatedTable.tableId,
+    handId: updatedHand.handId,
+    seatNumber: null,
+    authorRole: 'system',
+    body: auto
+      ? `${formatSeatLabel(normalizedSeatNumber)} automatically consumes ${appliedSeconds}s of time bank before timeout action.`
+      : `${formatSeatLabel(normalizedSeatNumber)} uses ${appliedSeconds}s of time bank.`,
+    createdAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: updatedHand.handId,
+      seatNumber: normalizedSeatNumber,
+      actorRole: normalizePokerPlayAuditActorRole(actorRole, actorRole),
+      eventKind: auto ? 'time_bank_auto_used' : 'time_bank_used',
+      payload: {
+        actorLabel: normalizeTrimmedString(actorLabel, auto ? 'system' : 'player'),
+        appliedSeconds,
+        remainingSeconds: nextRemainingSeconds,
+        actionExpiresAt: nextExpiresAt,
+      },
+      createdAt: requestAt,
+    });
+  }
+  return {
+    table: updatedTable,
+    hand: updatedHand,
+  };
 }
 
 function touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, atIso) {
@@ -1279,6 +1709,11 @@ function settleQueuedCashouts(deps, table, seats, hand, atIso) {
       createdAt: atIso,
     });
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+    table = deps.upsertPokerPlayTable({
+      ...table,
+      state: removeSeatTimeBankState(table, seat.seatNumber),
+      updatedAt: atIso,
+    });
   }
   return deps.listPokerPlaySeatsByTable(table.tableId);
 }
@@ -2135,6 +2570,22 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       const actingSeat = normalizeSeatNumber(hand?.state?.actingSeat);
       if (actingSeat && Number.isFinite(atMs) && Number.isFinite(expiresAtMs) && expiresAtMs <= atMs) {
         const seat = seats.find((item) => normalizeSeatNumber(item.seatNumber) === actingSeat) || null;
+        const timeBankRemainingSeconds = getSeatTimeBankRemainingSeconds(table, actingSeat);
+        if (timeBankRemainingSeconds > 0) {
+          const updated = applyTimeBankExtension(deps, {
+            table,
+            hand,
+            seatNumber: actingSeat,
+            consumeSeconds: timeBankRemainingSeconds,
+            requestAt: atIso,
+            actorRole: 'agent',
+            actorLabel: seat?.displayName || formatSeatLabel(actingSeat),
+            auto: true,
+          });
+          table = updated.table;
+          hand = updated.hand;
+          continue;
+        }
         const timeoutAction = pickTimeoutAction({ handState: hand.state, seatNumber: actingSeat });
         const outcome = applyPokerPlayActionToHandState({
           table,
@@ -2249,7 +2700,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   return { table, seats, hand };
 }
 
-function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, processAt, publicViewer = false } = {}) {
+function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, processAt, publicViewer = false, seatAgentMode = '' } = {}) {
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const viewerSeat = walletBinding?.walletSubject
     ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
@@ -2257,7 +2708,11 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   const messages = hand ? deps.listPokerPlayMessagesByHand(hand.handId) : [];
   const actions = hand ? deps.listPokerPlayActionsByHand(hand.handId) : [];
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
-  const suggestion = viewerSeat && hand && hand.status === 'live'
+  const workerSeatAgentMode = normalizeTrimmedString(seatAgentMode).toLowerCase() === 'worker';
+  const agentProposal = viewerSeat && hand
+    ? getLatestSeatAgentProposal(deps, hand.handId, viewerSeat.seatNumber)
+    : null;
+  const suggestion = !workerSeatAgentMode && viewerSeat && hand && hand.status === 'live'
     ? derivePokerPlayAgentSuggestion({ table, handState: hand.state, seatNumber: viewerSeat.seatNumber })
     : null;
   const review = buildPokerPlayReviewSummary(deps, table, seats, hand, walletBinding?.walletSubject || '');
@@ -2322,6 +2777,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     messages: sanitizeMessagesForViewer(messages, viewerSeat?.seatNumber || 0),
     actions: sanitizeActions(actions, seats),
     review,
+    agentProposal,
     suggestion,
     processAt: toProcessIso(deps, processAt),
   };
@@ -2430,11 +2886,13 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       winnerSeatNumber: 0,
       prizeOil: 0,
       prizeSettledAt: null,
+      timeBankRemainingBySeat: {},
     },
     rules: {
       decisionCountdownSeconds: normalized.decisionCountdownSeconds,
       presenceTimeoutSeconds: normalized.presenceTimeoutSeconds,
       reconnectGraceSeconds: normalized.reconnectGraceSeconds,
+      timeBankSeconds: normalized.timeBankSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'dynamic_ladder',
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
@@ -2577,7 +3035,7 @@ function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer
   };
 }
 
-function getTableDetail(deps, { tableId, session, req, processAt, publicViewer = false } = {}) {
+function getTableDetail(deps, { tableId, session, req, processAt, publicViewer = false, seatAgentMode = '' } = {}) {
   const requestAt = toProcessIso(deps, processAt);
   if (!publicViewer) {
     touchPokerPlaySeatPresenceForSession(deps, tableId, session, req, requestAt);
@@ -2591,6 +3049,38 @@ function getTableDetail(deps, { tableId, session, req, processAt, publicViewer =
     req,
     processAt: requestAt,
     publicViewer,
+    seatAgentMode,
+  });
+}
+
+function getHandHistory(deps, { tableId, session, req, processAt, publicViewer = false, limit = 20 } = {}) {
+  return buildPokerPlayHandHistoryPayload(deps, {
+    tableId,
+    session,
+    req,
+    processAt,
+    publicViewer,
+    limit,
+  });
+}
+
+function getSeriesTimeline(deps, { seriesId, session, req, processAt, publicViewer = false, limit = 200 } = {}) {
+  return buildPokerPlaySeriesTimelinePayload(deps, {
+    seriesId,
+    session,
+    req,
+    processAt,
+    publicViewer,
+    limit,
+  });
+}
+
+function getMyResults(deps, { session, req, processAt, limit = 50 } = {}) {
+  return buildPokerPlayMyResultsPayload(deps, {
+    session,
+    req,
+    processAt,
+    limit,
   });
 }
 
@@ -2680,6 +3170,11 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     streamflowVerificationId: deps.getStreamflowVerificationByWalletSubject(walletBinding.walletSubject)?.verificationId || null,
     lastSeenAt: requestAt,
     disconnectedAt: null,
+    updatedAt: requestAt,
+  });
+  table = deps.upsertPokerPlayTable({
+    ...table,
+    state: setSeatTimeBankRemainingSeconds(table, openSeatNumber, getSeatTimeBankRemainingSeconds(table, openSeatNumber)),
     updatedAt: requestAt,
   });
   if (normalizePokerPlayTableType(table.tableType) === 'tournament' && currentHand && currentHand.status === 'live') {
@@ -2788,6 +3283,11 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
       });
     }
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+    deps.upsertPokerPlayTable({
+      ...synced.table,
+      state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+      updatedAt: requestAt,
+    });
   } else {
     if (liveHand && normalizeTrimmedString(seat?.status).toLowerCase() === 'registered') {
       if (Number(seat.stackOil || 0) > 0) {
@@ -2810,6 +3310,11 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
         createdAt: requestAt,
       });
       deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+      deps.upsertPokerPlayTable({
+        ...synced.table,
+        state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+        updatedAt: requestAt,
+      });
       const refreshedRegistered = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
       return buildPokerPlayTablePayload(deps, refreshedRegistered.table, refreshedRegistered.seats, refreshedRegistered.hand, { session, req, processAt: requestAt });
     }
@@ -2820,6 +3325,11 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
       throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_STILL_ACTIVE', 'Tournament chips must finish the table; cashout is not available.');
     }
     deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+    deps.upsertPokerPlayTable({
+      ...synced.table,
+      state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+      updatedAt: requestAt,
+    });
   }
 
   const refreshed = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
@@ -2967,6 +3477,52 @@ function postAction(deps, { handId, session, req, body } = {}) {
     }
   }
 
+  const refreshed = syncPokerPlayTable(deps, synced.table.tableId, { processAt: requestAt });
+  return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
+}
+
+function useTimeBank(deps, { handId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const hand = deps.getPokerPlayHandById(handId);
+  if (!hand) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: body?.asOf });
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  const currentHand = deps.getPokerPlayHandById(handId) || synced.hand;
+  if (isTablePaused(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
+  }
+  if (!currentHand || currentHand.status !== 'live') {
+    throw createRouteError(409, 'POKER_PLAY_HAND_NOT_LIVE', 'This poker hand is no longer live.');
+  }
+  const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  const touchedSeat = touchPokerPlaySeatPresence(deps, synced.table.tableId, seat.walletSubject, requestAt) || seat;
+  if (normalizeSeatNumber(currentHand.state?.actingSeat) !== normalizeSeatNumber(touchedSeat.seatNumber)) {
+    throw createRouteError(409, 'POKER_PLAY_NOT_YOUR_TURN', 'It is not this seat’s turn to act.', {
+      actingSeat: normalizeSeatNumber(currentHand.state?.actingSeat),
+      seatNumber: normalizeSeatNumber(touchedSeat.seatNumber),
+    });
+  }
+  const remainingSeconds = getSeatTimeBankRemainingSeconds(synced.table, touchedSeat.seatNumber);
+  if (remainingSeconds <= 0) {
+    throw createRouteError(409, 'POKER_PLAY_TIME_BANK_EMPTY', 'No time bank remains for this seat.', {
+      seatNumber: normalizeSeatNumber(touchedSeat.seatNumber),
+    });
+  }
+  const requestedSeconds = Math.max(0, normalizeOilAmount(body?.consumeSeconds, remainingSeconds));
+  const consumeSeconds = Math.max(1, Math.min(remainingSeconds, requestedSeconds || remainingSeconds));
+  applyTimeBankExtension(deps, {
+    table: synced.table,
+    hand: currentHand,
+    seatNumber: touchedSeat.seatNumber,
+    consumeSeconds,
+    requestAt,
+    actorRole: 'human',
+    actorLabel: touchedSeat.displayName || formatSeatLabel(touchedSeat.seatNumber),
+  });
   const refreshed = syncPokerPlayTable(deps, synced.table.tableId, { processAt: requestAt });
   return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
 }
@@ -3144,6 +3700,9 @@ module.exports = {
   closeTournamentSeries,
   createTable,
   createRouteError,
+  getHandHistory,
+  getMyResults,
+  getSeriesTimeline,
   getSeriesDetail,
   getTableDetail,
   listTables,
@@ -3155,8 +3714,10 @@ module.exports = {
   pauseTable,
   postAction,
   postMessage,
+  postSeatAgentProposal,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
   syncPokerPlayTable,
+  useTimeBank,
 };

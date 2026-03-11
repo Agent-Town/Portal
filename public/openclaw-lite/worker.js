@@ -46652,6 +46652,155 @@ function utf8ToBytes(str2) {
   return new TextEncoder().encode(String(str2 ?? ""));
 }
 
+// src/openclaw-lite/shared/poker-seat-agent.js
+init_define_PI_VERSIONS();
+function normalizeNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+function normalizeText(value, fallback = "") {
+  const text = typeof value === "string" ? value.trim() : "";
+  return text || fallback;
+}
+function normalizeCards(cards) {
+  return (Array.isArray(cards) ? cards : []).map((card) => normalizeText(card).toUpperCase()).filter(Boolean).slice(0, 2);
+}
+function cardRank(card) {
+  const text = normalizeText(card).toUpperCase();
+  return text ? text[0] : "";
+}
+function cardSuit(card) {
+  const text = normalizeText(card).toUpperCase();
+  return text ? text.slice(-1) : "";
+}
+function isPocketPair(cards) {
+  if (cards.length !== 2) return false;
+  return cardRank(cards[0]) && cardRank(cards[0]) === cardRank(cards[1]);
+}
+function isSuited(cards) {
+  if (cards.length !== 2) return false;
+  return cardSuit(cards[0]) && cardSuit(cards[0]) === cardSuit(cards[1]);
+}
+function isBroadway(rank) {
+  return ["A", "K", "Q", "J", "T"].includes(String(rank || "").toUpperCase());
+}
+function countBroadway(cards) {
+  return cards.reduce((count, card) => count + (isBroadway(cardRank(card)) ? 1 : 0), 0);
+}
+function makeProposal({
+  actionKind,
+  amountOil = 0,
+  confidence = "medium",
+  body = "",
+  reason = ""
+} = {}) {
+  return {
+    schemaVersion: "poker-seat-agent-proposal-v1",
+    source: "worker-seat-agent-v1",
+    actionKind: normalizeText(actionKind).toLowerCase(),
+    amountOil: Math.max(0, Math.floor(normalizeNumber(amountOil, 0))),
+    confidence: ["low", "medium", "high"].includes(normalizeText(confidence).toLowerCase()) ? normalizeText(confidence).toLowerCase() : "medium",
+    body: normalizeText(body),
+    reason: normalizeText(reason)
+  };
+}
+function buildPokerSeatAgentProposal({
+  table = null,
+  hand = null,
+  mySeat = null
+} = {}) {
+  const allowed = new Set(
+    (Array.isArray(hand?.viewerAllowedActions) ? hand.viewerAllowedActions : []).map((value) => normalizeText(value).toLowerCase()).filter(Boolean)
+  );
+  if (!allowed.size) {
+    return makeProposal({
+      actionKind: "check",
+      amountOil: 0,
+      confidence: "low",
+      body: "No legal seat action is available right now.",
+      reason: "no_legal_action"
+    });
+  }
+  const cards = normalizeCards(mySeat?.holeCards);
+  const stackOil = Math.max(0, normalizeNumber(mySeat?.stackOil, 0));
+  const toCall = Math.max(0, normalizeNumber(hand?.requiredCallOil, 0));
+  const minRaiseToOil = Math.max(0, normalizeNumber(hand?.minRaiseToOil, 0));
+  const bigBlindOil = Math.max(1, normalizeNumber(table?.bigBlindOil, 1));
+  const aggressiveTarget = Math.min(
+    stackOil,
+    Math.max(minRaiseToOil, toCall + bigBlindOil)
+  );
+  const pressureTarget = Math.min(
+    stackOil,
+    Math.max(minRaiseToOil, toCall + Math.max(bigBlindOil * 2, 1))
+  );
+  const broadwayCount = countBroadway(cards);
+  const pair = isPocketPair(cards);
+  const suited = isSuited(cards);
+  if (allowed.has("raise") && pressureTarget > 0 && (pair || suited && broadwayCount >= 2)) {
+    return makeProposal({
+      actionKind: "raise",
+      amountOil: pressureTarget,
+      confidence: "high",
+      body: `Pressure this 6-max spot now. Raise to ${pressureTarget} OIL and keep initiative while the clock is live.`,
+      reason: pair ? "pocket_pair_pressure" : "suited_broadway_pressure"
+    });
+  }
+  if (allowed.has("bet") && aggressiveTarget > 0 && (pair || broadwayCount >= 1)) {
+    return makeProposal({
+      actionKind: "bet",
+      amountOil: aggressiveTarget,
+      confidence: pair ? "high" : "medium",
+      body: `Take the lead and size to ${aggressiveTarget} OIL before the table gets a free card.`,
+      reason: pair ? "pair_value_bet" : "broadway_lead_bet"
+    });
+  }
+  if (allowed.has("call") && toCall > 0 && toCall <= Math.max(bigBlindOil * 2, Math.floor(stackOil * 0.25))) {
+    return makeProposal({
+      actionKind: "call",
+      amountOil: toCall,
+      confidence: suited || broadwayCount >= 1 ? "medium" : "low",
+      body: `The price is controlled at ${toCall} OIL. Call and continue with position-sensitive postflop decisions.`,
+      reason: "priced_in_call"
+    });
+  }
+  if (allowed.has("check")) {
+    return makeProposal({
+      actionKind: "check",
+      amountOil: 0,
+      confidence: "medium",
+      body: "No forced investment here. Check and preserve OIL for the next betting node.",
+      reason: "free_check"
+    });
+  }
+  if (allowed.has("fold")) {
+    return makeProposal({
+      actionKind: "fold",
+      amountOil: 0,
+      confidence: toCall > Math.max(bigBlindOil * 2, Math.floor(stackOil * 0.25)) ? "medium" : "low",
+      body: "This spot burns too much stack for too little edge. Fold and preserve OIL for a cleaner decision.",
+      reason: "fallback_fold"
+    });
+  }
+  if (allowed.has("call")) {
+    return makeProposal({
+      actionKind: "call",
+      amountOil: toCall,
+      confidence: "low",
+      body: `This is the lowest-variance legal continue. Call ${toCall} OIL and reassess on the next street.`,
+      reason: "fallback_call"
+    });
+  }
+  const firstAllowed = Array.from(allowed)[0] || "check";
+  return makeProposal({
+    actionKind: firstAllowed,
+    amountOil: firstAllowed === "bet" || firstAllowed === "raise" ? aggressiveTarget : 0,
+    confidence: "low",
+    body: `Take the first legal action available: ${firstAllowed}.`,
+    reason: "first_legal_action"
+  });
+}
+
 // src/openclaw-lite/shared/crypto.js
 init_define_PI_VERSIONS();
 function randomBytes(len) {
@@ -47679,6 +47828,12 @@ function normalizeToolErrorCode(message, fallback = "UNSUPPORTED") {
   if (!raw) return String(fallback || "UNSUPPORTED");
   return raw;
 }
+function unwrapPortalToolData(envelope) {
+  if (envelope && typeof envelope === "object" && envelope.data && typeof envelope.data === "object") {
+    return envelope.data;
+  }
+  return envelope;
+}
 function isRetryableAgentTownErrorCode(code) {
   const normalized = String(code || "").trim().toUpperCase();
   return normalized.startsWith("WAITING_");
@@ -48044,6 +48199,211 @@ async function runAgentTownStateGetPonyInbox(params, toolName = "agent_town_stat
     const message = String(e?.message || "STATE_GET_PONY_INBOX_FAILED");
     const code = normalizeToolErrorCode(message, "UNSUPPORTED");
     return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { houseId: houseId || null }));
+  }
+}
+async function runPokerStateGetTable(params, toolName = "poker_state_get_table") {
+  const startedAtMs = nowMs();
+  const tableId = typeof params?.tableId === "string" ? params.tableId.trim() : "";
+  if (!tableId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing tableId"));
+  }
+  try {
+    const query = new URLSearchParams();
+    query.set("seatAgentMode", "worker");
+    if (typeof params?.asOf === "string" && params.asOf.trim()) query.set("asOf", params.asOf.trim());
+    const response = await apiJson(`/api/poker/play/tables/${encodeURIComponent(tableId)}?${query.toString()}`, { method: "GET" });
+    const stateSnapshot = unwrapPortalToolData(response);
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      tableId,
+      state: stateSnapshot
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_STATE_GET_TABLE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { tableId }));
+  }
+}
+async function runPokerStateGetHandHistory(params, toolName = "poker_state_get_hand_history") {
+  const startedAtMs = nowMs();
+  const tableId = typeof params?.tableId === "string" ? params.tableId.trim() : "";
+  if (!tableId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing tableId"));
+  }
+  try {
+    const query = new URLSearchParams();
+    if (typeof params?.asOf === "string" && params.asOf.trim()) query.set("asOf", params.asOf.trim());
+    if (Number.isFinite(Number(params?.limit))) query.set("limit", String(Math.max(1, Math.floor(Number(params.limit)))));
+    const response = await apiJson(`/api/poker/play/tables/${encodeURIComponent(tableId)}/history?${query.toString()}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      tableId,
+      history: unwrapPortalToolData(response)
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_STATE_GET_HAND_HISTORY_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { tableId }));
+  }
+}
+async function runPokerStateGetSeriesTimeline(params, toolName = "poker_state_get_series_timeline") {
+  const startedAtMs = nowMs();
+  const seriesId = typeof params?.seriesId === "string" ? params.seriesId.trim() : "";
+  if (!seriesId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing seriesId"));
+  }
+  try {
+    const query = new URLSearchParams();
+    if (typeof params?.asOf === "string" && params.asOf.trim()) query.set("asOf", params.asOf.trim());
+    if (Number.isFinite(Number(params?.limit))) query.set("limit", String(Math.max(1, Math.floor(Number(params.limit)))));
+    const response = await apiJson(`/api/poker/play/series/${encodeURIComponent(seriesId)}/timeline?${query.toString()}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      seriesId,
+      timeline: unwrapPortalToolData(response)
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_STATE_GET_SERIES_TIMELINE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { seriesId }));
+  }
+}
+async function runPokerStateGetMyResults(params, toolName = "poker_state_get_my_results") {
+  const startedAtMs = nowMs();
+  try {
+    const query = new URLSearchParams();
+    if (typeof params?.asOf === "string" && params.asOf.trim()) query.set("asOf", params.asOf.trim());
+    if (Number.isFinite(Number(params?.limit))) query.set("limit", String(Math.max(1, Math.floor(Number(params.limit)))));
+    const response = await apiJson(`/api/poker/play/results/me?${query.toString()}`, { method: "GET" });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      results: unwrapPortalToolData(response)
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_STATE_GET_MY_RESULTS_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message));
+  }
+}
+async function runPokerThreadPostNote(params, toolName = "poker_thread_post_note") {
+  const startedAtMs = nowMs();
+  const handId = typeof params?.handId === "string" ? params.handId.trim() : "";
+  const body = typeof params?.body === "string" ? params.body.trim() : "";
+  if (!handId || !body) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing handId or body"));
+  }
+  try {
+    const response = await apiJson(`/api/poker/play/hands/${encodeURIComponent(handId)}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ body, asOf: typeof params?.asOf === "string" ? params.asOf.trim() : void 0 })
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      handId,
+      message: unwrapPortalToolData(response)
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_THREAD_POST_NOTE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { handId }));
+  }
+}
+async function runPokerActionPropose(params, toolName = "poker_action_propose") {
+  const startedAtMs = nowMs();
+  const tableId = typeof params?.tableId === "string" ? params.tableId.trim() : "";
+  if (!tableId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing tableId"));
+  }
+  try {
+    const tableEnvelope = await runPokerStateGetTable({ tableId, asOf: params?.asOf }, "poker_state_get_table");
+    if (tableEnvelope?.ok !== true) {
+      const error = tableEnvelope?.error || {};
+      return withToolMeta(toolName, startedAtMs, makeToolFailure(
+        String(error?.code || "POKER_STATE_GET_TABLE_FAILED"),
+        String(error?.message || "Unable to read poker table state."),
+        error?.details || {},
+        error?.retryable === true
+      ));
+    }
+    const stateSnapshot = tableEnvelope?.data?.state && typeof tableEnvelope.data.state === "object" ? tableEnvelope.data.state : {};
+    const currentHandId = typeof params?.handId === "string" && params.handId.trim() ? params.handId.trim() : String(stateSnapshot?.hand?.handId || "");
+    const proposal = buildPokerSeatAgentProposal({
+      table: stateSnapshot?.table,
+      hand: stateSnapshot?.hand,
+      mySeat: stateSnapshot?.mySeat
+    });
+    if (!proposal || !proposal.actionKind) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("POKER_ACTION_PROPOSAL_EMPTY", "Worker seat agent could not produce a proposal.", { tableId, handId: currentHandId || null }));
+    }
+    let persisted = null;
+    if (params?.persist !== false && currentHandId) {
+      persisted = await apiJson(`/api/poker/play/hands/${encodeURIComponent(currentHandId)}/proposals`, {
+        method: "POST",
+        body: JSON.stringify({
+          ...proposal,
+          handId: currentHandId,
+          tableId,
+          asOf: typeof params?.asOf === "string" ? params.asOf.trim() : void 0
+        })
+      });
+    }
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      tableId,
+      handId: currentHandId,
+      proposal,
+      persisted: unwrapPortalToolData(persisted),
+      state: stateSnapshot
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_ACTION_PROPOSE_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { tableId }));
+  }
+}
+async function runPokerActionCommit(params, toolName = "poker_action_commit") {
+  const startedAtMs = nowMs();
+  const tableId = typeof params?.tableId === "string" ? params.tableId.trim() : "";
+  if (!tableId) {
+    return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing tableId"));
+  }
+  try {
+    const tableEnvelope = await runPokerStateGetTable({ tableId, asOf: params?.asOf }, "poker_state_get_table");
+    if (tableEnvelope?.ok !== true) {
+      const error = tableEnvelope?.error || {};
+      return withToolMeta(toolName, startedAtMs, makeToolFailure(
+        String(error?.code || "POKER_STATE_GET_TABLE_FAILED"),
+        String(error?.message || "Unable to read poker table state."),
+        error?.details || {},
+        error?.retryable === true
+      ));
+    }
+    const stateSnapshot = tableEnvelope?.data?.state && typeof tableEnvelope.data.state === "object" ? tableEnvelope.data.state : {};
+    const currentHandId = typeof params?.handId === "string" && params.handId.trim() ? params.handId.trim() : String(stateSnapshot?.hand?.handId || "");
+    if (!currentHandId) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("INVALID_ARGUMENTS", "Missing handId"));
+    }
+    const latestProposal = stateSnapshot?.agentProposal && typeof stateSnapshot.agentProposal === "object" ? stateSnapshot.agentProposal : null;
+    const actionKind = String(params?.actionKind || latestProposal?.actionKind || "").trim().toLowerCase();
+    const rawAmountOil = Number(params?.amountOil);
+    const fallbackAmountOil = Number(latestProposal?.amountOil || 0);
+    const amountOil = Math.max(0, Number.isFinite(rawAmountOil) ? rawAmountOil : Number.isFinite(fallbackAmountOil) ? fallbackAmountOil : 0);
+    if (!actionKind) {
+      return withToolMeta(toolName, startedAtMs, makeToolFailure("POKER_ACTION_COMMIT_MISSING_PROPOSAL", "No worker proposal is available to commit.", { tableId, handId: currentHandId }));
+    }
+    const response = await apiJson(`/api/poker/play/hands/${encodeURIComponent(currentHandId)}/actions`, {
+      method: "POST",
+      body: JSON.stringify({
+        actionKind,
+        amountOil,
+        asOf: typeof params?.asOf === "string" ? params.asOf.trim() : void 0
+      })
+    });
+    return withToolMeta(toolName, startedAtMs, makeToolSuccess({
+      tableId,
+      handId: currentHandId,
+      actionKind,
+      amountOil,
+      response: unwrapPortalToolData(response)
+    }));
+  } catch (e) {
+    const message = String(e?.message || "POKER_ACTION_COMMIT_FAILED");
+    const code = normalizeToolErrorCode(message, "UNSUPPORTED");
+    return withToolMeta(toolName, startedAtMs, makeToolFailure(code, message, { tableId }));
   }
 }
 async function runAgentTownUiIntentTool(params, toolName) {
@@ -49273,6 +49633,48 @@ var LITE_TOOL_SPECS = [
     sampleArgs: { houseId: "hs_example_house" }
   },
   {
+    name: "poker_state_get_table",
+    label: "Poker State Table",
+    description: "Reads one poker table state snapshot for the bound wallet seat.",
+    sampleArgs: { tableId: "pktable_cash_01" }
+  },
+  {
+    name: "poker_state_get_hand_history",
+    label: "Poker State Hand History",
+    description: "Reads recent hand history for one poker table.",
+    sampleArgs: { tableId: "pktable_cash_01", limit: 10 }
+  },
+  {
+    name: "poker_state_get_series_timeline",
+    label: "Poker State Series Timeline",
+    description: "Reads deterministic series timeline events for one tournament series.",
+    sampleArgs: { seriesId: "pkseries_01", limit: 20 }
+  },
+  {
+    name: "poker_state_get_my_results",
+    label: "Poker State My Results",
+    description: "Reads the bound wallet's live poker results and payouts.",
+    sampleArgs: { limit: 20 }
+  },
+  {
+    name: "poker_thread_post_note",
+    label: "Poker Thread Post Note",
+    description: "Posts a private human+agent note to the seat thread for the live hand.",
+    sampleArgs: { handId: "pkhand_01", body: "I want to pressure the cutoff open here." }
+  },
+  {
+    name: "poker_action_propose",
+    label: "Poker Action Propose",
+    description: "Builds a legal worker-backed seat proposal and optionally persists it.",
+    sampleArgs: { tableId: "pktable_cash_01", handId: "pkhand_01", persist: true }
+  },
+  {
+    name: "poker_action_commit",
+    label: "Poker Action Commit",
+    description: "Commits a worker proposal or explicit legal action to the live hand.",
+    sampleArgs: { tableId: "pktable_cash_01", handId: "pkhand_01", actionKind: "call", amountOil: 100 }
+  },
+  {
     name: "agent_town_ui_open_modal",
     label: "Agent Town UI Open Modal",
     description: "Opens a whitelisted app modal without route replacement.",
@@ -49597,6 +49999,34 @@ async function dispatchLiteTool(name, params, _signal, _onUpdate, toolCallId = n
     case "agent_town_state_get_pony_inbox": {
       const envelope = await runAgentTownStateGetPonyInbox(params || {}, "agent_town_state_get_pony_inbox");
       return envelopeToToolResult(envelope, "agent_town_state_get_pony_inbox");
+    }
+    case "poker_state_get_table": {
+      const envelope = await runPokerStateGetTable(params || {}, "poker_state_get_table");
+      return envelopeToToolResult(envelope, "poker_state_get_table");
+    }
+    case "poker_state_get_hand_history": {
+      const envelope = await runPokerStateGetHandHistory(params || {}, "poker_state_get_hand_history");
+      return envelopeToToolResult(envelope, "poker_state_get_hand_history");
+    }
+    case "poker_state_get_series_timeline": {
+      const envelope = await runPokerStateGetSeriesTimeline(params || {}, "poker_state_get_series_timeline");
+      return envelopeToToolResult(envelope, "poker_state_get_series_timeline");
+    }
+    case "poker_state_get_my_results": {
+      const envelope = await runPokerStateGetMyResults(params || {}, "poker_state_get_my_results");
+      return envelopeToToolResult(envelope, "poker_state_get_my_results");
+    }
+    case "poker_thread_post_note": {
+      const envelope = await runPokerThreadPostNote(params || {}, "poker_thread_post_note");
+      return envelopeToToolResult(envelope, "poker_thread_post_note");
+    }
+    case "poker_action_propose": {
+      const envelope = await runPokerActionPropose(params || {}, "poker_action_propose");
+      return envelopeToToolResult(envelope, "poker_action_propose");
+    }
+    case "poker_action_commit": {
+      const envelope = await runPokerActionCommit(params || {}, "poker_action_commit");
+      return envelopeToToolResult(envelope, "poker_action_commit");
     }
     case "agent_town_ui_open_modal":
     case "agent_town_ui_atlas_search":
@@ -54335,6 +54765,76 @@ ${extraContext}` : text;
       const result = await runHttpRequest(msg.params || {}, "http_request");
       post({
         type: "worker.tools.httpRequest",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.state.getTable") {
+      const result = await runPokerStateGetTable(msg.params || {}, "poker_state_get_table");
+      post({
+        type: "worker.tools.poker.state.getTable",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.state.getHandHistory") {
+      const result = await runPokerStateGetHandHistory(msg.params || {}, "poker_state_get_hand_history");
+      post({
+        type: "worker.tools.poker.state.getHandHistory",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.state.getSeriesTimeline") {
+      const result = await runPokerStateGetSeriesTimeline(msg.params || {}, "poker_state_get_series_timeline");
+      post({
+        type: "worker.tools.poker.state.getSeriesTimeline",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.state.getMyResults") {
+      const result = await runPokerStateGetMyResults(msg.params || {}, "poker_state_get_my_results");
+      post({
+        type: "worker.tools.poker.state.getMyResults",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.thread.postNote") {
+      const result = await runPokerThreadPostNote(msg.params || {}, "poker_thread_post_note");
+      post({
+        type: "worker.tools.poker.thread.postNote",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.action.propose") {
+      const result = await runPokerActionPropose(msg.params || {}, "poker_action_propose");
+      post({
+        type: "worker.tools.poker.action.propose",
+        requestId: String(msg.requestId || ""),
+        ok: true,
+        result
+      });
+      return;
+    }
+    if (msg.type === "gateway.command.tools.poker.action.commit") {
+      const result = await runPokerActionCommit(msg.params || {}, "poker_action_commit");
+      post({
+        type: "worker.tools.poker.action.commit",
         requestId: String(msg.requestId || ""),
         ok: true,
         result

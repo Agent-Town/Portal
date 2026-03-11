@@ -1,7 +1,7 @@
 {
   "vendorPath": "vendors/openclaw-lite-main",
   "vendorVersion": "1.2.0",
-  "builtAt": "2026-03-07T18:51:23.299Z",
+  "builtAt": "2026-03-11T14:54:29.617Z",
   "copiedArtifacts": [
     "gateway.js",
     "gateway.js.map",
@@ -15,6 +15,7 @@
     "crypto.js",
     "encoding.js",
     "idb.js",
+    "poker-seat-agent.js",
     "session-transcript-repair-lite.js",
     "vfs.js"
   ]

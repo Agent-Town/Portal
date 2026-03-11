@@ -2,7 +2,7 @@
 
 Status: Active  
 Audience: Engineering only
-Last updated: 2026-02-22
+Last updated: 2026-03-11
 
 ## Goal
 
@@ -91,6 +91,7 @@ Keep `skill.md` evolution testable as we:
 | Trainer namespace Web Experience parity | `public/trainer_namespace_plugin.js`, `public/trainer.js`, `server/index.js` | `trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept `webSessionId` and preserve backend `invocationId` / `evidenceId` parity with `/api/web/*` | `e2e/127_web_approval_roundtrip.spec.js` (`trainer namespace webSessionId bridge matches /api/web/* evidence and idempotent invocation ids`) |
 | Experience UI intent tools (modal open / Atlas search / Registry search / Poker modal / Pony compose) | `public/skill.md`, `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | worker tools `agent_town_ui_open_modal`, `agent_town_ui_atlas_search`, `agent_town_ui_registry_search`, `agent_town_ui_pony_compose` dispatch through strict browser intent whitelist; Poker stays modal-first via the hub iframe/embed route so worker continuity is preserved without arbitrary DOM access | `e2e/108_experience_intent_open_modal.spec.js`, `e2e/109_experience_intent_atlas_search.spec.js`, `e2e/110_experience_intent_pony_compose.spec.js`, `e2e/130_registry_tool_projection_compat.spec.js`, `e2e/166_poker_modal_embed_policy.spec.js` |
 | Experience intent continuity + policy guards | `public/app.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js` | deterministic intent envelope + trace, team/worker continuity under multi-intent flow, deterministic rejection codes (`UI_INTENT_UNKNOWN`, `UI_INTENT_INVALID_PARAM`, `CONFIRMATION_REQUIRED`) | `e2e/111_experience_intent_worker_continuity.spec.js`, `e2e/112_experience_intent_policy_negative.spec.js` |
+| Poker worker seat-agent tools and debug visibility | `public/skill.md`, `public/poker.js`, `public/app.js`, `server/poker_routes.js`, `server/poker_play_service.js`, `vendors/openclaw-lite-main/src/openclaw-lite/gateway.js`, `vendors/openclaw-lite-main/src/openclaw-lite/worker.js` | native worker tools `poker_state_get_table`, `poker_state_get_hand_history`, `poker_state_get_series_timeline`, `poker_state_get_my_results`, `poker_thread_post_note`, `poker_action_propose`, `poker_action_commit` drive seat-private poker proposals through the worker path; parent agent debug tabs expose the tools and traffic when Poker runs inside the hub modal | `e2e/222_poker_play_worker_agent_contract.spec.js`, `e2e/223_poker_play_worker_agent_ui.spec.js`, `e2e/224_poker_play_worker_agent_eval_contract.spec.js` |
 
 ## Progress Log
 
@@ -98,6 +99,11 @@ Keep `skill.md` evolution testable as we:
 
 - Added deterministic compiled-pack bridge coverage for the default Portal skill so runtime imports use `/__compiled/default-skill-pack/skill.md` while `public/skill.md` remains the external source of truth.
 - Documented the new internal pack manifest route in `specs/02_api_contract.md` and verified hash-pinned companion files (`manual/skill.md`, `heartbeat.md`, `tools.md`, `trace_map.json`).
+
+### 2026-03-11
+
+- Added native worker-backed poker seat-agent tool contracts and modal debug visibility coverage (`e2e/222` to `e2e/224`).
+- Kept Poker proposals seat-private by persisting worker proposals through poker audit/message surfaces instead of public rail or opponent payloads.
 
 ### 2026-02-26
 

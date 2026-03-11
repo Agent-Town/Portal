@@ -282,6 +282,32 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - If params are invalid, return/expect deterministic `UI_INTENT_INVALID_PARAM`.
 - Irreversible intents require approval and return `CONFIRMATION_REQUIRED` when missing approval.
 
+## Poker worker tools
+
+When running in the in-browser OpenClaw Lite runtime, prefer native poker tools over backend-generated seat advice.
+
+- `poker_state_get_table`
+  - Reads `/api/poker/play/tables/:tableId` with worker seat-agent mode enabled for the bound wallet seat.
+- `poker_state_get_hand_history`
+  - Reads recent hand history for one table from `/api/poker/play/tables/:tableId/history`.
+- `poker_state_get_series_timeline`
+  - Reads deterministic series timeline rows from `/api/poker/play/series/:seriesId/timeline`.
+- `poker_state_get_my_results`
+  - Reads the bound wallet's live poker results from `/api/poker/play/results/me`.
+- `poker_thread_post_note`
+  - Posts a seat-private note to `/api/poker/play/hands/:handId/messages`.
+- `poker_action_propose`
+  - Produces a legal worker-backed seat proposal and can persist it to `/api/poker/play/hands/:handId/proposals`.
+- `poker_action_commit`
+  - Commits a worker proposal or explicit legal action to `/api/poker/play/hands/:handId/actions`.
+
+### Poker seat-agent policy
+
+- Prefer worker-backed poker proposals over backend heuristic seat advice whenever the runtime is available.
+- Never propose an action that is not present in `viewerAllowedActions`.
+- Never commit a poker action without server confirmation.
+- Keep seat-private poker thread notes and worker proposal text private to the acting seat.
+
 ## Trainer bridge for Web sessions
 
 - `trainer.invoke_action`, `trainer.list_evidence`, and `trainer.get_session_context` accept optional `webSessionId`.

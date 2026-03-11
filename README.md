@@ -83,6 +83,11 @@ npm run verify:route-modules
 npm run verify:platform-export
 ```
 
+Opt-in poker seat-agent benchmark:
+```bash
+npm run eval:poker-seat-agent
+```
+
 Requirements for the live Privy smoke:
 - set `PRIVY_APP_ID` in `.env` or `.env.local`
 - set `PRIVY_LOGIN_METHOD=guest` to avoid OTP during Playwright

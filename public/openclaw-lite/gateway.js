@@ -1316,6 +1316,69 @@ async function init() {
       if (!res?.ok) throw new Error(String(res?.error || "HTTP_REQUEST_FAILED"));
       return res.result || null;
     },
+    async pokerStateGetTableTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.state.getTable",
+        responseType: "worker.tools.poker.state.getTable",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_STATE_GET_TABLE_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerStateGetHandHistoryTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.state.getHandHistory",
+        responseType: "worker.tools.poker.state.getHandHistory",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_STATE_GET_HAND_HISTORY_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerStateGetSeriesTimelineTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.state.getSeriesTimeline",
+        responseType: "worker.tools.poker.state.getSeriesTimeline",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_STATE_GET_SERIES_TIMELINE_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerStateGetMyResultsTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.state.getMyResults",
+        responseType: "worker.tools.poker.state.getMyResults",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_STATE_GET_MY_RESULTS_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerThreadPostNoteTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.thread.postNote",
+        responseType: "worker.tools.poker.thread.postNote",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_THREAD_POST_NOTE_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerActionProposeTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.action.propose",
+        responseType: "worker.tools.poker.action.propose",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_ACTION_PROPOSE_TOOL_FAILED"));
+      return res.result || null;
+    },
+    async pokerActionCommitTool(params = {}) {
+      const res = await sendWorkerRequest({
+        requestType: "gateway.command.tools.poker.action.commit",
+        responseType: "worker.tools.poker.action.commit",
+        payload: { params }
+      });
+      if (!res?.ok) throw new Error(String(res?.error || "POKER_ACTION_COMMIT_TOOL_FAILED"));
+      return res.result || null;
+    },
     async agentTownCeremonyCommit(params = {}) {
       const res = await sendWorkerRequest({
         requestType: "gateway.command.tools.agentTownCeremonyCommit",
@@ -1664,6 +1727,13 @@ async function init() {
   gatewayEvents.permissionPolicyGet = permissionPolicyGetRequest;
   gatewayEvents.permissionPolicySet = permissionPolicySetRequest;
   gatewayEvents.permissionPolicyClear = permissionPolicyClearRequest;
+  gatewayEvents.pokerStateGetTableTool = (params = {}) => window.__openclawLiteTest.pokerStateGetTableTool(params);
+  gatewayEvents.pokerStateGetHandHistoryTool = (params = {}) => window.__openclawLiteTest.pokerStateGetHandHistoryTool(params);
+  gatewayEvents.pokerStateGetSeriesTimelineTool = (params = {}) => window.__openclawLiteTest.pokerStateGetSeriesTimelineTool(params);
+  gatewayEvents.pokerStateGetMyResultsTool = (params = {}) => window.__openclawLiteTest.pokerStateGetMyResultsTool(params);
+  gatewayEvents.pokerThreadPostNoteTool = (params = {}) => window.__openclawLiteTest.pokerThreadPostNoteTool(params);
+  gatewayEvents.pokerActionProposeTool = (params = {}) => window.__openclawLiteTest.pokerActionProposeTool(params);
+  gatewayEvents.pokerActionCommitTool = (params = {}) => window.__openclawLiteTest.pokerActionCommitTool(params);
   gatewayEvents.invokeExperienceTool = (payload = {}) => invokeExperienceTool({
     tool: payload?.tool,
     params: payload?.params,

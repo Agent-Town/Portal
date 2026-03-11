@@ -2860,6 +2860,17 @@ function getActivePokerPlaySeatByWalletSubject(walletSubject) {
   return hydratePokerPlaySeat(row);
 }
 
+function listPokerPlaySeatsByWalletSubject(walletSubject, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_seats
+    WHERE wallet_subject = ?
+    ORDER BY updated_at DESC, created_at DESC, table_id DESC
+    LIMIT ?
+  `).all(walletSubject, Math.max(1, Number(limit || 100)));
+  return rows.map(hydratePokerPlaySeat).filter(Boolean);
+}
+
 function upsertPokerPlaySeat({
   tableId,
   seatNumber,
@@ -2982,6 +2993,17 @@ function getCurrentPokerPlayHandForTable(tableId) {
     LIMIT 1
   `).get(tableId);
   return hydratePokerPlayHand(row);
+}
+
+function listPokerPlayHandsByTable(tableId, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_hands
+    WHERE table_id = ?
+    ORDER BY hand_number DESC, created_at DESC
+    LIMIT ?
+  `).all(tableId, Math.max(1, Number(limit || 100)));
+  return rows.map(hydratePokerPlayHand).filter(Boolean);
 }
 
 function upsertPokerPlayHand({
@@ -3819,7 +3841,9 @@ module.exports = {
   listPokerPlayDisputesByHand,
   listPokerPlayDisputesByTable,
   listPokerPlayDisputesByWalletSubject,
+  listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
   listPokerSeasons,

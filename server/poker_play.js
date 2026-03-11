@@ -366,6 +366,132 @@ function createActionDeadline(nowIso, countdownSeconds) {
   return new Date(startMs + (Math.max(5, normalizeOilAmount(countdownSeconds, DEFAULT_PLAY_ACTION_COUNTDOWN_SECONDS)) * 1000)).toISOString();
 }
 
+function normalizeSeatList(seatNumbers) {
+  return Array.from(new Set((Array.isArray(seatNumbers) ? seatNumbers : []).map((seat) => normalizeSeatNumber(seat)).filter(Boolean))).sort((a, b) => a - b);
+}
+
+function clockwiseSeatOrderFromButton(seatNumbers, buttonSeat) {
+  const ordered = normalizeSeatList(seatNumbers);
+  if (!ordered.length) return [];
+  const startSeat = nextOccupiedSeat(ordered, normalizeSeatNumber(buttonSeat), { wrap: true }) || ordered[0];
+  return buildSeatOrder(ordered, startSeat);
+}
+
+function buildMatchedPotSlices(state) {
+  const seatStates = Object.values(state?.seatStates || {})
+    .map((seatState) => normalizeSeatState(seatState, seatState?.seatNumber))
+    .filter((seatState) => seatState.seatNumber && normalizeOilAmount(seatState.committedHandOil, 0) > 0)
+    .sort((left, right) => {
+      const delta = normalizeOilAmount(left?.committedHandOil, 0) - normalizeOilAmount(right?.committedHandOil, 0);
+      if (delta !== 0) return delta;
+      return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+    });
+  if (!seatStates.length) {
+    return {
+      potSlices: [],
+      returnedUncalledBySeat: {},
+    };
+  }
+
+  const levels = Array.from(new Set(seatStates.map((seatState) => normalizeOilAmount(seatState.committedHandOil, 0)).filter((amount) => amount > 0))).sort((a, b) => a - b);
+  let previousLevel = 0;
+  const potSlices = [];
+  const returnedUncalledBySeat = {};
+
+  for (const level of levels) {
+    const contributors = seatStates.filter((seatState) => normalizeOilAmount(seatState.committedHandOil, 0) >= level);
+    const perSeatContributionOil = Math.max(0, level - previousLevel);
+    const totalOil = perSeatContributionOil * contributors.length;
+    previousLevel = level;
+    if (!totalOil || !contributors.length) continue;
+    if (contributors.length === 1) {
+      const seatNumber = normalizeSeatNumber(contributors[0]?.seatNumber);
+      if (seatNumber) {
+        returnedUncalledBySeat[String(seatNumber)] = normalizeOilAmount(returnedUncalledBySeat[String(seatNumber)], 0) + totalOil;
+      }
+      continue;
+    }
+    const contributorSeatNumbers = contributors.map((seatState) => normalizeSeatNumber(seatState.seatNumber)).filter(Boolean).sort((a, b) => a - b);
+    const eligibleSeatNumbers = contributors
+      .filter((seatState) => seatState.folded !== true)
+      .map((seatState) => normalizeSeatNumber(seatState.seatNumber))
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+    potSlices.push({
+      potIndex: potSlices.length + 1,
+      potKind: potSlices.length === 0 ? 'main' : 'side',
+      capOil: level,
+      perSeatContributionOil,
+      totalOil,
+      contributorSeatNumbers,
+      eligibleSeatNumbers,
+      winningSeatNumbers: [],
+      oddChipSeatNumbers: [],
+      payoutBySeat: {},
+    });
+  }
+
+  return {
+    potSlices,
+    returnedUncalledBySeat,
+  };
+}
+
+function applyReturnedUncalledChips(state, returnedUncalledBySeat) {
+  const returns = returnedUncalledBySeat && typeof returnedUncalledBySeat === 'object' ? returnedUncalledBySeat : {};
+  for (const [seatNumberRaw, amountRaw] of Object.entries(returns)) {
+    const seatNumber = normalizeSeatNumber(seatNumberRaw);
+    const amount = normalizeOilAmount(amountRaw, 0);
+    if (!seatNumber || amount <= 0) continue;
+    const seatState = state?.seatStates?.[String(seatNumber)];
+    if (!seatState) continue;
+    seatState.stackOil += amount;
+    seatState.committedHandOil = Math.max(0, normalizeOilAmount(seatState.committedHandOil, 0) - amount);
+    seatState.committedStreetOil = Math.max(0, normalizeOilAmount(seatState.committedStreetOil, 0) - amount);
+    seatState.allIn = seatState.stackOil <= 0;
+  }
+}
+
+function distributeMatchedPot(totalOil, winners, buttonSeat) {
+  const winningSeatNumbers = normalizeSeatList(winners);
+  if (!winningSeatNumbers.length) {
+    return {
+      payoutBySeat: {},
+      oddChipSeatNumbers: [],
+    };
+  }
+  const payoutBySeat = {};
+  const baseAmount = Math.floor(Math.max(0, normalizeOilAmount(totalOil, 0)) / winningSeatNumbers.length);
+  let remainder = Math.max(0, normalizeOilAmount(totalOil, 0) - (baseAmount * winningSeatNumbers.length));
+  for (const seatNumber of winningSeatNumbers) {
+    payoutBySeat[String(seatNumber)] = baseAmount;
+  }
+  const oddChipSeatNumbers = [];
+  const clockwiseWinners = clockwiseSeatOrderFromButton(winningSeatNumbers, buttonSeat);
+  for (const seatNumber of clockwiseWinners) {
+    if (remainder <= 0) break;
+    payoutBySeat[String(seatNumber)] = normalizeOilAmount(payoutBySeat[String(seatNumber)], 0) + 1;
+    oddChipSeatNumbers.push(seatNumber);
+    remainder -= 1;
+  }
+  return {
+    payoutBySeat,
+    oddChipSeatNumbers,
+  };
+}
+
+function summarizePotSliceWinners(potSlices) {
+  const uniqueWinners = normalizeSeatList((Array.isArray(potSlices) ? potSlices : []).flatMap((slice) => slice?.winningSeatNumbers || []));
+  if (!uniqueWinners.length) return 'Hand ended without an eligible winner.';
+  if (uniqueWinners.length === 1 && Number(Array.isArray(potSlices) ? potSlices.length : 0) <= 1) {
+    return `Seat ${uniqueWinners[0]} wins the pot.`;
+  }
+  if (uniqueWinners.length === 1) {
+    return `Seat ${uniqueWinners[0]} wins ${Number(potSlices.length || 0)} matched pots.`;
+  }
+  return `${Number(potSlices.length || 0)} matched pots were awarded across seats ${uniqueWinners.join(', ')}.`;
+}
+
 function buildPendingOrder(state, startSeat, seatNumbers) {
   const canAct = (Array.isArray(seatNumbers) ? seatNumbers : actingSeatNumbersFromState(state))
     .filter((seatNumber) => {
@@ -420,16 +546,28 @@ function finalizeSettledState(state, result) {
 
 function settleByFold(state) {
   const next = cloneJson(state, {});
+  const { potSlices, returnedUncalledBySeat } = buildMatchedPotSlices(next);
+  applyReturnedUncalledChips(next, returnedUncalledBySeat);
+  next.potOil = potSlices.reduce((sum, slice) => sum + normalizeOilAmount(slice?.totalOil, 0), 0);
   const survivingSeats = nonFoldedSeatNumbersFromState(next);
   const winnerSeat = survivingSeats[0] || 0;
-  if (winnerSeat) {
-    next.seatStates[String(winnerSeat)].stackOil += normalizeOilAmount(next.potOil, 0);
+  const payoutBySeat = {};
+  for (const slice of potSlices) {
+    slice.winningSeatNumbers = winnerSeat ? [winnerSeat] : [];
+    slice.payoutBySeat = winnerSeat ? { [String(winnerSeat)]: normalizeOilAmount(slice.totalOil, 0) } : {};
+    slice.oddChipSeatNumbers = [];
+    if (winnerSeat) {
+      next.seatStates[String(winnerSeat)].stackOil += normalizeOilAmount(slice.totalOil, 0);
+      payoutBySeat[String(winnerSeat)] = normalizeOilAmount(payoutBySeat[String(winnerSeat)], 0) + normalizeOilAmount(slice.totalOil, 0);
+    }
   }
   return finalizeSettledState(next, {
     type: 'walk',
     winningSeatNumbers: winnerSeat ? [winnerSeat] : [],
-    payoutBySeat: winnerSeat ? { [winnerSeat]: normalizeOilAmount(next.potOil, 0) } : {},
+    payoutBySeat,
     handLabelsBySeat: {},
+    potSlices,
+    returnedUncalledBySeat,
     note: winnerSeat ? `Seat ${winnerSeat} wins uncontested.` : 'Hand ended without an eligible winner.',
   });
 }
@@ -465,16 +603,37 @@ function settleByShowdown(state) {
   }
 
   winners.sort((a, b) => a - b);
-  const pot = normalizeOilAmount(next.potOil, 0);
+  const { potSlices, returnedUncalledBySeat } = buildMatchedPotSlices(next);
+  applyReturnedUncalledChips(next, returnedUncalledBySeat);
+  next.potOil = potSlices.reduce((sum, slice) => sum + normalizeOilAmount(slice?.totalOil, 0), 0);
   const payoutBySeat = {};
-  if (winners.length) {
-    const base = Math.floor(pot / winners.length);
-    let remainder = pot - (base * winners.length);
-    for (const seatNumber of winners) {
-      const payout = base + (remainder > 0 ? 1 : 0);
-      remainder = Math.max(0, remainder - 1);
-      payoutBySeat[String(seatNumber)] = payout;
-      next.seatStates[String(seatNumber)].stackOil += payout;
+
+  for (const slice of potSlices) {
+    const eligibleWinners = normalizeSeatList(slice.eligibleSeatNumbers);
+    if (!eligibleWinners.length) continue;
+    let sliceBest = null;
+    let sliceWinningSeats = [];
+    for (const seatNumber of eligibleWinners) {
+      const evaluation = evaluations[String(seatNumber)];
+      if (!evaluation) continue;
+      if (!sliceBest || compareScoreArrays(evaluation.score, sliceBest.score) > 0) {
+        sliceBest = evaluation;
+        sliceWinningSeats = [seatNumber];
+      } else if (sliceBest && compareScoreArrays(evaluation.score, sliceBest.score) === 0) {
+        sliceWinningSeats.push(seatNumber);
+      }
+    }
+    sliceWinningSeats = normalizeSeatList(sliceWinningSeats);
+    slice.winningSeatNumbers = sliceWinningSeats;
+    const distribution = distributeMatchedPot(slice.totalOil, sliceWinningSeats, next.buttonSeat);
+    slice.payoutBySeat = distribution.payoutBySeat;
+    slice.oddChipSeatNumbers = distribution.oddChipSeatNumbers;
+    for (const [seatNumberRaw, amountRaw] of Object.entries(distribution.payoutBySeat)) {
+      const seatNumber = normalizeSeatNumber(seatNumberRaw);
+      const amount = normalizeOilAmount(amountRaw, 0);
+      if (!seatNumber || amount <= 0) continue;
+      next.seatStates[String(seatNumber)].stackOil += amount;
+      payoutBySeat[String(seatNumber)] = normalizeOilAmount(payoutBySeat[String(seatNumber)], 0) + amount;
     }
   }
 
@@ -485,12 +644,12 @@ function settleByShowdown(state) {
 
   return finalizeSettledState(next, {
     type: 'showdown',
-    winningSeatNumbers: winners,
+    winningSeatNumbers: normalizeSeatList(Object.keys(payoutBySeat).map((seatNumber) => Number(seatNumber))),
     payoutBySeat,
     handLabelsBySeat,
-    note: winners.length === 1
-      ? `Seat ${winners[0]} wins at showdown with ${handLabelsBySeat[String(winners[0])] || 'the best hand'}.`
-      : `Split pot between seats ${winners.join(', ')}.`,
+    potSlices,
+    returnedUncalledBySeat,
+    note: summarizePotSliceWinners(potSlices),
   });
 }
 

@@ -10,6 +10,7 @@
   let liveTableStream = null;
   let liveTableStreamKey = '';
   let liveTableRefreshInFlight = false;
+  let pokerRuntimeGatewayPromise = null;
 
   function setTitle(title, subtitle) {
     if (titleEl) titleEl.textContent = title;
@@ -40,6 +41,46 @@
       parsed.searchParams.set('embed', '1');
     }
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  }
+
+  function getParentRuntimeGateway() {
+    try {
+      if (window.parent && window.parent !== window && window.parent.location?.origin === window.location.origin) {
+        return window.parent.AgentTownRuntimeGateway || null;
+      }
+    } catch {
+      // ignore cross-window access failures
+    }
+    return null;
+  }
+
+  async function getPokerRuntimeGateway() {
+    const parentGateway = getParentRuntimeGateway();
+    if (parentGateway) return parentGateway;
+    if (window.__AGENT_TOWN_POKER_GATEWAY__) return window.__AGENT_TOWN_POKER_GATEWAY__;
+    if (!pokerRuntimeGatewayPromise) {
+      pokerRuntimeGatewayPromise = import('/openclaw-lite/gateway.js')
+        .then((module) => module?.default || module)
+        .then(async (gateway) => (gateway instanceof Promise ? await gateway : gateway))
+        .then((gateway) => {
+          window.__AGENT_TOWN_POKER_GATEWAY__ = gateway || null;
+          return gateway || null;
+        })
+        .catch(() => null);
+    }
+    return await pokerRuntimeGatewayPromise;
+  }
+
+  function shouldUseWorkerSeatAgentMode() {
+    return !!(getParentRuntimeGateway() || window.__AGENT_TOWN_POKER_GATEWAY__);
+  }
+
+  function buildPlayTableApiPath(tableId, { rail = false } = {}) {
+    const base = rail
+      ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}`
+      : `/api/poker/play/tables/${encodeURIComponent(tableId)}`;
+    if (rail || !shouldUseWorkerSeatAgentMode()) return base;
+    return `${base}?seatAgentMode=worker`;
   }
 
   function readWalletRecoveryKey() {
@@ -241,6 +282,49 @@
           </div>
         `).join('')}
       </div>
+    `;
+  }
+
+  function renderReturnedUncalledSummary(returnedUncalledBySeat) {
+    const entries = Object.entries(returnedUncalledBySeat && typeof returnedUncalledBySeat === 'object' ? returnedUncalledBySeat : {})
+      .map(([seatNumber, amountOil]) => ({
+        seatNumber: Number(seatNumber || 0),
+        amountOil: Number(amountOil || 0),
+      }))
+      .filter((entry) => entry.seatNumber > 0 && entry.amountOil > 0);
+    if (!entries.length) return '';
+    return `
+      <div class="pokerLabel">Returned Uncalled Chips</div>
+      <div class="pokerStack">
+        ${entries.map((entry) => `
+          <div class="pokerRow">
+            <span>${escapeHtml(`Seat ${entry.seatNumber}`)}</span>
+            <span>${escapeHtml(`${entry.amountOil} OIL`)}</span>
+            <span>returned</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderMatchedPots(result) {
+    const slices = Array.isArray(result?.potSlices) ? result.potSlices : [];
+    if (!slices.length) return '';
+    return `
+      <div class="pokerLabel">Matched Pots</div>
+      <div id="pokerMatchedPots" class="pokerStack">
+        ${slices.map((slice) => `
+          <div class="pokerMessage" data-pot-kind="${escapeHtml(slice.potKind || 'pot')}">
+            <div class="pokerLabel">${escapeHtml(`${slice.potKind || 'pot'} pot · ${Number(slice.totalOil || 0)} OIL`)}</div>
+            <div>${escapeHtml(`Eligible seats: ${(Array.isArray(slice.eligibleSeatNumbers) ? slice.eligibleSeatNumbers : []).join(', ') || 'none'}`)}</div>
+            <div>${escapeHtml(`Winning seats: ${(Array.isArray(slice.winningSeatNumbers) ? slice.winningSeatNumbers : []).join(', ') || 'none'}`)}</div>
+            ${Array.isArray(slice.oddChipSeatNumbers) && slice.oddChipSeatNumbers.length
+              ? `<div>${escapeHtml(`Odd chip: seat ${slice.oddChipSeatNumbers.join(', seat ')}`)}</div>`
+              : ''}
+          </div>
+        `).join('')}
+      </div>
+      ${renderReturnedUncalledSummary(result?.returnedUncalledBySeat)}
     `;
   }
 
@@ -1026,6 +1110,7 @@
           ${renderSummaryMetric('Pot', `${Number(hand.potOil || 0)} OIL`)}
           ${renderSummaryMetric('Street', hand.street || 'preflop')}
           ${renderSummaryMetric('Acting Seat', hand.actingSeat ? `Seat ${Number(hand.actingSeat || 0)}` : 'none')}
+          ${mySeat ? renderSummaryMetric('Time Bank', `${Number(hand.timeBankRemainingSeconds || 0)}s`) : ''}
         </div>
         <div class="pokerSplit">
           <div>
@@ -1041,11 +1126,33 @@
             <div>${escapeHtml(hand?.result?.note || 'Hand is live.')}</div>
           </div>
         </div>
+        ${renderMatchedPots(hand?.result)}
         ${seats.some((seat) => seat.isActing && seat.presenceStatus === 'disconnected') ? '<p>The acting seat is disconnected. The reconnect grace window is holding the clock before timeout action takes over.</p>' : ''}
       `);
     }
 
-    if (data?.suggestion && mySeat) {
+    if (!publicRail && !adminClosed && mySeat && hand) {
+      const proposal = data?.agentProposal && typeof data.agentProposal === 'object' ? data.agentProposal : null;
+      cards.push(`
+        <h2>Worker Seat Agent</h2>
+        ${proposal
+          ? `
+            <div class="pokerSummary">
+              ${renderSummaryMetric('Action', proposal.actionKind || 'hold')}
+              ${renderSummaryMetric('Amount', `${Number(proposal.amountOil || 0)} OIL`)}
+              ${renderSummaryMetric('Confidence', proposal.confidence || 'medium')}
+            </div>
+            <p>${escapeHtml(proposal.body || 'No worker proposal body recorded.')}</p>
+          `
+          : '<p>No worker proposal is persisted for this hand yet. Request one from the in-browser worker to keep the strategic line on the runtime path.</p>'}
+        <div class="pokerLinks">
+          <button id="pokerSeatAgentProposeButton" class="pokerButton" type="button">Request Worker Line</button>
+          ${proposal ? '<button id="pokerSeatAgentCommitButton" class="pokerButton" type="button">Commit Worker Action</button>' : ''}
+        </div>
+      `);
+    }
+
+    if (data?.suggestion && mySeat && !data?.agentProposal) {
       cards.push(`
         <h2>Your Agent Line</h2>
         <p>${escapeHtml(data.suggestion.body || 'No suggestion yet.')}</p>
@@ -1127,6 +1234,7 @@
             Amount OIL
             <input id="pokerPlayActionAmount" type="number" min="0" value="${Number(hand.minRaiseToOil || hand.requiredCallOil || 0)}">
           </label>
+          ${hand.canUseTimeBank ? `<button id="pokerPlayTimeBankButton" class="pokerButton" type="button">Use Time Bank (+${Number(hand.timeBankRemainingSeconds || 0)}s)</button>` : ''}
           <button class="pokerButton" type="submit">Submit Action</button>
         </form>
       `);
@@ -1248,6 +1356,21 @@
 
   function bindPlayActionForm(tableId, handId) {
     const form = document.getElementById('pokerPlayActionForm');
+    const timeBankButton = document.getElementById('pokerPlayTimeBankButton');
+    if (timeBankButton && handId) {
+      timeBankButton.addEventListener('click', async () => {
+        setStatus('Using time bank...');
+        try {
+          await api(`/api/poker/play/hands/${encodeURIComponent(handId)}/timebank`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Time bank failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
     if (!form || !handId) return;
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -1265,6 +1388,49 @@
         setStatus(`Action failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindWorkerSeatAgentControls(tableId, handId) {
+    const proposeButton = document.getElementById('pokerSeatAgentProposeButton');
+    if (proposeButton && handId) {
+      proposeButton.addEventListener('click', async () => {
+        setStatus('Requesting worker seat agent line...');
+        try {
+          const gateway = await getPokerRuntimeGateway();
+          if (!gateway || typeof gateway.pokerActionProposeTool !== 'function') {
+            throw new Error('RUNTIME_NOT_READY');
+          }
+          await gateway.pokerActionProposeTool({
+            tableId,
+            handId,
+            persist: true,
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Worker proposal failed: ${err?.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    const commitButton = document.getElementById('pokerSeatAgentCommitButton');
+    if (commitButton && handId) {
+      commitButton.addEventListener('click', async () => {
+        setStatus('Committing worker action...');
+        try {
+          const gateway = await getPokerRuntimeGateway();
+          if (!gateway || typeof gateway.pokerActionCommitTool !== 'function') {
+            throw new Error('RUNTIME_NOT_READY');
+          }
+          await gateway.pokerActionCommitTool({
+            tableId,
+            handId,
+            useLatestProposal: true,
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Worker commit failed: ${err?.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function bindPlayDisputeForm(tableId, handId) {
@@ -1447,9 +1613,7 @@
   async function loadPlayTable(tableId, { silent = false, rail = false } = {}) {
     setTitle(rail ? 'Poker Rail Table' : 'Live Poker Table', rail ? `Public rail view for ${tableId}.` : `Shared 6-max table state for ${tableId}.`);
     if (!silent) setStatus('Loading live table...');
-    const payload = await api(rail
-      ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}`
-      : `/api/poker/play/tables/${encodeURIComponent(tableId)}`);
+    const payload = await api(buildPlayTableApiPath(tableId, { rail }));
     const data = payload?.data && typeof payload.data === 'object' ? { ...payload.data } : {};
     const adminToken = rail ? '' : readStoredPokerAdminToken();
     if (adminToken) {
@@ -1469,6 +1633,7 @@
       bindPlayLeaveButton(tableId);
       bindPlayMessageForm(tableId, data?.hand?.handId || '');
       bindPlayActionForm(tableId, data?.hand?.handId || '');
+      bindWorkerSeatAgentControls(tableId, data?.hand?.handId || '');
       bindPlayDisputeForm(tableId, data?.hand?.handId || '');
       bindAdminReviewActions(tableId, data?.series?.seriesId || '');
     }

@@ -8891,6 +8891,7 @@ async function initGateway() {
       gateway = await gateway;
     }
     instrumentGatewayTraffic(gateway);
+    window.AgentTownRuntimeGateway = gateway;
 
     // Subscribe to agent events
     gateway.on('message', (msg) => {
