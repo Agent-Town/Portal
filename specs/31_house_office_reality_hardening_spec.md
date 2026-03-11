@@ -1,9 +1,10 @@
 # Phase 31 Spec: House Office Reality and Hardening
 
-Status: Proposed
+Status: Implemented
 Version: 0.1
 Audience: product, frontend, backend, UX, QA, security, benchmarking, AI-agent, and architecture teams
-Implementation baseline: `codex/house-office-options-v0-1` at commit `9525d4d`
+Implementation branch: `codex/house-office-options-v0-1`
+Verification state: `e2e/205` through `e2e/213` are green, and `npm test` passed with `331 passed, 4 skipped` on 2026-03-11.
 Depends on:
 1. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)
 2. [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md)

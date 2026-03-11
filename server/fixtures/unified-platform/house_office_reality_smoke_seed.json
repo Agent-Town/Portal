@@ -1,0 +1,12 @@
+{
+  "family": "house_office_reality_smoke_seed",
+  "schema": "agent-town-house-office-reality-smoke-seed/v1",
+  "checkpoints": [
+    "structure_parity",
+    "readiness_truth",
+    "ops_family_visible",
+    "ops_citation_selection",
+    "assignment_selection",
+    "continuity"
+  ]
+}

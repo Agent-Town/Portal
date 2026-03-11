@@ -1,7 +1,8 @@
 # Phase 33 Spec: Detailed AI-Agent Runbook for House Office Reality and Hardening
 
-Status: Proposed
+Status: Completed
 Version: 0.1
+Verification state: `T32.0` through `T32.8` are implemented, `e2e/205` through `e2e/213` are green, and `npm test` passed with `331 passed, 4 skipped` on 2026-03-11.
 Depends on:
 1. [specs/31_house_office_reality_hardening_spec.md](./31_house_office_reality_hardening_spec.md)
 2. [specs/32_house_office_reality_hardening_tdd_spec.md](./32_house_office_reality_hardening_tdd_spec.md)

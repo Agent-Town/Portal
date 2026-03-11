@@ -1,8 +1,9 @@
 # Phase 32 Spec: House Office Reality and Hardening (Contracts First, TDD)
 
-Status: Proposed
+Status: Implemented
 Version: 0.1
 Audience: frontend engineers, backend engineers, product engineers, security engineers, QA automation engineers, and AI-agent implementers
+Verification state: `e2e/205` through `e2e/213` are green, and `npm test` passed with `331 passed, 4 skipped` on 2026-03-11.
 Depends on:
 1. [specs/31_house_office_reality_hardening_spec.md](./31_house_office_reality_hardening_spec.md)
 2. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)
@@ -18,7 +19,7 @@ Implementation baseline:
 
 1. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md) is implemented.
 2. [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md) and [specs/30_house_office_extension_agent_runbook.md](./30_house_office_extension_agent_runbook.md) are implemented.
-3. This phase starts after `e2e/204_house_flow_readiness_contract.spec.js`.
+3. This phase starts after `e2e/204_house_flow_readiness_contract.spec.js` and is now fully implemented through `e2e/213_house_office_reality_hardening_smoke.spec.js`.
 
 Implementation constraints:
 
