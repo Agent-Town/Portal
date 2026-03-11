@@ -1,7 +1,7 @@
 # Phase 30 Spec: Detailed AI-Agent Runbook for House Office Extension
 
 Status: Implemented
-Version: 1.1
+Version: 1.2
 Depends on:
 1. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)
 2. [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md)
@@ -13,11 +13,18 @@ Purpose: convert the Phase 29 milestones into AI-agent-sized TDD work packets wi
 This is not a competing plan.
 It is the detailed execution layer for [specs/29_house_office_extension_tdd_spec.md](./29_house_office_extension_tdd_spec.md).
 
-Execution status on `codex/house-office-options-v0-1` at `5244403`:
+Execution status on `codex/house-office-options-v0-1` at `648c3c7`:
 
 1. `T29.0` through `T29.7` are implemented,
 2. all reserved House Office tests `195` through `202` are green,
-3. the runbook is now historical execution guidance plus maintenance reference for future changes to the House Office surface.
+3. follow-on maintenance proofs `203` and `204` are green,
+4. the runbook is now historical execution guidance plus maintenance reference for future changes to the House Office surface.
+
+Post-completion maintenance notes:
+
+1. `e2e/203_house_office_polish_surface.spec.js` is the first proof for visual and informational refinement beyond the minimum accepted contract.
+2. `e2e/204_house_flow_readiness_contract.spec.js` is the first proof for operational House-flow hardening and manual-validation readiness.
+3. [docs/live_lane_audit.md](../docs/live_lane_audit.md) now carries the House-flow manual-validation guidance that sits alongside the deterministic House Office TDD block.
 
 ## 1. How AI Agents Must Use This Runbook
 

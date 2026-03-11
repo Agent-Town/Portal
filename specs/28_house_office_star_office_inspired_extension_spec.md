@@ -1,9 +1,9 @@
 # Phase 28 Spec: House Office Extension Inspired by Star Office
 
 Status: Implemented
-Version: 1.1
+Version: 1.2
 Audience: product, frontend, backend, runtime, AI-agent, benchmarking, security, UX, office-planning, QA, and AI coding agents
-Implementation baseline: `codex/house-office-options-v0-1` at commit `5244403`
+Implementation baseline: `codex/house-office-options-v0-1` at commit `648c3c7`
 Primary external inspiration:
 1. `https://github.com/ringhyacinth/Star-Office-UI`
 2. `https://github.com/ringhyacinth/Star-Office-UI/blob/master/README.en.md`
@@ -48,9 +48,26 @@ Acceptance evidence:
 
 1. Option 2 and Option 3 milestone tests `e2e/195` through `e2e/202` are implemented and green.
 2. The late continuity-sensitive regression block covering `e2e/57`, `e2e/58`, `e2e/60`, and `e2e/72` is green on the same branch.
-3. Full deterministic suite result on the implementation baseline is `320 passed, 4 skipped`.
+3. Full deterministic suite result on the implementation baseline is `322 passed, 4 skipped`.
 4. The implementation remains inside the existing House shell and current `/api/platform/*` route family.
 5. Post-implementation polish keeps selected-office context and per-office metric chips visible without changing the House Office backend contract, covered by `e2e/203_house_office_polish_surface.spec.js`.
+6. Post-implementation hardening adds `GET /api/platform/house-readiness`, a manual-validation readiness panel in the House shell, and deterministic coverage in `e2e/204_house_flow_readiness_contract.spec.js`.
+
+# 1.2 Post-Implementation Maintenance Notes
+
+The core extension scope remains the completed `e2e/195` through `e2e/202` block.
+
+Two follow-on proofs are now part of the maintained baseline:
+
+1. `e2e/203_house_office_polish_surface.spec.js`
+   A. verifies selected-office context remains visible,
+   B. verifies per-office metric chips stay aligned with the composed overview payload.
+2. `e2e/204_house_flow_readiness_contract.spec.js`
+   A. verifies House flow blockers are surfaced before a house is attached,
+   B. verifies the House shell exposes a manual-validation checklist after attach,
+   C. verifies the readiness contract stays inside the existing `/api/platform/*` route family.
+
+Operational validation guidance for House flows is documented in [docs/live_lane_audit.md](../docs/live_lane_audit.md).
 
 # 2. Product Thesis
 
