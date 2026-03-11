@@ -450,6 +450,7 @@ Returns one live cash or tournament table payload with:
 - `data.viewerMode = "player"`
 - `data.table`
 - `data.series` for tournament tables
+- `data.waitlist`
 - `data.seats[]`
 - `data.mySeat`
 - `data.hand`
@@ -472,6 +473,13 @@ Worker seat-agent notes:
 - `data.agentProposal` is seat-private and only populated for the bound wallet seat that owns the proposal
 - rail viewers and opponent seats always receive `data.agentProposal = null`
 - worker-backed proposal payloads use `schemaVersion = "poker-seat-agent-proposal-v1"` and include `actionKind`, `amountOil`, `confidence`, `body`, `createdAt`, `handId`, `tableId`, and `seatNumber`
+
+Cash lifecycle and waitlist notes:
+- cash tables expose `data.table.summary.activeSeatCount`, `data.table.summary.openSeatCount`, `data.table.summary.waitlistCount`, and `data.table.summary.viewerWaitlistPosition`
+- `data.waitlist.count` is the number of `waiting` entries still queued for that table
+- `data.waitlist.viewerQueued` and `data.waitlist.viewerPosition` describe the bound wallet’s current queue state when it is not yet seated
+- cash-seat statuses may include `active`, `sitting_out`, `sitout_next_hand`, `away`, `away_next_hand`, and `leaving_after_hand`
+- `data.table.summary.occupancy` counts seats that still physically occupy the table, while `data.table.summary.activeSeatCount` excludes cash seats that are sitting out or away between hands
 
 ### GET `/api/poker/play/tables/:tableId/history`
 Returns recent hand history for one table with:
@@ -677,6 +685,121 @@ Failure codes:
 Tournament seat notes:
 - if a tournament hand is already live and late registration is still open, the seat is accepted with `data.mySeat.status = "registered"`
 - if late registration is closed, the route fails with `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
+
+### POST `/api/poker/play/tables/:tableId/reload`
+Debits additional offchain OIL into the bound cash-table seat between hands.
+
+Request shape:
+```json
+{
+  "amountOil": 60,
+  "asOf": "2026-03-11T08:00:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `data.mySeat.stackOil` increases by `amountOil`
+- reload is rejected while a cash hand is already live
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_RELOAD_UNAVAILABLE`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_TABLE_PAUSED`
+- `POKER_PLAY_HAND_IN_PROGRESS`
+- `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/tables/:tableId/sit-out`
+Marks the bound cash-table seat to sit out or go away, either immediately between hands or defer the state change until the current hand settles.
+
+Request shape:
+```json
+{
+  "markAway": true,
+  "asOf": "2026-03-11T08:00:30.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `markAway = false` yields `data.mySeat.status = "sitting_out"` between hands or `sitout_next_hand` during a live hand
+- `markAway = true` yields `data.mySeat.status = "away"` between hands or `away_next_hand` during a live hand
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_SIT_OUT_UNAVAILABLE`
+- `POKER_PLAY_TABLE_CLOSED`
+
+### POST `/api/poker/play/tables/:tableId/return`
+Returns the bound cash-table seat from a sit-out or away state back to `active`.
+
+Request shape:
+```json
+{
+  "asOf": "2026-03-11T08:01:30.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `data.mySeat.status` is restored to `active`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_RETURN_UNAVAILABLE`
+- `POKER_PLAY_TABLE_CLOSED`
+
+### POST `/api/poker/play/tables/:tableId/waitlist`
+Queues the bound wallet for the next open cash-table seat and reserves a future buy-in amount to be debited only if promotion succeeds.
+
+Request shape:
+```json
+{
+  "displayName": "Queue One",
+  "buyInOil": 250,
+  "asOf": "2026-03-11T10:00:30.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `data.waitlist.viewerQueued = true` and `data.waitlist.viewerPosition` reports the caller’s queue position
+- promotion only occurs once a real seat opens; if a cash-table leave happens during a live hand, promotion waits until that hand settles
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `NOT_FOUND`
+- `POKER_PLAY_WAITLIST_UNAVAILABLE`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_SEAT_ALREADY_ACTIVE`
+- `POKER_PLAY_ALREADY_SEATED`
+- `POKER_PLAY_WAITLIST_NOT_NEEDED`
+- `OIL_BALANCE_TOO_LOW`
+
+### DELETE `/api/poker/play/tables/:tableId/waitlist`
+Cancels the bound wallet’s active waitlist entry for a cash table.
+
+Response notes:
+- returns the normal player table payload
+- the cancelled entry drops out of `data.waitlist.count` immediately
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `NOT_FOUND`
 
 ### POST `/api/poker/play/matchmake`
 Finds an open live table with the same structure and seats the caller there. If no candidate exists, the server creates a new dynamic table and seats the caller into it.

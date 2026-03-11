@@ -96,7 +96,8 @@ test('M23.22: live table UI exposes player review and hidden operator resolution
 
   await expect(pageA.getByRole('heading', { name: 'Table Review' })).toBeVisible();
   await expect(pageA.getByText('Table paused: hand review')).toBeVisible();
-  await expect(pageA.getByText('Seat 1 (UI Review Alpha) · disconnect · open')).toBeVisible();
+  await expect(pageA.getByText('Latest audit event:')).toBeVisible();
+  await expect(pageA.getByText('dispute_opened')).toBeVisible();
 
   await pageA.evaluate(() => {
     window.localStorage.setItem('poker.adminToken', 'test-admin');
@@ -108,7 +109,8 @@ test('M23.22: live table UI exposes player review and hidden operator resolution
 
   await expect(pageA.getByText('Table resumed by operator.')).toBeVisible();
   await expect(pageA.getByText('Table paused: hand review')).toHaveCount(0);
-  await expect(pageA.getByText('Seat 1 (UI Review Alpha) · disconnect · resolved').first()).toBeVisible();
+  await expect(pageA.getByRole('heading', { name: 'Operator Review' })).toBeVisible();
+  await expect(pageA.getByText('No disputes on the selected hand.')).toBeVisible();
 
   await contextA.close();
   await contextB.close();

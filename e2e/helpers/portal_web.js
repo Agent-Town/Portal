@@ -180,6 +180,26 @@ async function processOilSnapshots(request, {
   return body;
 }
 
+async function fundOilWallet(request, {
+  walletSubject,
+  houseId = '',
+  amount = 0,
+} = {}) {
+  const resp = await request.post('/__test__/poker/oil/fund', {
+    headers: { 'x-test-reset': resetToken },
+    data: {
+      walletSubject,
+      houseId,
+      amount,
+    },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`OIL_FUND_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body;
+}
+
 async function runOilScheduler(request, {
   asOf,
   limit,
@@ -256,6 +276,7 @@ module.exports = {
   attachHouse,
   bindMockSolanaWallet,
   createWebSession,
+  fundOilWallet,
   getPokerSubmissionRow,
   getHouseEconomy,
   getPortalState,

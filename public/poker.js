@@ -79,8 +79,13 @@
     const base = rail
       ? `/api/poker/play/rail/tables/${encodeURIComponent(tableId)}`
       : `/api/poker/play/tables/${encodeURIComponent(tableId)}`;
-    if (rail || !shouldUseWorkerSeatAgentMode()) return base;
-    return `${base}?seatAgentMode=worker`;
+    const params = new URLSearchParams();
+    const routeParams = new URLSearchParams(window.location.search || '');
+    const asOf = String(routeParams.get('asOf') || '').trim();
+    if (asOf) params.set('asOf', asOf);
+    if (!rail && shouldUseWorkerSeatAgentMode()) params.set('seatAgentMode', 'worker');
+    const query = params.toString();
+    return query ? `${base}?${query}` : base;
   }
 
   function readWalletRecoveryKey() {
@@ -940,6 +945,7 @@
     const actions = Array.isArray(data?.actions) ? data.actions : [];
     const messages = Array.isArray(data?.messages) ? data.messages : [];
     const review = data?.review || {};
+    const waitlist = data?.waitlist || {};
     const myDisputes = Array.isArray(review?.myDisputes) ? review.myDisputes : [];
     const adminReview = data?.adminReview || null;
     const oilBalance = Number(data?.oilBalance?.balance || 0);
@@ -949,6 +955,7 @@
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
     const tableOpen = String(table?.status || 'open') === 'open';
     const canJoin = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const canWaitlist = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) <= 0 && table?.tableType === 'cash';
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
       `
@@ -972,6 +979,7 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
+          ${Number(table?.summary?.waitlistCount || 0) > 0 ? renderSummaryMetric('Waitlist', `${Number(table?.summary?.waitlistCount || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
           ${publicRail ? renderSummaryMetric('Viewer Mode', 'public rail') : renderSummaryMetric('Your OIL', `${oilBalance}`)}
           ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
@@ -1025,9 +1033,41 @@
       `);
     }
 
+    if (canWaitlist) {
+      cards.push(`
+        <h2>Waitlist</h2>
+        <p>The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.</p>
+        ${waitlist?.viewerQueued
+          ? `
+            <div class="pokerSummary">
+              ${renderSummaryMetric('Position', `${Number(waitlist?.viewerPosition || 0)}`)}
+              ${renderSummaryMetric('Queue', `${Number(waitlist?.count || 0)}`)}
+            </div>
+            <div class="pokerLinks">
+              <button id="pokerPlayLeaveWaitlistButton" class="pokerButton" type="button">Leave Waitlist</button>
+            </div>
+          `
+          : `
+            <form id="pokerPlayWaitlistForm" class="pokerForm">
+              <label>
+                Display Name
+                <input id="pokerPlayWaitlistDisplayName" maxlength="80" value="${escapeHtml(data?.houseId || 'House Seat')}">
+              </label>
+              <label>
+                Buy-In OIL
+                <input id="pokerPlayWaitlistBuyInOil" type="number" min="${Number(table?.buyInOil || 0)}" value="${Number(table?.buyInOil || 0)}">
+              </label>
+              <button class="pokerButton" type="submit">Join Waitlist</button>
+            </form>
+          `}
+      `);
+    }
+
     if (mySeat) {
       const seatStatus = formatPlaySeatStatus(mySeat.status);
       const leaveQueued = String(mySeat.status || '') === 'leaving_after_hand';
+      const seatSittingOut = String(mySeat.status || '') === 'sitting_out' || String(mySeat.status || '') === 'sitting_out_next_hand';
+      const seatAway = String(mySeat.status || '') === 'away' || String(mySeat.status || '') === 'away_next_hand';
       cards.push(`
         <h2>Your Seat</h2>
         <div class="pokerSummary">
@@ -1040,12 +1080,26 @@
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
+        ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
+        ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
         ${adminClosed ? `<p>This table was closed by an operator.${Number(table?.state?.refundedTotalOil || 0) > 0 ? ` Refunds issued: ${Number(table?.state?.refundedTotalOil || 0)} OIL total.` : ''}</p>` : ''}
         ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}</p>` : ''}
         ${adminClosed ? '' : `
           <div class="pokerLinks">
+            ${table?.tableType === 'cash' ? `<button id="pokerPlaySitOutButton" class="pokerButton" type="button"${seatSittingOut || seatAway ? ' disabled' : ''}>Sit Out Next Hand</button>` : ''}
+            ${table?.tableType === 'cash' ? `<button id="pokerPlayAwayButton" class="pokerButton" type="button"${seatAway ? ' disabled' : ''}>Mark Away</button>` : ''}
+            ${table?.tableType === 'cash' ? `<button id="pokerPlayReturnButton" class="pokerButton" type="button"${(!seatSittingOut && !seatAway) ? ' disabled' : ''}>Return To Table</button>` : ''}
             <button id="pokerPlayLeaveButton" class="pokerButton" type="button"${leaveQueued ? ' disabled' : ''}>${table?.tableType === 'cash' ? (leaveQueued ? 'Cash Out Queued' : (hand ? 'Leave After Hand' : 'Cash Out & Leave')) : 'Leave Seat'}</button>
           </div>
+          ${table?.tableType === 'cash' ? `
+            <form id="pokerPlayReloadForm" class="pokerForm">
+              <label>
+                Reload OIL
+                <input id="pokerPlayReloadAmount" type="number" min="1" value="${Number(table?.bigBlindOil || 0)}">
+              </label>
+              <button class="pokerButton" type="submit">Reload Stack</button>
+            </form>
+          ` : ''}
         `}
       `);
     }
@@ -1329,6 +1383,117 @@
         setStatus(`Leave failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindPlayReloadForm(tableId) {
+    const form = document.getElementById('pokerPlayReloadForm');
+    if (!form) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const amountOil = Number(document.getElementById('pokerPlayReloadAmount')?.value || 0);
+      if (amountOil <= 0) {
+        setStatus('Enter a reload amount greater than zero.');
+        return;
+      }
+      setStatus('Reloading seat stack...');
+      try {
+        await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/reload`, {
+          method: 'POST',
+          body: JSON.stringify({ amountOil }),
+        });
+        await loadPlayTable(tableId);
+      } catch (err) {
+        setStatus(`Reload failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindPlayLifecycleButtons(tableId) {
+    const sitOutButton = document.getElementById('pokerPlaySitOutButton');
+    if (sitOutButton) {
+      sitOutButton.addEventListener('click', async () => {
+        if (sitOutButton.disabled) return;
+        setStatus('Marking seat to sit out...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/sit-out`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Sit-out failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    const awayButton = document.getElementById('pokerPlayAwayButton');
+    if (awayButton) {
+      awayButton.addEventListener('click', async () => {
+        if (awayButton.disabled) return;
+        setStatus('Marking seat away...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/sit-out`, {
+            method: 'POST',
+            body: JSON.stringify({ markAway: true }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Away failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    const returnButton = document.getElementById('pokerPlayReturnButton');
+    if (returnButton) {
+      returnButton.addEventListener('click', async () => {
+        if (returnButton.disabled) return;
+        setStatus('Returning seat to the table...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/return`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Return failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+  }
+
+  function bindWaitlistControls(tableId) {
+    const form = document.getElementById('pokerPlayWaitlistForm');
+    if (form) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setStatus('Joining waitlist...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/waitlist`, {
+            method: 'POST',
+            body: JSON.stringify({
+              displayName: String(document.getElementById('pokerPlayWaitlistDisplayName')?.value || '').trim(),
+              buyInOil: Number(document.getElementById('pokerPlayWaitlistBuyInOil')?.value || 0),
+            }),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Waitlist failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    const leaveButton = document.getElementById('pokerPlayLeaveWaitlistButton');
+    if (leaveButton) {
+      leaveButton.addEventListener('click', async () => {
+        setStatus('Leaving waitlist...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/waitlist`, {
+            method: 'DELETE',
+            body: JSON.stringify({}),
+          });
+          await loadPlayTable(tableId);
+        } catch (err) {
+          setStatus(`Leave waitlist failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function bindPlayMessageForm(tableId, handId) {
@@ -1630,6 +1795,9 @@
     renderCards(renderPlayTableCards(data, { rail }));
     if (!rail) {
       bindPlayJoinForm(tableId);
+      bindWaitlistControls(tableId);
+      bindPlayReloadForm(tableId);
+      bindPlayLifecycleButtons(tableId);
       bindPlayLeaveButton(tableId);
       bindPlayMessageForm(tableId, data?.hand?.handId || '');
       bindPlayActionForm(tableId, data?.hand?.handId || '');

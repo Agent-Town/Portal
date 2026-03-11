@@ -413,6 +413,26 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_seats_wallet_created_idx
       ON poker_play_seats(wallet_subject, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_waitlist_entries (
+      waitlist_entry_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      portal_session_id TEXT,
+      house_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      buy_in_oil INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      promoted_seat_number INTEGER,
+      promoted_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (table_id, wallet_subject),
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_waitlist_entries_table_status_created_idx
+      ON poker_play_waitlist_entries(table_id, status, created_at ASC);
+
     CREATE TABLE IF NOT EXISTS poker_play_hands (
       hand_id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -871,6 +891,7 @@ function countTableRows(tableName) {
     'poker_centaur_actions',
     'poker_play_tables',
     'poker_play_seats',
+    'poker_play_waitlist_entries',
     'poker_play_hands',
     'poker_play_messages',
     'poker_play_actions',
@@ -908,6 +929,7 @@ function resetExtendedStore() {
     'poker_play_messages',
     'poker_play_hands',
     'poker_play_seats',
+    'poker_play_waitlist_entries',
     'poker_play_tables',
     'poker_oil_ledger_entries',
     'poker_oil_snapshot_events',
@@ -2963,6 +2985,123 @@ function deletePokerPlaySeat(tableId, seatNumber) {
   `).run(tableId, Number(seatNumber || 0));
 }
 
+function hydratePokerPlayWaitlistEntry(row) {
+  if (!row) return null;
+  return {
+    waitlistEntryId: row.waitlist_entry_id,
+    tableId: row.table_id,
+    portalSessionId: row.portal_session_id || null,
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject,
+    displayName: row.display_name,
+    buyInOil: Number(row.buy_in_oil || 0),
+    status: row.status,
+    promotedSeatNumber: Number(row.promoted_seat_number || 0) || null,
+    promotedAt: row.promoted_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listPokerPlayWaitlistEntriesByTable(tableId, { status = 'waiting' } = {}) {
+  const database = ensureDb();
+  const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+        SELECT * FROM poker_play_waitlist_entries
+        WHERE table_id = ? AND status = ?
+        ORDER BY created_at ASC, waitlist_entry_id ASC
+      `).all(tableId, normalizedStatus)
+    : database.prepare(`
+        SELECT * FROM poker_play_waitlist_entries
+        WHERE table_id = ?
+        ORDER BY created_at ASC, waitlist_entry_id ASC
+      `).all(tableId);
+  return rows.map(hydratePokerPlayWaitlistEntry).filter(Boolean);
+}
+
+function getPokerPlayWaitlistEntryByTableAndWalletSubject(tableId, walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_play_waitlist_entries
+    WHERE table_id = ? AND wallet_subject = ?
+    LIMIT 1
+  `).get(tableId, walletSubject);
+  return hydratePokerPlayWaitlistEntry(row);
+}
+
+function upsertPokerPlayWaitlistEntry({
+  waitlistEntryId = null,
+  tableId,
+  portalSessionId = null,
+  houseId = null,
+  walletSubject,
+  displayName,
+  buyInOil = 0,
+  status = 'waiting',
+  promotedSeatNumber = null,
+  promotedAt = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare(`
+      SELECT * FROM poker_play_waitlist_entries
+      WHERE table_id = ? AND wallet_subject = ?
+      LIMIT 1
+    `).get(tableId, walletSubject);
+    const nextEntryId = existing?.waitlist_entry_id || waitlistEntryId || makeId('pkwait');
+    database.prepare(`
+      INSERT INTO poker_play_waitlist_entries (
+        waitlist_entry_id,
+        table_id,
+        portal_session_id,
+        house_id,
+        wallet_subject,
+        display_name,
+        buy_in_oil,
+        status,
+        promoted_seat_number,
+        promoted_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(table_id, wallet_subject) DO UPDATE SET
+        portal_session_id = excluded.portal_session_id,
+        house_id = excluded.house_id,
+        display_name = excluded.display_name,
+        buy_in_oil = excluded.buy_in_oil,
+        status = excluded.status,
+        promoted_seat_number = excluded.promoted_seat_number,
+        promoted_at = excluded.promoted_at,
+        updated_at = excluded.updated_at
+    `).run(
+      nextEntryId,
+      tableId,
+      portalSessionId,
+      houseId,
+      walletSubject,
+      displayName,
+      Number(buyInOil || 0),
+      status,
+      promotedSeatNumber == null ? null : Number(promotedSeatNumber || 0),
+      promotedAt,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerPlayWaitlistEntryByTableAndWalletSubject(tableId, walletSubject);
+  });
+}
+
+function deletePokerPlayWaitlistEntry(tableId, walletSubject) {
+  const database = ensureDb();
+  database.prepare(`
+    DELETE FROM poker_play_waitlist_entries
+    WHERE table_id = ? AND wallet_subject = ?
+  `).run(tableId, walletSubject);
+}
+
 function hydratePokerPlayHand(row) {
   if (!row) return null;
   return {
@@ -3813,6 +3952,7 @@ module.exports = {
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
+  getPokerPlayWaitlistEntryByTableAndWalletSubject,
   getPokerReplayArtifactByRunId,
   getRegistryEntityById,
   getPokerRunById,
@@ -3846,12 +3986,14 @@ module.exports = {
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
+  listPokerPlayWaitlistEntriesByTable,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
   deletePokerPlaySeat,
+  deletePokerPlayWaitlistEntry,
   upsertCentaurEntry,
   upsertCentaurHand,
   upsertCentaurTournament,
@@ -3862,6 +4004,7 @@ module.exports = {
   upsertPokerPlayHand,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
+  upsertPokerPlayWaitlistEntry,
   upsertPokerReplayArtifact,
   upsertPokerRun,
   upsertPokerSeason,

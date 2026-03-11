@@ -36,7 +36,9 @@ const {
   getSeriesTimeline,
   getSeriesDetail,
   getTableDetail,
+  joinTableWaitlist,
   leaveTable,
+  leaveTableWaitlist,
   listTables,
   matchmakeIntoTable,
   openHandDispute,
@@ -44,9 +46,12 @@ const {
   postAction,
   postMessage,
   postSeatAgentProposal,
+  reloadTableSeat,
+  returnTableSeat,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
+  sitOutTableSeat,
   useTimeBank,
 } = require('./poker_play_service');
 
@@ -201,6 +206,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
+    getPokerPlayWaitlistEntryByTableAndWalletSubject,
     getPokerReplayArtifactByRunId,
     getPokerRunById,
     getPokerSeasonById,
@@ -229,11 +235,13 @@ function registerPokerRoutes(app, deps) {
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
+    listPokerPlayWaitlistEntriesByTable,
     listPokerSeasons,
     normalizePortalIdempotencyKey,
     nowIso,
     randomHex,
     deletePokerPlaySeat,
+    deletePokerPlayWaitlistEntry,
     requireBoundHumanSession,
     resolveHumanSessionWithRecovery,
     resolvePrimaryWalletSubject,
@@ -250,6 +258,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayDispute,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
+    upsertPokerPlayWaitlistEntry,
     upsertPokerSeason,
     upsertPokerSubmission,
     upsertStreamflowVerification,
@@ -290,6 +299,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
+    getPokerPlayWaitlistEntryByTableAndWalletSubject,
     getStreamflowVerificationByWalletSubject,
     listPokerPlayActionsByHand,
     listPokerPlayAuditEventsByHand,
@@ -302,6 +312,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
+    listPokerPlayWaitlistEntriesByTable,
     nowIso,
     randomHex,
     resolvePrimaryWalletSubject,
@@ -309,6 +320,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayDispute,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
+    upsertPokerPlayWaitlistEntry,
   };
 
   const pokerPlayStreamClientsByTable = new Map();
@@ -483,6 +495,15 @@ function registerPokerRoutes(app, deps) {
       timebank_live: [
         { seatNumber: 1, address: 'So1anaHarnessTimeBankA1111111111111111111111', houseId: 'house_harness_timebank_a', displayName: 'Clock Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessTimeBankB1111111111111111111111', houseId: 'house_harness_timebank_b', displayName: 'Clock Bravo' },
+      ],
+      cash_lifecycle_waiting: [
+        { seatNumber: 1, address: 'So1anaHarnessCashLifeA111111111111111111111', houseId: 'house_harness_cashlife_a', displayName: 'Lifecycle Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessCashLifeB111111111111111111111', houseId: 'house_harness_cashlife_b', displayName: 'Lifecycle Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessCashLifeC111111111111111111111', houseId: 'house_harness_cashlife_c', displayName: 'Lifecycle Charlie' },
+      ],
+      waitlist_full_cash: [
+        { seatNumber: 1, address: 'So1anaHarnessWaitlistA111111111111111111111', houseId: 'house_harness_waitlist_a', displayName: 'Waitlist Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessWaitlistB111111111111111111111', houseId: 'house_harness_waitlist_b', displayName: 'Waitlist Bravo' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -871,6 +892,121 @@ function registerPokerRoutes(app, deps) {
         result: {},
         createdAt: requestAt,
         updatedAt: requestAt,
+      });
+    } else if (normalizedScenario === 'cash_lifecycle_waiting') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Cash Lifecycle Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 200,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          lastButtonSeat: 2,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {},
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 0,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness cash lifecycle scenario.',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 200, stackOil: 240 },
+        { actor: seatTwo, buyInOil: 200, stackOil: 220 },
+        { actor: seatThree, buyInOil: 200, stackOil: 200 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+    } else if (normalizedScenario === 'waitlist_full_cash') {
+      const [seatOne, seatTwo] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Waitlist Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 2,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 250,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          lastButtonSeat: 2,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {},
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 2,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 0,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness waitlist scenario.',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, buyInOil: 250, stackOil: 260 },
+        { actor: seatTwo, buyInOil: 250, stackOil: 240 },
+      ].forEach(({ actor, buyInOil, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
       });
     }
 
@@ -1798,6 +1934,154 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.post('/api/poker/play/tables/:tableId/reload', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = reloadTableSeat(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'reload', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RELOAD_FAILED',
+        err?.message || 'Unable to reload the poker seat.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/sit-out', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = sitOutTableSeat(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'seat', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SIT_OUT_FAILED',
+        err?.message || 'Unable to sit out from the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/return', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = returnTableSeat(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'seat', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_RETURN_FAILED',
+        err?.message || 'Unable to return to the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/waitlist', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = joinTableWaitlist(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'waitlist', {
+        handId: payload?.hand?.handId || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_WAITLIST_JOIN_FAILED',
+        err?.message || 'Unable to join the poker waitlist.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.delete('/api/poker/play/tables/:tableId/waitlist', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = leaveTableWaitlist(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'waitlist', {
+        handId: payload?.hand?.handId || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_WAITLIST_LEAVE_FAILED',
+        err?.message || 'Unable to leave the poker waitlist.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/tables/:tableId/leave', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = requireBoundHumanSession(req, res, { requestId });
@@ -2632,6 +2916,31 @@ function registerPokerRoutes(app, deps) {
       verificationId: verification.verificationId,
       oilBalance: computeOilBalance(verification.walletSubject),
       processed,
+    });
+  });
+
+  app.post('/__test__/poker/oil/fund', express.json({ limit: '64kb' }), (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const walletSubject = normalizeTrimmedString(req.body?.walletSubject);
+    const houseId = normalizeTrimmedString(req.body?.houseId) || null;
+    const amount = Math.max(0, normalizeOilAmount(req.body?.amount, 0));
+    if (!walletSubject || amount <= 0) {
+      return res.status(400).json({ ok: false, error: 'INVALID_ARGUMENT' });
+    }
+    createOilLedgerEntry({
+      walletSubject,
+      houseId,
+      verificationId: null,
+      entryKind: 'test_oil_funding',
+      direction: 'credit',
+      amount,
+      memo: 'Test OIL funding',
+    });
+    return res.json({
+      ok: true,
+      oilBalance: computeOilBalance(walletSubject),
     });
   });
 
