@@ -96,6 +96,41 @@ function applyCreateCopy({ soloMode = false } = {}) {
   if (footerByline) footerByline.textContent = tCreate('create.footer.byline');
 }
 
+function getCreatePrivyBridge() {
+  const bridge = window.__PRIVY_WALLET_BRIDGE__;
+  return bridge && typeof bridge === 'object' ? bridge : null;
+}
+
+async function waitForCreatePrivyBridge(timeoutMs = 10_000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const bridge = getCreatePrivyBridge();
+    if (bridge) return bridge;
+    await delay(80);
+  }
+  return getCreatePrivyBridge();
+}
+
+async function ensureCreatePrivyWallet({ interactive = false } = {}) {
+  if (typeof window.ensurePrivyLogin === 'function') {
+    try {
+      await window.ensurePrivyLogin({ interactive: !!interactive });
+    } catch (err) {
+      if (interactive) throw err;
+    }
+  }
+
+  const bridge = await waitForCreatePrivyBridge(interactive ? 15_000 : 3_000);
+  if (!bridge || typeof bridge.connectSolana !== 'function') return null;
+
+  try {
+    return await bridge.connectSolana({ silent: !interactive });
+  } catch (err) {
+    if (interactive) throw err;
+    return null;
+  }
+}
+
 function readTeamCodeHint() {
   try {
     return String(localStorage.getItem(TEAM_CODE_HINT_STORAGE_KEY) || '').trim();
@@ -550,6 +585,7 @@ async function init() {
   }
   applyCreateCopy({ soloMode });
   startCreateSkillLoop({ enabled: !tokenMode });
+  ensureCreatePrivyWallet({ interactive: false }).catch(() => null);
 
   const state = await api('/api/canvas/state');
   palette = state.palette;
@@ -566,8 +602,28 @@ async function init() {
   updateLockState();
 
   async function connectWalletOrThrow() {
+    const existingAddress = walletClient && typeof walletClient.getAddress === 'function'
+      ? walletClient.getAddress({ chain: 'solana' })
+      : null;
+    if (existingAddress) return { address: existingAddress };
+
+    await ensureCreatePrivyWallet({ interactive: false }).catch(() => null);
+
     if (!walletClient) throw new Error('NO_SOLANA_WALLET');
-    const connected = await walletClient.connect({ chain: 'solana', silent: false });
+
+    let connected = null;
+    try {
+      connected = await walletClient.connect({ chain: 'solana', silent: true });
+    } catch {
+      connected = null;
+    }
+    if (!connected?.address && !(walletClient.getAddress && walletClient.getAddress({ chain: 'solana' }))) {
+      connected = await ensureCreatePrivyWallet({ interactive: true }).catch(() => null);
+    }
+    if (!connected?.address && !(walletClient.getAddress && walletClient.getAddress({ chain: 'solana' }))) {
+      connected = await walletClient.connect({ chain: 'solana', silent: false });
+    }
+
     const address = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
     if (!address) throw new Error('NO_SOLANA_PUBKEY');
     return { address };
@@ -804,9 +860,9 @@ async function init() {
     return { iv: new Uint8Array(iv), ct: new Uint8Array(ct) };
   }
 
-  function buildKeyWrapMessage({ houseId, origin }) {
+  function buildKeyWrapMessage({ houseId }) {
+    // Must stay byte-for-byte aligned with the server-side wallet proof message.
     const parts = ['ElizaTown House Key Wrap', `houseId: ${houseId}`];
-    if (origin) parts.push(`origin: ${origin}`);
     return parts.join('\n');
   }
 
@@ -931,8 +987,9 @@ async function init() {
       const ponyInbox = await makePonyInboxRegistration(Kroot);
 
       // 3.5) Wrap K_root with a deterministic wallet signature for recovery.
-      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey, origin: window.location.origin });
+      const wrapMsg = buildKeyWrapMessage({ houseId: housePubKey });
       const wrapSig = await signMessageBytes(wrapMsg);
+      const wrapSigB64 = b64(wrapSig);
       const wrapKeyBytes = await sha256(wrapSig);
       const wrapKey = await crypto.subtle.importKey('raw', wrapKeyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
       const wrapped = await aesGcmEncrypt(wrapKey, Kroot);
@@ -957,6 +1014,7 @@ async function init() {
             chain: 'solana',
             address
           },
+          keyWrapSig: wrapSigB64,
           keyWrap,
           houseAuthKey,
           ponyInboxPub: ponyInbox.ponyInboxPub,

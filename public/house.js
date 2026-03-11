@@ -276,6 +276,14 @@ function applyExperiencePreferenceToHouseUi() {
   if (shareAgentMessage && !String(shareAgentMessage.textContent || '').trim()) {
     shareAgentMessage.textContent = tHouse('house.share.agent_message_missing', { skillUrl: `${window.location.origin}/skill.md` });
   }
+  const errorNode = el('error');
+  if (errorNode && errorNode.dataset.errorCode) {
+    errorNode.textContent = mapHouseUiErrorMessage(errorNode.dataset.errorCode);
+  }
+  const publicUploadErrorNode = el('publicUploadError');
+  if (publicUploadErrorNode && publicUploadErrorNode.dataset.errorCode) {
+    publicUploadErrorNode.textContent = mapHouseUiErrorMessage(publicUploadErrorNode.dataset.errorCode);
+  }
   updateWalletUI();
   if (typeof setDescriptorOpen === 'function') setDescriptorOpen(descriptorOpen);
   if (typeof setErc8004Open === 'function') setErc8004Open(erc8004Open);
@@ -338,15 +346,24 @@ function setError(msg) {
   const node = el('error');
   if (!node) return;
   if (!msg) {
+    delete node.dataset.errorCode;
     node.textContent = '';
     return;
   }
+  node.dataset.errorCode = String(msg?.message || msg || '').trim();
   node.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function setPublicMediaError(msg) {
   const node = el('publicUploadError');
-  if (node) node.textContent = mapHouseUiErrorMessage(msg);
+  if (!node) return;
+  if (!msg) {
+    delete node.dataset.errorCode;
+    node.textContent = '';
+    return;
+  }
+  node.dataset.errorCode = String(msg?.message || msg || '').trim();
+  node.textContent = mapHouseUiErrorMessage(msg);
 }
 
 function setPublicMediaStatus(msg) {

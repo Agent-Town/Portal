@@ -15,6 +15,21 @@ test('create flow preserves ceremony + house generation and keeps house-auth met
   await installMockSolanaWallet(page);
   await reachCreateViaLite(page);
 
+  let initPayload = null;
+  await page.route('**/api/house/init', async (route) => {
+    initPayload = route.request().postDataJSON();
+    await route.continue();
+  });
+
+  await page.evaluate(() => {
+    const bridge = window.__PRIVY_WALLET_BRIDGE__ || null;
+    window.__PRIVY_WALLET_BRIDGE__ = null;
+    window.ensurePrivyLogin = async () => {
+      window.__PRIVY_WALLET_BRIDGE__ = bridge;
+      return true;
+    };
+  });
+
   await page.getByTestId('px-0-0').click();
   await expect(page.getByTestId('px-0-0')).toHaveAttribute('data-color', /[1-9]/);
 
@@ -177,6 +192,8 @@ test('create flow preserves ceremony + house generation and keeps house-auth met
   expect(agentReveal?.ok).toBe(true);
 
   await page.waitForURL(/\/house\?house=/, { timeout: 15000 });
+  expect(typeof initPayload?.keyWrapSig).toBe('string');
+  expect(initPayload.keyWrapSig.length).toBeGreaterThan(20);
 
   const houseId = new URL(page.url()).searchParams.get('house');
   expect(houseId).toBeTruthy();

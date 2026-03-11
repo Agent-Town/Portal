@@ -16,6 +16,15 @@ test('mainland preset uses generic human-post share wording on the house page', 
   await expect(page.locator('#shareAgentPostLabel')).toHaveText('Agent Moltbook 帖子');
 });
 
+test('global-default keeps X-specific human-post share wording on the house page', async ({ page }) => {
+  await seedExperiencePreference(page, 'global-default');
+  await page.goto('/house');
+
+  await expect(page.locator('#shareHumanPostLabel')).toHaveText('Human X post');
+  await expect(page.locator('#shareHumanPost')).toHaveAttribute('placeholder', 'https://x.com/.../status/...');
+  await expect(page.locator('#shareAgentPostLabel')).toHaveText('Agent Moltbook post');
+});
+
 test('mainland preset localizes share-link save recovery errors', async ({ page }) => {
   await seedExperiencePreference(page, 'cn-mainland');
   await page.route('**/api/human/posts', async (route) => {
@@ -42,4 +51,32 @@ test('mainland preset localizes share-link save recovery errors', async ({ page 
   });
 
   await expect(page.locator('#sharePostsError')).toHaveText('未找到当前会话对应的分享链接。请重新生成分享链接。');
+});
+
+test('global-default keeps share-link save recovery errors in English', async ({ page }) => {
+  await seedExperiencePreference(page, 'global-default');
+  await page.route('**/api/human/posts', async (route) => {
+    await route.fulfill({
+      status: 404,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: false, error: 'SHARE_NOT_FOUND' })
+    });
+  });
+
+  await page.goto('/house');
+  await expect(page.locator('#llmProviderSelect')).toHaveValue('openai');
+  await page.evaluate(() => {
+    const shareActive = document.getElementById('shareActive');
+    if (shareActive) shareActive.classList.remove('is-hidden');
+    const shareSetup = document.getElementById('shareSetup');
+    if (shareSetup) shareSetup.classList.add('is-hidden');
+    const human = document.getElementById('shareHumanPost');
+    if (human instanceof HTMLInputElement) human.value = 'https://x.com/robin/status/123';
+    const agent = document.getElementById('shareAgentPost');
+    if (agent instanceof HTMLInputElement) agent.value = 'https://www.moltbook.com/post/456';
+    const button = document.getElementById('saveSharePosts');
+    if (button instanceof HTMLButtonElement) button.click();
+  });
+
+  await expect(page.locator('#sharePostsError')).toHaveText('Share not found for this session. Regenerate the share link.');
 });
