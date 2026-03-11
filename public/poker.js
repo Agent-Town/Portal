@@ -365,6 +365,36 @@
           ${renderSummaryMetric('Live Tables', `${items.length}`)}
         </div>
       `,
+      `
+        <h2>Quick Seat</h2>
+        <p>Matchmake into an existing live table with the same structure, or create a new one instantly if no match exists.</p>
+        <form id="pokerPlayMatchmakeForm" class="pokerForm">
+          <label>
+            Table Type
+            <select id="pokerPlayMatchmakeType">
+              <option value="cash">Cash</option>
+              <option value="tournament">Tournament</option>
+            </select>
+          </label>
+          <label>
+            Small Blind OIL
+            <input id="pokerPlayMatchmakeSmallBlind" type="number" min="1" value="10">
+          </label>
+          <label>
+            Big Blind OIL
+            <input id="pokerPlayMatchmakeBigBlind" type="number" min="2" value="20">
+          </label>
+          <label>
+            Buy-In OIL
+            <input id="pokerPlayMatchmakeBuyIn" type="number" min="20" value="400">
+          </label>
+          <label>
+            Display Name
+            <input id="pokerPlayMatchmakeDisplayName" maxlength="80" value="${escapeHtml(payload?.data?.houseId || 'House Seat')}">
+          </label>
+          <button class="pokerButton" type="submit">Join Or Create</button>
+        </form>
+      `,
       items.length
         ? items.map((item) => `
           <div class="pokerSplit">
@@ -384,9 +414,54 @@
             </div>
           </div>
         `).join('')
-        : '<h2>No live tables seeded.</h2><p>The multiplayer lobby is ready, but no cash or tournament table is open yet.</p>',
+        : '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>',
     ]);
+    bindPlayMatchmakeForm();
     setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
+  }
+
+  function bindPlayMatchmakeForm() {
+    const form = document.getElementById('pokerPlayMatchmakeForm');
+    if (!form) return;
+    const typeEl = document.getElementById('pokerPlayMatchmakeType');
+    const smallBlindEl = document.getElementById('pokerPlayMatchmakeSmallBlind');
+    const bigBlindEl = document.getElementById('pokerPlayMatchmakeBigBlind');
+    const buyInEl = document.getElementById('pokerPlayMatchmakeBuyIn');
+    const applyDefaults = () => {
+      const tableType = String(typeEl?.value || 'cash');
+      if (!smallBlindEl || !bigBlindEl || !buyInEl) return;
+      if (tableType === 'tournament') {
+        if (String(smallBlindEl.value || '') === '10') smallBlindEl.value = '50';
+        if (String(bigBlindEl.value || '') === '20') bigBlindEl.value = '100';
+        if (String(buyInEl.value || '') === '400') buyInEl.value = '300';
+      } else {
+        if (String(smallBlindEl.value || '') === '50') smallBlindEl.value = '10';
+        if (String(bigBlindEl.value || '') === '100') bigBlindEl.value = '20';
+        if (String(buyInEl.value || '') === '300') buyInEl.value = '400';
+      }
+    };
+    if (typeEl) typeEl.addEventListener('change', applyDefaults);
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setStatus('Finding a matching live table...');
+      try {
+        const payload = await api('/api/poker/play/matchmake', {
+          method: 'POST',
+          body: JSON.stringify({
+            tableType: String(typeEl?.value || 'cash'),
+            smallBlindOil: Number(smallBlindEl?.value || 0),
+            bigBlindOil: Number(bigBlindEl?.value || 0),
+            buyInOil: Number(buyInEl?.value || 0),
+            displayName: String(document.getElementById('pokerPlayMatchmakeDisplayName')?.value || '').trim(),
+          }),
+        });
+        const tableId = String(payload?.data?.table?.tableId || '');
+        if (!tableId) throw new Error('POKER_PLAY_MATCHMAKE_MISSING_TABLE');
+        window.location.assign(buildPokerHref(`/poker/play/tables/${encodeURIComponent(tableId)}`));
+      } catch (err) {
+        setStatus(`Quick seat failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
   }
 
   function renderPlayTableCards(data) {

@@ -22,10 +22,12 @@ const {
   seedStreamflowFixtureState,
 } = require('./streamflow_adapter');
 const {
+  createTable,
   createRouteError,
   getTableDetail,
   leaveTable,
   listTables,
+  matchmakeIntoTable,
   postAction,
   postMessage,
   seatIntoTable,
@@ -517,6 +519,56 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_LIST_FAILED',
         err?.message || 'Unable to load poker tables.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = createTable(playRouteDeps, {
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_CREATE_FAILED',
+        err?.message || 'Unable to create the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/matchmake', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = matchmakeIntoTable(playRouteDeps, {
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_MATCHMAKE_FAILED',
+        err?.message || 'Unable to matchmake into a poker table.',
         {
           requestId,
           details: err?.details || {},

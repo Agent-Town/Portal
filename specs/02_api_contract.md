@@ -418,6 +418,24 @@ Hole-card privacy rules:
 - Opponent seats expose `hiddenCardCount` until showdown.
 - `data.messages[]` is seat-private: the viewer only receives their own human + agent thread plus public system notes.
 
+### POST `/api/poker/play/tables`
+Creates a live table from the provided cash or tournament structure. By default the creator is also seated immediately.
+
+Request shape:
+```json
+{
+  "tableType": "cash",
+  "title": "6-Max Cash 25/50",
+  "smallBlindOil": 25,
+  "bigBlindOil": 50,
+  "buyInOil": 500,
+  "maxSeats": 6,
+  "minPlayers": 2,
+  "decisionCountdownSeconds": 45,
+  "displayName": "Alpha House"
+}
+```
+
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
 
@@ -443,7 +461,28 @@ Failure codes:
 - `NOT_FOUND`
 - `POKER_PLAY_SEAT_ALREADY_ACTIVE`
 - `POKER_PLAY_TABLE_FULL`
+- `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
 - `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/matchmake`
+Finds an open live table with the same structure and seats the caller there. If no candidate exists, the server creates a new dynamic table and seats the caller into it.
+
+Request shape:
+```json
+{
+  "tableType": "tournament",
+  "smallBlindOil": 75,
+  "bigBlindOil": 150,
+  "buyInOil": 600,
+  "displayName": "Bravo House"
+}
+```
+
+Response fields:
+- `data.table`
+- `data.mySeat`
+- `data.hand`
+- `data.oilBalance`
 
 ### POST `/api/poker/play/tables/:tableId/leave`
 Leaves a live table. Cash tables credit the current stack back to offchain OIL between hands. Tournament tables only allow leaving after bust-out or payout.
