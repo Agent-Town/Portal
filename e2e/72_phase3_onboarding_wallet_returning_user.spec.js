@@ -12,7 +12,7 @@ const {
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
-const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockToken1111111111111111111111111111';
+const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockReturning72Wallet111111111111111';
 
 const MINT_IDS = {
   userEvm: '11155111:456',
@@ -65,6 +65,10 @@ function snapshotPathCounts(calls, paths) {
     snapshot[pathname] = calls.filter((entry) => entry.pathname === pathname).length;
   }
   return snapshot;
+}
+
+async function installReturningUserWallet(page) {
+  await installMockSolanaWallet(page, { address: TEST_SOLANA_WALLET_ADDRESS });
 }
 
 async function postJson(page, path, body = {}) {
@@ -577,7 +581,7 @@ test.beforeEach(async ({ request }) => {
 test('walleted returning user does not re-run townhall onboarding flow after full onboarding completion', async ({ page }) => {
   test.setTimeout(120000);
 
-  await installMockSolanaWallet(page);
+  await installReturningUserWallet(page);
   await mockTownhallMintFlow(page);
   const pathsToTrack = [
     '/api/townhall/register',

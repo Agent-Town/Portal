@@ -3,13 +3,14 @@ const { installMockSolanaWallet } = require('./helpers/phase1');
 const { reachCreateViaLite } = require('./helpers/phase2');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockShareAuth60Wallet111111111111111';
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 });
 
 test('api/human/posts rejects updates for share IDs outside the caller session', async ({ page, request }) => {
-  await installMockSolanaWallet(page);
+  await installMockSolanaWallet(page, { address: TEST_SOLANA_WALLET_ADDRESS });
   await reachCreateViaLite(page);
 
   await page.getByTestId('px-0-0').click();

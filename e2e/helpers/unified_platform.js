@@ -125,7 +125,7 @@ async function attachHouseToPageSession(page, {
   houseId = '',
   teamId = '',
 } = {}) {
-  return await page.evaluate(async ({ nextHouseId, nextTeamId, testResetToken }) => {
+  const result = await page.evaluate(async ({ nextHouseId, nextTeamId, testResetToken }) => {
     const response = await fetch('/__test__/session/attach-house', {
       method: 'POST',
       credentials: 'include',
@@ -147,6 +147,39 @@ async function attachHouseToPageSession(page, {
     nextTeamId: String(teamId || ''),
     testResetToken: resetToken,
   });
+  if (result?.status === 200) {
+    const expectedHouseId = String(houseId || '').trim();
+    const expectedTeamId = String(teamId || '').trim();
+    const deadlineAt = Date.now() + 10_000;
+    let lastContext = null;
+    let ready = false;
+    while (Date.now() < deadlineAt) {
+      const response = await page.request.get('/api/platform/context', {
+        failOnStatusCode: false,
+      });
+      const payload = await response.json().catch(() => null);
+      const data = payload?.data || payload || null;
+      lastContext = data;
+      const attachedHouseId = String(data?.houseId || '').trim();
+      const attachedTeamId = String(data?.activeTeamId || '').trim();
+      const houseReady = attachedHouseId === expectedHouseId;
+      const teamReady = !expectedTeamId || attachedTeamId === expectedTeamId;
+      if (response.ok() && houseReady && teamReady) {
+        ready = true;
+        break;
+      }
+      await page.waitForTimeout(100);
+    }
+    result.context = lastContext;
+    if (!ready) {
+      throw new Error(`ATTACH_HOUSE_CONTEXT_TIMEOUT:${JSON.stringify({
+        expectedHouseId,
+        expectedTeamId,
+        context: lastContext,
+      })}`);
+    }
+  }
+  return result;
 }
 
 async function getPlatformContextFromPage(page) {

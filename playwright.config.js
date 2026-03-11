@@ -1,4 +1,6 @@
 // @ts-check
+require('./e2e/helpers/playwright_request_retry_patch');
+
 const { defineConfig } = require('@playwright/test');
 const fs = require('fs');
 

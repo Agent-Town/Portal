@@ -2409,8 +2409,7 @@ function setCachedTokenEligibility(address, eligible) {
 
 async function hasElizaTownToken(address) {
   if (process.env.NODE_ENV === 'test') {
-    const testAddr = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
-    return address === testAddr;
+    return isTestMockAddress(address);
   }
   const cached = getCachedTokenEligibility(address);
   if (cached !== null) return cached;
@@ -11241,8 +11240,7 @@ app.post('/api/token/verify', async (req, res) => {
   if (nonce !== s.tokenLookupNonce) return res.status(400).json({ ok: false, error: 'NONCE_MISMATCH' });
 
   const msg = buildTokenCheckMessage({ address, nonce, ca: ELIZATOWN_MINT });
-  const testAddr = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
-  const skipSig = process.env.NODE_ENV === 'test' && address === testAddr;
+  const skipSig = isTestMockAddress(address);
   if (!skipSig && !verifySolanaSignature(address, msg, signature)) {
     return res.status(401).json({ ok: false, error: 'BAD_SIGNATURE' });
   }

@@ -5,7 +5,7 @@ const { attachPathRecorder, enterHatch, triggerWalletProfileCheck, ensureBrainPa
 const { makeCeremonyRevealPair, encryptCeremonyReveal } = require('./helpers/ceremony_crypto');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
-const testWalletAddress = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockToken1111111111111111111111111111';
+const testWalletAddress = process.env.TEST_TOKEN_ADDRESS || 'So1anaMockSkill58Wallet111111111111111111';
 
 test.beforeEach(async ({ request }) => {
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
@@ -86,8 +86,8 @@ function makeTextChunks({ id, model, step }) {
   ];
 }
 
-async function bootstrapWorker(page) {
-  await installMockSolanaWallet(page);
+async function bootstrapWorker(page, { address = testWalletAddress } = {}) {
+  await installMockSolanaWallet(page, { address });
   await enterHatch(page, 'signup');
   await triggerWalletProfileCheck(page);
   await expect(page.locator('#walletStatus')).toContainText(/Wallet verified\. Configure brain\.|No Privy-connected Solana wallet found\.|Wallet connected\. Lookup skipped/i, { timeout: 3000 });

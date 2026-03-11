@@ -15,7 +15,7 @@ const {
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 
-const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockToken1111111111111111111111111111';
+const TEST_SOLANA_WALLET_ADDRESS = 'So1anaMockOnboard57Wallet11111111111111111';
 
 const MINT_IDS = {
   userEvm: '11155111:456',
@@ -102,6 +102,10 @@ async function getJson(page, path) {
 
 async function enterSignup(page, { navigate = true } = {}) {
   await enterHatch(page, 'signup', { navigate });
+}
+
+async function installOnboardingWallet(page) {
+  await installMockSolanaWallet(page, { address: TEST_SOLANA_WALLET_ADDRESS });
 }
 
 async function openBrainTab(page) {
@@ -655,7 +659,7 @@ test('OpenAI Codex exchange resolves callback state even when attemptId is stale
 });
 
 test('hero wallet onboarding path opens setup and runs wallet profile check', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -665,7 +669,7 @@ test('hero wallet onboarding path opens setup and runs wallet profile check', as
 });
 
 test('full onboarding flow stores once-per-wallet completion and skips townhall/ceremony on reload', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
   await mockTownhallMintFlow(page);
 
   const pathsToTrack = [
@@ -758,7 +762,7 @@ test('full onboarding flow stores once-per-wallet completion and skips townhall/
 });
 
 test('llm mind config is stored locally and restored after reload', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -782,7 +786,7 @@ test('llm mind config is stored locally and restored after reload', async ({ pag
 });
 
 test('brain district advanced thinking level restores from local brain config', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -813,7 +817,7 @@ test('brain district advanced thinking level restores from local brain config', 
 });
 
 test('agent panel brain controls configure provider/model/thinking via the same setup pipeline', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
   await page.addInitScript(() => {
     try {
       localStorage.setItem('agentTown:panel:minimized', '0');
@@ -841,7 +845,7 @@ test('agent panel brain controls configure provider/model/thinking via the same 
 });
 
 test('agent panel brain completes OpenAI PKCE exchange and configures brain', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
   await page.addInitScript(() => {
     try {
       localStorage.setItem('agentTown:panel:minimized', '0');
@@ -880,7 +884,7 @@ test('agent panel brain completes OpenAI PKCE exchange and configures brain', as
 });
 
 test('agent panel brain rejects OpenAI id_token callback URLs with clear guidance', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
   await page.addInitScript(() => {
     try {
       localStorage.setItem('agentTown:panel:minimized', '0');
@@ -912,7 +916,7 @@ test('agent panel brain rejects OpenAI id_token callback URLs with clear guidanc
 });
 
 test('returning user auto-connects with saved brain without repeating wallet/brain setup', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
   await page.goto('/');
 
   await enterSignup(page, { navigate: false });
@@ -965,7 +969,7 @@ test('returning user auto-connects with saved brain without repeating wallet/bra
 });
 
 test('session reset reboots runtime and reconnects OpenClaw Lite with local LLM config', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -1024,7 +1028,7 @@ test('session reset reboots runtime and reconnects OpenClaw Lite with local LLM 
 });
 
 test('agent readiness status tracks skill import failure and recovery', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -1094,7 +1098,7 @@ test('wallet lookup/signature failure does not block brain setup for new onboard
 });
 
 test('experience run no longer hard-fails with hatch-required when llm is configured before setup completion', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -1121,7 +1125,7 @@ test('experience run no longer hard-fails with hatch-required when llm is config
 });
 
 test('onboarding visibility stays stable when agent source changes to external after local runtime connect', async ({ page, request }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -1163,7 +1167,7 @@ test('onboarding visibility stays stable when agent source changes to external a
 });
 
 test('human sigil selection stays visible and persisted through town polling updates', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
@@ -1196,7 +1200,7 @@ test('human sigil selection stays visible and persisted through town polling upd
 });
 
 test('refresh keeps team session, town panel visibility, and selected sigil', async ({ page }) => {
-  await installMockSolanaWallet(page);
+  await installOnboardingWallet(page);
 
   await page.goto('/');
   await enterSignup(page, { navigate: false });
