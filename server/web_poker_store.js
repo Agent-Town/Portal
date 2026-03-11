@@ -507,6 +507,35 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_disputes_hand_created_idx
       ON poker_play_disputes(hand_id, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_integrity_flags (
+      flag_id TEXT PRIMARY KEY,
+      signal_key TEXT NOT NULL UNIQUE,
+      table_id TEXT NOT NULL,
+      series_id TEXT,
+      hand_id TEXT,
+      seat_number INTEGER,
+      house_id TEXT,
+      wallet_subject TEXT,
+      status TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      category TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      details_json TEXT NOT NULL,
+      resolution_note TEXT,
+      resolved_at TEXT,
+      resolved_by TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_play_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_integrity_flags_status_created_idx
+      ON poker_play_integrity_flags(status, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_play_integrity_flags_table_status_idx
+      ON poker_play_integrity_flags(table_id, status, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_play_audit_events (
       audit_event_id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -896,6 +925,7 @@ function countTableRows(tableName) {
     'poker_play_messages',
     'poker_play_actions',
     'poker_play_disputes',
+    'poker_play_integrity_flags',
     'poker_play_audit_events',
     'poker_streamflow_lock_verifications',
     'poker_oil_snapshot_events',
@@ -926,6 +956,7 @@ function resetExtendedStore() {
     'poker_play_actions',
     'poker_play_audit_events',
     'poker_play_disputes',
+    'poker_play_integrity_flags',
     'poker_play_messages',
     'poker_play_hands',
     'poker_play_seats',
@@ -3336,6 +3367,30 @@ function hydratePokerPlayDispute(row) {
   };
 }
 
+function hydratePokerPlayIntegrityFlag(row) {
+  if (!row) return null;
+  return {
+    flagId: row.flag_id,
+    signalKey: row.signal_key,
+    tableId: row.table_id,
+    seriesId: row.series_id || null,
+    handId: row.hand_id || null,
+    seatNumber: row.seat_number == null ? null : Number(row.seat_number || 0),
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject || null,
+    status: row.status,
+    severity: row.severity,
+    category: row.category,
+    summary: row.summary,
+    details: fromJson(row.details_json, {}),
+    resolutionNote: row.resolution_note || null,
+    resolvedAt: row.resolved_at || null,
+    resolvedBy: row.resolved_by || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 function getPokerPlayDisputeById(disputeId) {
   const database = ensureDb();
   const row = database.prepare('SELECT * FROM poker_play_disputes WHERE dispute_id = ?').get(disputeId);
@@ -3400,6 +3455,128 @@ function listPokerPlayDisputesByWalletSubject(walletSubject, { tableId = '', lim
       LIMIT ?
     `).all(walletSubject, safeLimit);
   return rows.map(hydratePokerPlayDispute).filter(Boolean);
+}
+
+function getPokerPlayIntegrityFlagById(flagId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_play_integrity_flags WHERE flag_id = ?').get(flagId);
+  return hydratePokerPlayIntegrityFlag(row);
+}
+
+function listPokerPlayIntegrityFlags({ status = '', tableId = '', seriesId = '', limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const clauses = [];
+  const params = [];
+  const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+  const normalizedTableId = typeof tableId === 'string' ? tableId.trim() : '';
+  const normalizedSeriesId = typeof seriesId === 'string' ? seriesId.trim() : '';
+  if (normalizedStatus) {
+    clauses.push('status = ?');
+    params.push(normalizedStatus);
+  }
+  if (normalizedTableId) {
+    clauses.push('table_id = ?');
+    params.push(normalizedTableId);
+  }
+  if (normalizedSeriesId) {
+    clauses.push('series_id = ?');
+    params.push(normalizedSeriesId);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_integrity_flags
+    ${where}
+    ORDER BY created_at DESC, flag_id DESC
+    LIMIT ?
+  `).all(...params, safeLimit);
+  return rows.map(hydratePokerPlayIntegrityFlag).filter(Boolean);
+}
+
+function upsertPokerPlayIntegrityFlag({
+  flagId,
+  signalKey,
+  tableId,
+  seriesId = null,
+  handId = null,
+  seatNumber = null,
+  houseId = null,
+  walletSubject = null,
+  status = 'open',
+  severity = 'medium',
+  category = 'general',
+  summary = '',
+  details = {},
+  resolutionNote = null,
+  resolvedAt = null,
+  resolvedBy = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare('SELECT * FROM poker_play_integrity_flags WHERE signal_key = ?').get(signalKey);
+    const nextFlagId = existing?.flag_id || flagId || makeId('pkif');
+    database.prepare(`
+      INSERT INTO poker_play_integrity_flags (
+        flag_id,
+        signal_key,
+        table_id,
+        series_id,
+        hand_id,
+        seat_number,
+        house_id,
+        wallet_subject,
+        status,
+        severity,
+        category,
+        summary,
+        details_json,
+        resolution_note,
+        resolved_at,
+        resolved_by,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(flag_id) DO UPDATE SET
+        signal_key = excluded.signal_key,
+        table_id = excluded.table_id,
+        series_id = excluded.series_id,
+        hand_id = excluded.hand_id,
+        seat_number = excluded.seat_number,
+        house_id = excluded.house_id,
+        wallet_subject = excluded.wallet_subject,
+        status = excluded.status,
+        severity = excluded.severity,
+        category = excluded.category,
+        summary = excluded.summary,
+        details_json = excluded.details_json,
+        resolution_note = excluded.resolution_note,
+        resolved_at = excluded.resolved_at,
+        resolved_by = excluded.resolved_by,
+        updated_at = excluded.updated_at
+    `).run(
+      nextFlagId,
+      signalKey,
+      tableId,
+      seriesId,
+      handId,
+      seatNumber == null ? null : Number(seatNumber || 0),
+      houseId,
+      walletSubject,
+      status,
+      severity,
+      category,
+      summary,
+      toJson(details, {}),
+      resolutionNote,
+      resolvedAt,
+      resolvedBy,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerPlayIntegrityFlagById(nextFlagId);
+  });
 }
 
 function upsertPokerPlayDispute({
@@ -3949,6 +4126,7 @@ module.exports = {
   getPokerLeaderboardSnapshotById,
   getPokerPlayHandById,
   getPokerPlayDisputeById,
+  getPokerPlayIntegrityFlagById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -3981,6 +4159,7 @@ module.exports = {
   listPokerPlayDisputesByHand,
   listPokerPlayDisputesByTable,
   listPokerPlayDisputesByWalletSubject,
+  listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
   listPokerPlaySeatsByWalletSubject,
@@ -4001,6 +4180,7 @@ module.exports = {
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
   upsertPokerPlayDispute,
+  upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,

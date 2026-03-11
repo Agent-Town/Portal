@@ -24,6 +24,7 @@ const {
 const {
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminExportPayload,
+  buildPokerPlayIntegrityQueuePayload,
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
@@ -53,6 +54,7 @@ const {
   reenterTournamentSeries,
   returnTableSeat,
   resolveHandDispute,
+  resolveIntegrityFlag,
   resumeTable,
   seatIntoTable,
   sitOutTableSeat,
@@ -209,6 +211,7 @@ function registerPokerRoutes(app, deps) {
     getPokerOperatorServiceToken,
     getPokerPlayHandById,
     getPokerPlayDisputeById,
+    getPokerPlayIntegrityFlagById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
@@ -236,6 +239,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayDisputesByHand,
     listPokerPlayDisputesByTable,
     listPokerPlayDisputesByWalletSubject,
+    listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
     listPokerPlaySeatsByWalletSubject,
@@ -262,6 +266,7 @@ function registerPokerRoutes(app, deps) {
     upsertOilSnapshotEvent,
     upsertPokerPlayHand,
     upsertPokerPlayDispute,
+    upsertPokerPlayIntegrityFlag,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
     upsertPokerPlayWaitlistEntry,
@@ -302,6 +307,7 @@ function registerPokerRoutes(app, deps) {
     getCurrentPokerPlayHandForTable,
     getPokerPlayHandById,
     getPokerPlayDisputeById,
+    getPokerPlayIntegrityFlagById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
@@ -313,6 +319,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayDisputesByHand,
     listPokerPlayDisputesByTable,
     listPokerPlayDisputesByWalletSubject,
+    listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
     listPokerPlaySeatsByWalletSubject,
@@ -324,6 +331,7 @@ function registerPokerRoutes(app, deps) {
     resolvePrimaryWalletSubject,
     upsertPokerPlayHand,
     upsertPokerPlayDispute,
+    upsertPokerPlayIntegrityFlag,
     upsertPokerPlaySeat,
     upsertPokerPlayTable,
     upsertPokerPlayWaitlistEntry,
@@ -538,6 +546,11 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessTimelineA11111111111111111111', houseId: 'house_harness_timeline_a', displayName: 'Timeline Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessTimelineB11111111111111111111', houseId: 'house_harness_timeline_b', displayName: 'Timeline Bravo' },
         { seatNumber: 1, address: 'So1anaHarnessTimelineC11111111111111111111', houseId: 'house_harness_timeline_c', displayName: 'Timeline Charlie' },
+      ],
+      integrity_flag_story: [
+        { seatNumber: 1, address: 'So1anaHarnessIntegrityA1111111111111111111', houseId: 'house_harness_integrity_shared', displayName: 'Integrity Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessIntegrityB1111111111111111111', houseId: 'house_harness_integrity_shared', displayName: 'Integrity Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessIntegrityC1111111111111111111', houseId: 'house_harness_integrity_other', displayName: 'Integrity Charlie' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -2237,6 +2250,208 @@ function registerPokerRoutes(app, deps) {
       ].forEach((event) => createPokerPlayAuditEvent(event));
       seededSeriesId = seriesId;
       seededTableIds.push(tableAId, tableBId);
+    } else if (normalizedScenario === 'integrity_flag_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Integrity Table',
+        tableType: 'cash',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 25,
+        bigBlindOil: 50,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          activeHandId: handId,
+          activeHandNumber: 4,
+          lastButtonSeat: seatThree.seatNumber,
+          prizePoolOil: 0,
+          settlementLedgerEntryId: null,
+          timeBankRemainingBySeat: {},
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 0,
+          cashOutEnabled: true,
+        },
+        summary: {
+          headline: 'Harness integrity queue scenario.',
+        },
+        createdAt: addHarnessSeconds(requestAt, -180),
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 375 },
+        { actor: seatTwo, stackOil: 350 },
+        { actor: seatThree, stackOil: 475 },
+      ].forEach(({ actor, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 400,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: addHarnessSeconds(requestAt, -180),
+          updatedAt: requestAt,
+        });
+      });
+      upsertPokerPlayHand({
+        handId,
+        tableId: nextTableId,
+        handNumber: 4,
+        status: 'live',
+        actionExpiresAt,
+        state: {
+          handNumber: 4,
+          tableType: 'cash',
+          blindLevel: 0,
+          handsPerBlindLevel: 0,
+          buttonSeat: seatThree.seatNumber,
+          smallBlindSeat: seatOne.seatNumber,
+          bigBlindSeat: seatTwo.seatNumber,
+          actingSeat: seatThree.seatNumber,
+          street: 'turn',
+          phase: 'turn',
+          status: 'live',
+          countdownSeconds: 45,
+          communityCards: ['Qs', 'Td', '8h', '3c'],
+          seatOrder: [seatOne.seatNumber, seatTwo.seatNumber, seatThree.seatNumber],
+          seatStates: {
+            [String(seatOne.seatNumber)]: {
+              seatNumber: seatOne.seatNumber,
+              stackOil: 375,
+              holeCards: ['Ah', 'Ac'],
+              committedStreetOil: 25,
+              committedHandOil: 25,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatTwo.seatNumber)]: {
+              seatNumber: seatTwo.seatNumber,
+              stackOil: 350,
+              holeCards: ['Kh', 'Kd'],
+              committedStreetOil: 50,
+              committedHandOil: 50,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: true,
+            },
+            [String(seatThree.seatNumber)]: {
+              seatNumber: seatThree.seatNumber,
+              stackOil: 475,
+              holeCards: ['9c', '9d'],
+              committedStreetOil: 0,
+              committedHandOil: 0,
+              folded: false,
+              allIn: false,
+              eliminated: false,
+              actedStreet: false,
+            },
+          },
+          pendingSeatNumbers: [seatThree.seatNumber],
+          potOil: 75,
+          currentBetOil: 50,
+          lastRaiseSizeOil: 25,
+          minRaiseToOil: 100,
+          bigBlindOil: 50,
+          actionExpiresAt,
+          result: null,
+        },
+        result: {},
+        createdAt: addHarnessSeconds(requestAt, -120),
+        updatedAt: requestAt,
+      });
+      [
+        {
+          seatNumber: seatOne.seatNumber,
+          authorRole: 'human',
+          body: 'Do not leak this private seat note outside the review queue.',
+          createdAt: addHarnessSeconds(requestAt, -20),
+        },
+        {
+          seatNumber: seatOne.seatNumber,
+          authorRole: 'agent',
+          body: 'Keep this private seat-agent warning inside the seat thread.',
+          createdAt: addHarnessSeconds(requestAt, -15),
+        },
+      ].forEach((message) => createPokerPlayMessage({
+        tableId: nextTableId,
+        handId,
+        seatNumber: message.seatNumber,
+        authorRole: message.authorRole,
+        body: message.body,
+        createdAt: message.createdAt,
+      }));
+      [
+        {
+          disputeId: `pkdp_${randomHex(10)}`,
+          tableId: nextTableId,
+          handId,
+          seatNumber: seatOne.seatNumber,
+          houseId: seatOne.houseId,
+          walletSubject: seatOne.address,
+          status: 'open',
+          category: 'turn_order',
+          note: 'Seat order looked wrong after the shared-house action sequence.',
+          createdAt: addHarnessSeconds(requestAt, -10),
+          updatedAt: addHarnessSeconds(requestAt, -10),
+        },
+        {
+          disputeId: `pkdp_${randomHex(10)}`,
+          tableId: nextTableId,
+          handId,
+          seatNumber: seatThree.seatNumber,
+          houseId: seatThree.houseId,
+          walletSubject: seatThree.address,
+          status: 'open',
+          category: 'settlement',
+          note: 'Pot ownership needs another operator look before play resumes.',
+          createdAt: addHarnessSeconds(requestAt, -8),
+          updatedAt: addHarnessSeconds(requestAt, -8),
+        },
+      ].forEach((dispute) => upsertPokerPlayDispute(dispute));
+      [
+        {
+          tableId: nextTableId,
+          handId,
+          seatNumber: seatOne.seatNumber,
+          actorRole: 'human',
+          eventKind: 'dispute_opened',
+          createdAt: addHarnessSeconds(requestAt, -10),
+          payload: {
+            category: 'turn_order',
+            note: 'Seat order looked wrong after the shared-house action sequence.',
+          },
+        },
+        {
+          tableId: nextTableId,
+          handId,
+          seatNumber: seatThree.seatNumber,
+          actorRole: 'human',
+          eventKind: 'dispute_opened',
+          createdAt: addHarnessSeconds(requestAt, -8),
+          payload: {
+            category: 'settlement',
+            note: 'Pot ownership needs another operator look before play resumes.',
+          },
+        },
+      ].forEach((event) => createPokerPlayAuditEvent(event));
     }
 
     return {
@@ -3221,6 +3436,32 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/admin/integrity', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayIntegrityQueuePayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+        status: req.query?.status,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_INTEGRITY_QUEUE_FAILED',
+        err?.message || 'Unable to load poker integrity queue.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/admin/tables/:tableId/export', (req, res) => {
     const requestId = buildPortalRequestId();
     if (!isAdmin(req)) {
@@ -3320,6 +3561,37 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_DISPUTE_RESOLUTION_FAILED',
         err?.message || 'Unable to resolve the poker dispute.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/integrity/:flagId/resolve', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const result = resolveIntegrityFlag(playRouteDeps, {
+        flagId: req.params.flagId,
+        body: req.body,
+        processAt: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(result?.flag?.tableId || '', 'integrity_review', {
+        flagId: result?.flag?.flagId || req.params.flagId,
+        handId: result?.flag?.handId || null,
+        status: result?.flag?.status || null,
+      });
+      return sendPortalApiSuccess(res, result.queue, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_INTEGRITY_RESOLUTION_FAILED',
+        err?.message || 'Unable to resolve the poker integrity flag.',
         {
           requestId,
           details: err?.details || {},

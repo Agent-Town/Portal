@@ -1347,6 +1347,34 @@ function sanitizeDisputesForViewer(disputes, seats) {
   }));
 }
 
+function sanitizeIntegrityFlagDetailsForViewer(details, { includePrivate = false } = {}) {
+  const next = cloneJson(details, {});
+  if (!includePrivate && next && typeof next === 'object') {
+    delete next.privateNote;
+    delete next.privateMessageBodies;
+    if (Array.isArray(next.messages)) {
+      next.messages = next.messages.map((message) => {
+        const sanitized = cloneJson(message, {});
+        delete sanitized.body;
+        return sanitized;
+      });
+    }
+  }
+  return next;
+}
+
+function sanitizeIntegrityFlagsForViewer(flags, seats, { includePrivate = false } = {}) {
+  const seatMap = getSeatMap(seats);
+  return (Array.isArray(flags) ? flags : []).map((flag) => ({
+    ...flag,
+    seatNumber: flag.seatNumber == null ? null : normalizeSeatNumber(flag.seatNumber),
+    seatLabel: flag.seatNumber == null
+      ? null
+      : formatSeatLabel(flag.seatNumber, seatMap.get(normalizeSeatNumber(flag.seatNumber))?.displayName || ''),
+    details: sanitizeIntegrityFlagDetailsForViewer(flag.details, { includePrivate }),
+  }));
+}
+
 function sanitizeAuditPayloadForViewer(payload, { includePrivate = false } = {}) {
   const next = cloneJson(payload, {});
   if (!includePrivate && next && typeof next === 'object') {
@@ -1367,9 +1395,158 @@ function sanitizeAuditEventsForViewer(events, seats, { includePrivate = false } 
   }));
 }
 
+function listOpenIntegrityFlagsByTable(deps, tableId, { limit = 100 } = {}) {
+  if (typeof deps.listPokerPlayIntegrityFlags !== 'function') return [];
+  return deps.listPokerPlayIntegrityFlags({
+    tableId,
+    status: 'open',
+    limit,
+  });
+}
+
+function buildPokerPlayIntegritySignals(deps, table, seats, hand) {
+  const signals = [];
+  const activeSeats = getActiveSeatRows(seats);
+  const seatsByHouse = new Map();
+  for (const seat of activeSeats) {
+    const houseId = normalizeTrimmedString(seat?.houseId);
+    if (!houseId) continue;
+    const bucket = seatsByHouse.get(houseId) || [];
+    bucket.push(seat);
+    seatsByHouse.set(houseId, bucket);
+  }
+  for (const [houseId, houseSeats] of seatsByHouse.entries()) {
+    if (houseSeats.length < 2) continue;
+    const orderedSeats = houseSeats
+      .slice()
+      .sort((left, right) => normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber));
+    signals.push({
+      signalKey: `shared_house_multi_seat:${normalizeTrimmedString(table?.tableId)}:${houseId}`,
+      tableId: normalizeTrimmedString(table?.tableId),
+      seriesId: normalizeTrimmedString(getTournamentSeriesRef(table).seriesId) || null,
+      handId: normalizeTrimmedString(hand?.handId) || null,
+      seatNumber: normalizeSeatNumber(orderedSeats[0]?.seatNumber) || null,
+      houseId,
+      walletSubject: normalizeTrimmedString(orderedSeats[0]?.walletSubject) || null,
+      severity: 'high',
+      category: 'shared_house_multi_seat',
+      summary: `${houseId} controls ${orderedSeats.length} live seats on ${table?.title || table?.tableId || 'this table'}.`,
+      details: {
+        houseId,
+        seatNumbers: orderedSeats.map((seat) => normalizeSeatNumber(seat?.seatNumber)).filter(Boolean),
+        walletSubjects: orderedSeats.map((seat) => normalizeTrimmedString(seat?.walletSubject)).filter(Boolean),
+        seatCount: orderedSeats.length,
+      },
+    });
+  }
+
+  const openDisputes = typeof deps.listPokerPlayDisputesByTable === 'function'
+    ? deps.listPokerPlayDisputesByTable(table.tableId, { status: 'open', limit: 50 })
+    : [];
+  const uniqueWalletSubjects = new Set(
+    openDisputes
+      .map((dispute) => normalizeTrimmedString(dispute?.walletSubject))
+      .filter(Boolean)
+  );
+  if (openDisputes.length >= 2 && uniqueWalletSubjects.size >= 2) {
+    const orderedDisputes = openDisputes
+      .slice()
+      .sort((left, right) => String(left?.createdAt || '').localeCompare(String(right?.createdAt || '')));
+    const targetDispute = orderedDisputes[orderedDisputes.length - 1] || null;
+    const disputeHandId = normalizeTrimmedString(targetDispute?.handId, normalizeTrimmedString(hand?.handId)) || null;
+    signals.push({
+      signalKey: `multi_dispute_cluster:${normalizeTrimmedString(table?.tableId)}:${disputeHandId || 'table'}`,
+      tableId: normalizeTrimmedString(table?.tableId),
+      seriesId: normalizeTrimmedString(getTournamentSeriesRef(table).seriesId) || null,
+      handId: disputeHandId,
+      seatNumber: normalizeSeatNumber(targetDispute?.seatNumber) || null,
+      houseId: normalizeTrimmedString(targetDispute?.houseId) || null,
+      walletSubject: normalizeTrimmedString(targetDispute?.walletSubject) || null,
+      severity: 'medium',
+      category: 'multi_dispute_cluster',
+      summary: `${openDisputes.length} open hand reviews are stacked on ${table?.title || table?.tableId || 'this table'}.`,
+      details: {
+        disputeCount: openDisputes.length,
+        uniqueWalletCount: uniqueWalletSubjects.size,
+        disputeIds: orderedDisputes.map((dispute) => normalizeTrimmedString(dispute?.disputeId)).filter(Boolean),
+        handIds: Array.from(new Set(orderedDisputes.map((dispute) => normalizeTrimmedString(dispute?.handId)).filter(Boolean))),
+        categories: Array.from(new Set(orderedDisputes.map((dispute) => normalizeTrimmedString(dispute?.category)).filter(Boolean))),
+      },
+    });
+  }
+
+  return signals;
+}
+
+function syncPokerPlayIntegrityFlags(deps, table, seats, hand, { processAt } = {}) {
+  if (!table || typeof deps.upsertPokerPlayIntegrityFlag !== 'function' || typeof deps.listPokerPlayIntegrityFlags !== 'function') {
+    return [];
+  }
+  const requestAt = toProcessIso(deps, processAt);
+  const signals = buildPokerPlayIntegritySignals(deps, table, seats, hand);
+  const existingFlags = new Map(
+    deps.listPokerPlayIntegrityFlags({ tableId: table.tableId, limit: 200 }).map((flag) => [normalizeTrimmedString(flag?.signalKey), flag])
+  );
+  const nextFlags = [];
+  for (const signal of signals) {
+    const existing = existingFlags.get(normalizeTrimmedString(signal.signalKey)) || null;
+    if (existing && normalizeTrimmedString(existing?.status).toLowerCase() !== 'open') {
+      continue;
+    }
+    const nextFlag = deps.upsertPokerPlayIntegrityFlag({
+      flagId: existing?.flagId || null,
+      signalKey: signal.signalKey,
+      tableId: signal.tableId,
+      seriesId: signal.seriesId,
+      handId: signal.handId,
+      seatNumber: signal.seatNumber,
+      houseId: signal.houseId,
+      walletSubject: signal.walletSubject,
+      status: 'open',
+      severity: signal.severity,
+      category: signal.category,
+      summary: signal.summary,
+      details: signal.details,
+      resolutionNote: null,
+      resolvedAt: null,
+      resolvedBy: null,
+      createdAt: requestAt,
+      updatedAt: requestAt,
+    });
+    if (!existing && typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: signal.tableId,
+        handId: signal.handId,
+        seatNumber: signal.seatNumber,
+        actorRole: 'system',
+        eventKind: 'integrity_flag_opened',
+        payload: {
+          flagId: nextFlag.flagId,
+          category: signal.category,
+          severity: signal.severity,
+          signalKey: signal.signalKey,
+          summary: signal.summary,
+        },
+        createdAt: requestAt,
+      });
+    }
+    nextFlags.push(nextFlag);
+  }
+  return nextFlags;
+}
+
 function buildPokerPlayReviewSummary(deps, table, seats, hand, walletSubject) {
+  const openIntegrityFlags = syncPokerPlayIntegrityFlags(deps, table, seats, hand, {
+    processAt: hand?.updatedAt || table?.updatedAt,
+  });
   const openDisputes = deps.listPokerPlayDisputesByTable(table.tableId, { status: 'open', limit: 50 });
-  const latestAuditEvent = deps.listPokerPlayAuditEventsByTable(table.tableId, { limit: 1 })[0] || null;
+  const latestAuditEvents = deps.listPokerPlayAuditEventsByTable(table.tableId, { limit: 10 });
+  const latestAuditEvent = latestAuditEvents.find((event) => {
+    const eventKind = String(event?.eventKind || '');
+    return !eventKind.startsWith('integrity_flag_') && eventKind !== 'table_paused';
+  })
+    || latestAuditEvents[0]
+    || null;
   const myDisputes = normalizeTrimmedString(walletSubject)
     ? deps.listPokerPlayDisputesByWalletSubject(walletSubject, { tableId: table.tableId, limit: 20 })
     : [];
@@ -1386,6 +1563,10 @@ function buildPokerPlayReviewSummary(deps, table, seats, hand, walletSubject) {
       ? openDisputes.filter((dispute) => normalizeTrimmedString(dispute?.handId) === currentHandId).length
       : openDisputes.length,
     myDisputes: sanitizeDisputesForViewer(myHandDisputes, seats),
+    integrity: {
+      openFlagCount: openIntegrityFlags.length,
+      categories: Array.from(new Set(openIntegrityFlags.map((flag) => normalizeTrimmedString(flag?.category)).filter(Boolean))),
+    },
     latestAuditEvent: latestAuditEvent
       ? sanitizeAuditEventsForViewer([latestAuditEvent], seats, { includePrivate: false })[0]
       : null,
@@ -1398,7 +1579,12 @@ function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } =
   if (!synced?.table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
+  syncPokerPlayIntegrityFlags(deps, synced.table, synced.seats, synced.hand, { processAt: requestAt });
   const openDisputes = deps.listPokerPlayDisputesByTable(synced.table.tableId, { status: 'open', limit: 50 });
+  const openIntegrityFlags = listOpenIntegrityFlagsByTable(deps, synced.table.tableId, { limit: 50 });
+  const allIntegrityFlags = typeof deps.listPokerPlayIntegrityFlags === 'function'
+    ? deps.listPokerPlayIntegrityFlags({ tableId: synced.table.tableId, limit: 100 })
+    : [];
   const selectedHandId = normalizeTrimmedString(handId)
     || normalizeTrimmedString(openDisputes[0]?.handId)
     || normalizeTrimmedString(synced.hand?.handId);
@@ -1446,8 +1632,120 @@ function buildPokerPlayAdminReviewPayload(deps, { tableId, processAt, handId } =
     actions: sanitizeActions(reviewActions, synced.seats),
     disputes: sanitizeDisputesForViewer(reviewDisputes, synced.seats),
     openDisputes: sanitizeDisputesForViewer(openDisputes, synced.seats),
+    integrityFlags: sanitizeIntegrityFlagsForViewer(allIntegrityFlags, synced.seats, { includePrivate: false }),
+    integritySummary: {
+      openFlagCount: openIntegrityFlags.length,
+      resolvedFlagCount: allIntegrityFlags.filter((flag) => normalizeTrimmedString(flag?.status).toLowerCase() === 'resolved').length,
+      dismissedFlagCount: allIntegrityFlags.filter((flag) => normalizeTrimmedString(flag?.status).toLowerCase() === 'dismissed').length,
+    },
     auditEvents: sanitizeAuditEventsForViewer(auditEvents, synced.seats, { includePrivate: true }),
     processAt: requestAt,
+  };
+}
+
+function buildPokerPlayIntegrityQueuePayload(deps, { processAt, status = 'open', limit = 100 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const entries = deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((entry) => entry?.table);
+  for (const entry of entries) {
+    syncPokerPlayIntegrityFlags(deps, entry.table, entry.seats, entry.hand, { processAt: requestAt });
+  }
+  const normalizedStatus = normalizeTrimmedString(status).toLowerCase();
+  const filterStatus = normalizedStatus === 'all' ? '' : normalizedStatus;
+  const safeLimit = Math.max(1, Math.min(200, normalizeOilAmount(limit, 100)));
+  const flags = typeof deps.listPokerPlayIntegrityFlags === 'function'
+    ? deps.listPokerPlayIntegrityFlags({
+      status: filterStatus,
+      limit: safeLimit,
+    })
+    : [];
+  const allFlags = typeof deps.listPokerPlayIntegrityFlags === 'function'
+    ? deps.listPokerPlayIntegrityFlags({ limit: 500 })
+    : [];
+  const tableMap = new Map(entries.map((entry) => [normalizeTrimmedString(entry?.table?.tableId), entry]));
+  const items = flags.map((flag) => {
+    const entry = tableMap.get(normalizeTrimmedString(flag?.tableId)) || null;
+    const seats = entry?.seats || [];
+    const table = entry?.table || deps.getPokerPlayTableById(flag.tableId) || null;
+    return {
+      ...sanitizeIntegrityFlagsForViewer([flag], seats, { includePrivate: false })[0],
+      tableTitle: table?.title || flag.tableId,
+      tableStatus: table?.status || null,
+      seriesTitle: normalizeTrimmedString(getTournamentSeriesRef(table).seriesTitle) || null,
+    };
+  });
+  return {
+    summary: {
+      openFlagCount: allFlags.filter((flag) => normalizeTrimmedString(flag?.status).toLowerCase() === 'open').length,
+      resolvedFlagCount: allFlags.filter((flag) => normalizeTrimmedString(flag?.status).toLowerCase() === 'resolved').length,
+      dismissedFlagCount: allFlags.filter((flag) => normalizeTrimmedString(flag?.status).toLowerCase() === 'dismissed').length,
+      tableCount: new Set(items.map((item) => normalizeTrimmedString(item?.tableId)).filter(Boolean)).size,
+      eventCount: items.length,
+    },
+    filter: {
+      status: filterStatus || 'all',
+      limit: safeLimit,
+    },
+    items,
+    processAt: requestAt,
+  };
+}
+
+function resolvePokerPlayIntegrityFlagStatus(value) {
+  const normalized = normalizeTrimmedString(value).toLowerCase();
+  return normalized === 'resolved' || normalized === 'dismissed' ? normalized : '';
+}
+
+function resolveIntegrityFlag(deps, { flagId, body, processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt || body?.asOf);
+  if (typeof deps.getPokerPlayIntegrityFlagById !== 'function' || typeof deps.upsertPokerPlayIntegrityFlag !== 'function') {
+    throw createRouteError(500, 'INTEGRITY_UNAVAILABLE', 'Poker integrity flags are not available.');
+  }
+  const flag = deps.getPokerPlayIntegrityFlagById(flagId);
+  if (!flag) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker integrity flag not found.');
+  }
+  if (normalizeTrimmedString(flag.status).toLowerCase() !== 'open') {
+    throw createRouteError(409, 'POKER_PLAY_INTEGRITY_FLAG_CLOSED', 'This poker integrity flag is already closed.');
+  }
+  const status = resolvePokerPlayIntegrityFlagStatus(body?.status);
+  if (!status) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Resolution status must be resolved or dismissed.');
+  }
+  const resolutionNote = normalizePokerPlayDisputeNote(body?.resolutionNote);
+  const resolvedBy = normalizeTrimmedString(body?.resolvedBy, 'operator');
+  const updated = deps.upsertPokerPlayIntegrityFlag({
+    ...flag,
+    status,
+    resolutionNote: resolutionNote || null,
+    resolvedAt: requestAt,
+    resolvedBy,
+    updatedAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updated.tableId,
+      handId: updated.handId,
+      seatNumber: updated.seatNumber,
+      actorRole: 'operator',
+      eventKind: status === 'resolved' ? 'integrity_flag_resolved' : 'integrity_flag_dismissed',
+      payload: {
+        flagId: updated.flagId,
+        category: updated.category,
+        resolutionNote: resolutionNote || null,
+        resolvedBy,
+      },
+      createdAt: requestAt,
+    });
+  }
+  return {
+    flag: updated,
+    queue: buildPokerPlayIntegrityQueuePayload(deps, {
+      processAt: requestAt,
+      status: 'all',
+      limit: 100,
+    }),
   };
 }
 
@@ -5032,6 +5330,7 @@ function resolveHandDispute(deps, { disputeId, body, processAt } = {}) {
 
 module.exports = {
   buildPokerPlayAdminExportPayload,
+  buildPokerPlayIntegrityQueuePayload,
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
@@ -5060,6 +5359,7 @@ module.exports = {
   postAction,
   postMessage,
   postSeatAgentProposal,
+  resolveIntegrityFlag,
   rebalanceTournamentSeriesByDirector,
   reloadTableSeat,
   reenterTournamentSeries,

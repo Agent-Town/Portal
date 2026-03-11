@@ -78,6 +78,7 @@ const {
   getPokerLeaderboardSnapshotById,
   getPokerPlayHandById,
   getPokerPlayDisputeById,
+  getPokerPlayIntegrityFlagById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -108,6 +109,7 @@ const {
   listPokerPlayDisputesByHand,
   listPokerPlayDisputesByTable,
   listPokerPlayDisputesByWalletSubject,
+  listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
   listPokerPlaySeatsByWalletSubject,
@@ -128,6 +130,7 @@ const {
   upsertPokerBatch,
   upsertPokerLeaderboardSnapshot,
   upsertPokerPlayDispute,
+  upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
@@ -4365,6 +4368,7 @@ registerPokerRoutes(app, {
   getPokerSubmissionByRequest,
   getPokerPlayHandById,
   getPokerPlayDisputeById,
+  getPokerPlayIntegrityFlagById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -4387,6 +4391,7 @@ registerPokerRoutes(app, {
   listPokerPlayDisputesByHand,
   listPokerPlayDisputesByTable,
   listPokerPlayDisputesByWalletSubject,
+  listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
   listPokerPlaySeatsByWalletSubject,
@@ -4415,6 +4420,7 @@ registerPokerRoutes(app, {
   upsertPokerSeason,
   upsertPokerSubmission,
   upsertPokerPlayDispute,
+  upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
@@ -11744,7 +11750,7 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/play', '/poker/play/results', '/poker/play/tables/:tableId', '/poker/play/tables/:tableId/history', '/poker/play/series/:seriesId/timeline', '/poker/play/rail', '/poker/play/rail/tables/:tableId', '/poker/play/rail/series/:seriesId', '/poker/play/rail/series/:seriesId/timeline', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
+app.get(['/poker', '/poker/play', '/poker/play/admin/integrity', '/poker/play/results', '/poker/play/tables/:tableId', '/poker/play/tables/:tableId/history', '/poker/play/series/:seriesId/timeline', '/poker/play/rail', '/poker/play/rail/tables/:tableId', '/poker/play/rail/series/:seriesId', '/poker/play/rail/series/:seriesId/timeline', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }

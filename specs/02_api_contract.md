@@ -1119,11 +1119,16 @@ Response fields:
 - `data.actions[]`
 - `data.disputes[]`
 - `data.openDisputes[]`
+- `data.integrityFlags[]`
+- `data.integritySummary.openFlagCount`
+- `data.integritySummary.resolvedFlagCount`
+- `data.integritySummary.dismissedFlagCount`
 - `data.auditEvents[]`
 
 Notes:
 - if the caller does not pass `handId`, the route prefers the newest open-dispute hand, otherwise the current live hand
 - `data.reviewHand.seats[]` exposes full seat cards for operator inspection
+- `data.integrityFlags[]` contains operator-visible automated review signals with redacted private seat-thread content
 
 ### GET `/api/poker/play/admin/tables/:tableId/export` (admin)
 Returns an export-ready JSON payload for one table review.
@@ -1194,6 +1199,80 @@ Failure codes:
 - `INVALID_ARGUMENT`
 - `POKER_PLAY_DISPUTE_CLOSED`
 - `POKER_PLAY_TABLE_CLOSED`
+
+### GET `/api/poker/play/admin/integrity` (admin)
+Returns the operator integrity queue across live poker tables.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Query fields:
+- `status = "open" | "resolved" | "dismissed" | "all"`; defaults to `"open"`
+- `limit`; defaults to `100` and is clamped to `200`
+- `asOf`
+
+Response fields:
+- `data.summary.openFlagCount`
+- `data.summary.resolvedFlagCount`
+- `data.summary.dismissedFlagCount`
+- `data.summary.tableCount`
+- `data.summary.eventCount`
+- `data.filter.status`
+- `data.filter.limit`
+- `data.items[]`
+- `data.processAt`
+
+Per-item fields:
+- `data.items[].flagId`
+- `data.items[].tableId`
+- `data.items[].tableTitle`
+- `data.items[].tableStatus`
+- `data.items[].seriesTitle`
+- `data.items[].handId`
+- `data.items[].seatNumber`
+- `data.items[].category`
+- `data.items[].status`
+- `data.items[].summary`
+- `data.items[].details`
+- `data.items[].createdAt`
+- `data.items[].resolvedAt`
+- `data.items[].resolvedBy`
+
+Notes:
+- queue payloads redact seat-private hand-thread content and only expose operator-safe summaries plus details
+- the queue recomputes automated integrity signals for current live tables before reading persisted flags, so `status = "open"` reflects the latest live state
+
+Failure codes:
+- `FORBIDDEN`
+
+### POST `/api/poker/play/admin/integrity/:flagId/resolve` (admin)
+Resolves or dismisses one open automated integrity signal and returns the refreshed integrity queue.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "status": "resolved",
+  "resolutionNote": "Verified shared-house seats were an approved testing scenario.",
+  "resolvedBy": "operator",
+  "asOf": "2026-03-11T15:00:30.000Z"
+}
+```
+
+Request notes:
+- `status` must be `"resolved"` or `"dismissed"`
+- `resolvedBy` defaults to `"operator"`
+
+Response fields:
+- returns the same payload shape as `GET /api/poker/play/admin/integrity`
+
+Failure codes:
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_INTEGRITY_FLAG_CLOSED`
 
 ### POST `/api/poker/play/tables/:tableId/leave`
 Leaves a live table. Cash tables cash out immediately between hands, or queue a cash-out during a live hand and return the remaining stack to offchain OIL when that hand settles. Tournament tables only allow leaving after bust-out or payout.

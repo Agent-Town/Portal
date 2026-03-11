@@ -133,6 +133,10 @@
     return buildPokerApiPath('/api/poker/play/results/me');
   }
 
+  function buildPlayIntegrityQueueApiPath({ status = '' } = {}) {
+    return buildPokerApiPath('/api/poker/play/admin/integrity', { status });
+  }
+
   function readWalletRecoveryKey() {
     try {
       return String(window.localStorage.getItem('agentTown:walletRecoveryKey') || '').trim();
@@ -419,6 +423,36 @@
               <div class="pokerMuted">${escapeHtml(formatIso(item.createdAt))}</div>
             </div>
             ${renderTimelinePayload(item.payload || {})}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderIntegrityFlagRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No integrity flags matched this filter.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.category || 'flag')} · ${escapeHtml(item.severity || 'medium')}</div>
+                <div>${escapeHtml(item.tableTitle || item.tableId || 'Poker Table')}${item.seriesTitle ? ` · ${escapeHtml(item.seriesTitle)}` : ''}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(formatIso(item.createdAt))}</div>
+            </div>
+            <div>${escapeHtml(item.summary || 'No flag summary available.')}</div>
+            <div class="pokerMeta">
+              ${item.status ? `<span class="pokerBadge">${escapeHtml(item.status)}</span>` : ''}
+              ${item.seatLabel ? `<span class="pokerBadge">${escapeHtml(item.seatLabel)}</span>` : ''}
+            </div>
+            <div class="pokerLinks">
+              <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}`))}">Open Table</a>
+              <button class="pokerButton" type="button" data-integrity-action="resolved" data-flag-id="${escapeHtml(item.flagId || '')}">Resolve</button>
+              <button class="pokerButton" type="button" data-integrity-action="dismissed" data-flag-id="${escapeHtml(item.flagId || '')}">Dismiss</button>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -1200,6 +1234,53 @@
     setStatus(Number(summary?.eventCount || 0) > 0 ? `${Number(summary?.eventCount || 0)} series timeline row${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.` : 'No series timeline rows available.');
   }
 
+  async function loadPlayIntegrityQueue() {
+    clearLiveTableStream();
+    const adminToken = readStoredPokerAdminToken();
+    setTitle('Integrity Queue', 'Operator review queue for automated suspicious-play flags.');
+    if (!adminToken) {
+      setStatus('Poker admin token required.');
+      renderCards([
+        '<h2>Integrity Queue</h2><p>Set `poker.adminToken` in local storage before opening the operator integrity queue.</p>',
+      ]);
+      return;
+    }
+    const filterStatus = String(getRouteSearchParams().get('status') || 'open').trim() || 'open';
+    setStatus('Loading integrity queue...');
+    const payload = await api(buildPlayIntegrityQueueApiPath({ status: filterStatus }), {
+      headers: { 'x-admin-token': adminToken },
+    });
+    const data = payload?.data || {};
+    const summary = data?.summary || {};
+    const items = Array.isArray(data?.items) ? data.items : [];
+    renderCards([
+      `
+        <h2>Integrity Queue</h2>
+        <p>Automated suspicious-play flags stay durable and operator-resolved. This queue is summary-only and never includes private seat-thread bodies.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Open', `${Number(summary?.openFlagCount || 0)}`)}
+          ${renderSummaryMetric('Resolved', `${Number(summary?.resolvedFlagCount || 0)}`)}
+          ${renderSummaryMetric('Dismissed', `${Number(summary?.dismissedFlagCount || 0)}`)}
+          ${renderSummaryMetric('Visible Rows', `${Number(summary?.eventCount || items.length || 0)}`)}
+          ${renderSummaryMetric('Tables', `${Number(summary?.tableCount || 0)}`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Open</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity', { status: 'all' }))}">All</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity', { status: 'resolved' }))}">Resolved</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity', { status: 'dismissed' }))}">Dismissed</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+        </div>
+      `,
+      `
+        <h2>Flags</h2>
+        ${renderIntegrityFlagRows(items)}
+      `,
+    ]);
+    bindIntegrityQueueActions(filterStatus);
+    setStatus(items.length ? `${items.length} integrity flag row${items.length === 1 ? '' : 's'} loaded.` : 'No integrity flags matched this filter.');
+  }
+
   function bindPlayMatchmakeForm() {
     const form = document.getElementById('pokerPlayMatchmakeForm');
     if (!form) return;
@@ -1635,9 +1716,11 @@
         <div class="pokerSummary">
           ${renderSummaryMetric('Review Hand', adminReview?.reviewHand?.handId || adminReview?.activeHand?.handId || 'none')}
           ${renderSummaryMetric('Open Disputes', `${Number(adminReview?.openDisputes?.length || 0)}`)}
+          ${renderSummaryMetric('Open Integrity Flags', `${Number(adminReview?.integritySummary?.openFlagCount || 0)}`)}
           ${renderSummaryMetric('Audit Events', `${Number(adminReview?.auditEvents?.length || 0)}`)}
         </div>
         <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/admin/integrity'))}">Integrity Queue</a>
           ${adminClosed ? '' : `<button class="pokerButton" type="button" data-admin-table-close="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Close + Refund</button>`}
           ${!adminClosed && series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-series-table-id="${escapeHtml(table?.tableId || '')}">Cancel Series + Refund</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
@@ -1680,6 +1763,14 @@
               </div>
             </div>
           `).join('') : '<p>No disputes on the selected hand.</p>'}
+        </div>
+        <div class="pokerStack">
+          ${Array.isArray(adminReview?.integrityFlags) && adminReview.integrityFlags.length ? adminReview.integrityFlags.map((flag) => `
+            <div class="pokerMessage">
+              <div class="pokerLabel">${escapeHtml(flag.category || 'flag')} · ${escapeHtml(flag.severity || 'medium')} · ${escapeHtml(flag.status || 'open')}</div>
+              <div>${escapeHtml(flag.summary || 'No integrity summary available.')}</div>
+            </div>
+          `).join('') : '<p>No integrity flags on this table.</p>'}
         </div>
         <div class="pokerStack">
           ${Array.isArray(adminReview?.auditEvents) && adminReview.auditEvents.length ? adminReview.auditEvents.slice(0, 12).map((event) => `
@@ -1992,6 +2083,35 @@
         setStatus(`Review failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindIntegrityQueueActions(filterStatus = 'open') {
+    const token = readStoredPokerAdminToken();
+    if (!token) return;
+    const buttons = Array.from(document.querySelectorAll('[data-integrity-action][data-flag-id]'));
+    for (const button of buttons) {
+      button.addEventListener('click', async () => {
+        const flagId = String(button.getAttribute('data-flag-id') || '').trim();
+        const action = String(button.getAttribute('data-integrity-action') || '').trim();
+        if (!flagId || !action) return;
+        setStatus(action === 'dismissed' ? 'Dismissing integrity flag...' : 'Resolving integrity flag...');
+        try {
+          await api(`/api/poker/play/admin/integrity/${encodeURIComponent(flagId)}/resolve`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              status: action === 'dismissed' ? 'dismissed' : 'resolved',
+              resolutionNote: action === 'dismissed'
+                ? 'Operator dismissed the automated integrity signal.'
+                : 'Operator resolved the automated integrity signal.',
+            }),
+          });
+          await loadPlayIntegrityQueue();
+        } catch (err) {
+          setStatus(`Integrity resolution failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function bindAdminReviewActions(tableId, seriesId = '') {
@@ -2825,6 +2945,7 @@
       }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
+      if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
       if (path === '/poker/play/results') return await loadPlayResults();
       const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);
       if (tableHistoryMatch) return await loadPlayTableHistory(tableHistoryMatch[1]);
