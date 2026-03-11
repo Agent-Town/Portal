@@ -161,7 +161,7 @@
 
     async connect({ chain = CHAIN_SOLANA, silent = false } = {}) {
       if (chain === CHAIN_SOLANA) return this._connectSolana({ silent });
-      if (chain === CHAIN_EVM) return this._connectEvm();
+      if (chain === CHAIN_EVM) return this._connectEvm({ silent });
       throw new Error('UNSUPPORTED_CHAIN');
     }
 
@@ -276,10 +276,10 @@
       return provider;
     }
 
-    async _connectEvm() {
+    async _connectEvm({ silent = false } = {}) {
       const bridge = this._bridge();
       if (bridge && typeof bridge.connectEvm === 'function') {
-        const out = await bridge.connectEvm();
+        const out = await bridge.connectEvm({ silent: !!silent });
         const address = extractAddress(out?.address || out?.account || out?.signer || out);
         if (!address) throw new Error('NO_EVM_ACCOUNT');
         this.evmAddress = address;
@@ -320,7 +320,7 @@
       const provider = await this._getEvmProvider();
       let signer = address || this.evmAddress;
       if (!signer) {
-        const conn = await this._connectEvm();
+        const conn = await this._connectEvm({ silent: false });
         signer = conn.address;
       }
       const sig = await provider.request({

@@ -7,7 +7,9 @@ function setStatus(msg, isError = false) {
 
 let cachedPrivyConfig = null;
 let autoRedirecting = false;
-const walletClient = window.initWalletClient ? window.initWalletClient() : null;
+const START_PRIVY_SESSION_CHECK_TIMEOUT_MS = 8000;
+const START_PRIVY_LOGIN_TIMEOUT_MS = 60000;
+const START_PRIVY_WALLET_WARMUP_TIMEOUT_MS = 15000;
 
 function explainPrivyError(err) {
   const code = err && typeof err.code === 'string' ? err.code : '';
@@ -24,6 +26,8 @@ function explainPrivyError(err) {
   if ((code === 'PRIVY_EMAIL_SEND_FAILED' || code === 'PRIVY_EMAIL_CODE_FAILED') && status === 403) {
     return 'Privy rejected this request (403). Check App ID/Client ID, allowed domain, and enabled email auth.';
   }
+  if (code === 'PRIVY_LOGIN_TIMEOUT') return 'Privy login took too long. Try again.';
+  if (code === 'PRIVY_SESSION_CHECK_TIMEOUT') return 'Privy session check took too long. Reload and try again.';
   if (code === 'PRIVY_BRIDGE_INIT_FAILED' || code === 'PRIVY_BRIDGE_MISSING') {
     return 'Privy SDK failed to initialize. Disable blockers, allow third-party cookies for auth.privy.io, and reload.';
   }
@@ -216,31 +220,98 @@ function getPrivyBridge() {
   return bridge && typeof bridge === 'object' ? bridge : null;
 }
 
-function privyBridgeSupportsSolanaConnect() {
-  const bridge = getPrivyBridge();
-  return !!(bridge && typeof bridge.connectSolana === 'function');
+function createStartTimeoutError(code) {
+  const err = new Error(code);
+  err.code = code;
+  return err;
 }
 
-async function ensurePrivyWallet({ silent = true } = {}) {
-  if (walletClient && typeof walletClient.connect === 'function') {
-    try {
-      const connected = await walletClient.connect({ chain: 'solana', silent: !!silent });
-      const addr = connected?.address || walletClient.getAddress({ chain: 'solana' }) || null;
-      if (addr) return true;
-    } catch {
-      // Fall through to direct Privy bridge connect.
-    }
-  }
+function withStartTimeout(promise, timeoutMs, code) {
+  const ms = Number(timeoutMs);
+  if (!Number.isFinite(ms) || ms <= 0) return promise;
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => {
+      if (timer) clearTimeout(timer);
+    }),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(createStartTimeoutError(code)), ms);
+    }),
+  ]);
+}
 
-  const bridge = getPrivyBridge();
-  if (!bridge || typeof bridge.connectSolana !== 'function') return false;
-  try {
-    const connected = await bridge.connectSolana({ silent: !!silent });
-    const addr = connected?.address || null;
-    return !!addr;
-  } catch {
-    return false;
+function extractPrivyWarmupAddress(value) {
+  if (!value) return null;
+  const direct = typeof value === 'string' ? value.trim() : '';
+  if (direct) return direct;
+  if (typeof value?.address === 'string' && value.address.trim()) return value.address.trim();
+  if (typeof value?.publicKey === 'string' && value.publicKey.trim()) return value.publicKey.trim();
+  if (typeof value?.wallet?.address === 'string' && value.wallet.address.trim()) return value.wallet.address.trim();
+  if (value?.publicKey && typeof value.publicKey.toString === 'function') {
+    const out = String(value.publicKey.toString() || '').trim();
+    if (out) return out;
   }
+  return null;
+}
+
+async function warmPrivyWalletChain(chain, {
+  silent = true,
+  timeoutMs = START_PRIVY_WALLET_WARMUP_TIMEOUT_MS,
+} = {}) {
+  const bridge = getPrivyBridge();
+  const methodName = chain === 'evm' ? 'connectEvm' : 'connectSolana';
+  if (!bridge || typeof bridge[methodName] !== 'function') {
+    return {
+      chain,
+      supported: false,
+      ok: true,
+      skipped: true,
+      address: null,
+      error: null,
+    };
+  }
+  try {
+    const result = await withStartTimeout(
+      bridge[methodName]({ silent: !!silent }),
+      timeoutMs,
+      `PRIVY_${String(chain || '').toUpperCase()}_WARMUP_TIMEOUT`
+    );
+    const address = extractPrivyWarmupAddress(result);
+    return {
+      chain,
+      supported: true,
+      ok: !!address,
+      skipped: false,
+      address: address || null,
+      error: address ? null : 'PRIVY_WALLET_NO_ADDRESS',
+    };
+  } catch (err) {
+    return {
+      chain,
+      supported: true,
+      ok: false,
+      skipped: false,
+      address: null,
+      error: String(err?.code || err?.message || 'PRIVY_WALLET_WARMUP_FAILED'),
+    };
+  }
+}
+
+async function preparePrivyWalletEntry({
+  silent = true,
+  timeoutMs = START_PRIVY_WALLET_WARMUP_TIMEOUT_MS,
+} = {}) {
+  const [solana, evm] = await Promise.all([
+    warmPrivyWalletChain('solana', { silent, timeoutMs }),
+    warmPrivyWalletChain('evm', { silent, timeoutMs }),
+  ]);
+  const supported = [solana, evm].filter((entry) => entry.supported);
+  return {
+    ready: supported.every((entry) => entry.ok),
+    supportedCount: supported.length,
+    successCount: supported.filter((entry) => entry.ok).length,
+    results: { solana, evm },
+  };
 }
 
 function appPathFromConfig(cfg) {
@@ -266,23 +337,15 @@ async function maybeAutoSkipStart() {
   if (typeof window.ensurePrivyLogin !== 'function') return;
 
   try {
-    const alreadySignedIn = await window.ensurePrivyLogin({ interactive: false, requireSession: true });
+    const alreadySignedIn = await withStartTimeout(
+      window.ensurePrivyLogin({ interactive: false, requireSession: true }),
+      START_PRIVY_SESSION_CHECK_TIMEOUT_MS,
+      'PRIVY_SESSION_CHECK_TIMEOUT'
+    );
     if (!alreadySignedIn) return;
-
-    // Check onboarding status before redirecting
-    const res = await fetch('/api/onboarding/status', {
-      method: 'GET',
-      credentials: 'same-origin',
-      cache: 'no-store'
-    });
-    if (res.ok) {
-      const { step } = await res.json();
-      // If step > 1, the user has completed the first step (wallet/login)
-      if (step > 1) {
-        autoRedirecting = true;
-        window.location.replace(appPath);
-      }
-    }
+    await preparePrivyWalletEntry({ silent: true });
+    autoRedirecting = true;
+    window.location.replace(appPath);
   } catch {
     // no-op; allow manual entry
   }
@@ -311,16 +374,19 @@ async function handleEnter() {
     setStatus('Connecting to Privy...');
     let alreadySignedIn = false;
     try {
-      alreadySignedIn = !!(await window.ensurePrivyLogin({ interactive: false }));
+      alreadySignedIn = !!(await withStartTimeout(
+        window.ensurePrivyLogin({ interactive: false }),
+        START_PRIVY_SESSION_CHECK_TIMEOUT_MS,
+        'PRIVY_SESSION_CHECK_TIMEOUT'
+      ));
     } catch (err) {
       // Silent check should never block interactive login.
       console.warn('silent privy login check failed; falling back to interactive login', err);
       alreadySignedIn = false;
     }
     if (alreadySignedIn) {
-      if (privyBridgeSupportsSolanaConnect()) {
-        ensurePrivyWallet({ silent: true }).catch(() => false);
-      }
+      setStatus('Finalizing Privy wallets...');
+      await preparePrivyWalletEntry({ silent: true });
       if (loginUi && typeof loginUi.close === 'function') loginUi.close();
       setStatus('Success. Entering Agent Town...');
       window.location.assign(appPath);
@@ -335,20 +401,26 @@ async function handleEnter() {
     while (true) {
       try {
         setStatus('Connecting to Privy...');
-        const ok = await window.ensurePrivyLogin({ interactive: true, loginUi });
+        const ok = await withStartTimeout(
+          window.ensurePrivyLogin({ interactive: true, loginUi }),
+          START_PRIVY_LOGIN_TIMEOUT_MS,
+          'PRIVY_LOGIN_TIMEOUT'
+        );
         if (!ok) {
           const out = new Error('PRIVY_LOGIN_FAILED');
           out.code = 'PRIVY_LOGIN_FAILED';
           throw out;
         }
 
-        // Wallet provisioning can lag/fail transiently; do not block app entry on /start.
-        if (privyBridgeSupportsSolanaConnect()) {
-          ensurePrivyWallet({ silent: true }).catch(() => false);
-        }
+        setStatus('Finalizing Privy wallets...');
+        const warmup = await preparePrivyWalletEntry({ silent: false });
 
         if (loginUi && typeof loginUi.close === 'function') loginUi.close();
-        setStatus('Success. Entering Agent Town...');
+        setStatus(
+          warmup.ready || warmup.supportedCount === 0
+            ? 'Success. Entering Agent Town...'
+            : 'Privy login succeeded. Finishing wallet setup in Agent Town...'
+        );
         window.location.assign(appPath);
         return;
       } catch (err) {

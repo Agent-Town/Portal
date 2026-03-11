@@ -1457,15 +1457,25 @@
         }
         throw lastErr || new Error('EMBEDDED_WALLET_PROXY_NOT_INITIALIZED');
       },
-      connectEvm: async () => {
+      connectEvm: async ({ silent = false } = {}) => {
+        const interactive = !silent;
         let lastErr = null;
         for (let attempt = 0; attempt < 4; attempt += 1) {
           try {
             const { account, provider } = await ensureEvmProvider({
-              interactive: true,
+              interactive,
               refreshProvider: attempt > 0
             });
-            const accounts = await provider.request({ method: 'eth_requestAccounts' });
+            let accounts = [];
+            if (provider && typeof provider.request === 'function') {
+              const method = interactive ? 'eth_requestAccounts' : 'eth_accounts';
+              try {
+                const out = await provider.request({ method });
+                if (Array.isArray(out)) accounts = out;
+              } catch (err) {
+                if (interactive || !isUnsupportedEvmMethodError(err, method)) throw err;
+              }
+            }
             const address = normalizeAddress(Array.isArray(accounts) && accounts.length ? accounts[0] : account.address);
             if (!address) throw new Error('NO_EVM_ACCOUNT');
             return {
