@@ -87,6 +87,38 @@ This suite is a readiness check for wallet-backed flows, not a complete product 
 
 If `data/local.sepolia.wallet.json` is missing or still contains placeholder values, the lane should be treated as "private wallet not configured yet", not as a product failure.
 
+## House flows are manual-live, not fake-live
+
+There is intentionally no automated external "house live lane" in this repo yet.
+Attaching a real house still depends on a real user/session journey, so pretending that a `__test__` helper or seeded session proves live House behavior would be misleading.
+
+Instead, House flows use a session-bound readiness report plus a manual validation checklist:
+
+- `GET /api/platform/house-readiness`
+- the `House readiness` panel in the House Console
+
+What that readiness report verifies:
+
+- whether the current live session has an attached house
+- whether an active team is selected
+- whether House Office, Workshop, Tracks, Archive, Trainer, and Experiences are ready for in-shell validation
+- which district sections should be reachable during the walkthrough
+- the exact manual validation steps and success metrics an operator should use
+
+Recommended House validation sequence:
+
+1. open the House Console in `/app?district=house`
+2. confirm the readiness summary no longer reports `HOUSE_REQUIRED` or `ACTIVE_TEAM_REQUIRED`
+3. open `House Office` and confirm the selected-office card, briefing, attention, and office map render inside `/app`
+4. follow one briefing citation and confirm the shell stays in `/app`
+5. open `Workshop`, `Tracks`, `Archive`, and `Trainer` and confirm the same active team context is preserved
+
+This is the honest boundary today:
+
+- automated deterministic coverage proves the House shell and contracts
+- the readiness report proves whether a current live session is ready for operator validation
+- the final user-level walkthrough is still manual until a true external House live lane exists
+
 ## Removed false-live behavior
 
 The previous guest live lane was not fully live. It ran the app under `NODE_ENV=test`, which caused `/api/privy/config` to expose `testMode`, and the frontend then selected the deterministic guest bridge in `public/privy_bridge.js`.

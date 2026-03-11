@@ -1027,6 +1027,166 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildHouseFlowReadinessPayload({
+    context = {},
+  } = {}) {
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    const overview = buildHouseOfficeOverviewPayload({
+      context,
+      houseId,
+      teamId,
+    });
+    const counts = overview?.sourceManifest?.counts && typeof overview.sourceManifest.counts === 'object'
+      ? overview.sourceManifest.counts
+      : {};
+    const activeConfigVersionId = String(overview?.sourceManifest?.activeConfigVersionId || '').trim();
+    const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
+    const blockers = [];
+    if (!houseId) {
+      blockers.push({
+        code: 'HOUSE_REQUIRED',
+        message: 'Attach a house before validating House Office, Workshop, Tracks, Archive, and Trainer flows.',
+      });
+    }
+    if (houseId && !teamId) {
+      blockers.push({
+        code: 'ACTIVE_TEAM_REQUIRED',
+        message: 'Select an active team before validating team-specific House flows.',
+      });
+    }
+    const districtSections = [
+      { sectionId: 'front_desk', label: 'Front Desk', surface: 'office' },
+      { sectionId: 'workshop_wing', label: 'Workshop Wing', surface: 'workshop' },
+      { sectionId: 'analysis_wing', label: 'Analysis Wing', surface: 'trainer' },
+      { sectionId: 'archive_wing', label: 'Archive Wing', surface: 'archive' },
+      { sectionId: 'operations_wing', label: 'Operations Wing', surface: 'experiences' },
+      { sectionId: 'tracks_board', label: 'Tracks Board', surface: 'tracks' },
+    ];
+    const blockedBy = blockers.map((entry) => String(entry?.code || '').trim()).filter(Boolean);
+    const status = blockers.length ? 'action_required' : 'ready_for_manual_validation';
+    const summary = blockers.length
+      ? blockers.map((entry) => String(entry?.message || '').trim()).filter(Boolean).join(' ')
+      : 'House flows are ready for manual validation inside the current shell.';
+    const surfaces = [
+      {
+        surface: 'office',
+        label: 'House Office',
+        route: '/api/platform/house-office',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? `${Number(counts.officeCount || 0)} offices · ${Number(counts.briefingItemCount || 0)} briefing items · ${Number(counts.attentionCount || 0)} attention items`
+          : 'Requires an attached house and active team.',
+      },
+      {
+        surface: 'workshop',
+        label: 'House Workshop',
+        route: '/api/platform/workshop',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? (activeConfigVersionId
+            ? `Active config ${activeConfigVersionId} is bound for the current team.`
+            : 'No active config is currently bound to the selected team.')
+          : 'Requires an attached house and active team.',
+      },
+      {
+        surface: 'tracks',
+        label: 'House Tracks',
+        route: '/api/platform/tracks',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? `${Number(counts.trackCount || 0)} tracks · ${Number(counts.trackEventCount || 0)} track events`
+          : 'Requires an attached house and active team.',
+      },
+      {
+        surface: 'archive',
+        label: 'House Archive',
+        route: '/api/platform/archive',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? `${Number(counts.archiveRunCount || 0)} canonical archive runs`
+          : 'Requires an attached house and active team.',
+      },
+      {
+        surface: 'trainer',
+        label: 'House Trainer',
+        route: '/api/platform/trainer',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? `${Number(counts.trainerJobCount || 0)} trainer jobs · ${Number(counts.trainerResultCount || 0)} trainer results`
+          : 'Requires an attached house and active team.',
+      },
+      {
+        surface: 'experiences',
+        label: 'House Experiences',
+        route: '/api/platform/experiences',
+        ready: blockers.length === 0,
+        status: blockers.length === 0 ? 'ready' : 'blocked',
+        blockedBy,
+        summary: blockers.length === 0
+          ? `${Number(counts.experienceCount || 0)} experience entries available from the current House shell`
+          : 'Requires an attached house and active team.',
+      },
+    ];
+    const checklist = [
+      {
+        stepId: 'open_house_office',
+        label: 'Open House Office',
+        successMetric: 'The Office panel stays inside /app and shows a selected office card plus the current briefing, attention, and office map.',
+      },
+      {
+        stepId: 'follow_briefing_citation',
+        label: 'Follow one House Briefing citation',
+        successMetric: 'A real House source surface opens in-shell and the worker session remains continuous.',
+      },
+      {
+        stepId: 'open_workshop_and_tracks',
+        label: 'Open Workshop and Tracks',
+        successMetric: 'The selected team context stays stable while active config lineage and track progress remain readable.',
+      },
+      {
+        stepId: 'open_archive_and_trainer',
+        label: 'Open Archive and Trainer',
+        successMetric: 'Canonical traces and durable trainer records remain reachable without leaving the House shell.',
+      },
+    ];
+    return {
+      schema: 'agent-town-house-readiness/v1',
+      houseId: houseId || null,
+      activeTeamId: teamId || null,
+      availableTeamIds,
+      status,
+      summary,
+      blockers,
+      districtSections,
+      surfaces,
+      checklist,
+      counts: {
+        officeCount: Number(counts.officeCount || 0),
+        staffAgentCount: Number(counts.staffAgentCount || 0),
+        assignmentCount: Number(counts.assignmentCount || 0),
+        presenceCount: Number(counts.presenceCount || 0),
+        briefingItemCount: Number(counts.briefingItemCount || 0),
+        attentionCount: Number(counts.attentionCount || 0),
+        trackCount: Number(counts.trackCount || 0),
+        trackEventCount: Number(counts.trackEventCount || 0),
+        trainerJobCount: Number(counts.trainerJobCount || 0),
+        trainerResultCount: Number(counts.trainerResultCount || 0),
+        archiveRunCount: Number(counts.archiveRunCount || 0),
+      },
+    };
+  }
+
   function normalizePackFileMap(fileMap) {
     if (!fileMap || typeof fileMap !== 'object' || Array.isArray(fileMap)) return {};
     return Object.entries(fileMap).reduce((acc, [rawKey, rawValue]) => {
@@ -1452,6 +1612,18 @@ function registerPlatformReadRoutes(app, deps) {
       context,
       houseId,
       teamId,
+    }), { requestId });
+  });
+
+  app.get('/api/platform/house-readiness', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    return sendPortalApiSuccess(res, buildHouseFlowReadinessPayload({
+      context,
     }), { requestId });
   });
 

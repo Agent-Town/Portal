@@ -491,6 +491,15 @@ let houseSurfaceState = {
     activeTeamId: '',
     availableTeamIds: [],
   },
+  readiness: {
+    loaded: false,
+    status: '',
+    summary: 'House readiness will appear here once the shell context is available.',
+    blockers: [],
+    surfaces: [],
+    checklist: [],
+    districtSections: [],
+  },
   office: {
     loaded: false,
     offices: [],
@@ -1306,6 +1315,15 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   houseSurfaceState.context.activeTeamId = nextActiveTeamId;
   houseSurfaceState.context.availableTeamIds = nextTeamIds;
   if (previousActiveTeamId !== nextActiveTeamId) {
+    houseSurfaceState.readiness.loaded = false;
+    houseSurfaceState.readiness.status = '';
+    houseSurfaceState.readiness.summary = nextHouseId
+      ? 'House readiness is refreshing for the selected team.'
+      : 'Attach a house to inspect live House readiness.';
+    houseSurfaceState.readiness.blockers = [];
+    houseSurfaceState.readiness.surfaces = [];
+    houseSurfaceState.readiness.checklist = [];
+    houseSurfaceState.readiness.districtSections = [];
     houseSurfaceState.office.loaded = false;
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
@@ -1388,11 +1406,115 @@ function renderHouseSurfaceContext() {
   summaryNode.textContent = `Active team: ${activeTeamId}`;
 }
 
+function renderHouseReadiness() {
+  const summaryNode = el('houseReadinessSummary');
+  const surfacesNode = el('houseReadinessSurfaces');
+  const checklistNode = el('houseReadinessChecklist');
+  if (!summaryNode || !surfacesNode || !checklistNode) return;
+  const readiness = houseSurfaceState.readiness && typeof houseSurfaceState.readiness === 'object'
+    ? houseSurfaceState.readiness
+    : {};
+  const blockers = Array.isArray(readiness.blockers) ? readiness.blockers : [];
+  const surfaces = Array.isArray(readiness.surfaces) ? readiness.surfaces : [];
+  const checklist = Array.isArray(readiness.checklist) ? readiness.checklist : [];
+
+  summaryNode.textContent = String(
+    readiness.summary
+    || (blockers.length ? 'House readiness is blocked.' : 'House readiness will appear here once the shell context is available.')
+  ).trim();
+  summaryNode.style.color = blockers.length ? 'var(--warn)' : 'var(--muted)';
+  summaryNode.style.overflowWrap = 'anywhere';
+
+  surfacesNode.innerHTML = '';
+  if (!surfaces.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = blockers.length
+      ? blockers.map((entry) => String(entry?.code || '').trim()).filter(Boolean).join(' · ')
+      : 'No House readiness signals loaded yet.';
+    surfacesNode.appendChild(placeholder);
+  } else {
+    surfaces.forEach((surface) => {
+      const row = document.createElement('div');
+      row.className = 'small';
+      row.setAttribute('data-testid', 'house-readiness-surface');
+      row.style.border = '1px solid rgba(255,255,255,0.12)';
+      row.style.borderRadius = '10px';
+      row.style.padding = '8px';
+      row.style.background = 'rgba(255,255,255,0.02)';
+      row.style.overflowWrap = 'anywhere';
+      row.textContent = `${String(surface?.label || surface?.surface || 'Surface').trim() || 'Surface'} · ${String(surface?.status || 'unknown').trim() || 'unknown'} · ${String(surface?.summary || '').trim() || 'No summary available.'}`;
+      surfacesNode.appendChild(row);
+    });
+  }
+
+  checklistNode.innerHTML = '';
+  if (!checklist.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = blockers.length
+      ? 'Attach a house and select an active team to unlock the House validation checklist.'
+      : 'No manual validation checklist is available yet.';
+    checklistNode.appendChild(placeholder);
+  } else {
+    checklist.forEach((item) => {
+      const row = document.createElement('article');
+      row.setAttribute('data-testid', 'house-readiness-check-item');
+      row.style.border = '1px solid rgba(255,255,255,0.12)';
+      row.style.borderRadius = '10px';
+      row.style.padding = '8px';
+      row.style.background = 'rgba(255,255,255,0.02)';
+
+      const titleNode = document.createElement('div');
+      titleNode.style.fontWeight = '600';
+      titleNode.textContent = String(item?.label || item?.stepId || 'Manual validation step').trim() || 'Manual validation step';
+      row.appendChild(titleNode);
+
+      const metricNode = document.createElement('div');
+      metricNode.className = 'small';
+      metricNode.style.marginTop = '4px';
+      metricNode.style.overflowWrap = 'anywhere';
+      metricNode.textContent = String(item?.successMetric || '').trim() || 'No validation metric documented.';
+      row.appendChild(metricNode);
+      checklistNode.appendChild(row);
+    });
+  }
+}
+
 async function loadHousePlatformContext() {
   const response = await api('/api/platform/context');
   const data = response?.data || response || {};
   syncHouseSurfaceContextFromPayload(data);
   return data;
+}
+
+async function loadHouseReadiness({ skipContext = false } = {}) {
+  try {
+    if (!skipContext) {
+      await loadHousePlatformContext();
+      return houseSurfaceState.readiness;
+    }
+    const response = await api('/api/platform/house-readiness');
+    const data = response?.data || response || {};
+    syncHouseSurfaceContextFromPayload(data);
+    houseSurfaceState.readiness.loaded = true;
+    houseSurfaceState.readiness.status = String(data.status || '').trim();
+    houseSurfaceState.readiness.summary = String(data.summary || '').trim() || 'House readiness is unavailable.';
+    houseSurfaceState.readiness.blockers = Array.isArray(data.blockers) ? data.blockers : [];
+    houseSurfaceState.readiness.surfaces = Array.isArray(data.surfaces) ? data.surfaces : [];
+    houseSurfaceState.readiness.checklist = Array.isArray(data.checklist) ? data.checklist : [];
+    houseSurfaceState.readiness.districtSections = Array.isArray(data.districtSections) ? data.districtSections : [];
+  } catch (err) {
+    houseSurfaceState.readiness.loaded = true;
+    houseSurfaceState.readiness.status = 'unavailable';
+    houseSurfaceState.readiness.summary = `House readiness unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`;
+    houseSurfaceState.readiness.blockers = [];
+    houseSurfaceState.readiness.surfaces = [];
+    houseSurfaceState.readiness.checklist = [];
+    houseSurfaceState.readiness.districtSections = [];
+  }
+  renderHouseReadiness();
+  return houseSurfaceState.readiness;
 }
 
 async function setHouseActiveTeam(teamId) {
@@ -1418,6 +1540,9 @@ async function setHouseActiveTeam(teamId) {
     await loadHouseWorkshopSurface({ skipContext: true });
   } else if (houseSurfaceState.activeSurface === 'trainer') {
     await loadHouseTrainerSurface({ skipContext: true });
+  }
+  if (el('houseReadinessSummary')) {
+    await loadHouseReadiness({ skipContext: true });
   }
   return data;
 }
@@ -5029,6 +5154,11 @@ function bindTownDistrictControls() {
   renderHouseTrainerSurface();
   loadHousePlatformContext().catch(() => {
     renderHouseSurfaceContext();
+  }).then(() => {
+    if (!el('houseReadinessSummary')) return;
+    loadHouseReadiness({ skipContext: true }).catch(() => {
+      renderHouseReadiness();
+    });
   });
 }
 

@@ -1073,6 +1073,51 @@ Response fields:
 - `data.summary.archiveRunCount`
 - `data.emptyStateText`
 
+### GET `/api/platform/house-readiness` (human)
+Returns a session-bound House flow readiness report for live-user validation inside the current shell.
+This route is intentionally not a fake external live lane: it reports whether House Office, Workshop, Tracks, Archive, Trainer, and Experiences are ready for an operator walkthrough and what to validate next.
+
+Response fields:
+- `data.schema`
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.status`
+- `data.summary`
+- `data.blockers[]`
+- `data.blockers[].code`
+- `data.blockers[].message`
+- `data.districtSections[]`
+- `data.districtSections[].sectionId`
+- `data.districtSections[].label`
+- `data.districtSections[].surface`
+- `data.surfaces[]`
+- `data.surfaces[].surface`
+- `data.surfaces[].label`
+- `data.surfaces[].route`
+- `data.surfaces[].ready`
+- `data.surfaces[].status`
+- `data.surfaces[].blockedBy[]`
+- `data.surfaces[].summary`
+- `data.checklist[]`
+- `data.checklist[].stepId`
+- `data.checklist[].label`
+- `data.checklist[].successMetric`
+- `data.counts.officeCount`
+- `data.counts.staffAgentCount`
+- `data.counts.assignmentCount`
+- `data.counts.presenceCount`
+- `data.counts.briefingItemCount`
+- `data.counts.attentionCount`
+- `data.counts.trackCount`
+- `data.counts.trackEventCount`
+- `data.counts.trainerJobCount`
+- `data.counts.trainerResultCount`
+- `data.counts.archiveRunCount`
+
+Stable failure codes:
+- `SESSION_REQUIRED`
+
 ### POST `/api/platform/house-office/assignments` (human)
 Creates one minimal, session-bound House Office staff assignment for the current attached House and active team.
 Repeated identical assignment requests return the same `assignmentId`.
