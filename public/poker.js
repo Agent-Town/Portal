@@ -201,6 +201,14 @@
     return buildPokerApiPath('/api/poker/play/results/me');
   }
 
+  function buildPlayNativeSeasonApiPath(seasonId = '') {
+    const normalizedSeasonId = String(seasonId || '').trim();
+    if (!normalizedSeasonId) {
+      return buildPokerApiPath('/api/poker/play/seasons/native/current');
+    }
+    return buildPokerApiPath(`/api/poker/play/seasons/native/${encodeURIComponent(normalizedSeasonId)}/leaderboard`);
+  }
+
   function buildPlayIntegrityQueueApiPath({ status = '' } = {}) {
     return buildPokerApiPath('/api/poker/play/admin/integrity', { status });
   }
@@ -325,6 +333,13 @@
     if (value === 'registered') return 'registered for next hand';
     if (value.includes('_')) return value.replace(/_/g, ' ');
     return value || 'active';
+  }
+
+  function formatWalletSubject(value) {
+    const normalized = String(value || '').trim();
+    if (!normalized) return 'unknown wallet';
+    if (normalized.length <= 14) return normalized;
+    return `${normalized.slice(0, 8)}...${normalized.slice(-4)}`;
   }
 
   function renderCards(items) {
@@ -491,6 +506,35 @@
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}`))}">Open Table</a>
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId || '')}/history`, { status: 'completed' }))}">Hand History</a>
               ${item.seriesId ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId)}/timeline`))}">Series Timeline</a>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderNativeSeasonLeaderboardRows(items) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return '<p>No closed live-play rows landed in this native season yet.</p>';
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage" data-native-season-rank="${Number(item?.rank || 0)}" data-wallet-subject="${escapeHtml(String(item?.walletSubject || ''))}">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">#${Number(item?.rank || 0)} · ${escapeHtml(item?.displayName || formatWalletSubject(item?.walletSubject || ''))}</div>
+                <div>${escapeHtml(formatWalletSubject(item?.walletSubject || ''))}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(item?.latestAt ? formatIso(item.latestAt) : 'n/a')}</div>
+            </div>
+            <div class="pokerSummary">
+              ${renderSummaryMetric('Net', `${Number(item?.netOil || 0)} OIL`)}
+              ${renderSummaryMetric('ROI', `${Number(item?.roiPercent || 0)}%`)}
+              ${renderSummaryMetric('Cash Net', `${Number(item?.cashNetOil || 0)} OIL`)}
+              ${renderSummaryMetric('Tournament Net', `${Number(item?.tournamentNetOil || 0)} OIL`)}
+              ${renderSummaryMetric('Wins', `${Number(item?.tournamentWins || 0)}`)}
+              ${renderSummaryMetric('Cashes', `${Number(item?.tournamentCashes || 0)}`)}
+              ${renderSummaryMetric('Treasury', `${Number(item?.treasuryContributionOil || 0)} OIL`)}
             </div>
           </div>
         `).join('')}
@@ -1436,6 +1480,7 @@
         <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a sit-and-go that waits for either a full table or a configured start target, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/schedule'))}">Tournament Schedule</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Native Season</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
@@ -1968,6 +2013,7 @@
         </div>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Native Season</a>
         </div>
       `,
       `
@@ -1998,6 +2044,66 @@
       `,
     ]);
     setStatus(items.length ? `${items.length} result row${items.length === 1 ? '' : 's'} loaded.` : 'No poker results available for this wallet yet.');
+  }
+
+  async function loadPlayNativeSeason(seasonId = '') {
+    clearLiveTableStream();
+    setTitle('Native Season', 'Wallet-bound live-play standings derived from durable offchain poker rows.');
+    setStatus('Loading native season leaderboard...');
+    const payload = await api(buildPlayNativeSeasonApiPath(seasonId));
+    const data = payload?.data || {};
+    const season = data?.season || {};
+    const summary = season?.summary || {};
+    const leaderboard = data?.leaderboard || {};
+    const items = Array.isArray(leaderboard?.items) ? leaderboard.items : [];
+    const explicitSeasonPath = season?.seasonId
+      ? buildPokerHref(`/poker/play/seasons/native/${encodeURIComponent(season.seasonId)}`)
+      : buildPokerHref('/poker/play/seasons/native');
+    renderCards([
+      `
+        <h2>${escapeHtml(season?.title || season?.seasonId || 'Native Live Season')}</h2>
+        <p>Native season standings come from durable live-play rows only. No mirrored operator ladder is mixed into this page.</p>
+        <div class="pokerSummary" data-native-season-summary="1">
+          ${renderSummaryMetric('Season', season?.seasonId || 'current')}
+          ${renderSummaryMetric('Status', season?.status || 'running')}
+          ${renderSummaryMetric('Players', `${Number(summary?.playerCount || 0)}`)}
+          ${renderSummaryMetric('Tables', `${Number(summary?.tableCount || 0)}`)}
+          ${renderSummaryMetric('Entries', `${Number(summary?.entryCount || 0)}`)}
+          ${renderSummaryMetric('Net', `${Number(summary?.totalNetOil || 0)} OIL`)}
+          ${renderSummaryMetric('Treasury', `${Number(summary?.totalTreasuryContributionOil || 0)} OIL`)}
+          ${renderSummaryMetric('Room Drift', `${Number(summary?.roomNetDriftOil || 0)} OIL`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Current Season</a>
+          <a href="${escapeHtml(explicitSeasonPath)}">Open Explicit Season</a>
+        </div>
+      `,
+      `
+        <h2>Season Economy</h2>
+        <p>These totals expose exactly how native offchain OIL moved through live cash sessions and tournaments in the selected season window.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Cash Sessions', `${Number(summary?.cashSessionCount || 0)}`)}
+          ${renderSummaryMetric('Tournament Entries', `${Number(summary?.tournamentEntryCount || 0)}`)}
+          ${renderSummaryMetric('Invested', `${Number(summary?.investedOil || 0)} OIL`)}
+          ${renderSummaryMetric('Returned', `${Number(summary?.returnedOil || 0)} OIL`)}
+          ${renderSummaryMetric('Prizes', `${Number(summary?.prizeOil || 0)} OIL`)}
+          ${renderSummaryMetric('Bounties', `${Number(summary?.bountyOil || 0)} OIL`)}
+          ${renderSummaryMetric('Cash Rake', `${Number(summary?.totalCashRakeOil || 0)} OIL`)}
+          ${renderSummaryMetric('Tournament Fees', `${Number(summary?.totalTournamentFeeOil || 0)} OIL`)}
+          ${renderSummaryMetric('Treasury Credits', `${Number(summary?.actualTreasuryCreditOil || 0)} OIL`)}
+        </div>
+      `,
+      `
+        <h2>Leaderboard</h2>
+        <p>Rank order is deterministic by net OIL, then tournament wins, then cash net. Wallet display stays minimal while the full wallet subject remains available in the exportable API payload.</p>
+        ${renderNativeSeasonLeaderboardRows(items)}
+      `,
+    ]);
+    setStatus(items.length
+      ? `${items.length} native season row${items.length === 1 ? '' : 's'} loaded.`
+      : 'Native season ready with no closed live-play rows yet.');
   }
 
   async function loadPlayTableHistory(tableId) {
@@ -4808,9 +4914,12 @@
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
       if (path === '/poker/play/schedule') return await loadPlaySchedule();
+      if (path === '/poker/play/seasons/native') return await loadPlayNativeSeason();
       if (path === '/poker/play/admin/ops') return await loadPlayOpsDashboard();
       if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
       if (path === '/poker/play/results') return await loadPlayResults();
+      const nativeSeasonMatch = path.match(/^\/poker\/play\/seasons\/native\/([^/]+)$/);
+      if (nativeSeasonMatch) return await loadPlayNativeSeason(nativeSeasonMatch[1]);
       const handReviewMatch = path.match(/^\/poker\/play\/hands\/([^/]+)\/review$/);
       if (handReviewMatch) return await loadPlayHandReview(handReviewMatch[1]);
       const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);
