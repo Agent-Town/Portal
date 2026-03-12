@@ -2726,6 +2726,7 @@ function updateLibraryPublicStackReview({
   summary = '',
   note = '',
   verificationRef = '',
+  idempotencyKey = '',
   metadata = null,
   nowIso = new Date().toISOString(),
 } = {}) {
@@ -2737,6 +2738,7 @@ function updateLibraryPublicStackReview({
   const nextSummary = String(summary || existing.summary || '').trim() || existing.summary || '';
   const nextNote = typeof note === 'string' ? note : existing.note;
   const nextVerificationRef = String(verificationRef || existing.verificationRef || '').trim() || null;
+  const nextIdempotencyKey = String(idempotencyKey || existing.idempotencyKey || '').trim() || null;
   const nextMetadata = metadata && typeof metadata === 'object'
     ? {
         ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
@@ -2750,6 +2752,7 @@ function updateLibraryPublicStackReview({
         summary = ?,
         note = ?,
         verification_ref = ?,
+        idempotency_key = ?,
         metadata_json = ?,
         updated_at = ?
     WHERE library_public_stack_review_id = ?
@@ -2758,6 +2761,7 @@ function updateLibraryPublicStackReview({
     nextSummary,
     String(nextNote || ''),
     nextVerificationRef,
+    nextIdempotencyKey,
     JSON.stringify(nextMetadata),
     nowIso,
     normalizedLibraryPublicStackReviewId,

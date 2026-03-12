@@ -15,6 +15,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPeerRelay,
     createLibraryPublicStack,
     createLibraryPublicStackMember,
+    createLibraryPublicStackReview,
     createLibraryPublicStackVerification,
     createLibraryPublicStackVerificationMember,
     createLibrarySatchelReceipt,
@@ -35,6 +36,8 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicationById,
     getLibraryPublicStackById,
     getLibraryPublicStackByIdempotency,
+    getLibraryPublicStackReview,
+    getLibraryPublicStackReviewByIdempotency,
     getLibraryPublicStackVerificationById,
     getLibraryPublicStackVerificationByIdempotency,
     getLatestLibraryPublicStackVerification,
@@ -59,6 +62,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
     listLibraryPublicStackMembers,
+    listLibraryPublicStackReviews,
     listLibraryPublicStacks,
     listLibraryPublicStackVerificationMembers,
     listLibraryPublicStackVerifications,
@@ -107,6 +111,7 @@ function registerPlatformReadRoutes(app, deps) {
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
+    updateLibraryPublicStackReview,
     updateLibraryPublicStackVerification,
     updateLibraryPeerRelay,
     updateLibrarySatchelRelay,
@@ -1155,6 +1160,31 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function normalizeLibraryPublicStackReviewTier(reviewTier = '') {
+    const normalized = String(reviewTier || '').trim().toLowerCase();
+    if (normalized === 'trusted_here') return 'trusted_here';
+    if (normalized === 'review_later') return 'review_later';
+    if (normalized === 'blocked_here') return 'blocked_here';
+    return '';
+  }
+
+  function buildLibraryPublicStackReviewSummary({
+    reviewTier = '',
+    note = '',
+  } = {}) {
+    const normalizedReviewTier = normalizeLibraryPublicStackReviewTier(reviewTier);
+    const normalizedNote = String(note || '').trim();
+    let prefix = '';
+    if (normalizedReviewTier === 'trusted_here') {
+      prefix = 'Trusted here for this House.';
+    } else if (normalizedReviewTier === 'blocked_here') {
+      prefix = 'Blocked here for this House.';
+    } else {
+      prefix = 'Saved for later review in this House.';
+    }
+    return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
+  }
+
   function searchLibraryPublicStackGroups({
     query = '',
     family = '',
@@ -1914,6 +1944,72 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function persistLibraryPublicStackReviewRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    reviewTier = '',
+    note = '',
+    verificationRef = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existingReplay = getLibraryPublicStackReviewByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return {
+        status: 200,
+        review: existingReplay,
+      };
+    }
+    const summary = buildLibraryPublicStackReviewSummary({
+      reviewTier,
+      note,
+    });
+    const existing = getLibraryPublicStackReview({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        review: updateLibraryPublicStackReview({
+          libraryPublicStackReviewId: existing.libraryPublicStackReviewId,
+          reviewTier,
+          summary,
+          note,
+          verificationRef,
+          idempotencyKey,
+          metadata: {
+            updatedFrom: 'portal.house.library.public-stack.review',
+          },
+          nowIso: nowIso(),
+        }),
+      };
+    }
+    return {
+      status: 201,
+      review: createLibraryPublicStackReview({
+        libraryPublicStackReviewId: `pstrev_${randomHex(12)}`,
+        libraryPublicStackId,
+        houseId,
+        teamId,
+        reviewTier,
+        summary,
+        note,
+        verificationRef,
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.review',
+        },
+        nowIso: nowIso(),
+      }),
+    };
+  }
+
   function ensureLibraryPublicStackVerification({
     houseId = '',
     teamId = '',
@@ -2602,6 +2698,60 @@ function registerPlatformReadRoutes(app, deps) {
       }
       throw err;
     }
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/reviews', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before reviewing a Public Stack.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before reviewing a Public Stack.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to review a Public Stack.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to review a Public Stack.', { requestId });
+    }
+    const reviewTier = normalizeLibraryPublicStackReviewTier(req.body?.reviewTier);
+    if (!reviewTier) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PUBLIC_STACK_REVIEW_TIER_REQUIRED', 'Choose one local review tier for this Public Stack.', { requestId });
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+    const preview = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    if (!preview.ok) {
+      return sendPortalApiError(res, 404, preview.code || 'PUBLIC_STACK_NOT_FOUND', preview.message || 'Public Stack not found.', { requestId });
+    }
+    const latestVerification = getLatestLibraryPublicStackVerification({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    const persisted = persistLibraryPublicStackReviewRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+      reviewTier,
+      note,
+      verificationRef: latestVerification?.libraryPublicStackVerificationId || '',
+      idempotencyKey,
+    });
+    return sendPortalApiSuccess(res, {
+      review: persisted.review,
+      preview: preview.preview,
+    }, { requestId, status: persisted.status });
   });
 
   app.post('/api/platform/library/public-stacks/:registryEntityId/imports', express.json({ limit: '32kb' }), (req, res) => {
