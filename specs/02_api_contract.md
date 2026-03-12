@@ -1387,6 +1387,23 @@ Response fields:
 - `data.activeTeamId`
 - `data.availableTeamIds[]`
 - `data.deployments[]`
+- `data.runtimeInstances[]`
+- `data.runtimeInstances[].runtimeInstanceId`
+- `data.runtimeInstances[].houseWorkerSessionId`
+- `data.runtimeInstances[].executorKind`
+- `data.runtimeInstances[].executorProvider`
+- `data.runtimeInstances[].executorRef`
+- `data.runtimeInstances[].requestedRuntimeProfile`
+- `data.runtimeInstances[].appliedRuntimeProfile`
+- `data.runtimeInstances[].runtimeBinding`
+- `data.runtimeInstances[].leaseOwnerKind`
+- `data.runtimeInstances[].leaseOwnerLabel`
+- `data.runtimeInstances[].leaseOwnerId`
+- `data.runtimeInstances[].leaseStatus`
+- `data.runtimeInstances[].lastHeartbeatAt`
+- `data.runtimeInstances[].leaseExpiresAt`
+- `data.runtimeInstances[].startedAt`
+- `data.runtimeInstances[].stoppedAt`
 - `data.sessions[]`
 - `data.sessions[].houseWorkerSessionId`
 - `data.sessions[].deploymentId`
@@ -1394,12 +1411,16 @@ Response fields:
 - `data.sessions[].statusLabel`
 - `data.sessions[].runtimeAgentId`
 - `data.sessions[].runtimeSessionId`
+- `data.sessions[].runtimeInstanceId`
+- `data.sessions[].executorKind`
+- `data.sessions[].executorProvider`
 - `data.sessions[].latestTask`
 - `data.sessions[].latestReply`
 - `data.sessions[].runtimeProfile`
 - `data.sessions[].requestedRuntimeProfile`
 - `data.sessions[].appliedRuntimeProfile`
 - `data.sessions[].runtimeBinding`
+- `data.sessions[].runtimeInstance`
 - `data.sessions[].leaseStatus`
 - `data.sessions[].lastHeartbeatAt`
 - `data.sessions[].leaseExpiresAt`
@@ -1434,6 +1455,7 @@ Response fields:
 - `data.teamId`
 - `data.activeTeamId`
 - `data.availableTeamIds[]`
+- `data.runtimeInstances[]`
 - `data.sessions[]`
 - `data.deployments[]`
 - `data.concurrencyLimit`
@@ -1449,6 +1471,10 @@ Per-session fields:
 - `requestedRuntimeProfile`
 - `appliedRuntimeProfile`
 - `runtimeBinding`
+- `runtimeInstanceId`
+- `executorKind`
+- `executorProvider`
+- `runtimeInstance`
 - `leaseStatus`
 - `ownerKind`
 - `ownerLabel`
@@ -1468,6 +1494,47 @@ Per-session fields:
 - `latestTask`
 - `latestReply`
 - `eventCount`
+
+Per-runtime-instance fields:
+- `runtimeInstanceId`
+- `houseWorkerSessionId`
+- `deploymentId`
+- `executorKind`
+- `executorProvider`
+- `executorRef`
+- `requestedRuntimeProfile`
+- `appliedRuntimeProfile`
+- `runtimeBinding`
+- `leaseOwnerKind`
+- `leaseOwnerLabel`
+- `leaseOwnerId`
+- `leaseStatus`
+- `lastHeartbeatAt`
+- `leaseExpiresAt`
+- `startedAt`
+- `stoppedAt`
+
+### GET `/api/platform/house-workers/runtime-instances` (human)
+Returns first-class durable helper runtime instances for the current House team.
+
+Query params:
+- `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.runtimeInstances[]`
+- `data.sessions[]`
+- `data.deployments[]`
+- `data.concurrencyLimit`
+- `data.sourceManifest`
+- `data.emptyStateText`
 
 ### POST `/api/platform/house-workers/spawn` (human)
 Starts one installed House helper as a real child worker session.

@@ -89,6 +89,18 @@ async function listHouseWorkerSessions(request, { teamId = '' } = {}) {
   return readJsonResponse(response);
 }
 
+async function listHouseWorkerRuntimeInstances(request, { teamId = '' } = {}) {
+  const search = new URLSearchParams();
+  if (teamId) search.set('teamId', String(teamId || '').trim());
+  const response = await request.get(
+    search.toString()
+      ? `/api/platform/house-workers/runtime-instances?${search.toString()}`
+      : '/api/platform/house-workers/runtime-instances',
+    { failOnStatusCode: false }
+  );
+  return readJsonResponse(response);
+}
+
 async function getHouseWorkerLiveReadiness(request) {
   const response = await request.get('/api/platform/house-workers/live-readiness', {
     failOnStatusCode: false,
@@ -189,6 +201,7 @@ module.exports = {
   installSharedHouseWorker,
   listHouseWorkerShares,
   listHouseWorkerSessions,
+  listHouseWorkerRuntimeInstances,
   messageHouseWorker,
   readHouseWorkerSessionsFromPage,
   readHouseWorkerLiveReadinessFromPage,

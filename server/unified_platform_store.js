@@ -28,6 +28,7 @@ const PLATFORM_TABLES = Object.freeze([
   'house_worker_shares',
   'house_worker_share_invites',
   'house_worker_sessions',
+  'house_worker_runtime_instances',
   'house_worker_session_events',
   'track_progress_events',
   'sealed_contexts',
@@ -478,6 +479,32 @@ function ensureDb() {
       config_version_id TEXT,
       loadout_id TEXT,
       session_runtime_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_runtime_instances (
+      runtime_instance_id TEXT PRIMARY KEY,
+      house_worker_session_id TEXT NOT NULL UNIQUE,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      deployment_id TEXT NOT NULL,
+      executor_kind TEXT NOT NULL,
+      executor_provider TEXT,
+      executor_ref TEXT,
+      lease_status TEXT,
+      lease_owner_kind TEXT,
+      lease_owner_label TEXT,
+      lease_owner_id TEXT,
+      last_heartbeat_at TEXT,
+      lease_expires_at TEXT,
+      requested_runtime_profile_json TEXT NOT NULL DEFAULT '{}',
+      applied_runtime_profile_json TEXT NOT NULL DEFAULT '{}',
+      runtime_binding_json TEXT NOT NULL DEFAULT '{}',
+      workspace_snapshot_ref TEXT,
+      message_cursor TEXT,
+      started_at TEXT,
+      stopped_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2511,6 +2538,249 @@ function mapHouseWorkerSessionEventRow(row) {
   };
 }
 
+function mapHouseWorkerRuntimeInstanceRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    runtimeInstanceId: String(row.runtime_instance_id || ''),
+    houseWorkerSessionId: String(row.house_worker_session_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    deploymentId: String(row.deployment_id || ''),
+    executorKind: String(row.executor_kind || ''),
+    executorProvider: row.executor_provider ? String(row.executor_provider) : null,
+    executorRef: row.executor_ref ? String(row.executor_ref) : null,
+    leaseStatus: row.lease_status ? String(row.lease_status) : null,
+    leaseOwnerKind: row.lease_owner_kind ? String(row.lease_owner_kind) : null,
+    leaseOwnerLabel: row.lease_owner_label ? String(row.lease_owner_label) : null,
+    leaseOwnerId: row.lease_owner_id ? String(row.lease_owner_id) : null,
+    lastHeartbeatAt: row.last_heartbeat_at ? String(row.last_heartbeat_at) : null,
+    leaseExpiresAt: row.lease_expires_at ? String(row.lease_expires_at) : null,
+    requestedRuntimeProfile: parseJsonColumn(row.requested_runtime_profile_json, {}),
+    appliedRuntimeProfile: parseJsonColumn(row.applied_runtime_profile_json, {}),
+    runtimeBinding: parseJsonColumn(row.runtime_binding_json, {}),
+    workspaceSnapshotRef: row.workspace_snapshot_ref ? String(row.workspace_snapshot_ref) : null,
+    messageCursor: row.message_cursor ? String(row.message_cursor) : null,
+    startedAt: row.started_at ? String(row.started_at) : null,
+    stoppedAt: row.stopped_at ? String(row.stopped_at) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getHouseWorkerRuntimeInstanceById(runtimeInstanceId = '') {
+  const normalizedRuntimeInstanceId = String(runtimeInstanceId || '').trim();
+  if (!normalizedRuntimeInstanceId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_runtime_instances
+    WHERE runtime_instance_id = ?
+    LIMIT 1
+  `).get(normalizedRuntimeInstanceId);
+  return mapHouseWorkerRuntimeInstanceRow(row);
+}
+
+function getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId = '') {
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedSessionId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_runtime_instances
+    WHERE house_worker_session_id = ?
+    LIMIT 1
+  `).get(normalizedSessionId);
+  return mapHouseWorkerRuntimeInstanceRow(row);
+}
+
+function listHouseWorkerRuntimeInstances({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_runtime_instances
+    WHERE house_id = ?
+      AND (? = '' OR team_id = ?)
+    ORDER BY created_at ASC, runtime_instance_id ASC
+  `).all(normalizedHouseId, normalizedTeamId, normalizedTeamId);
+  return rows.map(mapHouseWorkerRuntimeInstanceRow).filter(Boolean);
+}
+
+function createHouseWorkerRuntimeInstance({
+  runtimeInstanceId = '',
+  houseWorkerSessionId = '',
+  houseId = '',
+  teamId = '',
+  deploymentId = '',
+  executorKind = '',
+  executorProvider = '',
+  executorRef = '',
+  leaseStatus = '',
+  leaseOwnerKind = '',
+  leaseOwnerLabel = '',
+  leaseOwnerId = '',
+  lastHeartbeatAt = '',
+  leaseExpiresAt = '',
+  requestedRuntimeProfile = null,
+  appliedRuntimeProfile = null,
+  runtimeBinding = null,
+  workspaceSnapshotRef = '',
+  messageCursor = '',
+  startedAt = '',
+  stoppedAt = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedRuntimeInstanceId = String(runtimeInstanceId || '').trim();
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  const normalizedExecutorKind = String(executorKind || '').trim();
+  if (
+    !normalizedRuntimeInstanceId
+    || !normalizedSessionId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedDeploymentId
+    || !normalizedExecutorKind
+  ) {
+    throw new Error('HOUSE_WORKER_RUNTIME_INSTANCE_INVALID');
+  }
+  const database = ensureDb();
+  const existing = getHouseWorkerRuntimeInstanceBySessionId(normalizedSessionId)
+    || getHouseWorkerRuntimeInstanceById(normalizedRuntimeInstanceId);
+  if (existing) return existing;
+  database.prepare(`
+    INSERT INTO house_worker_runtime_instances (
+      runtime_instance_id,
+      house_worker_session_id,
+      house_id,
+      team_id,
+      deployment_id,
+      executor_kind,
+      executor_provider,
+      executor_ref,
+      lease_status,
+      lease_owner_kind,
+      lease_owner_label,
+      lease_owner_id,
+      last_heartbeat_at,
+      lease_expires_at,
+      requested_runtime_profile_json,
+      applied_runtime_profile_json,
+      runtime_binding_json,
+      workspace_snapshot_ref,
+      message_cursor,
+      started_at,
+      stopped_at,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedRuntimeInstanceId,
+    normalizedSessionId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedDeploymentId,
+    normalizedExecutorKind,
+    String(executorProvider || '').trim() || null,
+    String(executorRef || '').trim() || null,
+    String(leaseStatus || '').trim() || null,
+    String(leaseOwnerKind || '').trim() || null,
+    String(leaseOwnerLabel || '').trim() || null,
+    String(leaseOwnerId || '').trim() || null,
+    String(lastHeartbeatAt || '').trim() || null,
+    String(leaseExpiresAt || '').trim() || null,
+    JSON.stringify(requestedRuntimeProfile && typeof requestedRuntimeProfile === 'object' ? requestedRuntimeProfile : {}),
+    JSON.stringify(appliedRuntimeProfile && typeof appliedRuntimeProfile === 'object' ? appliedRuntimeProfile : {}),
+    JSON.stringify(runtimeBinding && typeof runtimeBinding === 'object' ? runtimeBinding : {}),
+    String(workspaceSnapshotRef || '').trim() || null,
+    String(messageCursor || '').trim() || null,
+    String(startedAt || '').trim() || null,
+    String(stoppedAt || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerRuntimeInstanceById(normalizedRuntimeInstanceId);
+}
+
+function updateHouseWorkerRuntimeInstance({
+  runtimeInstanceId = '',
+  houseWorkerSessionId = '',
+  executorRef = undefined,
+  leaseStatus = undefined,
+  leaseOwnerKind = undefined,
+  leaseOwnerLabel = undefined,
+  leaseOwnerId = undefined,
+  lastHeartbeatAt = undefined,
+  leaseExpiresAt = undefined,
+  requestedRuntimeProfile = undefined,
+  appliedRuntimeProfile = undefined,
+  runtimeBinding = undefined,
+  workspaceSnapshotRef = undefined,
+  messageCursor = undefined,
+  startedAt = undefined,
+  stoppedAt = undefined,
+  updatedAt = new Date().toISOString(),
+} = {}) {
+  const existing = runtimeInstanceId
+    ? getHouseWorkerRuntimeInstanceById(runtimeInstanceId)
+    : getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId);
+  if (!existing) return null;
+  const nextRequestedRuntimeProfile = requestedRuntimeProfile === undefined
+    ? existing.requestedRuntimeProfile
+    : (requestedRuntimeProfile && typeof requestedRuntimeProfile === 'object' ? requestedRuntimeProfile : {});
+  const nextAppliedRuntimeProfile = appliedRuntimeProfile === undefined
+    ? existing.appliedRuntimeProfile
+    : (appliedRuntimeProfile && typeof appliedRuntimeProfile === 'object' ? appliedRuntimeProfile : {});
+  const nextRuntimeBinding = runtimeBinding === undefined
+    ? existing.runtimeBinding
+    : (runtimeBinding && typeof runtimeBinding === 'object' ? runtimeBinding : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE house_worker_runtime_instances
+    SET executor_ref = ?,
+        lease_status = ?,
+        lease_owner_kind = ?,
+        lease_owner_label = ?,
+        lease_owner_id = ?,
+        last_heartbeat_at = ?,
+        lease_expires_at = ?,
+        requested_runtime_profile_json = ?,
+        applied_runtime_profile_json = ?,
+        runtime_binding_json = ?,
+        workspace_snapshot_ref = ?,
+        message_cursor = ?,
+        started_at = ?,
+        stopped_at = ?,
+        updated_at = ?
+    WHERE runtime_instance_id = ?
+  `).run(
+    executorRef === undefined ? existing.executorRef : (String(executorRef || '').trim() || null),
+    leaseStatus === undefined ? existing.leaseStatus : (String(leaseStatus || '').trim() || null),
+    leaseOwnerKind === undefined ? existing.leaseOwnerKind : (String(leaseOwnerKind || '').trim() || null),
+    leaseOwnerLabel === undefined ? existing.leaseOwnerLabel : (String(leaseOwnerLabel || '').trim() || null),
+    leaseOwnerId === undefined ? existing.leaseOwnerId : (String(leaseOwnerId || '').trim() || null),
+    lastHeartbeatAt === undefined ? existing.lastHeartbeatAt : (String(lastHeartbeatAt || '').trim() || null),
+    leaseExpiresAt === undefined ? existing.leaseExpiresAt : (String(leaseExpiresAt || '').trim() || null),
+    JSON.stringify(nextRequestedRuntimeProfile),
+    JSON.stringify(nextAppliedRuntimeProfile),
+    JSON.stringify(nextRuntimeBinding),
+    workspaceSnapshotRef === undefined ? existing.workspaceSnapshotRef : (String(workspaceSnapshotRef || '').trim() || null),
+    messageCursor === undefined ? existing.messageCursor : (String(messageCursor || '').trim() || null),
+    startedAt === undefined ? existing.startedAt : (String(startedAt || '').trim() || null),
+    stoppedAt === undefined ? existing.stoppedAt : (String(stoppedAt || '').trim() || null),
+    String(updatedAt || '').trim() || new Date().toISOString(),
+    String(existing.runtimeInstanceId || '').trim(),
+  );
+  return getHouseWorkerRuntimeInstanceById(String(existing.runtimeInstanceId || '').trim());
+}
+
 function listHouseWorkerSessionEvents({
   houseWorkerSessionId = '',
 } = {}) {
@@ -3644,6 +3914,7 @@ function getUnifiedPlatformTestStats() {
       houseWorkerShares: true,
       houseWorkerSupervisor: true,
       houseWorkerSessions: true,
+      houseWorkerRuntimeInstances: true,
       houseWorkerEvents: true,
     },
   };
@@ -3662,6 +3933,7 @@ module.exports = {
   createHouseWorkerSessionEvent,
   createHouseWorkerShare,
   createHouseWorkerShareInvite,
+  createHouseWorkerRuntimeInstance,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -3688,6 +3960,8 @@ module.exports = {
   listHouseStaffAgents,
   listTeamConfigBindings,
   getHouseWorkerDeploymentById,
+  getHouseWorkerRuntimeInstanceById,
+  getHouseWorkerRuntimeInstanceBySessionId,
   getHouseWorkerShareById,
   getHouseWorkerShareInviteById,
   getHouseWorkerSessionById,
@@ -3704,6 +3978,7 @@ module.exports = {
   isUnifiedPlatformTable,
   listHouseStaffAssignments,
   listHouseWorkerDeployments,
+  listHouseWorkerRuntimeInstances,
   listHouseWorkerShareInvites,
   listHouseWorkerSessionEvents,
   listHouseWorkerSessions,
@@ -3722,6 +3997,7 @@ module.exports = {
   createSealedContextViolation,
   updateRunMetadata,
   updateHouseWorkerDeployment,
+  updateHouseWorkerRuntimeInstance,
   updateHouseWorkerShareInvite,
   updateHouseWorkerSession,
   updateSealedContextStatus,

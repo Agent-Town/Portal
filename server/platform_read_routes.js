@@ -7,6 +7,7 @@ function registerPlatformReadRoutes(app, deps) {
     buildPortalRequestId,
     createHouseStaffAssignment,
     createHouseWorkerDeployment,
+    createHouseWorkerRuntimeInstance,
     createHouseWorkerSession,
     createHouseWorkerSessionEvent,
     createHouseWorkerShare,
@@ -17,6 +18,8 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersion,
     getConfigVersionByIdempotency,
     getHouseWorkerDeploymentById,
+    getHouseWorkerRuntimeInstanceById,
+    getHouseWorkerRuntimeInstanceBySessionId,
     getHouseWorkerShareById,
     getHouseWorkerShareInviteById,
     getHouseWorkerSessionById,
@@ -35,6 +38,7 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseStaffAgents,
     listHouseStaffAssignments,
     listHouseWorkerDeployments,
+    listHouseWorkerRuntimeInstances,
     listHouseWorkerShareInvites,
     listHouseWorkerSessionEvents,
     listHouseWorkerSessions,
@@ -58,6 +62,7 @@ function registerPlatformReadRoutes(app, deps) {
     sha256PrefixedHex,
     stableJsonStringify,
     updateHouseWorkerDeployment,
+    updateHouseWorkerRuntimeInstance,
     updateHouseWorkerShareInvite,
     updateTrainerJobStatus,
     updateHouseWorkerSession,
@@ -1476,32 +1481,46 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
-  function buildHouseWorkerLeaseState(session = null) {
+  function buildHouseWorkerLeaseState(session = null, runtimeInstance = null) {
     const source = session && typeof session === 'object' ? session : {};
     const runtime = source?.runtime && typeof source.runtime === 'object' ? source.runtime : {};
+    const runtimeSource = runtimeInstance && typeof runtimeInstance === 'object' ? runtimeInstance : {};
     const storedStatus = normalizeHouseWorkerStatus(source?.status, 'starting');
-    const lastHeartbeatAt = normalizeHouseWorkerRuntimeIso(runtime?.lastHeartbeatAt || runtime?.appliedAt || source?.updatedAt || null);
-    const leaseExpiresAt = normalizeHouseWorkerRuntimeIso(runtime?.leaseExpiresAt)
+    const lastHeartbeatAt = normalizeHouseWorkerRuntimeIso(
+      runtimeSource?.lastHeartbeatAt
+      || runtime?.lastHeartbeatAt
+      || runtimeSource?.startedAt
+      || runtime?.appliedAt
+      || source?.updatedAt
+      || null
+    );
+    const leaseExpiresAt = normalizeHouseWorkerRuntimeIso(runtimeSource?.leaseExpiresAt || runtime?.leaseExpiresAt)
       || (lastHeartbeatAt
         ? normalizeHouseWorkerRuntimeIso(new Date(Date.parse(lastHeartbeatAt) + HOUSE_WORKER_LEASE_TTL_MS).toISOString())
         : null);
-    const ownerKind = String(runtime?.ownerKind || '').trim() || null;
-    const ownerLabel = String(runtime?.ownerLabel || '').trim() || null;
-    const ownerId = String(runtime?.ownerId || '').trim() || null;
+    const ownerKind = String(runtimeSource?.leaseOwnerKind || runtime?.ownerKind || '').trim() || null;
+    const ownerLabel = String(runtimeSource?.leaseOwnerLabel || runtime?.ownerLabel || '').trim() || null;
+    const ownerId = String(runtimeSource?.leaseOwnerId || runtime?.ownerId || '').trim() || null;
     const active = HOUSE_WORKER_ACTIVE_STATUSES.has(storedStatus);
     const stale = active
       && !!leaseExpiresAt
       && Number.isFinite(Date.parse(leaseExpiresAt))
       && Date.parse(leaseExpiresAt) <= Date.now();
-    let leaseStatus = 'stopped';
-    if (stale) {
-      leaseStatus = 'stale';
-    } else if (storedStatus === 'failed' || storedStatus === 'blocked') {
-      leaseStatus = 'blocked';
-    } else if (storedStatus === 'stopped') {
-      leaseStatus = 'stopped';
-    } else if (active) {
-      leaseStatus = 'active_detached';
+    let leaseStatus = String(runtimeSource?.leaseStatus || '').trim() || '';
+    if (!leaseStatus) {
+      if (stale) {
+        leaseStatus = 'stale';
+      } else if (storedStatus === 'failed' || storedStatus === 'blocked') {
+        leaseStatus = 'blocked';
+      } else if (storedStatus === 'stopped') {
+        leaseStatus = 'stopped';
+      } else if (storedStatus === 'starting') {
+        leaseStatus = 'starting';
+      } else if (active) {
+        leaseStatus = 'active_detached';
+      } else {
+        leaseStatus = 'stopped';
+      }
     }
     return {
       ownerKind,
@@ -1509,7 +1528,7 @@ function registerPlatformReadRoutes(app, deps) {
       ownerId,
       lastHeartbeatAt,
       leaseExpiresAt,
-      leaseStatus,
+      leaseStatus: stale ? 'stale' : leaseStatus,
       stale,
     };
   }
@@ -1695,6 +1714,15 @@ function registerPlatformReadRoutes(app, deps) {
     return `hws_${digest.slice(0, 24)}`;
   }
 
+  function buildHouseWorkerRuntimeInstanceId({
+    houseWorkerSessionId = '',
+  } = {}) {
+    const digest = sha256PrefixedHex(stableJsonStringify({
+      houseWorkerSessionId: String(houseWorkerSessionId || '').trim(),
+    })).replace(/^sha256:/i, '');
+    return `hwri_${digest.slice(0, 24)}`;
+  }
+
   function buildHouseWorkerRuntimeAgentId({
     deploymentId = '',
     sequence = 1,
@@ -1719,10 +1747,94 @@ function registerPlatformReadRoutes(app, deps) {
     return `hwse_${digest.slice(0, 24)}`;
   }
 
+  function buildHouseWorkerRuntimeInstanceCards({
+    houseId = '',
+    teamId = '',
+    deployments = [],
+    sessions = [],
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId) return [];
+    const sessionList = Array.isArray(sessions) && sessions.length
+      ? sessions
+      : listHouseWorkerSessions({ houseId: normalizedHouseId, teamId: normalizedTeamId });
+    const sessionMap = new Map(
+      sessionList
+        .map((entry) => [String(entry?.houseWorkerSessionId || '').trim(), entry])
+        .filter(([houseWorkerSessionId]) => houseWorkerSessionId)
+    );
+    const deploymentList = Array.isArray(deployments) && deployments.length
+      ? deployments
+      : buildHouseWorkerDeploymentsPayload({
+        context: {},
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }).deployments;
+    const deploymentMap = new Map(
+      deploymentList
+        .map((entry) => [String(entry?.deploymentId || '').trim(), entry])
+        .filter(([deploymentId]) => deploymentId)
+    );
+    return listHouseWorkerRuntimeInstances({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+      .map((runtimeInstance) => {
+        const houseWorkerSessionId = String(runtimeInstance?.houseWorkerSessionId || '').trim();
+        if (!houseWorkerSessionId) return null;
+        const session = sessionMap.get(houseWorkerSessionId) || null;
+        const deploymentId = String(runtimeInstance?.deploymentId || session?.deploymentId || '').trim();
+        const deployment = deploymentMap.get(deploymentId) || null;
+        const sessionRuntime = session?.runtime && typeof session.runtime === 'object' ? session.runtime : {};
+        const requestedRuntimeProfile = runtimeInstance?.requestedRuntimeProfile && typeof runtimeInstance.requestedRuntimeProfile === 'object'
+          ? runtimeInstance.requestedRuntimeProfile
+          : {
+            brainProfileId: String(session?.brainProfileId || sessionRuntime?.brainProfileId || '').trim() || null,
+            workspaceSeedRef: String(session?.workspaceSeedRef || sessionRuntime?.workspaceSeedRef || '').trim() || null,
+            configVersionId: String(session?.configVersionId || sessionRuntime?.configVersionId || '').trim() || null,
+            loadoutId: String(session?.loadoutId || sessionRuntime?.loadoutId || '').trim() || null,
+          };
+        const appliedRuntimeProfile = runtimeInstance?.appliedRuntimeProfile && typeof runtimeInstance.appliedRuntimeProfile === 'object'
+          ? runtimeInstance.appliedRuntimeProfile
+          : requestedRuntimeProfile;
+        const runtimeBinding = runtimeInstance?.runtimeBinding && typeof runtimeInstance.runtimeBinding === 'object'
+          ? runtimeInstance.runtimeBinding
+          : (sessionRuntime?.runtimeBinding && typeof sessionRuntime.runtimeBinding === 'object' ? sessionRuntime.runtimeBinding : null);
+        const leaseState = buildHouseWorkerLeaseState(session, runtimeInstance);
+        return {
+          runtimeInstanceId: String(runtimeInstance?.runtimeInstanceId || '').trim(),
+          houseWorkerSessionId,
+          houseId: normalizedHouseId,
+          teamId: normalizedTeamId,
+          deploymentId: deploymentId || null,
+          deploymentLabel: String(deployment?.displayName || session?.label || 'Helper').trim() || 'Helper',
+          runtimeAgentId: String(session?.runtimeAgentId || '').trim() || null,
+          executorKind: String(runtimeInstance?.executorKind || '').trim() || 'browser_tab',
+          executorProvider: String(runtimeInstance?.executorProvider || '').trim() || null,
+          executorRef: String(runtimeInstance?.executorRef || '').trim() || null,
+          requestedRuntimeProfile,
+          appliedRuntimeProfile,
+          runtimeBinding,
+          leaseOwnerKind: leaseState.ownerKind,
+          leaseOwnerLabel: leaseState.ownerLabel,
+          leaseOwnerId: leaseState.ownerId,
+          leaseStatus: leaseState.leaseStatus,
+          lastHeartbeatAt: leaseState.lastHeartbeatAt,
+          leaseExpiresAt: leaseState.leaseExpiresAt,
+          workspaceSnapshotRef: String(runtimeInstance?.workspaceSnapshotRef || '').trim() || null,
+          messageCursor: String(runtimeInstance?.messageCursor || '').trim() || null,
+          startedAt: String(runtimeInstance?.startedAt || session?.createdAt || '').trim() || null,
+          stoppedAt: String(runtimeInstance?.stoppedAt || '').trim() || null,
+          createdAt: String(runtimeInstance?.createdAt || '').trim() || null,
+          updatedAt: String(runtimeInstance?.updatedAt || '').trim() || null,
+        };
+      })
+      .filter(Boolean);
+  }
+
   function buildHouseWorkerSessionCards({
     houseId = '',
     teamId = '',
     deployments = [],
+    runtimeInstances = [],
   } = {}) {
     const normalizedHouseId = String(houseId || '').trim();
     const normalizedTeamId = String(teamId || '').trim();
@@ -1739,6 +1851,18 @@ function registerPlatformReadRoutes(app, deps) {
         .map((entry) => [String(entry?.deploymentId || '').trim(), entry])
         .filter(([deploymentId]) => deploymentId)
     );
+    const runtimeInstanceMap = new Map(
+      (Array.isArray(runtimeInstances) && runtimeInstances.length
+        ? runtimeInstances
+        : buildHouseWorkerRuntimeInstanceCards({
+          houseId: normalizedHouseId,
+          teamId: normalizedTeamId,
+          deployments: deploymentList,
+        })
+      )
+        .map((entry) => [String(entry?.houseWorkerSessionId || '').trim(), entry])
+        .filter(([houseWorkerSessionId]) => houseWorkerSessionId)
+    );
     return listHouseWorkerSessions({ houseId: normalizedHouseId, teamId: normalizedTeamId })
       .map((session) => {
         const deploymentId = String(session?.deploymentId || '').trim();
@@ -1750,18 +1874,28 @@ function registerPlatformReadRoutes(app, deps) {
         const lastTaskEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'task_message') || null;
         const lastReplyEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'assistant_reply') || null;
         const runtime = session?.runtime && typeof session.runtime === 'object' ? session.runtime : {};
-        const requestedRuntimeProfile = runtime?.requestedRuntimeProfile && typeof runtime.requestedRuntimeProfile === 'object'
-          ? runtime.requestedRuntimeProfile
+        const runtimeInstance = runtimeInstanceMap.get(String(session?.houseWorkerSessionId || '').trim()) || null;
+        const requestedRuntimeProfile = runtimeInstance?.requestedRuntimeProfile && typeof runtimeInstance.requestedRuntimeProfile === 'object'
+          ? runtimeInstance.requestedRuntimeProfile
+          : runtime?.requestedRuntimeProfile && typeof runtime.requestedRuntimeProfile === 'object'
+            ? runtime.requestedRuntimeProfile
           : {
             brainProfileId: String(session?.brainProfileId || runtime?.brainProfileId || '').trim() || null,
             workspaceSeedRef: String(session?.workspaceSeedRef || runtime?.workspaceSeedRef || '').trim() || null,
             configVersionId: String(session?.configVersionId || runtime?.configVersionId || '').trim() || null,
             loadoutId: String(session?.loadoutId || runtime?.loadoutId || '').trim() || null,
           };
-        const appliedRuntimeProfile = runtime?.appliedRuntimeProfile && typeof runtime.appliedRuntimeProfile === 'object'
-          ? runtime.appliedRuntimeProfile
-          : requestedRuntimeProfile;
-        const leaseState = buildHouseWorkerLeaseState(session);
+        const appliedRuntimeProfile = runtimeInstance?.appliedRuntimeProfile && typeof runtimeInstance.appliedRuntimeProfile === 'object'
+          ? runtimeInstance.appliedRuntimeProfile
+          : runtime?.appliedRuntimeProfile && typeof runtime.appliedRuntimeProfile === 'object'
+            ? runtime.appliedRuntimeProfile
+            : requestedRuntimeProfile;
+        const runtimeBinding = runtimeInstance?.runtimeBinding && typeof runtimeInstance.runtimeBinding === 'object'
+          ? runtimeInstance.runtimeBinding
+          : runtime?.runtimeBinding && typeof runtime.runtimeBinding === 'object'
+            ? runtime.runtimeBinding
+            : null;
+        const leaseState = buildHouseWorkerLeaseState(session, runtimeInstance);
         const delegation = buildHouseWorkerDelegationFields(session);
         const recovery = buildHouseWorkerRecoveryFields({
           session,
@@ -1783,6 +1917,9 @@ function registerPlatformReadRoutes(app, deps) {
           statusLabel: buildHouseWorkerSessionStatusLabel(session?.status, leaseState.leaseStatus),
           runtimeAgentId: String(session?.runtimeAgentId || '').trim() || null,
           runtimeSessionId: String(runtime?.runtimeSessionId || '').trim() || null,
+          runtimeInstanceId: String(runtimeInstance?.runtimeInstanceId || '').trim() || null,
+          executorKind: String(runtimeInstance?.executorKind || '').trim() || null,
+          executorProvider: String(runtimeInstance?.executorProvider || '').trim() || null,
           parentSessionId: delegation.parentWorkerSessionId,
           rootWorkerSessionId: delegation.rootWorkerSessionId,
           delegationDepth: delegation.delegationDepth,
@@ -1798,9 +1935,8 @@ function registerPlatformReadRoutes(app, deps) {
           runtimeProfile: appliedRuntimeProfile,
           requestedRuntimeProfile,
           appliedRuntimeProfile,
-          runtimeBinding: runtime?.runtimeBinding && typeof runtime.runtimeBinding === 'object'
-            ? runtime.runtimeBinding
-            : null,
+          runtimeBinding,
+          runtimeInstance,
           ownerKind: leaseState.ownerKind,
           ownerLabel: leaseState.ownerLabel,
           ownerId: leaseState.ownerId,
@@ -1834,10 +1970,16 @@ function registerPlatformReadRoutes(app, deps) {
       teamId,
       sourceKind,
     });
+    const runtimeInstances = buildHouseWorkerRuntimeInstanceCards({
+      houseId,
+      teamId,
+      deployments: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [],
+    });
     const sessions = buildHouseWorkerSessionCards({
       houseId,
       teamId,
       deployments: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [],
+      runtimeInstances,
     });
     return {
       houseId: deploymentsPayload.houseId,
@@ -1845,6 +1987,7 @@ function registerPlatformReadRoutes(app, deps) {
       activeTeamId: deploymentsPayload.activeTeamId,
       availableTeamIds: deploymentsPayload.availableTeamIds,
       deployments: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [],
+      runtimeInstances,
       sessions,
       concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
       sourceManifest: {
@@ -1857,6 +2000,7 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/deployments',
           '/api/platform/house-workers/shares',
           '/api/platform/house-workers/sessions',
+          '/api/platform/house-workers/runtime-instances',
           '/api/platform/house-workers/live-readiness',
           '/api/platform/house-workers/install',
           '/api/platform/house-workers/share',
@@ -1872,6 +2016,7 @@ function registerPlatformReadRoutes(app, deps) {
         counts: {
           deploymentCount: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments.length : 0,
           shareCount: buildHouseWorkerShareCards({ houseId, teamId }).length,
+          runtimeInstanceCount: runtimeInstances.length,
           sessionCount: sessions.length,
           activeSessionCount: sessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim())).length,
         },
@@ -1909,6 +2054,15 @@ function registerPlatformReadRoutes(app, deps) {
         }),
         updatedAt: now,
       });
+      const existingRuntimeInstance = getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId);
+      if (existingRuntimeInstance) {
+        updateHouseWorkerRuntimeInstance({
+          runtimeInstanceId: String(existingRuntimeInstance?.runtimeInstanceId || '').trim(),
+          leaseStatus: 'stopped',
+          stoppedAt: now,
+          updatedAt: now,
+        });
+      }
       const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
       createHouseWorkerSessionEvent({
         houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
@@ -3325,6 +3479,7 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/deployments',
           '/api/platform/house-workers/shares',
           '/api/platform/house-workers/sessions',
+          '/api/platform/house-workers/runtime-instances',
           '/api/platform/house-workers/install',
           '/api/platform/house-workers/share',
           '/api/platform/house-workers/install-shared',
@@ -4252,6 +4407,52 @@ function registerPlatformReadRoutes(app, deps) {
       teamId: payload.teamId,
       activeTeamId: payload.activeTeamId,
       availableTeamIds: payload.availableTeamIds,
+      runtimeInstances: payload.runtimeInstances,
+      sessions: payload.sessions,
+      deployments: payload.deployments,
+      concurrencyLimit: payload.concurrencyLimit,
+      sourceManifest: payload.sourceManifest,
+      emptyStateText: payload.emptyStateText,
+    }, { requestId });
+  });
+
+  app.get('/api/platform/house-workers/runtime-instances', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const payload = buildHouseWorkerCollectionsPayload({
+      context,
+      houseId,
+      teamId: String(teamResolution?.teamId || '').trim(),
+      sourceKind: 'durable_house_worker_runtime_instances',
+    });
+    return sendPortalApiSuccess(res, {
+      houseId: payload.houseId,
+      teamId: payload.teamId,
+      activeTeamId: payload.activeTeamId,
+      availableTeamIds: payload.availableTeamIds,
+      runtimeInstances: payload.runtimeInstances,
       sessions: payload.sessions,
       deployments: payload.deployments,
       concurrencyLimit: payload.concurrencyLimit,
@@ -4501,6 +4702,27 @@ function registerPlatformReadRoutes(app, deps) {
         appliedRuntimeProfile: null,
         runtimeBinding: runtimeProfileResolution.runtimeBindingSeed,
       },
+      nowIso: now,
+    });
+    const initialLease = buildHouseWorkerLeaseTimestamps(Date.parse(now));
+    createHouseWorkerRuntimeInstance({
+      runtimeInstanceId: buildHouseWorkerRuntimeInstanceId({ houseWorkerSessionId }),
+      houseWorkerSessionId,
+      houseId,
+      teamId,
+      deploymentId,
+      executorKind: 'browser_tab',
+      executorProvider: 'portal_browser',
+      executorRef: runtimeAgentId,
+      leaseStatus: 'starting',
+      leaseOwnerKind: 'browser_tab',
+      leaseOwnerLabel: 'This browser tab',
+      lastHeartbeatAt: initialLease.lastHeartbeatAt,
+      leaseExpiresAt: initialLease.leaseExpiresAt,
+      requestedRuntimeProfile: runtimeProfileResolution.requestedRuntimeProfile,
+      appliedRuntimeProfile: runtimeProfileResolution.appliedRuntimeProfileSeed,
+      runtimeBinding: runtimeProfileResolution.runtimeBindingSeed,
+      startedAt: now,
       nowIso: now,
     });
     const spawnEventSequence = listHouseWorkerSessionEvents({
@@ -5397,6 +5619,49 @@ function registerPlatformReadRoutes(app, deps) {
     if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
       return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
     }
+    const fallbackRequestedRuntimeProfile = workerSession?.runtime?.requestedRuntimeProfile
+      && typeof workerSession.runtime.requestedRuntimeProfile === 'object'
+      ? workerSession.runtime.requestedRuntimeProfile
+      : {
+        brainProfileId: String(workerSession?.brainProfileId || workerSession?.runtime?.brainProfileId || '').trim() || null,
+        workspaceSeedRef: String(workerSession?.workspaceSeedRef || workerSession?.runtime?.workspaceSeedRef || '').trim() || null,
+        configVersionId: String(workerSession?.configVersionId || workerSession?.runtime?.configVersionId || '').trim() || null,
+        loadoutId: String(workerSession?.loadoutId || workerSession?.runtime?.loadoutId || '').trim() || null,
+      };
+    const fallbackAppliedRuntimeProfile = workerSession?.runtime?.appliedRuntimeProfile
+      && typeof workerSession.runtime.appliedRuntimeProfile === 'object'
+      ? workerSession.runtime.appliedRuntimeProfile
+      : fallbackRequestedRuntimeProfile;
+    const fallbackRuntimeBinding = workerSession?.runtime?.runtimeBinding
+      && typeof workerSession.runtime.runtimeBinding === 'object'
+      ? workerSession.runtime.runtimeBinding
+      : {};
+    const existingRuntimeInstance = getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId)
+      || createHouseWorkerRuntimeInstance({
+        runtimeInstanceId: buildHouseWorkerRuntimeInstanceId({ houseWorkerSessionId }),
+        houseWorkerSessionId,
+        houseId,
+        teamId,
+        deploymentId: String(workerSession?.deploymentId || '').trim(),
+        executorKind: 'browser_tab',
+        executorProvider: 'portal_browser',
+        executorRef: String(runtimeSessionId || workerSession?.runtimeAgentId || '').trim() || null,
+        leaseStatus: status === 'starting'
+          ? 'starting'
+          : (status === 'failed' || status === 'blocked'
+            ? 'blocked'
+            : (status === 'stopped' ? 'stopped' : 'active_detached')),
+        leaseOwnerKind: ownerKind || String(workerSession?.runtime?.ownerKind || 'browser_tab').trim() || 'browser_tab',
+        leaseOwnerLabel: ownerLabel || String(workerSession?.runtime?.ownerLabel || 'This browser tab').trim() || 'This browser tab',
+        leaseOwnerId: ownerId || String(workerSession?.runtime?.ownerId || '').trim() || null,
+        lastHeartbeatAt: lastHeartbeatAt || String(workerSession?.runtime?.lastHeartbeatAt || '').trim() || null,
+        leaseExpiresAt: leaseExpiresAt || String(workerSession?.runtime?.leaseExpiresAt || '').trim() || null,
+        requestedRuntimeProfile: fallbackRequestedRuntimeProfile,
+        appliedRuntimeProfile: fallbackAppliedRuntimeProfile,
+        runtimeBinding: fallbackRuntimeBinding,
+        startedAt: String(workerSession?.createdAt || nowIso()).trim(),
+        nowIso: nowIso(),
+      });
     const runtimePatch = {
       statusReason: reason || null,
       runtimeSessionId: runtimeSessionId || String(workerSession?.runtime?.runtimeSessionId || '').trim() || null,
@@ -5413,6 +5678,24 @@ function registerPlatformReadRoutes(app, deps) {
       houseWorkerSessionId,
       status,
       runtime: mergeHouseWorkerRuntime(workerSession?.runtime, runtimePatch),
+      updatedAt: nowIso(),
+    });
+    updateHouseWorkerRuntimeInstance({
+      runtimeInstanceId: String(existingRuntimeInstance?.runtimeInstanceId || '').trim(),
+      executorRef: runtimeSessionId || String(existingRuntimeInstance?.executorRef || workerSession?.runtimeAgentId || '').trim() || null,
+      leaseStatus: status === 'starting'
+        ? 'starting'
+        : (status === 'failed' || status === 'blocked'
+          ? 'blocked'
+          : (status === 'stopped' ? 'stopped' : 'active_detached')),
+      leaseOwnerKind: ownerKind || undefined,
+      leaseOwnerLabel: ownerLabel || undefined,
+      leaseOwnerId: ownerId || undefined,
+      lastHeartbeatAt: lastHeartbeatAt || undefined,
+      leaseExpiresAt: leaseExpiresAt || undefined,
+      requestedRuntimeProfile: requestedRuntimeProfilePatch || undefined,
+      appliedRuntimeProfile: appliedRuntimeProfilePatch || undefined,
+      runtimeBinding: runtimeBindingPatch || undefined,
       updatedAt: nowIso(),
     });
     if (heartbeatOnly) {
@@ -5479,6 +5762,7 @@ function registerPlatformReadRoutes(app, deps) {
     if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
       return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
     }
+    const runtimeInstance = getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId);
     const updatedSession = updateHouseWorkerSession({
       houseWorkerSessionId,
       status: 'stopped',
@@ -5487,6 +5771,14 @@ function registerPlatformReadRoutes(app, deps) {
       }),
       updatedAt: nowIso(),
     });
+    if (runtimeInstance) {
+      updateHouseWorkerRuntimeInstance({
+        runtimeInstanceId: String(runtimeInstance?.runtimeInstanceId || '').trim(),
+        leaseStatus: 'stopped',
+        stoppedAt: nowIso(),
+        updatedAt: nowIso(),
+      });
+    }
     const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
     const event = createHouseWorkerSessionEvent({
       houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
