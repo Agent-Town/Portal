@@ -1,0 +1,18 @@
+{
+  "family": "worker_deployment_lifecycle_seed",
+  "schema": "agent-town-house-worker-deployment-lifecycle-seed/v1",
+  "states": [
+    "active",
+    "paused",
+    "archived"
+  ],
+  "actions": [
+    "pause",
+    "resume",
+    "archive",
+    "remove",
+    "reinstall",
+    "update"
+  ],
+  "currentReleaseLabel": "Release is current and ready to reinstall if needed."
+}

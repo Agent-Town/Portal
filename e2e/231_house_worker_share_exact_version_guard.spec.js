@@ -57,13 +57,13 @@ async function mutateSharedWorkerSnapshot(request, shareId, mutateRow) {
   expect(exported.json?.ok).toBe(true);
 
   const snapshot = exported.json?.snapshot;
-  const rows = Array.isArray(snapshot?.tables?.house_worker_shares)
-    ? snapshot.tables.house_worker_shares
+  const rows = Array.isArray(snapshot?.tables?.house_worker_share_invites)
+    ? snapshot.tables.house_worker_share_invites
     : [];
-  const targetRow = rows.find((row) => String(row?.share_id || '').trim() === String(shareId || '').trim());
+  const targetRow = rows.find((row) => String(row?.share_invite_id || '').trim() === String(shareId || '').trim());
   expect(targetRow).toBeTruthy();
 
-  mutateRow(targetRow);
+  mutateRow(targetRow, snapshot);
 
   const imported = await importPlatformSnapshot(request, snapshot, { reset: true });
   expect(imported.status).toBe(200);
@@ -111,11 +111,20 @@ test('M35.7a: shared helper install fails closed when share metadata diverges fr
 test('M35.7b: shared helper install fails closed when the exact shared Registry version no longer resolves', async ({ page, request, browser }) => {
   const { shareId } = await createSharedWorker(page, request);
   const { friendContext, friendPage } = await attachFriendHouse(browser);
-  await mutateSharedWorkerSnapshot(request, shareId, (row) => {
-    const payload = JSON.parse(String(row.share_payload_json || '{}'));
+  await mutateSharedWorkerSnapshot(request, shareId, (row, snapshot) => {
+    const invitePayload = JSON.parse(String(row.share_payload_json || '{}'));
+    invitePayload.entityVersionId = 'rev_house_worker_front_desk_helper_v404';
+    row.share_payload_json = JSON.stringify(invitePayload);
+    const packageShareId = String(row?.package_share_id || '').trim();
+    const packageRows = Array.isArray(snapshot?.tables?.house_worker_shares)
+      ? snapshot.tables.house_worker_shares
+      : [];
+    const packageRow = packageRows.find((entry) => String(entry?.share_id || '').trim() === packageShareId);
+    expect(packageRow).toBeTruthy();
+    const payload = JSON.parse(String(packageRow.share_payload_json || '{}'));
     payload.entityVersionId = 'rev_house_worker_front_desk_helper_v404';
-    row.entity_version_id = payload.entityVersionId;
-    row.share_payload_json = JSON.stringify(payload);
+    packageRow.entity_version_id = payload.entityVersionId;
+    packageRow.share_payload_json = JSON.stringify(payload);
   });
   const install = await installSharedHouseWorker(friendPage.request, { shareId });
   expect(install.status).toBe(409);
@@ -131,11 +140,20 @@ test('M35.7b: shared helper install fails closed when the exact shared Registry 
 test('M35.7c: shared helper install fails closed when the shared bundle no longer belongs to the exact shared package', async ({ page, request, browser }) => {
   const { shareId } = await createSharedWorker(page, request);
   const { friendContext, friendPage } = await attachFriendHouse(browser);
-  await mutateSharedWorkerSnapshot(request, shareId, (row) => {
-    const payload = JSON.parse(String(row.share_payload_json || '{}'));
+  await mutateSharedWorkerSnapshot(request, shareId, (row, snapshot) => {
+    const invitePayload = JSON.parse(String(row.share_payload_json || '{}'));
+    invitePayload.bundleHash = 'sha256:bundle_house_worker_front_desk_helper_v404';
+    row.share_payload_json = JSON.stringify(invitePayload);
+    const packageShareId = String(row?.package_share_id || '').trim();
+    const packageRows = Array.isArray(snapshot?.tables?.house_worker_shares)
+      ? snapshot.tables.house_worker_shares
+      : [];
+    const packageRow = packageRows.find((entry) => String(entry?.share_id || '').trim() === packageShareId);
+    expect(packageRow).toBeTruthy();
+    const payload = JSON.parse(String(packageRow.share_payload_json || '{}'));
     payload.bundleHash = 'sha256:bundle_house_worker_front_desk_helper_v404';
-    row.bundle_hash = payload.bundleHash;
-    row.share_payload_json = JSON.stringify(payload);
+    packageRow.bundle_hash = payload.bundleHash;
+    packageRow.share_payload_json = JSON.stringify(payload);
   });
   const install = await installSharedHouseWorker(friendPage.request, { shareId });
   expect(install.status).toBe(409);

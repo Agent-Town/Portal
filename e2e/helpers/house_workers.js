@@ -47,8 +47,23 @@ async function shareHouseWorker(request, payload = {}) {
   return readJsonResponse(response);
 }
 
+async function listHouseWorkerShares(request) {
+  const response = await request.get('/api/platform/house-workers/shares', {
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function getHouseWorkerShare(request, shareId) {
   const response = await request.get(`/api/platform/house-workers/shares/${encodeURIComponent(String(shareId || ''))}`, {
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
+async function revokeHouseWorkerShare(request, shareId) {
+  const response = await request.post(`/api/platform/house-workers/shares/${encodeURIComponent(String(shareId || ''))}/revoke`, {
+    data: {},
     failOnStatusCode: false,
   });
   return readJsonResponse(response);
@@ -98,6 +113,16 @@ async function stopHouseWorker(request, payload = {}) {
   return readJsonResponse(response);
 }
 
+async function updateHouseWorkerDeploymentLifecycle(request, deploymentId, action) {
+  const response = await request.post(`/api/platform/house-workers/deployments/${encodeURIComponent(String(deploymentId || ''))}/lifecycle`, {
+    data: {
+      action,
+    },
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function readHouseWorkerSupervisorSnapshot(page) {
   return await page.evaluate(() => {
     const api = window.__agentTownHouseWorkerSupervisor;
@@ -134,11 +159,14 @@ module.exports = {
   getHouseWorkerShare,
   installHouseWorker,
   installSharedHouseWorker,
+  listHouseWorkerShares,
   listHouseWorkerSessions,
   messageHouseWorker,
   readHouseWorkerSessionsFromPage,
   readHouseWorkerSupervisorSnapshot,
+  revokeHouseWorkerShare,
   shareHouseWorker,
   spawnHouseWorker,
   stopHouseWorker,
+  updateHouseWorkerDeploymentLifecycle,
 };

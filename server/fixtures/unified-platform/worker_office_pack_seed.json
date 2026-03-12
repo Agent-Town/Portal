@@ -1,0 +1,7 @@
+{
+  "family": "worker_office_pack_seed",
+  "schema": "agent-town-house-worker-office-pack-seed/v1",
+  "minimumMemberCount": 2,
+  "defaultInstallActionLabel": "Install Office Pack",
+  "defaultSummary": "Install multiple helpers into matching House Office desks in one step."
+}

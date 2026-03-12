@@ -82,8 +82,8 @@ test('M35.3d: sharing an installed helper fails closed when its exact deployed p
   expect(share.json?.error?.code).toBe('DEPLOYMENT_PACKAGE_VERSION_INVALID');
 
   const exported = await exportPlatformSnapshot(request);
-  const shareRows = Array.isArray(exported.json?.snapshot?.tables?.house_worker_shares)
-    ? exported.json.snapshot.tables.house_worker_shares
+  const shareRows = Array.isArray(exported.json?.snapshot?.tables?.house_worker_share_invites)
+    ? exported.json.snapshot.tables.house_worker_share_invites
     : [];
   expect(shareRows).toHaveLength(0);
 });
@@ -95,17 +95,32 @@ test('M35.3e: shared helper preview fails closed when the shared package version
   const shareId = String(share.json?.data?.shareId || '').trim();
   expect(shareId).toBeTruthy();
 
-  await mutatePlatformSnapshotRow(
-    request,
-    'house_worker_shares',
-    (row) => String(row?.share_id || '').trim() === shareId,
-    (row) => {
-      const payload = JSON.parse(String(row.share_payload_json || '{}'));
-      payload.entityVersionId = 'rev_house_worker_front_desk_helper_v404';
-      row.entity_version_id = payload.entityVersionId;
-      row.share_payload_json = JSON.stringify(payload);
-    }
-  );
+  const exportedBefore = await exportPlatformSnapshot(request);
+  expect(exportedBefore.status).toBe(200);
+  expect(exportedBefore.json?.ok).toBe(true);
+  const snapshot = exportedBefore.json?.snapshot;
+  const inviteRows = Array.isArray(snapshot?.tables?.house_worker_share_invites)
+    ? snapshot.tables.house_worker_share_invites
+    : [];
+  const inviteRow = inviteRows.find((row) => String(row?.share_invite_id || '').trim() === shareId);
+  expect(inviteRow).toBeTruthy();
+  const packageShareId = String(inviteRow?.package_share_id || '').trim();
+  expect(packageShareId).toBeTruthy();
+  const invitePayload = JSON.parse(String(inviteRow.share_payload_json || '{}'));
+  invitePayload.entityVersionId = 'rev_house_worker_front_desk_helper_v404';
+  inviteRow.share_payload_json = JSON.stringify(invitePayload);
+  const packageRows = Array.isArray(snapshot?.tables?.house_worker_shares)
+    ? snapshot.tables.house_worker_shares
+    : [];
+  const packageRow = packageRows.find((row) => String(row?.share_id || '').trim() === packageShareId);
+  expect(packageRow).toBeTruthy();
+  const payload = JSON.parse(String(packageRow.share_payload_json || '{}'));
+  payload.entityVersionId = 'rev_house_worker_front_desk_helper_v404';
+  packageRow.entity_version_id = payload.entityVersionId;
+  packageRow.share_payload_json = JSON.stringify(payload);
+  const imported = await importPlatformSnapshot(request, snapshot, { reset: true });
+  expect(imported.status).toBe(200);
+  expect(imported.json?.ok).toBe(true);
 
   const shareDetail = await getHouseWorkerShare(page.request, shareId);
   expect(shareDetail.status).toBe(409);

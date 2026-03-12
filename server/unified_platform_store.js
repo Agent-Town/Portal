@@ -26,6 +26,7 @@ const PLATFORM_TABLES = Object.freeze([
   'house_staff_assignments',
   'house_worker_deployments',
   'house_worker_shares',
+  'house_worker_share_invites',
   'house_worker_sessions',
   'house_worker_session_events',
   'track_progress_events',
@@ -79,6 +80,9 @@ const FIXTURE_FILES = Object.freeze({
   worker_spawn_profile_seed: 'worker_spawn_profile_seed.json',
   worker_spawn_guardrail_seed: 'worker_spawn_guardrail_seed.json',
   worker_spawn_smoke_seed: 'worker_spawn_smoke_seed.json',
+  worker_share_lifecycle_seed: 'worker_share_lifecycle_seed.json',
+  worker_deployment_lifecycle_seed: 'worker_deployment_lifecycle_seed.json',
+  worker_office_pack_seed: 'worker_office_pack_seed.json',
   tracks_core_seed: 'tracks_core_seed.json',
   tracks_progress_seed: 'tracks_progress_seed.json',
   editor_pack_compat_seed: 'editor_pack_compat_seed.json',
@@ -379,6 +383,26 @@ function ensureDb() {
       UNIQUE (registry_entity_id, entity_version_id, loadout_id, bundle_hash)
     );
 
+    CREATE TABLE IF NOT EXISTS house_worker_share_invites (
+      share_invite_id TEXT PRIMARY KEY,
+      share_scope_id TEXT NOT NULL,
+      share_kind TEXT NOT NULL DEFAULT 'single_worker',
+      identity_key TEXT NOT NULL,
+      package_share_id TEXT,
+      share_payload_json TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'active',
+      expires_at TEXT,
+      revoked_at TEXT,
+      revoked_reason TEXT,
+      install_count INTEGER NOT NULL DEFAULT 0,
+      last_installed_at TEXT,
+      created_by_house_id TEXT,
+      created_by_team_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (share_scope_id, share_kind, identity_key)
+    );
+
     CREATE TABLE IF NOT EXISTS house_worker_sessions (
       house_worker_session_id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -496,6 +520,11 @@ function ensureDb() {
   ensureColumn(db, 'trace_events', 'sealed_context_id', 'TEXT');
   ensureColumn(db, 'trace_events', 'canonical_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn(db, 'sealed_contexts', 'house_id', 'TEXT');
+  ensureColumn(db, 'house_worker_deployments', 'lifecycle_state', `TEXT NOT NULL DEFAULT 'active'`);
+  ensureColumn(db, 'house_worker_deployments', 'lifecycle_updated_at', 'TEXT');
+  ensureColumn(db, 'house_worker_deployments', 'lifecycle_note', 'TEXT');
+  ensureColumn(db, 'house_worker_deployments', 'update_state', `TEXT NOT NULL DEFAULT 'current'`);
+  ensureColumn(db, 'house_worker_deployments', 'update_summary_json', `TEXT NOT NULL DEFAULT '{}'`);
   return db;
 }
 
@@ -1741,8 +1770,13 @@ function mapHouseWorkerDeploymentRow(row) {
     bundleHash: String(row.bundle_hash || ''),
     displayName: String(row.display_name || ''),
     status: String(row.status || ''),
+    lifecycleState: String(row.lifecycle_state || 'active'),
+    lifecycleUpdatedAt: row.lifecycle_updated_at ? String(row.lifecycle_updated_at) : null,
+    lifecycleNote: row.lifecycle_note ? String(row.lifecycle_note) : null,
+    updateState: String(row.update_state || 'current'),
     summary: parseJsonColumn(row.summary_json, {}),
     runtimeDefaults: parseJsonColumn(row.runtime_defaults_json, {}),
+    updateSummary: parseJsonColumn(row.update_summary_json, {}),
     installSource: parseJsonColumn(row.install_source_json, {}),
     idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     createdAt: String(row.created_at || ''),
@@ -1793,8 +1827,13 @@ function createHouseWorkerDeployment({
   bundleHash = '',
   displayName = '',
   status = '',
+  lifecycleState = 'active',
+  lifecycleUpdatedAt = null,
+  lifecycleNote = null,
+  updateState = 'current',
   summary = null,
   runtimeDefaults = null,
+  updateSummary = null,
   installSource = null,
   idempotencyKey = '',
   nowIso = new Date().toISOString(),
@@ -1810,6 +1849,8 @@ function createHouseWorkerDeployment({
   const normalizedBundleHash = String(bundleHash || '').trim();
   const normalizedDisplayName = String(displayName || '').trim();
   const normalizedStatus = String(status || '').trim();
+  const normalizedLifecycleState = String(lifecycleState || 'active').trim() || 'active';
+  const normalizedUpdateState = String(updateState || 'current').trim() || 'current';
   if (
     !normalizedDeploymentId
     || !normalizedHouseId
@@ -1858,13 +1899,18 @@ function createHouseWorkerDeployment({
       bundle_hash,
       display_name,
       status,
+      lifecycle_state,
+      lifecycle_updated_at,
+      lifecycle_note,
+      update_state,
       summary_json,
       runtime_defaults_json,
+      update_summary_json,
       install_source_json,
       idempotency_key,
       created_at,
       updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     normalizedDeploymentId,
     normalizedHouseId,
@@ -1877,14 +1923,88 @@ function createHouseWorkerDeployment({
     normalizedBundleHash,
     normalizedDisplayName,
     normalizedStatus,
+    normalizedLifecycleState,
+    String(lifecycleUpdatedAt || nowIso).trim() || nowIso,
+    String(lifecycleNote || '').trim() || null,
+    normalizedUpdateState,
     JSON.stringify(summary && typeof summary === 'object' ? summary : {}),
     JSON.stringify(runtimeDefaults && typeof runtimeDefaults === 'object' ? runtimeDefaults : {}),
+    JSON.stringify(updateSummary && typeof updateSummary === 'object' ? updateSummary : {}),
     JSON.stringify(installSource && typeof installSource === 'object' ? installSource : {}),
     String(idempotencyKey || '').trim() || null,
     nowIso,
     nowIso,
   );
   return getHouseWorkerDeploymentById(normalizedDeploymentId);
+}
+
+function updateHouseWorkerDeployment(deploymentId = '', patch = {}, nowIso = new Date().toISOString()) {
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  if (!normalizedDeploymentId) return null;
+  const existing = getHouseWorkerDeploymentById(normalizedDeploymentId);
+  if (!existing) return null;
+  const database = ensureDb();
+  const nextSummary = patch.summary && typeof patch.summary === 'object'
+    ? patch.summary
+    : existing.summary;
+  const nextRuntimeDefaults = patch.runtimeDefaults && typeof patch.runtimeDefaults === 'object'
+    ? patch.runtimeDefaults
+    : existing.runtimeDefaults;
+  const nextUpdateSummary = patch.updateSummary && typeof patch.updateSummary === 'object'
+    ? patch.updateSummary
+    : existing.updateSummary;
+  database.prepare(`
+    UPDATE house_worker_deployments
+    SET office_id = ?,
+        staff_agent_id = ?,
+        registry_entity_id = ?,
+        entity_version_id = ?,
+        loadout_id = ?,
+        bundle_hash = ?,
+        display_name = ?,
+        status = ?,
+        lifecycle_state = ?,
+        lifecycle_updated_at = ?,
+        lifecycle_note = ?,
+        update_state = ?,
+        summary_json = ?,
+        runtime_defaults_json = ?,
+        update_summary_json = ?,
+        install_source_json = ?,
+        updated_at = ?
+    WHERE deployment_id = ?
+  `).run(
+    String(patch.officeId ?? existing.officeId ?? '').trim(),
+    String(patch.staffAgentId ?? existing.staffAgentId ?? '').trim(),
+    String(patch.registryEntityId ?? existing.registryEntityId ?? '').trim(),
+    String(patch.entityVersionId ?? existing.entityVersionId ?? '').trim(),
+    String(patch.loadoutId ?? existing.loadoutId ?? '').trim(),
+    String(patch.bundleHash ?? existing.bundleHash ?? '').trim(),
+    String(patch.displayName ?? existing.displayName ?? '').trim(),
+    String(patch.status ?? existing.status ?? '').trim(),
+    String(patch.lifecycleState ?? existing.lifecycleState ?? 'active').trim() || 'active',
+    String(patch.lifecycleUpdatedAt ?? nowIso).trim() || nowIso,
+    String(patch.lifecycleNote ?? existing.lifecycleNote ?? '').trim() || null,
+    String(patch.updateState ?? existing.updateState ?? 'current').trim() || 'current',
+    JSON.stringify(nextSummary && typeof nextSummary === 'object' ? nextSummary : {}),
+    JSON.stringify(nextRuntimeDefaults && typeof nextRuntimeDefaults === 'object' ? nextRuntimeDefaults : {}),
+    JSON.stringify(nextUpdateSummary && typeof nextUpdateSummary === 'object' ? nextUpdateSummary : {}),
+    JSON.stringify(patch.installSource && typeof patch.installSource === 'object' ? patch.installSource : existing.installSource || {}),
+    nowIso,
+    normalizedDeploymentId,
+  );
+  return getHouseWorkerDeploymentById(normalizedDeploymentId);
+}
+
+function removeHouseWorkerDeployment(deploymentId = '') {
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  if (!normalizedDeploymentId) return false;
+  const database = ensureDb();
+  const result = database.prepare(`
+    DELETE FROM house_worker_deployments
+    WHERE deployment_id = ?
+  `).run(normalizedDeploymentId);
+  return Number(result?.changes || 0) > 0;
 }
 
 function mapHouseWorkerShareRow(row) {
@@ -1896,6 +2016,29 @@ function mapHouseWorkerShareRow(row) {
     loadoutId: String(row.loadout_id || ''),
     bundleHash: String(row.bundle_hash || ''),
     payload: parseJsonColumn(row.share_payload_json, {}),
+    createdByHouseId: row.created_by_house_id ? String(row.created_by_house_id) : null,
+    createdByTeamId: row.created_by_team_id ? String(row.created_by_team_id) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapHouseWorkerShareInviteRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    shareInviteId: String(row.share_invite_id || ''),
+    shareId: String(row.share_invite_id || ''),
+    shareScopeId: String(row.share_scope_id || ''),
+    shareKind: String(row.share_kind || 'single_worker'),
+    identityKey: String(row.identity_key || ''),
+    packageShareId: row.package_share_id ? String(row.package_share_id) : null,
+    payload: parseJsonColumn(row.share_payload_json, {}),
+    status: String(row.status || 'active'),
+    expiresAt: row.expires_at ? String(row.expires_at) : null,
+    revokedAt: row.revoked_at ? String(row.revoked_at) : null,
+    revokedReason: row.revoked_reason ? String(row.revoked_reason) : null,
+    installCount: Number(row.install_count || 0),
+    lastInstalledAt: row.last_installed_at ? String(row.last_installed_at) : null,
     createdByHouseId: row.created_by_house_id ? String(row.created_by_house_id) : null,
     createdByTeamId: row.created_by_team_id ? String(row.created_by_team_id) : null,
     createdAt: String(row.created_at || ''),
@@ -1979,6 +2122,176 @@ function createHouseWorkerShare({
     nowIso,
   );
   return getHouseWorkerShareById(normalizedShareId);
+}
+
+function listHouseWorkerShareInvites({
+  shareScopeId = '',
+  createdByHouseId = '',
+  createdByTeamId = '',
+} = {}) {
+  const normalizedShareScopeId = String(shareScopeId || '').trim();
+  const normalizedCreatedByHouseId = String(createdByHouseId || '').trim();
+  const normalizedCreatedByTeamId = String(createdByTeamId || '').trim();
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_share_invites
+    WHERE (? = '' OR share_scope_id = ?)
+      AND (? = '' OR created_by_house_id = ?)
+      AND (? = '' OR created_by_team_id = ?)
+    ORDER BY created_at DESC, share_invite_id DESC
+  `).all(
+    normalizedShareScopeId,
+    normalizedShareScopeId,
+    normalizedCreatedByHouseId,
+    normalizedCreatedByHouseId,
+    normalizedCreatedByTeamId,
+    normalizedCreatedByTeamId,
+  );
+  return rows.map(mapHouseWorkerShareInviteRow).filter(Boolean);
+}
+
+function getHouseWorkerShareInviteById(shareInviteId = '') {
+  const normalizedShareInviteId = String(shareInviteId || '').trim();
+  if (!normalizedShareInviteId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_share_invites
+    WHERE share_invite_id = ?
+    LIMIT 1
+  `).get(normalizedShareInviteId);
+  return mapHouseWorkerShareInviteRow(row);
+}
+
+function createHouseWorkerShareInvite({
+  shareInviteId = '',
+  shareScopeId = '',
+  shareKind = 'single_worker',
+  identityKey = '',
+  packageShareId = null,
+  payload = null,
+  status = 'active',
+  expiresAt = null,
+  revokedAt = null,
+  revokedReason = null,
+  installCount = 0,
+  lastInstalledAt = null,
+  createdByHouseId = '',
+  createdByTeamId = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedShareInviteId = String(shareInviteId || '').trim();
+  const normalizedShareScopeId = String(shareScopeId || '').trim();
+  const normalizedShareKind = String(shareKind || 'single_worker').trim() || 'single_worker';
+  const normalizedIdentityKey = String(identityKey || '').trim();
+  if (!normalizedShareInviteId || !normalizedShareScopeId || !normalizedShareKind || !normalizedIdentityKey) {
+    throw new Error('HOUSE_WORKER_SHARE_INVITE_INVALID');
+  }
+  const database = ensureDb();
+  const existing = database.prepare(`
+    SELECT *
+    FROM house_worker_share_invites
+    WHERE share_scope_id = ?
+      AND share_kind = ?
+      AND identity_key = ?
+    LIMIT 1
+  `).get(
+    normalizedShareScopeId,
+    normalizedShareKind,
+    normalizedIdentityKey,
+  );
+  if (existing) {
+    const existingInvite = mapHouseWorkerShareInviteRow(existing);
+    return updateHouseWorkerShareInvite(existingInvite.shareInviteId, {
+      status,
+      expiresAt,
+      revokedAt,
+      revokedReason,
+      payload,
+      packageShareId,
+      createdByHouseId: String(createdByHouseId || existingInvite.createdByHouseId || '').trim() || null,
+      createdByTeamId: String(createdByTeamId || existingInvite.createdByTeamId || '').trim() || null,
+    }, nowIso);
+  }
+  database.prepare(`
+    INSERT INTO house_worker_share_invites (
+      share_invite_id,
+      share_scope_id,
+      share_kind,
+      identity_key,
+      package_share_id,
+      share_payload_json,
+      status,
+      expires_at,
+      revoked_at,
+      revoked_reason,
+      install_count,
+      last_installed_at,
+      created_by_house_id,
+      created_by_team_id,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedShareInviteId,
+    normalizedShareScopeId,
+    normalizedShareKind,
+    normalizedIdentityKey,
+    String(packageShareId || '').trim() || null,
+    JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+    String(status || 'active').trim() || 'active',
+    String(expiresAt || '').trim() || null,
+    String(revokedAt || '').trim() || null,
+    String(revokedReason || '').trim() || null,
+    Math.max(0, Number(installCount || 0)),
+    String(lastInstalledAt || '').trim() || null,
+    String(createdByHouseId || '').trim() || null,
+    String(createdByTeamId || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerShareInviteById(normalizedShareInviteId);
+}
+
+function updateHouseWorkerShareInvite(shareInviteId = '', patch = {}, nowIso = new Date().toISOString()) {
+  const normalizedShareInviteId = String(shareInviteId || '').trim();
+  if (!normalizedShareInviteId) return null;
+  const existing = getHouseWorkerShareInviteById(normalizedShareInviteId);
+  if (!existing) return null;
+  const database = ensureDb();
+  const nextPayload = patch.payload && typeof patch.payload === 'object'
+    ? patch.payload
+    : existing.payload;
+  database.prepare(`
+    UPDATE house_worker_share_invites
+    SET package_share_id = ?,
+        share_payload_json = ?,
+        status = ?,
+        expires_at = ?,
+        revoked_at = ?,
+        revoked_reason = ?,
+        install_count = ?,
+        last_installed_at = ?,
+        created_by_house_id = ?,
+        created_by_team_id = ?,
+        updated_at = ?
+    WHERE share_invite_id = ?
+  `).run(
+    String(patch.packageShareId ?? existing.packageShareId ?? '').trim() || null,
+    JSON.stringify(nextPayload && typeof nextPayload === 'object' ? nextPayload : {}),
+    String(patch.status ?? existing.status ?? 'active').trim() || 'active',
+    String(patch.expiresAt ?? existing.expiresAt ?? '').trim() || null,
+    String(patch.revokedAt ?? existing.revokedAt ?? '').trim() || null,
+    String(patch.revokedReason ?? existing.revokedReason ?? '').trim() || null,
+    Math.max(0, Number(patch.installCount ?? existing.installCount ?? 0)),
+    String(patch.lastInstalledAt ?? existing.lastInstalledAt ?? '').trim() || null,
+    String(patch.createdByHouseId ?? existing.createdByHouseId ?? '').trim() || null,
+    String(patch.createdByTeamId ?? existing.createdByTeamId ?? '').trim() || null,
+    nowIso,
+    normalizedShareInviteId,
+  );
+  return getHouseWorkerShareInviteById(normalizedShareInviteId);
 }
 
 function mapHouseWorkerSessionRow(row) {
@@ -3298,6 +3611,7 @@ module.exports = {
   createHouseWorkerSession,
   createHouseWorkerSessionEvent,
   createHouseWorkerShare,
+  createHouseWorkerShareInvite,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -3325,6 +3639,7 @@ module.exports = {
   listTeamConfigBindings,
   getHouseWorkerDeploymentById,
   getHouseWorkerShareById,
+  getHouseWorkerShareInviteById,
   getHouseWorkerSessionById,
   getTrainerJobById,
   getTrainerJobByIdempotency,
@@ -3339,6 +3654,7 @@ module.exports = {
   isUnifiedPlatformTable,
   listHouseStaffAssignments,
   listHouseWorkerDeployments,
+  listHouseWorkerShareInvites,
   listHouseWorkerSessionEvents,
   listHouseWorkerSessions,
   listConfigComponentVersions,
@@ -3355,6 +3671,8 @@ module.exports = {
   resetUnifiedPlatformStore,
   createSealedContextViolation,
   updateRunMetadata,
+  updateHouseWorkerDeployment,
+  updateHouseWorkerShareInvite,
   updateHouseWorkerSession,
   updateSealedContextStatus,
   upsertSealedContext,
@@ -3364,4 +3682,5 @@ module.exports = {
   upsertApprovalRecord,
   upsertTeamConfigBinding,
   upsertConfigVersion,
+  removeHouseWorkerDeployment,
 };

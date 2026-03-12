@@ -1049,6 +1049,12 @@ Response fields:
 - `data.deployments[].displayName`
 - `data.deployments[].status`
 - `data.deployments[].statusLabel`
+- `data.deployments[].lifecycleState`
+- `data.deployments[].lifecycleLabel`
+- `data.deployments[].updateState`
+- `data.deployments[].updateStateLabel`
+- `data.deployments[].latestVersionId`
+- `data.deployments[].latestVersionLabel`
 - `data.deployments[].oneLineBenefit`
 - `data.deployments[].whatItDoes`
 - `data.deployments[].bestFor[]`
@@ -1212,11 +1218,36 @@ Notes:
 - Install preserves exact package identity through `registryEntityId`, `entityVersionId`, `loadoutId`, and `bundleHash`.
 - Helpers that need local credentials install in `brain_binding_required` state with plain-language guidance.
 
+### GET `/api/platform/house-workers/shares` (human)
+Returns managed helper links created by the active House team.
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.shares[]`
+- `data.shares[].shareId`
+- `data.shares[].shareKind`
+- `data.shares[].title`
+- `data.shares[].status`
+- `data.shares[].statusLabel`
+- `data.shares[].expiresAt`
+- `data.shares[].installCount`
+- `data.shares[].memberCount`
+- `data.shares[].sharePath`
+- `data.shares[].revokeAllowed`
+- `data.sourceManifest`
+- `data.emptyStateText`
+
 ### POST `/api/platform/house-workers/share` (human)
-Creates a portable friend-install payload for one installed deployment or Registry worker package.
+Creates a managed friend-install link for one installed deployment, one Registry worker package, or a multi-helper office pack.
 
 Request body:
 - `deploymentId` optional
+- `deploymentIds[]` optional
 - `registryEntityId` optional
 
 Stable error codes:
@@ -1231,6 +1262,12 @@ Stable error codes:
 
 Response fields:
 - `data.shareId`
+- `data.shareKind`
+- `data.status`
+- `data.statusLabel`
+- `data.expiresAt`
+- `data.installCount`
+- `data.memberCount`
 - `data.sharePath`
 - `data.portable`
 - `data.portable.versionLabel`
@@ -1244,6 +1281,8 @@ Returns one portable House worker share payload.
 
 Stable error codes:
 - `NOT_FOUND`
+- `SHARE_REVOKED`
+- `SHARE_EXPIRED`
 - `SHARED_WORKER_PAYLOAD_INVALID`
 - `SHARED_WORKER_PAYLOAD_MISMATCH`
 - `SHARED_WORKER_VERSION_INVALID`
@@ -1253,6 +1292,12 @@ Stable error codes:
 
 Response fields:
 - `data.shareId`
+- `data.shareKind`
+- `data.status`
+- `data.statusLabel`
+- `data.expiresAt`
+- `data.installCount`
+- `data.memberCount`
 - `data.sharePath`
 - `data.portable`
 - `data.portable.versionLabel`
@@ -1261,8 +1306,23 @@ Response fields:
 - `data.summary`
 - `data.secretBoundarySummary`
 
+### POST `/api/platform/house-workers/shares/:shareId/revoke` (human)
+Revokes one managed helper link created by the active House team.
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `NOT_FOUND`
+
+Response fields:
+- `data.shareId`
+- `data.status`
+- `data.statusLabel`
+- `data.expiresAt`
+- `data.installCount`
+
 ### POST `/api/platform/house-workers/install-shared` (human)
-Installs one shared helper payload into the active House and active team.
+Installs one shared helper payload or one office pack into the active House and active team.
 
 Request body:
 - `shareId` required
@@ -1284,6 +1344,7 @@ Stable error codes:
 
 Response fields:
 - `data.deployment`
+- `data.deployments[]`
 - `data.deployment.versionLabel`
 - `data.deployment.compatibilityLabel`
 - `data.share`
@@ -1291,8 +1352,29 @@ Response fields:
 - `data.deploymentsPath`
 - `data.houseOfficePath`
 
+### POST `/api/platform/house-workers/deployments/:deploymentId/lifecycle` (human)
+Applies a lifecycle action to one installed helper.
+
+Request body:
+- `action` required
+  - supported: `pause`, `resume`, `archive`, `remove`, `reinstall`, `update`
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `DEPLOYMENT_NOT_FOUND`
+- `WORKER_PACKAGE_NOT_FOUND`
+
+Response fields:
+- `data.deployment`
+- `data.removed`
+- `data.residualActiveSessionCount`
+- `data.deploymentsPath`
+- `data.sessionsPath`
+
 ### GET `/api/platform/house-workers` (human)
-Returns the current House helper collections payload: installed deployments plus active helper sessions.
+Returns the current House helper collections payload: installed deployments plus helper links plus active helper sessions.
 
 Query params:
 - `teamId` (optional override; when omitted, resolves to `data.activeTeamId`)

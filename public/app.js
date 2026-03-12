@@ -506,6 +506,7 @@ let houseSurfaceState = {
     staffAgents: [],
     assignments: [],
     deployments: [],
+    workerShares: [],
     workerSessions: [],
     presence: [],
     briefing: [],
@@ -2907,23 +2908,50 @@ function applyHouseOfficePanelButtonStyle(button) {
   button.style.lineHeight = '1.35';
 }
 
+async function createHouseWorkerShare(payload = {}) {
+  return await api('/api/platform/house-workers/share', {
+    method: 'POST',
+    body: JSON.stringify(payload && typeof payload === 'object' ? payload : {}),
+  });
+}
+
+async function revokeHouseWorkerShareInvite(shareId = '') {
+  return await api(`/api/platform/house-workers/shares/${encodeURIComponent(String(shareId || '').trim())}/revoke`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+async function updateHouseWorkerDeploymentLifecycle(deploymentId = '', action = '') {
+  return await api(`/api/platform/house-workers/deployments/${encodeURIComponent(String(deploymentId || '').trim())}/lifecycle`, {
+    method: 'POST',
+    body: JSON.stringify({
+      action: String(action || '').trim(),
+    }),
+  });
+}
+
 function renderHouseOfficeSurface() {
   const emptyNode = el('houseOfficeEmpty');
   const summaryNode = el('houseOfficeSummary');
+  const shareActionsNode = el('houseOfficeShareActions');
+  const sharePackBtn = el('houseOfficeSharePackBtn');
   const selectedOfficeNode = el('houseOfficeSelectedOffice');
   const presenceNode = el('houseOfficePresence');
   const briefingNode = el('houseOfficeBriefing');
   const attentionNode = el('houseOfficeAttention');
   const assignmentsNode = el('houseOfficeAssignments');
   const deploymentsNode = el('houseOfficeDeployments');
+  const workerSharesNode = el('houseOfficeWorkerShares');
   const sessionsNode = el('houseOfficeWorkerSessions');
   const mapNode = el('houseOfficeMap');
   const sourceManifestNode = el('houseOfficeSourceManifest');
-  if (!emptyNode || !summaryNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !deploymentsNode || !sessionsNode || !mapNode || !sourceManifestNode) return;
+  if (!emptyNode || !summaryNode || !shareActionsNode || !selectedOfficeNode || !presenceNode || !briefingNode || !attentionNode || !assignmentsNode || !deploymentsNode || !workerSharesNode || !sessionsNode || !mapNode || !sourceManifestNode) return;
   const offices = Array.isArray(houseSurfaceState.office.offices) ? houseSurfaceState.office.offices : [];
   const staffAgents = Array.isArray(houseSurfaceState.office.staffAgents) ? houseSurfaceState.office.staffAgents : [];
   const assignments = Array.isArray(houseSurfaceState.office.assignments) ? houseSurfaceState.office.assignments : [];
   const deployments = Array.isArray(houseSurfaceState.office.deployments) ? houseSurfaceState.office.deployments : [];
+  const workerShares = Array.isArray(houseSurfaceState.office.workerShares) ? houseSurfaceState.office.workerShares : [];
   const workerSessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
   const activeWorkerSessions = workerSessions.filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
   const visibleWorkerSessions = workerSessions.filter((entry) => {
@@ -2954,6 +2982,7 @@ function renderHouseOfficeSurface() {
   const staffAgentCount = Number(summary?.staffAgentCount || staffAgents.length || 0);
   const assignmentCount = Number(summary?.assignmentCount || assignments.length || 0);
   const deploymentCount = Number(summary?.deploymentCount || deployments.length || 0);
+  const workerShareCount = Number(summary?.workerShareCount || workerShares.length || 0);
   const workerSessionCount = activeWorkerSessions.length;
   const briefingItemCount = briefing.reduce((sum, group) => {
     const items = Array.isArray(group?.items) ? group.items : [];
@@ -2974,6 +3003,7 @@ function renderHouseOfficeSurface() {
     `${staffAgentCount} staff`,
     `${assignmentCount} assignments`,
     `${deploymentCount} helpers`,
+    `${workerShareCount} links`,
     `${workerSessionCount} active sessions`,
     `${presence.length} presence`,
     `${briefingItemCount} briefing`,
@@ -2984,6 +3014,36 @@ function renderHouseOfficeSurface() {
     summaryParts.push(selectedOfficePurpose);
   }
   summaryNode.textContent = summaryParts.join(' · ');
+
+  shareActionsNode.classList.toggle('is-hidden', deployments.length < 2);
+  if (sharePackBtn) {
+    sharePackBtn.disabled = deployments.length < 2;
+    sharePackBtn.onclick = async () => {
+      if (deployments.length < 2) return;
+      sharePackBtn.disabled = true;
+      setHouseSurfaceStatus('Creating office pack link...');
+      try {
+        const response = await createHouseWorkerShare({
+          deploymentIds: deployments.map((entry) => String(entry?.deploymentId || '').trim()).filter(Boolean),
+        });
+        const sharePath = String(response?.data?.sharePath || '').trim();
+        const absoluteSharePath = sharePath ? new URL(sharePath, window.location.origin).toString() : '';
+        if (absoluteSharePath && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(absoluteSharePath).catch(() => null);
+        }
+        await loadHouseOfficeSurface({ skipContext: true });
+        setHouseSurfaceStatus(
+          absoluteSharePath
+            ? `Office pack link ready: ${absoluteSharePath}`
+            : 'Office pack link is ready.'
+        );
+      } catch (err) {
+        setHouseSurfaceStatus(`Office pack link unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+      } finally {
+        sharePackBtn.disabled = deployments.length < 2;
+      }
+    };
+  }
 
   selectedOfficeNode.innerHTML = '';
   selectedOfficeNode.style.border = '1px solid rgba(255,255,255,0.12)';
@@ -3296,6 +3356,16 @@ function renderHouseOfficeSurface() {
         card.appendChild(compatibilityLine);
       }
 
+      const updateStateLabel = String(deployment?.updateStateLabel || '').trim();
+      if (updateStateLabel) {
+        const updateLine = document.createElement('div');
+        updateLine.className = 'small';
+        updateLine.style.marginTop = '4px';
+        updateLine.setAttribute('data-testid', 'house-office-deployment-update-state');
+        updateLine.textContent = updateStateLabel;
+        card.appendChild(updateLine);
+      }
+
       const actionStatus = document.createElement('div');
       actionStatus.className = 'small';
       actionStatus.style.marginTop = '8px';
@@ -3357,6 +3427,50 @@ function renderHouseOfficeSurface() {
       stopBtn.disabled = !deploymentSession;
       actions.appendChild(stopBtn);
       card.appendChild(actions);
+
+      const manageActions = document.createElement('div');
+      manageActions.className = 'kv';
+      manageActions.style.marginTop = '8px';
+
+      const shareBtn = document.createElement('button');
+      shareBtn.type = 'button';
+      shareBtn.className = 'btn';
+      shareBtn.textContent = 'Copy Friend Link';
+      shareBtn.setAttribute('data-testid', 'house-office-helper-share');
+      manageActions.appendChild(shareBtn);
+
+      const pauseBtn = document.createElement('button');
+      pauseBtn.type = 'button';
+      pauseBtn.className = 'btn';
+      pauseBtn.textContent = String(deployment?.lifecycleState || '').trim() === 'paused' ? 'Resume Helper' : 'Pause Helper';
+      pauseBtn.setAttribute('data-testid', 'house-office-helper-pause');
+      manageActions.appendChild(pauseBtn);
+
+      const archiveBtn = document.createElement('button');
+      archiveBtn.type = 'button';
+      archiveBtn.className = 'btn';
+      archiveBtn.textContent = 'Archive Helper';
+      archiveBtn.setAttribute('data-testid', 'house-office-helper-archive');
+      archiveBtn.disabled = String(deployment?.lifecycleState || '').trim() === 'archived';
+      manageActions.appendChild(archiveBtn);
+
+      const refreshBtn = document.createElement('button');
+      refreshBtn.type = 'button';
+      refreshBtn.className = 'btn';
+      refreshBtn.textContent = String(deployment?.updateState || '').trim() === 'update_available'
+        ? `Update to ${String(deployment?.latestVersionLabel || 'latest release').trim()}`
+        : 'Reinstall Release';
+      refreshBtn.setAttribute('data-testid', 'house-office-helper-refresh');
+      manageActions.appendChild(refreshBtn);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn danger';
+      removeBtn.textContent = 'Remove Helper';
+      removeBtn.setAttribute('data-testid', 'house-office-helper-remove');
+      manageActions.appendChild(removeBtn);
+
+      card.appendChild(manageActions);
 
       const advanced = document.createElement('details');
       advanced.setAttribute('data-testid', 'house-office-deployment-advanced');
@@ -3505,7 +3619,174 @@ function renderHouseOfficeSurface() {
         }
       });
 
+      shareBtn.addEventListener('click', async () => {
+        shareBtn.disabled = true;
+        actionStatus.textContent = 'Creating friend link...';
+        try {
+          const response = await createHouseWorkerShare({ deploymentId });
+          const sharePath = String(response?.data?.sharePath || '').trim();
+          const absoluteSharePath = sharePath ? new URL(sharePath, window.location.origin).toString() : '';
+          if (absoluteSharePath && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(absoluteSharePath).catch(() => null);
+          }
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = absoluteSharePath
+            ? `Friend link ready: ${absoluteSharePath}`
+            : 'Friend link is ready.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Friend link unavailable.');
+        } finally {
+          shareBtn.disabled = false;
+        }
+      });
+
+      pauseBtn.addEventListener('click', async () => {
+        pauseBtn.disabled = true;
+        const action = String(deployment?.lifecycleState || '').trim() === 'paused' ? 'resume' : 'pause';
+        actionStatus.textContent = action === 'pause' ? 'Pausing helper...' : 'Resuming helper...';
+        try {
+          await updateHouseWorkerDeploymentLifecycle(deploymentId, action);
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = action === 'pause'
+            ? 'Helper paused.'
+            : 'Helper is ready to start again.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper lifecycle update failed.');
+        } finally {
+          pauseBtn.disabled = false;
+        }
+      });
+
+      archiveBtn.addEventListener('click', async () => {
+        archiveBtn.disabled = true;
+        actionStatus.textContent = 'Archiving helper...';
+        try {
+          await updateHouseWorkerDeploymentLifecycle(deploymentId, 'archive');
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = 'Helper archived.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper archive failed.');
+        } finally {
+          archiveBtn.disabled = false;
+        }
+      });
+
+      refreshBtn.addEventListener('click', async () => {
+        refreshBtn.disabled = true;
+        const action = String(deployment?.updateState || '').trim() === 'update_available' ? 'update' : 'reinstall';
+        actionStatus.textContent = action === 'update' ? 'Updating helper release...' : 'Reinstalling helper release...';
+        try {
+          await updateHouseWorkerDeploymentLifecycle(deploymentId, action);
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = action === 'update'
+            ? 'Helper updated to the latest release.'
+            : 'Helper release reinstalled.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper release refresh failed.');
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      });
+
+      removeBtn.addEventListener('click', async () => {
+        removeBtn.disabled = true;
+        actionStatus.textContent = 'Removing helper...';
+        try {
+          await updateHouseWorkerDeploymentLifecycle(deploymentId, 'remove');
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = 'Helper removed.';
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Helper removal failed.');
+        } finally {
+          removeBtn.disabled = false;
+        }
+      });
+
       deploymentsNode.appendChild(card);
+    });
+  }
+
+  workerSharesNode.innerHTML = '';
+  if (!workerShares.length) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'small';
+    placeholder.textContent = 'No helper links have been created yet.';
+    workerSharesNode.appendChild(placeholder);
+  } else {
+    workerShares.forEach((share) => {
+      const card = document.createElement('article');
+      card.setAttribute('data-testid', 'house-office-worker-share-item');
+      card.style.border = '1px solid rgba(255,255,255,0.12)';
+      card.style.borderRadius = '12px';
+      card.style.padding = '10px';
+      card.style.background = 'rgba(255,255,255,0.02)';
+      card.style.overflowWrap = 'anywhere';
+
+      const heading = document.createElement('div');
+      heading.style.fontWeight = '600';
+      heading.textContent = `${String(share?.title || 'Helper Link').trim() || 'Helper Link'} · ${String(share?.statusLabel || '').trim() || 'Link status unavailable'}`;
+      card.appendChild(heading);
+
+      const meta = document.createElement('div');
+      meta.className = 'small';
+      meta.style.marginTop = '4px';
+      meta.textContent = [
+        `${String(share?.memberCount || 1)} helper${Number(share?.memberCount || 1) === 1 ? '' : 's'}`,
+        `${String(share?.installCount || 0)} install${Number(share?.installCount || 0) === 1 ? '' : 's'}`,
+        share?.expiresAt ? `Expires ${String(share.expiresAt).trim()}` : '',
+      ].filter(Boolean).join(' · ');
+      card.appendChild(meta);
+
+      const summaryLine = document.createElement('div');
+      summaryLine.className = 'small';
+      summaryLine.style.marginTop = '4px';
+      summaryLine.textContent = String(share?.summary || 'Shared helper link').trim();
+      card.appendChild(summaryLine);
+
+      const actions = document.createElement('div');
+      actions.className = 'kv';
+      actions.style.marginTop = '8px';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn';
+      copyBtn.textContent = 'Copy Link';
+      copyBtn.setAttribute('data-testid', 'house-office-worker-share-copy');
+      actions.appendChild(copyBtn);
+
+      const revokeBtn = document.createElement('button');
+      revokeBtn.type = 'button';
+      revokeBtn.className = 'btn';
+      revokeBtn.textContent = 'Revoke Link';
+      revokeBtn.setAttribute('data-testid', 'house-office-worker-share-revoke');
+      revokeBtn.disabled = share?.revokeAllowed !== true;
+      actions.appendChild(revokeBtn);
+
+      copyBtn.addEventListener('click', async () => {
+        const sharePath = String(share?.sharePath || '').trim();
+        const absoluteSharePath = sharePath ? new URL(sharePath, window.location.origin).toString() : '';
+        if (absoluteSharePath && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(absoluteSharePath).catch(() => null);
+        }
+        setHouseSurfaceStatus(absoluteSharePath ? `Copied: ${absoluteSharePath}` : 'Share link unavailable.', !absoluteSharePath);
+      });
+
+      revokeBtn.addEventListener('click', async () => {
+        if (!share?.shareId) return;
+        revokeBtn.disabled = true;
+        setHouseSurfaceStatus('Revoking helper link...');
+        try {
+          await revokeHouseWorkerShareInvite(String(share.shareId || '').trim());
+          await loadHouseOfficeSurface({ skipContext: true });
+          setHouseSurfaceStatus('Helper link revoked.');
+        } catch (err) {
+          setHouseSurfaceStatus(`Helper link revoke failed: ${String(err?.message || 'UNKNOWN_ERROR')}`, true);
+          revokeBtn.disabled = false;
+        }
+      });
+
+      card.appendChild(actions);
+      workerSharesNode.appendChild(card);
     });
   }
 
@@ -4142,6 +4423,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.staffAgents = Array.isArray(data.staffAgents) ? data.staffAgents : [];
     houseSurfaceState.office.assignments = Array.isArray(data.assignments) ? data.assignments : [];
     houseSurfaceState.office.deployments = Array.isArray(data.deployments) ? data.deployments : [];
+    houseSurfaceState.office.workerShares = Array.isArray(data.workerShares) ? data.workerShares : [];
     houseSurfaceState.office.workerSessions = Array.isArray(data.workerSessions) ? data.workerSessions : [];
     houseSurfaceState.office.presence = Array.isArray(data.presence) ? data.presence : [];
     houseSurfaceState.office.briefing = Array.isArray(data.briefing) ? data.briefing : [];
@@ -4167,6 +4449,7 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
     houseSurfaceState.office.staffAgents = [];
     houseSurfaceState.office.assignments = [];
     houseSurfaceState.office.deployments = [];
+    houseSurfaceState.office.workerShares = [];
     houseSurfaceState.office.workerSessions = [];
     houseSurfaceState.office.presence = [];
     houseSurfaceState.office.briefing = [];

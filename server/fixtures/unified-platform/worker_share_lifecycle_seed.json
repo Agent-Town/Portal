@@ -1,0 +1,8 @@
+{
+  "family": "worker_share_lifecycle_seed",
+  "schema": "agent-town-house-worker-share-lifecycle-seed/v1",
+  "defaultTtlDays": 7,
+  "activeStatusLabel": "Active until the link expires or is revoked.",
+  "revokedStatusLabel": "Revoked links fail closed on preview and install.",
+  "expiredStatusLabel": "Expired links require a fresh share before install."
+}
