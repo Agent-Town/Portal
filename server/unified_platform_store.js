@@ -1764,6 +1764,19 @@ function listLibraryPublications({
   return database.prepare(query).all(...args).map(mapLibraryPublicationRow).filter(Boolean);
 }
 
+function getLibraryPublicationById(libraryPublicationId = '') {
+  const normalizedLibraryPublicationId = String(libraryPublicationId || '').trim();
+  if (!normalizedLibraryPublicationId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_publications
+    WHERE library_publication_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryPublicationId);
+  return mapLibraryPublicationRow(row);
+}
+
 function getLibraryPublicationByIdempotency({
   houseId = '',
   teamId = '',
@@ -1906,6 +1919,19 @@ function getLibraryPeerRelayByIdempotency({
     normalizedTeamId,
     normalizedIdempotencyKey,
   );
+  return mapLibraryPeerRelayRow(row);
+}
+
+function getLibraryPeerRelayById(libraryPeerRelayId = '') {
+  const normalizedLibraryPeerRelayId = String(libraryPeerRelayId || '').trim();
+  if (!normalizedLibraryPeerRelayId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_peer_relays
+    WHERE library_peer_relay_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryPeerRelayId);
   return mapLibraryPeerRelayRow(row);
 }
 
@@ -4145,7 +4171,9 @@ module.exports = {
   getConversationArtifactByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
+  getLibraryPublicationById,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
   getLibraryPublicationByIdempotency,

@@ -11,6 +11,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryItem,
     createLibraryItemRevision,
     createLibraryLink,
+    createLibraryPeerRelay,
     createLibraryShelf,
     createLibraryPublication,
     createSealedContextViolation,
@@ -22,6 +23,8 @@ function registerPlatformReadRoutes(app, deps) {
     getConversationArtifactByIdempotency,
     getLibraryItemById,
     getLibraryItemByIdempotency,
+    getLibraryPeerRelayByIdempotency,
+    getLibraryPublicationById,
     getLibraryShelfById,
     getLibraryShelfByIdempotency,
     getLibraryPublicationByIdempotency,
@@ -62,11 +65,13 @@ function registerPlatformReadRoutes(app, deps) {
     removeLibraryShelfItem,
     replaceScopeSetItems,
     replaceConfigComponentVersions,
+    resolveApprovedLibraryPeerRelayApproval,
     resolveApprovedLibraryPublicationApproval,
     resolveApprovedTrainerPatchPromotion,
     resolveHumanSessionWithRecovery,
     resolvePlatformTrainerLinkedConfigVersionId,
     resolveSessionPlatformContext,
+    resolveKnownHouseTarget,
     searchRegistryFamilyGroups,
     sendPortalApiError,
     sendPortalApiSuccess,
@@ -910,6 +915,47 @@ function registerPlatformReadRoutes(app, deps) {
     return {
       status: 201,
       publication,
+    };
+  }
+
+  function persistLibraryPeerRelayRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicationId = '',
+    registryId = '',
+    targetHouseId = '',
+    transportKind = 'pony.relay.registry.v1',
+    relayState = 'queued',
+    metadata = null,
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibraryPeerRelayByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        relay: existing,
+      };
+    }
+    const relay = createLibraryPeerRelay({
+      libraryPeerRelayId: `prelay_${randomHex(12)}`,
+      houseId,
+      teamId,
+      libraryPublicationId,
+      registryId,
+      targetHouseId,
+      transportKind,
+      relayState,
+      idempotencyKey,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      relay,
     };
   }
 
@@ -1864,6 +1910,103 @@ function registerPlatformReadRoutes(app, deps) {
         libraryItemId: item.libraryItemId,
         contentHash: item.contentHash,
         sourceRef: item.sourceRef,
+      },
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/peer-relays', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before relaying a Library publication.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before relaying a Library publication.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to relay a Library publication.', { requestId });
+    }
+    const existingRelay = getLibraryPeerRelayByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingRelay) {
+      return sendPortalApiSuccess(res, {
+        relay: existingRelay,
+      }, { requestId, status: 200 });
+    }
+    const libraryPublicationId = typeof req.body?.libraryPublicationId === 'string' ? req.body.libraryPublicationId.trim() : '';
+    const targetHouseId = typeof req.body?.targetHouseId === 'string' ? req.body.targetHouseId.trim() : '';
+    const transportKind = typeof req.body?.transportKind === 'string' ? req.body.transportKind.trim() : 'pony.relay.registry.v1';
+    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+    if (!libraryPublicationId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PUBLICATION_REQUIRED', 'libraryPublicationId is required to relay a Library publication.', { requestId });
+    }
+    if (!targetHouseId) {
+      return sendPortalApiError(res, 400, 'TARGET_HOUSE_REQUIRED', 'targetHouseId is required to relay a Library publication.', { requestId });
+    }
+    const publication = getLibraryPublicationById(libraryPublicationId);
+    if (!publication || publication.houseId !== context.houseId || publication.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_PUBLICATION_NOT_FOUND', 'The requested Library publication could not be found for this House team.', { requestId });
+    }
+    const item = publication.libraryItemId ? getLibraryItemById(publication.libraryItemId) : null;
+    if (!item) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLICATION_ITEM_REQUIRED', 'The published Library item could not be resolved for relay.', { requestId });
+    }
+    const target = resolveKnownHouseTarget(targetHouseId);
+    if (!target) {
+      return sendPortalApiError(res, 404, 'TARGET_HOUSE_NOT_FOUND', 'The requested target house could not be found.', { requestId });
+    }
+    const approval = resolveApprovedLibraryPeerRelayApproval(approvalId, {
+      houseId: context.houseId,
+      libraryPublicationId,
+      targetHouseId: target.houseId,
+      transportKind,
+    });
+    if (!approval) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PEER_RELAY_APPROVAL_REQUIRED', 'Relaying a Library publication requires explicit approval.', {
+        requestId,
+        details: {
+          approvalId: approvalId || null,
+          approvalKind: 'library_peer_relay',
+          libraryPublicationId,
+          targetHouseId: target.houseId,
+          transportKind,
+        },
+      });
+    }
+    const persisted = persistLibraryPeerRelayRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicationId,
+      registryId: String(publication.registryId || item.registryId || '').trim() || `regrelay_${randomHex(8)}`,
+      targetHouseId: target.houseId,
+      transportKind,
+      relayState: 'queued',
+      idempotencyKey,
+      metadata: {
+        approvalId: approval.approvalId,
+        approvalKind: approval.approvalKind,
+        sourceLibraryItemId: item.libraryItemId,
+        sourceContentHash: item.contentHash,
+      },
+    });
+    return sendPortalApiSuccess(res, {
+      relay: persisted.relay,
+      publication: {
+        libraryPublicationId: publication.libraryPublicationId,
+        libraryItemId: publication.libraryItemId,
+        registryId: publication.registryId,
+        contentHash: publication.contentHash,
+      },
+      target: {
+        houseId: target.houseId,
       },
     }, { requestId, status: persisted.status });
   });

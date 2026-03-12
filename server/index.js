@@ -108,6 +108,7 @@ const {
   countTrackProgressEventsByDedupe,
   createLibraryItem,
   createLibraryLink,
+  createLibraryPeerRelay,
   createLibraryPublication,
   createScopeSet,
   createTrackProgressEvent,
@@ -138,9 +139,11 @@ const {
   getLatestTraceEvent,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayByIdempotency,
+  getLibraryPublicationById,
+  getLibraryPublicationByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
-  getLibraryPublicationByIdempotency,
   getRunByIdempotency,
   getRunById,
   getRunByTraceId,
@@ -3818,6 +3821,7 @@ const PLATFORM_TRAINER_JOB_KINDS = new Set([
 const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
 const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
 const LIBRARY_PUBLICATION_FIXTURE_APPROVAL_ID = 'appr_fixture_library_publish_approved_01';
+const LIBRARY_PEER_RELAY_FIXTURE_APPROVAL_ID = 'appr_fixture_library_peer_relay_approved_01';
 
 function getPlatformExperienceDefinition(experienceId = '') {
   const normalizedExperienceId = String(experienceId || '').trim();
@@ -4446,6 +4450,7 @@ registerPlatformReadRoutes(app, {
   createLibraryItem,
   createLibraryItemRevision,
   createLibraryLink,
+  createLibraryPeerRelay,
   createLibraryShelf,
   createLibraryPublication,
   createSealedContextViolation,
@@ -4457,9 +4462,11 @@ registerPlatformReadRoutes(app, {
   getConversationArtifactByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayByIdempotency,
+  getLibraryPublicationById,
+  getLibraryPublicationByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
-  getLibraryPublicationByIdempotency,
   getRegistryEntityById,
   getRegistryProofByRegistryId,
   getSealedContextById,
@@ -4497,11 +4504,13 @@ registerPlatformReadRoutes(app, {
   removeLibraryShelfItem,
   replaceScopeSetItems,
   replaceConfigComponentVersions,
+  resolveApprovedLibraryPeerRelayApproval,
   resolveApprovedLibraryPublicationApproval,
   resolveApprovedTrainerPatchPromotion,
   resolveHumanSessionWithRecovery,
   resolvePlatformTrainerLinkedConfigVersionId,
   resolveSessionPlatformContext,
+  resolveKnownHouseTarget,
   searchRegistryFamilyGroups,
   sendPortalApiError,
   sendPortalApiSuccess,
@@ -6363,6 +6372,50 @@ function resolveApprovedLibraryPublicationApproval(approvalId, {
     },
     nowIso: nowIso(),
   });
+}
+
+function resolveApprovedLibraryPeerRelayApproval(approvalId, {
+  houseId = '',
+  libraryPublicationId = '',
+  targetHouseId = '',
+  transportKind = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== LIBRARY_PEER_RELAY_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'library_peer_relay',
+    subject: {
+      libraryPublicationId: String(libraryPublicationId || '').trim() || null,
+      targetHouseId: String(targetHouseId || '').trim() || null,
+      transportKind: String(transportKind || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
+}
+
+function resolveKnownHouseTarget(houseAddress = '') {
+  const normalizedHouseAddress = String(houseAddress || '').trim();
+  if (!normalizedHouseAddress) return null;
+  const store = readStore();
+  return resolveHouseAddress(store, normalizedHouseAddress);
 }
 
 function buildSeededSealedContextRecord({
