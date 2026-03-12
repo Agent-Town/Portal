@@ -615,7 +615,7 @@ function normalizeCreateTableConfig(input = {}) {
   };
 }
 
-function resolveTournamentBlindProgress(table, handNumber = 1) {
+function resolveTournamentBlindProgress(table, handNumber = 1, { includePendingAdvances = false } = {}) {
   if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
     return {
       blindLevel: 0,
@@ -630,10 +630,27 @@ function resolveTournamentBlindProgress(table, handNumber = 1) {
   const currentHandNumber = Math.max(1, normalizeOilAmount(handNumber, 1));
   const handsPerBlindLevel = Math.max(1, normalizeOilAmount(table?.rules?.handsPerBlindLevel, 2));
   const levels = normalizeTournamentBlindLevels(table?.rules?.blindLevels, table?.smallBlindOil, table?.bigBlindOil);
-  const levelIndex = Math.min(levels.length - 1, Math.floor((currentHandNumber - 1) / handsPerBlindLevel));
+  if (!levels.length) {
+    return {
+      blindLevel: 1,
+      handsPerBlindLevel,
+      smallBlindOil: Math.max(1, normalizeOilAmount(table?.smallBlindOil, 50)),
+      bigBlindOil: Math.max(2, normalizeOilAmount(table?.bigBlindOil, 100)),
+      levels: [],
+      handsUntilIncrease: 0,
+      nextBlindLevel: 0,
+    };
+  }
+  const naturalLevelIndex = Math.floor((currentHandNumber - 1) / handsPerBlindLevel);
+  const directorBlindLevelAdjustment = Math.max(0, normalizeOilAmount(table?.state?.directorBlindLevelAdjustment, 0));
+  const directorBlindAdvancesPending = Math.max(
+    0,
+    includePendingAdvances ? normalizeOilAmount(table?.state?.directorBlindAdvancesPending, 0) : 0
+  );
+  const levelIndex = Math.min(levels.length - 1, naturalLevelIndex + directorBlindLevelAdjustment + directorBlindAdvancesPending);
   const level = levels[levelIndex] || levels[0];
   const nextLevel = levels[levelIndex + 1] || null;
-  const nextLevelStartsAtHand = nextLevel ? (levelIndex + 1) * handsPerBlindLevel + 1 : 0;
+  const nextLevelStartsAtHand = nextLevel ? (naturalLevelIndex + 1) * handsPerBlindLevel + 1 : 0;
   return {
     blindLevel: Number(level?.level || levelIndex + 1),
     handsPerBlindLevel,
@@ -2674,6 +2691,16 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const disconnectedSeatCount = activeSeats.filter((seat) => getSeatPresenceStatus(seat) === 'disconnected').length;
   const handNumber = Number(hand?.handNumber || 0);
   const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
+  const pendingBlindAdvanceCount = Math.max(0, normalizeOilAmount(table?.state?.directorBlindAdvancesPending, 0));
+  const upcomingBlindProgress = normalizePokerPlayTableType(table?.tableType) === 'tournament'
+    ? resolveTournamentBlindProgress(
+      table,
+      hand?.status === 'live'
+        ? Math.max(1, handNumber + 1)
+        : Math.max(1, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1)),
+      { includePendingAdvances: true }
+    )
+    : blindProgress;
   const lateRegistration = resolveTournamentLateRegistration(table, hand);
   const scheduledStartAt = getTournamentScheduledStartAt(table);
   const scheduledStartPending = !!scheduledStartAt && isScheduledTournamentPending(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || '');
@@ -2727,6 +2754,8 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     blindLevel: blindProgress.blindLevel,
     nextBlindLevel: blindProgress.nextBlindLevel,
     handsUntilBlindIncrease: blindProgress.handsUntilIncrease,
+    pendingBlindAdvanceCount,
+    upcomingBlindLevel: upcomingBlindProgress.blindLevel,
     lateRegistrationOpen: lateRegistration.open,
     lateRegistrationRemainingHands: lateRegistration.remainingHands,
     scheduledStartAt: scheduledStartAt || null,
@@ -6107,9 +6136,24 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
   const nextHandNumber = Math.max(1, previousHandNumber + 1);
   let nextTable = table;
   if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
-    const blindProgress = resolveTournamentBlindProgress(table, nextHandNumber);
-    const nextTableState = {
+    const nextBlindAdjustment = Math.max(
+      0,
+      normalizeOilAmount(table?.state?.directorBlindLevelAdjustment, 0)
+        + normalizeOilAmount(table?.state?.directorBlindAdvancesPending, 0)
+    );
+    const tournamentState = {
       ...(table?.state && typeof table.state === 'object' ? table.state : {}),
+      currentBlindLevel: 0,
+      handsPerBlindLevel: 0,
+      directorBlindLevelAdjustment: nextBlindAdjustment,
+      directorBlindAdvancesPending: 0,
+    };
+    const blindProgress = resolveTournamentBlindProgress({
+      ...table,
+      state: tournamentState,
+    }, nextHandNumber);
+    const nextTournamentState = {
+      ...tournamentState,
       currentBlindLevel: blindProgress.blindLevel,
       handsPerBlindLevel: blindProgress.handsPerBlindLevel,
     };
@@ -6117,7 +6161,7 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
       ...table,
       smallBlindOil: blindProgress.smallBlindOil,
       bigBlindOil: blindProgress.bigBlindOil,
-      state: nextTableState,
+      state: nextTournamentState,
       updatedAt: atIso,
     });
   }
@@ -8138,6 +8182,86 @@ function startTournamentTableByDirector(deps, { tableId, reason, actorLabel = 'o
     atIso: requestAt,
     actorLabel,
     reason: normalizeTrimmedString(reason, 'Director started the tournament table.'),
+  });
+  return buildPokerPlayTablePayload(deps, detail.table, detail.seats, detail.hand, {
+    session: null,
+    req: null,
+    processAt: requestAt,
+  });
+}
+
+function advanceTournamentBlindLevelByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const table = synced.table;
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BLINDS_UNAVAILABLE', 'Director blind advancement is only available for tournament tables.');
+  }
+  const status = normalizeTrimmedString(table?.status, 'open').toLowerCase();
+  if (['admin_closed', 'series_closed', 'completed'].includes(status)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BLINDS_UNAVAILABLE', 'Director blind advancement is only available for active tournament tables.');
+  }
+  const liveHand = synced?.hand && synced.hand.status === 'live';
+  const currentState = table?.state && typeof table.state === 'object' ? table.state : {};
+  const currentAdjustment = Math.max(0, normalizeOilAmount(currentState?.directorBlindLevelAdjustment, 0));
+  const currentPending = Math.max(0, normalizeOilAmount(currentState?.directorBlindAdvancesPending, 0));
+  const referenceHandNumber = liveHand
+    ? Math.max(1, Number(synced?.hand?.handNumber || 1) + 1)
+    : Math.max(1, Number(synced?.hand?.handNumber || table?.state?.activeHandNumber || 1));
+  const currentPreview = resolveTournamentBlindProgress(table, referenceHandNumber, {
+    includePendingAdvances: liveHand,
+  });
+  const nextState = liveHand
+    ? {
+      ...currentState,
+      directorBlindLevelAdjustment: currentAdjustment,
+      directorBlindAdvancesPending: currentPending + 1,
+    }
+    : {
+      ...currentState,
+      directorBlindLevelAdjustment: currentAdjustment + 1,
+      directorBlindAdvancesPending: 0,
+    };
+  const nextPreview = resolveTournamentBlindProgress({
+    ...table,
+    state: nextState,
+  }, referenceHandNumber, {
+    includePendingAdvances: liveHand,
+  });
+  if (Number(nextPreview.blindLevel || 0) <= Number(currentPreview.blindLevel || 0)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BLINDS_FINAL', 'The tournament table is already at the final blind level.');
+  }
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    smallBlindOil: liveHand ? table?.smallBlindOil : nextPreview.smallBlindOil,
+    bigBlindOil: liveHand ? table?.bigBlindOil : nextPreview.bigBlindOil,
+    state: {
+      ...nextState,
+      ...(liveHand ? {} : {
+        currentBlindLevel: nextPreview.blindLevel,
+        handsPerBlindLevel: nextPreview.handsPerBlindLevel,
+      }),
+    },
+    updatedAt: requestAt,
+  });
+  const detail = syncPokerPlayTable(deps, updatedTable.tableId, { processAt: requestAt });
+  createDirectorAuditEvent(deps, {
+    seriesId: getTournamentSeriesRef(updatedTable).seriesId,
+    tableId: updatedTable.tableId,
+    handId: detail?.hand?.handId || synced?.hand?.handId || null,
+    eventKind: 'director_blinds_advanced',
+    payload: {
+      appliedOnNextHand: !!liveHand,
+      previousBlindLevel: Number(currentPreview.blindLevel || 0),
+      nextBlindLevel: Number(nextPreview.blindLevel || 0),
+      pendingBlindAdvanceCount: Math.max(0, normalizeOilAmount(detail?.table?.state?.directorBlindAdvancesPending, 0)),
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: normalizeTrimmedString(reason, liveHand ? 'Director queued the next blind increase.' : 'Director advanced the blind level.'),
   });
   return buildPokerPlayTablePayload(deps, detail.table, detail.seats, detail.hand, {
     session: null,
@@ -12364,6 +12488,7 @@ module.exports = {
   seatIntoTable,
   saveNotebookEntry,
   sitOutTableSeat,
+  advanceTournamentBlindLevelByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,

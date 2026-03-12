@@ -2620,6 +2620,7 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.pendingBlindAdvanceCount || 0) > 0 ? renderSummaryMetric('Queued Blinds', `${Number(table?.summary?.pendingBlindAdvanceCount || 0)}`) : ''}
           ${table?.tableType === 'tournament' && table?.summary?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(table?.summary?.scheduledStartAt)) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
@@ -2807,6 +2808,7 @@
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? '<p>Your last tournament entry busted. Re-entry stays available until late registration closes or the table schedule locks.</p>' : ''}
         ${table?.tableType === 'tournament' && scheduledBreakActive ? `<p>Scheduled break: ${escapeHtml(String(table?.summary?.scheduledBreakLabel || 'Break'))} until ${escapeHtml(formatIso(table?.summary?.scheduledBreakUntilAt))}.</p>` : ''}
+        ${table?.tableType === 'tournament' && Number(table?.summary?.pendingBlindAdvanceCount || 0) > 0 ? `<p>Director queued ${Number(table?.summary?.pendingBlindAdvanceCount || 0)} blind advance${Number(table?.summary?.pendingBlindAdvanceCount || 0) === 1 ? '' : 's'}; the next hand starts at level ${Number(table?.summary?.upcomingBlindLevel || table?.summary?.blindLevel || hand?.blindLevel || 1)}.</p>` : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
         ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
@@ -3136,6 +3138,7 @@
           ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
+          ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled' ? `<button class="pokerButton" type="button" data-admin-table-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Table</button>` : ''}
           ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
           <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
@@ -3980,6 +3983,35 @@
           await loadPlayTable(targetTableId);
         } catch (err) {
           setStatus(`Start failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const advanceBlindButton = document.querySelector('[data-admin-table-blinds-advance="1"][data-admin-table-id]');
+    if (advanceBlindButton) {
+      advanceBlindButton.addEventListener('click', async () => {
+        const targetTableId = String(advanceBlindButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Advancing tournament blinds...');
+        try {
+          const payload = await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/blinds/advance`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director advanced the tournament blinds.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+          const pendingBlindAdvanceCount = Number(payload?.data?.table?.summary?.pendingBlindAdvanceCount || 0);
+          const upcomingBlindLevel = Number(payload?.data?.table?.summary?.upcomingBlindLevel || 0);
+          const blindLevel = Number(payload?.data?.table?.summary?.blindLevel || 0);
+          setStatus(
+            pendingBlindAdvanceCount > 0
+              ? `Blind advance queued. Next hand starts at level ${upcomingBlindLevel || blindLevel || 1}.`
+              : `Blinds advanced to level ${blindLevel || upcomingBlindLevel || 1}.`
+          );
+        } catch (err) {
+          setStatus(`Blind advance failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }

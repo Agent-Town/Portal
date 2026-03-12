@@ -88,6 +88,7 @@ const {
   seatIntoTable,
   saveNotebookEntry,
   sitOutTableSeat,
+  advanceTournamentBlindLevelByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
@@ -6684,6 +6685,38 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_TABLE_START_FAILED',
         err?.message || 'Unable to start the tournament table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/blinds/advance', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = advanceTournamentBlindLevelByDirector(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'director_blinds_advanced', {
+        handId: payload?.hand?.handId || null,
+        blindLevel: Number(payload?.table?.summary?.blindLevel || 0),
+        upcomingBlindLevel: Number(payload?.table?.summary?.upcomingBlindLevel || 0),
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TABLE_BLIND_ADVANCE_FAILED',
+        err?.message || 'Unable to advance the tournament blinds.',
         {
           requestId,
           details: err?.details || {},

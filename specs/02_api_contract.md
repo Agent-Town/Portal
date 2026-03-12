@@ -1159,6 +1159,8 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.blindLevel`
 - tournaments expose `data.table.summary.nextBlindLevel`
 - tournaments expose `data.table.summary.handsUntilBlindIncrease`
+- tournaments expose `data.table.summary.pendingBlindAdvanceCount` when director-raised blinds are queued for the next hand
+- tournaments expose `data.table.summary.upcomingBlindLevel` so operator and player views can see the next-start blind level after queued advances
 - tournaments expose `data.table.summary.scheduledStartAt`
 - tournaments expose `data.table.summary.scheduledStartPending`
 - tournaments expose `data.table.summary.lateRegistrationOpen`
@@ -2062,6 +2064,26 @@ Request shape:
   "asOf": "2026-03-11T13:20:10.000Z"
 }
 ```
+
+### POST `/api/poker/play/admin/tables/:tableId/blinds/advance` (admin)
+Advances tournament blinds by one configured level. If a hand is live, the advance is queued and applies on the next hand; otherwise it applies immediately to the table start state.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director advanced the tournament blinds.",
+  "asOf": "2026-03-12T10:15:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal table payload
+- `data.table.summary.pendingBlindAdvanceCount` increments when the raise is queued behind a live hand
+- `data.table.summary.upcomingBlindLevel` exposes the next-start level after the queued advance
+- returns `409 POKER_PLAY_DIRECTOR_BLINDS_FINAL` when the table is already at the final configured blind level
 
 ### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
 Returns the operator review payload for one table.
