@@ -44,6 +44,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryItemRevisions,
     listLibraryLinks,
     listLibraryPeerReceipts,
+    listLibraryPeerRelays,
     listLibraryPublications,
     listLibraryShelfItems,
     listLibraryShelves,
@@ -338,6 +339,7 @@ function registerPlatformReadRoutes(app, deps) {
         scopeSets: [],
         shelves: [],
         items: [],
+        incomingRelays: [],
         emptyStateText: 'No curated Library items yet.',
       };
     }
@@ -357,6 +359,10 @@ function registerPlatformReadRoutes(app, deps) {
       scopeSets: selection.scopeSets,
       shelves: selection.shelves,
       items: selection.items,
+      incomingRelays: buildIncomingLibraryPeerRelayList({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }),
       emptyStateText: 'No curated Library items yet.',
     };
   }
@@ -681,6 +687,150 @@ function registerPlatformReadRoutes(app, deps) {
         family: String(entity.familySlug || entity.family || '').trim() || null,
       },
     };
+  }
+
+  function findLibraryPeerRelayImportForTarget({
+    houseId = '',
+    teamId = '',
+    libraryPeerRelayId = '',
+    registryId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRelayId = String(libraryPeerRelayId || '').trim();
+    const normalizedRegistryId = String(registryId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || (!normalizedRelayId && !normalizedRegistryId)) {
+      return null;
+    }
+    return listLibraryItems({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).find((item) => {
+      if (!item || typeof item !== 'object') return false;
+      if (String(item.importedState || '').trim() !== 'imported_artifact') return false;
+      if (item.readOnly !== true) return false;
+      if (String(item.sourceKind || '').trim() !== 'peer_relay_artifact') return false;
+      const sourceRef = String(item.sourceRef || '').trim();
+      const itemRegistryId = String(item.registryId || '').trim();
+      if (normalizedRelayId && sourceRef === normalizedRelayId) return true;
+      return !!(normalizedRegistryId && itemRegistryId === normalizedRegistryId);
+    }) || null;
+  }
+
+  function resolveIncomingLibraryPeerRelay({
+    houseId = '',
+    teamId = '',
+    libraryPeerRelayId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRelayId = String(libraryPeerRelayId || '').trim();
+    if (!normalizedHouseId || !normalizedRelayId) {
+      return { ok: false, code: 'LIBRARY_PEER_RELAY_NOT_FOUND', message: 'The requested Library relay could not be found.' };
+    }
+    const relay = getLibraryPeerRelayById(normalizedRelayId);
+    if (!relay || String(relay.targetHouseId || '').trim() !== normalizedHouseId) {
+      return { ok: false, code: 'LIBRARY_PEER_RELAY_NOT_FOUND', message: 'The requested Library relay could not be found for this House.' };
+    }
+    const receipt = listLibraryPeerReceipts({
+      libraryPeerRelayId: normalizedRelayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === normalizedHouseId) || null;
+    if (!receipt) {
+      return { ok: false, code: 'LIBRARY_PEER_RELAY_NOT_DELIVERED', message: 'This Library relay has not been delivered to the target House yet.' };
+    }
+    const publication = relay.libraryPublicationId ? getLibraryPublicationById(relay.libraryPublicationId) : null;
+    if (!publication) {
+      return { ok: false, code: 'LIBRARY_PUBLICATION_NOT_FOUND', message: 'The source publication for this relay could not be found.' };
+    }
+    const item = publication.libraryItemId ? getLibraryItemById(publication.libraryItemId) : null;
+    if (!item) {
+      return { ok: false, code: 'LIBRARY_PUBLICATION_ITEM_REQUIRED', message: 'The published Library item for this relay could not be resolved.' };
+    }
+    const importedItem = normalizedTeamId
+      ? findLibraryPeerRelayImportForTarget({
+          houseId: normalizedHouseId,
+          teamId: normalizedTeamId,
+          libraryPeerRelayId: normalizedRelayId,
+          registryId: String(relay.registryId || publication.registryId || '').trim(),
+        })
+      : null;
+    return {
+      ok: true,
+      relay,
+      receipt,
+      publication,
+      item,
+      importedItem,
+    };
+  }
+
+  function buildLibraryPeerRelayPreviewPayload({
+    houseId = '',
+    teamId = '',
+    libraryPeerRelayId = '',
+  } = {}) {
+    const resolved = resolveIncomingLibraryPeerRelay({
+      houseId,
+      teamId,
+      libraryPeerRelayId,
+    });
+    if (!resolved.ok) {
+      return resolved;
+    }
+    const {
+      relay,
+      receipt,
+      publication,
+      item,
+      importedItem,
+    } = resolved;
+    const sourceHouseId = String(relay?.houseId || '').trim() || null;
+    const registryId = String(relay?.registryId || publication?.registryId || item?.registryId || '').trim() || null;
+    return {
+      ok: true,
+      preview: {
+        libraryPeerRelayId: relay.libraryPeerRelayId,
+        libraryPublicationId: publication.libraryPublicationId,
+        sourceHouseId,
+        targetHouseId: String(relay?.targetHouseId || '').trim() || null,
+        transportKind: String(relay?.transportKind || '').trim() || 'pony.relay.registry.v1',
+        relayState: String(relay?.relayState || '').trim() || 'accepted',
+        registryId,
+        contentHash: String(publication?.contentHash || item?.contentHash || '').trim() || null,
+        receiptRef: String(receipt?.receiptRef || '').trim() || null,
+        receiptStatus: String(receipt?.status || '').trim() || 'accepted',
+        displayName: String(item?.title || registryId || relay.libraryPeerRelayId).trim() || relay.libraryPeerRelayId,
+        summary: String(item?.summary || '').trim() || `Relayed from ${sourceHouseId || 'another House'}`,
+        contentText: String(item?.contentText || ''),
+        contentRef: item?.contentRef ? String(item.contentRef) : null,
+        provenance: {
+          summary: `Relayed from ${sourceHouseId || 'another House'} via Pony and anchored to ${registryId || publication.libraryPublicationId}.`,
+          sourceRef: String(item?.sourceRef || publication?.sourceRef || '').trim() || null,
+          sourceKind: String(item?.sourceKind || '').trim() || null,
+        },
+        alreadyImported: !!importedItem,
+        importedItem: importedItem ? projectLibraryItemForRead(importedItem) : null,
+      },
+    };
+  }
+
+  function buildIncomingLibraryPeerRelayList({
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId) return [];
+    return listLibraryPeerRelays({
+      targetHouseId: normalizedHouseId,
+    }).map((relay) => {
+      const previewPayload = buildLibraryPeerRelayPreviewPayload({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+        libraryPeerRelayId: String(relay?.libraryPeerRelayId || '').trim(),
+      });
+      return previewPayload.ok ? previewPayload.preview : null;
+    }).filter(Boolean);
   }
 
   function flattenPublicStackSearchGroups(groups = []) {
@@ -2157,6 +2307,174 @@ function registerPlatformReadRoutes(app, deps) {
         houseId: target.houseId,
       },
     }, { requestId, status: receiptPersisted.status });
+  });
+
+  app.get('/api/platform/library/peer-relays/incoming', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before reading incoming Library relays.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      incomingRelays: buildIncomingLibraryPeerRelayList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+      }),
+    }, { requestId });
+  });
+
+  app.get('/api/platform/library/peer-relays/:libraryPeerRelayId/preview', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before previewing a relayed Library publication.', { requestId });
+    }
+    const libraryPeerRelayId = typeof req.params?.libraryPeerRelayId === 'string' ? req.params.libraryPeerRelayId.trim() : '';
+    if (!libraryPeerRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PEER_RELAY_REQUIRED', 'libraryPeerRelayId is required.', { requestId });
+    }
+    const previewPayload = buildLibraryPeerRelayPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPeerRelayId,
+    });
+    if (!previewPayload.ok) {
+      const status = String(previewPayload?.code || '').trim() === 'LIBRARY_PEER_RELAY_NOT_DELIVERED' ? 409 : 404;
+      return sendPortalApiError(res, status, previewPayload.code || 'LIBRARY_PEER_RELAY_NOT_FOUND', previewPayload.message || 'The requested Library relay could not be previewed.', {
+        requestId,
+      });
+    }
+    return sendPortalApiSuccess(res, {
+      preview: previewPayload.preview,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/library/peer-relays/:libraryPeerRelayId/imports', express.json({ limit: '16kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before importing a relayed Library publication.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before importing a relayed Library publication.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to import a relayed Library publication.', { requestId });
+    }
+    const libraryPeerRelayId = typeof req.params?.libraryPeerRelayId === 'string' ? req.params.libraryPeerRelayId.trim() : '';
+    if (!libraryPeerRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PEER_RELAY_REQUIRED', 'libraryPeerRelayId is required.', { requestId });
+    }
+    const resolved = resolveIncomingLibraryPeerRelay({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPeerRelayId,
+    });
+    if (!resolved.ok) {
+      const status = String(resolved?.code || '').trim() === 'LIBRARY_PEER_RELAY_NOT_DELIVERED' ? 409 : 404;
+      return sendPortalApiError(res, status, resolved.code || 'LIBRARY_PEER_RELAY_NOT_FOUND', resolved.message || 'The requested Library relay could not be imported.', {
+        requestId,
+      });
+    }
+    const existingReplay = getLibraryItemByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return sendPortalApiSuccess(res, {
+        import: {
+          libraryPeerRelayId,
+          registryId: existingReplay.registryId,
+        },
+        item: projectLibraryItemForRead(existingReplay),
+        links: listLibraryLinks({ libraryItemId: existingReplay.libraryItemId }),
+      }, { requestId, status: 200 });
+    }
+    if (resolved.importedItem) {
+      return sendPortalApiSuccess(res, {
+        import: {
+          libraryPeerRelayId,
+          registryId: resolved.importedItem.registryId,
+        },
+        item: projectLibraryItemForRead(resolved.importedItem),
+        links: listLibraryLinks({ libraryItemId: resolved.importedItem.libraryItemId }),
+      }, { requestId, status: 200 });
+    }
+    const registryId = String(resolved.relay?.registryId || resolved.publication?.registryId || resolved.item?.registryId || '').trim()
+      || `regrelay_${randomHex(8)}`;
+    const sourceHouseId = String(resolved.relay?.houseId || '').trim() || null;
+    const persisted = persistLibraryItemRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+      itemType: 'imported_artifact',
+      title: String(resolved.item?.title || registryId).trim() || registryId,
+      summary: `Relayed from ${sourceHouseId || 'another House'} · ${registryId}`,
+      contentText: String(resolved.item?.contentText || ''),
+      contentRef: resolved.item?.contentRef ? String(resolved.item.contentRef) : (registryId || resolved.relay.libraryPeerRelayId),
+      sourceKind: 'peer_relay_artifact',
+      sourceRef: resolved.relay.libraryPeerRelayId,
+      visibility: 'house_private',
+      importedState: 'imported_artifact',
+      registryId,
+      readOnly: true,
+      metadata: {
+        createdFrom: 'portal.house.library.peer-relay.import',
+        importKind: 'peer_relay_artifact',
+        sourceHouseId,
+        targetHouseId: context.houseId,
+        libraryPeerRelayId: resolved.relay.libraryPeerRelayId,
+        libraryPublicationId: resolved.publication.libraryPublicationId,
+        receiptId: resolved.receipt.libraryPeerReceiptId,
+        receiptRef: resolved.receipt.receiptRef,
+        contentHash: String(resolved.publication?.contentHash || resolved.item?.contentHash || '').trim() || null,
+      },
+      links: [
+        {
+          linkKind: 'imported_from_peer_relay',
+          sourceKind: 'peer_relay_artifact',
+          sourceRef: resolved.relay.libraryPeerRelayId,
+          metadata: {
+            sourceHouseId,
+            registryId,
+            libraryPublicationId: resolved.publication.libraryPublicationId,
+            receiptRef: resolved.receipt.receiptRef,
+          },
+        },
+        {
+          linkKind: 'relayed_publication',
+          sourceKind: 'library_publication',
+          sourceRef: resolved.publication.libraryPublicationId,
+          metadata: {
+            registryId,
+            sourceHouseId,
+            libraryPeerRelayId: resolved.relay.libraryPeerRelayId,
+          },
+        },
+      ],
+    });
+    return sendPortalApiSuccess(res, {
+      import: {
+        libraryPeerRelayId,
+        registryId,
+      },
+      item: projectLibraryItemForRead(persisted.item),
+      links: persisted.links,
+    }, { requestId, status: persisted.status });
   });
 
   app.post('/api/platform/library/conversation-artifacts', express.json({ limit: '64kb' }), (req, res) => {
