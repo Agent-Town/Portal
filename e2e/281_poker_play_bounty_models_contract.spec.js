@@ -253,6 +253,10 @@ for (const scenario of [
         '2026-03-12T21:06',
         '2026-03-12T21:07',
         '2026-03-12T21:08',
+        '2026-03-12T21:09',
+        '2026-03-12T21:10',
+        '2026-03-12T21:11',
+        '2026-03-12T21:12',
       ]) {
         finalDetail = await playAggressiveTournamentHand(tableId, {
           1: { page: pages[0], address: users[0].address },

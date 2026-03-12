@@ -2092,6 +2092,27 @@ Response notes:
 - returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_END_UNAVAILABLE` if no active series break exists
 - returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH` if only part of the active field is on break
 
+### POST `/api/poker/play/admin/series/:seriesId/blinds/advance` (admin)
+Advances tournament blinds by one configured level across every active table in a split tournament series. If a table is in a live hand, the advance queues on that table and applies on the next hand; otherwise it applies immediately.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director advanced the tournament blinds across the series.",
+  "asOf": "2026-03-12T21:01:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- each `data.tables[*].table.summary.pendingBlindAdvanceCount` indicates whether that table queued the advance behind a live hand
+- each `data.tables[*].table.summary.upcomingBlindLevel` exposes the next-start blind level after any queued advance
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BLINDS_MISMATCH` if the active tables do not share the same current and next blind progression state
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BLINDS_FINAL` if the series is already at the final configured blind level
+
 ### POST `/api/poker/play/admin/tables/:tableId/start` (admin)
 Force-starts one scheduled tournament table before its scheduled timestamp.
 

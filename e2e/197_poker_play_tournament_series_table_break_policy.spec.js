@@ -1,12 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const {
   resetPortalWebState,
-  seedStreamflowLocks,
+  fundOilWallet,
 } = require('./helpers/portal_web');
 const {
   bindPageSession,
   browserJson,
-  verifyStreamflowAndFundOil,
 } = require('./helpers/poker_play');
 
 test.beforeEach(async ({ request }) => {
@@ -45,7 +44,7 @@ async function sitIntoTable(page, address, tableId, { seatNumber, displayName, a
       asOf,
     },
   });
-  expect(resp.ok).toBe(true);
+  expect(resp.ok, JSON.stringify(resp.body)).toBe(true);
   return resp.body?.data || {};
 }
 
@@ -86,48 +85,43 @@ async function settleCurrentTableHand(tableId, seatActors, { asOfPrefix }) {
 
 test('M23.23: tournament director converges a manual 3-table series to the correct 5/5/5 shape', async ({ browser, request }) => {
   const users = [
-    { address: 'So1anaMockMatchA11111111111111111111111111111', houseId: 'house_director_1', streamId: 'stream-director-1' },
-    { address: 'So1anaMockMatchB11111111111111111111111111111', houseId: 'house_director_2', streamId: 'stream-director-2' },
-    { address: 'So1anaMockMatchC11111111111111111111111111111', houseId: 'house_director_3', streamId: 'stream-director-3' },
-    { address: 'So1anaMockMatchD11111111111111111111111111111', houseId: 'house_director_4', streamId: 'stream-director-4' },
-    { address: 'So1anaMockMatchE11111111111111111111111111111', houseId: 'house_director_5', streamId: 'stream-director-5' },
-    { address: 'So1anaMockMatchF11111111111111111111111111111', houseId: 'house_director_6', streamId: 'stream-director-6' },
-    { address: 'So1anaMockCashA111111111111111111111111111111', houseId: 'house_director_7', streamId: 'stream-director-7' },
-    { address: 'So1anaMockCashB111111111111111111111111111111', houseId: 'house_director_8', streamId: 'stream-director-8' },
-    { address: 'So1anaMockCashC111111111111111111111111111111', houseId: 'house_director_9', streamId: 'stream-director-9' },
-    { address: 'So1anaMockCashD111111111111111111111111111111', houseId: 'house_director_10', streamId: 'stream-director-10' },
-    { address: 'So1anaMockTourA111111111111111111111111111111', houseId: 'house_director_11', streamId: 'stream-director-11' },
-    { address: 'So1anaMockTourB111111111111111111111111111111', houseId: 'house_director_12', streamId: 'stream-director-12' },
-    { address: 'So1anaMockPauseA11111111111111111111111111111', houseId: 'house_director_13', streamId: 'stream-director-13' },
-    { address: 'So1anaMockPauseB11111111111111111111111111111', houseId: 'house_director_14', streamId: 'stream-director-14' },
-    { address: 'So1anaMockSeatA111111111111111111111111111111', houseId: 'house_director_15', streamId: 'stream-director-15' },
+    { address: 'So1anaMockDirBreakA111111111111111111111111111', houseId: 'house_director_1', streamId: 'stream-director-break-1' },
+    { address: 'So1anaMockDirBreakB111111111111111111111111111', houseId: 'house_director_2', streamId: 'stream-director-break-2' },
+    { address: 'So1anaMockDirBreakC111111111111111111111111111', houseId: 'house_director_3', streamId: 'stream-director-break-3' },
+    { address: 'So1anaMockDirBreakD111111111111111111111111111', houseId: 'house_director_4', streamId: 'stream-director-break-4' },
+    { address: 'So1anaMockDirBreakE111111111111111111111111111', houseId: 'house_director_5', streamId: 'stream-director-break-5' },
+    { address: 'So1anaMockDirBreakF111111111111111111111111111', houseId: 'house_director_6', streamId: 'stream-director-break-6' },
+    { address: 'So1anaMockDirBreakG111111111111111111111111111', houseId: 'house_director_7', streamId: 'stream-director-break-7' },
+    { address: 'So1anaMockDirBreakH111111111111111111111111111', houseId: 'house_director_8', streamId: 'stream-director-break-8' },
+    { address: 'So1anaMockDirBreakP111111111111111111111111111', houseId: 'house_director_9', streamId: 'stream-director-break-9' },
+    { address: 'So1anaMockDirBreakJ111111111111111111111111111', houseId: 'house_director_10', streamId: 'stream-director-break-10' },
+    { address: 'So1anaMockDirBreakK111111111111111111111111111', houseId: 'house_director_11', streamId: 'stream-director-break-11' },
+    { address: 'So1anaMockDirBreakL111111111111111111111111111', houseId: 'house_director_12', streamId: 'stream-director-break-12' },
+    { address: 'So1anaMockDirBreakM111111111111111111111111111', houseId: 'house_director_13', streamId: 'stream-director-break-13' },
+    { address: 'So1anaMockDirBreakN111111111111111111111111111', houseId: 'house_director_14', streamId: 'stream-director-break-14' },
+    { address: 'So1anaMockDirBreakQ111111111111111111111111111', houseId: 'house_director_15', streamId: 'stream-director-break-15' },
   ];
-
-  await seedStreamflowLocks(request, {
-    locks: users.map((user) => ({
-      address: user.address,
-      streamId: user.streamId,
-      tokenSymbol: '$AGENTTOWN',
-      locked: true,
-      lockedAmountAtomic: '2500000',
-    })),
-  });
 
   const contexts = [];
   const pages = [];
-  for (const user of users) {
+  async function bootstrapUser(index) {
+    if (pages[index]) return pages[index];
+    const user = users[index];
     const context = await browser.newContext();
     const page = await context.newPage();
     contexts.push(context);
-    pages.push(page);
+    pages[index] = page;
     await page.goto('/');
     await bindPageSession(page, user);
-    await verifyStreamflowAndFundOil(page, request, {
-      address: user.address,
-      streamId: user.streamId,
+    await fundOilWallet(request, {
+      walletSubject: user.address,
+      houseId: user.houseId,
+      amount: 5000,
     });
+    return page;
   }
 
+  await bootstrapUser(0);
   const tableA = await createTournamentTable(pages[0], users[0].address, {
     tableType: 'tournament',
     smallBlindOil: 75,
@@ -145,6 +139,7 @@ test('M23.23: tournament director converges a manual 3-table series to the corre
   expect(seriesId).toBeTruthy();
 
   for (let index = 1; index < 6; index += 1) {
+    await bootstrapUser(index);
     await sitIntoTable(pages[index], users[index].address, tableIdA, {
       seatNumber: index + 1,
       displayName: `Series A${index + 1}`,
@@ -161,6 +156,7 @@ test('M23.23: tournament director converges a manual 3-table series to the corre
     6: { page: pages[5], address: users[5].address },
   }, { asOfPrefix: '2026-03-11T17:00:10' });
 
+  await bootstrapUser(6);
   const tableB = await createTournamentTable(pages[6], users[6].address, {
     tableType: 'tournament',
     smallBlindOil: 75,
@@ -178,6 +174,7 @@ test('M23.23: tournament director converges a manual 3-table series to the corre
   expect(tableIdB).not.toBe(tableIdA);
 
   for (let index = 7; index < 12; index += 1) {
+    await bootstrapUser(index);
     await sitIntoTable(pages[index], users[index].address, tableIdB, {
       seatNumber: index - 5,
       displayName: `Series B${index - 5}`,
@@ -194,6 +191,7 @@ test('M23.23: tournament director converges a manual 3-table series to the corre
     6: { page: pages[11], address: users[11].address },
   }, { asOfPrefix: '2026-03-11T17:00:50' });
 
+  await bootstrapUser(12);
   const tableC = await createTournamentTable(pages[12], users[12].address, {
     tableType: 'tournament',
     smallBlindOil: 75,
@@ -211,11 +209,13 @@ test('M23.23: tournament director converges a manual 3-table series to the corre
   expect(tableIdC).not.toBe(tableIdA);
   expect(tableIdC).not.toBe(tableIdB);
 
+  await bootstrapUser(13);
   await sitIntoTable(pages[13], users[13].address, tableIdC, {
     seatNumber: 2,
     displayName: 'Series C2',
     asOf: '2026-03-11T17:01:11.000Z',
   });
+  await bootstrapUser(14);
   await sitIntoTable(pages[14], users[14].address, tableIdC, {
     seatNumber: 3,
     displayName: 'Series C3',

@@ -1,12 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const {
   resetPortalWebState,
-  seedStreamflowLocks,
+  fundOilWallet,
 } = require('./helpers/portal_web');
 const {
   bindPageSession,
   browserJson,
-  verifyStreamflowAndFundOil,
 } = require('./helpers/poker_play');
 
 test.beforeEach(async ({ request }) => {
@@ -95,16 +94,6 @@ test('M23.24: live poker lobby shows explicit multi-table rebalance policy befor
     { address: 'So1anaMockSeatA111111111111111111111111111111', houseId: 'house_director_ui_15', streamId: 'stream-director-ui-15' },
   ];
 
-  await seedStreamflowLocks(request, {
-    locks: users.map((user) => ({
-      address: user.address,
-      streamId: user.streamId,
-      tokenSymbol: '$AGENTTOWN',
-      locked: true,
-      lockedAmountAtomic: '2500000',
-    })),
-  });
-
   const contexts = [];
   const pages = [];
   for (const user of users) {
@@ -114,9 +103,10 @@ test('M23.24: live poker lobby shows explicit multi-table rebalance policy befor
     pages.push(page);
     await page.goto('/');
     await bindPageSession(page, user);
-    await verifyStreamflowAndFundOil(page, request, {
-      address: user.address,
-      streamId: user.streamId,
+    await fundOilWallet(request, {
+      walletSubject: user.address,
+      houseId: user.houseId,
+      amount: 5000,
     });
   }
 
@@ -135,11 +125,15 @@ test('M23.24: live poker lobby shows explicit multi-table rebalance policy befor
   const seriesTitle = String(tableA?.series?.seriesTitle || tableA?.table?.rules?.seriesTitle || 'Director UI');
 
   for (let index = 1; index < 6; index += 1) {
+    await bindPageSession(pages[index], users[index]);
     await sitIntoTable(pages[index], users[index].address, tableIdA, {
       seatNumber: index + 1,
       displayName: `Series UI A${index + 1}`,
       asOf: `2026-03-11T18:00:0${index}.000Z`,
     });
+  }
+  for (let index = 0; index < 6; index += 1) {
+    await bindPageSession(pages[index], users[index]);
   }
   await settleCurrentTableHand(pages[0], users[0].address, tableIdA, {
     1: { page: pages[0], address: users[0].address },
@@ -164,11 +158,15 @@ test('M23.24: live poker lobby shows explicit multi-table rebalance policy befor
   });
   const tableIdB = String(tableB?.table?.tableId || '');
   for (let index = 7; index < 12; index += 1) {
+    await bindPageSession(pages[index], users[index]);
     await sitIntoTable(pages[index], users[index].address, tableIdB, {
       seatNumber: index - 5,
       displayName: `Series UI B${index - 5}`,
       asOf: `2026-03-11T18:00:${String(30 + index).padStart(2, '0')}.000Z`,
     });
+  }
+  for (let index = 6; index < 12; index += 1) {
+    await bindPageSession(pages[index], users[index]);
   }
   await settleCurrentTableHand(pages[6], users[6].address, tableIdB, {
     1: { page: pages[6], address: users[6].address },
@@ -192,11 +190,13 @@ test('M23.24: live poker lobby shows explicit multi-table rebalance policy befor
     asOf: '2026-03-11T18:01:10.000Z',
   });
   const tableIdC = String(tableC?.table?.tableId || '');
+  await bindPageSession(pages[13], users[13]);
   await sitIntoTable(pages[13], users[13].address, tableIdC, {
     seatNumber: 2,
     displayName: 'Series UI C2',
     asOf: '2026-03-11T18:01:11.000Z',
   });
+  await bindPageSession(pages[14], users[14]);
   await sitIntoTable(pages[14], users[14].address, tableIdC, {
     seatNumber: 3,
     displayName: 'Series UI C3',

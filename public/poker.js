@@ -82,6 +82,30 @@
     return parsed.toString();
   }
 
+  function normalizePokerApiRequestPath(path) {
+    const rawPath = String(path || '').trim();
+    if (!rawPath) return rawPath;
+    let parsed;
+    try {
+      parsed = new URL(rawPath, window.location.origin);
+    } catch {
+      return rawPath;
+    }
+    if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/api/')) {
+      return rawPath;
+    }
+    const routeParams = getRouteSearchParams();
+    const asOf = String(routeParams.get('asOf') || '').trim();
+    const inviteCode = readRouteInviteCode();
+    if (asOf && !parsed.searchParams.has('asOf')) {
+      parsed.searchParams.set('asOf', asOf);
+    }
+    if (inviteCode && shouldPreserveInviteCode(parsed.pathname) && !parsed.searchParams.has('inviteCode')) {
+      parsed.searchParams.set('inviteCode', inviteCode);
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  }
+
   function setLiveTransportDebugState(patch) {
     liveTableTransportProtocol = String(patch?.protocol || liveTableTransportProtocol || '').trim();
     window.__pokerLiveTransportDebug = {
@@ -232,6 +256,7 @@
   }
 
   async function api(path, options = {}) {
+    const requestPath = normalizePokerApiRequestPath(path);
     const identityHeaders = await buildIdentityHeaders();
     const headers = {
       Accept: 'application/json',
@@ -239,7 +264,7 @@
       'content-type': 'application/json',
       ...(options.headers || {}),
     };
-    const response = await fetch(path, {
+    const response = await fetch(requestPath, {
       credentials: 'include',
       cache: 'no-store',
       ...options,
@@ -257,12 +282,13 @@
   }
 
   async function fetchWithIdentity(path, options = {}) {
+    const requestPath = normalizePokerApiRequestPath(path);
     const identityHeaders = await buildIdentityHeaders();
     const headers = {
       ...identityHeaders,
       ...(options.headers || {}),
     };
-    return await fetch(path, {
+    return await fetch(requestPath, {
       credentials: 'include',
       cache: 'no-store',
       ...options,
@@ -3164,6 +3190,7 @@
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
           ${multiTableSeriesDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-series-break-start="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Start Series Break</button>` : ''}
           ${multiTableSeriesDirectorBreakActive ? `<button class="pokerButton" type="button" data-admin-series-break-end="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">End Series Break</button>` : ''}
+          ${!adminClosed && series && table?.tableType === 'tournament' && Array.isArray(series?.tableIds) && series.tableIds.length > 1 ? `<button class="pokerButton" type="button" data-admin-series-blinds-advance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Advance Series Blinds</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
           ${tournamentDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-table-break-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Break Now</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' && scheduledBreakActive ? `<button class="pokerButton" type="button" data-admin-table-break-end="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">End Break Early</button>` : ''}
@@ -3954,6 +3981,38 @@
           setStatus('Series break ended.');
         } catch (err) {
           setStatus(`Series break end failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const advanceSeriesBlindButton = document.querySelector('[data-admin-series-blinds-advance="1"][data-admin-series-id]');
+    if (advanceSeriesBlindButton) {
+      advanceSeriesBlindButton.addEventListener('click', async () => {
+        const targetSeriesId = String(advanceSeriesBlindButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Advancing tournament blinds across the series...');
+        try {
+          const payload = await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/blinds/advance`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director advanced the tournament blinds across the series.',
+            }),
+          });
+          await loadPlayTable(tableId);
+          const entries = Array.isArray(payload?.data?.tables) ? payload.data.tables : [];
+          const queuedCount = entries.filter((entry) => Number(entry?.table?.summary?.pendingBlindAdvanceCount || 0) > 0).length;
+          const nextBlindLevel = Number(entries[0]?.table?.summary?.upcomingBlindLevel || entries[0]?.table?.summary?.blindLevel || 0);
+          const blindLevel = Number(entries[0]?.table?.summary?.blindLevel || nextBlindLevel || 0);
+          if (queuedCount <= 0) {
+            setStatus(`Series blinds advanced to level ${blindLevel || nextBlindLevel || 1} across ${entries.length || 0} tables.`);
+          } else if (queuedCount >= entries.length) {
+            setStatus(`Series blind advance queued for ${queuedCount} tables. Next hand starts at level ${nextBlindLevel || blindLevel || 1}.`);
+          } else {
+            setStatus(`Series blinds advanced on ${Math.max(0, entries.length - queuedCount)} tables; ${queuedCount} queued for the next hand.`);
+          }
+        } catch (err) {
+          setStatus(`Series blind advance failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }

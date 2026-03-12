@@ -8409,6 +8409,101 @@ function endScheduledBreaksForSeriesByDirector(deps, { seriesId, reason, actorLa
   });
 }
 
+function advanceTournamentBlindLevelsForSeriesByDirector(deps, { seriesId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const activeEntries = entries
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .map((entry) => ({
+      ...entry,
+      activeSeats: getActiveSeatRows(entry?.seats),
+    }))
+    .filter((entry) => entry.activeSeats.length > 0);
+  if (!activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'This tournament series is already closed.');
+  }
+  const previews = activeEntries.map((entry) => {
+    const table = entry.table;
+    const hand = entry.hand;
+    const liveHand = !!(hand && hand.status === 'live');
+    const currentState = table?.state && typeof table.state === 'object' ? table.state : {};
+    const currentAdjustment = Math.max(0, normalizeOilAmount(currentState?.directorBlindLevelAdjustment, 0));
+    const currentPending = Math.max(0, normalizeOilAmount(currentState?.directorBlindAdvancesPending, 0));
+    const referenceHandNumber = liveHand
+      ? Math.max(1, Number(hand?.handNumber || 1) + 1)
+      : Math.max(1, Number(hand?.handNumber || table?.state?.activeHandNumber || 1));
+    const currentPreview = resolveTournamentBlindProgress(table, referenceHandNumber, {
+      includePendingAdvances: liveHand,
+    });
+    const nextState = liveHand
+      ? {
+        ...currentState,
+        directorBlindLevelAdjustment: currentAdjustment,
+        directorBlindAdvancesPending: currentPending + 1,
+      }
+      : {
+        ...currentState,
+        directorBlindLevelAdjustment: currentAdjustment + 1,
+        directorBlindAdvancesPending: 0,
+      };
+    const nextPreview = resolveTournamentBlindProgress({
+      ...table,
+      state: nextState,
+    }, referenceHandNumber, {
+      includePendingAdvances: liveHand,
+    });
+    return {
+      entry,
+      liveHand,
+      currentPreview,
+      nextPreview,
+    };
+  });
+  const currentKeys = new Set(previews.map((preview) => [
+    Number(preview?.currentPreview?.blindLevel || 0),
+    Number(preview?.currentPreview?.smallBlindOil || 0),
+    Number(preview?.currentPreview?.bigBlindOil || 0),
+  ].join(':')));
+  const nextKeys = new Set(previews.map((preview) => [
+    Number(preview?.nextPreview?.blindLevel || 0),
+    Number(preview?.nextPreview?.smallBlindOil || 0),
+    Number(preview?.nextPreview?.bigBlindOil || 0),
+  ].join(':')));
+  if (currentKeys.size !== 1 || nextKeys.size !== 1) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BLINDS_MISMATCH', 'Active tournament tables do not share the same blind progression state.');
+  }
+  if (previews.some((preview) => Number(preview?.nextPreview?.blindLevel || 0) <= Number(preview?.currentPreview?.blindLevel || 0))) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BLINDS_FINAL', 'The tournament series is already at the final blind level.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director advanced the tournament blinds across the series.');
+  const payloads = previews.map((preview) => advanceTournamentBlindLevelByDirector(deps, {
+    tableId: preview.entry.table.tableId,
+    reason: targetReason,
+    actorLabel,
+    asOf: requestAt,
+  }));
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: previews[0]?.entry?.table?.tableId || '',
+    handId: payloads[0]?.hand?.handId || previews[0]?.entry?.hand?.handId || null,
+    eventKind: 'director_series_blinds_advanced',
+    payload: {
+      tableIds: payloads.map((payload) => String(payload?.table?.tableId || '')).filter(Boolean),
+      previousBlindLevel: Number(previews[0]?.currentPreview?.blindLevel || 0),
+      nextBlindLevel: Number(previews[0]?.nextPreview?.blindLevel || 0),
+      queuedTableCount: payloads.filter((payload) => Number(payload?.table?.summary?.pendingBlindAdvanceCount || 0) > 0).length,
+      immediateTableCount: payloads.filter((payload) => Number(payload?.table?.summary?.pendingBlindAdvanceCount || 0) <= 0).length,
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
 function startTournamentTableByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
   const requestAt = toProcessIso(deps, asOf);
   const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
@@ -12738,6 +12833,7 @@ module.exports = {
   saveNotebookEntry,
   sitOutTableSeat,
   advanceTournamentBlindLevelByDirector,
+  advanceTournamentBlindLevelsForSeriesByDirector,
   startScheduledBreakByDirector,
   endScheduledBreakByDirector,
   startScheduledBreaksForSeriesByDirector,

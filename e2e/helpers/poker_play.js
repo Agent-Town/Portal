@@ -1,46 +1,47 @@
 const { resetToken } = require('./portal_web');
 
 async function browserJson(page, path, { method = 'GET', data = null, headers = {} } = {}) {
-  return await page.evaluate(async ({ path: requestPath, method: requestMethod, data: requestData, headers: requestHeaders }) => {
-    const response = await fetch(requestPath, {
-      method: requestMethod,
-      credentials: 'include',
-      headers: {
-        ...(requestData ? { 'content-type': 'application/json' } : {}),
-        ...requestHeaders,
-      },
-      body: requestData ? JSON.stringify(requestData) : undefined,
-    });
-    const body = await response.json().catch(() => ({}));
-    return {
-      ok: response.ok,
-      status: response.status,
-      body,
-    };
-  }, { path, method, data, headers });
+  const normalizedMethod = String(method || 'GET').toUpperCase();
+  const includeBody = data && normalizedMethod !== 'GET' && normalizedMethod !== 'HEAD';
+  const response = await page.request.fetch(path, {
+    method: normalizedMethod,
+    headers: {
+      ...(includeBody ? { 'content-type': 'application/json' } : {}),
+      ...headers,
+    },
+    ...(includeBody ? { data } : {}),
+  });
+  const body = await response.json().catch(() => ({}));
+  return {
+    ok: response.ok(),
+    status: response.status(),
+    body,
+  };
 }
 
 async function bindPageSession(page, { address, houseId }) {
-  let resp = await browserJson(page, '/__test__/session/bind-wallet', {
-    method: 'POST',
-    headers: { 'x-test-reset': resetToken },
-    data: {
-      chain: 'solana',
-      address,
-    },
-  });
-  if (!resp.ok) {
-    throw new Error(`BIND_WALLET_FAILED:${resp.status}:${JSON.stringify(resp.body)}`);
-  }
-  resp = await browserJson(page, '/__test__/session/attach-house', {
-    method: 'POST',
-    headers: { 'x-test-reset': resetToken },
-    data: {
-      houseId,
-    },
-  });
-  if (!resp.ok) {
-    throw new Error(`ATTACH_HOUSE_FAILED:${resp.status}:${JSON.stringify(resp.body)}`);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let resp = await browserJson(page, '/__test__/session/bind-wallet', {
+      method: 'POST',
+      headers: { 'x-test-reset': resetToken },
+      data: {
+        chain: 'solana',
+        address,
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(`BIND_WALLET_FAILED:${resp.status}:${JSON.stringify(resp.body)}`);
+    }
+    resp = await browserJson(page, '/__test__/session/attach-house', {
+      method: 'POST',
+      headers: { 'x-test-reset': resetToken },
+      data: {
+        houseId,
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(`ATTACH_HOUSE_FAILED:${resp.status}:${JSON.stringify(resp.body)}`);
+    }
   }
 }
 

@@ -89,6 +89,7 @@ const {
   saveNotebookEntry,
   sitOutTableSeat,
   advanceTournamentBlindLevelByDirector,
+  advanceTournamentBlindLevelsForSeriesByDirector,
   startScheduledBreakByDirector,
   endScheduledBreakByDirector,
   startScheduledBreaksForSeriesByDirector,
@@ -501,6 +502,7 @@ function registerPokerRoutes(app, deps) {
 
   function buildPokerPlayTransportSnapshot({ channelKind, channelId, viewerMode, req }) {
     const request = createWebSocketRequestFacade(req);
+    const processAt = request.query?.asOf;
     if (channelKind === 'table') {
       if (viewerMode === 'player') {
         const response = createWebSocketResponseFacade();
@@ -512,12 +514,14 @@ function registerPokerRoutes(app, deps) {
           tableId: channelId,
           session,
           req: request,
+          processAt,
         });
       }
       return getTableDetail(playRouteDeps, {
         tableId: channelId,
         session: null,
         req: request,
+        processAt,
         publicViewer: true,
       });
     }
@@ -526,6 +530,7 @@ function registerPokerRoutes(app, deps) {
         seriesId: channelId,
         session: null,
         req: request,
+        processAt,
         publicViewer: true,
       });
     }
@@ -2215,6 +2220,11 @@ function registerPokerRoutes(app, deps) {
           },
           rules: buildHarnessTournamentRules(seriesId, 'Harness Director Series Break', {
             lateRegistrationHands: 0,
+            handsPerBlindLevel: 6,
+            blindLevels: [
+              { level: 1, smallBlindOil: 50, bigBlindOil: 100 },
+              { level: 2, smallBlindOil: 75, bigBlindOil: 150 },
+            ],
             scheduledBreaks,
           }),
           summary: {
@@ -6943,6 +6953,41 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_SERIES_BREAK_END_FAILED',
         err?.message || 'Unable to end the scheduled break for this tournament series.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/blinds/advance', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = advanceTournamentBlindLevelsForSeriesByDirector(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const entry of Array.isArray(payload?.tables) ? payload.tables : []) {
+        publishPokerPlayTableEvent(entry?.table?.tableId || '', 'series_blinds_advanced', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+          blindLevel: Number(entry?.table?.summary?.blindLevel || 0),
+          upcomingBlindLevel: Number(entry?.table?.summary?.upcomingBlindLevel || 0),
+          pendingBlindAdvanceCount: Number(entry?.table?.summary?.pendingBlindAdvanceCount || 0),
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_BLIND_ADVANCE_FAILED',
+        err?.message || 'Unable to advance the tournament blinds for this series.',
         {
           requestId,
           details: err?.details || {},
