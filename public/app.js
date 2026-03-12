@@ -4304,7 +4304,6 @@ function renderHouseOfficeSurface() {
   }
 
   const routeLines = Array.isArray(sourceManifest?.routes) ? sourceManifest.routes : [];
-  const fixtureLines = Array.isArray(sourceManifest?.fixtures) ? sourceManifest.fixtures : [];
   const countEntries = sourceManifest?.counts && typeof sourceManifest.counts === 'object'
     ? Object.entries(sourceManifest.counts)
     : [];
@@ -4312,7 +4311,6 @@ function renderHouseOfficeSurface() {
     `Schema: ${String(sourceManifest?.schema || 'agent-town-house-office/v1')}`,
     `Structure source: ${String(sourceManifest?.structureSourceKind || 'unattached_preview')}`,
     routeLines.length ? `Routes:\n${routeLines.map((route) => `- ${route}`).join('\n')}` : 'Routes: —',
-    fixtureLines.length ? `Fixtures:\n${fixtureLines.map((fixture) => `- ${fixture}`).join('\n')}` : 'Fixtures: —',
     countEntries.length ? `Counts:\n${countEntries.map(([key, value]) => `- ${key}=${value}`).join('\n')}` : 'Counts: —',
   ];
   sourceManifestNode.style.whiteSpace = 'pre-wrap';

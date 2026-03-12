@@ -117,6 +117,62 @@ const TRACK_DEFINITIONS = Object.freeze([
   },
 ]);
 
+const DEFAULT_HOUSE_OFFICE_STRUCTURE_SEED = Object.freeze({
+  family: 'house_office_default_structure_v1',
+  schema: 'agent-town-house-office-structure-seed/v1',
+  offices: [
+    {
+      officeId: 'office_fixture_workshop',
+      slug: 'workshop',
+      displayName: 'Workshop',
+      purpose: 'Inspect active config lineage and current build focus.',
+      order: 10,
+      mapColumn: 1,
+      mapRow: 1,
+      surface: 'workshop',
+    },
+    {
+      officeId: 'office_fixture_analysis',
+      slug: 'analysis',
+      displayName: 'Analysis',
+      purpose: 'Inspect trainer jobs, results, and replay outputs.',
+      order: 20,
+      mapColumn: 2,
+      mapRow: 1,
+      surface: 'trainer',
+    },
+    {
+      officeId: 'office_fixture_archive',
+      slug: 'archive',
+      displayName: 'Archive',
+      purpose: 'Review canonical traces, artifacts, and proof records.',
+      order: 30,
+      mapColumn: 1,
+      mapRow: 2,
+      surface: 'archive',
+    },
+    {
+      officeId: 'office_fixture_ops',
+      slug: 'ops',
+      displayName: 'Operations',
+      purpose: 'Open experiences, tracks, and current release attention.',
+      order: 40,
+      mapColumn: 2,
+      mapRow: 2,
+      surface: 'experiences',
+    },
+  ],
+  staffAgents: [
+    {
+      staffAgentId: 'staff_fixture_operator',
+      displayName: 'Operations Lead',
+      role: 'operator',
+      officeId: 'office_fixture_ops',
+      teamId: 'team_main',
+    },
+  ],
+});
+
 let db = null;
 const fixtureCache = new Map();
 
@@ -1493,18 +1549,7 @@ function listHouseStaffAgents({
 }
 
 function buildDefaultHouseOfficeStructureSeed() {
-  const structureFixture = loadFixtureFamily('house_office_structure_seed');
-  if (structureFixture && typeof structureFixture === 'object' && !Array.isArray(structureFixture)) {
-    return structureFixture;
-  }
-  const overviewFixture = loadFixtureFamily('house_office_overview_seed') || {};
-  const staffFixture = loadFixtureFamily('house_office_staff_seed') || {};
-  return {
-    family: 'house_office_structure_seed',
-    schema: 'agent-town-house-office-structure-seed/v1',
-    offices: Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [],
-    staffAgents: Array.isArray(staffFixture?.staffAgents) ? staffFixture.staffAgents : [],
-  };
+  return DEFAULT_HOUSE_OFFICE_STRUCTURE_SEED;
 }
 
 function ensureHouseOfficeStructure({

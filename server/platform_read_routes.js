@@ -23,7 +23,6 @@ function registerPlatformReadRoutes(app, deps) {
     getRegistryFamilyBySlug,
     getRegistryEntityById,
     getRegistryEntityByIdAtVersion,
-    getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
     listTrackDefinitions,
     listTrackProgressEvents,
@@ -125,6 +124,52 @@ function registerPlatformReadRoutes(app, deps) {
     'poker_or_web',
   ];
   const HOUSE_OFFICE_ATTENTION_SEVERITY_ORDER = ['critical', 'warn', 'info'];
+  const PACK_COMPATIBILITY_REQUIRED_FILES = ['manifest.json', 'overlay.json', 'policy.json'];
+  const PACK_COMPATIBILITY_OPTIONAL_FILES = [
+    'manual/skill.md',
+    'heartbeat.md',
+    'tools.md',
+    'trace_map.json',
+    'verification.json',
+    'provenance.json',
+  ];
+  const PACK_COMPATIBILITY_FILES = Object.freeze({
+    'manifest.json': 'manifest.json',
+    'overlay.json': 'overlay.json',
+    'policy.json': 'policy.json',
+    'manual/skill.md': 'manual/skill.md',
+    'heartbeat.md': 'heartbeat.md',
+    'tools.md': 'tools.md',
+    'trace_map.json': 'trace_map.json',
+    'verification.json': 'verification.json',
+    'provenance.json': 'provenance.json',
+  });
+  const PACK_COMPATIBILITY_SURFACE_BINDINGS = Object.freeze([
+    {
+      surfaceKey: 'house',
+      surfaceId: 'house.workshop',
+      route: '/api/platform/workshop',
+      consumes: ['packVersionId', 'contentHash', 'files', 'verification'],
+    },
+    {
+      surfaceKey: 'registry',
+      surfaceId: 'registry.proof',
+      route: '/api/registry/proof/:registryId',
+      consumes: ['packVersionId', 'contentHash', 'files'],
+    },
+    {
+      surfaceKey: 'web',
+      surfaceId: 'web.integration',
+      route: '/v1/integrations/:integrationId/compilations',
+      consumes: ['packVersionId', 'contentHash', 'files', 'manifestRoot'],
+    },
+    {
+      surfaceKey: 'trainer',
+      surfaceId: 'platform.trainer',
+      route: '/api/platform/trainer',
+      consumes: ['packVersionId', 'contentHash', 'files', 'manifestRoot'],
+    },
+  ]);
   const HOUSE_OFFICE_PREVIEW_OFFICES = [
     {
       officeId: 'office_fixture_workshop',
@@ -312,7 +357,6 @@ function registerPlatformReadRoutes(app, deps) {
         staffAgents: [],
         modelVersion: 'house_canonical_structure_v1',
         structureSourceKind: 'unattached_preview',
-        seedFixtures: ['house_office_structure_seed'],
       };
     }
     const ensuredStructure = ensureHouseOfficeStructure({
@@ -328,7 +372,6 @@ function registerPlatformReadRoutes(app, deps) {
       staffAgents: listHouseStaffAgents({ houseId: normalizedHouseId, teamId: normalizedTeamId }),
       modelVersion: 'house_canonical_structure_v1',
       structureSourceKind: String(ensuredStructure?.sourceKind || 'durable_house_structure').trim() || 'durable_house_structure',
-      seedFixtures: ['house_office_structure_seed'],
     };
   }
 
@@ -1211,11 +1254,6 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/share',
           '/api/platform/house-workers/install-shared',
         ],
-        fixtures: [
-          'worker_package_registry_seed',
-          'worker_package_install_seed',
-          'worker_package_share_seed',
-        ],
         counts: {
           deploymentCount: deployments.length,
         },
@@ -1830,24 +1868,6 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/message',
           '/api/platform/house-workers/status',
           '/api/platform/house-workers/stop',
-        ],
-        fixtures: [
-          'worker_package_registry_seed',
-          'worker_package_install_seed',
-          'worker_package_share_seed',
-          'worker_runtime_supervisor_seed',
-          'worker_runtime_profile_seed',
-          'worker_runtime_lease_seed',
-          'worker_nested_delegation_seed',
-          'worker_recovery_summary_seed',
-          'worker_default_user_language_seed',
-          'worker_live_readiness_seed',
-          'worker_runtime_reality_smoke_seed',
-          'worker_spawn_profile_seed',
-          'worker_spawn_guardrail_seed',
-          'worker_share_lifecycle_seed',
-          'worker_deployment_lifecycle_seed',
-          'worker_office_pack_seed',
         ],
         counts: {
           deploymentCount: Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments.length : 0,
@@ -3318,26 +3338,6 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/archive',
           '/api/platform/trainer',
         ],
-        fixtures: houseId
-          ? [
-            'house_office_structure_seed',
-            'house_office_assignments_seed',
-            'house_office_briefing_seed',
-            'house_office_privacy_seed',
-            'worker_package_registry_seed',
-            'worker_package_install_seed',
-            'worker_runtime_supervisor_seed',
-            'worker_spawn_profile_seed',
-            'worker_spawn_guardrail_seed',
-            'worker_share_lifecycle_seed',
-            'worker_deployment_lifecycle_seed',
-            'worker_office_pack_seed',
-          ]
-          : [
-            'house_office_overview_seed',
-            'house_office_structure_seed',
-            'worker_package_registry_seed',
-          ],
         structureSourceKind,
         counts: {
           officeCount: offices.length,
@@ -3765,46 +3765,29 @@ function registerPlatformReadRoutes(app, deps) {
   }
 
   function buildPackCompatibilityContract() {
-    const fixture = getUnifiedPlatformTestFixture('editor_pack_compat_seed') || {};
-    const fixturePack = fixture?.pack && typeof fixture.pack === 'object' && !Array.isArray(fixture.pack)
-      ? fixture.pack
-      : {};
     const defaultPack = buildDefaultCompiledSkillPack();
     const defaultManifest = defaultPack?.manifest && typeof defaultPack.manifest === 'object'
       ? defaultPack.manifest
       : {};
-    const requiredFiles = Array.isArray(fixturePack.requiredFiles)
-      ? fixturePack.requiredFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
-      : ['manifest.json', 'overlay.json', 'policy.json'];
-    const optionalFiles = Array.isArray(fixturePack.optionalFiles)
-      ? fixturePack.optionalFiles.map((entry) => String(entry || '').trim()).filter(Boolean)
-      : ['manual/skill.md', 'heartbeat.md', 'tools.md', 'trace_map.json', 'verification.json', 'provenance.json'];
-    const fixtureFiles = normalizePackFileMap(fixturePack.files);
-    const baseContentHash = String(fixturePack.contentHash || '').trim()
-      || sha256PrefixedHex(stableJsonStringify({
-        files: fixtureFiles,
-        packVersionId: String(fixturePack.packVersionId || ''),
-        requiredFiles,
-      }));
+    const requiredFiles = PACK_COMPATIBILITY_REQUIRED_FILES;
+    const optionalFiles = PACK_COMPATIBILITY_OPTIONAL_FILES;
+    const compatibleFiles = normalizePackFileMap(PACK_COMPATIBILITY_FILES);
+    const baseContentHash = sha256PrefixedHex(stableJsonStringify({
+      files: compatibleFiles,
+      requiredFiles,
+      optionalFiles,
+    }));
+    const compatiblePackVersionId = `packcompat_${baseContentHash.slice('sha256:'.length, 'sha256:'.length + 16)}`;
     const compatiblePack = buildCompatiblePackShape({
       manifest: {
-        packVersionId: String(fixturePack.packVersionId || '').trim(),
+        packVersionId: compatiblePackVersionId,
         contentHash: baseContentHash,
-        files: fixtureFiles,
+        files: compatibleFiles,
       },
       requiredFiles,
       optionalFiles,
     });
-    const surfaceBindings = Array.isArray(fixturePack.surfaceBindings)
-      ? fixturePack.surfaceBindings.map((entry) => ({
-        surfaceKey: String(entry?.surfaceKey || '').trim(),
-        surfaceId: String(entry?.surfaceId || '').trim(),
-        route: String(entry?.route || '').trim(),
-        consumes: Array.isArray(entry?.consumes)
-          ? entry.consumes.map((item) => String(item || '').trim()).filter(Boolean)
-          : [],
-      })).filter((entry) => entry.surfaceKey && entry.surfaceId && entry.route)
-      : [];
+    const surfaceBindings = PACK_COMPATIBILITY_SURFACE_BINDINGS;
     const surfaces = surfaceBindings.reduce((acc, binding) => {
       acc[binding.surfaceKey] = {
         surfaceId: binding.surfaceId,
@@ -3840,7 +3823,6 @@ function registerPlatformReadRoutes(app, deps) {
           manifestRoot: 'manifest.json',
           files: normalizePackFileMap(defaultManifest.files),
         },
-        editorFixture: compatiblePack,
       },
     };
   }

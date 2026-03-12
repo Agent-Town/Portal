@@ -6104,30 +6104,34 @@ function buildSeededSealedContextRecord({
   houseId = '',
   traceId = '',
   runId = '',
+  sealedContextId = '',
+  entrantId = '',
+  scopeType = 'entrant_private',
+  scopeKey = '',
+  allowedReaders = [],
+  forbiddenSources = [],
   releasePolicy = 'manual',
   status = 'active',
 } = {}) {
-  const fixture = getUnifiedPlatformTestFixture('sealed_context_seed') || {};
-  const sealedFixture = fixture?.sealedContext && typeof fixture.sealedContext === 'object'
-    ? fixture.sealedContext
-    : {};
-  const allowedReaders = Array.isArray(sealedFixture.allowedReaders)
-    ? sealedFixture.allowedReaders
+  const normalizedEntrantId = String(entrantId || '').trim() || 'entrant_house_alpha';
+  const defaultSealedContextId = `seal_${sha256PrefixedHex(`sealed:${normalizedEntrantId}`).slice('sha256:'.length, 'sha256:'.length + 16)}`;
+  const normalizedAllowedReaders = Array.isArray(allowedReaders)
+    ? allowedReaders.map((entry) => String(entry || '').trim()).filter(Boolean)
     : [];
-  const forbiddenSources = Array.isArray(sealedFixture.forbiddenSources)
-    ? sealedFixture.forbiddenSources
+  const normalizedForbiddenSources = Array.isArray(forbiddenSources)
+    ? forbiddenSources.map((entry) => String(entry || '').trim()).filter(Boolean)
     : [];
   return {
-    sealedContextId: String(sealedFixture.sealedContextId || `seal_${randomHex(10)}`),
+    sealedContextId: String(sealedContextId || defaultSealedContextId).trim() || defaultSealedContextId,
     traceId: String(traceId || '').trim() || null,
     runId: String(runId || '').trim() || null,
-    entrantId: String(sealedFixture.entrantId || 'entrant_fixture_alpha'),
-    scopeType: String(sealedFixture.scopeType || 'entrant_private'),
-    scopeKey: String(sealedFixture.scopeKey || 'table-7'),
-    allowedReaders,
-    forbiddenSources,
+    entrantId: normalizedEntrantId,
+    scopeType: String(scopeType || 'entrant_private').trim() || 'entrant_private',
+    scopeKey: String(scopeKey || `entrant:${normalizedEntrantId}`).trim() || `entrant:${normalizedEntrantId}`,
+    allowedReaders: normalizedAllowedReaders.length ? normalizedAllowedReaders : [normalizedEntrantId, 'arbiter_fixture'],
+    forbiddenSources: normalizedForbiddenSources.length ? normalizedForbiddenSources : ['trainer_job.compare'],
     releasePolicy,
-    status: String(status || sealedFixture.status || 'active'),
+    status: String(status || 'active').trim() || 'active',
     houseId: String(houseId || '').trim() || null,
   };
 }
@@ -10863,6 +10867,12 @@ if (process.env.NODE_ENV === 'test') {
       houseId,
       traceId: typeof req.body?.traceId === 'string' ? req.body.traceId.trim() : '',
       runId: typeof req.body?.runId === 'string' ? req.body.runId.trim() : '',
+      sealedContextId: typeof req.body?.sealedContextId === 'string' ? req.body.sealedContextId.trim() : '',
+      entrantId: typeof req.body?.entrantId === 'string' ? req.body.entrantId.trim() : '',
+      scopeType: typeof req.body?.scopeType === 'string' ? req.body.scopeType.trim() : 'entrant_private',
+      scopeKey: typeof req.body?.scopeKey === 'string' ? req.body.scopeKey.trim() : '',
+      allowedReaders: Array.isArray(req.body?.allowedReaders) ? req.body.allowedReaders : [],
+      forbiddenSources: Array.isArray(req.body?.forbiddenSources) ? req.body.forbiddenSources : [],
       releasePolicy: typeof req.body?.releasePolicy === 'string' ? req.body.releasePolicy.trim() : 'manual',
       status: typeof req.body?.status === 'string' ? req.body.status.trim() : 'active',
     });

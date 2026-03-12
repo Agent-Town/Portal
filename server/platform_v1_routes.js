@@ -122,9 +122,7 @@ function registerPlatformV1Routes(app, deps) {
   }
 
   function getTrackDuplicateThreshold() {
-    const fixture = deps.getUnifiedPlatformTestFixture('tracks_core_seed') || {};
-    const threshold = Number(fixture?.antiFarming?.duplicateActionThreshold || 1);
-    return Number.isFinite(threshold) && threshold > 0 ? Math.floor(threshold) : 1;
+    return 1;
   }
 
   function maybeCreateTrackProgressEvent({
@@ -1736,29 +1734,28 @@ function registerPlatformV1Routes(app, deps) {
         createdAt: nowIso(),
       });
 
-      const fixtureSealed = buildSeededSealedContextRecord({
+      const seededSealedContext = buildSeededSealedContextRecord({
         houseId: resolvedHouse.houseId,
-        traceId: run.traceId,
-        runId: run.runId,
-        releasePolicy: 'post_match',
-        status: 'active',
-      });
-      const sealedContext = upsertSealedContext({
-        houseId: resolvedHouse.houseId,
-        sealedContextId: entrantId === fixtureSealed.entrantId
-          ? fixtureSealed.sealedContextId
-          : deriveDeterministicSealId(entrantId),
         traceId: run.traceId,
         runId: run.runId,
         entrantId,
         scopeType: 'entrant_private',
         scopeKey: `poker:${entrantId}`,
-        allowedReaders: entrantId === fixtureSealed.entrantId
-          ? fixtureSealed.allowedReaders
-          : [entrantId, 'arbiter_fixture'],
-        forbiddenSources: fixtureSealed.forbiddenSources,
         releasePolicy: 'post_match',
         status: 'active',
+      });
+      const sealedContext = upsertSealedContext({
+        houseId: seededSealedContext.houseId,
+        sealedContextId: seededSealedContext.sealedContextId || deriveDeterministicSealId(entrantId),
+        traceId: seededSealedContext.traceId,
+        runId: seededSealedContext.runId,
+        entrantId: seededSealedContext.entrantId,
+        scopeType: seededSealedContext.scopeType,
+        scopeKey: seededSealedContext.scopeKey,
+        allowedReaders: seededSealedContext.allowedReaders,
+        forbiddenSources: seededSealedContext.forbiddenSources,
+        releasePolicy: seededSealedContext.releasePolicy,
+        status: seededSealedContext.status,
         nowIso: nowIso(),
       });
       const seq = latestEvent ? Number(latestEvent.seq || 0) + 1 : 1;

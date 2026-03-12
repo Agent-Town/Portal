@@ -977,7 +977,6 @@ Response fields:
 - `data.staffAgents[].teamId`
 - `data.modelVersion`
 - `data.structureSourceKind`
-- `data.seedFixtures[]`
 
 ### GET `/api/platform/house-office` (human)
 Returns the read-only House Office overview composed from the current House context, experiences, workshop, tracks, archive, trainer, and canonical House Office structure.
@@ -1120,7 +1119,6 @@ Response fields:
 - `data.sourceManifest.schema`
 - `data.sourceManifest.structureSourceKind`
 - `data.sourceManifest.routes[]`
-- `data.sourceManifest.fixtures[]`
 - `data.sourceManifest.counts.officeCount`
 - `data.sourceManifest.counts.staffAgentCount`
 - `data.sourceManifest.counts.assignmentCount`

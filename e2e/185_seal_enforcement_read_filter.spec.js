@@ -41,6 +41,11 @@ test('M25.2: sealed trace reads redact forbidden live-window analysis and releas
     houseId: seededHouse.houseId,
     traceId,
     runId,
+    entrantId: 'entrant_fixture_alpha',
+    scopeType: 'entrant_private',
+    scopeKey: 'poker:entrant_fixture_alpha',
+    allowedReaders: ['entrant_fixture_alpha', 'arbiter_fixture'],
+    forbiddenSources: ['trainer_job.compare'],
     releasePolicy: 'manual',
     status: 'active',
   });

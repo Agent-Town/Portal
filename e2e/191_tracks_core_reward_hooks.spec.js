@@ -8,7 +8,6 @@ const {
   createPlatformConfigVersion,
   createPlatformRun,
   createPlatformTrainerJob,
-  getPlatformFixture,
   ingestPlatformTraceRecords,
   promotePlatformConfigVersion,
 } = require('./helpers/unified_platform');
@@ -46,23 +45,6 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.8: tracks core and reward hooks are durable, trace-backed, and suppress trivial duplicate actions', async ({ page, request }) => {
-  const coreFixture = await getPlatformFixture(request, 'tracks_core_seed');
-  expect(coreFixture?.ok).toBe(true);
-  expect(coreFixture?.fixture).toMatchObject({
-    antiFarming: {
-      duplicateActionThreshold: 1,
-    },
-  });
-
-  const progressFixture = await getPlatformFixture(request, 'tracks_progress_seed');
-  expect(progressFixture?.ok).toBe(true);
-  expect(progressFixture?.fixture?.tracks?.map((entry) => String(entry?.title || ''))).toEqual([
-    'Poker Mastery',
-    'Web Ops',
-    'Builder',
-    'Analyst',
-  ]);
-
   const seededHouse = await seedRecoverableTokenHouse(request);
   const createdConfig = await createPlatformConfigVersion(request, {
     houseId: seededHouse.houseId,

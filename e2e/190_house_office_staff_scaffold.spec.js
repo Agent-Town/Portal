@@ -6,49 +6,45 @@ const {
   attachHouseToPageSession,
   getPlatformStats,
   getPlatformContextFromPage,
-  getPlatformFixture,
 } = require('./helpers/unified_platform');
 const { waitForLiteApi } = require('./helpers/trainer');
+
+const EXPECTED_HOUSE_OFFICES = [
+  {
+    officeId: 'office_fixture_workshop',
+    slug: 'workshop',
+    displayName: 'Workshop',
+  },
+  {
+    officeId: 'office_fixture_analysis',
+    slug: 'analysis',
+    displayName: 'Analysis',
+  },
+  {
+    officeId: 'office_fixture_archive',
+    slug: 'archive',
+    displayName: 'Archive',
+  },
+  {
+    officeId: 'office_fixture_ops',
+    slug: 'ops',
+    displayName: 'Operations',
+  },
+];
+
+const EXPECTED_HOUSE_STAFF = [
+  {
+    staffAgentId: 'staff_fixture_operator',
+    role: 'operator',
+    officeId: 'office_fixture_ops',
+  },
+];
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
 });
 
 test('M25.7: house office and staff scaffolding is deterministic and does not disturb current team flows', async ({ page, request }) => {
-  const fixture = await getPlatformFixture(request, 'house_office_structure_seed');
-  expect(fixture?.ok).toBe(true);
-  expect(fixture?.fixture).toMatchObject({
-    offices: [
-      {
-        officeId: 'office_fixture_workshop',
-        slug: 'workshop',
-        displayName: 'Workshop',
-      },
-      {
-        officeId: 'office_fixture_analysis',
-        slug: 'analysis',
-        displayName: 'Analysis',
-      },
-      {
-        officeId: 'office_fixture_archive',
-        slug: 'archive',
-        displayName: 'Archive',
-      },
-      {
-        officeId: 'office_fixture_ops',
-        slug: 'ops',
-        displayName: 'Operations',
-      },
-    ],
-    staffAgents: [
-      {
-        staffAgentId: 'staff_fixture_operator',
-        role: 'operator',
-        officeId: 'office_fixture_ops',
-      },
-    ],
-  });
-
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
 
@@ -77,10 +73,9 @@ test('M25.7: house office and staff scaffolding is deterministic and does not di
     teamId: 'team_main',
     structureSourceKind: 'durable_house_structure',
     modelVersion: 'house_canonical_structure_v1',
-    offices: fixture.fixture.offices,
-    staffAgents: fixture.fixture.staffAgents,
+    offices: EXPECTED_HOUSE_OFFICES,
+    staffAgents: EXPECTED_HOUSE_STAFF,
   });
-  expect(structureBody?.data?.seedFixtures).toEqual(['house_office_structure_seed']);
 
   const stats = await getPlatformStats(request);
   expect(stats?.stats?.counts?.house_offices).toBeGreaterThanOrEqual(4);

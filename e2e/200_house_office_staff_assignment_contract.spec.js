@@ -256,8 +256,10 @@ test('M29.5: House Office staff assignments are deterministic, idempotent, and p
       }),
     ],
   });
-  expect(overviewBody?.data?.sourceManifest?.fixtures).toEqual(expect.arrayContaining([
-    'house_office_assignments_seed',
+  expect(Array.isArray(overviewBody?.data?.sourceManifest?.routes)).toBe(true);
+  expect(overviewBody?.data?.sourceManifest?.routes).toEqual(expect.arrayContaining([
+    '/api/platform/house-office/assignments',
+    '/api/platform/trainer',
   ]));
   expect(overviewBody?.data?.sourceManifest?.counts).toMatchObject({
     assignmentCount: 1,

@@ -4,7 +4,6 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const {
   compilePlatformIntegration,
-  getPlatformFixture,
   getPlatformPackCompatibility,
   resolvePlatformIntegration,
   verifyPlatformPackCompatibility,
@@ -15,13 +14,6 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.10: editor compatibility stays grounded in the existing internal pack model', async ({ request }) => {
-  const fixture = await getPlatformFixture(request, 'editor_pack_compat_seed');
-  expect(fixture?.ok).toBe(true);
-  expect(fixture?.fixture?.pack).toMatchObject({
-    manifestRoot: 'manifest.json',
-    packVersionId: 'pack_editor_fixture_01',
-  });
-
   const contract = await getPlatformPackCompatibility(request);
   expect(contract.status).toBe(200);
   expect(contract.json?.ok).toBe(true);
@@ -74,14 +66,27 @@ test('M25.10: editor compatibility stays grounded in the existing internal pack 
   expect(contract.json?.data?.surfaces?.registry?.compatiblePack).toEqual(contract.json?.data?.compatiblePack);
   expect(contract.json?.data?.surfaces?.web?.compatiblePack).toEqual(contract.json?.data?.compatiblePack);
   expect(contract.json?.data?.surfaces?.trainer?.compatiblePack).toEqual(contract.json?.data?.compatiblePack);
+  expect(contract.json?.data?.compatiblePack).toMatchObject({
+    schema: 'agent-town-compatible-pack/v1',
+    manifestRoot: 'manifest.json',
+    files: {
+      'manifest.json': 'manifest.json',
+      'overlay.json': 'overlay.json',
+      'policy.json': 'policy.json',
+      'manual/skill.md': 'manual/skill.md',
+      'heartbeat.md': 'heartbeat.md',
+      'tools.md': 'tools.md',
+      'trace_map.json': 'trace_map.json',
+      'verification.json': 'verification.json',
+      'provenance.json': 'provenance.json',
+    },
+  });
+  expect(String(contract.json?.data?.compatiblePack?.packVersionId || '')).toMatch(/^packcompat_/);
+  expect(String(contract.json?.data?.compatiblePack?.contentHash || '')).toMatch(/^sha256:/);
 
   const verifiedFixture = await verifyPlatformPackCompatibility(request, {
-    manifestRoot: fixture.fixture.pack.manifestRoot,
-    manifest: {
-      packVersionId: fixture.fixture.pack.packVersionId,
-      contentHash: fixture.fixture.pack.contentHash,
-      files: fixture.fixture.pack.files,
-    },
+    manifestRoot: String(contract.json?.data?.compatiblePack?.manifestRoot || ''),
+    manifest: contract.json?.data?.compatiblePack,
   });
   expect(verifiedFixture.status).toBe(200);
   expect(verifiedFixture.json?.ok).toBe(true);
@@ -91,8 +96,8 @@ test('M25.10: editor compatibility stays grounded in the existing internal pack 
   expect(verifiedFixture.json?.data?.normalized?.compatiblePack).toMatchObject({
     schema: 'agent-town-compatible-pack/v1',
     manifestRoot: 'manifest.json',
-    packVersionId: 'pack_editor_fixture_01',
-    contentHash: fixture.fixture.pack.contentHash,
+    packVersionId: String(contract.json?.data?.compatiblePack?.packVersionId || ''),
+    contentHash: String(contract.json?.data?.compatiblePack?.contentHash || ''),
   });
 
   const seededHouse = await seedRecoverableTokenHouse(request);
