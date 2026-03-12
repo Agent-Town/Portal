@@ -2586,6 +2586,17 @@
       && !table?.summary?.liveHand
       && tournamentDirectorBreakReferenceHandNumber > 0
       && Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0) > 0;
+    const multiTableSeriesDirectorBreakReady = !!series
+      && table?.tableType === 'tournament'
+      && Number(series?.tableCount || 0) > 1
+      && !adminClosed
+      && !series?.scheduledBreakActive
+      && Number(series?.nextScheduledBreakAfterHandNumber || 0) > 0;
+    const multiTableSeriesDirectorBreakActive = !!series
+      && table?.tableType === 'tournament'
+      && Number(series?.tableCount || 0) > 1
+      && !adminClosed
+      && !!series?.scheduledBreakActive;
     const tableOpen = String(table?.status || 'open') === 'open';
     const registrationOpen = tableOpen || (table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled');
     const sitAndGoWaiting = table?.tableType === 'tournament'
@@ -3151,6 +3162,8 @@
           ${!adminClosed && series && table?.tableType === 'tournament' && table?.summary?.lateRegistrationOpen ? `<button class="pokerButton" type="button" data-admin-series-registration-close="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Close Registration</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
+          ${multiTableSeriesDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-series-break-start="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Start Series Break</button>` : ''}
+          ${multiTableSeriesDirectorBreakActive ? `<button class="pokerButton" type="button" data-admin-series-break-end="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">End Series Break</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
           ${tournamentDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-table-break-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Break Now</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' && scheduledBreakActive ? `<button class="pokerButton" type="button" data-admin-table-break-end="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">End Break Early</button>` : ''}
@@ -3897,6 +3910,50 @@
           await loadPlayTable(tableId);
         } catch (err) {
           setStatus(`Break failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const startSeriesBreakButton = document.querySelector('[data-admin-series-break-start="1"][data-admin-series-id]');
+    if (startSeriesBreakButton) {
+      startSeriesBreakButton.addEventListener('click', async () => {
+        const targetSeriesId = String(startSeriesBreakButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Starting scheduled break across the tournament series...');
+        try {
+          const payload = await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/breaks/start`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director started the next scheduled break across the tournament series.',
+            }),
+          });
+          await loadPlayTable(tableId);
+          setStatus(`Series break started across ${Number(payload?.data?.series?.scheduledBreakTableCount || 0)} tables.`);
+        } catch (err) {
+          setStatus(`Series break start failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const endSeriesBreakButton = document.querySelector('[data-admin-series-break-end="1"][data-admin-series-id]');
+    if (endSeriesBreakButton) {
+      endSeriesBreakButton.addEventListener('click', async () => {
+        const targetSeriesId = String(endSeriesBreakButton.getAttribute('data-admin-series-id') || '').trim() || String(seriesId || '').trim();
+        if (!targetSeriesId) return;
+        setStatus('Ending scheduled break across the tournament series...');
+        try {
+          await api(`/api/poker/play/admin/series/${encodeURIComponent(targetSeriesId)}/breaks/end`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director ended the scheduled break early across the tournament series.',
+            }),
+          });
+          await loadPlayTable(tableId);
+          setStatus('Series break ended.');
+        } catch (err) {
+          setStatus(`Series break end failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }

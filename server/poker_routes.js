@@ -91,6 +91,8 @@ const {
   advanceTournamentBlindLevelByDirector,
   startScheduledBreakByDirector,
   endScheduledBreakByDirector,
+  startScheduledBreaksForSeriesByDirector,
+  endScheduledBreaksForSeriesByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
@@ -1016,6 +1018,12 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessDirBreakA11111111111111111111', houseId: 'house_harness_dir_break_a', displayName: 'Break Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessDirBreakB11111111111111111111', houseId: 'house_harness_dir_break_b', displayName: 'Break Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessDirBreakC11111111111111111111', houseId: 'house_harness_dir_break_c', displayName: 'Break Charlie' },
+      ],
+      director_series_scheduled_break_ready: [
+        { seatNumber: 1, address: 'So1anaHarnessDirSeriesBreakA1111111111111111', houseId: 'house_harness_dir_series_break_a', displayName: 'Series Break Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessDirSeriesBreakB1111111111111111', houseId: 'house_harness_dir_series_break_b', displayName: 'Series Break Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessDirSeriesBreakC1111111111111111', houseId: 'house_harness_dir_series_break_c', displayName: 'Series Break Charlie' },
+        { seatNumber: 4, address: 'So1anaHarnessDirSeriesBreakD1111111111111111', houseId: 'house_harness_dir_series_break_d', displayName: 'Series Break Delta' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -2141,6 +2149,115 @@ function registerPokerRoutes(app, deps) {
       });
       seededSeriesId = seriesId;
       seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'director_series_scheduled_break_ready') {
+      const [seatOne, seatTwo, seatThree, seatFour] = normalizedActors;
+      const seriesId = `pkseries_harness_dir_series_break_${randomHex(6)}`;
+      const tableBId = `${nextTableId}_overflow`;
+      const scheduledBreaks = [
+        {
+          breakId: 'player_break_1',
+          afterHandNumber: 3,
+          label: 'Player Break 1',
+          durationMinutes: 5,
+        },
+        {
+          breakId: 'player_break_2',
+          afterHandNumber: 6,
+          label: 'Player Break 2',
+          durationMinutes: 5,
+        },
+      ];
+      const buildSeriesBreakTable = (tableIdValue, title, createdAt, actorsForTable) => {
+        upsertPokerPlayTable({
+          tableId: tableIdValue,
+          slug: `${normalizedScenario}-${randomHex(4)}`,
+          title,
+          tableType: 'tournament',
+          status: 'paused',
+          maxSeats: 6,
+          smallBlindOil: 50,
+          bigBlindOil: 100,
+          buyInOil: 600,
+          minPlayers: 2,
+          state: {
+            activeHandId: null,
+            activeHandNumber: 5,
+            completedAt: null,
+            winnerSeatNumber: 0,
+            prizeOil: 0,
+            prizeSettledAt: null,
+            lastButtonSeat: 2,
+            lastStartedAt: addHarnessSeconds(requestAt, -120),
+            lastSettledAt: requestAt,
+            lastSettledHandId: `${handId}_${tableIdValue}_settled`,
+            lastSettledHandNumber: 5,
+            timeBankRemainingBySeat: {
+              '1': 15,
+              '2': 15,
+            },
+            entryCount: 4,
+            reentryCount: 0,
+            entryCountsByWallet: {
+              [seatOne.address]: 1,
+              [seatTwo.address]: 1,
+              [seatThree.address]: 1,
+              [seatFour.address]: 1,
+            },
+            completedScheduledBreakAfterHands: [3],
+            scheduledBreakId: null,
+            scheduledBreakLabel: null,
+            scheduledBreakAfterHandNumber: 0,
+            scheduledBreakStartedAt: null,
+            scheduledBreakUntilAt: null,
+            scheduledBreakDurationMinutes: 0,
+            pausedAt: requestAt,
+            pausedReason: 'director staging',
+          },
+          rules: buildHarnessTournamentRules(seriesId, 'Harness Director Series Break', {
+            lateRegistrationHands: 0,
+            scheduledBreaks,
+          }),
+          summary: {
+            headline: 'Harness director series scheduled-break control scenario.',
+            seriesId,
+            seriesTitle: 'Harness Director Series Break',
+            scheduledBreakCount: 2,
+          },
+          createdAt,
+          updatedAt: requestAt,
+        });
+        actorsForTable.forEach((actor, index) => {
+          upsertPokerPlaySeat({
+            tableId: tableIdValue,
+            seatNumber: index + 1,
+            portalSessionId: `harness_${actor.address}`,
+            houseId: actor.houseId,
+            walletSubject: actor.address,
+            displayName: actor.displayName,
+            status: 'active',
+            buyInOil: 600,
+            stackOil: 600 - (index * 40),
+            lastSeenAt: requestAt,
+            disconnectedAt: null,
+            createdAt: requestAt,
+            updatedAt: requestAt,
+          });
+        });
+      };
+      buildSeriesBreakTable(
+        nextTableId,
+        'Harness Director Series Break Table A',
+        addHarnessSeconds(requestAt, -2400),
+        [seatOne, seatTwo]
+      );
+      buildSeriesBreakTable(
+        tableBId,
+        'Harness Director Series Break Table B',
+        addHarnessSeconds(requestAt, -1800),
+        [seatThree, seatFour]
+      );
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId, tableBId);
     } else if (normalizedScenario === 'tournament_schedule_waiting') {
       const [seatOne, seatTwo] = normalizedActors;
       const seriesId = `pkseries_harness_schedule_${randomHex(6)}`;
@@ -6759,6 +6876,73 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_SERIES_BREAK_TABLE_FAILED',
         err?.message || 'Unable to break the tournament table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/breaks/start', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = startScheduledBreaksForSeriesByDirector(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const entry of Array.isArray(payload?.tables) ? payload.tables : []) {
+        publishPokerPlayTableEvent(entry?.table?.tableId || '', 'series_break_started', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+          scheduledBreakActive: !!entry?.table?.summary?.scheduledBreakActive,
+          scheduledBreakLabel: entry?.table?.summary?.scheduledBreakLabel || null,
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_BREAK_START_FAILED',
+        err?.message || 'Unable to start the scheduled break for this tournament series.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/series/:seriesId/breaks/end', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = endScheduledBreaksForSeriesByDirector(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      for (const entry of Array.isArray(payload?.tables) ? payload.tables : []) {
+        publishPokerPlayTableEvent(entry?.table?.tableId || '', 'series_break_ended', {
+          seriesId: payload?.series?.seriesId || req.params.seriesId,
+          scheduledBreakActive: !!entry?.table?.summary?.scheduledBreakActive,
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SERIES_BREAK_END_FAILED',
+        err?.message || 'Unable to end the scheduled break for this tournament series.',
         {
           requestId,
           details: err?.details || {},

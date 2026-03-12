@@ -8265,6 +8265,150 @@ function breakTournamentSeriesTableByDirector(deps, {
   });
 }
 
+function startScheduledBreaksForSeriesByDirector(deps, { seriesId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const activeEntries = entries
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .map((entry) => ({
+      ...entry,
+      activeSeats: getActiveSeatRows(entry?.seats),
+    }))
+    .filter((entry) => entry.activeSeats.length > 0);
+  if (!activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'This tournament series is already closed.');
+  }
+  if (activeEntries.some((entry) => entry?.hand && entry.hand.status === 'live')) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_LIVE_HAND', 'Every tournament table must be between hands before a series break can start.');
+  }
+  if (activeEntries.some((entry) => {
+    const activeBreak = getActiveScheduledBreakState(entry.table);
+    return !!activeBreak && isScheduledBreakActive(entry.table, requestAt);
+  })) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_START_UNAVAILABLE', 'A scheduled break is already active in this series.');
+  }
+  const targets = activeEntries.map((entry) => ({
+    entry,
+    scheduledBreak: hasPokerPlayTableStarted(entry.table, entry.hand) && !isScheduledTournamentPending(entry.table, requestAt)
+      ? getNextScheduledBreak(entry.table)
+      : null,
+  }));
+  if (targets.some((target) => !target.scheduledBreak)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_START_UNAVAILABLE', 'Every active tournament table must share the next scheduled break before a series break can start.');
+  }
+  const breakKeys = new Set(targets.map((target) => [
+    normalizeTrimmedString(target?.scheduledBreak?.breakId, ''),
+    Number(target?.scheduledBreak?.afterHandNumber || 0),
+    normalizeTrimmedString(target?.scheduledBreak?.label, ''),
+    Number(target?.scheduledBreak?.durationMinutes || 0),
+  ].join(':')));
+  if (breakKeys.size !== 1) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH', 'Active tournament tables do not share the same next scheduled break.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director started the next scheduled break across the tournament series.');
+  for (const target of targets) {
+    activateTournamentScheduledBreak(deps, target.entry.table, target.entry.hand, target.scheduledBreak, requestAt, {
+      actorRole: 'operator',
+      eventKind: 'director_scheduled_break_started',
+      auditPayload: {
+        seriesId,
+        actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+        reason: targetReason,
+        seriesWide: true,
+      },
+    });
+  }
+  const leadEntry = targets[0]?.entry || activeEntries[0] || null;
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: leadEntry?.table?.tableId || '',
+    handId: leadEntry?.hand?.handId || null,
+    eventKind: 'director_series_scheduled_break_started',
+    payload: {
+      tableIds: targets.map((target) => String(target?.entry?.table?.tableId || '')).filter(Boolean),
+      breakId: targets[0]?.scheduledBreak?.breakId || null,
+      label: targets[0]?.scheduledBreak?.label || null,
+      afterHandNumber: Number(targets[0]?.scheduledBreak?.afterHandNumber || 0),
+      durationMinutes: Number(targets[0]?.scheduledBreak?.durationMinutes || 0),
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
+function endScheduledBreaksForSeriesByDirector(deps, { seriesId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt);
+  const activeEntries = entries
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .map((entry) => ({
+      ...entry,
+      activeSeats: getActiveSeatRows(entry?.seats),
+      activeBreak: getActiveScheduledBreakState(entry?.table),
+    }))
+    .filter((entry) => entry.activeSeats.length > 0);
+  if (!activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_SERIES_CLOSED', 'This tournament series is already closed.');
+  }
+  const activeBreakTargets = activeEntries.filter((entry) => !!entry.activeBreak && isScheduledBreakActive(entry.table, requestAt));
+  if (!activeBreakTargets.length) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_END_UNAVAILABLE', 'No active scheduled break can be ended for this series.');
+  }
+  if (activeBreakTargets.length !== activeEntries.length) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH', 'Only part of the active field is currently on a scheduled break.');
+  }
+  const breakKeys = new Set(activeBreakTargets.map((target) => [
+    normalizeTrimmedString(target?.activeBreak?.breakId, ''),
+    Number(target?.activeBreak?.afterHandNumber || 0),
+    normalizeTrimmedString(target?.activeBreak?.label, ''),
+    Number(target?.activeBreak?.durationMinutes || 0),
+  ].join(':')));
+  if (breakKeys.size !== 1) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH', 'Active tournament tables do not share the same scheduled break state.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director ended the scheduled break early across the tournament series.');
+  for (const target of activeBreakTargets) {
+    clearTournamentScheduledBreak(deps, target.table, target.hand, target.activeBreak, requestAt, {
+      actorRole: 'operator',
+      eventKind: 'director_scheduled_break_ended',
+      auditPayload: {
+        seriesId,
+        actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+        reason: targetReason,
+        endedEarly: true,
+        seriesWide: true,
+      },
+    });
+  }
+  const leadEntry = activeBreakTargets[0] || activeEntries[0] || null;
+  createDirectorAuditEvent(deps, {
+    seriesId,
+    tableId: leadEntry?.table?.tableId || '',
+    handId: leadEntry?.hand?.handId || null,
+    eventKind: 'director_series_scheduled_break_ended',
+    payload: {
+      tableIds: activeBreakTargets.map((target) => String(target?.table?.tableId || '')).filter(Boolean),
+      breakId: activeBreakTargets[0]?.activeBreak?.breakId || null,
+      label: activeBreakTargets[0]?.activeBreak?.label || null,
+      afterHandNumber: Number(activeBreakTargets[0]?.activeBreak?.afterHandNumber || 0),
+      durationMinutes: Number(activeBreakTargets[0]?.activeBreak?.durationMinutes || 0),
+      endedEarly: true,
+    },
+    atIso: requestAt,
+    actorLabel,
+    reason: targetReason,
+  });
+  return getSeriesDetail(deps, {
+    seriesId,
+    processAt: requestAt,
+  });
+}
+
 function startTournamentTableByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
   const requestAt = toProcessIso(deps, asOf);
   const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
@@ -12596,6 +12740,8 @@ module.exports = {
   advanceTournamentBlindLevelByDirector,
   startScheduledBreakByDirector,
   endScheduledBreakByDirector,
+  startScheduledBreaksForSeriesByDirector,
+  endScheduledBreaksForSeriesByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,

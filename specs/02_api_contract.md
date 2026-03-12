@@ -2051,6 +2051,47 @@ Request shape:
 }
 ```
 
+### POST `/api/poker/play/admin/series/:seriesId/breaks/start` (admin)
+Starts the next configured scheduled break across every active table in a split tournament series. This route is only valid when all active series tables are between hands and share the same next scheduled break.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director started the next scheduled break across the tournament series.",
+  "asOf": "2026-03-12T20:01:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- `data.series.scheduledBreakActive = true`
+- `data.series.scheduledBreakTableCount` exposes how many active tables are on the break
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_LIVE_HAND` if any active table is still in a live hand
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH` if active tables do not share the same next scheduled break
+
+### POST `/api/poker/play/admin/series/:seriesId/breaks/end` (admin)
+Ends an active scheduled break across the whole tournament series.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director ended the scheduled break early across the tournament series.",
+  "asOf": "2026-03-12T20:03:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal series detail payload
+- clears `data.series.scheduledBreakActive`
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_END_UNAVAILABLE` if no active series break exists
+- returns `409 POKER_PLAY_DIRECTOR_SERIES_BREAK_MISMATCH` if only part of the active field is on break
+
 ### POST `/api/poker/play/admin/tables/:tableId/start` (admin)
 Force-starts one scheduled tournament table before its scheduled timestamp.
 
