@@ -200,6 +200,20 @@ async function fundOilWallet(request, {
   return body;
 }
 
+async function getPokerTransportChannel(request, {
+  channelKind,
+  channelId,
+} = {}) {
+  const resp = await request.get(`/__test__/poker/play/transport/channels/${encodeURIComponent(channelKind || '')}/${encodeURIComponent(channelId || '')}`, {
+    headers: { 'x-test-reset': resetToken },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`POKER_TRANSPORT_CHANNEL_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body?.channel || null;
+}
+
 async function runOilScheduler(request, {
   asOf,
   limit,
@@ -277,6 +291,7 @@ module.exports = {
   bindMockSolanaWallet,
   createWebSession,
   fundOilWallet,
+  getPokerTransportChannel,
   getPokerSubmissionRow,
   getHouseEconomy,
   getPortalState,

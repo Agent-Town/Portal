@@ -22,6 +22,10 @@ const {
   seedStreamflowFixtureState,
 } = require('./streamflow_adapter');
 const {
+  createPokerTransportMemoryAdapter,
+  POKER_PLAY_TRANSPORT_VERSION,
+} = require('./poker_transport');
+const {
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
@@ -287,6 +291,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerSubmission,
     upsertStreamflowVerification,
     verifySolanaSignature,
+    WebSocketServer,
   } = deps;
 
   const routeDeps = {
@@ -362,7 +367,211 @@ function registerPokerRoutes(app, deps) {
 
   const pokerPlayStreamClientsByTable = new Map();
   const pokerPlayStreamClientsBySeries = new Map();
+  const pokerPlayTransport = createPokerTransportMemoryAdapter({ nowIso });
+  const pokerPlayTransportWss = WebSocketServer ? new WebSocketServer({ noServer: true }) : null;
   let pokerPlayStreamEventCounter = 0;
+
+  function normalizePokerPlayTransportChannelKind(value) {
+    const kind = normalizeTrimmedString(value).toLowerCase();
+    if (kind === 'table' || kind === 'series') return kind;
+    return '';
+  }
+
+  function createWebSocketRequestFacade(req) {
+    const url = new URL(String(req.url || '/'), 'http://localhost');
+    const query = {};
+    for (const [key, value] of url.searchParams.entries()) {
+      query[key] = value;
+    }
+    return {
+      ...req,
+      query,
+      params: {},
+      path: url.pathname,
+      header(name) {
+        return req.headers[String(name || '').toLowerCase()];
+      },
+    };
+  }
+
+  function createWebSocketResponseFacade() {
+    const headers = new Map();
+    return {
+      setHeader(name, value) {
+        headers.set(String(name || '').toLowerCase(), value);
+      },
+      getHeader(name) {
+        return headers.get(String(name || '').toLowerCase());
+      },
+    };
+  }
+
+  function buildPokerPlayTransportSnapshot({ channelKind, channelId, viewerMode, req }) {
+    const request = createWebSocketRequestFacade(req);
+    if (channelKind === 'table') {
+      if (viewerMode === 'player') {
+        const response = createWebSocketResponseFacade();
+        const session = resolveHumanSessionWithRecovery(request, response, { allowCreate: false });
+        if (!session) {
+          throw createRouteError(401, 'SESSION_REQUIRED', 'A live player session is required for this poker transport channel.');
+        }
+        return getTableDetail(playRouteDeps, {
+          tableId: channelId,
+          session,
+          req: request,
+        });
+      }
+      return getTableDetail(playRouteDeps, {
+        tableId: channelId,
+        session: null,
+        req: request,
+        publicViewer: true,
+      });
+    }
+    if (channelKind === 'series') {
+      return getSeriesDetail(playRouteDeps, {
+        seriesId: channelId,
+        session: null,
+        req: request,
+        publicViewer: true,
+      });
+    }
+    throw createRouteError(404, 'NOT_FOUND', 'Poker live transport channel not found.');
+  }
+
+  function sendPokerPlayTransportMessage(socket, envelope) {
+    if (!socket || socket.readyState !== 1) return;
+    socket.send(JSON.stringify(envelope || {}));
+  }
+
+  function closePokerPlayWebSocket(socket, code, reason) {
+    if (!socket) return;
+    try {
+      socket.close(code, reason);
+    } catch {
+      try {
+        socket.terminate();
+      } catch {
+        // no-op
+      }
+    }
+  }
+
+  function normalizePokerPlayTransportViewerMode(value) {
+    const viewerMode = normalizeTrimmedString(value, 'player').toLowerCase();
+    if (viewerMode === 'rail') return 'rail';
+    return 'player';
+  }
+
+  function handlePokerPlayTransportConnection(socket, req) {
+    const request = createWebSocketRequestFacade(req);
+    const channelKind = normalizePokerPlayTransportChannelKind(request.query?.channelKind);
+    const channelId = normalizeTrimmedString(request.query?.channelId);
+    const viewerMode = normalizePokerPlayTransportViewerMode(request.query?.viewer);
+    const lastSeenVersionRaw = request.query?.lastSeenVersion;
+    if (!channelKind || !channelId) {
+      sendPokerPlayTransportMessage(socket, {
+        transportVersion: POKER_PLAY_TRANSPORT_VERSION,
+        messageKind: 'error',
+        reason: 'invalid_channel',
+        at: nowIso(),
+      });
+      return closePokerPlayWebSocket(socket, 1008, 'INVALID_CHANNEL');
+    }
+    if (channelKind === 'series' && viewerMode !== 'rail') {
+      sendPokerPlayTransportMessage(socket, {
+        transportVersion: POKER_PLAY_TRANSPORT_VERSION,
+        channelKind,
+        channelId,
+        messageKind: 'error',
+        reason: 'viewer_mode_unsupported',
+        at: nowIso(),
+      });
+      return closePokerPlayWebSocket(socket, 1008, 'VIEWER_MODE_UNSUPPORTED');
+    }
+
+    let snapshot = null;
+    try {
+      snapshot = buildPokerPlayTransportSnapshot({
+        channelKind,
+        channelId,
+        viewerMode,
+        req,
+      });
+    } catch (err) {
+      sendPokerPlayTransportMessage(socket, {
+        transportVersion: POKER_PLAY_TRANSPORT_VERSION,
+        channelKind,
+        channelId,
+        messageKind: 'error',
+        reason: err?.code || 'snapshot_failed',
+        at: nowIso(),
+      });
+      return closePokerPlayWebSocket(socket, err?.status === 401 ? 1008 : 1011, err?.code || 'SNAPSHOT_FAILED');
+    }
+
+    const replay = pokerPlayTransport.resolveReplay({
+      channelKind,
+      channelId,
+      lastSeenVersion: lastSeenVersionRaw,
+    });
+    if (replay.mode === 'replay') {
+      for (const envelope of replay.deltas) {
+        sendPokerPlayTransportMessage(socket, envelope);
+      }
+    } else if (replay.mode === 'reset') {
+      sendPokerPlayTransportMessage(socket, {
+        ...pokerPlayTransport.buildSnapshotEnvelope({
+          channelKind,
+          channelId,
+          snapshot,
+          reason: replay.reason || 'version_gap',
+        }),
+        messageKind: 'reset',
+      });
+    } else if (replay.mode !== 'noop') {
+      sendPokerPlayTransportMessage(socket, pokerPlayTransport.buildSnapshotEnvelope({
+        channelKind,
+        channelId,
+        snapshot,
+        reason: replay.reason || 'subscribe',
+      }));
+    }
+
+    const unsubscribe = pokerPlayTransport.subscribe({
+      channelKind,
+      channelId,
+      listener(envelope) {
+        sendPokerPlayTransportMessage(socket, envelope);
+      },
+    });
+    const heartbeat = setInterval(() => {
+      sendPokerPlayTransportMessage(socket, {
+        transportVersion: POKER_PLAY_TRANSPORT_VERSION,
+        channelKind,
+        channelId,
+        messageKind: 'heartbeat',
+        version: pokerPlayTransport.getChannelStateSummary(channelKind, channelId)?.version || 0,
+        prevVersion: pokerPlayTransport.getChannelStateSummary(channelKind, channelId)?.version || 0,
+        patch: null,
+        snapshot: null,
+        reason: 'keepalive',
+        at: nowIso(),
+      });
+    }, 15000);
+    const close = () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    };
+    socket.on('close', close);
+    socket.on('error', close);
+  }
+
+  if (pokerPlayTransportWss) {
+    pokerPlayTransportWss.on('connection', (socket, req) => {
+      handlePokerPlayTransportConnection(socket, req);
+    });
+  }
 
   function writePokerPlayStreamEvent(res, { event = 'table', data = {}, id = null } = {}) {
     if (id != null) {
@@ -382,6 +591,13 @@ function registerPokerRoutes(app, deps) {
       at: nowIso(),
       ...((details && typeof details === 'object') ? details : {}),
     };
+    pokerPlayTransport.publish({
+      channelKind: 'table',
+      channelId: normalizedTableId,
+      reason: payload.reason,
+      patch: payload,
+      at: payload.at,
+    });
     const tableClients = pokerPlayStreamClientsByTable.get(normalizedTableId);
     if (tableClients && tableClients.size) {
       for (const client of tableClients) {
@@ -403,12 +619,19 @@ function registerPokerRoutes(app, deps) {
       normalizeTrimmedString(table?.summary?.seriesId)
     );
     if (!seriesId) return;
-    const seriesClients = pokerPlayStreamClientsBySeries.get(seriesId);
-    if (!seriesClients || !seriesClients.size) return;
     const seriesPayload = {
       seriesId,
       ...payload,
     };
+    pokerPlayTransport.publish({
+      channelKind: 'series',
+      channelId: seriesId,
+      reason: payload.reason,
+      patch: seriesPayload,
+      at: payload.at,
+    });
+    const seriesClients = pokerPlayStreamClientsBySeries.get(seriesId);
+    if (!seriesClients || !seriesClients.size) return;
     for (const client of seriesClients) {
       try {
         writePokerPlayStreamEvent(client.res, {
@@ -490,6 +713,44 @@ function registerPokerRoutes(app, deps) {
         at: nowIso(),
       },
     });
+  }
+
+  function resetPokerPlayTransportState() {
+    pokerPlayTransport.reset();
+    for (const bucket of pokerPlayStreamClientsByTable.values()) {
+      for (const client of bucket) {
+        try {
+          client.close();
+        } catch {
+          // no-op
+        }
+      }
+    }
+    pokerPlayStreamClientsByTable.clear();
+    for (const bucket of pokerPlayStreamClientsBySeries.values()) {
+      for (const client of bucket) {
+        try {
+          client.close();
+        } catch {
+          // no-op
+        }
+      }
+    }
+    pokerPlayStreamClientsBySeries.clear();
+    if (pokerPlayTransportWss && pokerPlayTransportWss.clients) {
+      for (const client of pokerPlayTransportWss.clients) {
+        closePokerPlayWebSocket(client, 1001, 'SERVER_RESET');
+      }
+    }
+  }
+
+  function handlePokerPlayWebSocketUpgrade(req, socket, head, pathname = '') {
+    if (!pokerPlayTransportWss) return false;
+    if (String(pathname || '') !== '/api/poker/play/ws') return false;
+    pokerPlayTransportWss.handleUpgrade(req, socket, head, (ws) => {
+      pokerPlayTransportWss.emit('connection', ws, req);
+    });
+    return true;
   }
 
   function normalizeHarnessSeatNumber(value, fallback = 0) {
@@ -6168,6 +6429,26 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/__test__/poker/play/transport/channels/:channelKind/:channelId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const summary = pokerPlayTransport.getChannelStateSummary(req.params.channelKind, req.params.channelId);
+    return res.json({
+      ok: true,
+      channel: summary || {
+        adapterKind: pokerPlayTransport.adapterKind,
+        transportVersion: pokerPlayTransport.transportVersion,
+        channelKind: normalizePokerPlayTransportChannelKind(req.params.channelKind),
+        channelId: normalizeTrimmedString(req.params.channelId),
+        version: 0,
+        replayEntryCount: 0,
+        latestDelta: null,
+        subscriberCount: 0,
+      },
+    });
+  });
+
   app.post('/__test__/poker/oil/process', express.json({ limit: '128kb' }), async (req, res) => {
     const token = process.env.TEST_RESET_TOKEN;
     if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
@@ -6238,6 +6519,11 @@ function registerPokerRoutes(app, deps) {
     resetStreamflowFixtureState();
     return res.json({ ok: true });
   });
+
+  return {
+    handleWebSocketUpgrade: handlePokerPlayWebSocketUpgrade,
+    resetTransportState: resetPokerPlayTransportState,
+  };
 }
 
 module.exports = {

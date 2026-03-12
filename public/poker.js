@@ -10,6 +10,7 @@
   let liveTableStream = null;
   let liveTableStreamKey = '';
   let liveTableRefreshInFlight = false;
+  let liveTableTransportProtocol = '';
   let pokerRuntimeGatewayPromise = null;
 
   function setTitle(title, subtitle) {
@@ -72,6 +73,23 @@
       parsed.searchParams.set('embed', '1');
     }
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  }
+
+  function buildPokerWebSocketUrl(path, extraParams = {}) {
+    const href = buildPokerHref(path, extraParams);
+    const parsed = new URL(href, window.location.origin);
+    parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+    return parsed.toString();
+  }
+
+  function setLiveTransportDebugState(patch) {
+    liveTableTransportProtocol = String(patch?.protocol || liveTableTransportProtocol || '').trim();
+    window.__pokerLiveTransportDebug = {
+      ...(window.__pokerLiveTransportDebug || {}),
+      protocol: liveTableTransportProtocol || '',
+      ...(patch && typeof patch === 'object' ? patch : {}),
+      updatedAtMs: Date.now(),
+    };
   }
 
   function getParentRuntimeGateway() {
@@ -239,6 +257,7 @@
       liveTableStream = null;
     }
     liveTableStreamKey = '';
+    liveTableTransportProtocol = '';
   }
 
   function formatPlaySeatStatus(status) {
@@ -857,7 +876,7 @@
     }
   }
 
-  function bindLiveTableStream(tableId, { rail = false } = {}) {
+  function bindLegacyLiveTableStream(tableId, { rail = false } = {}) {
     if (!tableId || typeof window.EventSource !== 'function') return;
     const streamKey = `${rail ? 'rail' : 'player'}:${tableId}`;
     if (liveTableStream && liveTableStreamKey === streamKey) return;
@@ -871,17 +890,31 @@
       withCredentials: true,
     });
     liveTableStream = stream;
+    setLiveTransportDebugState({
+      protocol: 'sse',
+      channelKind: 'table',
+      channelId: tableId,
+      viewerMode: rail ? 'rail' : 'player',
+      state: 'connected',
+    });
     stream.addEventListener('table', () => {
       if (window.location.pathname === expectedPath) {
         refreshLiveTable(tableId, { silent: true, rail }).catch(() => {});
       }
     });
     stream.addEventListener('error', () => {
+      setLiveTransportDebugState({
+        protocol: 'sse',
+        channelKind: 'table',
+        channelId: tableId,
+        viewerMode: rail ? 'rail' : 'player',
+        state: 'error',
+      });
       scheduleLiveTableRefresh(tableId, { rail });
     });
   }
 
-  function bindRailSeriesStream(seriesId) {
+  function bindLegacyRailSeriesStream(seriesId) {
     if (!seriesId || typeof window.EventSource !== 'function') return;
     const streamKey = `series:${seriesId}`;
     if (liveTableStream && liveTableStreamKey === streamKey) return;
@@ -892,14 +925,158 @@
       withCredentials: true,
     });
     liveTableStream = stream;
+    setLiveTransportDebugState({
+      protocol: 'sse',
+      channelKind: 'series',
+      channelId: seriesId,
+      viewerMode: 'rail',
+      state: 'connected',
+    });
     stream.addEventListener('series', () => {
       if (window.location.pathname === expectedPath) {
         refreshRailSeries(seriesId, { silent: true }).catch(() => {});
       }
     });
     stream.addEventListener('error', () => {
+      setLiveTransportDebugState({
+        protocol: 'sse',
+        channelKind: 'series',
+        channelId: seriesId,
+        viewerMode: 'rail',
+        state: 'error',
+      });
       scheduleRailSeriesRefresh(seriesId);
     });
+  }
+
+  function bindLiveTableStream(tableId, { rail = false } = {}) {
+    if (!tableId) return;
+    if (typeof window.WebSocket !== 'function') {
+      bindLegacyLiveTableStream(tableId, { rail });
+      return;
+    }
+    const streamKey = `${rail ? 'rail' : 'player'}:${tableId}`;
+    if (liveTableStream && liveTableStreamKey === streamKey) return;
+    clearLiveTableStream();
+    liveTableStreamKey = streamKey;
+    const expectedPath = rail ? `/poker/play/rail/tables/${tableId}` : `/poker/play/tables/${tableId}`;
+    const socket = new window.WebSocket(buildPokerWebSocketUrl('/api/poker/play/ws', {
+      channelKind: 'table',
+      channelId: tableId,
+      viewer: rail ? 'rail' : 'player',
+    }));
+    liveTableStream = socket;
+    socket.addEventListener('open', () => {
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'table',
+        channelId: tableId,
+        viewerMode: rail ? 'rail' : 'player',
+        state: 'connected',
+      });
+    });
+    socket.addEventListener('message', (event) => {
+      let payload = null;
+      try {
+        payload = JSON.parse(String(event.data || '{}'));
+      } catch {
+        payload = null;
+      }
+      if (!payload || typeof payload !== 'object') return;
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'table',
+        channelId: tableId,
+        viewerMode: rail ? 'rail' : 'player',
+        state: 'connected',
+        lastMessageKind: String(payload.messageKind || ''),
+        lastVersion: Number(payload.version || 0),
+        lastReason: String(payload.reason || ''),
+      });
+      const messageKind = String(payload.messageKind || '').trim().toLowerCase();
+      if (!['delta', 'reset'].includes(messageKind)) return;
+      if (window.location.pathname === expectedPath) {
+        refreshLiveTable(tableId, { silent: true, rail }).catch(() => {});
+      }
+    });
+    const handleFailure = () => {
+      if (liveTableStream !== socket) return;
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'table',
+        channelId: tableId,
+        viewerMode: rail ? 'rail' : 'player',
+        state: 'error',
+      });
+      scheduleLiveTableRefresh(tableId, { rail });
+    };
+    socket.addEventListener('error', handleFailure);
+    socket.addEventListener('close', handleFailure);
+  }
+
+  function bindRailSeriesStream(seriesId) {
+    if (!seriesId) return;
+    if (typeof window.WebSocket !== 'function') {
+      bindLegacyRailSeriesStream(seriesId);
+      return;
+    }
+    const streamKey = `series:${seriesId}`;
+    if (liveTableStream && liveTableStreamKey === streamKey) return;
+    clearLiveTableStream();
+    liveTableStreamKey = streamKey;
+    const expectedPath = `/poker/play/rail/series/${seriesId}`;
+    const socket = new window.WebSocket(buildPokerWebSocketUrl('/api/poker/play/ws', {
+      channelKind: 'series',
+      channelId: seriesId,
+      viewer: 'rail',
+    }));
+    liveTableStream = socket;
+    socket.addEventListener('open', () => {
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'series',
+        channelId: seriesId,
+        viewerMode: 'rail',
+        state: 'connected',
+      });
+    });
+    socket.addEventListener('message', (event) => {
+      let payload = null;
+      try {
+        payload = JSON.parse(String(event.data || '{}'));
+      } catch {
+        payload = null;
+      }
+      if (!payload || typeof payload !== 'object') return;
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'series',
+        channelId: seriesId,
+        viewerMode: 'rail',
+        state: 'connected',
+        lastMessageKind: String(payload.messageKind || ''),
+        lastVersion: Number(payload.version || 0),
+        lastReason: String(payload.reason || ''),
+      });
+      const messageKind = String(payload.messageKind || '').trim().toLowerCase();
+      if (!['delta', 'reset'].includes(messageKind)) return;
+      if (window.location.pathname === expectedPath) {
+        refreshRailSeries(seriesId, { silent: true }).catch(() => {});
+      }
+    });
+    const handleFailure = () => {
+      if (liveTableStream !== socket) return;
+      setLiveTransportDebugState({
+        protocol: 'ws',
+        channelKind: 'series',
+        channelId: seriesId,
+        viewerMode: 'rail',
+        state: 'error',
+      });
+      scheduleRailSeriesRefresh(seriesId);
+    };
+    socket.addEventListener('error', handleFailure);
+    socket.addEventListener('close', handleFailure);
   }
 
   function renderSnapshotSlots(snapshotState) {

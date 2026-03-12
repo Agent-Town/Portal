@@ -1111,6 +1111,46 @@ Stream notes:
 - the payload includes `seriesId`, `tableId`, `reason`, `at`, and any table-scoped detail fields forwarded from the member table update
 - closed tables roll out of `data.tables[]` but remain counted in `data.series.closedTableCount`
 
+### WebSocket `/api/poker/play/ws`
+Opens the versioned live transport channel for poker table and rail updates.
+
+Query shape:
+- `channelKind = table | series`
+- `channelId`
+- `viewer = player | rail`
+- `lastSeenVersion` optional replay checkpoint
+- existing `inviteCode`, `embed`, and `asOf` query params remain accepted when they are relevant to the underlying table or series read
+
+Envelope shape:
+```json
+{
+  "transportVersion": 1,
+  "channelKind": "table",
+  "channelId": "pkt_play_cash_01",
+  "messageKind": "snapshot",
+  "version": 6,
+  "prevVersion": 5,
+  "patch": null,
+  "snapshot": {
+    "table": {
+      "tableId": "pkt_play_cash_01"
+    }
+  },
+  "reason": "subscribe",
+  "at": "2026-03-12T10:00:00.000Z"
+}
+```
+
+Transport notes:
+- `messageKind` resolves as `snapshot`, `delta`, `reset`, `heartbeat`, or `error`
+- `snapshot` messages carry the normal table or series payload at the current channel version
+- `delta` messages carry one idempotent patch envelope with `reason`, `at`, and any table or series scoped patch fields
+- `reset` means the caller must discard its checkpoint and adopt the included snapshot
+- `lastSeenVersion` allows deterministic delta replay when the in-memory replay window still covers the missed versions
+- `viewer = player` is valid only for `channelKind = table`
+- `viewer = rail` is valid for table rail channels and series rail channels
+- this websocket channel is now the primary live transport path; the SSE routes remain as compatibility fallback channels
+
 ### POST `/api/poker/play/admin/tables/:tableId/pause` (admin)
 Pauses a live table for operator review. While paused:
 - the current hand stays visible

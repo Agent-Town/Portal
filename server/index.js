@@ -4348,7 +4348,7 @@ registerPlatformV1Routes(app, {
   verifyHouseAuth,
 });
 
-registerPokerRoutes(app, {
+const pokerRouteRuntime = registerPokerRoutes(app, {
   buildPortalRequestId,
   computePokerArtifactSha256,
   computeOilLedgerAmountByWalletSubject,
@@ -4445,6 +4445,7 @@ registerPokerRoutes(app, {
   upsertPokerPlayWaitlistEntry,
   upsertStreamflowVerification,
   verifySolanaSignature,
+  WebSocketServer,
 });
 
 const pokerOilProcessingDeps = {
@@ -9913,6 +9914,9 @@ if (process.env.NODE_ENV === 'test') {
     resetEmailOtpAdapter();
     invalidateAtlasStoreCaches();
     resetAllSessions();
+    if (pokerRouteRuntime && typeof pokerRouteRuntime.resetTransportState === 'function') {
+      pokerRouteRuntime.resetTransportState();
+    }
     rateBuckets.clear();
     ponyRateBuckets.clear();
     erc8004OptOutNonces.clear();
@@ -12464,8 +12468,10 @@ server.on('close', () => {
   pokerOilScheduler.stop();
 });
 
+let testExperienceWss = null;
+
 if (process.env.NODE_ENV === 'test' && WebSocketServer) {
-  const testExperienceWss = new WebSocketServer({ noServer: true });
+  testExperienceWss = new WebSocketServer({ noServer: true });
   testExperienceWss.on('connection', (socket) => {
     socket.on('message', (raw) => {
       const text = Buffer.isBuffer(raw)
@@ -12509,6 +12515,9 @@ if (process.env.NODE_ENV === 'test' && WebSocketServer) {
     });
   });
 
+}
+
+if (WebSocketServer) {
   server.on('upgrade', (req, socket, head) => {
     let pathname = '';
     try {
@@ -12516,13 +12525,17 @@ if (process.env.NODE_ENV === 'test' && WebSocketServer) {
     } catch {
       pathname = '';
     }
-    if (pathname !== '/__test__/experience/ws') {
-      socket.destroy();
+    if (pathname === '/__test__/experience/ws' && testExperienceWss) {
+      testExperienceWss.handleUpgrade(req, socket, head, (ws) => {
+        testExperienceWss.emit('connection', ws, req);
+      });
       return;
     }
-    testExperienceWss.handleUpgrade(req, socket, head, (ws) => {
-      testExperienceWss.emit('connection', ws, req);
-    });
+    if (pokerRouteRuntime && typeof pokerRouteRuntime.handleWebSocketUpgrade === 'function') {
+      const handled = pokerRouteRuntime.handleWebSocketUpgrade(req, socket, head, pathname);
+      if (handled) return;
+    }
+    socket.destroy();
   });
 }
 
