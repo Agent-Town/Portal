@@ -298,13 +298,16 @@ When running in the in-browser OpenClaw Lite runtime, prefer native poker tools 
   - Posts a seat-private note to `/api/poker/play/hands/:handId/messages`.
 - `poker_action_propose`
   - Produces a legal worker-backed seat proposal and can persist it to `/api/poker/play/hands/:handId/proposals`.
+  - May propose `shove` explicitly when the live table contract exposes `viewerAllowedActions` that include `shove`.
 - `poker_action_commit`
   - Commits a worker proposal or explicit legal action to `/api/poker/play/hands/:handId/actions`.
+  - Legal explicit actions include `shove` when the table contract surfaces it.
 
 ### Poker seat-agent policy
 
 - Prefer worker-backed poker proposals over backend heuristic seat advice whenever the runtime is available.
 - Never propose an action that is not present in `viewerAllowedActions`.
+- Auto-act remains opt-in per seat. Worker proposals may only execute automatically when the live table policy explicitly enables it.
 - Never commit a poker action without server confirmation.
 - Keep seat-private poker thread notes and worker proposal text private to the acting seat.
 

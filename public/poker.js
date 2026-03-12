@@ -927,8 +927,24 @@
   function renderActionOptions(actions) {
     const items = Array.isArray(actions) ? actions : [];
     return items.length
-      ? items.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(action)}</option>`).join('')
+      ? items.map((action) => `<option value="${escapeHtml(action)}">${escapeHtml(formatPokerActionLabel(action))}</option>`).join('')
       : '<option value="">No actions</option>';
+  }
+
+  function formatPokerActionLabel(action) {
+    const value = String(action || '').trim().toLowerCase();
+    if (value === 'shove') return 'Shove';
+    if (value === 'check_fold') return 'Check/Fold';
+    if (value.includes('_')) return value.replace(/_/g, ' ');
+    return value || 'action';
+  }
+
+  function formatAutoActLabel(mode) {
+    const value = String(mode || 'off').trim().toLowerCase();
+    if (value === 'check_fold') return 'check/fold';
+    if (value === 'seat_agent_auto') return 'seat-agent auto';
+    if (value === 'propose_only') return 'propose only';
+    return value || 'off';
   }
 
   function scheduleLiveTableRefresh(tableId, { rail = false } = {}) {
@@ -2573,6 +2589,7 @@
       const transferOptionsJson = escapeHtml(JSON.stringify(transferOptions));
       const blindObligation = mySeat?.blindObligation && typeof mySeat.blindObligation === 'object' ? mySeat.blindObligation : null;
       const waitlistPromotion = mySeat?.waitlistPromotion && typeof mySeat.waitlistPromotion === 'object' ? mySeat.waitlistPromotion : null;
+      const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
       cards.push(`
         <h2>Your Seat</h2>
         <div class="pokerSummary">
@@ -2580,6 +2597,7 @@
           ${renderSummaryMetric('Stack', `${Number(mySeat.stackOil || 0)} OIL`)}
           ${renderSummaryMetric('Status', seatStatus)}
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
+          ${renderSummaryMetric('Auto-Act', formatAutoActLabel(autoAct?.mode))}
           ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
           ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' && Number(mySeat?.currentBountyOil || 0) > 0 ? renderSummaryMetric('Current Bounty', `${Number(mySeat.currentBountyOil || 0)} OIL`) : ''}
@@ -2649,6 +2667,38 @@
             ` : '<p>No compatible cash table is open for transfer right now.</p>'}
           ` : ''}
         `}
+      `);
+    }
+
+    if (!publicRail && !adminClosed && mySeat) {
+      const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
+      cards.push(`
+        <h2>Auto-Act</h2>
+        <p>Automation is opt-in per seat and stays visible in the live table state.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Mode', formatAutoActLabel(autoAct?.mode))}
+          ${renderSummaryMetric('Allow Disconnect', autoAct?.allowWhileDisconnected ? 'yes' : 'no')}
+          ${renderSummaryMetric('Last Action', autoAct?.lastExecutedActionKind ? formatPokerActionLabel(autoAct.lastExecutedActionKind) : 'none')}
+        </div>
+        <form id="pokerPlayAutoActForm" class="pokerForm">
+          <label>
+            Mode
+            <select id="pokerPlayAutoActMode">
+              <option value="off"${String(autoAct?.mode || 'off') === 'off' ? ' selected' : ''}>Off</option>
+              <option value="propose_only"${String(autoAct?.mode || '') === 'propose_only' ? ' selected' : ''}>Propose Only</option>
+              <option value="check_fold"${String(autoAct?.mode || '') === 'check_fold' ? ' selected' : ''}>Check/Fold</option>
+              <option value="seat_agent_auto"${String(autoAct?.mode || '') === 'seat_agent_auto' ? ' selected' : ''}>Seat-Agent Auto</option>
+            </select>
+          </label>
+          <label>
+            <input id="pokerPlayAutoActAllowDisconnect" type="checkbox"${autoAct?.allowWhileDisconnected ? ' checked' : ''}>
+            Allow while disconnected
+          </label>
+          <button id="pokerPlayAutoActSaveButton" class="pokerButton" type="submit">Save Auto-Act</button>
+        </form>
+        <div class="pokerLinks">
+          <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto-Act</button>
+        </div>
       `);
     }
 
@@ -2831,6 +2881,7 @@
         <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
       `);
     } else if (!publicRail && !adminClosed && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
+      const shoveToOil = Number(mySeat.committedStreetOil || 0) + Number(mySeat.stackOil || 0);
       cards.push(`
         <h2>Submit Action</h2>
         <div class="pokerStack">
@@ -2851,6 +2902,7 @@
             Amount OIL
             <input id="pokerPlayActionAmount" type="number" min="0" value="${Number(hand.minRaiseToOil || hand.requiredCallOil || 0)}">
           </label>
+          ${hand.viewerAllowedActions.includes('shove') ? `<button id="pokerPlayShoveButton" class="pokerButton" type="button" data-shove-to-oil="${Number(shoveToOil || 0)}">Shove</button>` : ''}
           ${hand.canUseTimeBank ? `<button id="pokerPlayTimeBankButton" class="pokerButton" type="button">Use Time Bank (+${Number(hand.timeBankRemainingSeconds || 0)}s)</button>` : ''}
           <button class="pokerButton" type="submit">Submit Action</button>
         </form>
@@ -3210,6 +3262,7 @@
   function bindPlayActionForm(tableId, handId) {
     const form = document.getElementById('pokerPlayActionForm');
     const timeBankButton = document.getElementById('pokerPlayTimeBankButton');
+    const shoveButton = document.getElementById('pokerPlayShoveButton');
     if (timeBankButton && handId) {
       timeBankButton.addEventListener('click', async () => {
         setStatus('Using time bank...');
@@ -3221,6 +3274,24 @@
           await loadPlayTable(tableId);
         } catch (err) {
           setStatus(`Time bank failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    if (shoveButton && handId) {
+      shoveButton.addEventListener('click', async () => {
+        setStatus('Submitting shove...');
+        try {
+          await api(`/api/poker/play/hands/${encodeURIComponent(handId)}/actions`, {
+            method: 'POST',
+            body: JSON.stringify({
+              actionKind: 'shove',
+              amountOil: Number(shoveButton.getAttribute('data-shove-to-oil') || 0),
+            }),
+          });
+          await loadPlayTable(tableId);
+          setStatus('Action submitted.');
+        } catch (err) {
+          setStatus(`Action failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }
@@ -3237,10 +3308,53 @@
           }),
         });
         await loadPlayTable(tableId);
+        setStatus('Action submitted.');
       } catch (err) {
         setStatus(`Action failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindPlayAutoActControls(tableId) {
+    const form = document.getElementById('pokerPlayAutoActForm');
+    const offButton = document.getElementById('pokerPlayAutoActOffButton');
+    if (form && tableId) {
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setStatus('Saving auto-act...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/auto-act`, {
+            method: 'POST',
+            body: JSON.stringify({
+              mode: String(document.getElementById('pokerPlayAutoActMode')?.value || 'off').trim(),
+              allowWhileDisconnected: !!document.getElementById('pokerPlayAutoActAllowDisconnect')?.checked,
+            }),
+          });
+          await loadPlayTable(tableId);
+          setStatus('Auto-act updated.');
+        } catch (err) {
+          setStatus(`Auto-act failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    if (offButton && tableId) {
+      offButton.addEventListener('click', async () => {
+        setStatus('Disabling auto-act...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/auto-act`, {
+            method: 'POST',
+            body: JSON.stringify({
+              mode: 'off',
+              allowWhileDisconnected: false,
+            }),
+          });
+          await loadPlayTable(tableId);
+          setStatus('Auto-act disabled.');
+        } catch (err) {
+          setStatus(`Auto-act failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function bindWorkerSeatAgentControls(tableId, handId) {
@@ -3628,6 +3742,7 @@
       bindPlayReloadForm(tableId);
       bindCashSeatMovementForms(tableId);
       bindPlayLifecycleButtons(tableId);
+      bindPlayAutoActControls(tableId);
       bindTournamentReentryButton(data?.series?.seriesId || '', tableId);
       bindPlayLeaveButton(tableId);
       bindPlayMessageForm(tableId, data?.hand?.handId || '');

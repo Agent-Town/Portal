@@ -800,6 +800,9 @@ function getSeatAllowedActions({ handState, seatNumber }) {
   if (toCall === 0) actions.push('check');
   if (stackOil > 0 && toCall > 0) actions.push('call');
   if (stackOil > toCall) actions.push(handState?.currentBetOil > 0 ? 'raise' : 'bet');
+  if (stackOil > 0 && (actions.includes('call') || actions.includes('bet') || actions.includes('raise'))) {
+    actions.push('shove');
+  }
   return actions;
 }
 
@@ -880,14 +883,30 @@ function applyPokerPlayActionToHandState({
   const toCall = getSeatCallAmount(state, seatNumber);
   const stackOil = normalizeOilAmount(seat?.stackOil, 0);
   const currentCommitted = normalizeOilAmount(seat?.committedStreetOil, 0);
+  const maxTarget = currentCommitted + stackOil;
+  let effectiveAction = normalizedAction;
+  let effectiveAmountOil = amountOil;
+  if (normalizedAction === 'shove') {
+    const canAggress = allowed.includes('raise') || allowed.includes('bet');
+    if (canAggress && maxTarget > currentCommitted) {
+      effectiveAction = state?.currentBetOil > 0 ? 'raise' : 'bet';
+      effectiveAmountOil = maxTarget;
+    } else if (allowed.includes('call')) {
+      effectiveAction = 'call';
+      effectiveAmountOil = Math.min(toCall, stackOil);
+    } else if (allowed.includes('check')) {
+      effectiveAction = 'check';
+      effectiveAmountOil = 0;
+    }
+  }
   let debitOil = 0;
   let normalizedAmountOil = 0;
 
-  if (normalizedAction === 'fold') {
+  if (effectiveAction === 'fold') {
     seat.folded = true;
-  } else if (normalizedAction === 'check') {
+  } else if (effectiveAction === 'check') {
     // no-op
-  } else if (normalizedAction === 'call') {
+  } else if (effectiveAction === 'call') {
     debitOil = Math.min(toCall, stackOil);
     normalizedAmountOil = debitOil;
     seat.stackOil -= debitOil;
@@ -895,9 +914,8 @@ function applyPokerPlayActionToHandState({
     seat.committedHandOil += debitOil;
     seat.allIn = seat.stackOil <= 0;
     state.potOil += debitOil;
-  } else if (normalizedAction === 'bet' || normalizedAction === 'raise') {
-    const maxTarget = currentCommitted + stackOil;
-    let targetTotal = normalizeOilAmount(amountOil, 0);
+  } else if (effectiveAction === 'bet' || effectiveAction === 'raise') {
+    let targetTotal = normalizeOilAmount(effectiveAmountOil, 0);
     const minTarget = Math.max(
       normalizeOilAmount(state.minRaiseToOil, normalizeOilAmount(state.bigBlindOil, 1)),
       normalizeOilAmount(state.currentBetOil, 0) > 0 ? normalizeOilAmount(state.currentBetOil, 0) + Math.max(normalizeOilAmount(state.lastRaiseSizeOil, 0), 1) : normalizeOilAmount(state.bigBlindOil, 1)
@@ -929,7 +947,7 @@ function applyPokerPlayActionToHandState({
     ? state.pendingSeatNumbers.filter((pendingSeat) => normalizeSeatNumber(pendingSeat) !== normalizeSeatNumber(seatNumber))
     : [];
 
-  if (normalizedAction === 'bet' || normalizedAction === 'raise') {
+  if (effectiveAction === 'bet' || effectiveAction === 'raise') {
     const canActSeats = actingSeatNumbersFromState(state)
       .filter((pendingSeat) => normalizeSeatNumber(pendingSeat) !== normalizeSeatNumber(seatNumber) && !state.seatStates[String(pendingSeat)].folded);
     state.pendingSeatNumbers = buildSeatOrder(canActSeats, nextOccupiedSeat(canActSeats, normalizeSeatNumber(seatNumber)));
@@ -941,6 +959,7 @@ function applyPokerPlayActionToHandState({
     handState: next,
     debitOil,
     normalizedAmountOil,
+    appliedActionKind: effectiveAction,
   };
 }
 

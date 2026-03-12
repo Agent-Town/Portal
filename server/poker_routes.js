@@ -79,6 +79,7 @@ const {
   moveTournamentDirectorSeat,
   transferCashTableSeat,
   updatePokerPlayPolicy,
+  updateAutoActPolicy,
   useTimeBank,
 } = require('./poker_play_service');
 
@@ -5882,6 +5883,36 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_RETURN_FAILED',
         err?.message || 'Unable to return to the poker table.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/auto-act', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = updateAutoActPolicy(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body || {},
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'table', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_AUTO_ACT_FAILED',
+        err?.message || 'Unable to update poker auto-act policy.',
         {
           requestId,
           details: err?.details || {},

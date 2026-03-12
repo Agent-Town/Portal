@@ -82,7 +82,10 @@ test('skill.md keeps the minimal external-agent contract', async ({ request }) =
   expect(txt).toContain('`poker_action_propose`');
   expect(txt).toContain('`poker_action_commit`');
   expect(txt).toContain('### Poker seat-agent policy');
+  expect(txt).toContain('May propose `shove` explicitly when the live table contract exposes `viewerAllowedActions` that include `shove`.');
+  expect(txt).toContain('Legal explicit actions include `shove` when the table contract surfaces it.');
   expect(txt).toContain('Never propose an action that is not present in `viewerAllowedActions`.');
+  expect(txt).toContain('Auto-act remains opt-in per seat. Worker proposals may only execute automatically when the live table policy explicitly enables it.');
   expect(txt).toContain('Keep seat-private poker thread notes and worker proposal text private to the acting seat.');
   expect(txt).toContain('`atlas`, `registry`, `poker`, `pony`, `townhall`, `saloon`, `leaderboard`, `house`, `brain`, `sigil`');
   expect(txt).toContain('Do not navigate to direct standalone routes (for example `/poker`) when a modal intent exists.');

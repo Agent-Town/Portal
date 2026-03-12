@@ -85,9 +85,11 @@ export function buildPokerSeatAgentProposal({
 
   const cards = normalizeCards(mySeat?.holeCards);
   const stackOil = Math.max(0, normalizeNumber(mySeat?.stackOil, 0));
+  const committedStreetOil = Math.max(0, normalizeNumber(mySeat?.committedStreetOil, 0));
   const toCall = Math.max(0, normalizeNumber(hand?.requiredCallOil, 0));
   const minRaiseToOil = Math.max(0, normalizeNumber(hand?.minRaiseToOil, 0));
   const bigBlindOil = Math.max(1, normalizeNumber(table?.bigBlindOil, 1));
+  const shoveToOil = committedStreetOil + stackOil;
   const aggressiveTarget = Math.min(
     stackOil,
     Math.max(minRaiseToOil, toCall + bigBlindOil),
@@ -99,6 +101,16 @@ export function buildPokerSeatAgentProposal({
   const broadwayCount = countBroadway(cards);
   const pair = isPocketPair(cards);
   const suited = isSuited(cards);
+
+  if (allowed.has("shove") && shoveToOil > 0 && (pair || broadwayCount >= 2) && stackOil <= Math.max(bigBlindOil * 2, minRaiseToOil || bigBlindOil)) {
+    return makeProposal({
+      actionKind: "shove",
+      amountOil: shoveToOil,
+      confidence: pair ? "high" : "medium",
+      body: `Stack depth is compressed. Shove to ${shoveToOil} OIL and realize the full 6-max pressure now.`,
+      reason: pair ? "pair_shove_pressure" : "broadway_shove_pressure",
+    });
+  }
 
   if (allowed.has("raise") && pressureTarget > 0 && (pair || (suited && broadwayCount >= 2))) {
     return makeProposal({

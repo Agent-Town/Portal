@@ -526,6 +526,7 @@ Returns one live cash or tournament table payload with:
 - `data.mySeat`
 - `data.mySeat.blindObligation` for cash-seat return policy state when present
 - `data.mySeat.waitlistPromotion` for tournament seats promoted from the durable waitlist
+- `data.mySeat.autoAct` with `mode`, `enabled`, `allowWhileDisconnected`, and latest execution metadata for the bound seat
 - `data.mySeat.currentBountyOil`
 - `data.mySeat.bountyWonOil`
 - `data.hand`
@@ -564,6 +565,7 @@ Cash lifecycle and waitlist notes:
 - `data.cashMovement.transferAllowed` and `data.cashMovement.transferOptions[]` expose compatible between-hand cash-table transfers without debiting or crediting OIL
 - `data.study.handReviewPath` points to the current private review surface when the viewer is seated in the active hand
 - `data.study.notebookCount`, `data.study.opponentNoteCount`, `data.study.recentEntries[]`, and `data.study.opponentNotes[]` summarize wallet-private study state for that table
+- `data.hand.viewerAllowedActions[]` may include `shove` as a first-class legal action when the acting seat can move all-in explicitly
 - tournament tables reuse the same `data.waitlist` contract when scheduled or full-event waitlists are enabled
 - invite-only tables require a valid `inviteCode` on pre-join reads and seat/waitlist entry unless the wallet is already seated or created the table
 
@@ -1236,6 +1238,34 @@ Failure codes:
 - `UNAUTHORIZED`
 - `WALLET_SUBJECT_REQUIRED`
 - `NOT_FOUND`
+
+### POST `/api/poker/play/tables/:tableId/auto-act`
+Stores the bound seat's opt-in automation policy for the live table.
+
+Request shape:
+```json
+{
+  "mode": "check_fold",
+  "allowWhileDisconnected": false,
+  "asOf": "2026-03-11T10:00:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `data.mySeat.autoAct.mode` is `off`, `propose_only`, `check_fold`, or `seat_agent_auto`
+- `data.mySeat.autoAct.enabled` mirrors whether the saved mode is actively enabled for automation
+- `data.mySeat.autoAct.allowWhileDisconnected` controls whether automation may still fire after the seat is marked disconnected
+- successful writes append `auto_act_policy_updated` or `auto_act_revoked` to the table review audit stream
+- later automated actions append `auto_act_executed` with `automationMode`, `actionKind`, and proposal metadata when applicable
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_TABLE_CLOSED`
 
 ### POST `/api/poker/play/matchmake`
 Finds an open live table with the same structure and seats the caller there. If no candidate exists, the server creates a new dynamic table and seats the caller into it.
@@ -1925,6 +1955,11 @@ Request shape:
   "amountOil": 300
 }
 ```
+
+Action notes:
+- `actionKind` may also be `shove` when `data.hand.viewerAllowedActions[]` exposes it for the acting seat
+- the server may normalize a `shove` internally to the matched legal all-in path, but the public contract keeps `shove` as the user-facing action kind
+- auto-act execution uses the same legality rules as manual actions and never submits an action missing from the current `viewerAllowedActions[]`
 
 Failure codes:
 - `UNAUTHORIZED`

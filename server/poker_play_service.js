@@ -1032,7 +1032,93 @@ function buildActionNarrative(actionKind, amountOil) {
   if (action === 'call') return `calls ${Number(amountOil || 0)} OIL`;
   if (action === 'bet') return `bets to ${Number(amountOil || 0)} OIL`;
   if (action === 'raise') return `raises to ${Number(amountOil || 0)} OIL`;
+  if (action === 'shove') return `shoves to ${Number(amountOil || 0)} OIL`;
   return action || 'acts';
+}
+
+function normalizePokerPlayAutoActMode(value, fallback = 'off') {
+  const normalized = normalizeTrimmedString(value, fallback).toLowerCase();
+  return ['off', 'propose_only', 'check_fold', 'seat_agent_auto'].includes(normalized)
+    ? normalized
+    : fallback;
+}
+
+function getPokerPlayAutoActPolicyMap(table) {
+  const map = table?.state?.autoActByWallet;
+  return map && typeof map === 'object' ? cloneJson(map, {}) : {};
+}
+
+function getPokerPlaySeatAutoActPolicy(table, walletSubject) {
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  if (!normalizedWallet) return null;
+  const map = getPokerPlayAutoActPolicyMap(table);
+  const policy = map[normalizedWallet];
+  if (!policy || typeof policy !== 'object') return null;
+  return {
+    mode: normalizePokerPlayAutoActMode(policy.mode, 'off'),
+    allowWhileDisconnected: policy.allowWhileDisconnected === true,
+    updatedAt: normalizeTrimmedString(policy.updatedAt) || null,
+    lastExecutedAt: normalizeTrimmedString(policy.lastExecutedAt) || null,
+    lastExecutedHandId: normalizeTrimmedString(policy.lastExecutedHandId) || null,
+    lastExecutedActionKind: normalizeTrimmedString(policy.lastExecutedActionKind) || null,
+    lastProposalId: normalizeTrimmedString(policy.lastProposalId) || null,
+  };
+}
+
+function upsertPokerPlaySeatAutoActPolicy(deps, table, walletSubject, patch = {}, updatedAt) {
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  if (!table?.tableId || !normalizedWallet) return table;
+  const now = toProcessIso(deps, updatedAt);
+  const current = getPokerPlaySeatAutoActPolicy(table, normalizedWallet) || {
+    mode: 'off',
+    allowWhileDisconnected: false,
+    updatedAt: null,
+    lastExecutedAt: null,
+    lastExecutedHandId: null,
+    lastExecutedActionKind: null,
+    lastProposalId: null,
+  };
+  const mode = normalizePokerPlayAutoActMode(
+    Object.prototype.hasOwnProperty.call(patch || {}, 'mode') ? patch.mode : current.mode,
+    'off'
+  );
+  const nextPolicy = {
+    ...current,
+    ...cloneJson(patch, {}),
+    mode,
+    allowWhileDisconnected: Object.prototype.hasOwnProperty.call(patch || {}, 'allowWhileDisconnected')
+      ? patch.allowWhileDisconnected === true
+      : current.allowWhileDisconnected === true,
+    updatedAt: now,
+  };
+  const nextMap = {
+    ...getPokerPlayAutoActPolicyMap(table),
+    [normalizedWallet]: nextPolicy,
+  };
+  const nextState = {
+    ...(table.state && typeof table.state === 'object' ? table.state : {}),
+    autoActByWallet: nextMap,
+  };
+  return deps.upsertPokerPlayTable({
+    ...table,
+    state: nextState,
+    updatedAt: now,
+  });
+}
+
+function buildPokerPlayAutoActSummary(table, walletSubject) {
+  const policy = getPokerPlaySeatAutoActPolicy(table, walletSubject);
+  const mode = normalizePokerPlayAutoActMode(policy?.mode, 'off');
+  return {
+    mode,
+    enabled: mode !== 'off',
+    allowWhileDisconnected: policy?.allowWhileDisconnected === true,
+    updatedAt: policy?.updatedAt || null,
+    lastExecutedAt: policy?.lastExecutedAt || null,
+    lastExecutedHandId: policy?.lastExecutedHandId || null,
+    lastExecutedActionKind: policy?.lastExecutedActionKind || null,
+    lastProposalId: policy?.lastProposalId || null,
+  };
 }
 
 function getSeatMap(seats) {
@@ -3355,6 +3441,7 @@ function getLatestSeatAgentProposal(deps, handId, seatNumber) {
     if (normalizeSeatNumber(event?.seatNumber) !== normalizeSeatNumber(seatNumber)) continue;
     const payload = cloneJson(event?.payload, {});
     return {
+      proposalId: String(payload?.proposalId || ''),
       schemaVersion: String(payload?.schemaVersion || 'poker-seat-agent-proposal-v1'),
       source: String(payload?.source || 'worker-seat-agent-v1'),
       actionKind: String(payload?.actionKind || ''),
@@ -3368,6 +3455,65 @@ function getLatestSeatAgentProposal(deps, handId, seatNumber) {
     };
   }
   return null;
+}
+
+function resolveSeatAutoActDecision(deps, table, hand, seats, actingSeatNumber) {
+  const seatNumber = normalizeSeatNumber(actingSeatNumber);
+  if (!table?.tableId || !hand?.handId || !seatNumber) return null;
+  const seat = (Array.isArray(seats) ? seats : []).find((entry) => normalizeSeatNumber(entry?.seatNumber) === seatNumber) || null;
+  if (!seat?.walletSubject) return null;
+  const policy = getPokerPlaySeatAutoActPolicy(table, seat.walletSubject);
+  const mode = normalizePokerPlayAutoActMode(policy?.mode, 'off');
+  if (mode === 'off' || mode === 'propose_only') return null;
+  if (getSeatPresenceStatus(seat) === 'disconnected' && policy?.allowWhileDisconnected !== true) return null;
+  if (mode === 'check_fold') {
+    const allowed = getSeatAllowedActions({ handState: hand.state, seatNumber });
+    if (allowed.includes('check')) {
+      return {
+        mode,
+        seat,
+        actionKind: 'check',
+        amountOil: 0,
+        proposalId: null,
+        reason: 'check_fold_policy',
+      };
+    }
+    if (allowed.includes('fold')) {
+      return {
+        mode,
+        seat,
+        actionKind: 'fold',
+        amountOil: 0,
+        proposalId: null,
+        reason: 'check_fold_policy',
+      };
+    }
+    return null;
+  }
+  if (mode !== 'seat_agent_auto') return null;
+  const proposal = getLatestSeatAgentProposal(deps, hand.handId, seatNumber);
+  if (!proposal?.actionKind) return null;
+  try {
+    applyPokerPlayActionToHandState({
+      table,
+      handState: hand.state,
+      seatNumber,
+      actionKind: proposal.actionKind,
+      amountOil: Number(proposal.amountOil || 0),
+      nowIso: hand.updatedAt || hand.createdAt || new Date().toISOString(),
+    });
+  } catch {
+    return null;
+  }
+  return {
+    mode,
+    seat,
+    actionKind: proposal.actionKind,
+    amountOil: Number(proposal.amountOil || 0),
+    proposalId: normalizeTrimmedString(proposal?.proposalId) || null,
+    proposalBody: normalizeTrimmedString(proposal?.body) || '',
+    reason: 'seat_agent_proposal',
+  };
 }
 
 function requirePokerPlayViewerWalletBinding(deps, session, req) {
@@ -4034,6 +4180,7 @@ function postSeatAgentProposal(deps, { handId, session, req, body } = {}) {
     );
   }
   const proposal = {
+    proposalId: `pkprop_${deps.randomHex(10)}`,
     schemaVersion: 'poker-seat-agent-proposal-v1',
     source: normalizeTrimmedString(body?.source, 'worker-seat-agent-v1'),
     tableId: synced.table.tableId,
@@ -5858,6 +6005,87 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       const actingSeat = normalizeSeatNumber(hand?.state?.actingSeat);
       if (actingSeat && Number.isFinite(atMs) && Number.isFinite(expiresAtMs) && expiresAtMs <= atMs) {
         const seat = seats.find((item) => normalizeSeatNumber(item.seatNumber) === actingSeat) || null;
+        const autoActDecision = resolveSeatAutoActDecision(deps, table, hand, seats, actingSeat);
+        if (autoActDecision?.actionKind) {
+          const outcome = applyPokerPlayActionToHandState({
+            table,
+            handState: hand.state,
+            seatNumber: actingSeat,
+            actionKind: autoActDecision.actionKind,
+            amountOil: autoActDecision.amountOil,
+            nowIso: atIso,
+          });
+          deps.createPokerPlayAction({
+            tableId: table.tableId,
+            handId: hand.handId,
+            seatNumber: actingSeat,
+            actorRole: 'agent',
+            actionKind: autoActDecision.actionKind,
+            amountOil: Number(outcome.normalizedAmountOil || outcome.debitOil || 0),
+            payload: {
+              reason: 'auto_act',
+              automationMode: autoActDecision.mode,
+              proposalId: autoActDecision.proposalId || null,
+              requestedAmountOil: Number(autoActDecision.amountOil || 0),
+            },
+            createdAt: atIso,
+          });
+          deps.createPokerPlayMessage({
+            tableId: table.tableId,
+            handId: hand.handId,
+            seatNumber: actingSeat,
+            authorRole: 'agent',
+            body: autoActDecision.mode === 'seat_agent_auto' && autoActDecision.proposalBody
+              ? `Auto-act executes the saved worker line: ${autoActDecision.proposalBody}`
+              : `Auto-act ${buildActionNarrative(autoActDecision.actionKind, outcome.normalizedAmountOil || outcome.debitOil || 0)}.`,
+            createdAt: atIso,
+          });
+          if (typeof deps.createPokerPlayAuditEvent === 'function') {
+            deps.createPokerPlayAuditEvent({
+              tableId: table.tableId,
+              handId: hand.handId,
+              seatNumber: actingSeat,
+              actorRole: 'agent',
+              eventKind: 'auto_act_executed',
+              payload: {
+                automationMode: autoActDecision.mode,
+                actionKind: autoActDecision.actionKind,
+                amountOil: Number(outcome.normalizedAmountOil || outcome.debitOil || 0),
+                proposalId: autoActDecision.proposalId || null,
+                reason: autoActDecision.reason || 'auto_act',
+              },
+              createdAt: atIso,
+            });
+          }
+          table = upsertPokerPlaySeatAutoActPolicy(deps, table, autoActDecision.seat.walletSubject, {
+            lastExecutedAt: atIso,
+            lastExecutedHandId: hand.handId,
+            lastExecutedActionKind: autoActDecision.actionKind,
+            lastProposalId: autoActDecision.proposalId || null,
+          }, atIso);
+          hand = deps.upsertPokerPlayHand({
+            ...hand,
+            status: outcome.handState?.status || 'live',
+            actionExpiresAt: outcome.handState?.actionExpiresAt || null,
+            state: outcome.handState,
+            result: outcome.handState?.result || {},
+            updatedAt: atIso,
+          });
+          if (hand.status === 'live' && hand.state?.actingSeat) {
+            const prompt = buildPrivateAgentPrompt(table, hand.state, hand.state.actingSeat);
+            if (prompt) {
+              deps.createPokerPlayMessage({
+                tableId: table.tableId,
+                handId: hand.handId,
+                seatNumber: hand.state.actingSeat,
+                authorRole: 'agent',
+                body: prompt.body,
+                createdAt: atIso,
+              });
+            }
+          }
+          continue;
+        }
         const timeBankRemainingSeconds = getSeatTimeBankRemainingSeconds(table, actingSeat);
         if (timeBankRemainingSeconds > 0) {
           const updated = applyTimeBankExtension(deps, {
@@ -6081,6 +6309,9 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     processAt,
     publicViewer,
   });
+  const viewerAutoAct = (!publicViewer && walletBinding?.walletSubject)
+    ? buildPokerPlayAutoActSummary(table, walletBinding.walletSubject)
+    : null;
   const study = (!publicViewer && walletBinding?.walletSubject)
     ? buildStudySummaryForTable(deps, {
       table,
@@ -6120,6 +6351,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
         ...summarizeSeat(viewerSeat),
         blindObligation: getSeatBlindObligation(deps, table, viewerSeat),
         waitlistPromotion: getSeatWaitlistPromotion(deps, table, viewerSeat),
+        autoAct: viewerAutoAct,
       }
       : null,
     seats: (Array.isArray(seats) ? seats : [])
@@ -6538,6 +6770,49 @@ function getTableDetail(deps, { tableId, session, req, processAt, publicViewer =
     processAt: requestAt,
     publicViewer,
     seatAgentMode,
+  });
+}
+
+function updateAutoActPolicy(deps, { tableId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  const { seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  const requestedMode = normalizeTrimmedString(body?.mode);
+  const nextMode = normalizePokerPlayAutoActMode(requestedMode || 'off', '__invalid__');
+  if (nextMode === '__invalid__') {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Auto-act mode is invalid.');
+  }
+  const updatedTable = upsertPokerPlaySeatAutoActPolicy(deps, synced.table, seat.walletSubject, {
+    mode: nextMode,
+    allowWhileDisconnected: body?.allowWhileDisconnected === true,
+  }, requestAt);
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: synced.hand?.handId || null,
+      seatNumber: seat.seatNumber,
+      actorRole: 'human',
+      eventKind: nextMode === 'off' ? 'auto_act_revoked' : 'auto_act_policy_updated',
+      payload: {
+        automationMode: nextMode,
+        allowWhileDisconnected: body?.allowWhileDisconnected === true,
+      },
+      createdAt: requestAt,
+    });
+  }
+  return getTableDetail(deps, {
+    tableId: updatedTable.tableId,
+    session,
+    req,
+    processAt: requestAt,
+    publicViewer: false,
+    seatAgentMode: req.query?.seatAgentMode,
   });
 }
 
@@ -8421,6 +8696,7 @@ module.exports = {
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
   transferCashTableSeat,
+  updateAutoActPolicy,
   updatePokerPlayPolicy,
   useTimeBank,
 };
