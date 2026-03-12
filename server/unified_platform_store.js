@@ -32,6 +32,8 @@ const PLATFORM_TABLES = Object.freeze([
   'library_publications',
   'library_public_stacks',
   'library_public_stack_members',
+  'library_public_stack_verifications',
+  'library_public_stack_verification_members',
   'library_peer_relays',
   'library_peer_receipts',
   'library_satchel_relays',
@@ -93,6 +95,7 @@ const FIXTURE_FILES = Object.freeze({
   library_peer_relay_seed: 'library_peer_relay_seed.json',
   library_satchel_exchange_seed: 'library_satchel_exchange_seed.json',
   library_public_stack_seed: 'library_public_stack_seed.json',
+  library_public_stack_trust_seed: 'library_public_stack_trust_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -477,6 +480,35 @@ function ensureDb() {
       created_at TEXT NOT NULL,
       UNIQUE (library_public_stack_id, sort_index),
       UNIQUE (library_public_stack_id, library_publication_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_public_stack_verifications (
+      library_public_stack_verification_id TEXT PRIMARY KEY,
+      library_public_stack_id TEXT NOT NULL,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      verification_kind TEXT NOT NULL,
+      verification_state TEXT NOT NULL,
+      bundle_hash TEXT NOT NULL,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_public_stack_verification_members (
+      library_public_stack_verification_member_id TEXT PRIMARY KEY,
+      library_public_stack_verification_id TEXT NOT NULL,
+      library_publication_id TEXT NOT NULL,
+      registry_id TEXT NOT NULL,
+      content_hash TEXT,
+      sort_index INTEGER NOT NULL DEFAULT 0,
+      verification_state TEXT NOT NULL,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_public_stack_verification_id, sort_index),
+      UNIQUE (library_public_stack_verification_id, library_publication_id)
     );
 
     CREATE TABLE IF NOT EXISTS library_peer_relays (
@@ -1828,6 +1860,38 @@ function mapLibraryPublicStackMemberRow(row) {
   };
 }
 
+function mapLibraryPublicStackVerificationRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPublicStackVerificationId: String(row.library_public_stack_verification_id || ''),
+    libraryPublicStackId: String(row.library_public_stack_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    verificationKind: String(row.verification_kind || ''),
+    verificationState: String(row.verification_state || ''),
+    bundleHash: String(row.bundle_hash || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryPublicStackVerificationMemberRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPublicStackVerificationMemberId: String(row.library_public_stack_verification_member_id || ''),
+    libraryPublicStackVerificationId: String(row.library_public_stack_verification_id || ''),
+    libraryPublicationId: String(row.library_publication_id || ''),
+    registryId: String(row.registry_id || ''),
+    contentHash: row.content_hash ? String(row.content_hash) : null,
+    sortIndex: Number.isFinite(Number(row.sort_index)) ? Number(row.sort_index) : 0,
+    verificationState: String(row.verification_state || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
 function mapLibraryPeerRelayRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -2231,6 +2295,249 @@ function createLibraryPublicStackMember({
   );
   return listLibraryPublicStackMembers({ libraryPublicStackId: normalizedLibraryPublicStackId })
     .find((entry) => entry.libraryPublicStackMemberId === normalizedLibraryPublicStackMemberId) || null;
+}
+
+function listLibraryPublicStackVerifications({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_public_stack_verifications
+  `;
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  if (normalizedLibraryPublicStackId) {
+    clauses.push('library_public_stack_id = ?');
+    args.push(normalizedLibraryPublicStackId);
+  }
+  if (clauses.length) {
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, library_public_stack_verification_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryPublicStackVerificationRow).filter(Boolean);
+}
+
+function getLibraryPublicStackVerificationById(libraryPublicStackVerificationId = '') {
+  const normalizedLibraryPublicStackVerificationId = String(libraryPublicStackVerificationId || '').trim();
+  if (!normalizedLibraryPublicStackVerificationId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stack_verifications
+    WHERE library_public_stack_verification_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryPublicStackVerificationId);
+  return mapLibraryPublicStackVerificationRow(row);
+}
+
+function getLibraryPublicStackVerificationByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stack_verifications
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryPublicStackVerificationRow(row);
+}
+
+function getLatestLibraryPublicStackVerification({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+} = {}) {
+  return listLibraryPublicStackVerifications({ houseId, teamId, libraryPublicStackId })[0] || null;
+}
+
+function createLibraryPublicStackVerification({
+  libraryPublicStackVerificationId = '',
+  libraryPublicStackId = '',
+  houseId = '',
+  teamId = '',
+  verificationKind = 'bundle_integrity',
+  verificationState = 'verified',
+  bundleHash = '',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackVerificationId = String(libraryPublicStackVerificationId || '').trim();
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedVerificationKind = String(verificationKind || 'bundle_integrity').trim() || 'bundle_integrity';
+  const normalizedVerificationState = String(verificationState || 'verified').trim() || 'verified';
+  const normalizedBundleHash = String(bundleHash || '').trim();
+  if (
+    !normalizedLibraryPublicStackVerificationId
+    || !normalizedLibraryPublicStackId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedBundleHash
+  ) {
+    throw new Error('LIBRARY_PUBLIC_STACK_VERIFICATION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_public_stack_verifications (
+      library_public_stack_verification_id,
+      library_public_stack_id,
+      house_id,
+      team_id,
+      verification_kind,
+      verification_state,
+      bundle_hash,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPublicStackVerificationId,
+    normalizedLibraryPublicStackId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedVerificationKind,
+    normalizedVerificationState,
+    normalizedBundleHash,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return getLibraryPublicStackVerificationById(normalizedLibraryPublicStackVerificationId);
+}
+
+function updateLibraryPublicStackVerification({
+  libraryPublicStackVerificationId = '',
+  verificationState = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackVerificationId = String(libraryPublicStackVerificationId || '').trim();
+  if (!normalizedLibraryPublicStackVerificationId) return null;
+  const existing = getLibraryPublicStackVerificationById(normalizedLibraryPublicStackVerificationId);
+  if (!existing) return null;
+  const nextVerificationState = String(verificationState || existing.verificationState || '').trim() || existing.verificationState || 'verified';
+  const nextMetadata = metadata && typeof metadata === 'object'
+    ? {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...metadata,
+      }
+    : (existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_public_stack_verifications
+    SET verification_state = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_public_stack_verification_id = ?
+  `).run(
+    nextVerificationState,
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedLibraryPublicStackVerificationId,
+  );
+  return getLibraryPublicStackVerificationById(normalizedLibraryPublicStackVerificationId);
+}
+
+function listLibraryPublicStackVerificationMembers({
+  libraryPublicStackVerificationId = '',
+} = {}) {
+  const normalizedLibraryPublicStackVerificationId = String(libraryPublicStackVerificationId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_public_stack_verification_members
+  `;
+  const args = [];
+  if (normalizedLibraryPublicStackVerificationId) {
+    query += ' WHERE library_public_stack_verification_id = ?';
+    args.push(normalizedLibraryPublicStackVerificationId);
+  }
+  query += ' ORDER BY sort_index ASC, library_public_stack_verification_member_id ASC';
+  return database.prepare(query).all(...args).map(mapLibraryPublicStackVerificationMemberRow).filter(Boolean);
+}
+
+function createLibraryPublicStackVerificationMember({
+  libraryPublicStackVerificationMemberId = '',
+  libraryPublicStackVerificationId = '',
+  libraryPublicationId = '',
+  registryId = '',
+  contentHash = '',
+  sortIndex = 0,
+  verificationState = 'verified',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackVerificationMemberId = String(libraryPublicStackVerificationMemberId || '').trim();
+  const normalizedLibraryPublicStackVerificationId = String(libraryPublicStackVerificationId || '').trim();
+  const normalizedLibraryPublicationId = String(libraryPublicationId || '').trim();
+  const normalizedRegistryId = String(registryId || '').trim();
+  const normalizedVerificationState = String(verificationState || 'verified').trim() || 'verified';
+  if (
+    !normalizedLibraryPublicStackVerificationMemberId
+    || !normalizedLibraryPublicStackVerificationId
+    || !normalizedLibraryPublicationId
+    || !normalizedRegistryId
+  ) {
+    throw new Error('LIBRARY_PUBLIC_STACK_VERIFICATION_MEMBER_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_public_stack_verification_members (
+      library_public_stack_verification_member_id,
+      library_public_stack_verification_id,
+      library_publication_id,
+      registry_id,
+      content_hash,
+      sort_index,
+      verification_state,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPublicStackVerificationMemberId,
+    normalizedLibraryPublicStackVerificationId,
+    normalizedLibraryPublicationId,
+    normalizedRegistryId,
+    String(contentHash || '').trim() || null,
+    Number.isFinite(Number(sortIndex)) ? Number(sortIndex) : 0,
+    normalizedVerificationState,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+  );
+  return listLibraryPublicStackVerificationMembers({ libraryPublicStackVerificationId: normalizedLibraryPublicStackVerificationId })
+    .find((entry) => entry.libraryPublicStackVerificationMemberId === normalizedLibraryPublicStackVerificationMemberId) || null;
 }
 
 function listLibraryPeerRelays({
@@ -2878,6 +3185,30 @@ function getUnifiedPlatformPublicStacksInspector({
       sourceHouseId: String(houseId || '').trim(),
       familySlug: String(familySlug || '').trim(),
       scopeSetId: String(scopeSetId || '').trim(),
+    },
+  };
+}
+
+function getUnifiedPlatformPublicStackTrustInspector({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+} = {}) {
+  const verifications = listLibraryPublicStackVerifications({
+    houseId,
+    teamId,
+    libraryPublicStackId,
+  });
+  const verificationMembers = verifications.flatMap((verification) => listLibraryPublicStackVerificationMembers({
+    libraryPublicStackVerificationId: String(verification?.libraryPublicStackVerificationId || '').trim(),
+  }));
+  return {
+    verifications,
+    verificationMembers,
+    filters: {
+      targetHouseId: String(houseId || '').trim(),
+      teamId: String(teamId || '').trim(),
+      libraryPublicStackId: String(libraryPublicStackId || '').trim(),
     },
   };
 }
@@ -4808,6 +5139,7 @@ function getUnifiedPlatformTestStats() {
       peerRelay: true,
       satchelExchange: true,
       publicStacks: true,
+      publicStackTrust: true,
       promptPreview: true,
       editor: true,
       registryPreview: true,
@@ -4827,6 +5159,8 @@ module.exports = {
   createLibraryPeerRelay,
   createLibraryPublicStack,
   createLibraryPublicStackMember,
+  createLibraryPublicStackVerification,
+  createLibraryPublicStackVerificationMember,
   createLibrarySatchelReceipt,
   createLibrarySatchelRelay,
   createLibraryShelf,
@@ -4860,6 +5194,9 @@ module.exports = {
   getLibraryPublicationById,
   getLibraryPublicStackById,
   getLibraryPublicStackByIdempotency,
+  getLibraryPublicStackVerificationById,
+  getLibraryPublicStackVerificationByIdempotency,
+  getLatestLibraryPublicStackVerification,
   getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryShelfById,
@@ -4886,6 +5223,7 @@ module.exports = {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStackTrustInspector,
   getUnifiedPlatformPublicStacksInspector,
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
@@ -4907,6 +5245,8 @@ module.exports = {
   listLibraryPeerRelays,
   listLibraryPublicStackMembers,
   listLibraryPublicStacks,
+  listLibraryPublicStackVerificationMembers,
+  listLibraryPublicStackVerifications,
   listLibrarySatchelReceipts,
   listLibrarySatchelRelays,
   listLibraryPublications,
@@ -4932,6 +5272,7 @@ module.exports = {
   setUnifiedPlatformEditorSnapshot,
   setUnifiedPlatformPromptPreview,
   setUnifiedPlatformRegistryPreviewSnapshot,
+  updateLibraryPublicStackVerification,
   updateLibraryPeerRelay,
   updateLibrarySatchelRelay,
   updateRunMetadata,

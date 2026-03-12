@@ -1,0 +1,21 @@
+{
+  "publicStack": {
+    "familySlug": "house_library_stacks",
+    "scopeSetId": "scope_public_stack_trust_alpha_01",
+    "expectedMemberCount": 2,
+    "expectedVerificationKind": "bundle_integrity",
+    "expectedVerificationState": "verified"
+  },
+  "sourceHouse": {
+    "houseId": "house_library_trust_source",
+    "teamId": "team_main"
+  },
+  "targetHouse": {
+    "houseId": "house_library_trust_target",
+    "teamId": "team_main"
+  },
+  "expectedProofCards": [
+    "Bundle integrity",
+    "Local import status"
+  ]
+}
