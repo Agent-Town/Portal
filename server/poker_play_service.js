@@ -160,6 +160,44 @@ function normalizePokerPlayBlindReturnPolicy(value, fallback = 'post_big_blind')
   return policy === 'wait_for_big_blind' ? 'wait_for_big_blind' : 'post_big_blind';
 }
 
+function normalizePokerPlayNotebookEntryKind(value, fallback = 'notebook') {
+  const kind = normalizeTrimmedString(value, fallback).toLowerCase();
+  return kind === 'opponent_note' ? 'opponent_note' : 'notebook';
+}
+
+function normalizePokerPlayNotebookAuthorRole(value, fallback = 'human') {
+  const role = normalizeTrimmedString(value, fallback).toLowerCase();
+  return role === 'worker' ? 'worker' : 'human';
+}
+
+function normalizePokerPlayNotebookTopic(value) {
+  return normalizeTrimmedString(value).slice(0, 120);
+}
+
+function normalizePokerPlayNotebookBody(value) {
+  return normalizeTrimmedString(value).slice(0, 800);
+}
+
+function normalizePokerPlayNotebookTags(value) {
+  const items = Array.isArray(value)
+    ? value
+    : String(value || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  const seen = new Set();
+  return items
+    .map((item) => normalizeTrimmedString(item).toLowerCase())
+    .map((item) => item.replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32))
+    .filter(Boolean)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    })
+    .slice(0, 8);
+}
+
 function normalizePokerPlayInviteCode(value, fallback = '') {
   const code = normalizeTrimmedString(value, fallback)
     .toUpperCase()
@@ -3332,6 +3370,113 @@ function getLatestSeatAgentProposal(deps, handId, seatNumber) {
   return null;
 }
 
+function requirePokerPlayViewerWalletBinding(deps, session, req) {
+  const walletBinding = session ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  if (!walletBinding?.walletSubject) {
+    throw createRouteError(401, 'AUTH_REQUIRED', 'A bound wallet session is required for this poker study route.');
+  }
+  return walletBinding;
+}
+
+function listViewerNotebookEntries(deps, walletSubject, filters = {}) {
+  if (!walletSubject || typeof deps.listPokerPlayerNotebookEntriesByWalletSubject !== 'function') return [];
+  return deps.listPokerPlayerNotebookEntriesByWalletSubject(walletSubject, filters);
+}
+
+function findSeatDisplayNameByWalletSubject(seats, walletSubject) {
+  const normalizedWallet = normalizeTrimmedString(walletSubject);
+  if (!normalizedWallet) return '';
+  const seat = (Array.isArray(seats) ? seats : []).find((candidate) => (
+    normalizeTrimmedString(candidate?.walletSubject) === normalizedWallet
+  ));
+  return normalizeTrimmedString(seat?.displayName);
+}
+
+function decorateNotebookEntry(entry, {
+  table = null,
+  hand = null,
+  seats = [],
+  seriesId = '',
+  seriesTitle = '',
+} = {}) {
+  if (!entry) return null;
+  return {
+    ...cloneJson(entry, {}),
+    entryKind: normalizePokerPlayNotebookEntryKind(entry?.entryKind, 'notebook'),
+    topic: normalizeTrimmedString(entry?.topic),
+    body: normalizeTrimmedString(entry?.body),
+    tags: normalizePokerPlayNotebookTags(entry?.tags),
+    tableTitle: normalizeTrimmedString(table?.title) || null,
+    seriesId: normalizeTrimmedString(entry?.seriesId || seriesId) || null,
+    seriesTitle: normalizeTrimmedString(seriesTitle) || null,
+    handNumber: hand && normalizeTrimmedString(hand?.handId) === normalizeTrimmedString(entry?.handId)
+      ? Number(hand?.handNumber || 0)
+      : null,
+    opponentDisplayName: findSeatDisplayNameByWalletSubject(seats, entry?.opponentWalletSubject) || null,
+  };
+}
+
+function mapNotebookEntriesByHand(entries) {
+  const byHandId = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const handId = normalizeTrimmedString(entry?.handId);
+    if (!handId) continue;
+    const items = byHandId.get(handId) || [];
+    items.push(entry);
+    byHandId.set(handId, items);
+  }
+  return byHandId;
+}
+
+function buildStudySummaryForTable(deps, {
+  table,
+  seats,
+  hand,
+  walletSubject,
+} = {}) {
+  const seriesRef = getTournamentSeriesRef(table);
+  const entries = listViewerNotebookEntries(deps, walletSubject, {
+    tableId: table?.tableId,
+    limit: 25,
+  }).map((entry) => decorateNotebookEntry(entry, {
+    table,
+    hand,
+    seats,
+    seriesId: seriesRef.seriesId,
+    seriesTitle: seriesRef.seriesTitle,
+  }));
+  const notebookEntries = entries.filter((entry) => entry?.entryKind === 'notebook');
+  const opponentNotes = entries.filter((entry) => entry?.entryKind === 'opponent_note');
+  const latestOpponentNoteByWallet = new Map();
+  for (const entry of opponentNotes) {
+    const key = normalizeTrimmedString(entry?.opponentWalletSubject);
+    if (!key || latestOpponentNoteByWallet.has(key)) continue;
+    latestOpponentNoteByWallet.set(key, entry);
+  }
+  return {
+    handReviewPath: hand?.handId ? `/poker/play/hands/${encodeURIComponent(hand.handId)}/review` : null,
+    notebookCount: notebookEntries.length,
+    opponentNoteCount: opponentNotes.length,
+    recentEntries: notebookEntries.slice(0, 3),
+    opponentNotes: Array.from(latestOpponentNoteByWallet.values()).slice(0, 5),
+  };
+}
+
+function buildBoardPotSlices(hand) {
+  const result = hand?.result && typeof hand.result === 'object' ? hand.result : {};
+  const state = hand?.state && typeof hand.state === 'object' ? hand.state : {};
+  return {
+    communityCards: Array.isArray(state.communityCards) ? state.communityCards.slice() : [],
+    potOil: Number(state.potOil || 0),
+    payouts: Array.isArray(result?.payouts) ? cloneJson(result.payouts, []) : [],
+    potSlices: Array.isArray(result?.potSlices) ? cloneJson(result.potSlices, []) : [],
+    returnedUncalledBySeat: result?.returnedUncalledBySeat && typeof result.returnedUncalledBySeat === 'object'
+      ? cloneJson(result.returnedUncalledBySeat, {})
+      : {},
+    note: normalizeTrimmedString(result?.note),
+  };
+}
+
 function sanitizeTimelineEventPayload(payload = {}, { includePrivate = false } = {}) {
   const next = {
     actionKind: typeof payload?.actionKind === 'string' ? payload.actionKind : undefined,
@@ -3368,6 +3513,14 @@ function buildPokerPlayHandHistoryPayload(deps, {
     ? deps.getPokerPlaySeatByWalletSubject(synced.table.tableId, walletBinding.walletSubject)
     : null;
   const statusFilter = normalizeTrimmedString(status).toLowerCase();
+  const notebookEntriesByHand = mapNotebookEntriesByHand(
+    walletBinding?.walletSubject
+      ? listViewerNotebookEntries(deps, walletBinding.walletSubject, {
+        tableId: synced.table.tableId,
+        limit: 200,
+      })
+      : []
+  );
   const items = (typeof deps.listPokerPlayHandsByTable === 'function'
     ? deps.listPokerPlayHandsByTable(synced.table.tableId, { limit: Math.max(1, Number(limit || 20)) })
     : [])
@@ -3375,6 +3528,7 @@ function buildPokerPlayHandHistoryPayload(deps, {
     .map((historyHand) => {
       const actions = sanitizeActions(deps.listPokerPlayActionsByHand(historyHand.handId), synced.seats);
       const proposal = viewerSeat ? getLatestSeatAgentProposal(deps, historyHand.handId, viewerSeat.seatNumber) : null;
+      const notebookEntries = notebookEntriesByHand.get(normalizeTrimmedString(historyHand.handId)) || [];
       return {
         handId: historyHand.handId,
         handNumber: Number(historyHand.handNumber || 0),
@@ -3387,6 +3541,9 @@ function buildPokerPlayHandHistoryPayload(deps, {
         actionCount: actions.length,
         actions: publicViewer ? actions : actions.slice(-12),
         agentProposal: proposal,
+        reviewPath: publicViewer ? null : `/poker/play/hands/${encodeURIComponent(historyHand.handId)}/review`,
+        notebookEntryCount: notebookEntries.filter((entry) => normalizePokerPlayNotebookEntryKind(entry?.entryKind, 'notebook') === 'notebook').length,
+        opponentNoteCount: notebookEntries.filter((entry) => normalizePokerPlayNotebookEntryKind(entry?.entryKind, 'notebook') === 'opponent_note').length,
       };
     });
   return {
@@ -5924,6 +6081,14 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     processAt,
     publicViewer,
   });
+  const study = (!publicViewer && walletBinding?.walletSubject)
+    ? buildStudySummaryForTable(deps, {
+      table,
+      seats,
+      hand,
+      walletSubject: walletBinding.walletSubject,
+    })
+    : null;
 
   return {
     viewerMode: publicViewer ? 'public' : 'player',
@@ -5949,6 +6114,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     oilBalance,
     pokerPolicy,
     cashMovement,
+    study,
     mySeat: viewerSeat
       ? {
         ...summarizeSeat(viewerSeat),
@@ -6401,6 +6567,341 @@ function getHandHistory(deps, { tableId, session, req, processAt, publicViewer =
     limit,
     status,
   });
+}
+
+function listNotebook(deps, {
+  session,
+  req,
+  processAt,
+  entryKind = '',
+  tableId = '',
+  seriesId = '',
+  handId = '',
+  opponentWalletSubject = '',
+  limit = 50,
+} = {}) {
+  const walletBinding = requirePokerPlayViewerWalletBinding(deps, session, req);
+  const items = listViewerNotebookEntries(deps, walletBinding.walletSubject, {
+    entryKind: normalizeTrimmedString(entryKind),
+    tableId: normalizeTrimmedString(tableId),
+    seriesId: normalizeTrimmedString(seriesId),
+    handId: normalizeTrimmedString(handId),
+    opponentWalletSubject: normalizeTrimmedString(opponentWalletSubject),
+    limit: Math.max(1, Number(limit || 50)),
+  }).map((entry) => {
+    const table = entry?.tableId && typeof deps.getPokerPlayTableById === 'function'
+      ? deps.getPokerPlayTableById(entry.tableId)
+      : null;
+    const hand = entry?.handId && typeof deps.getPokerPlayHandById === 'function'
+      ? deps.getPokerPlayHandById(entry.handId)
+      : null;
+    const seats = table?.tableId && typeof deps.listPokerPlaySeatsByTable === 'function'
+      ? deps.listPokerPlaySeatsByTable(table.tableId)
+      : [];
+    const seriesRef = getTournamentSeriesRef(table);
+    return decorateNotebookEntry(entry, {
+      table,
+      hand,
+      seats,
+      seriesId: seriesRef.seriesId,
+      seriesTitle: seriesRef.seriesTitle,
+    });
+  });
+  return {
+    viewerMode: 'player',
+    filter: {
+      entryKind: normalizeTrimmedString(entryKind) || null,
+      tableId: normalizeTrimmedString(tableId) || null,
+      seriesId: normalizeTrimmedString(seriesId) || null,
+      handId: normalizeTrimmedString(handId) || null,
+      opponentWalletSubject: normalizeTrimmedString(opponentWalletSubject) || null,
+      limit: Math.max(1, Number(limit || 50)),
+    },
+    items,
+    processAt: toProcessIso(deps, processAt),
+  };
+}
+
+function saveNotebookEntry(deps, {
+  session,
+  req,
+  body,
+  processAt,
+  opponentWalletSubject = '',
+} = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const walletBinding = requirePokerPlayViewerWalletBinding(deps, session, req);
+  const viewerHouseId = getSessionHouseId(session);
+  const entryKind = normalizePokerPlayNotebookEntryKind(
+    normalizeTrimmedString(opponentWalletSubject) ? 'opponent_note' : body?.entryKind,
+    'notebook'
+  );
+  const topic = normalizePokerPlayNotebookTopic(body?.topic);
+  const noteBody = normalizePokerPlayNotebookBody(body?.body);
+  const tags = normalizePokerPlayNotebookTags(body?.tags);
+  if (!noteBody) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'A notebook note body is required.');
+  }
+  const targetHandId = normalizeTrimmedString(body?.handId);
+  const targetTableId = normalizeTrimmedString(body?.tableId);
+  const targetSeriesId = normalizeTrimmedString(body?.seriesId);
+  const hand = targetHandId && typeof deps.getPokerPlayHandById === 'function'
+    ? deps.getPokerPlayHandById(targetHandId)
+    : null;
+  if (targetHandId && !hand) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const table = (targetTableId && typeof deps.getPokerPlayTableById === 'function'
+    ? deps.getPokerPlayTableById(targetTableId)
+    : null) || (hand?.tableId && typeof deps.getPokerPlayTableById === 'function'
+      ? deps.getPokerPlayTableById(hand.tableId)
+      : null);
+  if (targetTableId && !table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (hand && table && normalizeTrimmedString(hand.tableId) !== normalizeTrimmedString(table.tableId)) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Notebook hand and table must match.');
+  }
+  const viewerSeat = table?.tableId && typeof deps.getPokerPlaySeatByWalletSubject === 'function'
+    ? deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)
+    : null;
+  if (table) {
+    requirePokerPlayTableAccess(table, {
+      walletSubject: walletBinding.walletSubject,
+      houseId: viewerHouseId,
+      viewerSeat,
+      inviteCode: parsePokerPlayInviteCode(req, body),
+      publicViewer: false,
+    });
+  }
+  const nextOpponentWalletSubject = normalizeTrimmedString(opponentWalletSubject || body?.opponentWalletSubject);
+  if (entryKind === 'opponent_note' && !nextOpponentWalletSubject) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Opponent notes require an opponent wallet subject.');
+  }
+  if (nextOpponentWalletSubject && nextOpponentWalletSubject === normalizeTrimmedString(walletBinding.walletSubject)) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Opponent notes cannot target the current wallet.');
+  }
+  if (typeof deps.upsertPokerPlayerNotebookEntry !== 'function') {
+    throw createRouteError(500, 'UNAVAILABLE', 'Poker notebook storage is not configured.');
+  }
+  const seriesRef = getTournamentSeriesRef(table);
+  const entry = deps.upsertPokerPlayerNotebookEntry({
+    entryId: normalizeTrimmedString(body?.entryId) || null,
+    walletSubject: walletBinding.walletSubject,
+    houseId: viewerHouseId || null,
+    entryKind,
+    tableId: table?.tableId || targetTableId || null,
+    seriesId: targetSeriesId || seriesRef.seriesId || null,
+    handId: hand?.handId || targetHandId || null,
+    opponentWalletSubject: nextOpponentWalletSubject || null,
+    opponentSeatKey: normalizeTrimmedString(body?.opponentSeatKey) || null,
+    topic,
+    authorRole: normalizePokerPlayNotebookAuthorRole(body?.authorRole, 'human'),
+    body: noteBody,
+    tags,
+    updatedAt: requestAt,
+  });
+  return {
+    entry: decorateNotebookEntry(entry, {
+      table,
+      hand,
+      seats: table?.tableId && typeof deps.listPokerPlaySeatsByTable === 'function'
+        ? deps.listPokerPlaySeatsByTable(table.tableId)
+        : [],
+      seriesId: targetSeriesId || seriesRef.seriesId,
+      seriesTitle: seriesRef.seriesTitle,
+    }),
+    processAt: requestAt,
+  };
+}
+
+function getHandReview(deps, { handId, session, req, processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const walletBinding = requirePokerPlayViewerWalletBinding(deps, session, req);
+  const viewerHouseId = getSessionHouseId(session);
+  const hand = typeof deps.getPokerPlayHandById === 'function' ? deps.getPokerPlayHandById(handId) : null;
+  if (!hand) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker hand not found.');
+  }
+  const synced = syncPokerPlayTable(deps, hand.tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const viewerSeat = typeof deps.getPokerPlaySeatByWalletSubject === 'function'
+    ? deps.getPokerPlaySeatByWalletSubject(synced.table.tableId, walletBinding.walletSubject)
+    : null;
+  requirePokerPlayTableAccess(synced.table, {
+    walletSubject: walletBinding.walletSubject,
+    houseId: viewerHouseId,
+    viewerSeat,
+    inviteCode: parsePokerPlayInviteCode(req),
+    publicViewer: false,
+  });
+  if (!viewerSeat) {
+    throw createRouteError(403, 'FORBIDDEN', 'Only a seated player from this table can open hand review.');
+  }
+  const seriesRef = getTournamentSeriesRef(synced.table);
+  const notebookEntries = listViewerNotebookEntries(deps, walletBinding.walletSubject, {
+    handId: hand.handId,
+    limit: 100,
+  }).map((entry) => decorateNotebookEntry(entry, {
+    table: synced.table,
+    hand,
+    seats: synced.seats,
+    seriesId: seriesRef.seriesId,
+    seriesTitle: seriesRef.seriesTitle,
+  }));
+  const handOpponentWallets = new Set(
+    (Array.isArray(synced.seats) ? synced.seats : [])
+      .map((seat) => normalizeTrimmedString(seat?.walletSubject))
+      .filter((wallet) => wallet && wallet !== normalizeTrimmedString(walletBinding.walletSubject))
+  );
+  const opponentNotes = listViewerNotebookEntries(deps, walletBinding.walletSubject, {
+    tableId: synced.table.tableId,
+    entryKind: 'opponent_note',
+    limit: 100,
+  })
+    .map((entry) => decorateNotebookEntry(entry, {
+      table: synced.table,
+      hand,
+      seats: synced.seats,
+      seriesId: seriesRef.seriesId,
+      seriesTitle: seriesRef.seriesTitle,
+    }))
+    .filter((entry) => handOpponentWallets.has(normalizeTrimmedString(entry?.opponentWalletSubject)))
+    .filter((entry) => {
+      const entryHandId = normalizeTrimmedString(entry?.handId);
+      return !entryHandId || entryHandId === normalizeTrimmedString(hand.handId);
+    });
+  const humanNote = notebookEntries.find((entry) => normalizePokerPlayNotebookEntryKind(entry?.entryKind, 'notebook') === 'notebook') || null;
+  const agentNote = getLatestSeatAgentProposal(deps, hand.handId, viewerSeat.seatNumber);
+  const lessonTags = normalizePokerPlayNotebookTags([
+    ...notebookEntries.flatMap((entry) => Array.isArray(entry?.tags) ? entry.tags : []),
+    ...opponentNotes.flatMap((entry) => Array.isArray(entry?.tags) ? entry.tags : []),
+  ]);
+  const actions = sanitizeActions(
+    typeof deps.listPokerPlayActionsByHand === 'function' ? deps.listPokerPlayActionsByHand(hand.handId) : [],
+    synced.seats
+  );
+  return {
+    viewerMode: 'player',
+    table: {
+      tableId: synced.table.tableId,
+      title: synced.table.title || 'Live Table',
+      tableType: synced.table.tableType,
+      status: synced.table.status,
+      summary: computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat),
+    },
+    series: seriesRef.seriesId
+      ? {
+        seriesId: seriesRef.seriesId,
+        seriesTitle: seriesRef.seriesTitle,
+      }
+      : null,
+    hand: {
+      handId: hand.handId,
+      handNumber: Number(hand.handNumber || 0),
+      status: String(hand.status || ''),
+      street: String(hand?.state?.street || hand?.state?.phase || 'preflop'),
+      startedAt: hand.createdAt || null,
+      completedAt: hand.updatedAt || null,
+    },
+    resultSummary: {
+      viewerSeatNumber: normalizeSeatNumber(viewerSeat?.seatNumber),
+      note: normalizeTrimmedString(hand?.result?.note),
+      winningSeatNumbers: Array.isArray(hand?.result?.winningSeatNumbers) ? cloneJson(hand.result.winningSeatNumbers, []) : [],
+      payouts: Array.isArray(hand?.result?.payouts) ? cloneJson(hand.result.payouts, []) : [],
+      actionCount: actions.length,
+    },
+    actionLine: actions,
+    boardPot: buildBoardPotSlices(hand),
+    humanNote,
+    agentNote,
+    lessonTags,
+    notebook: {
+      items: notebookEntries,
+      savePath: '/api/poker/play/notebook',
+    },
+    opponentNotes,
+    links: {
+      table: `/poker/play/tables/${encodeURIComponent(synced.table.tableId)}`,
+      history: `/poker/play/tables/${encodeURIComponent(synced.table.tableId)}/history`,
+      export: {
+        json: `/api/poker/play/tables/${encodeURIComponent(synced.table.tableId)}/history/export?format=json`,
+        ndjson: `/api/poker/play/tables/${encodeURIComponent(synced.table.tableId)}/history/export?format=ndjson`,
+        text: `/api/poker/play/tables/${encodeURIComponent(synced.table.tableId)}/history/export?format=text`,
+      },
+    },
+    processAt: requestAt,
+  };
+}
+
+function buildHandHistoryExport(deps, {
+  tableId,
+  session,
+  req,
+  processAt,
+  status = '',
+  limit = 20,
+} = {}) {
+  const walletBinding = requirePokerPlayViewerWalletBinding(deps, session, req);
+  const history = getHandHistory(deps, {
+    tableId,
+    session,
+    req,
+    processAt,
+    publicViewer: false,
+    status,
+    limit,
+  });
+  const notebookEntriesByHand = mapNotebookEntriesByHand(
+    listViewerNotebookEntries(deps, walletBinding.walletSubject, {
+      tableId: normalizeTrimmedString(tableId),
+      limit: 200,
+    })
+  );
+  return {
+    exportVersion: 'poker-play-hand-history-export-v1',
+    format: 'json',
+    generatedAt: toProcessIso(deps, processAt),
+    viewerWalletSubject: walletBinding.walletSubject,
+    table: cloneJson(history.table, {}),
+    filter: cloneJson(history.filter, {}),
+    items: (Array.isArray(history.items) ? history.items : []).map((item) => ({
+      ...cloneJson(item, {}),
+      notebookEntryIds: (notebookEntriesByHand.get(normalizeTrimmedString(item?.handId)) || []).map((entry) => entry.entryId),
+    })),
+  };
+}
+
+function buildHandHistoryExportNdjson(exportPayload) {
+  return (Array.isArray(exportPayload?.items) ? exportPayload.items : [])
+    .map((item) => JSON.stringify(item))
+    .join('\n');
+}
+
+function formatActionForCompactExport(action) {
+  const actionKind = normalizeTrimmedString(action?.actionKind, 'action');
+  const seatNumber = normalizeSeatNumber(action?.seatNumber);
+  const amountOil = Number(action?.amountOil || 0);
+  return amountOil > 0
+    ? `Seat ${seatNumber} ${actionKind} ${amountOil} OIL`
+    : `Seat ${seatNumber} ${actionKind}`;
+}
+
+function buildHandHistoryExportText(exportPayload) {
+  return (Array.isArray(exportPayload?.items) ? exportPayload.items : []).map((item) => {
+    const lines = [
+      `Hand ${Number(item?.handNumber || 0)} · ${normalizeTrimmedString(item?.status, 'unknown')}`,
+      `Street: ${normalizeTrimmedString(item?.street, 'preflop')}`,
+      `Board: ${Array.isArray(item?.communityCards) && item.communityCards.length ? item.communityCards.join(' ') : '-'}`,
+      `Result: ${normalizeTrimmedString(item?.result?.note, 'No result note.')}`,
+      `Actions: ${Array.isArray(item?.actions) && item.actions.length ? item.actions.map((action) => formatActionForCompactExport(action)).join('; ') : 'none'}`,
+      `Worker: ${normalizeTrimmedString(item?.agentProposal?.body, 'none')}`,
+      `Notebook: ${Array.isArray(item?.notebookEntryIds) && item.notebookEntryIds.length ? item.notebookEntryIds.join(', ') : '-'}`,
+    ];
+    return lines.join('\n');
+  }).join('\n\n');
 }
 
 function getSeriesTimeline(deps, { seriesId, session, req, processAt, publicViewer = false, limit = 200 } = {}) {
@@ -7884,6 +8385,10 @@ module.exports = {
   createTable,
   createRouteError,
   getHandHistory,
+  getHandReview,
+  buildHandHistoryExport,
+  buildHandHistoryExportNdjson,
+  buildHandHistoryExportText,
   getMyResults,
   getPokerPlayPolicy,
   getSeriesTimeline,
@@ -7891,6 +8396,7 @@ module.exports = {
   getTableDetail,
   joinTableWaitlist,
   listTables,
+  listNotebook,
   leaveTable,
   leaveTableWaitlist,
   matchmakeIntoTable,
@@ -7909,6 +8415,7 @@ module.exports = {
   resolveHandDispute,
   resumeTable,
   seatIntoTable,
+  saveNotebookEntry,
   sitOutTableSeat,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,

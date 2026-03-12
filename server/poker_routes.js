@@ -44,7 +44,11 @@ const {
   closeTournamentSeries,
   createTable,
   createRouteError,
+  buildHandHistoryExport,
+  buildHandHistoryExportNdjson,
+  buildHandHistoryExportText,
   getHandHistory,
+  getHandReview,
   getMyResults,
   getPokerPlayPolicy,
   getSeriesTimeline,
@@ -53,6 +57,7 @@ const {
   joinTableWaitlist,
   leaveTable,
   leaveTableWaitlist,
+  listNotebook,
   listTables,
   matchmakeIntoTable,
   openHandDispute,
@@ -68,6 +73,7 @@ const {
   resolveIntegrityFlag,
   resumeTable,
   seatIntoTable,
+  saveNotebookEntry,
   sitOutTableSeat,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
@@ -230,6 +236,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlayWalletPolicy,
     getPokerBlindObligationByTableAndWalletSubject,
     getOpenPokerPlayPlayerStatByTableAndWalletSubject,
+    getPokerPlayerNotebookEntryById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
@@ -263,6 +270,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlayerNotebookEntriesByWalletSubject,
     listPokerPlayPlayerStats,
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
@@ -275,6 +283,7 @@ function registerPokerRoutes(app, deps) {
     nowIso,
     randomHex,
     deletePokerBlindObligation,
+    deletePokerPlayerNotebookEntry,
     deletePokerPlaySeat,
     deletePokerTournamentWaitlistEntry,
     deletePokerPlayWaitlistEntry,
@@ -295,6 +304,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayDispute,
     upsertPokerPlayIntegrityFlag,
     upsertPokerPlaySeat,
+    upsertPokerPlayerNotebookEntry,
     upsertPokerPlayPlayerStat,
     upsertPokerPlayWalletPolicy,
     upsertPokerPlayTable,
@@ -345,6 +355,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlayWalletPolicy,
     getPokerBlindObligationByTableAndWalletSubject,
     getOpenPokerPlayPlayerStatByTableAndWalletSubject,
+    getPokerPlayerNotebookEntryById,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
@@ -362,6 +373,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayIntegrityFlags,
     listPokerPlayHandsByTable,
     listPokerPlayMessagesByHand,
+    listPokerPlayerNotebookEntriesByWalletSubject,
     listPokerPlayPlayerStats,
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
@@ -373,9 +385,11 @@ function registerPokerRoutes(app, deps) {
     randomHex,
     resolvePrimaryWalletSubject,
     deletePokerBlindObligation,
+    deletePokerPlayerNotebookEntry,
     upsertPokerPlayHand,
     upsertPokerPlayDispute,
     upsertPokerPlayIntegrityFlag,
+    upsertPokerPlayerNotebookEntry,
     upsertPokerPlaySeat,
     upsertPokerPlayPlayerStat,
     upsertPokerPlayWalletPolicy,
@@ -4655,6 +4669,192 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_HISTORY_FAILED',
         err?.message || 'Unable to load poker hand history.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/notebook', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = listNotebook(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+        entryKind: req.query?.entryKind,
+        tableId: req.query?.tableId,
+        seriesId: req.query?.seriesId,
+        handId: req.query?.handId,
+        opponentWalletSubject: req.query?.opponentWalletSubject,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_NOTEBOOK_LIST_FAILED',
+        err?.message || 'Unable to load poker notebook entries.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/notebook', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = saveNotebookEntry(playRouteDeps, {
+        session,
+        req,
+        body: req.body || {},
+        processAt: req.body?.asOf || req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_NOTEBOOK_SAVE_FAILED',
+        err?.message || 'Unable to save the poker notebook entry.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/opponents/:walletSubject/notes', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = listNotebook(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+        entryKind: 'opponent_note',
+        tableId: req.query?.tableId,
+        seriesId: req.query?.seriesId,
+        handId: req.query?.handId,
+        opponentWalletSubject: req.params.walletSubject,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_OPPONENT_NOTES_FAILED',
+        err?.message || 'Unable to load poker opponent notes.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/opponents/:walletSubject/notes', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = saveNotebookEntry(playRouteDeps, {
+        session,
+        req,
+        body: {
+          ...(req.body || {}),
+          entryKind: 'opponent_note',
+        },
+        opponentWalletSubject: req.params.walletSubject,
+        processAt: req.body?.asOf || req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_OPPONENT_NOTE_SAVE_FAILED',
+        err?.message || 'Unable to save the poker opponent note.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/hands/:handId/review', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = getHandReview(playRouteDeps, {
+        handId: req.params.handId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_HAND_REVIEW_FAILED',
+        err?.message || 'Unable to load poker hand review.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/tables/:tableId/history/export', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const format = normalizeTrimmedString(req.query?.format, 'json').toLowerCase();
+      if (format !== 'json' && format !== 'ndjson' && format !== 'text') {
+        throw createRouteError(400, 'INVALID_ARGUMENT', 'Unsupported poker history export format.');
+      }
+      const payload = buildHandHistoryExport(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        processAt: req.query?.asOf,
+        status: req.query?.status,
+        limit: req.query?.limit,
+      });
+      if (format === 'ndjson') {
+        res.setHeader('cache-control', 'no-store');
+        res.setHeader('content-type', 'application/x-ndjson; charset=utf-8');
+        return res.status(200).send(buildHandHistoryExportNdjson({
+          ...payload,
+          format,
+        }));
+      }
+      if (format === 'text') {
+        res.setHeader('cache-control', 'no-store');
+        res.setHeader('content-type', 'text/plain; charset=utf-8');
+        return res.status(200).send(buildHandHistoryExportText({
+          ...payload,
+          format,
+        }));
+      }
+      return sendPortalApiSuccess(res, { ...payload, format }, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_HISTORY_EXPORT_FAILED',
+        err?.message || 'Unable to export poker hand history.',
         {
           requestId,
           details: err?.details || {},

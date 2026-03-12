@@ -84,6 +84,7 @@ const {
   getPokerPlayWalletPolicy,
   getPokerBlindObligationByTableAndWalletSubject,
   getOpenPokerPlayPlayerStatByTableAndWalletSubject,
+  getPokerPlayerNotebookEntryById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -120,6 +121,7 @@ const {
   listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlayerNotebookEntriesByWalletSubject,
   listPokerPlayPlayerStats,
   listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
@@ -133,6 +135,7 @@ const {
   setWebSessionRevisionAndState,
   touchCredentialGrant,
   deletePokerBlindObligation,
+  deletePokerPlayerNotebookEntry,
   deletePokerPlaySeat,
   deletePokerTournamentWaitlistEntry,
   deletePokerPlayWaitlistEntry,
@@ -145,6 +148,7 @@ const {
   upsertPokerPlayDispute,
   upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
+  upsertPokerPlayerNotebookEntry,
   upsertPokerPlayPlayerStat,
   upsertPokerPlayWalletPolicy,
   upsertPokerBlindObligation,
@@ -4391,6 +4395,7 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
   getPokerPlayWalletPolicy,
   getPokerBlindObligationByTableAndWalletSubject,
   getOpenPokerPlayPlayerStatByTableAndWalletSubject,
+  getPokerPlayerNotebookEntryById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -4419,6 +4424,7 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
   listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlayerNotebookEntriesByWalletSubject,
   listPokerPlayPlayerStats,
   listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
@@ -4441,6 +4447,7 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
   summarizeMirroredPokerSeason,
   syncPokerMirrorFromOperator,
   deletePokerBlindObligation,
+  deletePokerPlayerNotebookEntry,
   deletePokerPlaySeat,
   deletePokerTournamentWaitlistEntry,
   upsertCentaurEntry,
@@ -4452,6 +4459,7 @@ const pokerRouteRuntime = registerPokerRoutes(app, {
   upsertPokerPlayDispute,
   upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
+  upsertPokerPlayerNotebookEntry,
   upsertPokerPlayPlayerStat,
   upsertPokerPlayWalletPolicy,
   upsertPokerBlindObligation,
@@ -11788,7 +11796,7 @@ app.get(/^\/__compiled\/default-skill-pack\/(.+)$/, (req, res) => {
   return res.send(body);
 });
 
-app.get(['/poker', '/poker/play', '/poker/play/admin/integrity', '/poker/play/admin/ops', '/poker/play/results', '/poker/play/tables/:tableId', '/poker/play/tables/:tableId/history', '/poker/play/series/:seriesId/timeline', '/poker/play/rail', '/poker/play/rail/tables/:tableId', '/poker/play/rail/series/:seriesId', '/poker/play/rail/series/:seriesId/timeline', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
+app.get(['/poker', '/poker/play', '/poker/play/admin/integrity', '/poker/play/admin/ops', '/poker/play/results', '/poker/play/tables/:tableId', '/poker/play/tables/:tableId/history', '/poker/play/hands/:handId/review', '/poker/play/series/:seriesId/timeline', '/poker/play/rail', '/poker/play/rail/tables/:tableId', '/poker/play/rail/series/:seriesId', '/poker/play/rail/series/:seriesId/timeline', '/poker/seasons/:seasonId', '/poker/leaderboards/:seasonId', '/poker/replays/:runId', '/poker/submissions/:submissionId', '/poker/centaur', '/poker/centaur/tournaments/:tournamentId'], (req, res) => {
   if (String(req.query?.embed || '').trim() === '1') {
     return sendHtmlNoStore(res, 'poker.html');
   }

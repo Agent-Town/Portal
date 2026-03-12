@@ -155,6 +155,17 @@
     });
   }
 
+  function buildPlayHistoryExportApiPath(tableId, { format = 'json', status = '' } = {}) {
+    return buildPokerApiPath(`/api/poker/play/tables/${encodeURIComponent(tableId)}/history/export`, {
+      format,
+      status,
+    });
+  }
+
+  function buildPlayHandReviewApiPath(handId) {
+    return buildPokerApiPath(`/api/poker/play/hands/${encodeURIComponent(handId)}/review`);
+  }
+
   function buildPlaySeriesTimelineApiPath(seriesId, { rail = false } = {}) {
     const base = rail
       ? `/api/poker/play/rail/series/${encodeURIComponent(seriesId)}/timeline`
@@ -235,6 +246,20 @@
       throw err;
     }
     return body;
+  }
+
+  async function fetchWithIdentity(path, options = {}) {
+    const identityHeaders = await buildIdentityHeaders();
+    const headers = {
+      ...identityHeaders,
+      ...(options.headers || {}),
+    };
+    return await fetch(path, {
+      credentials: 'include',
+      cache: 'no-store',
+      ...options,
+      headers,
+    });
   }
 
   function clearCountdownTimer() {
@@ -457,11 +482,18 @@
               <span class="pokerBadge">${escapeHtml(item.street || 'preflop')}</span>
               <span class="pokerBadge">${Number(item.actionCount || 0)} actions</span>
               ${item.agentProposal ? '<span class="pokerBadge">worker line</span>' : ''}
+              ${Number(item.notebookEntryCount || 0) > 0 ? `<span class="pokerBadge">${Number(item.notebookEntryCount || 0)} notebook</span>` : ''}
+              ${Number(item.opponentNoteCount || 0) > 0 ? `<span class="pokerBadge">${Number(item.opponentNoteCount || 0)} opponent note${Number(item.opponentNoteCount || 0) === 1 ? '' : 's'}</span>` : ''}
             </div>
             <div class="pokerLabel">Board</div>
             ${renderPokerCards(item.communityCards || [])}
             ${item.agentProposal ? `<p>${escapeHtml(item.agentProposal.body || 'No worker note.')}</p>` : ''}
             ${Array.isArray(item.actions) && item.actions.length ? renderPublicActionLog(item.actions, 'No public actions logged.') : '<p class="pokerMuted">No public actions logged.</p>'}
+            ${item.reviewPath ? `
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item.reviewPath))}">Review Hand</a>
+              </div>
+            ` : ''}
           </div>
         `).join('')}
       </div>
@@ -736,6 +768,72 @@
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  }
+
+  function triggerTextDownload(filename, text, mimeType = 'text/plain') {
+    const blob = new Blob([String(text || '')], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  function renderTagBadges(tags, emptyText = 'No tags yet.') {
+    const items = Array.isArray(tags) ? tags.map((tag) => String(tag || '').trim()).filter(Boolean) : [];
+    if (!items.length) return `<p class="pokerMuted">${escapeHtml(emptyText)}</p>`;
+    return renderMetaBadges(items);
+  }
+
+  function renderNotebookEntryRows(items, { emptyText = 'No notebook entries yet.', showBody = true } = {}) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) return `<p>${escapeHtml(emptyText)}</p>`;
+    return `
+      <div class="pokerStack">
+        ${rows.map((item) => `
+          <div class="pokerMessage">
+            <div class="pokerSplit">
+              <div>
+                <div class="pokerLabel">${escapeHtml(item.topic || (item.entryKind === 'opponent_note' ? 'Opponent Note' : 'Notebook Entry'))}</div>
+                <div>${escapeHtml(item.opponentDisplayName || item.opponentWalletSubject || item.tableTitle || 'Study entry')}</div>
+              </div>
+              <div class="pokerMuted">${escapeHtml(formatIso(item.updatedAt || item.createdAt))}</div>
+            </div>
+            ${showBody ? `<div>${escapeHtml(item.body || '')}</div>` : ''}
+            ${renderTagBadges(item.tags, 'No lesson tags.')}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderStudyPreview(study) {
+    const data = study && typeof study === 'object' ? study : null;
+    if (!data) return '';
+    const recentEntries = Array.isArray(data.recentEntries) ? data.recentEntries : [];
+    const opponentNotes = Array.isArray(data.opponentNotes) ? data.opponentNotes : [];
+    return `
+      <h2>Study</h2>
+      <div class="pokerSummary">
+        ${renderSummaryMetric('Notebook', `${Number(data.notebookCount || 0)}`)}
+        ${renderSummaryMetric('Opponent Notes', `${Number(data.opponentNoteCount || 0)}`)}
+      </div>
+      <div class="pokerLinks">
+        ${data.handReviewPath ? `<a href="${escapeHtml(buildPokerHref(data.handReviewPath))}">Open Current Hand Review</a>` : ''}
+        <a href="${escapeHtml(buildPokerHref(window.location.pathname.replace(/\/$/, '') + '/history', { status: 'completed' }))}">Open Hand History</a>
+      </div>
+      ${recentEntries.length ? `
+        <div class="pokerLabel">Recent Notebook</div>
+        ${renderNotebookEntryRows(recentEntries, { emptyText: 'No notebook entries yet.' })}
+      ` : '<p>No notebook entries saved yet.</p>'}
+      ${opponentNotes.length ? `
+        <div class="pokerLabel">Recent Opponent Notes</div>
+        ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes yet.' })}
+      ` : '<p>No opponent notes saved yet.</p>'}
+    `;
   }
 
   function renderPublicActionLog(actions, emptyText = 'No public actions logged yet.') {
@@ -1691,6 +1789,9 @@
           <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}/history`, { status: 'completed' }))}">Completed</a>
           <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(table?.tableId || tableId)}/history`, { status: 'live' }))}">Live</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+          <button id="pokerPlayHistoryExportJson" class="pokerButton" type="button">Export JSON</button>
+          <button id="pokerPlayHistoryExportNdjson" class="pokerButton" type="button">Export NDJSON</button>
+          <button id="pokerPlayHistoryExportText" class="pokerButton" type="button">Export Text</button>
         </div>
       `,
       `
@@ -1698,7 +1799,190 @@
         ${renderPlayHandHistoryRows(items)}
       `,
     ]);
+    bindPlayHistoryExportButtons(table?.tableId || tableId, { status: filterStatus });
     setStatus(items.length ? `${items.length} hand history row${items.length === 1 ? '' : 's'} loaded.` : 'No hand history rows matched this filter.');
+  }
+
+  function parseTagInput(value) {
+    return String(value || '')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+
+  async function downloadPlayHistoryExport(tableId, { format = 'json', status = '' } = {}) {
+    const response = await fetchWithIdentity(buildPlayHistoryExportApiPath(tableId, { format, status }), {
+      headers: {
+        Accept: format === 'json'
+          ? 'application/json'
+          : (format === 'ndjson' ? 'application/x-ndjson' : 'text/plain'),
+      },
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const error = new Error(body?.error?.message || `HTTP_${response.status}`);
+      error.code = body?.error?.code || 'UNKNOWN';
+      throw error;
+    }
+    const safeTableId = String(tableId || 'table').trim() || 'table';
+    if (format === 'json') {
+      const payload = await response.json().catch(() => ({}));
+      triggerJsonDownload(`poker-history-${safeTableId}.json`, payload?.data || {});
+      return;
+    }
+    const text = await response.text();
+    if (format === 'ndjson') {
+      triggerTextDownload(`poker-history-${safeTableId}.ndjson`, text, 'application/x-ndjson');
+      return;
+    }
+    triggerTextDownload(`poker-history-${safeTableId}.txt`, text, 'text/plain');
+  }
+
+  function bindPlayHistoryExportButtons(tableId, { status = '' } = {}) {
+    const buttonSpecs = [
+      ['pokerPlayHistoryExportJson', 'json'],
+      ['pokerPlayHistoryExportNdjson', 'ndjson'],
+      ['pokerPlayHistoryExportText', 'text'],
+    ];
+    for (const [id, format] of buttonSpecs) {
+      const button = document.getElementById(id);
+      if (!button || !tableId) continue;
+      button.addEventListener('click', async () => {
+        setStatus(`Preparing ${format.toUpperCase()} export...`);
+        try {
+          await downloadPlayHistoryExport(tableId, { format, status });
+          setStatus(`Exported ${format.toUpperCase()} hand history.`);
+        } catch (err) {
+          setStatus(`History export failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+  }
+
+  function bindPlayHandReviewForms(data) {
+    const handId = String(data?.hand?.handId || '').trim();
+    const tableId = String(data?.table?.tableId || '').trim();
+    const notebookForm = document.getElementById('pokerStudyForm');
+    if (notebookForm && handId && tableId) {
+      notebookForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        setStatus('Saving notebook...');
+        try {
+          await api(String(data?.notebook?.savePath || '/api/poker/play/notebook'), {
+            method: 'POST',
+            body: JSON.stringify({
+              tableId,
+              handId,
+              topic: String(document.getElementById('pokerStudyTopicInput')?.value || '').trim(),
+              body: String(document.getElementById('pokerStudyBodyInput')?.value || '').trim(),
+              tags: parseTagInput(document.getElementById('pokerStudyTagsInput')?.value || ''),
+            }),
+          });
+          await loadPlayHandReview(handId);
+          setStatus('Notebook saved.');
+        } catch (err) {
+          setStatus(`Notebook save failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+    bindPlayHistoryExportButtons(tableId, { status: 'completed' });
+  }
+
+  async function loadPlayHandReview(handId) {
+    clearLiveTableStream();
+    setTitle('Poker Hand Review', `Study review for hand ${handId}.`);
+    setStatus('Loading hand review...');
+    const payload = await api(buildPlayHandReviewApiPath(handId));
+    const data = payload?.data || {};
+    const table = data?.table || {};
+    const hand = data?.hand || {};
+    const resultSummary = data?.resultSummary || {};
+    const boardPot = data?.boardPot || {};
+    const notebook = data?.notebook || {};
+    const opponentNotes = Array.isArray(data?.opponentNotes) ? data.opponentNotes : [];
+    const notebookItems = Array.isArray(notebook?.items) ? notebook.items : [];
+    const lessonTags = Array.isArray(data?.lessonTags) ? data.lessonTags : [];
+    renderCards([
+      `
+        <h2>${escapeHtml(table?.title || 'Poker Hand Review')}</h2>
+        <p>Private post-hand review for the seated wallet. Hole cards stay excluded from this export-safe study surface.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Table', table?.tableType || 'cash')}
+          ${renderSummaryMetric('Hand', `${Number(hand?.handNumber || 0)}`)}
+          ${renderSummaryMetric('Street', hand?.street || 'preflop')}
+          ${renderSummaryMetric('Actions', `${Number(resultSummary?.actionCount || 0)}`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref(data?.links?.table || `/poker/play/tables/${encodeURIComponent(table?.tableId || '')}`))}">Back To Table</a>
+          <a href="${escapeHtml(buildPokerHref(data?.links?.history || `/poker/play/tables/${encodeURIComponent(table?.tableId || '')}/history`, { status: 'completed' }))}">Back To History</a>
+          <button id="pokerPlayHistoryExportJson" class="pokerButton" type="button">Export JSON</button>
+          <button id="pokerPlayHistoryExportNdjson" class="pokerButton" type="button">Export NDJSON</button>
+          <button id="pokerPlayHistoryExportText" class="pokerButton" type="button">Export Text</button>
+        </div>
+      `,
+      `
+        <h2>Result Summary</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Viewer Seat', resultSummary?.viewerSeatNumber ? `Seat ${Number(resultSummary.viewerSeatNumber || 0)}` : 'n/a')}
+          ${renderSummaryMetric('Winning Seats', Array.isArray(resultSummary?.winningSeatNumbers) && resultSummary.winningSeatNumbers.length ? resultSummary.winningSeatNumbers.join(', ') : 'n/a')}
+          ${renderSummaryMetric('Started', hand?.startedAt ? formatIso(hand.startedAt) : 'n/a')}
+          ${renderSummaryMetric('Completed', hand?.completedAt ? formatIso(hand.completedAt) : 'n/a')}
+        </div>
+        <p>${escapeHtml(resultSummary?.note || 'No result note recorded for this hand.')}</p>
+      `,
+      `
+        <h2>Action Line</h2>
+        ${Array.isArray(data?.actionLine) && data.actionLine.length ? renderPublicActionLog(data.actionLine, 'No public actions logged.') : '<p>No public actions logged.</p>'}
+      `,
+      `
+        <h2>Board & Pot</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Pot', `${Number(boardPot?.potOil || 0)} OIL`)}
+          ${renderSummaryMetric('Payout Rows', `${Array.isArray(boardPot?.payouts) ? boardPot.payouts.length : 0}`)}
+        </div>
+        <div class="pokerLabel">Board</div>
+        ${renderPokerCards(boardPot?.communityCards || [])}
+        ${renderMatchedPots(boardPot)}
+        ${boardPot?.note ? `<p>${escapeHtml(boardPot.note)}</p>` : ''}
+      `,
+      `
+        <h2>Human Note</h2>
+        ${data?.humanNote?.body ? `<p>${escapeHtml(data.humanNote.body)}</p>` : '<p>No human study note saved for this hand yet.</p>'}
+      `,
+      `
+        <h2>Agent Note</h2>
+        ${data?.agentNote?.body ? `<p>${escapeHtml(data.agentNote.body)}</p>` : '<p>No worker proposal was saved for this hand.</p>'}
+      `,
+      `
+        <h2>Lesson Tags</h2>
+        ${renderTagBadges(lessonTags, 'No lesson tags saved yet.')}
+      `,
+      `
+        <h2>Notebook</h2>
+        <form id="pokerStudyForm" class="pokerForm">
+          <label>
+            Topic
+            <input id="pokerStudyTopicInput" maxlength="120" value="">
+          </label>
+          <label>
+            Note
+            <textarea id="pokerStudyBodyInput" placeholder="Save the line you want to keep for this hand."></textarea>
+          </label>
+          <label>
+            Tags
+            <input id="pokerStudyTagsInput" maxlength="160" value="">
+          </label>
+          <button id="pokerStudySaveButton" class="pokerButton" type="submit">Save Notebook</button>
+        </form>
+        ${renderNotebookEntryRows(notebookItems, { emptyText: 'No notebook entries saved for this hand yet.', showBody: false })}
+      `,
+      `
+        <h2>Opponent Notes</h2>
+        ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes saved for this hand yet.' })}
+      `,
+    ]);
+    bindPlayHandReviewForms(data);
+    setStatus('Hand review ready.');
   }
 
   async function loadPlaySeriesTimeline(seriesId, { rail = false } = {}) {
@@ -2429,6 +2713,10 @@
           <a href="${escapeHtml(buildPokerHref(`/poker/play/rail/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Public Timeline</a>
         </div>
       `);
+    }
+
+    if (!publicRail && data?.study) {
+      cards.push(renderStudyPreview(data.study));
     }
 
     if (hand) {
@@ -3888,6 +4176,8 @@
       if (path === '/poker/play/admin/ops') return await loadPlayOpsDashboard();
       if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
       if (path === '/poker/play/results') return await loadPlayResults();
+      const handReviewMatch = path.match(/^\/poker\/play\/hands\/([^/]+)\/review$/);
+      if (handReviewMatch) return await loadPlayHandReview(handReviewMatch[1]);
       const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);
       if (tableHistoryMatch) return await loadPlayTableHistory(tableHistoryMatch[1]);
       const seriesTimelineMatch = path.match(/^\/poker\/play\/series\/([^/]+)\/timeline$/);

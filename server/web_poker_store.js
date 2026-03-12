@@ -473,6 +473,33 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_tournament_waitlist_entries_table_status_created_idx
       ON poker_tournament_waitlist_entries(table_id, status, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS poker_player_notebook_entries (
+      entry_id TEXT PRIMARY KEY,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      entry_kind TEXT NOT NULL,
+      table_id TEXT,
+      series_id TEXT,
+      hand_id TEXT,
+      opponent_wallet_subject TEXT,
+      opponent_seat_key TEXT,
+      topic TEXT,
+      author_role TEXT NOT NULL,
+      body TEXT NOT NULL,
+      tags_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_player_notebook_entries_wallet_updated_idx
+      ON poker_player_notebook_entries(wallet_subject, updated_at DESC, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_player_notebook_entries_wallet_hand_idx
+      ON poker_player_notebook_entries(wallet_subject, hand_id, updated_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_player_notebook_entries_wallet_opponent_idx
+      ON poker_player_notebook_entries(wallet_subject, opponent_wallet_subject, updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_play_hands (
       hand_id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -1019,6 +1046,7 @@ function countTableRows(tableName) {
     'poker_play_waitlist_entries',
     'poker_blind_obligations',
     'poker_tournament_waitlist_entries',
+    'poker_player_notebook_entries',
     'poker_play_hands',
     'poker_play_messages',
     'poker_play_actions',
@@ -1065,6 +1093,7 @@ function resetExtendedStore() {
     'poker_play_waitlist_entries',
     'poker_blind_obligations',
     'poker_tournament_waitlist_entries',
+    'poker_player_notebook_entries',
     'poker_play_tables',
     'poker_oil_ledger_entries',
     'poker_oil_snapshot_events',
@@ -3486,6 +3515,162 @@ function deletePokerTournamentWaitlistEntry(tableId, walletSubject) {
   `).run(tableId, walletSubject);
 }
 
+function hydratePokerPlayerNotebookEntry(row) {
+  if (!row) return null;
+  return {
+    entryId: row.entry_id,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    entryKind: row.entry_kind,
+    tableId: row.table_id || null,
+    seriesId: row.series_id || null,
+    handId: row.hand_id || null,
+    opponentWalletSubject: row.opponent_wallet_subject || null,
+    opponentSeatKey: row.opponent_seat_key || null,
+    topic: row.topic || '',
+    authorRole: row.author_role,
+    body: row.body,
+    tags: fromJson(row.tags_json, []),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listPokerPlayerNotebookEntriesByWalletSubject(walletSubject, {
+  entryKind = '',
+  tableId = '',
+  seriesId = '',
+  handId = '',
+  opponentWalletSubject = '',
+  limit = 100,
+} = {}) {
+  const database = ensureDb();
+  const filters = ['wallet_subject = ?'];
+  const values = [walletSubject];
+  if (typeof entryKind === 'string' && entryKind.trim()) {
+    filters.push('entry_kind = ?');
+    values.push(entryKind.trim());
+  }
+  if (typeof tableId === 'string' && tableId.trim()) {
+    filters.push('table_id = ?');
+    values.push(tableId.trim());
+  }
+  if (typeof seriesId === 'string' && seriesId.trim()) {
+    filters.push('series_id = ?');
+    values.push(seriesId.trim());
+  }
+  if (typeof handId === 'string' && handId.trim()) {
+    filters.push('hand_id = ?');
+    values.push(handId.trim());
+  }
+  if (typeof opponentWalletSubject === 'string' && opponentWalletSubject.trim()) {
+    filters.push('opponent_wallet_subject = ?');
+    values.push(opponentWalletSubject.trim());
+  }
+  values.push(Math.max(1, Number(limit || 100)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_player_notebook_entries
+    WHERE ${filters.join(' AND ')}
+    ORDER BY updated_at DESC, created_at DESC, entry_id DESC
+    LIMIT ?
+  `).all(...values);
+  return rows.map(hydratePokerPlayerNotebookEntry).filter(Boolean);
+}
+
+function getPokerPlayerNotebookEntryById(entryId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_player_notebook_entries
+    WHERE entry_id = ?
+    LIMIT 1
+  `).get(entryId);
+  return hydratePokerPlayerNotebookEntry(row);
+}
+
+function upsertPokerPlayerNotebookEntry({
+  entryId = null,
+  walletSubject,
+  houseId = null,
+  entryKind = 'notebook',
+  tableId = null,
+  seriesId = null,
+  handId = null,
+  opponentWalletSubject = null,
+  opponentSeatKey = null,
+  topic = '',
+  authorRole = 'human',
+  body = '',
+  tags = [],
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = entryId
+      ? database.prepare('SELECT * FROM poker_player_notebook_entries WHERE entry_id = ?').get(entryId)
+      : null;
+    const nextEntryId = existing?.entry_id || entryId || makeId('pknote');
+    database.prepare(`
+      INSERT INTO poker_player_notebook_entries (
+        entry_id,
+        wallet_subject,
+        house_id,
+        entry_kind,
+        table_id,
+        series_id,
+        hand_id,
+        opponent_wallet_subject,
+        opponent_seat_key,
+        topic,
+        author_role,
+        body,
+        tags_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(entry_id) DO UPDATE SET
+        wallet_subject = excluded.wallet_subject,
+        house_id = excluded.house_id,
+        entry_kind = excluded.entry_kind,
+        table_id = excluded.table_id,
+        series_id = excluded.series_id,
+        hand_id = excluded.hand_id,
+        opponent_wallet_subject = excluded.opponent_wallet_subject,
+        opponent_seat_key = excluded.opponent_seat_key,
+        topic = excluded.topic,
+        author_role = excluded.author_role,
+        body = excluded.body,
+        tags_json = excluded.tags_json,
+        updated_at = excluded.updated_at
+    `).run(
+      nextEntryId,
+      walletSubject,
+      houseId,
+      entryKind,
+      tableId,
+      seriesId,
+      handId,
+      opponentWalletSubject,
+      opponentSeatKey,
+      topic,
+      authorRole,
+      body,
+      toJson(tags, []),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerPlayerNotebookEntryById(nextEntryId);
+  });
+}
+
+function deletePokerPlayerNotebookEntry(entryId, walletSubject) {
+  const database = ensureDb();
+  database.prepare(`
+    DELETE FROM poker_player_notebook_entries
+    WHERE entry_id = ? AND wallet_subject = ?
+  `).run(entryId, walletSubject);
+}
+
 function hydratePokerPlayHand(row) {
   if (!row) return null;
   return {
@@ -4824,6 +5009,7 @@ module.exports = {
   getPokerPlayWalletPolicy,
   getPokerBlindObligationByTableAndWalletSubject,
   getOpenPokerPlayPlayerStatByTableAndWalletSubject,
+  getPokerPlayerNotebookEntryById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
@@ -4862,6 +5048,7 @@ module.exports = {
   listPokerPlayIntegrityFlags,
   listPokerPlayHandsByTable,
   listPokerPlayMessagesByHand,
+  listPokerPlayerNotebookEntriesByWalletSubject,
   listPokerPlayPlayerStats,
   listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
@@ -4875,6 +5062,7 @@ module.exports = {
   setWebSessionRevisionAndState,
   touchCredentialGrant,
   deletePokerBlindObligation,
+  deletePokerPlayerNotebookEntry,
   deletePokerPlaySeat,
   deletePokerTournamentWaitlistEntry,
   deletePokerPlayWaitlistEntry,
@@ -4887,6 +5075,7 @@ module.exports = {
   upsertPokerPlayDispute,
   upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
+  upsertPokerPlayerNotebookEntry,
   upsertPokerPlayPlayerStat,
   upsertPokerPlayWalletPolicy,
   upsertPokerBlindObligation,

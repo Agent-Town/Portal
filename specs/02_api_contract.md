@@ -539,6 +539,7 @@ Returns one live cash or tournament table payload with:
 - `data.cashMovement`
 - `data.agentProposal`
 - `data.suggestion`
+- `data.study`
 - `data.oilBalance`
 - `data.pokerPolicy`
 
@@ -561,6 +562,8 @@ Cash lifecycle and waitlist notes:
 - `data.table.summary.occupancy` counts seats that still physically occupy the table, while `data.table.summary.activeSeatCount` excludes cash seats that are sitting out or away between hands
 - `data.cashMovement.seatChangeAllowed` and `data.cashMovement.seatChangeOpenSeatNumbers[]` expose between-hand seat-change availability for the bound cash seat
 - `data.cashMovement.transferAllowed` and `data.cashMovement.transferOptions[]` expose compatible between-hand cash-table transfers without debiting or crediting OIL
+- `data.study.handReviewPath` points to the current private review surface when the viewer is seated in the active hand
+- `data.study.notebookCount`, `data.study.opponentNoteCount`, `data.study.recentEntries[]`, and `data.study.opponentNotes[]` summarize wallet-private study state for that table
 - tournament tables reuse the same `data.waitlist` contract when scheduled or full-event waitlists are enabled
 - invite-only tables require a valid `inviteCode` on pre-join reads and seat/waitlist entry unless the wallet is already seated or created the table
 
@@ -588,15 +591,177 @@ Returns recent hand history for one table with:
 - `data.items[].actionCount`
 - `data.items[].actions[]`
 - `data.items[].agentProposal`
+- `data.items[].reviewPath`
+- `data.items[].notebookEntryCount`
+- `data.items[].opponentNoteCount`
 
 History notes:
 - player viewers receive the same seat-private `data.items[].agentProposal` rule as the live table route
 - player viewers receive only the recent action tail for each hand
+- player viewers receive `data.items[].reviewPath` so they can open private post-hand review for the selected hand
+- history rows stay export-safe and never include private hole cards
 - unauthenticated reads return `data.viewerMode = "public"` and never include private worker proposal bodies
 - supported filters:
   - `status=completed`
   - `status=live`
   - `limit=<n>`
+
+### GET `/api/poker/play/notebook`
+Lists wallet-private poker study entries.
+
+Query params:
+- `entryKind` optional; `notebook` or `opponent_note`
+- `tableId` optional
+- `seriesId` optional
+- `handId` optional
+- `opponentWalletSubject` optional
+- `limit` optional, default `50`
+
+Response fields:
+- `data.viewerMode = "player"`
+- `data.filter`
+- `data.items[]`
+
+Entry fields:
+- `entryId`
+- `entryKind`
+- `authorRole`
+- `walletSubject`
+- `tableId`
+- `tableTitle`
+- `seriesId`
+- `seriesTitle`
+- `handId`
+- `handNumber`
+- `topic`
+- `body`
+- `tags[]`
+- `opponentWalletSubject`
+- `opponentDisplayName`
+- `createdAt`
+- `updatedAt`
+
+Failure codes:
+- `AUTH_REQUIRED`
+
+### POST `/api/poker/play/notebook`
+Creates or updates a wallet-private notebook entry for one reviewed hand or table.
+
+Request shape:
+```json
+{
+  "tableId": "pkt_play_cash_abcd1234",
+  "handId": "pph_example_002",
+  "topic": "River bluff-catch",
+  "body": "Call down on paired turns against one barrel and tag the blocker logic.",
+  "tags": ["river", "bluff-catch", "paired-turn"],
+  "asOf": "2026-03-11T14:00:00.000Z"
+}
+```
+
+Response fields:
+- `data.viewerMode = "player"`
+- `data.entry`
+
+Failure codes:
+- `AUTH_REQUIRED`
+- `INVALID_ARGUMENT`
+- `NOT_FOUND`
+- `FORBIDDEN`
+
+### GET `/api/poker/play/opponents/:walletSubject/notes`
+Lists the caller’s private opponent notes for one wallet subject.
+
+Response notes:
+- returns the same payload shape as `GET /api/poker/play/notebook`
+- `data.filter.entryKind = "opponent_note"`
+- only notes authored by the caller are returned
+
+Failure codes:
+- `AUTH_REQUIRED`
+
+### POST `/api/poker/play/opponents/:walletSubject/notes`
+Creates or updates a caller-private opponent note bound to the selected wallet subject.
+
+Request shape:
+```json
+{
+  "tableId": "pkt_play_cash_abcd1234",
+  "handId": "pph_example_002",
+  "topic": "Turn leaks",
+  "body": "Overfolds turn probes after flatting preflop.",
+  "tags": ["exploit", "turn"],
+  "asOf": "2026-03-11T14:00:00.000Z"
+}
+```
+
+Response notes:
+- returns the same payload shape as `POST /api/poker/play/notebook`
+- saved entries always persist with `entryKind = "opponent_note"`
+- `data.entry.opponentWalletSubject` echoes the route wallet subject
+
+Failure codes:
+- `AUTH_REQUIRED`
+- `INVALID_ARGUMENT`
+- `NOT_FOUND`
+- `FORBIDDEN`
+
+### GET `/api/poker/play/hands/:handId/review`
+Loads the private post-hand review surface for one seated player.
+
+Response fields:
+- `data.viewerMode = "player"`
+- `data.table`
+- `data.series`
+- `data.hand`
+- `data.resultSummary`
+- `data.actionLine[]`
+- `data.boardPot`
+- `data.humanNote`
+- `data.agentNote`
+- `data.lessonTags[]`
+- `data.notebook.items[]`
+- `data.notebook.savePath`
+- `data.opponentNotes[]`
+- `data.links.table`
+- `data.links.history`
+- `data.links.export.json`
+- `data.links.export.ndjson`
+- `data.links.export.text`
+
+Review notes:
+- only a currently seated wallet from the same table can open hand review
+- `data.boardPot` includes `communityCards[]`, `potOil`, `payouts[]`, `potSlices[]`, and `returnedUncalledBySeat`
+- `data.humanNote` and `data.opponentNotes[]` are wallet-private and never appear on public rail routes
+
+Failure codes:
+- `AUTH_REQUIRED`
+- `NOT_FOUND`
+- `FORBIDDEN`
+
+### GET `/api/poker/play/tables/:tableId/history/export`
+Exports wallet-safe hand history in JSON, NDJSON, or text.
+
+Query params:
+- `format` required; `json`, `ndjson`, or `text`
+- `status` optional
+- `limit` optional
+
+Format behavior:
+- `format=json` returns the normal `{ ok, data }` envelope
+- `format=ndjson` returns `application/x-ndjson`
+- `format=text` returns `text/plain`
+
+Export notes:
+- exports remain privacy-safe and exclude viewer hole cards
+- JSON items include `notebookEntryIds[]` so study references stay reproducible without leaking hidden cards
+- NDJSON and text stay deterministic for the same `tableId`, `status`, `limit`, and `asOf`
+
+Failure codes:
+- `AUTH_REQUIRED`
+- `INVALID_ARGUMENT`
+- `NOT_FOUND`
+- `FORBIDDEN`
 
 ### GET `/api/poker/play/series/:seriesId/timeline`
 Returns the deterministic ordered audit timeline for one tournament series with:
