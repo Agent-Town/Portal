@@ -282,7 +282,7 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - `agent_town_worker_list()`
   - Lists installed House helpers plus active helper sessions for the current House.
 - `agent_town_worker_spawn({ deploymentId, task, reason, brainProfileId?, workspaceSeedRef?, configVersionId?, loadoutId? })`
-  - Starts one installed helper as a real child worker session. Keep to the default path unless the human explicitly asks for advanced runtime settings.
+  - Starts one installed helper as a real child worker session. Keep to the default path unless the human explicitly asks for advanced runtime settings. Runtime-managed helper sessions may also use the same tool for one controlled nested helper step when delegation is allowed.
 - `agent_town_worker_message({ houseWorkerSessionId, workerSessionId, message })`
   - Sends one task message to a specific helper session and returns its latest reply.
 - `agent_town_worker_status({ houseWorkerSessionId, workerSessionId, deploymentId })`
@@ -293,6 +293,7 @@ When running in the in-browser OpenClaw Lite runtime, prefer explicit Agent Town
 - Prefer `agent_town_worker_list()` before naming a helper or session so you use the current House labels.
 - Do not invent `brainProfileId`, `workspaceSeedRef`, `configVersionId`, or `loadoutId`. Use defaults unless the human asks for an advanced override.
 - Do not invent `parentWorkerSessionId`; runtime-managed helper sessions fill that automatically when needed.
+- Nested helper delegation is guarded. If the runtime returns `DELEGATION_NOT_ALLOWED`, `RUNAWAY_SPAWN_BLOCKED`, or `DELEGATION_BUDGET_EXCEEDED`, explain that plainly instead of retrying with guessed lineage fields.
 - If a helper install or spawn result says local brain setup is still required, explain that plainly and ask the human to finish the House setup instead of guessing credentials.
 
 ### UI intent policy

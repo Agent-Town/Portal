@@ -89,6 +89,13 @@ async function listHouseWorkerSessions(request, { teamId = '' } = {}) {
   return readJsonResponse(response);
 }
 
+async function getHouseWorkerLiveReadiness(request) {
+  const response = await request.get('/api/platform/house-workers/live-readiness', {
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function spawnHouseWorker(request, payload = {}) {
   const response = await request.post('/api/platform/house-workers/spawn', {
     data: payload,
@@ -132,7 +139,7 @@ async function readHouseWorkerSupervisorSnapshot(page) {
 }
 
 async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
-  return await page.evaluate(async () => {
+  return await page.evaluate(async ({ teamId }) => {
     const api = window.__agentTownHouseWorkerSupervisor;
     if (!api || typeof api.sync !== 'function') {
       return {
@@ -140,7 +147,7 @@ async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
         json: null,
       };
     }
-    const sessions = await api.sync().catch(() => null);
+    const sessions = await api.sync({ teamId }).catch(() => null);
     return {
       status: 200,
       json: {
@@ -150,12 +157,33 @@ async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
         },
       },
     };
+  }, { teamId: String(teamId || '').trim() });
+}
+
+async function readHouseWorkerLiveReadinessFromPage(page) {
+  return await page.evaluate(async () => {
+    const api = window.__agentTownHouseWorkerLiveReadiness;
+    if (!api || typeof api.refresh !== 'function') {
+      return {
+        status: 503,
+        json: null,
+      };
+    }
+    const snapshot = await api.refresh().catch(() => null);
+    return {
+      status: 200,
+      json: {
+        ok: true,
+        data: snapshot && typeof snapshot === 'object' ? snapshot : null,
+      },
+    };
   });
 }
 
 module.exports = {
   getHouseWorkerCollections,
   getHouseWorkerDeployments,
+  getHouseWorkerLiveReadiness,
   getHouseWorkerShare,
   installHouseWorker,
   installSharedHouseWorker,
@@ -163,6 +191,7 @@ module.exports = {
   listHouseWorkerSessions,
   messageHouseWorker,
   readHouseWorkerSessionsFromPage,
+  readHouseWorkerLiveReadinessFromPage,
   readHouseWorkerSupervisorSnapshot,
   revokeHouseWorkerShare,
   shareHouseWorker,

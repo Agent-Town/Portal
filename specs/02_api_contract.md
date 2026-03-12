@@ -1399,6 +1399,23 @@ Response fields:
 - `data.sessions[].latestTask`
 - `data.sessions[].latestReply`
 - `data.sessions[].runtimeProfile`
+- `data.sessions[].requestedRuntimeProfile`
+- `data.sessions[].appliedRuntimeProfile`
+- `data.sessions[].runtimeBinding`
+- `data.sessions[].leaseStatus`
+- `data.sessions[].lastHeartbeatAt`
+- `data.sessions[].leaseExpiresAt`
+- `data.sessions[].ownerKind`
+- `data.sessions[].ownerLabel`
+- `data.sessions[].parentSessionId`
+- `data.sessions[].rootWorkerSessionId`
+- `data.sessions[].delegationDepth`
+- `data.sessions[].delegationReason`
+- `data.sessions[].delegationLineageLabel`
+- `data.sessions[].lastCompletedSummary`
+- `data.sessions[].lastActiveAgoLabel`
+- `data.sessions[].nextRecommendedAction`
+- `data.sessions[].resumeSafetyLabel`
 - `data.sessions[].recentEvents[]`
 - `data.concurrencyLimit`
 - `data.sourceManifest`
@@ -1440,6 +1457,15 @@ Per-session fields:
 - `ownerId`
 - `lastHeartbeatAt`
 - `leaseExpiresAt`
+- `parentSessionId`
+- `rootWorkerSessionId`
+- `delegationDepth`
+- `delegationReason`
+- `delegationLineageLabel`
+- `lastCompletedSummary`
+- `lastActiveAgoLabel`
+- `nextRecommendedAction`
+- `resumeSafetyLabel`
 - `runtimeSessionId`
 - `latestTask`
 - `latestReply`
@@ -1472,7 +1498,9 @@ Stable error codes:
 - `INVALID_WORKSPACE_SEED_REF`
 - `INVALID_CONFIG_VERSION_ID`
 - `INVALID_LOADOUT_ID`
+- `DELEGATION_NOT_ALLOWED`
 - `OVER_CONCURRENCY_LIMIT`
+- `DELEGATION_BUDGET_EXCEEDED`
 - `RUNAWAY_SPAWN_BLOCKED`
 
 Response fields:
@@ -1487,6 +1515,15 @@ Response fields:
 - `data.session.leaseStatus`
 - `data.session.lastHeartbeatAt`
 - `data.session.leaseExpiresAt`
+- `data.session.parentSessionId`
+- `data.session.rootWorkerSessionId`
+- `data.session.delegationDepth`
+- `data.session.delegationReason`
+- `data.session.delegationLineageLabel`
+- `data.session.lastCompletedSummary`
+- `data.session.lastActiveAgoLabel`
+- `data.session.nextRecommendedAction`
+- `data.session.resumeSafetyLabel`
 - `data.spawnedAt`
 - `data.spawnSource`
 - `data.session`
@@ -1495,14 +1532,49 @@ Response fields:
 - `data.sessionsPath`
 
 Notes:
-- `parentWorkerSessionId` is reserved for helper-origin spawn provenance and currently fails closed with `RUNAWAY_SPAWN_BLOCKED` when it resolves to a real helper session.
 - Spawn accepts portable runtime references only; raw secrets are rejected as unsupported overrides.
 - Spawn semantically validates helper runtime references before the helper is marked active:
   - `brainProfileId` must resolve to the supported local-browser inheritance path,
   - `workspaceSeedRef` must stay inside the `workspace/house-workers/*` or `seed://house-workers/*` namespace,
   - `configVersionId` must resolve to a known House config reference,
   - `loadoutId` must belong to the exact installed helper package.
+- When `parentWorkerSessionId` resolves to a real in-scope helper session, spawn may create one controlled delegated child helper if:
+  - the parent helper allows delegation,
+  - the target helper allows delegated use,
+  - depth stays at `2` or less,
+  - and the House worker concurrency budget still has room.
+- Delegated spawns persist `parentSessionId`, `rootWorkerSessionId`, `delegationDepth`, and `delegationReason` in durable session state.
 - Spawn is idempotent per active deployment within one House team: if the same helper is already active, the route returns the existing session with `data.reused=true` instead of creating a duplicate.
+
+### GET `/api/platform/house-workers/live-readiness` (human)
+Returns the live-readiness report for House worker validation in the current browser session.
+
+Stable error codes:
+- `SESSION_REQUIRED`
+
+Response fields:
+- `data.schema`
+- `data.houseId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.status`
+- `data.summary`
+- `data.checks[]`
+- `data.checks[].checkId`
+- `data.checks[].label`
+- `data.checks[].status`
+- `data.checks[].summary`
+- `data.checks[].browserValidationRequired`
+- `data.checks[].blockedBy[]`
+- `data.operatorSteps[]`
+- `data.operatorSteps[].stepId`
+- `data.operatorSteps[].label`
+- `data.operatorSteps[].successMetric`
+
+Notes:
+- This route is session-bound and honest about missing prerequisites instead of faking seeded success.
+- The readiness checks name whether the current browser has a usable local brain, whether a House is attached, whether an active team is selected, and whether at least one installable worker package is available from Registry.
+- `browserValidationRequired=true` means the prerequisite depends on the current operator browser, not only on durable backend state.
 
 ### POST `/api/platform/house-workers/message` (human)
 Writes one helper task or reply event and updates the current helper session status.

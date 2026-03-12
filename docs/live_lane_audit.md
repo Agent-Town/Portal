@@ -102,6 +102,8 @@ Instead, House flows use a session-bound readiness report plus a manual validati
 
 - `GET /api/platform/house-readiness`
 - the `House readiness` panel in the House Console
+- `GET /api/platform/house-workers/live-readiness`
+- the `House worker live readiness` panel in the House Console
 
 What that readiness report verifies:
 
@@ -116,6 +118,15 @@ What that readiness report verifies:
   - `blockedBy[]`
 - which district sections should be reachable during the walkthrough
 - the exact manual validation steps and success metrics an operator should use
+
+What the helper-specific live-readiness report verifies:
+
+- whether the current live session has an attached house
+- whether an active team is selected
+- whether a usable local helper brain is configured in the current browser
+- whether the operator is using a headed browser session suitable for interactive validation
+- whether at least one installable worker package is available from Registry for the current house flow
+- the exact next operator steps and success metrics for a real helper start/ask/stop walkthrough
 
 Recommended House validation sequence:
 

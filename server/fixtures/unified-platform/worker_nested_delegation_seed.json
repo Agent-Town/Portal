@@ -1,0 +1,9 @@
+{
+  "family": "worker_nested_delegation_seed",
+  "schema": "agent-town-house-worker-nested-delegation-seed/v1",
+  "maxDelegationDepth": 2,
+  "delegationBudget": 3,
+  "rootReason": "house_summary",
+  "childReason": "subtask_breakdown",
+  "budgetReason": "parallel_followup"
+}

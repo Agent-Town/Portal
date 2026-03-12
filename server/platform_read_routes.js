@@ -100,6 +100,14 @@ function registerPlatformReadRoutes(app, deps) {
     HOUSE_WORKER_LEASE_HEARTBEAT_MS + 1000,
     Number(getUnifiedPlatformTestFixture('worker_runtime_lease_seed')?.leaseTtlMs || 9000)
   );
+  const HOUSE_WORKER_MAX_DELEGATION_DEPTH = Math.max(
+    1,
+    Number(getUnifiedPlatformTestFixture('worker_nested_delegation_seed')?.maxDelegationDepth || 2)
+  );
+  const HOUSE_WORKER_DELEGATION_BUDGET = Math.max(
+    1,
+    Number(getUnifiedPlatformTestFixture('worker_nested_delegation_seed')?.delegationBudget || HOUSE_WORKER_MAX_ACTIVE_SESSIONS)
+  );
   const HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS = new Set(['brain:current-runtime', 'local_default']);
 
   function buildHouseExperienceItems() {
@@ -1429,6 +1437,88 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function formatHouseWorkerRelativeAgoLabel(value = '') {
+    const normalized = normalizeHouseWorkerRuntimeIso(value);
+    if (!normalized) return 'No recent activity yet.';
+    const deltaMs = Math.max(0, Date.now() - Date.parse(normalized));
+    if (deltaMs < 60_000) return 'moments ago';
+    if (deltaMs < 3_600_000) {
+      const minutes = Math.max(1, Math.round(deltaMs / 60_000));
+      return minutes === 1 ? 'about 1 minute ago' : `about ${minutes} minutes ago`;
+    }
+    const hours = Math.max(1, Math.round(deltaMs / 3_600_000));
+    return hours === 1 ? 'about 1 hour ago' : `about ${hours} hours ago`;
+  }
+
+  function buildHouseWorkerRecoveryFields({
+    session = null,
+    leaseState = null,
+    lastTaskEvent = null,
+    lastReplyEvent = null,
+  } = {}) {
+    const source = session && typeof session === 'object' ? session : {};
+    const runtime = source?.runtime && typeof source.runtime === 'object' ? source.runtime : {};
+    const normalizedLeaseState = leaseState && typeof leaseState === 'object' ? leaseState : buildHouseWorkerLeaseState(source);
+    const lastReply = String(lastReplyEvent?.payload?.message || runtime?.lastReply || '').trim();
+    const lastTask = String(lastTaskEvent?.payload?.message || runtime?.lastTask || runtime?.task || '').trim();
+    const lastCompletedSummary = lastReply
+      ? `Last finished: ${lastReply}`
+      : lastTask
+        ? `Last finished: ${lastTask}`
+        : 'Last finished: No completed helper work is recorded yet.';
+    const lastActiveAgoLabel = `Last active ${formatHouseWorkerRelativeAgoLabel(
+      normalizedLeaseState?.lastHeartbeatAt || source?.updatedAt || source?.createdAt || ''
+    )}`;
+    const normalizedStatus = normalizeHouseWorkerStatus(source?.status, 'starting');
+    let nextRecommendedAction = 'Next step: Start this helper when you want it to help again.';
+    let resumeSafetyLabel = 'Safe to do now: Start this helper when you are ready.';
+    if (normalizedLeaseState?.stale === true) {
+      nextRecommendedAction = 'Next step: Restart this helper here when you want it to continue.';
+      resumeSafetyLabel = 'Safe to do now: Restarting here is safe because the earlier copy stopped reporting.';
+    } else if (HOUSE_WORKER_ACTIVE_STATUSES.has(normalizedStatus)) {
+      nextRecommendedAction = 'Next step: Take over this helper here if you want it to continue in this tab.';
+      resumeSafetyLabel = 'Safe to do now: Taking over here restarts this helper in the current browser tab.';
+    } else if (normalizedStatus === 'stopped') {
+      nextRecommendedAction = 'Next step: Start this helper again when you want more work done.';
+      resumeSafetyLabel = 'Safe to do now: Starting again creates a fresh helper run.';
+    } else if (normalizedStatus === 'blocked' || normalizedStatus === 'failed') {
+      nextRecommendedAction = 'Next step: Review the latest task, then restart or stop this helper.';
+      resumeSafetyLabel = 'Safe to do now: Restart only after you understand why the helper stopped.';
+    }
+    return {
+      lastCompletedSummary,
+      lastActiveAgoLabel,
+      nextRecommendedAction,
+      resumeSafetyLabel,
+    };
+  }
+
+  function buildHouseWorkerDelegationFields(session = null) {
+    const source = session && typeof session === 'object' ? session : {};
+    const runtime = source?.runtime && typeof source.runtime === 'object' ? source.runtime : {};
+    const parentWorkerSessionId = String(source?.parentSessionId || runtime?.parentWorkerSessionId || '').trim() || null;
+    const rootWorkerSessionId = String(runtime?.rootWorkerSessionId || source?.houseWorkerSessionId || '').trim() || null;
+    const delegationDepth = Math.max(0, Number(runtime?.delegationDepth || 0) || 0);
+    const delegationReason = String(runtime?.delegationReason || runtime?.reason || '').trim() || null;
+    let delegationLineageLabel = '';
+    if (parentWorkerSessionId) {
+      delegationLineageLabel = delegationReason
+        ? `Requested by another helper for: ${delegationReason}.`
+        : 'Requested by another helper.';
+    } else if (String(runtime?.spawnSource || '').trim() === 'parent_worker') {
+      delegationLineageLabel = delegationReason
+        ? `Requested by your main agent for: ${delegationReason}.`
+        : 'Requested by your main agent.';
+    }
+    return {
+      parentWorkerSessionId,
+      rootWorkerSessionId,
+      delegationDepth,
+      delegationReason,
+      delegationLineageLabel: delegationLineageLabel || null,
+    };
+  }
+
   function normalizeHouseWorkerRuntimeProfilePatch(value = null) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
     if (!source) return null;
@@ -1595,6 +1685,13 @@ function registerPlatformReadRoutes(app, deps) {
           ? runtime.appliedRuntimeProfile
           : requestedRuntimeProfile;
         const leaseState = buildHouseWorkerLeaseState(session);
+        const delegation = buildHouseWorkerDelegationFields(session);
+        const recovery = buildHouseWorkerRecoveryFields({
+          session,
+          leaseState,
+          lastTaskEvent,
+          lastReplyEvent,
+        });
         const computedStatus = leaseState.stale
           ? 'stale'
           : normalizeHouseWorkerStatus(session?.status, 'starting');
@@ -1609,10 +1706,18 @@ function registerPlatformReadRoutes(app, deps) {
           statusLabel: buildHouseWorkerSessionStatusLabel(session?.status, leaseState.leaseStatus),
           runtimeAgentId: String(session?.runtimeAgentId || '').trim() || null,
           runtimeSessionId: String(runtime?.runtimeSessionId || '').trim() || null,
-          parentSessionId: String(session?.parentSessionId || '').trim() || null,
+          parentSessionId: delegation.parentWorkerSessionId,
+          rootWorkerSessionId: delegation.rootWorkerSessionId,
+          delegationDepth: delegation.delegationDepth,
+          delegationReason: delegation.delegationReason,
+          delegationLineageLabel: delegation.delegationLineageLabel,
           spawnSource: String(runtime?.spawnSource || '').trim() || null,
           latestTask: String(lastTaskEvent?.payload?.message || runtime?.task || '').trim() || null,
           latestReply: String(lastReplyEvent?.payload?.message || runtime?.lastReply || '').trim() || null,
+          lastCompletedSummary: recovery.lastCompletedSummary,
+          lastActiveAgoLabel: recovery.lastActiveAgoLabel,
+          nextRecommendedAction: recovery.nextRecommendedAction,
+          resumeSafetyLabel: recovery.resumeSafetyLabel,
           runtimeProfile: appliedRuntimeProfile,
           requestedRuntimeProfile,
           appliedRuntimeProfile,
@@ -1675,6 +1780,7 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/deployments',
           '/api/platform/house-workers/shares',
           '/api/platform/house-workers/sessions',
+          '/api/platform/house-workers/live-readiness',
           '/api/platform/house-workers/install',
           '/api/platform/house-workers/share',
           '/api/platform/house-workers/shares/:shareId',
@@ -1691,6 +1797,13 @@ function registerPlatformReadRoutes(app, deps) {
           'worker_package_install_seed',
           'worker_package_share_seed',
           'worker_runtime_supervisor_seed',
+          'worker_runtime_profile_seed',
+          'worker_runtime_lease_seed',
+          'worker_nested_delegation_seed',
+          'worker_recovery_summary_seed',
+          'worker_default_user_language_seed',
+          'worker_live_readiness_seed',
+          'worker_runtime_reality_smoke_seed',
           'worker_spawn_profile_seed',
           'worker_spawn_guardrail_seed',
           'worker_share_lifecycle_seed',
@@ -3492,6 +3605,88 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildHouseWorkerLiveReadinessPayload({
+    context = {},
+  } = {}) {
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
+    const workerRegistryEntityId = String(
+      getUnifiedPlatformTestFixture('worker_package_registry_seed')?.registryEntityId || ''
+    ).trim();
+    const workerCatalogAvailable = !!(workerRegistryEntityId && getRegistryEntityById(workerRegistryEntityId));
+    const deployments = houseId && teamId ? listHouseWorkerDeployments({ houseId, teamId }) : [];
+    const liveFixture = getUnifiedPlatformTestFixture('worker_live_readiness_seed') || {};
+    const operatorSteps = Array.isArray(liveFixture?.operatorSteps) ? liveFixture.operatorSteps : [];
+    const checks = [
+      {
+        checkId: 'house_attached',
+        label: 'House attached',
+        status: houseId ? 'ready' : 'blocked',
+        blockedBy: houseId ? [] : ['HOUSE_REQUIRED'],
+        summary: houseId
+          ? `House ${houseId} is attached to this live browser session.`
+          : 'Attach a house before validating live helper work.',
+        browserValidationRequired: false,
+      },
+      {
+        checkId: 'active_team_selected',
+        label: 'Active team selected',
+        status: houseId && teamId ? 'ready' : 'blocked',
+        blockedBy: houseId && teamId ? [] : ['ACTIVE_TEAM_REQUIRED'],
+        summary: houseId && teamId
+          ? `Team ${teamId} is active for this House session.`
+          : 'Select an active team before validating live helper work.',
+        browserValidationRequired: false,
+      },
+      {
+        checkId: 'worker_catalog_available',
+        label: 'Helper catalog available',
+        status: workerCatalogAvailable ? 'ready' : 'blocked',
+        blockedBy: workerCatalogAvailable ? [] : ['WORKER_CATALOG_REQUIRED'],
+        summary: workerCatalogAvailable
+          ? 'At least one Registry helper package is available for install.'
+          : 'No Registry helper package is available for live install yet.',
+        browserValidationRequired: false,
+      },
+      {
+        checkId: 'browser_local_brain_ready',
+        label: 'Local brain ready in this browser',
+        status: 'browser_validation_required',
+        blockedBy: ['LOCAL_BRAIN_REQUIRED'],
+        summary: 'Check in this browser that a local brain is configured before starting helpers.',
+        browserValidationRequired: true,
+      },
+      {
+        checkId: 'headed_operator_browser',
+        label: 'Headed operator browser',
+        status: 'browser_validation_required',
+        blockedBy: ['HEADED_BROWSER_REQUIRED'],
+        summary: 'Run the live helper gate in a visible browser window so the operator can confirm the helper response.',
+        browserValidationRequired: true,
+      },
+    ];
+    const blockingChecks = checks.filter((entry) => entry.status === 'blocked');
+    return {
+      schema: 'agent-town-house-worker-live-readiness/v1',
+      houseId: houseId || null,
+      activeTeamId: teamId || null,
+      availableTeamIds,
+      status: blockingChecks.length === 0 ? 'browser_validation_required' : 'action_required',
+      summary: blockingChecks.length === 0
+        ? 'Server-side House worker prerequisites are ready. Finish the browser checks, then run the headed operator gate.'
+        : blockingChecks.map((entry) => String(entry?.summary || '').trim()).filter(Boolean).join(' '),
+      checks,
+      operatorSteps,
+      liveGateCommand: 'npm run test:house-worker-live',
+      liveGateConfig: 'playwright.house-worker.live.config.js',
+      counts: {
+        deploymentCount: deployments.length,
+        workerCatalogCount: workerCatalogAvailable ? 1 : 0,
+      },
+    };
+  }
+
   function normalizePackFileMap(fileMap) {
     if (!fileMap || typeof fileMap !== 'object' || Array.isArray(fileMap)) return {};
     return Object.entries(fileMap).reduce((acc, [rawKey, rawValue]) => {
@@ -4097,15 +4292,48 @@ function registerPlatformReadRoutes(app, deps) {
     if (requestedOfficeId && requestedOfficeId !== String(deployment?.officeId || '').trim()) {
       return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'Helpers must stay inside their installed office scope.', { requestId });
     }
+    let parentSession = null;
+    let parentDeployment = null;
+    let rootWorkerSessionId = '';
+    let delegationDepth = String(body?.spawnSource || '').trim() === 'parent_worker' ? 1 : 0;
     if (parentWorkerSessionId) {
-      const parentSession = getHouseWorkerSessionById(parentWorkerSessionId);
+      parentSession = getHouseWorkerSessionById(parentWorkerSessionId);
       if (!parentSession) {
         return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
       }
       if (String(parentSession?.houseId || '').trim() !== houseId || String(parentSession?.teamId || '').trim() !== teamId) {
         return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
       }
-      return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
+      parentDeployment = getHouseWorkerDeploymentById(String(parentSession?.deploymentId || '').trim());
+      if (
+        parentDeployment
+        && (
+          parentDeployment?.houseId !== houseId
+          || parentDeployment?.teamId !== teamId
+        )
+      ) {
+        parentDeployment = null;
+      }
+      if (parentDeployment?.runtimeDefaults?.delegationAllowed !== true) {
+        return sendPortalApiError(res, 409, 'DELEGATION_NOT_ALLOWED', 'This helper cannot ask another helper to start yet.', { requestId });
+      }
+      if (deployment?.runtimeDefaults?.delegationAllowed !== true) {
+        return sendPortalApiError(res, 409, 'DELEGATION_NOT_ALLOWED', 'This target helper package is not available for delegated work yet.', { requestId });
+      }
+      rootWorkerSessionId = String(
+        parentSession?.runtime?.rootWorkerSessionId
+        || parentSession?.houseWorkerSessionId
+        || ''
+      ).trim();
+      delegationDepth = Math.max(0, Number(parentSession?.runtime?.delegationDepth || 0) || 0) + 1;
+      if (delegationDepth > HOUSE_WORKER_MAX_DELEGATION_DEPTH) {
+        return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'This helper already reached the safe delegation depth limit.', {
+          requestId,
+          details: {
+            maxDelegationDepth: HOUSE_WORKER_MAX_DELEGATION_DEPTH,
+          },
+        });
+      }
     }
     const activeSessions = listHouseWorkerSessions({ houseId, teamId })
       .filter((entry) => {
@@ -4113,6 +4341,25 @@ function registerPlatformReadRoutes(app, deps) {
         if (!HOUSE_WORKER_ACTIVE_STATUSES.has(normalizedStatus)) return false;
         return buildHouseWorkerLeaseState(entry).stale !== true;
       });
+    if (parentWorkerSessionId) {
+      const activeDelegatedSessions = activeSessions.filter((entry) => {
+        const activeRootWorkerSessionId = String(
+          entry?.runtime?.rootWorkerSessionId
+          || entry?.houseWorkerSessionId
+          || ''
+        ).trim();
+        const activeDelegationDepth = Math.max(0, Number(entry?.runtime?.delegationDepth || 0) || 0);
+        return !!activeRootWorkerSessionId && activeDelegationDepth > 0 && activeRootWorkerSessionId === rootWorkerSessionId;
+      });
+      if (activeDelegatedSessions.length >= HOUSE_WORKER_DELEGATION_BUDGET) {
+        return sendPortalApiError(res, 409, 'DELEGATION_BUDGET_EXCEEDED', 'This helper already reached the safe number of parallel delegated workers.', {
+          requestId,
+          details: {
+            delegationBudget: HOUSE_WORKER_DELEGATION_BUDGET,
+          },
+        });
+      }
+    }
     const activeSessionForDeployment = activeSessions.find((entry) =>
       String(entry?.deploymentId || '').trim() === deploymentId
     ) || null;
@@ -4142,7 +4389,9 @@ function registerPlatformReadRoutes(app, deps) {
       }, { requestId });
     }
     if (activeSessions.length >= HOUSE_WORKER_MAX_ACTIVE_SESSIONS) {
-      return sendPortalApiError(res, 409, 'OVER_CONCURRENCY_LIMIT', 'This House already has the maximum number of active helpers running.', {
+      return sendPortalApiError(res, 409, parentWorkerSessionId ? 'DELEGATION_BUDGET_EXCEEDED' : 'OVER_CONCURRENCY_LIMIT', parentWorkerSessionId
+        ? 'This House already has the maximum number of parallel helpers running for delegated work.'
+        : 'This House already has the maximum number of active helpers running.', {
         requestId,
         details: {
           concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
@@ -4195,6 +4444,9 @@ function registerPlatformReadRoutes(app, deps) {
     });
     const now = nowIso();
     const spawnSource = normalizeHouseWorkerSpawnSource(body?.spawnSource, parentWorkerSessionId ? 'parent_worker' : 'house_ui');
+    if (!rootWorkerSessionId) {
+      rootWorkerSessionId = houseWorkerSessionId;
+    }
     const sessionRecord = createHouseWorkerSession({
       houseWorkerSessionId,
       houseId,
@@ -4213,7 +4465,11 @@ function registerPlatformReadRoutes(app, deps) {
         reason,
         requestedOfficeId: requestedOfficeId || null,
         spawnSource,
-        spawnDepth: parentWorkerSessionId ? 1 : 0,
+        spawnDepth: delegationDepth,
+        parentWorkerSessionId: parentWorkerSessionId || null,
+        rootWorkerSessionId,
+        delegationDepth,
+        delegationReason: reason,
         runtimeSessionId: null,
         supervisorSource: 'browser_supervisor',
         brainProfileId: runtimeProfile.brainProfileId,
@@ -4244,6 +4500,8 @@ function registerPlatformReadRoutes(app, deps) {
         runtimeProfile,
         spawnSource,
         parentWorkerSessionId: parentWorkerSessionId || null,
+        rootWorkerSessionId,
+        delegationDepth,
       },
       createdAt: now,
     });
@@ -5225,6 +5483,16 @@ function registerPlatformReadRoutes(app, deps) {
       session: sessionCard,
       event,
     }, { requestId });
+  });
+
+  app.get('/api/platform/house-workers/live-readiness', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    return sendPortalApiSuccess(res, buildHouseWorkerLiveReadinessPayload({ context }), { requestId });
   });
 
   app.get('/api/platform/house-readiness', (req, res) => {

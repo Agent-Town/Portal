@@ -1,0 +1,10 @@
+{
+  "family": "worker_recovery_summary_seed",
+  "schema": "agent-town-house-worker-recovery-summary-seed/v1",
+  "lastCompletedPrefix": "Last finished",
+  "lastActivePrefix": "Last active",
+  "nextActionPrefix": "Next step",
+  "resumeSafetyPrefix": "Safe to do now",
+  "staleNextAction": "Restart this helper here when you want it to continue.",
+  "detachedNextAction": "Take over this helper here if you want it to continue in this tab."
+}

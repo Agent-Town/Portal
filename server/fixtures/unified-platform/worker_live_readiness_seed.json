@@ -1,0 +1,17 @@
+{
+  "family": "worker_live_readiness_seed",
+  "schema": "agent-town-house-worker-live-readiness-seed/v1",
+  "requiredChecks": [
+    "house_attached",
+    "active_team_selected",
+    "worker_catalog_available",
+    "browser_local_brain_ready",
+    "headed_operator_browser"
+  ],
+  "operatorSteps": [
+    "Open House in a live browser session.",
+    "Confirm the current session already has a house and active team.",
+    "Configure a local brain in this browser.",
+    "Run the headed helper smoke and confirm the helper replies once."
+  ]
+}

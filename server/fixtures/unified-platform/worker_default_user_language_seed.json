@@ -1,0 +1,15 @@
+{
+  "family": "worker_default_user_language_seed",
+  "schema": "agent-town-house-worker-default-user-language-seed/v1",
+  "forbiddenDefaultFragments": [
+    "hws_",
+    "helper_",
+    "deployment id",
+    "registry package",
+    "entityversionid",
+    "loadout",
+    "bundle hash",
+    "runtime session"
+  ],
+  "advancedSummaryLabel": "Advanced helper details"
+}
