@@ -559,6 +559,7 @@ let houseSurfaceState = {
     publicStacksQuery: '',
     publicStacksFamily: '',
     publicStacksTrust: '',
+    publicStacksSeal: '',
     publicStackReviewTierDraft: '',
     publicStackReviewNoteDraft: '',
     publicStacksResults: [],
@@ -1848,6 +1849,7 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.publicStacksQuery = '';
   houseSurfaceState.library.publicStacksFamily = '';
   houseSurfaceState.library.publicStacksTrust = '';
+  houseSurfaceState.library.publicStacksSeal = '';
   houseSurfaceState.library.publicStackReviewTierDraft = '';
   houseSurfaceState.library.publicStackReviewNoteDraft = '';
   houseSurfaceState.library.publicStacksResults = [];
@@ -1933,6 +1935,16 @@ function buildHouseLibraryPublicStackTrustLabels(preview = null) {
   } else if (reviewTier === 'blocked_here') {
     labels.push('Blocked here');
   }
+  const attestationSealState = String(preview?.provenance?.sealState || '').trim();
+  if (attestationSealState === 'verified') {
+    labels.push('Verified seal');
+  } else if (attestationSealState === 'mismatch') {
+    labels.push('Seal mismatch');
+  } else if (attestationSealState === 'unchecked') {
+    labels.push('Unchecked seal');
+  } else if (Number(preview?.attestationProvenanceCounts?.sealed || 0) > 0) {
+    labels.push('Sealed');
+  }
   return labels;
 }
 
@@ -1949,12 +1961,29 @@ function formatHouseLibraryAttestationCountLabel(count = 0) {
   return `${total} attestation${total === 1 ? '' : 's'}`;
 }
 
+function formatHouseLibrarySealStateLabel(sealState = '') {
+  const normalized = String(sealState || '').trim();
+  if (normalized === 'verified') return 'Verified seal';
+  if (normalized === 'mismatch') return 'Seal mismatch';
+  if (normalized === 'unchecked') return 'Unchecked seal';
+  if (normalized === 'unsealed') return 'No seal yet';
+  return '';
+}
+
 function buildHouseLibraryAttestationCardLabels(attestations = []) {
   return (Array.isArray(attestations) ? attestations : []).map((attestation) => {
     const houseId = String(attestation?.houseId || '').trim();
     const reviewLabel = formatHouseLibraryPublicStackReviewTier(attestation?.reviewTier);
+    const sealLabel = formatHouseLibrarySealStateLabel(attestation?.sealState);
     const summary = String(attestation?.summary || '').trim();
-    return [houseId, reviewLabel, summary].filter(Boolean).join(': ');
+    const signerLabel = String(attestation?.provenance?.walletAddressMasked || '').trim();
+    return [
+      houseId,
+      reviewLabel,
+      sealLabel,
+      signerLabel ? `Signer ${signerLabel}` : '',
+      summary,
+    ].filter(Boolean).join(': ');
   }).filter(Boolean);
 }
 
@@ -2031,6 +2060,8 @@ function syncHouseLibraryPublicStackReviewControls() {
   const reviewNoteInput = el('houseLibraryGuidedReviewNoteInput');
   const reviewSaveBtn = el('houseLibraryGuidedReviewSaveBtn');
   const attestBtn = el('houseLibraryGuidedAttestBtn');
+  const sealBtn = el('houseLibraryGuidedSealBtn');
+  const checkSealBtn = el('houseLibraryGuidedCheckSealBtn');
   const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
     ? houseSurfaceState.library.publicStackPreview
     : null;
@@ -2072,6 +2103,28 @@ function syncHouseLibraryPublicStackReviewControls() {
     attestBtn.disabled = !reviewable || !localReview || !!localAttestation;
     attestBtn.textContent = localAttestation ? 'Attestation Published' : 'Publish Attestation';
   }
+  if (sealBtn) {
+    const localAttestation = preview?.localAttestation && typeof preview.localAttestation === 'object' ? preview.localAttestation : null;
+    const localProvenance = localAttestation?.provenance && typeof localAttestation.provenance === 'object' ? localAttestation.provenance : null;
+    sealBtn.disabled = !reviewable || !localAttestation || !!localProvenance;
+    sealBtn.textContent = localProvenance ? 'Attestation Sealed' : 'Seal Attestation';
+  }
+  if (checkSealBtn) {
+    const attestationWithSeal = Array.isArray(preview?.attestations)
+      ? preview.attestations.find((entry) => entry?.provenance && typeof entry.provenance === 'object') || null
+      : null;
+    const sealState = String(attestationWithSeal?.sealState || '').trim();
+    checkSealBtn.disabled = !reviewable || !attestationWithSeal;
+    if (sealState === 'verified') {
+      checkSealBtn.textContent = 'Seal Checked';
+      checkSealBtn.disabled = true;
+    } else if (sealState === 'mismatch') {
+      checkSealBtn.textContent = 'Seal Mismatch';
+      checkSealBtn.disabled = false;
+    } else {
+      checkSealBtn.textContent = 'Check Seal';
+    }
+  }
 }
 
 function syncHouseLibraryPublicStackPublishControls() {
@@ -2099,12 +2152,14 @@ async function loadHouseLibraryPublicStacksSearch({
   query = String(houseSurfaceState.library.publicStacksQuery || '').trim(),
   family = String(houseSurfaceState.library.publicStacksFamily || '').trim(),
   trust = String(houseSurfaceState.library.publicStacksTrust || '').trim(),
+  seal = String(houseSurfaceState.library.publicStacksSeal || '').trim(),
   preservePreview = false,
 } = {}) {
   const params = new URLSearchParams();
   if (query) params.set('q', query);
   if (family) params.set('family', family);
   if (trust) params.set('trust', trust);
+  if (seal) params.set('seal', seal);
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const response = await apiWithRetry(`/api/platform/library/public-stacks/search${suffix}`, {
     method: 'GET',
@@ -2115,6 +2170,7 @@ async function loadHouseLibraryPublicStacksSearch({
   houseSurfaceState.library.publicStacksQuery = String(data?.query || query || '').trim();
   houseSurfaceState.library.publicStacksFamily = String(data?.family || family || '').trim();
   houseSurfaceState.library.publicStacksTrust = String(data?.trust || trust || '').trim();
+  houseSurfaceState.library.publicStacksSeal = String(data?.seal || seal || '').trim();
   houseSurfaceState.library.publicStacksResults = Array.isArray(data?.results) ? data.results : [];
   houseSurfaceState.library.publicStacksResultCount = Math.max(0, Number(data?.resultCount || 0));
   if (!preservePreview) {
@@ -3425,6 +3481,7 @@ async function saveHouseLibraryPublicStackReview({
     query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
     family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
+    seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -3478,12 +3535,154 @@ async function publishHouseLibraryPublicStackAttestation({
     query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
     family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
+    seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
   renderHouseLibrarySurface();
   setHouseLibraryActionStatus(`Published attestation for ${stackLabel}.`);
   setHouseSurfaceStatus(`Published attestation for ${stackLabel}.`);
+  return data;
+}
+
+async function sealHouseLibraryPublicStackAttestation({
+  libraryPublicStackId: libraryPublicStackIdOverride = '',
+} = {}) {
+  const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
+    ? houseSurfaceState.library.publicStackPreview
+    : null;
+  const libraryPublicStackId = String(libraryPublicStackIdOverride || preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim();
+  if (!libraryPublicStackId) {
+    throw new Error('PUBLIC_STACK_REQUIRED');
+  }
+  const localAttestation = preview?.localAttestation && typeof preview.localAttestation === 'object'
+    ? preview.localAttestation
+    : null;
+  if (!localAttestation) {
+    throw new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED');
+  }
+  if (localAttestation?.provenance && typeof localAttestation.provenance === 'object') {
+    return localAttestation.provenance;
+  }
+  const provenanceDraft = localAttestation?.provenanceDraft && typeof localAttestation.provenanceDraft === 'object'
+    ? localAttestation.provenanceDraft
+    : null;
+  const message = String(provenanceDraft?.message || '').trim();
+  if (!message) {
+    throw new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED');
+  }
+  await connectWallet({ silent: false });
+  const signerAddress = String(appWalletClient?.getAddress?.({ chain: 'solana' }) || walletAddr || '').trim();
+  if (!signerAddress) {
+    throw new Error('NO_SOLANA_WALLET');
+  }
+  const signatureBytes = await appWalletClient.signMessage({ chain: 'solana', message });
+  const signature = b64(signatureBytes);
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const attestationId = String(localAttestation?.libraryPublicStackAttestationId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_seal_public_stack_attestation', [
+    houseId,
+    teamId,
+    libraryPublicStackId,
+    attestationId,
+    signerAddress,
+    String(provenanceDraft?.messageDigest || '').trim(),
+  ]);
+  const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  setHouseLibraryActionStatus(`Sealing attestation for ${stackLabel}...`);
+  setHouseSurfaceStatus(`Sealing attestation for ${stackLabel}...`);
+  const response = await apiWithRetry(`/api/platform/library/public-stacks/${encodeURIComponent(libraryPublicStackId)}/attestations/${encodeURIComponent(attestationId)}/provenance`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      chain: 'solana',
+      walletAddress: signerAddress,
+      signature,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  houseSurfaceState.library.publicStackPreview = data?.preview && typeof data.preview === 'object'
+    ? data.preview
+    : houseSurfaceState.library.publicStackPreview;
+  await loadHouseLibraryPublicStacksSearch({
+    query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
+    family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
+    trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
+    seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
+    preservePreview: true,
+  }).catch(() => null);
+  await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
+  renderHouseLibrarySurface();
+  setHouseLibraryActionStatus(`Sealed attestation for ${stackLabel}.`);
+  setHouseSurfaceStatus(`Sealed attestation for ${stackLabel}.`);
+  return data;
+}
+
+async function checkHouseLibraryPublicStackSeal({
+  libraryPublicStackId: libraryPublicStackIdOverride = '',
+  provenanceId: provenanceIdOverride = '',
+} = {}) {
+  const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
+    ? houseSurfaceState.library.publicStackPreview
+    : null;
+  const libraryPublicStackId = String(libraryPublicStackIdOverride || preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim();
+  if (!libraryPublicStackId) {
+    throw new Error('PUBLIC_STACK_REQUIRED');
+  }
+  const attestationWithSeal = Array.isArray(preview?.attestations)
+    ? preview.attestations.find((entry) => entry?.provenance && typeof entry.provenance === 'object') || null
+    : null;
+  const provenanceId = String(provenanceIdOverride || attestationWithSeal?.provenance?.libraryPublicStackAttestationProvenanceId || '').trim();
+  const attestationId = String(attestationWithSeal?.libraryPublicStackAttestationId || '').trim();
+  if (!provenanceId || !attestationId) {
+    throw new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_check_public_stack_seal', [
+    houseId,
+    teamId,
+    libraryPublicStackId,
+    provenanceId,
+  ]);
+  const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  setHouseLibraryActionStatus(`Checking seal for ${stackLabel}...`);
+  setHouseSurfaceStatus(`Checking seal for ${stackLabel}...`);
+  const response = await apiWithRetry(`/api/platform/library/public-stacks/${encodeURIComponent(libraryPublicStackId)}/attestations/${encodeURIComponent(attestationId)}/provenance/${encodeURIComponent(provenanceId)}/verifications`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  houseSurfaceState.library.publicStackPreview = data?.preview && typeof data.preview === 'object'
+    ? data.preview
+    : houseSurfaceState.library.publicStackPreview;
+  await loadHouseLibraryPublicStacksSearch({
+    query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
+    family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
+    trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
+    seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
+    preservePreview: true,
+  }).catch(() => null);
+  await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
+  renderHouseLibrarySurface();
+  const verificationStatus = String(data?.verificationReceipt?.verificationStatus || '').trim();
+  if (verificationStatus === 'verified') {
+    setHouseLibraryActionStatus(`Checked seal for ${stackLabel}.`);
+    setHouseSurfaceStatus(`Checked seal for ${stackLabel}.`);
+  } else {
+    setHouseLibraryActionStatus(`Seal mismatch for ${stackLabel}.`, true);
+    setHouseSurfaceStatus(`Seal mismatch for ${stackLabel}.`, true);
+  }
   return data;
 }
 
@@ -3535,6 +3734,8 @@ function renderHouseLibrarySurface() {
   const guidedReviewNoteInput = el('houseLibraryGuidedReviewNoteInput');
   const guidedReviewSaveBtn = el('houseLibraryGuidedReviewSaveBtn');
   const guidedAttestBtn = el('houseLibraryGuidedAttestBtn');
+  const guidedSealBtn = el('houseLibraryGuidedSealBtn');
+  const guidedCheckSealBtn = el('houseLibraryGuidedCheckSealBtn');
   const relayTargetInput = el('houseLibraryRelayTargetInput');
   const relayApprovalInput = el('houseLibraryRelayApprovalInput');
   const relaySendBtn = el('houseLibraryRelaySendBtn');
@@ -3593,6 +3794,8 @@ function renderHouseLibrarySurface() {
     || !guidedReviewNoteInput
     || !guidedReviewSaveBtn
     || !guidedAttestBtn
+    || !guidedSealBtn
+    || !guidedCheckSealBtn
     || !relayTargetInput
     || !relayApprovalInput
     || !relaySendBtn
@@ -3756,6 +3959,7 @@ function renderHouseLibrarySurface() {
       String(result?.familyTitle || result?.familySlug || ''),
       Number(result?.storefront?.memberCount || 0) > 0 ? `${Number(result.storefront.memberCount)} item${Number(result.storefront.memberCount) === 1 ? '' : 's'}` : '',
       attestationCount > 0 ? formatHouseLibraryAttestationCountLabel(attestationCount) : '',
+      String(result?.provenanceSummary || '').trim(),
       formatHouseLibraryPublicStackReviewTier(result?.reviewTier),
     ].filter(Boolean).join(' · ');
     button.addEventListener('click', async () => {
@@ -3834,6 +4038,7 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.description || '').trim(),
       `Provenance: ${String(publicStackPreview?.provenance?.summary || '').trim() || 'Visible.'}`,
       `Verification: ${String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.'}`,
+      `Seal: ${String(publicStackPreview?.provenance?.sealSummary || '').trim() || formatHouseLibrarySealStateLabel(publicStackPreview?.provenance?.sealState) || 'No seal yet.'}`,
       publicStackPreview?.review
         ? `Local review: ${String(publicStackPreview?.review?.summary || '').trim() || formatHouseLibraryPublicStackReviewTier(publicStackPreview?.reviewTier)}`
         : '',
@@ -3892,6 +4097,7 @@ function renderHouseLibrarySurface() {
         String(publicStackPreview?.registryId || ''),
         buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
         String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
+        String(publicStackPreview?.provenance?.sealSummary || '').trim() || formatHouseLibrarySealStateLabel(publicStackPreview?.provenance?.sealState),
         getHouseLibraryPublicStackImportPolicyMessage(publicStackPreview),
         (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
           ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
@@ -3980,6 +4186,7 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.registryId || ''),
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
       String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
+      String(publicStackPreview?.provenance?.sealSummary || '').trim() || formatHouseLibrarySealStateLabel(publicStackPreview?.provenance?.sealState),
       getHouseLibraryPublicStackImportPolicyMessage(publicStackPreview),
       (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
         ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
@@ -7828,6 +8035,38 @@ function bindTownDistrictControls() {
         await publishHouseLibraryPublicStackAttestation();
       } catch (err) {
         const code = String(err?.message || err?.code || 'LIBRARY_PUBLIC_STACK_ATTESTATION_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryGuidedSealBtn = el('houseLibraryGuidedSealBtn');
+  if (houseLibraryGuidedSealBtn) {
+    houseLibraryGuidedSealBtn.onclick = async () => {
+      houseLibraryGuidedSealBtn.disabled = true;
+      try {
+        await sealHouseLibraryPublicStackAttestation();
+      } catch (err) {
+        const code = String(err?.message || err?.code || 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryGuidedCheckSealBtn = el('houseLibraryGuidedCheckSealBtn');
+  if (houseLibraryGuidedCheckSealBtn) {
+    houseLibraryGuidedCheckSealBtn.onclick = async () => {
+      houseLibraryGuidedCheckSealBtn.disabled = true;
+      try {
+        await checkHouseLibraryPublicStackSeal();
+      } catch (err) {
+        const code = String(err?.message || err?.code || 'LIBRARY_PUBLIC_STACK_SEAL_CHECK_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {

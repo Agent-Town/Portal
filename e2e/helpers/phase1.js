@@ -1,5 +1,8 @@
 const crypto = require('crypto');
 const { expect } = require('@playwright/test');
+const bs58Module = require('bs58');
+const nacl = require('tweetnacl');
+const bs58 = typeof bs58Module?.encode === 'function' ? bs58Module : bs58Module?.default;
 
 const DEFAULT_TEST_TOKEN_ADDRESS = 'So1anaMockToken1111111111111111111111111111';
 
@@ -7,6 +10,26 @@ function makeSignatureBytes(multiplier = 11) {
   const sig = Buffer.alloc(64);
   for (let i = 0; i < sig.length; i += 1) sig[i] = (i * multiplier) & 0xff;
   return sig;
+}
+
+function createDeterministicSolanaSigner({
+  seedLabel = 'phase1-deterministic-solana-signer',
+} = {}) {
+  const seed = crypto.createHash('sha256').update(String(seedLabel || 'phase1-deterministic-solana-signer')).digest();
+  const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed));
+  return {
+    seedLabel: String(seedLabel || 'phase1-deterministic-solana-signer'),
+    address: bs58.encode(Buffer.from(keyPair.publicKey)),
+    publicKey: Uint8Array.from(keyPair.publicKey),
+    secretKey: Uint8Array.from(keyPair.secretKey),
+    signBytes(bytes) {
+      const input = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes || []);
+      return Buffer.from(nacl.sign.detached(input, keyPair.secretKey));
+    },
+    signMessage(message = '') {
+      return this.signBytes(Buffer.from(String(message || ''), 'utf8'));
+    }
+  };
 }
 
 async function installMockSolanaWallet(page, {
@@ -41,6 +64,73 @@ async function installMockSolanaWallet(page, {
       signSolanaMessage: async () => signResult
     };
   }, { addr: address, sig: signature, includeDisconnect: withDisconnect });
+}
+
+async function installDeterministicSigningSolanaWallet(page, {
+  seedLabel = 'phase1-deterministic-solana-signer',
+  withDisconnect = true,
+} = {}) {
+  const signer = createDeterministicSolanaSigner({ seedLabel });
+  const exposedFnName = `__phase1SignSolanaMessage_${crypto.randomBytes(6).toString('hex')}`;
+  await page.exposeFunction(exposedFnName, async ({ bytes = [] } = {}) => {
+    const signature = signer.signBytes(Uint8Array.from(Array.isArray(bytes) ? bytes : []));
+    return {
+      signature: Array.from(signature),
+      address: signer.address,
+    };
+  });
+  await page.addInitScript(({ addr, fnName, includeDisconnect }) => {
+    async function signMessageBytes(input) {
+      const bytes = input instanceof Uint8Array
+        ? input
+        : input instanceof ArrayBuffer
+          ? new Uint8Array(input)
+          : ArrayBuffer.isView(input)
+            ? new Uint8Array(input.buffer)
+            : Array.isArray(input)
+              ? Uint8Array.from(input)
+              : new Uint8Array();
+      const out = await window[fnName]({ bytes: Array.from(bytes) });
+      const signatureBytes = Uint8Array.from(Array.isArray(out?.signature) ? out.signature : []);
+      return {
+        signature: signatureBytes,
+        publicKey: { toString: () => addr },
+      };
+    }
+    const walletProvider = {
+      request: async ({ method, params }) => {
+        if (method === 'signMessage' || method === 'solana_signMessage') {
+          const first = Array.isArray(params) && params.length ? params[0] : [];
+          return await signMessageBytes(first);
+        }
+        if (method === 'signAndSendTransaction' || method === 'solana_signAndSendTransaction') {
+          return { signature: 'mock-solana-signature' };
+        }
+        return null;
+      },
+      on: () => {},
+      off: () => {},
+    };
+    window.solana = {
+      isPhantom: true,
+      connect: async () => ({ publicKey: { toString: () => addr } }),
+      signMessage: async (messageBytes) => await signMessageBytes(messageBytes),
+      ...(includeDisconnect ? { disconnect: async () => {} } : {}),
+    };
+    window.__PRIVY_WALLET_BRIDGE__ = {
+      connectSolana: async () => ({ address: addr, provider: walletProvider, wallet: walletProvider }),
+      disconnectSolana: async () => {},
+      signSolanaMessage: async ({ message = '', bytes = null } = {}) => {
+        const payload = bytes || new TextEncoder().encode(String(message || ''));
+        return await signMessageBytes(payload);
+      },
+    };
+  }, {
+    addr: signer.address,
+    fnName: exposedFnName,
+    includeDisconnect: withDisconnect,
+  });
+  return signer;
 }
 
 function base58Encode(bytes) {
@@ -147,7 +237,9 @@ function houseAuthHeadersFromKeyB64(houseId, method, path, body, keyB64) {
 
 module.exports = {
   DEFAULT_TEST_TOKEN_ADDRESS,
+  createDeterministicSolanaSigner,
   makeSignatureBytes,
+  installDeterministicSigningSolanaWallet,
   installMockSolanaWallet,
   seedRecoverableTokenHouse,
   fetchSessionState,

@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 function registerPlatformReadRoutes(app, deps) {
   const {
     addLibraryShelfItem,
@@ -15,6 +17,8 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPeerRelay,
     createLibraryPublicStack,
     createLibraryPublicStackAttestation,
+    createLibraryPublicStackAttestationProvenance,
+    createLibraryPublicStackAttestationVerificationReceipt,
     createLibraryPublicStackMember,
     createLibraryPublicStackReview,
     createLibraryPublicStackVerification,
@@ -38,7 +42,13 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicStackById,
     getLibraryPublicStackByIdempotency,
     getLibraryPublicStackAttestation,
+    getLibraryPublicStackAttestationById,
     getLibraryPublicStackAttestationByIdempotency,
+    getLibraryPublicStackAttestationProvenance,
+    getLibraryPublicStackAttestationProvenanceById,
+    getLibraryPublicStackAttestationProvenanceByIdempotency,
+    getLibraryPublicStackAttestationVerificationReceipt,
+    getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
     getLibraryPublicStackReview,
     getLibraryPublicStackReviewByIdempotency,
     getLibraryPublicStackVerificationById,
@@ -65,6 +75,8 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
     listLibraryPublicStackAttestations,
+    listLibraryPublicStackAttestationProvenance,
+    listLibraryPublicStackAttestationVerificationReceipts,
     listLibraryPublicStackMembers,
     listLibraryPublicStackReviews,
     listLibraryPublicStacks,
@@ -1206,6 +1218,245 @@ function registerPlatformReadRoutes(app, deps) {
     return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
   }
 
+  function base58Decode(str = '') {
+    const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const normalized = String(str || '').trim();
+    if (!normalized) return null;
+    let value = 0n;
+    for (const ch of normalized) {
+      const idx = alphabet.indexOf(ch);
+      if (idx < 0) return null;
+      value = (value * 58n) + BigInt(idx);
+    }
+    const bytes = [];
+    while (value > 0n) {
+      bytes.push(Number(value & 0xffn));
+      value >>= 8n;
+    }
+    bytes.reverse();
+    let leadingZeros = 0;
+    for (let i = 0; i < normalized.length && normalized[i] === '1'; i += 1) leadingZeros += 1;
+    return new Uint8Array([
+      ...new Array(leadingZeros).fill(0),
+      ...bytes,
+    ]);
+  }
+
+  function maskWalletAddress(address = '') {
+    const normalized = String(address || '').trim();
+    if (normalized.length <= 10) return normalized || null;
+    return `${normalized.slice(0, 4)}...${normalized.slice(-4)}`;
+  }
+
+  function normalizeLibraryPublicStackSealFilter(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'sealed') return 'sealed';
+    if (normalized === 'verified_here') return 'verified_here';
+    return '';
+  }
+
+  function buildLibraryPublicStackAttestationProvenanceDraft(attestation = null) {
+    const attestationId = String(attestation?.libraryPublicStackAttestationId || '').trim();
+    const publicStackId = String(attestation?.libraryPublicStackId || '').trim();
+    const houseId = String(attestation?.houseId || '').trim();
+    const teamId = String(attestation?.teamId || '').trim();
+    const reviewTier = String(attestation?.reviewTier || '').trim();
+    const summary = String(attestation?.summary || '').trim();
+    if (!attestationId || !publicStackId || !houseId || !teamId || !reviewTier || !summary) {
+      return null;
+    }
+    const messageVersion = 'v1';
+    const payload = {
+      kind: 'library_public_stack_attestation_provenance.v1',
+      messageVersion,
+      libraryPublicStackAttestationId: attestationId,
+      libraryPublicStackId: publicStackId,
+      houseId,
+      teamId,
+      reviewTier,
+      summary,
+    };
+    const message = stableJsonStringify(payload);
+    return {
+      ...payload,
+      message,
+      messageDigest: sha256PrefixedHex(message),
+    };
+  }
+
+  function verifyLibraryPublicStackAttestationProvenance({
+    attestation = null,
+    provenance = null,
+  } = {}) {
+    const draft = buildLibraryPublicStackAttestationProvenanceDraft(attestation);
+    if (!draft) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'ATTESTATION_DRAFT_UNAVAILABLE',
+        verifiedSignerAddress: null,
+        verifiedChain: String(provenance?.chain || '').trim() || null,
+      };
+    }
+    const chain = String(provenance?.chain || '').trim().toLowerCase();
+    const walletAddress = String(provenance?.walletAddress || '').trim();
+    const messageVersion = String(provenance?.messageVersion || '').trim();
+    const message = String(provenance?.message || '');
+    const messageDigest = String(provenance?.messageDigest || '').trim();
+    const signature = String(provenance?.signature || '').trim();
+    if (!walletAddress || !messageVersion || !messageDigest || !signature) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'PROVENANCE_FIELDS_REQUIRED',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain || null,
+      };
+    }
+    if (messageVersion !== draft.messageVersion) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'MESSAGE_VERSION_MISMATCH',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain || null,
+      };
+    }
+    if (message !== draft.message || messageDigest !== draft.messageDigest) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'MESSAGE_DIGEST_MISMATCH',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain || null,
+      };
+    }
+    if (chain !== 'solana') {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'CHAIN_UNSUPPORTED',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain || null,
+      };
+    }
+    const publicKeyBytes = base58Decode(walletAddress);
+    const signatureBytes = Buffer.from(signature, 'base64');
+    if (!publicKeyBytes || publicKeyBytes.length !== 32) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'WALLET_ADDRESS_INVALID',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain,
+      };
+    }
+    if (signatureBytes.length !== 64) {
+      return {
+        ok: false,
+        verificationStatus: 'mismatch',
+        verificationReason: 'SIGNATURE_FORMAT_INVALID',
+        verifiedSignerAddress: walletAddress || null,
+        verifiedChain: chain,
+      };
+    }
+    const spkiPrefix = Buffer.from('302a300506032b6570032100', 'hex');
+    const publicKey = crypto.createPublicKey({
+      key: Buffer.concat([spkiPrefix, Buffer.from(publicKeyBytes)]),
+      format: 'der',
+      type: 'spki',
+    });
+    const verified = crypto.verify(
+      null,
+      Buffer.from(draft.message, 'utf8'),
+      publicKey,
+      signatureBytes,
+    );
+    return {
+      ok: verified,
+      verificationStatus: verified ? 'verified' : 'mismatch',
+      verificationReason: verified ? '' : 'SIGNATURE_MISMATCH',
+      verifiedSignerAddress: walletAddress || null,
+      verifiedChain: chain,
+      draft,
+    };
+  }
+
+  function buildLibraryPublicStackAttestationSealSummary({
+    provenance = null,
+    localVerificationReceipt = null,
+  } = {}) {
+    if (!provenance) {
+      return {
+        sealState: 'unsealed',
+        summary: '',
+      };
+    }
+    const receiptStatus = String(localVerificationReceipt?.verificationStatus || '').trim();
+    if (receiptStatus === 'verified') {
+      return {
+        sealState: 'verified',
+        summary: `Verified seal from ${maskWalletAddress(provenance.walletAddress) || 'wallet'}.`,
+      };
+    }
+    if (receiptStatus === 'mismatch') {
+      return {
+        sealState: 'mismatch',
+        summary: `Seal mismatch from ${maskWalletAddress(provenance.walletAddress) || 'wallet'}.`,
+      };
+    }
+    return {
+      sealState: 'unchecked',
+      summary: `Unchecked seal from ${maskWalletAddress(provenance.walletAddress) || 'wallet'}.`,
+    };
+  }
+
+  function buildLibraryPublicStackAttestationProvenanceAggregate(attestations = []) {
+    const counts = {
+      total: 0,
+      sealed: 0,
+      verifiedHere: 0,
+      mismatchHere: 0,
+    };
+    (Array.isArray(attestations) ? attestations : []).forEach((attestation) => {
+      counts.total += 1;
+      if (attestation?.provenance) counts.sealed += 1;
+      const sealState = String(attestation?.sealState || '').trim();
+      if (sealState === 'verified') {
+        counts.verifiedHere += 1;
+      } else if (sealState === 'mismatch') {
+        counts.mismatchHere += 1;
+      }
+    });
+    if (!counts.sealed) {
+      return {
+        counts,
+        summary: '',
+      };
+    }
+    const parts = [`${counts.sealed} sealed`];
+    if (counts.verifiedHere) parts.push(`${counts.verifiedHere} verified here`);
+    if (counts.mismatchHere) parts.push(`${counts.mismatchHere} mismatched here`);
+    return {
+      counts,
+      summary: `Seal status: ${parts.join(', ')}.`,
+    };
+  }
+
+  function deriveLibraryPublicStackSealState(attestations = []) {
+    const source = Array.isArray(attestations) ? attestations : [];
+    if (source.some((attestation) => String(attestation?.sealState || '').trim() === 'mismatch')) {
+      return 'mismatch';
+    }
+    if (source.some((attestation) => String(attestation?.sealState || '').trim() === 'verified')) {
+      return 'verified';
+    }
+    if (source.some((attestation) => String(attestation?.sealState || '').trim() === 'unchecked')) {
+      return 'unchecked';
+    }
+    return 'unsealed';
+  }
+
   function projectLibraryPublicStackLocalReview({
     houseId = '',
     teamId = '',
@@ -1277,18 +1528,64 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
-  function projectLibraryPublicStackAttestationCards(attestations = []) {
-    return (Array.isArray(attestations) ? attestations : []).map((attestation) => ({
-      libraryPublicStackAttestationId: String(attestation?.libraryPublicStackAttestationId || '').trim(),
-      libraryPublicStackReviewId: String(attestation?.libraryPublicStackReviewId || '').trim(),
-      houseId: String(attestation?.houseId || '').trim(),
-      teamId: String(attestation?.teamId || '').trim(),
-      reviewTier: String(attestation?.reviewTier || '').trim(),
-      summary: String(attestation?.summary || '').trim(),
-      note: String(attestation?.note || '').trim() || null,
-      createdAt: String(attestation?.createdAt || '').trim(),
-      updatedAt: String(attestation?.updatedAt || '').trim(),
-    })).filter((entry) => entry.libraryPublicStackAttestationId && entry.houseId);
+  function projectLibraryPublicStackAttestationCards(attestations = [], {
+    targetHouseId = '',
+    targetTeamId = '',
+  } = {}) {
+    const normalizedTargetHouseId = String(targetHouseId || '').trim();
+    const normalizedTargetTeamId = String(targetTeamId || '').trim();
+    return (Array.isArray(attestations) ? attestations : []).map((attestation) => {
+      const libraryPublicStackAttestationId = String(attestation?.libraryPublicStackAttestationId || '').trim();
+      const provenance = getLibraryPublicStackAttestationProvenance({
+        libraryPublicStackAttestationId,
+      });
+      const localVerificationReceipt = provenance && normalizedTargetHouseId && normalizedTargetTeamId
+        ? getLibraryPublicStackAttestationVerificationReceipt({
+            houseId: normalizedTargetHouseId,
+            teamId: normalizedTargetTeamId,
+            libraryPublicStackAttestationProvenanceId: String(provenance?.libraryPublicStackAttestationProvenanceId || '').trim(),
+          })
+        : null;
+      const sealSummary = buildLibraryPublicStackAttestationSealSummary({
+        provenance,
+        localVerificationReceipt,
+      });
+      return {
+        libraryPublicStackAttestationId,
+        libraryPublicStackId: String(attestation?.libraryPublicStackId || '').trim(),
+        libraryPublicStackReviewId: String(attestation?.libraryPublicStackReviewId || '').trim(),
+        houseId: String(attestation?.houseId || '').trim(),
+        teamId: String(attestation?.teamId || '').trim(),
+        reviewTier: String(attestation?.reviewTier || '').trim(),
+        summary: String(attestation?.summary || '').trim(),
+        note: String(attestation?.note || '').trim() || null,
+        createdAt: String(attestation?.createdAt || '').trim(),
+        updatedAt: String(attestation?.updatedAt || '').trim(),
+        provenance: provenance
+          ? {
+              libraryPublicStackAttestationProvenanceId: String(provenance?.libraryPublicStackAttestationProvenanceId || '').trim(),
+              chain: String(provenance?.chain || '').trim() || null,
+              walletAddress: String(provenance?.walletAddress || '').trim() || null,
+              walletAddressMasked: maskWalletAddress(provenance?.walletAddress) || null,
+              messageVersion: String(provenance?.messageVersion || '').trim() || null,
+              messageDigest: String(provenance?.messageDigest || '').trim() || null,
+              signedAt: String(provenance?.signedAt || '').trim() || null,
+            }
+          : null,
+        localVerificationReceipt: localVerificationReceipt
+          ? {
+              libraryPublicStackAttestationVerificationReceiptId: String(localVerificationReceipt?.libraryPublicStackAttestationVerificationReceiptId || '').trim(),
+              verificationStatus: String(localVerificationReceipt?.verificationStatus || '').trim() || null,
+              verificationReason: String(localVerificationReceipt?.verificationReason || '').trim() || null,
+              verifiedSignerAddress: String(localVerificationReceipt?.verifiedSignerAddress || '').trim() || null,
+              verifiedChain: String(localVerificationReceipt?.verifiedChain || '').trim() || null,
+              verifiedAt: String(localVerificationReceipt?.verifiedAt || '').trim() || null,
+            }
+          : null,
+        sealState: sealSummary.sealState,
+        sealSummary: sealSummary.summary,
+      };
+    }).filter((entry) => entry.libraryPublicStackAttestationId && entry.houseId);
   }
 
   function searchLibraryPublicStackGroups({
@@ -1297,6 +1594,7 @@ function registerPlatformReadRoutes(app, deps) {
     houseId = '',
     teamId = '',
     trust = '',
+    seal = '',
   } = {}) {
     const normalizedFamily = String(family || '').trim();
     if (normalizedFamily && normalizedFamily !== 'house_library_stacks') {
@@ -1304,6 +1602,7 @@ function registerPlatformReadRoutes(app, deps) {
     }
     const normalizedQuery = String(query || '').trim().toLowerCase();
     const normalizedTrust = normalizeLibraryPublicStackReviewTier(trust);
+    const normalizedSeal = normalizeLibraryPublicStackSealFilter(seal);
     const stacks = listLibraryPublicStacks({})
       .filter((entry) => String(entry?.publicationState || '').trim() === 'published')
       .filter((entry) => {
@@ -1324,18 +1623,33 @@ function registerPlatformReadRoutes(app, deps) {
         });
         const attestationCards = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
-        }));
+        }), {
+          targetHouseId: houseId,
+          targetTeamId: teamId,
+        });
         const attestationSummary = buildLibraryPublicStackAttestationAggregate(attestationCards);
+        const provenanceSummary = buildLibraryPublicStackAttestationProvenanceAggregate(attestationCards);
         return {
           entry,
           localReview,
           attestationCards,
           attestationSummary,
+          provenanceSummary,
         };
       })
-      .filter(({ localReview }) => {
+      .filter(({ localReview, provenanceSummary }) => {
         if (!normalizedTrust) return true;
         return String(localReview?.reviewTier || '').trim() === normalizedTrust;
+      })
+      .filter(({ provenanceSummary }) => {
+        if (!normalizedSeal) return true;
+        if (normalizedSeal === 'sealed') {
+          return Number(provenanceSummary?.counts?.sealed || 0) > 0;
+        }
+        if (normalizedSeal === 'verified_here') {
+          return Number(provenanceSummary?.counts?.verifiedHere || 0) > 0;
+        }
+        return true;
       });
     if (!stacks.length) return [];
     const familyInfo = getHouseLibraryPublicStackFamilyInfo('house_library_stacks');
@@ -1350,7 +1664,7 @@ function registerPlatformReadRoutes(app, deps) {
         summary: familyInfo.description || null,
       },
       memberCount: stacks.length,
-      members: stacks.map(({ entry, localReview, attestationCards, attestationSummary }) => {
+      members: stacks.map(({ entry, localReview, attestationCards, attestationSummary, provenanceSummary }) => {
         const members = listLibraryPublicStackMembers({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
@@ -1365,6 +1679,8 @@ function registerPlatformReadRoutes(app, deps) {
           reviewSummary: String(localReview?.review?.summary || '').trim() || null,
           attestationCounts: attestationSummary.counts,
           attestationSummary: String(attestationSummary.summary || '').trim() || null,
+          provenanceCounts: provenanceSummary.counts,
+          provenanceSummary: String(provenanceSummary.summary || '').trim() || null,
           projection: {
             bundleHash: String(entry?.bundleHash || '').trim() || null,
             scopeSetId: String(entry?.scopeSetId || '').trim() || null,
@@ -1384,6 +1700,8 @@ function registerPlatformReadRoutes(app, deps) {
             memberCount: members.length,
             attestationCount: attestationSummary.counts.total,
             attestationSummary: String(attestationSummary.summary || '').trim() || null,
+            sealedCount: Number(provenanceSummary?.counts?.sealed || 0),
+            provenanceSummary: String(provenanceSummary.summary || '').trim() || null,
           },
         };
       }).sort((a, b) => String(a?.displayName || '').localeCompare(String(b?.displayName || ''))),
@@ -1621,11 +1939,19 @@ function registerPlatformReadRoutes(app, deps) {
     });
     const publicAttestations = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
       libraryPublicStackId: normalizedPublicStackId,
-    }));
+    }), {
+      targetHouseId: houseId,
+      targetTeamId: teamId,
+    });
     const attestationSummary = buildLibraryPublicStackAttestationAggregate(publicAttestations);
+    const attestationProvenanceSummary = buildLibraryPublicStackAttestationProvenanceAggregate(publicAttestations);
+    const attestationSealState = deriveLibraryPublicStackSealState(publicAttestations);
     const localAttestation = (houseId && teamId)
       ? publicAttestations.find((entry) => String(entry?.houseId || '').trim() === String(houseId || '').trim()
           && String(entry?.teamId || '').trim() === String(teamId || '').trim()) || null
+      : null;
+    const localAttestationDraft = localAttestation
+      ? buildLibraryPublicStackAttestationProvenanceDraft(localAttestation)
       : null;
     const trustOverlay = buildLibraryPublicStackTrustOverlay({
       publicStack,
@@ -1656,8 +1982,14 @@ function registerPlatformReadRoutes(app, deps) {
         verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
         reviewTier: String(localReview?.reviewTier || '').trim() || null,
         review: localReview?.review || null,
-        localAttestation,
+        localAttestation: localAttestation
+          ? {
+              ...localAttestation,
+              provenanceDraft: localAttestationDraft,
+            }
+          : null,
         attestationCounts: attestationSummary.counts,
+        attestationProvenanceCounts: attestationProvenanceSummary.counts,
         attestations: publicAttestations,
         verification: trustOverlay?.verification || {
           verificationState: 'unverified',
@@ -1684,6 +2016,8 @@ function registerPlatformReadRoutes(app, deps) {
           bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
           verificationSummary: String(trustOverlay?.verification?.summary || '').trim() || null,
           attestationSummary: String(attestationSummary.summary || '').trim() || null,
+          sealState: attestationSealState,
+          sealSummary: String(attestationProvenanceSummary.summary || '').trim() || null,
           orderedPublicationIds: Array.isArray(manifest?.orderedPublicationIds) ? manifest.orderedPublicationIds : memberPreviews.map((member) => member.libraryPublicationId).filter(Boolean),
           orderedRegistryIds: Array.isArray(manifest?.orderedRegistryIds) ? manifest.orderedRegistryIds : memberPreviews.map((member) => member.registryId).filter(Boolean),
         },
@@ -1713,6 +2047,10 @@ function registerPlatformReadRoutes(app, deps) {
           ? member.attestationCounts
           : { total: 0, trustedHere: 0, reviewLater: 0, blockedHere: 0 },
         attestationSummary: String(member?.attestationSummary || member?.storefront?.attestationSummary || '').trim() || null,
+        provenanceCounts: member?.provenanceCounts && typeof member.provenanceCounts === 'object'
+          ? member.provenanceCounts
+          : { total: 0, sealed: 0, verifiedHere: 0, mismatchHere: 0 },
+        provenanceSummary: String(member?.provenanceSummary || member?.storefront?.provenanceSummary || '').trim() || null,
         storefront: member?.storefront && typeof member.storefront === 'object'
           ? member.storefront
           : {},
@@ -2240,6 +2578,175 @@ function registerPlatformReadRoutes(app, deps) {
         metadata: {
           createdFrom: 'portal.house.library.public-stack.attestation',
           localReviewSummary: String(review.summary || '').trim() || null,
+        },
+        nowIso: nowIso(),
+      }),
+    };
+  }
+
+  function persistLibraryPublicStackAttestationProvenanceRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    libraryPublicStackAttestationId = '',
+    chain = 'solana',
+    walletAddress = '',
+    signature = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existingReplay = getLibraryPublicStackAttestationProvenanceByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return {
+        status: 200,
+        provenance: existingReplay,
+      };
+    }
+    const attestation = String(libraryPublicStackAttestationId || '').trim()
+      ? getLibraryPublicStackAttestationById(String(libraryPublicStackAttestationId || '').trim())
+      : getLibraryPublicStackAttestation({
+          houseId,
+          teamId,
+          libraryPublicStackId,
+        });
+    if (
+      !attestation
+      || String(attestation?.houseId || '').trim() !== String(houseId || '').trim()
+      || String(attestation?.teamId || '').trim() !== String(teamId || '').trim()
+      || String(attestation?.libraryPublicStackId || '').trim() !== String(libraryPublicStackId || '').trim()
+    ) {
+      const err = new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED');
+      err.code = 'LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED';
+      throw err;
+    }
+    const existing = getLibraryPublicStackAttestationProvenance({
+      libraryPublicStackAttestationId: String(attestation?.libraryPublicStackAttestationId || '').trim(),
+    });
+    if (existing) {
+      return {
+        status: 200,
+        provenance: existing,
+      };
+    }
+    const draft = buildLibraryPublicStackAttestationProvenanceDraft(attestation);
+    if (!draft) {
+      const err = new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_INVALID');
+      err.code = 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_INVALID';
+      throw err;
+    }
+    const verification = verifyLibraryPublicStackAttestationProvenance({
+      attestation,
+      provenance: {
+        chain,
+        walletAddress,
+        messageVersion: draft.messageVersion,
+        message: draft.message,
+        messageDigest: draft.messageDigest,
+        signature,
+      },
+    });
+    if (!verification.ok) {
+      const err = new Error(verification.verificationReason || 'WALLET_SIGNATURE_REQUIRED');
+      err.code = verification.verificationReason === 'SIGNATURE_FORMAT_INVALID'
+        ? 'WALLET_SIGNATURE_REQUIRED'
+        : 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_INVALID_SIGNATURE';
+      err.details = verification;
+      throw err;
+    }
+    return {
+      status: 201,
+      provenance: createLibraryPublicStackAttestationProvenance({
+        libraryPublicStackAttestationProvenanceId: `pstprov_${randomHex(12)}`,
+        libraryPublicStackAttestationId: String(attestation?.libraryPublicStackAttestationId || '').trim(),
+        libraryPublicStackId,
+        houseId,
+        teamId,
+        chain,
+        walletAddress,
+        messageVersion: draft.messageVersion,
+        message: draft.message,
+        messageDigest: draft.messageDigest,
+        signature,
+        signedAt: nowIso(),
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.attestation.provenance',
+          verificationStatus: verification.verificationStatus,
+        },
+        nowIso: nowIso(),
+      }),
+    };
+  }
+
+  function persistLibraryPublicStackAttestationVerificationReceiptRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    libraryPublicStackAttestationProvenanceId = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existingReplay = getLibraryPublicStackAttestationVerificationReceiptByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return {
+        status: 200,
+        verificationReceipt: existingReplay,
+      };
+    }
+    const provenance = getLibraryPublicStackAttestationProvenanceById(libraryPublicStackAttestationProvenanceId);
+    if (
+      !provenance
+      || String(provenance?.libraryPublicStackId || '').trim() !== String(libraryPublicStackId || '').trim()
+    ) {
+      const err = new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED');
+      err.code = 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED';
+      throw err;
+    }
+    const existing = getLibraryPublicStackAttestationVerificationReceipt({
+      houseId,
+      teamId,
+      libraryPublicStackAttestationProvenanceId,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        verificationReceipt: existing,
+      };
+    }
+    const attestation = getLibraryPublicStackAttestationById(String(provenance?.libraryPublicStackAttestationId || '').trim());
+    if (!attestation) {
+      const err = new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED');
+      err.code = 'LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED';
+      throw err;
+    }
+    const verification = verifyLibraryPublicStackAttestationProvenance({
+      attestation,
+      provenance,
+    });
+    return {
+      status: 201,
+      verificationReceipt: createLibraryPublicStackAttestationVerificationReceipt({
+        libraryPublicStackAttestationVerificationReceiptId: `pstvr_${randomHex(12)}`,
+        libraryPublicStackAttestationProvenanceId,
+        libraryPublicStackAttestationId: String(provenance?.libraryPublicStackAttestationId || '').trim(),
+        libraryPublicStackId,
+        houseId,
+        teamId,
+        verificationStatus: verification.verificationStatus,
+        verificationReason: verification.verificationReason || '',
+        verifiedSignerAddress: verification.verifiedSignerAddress || '',
+        verifiedChain: verification.verifiedChain || '',
+        verifiedAt: nowIso(),
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.attestation.verification-receipt',
+          messageDigest: String(provenance?.messageDigest || '').trim() || null,
         },
         nowIso: nowIso(),
       }),
@@ -2841,14 +3348,16 @@ function registerPlatformReadRoutes(app, deps) {
     const query = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
     const family = typeof req.query?.family === 'string' ? req.query.family.trim() : '';
     const trust = normalizeLibraryPublicStackReviewTier(req.query?.trust);
+    const seal = normalizeLibraryPublicStackSealFilter(req.query?.seal);
     const groups = [
-      ...(trust ? [] : searchRegistryFamilyGroups({ query, family })),
+      ...(trust || seal ? [] : searchRegistryFamilyGroups({ query, family })),
       ...searchLibraryPublicStackGroups({
         query,
         family,
         houseId: context.houseId,
         teamId: context.activeTeamId,
         trust,
+        seal,
       }),
     ];
     const results = flattenPublicStackSearchGroups(groups);
@@ -2863,6 +3372,7 @@ function registerPlatformReadRoutes(app, deps) {
       query,
       family,
       trust,
+      seal,
       resultCount: results.length,
       groups,
       results,
@@ -3056,6 +3566,144 @@ function registerPlatformReadRoutes(app, deps) {
           409,
           'LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED',
           'Save a local review before publishing a Public Stack attestation.',
+          { requestId },
+        );
+      }
+      throw err;
+    }
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/attestations/:attestationId/provenance', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before sealing a Public Stack attestation.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before sealing a Public Stack attestation.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to seal a Public Stack attestation.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to seal a Public Stack attestation.', { requestId });
+    }
+    const attestationId = typeof req.params?.attestationId === 'string' ? req.params.attestationId.trim() : '';
+    const chain = String(req.body?.chain || 'solana').trim() || 'solana';
+    const walletAddress = typeof req.body?.walletAddress === 'string' ? req.body.walletAddress.trim() : '';
+    const signature = typeof req.body?.signature === 'string' ? req.body.signature.trim() : '';
+    if (!signature) {
+      return sendPortalApiError(res, 400, 'WALLET_SIGNATURE_REQUIRED', 'A wallet signature is required to seal this Public Stack attestation.', { requestId });
+    }
+    try {
+      const persisted = persistLibraryPublicStackAttestationProvenanceRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+        libraryPublicStackAttestationId: attestationId,
+        chain,
+        walletAddress,
+        signature,
+        idempotencyKey,
+      });
+      const previewAfterSave = buildLibraryPublicStackPreviewPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+      });
+      return sendPortalApiSuccess(res, {
+        provenance: persisted.provenance,
+        preview: previewAfterSave.ok ? previewAfterSave.preview : null,
+      }, { requestId, status: persisted.status });
+    } catch (err) {
+      const code = String(err?.code || '').trim();
+      if (code === 'LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED') {
+        return sendPortalApiError(
+          res,
+          409,
+          'LIBRARY_PUBLIC_STACK_ATTESTATION_REQUIRED',
+          'Publish a Public Stack attestation before sealing it.',
+          { requestId },
+        );
+      }
+      if (code === 'WALLET_SIGNATURE_REQUIRED') {
+        return sendPortalApiError(
+          res,
+          400,
+          'WALLET_SIGNATURE_REQUIRED',
+          'A wallet signature is required to seal this Public Stack attestation.',
+          { requestId },
+        );
+      }
+      if (code === 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_INVALID_SIGNATURE') {
+        return sendPortalApiError(
+          res,
+          409,
+          'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_INVALID_SIGNATURE',
+          'The wallet signature did not match the attestation seal message.',
+          { requestId },
+        );
+      }
+      throw err;
+    }
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/attestations/:attestationId/provenance/:provenanceId/verifications', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before checking a Public Stack seal.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before checking a Public Stack seal.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to check a Public Stack seal.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    const provenanceId = typeof req.params?.provenanceId === 'string' ? req.params.provenanceId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to check a Public Stack seal.', { requestId });
+    }
+    if (!provenanceId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED', 'Select one Public Stack seal to check.', { requestId });
+    }
+    try {
+      const persisted = persistLibraryPublicStackAttestationVerificationReceiptRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+        libraryPublicStackAttestationProvenanceId: provenanceId,
+        idempotencyKey,
+      });
+      const previewAfterSave = buildLibraryPublicStackPreviewPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+      });
+      return sendPortalApiSuccess(res, {
+        verificationReceipt: persisted.verificationReceipt,
+        preview: previewAfterSave.ok ? previewAfterSave.preview : null,
+      }, { requestId, status: persisted.status });
+    } catch (err) {
+      const code = String(err?.code || '').trim();
+      if (code === 'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED') {
+        return sendPortalApiError(
+          res,
+          409,
+          'LIBRARY_PUBLIC_STACK_ATTESTATION_PROVENANCE_REQUIRED',
+          'Choose one sealed Public Stack attestation before checking it.',
           { requestId },
         );
       }

@@ -1,0 +1,20 @@
+{
+  "phase": "37.0",
+  "description": "Deterministic harness seed for Public Stack attestation provenance and local verification receipts.",
+  "provenance": {
+    "supportedChains": [
+      "solana"
+    ],
+    "messageVersion": "v1",
+    "verificationStatuses": [
+      "verified",
+      "mismatch"
+    ],
+    "sealStates": [
+      "unsealed",
+      "unchecked",
+      "verified",
+      "mismatch"
+    ]
+  }
+}

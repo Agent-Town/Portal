@@ -127,6 +127,8 @@ const {
   createLibraryShelf,
   createLibraryPublicStack,
   createLibraryPublicStackAttestation,
+  createLibraryPublicStackAttestationProvenance,
+  createLibraryPublicStackAttestationVerificationReceipt,
   createLibraryPublicStackMember,
   createLibraryPublicStackReview,
   createLibraryPublicStackVerification,
@@ -156,6 +158,12 @@ const {
   getLibraryPublicStackAttestation,
   getLibraryPublicStackAttestationById,
   getLibraryPublicStackAttestationByIdempotency,
+  getLibraryPublicStackAttestationProvenance,
+  getLibraryPublicStackAttestationProvenanceById,
+  getLibraryPublicStackAttestationProvenanceByIdempotency,
+  getLibraryPublicStackAttestationVerificationReceipt,
+  getLibraryPublicStackAttestationVerificationReceiptById,
+  getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewById,
   getLibraryPublicStackReviewByIdempotency,
@@ -188,6 +196,8 @@ const {
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicStackAttestationsInspector,
+  getUnifiedPlatformPublicStackAttestationProvenanceInspector,
+  getUnifiedPlatformPublicStackAttestationVerificationReceiptsInspector,
   getUnifiedPlatformPublicStackReviewsInspector,
   getUnifiedPlatformPublicStackTrustInspector,
   getUnifiedPlatformPublicStacksInspector,
@@ -209,6 +219,8 @@ const {
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
   listLibraryPublicStackAttestations,
+  listLibraryPublicStackAttestationProvenance,
+  listLibraryPublicStackAttestationVerificationReceipts,
   listLibraryPublicStackMembers,
   listLibraryPublicStackReviews,
   listLibraryPublicStacks,
@@ -4498,6 +4510,8 @@ registerPlatformReadRoutes(app, {
   createLibraryPeerRelay,
   createLibraryPublicStack,
   createLibraryPublicStackAttestation,
+  createLibraryPublicStackAttestationProvenance,
+  createLibraryPublicStackAttestationVerificationReceipt,
   createLibraryPublicStackMember,
   createLibraryPublicStackReview,
   createLibraryPublicStackVerification,
@@ -4523,6 +4537,12 @@ registerPlatformReadRoutes(app, {
   getLibraryPublicStackAttestation,
   getLibraryPublicStackAttestationById,
   getLibraryPublicStackAttestationByIdempotency,
+  getLibraryPublicStackAttestationProvenance,
+  getLibraryPublicStackAttestationProvenanceById,
+  getLibraryPublicStackAttestationProvenanceByIdempotency,
+  getLibraryPublicStackAttestationVerificationReceipt,
+  getLibraryPublicStackAttestationVerificationReceiptById,
+  getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewByIdempotency,
   getLibraryPublicStackVerificationById,
@@ -4551,6 +4571,8 @@ registerPlatformReadRoutes(app, {
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
   listLibraryPublicStackAttestations,
+  listLibraryPublicStackAttestationProvenance,
+  listLibraryPublicStackAttestationVerificationReceipts,
   listLibraryPublicStackMembers,
   listLibraryPublicStackReviews,
   listLibraryPublicStacks,
@@ -11383,6 +11405,10 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPublicStackReviewsInspector();
     } else if (inspector === 'public-stack-attestations') {
       data = getUnifiedPlatformPublicStackAttestationsInspector();
+    } else if (inspector === 'public-stack-attestation-provenance') {
+      data = getUnifiedPlatformPublicStackAttestationProvenanceInspector();
+    } else if (inspector === 'public-stack-attestation-verification-receipts') {
+      data = getUnifiedPlatformPublicStackAttestationVerificationReceiptsInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {
