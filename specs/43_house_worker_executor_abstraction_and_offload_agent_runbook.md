@@ -1,6 +1,6 @@
 # Phase 43 Spec: Detailed AI-Agent Runbook For House Worker Executor Abstraction And Offload
 
-Status: Proposed
+Status: In progress
 Version: 0.1
 Depends on:
 1. [specs/40_house_worker_backend_pool_and_offload_spec.md](./40_house_worker_backend_pool_and_offload_spec.md)
@@ -19,6 +19,11 @@ Start gate:
 1. Re-run `npm test` on the branch baseline before any implementation work.
 2. Do not start this phase until the inherited baseline is green.
 3. Record the baseline commit and proof state in the first implementation PR or branch note.
+
+Current execution state:
+
+1. `T42.0` through `T42.6` are implemented.
+2. The next unlocked milestone is `T42.7`.
 
 This is not a competing plan.
 It is the execution layer for the executor-abstraction and offload architecture defined in:

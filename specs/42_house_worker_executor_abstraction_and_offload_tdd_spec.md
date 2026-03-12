@@ -1,6 +1,6 @@
 # Phase 42 Spec: House Worker Executor Abstraction And Offload (Contracts First, TDD)
 
-Status: Proposed
+Status: In progress
 Version: 0.1
 Audience: frontend engineers, backend engineers, runtime engineers, desktop engineers, mobile engineers, security engineers, QA automation engineers, infrastructure engineers, and AI-agent implementers
 Depends on:
@@ -24,6 +24,11 @@ Implementation baseline:
 2. The current product still records helper sessions with `supervisorSource = browser_supervisor`.
 3. The current product still starts helper runtimes from the browser shell.
 4. This phase must begin only after implementers rerun `npm test` and confirm the inherited baseline is green before any code changes.
+
+Current proof state:
+
+1. `T42.0` through `T42.6` are implemented on the current branch.
+2. Desktop-local-node support currently covers registration, heartbeat, and provider-readiness truth only.
 
 Implementation constraints:
 

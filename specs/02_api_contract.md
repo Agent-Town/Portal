@@ -1593,6 +1593,117 @@ Notes:
 - A successful offload preserves one runtime-instance record and updates executor truth from `browser_tab` to `backend_pool` without creating a duplicate active runtime.
 - If the backend-pool runtime later stops heartbeating, the same runtime instance must degrade to `leaseStatus = stale` instead of remaining falsely active.
 
+### POST `/api/platform/house-workers/local-node/register` (human)
+Registers one desktop local node as an available non-browser House helper executor for the active House and active team.
+
+Request body:
+- `localNodeId` required
+- `displayLabel` required
+- `capabilitySet` optional
+- `leaseTtlMs` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `EXECUTOR_NODE_ALREADY_REGISTERED`
+
+Response fields:
+- `data.node`
+- `data.node.localNodeId`
+- `data.node.displayLabel`
+- `data.node.capabilitySet`
+- `data.node.availabilityState`
+- `data.node.leaseStatus`
+- `data.node.lastHeartbeatAt`
+- `data.node.leaseExpiresAt`
+- `data.heartbeatToken`
+- `data.heartbeatPath`
+- `data.providerReadinessPath`
+- `data.leaseTtlMs`
+
+Notes:
+- The raw heartbeat token is returned only at registration time.
+- Duplicate `localNodeId` registration fails closed instead of silently replacing the existing node identity.
+
+### POST `/api/platform/house-workers/local-node/heartbeat`
+Extends the lease for one previously registered desktop local node.
+
+Request headers:
+- `x-house-worker-local-node-token` required
+
+Request body:
+- `localNodeId` required
+- `capabilitySet` optional
+- `leaseTtlMs` optional
+
+Stable error codes:
+- `EXECUTOR_NODE_TOKEN_REQUIRED`
+- `EXECUTOR_NODE_TOKEN_INVALID`
+- `EXECUTOR_NODE_TOKEN_MISMATCH`
+- `INVALID_ARGUMENT`
+
+Response fields:
+- `data.node`
+- `data.node.localNodeId`
+- `data.node.displayLabel`
+- `data.node.capabilitySet`
+- `data.node.availabilityState`
+- `data.node.leaseStatus`
+- `data.node.lastHeartbeatAt`
+- `data.node.leaseExpiresAt`
+- `data.providerReadinessPath`
+- `data.leaseTtlMs`
+
+Notes:
+- Heartbeat is executor-authenticated and does not require a human browser session.
+- A valid heartbeat can move a stale node back to `availabilityState = ready`.
+
+### GET `/api/platform/house-workers/provider-readiness` (human)
+Returns executor availability truth for the active or requested House team.
+
+Query params:
+- `teamId` optional override; when omitted, resolves to `data.activeTeamId`
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_REQUIRED`
+- `ACTIVE_TEAM_REQUIRED`
+- `TEAM_NOT_FOUND`
+
+Response fields:
+- `data.schema`
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.status`
+- `data.summary`
+- `data.providers[]`
+- `data.providers[].executorKind`
+- `data.providers[].status`
+- `data.providers[].persistent`
+- `data.providers[].summary`
+- `data.providers[].nodeCount`
+- `data.providers[].readyNodeCount`
+- `data.providers[].staleNodeCount`
+- `data.providers[].nodes[]`
+- `data.providers[].nodes[].localNodeId`
+- `data.providers[].nodes[].displayLabel`
+- `data.providers[].nodes[].capabilitySet`
+- `data.providers[].nodes[].availabilityState`
+- `data.providers[].nodes[].leaseStatus`
+- `data.providers[].nodes[].lastHeartbeatAt`
+- `data.providers[].nodes[].leaseExpiresAt`
+- `data.counts.providerCount`
+- `data.counts.localNodeCount`
+- `data.counts.readyLocalNodeCount`
+- `data.counts.staleLocalNodeCount`
+
+Notes:
+- `desktop_local_node` readiness is derived from current lease timestamps and must fail closed to `stale` when the node stops heartbeating.
+- This route is the control-plane truth for non-browser executor availability; it must not trust stored availability labels alone.
+
 ### GET `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots` (human)
 Returns captured workspace snapshots for one helper runtime instance.
 

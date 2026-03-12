@@ -142,6 +142,37 @@ async function getHouseWorkerLiveReadiness(request) {
   return readJsonResponse(response);
 }
 
+async function getHouseWorkerProviderReadiness(request, { teamId = '' } = {}) {
+  const search = new URLSearchParams();
+  if (teamId) search.set('teamId', String(teamId || '').trim());
+  const response = await request.get(
+    search.toString()
+      ? `/api/platform/house-workers/provider-readiness?${search.toString()}`
+      : '/api/platform/house-workers/provider-readiness',
+    { failOnStatusCode: false }
+  );
+  return readJsonResponse(response);
+}
+
+async function registerHouseWorkerLocalNode(request, payload = {}) {
+  const response = await request.post('/api/platform/house-workers/local-node/register', {
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
+async function heartbeatHouseWorkerLocalNode(request, payload = {}, heartbeatToken = '') {
+  const headers = {};
+  if (heartbeatToken) headers['x-house-worker-local-node-token'] = String(heartbeatToken || '').trim();
+  const response = await request.post('/api/platform/house-workers/local-node/heartbeat', {
+    headers,
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function spawnHouseWorker(request, payload = {}) {
   const response = await request.post('/api/platform/house-workers/spawn', {
     data: payload,
@@ -255,7 +286,9 @@ module.exports = {
   getHouseWorkerCollections,
   getHouseWorkerDeployments,
   getHouseWorkerLiveReadiness,
+  getHouseWorkerProviderReadiness,
   getHouseWorkerShare,
+  heartbeatHouseWorkerLocalNode,
   installHouseWorker,
   installSharedHouseWorker,
   crashHouseWorkerRuntime,
@@ -271,6 +304,7 @@ module.exports = {
   readHouseWorkerSessionsFromPage,
   readHouseWorkerLiveReadinessFromPage,
   readHouseWorkerSupervisorSnapshot,
+  registerHouseWorkerLocalNode,
   revokeHouseWorkerShare,
   shareHouseWorker,
   spawnHouseWorker,

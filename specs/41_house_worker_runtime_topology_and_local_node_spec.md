@@ -1,6 +1,6 @@
 # 41. House Worker Runtime Topology And Local Node Spec
 
-Status: Proposed  
+Status: In progress  
 Branch target: `codex/backend-worker-pool-spec-v0-1`  
 Depends on: [specs/40_house_worker_backend_pool_and_offload_spec.md](./40_house_worker_backend_pool_and_offload_spec.md)  
 Audience: product, runtime, backend, mobile, desktop, UX, QA, security, economics, and AI-agent implementation teams
@@ -21,6 +21,15 @@ This spec exists because the backend-pool direction is still too abstract unless
 7. how a database-backed `$OIL` intelligence-credit economy can work without copying secrets.
 
 This document is the topology and execution-host spec that must be settled before implementation.
+
+Implementation note:
+
+1. The first shipped desktop-local-node slice is the registration and heartbeat contract.
+2. The current branch now exposes:
+   - `POST /api/platform/house-workers/local-node/register`
+   - `POST /api/platform/house-workers/local-node/heartbeat`
+   - `GET /api/platform/house-workers/provider-readiness`
+3. This is the Stage B identity and lease-truth foothold only; actual browser-to-local-node transfer remains a later milestone.
 
 ## 2. Current Runtime Truth
 

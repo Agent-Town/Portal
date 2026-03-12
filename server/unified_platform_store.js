@@ -28,6 +28,7 @@ const PLATFORM_TABLES = Object.freeze([
   'house_worker_shares',
   'house_worker_share_invites',
   'house_worker_sessions',
+  'house_worker_executor_nodes',
   'house_worker_runtime_instances',
   'house_worker_workspace_snapshots',
   'house_worker_transport_messages',
@@ -481,6 +482,21 @@ function ensureDb() {
       config_version_id TEXT,
       loadout_id TEXT,
       session_runtime_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_executor_nodes (
+      local_node_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      display_label TEXT NOT NULL,
+      capability_set_json TEXT NOT NULL DEFAULT '{}',
+      heartbeat_token_hash TEXT NOT NULL,
+      availability_state TEXT NOT NULL DEFAULT 'ready',
+      registered_at TEXT NOT NULL,
+      last_heartbeat_at TEXT,
+      lease_expires_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2426,6 +2442,174 @@ function mapHouseWorkerSessionRow(row) {
   };
 }
 
+function hashHouseWorkerExecutorToken(value = '') {
+  const normalizedValue = String(value || '').trim();
+  if (!normalizedValue) return '';
+  return `sha256:${crypto.createHash('sha256').update(normalizedValue).digest('hex')}`;
+}
+
+function mapHouseWorkerExecutorNodeRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    localNodeId: String(row.local_node_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    displayLabel: String(row.display_label || ''),
+    capabilitySet: parseJsonColumn(row.capability_set_json, {}),
+    heartbeatTokenHash: String(row.heartbeat_token_hash || ''),
+    availabilityState: String(row.availability_state || ''),
+    registeredAt: String(row.registered_at || ''),
+    lastHeartbeatAt: row.last_heartbeat_at ? String(row.last_heartbeat_at) : null,
+    leaseExpiresAt: row.lease_expires_at ? String(row.lease_expires_at) : null,
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getHouseWorkerExecutorNodeById(localNodeId = '') {
+  const normalizedLocalNodeId = String(localNodeId || '').trim();
+  if (!normalizedLocalNodeId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_executor_nodes
+    WHERE local_node_id = ?
+    LIMIT 1
+  `).get(normalizedLocalNodeId);
+  return mapHouseWorkerExecutorNodeRow(row);
+}
+
+function getHouseWorkerExecutorNodeByToken(heartbeatToken = '') {
+  const tokenHash = hashHouseWorkerExecutorToken(heartbeatToken);
+  if (!tokenHash) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_executor_nodes
+    WHERE heartbeat_token_hash = ?
+    LIMIT 1
+  `).get(tokenHash);
+  return mapHouseWorkerExecutorNodeRow(row);
+}
+
+function listHouseWorkerExecutorNodes({
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  if (!normalizedHouseId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_executor_nodes
+    WHERE house_id = ?
+      AND (? = '' OR team_id = ?)
+    ORDER BY created_at ASC, local_node_id ASC
+  `).all(normalizedHouseId, normalizedTeamId, normalizedTeamId);
+  return rows.map(mapHouseWorkerExecutorNodeRow).filter(Boolean);
+}
+
+function createHouseWorkerExecutorNode({
+  localNodeId = '',
+  houseId = '',
+  teamId = '',
+  displayLabel = '',
+  capabilitySet = null,
+  heartbeatTokenHash = '',
+  availabilityState = 'ready',
+  registeredAt = '',
+  lastHeartbeatAt = '',
+  leaseExpiresAt = '',
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLocalNodeId = String(localNodeId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedDisplayLabel = String(displayLabel || '').trim();
+  const normalizedHeartbeatTokenHash = String(heartbeatTokenHash || '').trim();
+  if (
+    !normalizedLocalNodeId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedDisplayLabel
+    || !normalizedHeartbeatTokenHash
+  ) {
+    throw new Error('HOUSE_WORKER_EXECUTOR_NODE_INVALID');
+  }
+  const existing = getHouseWorkerExecutorNodeById(normalizedLocalNodeId);
+  if (existing) return existing;
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO house_worker_executor_nodes (
+      local_node_id,
+      house_id,
+      team_id,
+      display_label,
+      capability_set_json,
+      heartbeat_token_hash,
+      availability_state,
+      registered_at,
+      last_heartbeat_at,
+      lease_expires_at,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLocalNodeId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedDisplayLabel,
+    JSON.stringify(capabilitySet && typeof capabilitySet === 'object' ? capabilitySet : {}),
+    normalizedHeartbeatTokenHash,
+    String(availabilityState || 'ready').trim() || 'ready',
+    String(registeredAt || nowIso).trim() || nowIso,
+    String(lastHeartbeatAt || '').trim() || null,
+    String(leaseExpiresAt || '').trim() || null,
+    nowIso,
+    nowIso,
+  );
+  return getHouseWorkerExecutorNodeById(normalizedLocalNodeId);
+}
+
+function updateHouseWorkerExecutorNode(localNodeId = '', patch = {}, nowIso = new Date().toISOString()) {
+  const normalizedLocalNodeId = String(localNodeId || '').trim();
+  if (!normalizedLocalNodeId) return null;
+  const existing = getHouseWorkerExecutorNodeById(normalizedLocalNodeId);
+  if (!existing) return null;
+  const nextCapabilitySet = patch.capabilitySet && typeof patch.capabilitySet === 'object'
+    ? patch.capabilitySet
+    : existing.capabilitySet;
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE house_worker_executor_nodes
+    SET house_id = ?,
+        team_id = ?,
+        display_label = ?,
+        capability_set_json = ?,
+        heartbeat_token_hash = ?,
+        availability_state = ?,
+        registered_at = ?,
+        last_heartbeat_at = ?,
+        lease_expires_at = ?,
+        updated_at = ?
+    WHERE local_node_id = ?
+  `).run(
+    String(patch.houseId ?? existing.houseId ?? '').trim() || existing.houseId,
+    String(patch.teamId ?? existing.teamId ?? '').trim() || existing.teamId,
+    String(patch.displayLabel ?? existing.displayLabel ?? '').trim() || existing.displayLabel,
+    JSON.stringify(nextCapabilitySet && typeof nextCapabilitySet === 'object' ? nextCapabilitySet : {}),
+    String(patch.heartbeatTokenHash ?? existing.heartbeatTokenHash ?? '').trim() || existing.heartbeatTokenHash,
+    String(patch.availabilityState ?? existing.availabilityState ?? 'ready').trim() || 'ready',
+    String(patch.registeredAt ?? existing.registeredAt ?? nowIso).trim() || existing.registeredAt || nowIso,
+    String(patch.lastHeartbeatAt ?? existing.lastHeartbeatAt ?? '').trim() || null,
+    String(patch.leaseExpiresAt ?? existing.leaseExpiresAt ?? '').trim() || null,
+    nowIso,
+    normalizedLocalNodeId,
+  );
+  return getHouseWorkerExecutorNodeById(normalizedLocalNodeId);
+}
+
 function getHouseWorkerSessionById(houseWorkerSessionId = '') {
   const normalizedSessionId = String(houseWorkerSessionId || '').trim();
   if (!normalizedSessionId) return null;
@@ -4237,6 +4421,7 @@ module.exports = {
   createTrainerResult,
   createHouseStaffAssignment,
   createHouseWorkerDeployment,
+  createHouseWorkerExecutorNode,
   createHouseWorkerSession,
   createHouseWorkerSessionEvent,
   createHouseWorkerShare,
@@ -4270,6 +4455,8 @@ module.exports = {
   listHouseStaffAgents,
   listTeamConfigBindings,
   getHouseWorkerDeploymentById,
+  getHouseWorkerExecutorNodeById,
+  getHouseWorkerExecutorNodeByToken,
   getHouseWorkerRuntimeInstanceById,
   getHouseWorkerRuntimeInstanceBySessionId,
   getHouseWorkerWorkspaceSnapshotByRef,
@@ -4290,6 +4477,7 @@ module.exports = {
   isUnifiedPlatformTable,
   listHouseStaffAssignments,
   listHouseWorkerDeployments,
+  listHouseWorkerExecutorNodes,
   listHouseWorkerRuntimeInstances,
   listHouseWorkerWorkspaceSnapshots,
   listHouseWorkerTransportMessages,
@@ -4311,6 +4499,7 @@ module.exports = {
   createSealedContextViolation,
   updateRunMetadata,
   updateHouseWorkerDeployment,
+  updateHouseWorkerExecutorNode,
   updateHouseWorkerRuntimeInstance,
   updateHouseWorkerShareInvite,
   updateHouseWorkerSession,

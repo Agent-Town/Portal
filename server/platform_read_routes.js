@@ -7,6 +7,7 @@ function registerPlatformReadRoutes(app, deps) {
     buildPortalRequestId,
     createHouseStaffAssignment,
     createHouseWorkerDeployment,
+    createHouseWorkerExecutorNode,
     createHouseWorkerRuntimeInstance,
     createHouseWorkerWorkspaceSnapshot,
     createHouseWorkerTransportMessage,
@@ -20,6 +21,8 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersion,
     getConfigVersionByIdempotency,
     getHouseWorkerDeploymentById,
+    getHouseWorkerExecutorNodeById,
+    getHouseWorkerExecutorNodeByToken,
     getHouseWorkerBackendRuntimeSnapshot,
     getHouseWorkerRuntimeInstanceById,
     getHouseWorkerRuntimeInstanceBySessionId,
@@ -43,6 +46,7 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseStaffAgents,
     listHouseStaffAssignments,
     listHouseWorkerDeployments,
+    listHouseWorkerExecutorNodes,
     listHouseWorkerRuntimeInstances,
     listHouseWorkerWorkspaceSnapshots,
     listHouseWorkerTransportMessages,
@@ -71,6 +75,7 @@ function registerPlatformReadRoutes(app, deps) {
     stableJsonStringify,
     stopHouseWorkerBackendRuntime,
     updateHouseWorkerDeployment,
+    updateHouseWorkerExecutorNode,
     updateHouseWorkerRuntimeInstance,
     updateHouseWorkerShareInvite,
     updateTrainerJobStatus,
@@ -103,6 +108,9 @@ function registerPlatformReadRoutes(app, deps) {
   const HOUSE_WORKER_SHARE_DEFAULT_TTL_DAYS = 7;
   const HOUSE_WORKER_LEASE_HEARTBEAT_MS = 2500;
   const HOUSE_WORKER_LEASE_TTL_MS = 15000;
+  const HOUSE_WORKER_LOCAL_NODE_DEFAULT_LEASE_TTL_MS = 30000;
+  const HOUSE_WORKER_LOCAL_NODE_MIN_LEASE_TTL_MS = 250;
+  const HOUSE_WORKER_LOCAL_NODE_MAX_LEASE_TTL_MS = 300000;
   const HOUSE_WORKER_MAX_DELEGATION_DEPTH = 2;
   const HOUSE_WORKER_DELEGATION_BUDGET = 3;
   const HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS = new Set(['brain:current-runtime', 'local_default']);
@@ -1153,6 +1161,100 @@ function registerPlatformReadRoutes(app, deps) {
     if (normalized === 'revoked') return 'revoked';
     if (expiresAt && isExpiredIsoTimestamp(expiresAt)) return 'expired';
     return 'active';
+  }
+
+  function normalizeHouseWorkerLocalNodeId(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (!normalized) return '';
+    return /^[a-z0-9][a-z0-9._:-]{1,79}$/.test(normalized) ? normalized : '';
+  }
+
+  function normalizeHouseWorkerLocalNodeDisplayLabel(value = '', fallback = 'Desktop local node') {
+    const normalized = String(value || fallback).trim().replace(/\s+/g, ' ');
+    if (!normalized) return '';
+    if (normalized.length > 80) return '';
+    return normalized;
+  }
+
+  function normalizeHouseWorkerLocalNodeLeaseTtlMs(value, fallback = HOUSE_WORKER_LOCAL_NODE_DEFAULT_LEASE_TTL_MS) {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.max(
+      HOUSE_WORKER_LOCAL_NODE_MIN_LEASE_TTL_MS,
+      Math.min(HOUSE_WORKER_LOCAL_NODE_MAX_LEASE_TTL_MS, parsed)
+    );
+  }
+
+  function normalizeHouseWorkerLocalNodeStringList(value, {
+    maxItems = 8,
+    maxLength = 48,
+  } = {}) {
+    if (!Array.isArray(value)) return [];
+    const seen = new Set();
+    return value
+      .map((entry) => String(entry || '').trim().toLowerCase())
+      .filter((entry) => entry && entry.length <= maxLength && /^[a-z0-9._:-]+$/.test(entry))
+      .filter((entry) => {
+        if (seen.has(entry)) return false;
+        seen.add(entry);
+        return true;
+      })
+      .slice(0, maxItems)
+      .sort((left, right) => left.localeCompare(right));
+  }
+
+  function normalizeHouseWorkerLocalNodeCapabilitySet(value = null) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const platformTargets = normalizeHouseWorkerLocalNodeStringList(source.platformTargets, {
+      maxItems: 6,
+      maxLength: 24,
+    });
+    const runtimeKinds = normalizeHouseWorkerLocalNodeStringList(
+      source.runtimeKinds || source.supportedExecutorKinds || ['desktop_local_node'],
+      {
+        maxItems: 6,
+        maxLength: 32,
+      }
+    );
+    const maxConcurrentHelpers = Number.parseInt(String(source.maxConcurrentHelpers ?? '1'), 10);
+    return {
+      runtimeKinds: runtimeKinds.length ? runtimeKinds : ['desktop_local_node'],
+      platformTargets,
+      maxConcurrentHelpers: Number.isFinite(maxConcurrentHelpers)
+        ? Math.max(1, Math.min(16, maxConcurrentHelpers))
+        : 1,
+      supportsBrowserTransfer: source.supportsBrowserTransfer !== false,
+      supportsPersistentExecution: source.supportsPersistentExecution !== false,
+    };
+  }
+
+  function buildHouseWorkerExecutorNodeCard(node = null) {
+    const source = node && typeof node === 'object' ? node : {};
+    const lastHeartbeatAt = normalizeHouseWorkerRuntimeIso(source.lastHeartbeatAt || null);
+    const leaseExpiresAt = normalizeHouseWorkerRuntimeIso(source.leaseExpiresAt || null);
+    const stale = !!leaseExpiresAt
+      && Number.isFinite(Date.parse(leaseExpiresAt))
+      && Date.parse(leaseExpiresAt) <= Date.now();
+    const availabilityState = stale
+      ? 'stale'
+      : (String(source.availabilityState || 'ready').trim() || 'ready');
+    return {
+      localNodeId: String(source.localNodeId || '').trim() || null,
+      houseId: String(source.houseId || '').trim() || null,
+      teamId: String(source.teamId || '').trim() || null,
+      displayLabel: String(source.displayLabel || 'Desktop local node').trim() || 'Desktop local node',
+      capabilitySet: normalizeHouseWorkerLocalNodeCapabilitySet(source.capabilitySet),
+      availabilityState,
+      leaseStatus: stale ? 'stale' : (lastHeartbeatAt ? 'active' : 'registered'),
+      registeredAt: normalizeHouseWorkerRuntimeIso(source.registeredAt || null),
+      lastHeartbeatAt,
+      leaseExpiresAt,
+      summary: stale
+        ? 'This desktop local node stopped heartbeating and is not currently available.'
+        : (lastHeartbeatAt
+          ? 'This desktop local node is actively heartbeating and can accept helper work.'
+          : 'This desktop local node is registered but has not heartbeated yet.'),
+    };
   }
 
   function buildHouseWorkerShareStatusLabel(invite = null) {
@@ -4103,6 +4205,71 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildHouseWorkerProviderReadinessPayload({
+    context = {},
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || context?.houseId || '').trim();
+    const normalizedTeamId = String(teamId || context?.activeTeamId || '').trim();
+    const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
+    const localNodes = normalizedHouseId && normalizedTeamId
+      ? listHouseWorkerExecutorNodes({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }).map((entry) => buildHouseWorkerExecutorNodeCard(entry)).filter(Boolean)
+      : [];
+    const readyLocalNodes = localNodes.filter((entry) => String(entry?.availabilityState || '').trim() === 'ready');
+    const staleLocalNodes = localNodes.filter((entry) => String(entry?.availabilityState || '').trim() === 'stale');
+    const providers = [
+      {
+        executorKind: 'browser_tab',
+        status: 'browser_validation_required',
+        persistent: false,
+        summary: 'This browser can run helpers locally while the app stays open and a local brain is configured.',
+      },
+      {
+        executorKind: 'backend_pool',
+        status: 'ready',
+        persistent: true,
+        summary: 'Portal can offload helpers to the backend pool for persistent execution.',
+      },
+      {
+        executorKind: 'desktop_local_node',
+        status: readyLocalNodes.length > 0 ? 'ready' : 'action_required',
+        persistent: true,
+        summary: readyLocalNodes.length > 0
+          ? `${readyLocalNodes.length} desktop local node${readyLocalNodes.length === 1 ? ' is' : 's are'} ready for helper work.`
+          : (staleLocalNodes.length > 0
+            ? 'All registered desktop local nodes are stale. Restart one to accept helper work again.'
+            : 'Register a desktop local node to run helpers outside the browser.'),
+        nodeCount: localNodes.length,
+        readyNodeCount: readyLocalNodes.length,
+        staleNodeCount: staleLocalNodes.length,
+        nodes: localNodes,
+      },
+    ];
+    return {
+      schema: 'agent-town-house-worker-provider-readiness/v1',
+      houseId: normalizedHouseId || null,
+      teamId: normalizedTeamId || null,
+      activeTeamId: context?.activeTeamId || null,
+      availableTeamIds,
+      status: readyLocalNodes.length > 0 ? 'ready' : 'action_required',
+      summary: readyLocalNodes.length > 0
+        ? 'At least one non-browser executor is ready for helper work.'
+        : 'Browser helpers are available, but no desktop local node is currently ready.',
+      providers,
+      localNodes,
+      counts: {
+        providerCount: providers.length,
+        localNodeCount: localNodes.length,
+        readyLocalNodeCount: readyLocalNodes.length,
+        staleLocalNodeCount: staleLocalNodes.length,
+      },
+    };
+  }
+
   function normalizePackFileMap(fileMap) {
     if (!fileMap || typeof fileMap !== 'object' || Array.isArray(fileMap)) return {};
     return Object.entries(fileMap).reduce((acc, [rawKey, rawValue]) => {
@@ -6565,6 +6732,143 @@ function registerPlatformReadRoutes(app, deps) {
       session: sessionCard,
       event,
     }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/local-node/register', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId || !teamId) {
+      return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before registering a desktop local node.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const localNodeId = normalizeHouseWorkerLocalNodeId(body?.localNodeId);
+    const displayLabel = normalizeHouseWorkerLocalNodeDisplayLabel(body?.displayLabel);
+    if (!localNodeId || !displayLabel) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'localNodeId and displayLabel are required.', { requestId });
+    }
+    const existingNode = getHouseWorkerExecutorNodeById(localNodeId);
+    if (existingNode) {
+      return sendPortalApiError(
+        res,
+        409,
+        'EXECUTOR_NODE_ALREADY_REGISTERED',
+        'That desktop local node id is already registered.',
+        {
+          requestId,
+          details: {
+            node: buildHouseWorkerExecutorNodeCard(existingNode),
+          },
+        }
+      );
+    }
+    const now = nowIso();
+    const leaseTtlMs = normalizeHouseWorkerLocalNodeLeaseTtlMs(body?.leaseTtlMs);
+    const heartbeatToken = `hwn_${randomHex(24)}`;
+    const node = createHouseWorkerExecutorNode({
+      localNodeId,
+      houseId,
+      teamId,
+      displayLabel,
+      capabilitySet: normalizeHouseWorkerLocalNodeCapabilitySet(body?.capabilitySet),
+      heartbeatTokenHash: sha256PrefixedHex(heartbeatToken),
+      availabilityState: 'ready',
+      registeredAt: now,
+      lastHeartbeatAt: now,
+      leaseExpiresAt: new Date(Date.parse(now) + leaseTtlMs).toISOString(),
+      nowIso: now,
+    });
+    return sendPortalApiSuccess(res, {
+      node: buildHouseWorkerExecutorNodeCard(node),
+      heartbeatToken,
+      heartbeatPath: '/api/platform/house-workers/local-node/heartbeat',
+      providerReadinessPath: '/api/platform/house-workers/provider-readiness',
+      leaseTtlMs,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/local-node/heartbeat', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const heartbeatToken = typeof req.headers['x-house-worker-local-node-token'] === 'string'
+      ? req.headers['x-house-worker-local-node-token'].trim()
+      : '';
+    if (!heartbeatToken) {
+      return sendPortalApiError(res, 401, 'EXECUTOR_NODE_TOKEN_REQUIRED', 'A local-node heartbeat token is required.', { requestId });
+    }
+    const nodeByToken = getHouseWorkerExecutorNodeByToken(heartbeatToken);
+    if (!nodeByToken) {
+      return sendPortalApiError(res, 401, 'EXECUTOR_NODE_TOKEN_INVALID', 'The local-node heartbeat token is not valid.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const localNodeId = normalizeHouseWorkerLocalNodeId(body?.localNodeId);
+    if (!localNodeId) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'localNodeId is required.', { requestId });
+    }
+    if (localNodeId !== String(nodeByToken?.localNodeId || '').trim()) {
+      return sendPortalApiError(res, 403, 'EXECUTOR_NODE_TOKEN_MISMATCH', 'The heartbeat token does not match that desktop local node id.', { requestId });
+    }
+    const now = nowIso();
+    const leaseTtlMs = normalizeHouseWorkerLocalNodeLeaseTtlMs(body?.leaseTtlMs);
+    const updatedNode = updateHouseWorkerExecutorNode(localNodeId, {
+      capabilitySet: body?.capabilitySet && typeof body.capabilitySet === 'object'
+        ? normalizeHouseWorkerLocalNodeCapabilitySet(body.capabilitySet)
+        : nodeByToken?.capabilitySet,
+      availabilityState: 'ready',
+      lastHeartbeatAt: now,
+      leaseExpiresAt: new Date(Date.parse(now) + leaseTtlMs).toISOString(),
+    }, now);
+    return sendPortalApiSuccess(res, {
+      node: buildHouseWorkerExecutorNodeCard(updatedNode),
+      providerReadinessPath: '/api/platform/house-workers/provider-readiness',
+      leaseTtlMs,
+    }, { requestId });
+  });
+
+  app.get('/api/platform/house-workers/provider-readiness', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    if (!houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before checking helper executor readiness.', { requestId });
+    }
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const teamId = String(teamResolution?.teamId || '').trim();
+    if (!teamId) {
+      return sendPortalApiError(res, 409, 'ACTIVE_TEAM_REQUIRED', 'Select an active team before checking helper executor readiness.', { requestId });
+    }
+    return sendPortalApiSuccess(res, buildHouseWorkerProviderReadinessPayload({
+      context: {
+        ...context,
+        activeTeamId: teamId,
+      },
+      houseId,
+      teamId,
+    }), { requestId });
   });
 
   app.get('/api/platform/house-workers/live-readiness', (req, res) => {
