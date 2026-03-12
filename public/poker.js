@@ -304,6 +304,24 @@
     `;
   }
 
+  function formatTournamentBountyModelLabel(bountyModel) {
+    return String(bountyModel || '').trim().toLowerCase() === 'pko_50'
+      ? 'PKO 50/50'
+      : 'Standard';
+  }
+
+  function isSitAndGoFillPolicy(fillPolicy) {
+    const value = String(fillPolicy || '').trim().toLowerCase();
+    return value === 'fill_to_full' || value === 'fill_to_target';
+  }
+
+  function formatTournamentFillPolicyLabel(fillPolicy) {
+    const value = String(fillPolicy || '').trim().toLowerCase();
+    if (value === 'fill_to_full') return 'sit-and-go';
+    if (value === 'fill_to_target') return 'sit-and-go target';
+    return 'open match';
+  }
+
   function renderSeriesStandings(standings) {
     const items = Array.isArray(standings) ? standings : [];
     if (!items.length) return '<p>No final placements yet.</p>';
@@ -313,7 +331,7 @@
           <div class="pokerRow">
             <span>${escapeHtml(`${Number(item.place || 0)}.`)}</span>
             <span>${escapeHtml(item.displayName || 'Seat')}</span>
-            <span>${Number(item.prizeOil || 0)} OIL</span>
+            <span>${Number(item.bountyWonOil || 0) > 0 ? `${Number(item.totalWonOil || (Number(item.prizeOil || 0) + Number(item.bountyWonOil || 0)))} OIL (${Number(item.prizeOil || 0)} prize + ${Number(item.bountyWonOil || 0)} bounty)` : `${Number(item.prizeOil || 0)} OIL`}</span>
           </div>
         `).join('')}
       </div>
@@ -386,6 +404,7 @@
               ${renderSummaryMetric('Invested', `${Number(item.investedOil || 0)} OIL`)}
               ${renderSummaryMetric('Returned', `${Number(item.returnedOil || 0)} OIL`)}
               ${renderSummaryMetric('Prize', `${Number(item.prizeOil || 0)} OIL`)}
+              ${renderSummaryMetric('Bounty', `${Number(item.bountyOil || 0)} OIL`)}
               ${renderSummaryMetric('Net', `${Number(item.netOil || 0)} OIL`)}
               ${renderSummaryMetric('Finish', item.finishPosition ? `${Number(item.finishPosition || 0)}` : 'n/a')}
             </div>
@@ -1089,7 +1108,7 @@
       `,
       `
         <h2>Quick Seat</h2>
-        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a fill-to-full sit-and-go, or create an invite-only table that stays out of the public lobby and rail.</p>
+        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a sit-and-go that waits for either a full table or a configured start target, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
@@ -1114,6 +1133,7 @@
             <select id="pokerPlayMatchmakeFillPolicy">
               <option value="open_match">Open Match</option>
               <option value="fill_to_full">Sit-And-Go Fill To Full</option>
+              <option value="fill_to_target">Sit-And-Go Fill To Target</option>
             </select>
           </label>
           <label id="pokerPlayMatchmakeMaxSeatsRow" hidden>
@@ -1121,6 +1141,17 @@
             <select id="pokerPlayMatchmakeMaxSeats">
               <option value="6">6 Seats</option>
               <option value="3">3 Seats</option>
+            </select>
+          </label>
+          <label id="pokerPlayMatchmakeStartTargetRow" hidden>
+            Start Target
+            <select id="pokerPlayMatchmakeStartTargetSeats"></select>
+          </label>
+          <label id="pokerPlayMatchmakeBountyRow" hidden>
+            Tournament Bounty
+            <select id="pokerPlayMatchmakeBountyModel">
+              <option value="none">Standard</option>
+              <option value="pko_50">PKO 50/50</option>
             </select>
           </label>
           <label>
@@ -1158,6 +1189,8 @@
                 Number(item.targetTableCount || 0) > 0 ? `target ${Number(item.targetTableCount || 0)}` : '',
                 `${Number(item.entrantCount || 0)} entrants`,
                 Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL bounty` : '',
+                String(item?.bountyModel || '') === 'pko_50' ? formatTournamentBountyModelLabel(item?.bountyModel) : '',
                 Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
                 item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
                 item.needsRebalance ? 'table break pending' : '',
@@ -1183,7 +1216,7 @@
               <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
               ${renderMetaBadges([
                 item.tableType,
-                item?.tableType === 'tournament' && item?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
+                item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : '',
                 item.accessMode === 'invite_only' ? 'invite-only' : '',
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item.buyInOil || 0)} OIL buy-in`,
@@ -1200,6 +1233,12 @@
                   : '',
                 item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
                   ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
+                  : '',
+                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
+                  ? `${Number(item.summary.bountyPoolOil || 0)} OIL bounty`
+                  : '',
+                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
+                  ? formatTournamentBountyModelLabel(item?.summary?.bountyModel)
                   : '',
               ])}
             </div>
@@ -1247,6 +1286,8 @@
                 `${Number(item.tableCount || 0)} tables`,
                 `${Number(item.entrantCount || 0)} entrants`,
                 Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
+                String(item?.bountyModel || '') === 'pko_50' ? `${Number(item?.bountyPoolOil || 0)} OIL bounty` : '',
+                String(item?.bountyModel || '') === 'pko_50' ? formatTournamentBountyModelLabel(item?.bountyModel) : '',
                 Number(item.paidPlaces || 0) > 0 ? `${Number(item.paidPlaces || 0)} paid` : '',
                 item.needsRebalance ? 'table break pending' : '',
               ])}
@@ -1267,7 +1308,7 @@
               <p>${escapeHtml(item?.summary?.headline || 'Public table state only.')}</p>
               ${renderMetaBadges([
                 item.tableType,
-                item?.tableType === 'tournament' && item?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
+                item?.tableType === 'tournament' && isSitAndGoFillPolicy(item?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(item?.summary?.fillPolicy) : '',
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
                 item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
@@ -1277,6 +1318,12 @@
                 Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
                 item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
                   ? `${Number(item.summary.prizePoolOil || 0)} OIL pool`
+                  : '',
+                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
+                  ? `${Number(item.summary.bountyPoolOil || 0)} OIL bounty`
+                  : '',
+                item?.tableType === 'tournament' && String(item?.summary?.bountyModel || '') === 'pko_50'
+                  ? formatTournamentBountyModelLabel(item?.summary?.bountyModel)
                   : '',
               ].filter(Boolean))}
             </div>
@@ -1308,6 +1355,8 @@
           ${renderSummaryMetric('Live Tables', `${Number(series?.liveTableCount || 0)}`)}
           ${renderSummaryMetric('Entrants', `${Number(series?.entrantCount || 0)}`)}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+          ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
+          ${Number(series?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(series?.bountyPoolOil || 0)} OIL`) : ''}
           ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
           ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
@@ -1403,6 +1452,7 @@
           ${renderSummaryMetric('Reloads', `${Number(summary?.reloadOil || 0)} OIL`)}
           ${renderSummaryMetric('Returned', `${Number(summary?.returnedOil || 0)} OIL`)}
           ${renderSummaryMetric('Prizes', `${Number(summary?.prizeOil || 0)} OIL`)}
+          ${renderSummaryMetric('Bounties', `${Number(summary?.bountyOil || 0)} OIL`)}
           ${renderSummaryMetric('Net', `${Number(summary?.netOil || 0)} OIL`)}
         </div>
         <div class="pokerLinks">
@@ -1417,6 +1467,7 @@
           ${renderSummaryMetric('Cashes', `${Number(summary?.tournamentCashes || 0)}`)}
           ${renderSummaryMetric('Wins', `${Number(summary?.tournamentWins || 0)}`)}
           ${renderSummaryMetric('ROI', `${Number(summary?.tournamentRoiPercent || 0)}%`)}
+          ${renderSummaryMetric('Bounty Won', `${Number(summary?.tournamentBountyOil || 0)} OIL`)}
           ${renderSummaryMetric('Cash Net', `${Number(summary?.cashNetOil || 0)} OIL`)}
         </div>
       `,
@@ -1506,6 +1557,8 @@
           ${renderSummaryMetric('Events', `${Number(summary?.eventCount || 0)}`)}
           ${renderSummaryMetric('Entrants', `${Number(series?.entryCount || 0)}`)}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+          ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
+          ${Number(series?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(series?.bountyPoolOil || 0)} OIL`) : ''}
         </div>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref(rail ? '/poker/play/rail' : '/poker/play'))}">${rail ? 'Back To Rail' : 'Back To Lobby'}</a>
@@ -1679,6 +1732,10 @@
     const fillPolicyEl = document.getElementById('pokerPlayMatchmakeFillPolicy');
     const maxSeatsRow = document.getElementById('pokerPlayMatchmakeMaxSeatsRow');
     const maxSeatsEl = document.getElementById('pokerPlayMatchmakeMaxSeats');
+    const startTargetRow = document.getElementById('pokerPlayMatchmakeStartTargetRow');
+    const startTargetEl = document.getElementById('pokerPlayMatchmakeStartTargetSeats');
+    const bountyRow = document.getElementById('pokerPlayMatchmakeBountyRow');
+    const bountyEl = document.getElementById('pokerPlayMatchmakeBountyModel');
     const smallBlindEl = document.getElementById('pokerPlayMatchmakeSmallBlind');
     const bigBlindEl = document.getElementById('pokerPlayMatchmakeBigBlind');
     const buyInEl = document.getElementById('pokerPlayMatchmakeBuyIn');
@@ -1695,20 +1752,50 @@
         if (String(buyInEl.value || '') === '300') buyInEl.value = '400';
       }
     };
+    const syncStartTargetOptions = () => {
+      if (!startTargetEl || !maxSeatsEl) return;
+      const maxSeats = Math.max(2, Number(maxSeatsEl.value || 6));
+      const currentValue = Math.max(2, Math.min(maxSeats, Number(startTargetEl.value || Math.min(maxSeats, 3))));
+      startTargetEl.innerHTML = Array.from({ length: Math.max(1, maxSeats - 1) }, (_unused, index) => {
+        const seatCount = index + 2;
+        return `<option value="${seatCount}">${seatCount} Seats</option>`;
+      }).join('');
+      startTargetEl.value = String(currentValue);
+    };
     const syncTournamentOptions = () => {
       const tournament = String(typeEl?.value || 'cash') === 'tournament';
+      const fillPolicy = String(fillPolicyEl?.value || 'open_match');
+      const targetStart = fillPolicy === 'fill_to_target';
       if (fillPolicyRow) fillPolicyRow.hidden = !tournament;
       if (maxSeatsRow) maxSeatsRow.hidden = !tournament;
+      if (startTargetRow) startTargetRow.hidden = !tournament || !targetStart;
+      if (bountyRow) bountyRow.hidden = !tournament;
       if (fillPolicyEl) fillPolicyEl.disabled = !tournament;
       if (maxSeatsEl) maxSeatsEl.disabled = !tournament;
+      if (startTargetEl) startTargetEl.disabled = !tournament || !targetStart;
+      if (bountyEl) bountyEl.disabled = !tournament;
       if (!tournament) {
         if (fillPolicyEl) fillPolicyEl.value = 'open_match';
         if (maxSeatsEl) maxSeatsEl.value = '6';
+        if (startTargetEl) startTargetEl.value = '3';
+        if (bountyEl) bountyEl.value = 'none';
       }
+      syncStartTargetOptions();
     };
     if (typeEl) {
       typeEl.addEventListener('change', () => {
         applyDefaults();
+        syncTournamentOptions();
+      });
+    }
+    if (fillPolicyEl) {
+      fillPolicyEl.addEventListener('change', () => {
+        syncTournamentOptions();
+      });
+    }
+    if (maxSeatsEl) {
+      maxSeatsEl.addEventListener('change', () => {
+        syncStartTargetOptions();
         syncTournamentOptions();
       });
     }
@@ -1731,6 +1818,10 @@
         if (tableType === 'tournament') {
           payloadBody.fillPolicy = String(fillPolicyEl?.value || 'open_match');
           payloadBody.maxSeats = Number(maxSeatsEl?.value || 6);
+          if (payloadBody.fillPolicy === 'fill_to_target') {
+            payloadBody.startTargetSeats = Number(startTargetEl?.value || 3);
+          }
+          payloadBody.bountyModel = String(bountyEl?.value || 'none');
         }
         const payload = await api(accessMode === 'invite_only' ? '/api/poker/play/tables' : '/api/poker/play/matchmake', {
           method: 'POST',
@@ -1811,7 +1902,7 @@
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
     const tableOpen = String(table?.status || 'open') === 'open';
     const sitAndGoWaiting = table?.tableType === 'tournament'
-      && table?.summary?.fillPolicy === 'fill_to_full'
+      && isSitAndGoFillPolicy(table?.summary?.fillPolicy)
       && !table?.summary?.liveHand
       && !table?.summary?.completedAt
       && Number(table?.summary?.seatsUntilStart || 0) > 0;
@@ -1836,7 +1927,7 @@
           ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
           ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
-          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', table?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : 'open match') : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', formatTournamentFillPolicyLabel(table?.summary?.fillPolicy)) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Target', `${Number(table?.summary?.startTargetSeats || table?.minPlayers || 2)}`) : ''}
           ${table?.tableType === 'tournament' && !table?.summary?.liveHand && !table?.summary?.completedAt ? renderSummaryMetric('Seats To Start', `${Number(table?.summary?.seatsUntilStart || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
@@ -1846,8 +1937,11 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Entries', `${Number(table?.summary?.entryCount || 0)}`) : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(table?.summary?.bountyModel)) : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(table?.summary?.bountyPerEntryOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' && Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entry', `${Number(table?.summary?.acceptedReentryCount || 0)}/${Number(table?.summary?.reentryLimit || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Prize Pool', `${Number(table?.summary?.prizePoolOil || 0)} OIL`) : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(table?.summary?.bountyPoolOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Paid Places', `${Number(table?.summary?.paidPlaces || 0)}`) : ''}
           ${Number(table?.summary?.waitlistCount || 0) > 0 ? renderSummaryMetric('Waitlist', `${Number(table?.summary?.waitlistCount || 0)}`) : ''}
           ${Number(table?.summary?.disconnectedSeatCount || 0) > 0 ? renderSummaryMetric('Disconnected', `${Number(table?.summary?.disconnectedSeatCount || 0)}`) : ''}
@@ -1855,11 +1949,14 @@
           ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderMetaBadges([
-          table?.tableType === 'tournament' && table?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
+          table?.tableType === 'tournament' && isSitAndGoFillPolicy(table?.summary?.fillPolicy) ? formatTournamentFillPolicyLabel(table?.summary?.fillPolicy) : '',
           tableAccess?.inviteOnly ? 'invite-only' : '',
           `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
           table?.tableType === 'tournament' && !table?.summary?.liveHand && Number(table?.summary?.seatsUntilStart || 0) > 0
             ? `${Number(table?.summary?.seatsUntilStart || 0)} to start`
+            : '',
+          table?.tableType === 'tournament' && String(table?.summary?.bountyModel || '') === 'pko_50'
+            ? formatTournamentBountyModelLabel(table?.summary?.bountyModel)
             : '',
           table?.summary?.liveHand ? `hand ${Number(table?.summary?.handNumber || 0)}` : 'waiting',
           table?.summary?.winnerSeatNumber ? `winner seat ${Number(table?.summary?.winnerSeatNumber || 0)}` : '',
@@ -1983,6 +2080,8 @@
           ${renderSummaryMetric('Role', hand?.actingSeat === Number(mySeat.seatNumber || 0) ? 'acting now' : 'waiting')}
           ${mySeat?.finishPosition ? renderSummaryMetric('Finish', `${Number(mySeat.finishPosition || 0)}`) : ''}
           ${Number(mySeat?.prizeOil || 0) > 0 ? renderSummaryMetric('Prize', `${Number(mySeat.prizeOil || 0)} OIL`) : ''}
+          ${table?.tableType === 'tournament' && Number(mySeat?.currentBountyOil || 0) > 0 ? renderSummaryMetric('Current Bounty', `${Number(mySeat.currentBountyOil || 0)} OIL`) : ''}
+          ${Number(mySeat?.bountyWonOil || 0) > 0 ? renderSummaryMetric('Bounty Won', `${Number(mySeat.bountyWonOil || 0)} OIL`) : ''}
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? '<p>Your last tournament entry busted. Re-entry stays available until late registration closes or the table schedule locks.</p>' : ''}
@@ -1990,7 +2089,7 @@
         ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
         ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
         ${adminClosed ? `<p>This table was closed by an operator.${Number(table?.state?.refundedTotalOil || 0) > 0 ? ` Refunds issued: ${Number(table?.state?.refundedTotalOil || 0)} OIL total.` : ''}</p>` : ''}
-        ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}</p>` : ''}
+        ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}${Number(mySeat?.bountyWonOil || 0) > 0 ? ` Bounty won: ${Number(mySeat.bountyWonOil || 0)} OIL.` : ''}</p>` : ''}
         ${adminClosed ? '' : `
           <div class="pokerLinks">
             ${table?.tableType === 'cash' ? `<button id="pokerPlaySitOutButton" class="pokerButton" type="button"${seatSittingOut || seatAway ? ' disabled' : ''}>Sit Out Next Hand</button>` : ''}
@@ -2045,8 +2144,12 @@
           ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
           ${series?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(series?.scheduledStartAt)) : ''}
           ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
+          ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
+          ${Number(series?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(series?.bountyPerEntryOil || 0)} OIL`) : ''}
           ${Number(series?.acceptedReentryCount || 0) > 0 || Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entries', `${Number(series?.acceptedReentryCount || 0)}`) : ''}
           ${renderSummaryMetric('Prize Pool', `${Number(series?.prizePoolOil || 0)} OIL`)}
+          ${Number(series?.bountyPoolOil || 0) > 0 ? renderSummaryMetric('Bounty Pool', `${Number(series?.bountyPoolOil || 0)} OIL`) : ''}
+          ${Number(series?.totalBountyAwardedOil || 0) > 0 ? renderSummaryMetric('Bounty Paid', `${Number(series?.totalBountyAwardedOil || 0)} OIL`) : ''}
           ${renderSummaryMetric('Paid Places', `${Number(series?.paidPlaces || 0)}`)}
           ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
         </div>

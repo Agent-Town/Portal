@@ -552,6 +552,7 @@ function ensureDb() {
       cashout_oil INTEGER NOT NULL DEFAULT 0,
       refund_oil INTEGER NOT NULL DEFAULT 0,
       prize_oil INTEGER NOT NULL DEFAULT 0,
+      bounty_oil INTEGER NOT NULL DEFAULT 0,
       stack_oil INTEGER NOT NULL DEFAULT 0,
       finish_position INTEGER,
       status TEXT NOT NULL,
@@ -680,7 +681,11 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_play_seats', 'disconnected_at', 'TEXT');
   ensureColumnExists(db, 'poker_play_seats', 'eliminated_at', 'TEXT');
   ensureColumnExists(db, 'poker_play_seats', 'prize_oil', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumnExists(db, 'poker_play_seats', 'current_bounty_oil', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumnExists(db, 'poker_play_seats', 'bounty_won_oil', 'INTEGER NOT NULL DEFAULT 0');
+  ensureColumnExists(db, 'poker_play_seats', 'bounty_settled_at', 'TEXT');
   ensureColumnExists(db, 'poker_play_seats', 'payout_settled_at', 'TEXT');
+  ensureColumnExists(db, 'poker_play_player_stats', 'bounty_oil', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumnExists(db, 'poker_oil_ledger_entries', 'table_id', 'TEXT');
   ensureColumnExists(db, 'poker_oil_ledger_entries', 'series_id', 'TEXT');
   seedRegistryEntities();
@@ -2921,6 +2926,9 @@ function hydratePokerPlaySeat(row) {
     disconnectedAt: row.disconnected_at || null,
     eliminatedAt: row.eliminated_at || null,
     prizeOil: Number(row.prize_oil || 0),
+    currentBountyOil: Number(row.current_bounty_oil || 0),
+    bountyWonOil: Number(row.bounty_won_oil || 0),
+    bountySettledAt: row.bounty_settled_at || null,
     payoutSettledAt: row.payout_settled_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -2994,6 +3002,9 @@ function upsertPokerPlaySeat({
   disconnectedAt = null,
   eliminatedAt = null,
   prizeOil = 0,
+  currentBountyOil = 0,
+  bountyWonOil = 0,
+  bountySettledAt = null,
   payoutSettledAt = null,
   createdAt = null,
   updatedAt = null,
@@ -3021,10 +3032,13 @@ function upsertPokerPlaySeat({
         disconnected_at,
         eliminated_at,
         prize_oil,
+        current_bounty_oil,
+        bounty_won_oil,
+        bounty_settled_at,
         payout_settled_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(table_id, seat_number) DO UPDATE SET
         portal_session_id = excluded.portal_session_id,
         house_id = excluded.house_id,
@@ -3038,6 +3052,9 @@ function upsertPokerPlaySeat({
         disconnected_at = excluded.disconnected_at,
         eliminated_at = excluded.eliminated_at,
         prize_oil = excluded.prize_oil,
+        current_bounty_oil = excluded.current_bounty_oil,
+        bounty_won_oil = excluded.bounty_won_oil,
+        bounty_settled_at = excluded.bounty_settled_at,
         payout_settled_at = excluded.payout_settled_at,
         updated_at = excluded.updated_at
     `).run(
@@ -3055,6 +3072,9 @@ function upsertPokerPlaySeat({
       disconnectedAt,
       eliminatedAt,
       Number(prizeOil || 0),
+      Number(currentBountyOil || 0),
+      Number(bountyWonOil || 0),
+      bountySettledAt,
       payoutSettledAt,
       existing?.created_at || createdAt || now,
       updatedAt || now
@@ -3721,6 +3741,7 @@ function hydratePokerPlayPlayerStat(row) {
     cashoutOil: Number(row.cashout_oil || 0),
     refundOil: Number(row.refund_oil || 0),
     prizeOil: Number(row.prize_oil || 0),
+    bountyOil: Number(row.bounty_oil || 0),
     stackOil: Number(row.stack_oil || 0),
     finishPosition: Number(row.finish_position || 0) || null,
     status: row.status,
@@ -3811,6 +3832,7 @@ function upsertPokerPlayPlayerStat({
   cashoutOil = 0,
   refundOil = 0,
   prizeOil = 0,
+  bountyOil = 0,
   stackOil = 0,
   finishPosition = null,
   status = 'open',
@@ -3845,6 +3867,7 @@ function upsertPokerPlayPlayerStat({
         cashout_oil,
         refund_oil,
         prize_oil,
+        bounty_oil,
         stack_oil,
         finish_position,
         status,
@@ -3853,7 +3876,7 @@ function upsertPokerPlayPlayerStat({
         closed_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(result_id) DO UPDATE SET
         wallet_subject = excluded.wallet_subject,
         house_id = excluded.house_id,
@@ -3869,6 +3892,7 @@ function upsertPokerPlayPlayerStat({
         cashout_oil = excluded.cashout_oil,
         refund_oil = excluded.refund_oil,
         prize_oil = excluded.prize_oil,
+        bounty_oil = excluded.bounty_oil,
         stack_oil = excluded.stack_oil,
         finish_position = excluded.finish_position,
         status = excluded.status,
@@ -3892,6 +3916,7 @@ function upsertPokerPlayPlayerStat({
       Number(cashoutOil || 0),
       Number(refundOil || 0),
       Number(prizeOil || 0),
+      Number(bountyOil || 0),
       Number(stackOil || 0),
       finishPosition == null ? null : Number(finishPosition || 0),
       status,

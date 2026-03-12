@@ -408,6 +408,9 @@ Returns the live 6-max poker lobby payload with:
 - `data.items[].summary.handsUntilBlindIncrease`
 - `data.items[].summary.lateRegistrationOpen`
 - `data.items[].summary.lateRegistrationRemainingHands`
+- `data.items[].summary.bountyModel`
+- `data.items[].summary.bountyPerEntryOil`
+- `data.items[].summary.bountyPoolOil`
 - `data.series[]` aggregated tournament-series rows
 - `data.series[].seriesId`
 - `data.series[].tableCount`
@@ -420,6 +423,11 @@ Returns the live 6-max poker lobby payload with:
 - `data.series[].pendingBreakSeatCount`
 - `data.series[].pendingBreakBlockedByLiveTable`
 - `data.series[].prizePoolOil`
+- `data.series[].bountyModel`
+- `data.series[].bountyPerEntryOil`
+- `data.series[].bountyPoolOil`
+- `data.series[].totalBountyAwardedOil`
+- `data.series[].activeBountyPoolOil`
 - `data.series[].payoutModel`
 - `data.series[].paidPlaces`
 - `data.series[].payouts[]`
@@ -516,6 +524,8 @@ Returns one live cash or tournament table payload with:
 - `data.waitlist`
 - `data.seats[]`
 - `data.mySeat`
+- `data.mySeat.currentBountyOil`
+- `data.mySeat.bountyWonOil`
 - `data.hand`
 - `data.messages[]`
 - `data.actions[]`
@@ -637,6 +647,7 @@ Returns the bound wallet's live poker results surface with:
 - `data.items[].returnedOil`
 - `data.items[].stackOil`
 - `data.items[].prizeOil`
+- `data.items[].bountyOil`
 - `data.items[].netOil`
 - `data.items[].finishPosition`
 - `data.items[].payoutSettledAt`
@@ -661,6 +672,7 @@ Returns the bound wallet's live poker results surface with:
 - `data.summary.tournamentWins`
 - `data.summary.tournamentInvestedOil`
 - `data.summary.tournamentPrizeOil`
+- `data.summary.tournamentBountyOil`
 - `data.summary.tournamentNetOil`
 - `data.summary.tournamentRoiPercent`
 - `data.summary.liveSeatCount`
@@ -709,7 +721,7 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.scheduledStartPending`
 - tournaments expose `data.table.summary.lateRegistrationOpen`
 - tournaments expose `data.table.summary.lateRegistrationRemainingHands`
-- tournaments expose `data.table.summary.fillPolicy` as `open_match` or `fill_to_full`
+- tournaments expose `data.table.summary.fillPolicy` as `open_match`, `fill_to_full`, or `fill_to_target`
 - tournaments expose `data.table.summary.startTargetSeats`, `data.table.summary.seatsUntilStart`, and `data.table.summary.startReady` for first-hand readiness
 - tournaments expose `data.table.summary.entryCount`
 - tournaments expose `data.table.summary.reentryLimit`
@@ -731,7 +743,13 @@ Tournament blind progression notes:
 - `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
 - `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
-- once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, and `prizeOil`
+- `data.table.summary.bountyModel` currently resolves as `none` or `pko_50`
+- `data.table.summary.bountyPerEntryOil` is the starting bounty attached to one accepted tournament entry
+- `data.table.summary.bountyPoolOil` is the total committed bounty pool across accepted tournament entries
+- `data.series.bountyModel` mirrors the series-wide tournament bounty policy
+- `data.series.bountyPerEntryOil`, `data.series.bountyPoolOil`, `data.series.totalBountyAwardedOil`, and `data.series.activeBountyPoolOil` expose the durable progressive bounty economy
+- once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, `prizeOil`, `bountyWonOil`, and `totalWonOil`
+- player tournament seats expose `data.mySeat.currentBountyOil` while still alive and `data.mySeat.bountyWonOil` for settled knockout credits
 - when an operator cancels the series, `data.series.stage = "cancelled"` and the series exposes `adminClosedTableCount`, `refundedSeatCount`, `refundedTotalOil`, `closeReason`, `refundMode`, and `closedAt`
 - cancelled series set `data.series.activeTableId = null` and `data.tables[] = []`
 
@@ -788,9 +806,11 @@ Request shape:
 ```
 
 Tournament-only request fields:
-- `fillPolicy`; `open_match` by default or `fill_to_full` for sit-and-go
+- `fillPolicy`; `open_match` by default, `fill_to_full` for full-table sit-and-go, or `fill_to_target` for target-start sit-and-go
+- `startTargetSeats`; required for `fill_to_target`, ignored otherwise, and clamped between `minPlayers` and `maxSeats`
 - `lateRegistrationHands`
 - `handsPerBlindLevel`
+- `bountyModel`; `none` by default or `pko_50` for progressive knockout split accounting
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
 
 Optional live-play request fields:
@@ -980,9 +1000,11 @@ Request shape:
 {
   "tableType": "tournament",
   "fillPolicy": "fill_to_full",
+  "startTargetSeats": 3,
   "smallBlindOil": 75,
   "bigBlindOil": 150,
   "buyInOil": 600,
+  "bountyModel": "pko_50",
   "maxSeats": 3,
   "lateRegistrationHands": 0,
   "reentryLimit": 0,
@@ -1011,10 +1033,13 @@ Tournament matchmaking notes:
 - tournament matching includes `lateRegistrationHands` as part of the structure key
 - tournament matching also includes `reentryLimit` as part of the structure key
 - tournament matching also includes `fillPolicy`
+- tournament matching also includes `startTargetSeats`
+- tournament matching also includes `bountyModel`, so PKO and non-PKO tables never mix
 - invite-only tables are out of scope for matchmaking and must be created directly with `POST /api/poker/play/tables`
 - if a matching tournament table is already live but still within the late-registration window, matchmaking may seat the caller into that live table as `registered`
 - if a matching tournament table is still `scheduled`, matchmaking may seat the caller before cards are dealt and preserve the scheduled start timestamp in the returned table payload
 - `fillPolicy = "fill_to_full"` creates sit-and-go behavior: the first automatic hand waits until `data.table.summary.startTargetSeats` is reached, late registration is disabled, re-entry is disabled, and once that table is live a later identical matchmake request creates a fresh single-table tournament instead of extending the old series
+- `fillPolicy = "fill_to_target"` creates the same single-table sit-and-go behavior, but the first automatic hand starts once the configured `startTargetSeats` threshold is reached even if open seats remain at the table cap
 
 ### POST `/api/poker/play/series/:seriesId/reenter`
 Lets a wallet with an earlier busted tournament entry buy back into the same series when the configured re-entry policy still allows it.
@@ -1031,6 +1056,7 @@ Request shape:
 Response notes:
 - returns the normal player table payload for the chosen re-entry table
 - increments `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
+- if `data.series.bountyModel = "pko_50"`, re-entry also increments `data.series.bountyPoolOil` and resets the re-entered seat's `data.mySeat.currentBountyOil`
 - may reuse the same table seat record or choose another live table in the same series, depending on seat availability
 
 Failure codes:
@@ -1488,7 +1514,7 @@ Per-mismatch fields:
 - `data.items[].note`
 
 Notes:
-- reconciliation currently covers poker buy-ins, reloads, cashouts, refunds, and tournament prizes
+- reconciliation currently covers poker buy-ins, reloads, cashouts, refunds, tournament prizes, and tournament bounty credits
 - mismatch rows are exact and category-specific; there is no generic catch-all `"failed"` item
 - wallet balances are reported alongside row mismatches so operator review can confirm the precise delta per wallet subject
 
