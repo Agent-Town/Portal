@@ -1056,7 +1056,7 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.fillPolicy` as `open_match`, `fill_to_full`, or `fill_to_target`
 - tournaments expose `data.table.summary.startTargetSeats`, `data.table.summary.seatsUntilStart`, and `data.table.summary.startReady` for first-hand readiness
 - tournaments expose `data.table.summary.entryCount`
-- tournaments expose `data.table.summary.formatVariant` as `standard` or `satellite`
+- tournaments expose `data.table.summary.formatVariant` as `standard`, `satellite`, or `multi_flight`
 - tournaments expose `data.table.summary.reentryLimit`
 - tournaments expose `data.table.summary.acceptedReentryCount`
 - tournaments expose `data.table.summary.rebuyLimit`
@@ -1114,7 +1114,12 @@ Tournament blind progression notes:
 - `data.series.bountyPerEntryOil`, `data.series.bountyPoolOil`, `data.series.totalBountyAwardedOil`, and `data.series.activeBountyPoolOil` expose the durable progressive bounty economy
 - satellite tournaments expose `data.table.summary.satelliteTargetSeriesId`, `data.table.summary.satelliteTargetSeriesTitle`, `data.table.summary.satelliteAwardKind`, `data.table.summary.satelliteAwardCount`, and `data.table.summary.satelliteAwardValueOil`
 - satellite series expose `data.series.satelliteTargetSeriesId`, `data.series.satelliteTargetSeriesTitle`, `data.series.satelliteAwardKind`, `data.series.satelliteAwardCount`, and `data.series.satelliteAwardValueOil`
+- multi-flight tournaments expose `data.table.summary.multiFlightFestivalParentId`, `data.table.summary.multiFlightFestivalTitle`, `data.table.summary.multiFlightStage`, `data.table.summary.multiFlightFlightCode`, `data.table.summary.multiFlightFlightLabel`, `data.table.summary.multiFlightMergeSeriesId`, `data.table.summary.multiFlightMergeSeriesTitle`, `data.table.summary.multiFlightAdvanceSeatCount`, `data.table.summary.multiFlightAdvancedSeatCount`, and `data.table.summary.multiFlightBaggedAt`
+- merge-stage multi-flight tables expose `data.table.summary.multiFlightImportedFlightCount`, `data.table.summary.multiFlightImportedEntryCount`, `data.table.summary.multiFlightImportedPrizePoolOil`, `data.table.summary.multiFlightImportedBountyPoolOil`, and `data.table.summary.multiFlightImportedCarriedStackTotalOil`
+- multi-flight series expose the same `multiFlight*` fields at `data.series.*`, with merge-series values reflecting imported Day 1 flight totals instead of a second direct buy-in debit
+- merge-stage multi-flight tables reject direct seat entry and only accept carried stacks imported from completed flight tables
 - once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, `prizeOil`, `bountyWonOil`, and `totalWonOil`
+- bagged multi-flight standings may also include `status = "advanced"`, `carriedStackOil`, `advancedAt`, `advancedToSeriesId`, and `advancedToTableId`
 - player tournament seats expose `data.mySeat.currentBountyOil` while still alive and `data.mySeat.bountyWonOil` for settled knockout credits
 - when an operator cancels the series, `data.series.stage = "cancelled"` and the series exposes `adminClosedTableCount`, `refundedSeatCount`, `refundedTotalOil`, `closeReason`, `refundMode`, and `closedAt`
 - cancelled series set `data.series.activeTableId = null` and `data.tables[] = []`
@@ -1180,12 +1185,13 @@ Request shape:
 Tournament-only request fields:
 - `fillPolicy`; `open_match` by default, `fill_to_full` for full-table sit-and-go, or `fill_to_target` for target-start sit-and-go
 - `startTargetSeats`; required for `fill_to_target`, ignored otherwise, and clamped between `minPlayers` and `maxSeats`
-- `formatVariant`; `standard` by default, or `satellite`
+- `formatVariant`; `standard` by default, or `satellite` / `multi_flight`
 - `lateRegistrationHands`
 - `handsPerBlindLevel`
 - `bountyModel`; `none` by default, or `pko_50`, `pko_75`, or `full_bounty`
 - `tournamentEntryFeeOil`; optional offchain room fee retained on completed tournament settlement
 - `satelliteTargetSeriesId`, `satelliteTargetSeriesTitle`, `satelliteAwardKind`, `satelliteAwardCount`, and `satelliteAwardValueOil` when `formatVariant = "satellite"`
+- `multiFlightFestivalParentId`, `multiFlightFestivalTitle`, `multiFlightFlightCode`, `multiFlightFlightLabel`, `multiFlightMergeSeriesId`, `multiFlightMergeSeriesTitle`, and `multiFlightAdvanceSeatCount` when `formatVariant = "multi_flight"`
 - `rebuyLimit` and `rebuyWindowHands` for explicit rebuy policy
 - `addonWindowAfterHandNumbers[]`, `addonCostOil`, `addonChipsOil`, and `maxAddonsPerSeat` for explicit add-on policy
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`

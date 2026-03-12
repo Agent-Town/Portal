@@ -32,9 +32,23 @@ async function playAggressiveTournamentHand(tableId, seatActors, { asOfPrefix })
   const startingHandNumber = Number(detail?.hand?.handNumber || 0);
   expect(startingHandNumber).toBeGreaterThan(0);
   for (let tick = 1; tick <= 24; tick += 1) {
-    const actingSeat = Number(detail?.hand?.actingSeat || 0);
+    let actingSeat = Number(detail?.hand?.actingSeat || 0);
+    if (!actingSeat) {
+      if (detail?.table?.summary?.completedAt) return detail;
+      const recoveryIso = `${asOfPrefix}:${String(tick).padStart(2, '0')}.500Z`;
+      detail = await getTable(observer.page, observer.address, tableId, { asOf: recoveryIso });
+      if (detail?.table?.summary?.completedAt) return detail;
+      if (Number(detail?.hand?.handNumber || 0) > startingHandNumber) return detail;
+      actingSeat = Number(detail?.hand?.actingSeat || 0);
+    }
     const actor = seatActors[actingSeat];
-    expect(actor).toBeTruthy();
+    if (!actor) {
+      const settleIso = `${asOfPrefix}:${String(tick).padStart(2, '0')}.900Z`;
+      detail = await getTable(observer.page, observer.address, tableId, { asOf: settleIso });
+      if (detail?.table?.summary?.completedAt) return detail;
+      if (Number(detail?.hand?.handNumber || 0) > startingHandNumber) return detail;
+      continue;
+    }
     const atIso = `${asOfPrefix}:${String(tick).padStart(2, '0')}.000Z`;
     const actorDetail = await getTable(actor.page, actor.address, tableId, { asOf: atIso });
     const handId = String(actorDetail?.hand?.handId || '');

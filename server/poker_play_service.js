@@ -230,7 +230,29 @@ function normalizePokerPlayTournamentBountyModel(value, fallback = 'none') {
 
 function normalizePokerPlayTournamentFormat(value, fallback = 'standard') {
   const format = normalizeTrimmedString(value, fallback).toLowerCase();
-  return format === 'satellite' ? 'satellite' : 'standard';
+  if (format === 'satellite') return 'satellite';
+  if (format === 'multi_flight') return 'multi_flight';
+  return 'standard';
+}
+
+function normalizePokerPlayMultiFlightFestivalId(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 96);
+}
+
+function normalizePokerPlayMultiFlightFestivalTitle(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 96);
+}
+
+function normalizePokerPlayMultiFlightFlightCode(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+}
+
+function normalizePokerPlayMultiFlightFlightLabel(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 96);
 }
 
 function normalizePokerPlayTournamentSatelliteAwardKind(value, fallback = 'ticket') {
@@ -309,6 +331,7 @@ function normalizeCashLifecycleSeatStatus(value, fallback = 'active') {
     'away',
     'waiting_big_blind',
     'busted',
+    'advanced',
     'paid',
     'void_refund',
   ]);
@@ -472,6 +495,30 @@ function normalizeCreateTableConfig(input = {}) {
   const satelliteAwardValueOil = tableType === 'tournament' && formatVariant === 'satellite'
     ? Math.max(0, normalizeOilAmount(input?.satelliteAwardValueOil, buyInOil))
     : 0;
+  const multiFlightFestivalParentId = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizePokerPlayMultiFlightFestivalId(input?.multiFlightFestivalParentId)
+    : '';
+  const multiFlightFestivalTitle = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizePokerPlayMultiFlightFestivalTitle(input?.multiFlightFestivalTitle, seriesTitle || title)
+    : '';
+  const multiFlightFlightCode = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizePokerPlayMultiFlightFlightCode(input?.multiFlightFlightCode)
+    : '';
+  const multiFlightFlightLabel = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizePokerPlayMultiFlightFlightLabel(
+      input?.multiFlightFlightLabel,
+      multiFlightFlightCode ? `Flight ${multiFlightFlightCode}` : ''
+    )
+    : '';
+  const multiFlightMergeSeriesId = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizeTrimmedString(input?.multiFlightMergeSeriesId)
+    : '';
+  const multiFlightMergeSeriesTitle = tableType === 'tournament' && formatVariant === 'multi_flight'
+    ? normalizeTrimmedString(input?.multiFlightMergeSeriesTitle)
+    : '';
+  const multiFlightAdvanceSeatCount = tableType === 'tournament' && formatVariant === 'multi_flight' && multiFlightMergeSeriesId
+    ? Math.max(1, Math.min(maxSeats, normalizeOilAmount(input?.multiFlightAdvanceSeatCount, minPlayers)))
+    : 0;
   const rebuyLimit = tableType === 'tournament'
     ? Math.max(0, normalizeOilAmount(input?.rebuyLimit, 0))
     : 0;
@@ -520,6 +567,13 @@ function normalizeCreateTableConfig(input = {}) {
     satelliteAwardKind,
     satelliteAwardCount,
     satelliteAwardValueOil,
+    multiFlightFestivalParentId,
+    multiFlightFestivalTitle,
+    multiFlightFlightCode,
+    multiFlightFlightLabel,
+    multiFlightMergeSeriesId,
+    multiFlightMergeSeriesTitle,
+    multiFlightAdvanceSeatCount,
     decisionCountdownSeconds: countdownSeconds,
     presenceTimeoutSeconds,
     reconnectGraceSeconds,
@@ -617,6 +671,11 @@ function buildMatchKey(config) {
       base.push(`sak${normalizePokerPlayTournamentSatelliteAwardKind(config?.satelliteAwardKind)}`);
       base.push(`san${Math.max(1, normalizeOilAmount(config?.satelliteAwardCount, 1))}`);
       base.push(`sav${Math.max(0, normalizeOilAmount(config?.satelliteAwardValueOil, config?.buyInOil))}`);
+    } else if (formatVariant === 'multi_flight') {
+      base.push(`mff${slugifySegment(config?.multiFlightFestivalParentId || 'none', 'none')}`);
+      base.push(`mfm${slugifySegment(config?.multiFlightMergeSeriesId || 'merge', 'merge')}`);
+      base.push(`mfc${slugifySegment(config?.multiFlightFlightCode || 'day', 'day')}`);
+      base.push(`mfa${Math.max(0, normalizeOilAmount(config?.multiFlightAdvanceSeatCount, 0))}`);
     }
   }
   if (normalizePokerPlayTableType(config?.tableType) === 'cash') {
@@ -651,6 +710,10 @@ function buildMatchKeyFromTable(table) {
     startTargetSeats: table?.rules?.startTargetSeats,
     formatVariant: table?.rules?.formatVariant,
     satelliteTargetSeriesId: table?.rules?.satelliteTargetSeriesId,
+    multiFlightFestivalParentId: table?.rules?.multiFlightFestivalParentId,
+    multiFlightMergeSeriesId: table?.rules?.multiFlightMergeSeriesId,
+    multiFlightFlightCode: table?.rules?.multiFlightFlightCode,
+    multiFlightAdvanceSeatCount: table?.rules?.multiFlightAdvanceSeatCount,
     satelliteAwardKind: table?.rules?.satelliteAwardKind,
     satelliteAwardCount: table?.rules?.satelliteAwardCount,
     satelliteAwardValueOil: table?.rules?.satelliteAwardValueOil,
@@ -1022,6 +1085,112 @@ function getTournamentSatelliteAwardValueOil(table) {
   return Math.max(0, normalizeOilAmount(table?.rules?.satelliteAwardValueOil, table?.buyInOil));
 }
 
+function getTournamentMultiFlightFestivalParentId(table) {
+  return normalizePokerPlayMultiFlightFestivalId(
+    table?.rules?.multiFlightFestivalParentId || table?.summary?.multiFlightFestivalParentId || ''
+  );
+}
+
+function getTournamentMultiFlightFestivalTitle(table) {
+  return normalizePokerPlayMultiFlightFestivalTitle(
+    table?.rules?.multiFlightFestivalTitle || table?.summary?.multiFlightFestivalTitle || table?.title || '',
+    table?.title || ''
+  );
+}
+
+function getTournamentMultiFlightFlightCode(table) {
+  return normalizePokerPlayMultiFlightFlightCode(
+    table?.rules?.multiFlightFlightCode || table?.summary?.multiFlightFlightCode || ''
+  );
+}
+
+function getTournamentMultiFlightFlightLabel(table) {
+  return normalizePokerPlayMultiFlightFlightLabel(
+    table?.rules?.multiFlightFlightLabel || table?.summary?.multiFlightFlightLabel || '',
+    getTournamentMultiFlightFlightCode(table) ? `Flight ${getTournamentMultiFlightFlightCode(table)}` : ''
+  );
+}
+
+function getTournamentMultiFlightMergeSeriesId(table) {
+  return normalizeTrimmedString(table?.rules?.multiFlightMergeSeriesId || table?.summary?.multiFlightMergeSeriesId || '');
+}
+
+function getTournamentMultiFlightMergeSeriesTitle(table) {
+  return normalizeTrimmedString(
+    table?.rules?.multiFlightMergeSeriesTitle || table?.summary?.multiFlightMergeSeriesTitle || ''
+  );
+}
+
+function getTournamentMultiFlightAdvanceSeatCount(table) {
+  return Math.max(0, normalizeOilAmount(table?.rules?.multiFlightAdvanceSeatCount, 0));
+}
+
+function isMultiFlightTournament(table) {
+  return getTournamentFormatVariant(table) === 'multi_flight';
+}
+
+function isMultiFlightFlightTable(table) {
+  return isMultiFlightTournament(table) && !!getTournamentMultiFlightMergeSeriesId(table);
+}
+
+function getTournamentMultiFlightStage(table) {
+  if (!isMultiFlightTournament(table)) return null;
+  return isMultiFlightFlightTable(table) ? 'flight' : 'merge';
+}
+
+function getTournamentMultiFlightImportMap(table) {
+  const raw = table?.state?.multiFlightImportsBySourceSeriesId;
+  return raw && typeof raw === 'object' ? cloneJson(raw, {}) : {};
+}
+
+function normalizeTournamentMultiFlightImportRecord(record = {}) {
+  const sourceSeriesId = normalizeTrimmedString(record?.sourceSeriesId);
+  if (!sourceSeriesId) return null;
+  return {
+    sourceSeriesId,
+    sourceSeriesTitle: normalizeTrimmedString(record?.sourceSeriesTitle) || null,
+    festivalParentId: normalizePokerPlayMultiFlightFestivalId(record?.festivalParentId) || null,
+    festivalTitle: normalizePokerPlayMultiFlightFestivalTitle(record?.festivalTitle) || null,
+    flightCode: normalizePokerPlayMultiFlightFlightCode(record?.flightCode) || null,
+    flightLabel: normalizePokerPlayMultiFlightFlightLabel(record?.flightLabel) || null,
+    entryCount: Math.max(0, normalizeOilAmount(record?.entryCount, 0)),
+    prizePoolOil: Math.max(0, normalizeOilAmount(record?.prizePoolOil, 0)),
+    bountyPoolOil: Math.max(0, normalizeOilAmount(record?.bountyPoolOil, 0)),
+    advancedSeatCount: Math.max(0, normalizeOilAmount(record?.advancedSeatCount, 0)),
+    carriedStackTotalOil: Math.max(0, normalizeOilAmount(record?.carriedStackTotalOil, 0)),
+    importedAt: normalizeIsoString(record?.importedAt) || null,
+  };
+}
+
+function buildTournamentMultiFlightImportSummary(entries) {
+  const bySourceSeriesId = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const importMap = getTournamentMultiFlightImportMap(entry?.table);
+    for (const value of Object.values(importMap)) {
+      const normalized = normalizeTournamentMultiFlightImportRecord(value);
+      if (!normalized?.sourceSeriesId) continue;
+      const existing = bySourceSeriesId.get(normalized.sourceSeriesId);
+      if (!existing || compareIsoAsc(existing.importedAt || '', normalized.importedAt || '') < 0) {
+        bySourceSeriesId.set(normalized.sourceSeriesId, normalized);
+      }
+    }
+  }
+  const items = Array.from(bySourceSeriesId.values()).sort((left, right) => {
+    const importedDelta = compareIsoAsc(left?.importedAt || '', right?.importedAt || '');
+    if (importedDelta !== 0) return importedDelta;
+    return String(left?.sourceSeriesId || '').localeCompare(String(right?.sourceSeriesId || ''));
+  });
+  return {
+    items,
+    flightCount: items.length,
+    entryCount: items.reduce((sum, item) => sum + Math.max(0, Number(item?.entryCount || 0)), 0),
+    prizePoolOil: items.reduce((sum, item) => sum + Math.max(0, Number(item?.prizePoolOil || 0)), 0),
+    bountyPoolOil: items.reduce((sum, item) => sum + Math.max(0, Number(item?.bountyPoolOil || 0)), 0),
+    advancedSeatCount: items.reduce((sum, item) => sum + Math.max(0, Number(item?.advancedSeatCount || 0)), 0),
+    carriedStackTotalOil: items.reduce((sum, item) => sum + Math.max(0, Number(item?.carriedStackTotalOil || 0)), 0),
+  };
+}
+
 function getTournamentRebuyLimit(table) {
   return Math.max(0, normalizeOilAmount(table?.rules?.rebuyLimit, 0));
 }
@@ -1223,7 +1392,7 @@ function isSeatInPlay(seat) {
 function isSeatOccupyingTable(seat) {
   const status = normalizeTrimmedString(seat?.status).toLowerCase();
   if (!seat) return false;
-  return status !== 'busted' && status !== 'paid' && status !== 'void_refund';
+  return status !== 'busted' && status !== 'advanced' && status !== 'paid' && status !== 'void_refund';
 }
 
 function isTournamentVoidedSeat(seat) {
@@ -2467,9 +2636,17 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const addonWindow = resolveTournamentAddonWindow(table, hand);
   const addonPrizePoolOil = Math.max(0, normalizeOilAmount(table?.state?.addonPrizePoolOil, 0));
   const addonBountyPoolOil = Math.max(0, normalizeOilAmount(table?.state?.addonBountyPoolOil, 0));
+  const multiFlightImportSummary = buildTournamentMultiFlightImportSummary([{ table }]);
+  const multiFlightStage = getTournamentMultiFlightStage(table);
+  const localEntrantCount = multiFlightStage === 'merge' && multiFlightImportSummary.flightCount > 0
+    ? multiFlightImportSummary.entryCount
+    : entryCount;
+  const localPrizePoolOil = multiFlightStage === 'merge' && multiFlightImportSummary.flightCount > 0
+    ? multiFlightImportSummary.prizePoolOil
+    : ((entryCount * computeTournamentPrizeContributionOil(table?.buyInOil, bountyModel, tournamentEntryFeeOil)) + addonPrizePoolOil);
   const localPayoutPlan = buildTournamentPayoutPlan({
-    entrantCount: entryCount,
-    prizePoolOil: (entryCount * computeTournamentPrizeContributionOil(table?.buyInOil, bountyModel, tournamentEntryFeeOil)) + addonPrizePoolOil,
+    entrantCount: localEntrantCount,
+    prizePoolOil: localPrizePoolOil,
     formatVariant,
     satelliteAwardCount: getTournamentSatelliteAwardCount(table),
     satelliteAwardKind: getTournamentSatelliteAwardKind(table),
@@ -2512,12 +2689,14 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     startTargetSeats,
     seatsUntilStart,
     startReady,
-    entryCount,
+    entryCount: localEntrantCount,
     acceptedReentryCount: Math.max(0, normalizeOilAmount(table?.state?.reentryCount, 0)),
     acceptedRebuyCount: Math.max(0, normalizeOilAmount(table?.state?.rebuyCount, 0)),
     bountyModel,
     bountyPerEntryOil,
-    bountyPoolOil: (entryCount * bountyPerEntryOil) + addonBountyPoolOil,
+    bountyPoolOil: multiFlightStage === 'merge' && multiFlightImportSummary.flightCount > 0
+      ? multiFlightImportSummary.bountyPoolOil
+      : ((entryCount * bountyPerEntryOil) + addonBountyPoolOil),
     tournamentEntryFeeOil,
     tournamentFeePoolOil: entryCount * tournamentEntryFeeOil,
     prizePoolOil: Number(localPayoutPlan.prizePoolOil || 0),
@@ -2539,6 +2718,35 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     satelliteAwardValueOil: formatVariant === 'satellite'
       ? getTournamentSatelliteAwardValueOil(table)
       : 0,
+    multiFlightFestivalParentId: isMultiFlightTournament(table)
+      ? getTournamentMultiFlightFestivalParentId(table)
+      : null,
+    multiFlightFestivalTitle: isMultiFlightTournament(table)
+      ? getTournamentMultiFlightFestivalTitle(table)
+      : null,
+    multiFlightStage,
+    multiFlightFlightCode: isMultiFlightTournament(table)
+      ? getTournamentMultiFlightFlightCode(table) || null
+      : null,
+    multiFlightFlightLabel: isMultiFlightTournament(table)
+      ? getTournamentMultiFlightFlightLabel(table) || null
+      : null,
+    multiFlightMergeSeriesId: isMultiFlightFlightTable(table)
+      ? getTournamentMultiFlightMergeSeriesId(table) || null
+      : null,
+    multiFlightMergeSeriesTitle: isMultiFlightFlightTable(table)
+      ? getTournamentMultiFlightMergeSeriesTitle(table) || null
+      : null,
+    multiFlightAdvanceSeatCount: isMultiFlightFlightTable(table)
+      ? getTournamentMultiFlightAdvanceSeatCount(table)
+      : 0,
+    multiFlightAdvancedSeatCount: Math.max(0, normalizeOilAmount(table?.state?.multiFlightAdvancedSeatCount, 0)),
+    multiFlightBaggedAt: normalizeIsoString(table?.state?.multiFlightBaggedAt) || null,
+    multiFlightImportedFlightCount: multiFlightImportSummary.flightCount,
+    multiFlightImportedEntryCount: multiFlightImportSummary.entryCount,
+    multiFlightImportedPrizePoolOil: multiFlightImportSummary.prizePoolOil,
+    multiFlightImportedBountyPoolOil: multiFlightImportSummary.bountyPoolOil,
+    multiFlightImportedCarriedStackTotalOil: multiFlightImportSummary.carriedStackTotalOil,
     addonWindowAfterHandNumbers: addonWindow.afterHandNumbers,
     addonWindowOpen: addonWindow.open,
     activeAddonWindowAfterHandNumber: addonWindow.activeAfterHandNumber,
@@ -2579,13 +2787,17 @@ function buildDynamicTableSummary(config, matchKey) {
   });
   const tournamentHeadline = tournamentFormatVariant === 'satellite'
     ? 'Six-max satellite tournament that awards downstream target-event qualification.'
+    : (tournamentFormatVariant === 'multi_flight'
+      ? (normalizeTrimmedString(config?.multiFlightMergeSeriesId)
+        ? 'Day 1 multi-flight table that bags surviving stacks into a downstream merge stage.'
+        : 'Merge-stage multi-flight tournament that receives carried stacks from Day 1 flights.')
     : (tournamentBountyModel === 'pko_50' || tournamentBountyModel === 'pko_75' || tournamentBountyModel === 'full_bounty'
       ? 'Six-max bounty tournament with real ladder prizes, live knockout rewards, and private human + agent seat threads.'
-    : (tournamentFillPolicy === 'fill_to_full'
-      ? 'Sit-and-go tournament that waits for a full table before the first hand.'
-      : (tournamentFillPolicy === 'fill_to_target'
-        ? `Sit-and-go tournament that waits for ${tournamentStartTargetSeats} seats before the first hand.`
-        : 'Six-max tournament with a real payout ladder and private human + agent seat threads.')));
+      : (tournamentFillPolicy === 'fill_to_full'
+        ? 'Sit-and-go tournament that waits for a full table before the first hand.'
+        : (tournamentFillPolicy === 'fill_to_target'
+          ? `Sit-and-go tournament that waits for ${tournamentStartTargetSeats} seats before the first hand.`
+          : 'Six-max tournament with a real payout ladder and private human + agent seat threads.'))));
   const summary = {
     headline: config.tableType === 'cash'
       ? 'Open cash table with private human + agent seat threads.'
@@ -2620,6 +2832,42 @@ function buildDynamicTableSummary(config, matchKey) {
     summary.satelliteAwardKind = tournamentFormatVariant === 'satellite' ? normalizePokerPlayTournamentSatelliteAwardKind(config?.satelliteAwardKind) : null;
     summary.satelliteAwardCount = tournamentFormatVariant === 'satellite' ? Math.max(1, normalizeOilAmount(config?.satelliteAwardCount, 1)) : 0;
     summary.satelliteAwardValueOil = tournamentFormatVariant === 'satellite' ? Math.max(0, normalizeOilAmount(config?.satelliteAwardValueOil, config?.buyInOil)) : 0;
+    summary.multiFlightFestivalParentId = tournamentFormatVariant === 'multi_flight'
+      ? normalizePokerPlayMultiFlightFestivalId(config?.multiFlightFestivalParentId) || null
+      : null;
+    summary.multiFlightFestivalTitle = tournamentFormatVariant === 'multi_flight'
+      ? normalizePokerPlayMultiFlightFestivalTitle(config?.multiFlightFestivalTitle, config?.seriesTitle || config?.title) || null
+      : null;
+    summary.multiFlightStage = tournamentFormatVariant === 'multi_flight'
+      ? (normalizeTrimmedString(config?.multiFlightMergeSeriesId) ? 'flight' : 'merge')
+      : null;
+    summary.multiFlightFlightCode = tournamentFormatVariant === 'multi_flight'
+      ? normalizePokerPlayMultiFlightFlightCode(config?.multiFlightFlightCode) || null
+      : null;
+    summary.multiFlightFlightLabel = tournamentFormatVariant === 'multi_flight'
+      ? normalizePokerPlayMultiFlightFlightLabel(
+        config?.multiFlightFlightLabel,
+        normalizePokerPlayMultiFlightFlightCode(config?.multiFlightFlightCode)
+          ? `Flight ${normalizePokerPlayMultiFlightFlightCode(config?.multiFlightFlightCode)}`
+          : ''
+      ) || null
+      : null;
+    summary.multiFlightMergeSeriesId = tournamentFormatVariant === 'multi_flight'
+      ? normalizeTrimmedString(config?.multiFlightMergeSeriesId) || null
+      : null;
+    summary.multiFlightMergeSeriesTitle = tournamentFormatVariant === 'multi_flight'
+      ? normalizeTrimmedString(config?.multiFlightMergeSeriesTitle) || null
+      : null;
+    summary.multiFlightAdvanceSeatCount = tournamentFormatVariant === 'multi_flight'
+      ? Math.max(0, normalizeOilAmount(config?.multiFlightAdvanceSeatCount, 0))
+      : 0;
+    summary.multiFlightAdvancedSeatCount = 0;
+    summary.multiFlightBaggedAt = null;
+    summary.multiFlightImportedFlightCount = 0;
+    summary.multiFlightImportedEntryCount = 0;
+    summary.multiFlightImportedPrizePoolOil = 0;
+    summary.multiFlightImportedBountyPoolOil = 0;
+    summary.multiFlightImportedCarriedStackTotalOil = 0;
     summary.addonWindowAfterHandNumbers = normalizePokerPlayTournamentAddonWindowAfterHandNumbers(config?.addonWindowAfterHandNumbers);
     summary.addonWindowOpen = false;
     summary.activeAddonWindowAfterHandNumber = 0;
@@ -2701,13 +2949,18 @@ function buildTournamentEconomics(entries) {
   const leadTable = (Array.isArray(entries) ? entries : []).find((entry) => entry?.table)?.table || null;
   const bountyModel = getTournamentBountyModel(leadTable);
   const formatVariant = getTournamentFormatVariant(leadTable);
+  const multiFlightImports = buildTournamentMultiFlightImportSummary(entries);
+  const multiFlightMergeStage = isMultiFlightTournament(leadTable) && !isMultiFlightFlightTable(leadTable) && multiFlightImports.flightCount > 0;
   const settledChopTable = (Array.isArray(entries) ? entries : [])
     .map((entry) => entry?.table || null)
     .find((table) => normalizeIsoString(table?.state?.chopSettledAt) && Array.isArray(table?.state?.payouts) && table.state.payouts.length);
+  const effectivePrizePoolOil = multiFlightMergeStage
+    ? multiFlightImports.prizePoolOil
+    : (prizePoolOil + addonPrizePoolOil);
   const payoutPlan = settledChopTable
     ? {
       entrantCount: entryCount,
-      prizePoolOil: Math.max(0, normalizeOilAmount(settledChopTable?.state?.prizePoolOil, prizePoolOil + addonPrizePoolOil)),
+      prizePoolOil: Math.max(0, normalizeOilAmount(settledChopTable?.state?.prizePoolOil, effectivePrizePoolOil)),
       payoutModel: normalizeTrimmedString(settledChopTable?.state?.payoutModel, 'deal_custom'),
       paidPlaces: Math.max(
         0,
@@ -2719,24 +2972,30 @@ function buildTournamentEconomics(entries) {
       payouts: cloneJson(settledChopTable?.state?.payouts, []),
     }
     : buildTournamentPayoutPlan({
-      entrantCount: entryCount,
-      prizePoolOil: prizePoolOil + addonPrizePoolOil,
+      entrantCount: multiFlightMergeStage ? multiFlightImports.entryCount : entryCount,
+      prizePoolOil: effectivePrizePoolOil,
       formatVariant,
       satelliteAwardCount: getTournamentSatelliteAwardCount(leadTable),
       satelliteAwardKind: getTournamentSatelliteAwardKind(leadTable),
     });
-  const completed = getActiveSeatRows(seats).length <= 1 && payoutPlan.entrantCount > 1;
+  const completed = (
+    getActiveSeatRows(seats).length <= 1
+    || (isMultiFlightFlightTable(leadTable) && !!normalizeIsoString(leadTable?.state?.multiFlightBaggedAt))
+  ) && payoutPlan.entrantCount > 1;
+  const storedStandingsTable = (Array.isArray(entries) ? entries : [])
+    .map((entry) => entry?.table || null)
+    .find((table) => Array.isArray(table?.state?.standings) && table.state.standings.length);
   return {
     ...payoutPlan,
     formatVariant,
     bountyModel,
     bountyPerEntryOil: computeTournamentInitialBountyOil(leadTable?.buyInOil, bountyModel, getTournamentEntryFeeOil(leadTable)),
     tournamentEntryFeeOil: getTournamentEntryFeeOil(leadTable),
-    bountyPoolOil: bountyPoolOil + addonBountyPoolOil,
+    bountyPoolOil: multiFlightMergeStage ? multiFlightImports.bountyPoolOil : (bountyPoolOil + addonBountyPoolOil),
     totalBountyAwardedOil,
     activeBountyPoolOil,
     uniquePlayerCount,
-    entryCount,
+    entryCount: multiFlightMergeStage ? multiFlightImports.entryCount : entryCount,
     reentryCount: Object.values(entryCountsByWallet).reduce((sum, count) => sum + Math.max(0, Number(count || 0) - 1), 0),
     rebuyCount,
     addonCount,
@@ -2747,8 +3006,28 @@ function buildTournamentEconomics(entries) {
     satelliteAwardKind: formatVariant === 'satellite' ? getTournamentSatelliteAwardKind(leadTable) : null,
     satelliteAwardCount: formatVariant === 'satellite' ? getTournamentSatelliteAwardCount(leadTable) : 0,
     satelliteAwardValueOil: formatVariant === 'satellite' ? getTournamentSatelliteAwardValueOil(leadTable) : 0,
+    multiFlightFestivalParentId: isMultiFlightTournament(leadTable) ? getTournamentMultiFlightFestivalParentId(leadTable) || null : null,
+    multiFlightFestivalTitle: isMultiFlightTournament(leadTable) ? getTournamentMultiFlightFestivalTitle(leadTable) || null : null,
+    multiFlightStage: getTournamentMultiFlightStage(leadTable),
+    multiFlightFlightCode: isMultiFlightTournament(leadTable) ? getTournamentMultiFlightFlightCode(leadTable) || null : null,
+    multiFlightFlightLabel: isMultiFlightTournament(leadTable) ? getTournamentMultiFlightFlightLabel(leadTable) || null : null,
+    multiFlightMergeSeriesId: isMultiFlightFlightTable(leadTable) ? getTournamentMultiFlightMergeSeriesId(leadTable) || null : null,
+    multiFlightMergeSeriesTitle: isMultiFlightFlightTable(leadTable) ? getTournamentMultiFlightMergeSeriesTitle(leadTable) || null : null,
+    multiFlightAdvanceSeatCount: isMultiFlightFlightTable(leadTable) ? getTournamentMultiFlightAdvanceSeatCount(leadTable) : 0,
+    multiFlightAdvancedSeatCount: multiFlightMergeStage
+      ? multiFlightImports.advancedSeatCount
+      : Math.max(0, normalizeOilAmount(leadTable?.state?.multiFlightAdvancedSeatCount, 0)),
+    multiFlightImportedFlightCount: multiFlightImports.flightCount,
+    multiFlightImportedEntryCount: multiFlightImports.entryCount,
+    multiFlightImportedPrizePoolOil: multiFlightImports.prizePoolOil,
+    multiFlightImportedBountyPoolOil: multiFlightImports.bountyPoolOil,
+    multiFlightImportedCarriedStackTotalOil: multiFlightImports.carriedStackTotalOil,
     completed,
-    standings: completed ? buildCompletedTournamentPlacements(entries) : [],
+    standings: completed
+      ? (storedStandingsTable
+        ? cloneJson(storedStandingsTable.state.standings, [])
+        : buildCompletedTournamentPlacements(entries))
+      : [],
   };
 }
 
@@ -3064,6 +3343,20 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     satelliteAwardKind: economics.satelliteAwardKind || null,
     satelliteAwardCount: Number(economics.satelliteAwardCount || 0),
     satelliteAwardValueOil: Number(economics.satelliteAwardValueOil || 0),
+    multiFlightFestivalParentId: economics.multiFlightFestivalParentId || null,
+    multiFlightFestivalTitle: economics.multiFlightFestivalTitle || null,
+    multiFlightStage: economics.multiFlightStage || null,
+    multiFlightFlightCode: economics.multiFlightFlightCode || null,
+    multiFlightFlightLabel: economics.multiFlightFlightLabel || null,
+    multiFlightMergeSeriesId: economics.multiFlightMergeSeriesId || null,
+    multiFlightMergeSeriesTitle: economics.multiFlightMergeSeriesTitle || null,
+    multiFlightAdvanceSeatCount: Number(economics.multiFlightAdvanceSeatCount || 0),
+    multiFlightAdvancedSeatCount: Number(economics.multiFlightAdvancedSeatCount || 0),
+    multiFlightImportedFlightCount: Number(economics.multiFlightImportedFlightCount || 0),
+    multiFlightImportedEntryCount: Number(economics.multiFlightImportedEntryCount || 0),
+    multiFlightImportedPrizePoolOil: Number(economics.multiFlightImportedPrizePoolOil || 0),
+    multiFlightImportedBountyPoolOil: Number(economics.multiFlightImportedBountyPoolOil || 0),
+    multiFlightImportedCarriedStackTotalOil: Number(economics.multiFlightImportedCarriedStackTotalOil || 0),
     addonCount: Number(economics.addonCount || 0),
     addonPrizePoolOil: Number(economics.addonPrizePoolOil || 0),
     addonBountyPoolOil: Number(economics.addonBountyPoolOil || 0),
@@ -6016,6 +6309,381 @@ function hasPendingTournamentRebuyOpportunity(entries) {
   return false;
 }
 
+function buildMultiFlightBaggedStandings(seats, advancers, {
+  tableId,
+  atIso,
+  mergeSeriesId,
+  mergeTableId,
+} = {}) {
+  const advancerBySeat = new Map(
+    (Array.isArray(advancers) ? advancers : [])
+      .map((item) => [normalizeSeatNumber(item?.seat?.seatNumber), item])
+      .filter(([seatNumber]) => seatNumber > 0)
+  );
+  const orderedAdvancers = (Array.isArray(advancers) ? advancers : [])
+    .slice()
+    .sort((left, right) => {
+      const stackDelta = Number(right?.carriedStackOil || right?.seat?.stackOil || 0) - Number(left?.carriedStackOil || left?.seat?.stackOil || 0);
+      if (stackDelta !== 0) return stackDelta;
+      return normalizeSeatNumber(left?.seat?.seatNumber) - normalizeSeatNumber(right?.seat?.seatNumber);
+    });
+  const bustedSeats = sortSeatsByTournamentElimination(
+    (Array.isArray(seats) ? seats : []).filter((seat) => !advancerBySeat.has(normalizeSeatNumber(seat?.seatNumber)))
+  );
+  const items = [];
+  for (const advancer of orderedAdvancers) {
+    const seat = advancer?.seat || null;
+    items.push({
+      place: items.length + 1,
+      tableId: tableId || seat?.tableId || null,
+      seatNumber: normalizeSeatNumber(seat?.seatNumber),
+      displayName: seat?.displayName || formatSeatLabel(seat?.seatNumber),
+      houseId: seat?.houseId || null,
+      walletSubject: seat?.walletSubject || '',
+      status: 'advanced',
+      prizeOil: 0,
+      bountyWonOil: Number(seat?.bountyWonOil || 0),
+      totalWonOil: Number(seat?.bountyWonOil || 0),
+      eliminatedAt: null,
+      payoutSettledAt: atIso,
+      carriedStackOil: Number(advancer?.carriedStackOil || seat?.stackOil || 0),
+      advancedAt: atIso,
+      advancedToSeriesId: mergeSeriesId || null,
+      advancedToTableId: mergeTableId || null,
+    });
+  }
+  for (const seat of bustedSeats) {
+    items.push({
+      place: items.length + 1,
+      tableId: tableId || seat?.tableId || null,
+      seatNumber: normalizeSeatNumber(seat?.seatNumber),
+      displayName: seat?.displayName || formatSeatLabel(seat?.seatNumber),
+      houseId: seat?.houseId || null,
+      walletSubject: seat?.walletSubject || '',
+      status: seat?.status || 'busted',
+      prizeOil: Number(seat?.prizeOil || 0),
+      bountyWonOil: Number(seat?.bountyWonOil || 0),
+      totalWonOil: Number(seat?.prizeOil || 0) + Number(seat?.bountyWonOil || 0),
+      eliminatedAt: seat?.eliminatedAt || null,
+      payoutSettledAt: seat?.payoutSettledAt || null,
+      carriedStackOil: 0,
+      advancedAt: null,
+      advancedToSeriesId: null,
+      advancedToTableId: null,
+    });
+  }
+  return items;
+}
+
+function upsertMultiFlightImportIntoTargetTable(deps, table, record, atIso) {
+  if (!table?.tableId) return table;
+  const normalizedRecord = normalizeTournamentMultiFlightImportRecord({
+    ...record,
+    importedAt: atIso,
+  });
+  if (!normalizedRecord) return table;
+  const nextImports = {
+    ...getTournamentMultiFlightImportMap(table),
+    [normalizedRecord.sourceSeriesId]: normalizedRecord,
+  };
+  return deps.upsertPokerPlayTable({
+    ...table,
+    state: {
+      ...(table.state && typeof table.state === 'object' ? table.state : {}),
+      multiFlightImportsBySourceSeriesId: nextImports,
+    },
+    updatedAt: atIso,
+  });
+}
+
+function registerMultiFlightAdvancerIntoMergeSeries(deps, sourceTable, sourceSeat, {
+  carriedStackOil,
+  asOf,
+} = {}) {
+  const targetSeriesId = getTournamentMultiFlightMergeSeriesId(sourceTable);
+  if (!targetSeriesId) {
+    return null;
+  }
+  const requestAt = toProcessIso(deps, asOf);
+  const entries = listTournamentSeriesEntriesDirectBySeriesId(deps, targetSeriesId, {
+    includeClosed: false,
+  });
+  if (!entries.length) {
+    return null;
+  }
+  const walletSubject = normalizeTrimmedString(sourceSeat?.walletSubject);
+  if (!walletSubject) {
+    return null;
+  }
+  const existingEntry = entries.find((entry) => (
+    normalizeTrimmedString(entry?.viewerSeat?.walletSubject) === walletSubject
+      || !!(Array.isArray(entry?.seats) ? entry.seats : []).find((seat) => normalizeTrimmedString(seat?.walletSubject) === walletSubject && !isTournamentVoidedSeat(seat))
+  ));
+  if (existingEntry?.table) {
+    const existingSeat = (Array.isArray(existingEntry?.seats) ? existingEntry.seats : [])
+      .find((seat) => normalizeTrimmedString(seat?.walletSubject) === walletSubject && !isTournamentVoidedSeat(seat)) || null;
+    return {
+      table: existingEntry.table,
+      seat: existingSeat,
+      carriedStackOil: Math.max(0, Number(existingSeat?.stackOil || carriedStackOil || 0)),
+      created: false,
+    };
+  }
+  const candidates = entries
+    .map((entry) => ({
+      ...entry,
+      summary: computeTableSummary(entry.table, entry.seats, entry.hand, null),
+    }))
+    .filter((entry) => Number(entry?.summary?.openSeatCount || 0) > 0)
+    .filter((entry) => !entry?.hand || entry.hand.status !== 'live' || resolveTournamentLateRegistration(entry.table, entry.hand).open)
+    .sort((left, right) => {
+      const scheduledDelta = Number(!!left?.summary?.scheduledStartPending) - Number(!!right?.summary?.scheduledStartPending);
+      if (scheduledDelta !== 0) return scheduledDelta;
+      const occupancyDelta = Number(right?.summary?.occupancy || 0) - Number(left?.summary?.occupancy || 0);
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(left?.table?.tableId || '').localeCompare(String(right?.table?.tableId || ''));
+    });
+  const candidate = candidates[0] || null;
+  if (!candidate?.table) {
+    return null;
+  }
+  const targetTable = maybeClearReusableTournamentSeats(deps, candidate.table);
+  const synced = syncPokerPlayTable(deps, targetTable.tableId, { processAt: requestAt });
+  const seatNumber = findNextOpenSeatNumber(synced.table, synced.seats);
+  if (!seatNumber) {
+    return null;
+  }
+  const nextTableState = incrementTournamentEntryState(synced.table, walletSubject, {
+    reentry: false,
+    rebuy: false,
+  });
+  const seatStatus = synced.hand && synced.hand.status === 'live' ? 'registered' : 'active';
+  const targetSeat = deps.upsertPokerPlaySeat({
+    tableId: synced.table.tableId,
+    seatNumber,
+    portalSessionId: sourceSeat?.portalSessionId || null,
+    houseId: sourceSeat?.houseId || null,
+    walletSubject,
+    displayName: normalizePokerPlayDisplayName(sourceSeat?.displayName, walletSubject.slice(0, 8)),
+    status: seatStatus,
+    buyInOil: Math.max(0, Number(sourceSeat?.buyInOil || synced.table.buyInOil || 0)),
+    stackOil: Math.max(0, Number(carriedStackOil || sourceSeat?.stackOil || 0)),
+    streamflowVerificationId: sourceSeat?.streamflowVerificationId || null,
+    lastSeenAt: requestAt,
+    disconnectedAt: null,
+    eliminatedAt: null,
+    prizeOil: 0,
+    currentBountyOil: Math.max(0, Number(sourceSeat?.currentBountyOil || 0)),
+    bountyWonOil: Math.max(0, Number(sourceSeat?.bountyWonOil || 0)),
+    bountySettledAt: null,
+    payoutSettledAt: null,
+    updatedAt: requestAt,
+  });
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...synced.table,
+    state: setSeatTimeBankRemainingSeconds(
+      {
+        ...synced.table,
+        state: nextTableState,
+      },
+      seatNumber,
+      getSeatTimeBankRemainingSeconds(synced.table, seatNumber)
+    ),
+    updatedAt: requestAt,
+  });
+  upsertPokerPlayPlayerStatForSeat(deps, updatedTable, targetSeat, {
+    processAt: requestAt,
+    status: seatStatus === 'registered' ? 'registered' : 'open',
+    stackOil: Number(targetSeat?.stackOil || 0),
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: synced.hand?.handId || null,
+      seatNumber,
+      actorRole: 'system',
+      eventKind: 'multi_flight_advancer_registered',
+      payload: {
+        sourceTableId: sourceTable?.tableId || null,
+        sourceSeriesId: getTournamentSeriesRef(sourceTable).seriesId || null,
+        flightCode: getTournamentMultiFlightFlightCode(sourceTable) || null,
+        walletSubject,
+        carriedStackOil: Number(targetSeat?.stackOil || 0),
+      },
+      createdAt: requestAt,
+    });
+  }
+  if (synced.hand?.handId && typeof deps.createPokerPlayMessage === 'function') {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: synced.hand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `${formatSeatLabel(seatNumber, targetSeat.displayName)} advances from ${getTournamentMultiFlightFlightLabel(sourceTable) || sourceTable?.title || 'Day 1'} with ${Number(targetSeat?.stackOil || 0)} chips.`,
+      createdAt: requestAt,
+    });
+  }
+  return {
+    table: updatedTable,
+    seat: targetSeat,
+    carriedStackOil: Number(targetSeat?.stackOil || 0),
+    created: true,
+  };
+}
+
+function maybeBagMultiFlightFlight(deps, table, seats, hand, atIso) {
+  if (!isMultiFlightFlightTable(table)) {
+    return { table, seats, hand, bagged: false };
+  }
+  if (!hasPokerPlayTableStarted(table, hand)) {
+    return { table, seats, hand, bagged: false };
+  }
+  if (normalizeIsoString(table?.state?.multiFlightBaggedAt) || normalizeIsoString(table?.state?.completedAt)) {
+    return { table, seats, hand, bagged: false };
+  }
+  const activeSeats = getActiveSeatRows(seats);
+  const advanceSeatCount = getTournamentMultiFlightAdvanceSeatCount(table);
+  if (advanceSeatCount <= 0 || !activeSeats.length || activeSeats.length > advanceSeatCount) {
+    return { table, seats, hand, bagged: false };
+  }
+  const flightEconomics = buildTournamentEconomics([{ table, seats, hand }]);
+  const advancerRegistrations = [];
+  const touchedTargetTableIds = new Set();
+  for (const seat of activeSeats.slice().sort((left, right) => {
+    const stackDelta = Number(right?.stackOil || 0) - Number(left?.stackOil || 0);
+    if (stackDelta !== 0) return stackDelta;
+    return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+  })) {
+    const registration = registerMultiFlightAdvancerIntoMergeSeries(deps, table, seat, {
+      carriedStackOil: Number(seat?.stackOil || 0),
+      asOf: atIso,
+    });
+    if (!registration?.table || !registration?.seat) {
+      return { table, seats, hand, bagged: false };
+    }
+    advancerRegistrations.push({
+      seat,
+      mergeSeat: registration.seat,
+      mergeTableId: registration.table.tableId,
+      carriedStackOil: Number(registration.carriedStackOil || 0),
+    });
+    touchedTargetTableIds.add(String(registration.table.tableId || ''));
+  }
+  const standings = buildMultiFlightBaggedStandings(seats, advancerRegistrations, {
+    tableId: table.tableId,
+    atIso,
+    mergeSeriesId: getTournamentMultiFlightMergeSeriesId(table),
+    mergeTableId: advancerRegistrations[0]?.mergeTableId || null,
+  });
+  const placementByWallet = new Map(
+    standings
+      .filter((item) => normalizeTrimmedString(item?.walletSubject))
+      .map((item) => [normalizeTrimmedString(item.walletSubject), Number(item.place || 0)])
+  );
+  const advancerWallets = new Set(
+    advancerRegistrations.map((item) => normalizeTrimmedString(item?.seat?.walletSubject)).filter(Boolean)
+  );
+  for (const seat of Array.isArray(seats) ? seats : []) {
+    const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+    const advanced = advancerWallets.has(walletSubject);
+    const updatedSeat = deps.upsertPokerPlaySeat({
+      ...seat,
+      status: advanced ? 'advanced' : seat?.status || 'busted',
+      stackOil: advanced ? 0 : Number(seat?.stackOil || 0),
+      currentBountyOil: advanced ? 0 : Number(seat?.currentBountyOil || 0),
+      payoutSettledAt: advanced ? atIso : (seat?.payoutSettledAt || null),
+      updatedAt: atIso,
+    });
+    upsertPokerPlayPlayerStatForSeat(deps, table, updatedSeat, {
+      processAt: atIso,
+      finishPosition: placementByWallet.get(walletSubject) || null,
+      status: advanced ? 'advanced' : (updatedSeat.status || 'busted'),
+      close: true,
+      closedAt: atIso,
+      payoutSettledAt: advanced ? atIso : null,
+      stackOil: 0,
+    });
+    if (advanced && typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: table.tableId,
+        handId: hand?.handId || null,
+        seatNumber: normalizeSeatNumber(updatedSeat?.seatNumber),
+        actorRole: 'system',
+        eventKind: 'multi_flight_advanced',
+        payload: {
+          mergeSeriesId: getTournamentMultiFlightMergeSeriesId(table) || null,
+          mergeTableId: advancerRegistrations.find((item) => normalizeTrimmedString(item?.seat?.walletSubject) === walletSubject)?.mergeTableId || null,
+          carriedStackOil: advancerRegistrations.find((item) => normalizeTrimmedString(item?.seat?.walletSubject) === walletSubject)?.carriedStackOil || 0,
+        },
+        createdAt: atIso,
+      });
+    }
+  }
+  const importRecord = {
+    sourceSeriesId: getTournamentSeriesRef(table).seriesId || table.tableId,
+    sourceSeriesTitle: getTournamentSeriesRef(table).seriesTitle || table.title,
+    festivalParentId: getTournamentMultiFlightFestivalParentId(table) || null,
+    festivalTitle: getTournamentMultiFlightFestivalTitle(table) || null,
+    flightCode: getTournamentMultiFlightFlightCode(table) || null,
+    flightLabel: getTournamentMultiFlightFlightLabel(table) || null,
+    entryCount: Number(flightEconomics.entryCount || 0),
+    prizePoolOil: Number(flightEconomics.prizePoolOil || 0),
+    bountyPoolOil: Number(flightEconomics.bountyPoolOil || 0),
+    advancedSeatCount: advancerRegistrations.length,
+    carriedStackTotalOil: advancerRegistrations.reduce((sum, item) => sum + Number(item?.carriedStackOil || 0), 0),
+  };
+  for (const targetTableId of Array.from(touchedTargetTableIds).filter(Boolean)) {
+    const targetTable = deps.getPokerPlayTableById(targetTableId);
+    if (targetTable) {
+      upsertMultiFlightImportIntoTargetTable(deps, targetTable, importRecord, atIso);
+    }
+  }
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    state: {
+      ...(table.state && typeof table.state === 'object' ? table.state : {}),
+      completedAt: atIso,
+      winnerSeatNumber: 0,
+      prizeOil: 0,
+      prizeSettledAt: atIso,
+      payoutModel: 'multi_flight_bag',
+      payouts: [],
+      standings,
+      multiFlightBaggedAt: atIso,
+      multiFlightAdvancedSeatCount: advancerRegistrations.length,
+      multiFlightImportedIntoSeriesId: getTournamentMultiFlightMergeSeriesId(table) || null,
+      multiFlightImportedIntoTableId: advancerRegistrations[0]?.mergeTableId || null,
+      activeHandId: hand?.handId || null,
+      activeHandNumber: Number(hand?.handNumber || table?.state?.activeHandNumber || 0),
+      prizePoolOil: Number(flightEconomics.prizePoolOil || 0),
+      bountyPoolOil: Number(flightEconomics.bountyPoolOil || 0),
+    },
+    updatedAt: atIso,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: hand?.handId || null,
+      seatNumber: null,
+      actorRole: 'system',
+      eventKind: 'multi_flight_bagged',
+      payload: {
+        mergeSeriesId: getTournamentMultiFlightMergeSeriesId(table) || null,
+        mergeTableId: advancerRegistrations[0]?.mergeTableId || null,
+        advancedSeatCount: advancerRegistrations.length,
+        importedPrizePoolOil: Number(flightEconomics.prizePoolOil || 0),
+      },
+      createdAt: atIso,
+    });
+  }
+  return {
+    table: updatedTable,
+    seats: deps.listPokerPlaySeatsByTable(table.tableId),
+    hand,
+    bagged: true,
+  };
+}
+
 function registerSatelliteAwardIntoTargetSeries(deps, award, { asOf } = {}) {
   if (!award?.targetSeriesId || typeof deps.upsertPokerSatelliteAward !== 'function') {
     return award;
@@ -6393,6 +7061,11 @@ function maybeClearReusableTournamentSeats(deps, table) {
       addonCount: 0,
       addonPrizePoolOil: 0,
       addonBountyPoolOil: 0,
+      multiFlightBaggedAt: null,
+      multiFlightAdvancedSeatCount: 0,
+      multiFlightImportedIntoSeriesId: null,
+      multiFlightImportedIntoTableId: null,
+      multiFlightImportsBySourceSeriesId: {},
       rebuyCountsByWallet: {},
       addonCountsByWallet: {},
       satelliteAwardsSettledAt: null,
@@ -6893,7 +7566,7 @@ function closeTable(deps, { tableId, reason, actorLabel = 'operator', refundMode
       continue;
     }
 
-    const alreadySettled = status === 'paid' || status === 'busted' || status === 'void_refund';
+    const alreadySettled = status === 'paid' || status === 'advanced' || status === 'busted' || status === 'void_refund';
     const refundAmount = refundPolicy === 'none' || alreadySettled
       ? 0
       : Math.max(0, Number(seat?.buyInOil || 0));
@@ -7820,6 +8493,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
         updatedAt: atIso,
       });
 
+      const multiFlightBag = maybeBagMultiFlightFlight(deps, table, seats, hand, atIso);
+      table = multiFlightBag.table;
+      seats = multiFlightBag.seats;
+      hand = multiFlightBag.hand;
+      if (multiFlightBag.bagged) break;
+
       const tournamentSettlement = settleTournamentIfComplete(deps, table, seats, hand, atIso);
       table = tournamentSettlement.table;
       seats = tournamentSettlement.seats;
@@ -7867,6 +8546,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
     hand = scheduledBreakState.hand;
     if (scheduledBreakState.active) break;
     if (scheduledBreakState.changed) continue;
+
+    const multiFlightBag = maybeBagMultiFlightFlight(deps, table, seats, hand, atIso);
+    table = multiFlightBag.table;
+    seats = multiFlightBag.seats;
+    hand = multiFlightBag.hand;
+    if (multiFlightBag.bagged) break;
 
     if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= getPokerPlayAutoStartSeatTarget(table, hand)) {
       const started = startNewTableHand(deps, table, seats, hand, atIso);
@@ -7946,8 +8631,9 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
       finishPosition,
     };
   };
+  const baseTableSummary = computeTableSummary(table, seats, hand, viewerSeat);
   const tableSummary = {
-    ...computeTableSummary(table, seats, hand, viewerSeat),
+    ...baseTableSummary,
     waitlistCount: Number(waitlist?.count || 0),
     viewerWaitlistPosition: waitlist?.viewerPosition ?? null,
     ...(series
@@ -7961,6 +8647,20 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
         payoutModel: series?.payoutModel || '',
         paidPlaces: Number(series?.paidPlaces || 0),
         payouts: cloneJson(series?.payouts, []),
+        multiFlightFestivalParentId: series?.multiFlightFestivalParentId || baseTableSummary?.multiFlightFestivalParentId || null,
+        multiFlightFestivalTitle: series?.multiFlightFestivalTitle || baseTableSummary?.multiFlightFestivalTitle || null,
+        multiFlightStage: series?.multiFlightStage || baseTableSummary?.multiFlightStage || null,
+        multiFlightFlightCode: series?.multiFlightFlightCode || baseTableSummary?.multiFlightFlightCode || null,
+        multiFlightFlightLabel: series?.multiFlightFlightLabel || baseTableSummary?.multiFlightFlightLabel || null,
+        multiFlightMergeSeriesId: series?.multiFlightMergeSeriesId || baseTableSummary?.multiFlightMergeSeriesId || null,
+        multiFlightMergeSeriesTitle: series?.multiFlightMergeSeriesTitle || baseTableSummary?.multiFlightMergeSeriesTitle || null,
+        multiFlightAdvanceSeatCount: Number(series?.multiFlightAdvanceSeatCount || baseTableSummary?.multiFlightAdvanceSeatCount || 0),
+        multiFlightAdvancedSeatCount: Number(series?.multiFlightAdvancedSeatCount || baseTableSummary?.multiFlightAdvancedSeatCount || 0),
+        multiFlightImportedFlightCount: Number(series?.multiFlightImportedFlightCount || baseTableSummary?.multiFlightImportedFlightCount || 0),
+        multiFlightImportedEntryCount: Number(series?.multiFlightImportedEntryCount || baseTableSummary?.multiFlightImportedEntryCount || 0),
+        multiFlightImportedPrizePoolOil: Number(series?.multiFlightImportedPrizePoolOil || baseTableSummary?.multiFlightImportedPrizePoolOil || 0),
+        multiFlightImportedBountyPoolOil: Number(series?.multiFlightImportedBountyPoolOil || baseTableSummary?.multiFlightImportedBountyPoolOil || 0),
+        multiFlightImportedCarriedStackTotalOil: Number(series?.multiFlightImportedCarriedStackTotalOil || baseTableSummary?.multiFlightImportedCarriedStackTotalOil || 0),
       }
       : {}),
   };
@@ -8330,6 +9030,9 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       addonCount: 0,
       addonPrizePoolOil: 0,
       addonBountyPoolOil: 0,
+      multiFlightBaggedAt: null,
+      multiFlightAdvancedSeatCount: 0,
+      multiFlightImportsBySourceSeriesId: {},
       entryCountsByWallet: {},
       rebuyCountsByWallet: {},
       addonCountsByWallet: {},
@@ -8365,6 +9068,13 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       satelliteAwardKind: normalized.tableType === 'tournament' ? normalized.satelliteAwardKind : 'ticket',
       satelliteAwardCount: normalized.tableType === 'tournament' ? normalized.satelliteAwardCount : 0,
       satelliteAwardValueOil: normalized.tableType === 'tournament' ? normalized.satelliteAwardValueOil : 0,
+      multiFlightFestivalParentId: normalized.tableType === 'tournament' ? (normalized.multiFlightFestivalParentId || null) : null,
+      multiFlightFestivalTitle: normalized.tableType === 'tournament' ? (normalized.multiFlightFestivalTitle || null) : null,
+      multiFlightFlightCode: normalized.tableType === 'tournament' ? (normalized.multiFlightFlightCode || null) : null,
+      multiFlightFlightLabel: normalized.tableType === 'tournament' ? (normalized.multiFlightFlightLabel || null) : null,
+      multiFlightMergeSeriesId: normalized.tableType === 'tournament' ? (normalized.multiFlightMergeSeriesId || null) : null,
+      multiFlightMergeSeriesTitle: normalized.tableType === 'tournament' ? (normalized.multiFlightMergeSeriesTitle || null) : null,
+      multiFlightAdvanceSeatCount: normalized.tableType === 'tournament' ? normalized.multiFlightAdvanceSeatCount : 0,
       fillPolicy: normalized.tableType === 'tournament' ? normalized.fillPolicy : 'open_match',
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       rebuyLimit: normalized.tableType === 'tournament' ? normalized.rebuyLimit : 0,
@@ -9179,6 +9889,13 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     throw createRouteError(409, 'POKER_PLAY_TOURNAMENT_SCHEDULED', 'This tournament is scheduled and not open for hand start yet.', {
       scheduledStartAt: getTournamentScheduledStartAt(table) || null,
     });
+  }
+  if (tournamentTable && isMultiFlightTournament(table) && !isMultiFlightFlightTable(table)) {
+    throw createRouteError(
+      409,
+      'POKER_PLAY_MULTIFLIGHT_MERGE_DIRECT_SEAT_UNAVAILABLE',
+      'Merge-stage multi-flight tables only accept carried stacks from completed flights.'
+    );
   }
 
   const requestedSeatNumber = normalizeSeatNumber(body?.seatNumber);

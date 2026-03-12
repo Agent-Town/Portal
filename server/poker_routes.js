@@ -87,6 +87,7 @@ const {
   sitOutTableSeat,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
+  syncPokerPlayTable,
   transferCashTableSeat,
   updatePokerPlayPolicy,
   updateAutoActPolicy,
@@ -940,6 +941,11 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessRebuyA111111111111111111111111', houseId: 'house_harness_rebuy_a', displayName: 'Rebuy Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessRebuyB111111111111111111111111', houseId: 'house_harness_rebuy_b', displayName: 'Rebuy Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessRebuyC111111111111111111111111', houseId: 'house_harness_rebuy_c', displayName: 'Rebuy Charlie' },
+      ],
+      multiflight_story: [
+        { seatNumber: 1, address: 'So1anaHarnessFlightA11111111111111111111111', houseId: 'house_harness_flight_a', displayName: 'Flight Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessFlightB11111111111111111111111', houseId: 'house_harness_flight_b', displayName: 'Flight Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessFlightC11111111111111111111111', houseId: 'house_harness_flight_c', displayName: 'Flight Charlie' },
       ],
       chop_deal_story: [
         { seatNumber: 1, address: 'So1anaHarnessChopA1111111111111111111111111', houseId: 'house_harness_chop_a', displayName: 'Deal Alpha' },
@@ -2334,6 +2340,193 @@ function registerPokerRoutes(app, deps) {
       });
       seededSeriesId = seriesId;
       seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'multiflight_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const festivalParentId = `pkfestival_harness_${randomHex(6)}`;
+      const festivalTitle = 'Harness Festival';
+      const flightSeriesId = `pkseries_harness_flight_${randomHex(6)}`;
+      const mergeSeriesId = `pkseries_harness_merge_${randomHex(6)}`;
+      const mergeTableId = `${nextTableId}_merge`;
+      const mergeScheduledStartAt = addHarnessSeconds(requestAt, 3600);
+      upsertPokerPlayTable({
+        tableId: mergeTableId,
+        slug: `${normalizedScenario}-merge-${randomHex(4)}`,
+        title: 'Harness Festival Day 2',
+        tableType: 'tournament',
+        status: 'scheduled',
+        maxSeats: 6,
+        smallBlindOil: 100,
+        bigBlindOil: 200,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 0,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          scheduledStartAt: mergeScheduledStartAt,
+          entryCount: 0,
+          reentryCount: 0,
+          rebuyCount: 0,
+          addonCount: 0,
+          addonPrizePoolOil: 0,
+          addonBountyPoolOil: 0,
+          multiFlightBaggedAt: null,
+          multiFlightAdvancedSeatCount: 0,
+          multiFlightImportsBySourceSeriesId: {},
+          entryCountsByWallet: {},
+          rebuyCountsByWallet: {},
+          addonCountsByWallet: {},
+          completedScheduledBreakAfterHands: [],
+          scheduledBreakId: null,
+          scheduledBreakLabel: null,
+          scheduledBreakAfterHandNumber: 0,
+          scheduledBreakStartedAt: null,
+          scheduledBreakUntilAt: null,
+          scheduledBreakDurationMinutes: 0,
+          timeBankRemainingBySeat: {},
+        },
+        rules: buildHarnessTournamentRules(mergeSeriesId, 'Harness Festival Day 2', {
+          formatVariant: 'multi_flight',
+          scheduledStartAt: mergeScheduledStartAt,
+          lateRegistrationHands: 0,
+          multiFlightFestivalParentId: festivalParentId,
+          multiFlightFestivalTitle: festivalTitle,
+        }),
+        summary: {
+          headline: 'Harness Day 2 merge table.',
+          seriesId: mergeSeriesId,
+          seriesTitle: 'Harness Festival Day 2',
+          formatVariant: 'multi_flight',
+          multiFlightFestivalParentId: festivalParentId,
+          multiFlightFestivalTitle: festivalTitle,
+          multiFlightStage: 'merge',
+          multiFlightImportedFlightCount: 0,
+          multiFlightImportedEntryCount: 0,
+          multiFlightImportedPrizePoolOil: 0,
+          multiFlightImportedCarriedStackTotalOil: 0,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Festival Flight A',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 4,
+          lastSettledHandId: `${handId}_settled`,
+          lastSettledHandNumber: 4,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          entryCount: 3,
+          reentryCount: 0,
+          rebuyCount: 0,
+          addonCount: 0,
+          addonPrizePoolOil: 0,
+          addonBountyPoolOil: 0,
+          multiFlightBaggedAt: null,
+          multiFlightAdvancedSeatCount: 0,
+          multiFlightImportsBySourceSeriesId: {},
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          rebuyCountsByWallet: {},
+          addonCountsByWallet: {},
+          completedScheduledBreakAfterHands: [],
+          scheduledBreakId: null,
+          scheduledBreakLabel: null,
+          scheduledBreakAfterHandNumber: 0,
+          scheduledBreakStartedAt: null,
+          scheduledBreakUntilAt: null,
+          scheduledBreakDurationMinutes: 0,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+            '3': 15,
+          },
+        },
+        rules: buildHarnessTournamentRules(flightSeriesId, 'Harness Festival Flight A', {
+          formatVariant: 'multi_flight',
+          lateRegistrationHands: 0,
+          multiFlightFestivalParentId: festivalParentId,
+          multiFlightFestivalTitle: festivalTitle,
+          multiFlightFlightCode: 'A',
+          multiFlightFlightLabel: 'Flight A',
+          multiFlightMergeSeriesId: mergeSeriesId,
+          multiFlightMergeSeriesTitle: 'Harness Festival Day 2',
+          multiFlightAdvanceSeatCount: 2,
+        }),
+        summary: {
+          headline: 'Harness multi-flight day 1 table.',
+          seriesId: flightSeriesId,
+          seriesTitle: 'Harness Festival Flight A',
+          formatVariant: 'multi_flight',
+          multiFlightFestivalParentId: festivalParentId,
+          multiFlightFestivalTitle: festivalTitle,
+          multiFlightStage: 'flight',
+          multiFlightFlightCode: 'A',
+          multiFlightFlightLabel: 'Flight A',
+          multiFlightMergeSeriesId: mergeSeriesId,
+          multiFlightMergeSeriesTitle: 'Harness Festival Day 2',
+          multiFlightAdvanceSeatCount: 2,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 900, status: 'active', eliminatedAt: null },
+        { actor: seatTwo, stackOil: 600, status: 'active', eliminatedAt: null },
+        { actor: seatThree, stackOil: 0, status: 'busted', eliminatedAt: addHarnessSeconds(requestAt, -60) },
+      ].forEach(({ actor, stackOil, status, eliminatedAt }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status,
+          buyInOil: 600,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          eliminatedAt,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      syncPokerPlayTable(playRouteDeps, nextTableId, {
+        processAt: addHarnessSeconds(requestAt, 1),
+      });
+      seededSeriesId = flightSeriesId;
+      seededTableIds.push(nextTableId, mergeTableId);
+      reconciliationDebug = {
+        multiFlight: {
+          festivalParentId,
+          flightSeriesId,
+          mergeSeriesId,
+          mergeTableId,
+          expectedAdvancedSeatCount: 2,
+          expectedImportedPrizePoolOil: 1800,
+          expectedImportedEntryCount: 3,
+          expectedCarriedStackTotalOil: 1500,
+        },
+      };
     } else if (normalizedScenario === 'chop_deal_story') {
       const [seatOne, seatTwo, seatThree] = normalizedActors;
       const seriesId = `pkseries_harness_chop_${randomHex(6)}`;
