@@ -125,6 +125,8 @@ const {
   createConversationArtifact,
   createLibraryItemRevision,
   createLibraryShelf,
+  createLibraryPublicStack,
+  createLibraryPublicStackMember,
   createRun,
   createSealedContextViolation,
   createTraceEvent,
@@ -145,6 +147,8 @@ const {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibraryPublicStackById,
+  getLibraryPublicStackByIdempotency,
   getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
@@ -188,6 +192,8 @@ const {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryPublicStackMembers,
+  listLibraryPublicStacks,
   listLibrarySatchelRelays,
   listLibrarySatchelReceipts,
   listLibraryPublications,
@@ -3835,6 +3841,7 @@ const PLATFORM_TRAINER_JOB_KINDS = new Set([
 const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', 'failed', 'succeeded', 'canceled']);
 const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
 const LIBRARY_PUBLICATION_FIXTURE_APPROVAL_ID = 'appr_fixture_library_publish_approved_01';
+const LIBRARY_PUBLIC_STACK_FIXTURE_APPROVAL_ID = 'appr_fixture_library_public_stack_approved_01';
 const LIBRARY_PEER_RELAY_FIXTURE_APPROVAL_ID = 'appr_fixture_library_peer_relay_approved_01';
 const LIBRARY_SATCHEL_RELAY_FIXTURE_APPROVAL_ID = 'appr_fixture_library_satchel_relay_approved_01';
 
@@ -4467,6 +4474,8 @@ registerPlatformReadRoutes(app, {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibraryPublicStack,
+  createLibraryPublicStackMember,
   createLibrarySatchelReceipt,
   createLibrarySatchelRelay,
   createLibraryShelf,
@@ -4483,6 +4492,8 @@ registerPlatformReadRoutes(app, {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibraryPublicStackById,
+  getLibraryPublicStackByIdempotency,
   getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
@@ -4505,6 +4516,8 @@ registerPlatformReadRoutes(app, {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryPublicStackMembers,
+  listLibraryPublicStacks,
   listLibrarySatchelRelays,
   listLibrarySatchelReceipts,
   listLibraryPublications,
@@ -4531,6 +4544,7 @@ registerPlatformReadRoutes(app, {
   replaceConfigComponentVersions,
   dispatchLibraryPeerRelayEnvelope,
   dispatchLibrarySatchelRelayEnvelope,
+  resolveApprovedLibraryPublicStackApproval,
   resolveApprovedLibraryPeerRelayApproval,
   resolveApprovedLibrarySatchelRelayApproval,
   resolveApprovedLibraryPublicationApproval,
@@ -6389,6 +6403,41 @@ function resolveApprovedLibraryPublicationApproval(approvalId, {
     subject: {
       libraryItemId: String(libraryItemId || '').trim() || null,
       visibility: String(visibility || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
+}
+
+function resolveApprovedLibraryPublicStackApproval(approvalId, {
+  houseId = '',
+  scopeSetId = '',
+  familySlug = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== LIBRARY_PUBLIC_STACK_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'library_public_stack',
+    subject: {
+      scopeSetId: String(scopeSetId || '').trim() || null,
+      familySlug: String(familySlug || '').trim() || null,
     },
     status: 'approved',
     requestedBy: {

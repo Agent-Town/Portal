@@ -13,6 +13,8 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryLink,
     createLibraryPeerReceipt,
     createLibraryPeerRelay,
+    createLibraryPublicStack,
+    createLibraryPublicStackMember,
     createLibrarySatchelReceipt,
     createLibrarySatchelRelay,
     createLibraryShelf,
@@ -29,6 +31,8 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPeerRelayById,
     getLibraryPeerRelayByIdempotency,
     getLibraryPublicationById,
+    getLibraryPublicStackById,
+    getLibraryPublicStackByIdempotency,
     getLibrarySatchelRelayById,
     getLibrarySatchelRelayByIdempotency,
     getLibraryShelfById,
@@ -49,6 +53,8 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryLinks,
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
+    listLibraryPublicStackMembers,
+    listLibraryPublicStacks,
     listLibrarySatchelRelays,
     listLibrarySatchelReceipts,
     listLibraryPublications,
@@ -77,6 +83,7 @@ function registerPlatformReadRoutes(app, deps) {
     replaceConfigComponentVersions,
     dispatchLibraryPeerRelayEnvelope,
     dispatchLibrarySatchelRelayEnvelope,
+    resolveApprovedLibraryPublicStackApproval,
     resolveApprovedLibraryPeerRelayApproval,
     resolveApprovedLibrarySatchelRelayApproval,
     resolveApprovedLibraryPublicationApproval,
@@ -1070,6 +1077,254 @@ function registerPlatformReadRoutes(app, deps) {
     }).filter(Boolean);
   }
 
+  function findLibraryPublicStackImportsForTarget({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedPublicStackId) {
+      return new Map();
+    }
+    return listLibraryItems({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).reduce((acc, item) => {
+      if (!item || typeof item !== 'object') return acc;
+      if (String(item.importedState || '').trim() !== 'imported_artifact') return acc;
+      if (item.readOnly !== true) return acc;
+      if (String(item.sourceKind || '').trim() !== 'public_stack_artifact') return acc;
+      const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+      if (String(metadata.libraryPublicStackId || '').trim() !== normalizedPublicStackId) return acc;
+      const libraryPublicationId = String(metadata.libraryPublicationId || '').trim();
+      const registryId = String(item.registryId || metadata.registryId || '').trim();
+      if (libraryPublicationId) acc.set(libraryPublicationId, item);
+      if (registryId) acc.set(registryId, item);
+      return acc;
+    }, new Map());
+  }
+
+  function findImportedPublicStackScopeSetForTarget({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    bundleHash = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+    const normalizedBundleHash = String(bundleHash || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedPublicStackId) return null;
+    return listScopeSets({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).find((scopeSet) => {
+      const metadata = scopeSet?.metadata && typeof scopeSet.metadata === 'object' ? scopeSet.metadata : {};
+      if (String(metadata.importKind || '').trim() !== 'public_stack_bundle') return false;
+      if (String(metadata.libraryPublicStackId || '').trim() !== normalizedPublicStackId) return false;
+      if (normalizedBundleHash && String(metadata.bundleHash || '').trim() !== normalizedBundleHash) return false;
+      return true;
+    }) || null;
+  }
+
+  function getHouseLibraryPublicStackFamilyInfo(familySlug = 'house_library_stacks') {
+    const normalizedFamilySlug = String(familySlug || 'house_library_stacks').trim() || 'house_library_stacks';
+    if (normalizedFamilySlug === 'house_library_stacks') {
+      return {
+        familySlug: normalizedFamilySlug,
+        displayName: 'House Library Stacks',
+        description: 'Curated Satchels published from House Library.',
+        status: 'published',
+      };
+    }
+    return {
+      familySlug: normalizedFamilySlug,
+      displayName: normalizedFamilySlug,
+      description: null,
+      status: 'published',
+    };
+  }
+
+  function searchLibraryPublicStackGroups({
+    query = '',
+    family = '',
+  } = {}) {
+    const normalizedFamily = String(family || '').trim();
+    if (normalizedFamily && normalizedFamily !== 'house_library_stacks') {
+      return [];
+    }
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    const stacks = listLibraryPublicStacks({})
+      .filter((entry) => String(entry?.publicationState || '').trim() === 'published')
+      .filter((entry) => {
+        if (!normalizedQuery) return true;
+        const haystack = [
+          String(entry?.title || ''),
+          String(entry?.summary || ''),
+          String(entry?.familySlug || ''),
+          String(entry?.metadata?.manifest?.title || ''),
+        ].join(' ').toLowerCase();
+        return haystack.includes(normalizedQuery);
+      });
+    if (!stacks.length) return [];
+    const familyInfo = getHouseLibraryPublicStackFamilyInfo('house_library_stacks');
+    return [{
+      family: familyInfo.familySlug,
+      familySlug: familyInfo.familySlug,
+      familyTitle: familyInfo.displayName,
+      familyDescription: familyInfo.description || null,
+      familyStatus: familyInfo.status || 'published',
+      storefront: {
+        title: familyInfo.displayName,
+        summary: familyInfo.description || null,
+      },
+      memberCount: stacks.length,
+      members: stacks.map((entry) => {
+        const members = listLibraryPublicStackMembers({
+          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+        });
+        return {
+          registryEntityId: String(entry?.libraryPublicStackId || '').trim(),
+          registryId: String(entry?.libraryPublicStackId || '').trim(),
+          entityKind: 'library_public_stack_bundle',
+          slug: String(entry?.libraryPublicStackId || '').trim(),
+          displayName: String(entry?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
+          description: String(entry?.summary || '').trim() || null,
+          projection: {
+            bundleHash: String(entry?.bundleHash || '').trim() || null,
+            scopeSetId: String(entry?.scopeSetId || '').trim() || null,
+            memberCount: members.length,
+            sourceHouseId: String(entry?.houseId || '').trim() || null,
+          },
+          proofCards: [],
+          loadouts: [],
+          storefront: {
+            title: String(entry?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
+            summary: String(entry?.summary || '').trim() || null,
+            proofCount: 0,
+            loadoutCount: 0,
+            memberCount: members.length,
+          },
+        };
+      }).sort((a, b) => String(a?.displayName || '').localeCompare(String(b?.displayName || ''))),
+    }];
+  }
+
+  function buildLibraryPublicStackPreviewPayload({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+  } = {}) {
+    const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+    if (!normalizedPublicStackId) {
+      return {
+        ok: false,
+        code: 'PUBLIC_STACK_NOT_FOUND',
+        message: 'Public Stack not found.',
+      };
+    }
+    const publicStack = getLibraryPublicStackById(normalizedPublicStackId);
+    if (!publicStack || String(publicStack.publicationState || '').trim() !== 'published') {
+      return {
+        ok: false,
+        code: 'PUBLIC_STACK_NOT_FOUND',
+        message: 'Public Stack not found.',
+      };
+    }
+    const manifest = publicStack?.metadata?.manifest && typeof publicStack.metadata.manifest === 'object'
+      ? publicStack.metadata.manifest
+      : {};
+    const members = listLibraryPublicStackMembers({
+      libraryPublicStackId: normalizedPublicStackId,
+    }).map((member) => {
+      const metadata = member?.metadata && typeof member.metadata === 'object' ? member.metadata : {};
+      return {
+        position: Number.isFinite(Number(member?.sortIndex)) ? Number(member.sortIndex) : 0,
+        libraryItemId: String(member?.libraryItemId || metadata.libraryItemId || '').trim() || null,
+        libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
+        registryId: String(member?.registryId || metadata.registryId || '').trim() || null,
+        contentHash: String(metadata.contentHash || '').trim() || null,
+        itemType: String(metadata.itemType || '').trim() || 'library_note',
+        title: String(metadata.title || member?.registryId || member?.libraryPublicationId || '').trim() || String(member?.libraryPublicationId || ''),
+        summary: String(metadata.summary || '').trim() || null,
+        contentText: String(metadata.contentText || ''),
+        contentRef: metadata.contentRef ? String(metadata.contentRef) : null,
+        sourceKind: String(metadata.sourceKind || '').trim() || null,
+        sourceRef: String(metadata.sourceRef || '').trim() || null,
+      };
+    });
+    const importedItems = (houseId && teamId)
+      ? findLibraryPublicStackImportsForTarget({
+          houseId,
+          teamId,
+          libraryPublicStackId: normalizedPublicStackId,
+        })
+      : new Map();
+    const localScopeSet = (houseId && teamId)
+      ? findImportedPublicStackScopeSetForTarget({
+          houseId,
+          teamId,
+          libraryPublicStackId: normalizedPublicStackId,
+          bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim(),
+        })
+      : null;
+    const memberPreviews = members.map((member) => {
+      const importedItem = importedItems instanceof Map
+        ? (importedItems.get(member.libraryPublicationId) || importedItems.get(member.registryId) || null)
+        : null;
+      return {
+        ...member,
+        alreadyImported: !!importedItem,
+        importedItem: importedItem ? projectLibraryItemForRead(importedItem) : null,
+      };
+    });
+    const importedCount = memberPreviews.filter((member) => member.alreadyImported).length;
+    const familyInfo = getHouseLibraryPublicStackFamilyInfo(String(publicStack?.familySlug || '').trim() || 'house_library_stacks');
+    return {
+      ok: true,
+      preview: {
+        registryId: normalizedPublicStackId,
+        registryEntityId: normalizedPublicStackId,
+        libraryPublicStackId: normalizedPublicStackId,
+        displayName: String(publicStack?.title || normalizedPublicStackId).trim() || normalizedPublicStackId,
+        description: String(publicStack?.summary || '').trim() || null,
+        entityKind: 'library_public_stack_bundle',
+        bundleKind: 'library_public_stack',
+        family: familyInfo.familySlug,
+        familyTitle: familyInfo.displayName,
+        sourceHouseId: String(publicStack?.houseId || '').trim() || null,
+        sourceTeamId: String(publicStack?.teamId || '').trim() || null,
+        scopeSetId: String(publicStack?.scopeSetId || manifest?.scopeSetId || '').trim() || null,
+        scopeKind: String(manifest?.scopeKind || 'reading_table').trim() || 'reading_table',
+        bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
+        publicationState: String(publicStack?.publicationState || '').trim() || 'published',
+        memberCount: memberPreviews.length,
+        importedCount,
+        alreadyImported: importedCount > 0,
+        alreadyImportedAll: importedCount === memberPreviews.length && memberPreviews.length > 0,
+        members: memberPreviews,
+        localScopeSet: localScopeSet
+          ? {
+              scopeSetId: localScopeSet.scopeSetId,
+              title: localScopeSet.title,
+              orderedItemIds: listScopeSetItems(localScopeSet.scopeSetId).map((entry) => entry.libraryItemId),
+            }
+          : null,
+        storefront: {
+          memberCount: memberPreviews.length,
+        },
+        provenance: {
+          summary: `Published from ${String(publicStack?.houseId || '').trim() || 'another House'} with ${memberPreviews.length} curated Library artifacts.`,
+          bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
+          orderedPublicationIds: Array.isArray(manifest?.orderedPublicationIds) ? manifest.orderedPublicationIds : memberPreviews.map((member) => member.libraryPublicationId).filter(Boolean),
+          orderedRegistryIds: Array.isArray(manifest?.orderedRegistryIds) ? manifest.orderedRegistryIds : memberPreviews.map((member) => member.registryId).filter(Boolean),
+        },
+      },
+    };
+  }
+
   function flattenPublicStackSearchGroups(groups = []) {
     const source = Array.isArray(groups) ? groups : [];
     return source.flatMap((group) => {
@@ -1094,9 +1349,19 @@ function registerPlatformReadRoutes(app, deps) {
   }
 
   function buildPublicStackPreviewPayload({
+    houseId = '',
+    teamId = '',
     registryEntityId = '',
   } = {}) {
     const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+    const publicStackPreview = buildLibraryPublicStackPreviewPayload({
+      houseId,
+      teamId,
+      libraryPublicStackId: normalizedRegistryEntityId,
+    });
+    if (publicStackPreview.ok) {
+      return publicStackPreview;
+    }
     const entity = getRegistryEntityById(normalizedRegistryEntityId);
     if (!entity) {
       return {
@@ -1310,6 +1575,70 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function persistLibraryPublicStackRecord({
+    houseId = '',
+    teamId = '',
+    scopeSetId = '',
+    familySlug = 'house_library_stacks',
+    title = '',
+    summary = '',
+    manifest = null,
+    metadata = null,
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibraryPublicStackByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        publicStack: existing,
+        members: listLibraryPublicStackMembers({
+          libraryPublicStackId: existing.libraryPublicStackId,
+        }),
+      };
+    }
+    const publicStack = createLibraryPublicStack({
+      libraryPublicStackId: `pstack_${randomHex(12)}`,
+      houseId,
+      teamId,
+      scopeSetId,
+      familySlug,
+      title,
+      summary,
+      bundleHash: String(manifest?.bundleHash || '').trim(),
+      publicationState: 'published',
+      idempotencyKey,
+      metadata: {
+        ...(manifest && typeof manifest === 'object' ? { manifest } : {}),
+        ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      },
+      nowIso: nowIso(),
+    });
+    const members = Array.isArray(manifest?.members) ? manifest.members : [];
+    members.forEach((member) => {
+      createLibraryPublicStackMember({
+        libraryPublicStackMemberId: `pstackm_${randomHex(12)}`,
+        libraryPublicStackId: publicStack.libraryPublicStackId,
+        libraryPublicationId: String(member?.libraryPublicationId || '').trim(),
+        registryId: String(member?.registryId || '').trim(),
+        libraryItemId: String(member?.libraryItemId || '').trim(),
+        sortIndex: Number.isFinite(Number(member?.position)) ? Number(member.position) : 0,
+        metadata: member && typeof member === 'object' ? member : {},
+        nowIso: nowIso(),
+      });
+    });
+    return {
+      status: 201,
+      publicStack,
+      members: listLibraryPublicStackMembers({
+        libraryPublicStackId: publicStack.libraryPublicStackId,
+      }),
+    };
+  }
+
   function persistLibraryPeerRelayRecord({
     houseId = '',
     teamId = '',
@@ -1511,6 +1840,42 @@ function registerPlatformReadRoutes(app, deps) {
       orderedPublicationIds: members.map((entry) => entry.libraryPublicationId),
       orderedRegistryIds: members.map((entry) => entry.registryId).filter(Boolean),
       members,
+    };
+    return {
+      ...manifestCore,
+      bundleHash: sha256PrefixedHex(stableJsonStringify(manifestCore)),
+    };
+  }
+
+  function buildLibraryPublicStackBundleManifest({
+    scopeSet = null,
+    scopeSetItems = [],
+    itemsById = new Map(),
+    publicationsByItemId = new Map(),
+    familySlug = 'house_library_stacks',
+  } = {}) {
+    const satchelManifest = buildLibrarySatchelBundleManifest({
+      scopeSet,
+      scopeSetItems,
+      itemsById,
+      publicationsByItemId,
+      targetHouseId: '',
+      transportKind: 'registry.public_stack.v1',
+    });
+    const manifestCore = {
+      kind: 'library_public_stack_bundle.v1',
+      sourceHouseId: satchelManifest.sourceHouseId,
+      sourceTeamId: satchelManifest.sourceTeamId,
+      scopeSetId: satchelManifest.scopeSetId,
+      title: satchelManifest.title,
+      scopeKind: satchelManifest.scopeKind,
+      sourceShelfId: satchelManifest.sourceShelfId,
+      familySlug: String(familySlug || 'house_library_stacks').trim() || 'house_library_stacks',
+      memberCount: satchelManifest.memberCount,
+      orderedItemIds: satchelManifest.orderedItemIds,
+      orderedPublicationIds: satchelManifest.orderedPublicationIds,
+      orderedRegistryIds: satchelManifest.orderedRegistryIds,
+      members: satchelManifest.members,
     };
     return {
       ...manifestCore,
@@ -1823,7 +2188,10 @@ function registerPlatformReadRoutes(app, deps) {
     }
     const query = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
     const family = typeof req.query?.family === 'string' ? req.query.family.trim() : '';
-    const groups = searchRegistryFamilyGroups({ query, family });
+    const groups = [
+      ...searchRegistryFamilyGroups({ query, family }),
+      ...searchLibraryPublicStackGroups({ query, family }),
+    ];
     const results = flattenPublicStackSearchGroups(groups);
     setUnifiedPlatformRegistryPreviewSnapshot({
       query,
@@ -1851,7 +2219,12 @@ function registerPlatformReadRoutes(app, deps) {
     if (!registryEntityId) {
       return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to preview a Public Stack.', { requestId });
     }
-    const preview = buildPublicStackPreviewPayload({ registryEntityId });
+    const context = resolveSessionPlatformContext(session);
+    const preview = buildPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      registryEntityId,
+    });
     if (!preview.ok) {
       return sendPortalApiError(res, 404, preview.code || 'REGISTRY_ENTITY_NOT_FOUND', preview.message || 'Registry artifact not found.', { requestId });
     }
@@ -1864,6 +2237,179 @@ function registerPlatformReadRoutes(app, deps) {
       preview: preview.preview,
     });
     return sendPortalApiSuccess(res, preview, { requestId });
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/imports', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before importing a Public Stack.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before importing a Public Stack.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to import a Public Stack.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to import a Public Stack.', { requestId });
+    }
+    const resolved = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    if (!resolved.ok) {
+      return sendPortalApiError(res, 404, resolved.code || 'PUBLIC_STACK_NOT_FOUND', resolved.message || 'Public Stack not found.', { requestId });
+    }
+    const importedItems = [];
+    const importedLinks = [];
+    let createdSomething = false;
+    resolved.preview.members.forEach((member) => {
+      const existingImported = member.alreadyImported
+        ? (member.importedItem || null)
+        : null;
+      if (existingImported) {
+        importedItems.push(existingImported);
+        importedLinks.push(...listLibraryLinks({ libraryItemId: existingImported.libraryItemId }));
+        return;
+      }
+      const registryId = String(member.registryId || '').trim() || `regstack_${randomHex(8)}`;
+      const persisted = persistLibraryItemRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        idempotencyKey: `${idempotencyKey}:${member.libraryPublicationId}`,
+        itemType: 'imported_artifact',
+        title: String(member.title || registryId).trim() || registryId,
+        summary: `Imported from Public Stack · ${registryId}`,
+        contentText: [
+          `Public Stack: ${resolved.preview.displayName}`,
+          `Public Stack ID: ${resolved.preview.libraryPublicStackId}`,
+          `Source House: ${String(resolved.preview.sourceHouseId || '').trim() || 'unknown'}`,
+          `Registry ID: ${registryId}`,
+          `Publication ID: ${String(member.libraryPublicationId || '').trim() || '—'}`,
+          `Item type: ${String(member.itemType || '').trim() || '—'}`,
+          `Summary: ${String(member.summary || '').trim() || '—'}`,
+          `Content hash: ${String(member.contentHash || '').trim() || '—'}`,
+        ].join('\n'),
+        contentRef: member.contentRef ? String(member.contentRef) : (registryId || resolved.preview.libraryPublicStackId),
+        sourceKind: 'public_stack_artifact',
+        sourceRef: `${resolved.preview.libraryPublicStackId}:${member.libraryPublicationId}`,
+        visibility: 'house_private',
+        importedState: 'imported_artifact',
+        registryId,
+        readOnly: true,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.import',
+          importKind: 'public_stack_artifact',
+          sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
+          targetHouseId: context.houseId,
+          libraryPublicStackId: resolved.preview.libraryPublicStackId,
+          libraryPublicationId: member.libraryPublicationId,
+          scopeSetId: resolved.preview.scopeSetId,
+          contentHash: member.contentHash,
+          bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+          position: member.position,
+          registryId,
+        },
+        links: [
+          {
+            linkKind: 'imported_from_public_stack',
+            sourceKind: 'public_stack_artifact',
+            sourceRef: resolved.preview.libraryPublicStackId,
+            metadata: {
+              sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
+              registryId,
+              libraryPublicationId: member.libraryPublicationId,
+              bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+            },
+          },
+          {
+            linkKind: 'published_bundle_member',
+            sourceKind: 'library_publication',
+            sourceRef: member.libraryPublicationId,
+            metadata: {
+              registryId,
+              sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
+              libraryPublicStackId: resolved.preview.libraryPublicStackId,
+              bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+            },
+          },
+        ],
+      });
+      importedItems.push(persisted.item);
+      importedLinks.push(...persisted.links);
+      if (persisted.status === 201) {
+        createdSomething = true;
+      }
+    });
+
+    let scopeSet = resolved.preview.localScopeSet
+      ? getScopeSetById(String(resolved.preview.localScopeSet.scopeSetId || '').trim())
+      : findImportedPublicStackScopeSetForTarget({
+          houseId: context.houseId,
+          teamId: context.activeTeamId,
+          libraryPublicStackId: resolved.preview.libraryPublicStackId,
+          bundleHash: String(resolved.preview.bundleHash || '').trim(),
+        });
+    if (!scopeSet) {
+      scopeSet = createScopeSet({
+        scopeSetId: `scope_${randomHex(12)}`,
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        title: String(resolved.preview.displayName || 'Imported Public Stack').trim() || 'Imported Public Stack',
+        createdBy: 'human',
+        idempotencyKey: `${idempotencyKey}:scope`,
+        metadata: {
+          source: 'portal.house.library.public-stack.import',
+          scopeKind: 'satchel',
+          importKind: 'public_stack_bundle',
+          libraryPublicStackId: resolved.preview.libraryPublicStackId,
+          sourceScopeSetId: resolved.preview.scopeSetId,
+          bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+          sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
+        },
+        nowIso: nowIso(),
+      });
+      createdSomething = true;
+    }
+    const orderedImportedItemIds = resolved.preview.members.map((member) => {
+      const directMatch = importedItems.find((item) => String(item?.sourceRef || '').trim() === `${resolved.preview.libraryPublicStackId}:${member.libraryPublicationId}`);
+      if (directMatch) return directMatch.libraryItemId;
+      return null;
+    }).filter(Boolean);
+    replaceScopeSetItems({
+      scopeSetId: scopeSet.scopeSetId,
+      itemIds: orderedImportedItemIds,
+      nowIso: nowIso(),
+    });
+
+    const previewAfterImport = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: resolved.preview.libraryPublicStackId,
+    });
+    return sendPortalApiSuccess(res, {
+      import: {
+        libraryPublicStackId: resolved.preview.libraryPublicStackId,
+        importedCount: importedItems.length,
+        memberCount: resolved.preview.memberCount,
+        createdSomething,
+      },
+      items: importedItems.map((item) => projectLibraryItemForRead(item)),
+      links: importedLinks,
+      scopeSet: previewAfterImport.ok ? previewAfterImport.preview.localScopeSet : {
+        scopeSetId: scopeSet.scopeSetId,
+        title: scopeSet.title,
+        orderedItemIds: orderedImportedItemIds,
+      },
+    }, { requestId, status: createdSomething ? 201 : 200 });
   });
 
   app.post('/api/platform/library/benchmarks/run', express.json({ limit: '64kb' }), (req, res) => {
@@ -2469,6 +3015,155 @@ function registerPlatformReadRoutes(app, deps) {
         libraryItemId: item.libraryItemId,
         contentHash: item.contentHash,
         sourceRef: item.sourceRef,
+      },
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/public-stacks', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before publishing a Public Stack.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before publishing a Public Stack.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to publish a Public Stack.', { requestId });
+    }
+    const existingPublicStack = getLibraryPublicStackByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingPublicStack) {
+      return sendPortalApiSuccess(res, {
+        publicStack: existingPublicStack,
+        members: listLibraryPublicStackMembers({
+          libraryPublicStackId: existingPublicStack.libraryPublicStackId,
+        }),
+      }, { requestId, status: 200 });
+    }
+    const scopeSetId = typeof req.body?.scopeSetId === 'string' ? req.body.scopeSetId.trim() : '';
+    const familySlug = typeof req.body?.familySlug === 'string' ? req.body.familySlug.trim() : 'house_library_stacks';
+    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+    if (!scopeSetId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SCOPE_SET_REQUIRED', 'scopeSetId is required to publish a Public Stack.', { requestId });
+    }
+    const scopeSet = getScopeSetById(scopeSetId);
+    if (!scopeSet || scopeSet.houseId !== context.houseId || scopeSet.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_SCOPE_SET_NOT_FOUND', 'The requested Reading Table or Satchel could not be found for this House team.', { requestId });
+    }
+    const scopeSetItems = listScopeSetItems(scopeSet.scopeSetId);
+    if (!scopeSetItems.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLIC_STACK_EMPTY', 'A Public Stack requires at least one Library item.', { requestId });
+    }
+    const itemsById = new Map(
+      listLibraryItems({ houseId: context.houseId, teamId: context.activeTeamId })
+        .map((item) => [item.libraryItemId, item])
+    );
+    const missingItemIds = scopeSetItems
+      .map((entry) => String(entry?.libraryItemId || '').trim())
+      .filter((libraryItemId) => libraryItemId && !itemsById.has(libraryItemId));
+    if (missingItemIds.length) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'One or more Public Stack members could not be found for this House team.', {
+        requestId,
+        details: {
+          missingItemIds,
+          scopeSetId: scopeSet.scopeSetId,
+        },
+      });
+    }
+    const blockedItemIds = scopeSetItems
+      .map((entry) => String(entry?.libraryItemId || '').trim())
+      .filter((libraryItemId) => {
+        const item = itemsById.get(libraryItemId);
+        return !!item && isLibraryItemSealActive(item);
+      });
+    if (blockedItemIds.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_SEAL_BLOCKED', 'A sealed Library item cannot be included in a Public Stack.', {
+        requestId,
+        details: {
+          blockedItemIds,
+          scopeSetId: scopeSet.scopeSetId,
+        },
+      });
+    }
+    const publications = listLibraryPublications({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+    }).filter((entry) => String(entry?.publicationState || '').trim() === 'published');
+    const publicationsByItemId = new Map();
+    publications.forEach((publication) => {
+      const libraryItemId = String(publication?.libraryItemId || '').trim();
+      if (!libraryItemId || publicationsByItemId.has(libraryItemId)) return;
+      publicationsByItemId.set(libraryItemId, publication);
+    });
+    const missingPublicationItemIds = scopeSetItems
+      .map((entry) => String(entry?.libraryItemId || '').trim())
+      .filter((libraryItemId) => libraryItemId && !publicationsByItemId.has(libraryItemId));
+    if (missingPublicationItemIds.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLIC_STACK_PUBLICATION_REQUIRED', 'Every Public Stack member must be published before bundle publication.', {
+        requestId,
+        details: {
+          missingPublicationItemIds,
+          scopeSetId: scopeSet.scopeSetId,
+        },
+      });
+    }
+    const approval = resolveApprovedLibraryPublicStackApproval(approvalId, {
+      houseId: context.houseId,
+      scopeSetId: scopeSet.scopeSetId,
+      familySlug,
+    });
+    if (!approval) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLIC_STACK_APPROVAL_REQUIRED', 'Publishing a Public Stack requires explicit approval.', {
+        requestId,
+        details: {
+          approvalId: approvalId || null,
+          approvalKind: 'library_public_stack',
+          scopeSetId: scopeSet.scopeSetId,
+          familySlug,
+        },
+      });
+    }
+    const manifest = buildLibraryPublicStackBundleManifest({
+      scopeSet,
+      scopeSetItems,
+      itemsById,
+      publicationsByItemId,
+      familySlug,
+    });
+    const persisted = persistLibraryPublicStackRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      scopeSetId: scopeSet.scopeSetId,
+      familySlug,
+      title: String(manifest?.title || scopeSet.title || 'Public Stack').trim() || 'Public Stack',
+      summary: `Published from ${context.houseId} · ${manifest.memberCount} curated Library item${manifest.memberCount === 1 ? '' : 's'}.`,
+      manifest,
+      metadata: {
+        approvalId: approval.approvalId,
+        approvalKind: approval.approvalKind,
+        sourceScopeKind: String(manifest?.scopeKind || 'reading_table').trim() || 'reading_table',
+        memberCount: manifest.memberCount,
+      },
+      idempotencyKey,
+    });
+    return sendPortalApiSuccess(res, {
+      publicStack: persisted.publicStack,
+      members: persisted.members,
+      bundleManifest: manifest,
+      scopeSet: {
+        scopeSetId: scopeSet.scopeSetId,
+        title: scopeSet.title,
+        scopeKind: String(scopeSet?.metadata?.scopeKind || 'reading_table').trim() || 'reading_table',
+        orderedItemIds: manifest.orderedItemIds,
       },
     }, { requestId, status: persisted.status });
   });
