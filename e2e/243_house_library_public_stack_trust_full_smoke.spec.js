@@ -4,6 +4,7 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const {
   openHouseLibraryPublicStackPreview,
   openHouseLibraryPreviewDetails,
+  openHouseLibrarySatchelPublishDrawer,
 } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
@@ -125,6 +126,7 @@ test('M34.4: House Library trust flow stays in the same shell from Public Stack 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
   await page.getByRole('button', { name: /Journey Trust Pack/ }).first().click();
+  await openHouseLibrarySatchelPublishDrawer(page);
   await page.getByTestId('house-library-public-stack-approval-input').fill(APPROVED_PUBLIC_STACK_ID);
   await page.getByTestId('house-library-public-stack-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published Satchel Journey Trust Pack to Public Stacks.');

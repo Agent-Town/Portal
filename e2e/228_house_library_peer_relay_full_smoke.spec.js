@@ -1,6 +1,9 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
-const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
+const {
+  openHouseLibraryManualPublishDrawer,
+  openHouseLibraryPreviewDetails,
+} = require('./helpers/house_library_public_stacks');
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
@@ -76,6 +79,7 @@ test('M31.4: House Library full relay smoke stays in the same shell from source 
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
+  await openHouseLibraryManualPublishDrawer(page);
   await expect(page.locator('#houseLibraryList button')).toHaveCount(1);
   await expect(page.locator('#houseLibraryList button').first()).toContainText('Co-op Relay Contract');
 

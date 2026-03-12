@@ -1,7 +1,10 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
-const { openHouseLibraryPublicStackPreview } = require('./helpers/house_library_public_stacks');
+const {
+  openHouseLibraryPublicStackPreview,
+  openHouseLibrarySatchelPublishDrawer,
+} = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -133,6 +136,7 @@ test('M33.4: House Library full Public Stack smoke stays in the same shell from 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
   await page.getByRole('button', { name: /Journey Public Pack/ }).first().click();
+  await openHouseLibrarySatchelPublishDrawer(page);
   await page.getByTestId('house-library-public-stack-approval-input').fill(APPROVED_PUBLIC_STACK_ID);
   await expect(page.getByTestId('house-library-public-stack-publish-button')).toBeEnabled();
   await page.getByTestId('house-library-public-stack-publish-button').click();

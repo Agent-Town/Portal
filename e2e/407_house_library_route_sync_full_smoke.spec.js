@@ -1,5 +1,6 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
+const { openHouseLibraryRouteManualDrawer } = require('./helpers/house_library_public_stacks');
 const { seedHouseLibraryRouteSyncScene } = require('./helpers/house_library_route_sync');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { readWorkerSessionId } = require('./helpers/unified_platform');
@@ -20,6 +21,7 @@ test('M41.5: Route Desk stays same-shell from follow through sync, preview, and 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
   const initialSessionId = await readWorkerSessionId(page);
+  await openHouseLibraryRouteManualDrawer(page);
 
   await page.getByTestId('house-library-route-source-input').fill(scene.sourceHouse.houseId);
   await page.getByTestId('house-library-route-follow-button').click();

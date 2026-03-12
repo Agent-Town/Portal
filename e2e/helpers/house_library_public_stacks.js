@@ -105,6 +105,8 @@ async function seedPublishedHouseLibraryPublicStack(page, {
   return {
     alphaId,
     betaId,
+    alphaPublicationId: String(publishAlphaResp.json?.data?.publication?.libraryPublicationId || ''),
+    betaPublicationId: String(publishBetaResp.json?.data?.publication?.libraryPublicationId || ''),
     scopeSetId,
     libraryPublicStackId: String(publicStackResp.json?.data?.publicStack?.libraryPublicStackId || ''),
   };
@@ -153,6 +155,74 @@ async function openHouseLibraryStorefrontDetails(page) {
     await page.getByTestId('house-library-storefront-details-toggle').click();
   }
   await expect(details).toHaveAttribute('open', '');
+}
+
+async function openHouseLibraryDrawer(page, {
+  drawerTestId = '',
+  toggleTestId = '',
+} = {}) {
+  const details = page.getByTestId(String(drawerTestId || '').trim());
+  const expanded = await details.evaluate((node) => node.open === true).catch(() => false);
+  if (!expanded) {
+    await page.getByTestId(String(toggleTestId || '').trim()).click();
+  }
+  await expect(details).toHaveAttribute('open', '');
+}
+
+async function openHouseLibraryRouteManualDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-route-manual-drawer',
+    toggleTestId: 'house-library-route-manual-toggle',
+  });
+}
+
+async function openHouseLibrarySatchelPublishDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-satchel-publish-drawer',
+    toggleTestId: 'house-library-satchel-publish-toggle',
+  });
+}
+
+async function openHouseLibraryManualImportDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-manual-import-drawer',
+    toggleTestId: 'house-library-manual-import-toggle',
+  });
+}
+
+async function openHouseLibraryManualPublishDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-manual-publish-drawer',
+    toggleTestId: 'house-library-manual-publish-toggle',
+  });
+}
+
+async function openHouseLibraryDetailDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-detail-drawer',
+    toggleTestId: 'house-library-detail-toggle',
+  });
+}
+
+async function openHouseLibraryRevisionsDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-revisions-drawer',
+    toggleTestId: 'house-library-revisions-toggle',
+  });
+}
+
+async function openHouseLibraryIncomingRelayDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-incoming-relay-drawer',
+    toggleTestId: 'house-library-incoming-relay-toggle',
+  });
+}
+
+async function openHouseLibraryIncomingSatchelDrawer(page) {
+  await openHouseLibraryDrawer(page, {
+    drawerTestId: 'house-library-incoming-satchel-drawer',
+    toggleTestId: 'house-library-incoming-satchel-toggle',
+  });
 }
 
 async function saveHouseLibraryReview(page, {
@@ -256,7 +326,15 @@ async function setHouseLibraryDiscoveryFilter(page, value = '') {
 module.exports = {
   APPROVED_PUBLICATION_ID,
   APPROVED_PUBLIC_STACK_ID,
+  openHouseLibraryDetailDrawer,
+  openHouseLibraryIncomingRelayDrawer,
+  openHouseLibraryIncomingSatchelDrawer,
+  openHouseLibraryManualImportDrawer,
+  openHouseLibraryManualPublishDrawer,
   openHouseLibraryPreviewDetails,
+  openHouseLibraryRevisionsDrawer,
+  openHouseLibraryRouteManualDrawer,
+  openHouseLibrarySatchelPublishDrawer,
   openHouseLibraryStorefrontDetails,
   seedPublishedHouseLibraryPublicStack,
   openHouseLibraryPublicStackPreview,

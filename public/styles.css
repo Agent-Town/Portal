@@ -4864,11 +4864,30 @@ body.atlas-page.atlas-embed .atlas-chip {
   grid-template-columns: auto 1fr auto auto;
   gap: 8px;
   align-items: center;
+  width: 100%;
   padding: 10px;
   border: 2px solid var(--border);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(255, 250, 236, 0.94) 0%, rgba(255, 242, 214, 0.94) 100%);
   box-shadow: 0 4px 0 rgba(44, 69, 99, 0.18);
+  text-align: left;
+  color: var(--text-strong);
+  font: inherit;
+}
+
+button.house-library-card {
+  grid-template-columns: auto 1fr auto;
+  cursor: pointer;
+}
+
+button.house-library-card.primary {
+  background: linear-gradient(180deg, rgba(128, 202, 255, 0.94) 0%, rgba(91, 155, 213, 0.94) 100%);
+  color: #ffffff;
+}
+
+button.house-library-card.primary .house-library-token {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
 }
 
 .house-library-card-content {

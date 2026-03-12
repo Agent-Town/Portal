@@ -2128,6 +2128,104 @@ function renderHouseLibraryTokenCluster(node, tokens = []) {
   });
 }
 
+function createHouseLibraryCardButton({
+  testId = '',
+  dataset = {},
+  title = '',
+  meta = '',
+  familyToken = null,
+  tokens = [],
+  selected = false,
+  ariaLabel = '',
+  onClick = null,
+} = {}) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `btn house-library-card${selected ? ' primary' : ''}`;
+  if (testId) {
+    button.setAttribute('data-testid', String(testId));
+  }
+  Object.entries(dataset && typeof dataset === 'object' ? dataset : {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    button.dataset[key] = String(value);
+  });
+  if (ariaLabel) {
+    button.setAttribute('aria-label', String(ariaLabel));
+    button.title = String(ariaLabel);
+  }
+
+  const familyNode = document.createElement('div');
+  familyNode.className = 'house-library-card-family';
+  renderHouseLibraryTokenCluster(familyNode, familyToken ? [familyToken] : []);
+
+  const contentNode = document.createElement('div');
+  contentNode.className = 'house-library-card-content';
+  const titleNode = document.createElement('div');
+  titleNode.className = 'small';
+  titleNode.textContent = String(title || '').trim();
+  const metaNode = document.createElement('div');
+  metaNode.className = 'small';
+  metaNode.textContent = String(meta || '').trim();
+  contentNode.appendChild(titleNode);
+  if (String(meta || '').trim()) {
+    contentNode.appendChild(metaNode);
+  }
+
+  const trustNode = document.createElement('div');
+  trustNode.className = 'house-library-card-trust';
+  renderHouseLibraryTokenCluster(trustNode, Array.isArray(tokens) ? tokens : []);
+
+  button.appendChild(familyNode);
+  button.appendChild(contentNode);
+  button.appendChild(trustNode);
+  if (typeof onClick === 'function') {
+    button.addEventListener('click', onClick);
+  }
+  return button;
+}
+
+function getHouseLibraryLocalItemFamilyToken(item = null) {
+  if (!item || typeof item !== 'object') {
+    return { shortLabel: '[book]', label: 'Library item' };
+  }
+  if (String(item?.importedState || '') === 'imported_artifact') {
+    return { shortLabel: '[scroll]', label: 'Imported artifact' };
+  }
+  const sourceKind = String(item?.sourceKind || '').trim();
+  const itemType = String(item?.itemType || '').trim();
+  if (sourceKind === 'workspace_file') {
+    return { shortLabel: '[gear]', label: 'Workshop file' };
+  }
+  if (sourceKind === 'conversation_artifact' || sourceKind === 'conversation_excerpt') {
+    return { shortLabel: '[talk]', label: 'Conversation memory' };
+  }
+  if (sourceKind === 'peer_relay_artifact') {
+    return { shortLabel: '[post]', label: 'Relay import' };
+  }
+  if (itemType === 'playbook') {
+    return { shortLabel: '[gear]', label: 'Playbook' };
+  }
+  return { shortLabel: '[book]', label: 'Library note' };
+}
+
+function buildHouseLibraryLocalItemTokens(item = null) {
+  if (!item || typeof item !== 'object') return [];
+  const tokens = [];
+  if (String(item?.importedState || '') === 'imported_artifact') {
+    tokens.push({ shortLabel: '[home]', label: 'Imported', tone: 'good' });
+    tokens.push({ shortLabel: '[lock]', label: 'Read only', tone: 'muted' });
+  } else {
+    tokens.push({ shortLabel: '[house]', label: 'Private', tone: 'muted' });
+  }
+  if (String(item?.sealPolicy || '') === 'blocked_publication') {
+    tokens.push({ shortLabel: '[seal]', label: 'Seal active', tone: 'muted' });
+  }
+  if (Number(item?.publicationCount || 0) > 0 || item?.published === true) {
+    tokens.push({ shortLabel: '[echo]', label: 'Published', tone: 'good' });
+  }
+  return tokens;
+}
+
 function buildHouseLibraryPreviewHeroStatus(preview = null) {
   if (!preview || typeof preview !== 'object') {
     return 'Look, check, trust, import.';
@@ -4660,17 +4758,31 @@ function renderHouseLibrarySurface() {
   });
 
   routeSubscriptions.forEach((route) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(selectedRoute?.libraryRouteSubscriptionId || '') === String(route?.libraryRouteSubscriptionId || '') ? ' primary' : ''}`;
-    button.dataset.libraryRouteSubscriptionId = String(route?.libraryRouteSubscriptionId || '');
-    button.setAttribute('data-testid', 'house-library-route-card');
-    button.textContent = [
-      String(route?.sourceHouseId || '').trim() || 'Unknown House',
+    const routeTitle = String(route?.sourceHouseId || '').trim() || 'Unknown House';
+    const routeMeta = [
       `${Number(route?.syncedCount || 0)} synced`,
       Number(route?.importedCount || 0) > 0 ? `${Number(route.importedCount)} imported` : '',
       String(route?.routeState || '').trim() === 'active' ? 'Active' : String(route?.routeState || '').trim(),
     ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-route-card',
+      dataset: {
+        libraryRouteSubscriptionId: String(route?.libraryRouteSubscriptionId || ''),
+      },
+      title: routeTitle,
+      meta: routeMeta,
+      familyToken: { shortLabel: '[route]', label: 'Route Desk subscription' },
+      tokens: [
+        String(route?.routeState || '').trim() === 'active'
+          ? { shortLabel: '[go]', label: 'Active route', tone: 'good' }
+          : { shortLabel: '[look]', label: 'Route pending', tone: 'muted' },
+        Number(route?.importedCount || 0) > 0
+          ? { shortLabel: '[home]', label: `${Number(route?.importedCount || 0)} imported`, tone: 'good' }
+          : null,
+      ].filter(Boolean),
+      selected: String(selectedRoute?.libraryRouteSubscriptionId || '') === String(route?.libraryRouteSubscriptionId || ''),
+      ariaLabel: [routeTitle, routeMeta].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -4685,17 +4797,29 @@ function renderHouseLibrarySurface() {
   });
 
   routeFeed.forEach((entry) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(selectedRouteFeedEntry?.libraryRouteSyncReceiptId || '') === String(entry?.libraryRouteSyncReceiptId || '') ? ' primary' : ''}`;
-    button.dataset.libraryRouteSyncReceiptId = String(entry?.libraryRouteSyncReceiptId || '');
-    button.setAttribute('data-testid', 'house-library-route-feed-card');
-    button.textContent = [
-      String(entry?.displayName || entry?.libraryPublicStackId || '').trim(),
+    const feedTitle = String(entry?.displayName || entry?.libraryPublicStackId || '').trim();
+    const feedMeta = [
       String(entry?.sourceHouseId || '').trim() ? `From ${String(entry?.sourceHouseId || '').trim()}` : '',
       formatHouseLibraryDiscoveryLaneLabel(entry?.discoveryLane),
       entry?.importedHere === true ? 'Imported' : 'Ready to preview',
     ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-route-feed-card',
+      dataset: {
+        libraryRouteSyncReceiptId: String(entry?.libraryRouteSyncReceiptId || ''),
+      },
+      title: feedTitle,
+      meta: feedMeta,
+      familyToken: getHouseLibraryFamilyToken(String(entry?.familySlug || entry?.family || '').trim()),
+      tokens: buildHouseLibraryTrustTokens({
+        reviewTier: entry?.reviewTier,
+        safetyState: entry?.safetyState,
+        discoveryLane: entry?.discoveryLane,
+        sealState: entry?.sealState,
+      }),
+      selected: String(selectedRouteFeedEntry?.libraryRouteSyncReceiptId || '') === String(entry?.libraryRouteSyncReceiptId || ''),
+      ariaLabel: [feedTitle, feedMeta].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -4776,15 +4900,31 @@ function renderHouseLibrarySurface() {
   });
 
   safetyDesk.forEach((entry) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(publicStackPreview?.libraryPublicStackId || '') === String(entry?.libraryPublicStackId || '') ? ' primary' : ''}`;
-    button.dataset.libraryPublicStackId = String(entry?.libraryPublicStackId || '');
-    button.textContent = [
+    const safetyTitle = String(entry?.displayName || entry?.libraryPublicStackId || '').trim();
+    const safetyMeta = [
       formatHouseLibrarySafetyStateLabel(entry?.safetyState) || 'Safety',
-      String(entry?.displayName || entry?.libraryPublicStackId || '').trim(),
       String(entry?.sourceHouseId || '').trim() ? `From ${String(entry?.sourceHouseId || '').trim()}` : '',
     ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-safety-card',
+      dataset: {
+        libraryPublicStackId: String(entry?.libraryPublicStackId || ''),
+      },
+      title: safetyTitle,
+      meta: safetyMeta,
+      familyToken: getHouseLibraryFamilyToken(String(entry?.familySlug || entry?.family || '').trim()),
+      tokens: buildHouseLibraryTrustTokens({
+        reviewTier: entry?.reviewTier,
+        safetyState: entry?.safetyState,
+        discoveryLane: entry?.discoveryLane,
+        sealState: entry?.sealState,
+      }),
+      selected: String(publicStackPreview?.libraryPublicStackId || '') === String(entry?.libraryPublicStackId || ''),
+      ariaLabel: [
+        formatHouseLibrarySafetyStateLabel(entry?.safetyState),
+        safetyTitle,
+      ].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -4799,15 +4939,27 @@ function renderHouseLibrarySurface() {
   });
 
   incomingRelays.forEach((relay) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(incomingRelayPreview?.libraryPeerRelayId || selectedIncomingRelay?.libraryPeerRelayId || '') === String(relay?.libraryPeerRelayId || '') ? ' primary' : ''}`;
-    button.dataset.libraryPeerRelayId = String(relay?.libraryPeerRelayId || '');
-    button.textContent = [
-      String(relay?.displayName || relay?.registryId || relay?.libraryPeerRelayId || ''),
+    const relayTitle = String(relay?.displayName || relay?.registryId || relay?.libraryPeerRelayId || '');
+    const relayMeta = [
       String(relay?.sourceHouseId || ''),
       relay?.alreadyImported === true ? 'Imported' : 'Ready to import',
     ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-incoming-relay-card',
+      dataset: {
+        libraryPeerRelayId: String(relay?.libraryPeerRelayId || ''),
+      },
+      title: relayTitle,
+      meta: relayMeta,
+      familyToken: { shortLabel: '[post]', label: 'Received relay' },
+      tokens: [
+        relay?.alreadyImported === true
+          ? { shortLabel: '[home]', label: 'Imported', tone: 'good' }
+          : { shortLabel: '[go]', label: 'Ready to import', tone: 'muted' },
+      ],
+      selected: String(incomingRelayPreview?.libraryPeerRelayId || selectedIncomingRelay?.libraryPeerRelayId || '') === String(relay?.libraryPeerRelayId || ''),
+      ariaLabel: [relayTitle, relayMeta].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -4822,15 +4974,27 @@ function renderHouseLibrarySurface() {
   });
 
   incomingSatchelRelays.forEach((relay) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(incomingSatchelRelayPreview?.librarySatchelRelayId || selectedIncomingSatchelRelay?.librarySatchelRelayId || '') === String(relay?.librarySatchelRelayId || '') ? ' primary' : ''}`;
-    button.dataset.librarySatchelRelayId = String(relay?.librarySatchelRelayId || '');
-    button.textContent = [
-      String(relay?.title || relay?.librarySatchelRelayId || ''),
+    const satchelTitle = String(relay?.title || relay?.librarySatchelRelayId || '');
+    const satchelMeta = [
       String(relay?.sourceHouseId || ''),
       relay?.alreadyImportedAll === true ? 'Imported' : 'Ready to import',
     ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-incoming-satchel-card',
+      dataset: {
+        librarySatchelRelayId: String(relay?.librarySatchelRelayId || ''),
+      },
+      title: satchelTitle,
+      meta: satchelMeta,
+      familyToken: { shortLabel: '[bag]', label: 'Received Satchel' },
+      tokens: [
+        relay?.alreadyImportedAll === true
+          ? { shortLabel: '[home]', label: 'Imported', tone: 'good' }
+          : { shortLabel: '[go]', label: 'Ready to import', tone: 'muted' },
+      ],
+      selected: String(incomingSatchelRelayPreview?.librarySatchelRelayId || selectedIncomingSatchelRelay?.librarySatchelRelayId || '') === String(relay?.librarySatchelRelayId || ''),
+      ariaLabel: [satchelTitle, satchelMeta].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
@@ -5045,15 +5209,26 @@ function renderHouseLibrarySurface() {
     if (item?.readOnly === true) {
       itemStateParts.push('Read only');
     }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `btn${String(item?.libraryItemId || '') === String(selectedItem?.libraryItemId || '') ? ' primary' : ''}`;
-    button.dataset.libraryItemId = String(item?.libraryItemId || '');
-    button.textContent = [
-      String(item?.title || item?.libraryItemId || ''),
-      String(item?.itemType || ''),
-      itemStateParts.join(' · '),
-    ].filter(Boolean).join(' · ');
+    const button = createHouseLibraryCardButton({
+      testId: 'house-library-local-card',
+      dataset: {
+        libraryItemId: String(item?.libraryItemId || ''),
+      },
+      title: String(item?.title || item?.libraryItemId || ''),
+      meta: [
+        String(item?.itemType || ''),
+        String(item?.summary || '').trim(),
+        itemStateParts.join(' · '),
+      ].filter(Boolean).join(' · '),
+      familyToken: getHouseLibraryLocalItemFamilyToken(item),
+      tokens: buildHouseLibraryLocalItemTokens(item),
+      selected: String(item?.libraryItemId || '') === String(selectedItem?.libraryItemId || ''),
+      ariaLabel: [
+        String(item?.title || item?.libraryItemId || ''),
+        String(item?.itemType || ''),
+        itemStateParts.join(' · '),
+      ].filter(Boolean).join(' · '),
+    });
     button.addEventListener('click', async () => {
       houseSurfaceState.library.selectedItemId = String(item?.libraryItemId || '');
       await loadHouseLibraryRevisions(String(item?.libraryItemId || '').trim()).catch(() => []);

@@ -9,6 +9,7 @@ const {
   readWorkerSessionId,
   seedPlatformConfigVersion,
 } = require('./helpers/unified_platform');
+const { openHouseLibraryManualPublishDrawer } = require('./helpers/house_library_public_stacks');
 
 const APPROVED_PUBLICATION_ID = 'appr_fixture_library_publish_approved_01';
 
@@ -56,6 +57,7 @@ test('M29.13: House Library publishes the selected item to Registry inside the s
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
+  await openHouseLibraryManualPublishDrawer(page);
   await expect(page.locator('#houseLibraryList button')).toHaveCount(1);
   await expect(page.locator('#houseLibraryList button').first()).toContainText('Registry Publish Playbook');
   await expect(page.getByTestId('house-library-approval-input')).toBeEnabled();

@@ -9,6 +9,7 @@ const {
   readWorkerSessionId,
   seedPlatformConfigVersion,
 } = require('./helpers/unified_platform');
+const { openHouseLibraryManualImportDrawer } = require('./helpers/house_library_public_stacks');
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
@@ -38,6 +39,7 @@ test('M29.12: House Library imports Registry artifacts inside the same shell and
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
+  await openHouseLibraryManualImportDrawer(page);
   await expect(page.getByTestId('house-library-import-button')).toBeDisabled();
 
   await page.getByTestId('house-library-import-input').fill('reg_registry_catalog');
