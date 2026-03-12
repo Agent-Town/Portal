@@ -127,6 +127,7 @@ const {
   createLibraryShelf,
   createLibraryPublicStack,
   createLibraryPublicStackMember,
+  createLibraryPublicStackReview,
   createLibraryPublicStackVerification,
   createLibraryPublicStackVerificationMember,
   createRun,
@@ -151,6 +152,9 @@ const {
   getLibraryPublicationById,
   getLibraryPublicStackById,
   getLibraryPublicStackByIdempotency,
+  getLibraryPublicStackReview,
+  getLibraryPublicStackReviewById,
+  getLibraryPublicStackReviewByIdempotency,
   getLibraryPublicStackVerificationById,
   getLibraryPublicStackVerificationByIdempotency,
   getLatestLibraryPublicStackVerification,
@@ -179,6 +183,7 @@ const {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStackReviewsInspector,
   getUnifiedPlatformPublicStackTrustInspector,
   getUnifiedPlatformPublicStacksInspector,
   getUnifiedPlatformPublicationsInspector,
@@ -199,6 +204,7 @@ const {
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
   listLibraryPublicStackMembers,
+  listLibraryPublicStackReviews,
   listLibraryPublicStacks,
   listLibraryPublicStackVerificationMembers,
   listLibraryPublicStackVerifications,
@@ -223,6 +229,7 @@ const {
   setUnifiedPlatformBenchmarkSnapshot,
   setUnifiedPlatformRegistryPreviewSnapshot,
   setUnifiedPlatformPromptPreview,
+  updateLibraryPublicStackReview,
   updateLibraryPublicStackVerification,
   updateLibraryPeerRelay,
   updateLibrarySatchelRelay,
@@ -11356,6 +11363,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPublicStacksInspector();
     } else if (inspector === 'public-stack-trust') {
       data = getUnifiedPlatformPublicStackTrustInspector();
+    } else if (inspector === 'public-stack-reviews') {
+      data = getUnifiedPlatformPublicStackReviewsInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {
