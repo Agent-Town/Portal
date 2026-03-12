@@ -1749,21 +1749,30 @@ function buildHouseWorkerSessionPresentation(session = null) {
   if (active && !attached) {
     return {
       attached: false,
-      statusLabel: 'Needs restart in this tab',
-      actionLabel: 'Helper runtime is not attached in this browser. Restart it to continue here.',
+      handoffRequired: true,
+      statusLabel: 'Running in another tab or after refresh',
+      actionLabel: 'This helper is active in another tab or after a page refresh. Choose Take Over Here to continue in this tab.',
+      startLabel: 'Take Over Here',
+      stopLabel: 'Stop Everywhere',
     };
   }
   if (active && attached) {
     return {
       attached: true,
+      handoffRequired: false,
       statusLabel: String(source?.statusLabel || source?.status || 'Ready to help').trim() || 'Ready to help',
-      actionLabel: 'Helper is already running in this tab. Use Ask Helper or Stop Helper.',
+      actionLabel: 'This helper is already running in this tab. Ask it a question or stop it when you are done.',
+      startLabel: 'Running in this tab',
+      stopLabel: 'Stop Helper',
     };
   }
   return {
     attached,
+    handoffRequired: false,
     statusLabel: String(source?.statusLabel || source?.status || 'Ready to help').trim() || 'Ready to help',
     actionLabel: String(source?.statusLabel || 'Ready to help').trim() || 'Ready to help',
+    startLabel: 'Start Helper',
+    stopLabel: 'Stop Helper',
   };
 }
 
@@ -3054,10 +3063,11 @@ function renderHouseOfficeSurface() {
       const localBrainReady = houseWorkerSupervisorState.localBrainReady === true;
       const sessionPresentation = buildHouseWorkerSessionPresentation(deploymentSession);
       const activeAttachedSession = !!deploymentSession && sessionPresentation.attached === true;
+      const detachedActiveSession = !!deploymentSession && sessionPresentation.handoffRequired === true;
       actionStatus.textContent = !localBrainReady
         ? String(houseWorkerSupervisorState.localBrainStatusLabel || 'Configure your local brain in this browser before starting helpers.').trim()
-        : activeAttachedSession
-          ? 'Helper is already running in this tab. Use Ask Helper or Stop Helper.'
+        : activeAttachedSession || detachedActiveSession
+          ? sessionPresentation.actionLabel
           : deploymentSession
           ? sessionPresentation.actionLabel
           : 'Start Helper when your local brain is ready.';
@@ -3081,10 +3091,10 @@ function renderHouseOfficeSurface() {
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
       startBtn.className = 'btn';
-      startBtn.textContent = activeAttachedSession
-        ? 'Running in this tab'
+      startBtn.textContent = activeAttachedSession || detachedActiveSession
+        ? sessionPresentation.startLabel
         : deploymentSession && !sessionPresentation.attached
-          ? 'Restart Helper'
+          ? 'Take Over Here'
           : 'Start Helper';
       startBtn.setAttribute('data-testid', 'house-office-helper-start');
       startBtn.disabled = !localBrainReady || activeAttachedSession;
@@ -3101,7 +3111,7 @@ function renderHouseOfficeSurface() {
       const stopBtn = document.createElement('button');
       stopBtn.type = 'button';
       stopBtn.className = 'btn';
-      stopBtn.textContent = 'Stop Helper';
+      stopBtn.textContent = detachedActiveSession ? sessionPresentation.stopLabel : 'Stop Helper';
       stopBtn.setAttribute('data-testid', 'house-office-helper-stop');
       stopBtn.disabled = !deploymentSession;
       actions.appendChild(stopBtn);
@@ -3165,7 +3175,11 @@ function renderHouseOfficeSurface() {
         startBtn.disabled = true;
         askBtn.disabled = true;
         stopBtn.disabled = true;
-        actionStatus.textContent = deploymentSession && !sessionPresentation.attached ? 'Restarting helper in this tab...' : 'Starting helper...';
+        actionStatus.textContent = detachedActiveSession
+          ? 'Taking helper over in this tab...'
+          : deploymentSession && !sessionPresentation.attached
+            ? 'Restarting helper in this tab...'
+            : 'Starting helper...';
         const profileInputs = Array.from(advanced.querySelectorAll('input[data-field-key]'));
         const runtimeProfile = profileInputs.reduce((acc, input) => {
           const fieldKey = String(input?.dataset?.fieldKey || '').trim();
@@ -3338,7 +3352,7 @@ function renderHouseOfficeSurface() {
       const stopBtn = document.createElement('button');
       stopBtn.type = 'button';
       stopBtn.className = 'btn';
-      stopBtn.textContent = 'Stop Helper';
+      stopBtn.textContent = sessionPresentation.attached ? 'Stop Helper' : String(sessionPresentation.stopLabel || 'Stop Helper');
       stopBtn.setAttribute('data-testid', 'house-office-worker-session-stop');
       actions.appendChild(stopBtn);
       card.appendChild(actions);

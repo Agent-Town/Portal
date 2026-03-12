@@ -10,7 +10,7 @@ test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
 });
 
-test('House worker sessions stay honest after reload and support an explicit restart in the current tab', async ({ page, request }) => {
+test('House helper cross-tab handoff uses plain-language takeover copy for normal users', async ({ page, request, context }) => {
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   expect(installFixture?.ok).toBe(true);
 
@@ -37,26 +37,35 @@ test('House worker sessions stay honest after reload and support an explicit res
     return Number(snapshot?.activeWorkerCount || 0);
   }).toBeGreaterThanOrEqual(2);
 
-  await page.reload();
-  await waitForLiteApi(page);
-  await page.getByTestId('house-open-office').click();
+  const secondPage = await context.newPage();
+  await secondPage.goto('/app?district=house&liteDriver=phase1');
+  await waitForLiteApi(secondPage);
+  await setDeterministicLlm(secondPage);
+  await attachHouseToPageSession(secondPage, {
+    houseId: seededHouse.houseId,
+    teamId: 'team_main',
+  });
+  await secondPage.getByTestId('house-open-office').click();
 
-  const sessionCard = page.getByTestId('house-office-worker-session-item').first();
-  await expect(sessionCard).toBeVisible();
+  const deploymentCard = secondPage.getByTestId('house-office-deployment-item').first();
+  await expect(deploymentCard.getByTestId('house-office-helper-status')).toContainText('another tab or after a page refresh');
+  await expect(deploymentCard.getByTestId('house-office-helper-start')).toHaveText('Take Over Here');
+  await expect(deploymentCard.getByTestId('house-office-helper-stop')).toHaveText('Stop Everywhere');
+
+  const sessionCard = secondPage.getByTestId('house-office-worker-session-item').first();
   await expect(sessionCard.getByTestId('house-office-worker-session-status')).toContainText('Running in another tab or after refresh');
   await expect(sessionCard.getByTestId('house-office-worker-session-ask')).toBeDisabled();
-  await expect(page.getByTestId('house-office-helper-start').first()).toHaveText('Take Over Here');
+  await expect(sessionCard.getByTestId('house-office-worker-session-stop')).toHaveText('Stop Everywhere');
 
-  const snapshotAfterReload = await readHouseWorkerSupervisorSnapshot(page);
-  expect(Number(snapshotAfterReload?.activeWorkerCount || 0)).toBe(1);
-
-  await page.getByTestId('house-office-helper-start').first().click();
+  await deploymentCard.getByTestId('house-office-helper-start').click();
 
   await expect.poll(async () => {
-    const snapshot = await readHouseWorkerSupervisorSnapshot(page);
+    const snapshot = await readHouseWorkerSupervisorSnapshot(secondPage);
     return Number(snapshot?.activeWorkerCount || 0);
   }).toBeGreaterThanOrEqual(2);
 
-  await expect(sessionCard.getByTestId('house-office-worker-session-status')).toContainText(/Ready|Working|Idle/);
-  await expect(sessionCard.getByTestId('house-office-worker-session-ask')).toBeEnabled();
+  await expect(deploymentCard.getByTestId('house-office-helper-start')).toHaveText('Running in this tab');
+  await expect(deploymentCard.getByTestId('house-office-helper-status')).toContainText('already running in this tab');
+
+  await secondPage.close();
 });

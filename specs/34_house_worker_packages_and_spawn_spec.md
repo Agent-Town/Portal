@@ -6,14 +6,15 @@ Audience: product, frontend, backend, runtime, UX, QA, security, benchmarking, s
 Implementation branch target: `codex/house-worker-packages-spawn-v0-1`
 Implementation baseline: `9eb0842`
 Latest proof state:
-1. `e2e/215` through `e2e/234` are green.
+1. `e2e/215` through `e2e/235` are green.
 2. Worker-skill contract sync is green in [e2e/55_phase3_skill_contract_line.spec.js](../e2e/55_phase3_skill_contract_line.spec.js).
 3. Post-phase runtime-truth hardening is green in [e2e/229_house_worker_reload_truth.spec.js](../e2e/229_house_worker_reload_truth.spec.js) and [e2e/230_house_worker_local_brain_guard.spec.js](../e2e/230_house_worker_local_brain_guard.spec.js).
 4. Shared-install exact-version hardening is green in [e2e/231_house_worker_share_exact_version_guard.spec.js](../e2e/231_house_worker_share_exact_version_guard.spec.js).
 5. Share-create and share-preview truth hardening is green in [e2e/232_house_worker_share_preview_truth.spec.js](../e2e/232_house_worker_share_preview_truth.spec.js).
 6. Release and compatibility visibility hardening is green in [e2e/233_house_worker_release_visibility.spec.js](../e2e/233_house_worker_release_visibility.spec.js).
 7. Single-session-per-helper runtime truth is green in [e2e/234_house_worker_single_active_session_guard.spec.js](../e2e/234_house_worker_single_active_session_guard.spec.js).
-8. Full deterministic suite is green at `356 passed, 4 skipped` via `npm test`.
+8. Cross-tab helper takeover copy is green in [e2e/235_house_worker_cross_tab_takeover_copy.spec.js](../e2e/235_house_worker_cross_tab_takeover_copy.spec.js).
+9. Full deterministic suite is green at `357 passed, 4 skipped` via `npm test`.
 Depends on:
 1. [specs/22_option5_integration_unified_completion_spec.md](./22_option5_integration_unified_completion_spec.md)
 2. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)

@@ -41,17 +41,18 @@ Implementation constraints:
 
 Current proof state:
 
-1. `215` through `234` are green.
+1. `215` through `235` are green.
 2. Skill/API sync is green in `e2e/55` and `e2e/135`.
 3. Runtime-truth hardening is green in `e2e/229` and `e2e/230`.
 4. Shared-install exact-version hardening is green in `e2e/231`.
 5. Share-create and share-preview truth hardening is green in `e2e/232`.
 6. Release and compatibility visibility hardening is green in `e2e/233`.
 7. Single-session-per-helper runtime truth is green in `e2e/234`.
-8. Full deterministic suite is green at `356 passed, 4 skipped`.
-9. Default tests remain deterministic and offline-safe.
-10. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
-11. New worker-tool behavior must sync:
+8. Cross-tab helper takeover UX is green in `e2e/235`.
+9. Full deterministic suite is green at `357 passed, 4 skipped`.
+10. Default tests remain deterministic and offline-safe.
+11. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
+12. New worker-tool behavior must sync:
    A. [public/skill.md](../public/skill.md)
    B. [docs/internal-skill-testline.md](../docs/internal-skill-testline.md)
    C. `e2e/55_phase3_skill_contract_line.spec.js` or adjacent new tests.
