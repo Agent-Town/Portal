@@ -758,6 +758,22 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_wallet_policies_self_excluded_idx
       ON poker_play_wallet_policies(self_excluded_until, updated_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_schedule_templates (
+      template_id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      recurrence_kind TEXT NOT NULL,
+      recurrence_interval_hours INTEGER NOT NULL,
+      recurrence_label TEXT NOT NULL,
+      first_start_at TEXT NOT NULL,
+      event_count INTEGER NOT NULL DEFAULT 1,
+      config_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_schedule_templates_start_idx
+      ON poker_play_schedule_templates(first_start_at, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_streamflow_lock_verifications (
       verification_id TEXT PRIMARY KEY,
       portal_session_id TEXT,
@@ -1182,6 +1198,7 @@ function resetExtendedStore() {
     'poker_play_hands',
     'poker_play_seats',
     'poker_play_waitlist_entries',
+    'poker_play_schedule_templates',
     'poker_blind_obligations',
     'poker_tournament_waitlist_entries',
     'poker_satellite_awards',
@@ -3001,6 +3018,100 @@ function getPokerPlayTableById(tableId) {
   const database = ensureDb();
   const row = database.prepare('SELECT * FROM poker_play_tables WHERE table_id = ?').get(tableId);
   return hydratePokerPlayTable(row);
+}
+
+function hydratePokerPlayScheduleTemplate(row) {
+  if (!row) return null;
+  return {
+    templateId: row.template_id,
+    title: row.title,
+    recurrenceKind: row.recurrence_kind,
+    recurrenceIntervalHours: Number(row.recurrence_interval_hours || 0),
+    recurrenceLabel: row.recurrence_label,
+    firstStartAt: row.first_start_at,
+    eventCount: Math.max(1, Number(row.event_count || 1)),
+    config: fromJson(row.config_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listPokerPlayScheduleTemplates() {
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT * FROM poker_play_schedule_templates
+    ORDER BY first_start_at ASC, template_id ASC
+  `).all();
+  return rows.map(hydratePokerPlayScheduleTemplate).filter(Boolean);
+}
+
+function getPokerPlayScheduleTemplateById(templateId) {
+  const normalizedTemplateId = String(templateId || '').trim();
+  if (!normalizedTemplateId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_play_schedule_templates
+    WHERE template_id = ?
+  `).get(normalizedTemplateId);
+  return hydratePokerPlayScheduleTemplate(row);
+}
+
+function upsertPokerPlayScheduleTemplate({
+  templateId,
+  title,
+  recurrenceKind,
+  recurrenceIntervalHours,
+  recurrenceLabel,
+  firstStartAt,
+  eventCount = 1,
+  config = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const normalizedTemplateId = String(templateId || '').trim();
+    if (!normalizedTemplateId) return null;
+    const now = updatedAt || createdAt || sqlNow();
+    const existing = database.prepare(`
+      SELECT * FROM poker_play_schedule_templates
+      WHERE template_id = ?
+    `).get(normalizedTemplateId);
+    database.prepare(`
+      INSERT INTO poker_play_schedule_templates (
+        template_id,
+        title,
+        recurrence_kind,
+        recurrence_interval_hours,
+        recurrence_label,
+        first_start_at,
+        event_count,
+        config_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(template_id) DO UPDATE SET
+        title = excluded.title,
+        recurrence_kind = excluded.recurrence_kind,
+        recurrence_interval_hours = excluded.recurrence_interval_hours,
+        recurrence_label = excluded.recurrence_label,
+        first_start_at = excluded.first_start_at,
+        event_count = excluded.event_count,
+        config_json = excluded.config_json,
+        updated_at = excluded.updated_at
+    `).run(
+      normalizedTemplateId,
+      String(title || '').trim(),
+      String(recurrenceKind || '').trim(),
+      Math.max(1, Number(recurrenceIntervalHours || 0)),
+      String(recurrenceLabel || '').trim(),
+      String(firstStartAt || '').trim(),
+      Math.max(1, Number(eventCount || 1)),
+      toJson(config, {}),
+      existing?.created_at || createdAt || now,
+      now
+    );
+    return getPokerPlayScheduleTemplateById(normalizedTemplateId);
+  });
 }
 
 function upsertPokerPlayTable({
@@ -5586,6 +5697,7 @@ module.exports = {
   getPokerPlayerNotebookEntryById,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
+  getPokerPlayScheduleTemplateById,
   getPokerPlayTableById,
   getPokerSatelliteAwardById,
   getPokerSatelliteAwardBySourceAndWallet,
@@ -5631,6 +5743,7 @@ module.exports = {
   listPokerPlayPlayerStatsByWalletSubject,
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
+  listPokerPlayScheduleTemplates,
   listPokerPlayTables,
   listPokerRebuyEventsBySeriesId,
   listPokerRebuyEventsByTable,
@@ -5663,6 +5776,7 @@ module.exports = {
   upsertPokerPlayWalletPolicy,
   upsertPokerBlindObligation,
   upsertPokerPlaySeat,
+  upsertPokerPlayScheduleTemplate,
   upsertPokerPlayTable,
   upsertPokerSatelliteAward,
   upsertPokerTournamentWaitlistEntry,

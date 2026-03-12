@@ -515,6 +515,75 @@ Schedule notes:
 - scheduled-break metadata is surfaced here so the calendar can preview break cadence before an event starts
 - query param `days=<n>` narrows or widens the forward calendar window; `asOf=<iso>` remains deterministic for test-mode reads
 
+### GET `/api/poker/play/admin/schedule/templates`
+Returns the durable operator-owned recurring schedule template set plus the materialized scheduled tournament events generated from those templates.
+
+Admin auth:
+- requires `x-admin-token`
+
+Response fields:
+- `data.summary.templateCount`
+- `data.summary.eventCount`
+- `data.summary.nextStartAt`
+- `data.templates[]`
+- `data.templates[].templateId`
+- `data.templates[].title`
+- `data.templates[].recurrenceKind`
+- `data.templates[].recurrenceIntervalHours`
+- `data.templates[].recurrenceLabel`
+- `data.templates[].firstStartAt`
+- `data.templates[].eventCount`
+- `data.templates[].generatedEventCount`
+- `data.templates[].nextStartAt`
+- `data.templates[].config`
+- `data.templates[].items[]`
+- `data.templates[].items[].tableId`
+- `data.templates[].items[].title`
+- `data.templates[].items[].tableStatus`
+- `data.templates[].items[].scheduledStartAt`
+- `data.templates[].items[].entryCount`
+- `data.templates[].items[].openSeatCount`
+- `data.templates[].items[].waitlistCount`
+- `data.templates[].items[].links.table`
+
+Notes:
+- this route is the durable operator view; the public `/api/poker/play/schedule` feed remains the player-facing calendar
+- generated items are real tournament tables, not virtual projections
+
+### POST `/api/poker/play/admin/schedule/templates`
+Creates one durable recurring schedule template and materializes a bounded set of future scheduled tournament tables immediately.
+
+Admin auth:
+- requires `x-admin-token`
+
+Request shape:
+```json
+{
+  "title": "Daily Centaur Sprint",
+  "firstStartAt": "2026-03-13T12:00:00.000Z",
+  "recurrenceKind": "daily",
+  "eventCount": 3,
+  "buyInOil": 400,
+  "smallBlindOil": 50,
+  "bigBlindOil": 100,
+  "maxSeats": 6,
+  "minPlayers": 2,
+  "lateRegistrationHands": 2,
+  "handsPerBlindLevel": 8
+}
+```
+
+Response notes:
+- returns the same payload shape as `GET /api/poker/play/admin/schedule/templates`
+- `data.createdTemplateId` identifies the newly stored durable template
+- each materialized event is immediately visible through the public `/api/poker/play/schedule` feed
+
+Failure codes:
+- `FORBIDDEN`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_SCHEDULE_TEMPLATE_PAST_START`
+- `POKER_PLAY_SCHEDULE_TEMPLATE_UNAVAILABLE`
+
 ### GET `/api/poker/play/policy`
 Returns the authenticated wallet's current live-poker responsible-gaming policy summary.
 

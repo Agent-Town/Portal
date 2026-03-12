@@ -33,6 +33,7 @@ const {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
   buildPokerPlayLedgerReconciliationPayload,
+  buildPokerPlayAdminScheduleTemplatesPayload,
   buildPokerPlayAdminTreasuryPayload,
   buildPokerPlayNativeSeasonLeaderboardPayload,
   buildPokerPlayOpsDashboardPayload,
@@ -47,6 +48,7 @@ const {
   closeTable,
   closeTournamentSeries,
   createTable,
+  createScheduleTemplate,
   createRouteError,
   addTournamentAddon,
   createChopProposal,
@@ -293,6 +295,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
+    listPokerPlayScheduleTemplates,
     listPokerPlayTables,
     listPokerRebuyEventsBySeriesId,
     listPokerRebuyEventsByTable,
@@ -331,6 +334,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayPlayerStat,
     upsertPokerPlayWalletPolicy,
     upsertPokerPlayTable,
+    upsertPokerPlayScheduleTemplate,
     upsertPokerSatelliteAward,
     upsertPokerTournamentWaitlistEntry,
     upsertPokerPlayWaitlistEntry,
@@ -408,6 +412,7 @@ function registerPokerRoutes(app, deps) {
     listPokerPlayPlayerStatsByWalletSubject,
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
+    listPokerPlayScheduleTemplates,
     listPokerPlayTables,
     listPokerRebuyEventsBySeriesId,
     listPokerRebuyEventsByTable,
@@ -429,6 +434,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayWalletPolicy,
     upsertPokerBlindObligation,
     upsertPokerChopProposal,
+    upsertPokerPlayScheduleTemplate,
     upsertPokerPlayTable,
     upsertPokerSatelliteAward,
     upsertPokerTournamentWaitlistEntry,
@@ -6753,6 +6759,55 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_OPS_DASHBOARD_FAILED',
         err?.message || 'Unable to load poker operations dashboard.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/schedule/templates', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminScheduleTemplatesPayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SCHEDULE_TEMPLATES_FAILED',
+        err?.message || 'Unable to load poker schedule templates.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/schedule/templates', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = createScheduleTemplate(playRouteDeps, {
+        body: req.body || {},
+        processAt: req.body?.asOf || req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SCHEDULE_TEMPLATE_CREATE_FAILED',
+        err?.message || 'Unable to create the poker schedule template.',
         {
           requestId,
           details: err?.details || {},

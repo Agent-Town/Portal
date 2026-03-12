@@ -185,6 +185,10 @@
     return buildPokerApiPath('/api/poker/play/admin/ops');
   }
 
+  function buildPlayAdminScheduleTemplatesApiPath() {
+    return buildPokerApiPath('/api/poker/play/admin/schedule/templates');
+  }
+
   function buildPlayScheduleApiPath() {
     return buildPokerApiPath('/api/poker/play/schedule');
   }
@@ -1555,9 +1559,24 @@
     clearLiveTableStream();
     setTitle('Tournament Schedule', 'Recurring events, registration windows, and scheduled player breaks.');
     setStatus('Loading tournament schedule...');
+    const adminToken = readStoredPokerAdminToken();
     const payload = await api(buildPlayScheduleApiPath());
+    let adminPayload = null;
+    let adminError = '';
+    if (adminToken) {
+      try {
+        adminPayload = await api(buildPlayAdminScheduleTemplatesApiPath(), {
+          headers: { 'x-admin-token': adminToken },
+        });
+      } catch (err) {
+        adminError = err.code || err.message || 'UNKNOWN';
+      }
+    }
     const data = payload?.data || {};
+    const adminData = adminPayload?.data || {};
     const summary = data?.summary || {};
+    const adminSummary = adminData?.summary || {};
+    const adminTemplates = Array.isArray(adminData?.templates) ? adminData.templates : [];
     const templates = Array.isArray(data?.templates) ? data.templates : [];
     const days = Array.isArray(data?.days) ? data.days : [];
     const cards = [
@@ -1576,6 +1595,69 @@
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
       `,
+      adminToken
+        ? `
+          <h2>Schedule Admin</h2>
+          <p>Durable recurring templates materialize real scheduled tournament tables. Create the template here; the public calendar stays on the same minimal route.</p>
+          ${adminError
+            ? `<p>Admin schedule load failed: ${escapeHtml(adminError)}</p>`
+            : `
+              <div class="pokerSummary">
+                ${renderSummaryMetric('Templates', `${Number(adminSummary?.templateCount || 0)}`)}
+                ${renderSummaryMetric('Events', `${Number(adminSummary?.eventCount || 0)}`)}
+                ${renderSummaryMetric('Next Start', adminSummary?.nextStartAt ? formatIso(adminSummary.nextStartAt) : 'none')}
+              </div>
+            `}
+          <form id="pokerPlayScheduleTemplateForm" class="pokerForm">
+            <label>
+              Title
+              <input id="pokerPlayScheduleTemplateTitle" type="text" value="Daily Centaur Sprint" maxlength="80" required>
+            </label>
+            <label>
+              First Start At
+              <input id="pokerPlayScheduleTemplateFirstStartAt" type="text" value="2026-03-13T12:00:00.000Z" placeholder="2026-03-13T12:00:00.000Z" required>
+            </label>
+            <label>
+              Recurrence
+              <select id="pokerPlayScheduleTemplateRecurrenceKind">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+              </select>
+            </label>
+            <label>
+              Event Count
+              <input id="pokerPlayScheduleTemplateEventCount" type="number" min="1" max="12" value="3">
+            </label>
+            <label>
+              Buy-In OIL
+              <input id="pokerPlayScheduleTemplateBuyInOil" type="number" min="0" value="400">
+            </label>
+            <label>
+              Small Blind OIL
+              <input id="pokerPlayScheduleTemplateSmallBlindOil" type="number" min="1" value="50">
+            </label>
+            <label>
+              Big Blind OIL
+              <input id="pokerPlayScheduleTemplateBigBlindOil" type="number" min="1" value="100">
+            </label>
+            <button class="pokerButton" type="submit">Create Template</button>
+          </form>
+          ${adminTemplates.length
+            ? `
+              <div class="pokerStack">
+                ${adminTemplates.map((item) => `
+                  <div class="pokerMessage">
+                    <div class="pokerLabel">${escapeHtml(item?.title || 'Schedule Template')}</div>
+                    <div>${escapeHtml(item?.recurrenceLabel || 'Recurring')}</div>
+                    <div>${Number(item?.generatedEventCount || 0)} generated event${Number(item?.generatedEventCount || 0) === 1 ? '' : 's'}</div>
+                    <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No generated event yet.'}</div>
+                  </div>
+                `).join('')}
+              </div>
+            `
+            : '<p>No durable schedule templates yet.</p>'}
+        `
+        : '',
       templates.length
         ? `
           <h2>Recurring Templates</h2>
@@ -1630,6 +1712,7 @@
     setStatus(Number(summary?.eventCount || 0) > 0
       ? `${Number(summary?.eventCount || 0)} scheduled tournament event${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.`
       : 'No tournament events are scheduled right now.');
+    bindPlayScheduleAdminForm();
     bindPlayScheduleActions();
   }
 
@@ -3352,6 +3435,49 @@
           setStatus(`${failureByKind[actionKind] || 'Schedule action failed'}: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
+    });
+  }
+
+  function bindPlayScheduleAdminForm() {
+    const form = document.getElementById('pokerPlayScheduleTemplateForm');
+    const adminToken = readStoredPokerAdminToken();
+    if (!form || !adminToken) return;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const title = String(document.getElementById('pokerPlayScheduleTemplateTitle')?.value || '').trim();
+      const firstStartAt = String(document.getElementById('pokerPlayScheduleTemplateFirstStartAt')?.value || '').trim();
+      const recurrenceKind = String(document.getElementById('pokerPlayScheduleTemplateRecurrenceKind')?.value || 'daily').trim();
+      const eventCount = Number(document.getElementById('pokerPlayScheduleTemplateEventCount')?.value || 0);
+      const buyInOil = Number(document.getElementById('pokerPlayScheduleTemplateBuyInOil')?.value || 0);
+      const smallBlindOil = Number(document.getElementById('pokerPlayScheduleTemplateSmallBlindOil')?.value || 0);
+      const bigBlindOil = Number(document.getElementById('pokerPlayScheduleTemplateBigBlindOil')?.value || 0);
+      if (!title || !firstStartAt) {
+        setStatus('Schedule template title and first start time are required.');
+        return;
+      }
+      setStatus('Creating recurring schedule template...');
+      try {
+        await api(buildPlayAdminScheduleTemplatesApiPath(), {
+          method: 'POST',
+          headers: { 'x-admin-token': adminToken },
+          body: JSON.stringify({
+            title,
+            firstStartAt,
+            recurrenceKind,
+            eventCount,
+            buyInOil,
+            smallBlindOil,
+            bigBlindOil,
+            maxSeats: 6,
+            minPlayers: 2,
+            lateRegistrationHands: 2,
+            handsPerBlindLevel: 8,
+          }),
+        });
+        await loadPlaySchedule();
+      } catch (err) {
+        setStatus(`Schedule template creation failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
     });
   }
 

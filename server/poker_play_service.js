@@ -182,6 +182,11 @@ function normalizePokerPlayScheduleRecurrenceLabel(value, fallback = '') {
   return normalizeTrimmedString(value, fallback).slice(0, 96);
 }
 
+function normalizePokerPlayScheduleRecurrenceKind(value, fallback = 'daily') {
+  const kind = normalizeTrimmedString(value, fallback).toLowerCase();
+  return kind === 'weekly' ? 'weekly' : 'daily';
+}
+
 function normalizePokerPlayScheduledBreakLabel(value, fallback = '') {
   return normalizeTrimmedString(value, fallback).slice(0, 80);
 }
@@ -1261,6 +1266,23 @@ function addHoursToIso(iso, hours) {
   const safeHours = Math.max(0, Number(hours || 0));
   const nextMs = (Number.isFinite(baseMs) ? baseMs : Date.now()) + (safeHours * 60 * 60 * 1000);
   return new Date(nextMs).toISOString();
+}
+
+function getPokerPlayScheduleRecurrenceIntervalHours(kind) {
+  return normalizePokerPlayScheduleRecurrenceKind(kind) === 'weekly' ? (7 * 24) : 24;
+}
+
+function buildPokerPlayScheduleRecurrenceLabel(kind, firstStartAt) {
+  const normalizedKind = normalizePokerPlayScheduleRecurrenceKind(kind);
+  const parsed = Date.parse(String(firstStartAt || ''));
+  const date = Number.isFinite(parsed) ? new Date(parsed) : new Date();
+  const hh = String(date.getUTCHours()).padStart(2, '0');
+  const mm = String(date.getUTCMinutes()).padStart(2, '0');
+  if (normalizedKind === 'weekly') {
+    const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getUTCDay()] || 'UTC';
+    return `Weekly ${weekday} ${hh}:${mm} UTC`;
+  }
+  return `Daily ${hh}:${mm} UTC`;
 }
 
 function addMinutesToIso(iso, minutes) {
@@ -9039,6 +9061,129 @@ function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicVi
   };
 }
 
+function buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const templates = (typeof deps.listPokerPlayScheduleTemplates === 'function'
+    ? deps.listPokerPlayScheduleTemplates()
+    : [])
+    .map((template) => {
+      const items = deps.listPokerPlayTables()
+        .filter((table) => normalizePokerPlayTableType(table?.tableType) === 'tournament')
+        .filter((table) => normalizePokerPlayScheduleTemplateId(table?.rules?.scheduleTemplateId || table?.summary?.scheduleTemplateId || '') === template.templateId)
+        .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+        .map((entry) => {
+          const summary = computeTableSummary(entry.table, entry.seats, entry.hand, null);
+          return {
+            tableId: String(entry.table.tableId || ''),
+            title: String(entry.table.title || template.title || 'Tournament'),
+            tableStatus: String(entry.table.status || 'open'),
+            scheduledStartAt: getTournamentScheduledStartAt(entry.table) || null,
+            entryCount: Number(summary?.entryCount || 0),
+            openSeatCount: Number(summary?.openSeatCount || 0),
+            waitlistCount: Number(summary?.waitlistCount || 0),
+            links: {
+              table: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+            },
+          };
+        })
+        .sort((left, right) => compareIsoAsc(left?.scheduledStartAt, right?.scheduledStartAt));
+      return {
+        templateId: template.templateId,
+        title: template.title,
+        recurrenceKind: template.recurrenceKind,
+        recurrenceIntervalHours: Number(template.recurrenceIntervalHours || 0),
+        recurrenceLabel: template.recurrenceLabel,
+        firstStartAt: template.firstStartAt,
+        eventCount: Math.max(1, Number(template.eventCount || 1)),
+        generatedEventCount: items.length,
+        nextStartAt: items[0]?.scheduledStartAt || null,
+        config: cloneJson(template.config, {}),
+        items,
+      };
+    })
+    .sort((left, right) => compareIsoAsc(left?.firstStartAt, right?.firstStartAt));
+  return {
+    summary: {
+      templateCount: templates.length,
+      eventCount: templates.reduce((sum, item) => sum + Number(item?.generatedEventCount || 0), 0),
+      nextStartAt: templates.flatMap((item) => item?.items?.[0]?.scheduledStartAt ? [item.items[0].scheduledStartAt] : [])[0] || null,
+    },
+    templates,
+    processAt: requestAt,
+  };
+}
+
+function createScheduleTemplate(deps, { body, processAt } = {}) {
+  if (typeof deps.upsertPokerPlayScheduleTemplate !== 'function' || typeof deps.listPokerPlayScheduleTemplates !== 'function') {
+    throw createRouteError(500, 'POKER_PLAY_SCHEDULE_TEMPLATE_UNAVAILABLE', 'Schedule template storage is unavailable.');
+  }
+  const requestAt = toProcessIso(deps, processAt || body?.asOf);
+  const normalizedTitle = normalizePokerPlayScheduleTemplateTitle(body?.title, body?.scheduleTemplateTitle || 'Scheduled Tournament');
+  if (!normalizedTitle) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Schedule template title is required.');
+  }
+  const firstStartAt = normalizeIsoString(body?.firstStartAt || body?.scheduledStartAt);
+  if (!firstStartAt) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'A valid firstStartAt ISO timestamp is required.');
+  }
+  if (compareIsoAsc(firstStartAt, requestAt) < 0) {
+    throw createRouteError(409, 'POKER_PLAY_SCHEDULE_TEMPLATE_PAST_START', 'Schedule templates must start at or after the requested process time.');
+  }
+  const recurrenceKind = normalizePokerPlayScheduleRecurrenceKind(body?.recurrenceKind || body?.cadence);
+  const recurrenceIntervalHours = getPokerPlayScheduleRecurrenceIntervalHours(recurrenceKind);
+  const recurrenceLabel = normalizePokerPlayScheduleRecurrenceLabel(
+    body?.recurrenceLabel,
+    buildPokerPlayScheduleRecurrenceLabel(recurrenceKind, firstStartAt)
+  );
+  const eventCount = Math.max(1, Math.min(12, normalizeOilAmount(body?.eventCount, 3)));
+  const templateId = normalizePokerPlayScheduleTemplateId(
+    body?.templateId,
+    `pktpl_${slugifySegment(normalizedTitle, 'schedule')}_${deps.randomHex(6)}`
+  );
+  const tableConfig = {
+    tableType: 'tournament',
+    title: normalizedTitle,
+    smallBlindOil: body?.smallBlindOil,
+    bigBlindOil: body?.bigBlindOil,
+    buyInOil: body?.buyInOil,
+    maxSeats: body?.maxSeats,
+    minPlayers: body?.minPlayers,
+    lateRegistrationHands: body?.lateRegistrationHands,
+    handsPerBlindLevel: body?.handsPerBlindLevel,
+    scheduledBreaks: body?.scheduledBreaks,
+    accessMode: 'public',
+  };
+  const storedTemplate = deps.upsertPokerPlayScheduleTemplate({
+    templateId,
+    title: normalizedTitle,
+    recurrenceKind,
+    recurrenceIntervalHours,
+    recurrenceLabel,
+    firstStartAt,
+    eventCount,
+    config: cloneJson(tableConfig, {}),
+    createdAt: requestAt,
+    updatedAt: requestAt,
+  });
+  for (let index = 0; index < eventCount; index += 1) {
+    const scheduledStartAt = addHoursToIso(firstStartAt, recurrenceIntervalHours * index);
+    createDynamicTable(deps, {
+      ...tableConfig,
+      scheduledStartAt,
+      scheduleTemplateId: templateId,
+      scheduleTemplateTitle: normalizedTitle,
+      scheduleRecurrenceLabel: recurrenceLabel,
+      creatorWalletSubject: 'poker_schedule_admin',
+      creatorHouseId: 'house_poker_schedule_admin',
+    }, { createdAt: requestAt });
+  }
+  const payload = buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt: requestAt });
+  return {
+    ...payload,
+    createdTemplateId: storedTemplate?.templateId || templateId,
+  };
+}
+
 function requireSeatWriter(deps, { table, session, req }) {
   const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
   if (!walletBinding?.walletSubject) {
@@ -12091,6 +12236,7 @@ module.exports = {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
   buildPokerPlayLedgerReconciliationPayload,
+  buildPokerPlayAdminScheduleTemplatesPayload,
   buildPokerPlayAdminTreasuryPayload,
   buildPokerPlayNativeSeasonLeaderboardPayload,
   buildPokerPlayOpsDashboardPayload,
@@ -12107,6 +12253,7 @@ module.exports = {
   closeTable,
   closeTournamentSeries,
   createTable,
+  createScheduleTemplate,
   createRouteError,
   addTournamentAddon,
   createChopProposal,
