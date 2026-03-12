@@ -1185,15 +1185,44 @@ function registerPlatformReadRoutes(app, deps) {
     return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
   }
 
+  function projectLibraryPublicStackLocalReview({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedLibraryPublicStackId) {
+      return {
+        reviewTier: '',
+        review: null,
+      };
+    }
+    const review = getLibraryPublicStackReview({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      libraryPublicStackId: normalizedLibraryPublicStackId,
+    });
+    return {
+      reviewTier: String(review?.reviewTier || '').trim() || '',
+      review,
+    };
+  }
+
   function searchLibraryPublicStackGroups({
     query = '',
     family = '',
+    houseId = '',
+    teamId = '',
+    trust = '',
   } = {}) {
     const normalizedFamily = String(family || '').trim();
     if (normalizedFamily && normalizedFamily !== 'house_library_stacks') {
       return [];
     }
     const normalizedQuery = String(query || '').trim().toLowerCase();
+    const normalizedTrust = normalizeLibraryPublicStackReviewTier(trust);
     const stacks = listLibraryPublicStacks({})
       .filter((entry) => String(entry?.publicationState || '').trim() === 'published')
       .filter((entry) => {
@@ -1205,6 +1234,21 @@ function registerPlatformReadRoutes(app, deps) {
           String(entry?.metadata?.manifest?.title || ''),
         ].join(' ').toLowerCase();
         return haystack.includes(normalizedQuery);
+      })
+      .map((entry) => {
+        const localReview = projectLibraryPublicStackLocalReview({
+          houseId,
+          teamId,
+          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+        });
+        return {
+          entry,
+          localReview,
+        };
+      })
+      .filter(({ localReview }) => {
+        if (!normalizedTrust) return true;
+        return String(localReview?.reviewTier || '').trim() === normalizedTrust;
       });
     if (!stacks.length) return [];
     const familyInfo = getHouseLibraryPublicStackFamilyInfo('house_library_stacks');
@@ -1219,7 +1263,7 @@ function registerPlatformReadRoutes(app, deps) {
         summary: familyInfo.description || null,
       },
       memberCount: stacks.length,
-      members: stacks.map((entry) => {
+      members: stacks.map(({ entry, localReview }) => {
         const members = listLibraryPublicStackMembers({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
@@ -1230,6 +1274,8 @@ function registerPlatformReadRoutes(app, deps) {
           slug: String(entry?.libraryPublicStackId || '').trim(),
           displayName: String(entry?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
           description: String(entry?.summary || '').trim() || null,
+          reviewTier: String(localReview?.reviewTier || '').trim() || null,
+          reviewSummary: String(localReview?.review?.summary || '').trim() || null,
           projection: {
             bundleHash: String(entry?.bundleHash || '').trim() || null,
             scopeSetId: String(entry?.scopeSetId || '').trim() || null,
@@ -1467,6 +1513,11 @@ function registerPlatformReadRoutes(app, deps) {
           libraryPublicStackVerificationId: String(latestVerification?.libraryPublicStackVerificationId || '').trim(),
         })
       : [];
+    const localReview = projectLibraryPublicStackLocalReview({
+      houseId,
+      teamId,
+      libraryPublicStackId: normalizedPublicStackId,
+    });
     const trustOverlay = buildLibraryPublicStackTrustOverlay({
       publicStack,
       memberPreviews,
@@ -1494,6 +1545,8 @@ function registerPlatformReadRoutes(app, deps) {
         bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
         publicationState: String(publicStack?.publicationState || '').trim() || 'published',
         verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
+        reviewTier: String(localReview?.reviewTier || '').trim() || null,
+        review: localReview?.review || null,
         verification: trustOverlay?.verification || {
           verificationState: 'unverified',
         },
@@ -1540,6 +1593,8 @@ function registerPlatformReadRoutes(app, deps) {
         displayName: String(member?.displayName || member?.slug || member?.registryEntityId || '').trim(),
         description: String(member?.description || '').trim() || null,
         entityKind: String(member?.entityKind || '').trim() || null,
+        reviewTier: String(member?.reviewTier || '').trim() || null,
+        reviewSummary: String(member?.reviewSummary || '').trim() || null,
         storefront: member?.storefront && typeof member.storefront === 'object'
           ? member.storefront
           : {},
@@ -2601,11 +2656,19 @@ function registerPlatformReadRoutes(app, deps) {
     if (!session) {
       return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
     }
+    const context = resolveSessionPlatformContext(session);
     const query = typeof req.query?.q === 'string' ? req.query.q.trim() : '';
     const family = typeof req.query?.family === 'string' ? req.query.family.trim() : '';
+    const trust = normalizeLibraryPublicStackReviewTier(req.query?.trust);
     const groups = [
-      ...searchRegistryFamilyGroups({ query, family }),
-      ...searchLibraryPublicStackGroups({ query, family }),
+      ...(trust ? [] : searchRegistryFamilyGroups({ query, family })),
+      ...searchLibraryPublicStackGroups({
+        query,
+        family,
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        trust,
+      }),
     ];
     const results = flattenPublicStackSearchGroups(groups);
     setUnifiedPlatformRegistryPreviewSnapshot({
@@ -2618,6 +2681,7 @@ function registerPlatformReadRoutes(app, deps) {
     return sendPortalApiSuccess(res, {
       query,
       family,
+      trust,
       resultCount: results.length,
       groups,
       results,
@@ -2748,9 +2812,14 @@ function registerPlatformReadRoutes(app, deps) {
       verificationRef: latestVerification?.libraryPublicStackVerificationId || '',
       idempotencyKey,
     });
+    const previewAfterSave = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
     return sendPortalApiSuccess(res, {
       review: persisted.review,
-      preview: preview.preview,
+      preview: previewAfterSave.ok ? previewAfterSave.preview : preview.preview,
     }, { requestId, status: persisted.status });
   });
 
