@@ -1147,6 +1147,7 @@ Transport notes:
 - `delta` messages carry one idempotent patch envelope with `reason`, `at`, and any table or series scoped patch fields
 - `reset` means the caller must discard its checkpoint and adopt the included snapshot
 - `lastSeenVersion` allows deterministic delta replay when the in-memory replay window still covers the missed versions
+- live fanout is channel-based, so multiple logical subscribers may receive the same versioned delta through the shared pub/sub layer without payload drift
 - `viewer = player` is valid only for `channelKind = table`
 - `viewer = rail` is valid for table rail channels and series rail channels
 - this websocket channel is now the primary live transport path; the SSE routes remain as compatibility fallback channels

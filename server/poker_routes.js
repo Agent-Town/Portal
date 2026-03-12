@@ -26,6 +26,9 @@ const {
   POKER_PLAY_TRANSPORT_VERSION,
 } = require('./poker_transport');
 const {
+  createPokerPubSubMemoryAdapter,
+} = require('./poker_pubsub');
+const {
   buildPokerPlayAdminReviewPayload,
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
@@ -368,6 +371,7 @@ function registerPokerRoutes(app, deps) {
   const pokerPlayStreamClientsByTable = new Map();
   const pokerPlayStreamClientsBySeries = new Map();
   const pokerPlayTransport = createPokerTransportMemoryAdapter({ nowIso });
+  const pokerPlayPubSub = createPokerPubSubMemoryAdapter({ nowIso });
   const pokerPlayTransportWss = WebSocketServer ? new WebSocketServer({ noServer: true }) : null;
   let pokerPlayStreamEventCounter = 0;
 
@@ -375,6 +379,13 @@ function registerPokerRoutes(app, deps) {
     const kind = normalizeTrimmedString(value).toLowerCase();
     if (kind === 'table' || kind === 'series') return kind;
     return '';
+  }
+
+  function buildPokerPlayPubSubTopic(channelKind, channelId) {
+    const kind = normalizePokerPlayTransportChannelKind(channelKind);
+    const id = normalizeTrimmedString(channelId);
+    if (!kind || !id) return '';
+    return `poker-play:${kind}:${id}`;
   }
 
   function createWebSocketRequestFacade(req) {
@@ -468,6 +479,10 @@ function registerPokerRoutes(app, deps) {
     const channelKind = normalizePokerPlayTransportChannelKind(request.query?.channelKind);
     const channelId = normalizeTrimmedString(request.query?.channelId);
     const viewerMode = normalizePokerPlayTransportViewerMode(request.query?.viewer);
+    const subscriberId = normalizeTrimmedString(
+      request.query?.subscriberId,
+      `ws:${channelKind || 'unknown'}:${channelId || 'unknown'}:${randomHex(8)}`
+    );
     const lastSeenVersionRaw = request.query?.lastSeenVersion;
     if (!channelKind || !channelId) {
       sendPokerPlayTransportMessage(socket, {
@@ -538,10 +553,12 @@ function registerPokerRoutes(app, deps) {
       }));
     }
 
-    const unsubscribe = pokerPlayTransport.subscribe({
-      channelKind,
-      channelId,
-      listener(envelope) {
+    const unsubscribe = pokerPlayPubSub.subscribe({
+      topic: buildPokerPlayPubSubTopic(channelKind, channelId),
+      subscriberId,
+      listener(message) {
+        const envelope = message && typeof message === 'object' ? message : null;
+        if (!envelope) return;
         sendPokerPlayTransportMessage(socket, envelope);
       },
     });
@@ -591,26 +608,23 @@ function registerPokerRoutes(app, deps) {
       at: nowIso(),
       ...((details && typeof details === 'object') ? details : {}),
     };
-    pokerPlayTransport.publish({
+    const tableEnvelope = pokerPlayTransport.publish({
       channelKind: 'table',
       channelId: normalizedTableId,
       reason: payload.reason,
       patch: payload,
       at: payload.at,
     });
-    const tableClients = pokerPlayStreamClientsByTable.get(normalizedTableId);
-    if (tableClients && tableClients.size) {
-      for (const client of tableClients) {
-        try {
-          writePokerPlayStreamEvent(client.res, {
-            id: pokerPlayStreamEventCounter,
-            event: 'table',
-            data: payload,
-          });
-        } catch {
-          client.close();
-        }
-      }
+    if (tableEnvelope) {
+      pokerPlayPubSub.publish({
+        topic: buildPokerPlayPubSubTopic('table', normalizedTableId),
+        message: tableEnvelope,
+        metadata: {
+          source: 'mutation',
+          channelKind: 'table',
+          channelId: normalizedTableId,
+        },
+      });
     }
 
     const table = getPokerPlayTableById(normalizedTableId);
@@ -623,25 +637,23 @@ function registerPokerRoutes(app, deps) {
       seriesId,
       ...payload,
     };
-    pokerPlayTransport.publish({
+    const seriesEnvelope = pokerPlayTransport.publish({
       channelKind: 'series',
       channelId: seriesId,
       reason: payload.reason,
       patch: seriesPayload,
       at: payload.at,
     });
-    const seriesClients = pokerPlayStreamClientsBySeries.get(seriesId);
-    if (!seriesClients || !seriesClients.size) return;
-    for (const client of seriesClients) {
-      try {
-        writePokerPlayStreamEvent(client.res, {
-          id: `${pokerPlayStreamEventCounter}-series`,
-          event: 'series',
-          data: seriesPayload,
-        });
-      } catch {
-        client.close();
-      }
+    if (seriesEnvelope) {
+      pokerPlayPubSub.publish({
+        topic: buildPokerPlayPubSubTopic('series', seriesId),
+        message: seriesEnvelope,
+        metadata: {
+          source: 'mutation',
+          channelKind: 'series',
+          channelId: seriesId,
+        },
+      });
     }
   }
 
@@ -659,8 +671,26 @@ function registerPokerRoutes(app, deps) {
         client.close();
       }
     }, 15000);
+    const unsubscribe = pokerPlayPubSub.subscribe({
+      topic: buildPokerPlayPubSubTopic('table', normalizedTableId),
+      subscriberId: `sse:table:${normalizedTableId}:${randomHex(8)}`,
+      listener(message) {
+        const envelope = message && typeof message === 'object' ? message : null;
+        if (!envelope) return;
+        try {
+          writePokerPlayStreamEvent(res, {
+            id: envelope?.version || null,
+            event: 'table',
+            data: envelope?.patch || {},
+          });
+        } catch {
+          client.close();
+        }
+      },
+    });
     client.close = () => {
       clearInterval(heartbeat);
+      unsubscribe();
       bucket.delete(client);
       if (!bucket.size) {
         pokerPlayStreamClientsByTable.delete(normalizedTableId);
@@ -694,8 +724,26 @@ function registerPokerRoutes(app, deps) {
         client.close();
       }
     }, 15000);
+    const unsubscribe = pokerPlayPubSub.subscribe({
+      topic: buildPokerPlayPubSubTopic('series', normalizedSeriesId),
+      subscriberId: `sse:series:${normalizedSeriesId}:${randomHex(8)}`,
+      listener(message) {
+        const envelope = message && typeof message === 'object' ? message : null;
+        if (!envelope) return;
+        try {
+          writePokerPlayStreamEvent(res, {
+            id: envelope?.version ? `${envelope.version}-series` : null,
+            event: 'series',
+            data: envelope?.patch || {},
+          });
+        } catch {
+          client.close();
+        }
+      },
+    });
     client.close = () => {
       clearInterval(heartbeat);
+      unsubscribe();
       bucket.delete(client);
       if (!bucket.size) {
         pokerPlayStreamClientsBySeries.delete(normalizedSeriesId);
@@ -717,6 +765,7 @@ function registerPokerRoutes(app, deps) {
 
   function resetPokerPlayTransportState() {
     pokerPlayTransport.reset();
+    pokerPlayPubSub.reset();
     for (const bucket of pokerPlayStreamClientsByTable.values()) {
       for (const client of bucket) {
         try {
@@ -6445,6 +6494,26 @@ function registerPokerRoutes(app, deps) {
         replayEntryCount: 0,
         latestDelta: null,
         subscriberCount: 0,
+      },
+    });
+  });
+
+  app.get('/__test__/poker/play/pubsub/topics/:channelKind/:channelId', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    if (req.header('x-test-reset') !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const topic = buildPokerPlayPubSubTopic(req.params.channelKind, req.params.channelId);
+    return res.json({
+      ok: true,
+      topic: pokerPlayPubSub.getTopicSummary(topic) || {
+        adapterKind: pokerPlayPubSub.adapterKind,
+        topic,
+        publishCount: 0,
+        retainedCount: 0,
+        latestPublishedAt: null,
+        latestEnvelope: null,
+        subscriberCount: 0,
+        subscribers: [],
       },
     });
   });

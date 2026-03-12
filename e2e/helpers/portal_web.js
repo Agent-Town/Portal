@@ -214,6 +214,20 @@ async function getPokerTransportChannel(request, {
   return body?.channel || null;
 }
 
+async function getPokerPubSubTopic(request, {
+  channelKind,
+  channelId,
+} = {}) {
+  const resp = await request.get(`/__test__/poker/play/pubsub/topics/${encodeURIComponent(channelKind || '')}/${encodeURIComponent(channelId || '')}`, {
+    headers: { 'x-test-reset': resetToken },
+  });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok()) {
+    throw new Error(`POKER_PUBSUB_TOPIC_FAILED:${resp.status()}:${JSON.stringify(body)}`);
+  }
+  return body?.topic || null;
+}
+
 async function runOilScheduler(request, {
   asOf,
   limit,
@@ -291,6 +305,7 @@ module.exports = {
   bindMockSolanaWallet,
   createWebSession,
   fundOilWallet,
+  getPokerPubSubTopic,
   getPokerTransportChannel,
   getPokerSubmissionRow,
   getHouseEconomy,
