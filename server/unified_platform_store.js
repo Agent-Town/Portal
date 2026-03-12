@@ -32,6 +32,8 @@ const PLATFORM_TABLES = Object.freeze([
   'library_publications',
   'library_peer_relays',
   'library_peer_receipts',
+  'library_satchel_relays',
+  'library_satchel_receipts',
   'track_progress_events',
   'sealed_contexts',
   'sealed_context_violations',
@@ -87,6 +89,7 @@ const FIXTURE_FILES = Object.freeze({
   library_benchmark_seed: 'library_benchmark_seed.json',
   library_guided_flow_seed: 'library_guided_flow_seed.json',
   library_peer_relay_seed: 'library_peer_relay_seed.json',
+  library_satchel_exchange_seed: 'library_satchel_exchange_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -120,6 +123,7 @@ let unifiedPlatformInspectors = {
   registryPreview: buildDefaultRegistryPreviewInspector(),
   benchmarks: buildDefaultBenchmarkInspector(),
   peerRelay: buildDefaultPeerRelayInspector(),
+  satchelExchange: buildDefaultSatchelExchangeInspector(),
 };
 
 function hasTableColumn(database, tableName, columnName) {
@@ -469,6 +473,33 @@ function ensureDb() {
       UNIQUE (library_peer_relay_id, receipt_kind, receipt_ref)
     );
 
+    CREATE TABLE IF NOT EXISTS library_satchel_relays (
+      library_satchel_relay_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      scope_set_id TEXT NOT NULL,
+      target_house_id TEXT NOT NULL,
+      bundle_manifest_json TEXT NOT NULL DEFAULT '{}',
+      relay_state TEXT NOT NULL,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_satchel_receipts (
+      library_satchel_receipt_id TEXT PRIMARY KEY,
+      library_satchel_relay_id TEXT NOT NULL,
+      target_house_id TEXT NOT NULL,
+      receipt_kind TEXT NOT NULL,
+      receipt_ref TEXT NOT NULL,
+      status TEXT NOT NULL,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_satchel_relay_id, receipt_kind, receipt_ref)
+    );
+
     CREATE TABLE IF NOT EXISTS track_progress_events (
       track_progress_event_id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -682,6 +713,18 @@ function buildDefaultPeerRelayInspector() {
   };
 }
 
+function buildDefaultSatchelExchangeInspector() {
+  return {
+    relays: [],
+    receipts: [],
+    filters: {
+      sourceHouseId: '',
+      targetHouseId: '',
+      scopeSetId: '',
+    },
+  };
+}
+
 function resetUnifiedPlatformInspectors() {
   unifiedPlatformInspectors = {
     promptPreview: buildDefaultPromptPreviewInspector(),
@@ -689,6 +732,7 @@ function resetUnifiedPlatformInspectors() {
     registryPreview: buildDefaultRegistryPreviewInspector(),
     benchmarks: buildDefaultBenchmarkInspector(),
     peerRelay: buildDefaultPeerRelayInspector(),
+    satchelExchange: buildDefaultSatchelExchangeInspector(),
   };
 }
 
@@ -1736,6 +1780,37 @@ function mapLibraryPeerReceiptRow(row) {
   };
 }
 
+function mapLibrarySatchelRelayRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    librarySatchelRelayId: String(row.library_satchel_relay_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    scopeSetId: String(row.scope_set_id || ''),
+    targetHouseId: String(row.target_house_id || ''),
+    bundleManifest: parseJsonColumn(row.bundle_manifest_json, {}),
+    relayState: String(row.relay_state || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibrarySatchelReceiptRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    librarySatchelReceiptId: String(row.library_satchel_receipt_id || ''),
+    librarySatchelRelayId: String(row.library_satchel_relay_id || ''),
+    targetHouseId: String(row.target_house_id || ''),
+    receiptKind: String(row.receipt_kind || ''),
+    receiptRef: String(row.receipt_ref || ''),
+    status: String(row.status || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
 function listLibraryPublications({
   houseId = '',
   teamId = '',
@@ -2101,6 +2176,167 @@ function createLibraryPeerReceipt({
     .find((entry) => entry.libraryPeerReceiptId === normalizedLibraryPeerReceiptId) || null;
 }
 
+function listLibrarySatchelRelays({
+  houseId = '',
+  teamId = '',
+  targetHouseId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_satchel_relays
+  `;
+  const args = [];
+  if (normalizedHouseId || normalizedTeamId || normalizedTargetHouseId) {
+    const clauses = [];
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    if (normalizedTargetHouseId) {
+      clauses.push('target_house_id = ?');
+      args.push(normalizedTargetHouseId);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, library_satchel_relay_id DESC';
+  return database.prepare(query).all(...args).map(mapLibrarySatchelRelayRow).filter(Boolean);
+}
+
+function createLibrarySatchelRelay({
+  librarySatchelRelayId = '',
+  houseId = '',
+  teamId = '',
+  scopeSetId = '',
+  targetHouseId = '',
+  bundleManifest = null,
+  relayState = 'queued',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibrarySatchelRelayId = String(librarySatchelRelayId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedScopeSetId = String(scopeSetId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const normalizedRelayState = String(relayState || 'queued').trim() || 'queued';
+  if (
+    !normalizedLibrarySatchelRelayId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedScopeSetId
+    || !normalizedTargetHouseId
+  ) {
+    throw new Error('LIBRARY_SATCHEL_RELAY_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_satchel_relays (
+      library_satchel_relay_id,
+      house_id,
+      team_id,
+      scope_set_id,
+      target_house_id,
+      bundle_manifest_json,
+      relay_state,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibrarySatchelRelayId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedScopeSetId,
+    normalizedTargetHouseId,
+    JSON.stringify(bundleManifest && typeof bundleManifest === 'object' ? bundleManifest : {}),
+    normalizedRelayState,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return listLibrarySatchelRelays({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+    .find((entry) => entry.librarySatchelRelayId === normalizedLibrarySatchelRelayId) || null;
+}
+
+function listLibrarySatchelReceipts({
+  librarySatchelRelayId = '',
+} = {}) {
+  const normalizedLibrarySatchelRelayId = String(librarySatchelRelayId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_satchel_receipts
+  `;
+  const args = [];
+  if (normalizedLibrarySatchelRelayId) {
+    query += ' WHERE library_satchel_relay_id = ?';
+    args.push(normalizedLibrarySatchelRelayId);
+  }
+  query += ' ORDER BY created_at DESC, library_satchel_receipt_id DESC';
+  return database.prepare(query).all(...args).map(mapLibrarySatchelReceiptRow).filter(Boolean);
+}
+
+function createLibrarySatchelReceipt({
+  librarySatchelReceiptId = '',
+  librarySatchelRelayId = '',
+  targetHouseId = '',
+  receiptKind = 'pony_dispatch_receipt',
+  receiptRef = '',
+  status = 'accepted',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibrarySatchelReceiptId = String(librarySatchelReceiptId || '').trim();
+  const normalizedLibrarySatchelRelayId = String(librarySatchelRelayId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const normalizedReceiptKind = String(receiptKind || 'pony_dispatch_receipt').trim() || 'pony_dispatch_receipt';
+  const normalizedReceiptRef = String(receiptRef || '').trim();
+  const normalizedStatus = String(status || 'accepted').trim() || 'accepted';
+  if (
+    !normalizedLibrarySatchelReceiptId
+    || !normalizedLibrarySatchelRelayId
+    || !normalizedTargetHouseId
+    || !normalizedReceiptRef
+  ) {
+    throw new Error('LIBRARY_SATCHEL_RECEIPT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_satchel_receipts (
+      library_satchel_receipt_id,
+      library_satchel_relay_id,
+      target_house_id,
+      receipt_kind,
+      receipt_ref,
+      status,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibrarySatchelReceiptId,
+    normalizedLibrarySatchelRelayId,
+    normalizedTargetHouseId,
+    normalizedReceiptKind,
+    normalizedReceiptRef,
+    normalizedStatus,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+  );
+  return listLibrarySatchelReceipts({ librarySatchelRelayId: normalizedLibrarySatchelRelayId })
+    .find((entry) => entry.librarySatchelReceiptId === normalizedLibrarySatchelReceiptId) || null;
+}
+
 function setUnifiedPlatformPromptPreview(snapshot = null) {
   const source = snapshot && typeof snapshot === 'object' ? snapshot : {};
   unifiedPlatformInspectors.promptPreview = {
@@ -2233,6 +2469,26 @@ function getUnifiedPlatformPeerRelayInspector({
       sourceHouseId: String(houseId || '').trim(),
       targetHouseId: String(targetHouseId || '').trim(),
       transportKind: '',
+    },
+  };
+}
+
+function getUnifiedPlatformSatchelExchangeInspector({
+  houseId = '',
+  teamId = '',
+  targetHouseId = '',
+} = {}) {
+  const relays = listLibrarySatchelRelays({ houseId, teamId, targetHouseId });
+  const receipts = relays.flatMap((relay) => listLibrarySatchelReceipts({
+    librarySatchelRelayId: String(relay?.librarySatchelRelayId || '').trim(),
+  }));
+  return {
+    relays,
+    receipts,
+    filters: {
+      sourceHouseId: String(houseId || '').trim(),
+      targetHouseId: String(targetHouseId || '').trim(),
+      scopeSetId: '',
     },
   };
 }
@@ -4161,6 +4417,7 @@ function getUnifiedPlatformTestStats() {
       scopes: true,
       publications: true,
       peerRelay: true,
+      satchelExchange: true,
       promptPreview: true,
       editor: true,
       registryPreview: true,
@@ -4178,6 +4435,8 @@ module.exports = {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibrarySatchelReceipt,
+  createLibrarySatchelRelay,
   createLibraryShelf,
   createLibraryPublication,
   createScopeSet,
@@ -4234,6 +4493,7 @@ module.exports = {
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
   getUnifiedPlatformRevisionsInspector,
+  getUnifiedPlatformSatchelExchangeInspector,
   getUnifiedPlatformShelvesInspector,
   getUnifiedPlatformScopesInspector,
   getUnifiedPlatformTestFixture: loadFixtureFamily,
@@ -4248,6 +4508,8 @@ module.exports = {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibrarySatchelReceipts,
+  listLibrarySatchelRelays,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,

@@ -169,6 +169,7 @@ const {
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
   getUnifiedPlatformRevisionsInspector,
+  getUnifiedPlatformSatchelExchangeInspector,
   getUnifiedPlatformShelvesInspector,
   getUnifiedPlatformScopesInspector,
   getUnifiedPlatformTestFixture,
@@ -11132,6 +11133,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPublicationsInspector();
     } else if (inspector === 'peer-relay') {
       data = getUnifiedPlatformPeerRelayInspector();
+    } else if (inspector === 'satchel-exchange') {
+      data = getUnifiedPlatformSatchelExchangeInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {

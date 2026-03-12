@@ -1,0 +1,24 @@
+{
+  "family": "library_satchel_exchange_seed",
+  "scopeSet": {
+    "houseId": "house_library_satchel_source",
+    "teamId": "team_main",
+    "scopeSetId": "scope_satchel_alpha_01",
+    "title": "Launch Satchel Alpha",
+    "scopeKind": "satchel",
+    "orderedItemIds": [
+      "lib_satchel_alpha_01",
+      "lib_satchel_alpha_02"
+    ]
+  },
+  "bundleRelay": {
+    "targetHouseId": "house_library_satchel_friend",
+    "relayState": "queued",
+    "receiptKind": "pony_dispatch_receipt",
+    "expectedReceiptCount": 1,
+    "publicationRefs": [
+      "pub_satchel_alpha_01",
+      "pub_satchel_alpha_02"
+    ]
+  }
+}
