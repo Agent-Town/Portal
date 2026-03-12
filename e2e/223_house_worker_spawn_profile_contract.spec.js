@@ -4,7 +4,7 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi, setDeterministicLlm } = require('./helpers/trainer');
 const { installHouseWorker, readHouseWorkerSessionsFromPage } = require('./helpers/house_workers');
-const { attachHouseToPageSession, getPlatformFixture } = require('./helpers/unified_platform');
+const { attachHouseToPageSession, ensureActivePlatformConfigVersion, getPlatformFixture } = require('./helpers/unified_platform');
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
@@ -17,6 +17,13 @@ test('M35.8: advanced spawn profile overrides persist exactly while the default 
   expect(profileFixture?.ok).toBe(true);
 
   const seededHouse = await seedRecoverableTokenHouse(request);
+  const configVersionId = await ensureActivePlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    configVersionId: 'cfg_house_worker_spawn_profile_contract_01',
+    idempotencyPrefix: 'house-worker-spawn-profile-contract',
+    branch: 'house-worker-spawn-profile-contract',
+  });
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
@@ -40,7 +47,7 @@ test('M35.8: advanced spawn profile overrides persist exactly while the default 
 
   await page.getByTestId('house-office-helper-brainProfileId-input').first().fill(String(profileFixture.fixture.brainProfileId || ''));
   await page.getByTestId('house-office-helper-workspaceSeedRef-input').first().fill(String(profileFixture.fixture.workspaceSeedRef || ''));
-  await page.getByTestId('house-office-helper-configVersionId-input').first().fill(String(profileFixture.fixture.configVersionId || ''));
+  await page.getByTestId('house-office-helper-configVersionId-input').first().fill(configVersionId);
   await page.getByTestId('house-office-helper-loadoutId-input').first().fill(String(profileFixture.fixture.loadoutId || ''));
   await page.getByTestId('house-office-helper-start').first().click();
 
@@ -54,7 +61,7 @@ test('M35.8: advanced spawn profile overrides persist exactly while the default 
   expect(session?.runtimeProfile).toMatchObject({
     brainProfileId: profileFixture.fixture.brainProfileId,
     workspaceSeedRef: profileFixture.fixture.workspaceSeedRef,
-    configVersionId: profileFixture.fixture.configVersionId,
+    configVersionId,
     loadoutId: profileFixture.fixture.loadoutId,
   });
 });

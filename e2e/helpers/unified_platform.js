@@ -312,6 +312,68 @@ async function createPlatformConfigVersion(request, {
   }
 }
 
+function buildDeterministicPlatformConfigPayload(configVersionId, {
+  teamId = 'team_main',
+  branch = 'house-worker-runtime',
+} = {}) {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  const suffix = normalizedConfigVersionId || 'cfg_house_worker_runtime_default';
+  return {
+    configVersionId: normalizedConfigVersionId,
+    teamId,
+    displayVersion: `${suffix}@2026.03.12`,
+    branch,
+    status: 'candidate',
+    componentRefs: {
+      housePolicyVersionId: `hpv_${suffix}`,
+      teamCompositionVersionId: `tcv_${suffix}`,
+      agentConfigVersionIds: [`agv_${suffix}`],
+      officePolicyVersionIds: [],
+      experiencePresetVersionId: `epv_${suffix}`,
+      integrationOverlayVersionIds: [],
+      trainerPresetVersionId: `tpv_${suffix}`,
+    },
+  };
+}
+
+async function ensureActivePlatformConfigVersion(request, {
+  houseId = '',
+  houseAuthKey = '',
+  teamId = 'team_main',
+  configVersionId = '',
+  idempotencyPrefix = 'house-worker-runtime',
+  branch = 'house-worker-runtime',
+} = {}) {
+  const normalizedConfigVersionId = String(configVersionId || '').trim();
+  if (!normalizedConfigVersionId) {
+    throw new Error('ACTIVE_PLATFORM_CONFIG_VERSION_ID_REQUIRED');
+  }
+  const normalizedPrefix = String(idempotencyPrefix || 'house-worker-runtime').trim() || 'house-worker-runtime';
+  const created = await createPlatformConfigVersion(request, {
+    houseId,
+    houseAuthKey,
+    idempotencyKey: `${normalizedPrefix}:create:${normalizedConfigVersionId}`,
+    payload: buildDeterministicPlatformConfigPayload(normalizedConfigVersionId, {
+      teamId,
+      branch,
+    }),
+  });
+  if (created.status !== 201 || created.json?.ok !== true) {
+    throw new Error(`ACTIVE_PLATFORM_CONFIG_CREATE_FAILED:${JSON.stringify(created)}`);
+  }
+  const promoted = await promotePlatformConfigVersion(request, {
+    houseId,
+    houseAuthKey,
+    configVersionId: normalizedConfigVersionId,
+    teamId,
+    idempotencyKey: `${normalizedPrefix}:promote:${normalizedConfigVersionId}`,
+  });
+  if (promoted.status !== 200 || promoted.json?.ok !== true) {
+    throw new Error(`ACTIVE_PLATFORM_CONFIG_PROMOTE_FAILED:${JSON.stringify(promoted)}`);
+  }
+  return normalizedConfigVersionId;
+}
+
 async function createPlatformRun(request, {
   houseId = '',
   houseAuthKey = '',
@@ -817,6 +879,7 @@ async function setPlatformRunStatus(request, runId, status) {
 module.exports = {
   compilePlatformIntegration,
   compileDefaultSkillPack,
+  ensureActivePlatformConfigVersion,
   createPlatformConfigVersion,
   createPlatformRun,
   createPlatformTrainerJob,

@@ -10,7 +10,7 @@ const {
   shareHouseWorker,
 } = require('./helpers/house_workers');
 const { resetPortalWebState } = require('./helpers/portal_web');
-const { attachHouseToPageSession, getPlatformFixture } = require('./helpers/unified_platform');
+const { attachHouseToPageSession, ensureActivePlatformConfigVersion, getPlatformFixture } = require('./helpers/unified_platform');
 const { waitForLiteApi, setDeterministicLlm } = require('./helpers/trainer');
 
 function normalizeCheckpoints(entries = []) {
@@ -35,6 +35,13 @@ test('M35.13: worker package discovery, install, share, spawn, and delegation co
   await waitForLiteApi(page);
 
   const houseA = await seedRecoverableTokenHouse(request);
+  await ensureActivePlatformConfigVersion(request, {
+    houseId: houseA.houseId,
+    houseAuthKey: houseA.houseAuthKey,
+    configVersionId: 'cfg_house_worker_unified_smoke_owner_01',
+    idempotencyPrefix: 'house-worker-unified-smoke-owner',
+    branch: 'house-worker-unified-smoke-owner',
+  });
   await attachHouseToPageSession(page, {
     houseId: houseA.houseId,
     teamId: 'team_main',
@@ -77,6 +84,13 @@ test('M35.13: worker package discovery, install, share, spawn, and delegation co
   await waitForLiteApi(friendPage);
   await setDeterministicLlm(friendPage);
   const houseB = await seedRecoverableTokenHouse(friendPage.request);
+  const friendConfigVersionId = await ensureActivePlatformConfigVersion(friendPage.request, {
+    houseId: houseB.houseId,
+    houseAuthKey: houseB.houseAuthKey,
+    configVersionId: 'cfg_house_worker_unified_smoke_friend_01',
+    idempotencyPrefix: 'house-worker-unified-smoke-friend',
+    branch: 'house-worker-unified-smoke-friend',
+  });
   await attachHouseToPageSession(friendPage, {
     houseId: houseB.houseId,
     teamId: 'team_main',
@@ -99,7 +113,7 @@ test('M35.13: worker package discovery, install, share, spawn, and delegation co
     reason: 'friend_house_start',
     brainProfileId: profileFixture.fixture.brainProfileId,
     workspaceSeedRef: profileFixture.fixture.workspaceSeedRef,
-    configVersionId: profileFixture.fixture.configVersionId,
+    configVersionId: friendConfigVersionId,
     loadoutId: profileFixture.fixture.loadoutId,
   });
   expect(spawnResult?.ok).toBe(true);
@@ -112,7 +126,7 @@ test('M35.13: worker package discovery, install, share, spawn, and delegation co
   expect(spawnResult?.data?.runtimeProfile).toMatchObject({
     brainProfileId: profileFixture.fixture.brainProfileId,
     workspaceSeedRef: profileFixture.fixture.workspaceSeedRef,
-    configVersionId: profileFixture.fixture.configVersionId,
+    configVersionId: friendConfigVersionId,
     loadoutId: profileFixture.fixture.loadoutId,
   });
 

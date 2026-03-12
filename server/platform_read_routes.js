@@ -20,6 +20,7 @@ function registerPlatformReadRoutes(app, deps) {
     getHouseWorkerShareById,
     getHouseWorkerShareInviteById,
     getHouseWorkerSessionById,
+    getRegistryFamilyBySlug,
     getRegistryEntityById,
     getRegistryEntityByIdAtVersion,
     getUnifiedPlatformTestFixture,
@@ -84,41 +85,96 @@ function registerPlatformReadRoutes(app, deps) {
   ]);
   const HOUSE_WORKER_ALLOWED_STATUS_VALUES = new Set(['starting', 'ready', 'idle', 'working', 'waiting', 'blocked', 'stopped', 'failed']);
   const HOUSE_WORKER_ALLOWED_DEPLOYMENT_ACTIONS = new Set(['pause', 'resume', 'archive', 'remove', 'reinstall', 'update']);
-  const HOUSE_WORKER_MAX_ACTIVE_SESSIONS = Math.max(
-    1,
-    Number(getUnifiedPlatformTestFixture('worker_spawn_guardrail_seed')?.maxActiveSessions || 3)
-  );
-  const HOUSE_WORKER_SHARE_DEFAULT_TTL_DAYS = Math.max(
-    1,
-    Number(getUnifiedPlatformTestFixture('worker_share_lifecycle_seed')?.defaultTtlDays || 7)
-  );
-  const HOUSE_WORKER_LEASE_HEARTBEAT_MS = Math.max(
-    1000,
-    Number(getUnifiedPlatformTestFixture('worker_runtime_lease_seed')?.heartbeatIntervalMs || 2500)
-  );
-  const HOUSE_WORKER_LEASE_TTL_MS = Math.max(
-    HOUSE_WORKER_LEASE_HEARTBEAT_MS + 1000,
-    Number(getUnifiedPlatformTestFixture('worker_runtime_lease_seed')?.leaseTtlMs || 9000)
-  );
-  const HOUSE_WORKER_MAX_DELEGATION_DEPTH = Math.max(
-    1,
-    Number(getUnifiedPlatformTestFixture('worker_nested_delegation_seed')?.maxDelegationDepth || 2)
-  );
-  const HOUSE_WORKER_DELEGATION_BUDGET = Math.max(
-    1,
-    Number(getUnifiedPlatformTestFixture('worker_nested_delegation_seed')?.delegationBudget || HOUSE_WORKER_MAX_ACTIVE_SESSIONS)
-  );
+  const HOUSE_WORKER_MAX_ACTIVE_SESSIONS = 3;
+  const HOUSE_WORKER_SHARE_DEFAULT_TTL_DAYS = 7;
+  const HOUSE_WORKER_LEASE_HEARTBEAT_MS = 2500;
+  const HOUSE_WORKER_LEASE_TTL_MS = 15000;
+  const HOUSE_WORKER_MAX_DELEGATION_DEPTH = 2;
+  const HOUSE_WORKER_DELEGATION_BUDGET = 3;
   const HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS = new Set(['brain:current-runtime', 'local_default']);
+  const HOUSE_EXPERIENCE_ENTRIES = [
+    {
+      experienceId: 'web.agent',
+      title: 'Web Ops',
+      entryPath: '/app?district=atlas',
+    },
+    {
+      experienceId: 'poker.season',
+      title: 'Poker',
+      entryPath: '/app?district=poker',
+    },
+  ];
+  const TRACK_DUPLICATE_ACTION_THRESHOLD = 1;
+  const HOUSE_OFFICE_FORBIDDEN_MARKERS = ['prompt', 'callbackUrl', 'credential', 'accessToken', 'sealedPayload'];
+  const HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES = new Set([
+    'idle',
+    'building',
+    'researching',
+    'evaluating',
+    'competing',
+    'reviewing',
+    'alert',
+  ]);
+  const HOUSE_OFFICE_BRIEFING_WINDOW_HOURS = 24;
+  const HOUSE_OFFICE_BRIEFING_GROUP_ORDER = [
+    'archive',
+    'trainer',
+    'workshop',
+    'tracks',
+    'experiences',
+    'poker_or_web',
+  ];
+  const HOUSE_OFFICE_ATTENTION_SEVERITY_ORDER = ['critical', 'warn', 'info'];
+  const HOUSE_OFFICE_PREVIEW_OFFICES = [
+    {
+      officeId: 'office_fixture_workshop',
+      slug: 'workshop',
+      displayName: 'Workshop',
+      purpose: 'Inspect active config lineage and current build focus.',
+      order: 10,
+      mapColumn: 1,
+      mapRow: 1,
+      surface: 'workshop',
+    },
+    {
+      officeId: 'office_fixture_analysis',
+      slug: 'analysis',
+      displayName: 'Analysis',
+      purpose: 'Inspect trainer jobs, results, and replay outputs.',
+      order: 20,
+      mapColumn: 2,
+      mapRow: 1,
+      surface: 'trainer',
+    },
+    {
+      officeId: 'office_fixture_archive',
+      slug: 'archive',
+      displayName: 'Archive',
+      purpose: 'Review canonical traces, artifacts, and proof records.',
+      order: 30,
+      mapColumn: 1,
+      mapRow: 2,
+      surface: 'archive',
+    },
+    {
+      officeId: 'office_fixture_ops',
+      slug: 'ops',
+      displayName: 'Operations',
+      purpose: 'Open experiences, tracks, and current release attention.',
+      order: 40,
+      mapColumn: 2,
+      mapRow: 2,
+      surface: 'experiences',
+    },
+  ];
 
   function buildHouseExperienceItems() {
-    const fixture = getUnifiedPlatformTestFixture('house_experiences_seed') || {};
-    const seededItems = Array.isArray(fixture?.experiences) ? fixture.experiences : [];
     const definitions = new Map(
       (Array.isArray(listPlatformExperienceDefinitions()) ? listPlatformExperienceDefinitions() : [])
         .map((entry) => [String(entry?.experienceId || '').trim(), entry])
         .filter(([experienceId]) => experienceId)
     );
-    return seededItems.map((item) => {
+    return HOUSE_EXPERIENCE_ENTRIES.map((item) => {
       const experienceId = String(item?.experienceId || '').trim();
       if (!experienceId) return null;
       const definition = definitions.get(experienceId) || null;
@@ -154,10 +210,8 @@ function registerPlatformReadRoutes(app, deps) {
   }
 
   function getTrackAntiFarmingPolicy() {
-    const fixture = getUnifiedPlatformTestFixture('tracks_core_seed') || {};
-    const threshold = Number(fixture?.antiFarming?.duplicateActionThreshold || 1);
     return {
-      duplicateActionThreshold: Number.isFinite(threshold) && threshold > 0 ? Math.floor(threshold) : 1,
+      duplicateActionThreshold: TRACK_DUPLICATE_ACTION_THRESHOLD,
       mode: 'dedupe_key_cap',
     };
   }
@@ -278,17 +332,8 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
-  function getHouseOfficePrivacyFixture() {
-    const fixture = getUnifiedPlatformTestFixture('house_office_privacy_seed');
-    return fixture && typeof fixture === 'object' && !Array.isArray(fixture) ? fixture : {};
-  }
-
   function getHouseOfficeForbiddenMarkers() {
-    const fixture = getHouseOfficePrivacyFixture();
-    const markers = Array.isArray(fixture?.forbiddenFields)
-      ? fixture.forbiddenFields
-      : ['prompt', 'callbackUrl', 'credential', 'accessToken', 'sealedPayload'];
-    return markers
+    return HOUSE_OFFICE_FORBIDDEN_MARKERS
       .map((entry) => String(entry || '').trim().toLowerCase())
       .filter(Boolean);
   }
@@ -1347,13 +1392,7 @@ function registerPlatformReadRoutes(app, deps) {
     if (requestedRuntimeProfile?.configVersionId) {
       const requestedConfigVersionId = String(requestedRuntimeProfile.configVersionId || '').trim();
       const configVersion = getConfigVersion(requestedConfigVersionId);
-      const fixtureConfigVersionIds = new Set([
-        String(getUnifiedPlatformTestFixture('house_workshop_seed')?.activeConfig?.configVersionId || '').trim(),
-        String(getUnifiedPlatformTestFixture('worker_spawn_profile_seed')?.configVersionId || '').trim(),
-        String(getUnifiedPlatformTestFixture('worker_runtime_profile_seed')?.configVersionId || '').trim(),
-        String(getUnifiedPlatformTestFixture('worker_profile_validation_seed')?.valid?.configVersionId || '').trim(),
-      ].filter(Boolean));
-      if (!configVersion && !fixtureConfigVersionIds.has(requestedConfigVersionId)) {
+      if (!configVersion) {
         return {
           ok: false,
           code: 'INVALID_CONFIG_VERSION_ID',
@@ -2367,12 +2406,6 @@ function registerPlatformReadRoutes(app, deps) {
     archiveRuns = [],
     trackPayload = null,
   } = {}) {
-    const presenceFixture = getUnifiedPlatformTestFixture('house_office_presence_seed') || {};
-    const allowedStatuses = new Set(
-      (Array.isArray(presenceFixture?.allowedStatuses) ? presenceFixture.allowedStatuses : [])
-        .map((entry) => String(entry || '').trim())
-        .filter(Boolean)
-    );
     const officeList = Array.isArray(offices) ? offices : [];
     const runs = Array.isArray(archiveRuns) ? archiveRuns : [];
     const jobs = Array.isArray(trainerJobs) ? trainerJobs : [];
@@ -2401,7 +2434,7 @@ function registerPlatformReadRoutes(app, deps) {
           officeId,
           officeLabel,
           focus: sanitizeHouseOfficeText(`Config ${String(binding.activeConfigVersionId || '').trim()}`, 'Sensitive activity redacted'),
-          status: allowedStatuses.has('building') ? 'building' : 'idle',
+          status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('building') ? 'building' : 'idle',
           lastActivityAt: String(binding.updatedAt || binding.createdAt || '').trim() || null,
           deepLink: deeplinks.workshop || deeplinks.office,
           sourceRefs: [
@@ -2420,7 +2453,7 @@ function registerPlatformReadRoutes(app, deps) {
             officeId,
             officeLabel,
             focus: sanitizeHouseOfficeText(`Approval needed for ${String(latestTrainerResult.trainerResultId || '').trim()}`, 'Sensitive activity redacted'),
-            status: allowedStatuses.has('alert') ? 'alert' : 'idle',
+            status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('alert') ? 'alert' : 'idle',
             lastActivityAt: String(latestTrainerResult.updatedAt || latestTrainerResult.createdAt || '').trim() || null,
             deepLink: deeplinks.trainer || deeplinks.office,
             sourceRefs: [
@@ -2447,7 +2480,7 @@ function registerPlatformReadRoutes(app, deps) {
               trainerResultId ? `Review ${trainerResultId}` : `Evaluate ${trainerJobId}`,
               'Sensitive activity redacted'
             ),
-            status: allowedStatuses.has('evaluating') ? 'evaluating' : 'idle',
+            status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('evaluating') ? 'evaluating' : 'idle',
             lastActivityAt: String(
               latestTrainerResult?.updatedAt
               || latestTrainerResult?.createdAt
@@ -2482,7 +2515,7 @@ function registerPlatformReadRoutes(app, deps) {
           officeId,
           officeLabel,
           focus: sanitizeHouseOfficeText(`Run ${String(latestArchiveRun.runId || '').trim()}`, 'Sensitive activity redacted'),
-          status: allowedStatuses.has('researching') ? 'researching' : 'idle',
+          status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('researching') ? 'researching' : 'idle',
           lastActivityAt: String(
             latestArchiveRun.completedAt
             || latestArchiveRun.updatedAt
@@ -2508,7 +2541,7 @@ function registerPlatformReadRoutes(app, deps) {
             officeId,
             officeLabel,
             focus: sanitizeHouseOfficeText('Poker Mastery progress', 'Sensitive activity redacted'),
-            status: allowedStatuses.has('competing') ? 'competing' : 'idle',
+            status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('competing') ? 'competing' : 'idle',
             lastActivityAt: String(
               latestOpsTrackEvent?.createdAt
               || latestOpsRun?.updatedAt
@@ -2539,7 +2572,7 @@ function registerPlatformReadRoutes(app, deps) {
             officeId,
             officeLabel,
             focus: sanitizeHouseOfficeText('Web Ops progress', 'Sensitive activity redacted'),
-            status: allowedStatuses.has('researching') ? 'researching' : 'idle',
+            status: HOUSE_OFFICE_PRESENCE_ALLOWED_STATUSES.has('researching') ? 'researching' : 'idle',
             lastActivityAt: String(
               latestOpsTrackEvent?.createdAt
               || latestOpsRun?.updatedAt
@@ -2648,12 +2681,9 @@ function registerPlatformReadRoutes(app, deps) {
     trackPayload = null,
     experiences = [],
   } = {}) {
-    const fixture = getUnifiedPlatformTestFixture('house_office_briefing_seed') || {};
-    const rawWindowHours = Number(fixture?.defaultWindowHours || 24);
+    const rawWindowHours = HOUSE_OFFICE_BRIEFING_WINDOW_HOURS;
     const windowHours = Number.isFinite(rawWindowHours) && rawWindowHours > 0 ? rawWindowHours : 24;
-    const groupOrder = Array.isArray(fixture?.groupOrder) && fixture.groupOrder.length
-      ? fixture.groupOrder.map((entry) => String(entry || '').trim()).filter(Boolean)
-      : ['archive', 'trainer', 'workshop', 'tracks', 'experiences', 'poker_or_web'];
+    const groupOrder = HOUSE_OFFICE_BRIEFING_GROUP_ORDER;
     const groupLabels = {
       archive: 'Archive',
       trainer: 'Trainer',
@@ -2938,10 +2968,7 @@ function registerPlatformReadRoutes(app, deps) {
     experiences = [],
     deeplinks = {},
   } = {}) {
-    const fixture = getUnifiedPlatformTestFixture('house_office_attention_seed') || {};
-    const severityOrder = Array.isArray(fixture?.severityOrder) && fixture.severityOrder.length
-      ? fixture.severityOrder.map((entry) => String(entry || '').trim()).filter(Boolean)
-      : ['critical', 'warn', 'info'];
+    const severityOrder = HOUSE_OFFICE_ATTENTION_SEVERITY_ORDER;
     const severityRank = new Map(severityOrder.map((severity, index) => [severity, index]));
     const trainerJobsById = new Map(
       (Array.isArray(trainerJobs) ? trainerJobs : [])
@@ -3092,9 +3119,8 @@ function registerPlatformReadRoutes(app, deps) {
     houseId = '',
     teamId = '',
   } = {}) {
-    const overviewFixture = getUnifiedPlatformTestFixture('house_office_overview_seed') || {};
     const deeplinks = buildHouseOfficeDeepLinks();
-    const previewOffices = (Array.isArray(overviewFixture?.offices) ? overviewFixture.offices : [])
+    const previewOffices = HOUSE_OFFICE_PREVIEW_OFFICES
       .map((entry, index) => {
         const officeId = String(entry?.officeId || '').trim();
         const slug = String(entry?.slug || '').trim();
@@ -3351,7 +3377,7 @@ function registerPlatformReadRoutes(app, deps) {
         archiveRunCount: archiveRuns.length,
       },
       emptyStateText: !houseId
-        ? String(overviewFixture?.emptyStateText || 'Attach a house to inspect the House Office overview.')
+        ? 'Attach a house to inspect the House Office overview.'
         : activityCount > 0
           ? ''
           : 'No recent House Office activity is available yet.',
@@ -3617,13 +3643,19 @@ function registerPlatformReadRoutes(app, deps) {
     const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
     const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
     const availableTeamIds = Array.isArray(context?.availableTeamIds) ? context.availableTeamIds : [];
-    const workerRegistryEntityId = String(
-      getUnifiedPlatformTestFixture('worker_package_registry_seed')?.registryEntityId || ''
-    ).trim();
-    const workerCatalogAvailable = !!(workerRegistryEntityId && getRegistryEntityById(workerRegistryEntityId));
+    const workerFamily = getRegistryFamilyBySlug('workers');
+    const workerCatalogMembers = Array.isArray(workerFamily?.members)
+      ? workerFamily.members.filter((entry) => String(entry?.entityKind || '').trim() === 'worker_package')
+      : [];
+    const workerCatalogAvailable = workerCatalogMembers.length > 0;
     const deployments = houseId && teamId ? listHouseWorkerDeployments({ houseId, teamId }) : [];
-    const liveFixture = getUnifiedPlatformTestFixture('worker_live_readiness_seed') || {};
-    const operatorSteps = Array.isArray(liveFixture?.operatorSteps) ? liveFixture.operatorSteps : [];
+    const operatorSteps = [
+      'Open House in a real browser session.',
+      'Make sure the current session already has a house and an active team.',
+      'If you need a reusable live session file, run npm run capture:house-worker-live-state and follow the prompts.',
+      'Configure a local brain in this browser.',
+      'Run the headed helper smoke and confirm the helper replies once.',
+    ];
     const checks = [
       {
         checkId: 'house_attached',
@@ -3689,7 +3721,7 @@ function registerPlatformReadRoutes(app, deps) {
       liveGateConfig: 'playwright.house-worker.live.config.js',
       counts: {
         deploymentCount: deployments.length,
-        workerCatalogCount: workerCatalogAvailable ? 1 : 0,
+        workerCatalogCount: workerCatalogMembers.length,
       },
     };
   }

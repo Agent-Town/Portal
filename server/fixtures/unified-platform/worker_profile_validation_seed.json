@@ -4,7 +4,8 @@
   "valid": {
     "brainProfileId": "brain:current-runtime",
     "workspaceSeedRef": "workspace/house-workers/front-desk-helper",
-    "configVersionId": "cfg_house_fixture_01",
+    "configVersionId": null,
+    "configVersionSource": "active_team_config",
     "loadoutId": "loadout_house_worker_front_desk_helper_v1"
   },
   "invalid": {

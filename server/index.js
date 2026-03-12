@@ -4239,6 +4239,7 @@ registerPlatformReadRoutes(app, {
   getHouseWorkerShareById,
   getHouseWorkerShareInviteById,
   getHouseWorkerSessionById,
+  getRegistryFamilyBySlug,
   getRegistryEntityById,
   getRegistryEntityByIdAtVersion,
   getUnifiedPlatformTestFixture,

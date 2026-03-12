@@ -4486,14 +4486,22 @@ function renderHouseWorkshopSurface() {
   inboxBtn.dataset.entryPath = inboxPath;
   detailNode.dataset.selectedKind = '';
   detailNode.dataset.selectedId = '';
+  const effectiveSelectedKind = selectedKind || (activeConfigVersionId ? 'config_version' : '');
+  const effectiveSelectedId = selectedId || (effectiveSelectedKind === 'team_binding' ? selectedId : activeConfigVersionId);
+  if (effectiveSelectedKind) {
+    detailNode.dataset.selectedKind = effectiveSelectedKind;
+  }
+  if (effectiveSelectedId) {
+    detailNode.dataset.selectedId = effectiveSelectedId;
+  }
 
   if (!activeConfigVersionId) {
-    detailNode.textContent = 'Select a team with an active config binding to inspect Workshop lineage.';
+    detailNode.textContent = effectiveSelectedKind
+      ? `No active config is currently bound to this team. Selected ${effectiveSelectedKind} ${effectiveSelectedId || '—'}.`
+      : 'Select a team with an active config binding to inspect Workshop lineage.';
     return;
   }
 
-  const effectiveSelectedKind = selectedKind || 'config_version';
-  const effectiveSelectedId = selectedId || (effectiveSelectedKind === 'team_binding' ? '' : activeConfigVersionId);
   detailNode.dataset.selectedKind = effectiveSelectedKind;
   detailNode.dataset.selectedId = effectiveSelectedId;
   detailNode.textContent = `Active config ${activeConfigVersionId} · parent ${parentConfigVersionId || '—'} · hash ${activeConfigHash || '—'} · created by ${createdBy || '—'} · trainer job ${trainerJobId || '—'} · trainer result ${trainerResultId || '—'} · patch ${candidatePatchId || '—'} · selected ${effectiveSelectedKind} ${effectiveSelectedId || '—'}`;

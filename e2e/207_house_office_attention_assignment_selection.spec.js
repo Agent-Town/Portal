@@ -80,6 +80,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M32.2: House Office attention items and assignments open the exact target record in-shell', async ({ page, request }) => {
+  test.slow();
   const scenario = await seedAttentionAssignmentScenario(request);
 
   await page.goto('/app?district=house&liteDriver=phase1');

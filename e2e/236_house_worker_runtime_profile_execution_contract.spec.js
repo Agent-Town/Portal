@@ -4,7 +4,7 @@ const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi, setDeterministicLlm } = require('./helpers/trainer');
 const { installHouseWorker, readHouseWorkerSessionsFromPage, readHouseWorkerSupervisorSnapshot } = require('./helpers/house_workers');
-const { attachHouseToPageSession, getPlatformFixture } = require('./helpers/unified_platform');
+const { attachHouseToPageSession, ensureActivePlatformConfigVersion, getPlatformFixture } = require('./helpers/unified_platform');
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
@@ -17,6 +17,13 @@ test('T38.0: helper runtime profile fields produce applied runtime evidence inst
   expect(profileFixture?.ok).toBe(true);
 
   const seededHouse = await seedRecoverableTokenHouse(request);
+  const configVersionId = await ensureActivePlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    configVersionId: 'cfg_house_worker_runtime_profile_contract_01',
+    idempotencyPrefix: 'house-worker-runtime-profile-contract',
+    branch: 'house-worker-runtime-profile-contract',
+  });
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
@@ -35,7 +42,7 @@ test('T38.0: helper runtime profile fields produce applied runtime evidence inst
   await page.getByTestId('house-office-deployment-advanced').first().locator('summary').click();
   await page.getByTestId('house-office-helper-brainProfileId-input').first().fill(String(profileFixture.fixture.brainProfileId || ''));
   await page.getByTestId('house-office-helper-workspaceSeedRef-input').first().fill(String(profileFixture.fixture.workspaceSeedRef || ''));
-  await page.getByTestId('house-office-helper-configVersionId-input').first().fill(String(profileFixture.fixture.configVersionId || ''));
+  await page.getByTestId('house-office-helper-configVersionId-input').first().fill(configVersionId);
   await page.getByTestId('house-office-helper-loadoutId-input').first().fill(String(profileFixture.fixture.loadoutId || ''));
   await page.getByTestId('house-office-helper-start').first().click();
 
@@ -62,13 +69,13 @@ test('T38.0: helper runtime profile fields produce applied runtime evidence inst
   expect(session?.requestedRuntimeProfile).toMatchObject({
     brainProfileId: profileFixture.fixture.brainProfileId,
     workspaceSeedRef: profileFixture.fixture.workspaceSeedRef,
-    configVersionId: profileFixture.fixture.configVersionId,
+    configVersionId,
     loadoutId: profileFixture.fixture.loadoutId,
   });
   expect(session?.appliedRuntimeProfile).toMatchObject({
     brainProfileId: profileFixture.fixture.expectedAppliedBrainProfileId,
     workspaceSeedRef: profileFixture.fixture.workspaceSeedRef,
-    configVersionId: profileFixture.fixture.configVersionId,
+    configVersionId,
     loadoutId: profileFixture.fixture.loadoutId,
   });
   expect(session?.runtimeProfile).toMatchObject(session?.appliedRuntimeProfile || {});

@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { installHouseWorker, readHouseWorkerSessionsFromPage, spawnHouseWorker } = require('./helpers/house_workers');
 const { resetPortalWebState } = require('./helpers/portal_web');
-const { attachHouseToPageSession, getPlatformFixture } = require('./helpers/unified_platform');
+const { attachHouseToPageSession, ensureActivePlatformConfigVersion, getPlatformFixture } = require('./helpers/unified_platform');
 const { waitForLiteApi } = require('./helpers/trainer');
 
 test.beforeEach(async ({ request }) => {
@@ -17,6 +17,13 @@ test('T38.6: invalid helper runtime references fail before spawn while valid def
   expect(validationFixture?.ok).toBe(true);
 
   const seededHouse = await seedRecoverableTokenHouse(request);
+  const configVersionId = await ensureActivePlatformConfigVersion(request, {
+    houseId: seededHouse.houseId,
+    houseAuthKey: seededHouse.houseAuthKey,
+    configVersionId: 'cfg_house_worker_profile_validation_01',
+    idempotencyPrefix: 'house-worker-profile-validation',
+    branch: 'house-worker-profile-validation',
+  });
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
@@ -78,7 +85,7 @@ test('T38.6: invalid helper runtime references fail before spawn while valid def
     reason: 'validation_probe',
     brainProfileId: validationFixture.fixture.valid.brainProfileId,
     workspaceSeedRef: validationFixture.fixture.valid.workspaceSeedRef,
-    configVersionId: validationFixture.fixture.valid.configVersionId,
+    configVersionId,
     loadoutId: validationFixture.fixture.valid.loadoutId,
   });
   expect(validSpawn.status).toBe(201);
@@ -86,7 +93,7 @@ test('T38.6: invalid helper runtime references fail before spawn while valid def
   expect(validSpawn.json?.data?.session?.requestedRuntimeProfile).toMatchObject({
     brainProfileId: validationFixture.fixture.valid.brainProfileId,
     workspaceSeedRef: validationFixture.fixture.valid.workspaceSeedRef,
-    configVersionId: validationFixture.fixture.valid.configVersionId,
+    configVersionId,
     loadoutId: validationFixture.fixture.valid.loadoutId,
   });
 });
