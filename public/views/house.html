@@ -309,6 +309,7 @@
         style="flex:1; min-width:0;"
       />
       <button class="btn" id="houseLibraryRelaySendBtn" type="button" data-testid="house-library-relay-send-button">Relay to House</button>
+      <button class="btn" id="houseLibrarySatchelRelaySendBtn" type="button" data-testid="house-library-satchel-relay-send-button">Relay Satchel</button>
     </div>
   </div>
   <h3 class="small" style="margin:10px 0 4px;">Relay Desk</h3>
@@ -317,6 +318,13 @@
   <div class="small" id="houseLibraryIncomingRelayPreview" data-testid="house-library-incoming-relay-preview">Select a received relay to preview its provenance.</div>
   <div class="kv" data-testid="house-library-incoming-relay-import-controls" style="margin:8px 0;">
     <button class="btn" id="houseLibraryImportRelayBtn" type="button" data-testid="house-library-import-relay-button" disabled>Import Received Relay</button>
+  </div>
+  <h3 class="small" style="margin:10px 0 4px;">Satchel Desk</h3>
+  <div class="small" id="houseLibraryIncomingSatchelsEmpty" data-testid="house-library-incoming-satchels-empty">No relayed Satchels have arrived for this House yet.</div>
+  <div class="kv stack" id="houseLibraryIncomingSatchels" data-testid="house-library-incoming-satchels" style="margin-bottom:8px;"></div>
+  <div class="small" id="houseLibraryIncomingSatchelPreview" data-testid="house-library-incoming-satchel-preview">Select a received Satchel to preview its bundle provenance.</div>
+  <div class="kv" data-testid="house-library-incoming-satchel-import-controls" style="margin:8px 0;">
+    <button class="btn" id="houseLibraryImportSatchelBtn" type="button" data-testid="house-library-import-satchel-button" disabled>Import Received Satchel</button>
   </div>
   <div class="small" style="margin:10px 0 4px;">Direct Registry ID</div>
   <div class="kv" style="margin:8px 0;" data-testid="house-library-import-controls">

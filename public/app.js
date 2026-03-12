@@ -564,6 +564,9 @@ let houseSurfaceState = {
     incomingRelays: [],
     selectedIncomingRelayId: '',
     incomingRelayPreview: null,
+    incomingSatchelRelays: [],
+    selectedIncomingSatchelRelayId: '',
+    incomingSatchelRelayPreview: null,
     relayTargetHouseId: '',
     relayApprovalId: '',
     emptyStateText: 'No curated Library items yet.',
@@ -1766,6 +1769,7 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const selectedItems = Array.isArray(payload?.selectedItems) ? payload.selectedItems : [];
   const incomingRelays = Array.isArray(payload?.incomingRelays) ? payload.incomingRelays : [];
+  const incomingSatchelRelays = Array.isArray(payload?.incomingSatchelRelays) ? payload.incomingSatchelRelays : [];
   houseSurfaceState.library.loaded = true;
   houseSurfaceState.library.items = items;
   houseSurfaceState.library.shelves = Array.isArray(payload?.shelves) ? payload.shelves : [];
@@ -1779,6 +1783,7 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
     : [];
   houseSurfaceState.library.selectedItems = selectedItems;
   houseSurfaceState.library.incomingRelays = incomingRelays;
+  houseSurfaceState.library.incomingSatchelRelays = incomingSatchelRelays;
   houseSurfaceState.library.emptyStateText = String(payload?.emptyStateText || 'No curated Library items yet.');
   if (!items.some((item) => String(item?.libraryItemId || '') === String(houseSurfaceState.library.selectedItemId || ''))) {
     houseSurfaceState.library.selectedItemId = '';
@@ -1797,6 +1802,18 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   }
   if (!houseSurfaceState.library.selectedIncomingRelayId && incomingRelays[0]?.libraryPeerRelayId) {
     houseSurfaceState.library.selectedIncomingRelayId = String(incomingRelays[0].libraryPeerRelayId);
+  }
+  if (!incomingSatchelRelays.some((entry) => String(entry?.librarySatchelRelayId || '') === String(houseSurfaceState.library.selectedIncomingSatchelRelayId || ''))) {
+    houseSurfaceState.library.selectedIncomingSatchelRelayId = '';
+    if (
+      houseSurfaceState.library.incomingSatchelRelayPreview
+      && !incomingSatchelRelays.some((entry) => String(entry?.librarySatchelRelayId || '') === String(houseSurfaceState.library.incomingSatchelRelayPreview?.librarySatchelRelayId || ''))
+    ) {
+      houseSurfaceState.library.incomingSatchelRelayPreview = null;
+    }
+  }
+  if (!houseSurfaceState.library.selectedIncomingSatchelRelayId && incomingSatchelRelays[0]?.librarySatchelRelayId) {
+    houseSurfaceState.library.selectedIncomingSatchelRelayId = String(incomingSatchelRelays[0].librarySatchelRelayId);
   }
   if (
     houseSurfaceState.library.composerMode === 'edit'
@@ -1832,6 +1849,9 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.incomingRelays = [];
   houseSurfaceState.library.selectedIncomingRelayId = '';
   houseSurfaceState.library.incomingRelayPreview = null;
+  houseSurfaceState.library.incomingSatchelRelays = [];
+  houseSurfaceState.library.selectedIncomingSatchelRelayId = '';
+  houseSurfaceState.library.incomingSatchelRelayPreview = null;
   houseSurfaceState.library.relayTargetHouseId = '';
   houseSurfaceState.library.relayApprovalId = '';
 }
@@ -1971,6 +1991,13 @@ function getSelectedHouseLibraryIncomingRelay() {
   return relays.find((entry) => String(entry?.libraryPeerRelayId || '').trim() === selectedRelayId) || relays[0] || null;
 }
 
+function getSelectedHouseLibraryIncomingSatchelRelay() {
+  const relays = Array.isArray(houseSurfaceState.library.incomingSatchelRelays) ? houseSurfaceState.library.incomingSatchelRelays : [];
+  if (!relays.length) return null;
+  const selectedRelayId = String(houseSurfaceState.library.selectedIncomingSatchelRelayId || relays[0]?.librarySatchelRelayId || '').trim();
+  return relays.find((entry) => String(entry?.librarySatchelRelayId || '').trim() === selectedRelayId) || relays[0] || null;
+}
+
 function syncHouseLibraryPeerRelayControls(selectedItem = null) {
   const targetInput = el('houseLibraryRelayTargetInput');
   const approvalInput = el('houseLibraryRelayApprovalInput');
@@ -2011,6 +2038,23 @@ function syncHouseLibraryPeerRelayControls(selectedItem = null) {
   }
 }
 
+function syncHouseLibrarySatchelRelayControls() {
+  const sendBtn = el('houseLibrarySatchelRelaySendBtn');
+  const importBtn = el('houseLibraryImportSatchelBtn');
+  const activeScopeSet = getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId);
+  if (sendBtn) {
+    sendBtn.disabled = !activeScopeSet || !String(houseSurfaceState.library.relayTargetHouseId || '').trim() || !String(houseSurfaceState.library.relayApprovalId || '').trim();
+    sendBtn.dataset.scopeSetId = String(activeScopeSet?.scopeSetId || '');
+  }
+  if (importBtn) {
+    const preview = houseSurfaceState.library.incomingSatchelRelayPreview && typeof houseSurfaceState.library.incomingSatchelRelayPreview === 'object'
+      ? houseSurfaceState.library.incomingSatchelRelayPreview
+      : getSelectedHouseLibraryIncomingSatchelRelay();
+    importBtn.disabled = !preview || preview?.alreadyImportedAll === true;
+    importBtn.dataset.librarySatchelRelayId = String(preview?.librarySatchelRelayId || '');
+  }
+}
+
 async function loadHouseLibraryIncomingRelayPreview(libraryPeerRelayId = '') {
   const normalizedRelayId = String(libraryPeerRelayId || '').trim();
   if (!normalizedRelayId) {
@@ -2032,6 +2076,30 @@ async function loadHouseLibraryIncomingRelayPreview(libraryPeerRelayId = '') {
   const previewLabel = String(data?.preview?.displayName || normalizedRelayId).trim() || normalizedRelayId;
   setHouseLibraryActionStatus(`Previewing ${previewLabel} from Relay Desk.`);
   setHouseSurfaceStatus(`Previewing ${previewLabel} from Relay Desk.`);
+  return data;
+}
+
+async function loadHouseLibraryIncomingSatchelPreview(librarySatchelRelayId = '') {
+  const normalizedRelayId = String(librarySatchelRelayId || '').trim();
+  if (!normalizedRelayId) {
+    throw new Error('LIBRARY_SATCHEL_RELAY_REQUIRED');
+  }
+  setHouseLibraryActionStatus(`Opening Satchel ${normalizedRelayId}...`);
+  setHouseSurfaceStatus(`Opening Satchel ${normalizedRelayId}...`);
+  const response = await apiWithRetry(`/api/platform/library/satchel-relays/${encodeURIComponent(normalizedRelayId)}/preview`, {
+    method: 'GET',
+  }, {
+    retryCodes: ['SESSION_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  houseSurfaceState.library.selectedIncomingSatchelRelayId = normalizedRelayId;
+  houseSurfaceState.library.incomingSatchelRelayPreview = data?.preview && typeof data.preview === 'object'
+    ? data.preview
+    : null;
+  renderHouseLibrarySurface();
+  const previewLabel = String(data?.preview?.title || normalizedRelayId).trim() || normalizedRelayId;
+  setHouseLibraryActionStatus(`Previewing ${previewLabel} from Satchel Desk.`);
+  setHouseSurfaceStatus(`Previewing ${previewLabel} from Satchel Desk.`);
   return data;
 }
 
@@ -2096,6 +2164,65 @@ async function relaySelectedHouseLibraryItemToHouse() {
   return relayData;
 }
 
+async function relayActiveHouseLibraryScopeSetToHouse() {
+  const activeScopeSet = getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId);
+  const scopeSetId = String(activeScopeSet?.scopeSetId || '').trim();
+  if (!scopeSetId) {
+    throw new Error('LIBRARY_SCOPE_SET_REQUIRED');
+  }
+  const approvalId = String(houseSurfaceState.library.relayApprovalId || '').trim();
+  const targetHouseId = String(houseSurfaceState.library.relayTargetHouseId || '').trim();
+  if (!approvalId) {
+    throw new Error('LIBRARY_SATCHEL_RELAY_APPROVAL_REQUIRED');
+  }
+  if (!targetHouseId) {
+    throw new Error('TARGET_HOUSE_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const scopeLabel = String(activeScopeSet?.title || scopeSetId).trim() || scopeSetId;
+  const relayIdempotencyKey = makeStableHouseIdempotencyKey('house_library_satchel_relay', [
+    houseId,
+    teamId,
+    scopeSetId,
+    targetHouseId,
+  ]);
+  setHouseLibraryActionStatus(`Relaying Satchel ${scopeLabel} to ${targetHouseId}...`);
+  setHouseSurfaceStatus(`Relaying Satchel ${scopeLabel} to ${targetHouseId}...`);
+  const relayResponse = await apiWithRetry('/api/platform/library/satchel-relays', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': relayIdempotencyKey,
+    },
+    body: JSON.stringify({
+      scopeSetId,
+      targetHouseId,
+      transportKind: 'pony.relay.registry.v1',
+      approvalId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const relayData = relayResponse?.data || relayResponse || {};
+  const relay = relayData?.relay && typeof relayData.relay === 'object' ? relayData.relay : null;
+  const relayId = String(relay?.librarySatchelRelayId || '').trim();
+  if (!relayId) {
+    throw new Error('LIBRARY_SATCHEL_RELAY_REQUIRED');
+  }
+  await apiWithRetry(`/api/platform/library/satchel-relays/${encodeURIComponent(relayId)}/deliver`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  await loadHouseLibrarySurface({ skipContext: true });
+  renderHouseLibrarySurface();
+  const successText = `Relayed Satchel ${scopeLabel} to ${targetHouseId}.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return relayData;
+}
+
 async function importSelectedHouseLibraryIncomingRelay() {
   const preview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
     ? houseSurfaceState.library.incomingRelayPreview
@@ -2132,6 +2259,47 @@ async function importSelectedHouseLibraryIncomingRelay() {
   await loadHouseLibraryIncomingRelayPreview(libraryPeerRelayId).catch(() => null);
   renderHouseLibrarySurface();
   const successText = `Imported ${relayLabel} from Relay Desk.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return data;
+}
+
+async function importSelectedHouseLibraryIncomingSatchel() {
+  const preview = houseSurfaceState.library.incomingSatchelRelayPreview && typeof houseSurfaceState.library.incomingSatchelRelayPreview === 'object'
+    ? houseSurfaceState.library.incomingSatchelRelayPreview
+    : getSelectedHouseLibraryIncomingSatchelRelay();
+  const librarySatchelRelayId = String(preview?.librarySatchelRelayId || '').trim();
+  if (!librarySatchelRelayId) {
+    throw new Error('LIBRARY_SATCHEL_RELAY_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_satchel_relay_import', [
+    houseId,
+    teamId,
+    librarySatchelRelayId,
+  ]);
+  const relayLabel = String(preview?.title || librarySatchelRelayId).trim() || librarySatchelRelayId;
+  setHouseLibraryActionStatus(`Importing Satchel ${relayLabel} from Satchel Desk...`);
+  setHouseSurfaceStatus(`Importing Satchel ${relayLabel} from Satchel Desk...`);
+  const response = await apiWithRetry(`/api/platform/library/satchel-relays/${encodeURIComponent(librarySatchelRelayId)}/imports`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const importedScopeSetId = String(data?.scopeSet?.scopeSetId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (importedScopeSetId) {
+    houseSurfaceState.library.activeScopeSetId = importedScopeSetId;
+  }
+  await loadHouseLibraryIncomingSatchelPreview(librarySatchelRelayId).catch(() => null);
+  renderHouseLibrarySurface();
+  const successText = `Imported Satchel ${relayLabel} from Satchel Desk.`;
   setHouseLibraryActionStatus(successText);
   setHouseSurfaceStatus(successText);
   return data;
@@ -2908,10 +3076,15 @@ function renderHouseLibrarySurface() {
   const relayTargetInput = el('houseLibraryRelayTargetInput');
   const relayApprovalInput = el('houseLibraryRelayApprovalInput');
   const relaySendBtn = el('houseLibraryRelaySendBtn');
+  const satchelRelaySendBtn = el('houseLibrarySatchelRelaySendBtn');
   const incomingRelaysEmptyNode = el('houseLibraryIncomingRelaysEmpty');
   const incomingRelaysNode = el('houseLibraryIncomingRelays');
   const incomingRelayPreviewNode = el('houseLibraryIncomingRelayPreview');
   const importRelayBtn = el('houseLibraryImportRelayBtn');
+  const incomingSatchelsEmptyNode = el('houseLibraryIncomingSatchelsEmpty');
+  const incomingSatchelsNode = el('houseLibraryIncomingSatchels');
+  const incomingSatchelPreviewNode = el('houseLibraryIncomingSatchelPreview');
+  const importSatchelBtn = el('houseLibraryImportSatchelBtn');
   const revisionsNode = el('houseLibraryRevisions');
   const scopeSetsNode = el('houseLibraryScopeSets');
   const scopeEmptyNode = el('houseLibraryScopeEmpty');
@@ -2953,10 +3126,15 @@ function renderHouseLibrarySurface() {
     || !relayTargetInput
     || !relayApprovalInput
     || !relaySendBtn
+    || !satchelRelaySendBtn
     || !incomingRelaysEmptyNode
     || !incomingRelaysNode
     || !incomingRelayPreviewNode
     || !importRelayBtn
+    || !incomingSatchelsEmptyNode
+    || !incomingSatchelsNode
+    || !incomingSatchelPreviewNode
+    || !importSatchelBtn
     || !revisionsNode
     || !scopeSetsNode
     || !scopeEmptyNode
@@ -2975,10 +3153,12 @@ function renderHouseLibrarySurface() {
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
   const incomingRelays = Array.isArray(houseSurfaceState.library.incomingRelays) ? houseSurfaceState.library.incomingRelays : [];
+  const incomingSatchelRelays = Array.isArray(houseSurfaceState.library.incomingSatchelRelays) ? houseSurfaceState.library.incomingSatchelRelays : [];
   listNode.innerHTML = '';
   shelvesNode.innerHTML = '';
   publicStacksResultsNode.innerHTML = '';
   incomingRelaysNode.innerHTML = '';
+  incomingSatchelsNode.innerHTML = '';
   revisionsNode.innerHTML = '';
   scopeSetsNode.innerHTML = '';
   actionsNode.innerHTML = '';
@@ -2996,6 +3176,7 @@ function renderHouseLibrarySurface() {
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
   syncHouseLibraryPeerRelayControls(null);
+  syncHouseLibrarySatchelRelayControls();
   shelfTitleInput.value = String(houseSurfaceState.library.draftShelfTitle || '');
   facetFilterSelect.value = String(houseSurfaceState.library.selectedFacetFilter || 'all');
   satchelTitleInput.value = String(houseSurfaceState.library.draftSatchelTitle || '');
@@ -3014,6 +3195,10 @@ function renderHouseLibrarySurface() {
   const incomingRelayPreview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
     ? houseSurfaceState.library.incomingRelayPreview
     : null;
+  const selectedIncomingSatchelRelay = getSelectedHouseLibraryIncomingSatchelRelay();
+  const incomingSatchelRelayPreview = houseSurfaceState.library.incomingSatchelRelayPreview && typeof houseSurfaceState.library.incomingSatchelRelayPreview === 'object'
+    ? houseSurfaceState.library.incomingSatchelRelayPreview
+    : null;
   publicStacksEmptyNode.classList.toggle('is-hidden', publicStackResults.length > 0);
   publicStacksEmptyNode.textContent = publicStackResults.length
     ? ''
@@ -3022,6 +3207,10 @@ function renderHouseLibrarySurface() {
   incomingRelaysEmptyNode.textContent = incomingRelays.length
     ? ''
     : 'No relayed publications have arrived for this House yet.';
+  incomingSatchelsEmptyNode.classList.toggle('is-hidden', incomingSatchelRelays.length > 0);
+  incomingSatchelsEmptyNode.textContent = incomingSatchelRelays.length
+    ? ''
+    : 'No relayed Satchels have arrived for this House yet.';
 
   const allShelvesBtn = document.createElement('button');
   allShelvesBtn.type = 'button';
@@ -3130,6 +3319,29 @@ function renderHouseLibrarySurface() {
     incomingRelaysNode.appendChild(button);
   });
 
+  incomingSatchelRelays.forEach((relay) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(incomingSatchelRelayPreview?.librarySatchelRelayId || selectedIncomingSatchelRelay?.librarySatchelRelayId || '') === String(relay?.librarySatchelRelayId || '') ? ' primary' : ''}`;
+    button.dataset.librarySatchelRelayId = String(relay?.librarySatchelRelayId || '');
+    button.textContent = [
+      String(relay?.title || relay?.librarySatchelRelayId || ''),
+      String(relay?.sourceHouseId || ''),
+      relay?.alreadyImportedAll === true ? 'Imported' : 'Ready to import',
+    ].filter(Boolean).join(' · ');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await loadHouseLibraryIncomingSatchelPreview(String(relay?.librarySatchelRelayId || ''));
+      } catch (err) {
+        button.disabled = false;
+        setHouseLibraryActionStatus(String(err?.message || 'LIBRARY_SATCHEL_RELAY_PREVIEW_FAILED'), true);
+        setHouseSurfaceStatus(String(err?.message || 'LIBRARY_SATCHEL_RELAY_PREVIEW_FAILED'), true);
+      }
+    });
+    incomingSatchelsNode.appendChild(button);
+  });
+
   if (!publicStackPreview) {
     registryPreviewNode.textContent = 'Select a Public Stack to preview its provenance.';
   } else {
@@ -3156,6 +3368,22 @@ function renderHouseLibrarySurface() {
       effectiveIncomingRelayPreview?.alreadyImported === true
         ? `Already in your Library as ${String(effectiveIncomingRelayPreview?.importedItem?.title || effectiveIncomingRelayPreview?.importedItem?.libraryItemId || 'an imported item')}.`
         : 'Ready to import as a read-only Library artifact.',
+    ].filter(Boolean).join(' · ');
+  }
+
+  const effectiveIncomingSatchelPreview = incomingSatchelRelayPreview || selectedIncomingSatchelRelay || null;
+  if (!effectiveIncomingSatchelPreview) {
+    incomingSatchelPreviewNode.textContent = 'Select a received Satchel to preview its bundle provenance.';
+  } else {
+    incomingSatchelPreviewNode.textContent = [
+      String(effectiveIncomingSatchelPreview?.title || effectiveIncomingSatchelPreview?.librarySatchelRelayId || ''),
+      `From: ${String(effectiveIncomingSatchelPreview?.sourceHouseId || '').trim() || 'another House'}`,
+      `${Number(effectiveIncomingSatchelPreview?.memberCount || 0)} item${Number(effectiveIncomingSatchelPreview?.memberCount || 0) === 1 ? '' : 's'}`,
+      String(effectiveIncomingSatchelPreview?.summary || '').trim(),
+      `Provenance: ${String(effectiveIncomingSatchelPreview?.provenance?.summary || '').trim() || 'Relayed via Pony.'}`,
+      effectiveIncomingSatchelPreview?.alreadyImportedAll === true
+        ? `Already in your Library as Satchel ${String(effectiveIncomingSatchelPreview?.localScopeSet?.title || effectiveIncomingSatchelPreview?.title || 'Imported Satchel')}.`
+        : 'Ready to import as a read-only Satchel pack.',
     ].filter(Boolean).join(' · ');
   }
 
@@ -3212,6 +3440,7 @@ function renderHouseLibrarySurface() {
   }
   syncHouseLibraryPublishControls(selectedItem);
   syncHouseLibraryPeerRelayControls(selectedItem);
+  syncHouseLibrarySatchelRelayControls();
   const noteReadOnly = selectedItem?.readOnly === true || String(selectedItem?.importedState || '') === 'imported_artifact';
   const selectedItemTrustLabels = buildHouseLibraryItemTrustLabels(selectedItem);
   const sealBlocked = String(selectedItem?.sealPolicy || '') === 'blocked_publication';
@@ -3249,6 +3478,15 @@ function renderHouseLibrarySurface() {
       importedPreviewItem
         ? `Already in your Library as ${String(importedPreviewItem?.title || importedPreviewItem?.libraryItemId || 'an imported item')}. Importing again will reuse it.`
         : 'This Public Stack is ready to bring into your Library.',
+    ].filter(Boolean).join(' · '));
+  }
+  const activeScopeSet = getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId);
+  if (activeScopeSet) {
+    exchangeSummaryParts.push([
+      `Satchel guide: ${String(activeScopeSet?.title || activeScopeSet?.scopeSetId || 'Reading Table')}`,
+      String(activeScopeSet?.scopeKind || '') === 'satchel' ? 'Satchel' : 'Reading Table',
+      `${Array.isArray(activeScopeSet?.orderedItemIds) ? activeScopeSet.orderedItemIds.length : 0} item${Array.isArray(activeScopeSet?.orderedItemIds) && activeScopeSet.orderedItemIds.length === 1 ? '' : 's'}`,
+      'Relay approval and target House are required before sending this curated pack.',
     ].filter(Boolean).join(' · '));
   }
   exchangeSummaryNode.textContent = exchangeSummaryParts.length
@@ -7009,6 +7247,7 @@ function bindTownDistrictControls() {
     houseLibraryRelayTargetInput.oninput = () => {
       houseSurfaceState.library.relayTargetHouseId = String(houseLibraryRelayTargetInput.value || '').trim();
       syncHouseLibraryPeerRelayControls();
+      syncHouseLibrarySatchelRelayControls();
     };
     houseLibraryRelayTargetInput.onkeydown = (event) => {
       if (event.key !== 'Enter' || event.shiftKey) return;
@@ -7025,6 +7264,7 @@ function bindTownDistrictControls() {
     houseLibraryRelayApprovalInput.oninput = () => {
       houseSurfaceState.library.relayApprovalId = String(houseLibraryRelayApprovalInput.value || '').trim();
       syncHouseLibraryPeerRelayControls();
+      syncHouseLibrarySatchelRelayControls();
     };
     houseLibraryRelayApprovalInput.onkeydown = (event) => {
       if (event.key !== 'Enter' || event.shiftKey) return;
@@ -7052,6 +7292,22 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseLibrarySatchelRelaySendBtn = el('houseLibrarySatchelRelaySendBtn');
+  if (houseLibrarySatchelRelaySendBtn) {
+    houseLibrarySatchelRelaySendBtn.onclick = async () => {
+      houseLibrarySatchelRelaySendBtn.disabled = true;
+      try {
+        await relayActiveHouseLibraryScopeSetToHouse();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_SATCHEL_RELAY_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
   const houseLibraryImportRelayBtn = el('houseLibraryImportRelayBtn');
   if (houseLibraryImportRelayBtn) {
     houseLibraryImportRelayBtn.onclick = async () => {
@@ -7060,6 +7316,22 @@ function bindTownDistrictControls() {
         await importSelectedHouseLibraryIncomingRelay();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_PEER_RELAY_IMPORT_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryImportSatchelBtn = el('houseLibraryImportSatchelBtn');
+  if (houseLibraryImportSatchelBtn) {
+    houseLibraryImportSatchelBtn.onclick = async () => {
+      houseLibraryImportSatchelBtn.disabled = true;
+      try {
+        await importSelectedHouseLibraryIncomingSatchel();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_SATCHEL_RELAY_IMPORT_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {

@@ -356,6 +356,7 @@ function registerPlatformReadRoutes(app, deps) {
         shelves: [],
         items: [],
         incomingRelays: [],
+        incomingSatchelRelays: [],
         emptyStateText: 'No curated Library items yet.',
       };
     }
@@ -376,6 +377,10 @@ function registerPlatformReadRoutes(app, deps) {
       shelves: selection.shelves,
       items: selection.items,
       incomingRelays: buildIncomingLibraryPeerRelayList({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }),
+      incomingSatchelRelays: buildIncomingLibrarySatchelRelayList({
         houseId: normalizedHouseId,
         teamId: normalizedTeamId,
       }),
