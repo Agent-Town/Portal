@@ -1753,6 +1753,13 @@ function buildHouseWorkerSessionPresentation(session = null) {
       actionLabel: 'Helper runtime is not attached in this browser. Restart it to continue here.',
     };
   }
+  if (active && attached) {
+    return {
+      attached: true,
+      statusLabel: String(source?.statusLabel || source?.status || 'Ready to help').trim() || 'Ready to help',
+      actionLabel: 'Helper is already running in this tab. Use Ask Helper or Stop Helper.',
+    };
+  }
   return {
     attached,
     statusLabel: String(source?.statusLabel || source?.status || 'Ready to help').trim() || 'Ready to help',
@@ -2318,6 +2325,10 @@ async function spawnHouseWorkerSession(payload = {}) {
   }
   const llmPayload = buildGatewayLlmPayload(llmConfig);
   const existing = houseWorkerSupervisorState.runtimes.get(houseWorkerSessionId);
+  if (data?.reused === true && existing && typeof existing.sendMessage === 'function') {
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+    return data;
+  }
   if (existing && typeof existing.stop === 'function') {
     await existing.stop('respawn').catch(() => null);
   }
@@ -3042,9 +3053,12 @@ function renderHouseOfficeSurface() {
       const deploymentSession = deploymentSessions[0] || null;
       const localBrainReady = houseWorkerSupervisorState.localBrainReady === true;
       const sessionPresentation = buildHouseWorkerSessionPresentation(deploymentSession);
+      const activeAttachedSession = !!deploymentSession && sessionPresentation.attached === true;
       actionStatus.textContent = !localBrainReady
         ? String(houseWorkerSupervisorState.localBrainStatusLabel || 'Configure your local brain in this browser before starting helpers.').trim()
-        : deploymentSession
+        : activeAttachedSession
+          ? 'Helper is already running in this tab. Use Ask Helper or Stop Helper.'
+          : deploymentSession
           ? sessionPresentation.actionLabel
           : 'Start Helper when your local brain is ready.';
       card.appendChild(actionStatus);
@@ -3067,9 +3081,13 @@ function renderHouseOfficeSurface() {
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
       startBtn.className = 'btn';
-      startBtn.textContent = deploymentSession && !sessionPresentation.attached ? 'Restart Helper' : 'Start Helper';
+      startBtn.textContent = activeAttachedSession
+        ? 'Running in this tab'
+        : deploymentSession && !sessionPresentation.attached
+          ? 'Restart Helper'
+          : 'Start Helper';
       startBtn.setAttribute('data-testid', 'house-office-helper-start');
-      startBtn.disabled = !localBrainReady;
+      startBtn.disabled = !localBrainReady || activeAttachedSession;
       actions.appendChild(startBtn);
 
       const askBtn = document.createElement('button');

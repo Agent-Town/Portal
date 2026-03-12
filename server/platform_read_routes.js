@@ -450,6 +450,11 @@ function registerPlatformReadRoutes(app, deps) {
   } = {}) {
     const sourceDeployment = deployment && typeof deployment === 'object' ? deployment : {};
     const sourcePackage = packageInfo && typeof packageInfo === 'object' ? packageInfo : {};
+    const compatibilitySource = {
+      versionLabel: String(sourceDeployment?.summary?.versionLabel || sourcePackage?.versionLabel || '').trim() || null,
+      entityVersionId: String(sourceDeployment?.entityVersionId || sourcePackage?.entityVersionId || '').trim() || null,
+      requiresLocalBrain: sourceDeployment?.summary?.requiresLocalBrain === true || sourcePackage?.requiresLocalBrain === true,
+    };
     return {
       schema: 'agent-town-house-worker-share/v1',
       registryEntityId: String(sourceDeployment?.registryEntityId || sourcePackage?.registryEntityId || '').trim(),
@@ -469,12 +474,7 @@ function registerPlatformReadRoutes(app, deps) {
         : (Array.isArray(sourcePackage?.supportedSurfaces) ? sourcePackage.supportedSurfaces : []),
       requiresLocalBrain: sourceDeployment?.summary?.requiresLocalBrain === true || sourcePackage?.requiresLocalBrain === true,
       versionLabel: String(sourceDeployment?.summary?.versionLabel || sourcePackage?.versionLabel || '').trim() || null,
-      compatibilityLabel: String(
-        sourceDeployment?.summary?.compatibilityLabel
-        || sourcePackage?.compatibilityLabel
-        || buildHouseWorkerCompatibilityLabel(sourcePackage, { shared: true })
-        || ''
-      ).trim() || null,
+      compatibilityLabel: buildHouseWorkerCompatibilityLabel(compatibilitySource, { shared: true }),
       delegationAllowed: sourceDeployment?.runtimeDefaults?.delegationAllowed === true || sourcePackage?.delegationAllowed === true,
       runtimeDefaults: {
         brainProfileId: String(sourceDeployment?.runtimeDefaults?.brainProfileId || sourcePackage?.runtimeDefaults?.brainProfileId || '').trim() || null,
@@ -3440,17 +3440,6 @@ function registerPlatformReadRoutes(app, deps) {
     if (requestedOfficeId && requestedOfficeId !== String(deployment?.officeId || '').trim()) {
       return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'Helpers must stay inside their installed office scope.', { requestId });
     }
-    const activeSessions = listHouseWorkerSessions({ houseId, teamId })
-      .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
-    if (activeSessions.length >= HOUSE_WORKER_MAX_ACTIVE_SESSIONS) {
-      return sendPortalApiError(res, 409, 'OVER_CONCURRENCY_LIMIT', 'This House already has the maximum number of active helpers running.', {
-        requestId,
-        details: {
-          concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
-          activeSessionCount: activeSessions.length,
-        },
-      });
-    }
     if (parentWorkerSessionId) {
       const parentSession = getHouseWorkerSessionById(parentWorkerSessionId);
       if (!parentSession) {
@@ -3460,6 +3449,45 @@ function registerPlatformReadRoutes(app, deps) {
         return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Parent worker session not found for the active team.', { requestId });
       }
       return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
+    }
+    const activeSessions = listHouseWorkerSessions({ houseId, teamId })
+      .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
+    const activeSessionForDeployment = activeSessions.find((entry) =>
+      String(entry?.deploymentId || '').trim() === deploymentId
+    ) || null;
+    if (activeSessionForDeployment) {
+      const sessionCard = buildHouseWorkerSessionCards({ houseId, teamId })
+        .find((entry) => String(entry?.houseWorkerSessionId || '').trim() === String(activeSessionForDeployment?.houseWorkerSessionId || '').trim())
+        || null;
+      return sendPortalApiSuccess(res, {
+        workerSessionId: String(activeSessionForDeployment?.houseWorkerSessionId || '').trim(),
+        houseWorkerSessionId: String(activeSessionForDeployment?.houseWorkerSessionId || '').trim(),
+        deploymentId,
+        status: normalizeHouseWorkerStatus(activeSessionForDeployment?.status, 'starting'),
+        runtimeProfile: sessionCard?.runtimeProfile && typeof sessionCard.runtimeProfile === 'object'
+          ? sessionCard.runtimeProfile
+          : {
+            brainProfileId: String(activeSessionForDeployment?.brainProfileId || '').trim() || null,
+            workspaceSeedRef: String(activeSessionForDeployment?.workspaceSeedRef || '').trim() || null,
+            configVersionId: String(activeSessionForDeployment?.configVersionId || '').trim() || null,
+            loadoutId: String(activeSessionForDeployment?.loadoutId || '').trim() || null,
+          },
+        spawnedAt: String(activeSessionForDeployment?.createdAt || '').trim() || null,
+        spawnSource: String(activeSessionForDeployment?.runtime?.spawnSource || '').trim() || 'house_ui',
+        session: sessionCard,
+        reused: true,
+        nextStep: 'This helper is already running for this House. Use the existing helper card instead of starting another copy.',
+        sessionsPath: '/api/platform/house-workers/sessions',
+      }, { requestId });
+    }
+    if (activeSessions.length >= HOUSE_WORKER_MAX_ACTIVE_SESSIONS) {
+      return sendPortalApiError(res, 409, 'OVER_CONCURRENCY_LIMIT', 'This House already has the maximum number of active helpers running.', {
+        requestId,
+        details: {
+          concurrencyLimit: HOUSE_WORKER_MAX_ACTIVE_SESSIONS,
+          activeSessionCount: activeSessions.length,
+        },
+      });
     }
     const runtimeProfile = buildHouseWorkerRuntimeProfile({
       deployment,

@@ -1378,11 +1378,14 @@ Response fields:
 - `data.spawnedAt`
 - `data.spawnSource`
 - `data.session`
+- `data.reused`
+- `data.nextStep`
 - `data.sessionsPath`
 
 Notes:
 - `parentWorkerSessionId` is reserved for helper-origin spawn provenance and currently fails closed with `RUNAWAY_SPAWN_BLOCKED` when it resolves to a real helper session.
 - Spawn accepts portable runtime references only; raw secrets are rejected as unsupported overrides.
+- Spawn is idempotent per active deployment within one House team: if the same helper is already active, the route returns the existing session with `data.reused=true` instead of creating a duplicate.
 
 ### POST `/api/platform/house-workers/message` (human)
 Writes one helper task or reply event and updates the current helper session status.

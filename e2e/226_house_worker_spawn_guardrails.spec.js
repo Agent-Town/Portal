@@ -13,8 +13,10 @@ test.beforeEach(async ({ request }) => {
 test('M35.11: helper spawn guardrails reject unsafe or runaway requests without partial rows', async ({ page, request, browser }) => {
   const installFixture = await getPlatformFixture(request, 'worker_package_install_seed');
   const guardrailFixture = await getPlatformFixture(request, 'worker_spawn_guardrail_seed');
+  const structureFixture = await getPlatformFixture(request, 'house_office_structure_seed');
   expect(installFixture?.ok).toBe(true);
   expect(guardrailFixture?.ok).toBe(true);
+  expect(structureFixture?.ok).toBe(true);
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
@@ -30,6 +32,7 @@ test('M35.11: helper spawn guardrails reject unsafe or runaway requests without 
   });
   expect(installResult.status).toBe(200);
   const deploymentId = String(installResult.json?.data?.deployment?.deploymentId || '').trim();
+  const initialOfficeId = String(installResult.json?.data?.deployment?.officeId || '').trim();
   expect(deploymentId).toBeTruthy();
 
   const unsupported = await spawnHouseWorker(page.request, {
@@ -100,10 +103,30 @@ test('M35.11: helper spawn guardrails reject unsafe or runaway requests without 
   expect(String(blockedRunaway.json?.error?.code || blockedRunaway.json?.error || '')).toBe('RUNAWAY_SPAWN_BLOCKED');
 
   const concurrencyLimit = Number(guardrailFixture.fixture.maxActiveSessions || 3);
-  for (let index = 1; index < concurrencyLimit; index += 1) {
+  const candidateOfficeIds = (Array.isArray(structureFixture.fixture?.offices) ? structureFixture.fixture.offices : [])
+    .map((entry) => String(entry?.officeId || '').trim())
+    .filter(Boolean)
+    .filter((officeId) => officeId !== initialOfficeId);
+  expect(candidateOfficeIds.length).toBeGreaterThanOrEqual(concurrencyLimit);
+
+  const overflowOfficeId = candidateOfficeIds[0];
+  const activeOfficeIds = candidateOfficeIds.slice(1, concurrencyLimit);
+  const extraDeploymentIds = [];
+  for (const officeId of [overflowOfficeId, ...activeOfficeIds]) {
+    const extraInstall = await installHouseWorker(page.request, {
+      registryEntityId: installFixture.fixture.registryEntityId,
+      officeId,
+    });
+    expect(extraInstall.status).toBe(200);
+    const extraDeploymentId = String(extraInstall.json?.data?.deployment?.deploymentId || '').trim();
+    expect(extraDeploymentId).toBeTruthy();
+    extraDeploymentIds.push(extraDeploymentId);
+  }
+
+  for (let index = 0; index < activeOfficeIds.length; index += 1) {
     const spawned = await spawnHouseWorker(page.request, {
-      deploymentId,
-      task: `Guardrail helper ${index + 1}`,
+      deploymentId: String(extraDeploymentIds[index + 1] || '').trim(),
+      task: `Guardrail helper ${index + 2}`,
       reason: 'guardrail_probe',
     });
     expect([200, 201]).toContain(spawned.status);
@@ -115,7 +138,7 @@ test('M35.11: helper spawn guardrails reject unsafe or runaway requests without 
   expect(activeSessions).toHaveLength(concurrencyLimit);
 
   const overflow = await spawnHouseWorker(page.request, {
-    deploymentId,
+    deploymentId: String(extraDeploymentIds[0] || '').trim(),
     task: 'One helper too many',
     reason: 'guardrail_probe',
   });

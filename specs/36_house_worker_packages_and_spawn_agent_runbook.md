@@ -15,12 +15,13 @@ Purpose: convert Phase 35 into AI-agent-sized TDD work packets with explicit mea
 Current proof state:
 
 1. `T35.0` through `T35.13` are implemented.
-2. `e2e/215` through `e2e/233` are green.
+2. `e2e/215` through `e2e/234` are green.
 3. Post-phase runtime-truth hardening is green in `e2e/229` and `e2e/230`.
 4. Shared-install exact-version hardening is green in `e2e/231`.
 5. Share-create and share-preview truth hardening is green in `e2e/232`.
 6. Release and compatibility visibility hardening is green in `e2e/233`.
-7. Full deterministic suite is green at `355 passed, 4 skipped`.
+7. Single-session-per-helper runtime truth is green in `e2e/234`.
+8. Full deterministic suite is green at `356 passed, 4 skipped`.
 
 This is not a competing plan.
 It is the detailed execution layer for:
