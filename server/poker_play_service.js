@@ -8911,6 +8911,11 @@ function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicVi
       const viewerRegistered = !!entry.viewerSeat;
       const viewerWaitlisted = !!entry.waitlist?.viewerQueued;
       const registrationOpen = !!entry.summary?.scheduledStartPending || !entry.summary?.liveHand || !!entry.summary?.lateRegistrationOpen;
+      const viewerSeatStatus = normalizeTrimmedString(entry?.viewerSeat?.status).toLowerCase();
+      const canUnregister = viewerRegistered && (
+        !hasPokerPlayTableStarted(entry.table, entry.hand)
+        || (!!entry.hand && entry.hand.status === 'live' && viewerSeatStatus === 'registered')
+      );
       let registrationStatus = 'closed';
       if (viewerRegistered) registrationStatus = 'registered';
       else if (viewerWaitlisted) registrationStatus = 'waitlisted';
@@ -8925,6 +8930,7 @@ function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicVi
         seriesTitle: seriesRef.seriesTitle || null,
         scheduledStartAt,
         day: scheduledStartAt.slice(0, 10),
+        buyInOil: Number(entry.table?.buyInOil || 0),
         openSeatCount: Number(entry.summary?.openSeatCount || 0),
         waitlistCount: Number(entry.summary?.waitlistCount || 0),
         entryCount: Number(entry.summary?.entryCount || 0),
@@ -8941,6 +8947,32 @@ function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicVi
         scheduledBreakUntilAt: entry.summary?.scheduledBreakUntilAt || null,
         nextScheduledBreakAfterHandNumber: nextBreakAfterHandNumber,
         nextScheduledBreakLabel: entry.summary?.nextScheduledBreakLabel || null,
+        actions: {
+          register: registrationStatus === 'open'
+            ? {
+              method: 'POST',
+              path: `/api/poker/play/tables/${encodeURIComponent(entry.table.tableId)}/sit`,
+            }
+            : null,
+          waitlist: registrationStatus === 'waitlist'
+            ? {
+              method: 'POST',
+              path: `/api/poker/play/tables/${encodeURIComponent(entry.table.tableId)}/waitlist`,
+            }
+            : null,
+          unregister: canUnregister
+            ? {
+              method: 'POST',
+              path: `/api/poker/play/tables/${encodeURIComponent(entry.table.tableId)}/leave`,
+            }
+            : null,
+          leaveWaitlist: viewerWaitlisted
+            ? {
+              method: 'DELETE',
+              path: `/api/poker/play/tables/${encodeURIComponent(entry.table.tableId)}/waitlist`,
+            }
+            : null,
+        },
         links: {
           table: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
           timeline: seriesRef.seriesId ? `/poker/play/series/${encodeURIComponent(seriesRef.seriesId)}/timeline` : null,

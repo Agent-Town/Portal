@@ -1598,7 +1598,7 @@
         <h2>${escapeHtml(day?.day || 'Upcoming')}</h2>
         <div class="pokerStack">
           ${items.map((item) => `
-            <div class="pokerMessage">
+            <div class="pokerMessage" data-schedule-card="${escapeHtml(item?.tableId || '')}">
               <div class="pokerLabel">${escapeHtml(item?.title || 'Tournament')}</div>
               <div>${escapeHtml(formatIso(item?.scheduledStartAt))}</div>
               ${renderMetaBadges([
@@ -1607,12 +1607,14 @@
                 Number(item?.scheduledBreakCount || 0) > 0 ? `${Number(item?.scheduledBreakCount || 0)} break${Number(item?.scheduledBreakCount || 0) === 1 ? '' : 's'}` : '',
               ].filter(Boolean))}
               <div class="pokerSummary">
+                ${renderSummaryMetric('Buy-In', `${Number(item?.buyInOil || 0)} OIL`)}
                 ${renderSummaryMetric('Entries', `${Number(item?.entryCount || 0)}`)}
                 ${renderSummaryMetric('Open Seats', `${Number(item?.openSeatCount || 0)}`)}
                 ${renderSummaryMetric('Waitlist', `${Number(item?.waitlistCount || 0)}`)}
                 ${Number(item?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(item?.nextScheduledBreakLabel || 'Break')} after hand ${Number(item?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
               </div>
               <div class="pokerLinks">
+                ${renderPlayScheduleActionButtons(item)}
                 <a href="${escapeHtml(buildPokerHref(item?.links?.table || '/poker/play'))}">Open Lobby Table</a>
                 ${item?.links?.timeline ? `<a href="${escapeHtml(buildPokerHref(item.links.timeline))}">Series Timeline</a>` : ''}
               </div>
@@ -1628,6 +1630,26 @@
     setStatus(Number(summary?.eventCount || 0) > 0
       ? `${Number(summary?.eventCount || 0)} scheduled tournament event${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.`
       : 'No tournament events are scheduled right now.');
+    bindPlayScheduleActions();
+  }
+
+  function renderPlayScheduleActionButtons(item) {
+    const tableId = String(item?.tableId || '').trim();
+    const actions = item?.actions && typeof item.actions === 'object' ? item.actions : {};
+    const buyInOil = Number(item?.buyInOil || 0);
+    const buttons = [];
+    const pushButton = (action, kind, label) => {
+      if (!action || !tableId) return;
+      const path = String(action?.path || '').trim();
+      const method = String(action?.method || '').trim().toUpperCase();
+      if (!path || !method) return;
+      buttons.push(`<button class="pokerButton" type="button" data-schedule-action-kind="${escapeHtml(kind)}" data-schedule-table-id="${escapeHtml(tableId)}" data-schedule-method="${escapeHtml(method)}" data-schedule-path="${escapeHtml(path)}" data-schedule-buy-in-oil="${escapeHtml(String(buyInOil))}">${escapeHtml(label)}</button>`);
+    };
+    pushButton(actions?.register, 'register', 'Register');
+    pushButton(actions?.waitlist, 'waitlist', 'Join Waitlist');
+    pushButton(actions?.unregister, 'unregister', 'Unregister');
+    pushButton(actions?.leaveWaitlist, 'leave_waitlist', 'Leave Waitlist');
+    return buttons.join('');
   }
 
   async function loadPlayRailLobby() {
@@ -3290,6 +3312,46 @@
       } catch (err) {
         setStatus(`Re-entry failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
+    });
+  }
+
+  function bindPlayScheduleActions() {
+    const buttons = document.querySelectorAll('[data-schedule-action-kind][data-schedule-method][data-schedule-path][data-schedule-table-id]');
+    buttons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        if (button.disabled) return;
+        const actionKind = String(button.getAttribute('data-schedule-action-kind') || '').trim();
+        const method = String(button.getAttribute('data-schedule-method') || 'POST').trim().toUpperCase();
+        const path = String(button.getAttribute('data-schedule-path') || '').trim();
+        const buyInOil = Number(button.getAttribute('data-schedule-buy-in-oil') || 0);
+        if (!path) return;
+        const statusByKind = {
+          register: 'Registering for scheduled event...',
+          waitlist: 'Joining scheduled waitlist...',
+          unregister: 'Unregistering from scheduled event...',
+          leave_waitlist: 'Leaving scheduled waitlist...',
+        };
+        const failureByKind = {
+          register: 'Schedule registration failed',
+          waitlist: 'Schedule waitlist failed',
+          unregister: 'Schedule unregister failed',
+          leave_waitlist: 'Schedule waitlist leave failed',
+        };
+        setStatus(statusByKind[actionKind] || 'Updating scheduled event...');
+        try {
+          const body = {};
+          if ((actionKind === 'register' || actionKind === 'waitlist') && buyInOil > 0) {
+            body.buyInOil = buyInOil;
+          }
+          await api(buildPokerApiPath(path), {
+            method,
+            body: JSON.stringify(body),
+          });
+          await loadPlaySchedule();
+        } catch (err) {
+          setStatus(`${failureByKind[actionKind] || 'Schedule action failed'}: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
     });
   }
 

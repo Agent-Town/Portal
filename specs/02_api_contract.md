@@ -482,6 +482,7 @@ Returns the scheduled tournament calendar and recurring template lobby with:
 - `data.days[].items[].seriesId`
 - `data.days[].items[].seriesTitle`
 - `data.days[].items[].scheduledStartAt`
+- `data.days[].items[].buyInOil`
 - `data.days[].items[].registrationStatus`
 - `data.days[].items[].openSeatCount`
 - `data.days[].items[].waitlistCount`
@@ -494,6 +495,14 @@ Returns the scheduled tournament calendar and recurring template lobby with:
 - `data.days[].items[].scheduledBreakUntilAt`
 - `data.days[].items[].nextScheduledBreakAfterHandNumber`
 - `data.days[].items[].nextScheduledBreakLabel`
+- `data.days[].items[].actions.register.method`
+- `data.days[].items[].actions.register.path`
+- `data.days[].items[].actions.waitlist.method`
+- `data.days[].items[].actions.waitlist.path`
+- `data.days[].items[].actions.unregister.method`
+- `data.days[].items[].actions.unregister.path`
+- `data.days[].items[].actions.leaveWaitlist.method`
+- `data.days[].items[].actions.leaveWaitlist.path`
 - `data.days[].items[].links.table`
 - `data.days[].items[].links.timeline`
 
@@ -501,6 +510,8 @@ Schedule notes:
 - only tournament tables with a durable `scheduledStartAt` appear in this feed
 - invite-only scheduled tournaments are only visible to their creator or an already-authorized seat
 - `registrationStatus` is `registered`, `waitlisted`, `open`, `waitlist`, or `closed`
+- schedule items expose direct mutation descriptors under `actions.*` so the calendar can register, waitlist, unregister, or leave a waitlist without inferring route semantics from status text
+- `actions.unregister` only appears while pre-start unregister or late-registration cancellation is still legal for the viewer's seat
 - scheduled-break metadata is surfaced here so the calendar can preview break cadence before an event starts
 - query param `days=<n>` narrows or widens the forward calendar window; `asOf=<iso>` remains deterministic for test-mode reads
 
