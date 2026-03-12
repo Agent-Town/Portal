@@ -1649,8 +1649,12 @@
                   <div class="pokerMessage">
                     <div class="pokerLabel">${escapeHtml(item?.title || 'Schedule Template')}</div>
                     <div>${escapeHtml(item?.recurrenceLabel || 'Recurring')}</div>
+                    <div>${escapeHtml(String(item?.status || 'active'))}</div>
                     <div>${Number(item?.generatedEventCount || 0)} generated event${Number(item?.generatedEventCount || 0) === 1 ? '' : 's'}</div>
                     <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No generated event yet.'}</div>
+                    ${String(item?.status || 'active') === 'active'
+                      ? `<button class="pokerButton" type="button" data-schedule-template-cancel="${escapeHtml(String(item?.templateId || ''))}">Cancel Template</button>`
+                      : ''}
                   </div>
                 `).join('')}
               </div>
@@ -1713,6 +1717,7 @@
       ? `${Number(summary?.eventCount || 0)} scheduled tournament event${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.`
       : 'No tournament events are scheduled right now.');
     bindPlayScheduleAdminForm();
+    bindPlayScheduleTemplateActions();
     bindPlayScheduleActions();
   }
 
@@ -3479,6 +3484,29 @@
         setStatus(`Schedule template creation failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindPlayScheduleTemplateActions() {
+    const adminToken = readStoredPokerAdminToken();
+    if (!adminToken) return;
+    const buttons = Array.from(document.querySelectorAll('[data-schedule-template-cancel]'));
+    for (const button of buttons) {
+      button.addEventListener('click', async () => {
+        const templateId = String(button.getAttribute('data-schedule-template-cancel') || '').trim();
+        if (!templateId || button.disabled) return;
+        setStatus('Cancelling recurring schedule template...');
+        try {
+          await api(buildPokerApiPath(`/api/poker/play/admin/schedule/templates/${encodeURIComponent(templateId)}/cancel`), {
+            method: 'POST',
+            headers: { 'x-admin-token': adminToken },
+            body: JSON.stringify({}),
+          });
+          await loadPlaySchedule();
+        } catch (err) {
+          setStatus(`Schedule template cancel failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function bindWaitlistControls(tableId) {

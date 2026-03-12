@@ -528,6 +528,7 @@ Response fields:
 - `data.templates[]`
 - `data.templates[].templateId`
 - `data.templates[].title`
+- `data.templates[].status`
 - `data.templates[].recurrenceKind`
 - `data.templates[].recurrenceIntervalHours`
 - `data.templates[].recurrenceLabel`
@@ -536,6 +537,7 @@ Response fields:
 - `data.templates[].generatedEventCount`
 - `data.templates[].nextStartAt`
 - `data.templates[].config`
+- `data.templates[].cancelledAt`
 - `data.templates[].items[]`
 - `data.templates[].items[].tableId`
 - `data.templates[].items[].title`
@@ -582,6 +584,34 @@ Failure codes:
 - `FORBIDDEN`
 - `INVALID_ARGUMENT`
 - `POKER_PLAY_SCHEDULE_TEMPLATE_PAST_START`
+- `POKER_PLAY_SCHEDULE_TEMPLATE_UNAVAILABLE`
+
+### POST `/api/poker/play/admin/schedule/templates/:templateId/cancel`
+Cancels one durable recurring schedule template and closes any still-unstarted future events generated from it with operator refunds.
+
+Admin auth:
+- requires `x-admin-token`
+
+Response fields:
+- returns the same payload shape as `GET /api/poker/play/admin/schedule/templates`
+- `data.cancelledTemplateId`
+- `data.closedTables[]`
+- `data.closedTables[].tableId`
+- `data.closedTables[].title`
+- `data.closedTables[].scheduledStartAt`
+- `data.closedTables[].refundSummary.refundMode`
+- `data.closedTables[].refundSummary.refundedSeatCount`
+- `data.closedTables[].refundSummary.refundedTotalOil`
+
+Notes:
+- only future scheduled events that have not started yet are closed by this route
+- already-live or historically completed tournament tables are left untouched
+- cancelled templates remain visible in the admin template payload with `status = "cancelled"`
+- cancelled future events drop out of the public `/api/poker/play/schedule` feed after closure
+
+Failure codes:
+- `FORBIDDEN`
+- `NOT_FOUND`
 - `POKER_PLAY_SCHEDULE_TEMPLATE_UNAVAILABLE`
 
 ### GET `/api/poker/play/policy`

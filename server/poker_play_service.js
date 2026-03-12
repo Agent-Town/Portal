@@ -187,6 +187,11 @@ function normalizePokerPlayScheduleRecurrenceKind(value, fallback = 'daily') {
   return kind === 'weekly' ? 'weekly' : 'daily';
 }
 
+function normalizePokerPlayScheduleTemplateStatus(value, fallback = 'active') {
+  const status = normalizeTrimmedString(value, fallback).toLowerCase();
+  return status === 'cancelled' ? 'cancelled' : 'active';
+}
+
 function normalizePokerPlayScheduledBreakLabel(value, fallback = '') {
   return normalizeTrimmedString(value, fallback).slice(0, 80);
 }
@@ -8883,6 +8888,7 @@ function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicVi
     .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
     .filter((entry) => normalizePokerPlayTableType(entry?.table?.tableType) === 'tournament')
     .filter((entry) => !!getTournamentScheduledStartAt(entry?.table))
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
     .map((entry) => {
       const viewerSeat = walletBinding?.walletSubject
         ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
@@ -9071,6 +9077,7 @@ function buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt } = {}) {
         .filter((table) => normalizePokerPlayTableType(table?.tableType) === 'tournament')
         .filter((table) => normalizePokerPlayScheduleTemplateId(table?.rules?.scheduleTemplateId || table?.summary?.scheduleTemplateId || '') === template.templateId)
         .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+        .filter((entry) => !isSeriesClosedTable(entry?.table))
         .map((entry) => {
           const summary = computeTableSummary(entry.table, entry.seats, entry.hand, null);
           return {
@@ -9090,6 +9097,7 @@ function buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt } = {}) {
       return {
         templateId: template.templateId,
         title: template.title,
+        status: normalizePokerPlayScheduleTemplateStatus(template.status),
         recurrenceKind: template.recurrenceKind,
         recurrenceIntervalHours: Number(template.recurrenceIntervalHours || 0),
         recurrenceLabel: template.recurrenceLabel,
@@ -9098,6 +9106,7 @@ function buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt } = {}) {
         generatedEventCount: items.length,
         nextStartAt: items[0]?.scheduledStartAt || null,
         config: cloneJson(template.config, {}),
+        cancelledAt: template.cancelledAt || null,
         items,
       };
     })
@@ -9156,12 +9165,14 @@ function createScheduleTemplate(deps, { body, processAt } = {}) {
   const storedTemplate = deps.upsertPokerPlayScheduleTemplate({
     templateId,
     title: normalizedTitle,
+    status: 'active',
     recurrenceKind,
     recurrenceIntervalHours,
     recurrenceLabel,
     firstStartAt,
     eventCount,
     config: cloneJson(tableConfig, {}),
+    cancelledAt: null,
     createdAt: requestAt,
     updatedAt: requestAt,
   });
@@ -9181,6 +9192,64 @@ function createScheduleTemplate(deps, { body, processAt } = {}) {
   return {
     ...payload,
     createdTemplateId: storedTemplate?.templateId || templateId,
+  };
+}
+
+function cancelScheduleTemplate(deps, { templateId, reason, actorLabel = 'operator', asOf } = {}) {
+  if (typeof deps.upsertPokerPlayScheduleTemplate !== 'function' || typeof deps.listPokerPlayScheduleTemplates !== 'function') {
+    throw createRouteError(500, 'POKER_PLAY_SCHEDULE_TEMPLATE_UNAVAILABLE', 'Schedule template storage is unavailable.');
+  }
+  const requestAt = toProcessIso(deps, asOf);
+  const normalizedTemplateId = normalizePokerPlayScheduleTemplateId(templateId);
+  const existingTemplate = (typeof deps.listPokerPlayScheduleTemplates === 'function'
+    ? deps.listPokerPlayScheduleTemplates()
+    : []).find((item) => normalizePokerPlayScheduleTemplateId(item?.templateId) === normalizedTemplateId) || null;
+  if (!existingTemplate) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker schedule template not found.');
+  }
+
+  const closeReason = normalizeTrimmedString(
+    reason,
+    `Operator cancelled recurring schedule template ${existingTemplate.title || normalizedTemplateId}.`
+  );
+  const matchingEntries = deps.listPokerPlayTables()
+    .filter((table) => normalizePokerPlayTableType(table?.tableType) === 'tournament')
+    .filter((table) => normalizePokerPlayScheduleTemplateId(table?.rules?.scheduleTemplateId || table?.summary?.scheduleTemplateId || '') === normalizedTemplateId)
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((entry) => !isSeriesClosedTable(entry?.table))
+    .filter((entry) => {
+      const scheduledStartAt = getTournamentScheduledStartAt(entry?.table);
+      return !!scheduledStartAt && compareIsoAsc(scheduledStartAt, requestAt) >= 0;
+    })
+    .filter((entry) => !hasPokerPlayTableStarted(entry?.table, entry?.hand));
+
+  const closedTables = matchingEntries.map((entry) => {
+    const closed = closeTable(deps, {
+      tableId: entry.table.tableId,
+      reason: closeReason,
+      actorLabel,
+      refundMode: 'refund_all',
+      asOf: requestAt,
+    });
+    return {
+      tableId: String(closed?.table?.tableId || entry.table.tableId || ''),
+      title: String(closed?.table?.title || entry.table.title || 'Tournament'),
+      scheduledStartAt: getTournamentScheduledStartAt(entry.table) || null,
+      refundSummary: cloneJson(closed?.refundSummary, {}),
+    };
+  });
+
+  const storedTemplate = deps.upsertPokerPlayScheduleTemplate({
+    ...existingTemplate,
+    status: 'cancelled',
+    cancelledAt: existingTemplate?.cancelledAt || requestAt,
+    updatedAt: requestAt,
+  });
+  const payload = buildPokerPlayAdminScheduleTemplatesPayload(deps, { processAt: requestAt });
+  return {
+    ...payload,
+    cancelledTemplateId: storedTemplate?.templateId || normalizedTemplateId,
+    closedTables,
   };
 }
 
@@ -12252,6 +12321,7 @@ module.exports = {
   closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
+  cancelScheduleTemplate,
   createTable,
   createScheduleTemplate,
   createRouteError,

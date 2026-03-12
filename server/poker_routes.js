@@ -47,6 +47,7 @@ const {
   closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
+  cancelScheduleTemplate,
   createTable,
   createScheduleTemplate,
   createRouteError,
@@ -6808,6 +6809,40 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_SCHEDULE_TEMPLATE_CREATE_FAILED',
         err?.message || 'Unable to create the poker schedule template.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/schedule/templates/:templateId/cancel', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = cancelScheduleTemplate(playRouteDeps, {
+        templateId: req.params.templateId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf || req.query?.asOf,
+      });
+      for (const item of Array.isArray(payload?.closedTables) ? payload.closedTables : []) {
+        publishPokerPlayTableEvent(item?.tableId || '', 'schedule_template_cancel', {
+          templateId: payload?.cancelledTemplateId || req.params.templateId,
+          refundedSeatCount: Number(item?.refundSummary?.refundedSeatCount || 0),
+          refundedTotalOil: Number(item?.refundSummary?.refundedTotalOil || 0),
+        });
+      }
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SCHEDULE_TEMPLATE_CANCEL_FAILED',
+        err?.message || 'Unable to cancel the poker schedule template.',
         {
           requestId,
           details: err?.details || {},

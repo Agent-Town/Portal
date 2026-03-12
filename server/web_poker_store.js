@@ -761,12 +761,14 @@ function ensureDb() {
     CREATE TABLE IF NOT EXISTS poker_play_schedule_templates (
       template_id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
       recurrence_kind TEXT NOT NULL,
       recurrence_interval_hours INTEGER NOT NULL,
       recurrence_label TEXT NOT NULL,
       first_start_at TEXT NOT NULL,
       event_count INTEGER NOT NULL DEFAULT 1,
       config_json TEXT NOT NULL,
+      cancelled_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -859,6 +861,8 @@ function ensureDb() {
   ensureColumnExists(db, 'poker_play_player_stats', 'entry_fee_oil', 'INTEGER NOT NULL DEFAULT 0');
   ensureColumnExists(db, 'poker_oil_ledger_entries', 'table_id', 'TEXT');
   ensureColumnExists(db, 'poker_oil_ledger_entries', 'series_id', 'TEXT');
+  ensureColumnExists(db, 'poker_play_schedule_templates', 'status', "TEXT NOT NULL DEFAULT 'active'");
+  ensureColumnExists(db, 'poker_play_schedule_templates', 'cancelled_at', 'TEXT');
   seedRegistryEntities();
   seedCentaurTournaments();
   seedPokerPlayTables();
@@ -3025,12 +3029,14 @@ function hydratePokerPlayScheduleTemplate(row) {
   return {
     templateId: row.template_id,
     title: row.title,
+    status: row.status || 'active',
     recurrenceKind: row.recurrence_kind,
     recurrenceIntervalHours: Number(row.recurrence_interval_hours || 0),
     recurrenceLabel: row.recurrence_label,
     firstStartAt: row.first_start_at,
     eventCount: Math.max(1, Number(row.event_count || 1)),
     config: fromJson(row.config_json, {}),
+    cancelledAt: row.cancelled_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -3059,12 +3065,14 @@ function getPokerPlayScheduleTemplateById(templateId) {
 function upsertPokerPlayScheduleTemplate({
   templateId,
   title,
+  status = 'active',
   recurrenceKind,
   recurrenceIntervalHours,
   recurrenceLabel,
   firstStartAt,
   eventCount = 1,
   config = {},
+  cancelledAt = null,
   createdAt = null,
   updatedAt = null,
 }) {
@@ -3080,33 +3088,39 @@ function upsertPokerPlayScheduleTemplate({
       INSERT INTO poker_play_schedule_templates (
         template_id,
         title,
+        status,
         recurrence_kind,
         recurrence_interval_hours,
         recurrence_label,
         first_start_at,
         event_count,
         config_json,
+        cancelled_at,
         created_at,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(template_id) DO UPDATE SET
         title = excluded.title,
+        status = excluded.status,
         recurrence_kind = excluded.recurrence_kind,
         recurrence_interval_hours = excluded.recurrence_interval_hours,
         recurrence_label = excluded.recurrence_label,
         first_start_at = excluded.first_start_at,
         event_count = excluded.event_count,
         config_json = excluded.config_json,
+        cancelled_at = excluded.cancelled_at,
         updated_at = excluded.updated_at
     `).run(
       normalizedTemplateId,
       String(title || '').trim(),
+      String(status || 'active').trim() || 'active',
       String(recurrenceKind || '').trim(),
       Math.max(1, Number(recurrenceIntervalHours || 0)),
       String(recurrenceLabel || '').trim(),
       String(firstStartAt || '').trim(),
       Math.max(1, Number(eventCount || 1)),
       toJson(config, {}),
+      cancelledAt || null,
       existing?.created_at || createdAt || now,
       now
     );
