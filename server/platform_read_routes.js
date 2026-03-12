@@ -255,6 +255,13 @@ function registerPlatformReadRoutes(app, deps) {
       shelfTitles: shelfMembership.map((entry) => entry.title),
       publicationCount: publications.length,
       published: publications.length > 0,
+      publications: publications.map((entry) => ({
+        libraryPublicationId: entry.libraryPublicationId,
+        registryId: entry.registryId,
+        visibility: entry.visibility,
+        publicationState: entry.publicationState,
+        contentHash: entry.contentHash,
+      })),
       createdAt: item?.createdAt,
       updatedAt: item?.updatedAt,
     };

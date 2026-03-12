@@ -561,6 +561,11 @@ let houseSurfaceState = {
     publicStacksResults: [],
     publicStacksResultCount: 0,
     publicStackPreview: null,
+    incomingRelays: [],
+    selectedIncomingRelayId: '',
+    incomingRelayPreview: null,
+    relayTargetHouseId: '',
+    relayApprovalId: '',
     emptyStateText: 'No curated Library items yet.',
     actionStatusText: '',
     actionStatusError: false,
@@ -1760,6 +1765,7 @@ function renderHouseExperiencesSurface() {
 function syncHouseLibraryStateFromPayload(payload = {}) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const selectedItems = Array.isArray(payload?.selectedItems) ? payload.selectedItems : [];
+  const incomingRelays = Array.isArray(payload?.incomingRelays) ? payload.incomingRelays : [];
   houseSurfaceState.library.loaded = true;
   houseSurfaceState.library.items = items;
   houseSurfaceState.library.shelves = Array.isArray(payload?.shelves) ? payload.shelves : [];
@@ -1772,12 +1778,25 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
     ? payload.selectedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
     : [];
   houseSurfaceState.library.selectedItems = selectedItems;
+  houseSurfaceState.library.incomingRelays = incomingRelays;
   houseSurfaceState.library.emptyStateText = String(payload?.emptyStateText || 'No curated Library items yet.');
   if (!items.some((item) => String(item?.libraryItemId || '') === String(houseSurfaceState.library.selectedItemId || ''))) {
     houseSurfaceState.library.selectedItemId = '';
   }
   if (!houseSurfaceState.library.selectedItemId && items[0]?.libraryItemId) {
     houseSurfaceState.library.selectedItemId = String(items[0].libraryItemId);
+  }
+  if (!incomingRelays.some((entry) => String(entry?.libraryPeerRelayId || '') === String(houseSurfaceState.library.selectedIncomingRelayId || ''))) {
+    houseSurfaceState.library.selectedIncomingRelayId = '';
+    if (
+      houseSurfaceState.library.incomingRelayPreview
+      && !incomingRelays.some((entry) => String(entry?.libraryPeerRelayId || '') === String(houseSurfaceState.library.incomingRelayPreview?.libraryPeerRelayId || ''))
+    ) {
+      houseSurfaceState.library.incomingRelayPreview = null;
+    }
+  }
+  if (!houseSurfaceState.library.selectedIncomingRelayId && incomingRelays[0]?.libraryPeerRelayId) {
+    houseSurfaceState.library.selectedIncomingRelayId = String(incomingRelays[0].libraryPeerRelayId);
   }
   if (
     houseSurfaceState.library.composerMode === 'edit'
@@ -1810,6 +1829,11 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.publicStacksResults = [];
   houseSurfaceState.library.publicStacksResultCount = 0;
   houseSurfaceState.library.publicStackPreview = null;
+  houseSurfaceState.library.incomingRelays = [];
+  houseSurfaceState.library.selectedIncomingRelayId = '';
+  houseSurfaceState.library.incomingRelayPreview = null;
+  houseSurfaceState.library.relayTargetHouseId = '';
+  houseSurfaceState.library.relayApprovalId = '';
 }
 
 function getHouseLibraryPublicStacksResults() {
@@ -1937,6 +1961,179 @@ async function previewHouseLibraryPublicStack(registryEntityId = '') {
   const previewTitle = String(data?.preview?.displayName || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId;
   setHouseLibraryActionStatus(`Previewing ${previewTitle} from Public Stacks.`);
   setHouseSurfaceStatus(`Previewing ${previewTitle} from Public Stacks.`);
+  return data;
+}
+
+function getSelectedHouseLibraryIncomingRelay() {
+  const relays = Array.isArray(houseSurfaceState.library.incomingRelays) ? houseSurfaceState.library.incomingRelays : [];
+  if (!relays.length) return null;
+  const selectedRelayId = String(houseSurfaceState.library.selectedIncomingRelayId || relays[0]?.libraryPeerRelayId || '').trim();
+  return relays.find((entry) => String(entry?.libraryPeerRelayId || '').trim() === selectedRelayId) || relays[0] || null;
+}
+
+function syncHouseLibraryPeerRelayControls(selectedItem = null) {
+  const targetInput = el('houseLibraryRelayTargetInput');
+  const approvalInput = el('houseLibraryRelayApprovalInput');
+  const sendBtn = el('houseLibraryRelaySendBtn');
+  const selectedRelay = getSelectedHouseLibraryIncomingRelay();
+  const importBtn = el('houseLibraryImportRelayBtn');
+  const item = selectedItem && typeof selectedItem === 'object' ? selectedItem : getSelectedHouseLibraryItem();
+  const publications = Array.isArray(item?.publications) ? item.publications : [];
+  const selectedPublication = publications[0] && typeof publications[0] === 'object' ? publications[0] : null;
+  if (targetInput) {
+    const storedTarget = String(houseSurfaceState.library.relayTargetHouseId || '');
+    const liveTarget = String(targetInput.value || '');
+    if (targetInput === document.activeElement || (!storedTarget && liveTarget)) {
+      houseSurfaceState.library.relayTargetHouseId = liveTarget.trim();
+    } else if (liveTarget !== storedTarget) {
+      targetInput.value = storedTarget;
+    }
+  }
+  if (approvalInput) {
+    const storedApproval = String(houseSurfaceState.library.relayApprovalId || '');
+    const liveApproval = String(approvalInput.value || '');
+    if (approvalInput === document.activeElement || (!storedApproval && liveApproval)) {
+      houseSurfaceState.library.relayApprovalId = liveApproval.trim();
+    } else if (liveApproval !== storedApproval) {
+      approvalInput.value = storedApproval;
+    }
+  }
+  if (sendBtn) {
+    sendBtn.disabled = !selectedPublication || !String(houseSurfaceState.library.relayTargetHouseId || '').trim() || !String(houseSurfaceState.library.relayApprovalId || '').trim();
+    sendBtn.dataset.libraryPublicationId = String(selectedPublication?.libraryPublicationId || '');
+  }
+  if (importBtn) {
+    const preview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
+      ? houseSurfaceState.library.incomingRelayPreview
+      : selectedRelay;
+    importBtn.disabled = !preview || preview?.alreadyImported === true;
+    importBtn.dataset.libraryPeerRelayId = String(preview?.libraryPeerRelayId || '');
+  }
+}
+
+async function loadHouseLibraryIncomingRelayPreview(libraryPeerRelayId = '') {
+  const normalizedRelayId = String(libraryPeerRelayId || '').trim();
+  if (!normalizedRelayId) {
+    throw new Error('LIBRARY_PEER_RELAY_REQUIRED');
+  }
+  setHouseLibraryActionStatus(`Opening relay ${normalizedRelayId}...`);
+  setHouseSurfaceStatus(`Opening relay ${normalizedRelayId}...`);
+  const response = await apiWithRetry(`/api/platform/library/peer-relays/${encodeURIComponent(normalizedRelayId)}/preview`, {
+    method: 'GET',
+  }, {
+    retryCodes: ['SESSION_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  houseSurfaceState.library.selectedIncomingRelayId = normalizedRelayId;
+  houseSurfaceState.library.incomingRelayPreview = data?.preview && typeof data.preview === 'object'
+    ? data.preview
+    : null;
+  renderHouseLibrarySurface();
+  const previewLabel = String(data?.preview?.displayName || normalizedRelayId).trim() || normalizedRelayId;
+  setHouseLibraryActionStatus(`Previewing ${previewLabel} from Relay Desk.`);
+  setHouseSurfaceStatus(`Previewing ${previewLabel} from Relay Desk.`);
+  return data;
+}
+
+async function relaySelectedHouseLibraryItemToHouse() {
+  const selectedItem = getSelectedHouseLibraryItem();
+  const publications = Array.isArray(selectedItem?.publications) ? selectedItem.publications : [];
+  const publication = publications[0] && typeof publications[0] === 'object' ? publications[0] : null;
+  const libraryPublicationId = String(publication?.libraryPublicationId || '').trim();
+  if (!libraryPublicationId) {
+    throw new Error('LIBRARY_PUBLICATION_REQUIRED');
+  }
+  const approvalId = String(houseSurfaceState.library.relayApprovalId || '').trim();
+  const targetHouseId = String(houseSurfaceState.library.relayTargetHouseId || '').trim();
+  if (!approvalId) {
+    throw new Error('LIBRARY_PEER_RELAY_APPROVAL_REQUIRED');
+  }
+  if (!targetHouseId) {
+    throw new Error('TARGET_HOUSE_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const itemLabel = String(selectedItem?.title || libraryPublicationId).trim() || libraryPublicationId;
+  const relayIdempotencyKey = makeStableHouseIdempotencyKey('house_library_peer_relay', [
+    houseId,
+    teamId,
+    libraryPublicationId,
+    targetHouseId,
+  ]);
+  setHouseLibraryActionStatus(`Relaying ${itemLabel} to ${targetHouseId}...`);
+  setHouseSurfaceStatus(`Relaying ${itemLabel} to ${targetHouseId}...`);
+  const relayResponse = await apiWithRetry('/api/platform/library/peer-relays', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': relayIdempotencyKey,
+    },
+    body: JSON.stringify({
+      libraryPublicationId,
+      targetHouseId,
+      transportKind: 'pony.relay.registry.v1',
+      approvalId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const relayData = relayResponse?.data || relayResponse || {};
+  const relay = relayData?.relay && typeof relayData.relay === 'object' ? relayData.relay : null;
+  const relayId = String(relay?.libraryPeerRelayId || '').trim();
+  if (!relayId) {
+    throw new Error('LIBRARY_PEER_RELAY_REQUIRED');
+  }
+  await apiWithRetry(`/api/platform/library/peer-relays/${encodeURIComponent(relayId)}/deliver`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  await loadHouseLibrarySurface({ skipContext: true });
+  renderHouseLibrarySurface();
+  const successText = `Relayed ${itemLabel} to ${targetHouseId}.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
+  return relayData;
+}
+
+async function importSelectedHouseLibraryIncomingRelay() {
+  const preview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
+    ? houseSurfaceState.library.incomingRelayPreview
+    : getSelectedHouseLibraryIncomingRelay();
+  const libraryPeerRelayId = String(preview?.libraryPeerRelayId || '').trim();
+  if (!libraryPeerRelayId) {
+    throw new Error('LIBRARY_PEER_RELAY_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_peer_relay_import', [
+    houseId,
+    teamId,
+    libraryPeerRelayId,
+  ]);
+  const relayLabel = String(preview?.displayName || libraryPeerRelayId).trim() || libraryPeerRelayId;
+  setHouseLibraryActionStatus(`Importing ${relayLabel} from Relay Desk...`);
+  setHouseSurfaceStatus(`Importing ${relayLabel} from Relay Desk...`);
+  const response = await apiWithRetry(`/api/platform/library/peer-relays/${encodeURIComponent(libraryPeerRelayId)}/imports`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const importedItemId = String(data?.item?.libraryItemId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (importedItemId) {
+    houseSurfaceState.library.selectedItemId = importedItemId;
+  }
+  await loadHouseLibraryIncomingRelayPreview(libraryPeerRelayId).catch(() => null);
+  renderHouseLibrarySurface();
+  const successText = `Imported ${relayLabel} from Relay Desk.`;
+  setHouseLibraryActionStatus(successText);
+  setHouseSurfaceStatus(successText);
   return data;
 }
 
@@ -2639,6 +2836,12 @@ async function publishSelectedHouseLibraryItemToRegistry({
   const data = response?.data || response || {};
   const publication = data?.publication && typeof data.publication === 'object' ? data.publication : {};
   const registryId = String(publication?.registryId || '').trim();
+  const selectedItemId = String(selectedItem?.libraryItemId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  if (selectedItemId) {
+    houseSurfaceState.library.selectedItemId = selectedItemId;
+  }
+  renderHouseLibrarySurface();
   const successText = registryId
     ? `Published ${itemLabel} to Registry as ${registryId}.`
     : `Published ${itemLabel} to Registry.`;
@@ -2702,6 +2905,13 @@ function renderHouseLibrarySurface() {
   const guidedApprovalInput = el('houseLibraryGuidedApprovalInput');
   const guidedPublishBtn = el('houseLibraryGuidedPublishBtn');
   const guidedImportBtn = el('houseLibraryGuidedImportBtn');
+  const relayTargetInput = el('houseLibraryRelayTargetInput');
+  const relayApprovalInput = el('houseLibraryRelayApprovalInput');
+  const relaySendBtn = el('houseLibraryRelaySendBtn');
+  const incomingRelaysEmptyNode = el('houseLibraryIncomingRelaysEmpty');
+  const incomingRelaysNode = el('houseLibraryIncomingRelays');
+  const incomingRelayPreviewNode = el('houseLibraryIncomingRelayPreview');
+  const importRelayBtn = el('houseLibraryImportRelayBtn');
   const revisionsNode = el('houseLibraryRevisions');
   const scopeSetsNode = el('houseLibraryScopeSets');
   const scopeEmptyNode = el('houseLibraryScopeEmpty');
@@ -2740,6 +2950,13 @@ function renderHouseLibrarySurface() {
     || !guidedApprovalInput
     || !guidedPublishBtn
     || !guidedImportBtn
+    || !relayTargetInput
+    || !relayApprovalInput
+    || !relaySendBtn
+    || !incomingRelaysEmptyNode
+    || !incomingRelaysNode
+    || !incomingRelayPreviewNode
+    || !importRelayBtn
     || !revisionsNode
     || !scopeSetsNode
     || !scopeEmptyNode
@@ -2757,9 +2974,11 @@ function renderHouseLibrarySurface() {
   const scopeSets = Array.isArray(houseSurfaceState.library.scopeSets) ? houseSurfaceState.library.scopeSets : [];
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
+  const incomingRelays = Array.isArray(houseSurfaceState.library.incomingRelays) ? houseSurfaceState.library.incomingRelays : [];
   listNode.innerHTML = '';
   shelvesNode.innerHTML = '';
   publicStacksResultsNode.innerHTML = '';
+  incomingRelaysNode.innerHTML = '';
   revisionsNode.innerHTML = '';
   scopeSetsNode.innerHTML = '';
   actionsNode.innerHTML = '';
@@ -2776,6 +2995,7 @@ function renderHouseLibrarySurface() {
   syncHouseLibraryPublicStacksControls();
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
+  syncHouseLibraryPeerRelayControls(null);
   shelfTitleInput.value = String(houseSurfaceState.library.draftShelfTitle || '');
   facetFilterSelect.value = String(houseSurfaceState.library.selectedFacetFilter || 'all');
   satchelTitleInput.value = String(houseSurfaceState.library.draftSatchelTitle || '');
@@ -2790,10 +3010,18 @@ function renderHouseLibrarySurface() {
   const publicStackPreview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
     ? houseSurfaceState.library.publicStackPreview
     : null;
+  const selectedIncomingRelay = getSelectedHouseLibraryIncomingRelay();
+  const incomingRelayPreview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
+    ? houseSurfaceState.library.incomingRelayPreview
+    : null;
   publicStacksEmptyNode.classList.toggle('is-hidden', publicStackResults.length > 0);
   publicStacksEmptyNode.textContent = publicStackResults.length
     ? ''
     : 'Search Public Stacks without leaving this room.';
+  incomingRelaysEmptyNode.classList.toggle('is-hidden', incomingRelays.length > 0);
+  incomingRelaysEmptyNode.textContent = incomingRelays.length
+    ? ''
+    : 'No relayed publications have arrived for this House yet.';
 
   const allShelvesBtn = document.createElement('button');
   allShelvesBtn.type = 'button';
@@ -2879,6 +3107,29 @@ function renderHouseLibrarySurface() {
     publicStacksResultsNode.appendChild(button);
   });
 
+  incomingRelays.forEach((relay) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(incomingRelayPreview?.libraryPeerRelayId || selectedIncomingRelay?.libraryPeerRelayId || '') === String(relay?.libraryPeerRelayId || '') ? ' primary' : ''}`;
+    button.dataset.libraryPeerRelayId = String(relay?.libraryPeerRelayId || '');
+    button.textContent = [
+      String(relay?.displayName || relay?.registryId || relay?.libraryPeerRelayId || ''),
+      String(relay?.sourceHouseId || ''),
+      relay?.alreadyImported === true ? 'Imported' : 'Ready to import',
+    ].filter(Boolean).join(' · ');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await loadHouseLibraryIncomingRelayPreview(String(relay?.libraryPeerRelayId || ''));
+      } catch (err) {
+        button.disabled = false;
+        setHouseLibraryActionStatus(String(err?.message || 'LIBRARY_PEER_RELAY_PREVIEW_FAILED'), true);
+        setHouseSurfaceStatus(String(err?.message || 'LIBRARY_PEER_RELAY_PREVIEW_FAILED'), true);
+      }
+    });
+    incomingRelaysNode.appendChild(button);
+  });
+
   if (!publicStackPreview) {
     registryPreviewNode.textContent = 'Select a Public Stack to preview its provenance.';
   } else {
@@ -2889,6 +3140,22 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.description || '').trim(),
       `Provenance: ${String(publicStackPreview?.provenance?.summary || '').trim() || 'Visible.'}`,
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
+    ].filter(Boolean).join(' · ');
+  }
+
+  const effectiveIncomingRelayPreview = incomingRelayPreview || selectedIncomingRelay || null;
+  if (!effectiveIncomingRelayPreview) {
+    incomingRelayPreviewNode.textContent = 'Select a received relay to preview its provenance.';
+  } else {
+    incomingRelayPreviewNode.textContent = [
+      String(effectiveIncomingRelayPreview?.displayName || effectiveIncomingRelayPreview?.libraryPeerRelayId || ''),
+      String(effectiveIncomingRelayPreview?.registryId || ''),
+      `From: ${String(effectiveIncomingRelayPreview?.sourceHouseId || '').trim() || 'another House'}`,
+      String(effectiveIncomingRelayPreview?.summary || '').trim(),
+      `Provenance: ${String(effectiveIncomingRelayPreview?.provenance?.summary || '').trim() || 'Relayed via Pony.'}`,
+      effectiveIncomingRelayPreview?.alreadyImported === true
+        ? `Already in your Library as ${String(effectiveIncomingRelayPreview?.importedItem?.title || effectiveIncomingRelayPreview?.importedItem?.libraryItemId || 'an imported item')}.`
+        : 'Ready to import as a read-only Library artifact.',
     ].filter(Boolean).join(' · ');
   }
 
@@ -2935,13 +3202,16 @@ function renderHouseLibrarySurface() {
   if (String(selectedItem?.sourceKind || '') === 'user_note') {
     selectedItemStateParts.push('Local note');
   }
-  if (String(selectedItem?.importedState || '') === 'imported_artifact') {
+  if (String(selectedItem?.sourceKind || '') === 'peer_relay_artifact') {
+    selectedItemStateParts.push('Imported from Relay Desk');
+  } else if (String(selectedItem?.importedState || '') === 'imported_artifact') {
     selectedItemStateParts.push('Imported from Registry');
   }
   if (selectedItem?.readOnly === true) {
     selectedItemStateParts.push('Read only');
   }
   syncHouseLibraryPublishControls(selectedItem);
+  syncHouseLibraryPeerRelayControls(selectedItem);
   const noteReadOnly = selectedItem?.readOnly === true || String(selectedItem?.importedState || '') === 'imported_artifact';
   const selectedItemTrustLabels = buildHouseLibraryItemTrustLabels(selectedItem);
   const sealBlocked = String(selectedItem?.sealPolicy || '') === 'blocked_publication';
@@ -2957,6 +3227,18 @@ function renderHouseLibrarySurface() {
         : sealBlocked
           ? 'This item cannot leave the Library while its seal is active.'
           : 'Approval is required before publishing.',
+    ].filter(Boolean).join(' · '));
+    const selectedPublication = Array.isArray(selectedItem?.publications) && selectedItem.publications[0]
+      ? selectedItem.publications[0]
+      : null;
+    exchangeSummaryParts.push([
+      `Relay guide: ${String(selectedItem?.title || selectedItem?.libraryItemId || 'Library item')}`,
+      selectedPublication
+        ? `Published as ${String(selectedPublication?.registryId || selectedPublication?.libraryPublicationId || '').trim() || 'a Library publication'}`
+        : 'Publish this item before relaying it to another House.',
+      selectedPublication
+        ? 'Relay approval and target House are required before sending.'
+        : '',
     ].filter(Boolean).join(' · '));
   }
   if (publicStackPreview) {
@@ -6714,6 +6996,70 @@ function bindTownDistrictControls() {
         await runHouseLibraryGuidedPublish();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_PUBLISH_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryRelayTargetInput = el('houseLibraryRelayTargetInput');
+  if (houseLibraryRelayTargetInput) {
+    houseLibraryRelayTargetInput.oninput = () => {
+      houseSurfaceState.library.relayTargetHouseId = String(houseLibraryRelayTargetInput.value || '').trim();
+      syncHouseLibraryPeerRelayControls();
+    };
+    houseLibraryRelayTargetInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryRelaySendBtn = el('houseLibraryRelaySendBtn');
+      if (houseLibraryRelaySendBtn && !houseLibraryRelaySendBtn.disabled) {
+        houseLibraryRelaySendBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryRelayApprovalInput = el('houseLibraryRelayApprovalInput');
+  if (houseLibraryRelayApprovalInput) {
+    houseLibraryRelayApprovalInput.oninput = () => {
+      houseSurfaceState.library.relayApprovalId = String(houseLibraryRelayApprovalInput.value || '').trim();
+      syncHouseLibraryPeerRelayControls();
+    };
+    houseLibraryRelayApprovalInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryRelaySendBtn = el('houseLibraryRelaySendBtn');
+      if (houseLibraryRelaySendBtn && !houseLibraryRelaySendBtn.disabled) {
+        houseLibraryRelaySendBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryRelaySendBtn = el('houseLibraryRelaySendBtn');
+  if (houseLibraryRelaySendBtn) {
+    houseLibraryRelaySendBtn.onclick = async () => {
+      houseLibraryRelaySendBtn.disabled = true;
+      try {
+        await relaySelectedHouseLibraryItemToHouse();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_PEER_RELAY_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryImportRelayBtn = el('houseLibraryImportRelayBtn');
+  if (houseLibraryImportRelayBtn) {
+    houseLibraryImportRelayBtn.onclick = async () => {
+      houseLibraryImportRelayBtn.disabled = true;
+      try {
+        await importSelectedHouseLibraryIncomingRelay();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_PEER_RELAY_IMPORT_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {

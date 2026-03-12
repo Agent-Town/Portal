@@ -287,6 +287,36 @@
     <div class="kv" data-testid="house-library-guided-import-controls">
       <button class="btn" id="houseLibraryGuidedImportBtn" type="button" data-testid="house-library-guided-import-button">Import from Guide</button>
     </div>
+    <div class="kv" data-testid="house-library-peer-relay-controls">
+      <label class="small" for="houseLibraryRelayTargetInput">Target House</label>
+      <input
+        id="houseLibraryRelayTargetInput"
+        data-testid="house-library-relay-target-input"
+        class="pixel-input"
+        type="text"
+        placeholder="house_..."
+        autocomplete="off"
+        style="flex:1; min-width:0;"
+      />
+      <label class="small" for="houseLibraryRelayApprovalInput">Relay Approval</label>
+      <input
+        id="houseLibraryRelayApprovalInput"
+        data-testid="house-library-relay-approval-input"
+        class="pixel-input"
+        type="text"
+        placeholder="appr_..."
+        autocomplete="off"
+        style="flex:1; min-width:0;"
+      />
+      <button class="btn" id="houseLibraryRelaySendBtn" type="button" data-testid="house-library-relay-send-button">Relay to House</button>
+    </div>
+  </div>
+  <h3 class="small" style="margin:10px 0 4px;">Relay Desk</h3>
+  <div class="small" id="houseLibraryIncomingRelaysEmpty" data-testid="house-library-incoming-relays-empty">No relayed publications have arrived for this House yet.</div>
+  <div class="kv stack" id="houseLibraryIncomingRelays" data-testid="house-library-incoming-relays" style="margin-bottom:8px;"></div>
+  <div class="small" id="houseLibraryIncomingRelayPreview" data-testid="house-library-incoming-relay-preview">Select a received relay to preview its provenance.</div>
+  <div class="kv" data-testid="house-library-incoming-relay-import-controls" style="margin:8px 0;">
+    <button class="btn" id="houseLibraryImportRelayBtn" type="button" data-testid="house-library-import-relay-button" disabled>Import Received Relay</button>
   </div>
   <div class="small" style="margin:10px 0 4px;">Direct Registry ID</div>
   <div class="kv" style="margin:8px 0;" data-testid="house-library-import-controls">
