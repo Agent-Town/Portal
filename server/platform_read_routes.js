@@ -15,6 +15,8 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPeerRelay,
     createLibraryPublicStack,
     createLibraryPublicStackMember,
+    createLibraryPublicStackVerification,
+    createLibraryPublicStackVerificationMember,
     createLibrarySatchelReceipt,
     createLibrarySatchelRelay,
     createLibraryShelf,
@@ -33,6 +35,9 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicationById,
     getLibraryPublicStackById,
     getLibraryPublicStackByIdempotency,
+    getLibraryPublicStackVerificationById,
+    getLibraryPublicStackVerificationByIdempotency,
+    getLatestLibraryPublicStackVerification,
     getLibrarySatchelRelayById,
     getLibrarySatchelRelayByIdempotency,
     getLibraryShelfById,
@@ -55,6 +60,8 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryPeerRelays,
     listLibraryPublicStackMembers,
     listLibraryPublicStacks,
+    listLibraryPublicStackVerificationMembers,
+    listLibraryPublicStackVerifications,
     listLibrarySatchelRelays,
     listLibrarySatchelReceipts,
     listLibraryPublications,
@@ -100,6 +107,7 @@ function registerPlatformReadRoutes(app, deps) {
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
+    updateLibraryPublicStackVerification,
     updateLibraryPeerRelay,
     updateLibrarySatchelRelay,
     updateLibraryItem,
@@ -1212,6 +1220,158 @@ function registerPlatformReadRoutes(app, deps) {
     }];
   }
 
+  function projectLibraryPublicStackBundleMember(member = null) {
+    const metadata = member?.metadata && typeof member.metadata === 'object' ? member.metadata : {};
+    return {
+      position: Number.isFinite(Number(member?.sortIndex)) ? Number(member.sortIndex) : 0,
+      libraryItemId: String(member?.libraryItemId || metadata.libraryItemId || '').trim() || null,
+      libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
+      registryId: String(member?.registryId || metadata.registryId || '').trim() || null,
+      contentHash: String(metadata.contentHash || '').trim() || null,
+      itemType: String(metadata.itemType || '').trim() || 'library_note',
+      title: String(metadata.title || member?.registryId || member?.libraryPublicationId || '').trim() || String(member?.libraryPublicationId || ''),
+      summary: String(metadata.summary || '').trim() || null,
+      contentText: String(metadata.contentText || ''),
+      contentRef: metadata.contentRef ? String(metadata.contentRef) : null,
+      sourceKind: String(metadata.sourceKind || '').trim() || null,
+      sourceRef: String(metadata.sourceRef || '').trim() || null,
+    };
+  }
+
+  function buildLibraryPublicStackBundleManifestCore({
+    publicStack = null,
+    members = [],
+  } = {}) {
+    const manifest = publicStack?.metadata?.manifest && typeof publicStack.metadata.manifest === 'object'
+      ? publicStack.metadata.manifest
+      : {};
+    const projectedMembers = (Array.isArray(members) ? members : [])
+      .map((member) => ({
+        position: Number.isFinite(Number(member?.position)) ? Number(member.position) : 0,
+        libraryItemId: String(member?.libraryItemId || '').trim() || null,
+        libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
+        registryId: String(member?.registryId || '').trim() || null,
+        contentHash: String(member?.contentHash || '').trim() || null,
+        itemType: String(member?.itemType || '').trim() || 'library_note',
+        title: String(member?.title || member?.registryId || member?.libraryPublicationId || '').trim() || String(member?.libraryPublicationId || ''),
+        summary: String(member?.summary || '').trim() || null,
+        contentText: String(member?.contentText || ''),
+        contentRef: member?.contentRef ? String(member.contentRef) : null,
+        sourceKind: String(member?.sourceKind || '').trim() || null,
+        sourceRef: String(member?.sourceRef || '').trim() || null,
+      }))
+      .sort((a, b) => Number(a.position || 0) - Number(b.position || 0));
+    return {
+      kind: 'library_public_stack_bundle.v1',
+      sourceHouseId: String(publicStack?.houseId || manifest?.sourceHouseId || '').trim() || null,
+      sourceTeamId: String(publicStack?.teamId || manifest?.sourceTeamId || '').trim() || null,
+      scopeSetId: String(publicStack?.scopeSetId || manifest?.scopeSetId || '').trim() || null,
+      title: String(publicStack?.title || manifest?.title || 'Public Stack').trim() || 'Public Stack',
+      scopeKind: String(manifest?.scopeKind || 'reading_table').trim() || 'reading_table',
+      sourceShelfId: String(manifest?.sourceShelfId || '').trim() || null,
+      familySlug: String(publicStack?.familySlug || manifest?.familySlug || 'house_library_stacks').trim() || 'house_library_stacks',
+      memberCount: projectedMembers.length,
+      orderedItemIds: projectedMembers.map((entry) => entry.libraryItemId),
+      orderedPublicationIds: projectedMembers.map((entry) => entry.libraryPublicationId),
+      orderedRegistryIds: projectedMembers.map((entry) => entry.registryId).filter(Boolean),
+      members: projectedMembers,
+    };
+  }
+
+  function buildLibraryPublicStackTrustOverlay({
+    publicStack = null,
+    memberPreviews = [],
+    localScopeSet = null,
+    verification = null,
+    verificationMembers = [],
+  } = {}) {
+    const manifestCore = buildLibraryPublicStackBundleManifestCore({
+      publicStack,
+      members: memberPreviews,
+    });
+    const expectedBundleHash = String(publicStack?.bundleHash || '').trim() || null;
+    const computedBundleHash = sha256PrefixedHex(stableJsonStringify(manifestCore));
+    const bundleHashMatches = !!expectedBundleHash && expectedBundleHash === computedBundleHash;
+    const proofRows = Array.isArray(verificationMembers) ? verificationMembers : [];
+    const verifiedMemberCount = proofRows.length
+      ? proofRows.filter((entry) => String(entry?.verificationState || '').trim() === 'verified').length
+      : (Array.isArray(memberPreviews) ? memberPreviews.filter((entry) => {
+          return !!(
+            String(entry?.libraryPublicationId || '').trim()
+            && String(entry?.registryId || '').trim()
+            && String(entry?.contentHash || '').trim()
+          );
+        }).length : 0);
+    const importedCount = Array.isArray(memberPreviews)
+      ? memberPreviews.filter((entry) => entry?.alreadyImported === true).length
+      : 0;
+    const storedVerificationState = String(verification?.verificationState || '').trim();
+    const verificationState = storedVerificationState || 'unverified';
+    const bundleCardStatus = verificationState === 'unverified'
+      ? 'pending'
+      : bundleHashMatches && verifiedMemberCount === (Array.isArray(memberPreviews) ? memberPreviews.length : 0)
+        ? 'verified'
+        : 'warning';
+    const bundleCardSummary = verificationState === 'unverified'
+      ? `Run verification to check the bundle hash against ${Array.isArray(memberPreviews) ? memberPreviews.length : 0} published item${Array.isArray(memberPreviews) && memberPreviews.length === 1 ? '' : 's'}.`
+      : bundleHashMatches
+        ? `Bundle hash matches ${verifiedMemberCount} published item${verifiedMemberCount === 1 ? '' : 's'}.`
+        : 'Bundle hash no longer matches the stored published members.';
+    const localCardStatus = localScopeSet && importedCount === (Array.isArray(memberPreviews) ? memberPreviews.length : 0) && importedCount > 0
+      ? 'verified'
+      : importedCount > 0
+        ? 'partial'
+        : 'pending';
+    const localCardSummary = localScopeSet && importedCount === (Array.isArray(memberPreviews) ? memberPreviews.length : 0) && importedCount > 0
+      ? `Imported here as Satchel ${String(localScopeSet?.title || localScopeSet?.scopeSetId || 'Imported Public Stack').trim() || 'Imported Public Stack'}.`
+      : importedCount > 0
+        ? `${importedCount} of ${Array.isArray(memberPreviews) ? memberPreviews.length : 0} members are already in this House.`
+        : 'Not yet imported into this House.';
+    return {
+      verificationState,
+      verification: {
+        libraryPublicStackVerificationId: verification?.libraryPublicStackVerificationId || null,
+        libraryPublicStackId: String(publicStack?.libraryPublicStackId || '').trim() || null,
+        verificationKind: String(verification?.verificationKind || 'bundle_integrity').trim() || 'bundle_integrity',
+        verificationState,
+        bundleHash: expectedBundleHash,
+        computedBundleHash,
+        bundleHashMatches,
+        verifiedAt: verification?.updatedAt || verification?.createdAt || null,
+        memberCount: Array.isArray(memberPreviews) ? memberPreviews.length : 0,
+        verifiedMemberCount,
+        importedCount,
+        localScopeSetId: localScopeSet?.scopeSetId || null,
+        summary: verificationState === 'unverified'
+          ? 'Not yet verified in this House.'
+          : bundleCardSummary,
+      },
+      proofCards: [
+        {
+          title: 'Bundle integrity',
+          status: bundleCardStatus,
+          summary: bundleCardSummary,
+          evidence: {
+            bundleHash: expectedBundleHash,
+            computedBundleHash,
+            memberCount: Array.isArray(memberPreviews) ? memberPreviews.length : 0,
+            verifiedMemberCount,
+          },
+        },
+        {
+          title: 'Local import status',
+          status: localCardStatus,
+          summary: localCardSummary,
+          evidence: {
+            importedCount,
+            memberCount: Array.isArray(memberPreviews) ? memberPreviews.length : 0,
+            localScopeSetId: localScopeSet?.scopeSetId || null,
+          },
+        },
+      ],
+    };
+  }
+
   function buildLibraryPublicStackPreviewPayload({
     houseId = '',
     teamId = '',
@@ -1238,23 +1398,7 @@ function registerPlatformReadRoutes(app, deps) {
       : {};
     const members = listLibraryPublicStackMembers({
       libraryPublicStackId: normalizedPublicStackId,
-    }).map((member) => {
-      const metadata = member?.metadata && typeof member.metadata === 'object' ? member.metadata : {};
-      return {
-        position: Number.isFinite(Number(member?.sortIndex)) ? Number(member.sortIndex) : 0,
-        libraryItemId: String(member?.libraryItemId || metadata.libraryItemId || '').trim() || null,
-        libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
-        registryId: String(member?.registryId || metadata.registryId || '').trim() || null,
-        contentHash: String(metadata.contentHash || '').trim() || null,
-        itemType: String(metadata.itemType || '').trim() || 'library_note',
-        title: String(metadata.title || member?.registryId || member?.libraryPublicationId || '').trim() || String(member?.libraryPublicationId || ''),
-        summary: String(metadata.summary || '').trim() || null,
-        contentText: String(metadata.contentText || ''),
-        contentRef: metadata.contentRef ? String(metadata.contentRef) : null,
-        sourceKind: String(metadata.sourceKind || '').trim() || null,
-        sourceRef: String(metadata.sourceRef || '').trim() || null,
-      };
-    });
+    }).map((member) => projectLibraryPublicStackBundleMember(member));
     const importedItems = (houseId && teamId)
       ? findLibraryPublicStackImportsForTarget({
           houseId,
@@ -1281,6 +1425,25 @@ function registerPlatformReadRoutes(app, deps) {
       };
     });
     const importedCount = memberPreviews.filter((member) => member.alreadyImported).length;
+    const latestVerification = (houseId && teamId)
+      ? getLatestLibraryPublicStackVerification({
+          houseId,
+          teamId,
+          libraryPublicStackId: normalizedPublicStackId,
+        })
+      : null;
+    const latestVerificationMembers = latestVerification
+      ? listLibraryPublicStackVerificationMembers({
+          libraryPublicStackVerificationId: String(latestVerification?.libraryPublicStackVerificationId || '').trim(),
+        })
+      : [];
+    const trustOverlay = buildLibraryPublicStackTrustOverlay({
+      publicStack,
+      memberPreviews,
+      localScopeSet,
+      verification: latestVerification,
+      verificationMembers: latestVerificationMembers,
+    });
     const familyInfo = getHouseLibraryPublicStackFamilyInfo(String(publicStack?.familySlug || '').trim() || 'house_library_stacks');
     return {
       ok: true,
@@ -1300,11 +1463,16 @@ function registerPlatformReadRoutes(app, deps) {
         scopeKind: String(manifest?.scopeKind || 'reading_table').trim() || 'reading_table',
         bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
         publicationState: String(publicStack?.publicationState || '').trim() || 'published',
+        verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
+        verification: trustOverlay?.verification || {
+          verificationState: 'unverified',
+        },
         memberCount: memberPreviews.length,
         importedCount,
         alreadyImported: importedCount > 0,
         alreadyImportedAll: importedCount === memberPreviews.length && memberPreviews.length > 0,
         members: memberPreviews,
+        proofCards: Array.isArray(trustOverlay?.proofCards) ? trustOverlay.proofCards : [],
         localScopeSet: localScopeSet
           ? {
               scopeSetId: localScopeSet.scopeSetId,
@@ -1318,6 +1486,7 @@ function registerPlatformReadRoutes(app, deps) {
         provenance: {
           summary: `Published from ${String(publicStack?.houseId || '').trim() || 'another House'} with ${memberPreviews.length} curated Library artifacts.`,
           bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
+          verificationSummary: String(trustOverlay?.verification?.summary || '').trim() || null,
           orderedPublicationIds: Array.isArray(manifest?.orderedPublicationIds) ? manifest.orderedPublicationIds : memberPreviews.map((member) => member.libraryPublicationId).filter(Boolean),
           orderedRegistryIds: Array.isArray(manifest?.orderedRegistryIds) ? manifest.orderedRegistryIds : memberPreviews.map((member) => member.registryId).filter(Boolean),
         },
@@ -1637,6 +1806,156 @@ function registerPlatformReadRoutes(app, deps) {
         libraryPublicStackId: publicStack.libraryPublicStackId,
       }),
     };
+  }
+
+  function persistLibraryPublicStackVerificationRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibraryPublicStackVerificationByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        verification: existing,
+        members: listLibraryPublicStackVerificationMembers({
+          libraryPublicStackVerificationId: existing.libraryPublicStackVerificationId,
+        }),
+      };
+    }
+    const previewPayload = buildLibraryPublicStackPreviewPayload({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (!previewPayload.ok) {
+      const err = new Error(previewPayload.code || 'PUBLIC_STACK_NOT_FOUND');
+      err.code = previewPayload.code || 'PUBLIC_STACK_NOT_FOUND';
+      err.message = previewPayload.message || 'Public Stack not found.';
+      throw err;
+    }
+    const publicStack = getLibraryPublicStackById(libraryPublicStackId);
+    if (!publicStack) {
+      const err = new Error('PUBLIC_STACK_NOT_FOUND');
+      err.code = 'PUBLIC_STACK_NOT_FOUND';
+      err.message = 'Public Stack not found.';
+      throw err;
+    }
+    const manifestCore = buildLibraryPublicStackBundleManifestCore({
+      publicStack,
+      members: previewPayload.preview.members,
+    });
+    const computedBundleHash = sha256PrefixedHex(stableJsonStringify(manifestCore));
+    const expectedBundleHash = String(publicStack?.bundleHash || '').trim() || computedBundleHash;
+    const bundleHashMatches = computedBundleHash === expectedBundleHash;
+    const verificationState = bundleHashMatches
+      && previewPayload.preview.members.every((member) => {
+        return !!(
+          String(member?.libraryPublicationId || '').trim()
+          && String(member?.registryId || '').trim()
+          && String(member?.contentHash || '').trim()
+        );
+      })
+      ? 'verified'
+      : 'warning';
+    const verification = createLibraryPublicStackVerification({
+      libraryPublicStackVerificationId: `pstv_${randomHex(12)}`,
+      libraryPublicStackId,
+      houseId,
+      teamId,
+      verificationKind: 'bundle_integrity',
+      verificationState,
+      bundleHash: expectedBundleHash,
+      idempotencyKey,
+      metadata: {
+        computedBundleHash,
+        bundleHashMatches,
+        memberCount: previewPayload.preview.memberCount,
+        importedCount: previewPayload.preview.importedCount,
+        localScopeSetId: previewPayload.preview.localScopeSet?.scopeSetId || null,
+        sourceHouseId: String(previewPayload.preview.sourceHouseId || '').trim() || null,
+        proofCards: Array.isArray(previewPayload.preview.proofCards) ? previewPayload.preview.proofCards : [],
+      },
+      nowIso: nowIso(),
+    });
+    previewPayload.preview.members.forEach((member) => {
+      createLibraryPublicStackVerificationMember({
+        libraryPublicStackVerificationMemberId: `pstvm_${randomHex(12)}`,
+        libraryPublicStackVerificationId: verification.libraryPublicStackVerificationId,
+        libraryPublicationId: String(member?.libraryPublicationId || '').trim(),
+        registryId: String(member?.registryId || '').trim(),
+        contentHash: String(member?.contentHash || '').trim() || null,
+        sortIndex: Number.isFinite(Number(member?.position)) ? Number(member.position) : 0,
+        verificationState: verificationState === 'verified'
+          ? 'verified'
+          : String(member?.libraryPublicationId || '').trim() && String(member?.registryId || '').trim() && String(member?.contentHash || '').trim()
+            ? 'verified'
+            : 'warning',
+        metadata: {
+          title: String(member?.title || '').trim() || null,
+          itemType: String(member?.itemType || '').trim() || null,
+          sourceKind: String(member?.sourceKind || '').trim() || null,
+          sourceRef: String(member?.sourceRef || '').trim() || null,
+        },
+        nowIso: nowIso(),
+      });
+    });
+    return {
+      status: 201,
+      verification,
+      members: listLibraryPublicStackVerificationMembers({
+        libraryPublicStackVerificationId: verification.libraryPublicStackVerificationId,
+      }),
+    };
+  }
+
+  function ensureLibraryPublicStackVerification({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    idempotencyKey = '',
+  } = {}) {
+    const latestVerification = getLatestLibraryPublicStackVerification({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    const previewPayload = buildLibraryPublicStackPreviewPayload({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (!previewPayload.ok) {
+      const err = new Error(previewPayload.code || 'PUBLIC_STACK_NOT_FOUND');
+      err.code = previewPayload.code || 'PUBLIC_STACK_NOT_FOUND';
+      err.message = previewPayload.message || 'Public Stack not found.';
+      throw err;
+    }
+    if (
+      latestVerification
+      && String(latestVerification?.bundleHash || '').trim()
+      && String(latestVerification?.bundleHash || '').trim() === String(previewPayload.preview?.bundleHash || '').trim()
+      && String(latestVerification?.verificationState || '').trim() === 'verified'
+    ) {
+      return {
+        status: 200,
+        verification: latestVerification,
+        members: listLibraryPublicStackVerificationMembers({
+          libraryPublicStackVerificationId: latestVerification.libraryPublicStackVerificationId,
+        }),
+      };
+    }
+    return persistLibraryPublicStackVerificationRecord({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+      idempotencyKey,
+    });
   }
 
   function persistLibraryPeerRelayRecord({
@@ -2239,6 +2558,52 @@ function registerPlatformReadRoutes(app, deps) {
     return sendPortalApiSuccess(res, preview, { requestId });
   });
 
+  app.post('/api/platform/library/public-stacks/:registryEntityId/verifications', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before verifying a Public Stack.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before verifying a Public Stack.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to verify a Public Stack.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to verify a Public Stack.', { requestId });
+    }
+    try {
+      const persisted = persistLibraryPublicStackVerificationRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+        idempotencyKey,
+      });
+      const preview = buildLibraryPublicStackPreviewPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+      });
+      return sendPortalApiSuccess(res, {
+        verification: preview.ok ? preview.preview.verification : persisted.verification,
+        members: persisted.members,
+        proofCards: preview.ok ? preview.preview.proofCards : [],
+      }, { requestId, status: persisted.status });
+    } catch (err) {
+      if (String(err?.code || '').trim() === 'PUBLIC_STACK_NOT_FOUND') {
+        return sendPortalApiError(res, 404, 'PUBLIC_STACK_NOT_FOUND', 'Public Stack not found.', { requestId });
+      }
+      throw err;
+    }
+  });
+
   app.post('/api/platform/library/public-stacks/:registryEntityId/imports', express.json({ limit: '32kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -2268,6 +2633,12 @@ function registerPlatformReadRoutes(app, deps) {
     if (!resolved.ok) {
       return sendPortalApiError(res, 404, resolved.code || 'PUBLIC_STACK_NOT_FOUND', resolved.message || 'Public Stack not found.', { requestId });
     }
+    const verificationPersisted = ensureLibraryPublicStackVerification({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: resolved.preview.libraryPublicStackId,
+      idempotencyKey: `${idempotencyKey}:verify`,
+    });
     const importedItems = [];
     const importedLinks = [];
     let createdSomething = false;
@@ -2311,6 +2682,8 @@ function registerPlatformReadRoutes(app, deps) {
           sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
           targetHouseId: context.houseId,
           libraryPublicStackId: resolved.preview.libraryPublicStackId,
+          libraryPublicStackVerificationId: verificationPersisted.verification.libraryPublicStackVerificationId,
+          verificationState: String(verificationPersisted.verification?.verificationState || '').trim() || 'verified',
           libraryPublicationId: member.libraryPublicationId,
           scopeSetId: resolved.preview.scopeSetId,
           contentHash: member.contentHash,
@@ -2328,6 +2701,7 @@ function registerPlatformReadRoutes(app, deps) {
               registryId,
               libraryPublicationId: member.libraryPublicationId,
               bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+              libraryPublicStackVerificationId: verificationPersisted.verification.libraryPublicStackVerificationId,
             },
           },
           {
@@ -2339,6 +2713,7 @@ function registerPlatformReadRoutes(app, deps) {
               sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
               libraryPublicStackId: resolved.preview.libraryPublicStackId,
               bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
+              libraryPublicStackVerificationId: verificationPersisted.verification.libraryPublicStackVerificationId,
             },
           },
         ],
@@ -2371,6 +2746,7 @@ function registerPlatformReadRoutes(app, deps) {
           scopeKind: 'satchel',
           importKind: 'public_stack_bundle',
           libraryPublicStackId: resolved.preview.libraryPublicStackId,
+          libraryPublicStackVerificationId: verificationPersisted.verification.libraryPublicStackVerificationId,
           sourceScopeSetId: resolved.preview.scopeSetId,
           bundleHash: String(resolved.preview.bundleHash || '').trim() || null,
           sourceHouseId: String(resolved.preview.sourceHouseId || '').trim() || null,
@@ -2389,6 +2765,15 @@ function registerPlatformReadRoutes(app, deps) {
       itemIds: orderedImportedItemIds,
       nowIso: nowIso(),
     });
+    updateLibraryPublicStackVerification({
+      libraryPublicStackVerificationId: verificationPersisted.verification.libraryPublicStackVerificationId,
+      metadata: {
+        importedCount: orderedImportedItemIds.length,
+        importedAll: orderedImportedItemIds.length === Number(resolved.preview.memberCount || 0),
+        localScopeSetId: scopeSet.scopeSetId,
+      },
+      nowIso: nowIso(),
+    });
 
     const previewAfterImport = buildLibraryPublicStackPreviewPayload({
       houseId: context.houseId,
@@ -2402,6 +2787,7 @@ function registerPlatformReadRoutes(app, deps) {
         memberCount: resolved.preview.memberCount,
         createdSomething,
       },
+      verification: previewAfterImport.ok ? previewAfterImport.preview.verification : verificationPersisted.verification,
       items: importedItems.map((item) => projectLibraryItemForRead(item)),
       links: importedLinks,
       scopeSet: previewAfterImport.ok ? previewAfterImport.preview.localScopeSet : {
