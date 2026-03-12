@@ -59,6 +59,7 @@ const POKER_PLAY_REFUND_ENTRY_KINDS = ['poker_play_admin_refund', 'poker_play_to
 const POKER_PLAY_PAYOUT_ENTRY_KINDS = ['poker_play_tournament_prize'];
 const POKER_PLAY_BOUNTY_ENTRY_KINDS = ['poker_play_tournament_bounty'];
 const POKER_PLAY_TREASURY_ENTRY_KINDS = ['poker_play_room_treasury_credit'];
+const POKER_PLAY_CHOP_ACTIVE_STATUSES = new Set(['open', 'pending_approval']);
 const POKER_PLAY_POLICY_SPEND_ENTRY_KINDS = [
   'poker_play_buy_in',
   'poker_play_waitlist_buy_in',
@@ -126,6 +127,19 @@ function normalizePokerPlayDisputeNote(value) {
 function normalizePokerPlayDisputeResolutionStatus(value, fallback = '') {
   const status = normalizeTrimmedString(value, fallback).toLowerCase();
   return status === 'resolved' || status === 'dismissed' ? status : fallback;
+}
+
+function normalizePokerPlayChopStatus(value, fallback = 'open') {
+  const status = normalizeTrimmedString(value, fallback).toLowerCase();
+  if (status === 'pending_approval') return 'pending_approval';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'settled') return 'settled';
+  return 'open';
+}
+
+function normalizePokerPlayChopNote(value) {
+  const note = normalizeTrimmedString(value);
+  return note ? note.slice(0, 400) : '';
 }
 
 function normalizePokerPlayProposalConfidence(value, fallback = 'medium') {
@@ -2687,13 +2701,30 @@ function buildTournamentEconomics(entries) {
   const leadTable = (Array.isArray(entries) ? entries : []).find((entry) => entry?.table)?.table || null;
   const bountyModel = getTournamentBountyModel(leadTable);
   const formatVariant = getTournamentFormatVariant(leadTable);
-  const payoutPlan = buildTournamentPayoutPlan({
-    entrantCount: entryCount,
-    prizePoolOil: prizePoolOil + addonPrizePoolOil,
-    formatVariant,
-    satelliteAwardCount: getTournamentSatelliteAwardCount(leadTable),
-    satelliteAwardKind: getTournamentSatelliteAwardKind(leadTable),
-  });
+  const settledChopTable = (Array.isArray(entries) ? entries : [])
+    .map((entry) => entry?.table || null)
+    .find((table) => normalizeIsoString(table?.state?.chopSettledAt) && Array.isArray(table?.state?.payouts) && table.state.payouts.length);
+  const payoutPlan = settledChopTable
+    ? {
+      entrantCount: entryCount,
+      prizePoolOil: Math.max(0, normalizeOilAmount(settledChopTable?.state?.prizePoolOil, prizePoolOil + addonPrizePoolOil)),
+      payoutModel: normalizeTrimmedString(settledChopTable?.state?.payoutModel, 'deal_custom'),
+      paidPlaces: Math.max(
+        0,
+        normalizeOilAmount(
+          settledChopTable?.state?.paidPlaces,
+          (Array.isArray(settledChopTable?.state?.payouts) ? settledChopTable.state.payouts : []).filter((item) => Number(item?.amountOil || 0) > 0).length
+        )
+      ),
+      payouts: cloneJson(settledChopTable?.state?.payouts, []),
+    }
+    : buildTournamentPayoutPlan({
+      entrantCount: entryCount,
+      prizePoolOil: prizePoolOil + addonPrizePoolOil,
+      formatVariant,
+      satelliteAwardCount: getTournamentSatelliteAwardCount(leadTable),
+      satelliteAwardKind: getTournamentSatelliteAwardKind(leadTable),
+    });
   const completed = getActiveSeatRows(seats).length <= 1 && payoutPlan.entrantCount > 1;
   return {
     ...payoutPlan,
@@ -2719,6 +2750,131 @@ function buildTournamentEconomics(entries) {
     completed,
     standings: completed ? buildCompletedTournamentPlacements(entries) : [],
   };
+}
+
+function buildTournamentChopSnapshot(entries) {
+  const items = Array.isArray(entries) ? entries : [];
+  const economics = buildTournamentEconomics(items);
+  const allSeats = getTournamentAllSeats(items).filter((seat) => !isTournamentVoidedSeat(seat));
+  const remainingSeats = getActiveSeatRows(allSeats)
+    .slice()
+    .sort((left, right) => {
+      const stackDelta = Number(right?.stackOil || 0) - Number(left?.stackOil || 0);
+      if (stackDelta !== 0) return stackDelta;
+      return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+    });
+  const remainingSeatKeys = new Set(remainingSeats.map((seat) => getTournamentSeatIdentity(seat)));
+  const payoutByPlace = new Map((Array.isArray(economics?.payouts) ? economics.payouts : []).map((item) => [Number(item.place || 0), Number(item.amountOil || 0)]));
+  const defaultPayouts = Array.from({ length: remainingSeats.length }, (_item, index) => ({
+    place: index + 1,
+    amountOil: Number(payoutByPlace.get(index + 1) || 0),
+  }));
+  const payablePoolOil = defaultPayouts.reduce((sum, item) => sum + Number(item.amountOil || 0), 0);
+  const fixedPayouts = sortSeatsByTournamentElimination(
+    allSeats.filter((seat) => !remainingSeatKeys.has(getTournamentSeatIdentity(seat)))
+  )
+    .map((seat, index) => {
+      const place = remainingSeats.length + index + 1;
+      return {
+        place,
+        tableId: seat.tableId,
+        seatNumber: normalizeSeatNumber(seat?.seatNumber),
+        walletSubject: normalizeTrimmedString(seat?.walletSubject),
+        houseId: seat?.houseId || null,
+        displayName: seat?.displayName || formatSeatLabel(seat?.seatNumber),
+        amountOil: Number(payoutByPlace.get(place) || 0),
+      };
+    })
+    .filter((item) => item.amountOil > 0);
+  return {
+    economics,
+    remainingSeats: remainingSeats.map((seat) => ({
+      tableId: seat.tableId,
+      seatNumber: normalizeSeatNumber(seat?.seatNumber),
+      walletSubject: normalizeTrimmedString(seat?.walletSubject),
+      houseId: seat?.houseId || null,
+      displayName: seat?.displayName || formatSeatLabel(seat?.seatNumber),
+      stackOil: Number(seat?.stackOil || 0),
+      buyInOil: Number(seat?.buyInOil || 0),
+      currentBountyOil: Number(seat?.currentBountyOil || 0),
+    })),
+    defaultPayouts,
+    fixedPayouts,
+    payablePoolOil,
+  };
+}
+
+function getSeriesChopProposalList(deps, seriesId, { limit = 20 } = {}) {
+  return typeof deps.listPokerChopProposalsBySeriesId === 'function'
+    ? deps.listPokerChopProposalsBySeriesId(seriesId, { limit })
+    : [];
+}
+
+function getLatestSeriesChopProposal(deps, seriesId, { activeOnly = false } = {}) {
+  const items = getSeriesChopProposalList(deps, seriesId, { limit: 20 });
+  return items.find((proposal) => !activeOnly || POKER_PLAY_CHOP_ACTIVE_STATUSES.has(normalizePokerPlayChopStatus(proposal?.status, 'open'))) || null;
+}
+
+function buildPokerPlayChopProposalSummary(proposal, { viewerWalletSubject = '', publicViewer = false } = {}) {
+  if (!proposal || typeof proposal !== 'object') return null;
+  const agreements = (Array.isArray(proposal?.agreements) ? proposal.agreements : []).map((item) => ({
+    walletSubject: publicViewer ? null : normalizeTrimmedString(item?.walletSubject) || null,
+    seatNumber: normalizeSeatNumber(item?.seatNumber),
+    displayName: normalizePokerPlayDisplayName(item?.displayName || formatSeatLabel(item?.seatNumber)),
+    agreedAt: normalizeIsoString(item?.agreedAt) || null,
+    status: normalizeIsoString(item?.agreedAt) ? 'agreed' : 'pending',
+  }));
+  const agreementCount = agreements.filter((item) => item.status === 'agreed').length;
+  const remainingSeats = (Array.isArray(proposal?.remainingSeats) ? proposal.remainingSeats : []).map((item) => ({
+    tableId: normalizeTrimmedString(item?.tableId) || null,
+    seatNumber: normalizeSeatNumber(item?.seatNumber),
+    walletSubject: publicViewer ? null : normalizeTrimmedString(item?.walletSubject) || null,
+    displayName: normalizePokerPlayDisplayName(item?.displayName || formatSeatLabel(item?.seatNumber)),
+    stackOil: Number(item?.stackOil || 0),
+    currentBountyOil: Number(item?.currentBountyOil || 0),
+  }));
+  const proposedPayouts = (Array.isArray(proposal?.proposedPayouts) ? proposal.proposedPayouts : []).map((item) => ({
+    seatNumber: normalizeSeatNumber(item?.seatNumber),
+    walletSubject: publicViewer ? null : normalizeTrimmedString(item?.walletSubject) || null,
+    displayName: normalizePokerPlayDisplayName(item?.displayName || formatSeatLabel(item?.seatNumber)),
+    amountOil: Number(item?.amountOil || 0),
+  }));
+  return {
+    proposalId: normalizeTrimmedString(proposal?.proposalId),
+    seriesId: normalizeTrimmedString(proposal?.seriesId),
+    tableId: normalizeTrimmedString(proposal?.tableId),
+    handId: normalizeTrimmedString(proposal?.handId) || null,
+    status: normalizePokerPlayChopStatus(proposal?.status, 'open'),
+    proposalKind: normalizeTrimmedString(proposal?.proposalKind, 'deal_custom'),
+    proposerSeatNumber: normalizeSeatNumber(proposal?.proposerSeatNumber),
+    proposerWalletSubject: publicViewer ? null : normalizeTrimmedString(proposal?.proposerWalletSubject) || null,
+    note: normalizePokerPlayChopNote(proposal?.note),
+    remainingSeats,
+    defaultPayouts: cloneJson(proposal?.defaultPayouts, []),
+    fixedPayouts: cloneJson(proposal?.fixedPayouts, []),
+    proposedPayouts,
+    agreements,
+    agreementCount,
+    allAgreed: remainingSeats.length > 0 && agreementCount >= remainingSeats.length,
+    viewerAgreed: !!agreements.find((item) => normalizeTrimmedString(item?.walletSubject) === normalizeTrimmedString(viewerWalletSubject) && item.status === 'agreed'),
+    settlement: cloneJson(proposal?.settlement, {}),
+    approvedAt: normalizeIsoString(proposal?.approvedAt) || null,
+    approvedBy: publicViewer ? null : normalizeTrimmedString(proposal?.approvedBy) || null,
+    rejectedAt: normalizeIsoString(proposal?.rejectedAt) || null,
+    rejectedBy: publicViewer ? null : normalizeTrimmedString(proposal?.rejectedBy) || null,
+    settledAt: normalizeIsoString(proposal?.settledAt) || null,
+    createdAt: normalizeIsoString(proposal?.createdAt) || null,
+    updatedAt: normalizeIsoString(proposal?.updatedAt) || null,
+  };
+}
+
+function getLatestSeriesChopProposalSummary(deps, seriesId, { viewerWalletSubject = '', publicViewer = false } = {}) {
+  const proposal = getLatestSeriesChopProposal(deps, seriesId);
+  if (!proposal) return null;
+  const summary = buildPokerPlayChopProposalSummary(proposal, { viewerWalletSubject, publicViewer });
+  if (!summary) return null;
+  if (publicViewer && summary.status !== 'settled') return null;
+  return summary;
 }
 
 function buildTournamentSeriesClosureSummary(entries) {
@@ -3528,6 +3684,9 @@ function buildPokerPlayAdminSeriesReviewPayload(deps, { seriesId, processAt } = 
   if (!series) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker tournament series not found.');
   }
+  const chopProposals = getSeriesChopProposalList(deps, normalizeTrimmedString(series?.seriesId, seriesId), { limit: 20 })
+    .map((proposal) => buildPokerPlayChopProposalSummary(proposal, { viewerWalletSubject: '', publicViewer: false }))
+    .filter(Boolean);
   const tableReviews = normalizedEntries
     .slice()
     .sort((left, right) => {
@@ -3571,6 +3730,7 @@ function buildPokerPlayAdminSeriesReviewPayload(deps, { seriesId, processAt } = 
     auditEventCount: 0,
     messageCount: 0,
     actionCount: 0,
+    chopProposalCount: chopProposals.length,
   });
 
   return {
@@ -3578,6 +3738,7 @@ function buildPokerPlayAdminSeriesReviewPayload(deps, { seriesId, processAt } = 
     processAt: requestAt,
     series,
     summary,
+    chopProposals,
     tables: tableReviews,
   };
 }
@@ -4376,6 +4537,11 @@ function sanitizeTimelineEventPayload(payload = {}, { includePrivate = false } =
     tableId: typeof payload?.tableId === 'string' ? payload.tableId : undefined,
     handId: typeof payload?.handId === 'string' ? payload.handId : undefined,
     reason: typeof payload?.reason === 'string' ? payload.reason : undefined,
+    proposalId: typeof payload?.proposalId === 'string' ? payload.proposalId : undefined,
+    proposalKind: typeof payload?.proposalKind === 'string' ? payload.proposalKind : undefined,
+    agreementCount: Number(payload?.agreementCount || 0) || undefined,
+    allAgreed: payload?.allAgreed === true ? true : undefined,
+    payablePoolOil: Number(payload?.payablePoolOil || 0) || undefined,
   };
   if (includePrivate && typeof payload?.body === 'string' && payload.body.trim()) {
     next.body = payload.body.trim();
@@ -6230,6 +6396,8 @@ function maybeClearReusableTournamentSeats(deps, table) {
       rebuyCountsByWallet: {},
       addonCountsByWallet: {},
       satelliteAwardsSettledAt: null,
+      chopSettledAt: null,
+      chopProposalId: null,
       payouts: [],
       standings: [],
       completedScheduledBreakAfterHands: [],
@@ -7759,6 +7927,12 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
       walletBinding?.walletSubject || ''
     )
     : null;
+  const chopProposal = seriesRef.seriesId
+    ? getLatestSeriesChopProposalSummary(deps, seriesRef.seriesId, {
+      viewerWalletSubject: walletBinding?.walletSubject || '',
+      publicViewer,
+    })
+    : null;
   const placementByWallet = new Map(
     (Array.isArray(series?.standings) ? series.standings : [])
       .filter((item) => normalizeTrimmedString(item?.walletSubject))
@@ -7826,6 +8000,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
       },
     },
     series,
+    chopProposal,
     waitlist,
     houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
@@ -8413,6 +8588,10 @@ function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer
     wallet: walletBinding?.submitterWallet || null,
     oilBalance: walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null,
     series,
+    chopProposal: getLatestSeriesChopProposalSummary(deps, targetSeriesId, {
+      viewerWalletSubject: walletBinding?.walletSubject || '',
+      publicViewer,
+    }),
     tables,
     processAt: requestAt,
   };
@@ -9466,6 +9645,535 @@ function addTournamentAddon(deps, { tableId, session, req, body } = {}) {
     req,
     processAt: requestAt,
   });
+}
+
+function resolveTournamentChopContext(deps, seriesId, requestAt, { requireBetweenHands = true } = {}) {
+  const entries = getTournamentDirectorEntries(deps, seriesId, requestAt, { includeClosed: true });
+  const activeEntries = entries.filter((entry) => !isSeriesClosedTable(entry?.table));
+  if (activeEntries.length !== 1) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_NOT_FINAL_TABLE', 'Chop proposals are only available once the tournament is down to one active table.');
+  }
+  const activeEntry = activeEntries[0];
+  if (normalizePokerPlayTableType(activeEntry?.table?.tableType) !== 'tournament') {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_TOURNAMENT_ONLY', 'Chop proposals are tournament-only.');
+  }
+  if (requireBetweenHands && activeEntry?.hand && activeEntry.hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_HAND_LIVE', 'Chop proposals can only be created or approved between hands.');
+  }
+  const snapshot = buildTournamentChopSnapshot(entries);
+  if (snapshot.remainingSeats.length < 2 || snapshot.remainingSeats.length > 3) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_NOT_AVAILABLE', 'Chop proposals are only available with 2 or 3 seats remaining.');
+  }
+  return {
+    entries,
+    activeEntry,
+    snapshot,
+  };
+}
+
+function normalizePokerPlayChopPayouts(input, remainingSeats, payablePoolOil) {
+  const items = Array.isArray(input) ? input : [];
+  const seatByNumber = new Map((Array.isArray(remainingSeats) ? remainingSeats : []).map((seat) => [normalizeSeatNumber(seat?.seatNumber), seat]));
+  const seenSeats = new Set();
+  const normalized = [];
+  for (const item of items) {
+    const seatNumber = normalizeSeatNumber(item?.seatNumber);
+    const seat = seatByNumber.get(seatNumber);
+    if (!seat || seenSeats.has(seatNumber)) continue;
+    seenSeats.add(seatNumber);
+    normalized.push({
+      seatNumber,
+      walletSubject: normalizeTrimmedString(seat?.walletSubject),
+      houseId: seat?.houseId || null,
+      displayName: seat?.displayName || formatSeatLabel(seatNumber),
+      amountOil: Math.max(0, normalizeOilAmount(item?.amountOil, 0)),
+    });
+  }
+  if (normalized.length !== seatByNumber.size) {
+    throw createRouteError(400, 'POKER_PLAY_CHOP_INVALID_PAYOUTS', 'A chop proposal must include one payout for each remaining seat.');
+  }
+  const totalOil = normalized.reduce((sum, item) => sum + Number(item.amountOil || 0), 0);
+  const targetTotalOil = Math.max(0, normalizeOilAmount(payablePoolOil, 0));
+  if (totalOil !== targetTotalOil) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_TOTAL_MISMATCH', 'Chop payout totals must match the current payable pool exactly.', {
+      payablePoolOil: targetTotalOil,
+      proposedTotalOil: totalOil,
+    });
+  }
+  return normalized.sort((left, right) => {
+    const amountDelta = Number(right?.amountOil || 0) - Number(left?.amountOil || 0);
+    if (amountDelta !== 0) return amountDelta;
+    return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+  });
+}
+
+function settleTournamentSeriesByChopProposal(deps, proposal, {
+  approvedBy = 'operator',
+  atIso,
+} = {}) {
+  const requestAt = toProcessIso(deps, atIso);
+  const context = resolveTournamentChopContext(deps, proposal?.seriesId, requestAt, { requireBetweenHands: true });
+  const { entries, activeEntry, snapshot } = context;
+  const currentRemainingSeats = getActiveSeatRows(activeEntry?.seats);
+  const currentWallets = currentRemainingSeats.map((seat) => normalizeTrimmedString(seat?.walletSubject)).filter(Boolean).sort();
+  const proposedWallets = (Array.isArray(proposal?.remainingSeats) ? proposal.remainingSeats : [])
+    .map((seat) => normalizeTrimmedString(seat?.walletSubject))
+    .filter(Boolean)
+    .sort();
+  if (currentWallets.length !== proposedWallets.length || currentWallets.some((wallet, index) => wallet !== proposedWallets[index])) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_STALE', 'The remaining tournament seats changed after this chop proposal was created.');
+  }
+  const proposedPayouts = normalizePokerPlayChopPayouts(
+    proposal?.proposedPayouts,
+    currentRemainingSeats,
+    snapshot.payablePoolOil
+  );
+  const proposalPayoutByWallet = new Map(proposedPayouts.map((item) => [normalizeTrimmedString(item.walletSubject), Number(item.amountOil || 0)]));
+  const payoutByPlace = new Map((Array.isArray(snapshot?.economics?.payouts) ? snapshot.economics.payouts : []).map((item) => [Number(item.place || 0), Number(item.amountOil || 0)]));
+  const remainingIdentities = new Set(currentRemainingSeats.map((seat) => getTournamentSeatIdentity(seat)));
+  const orderedRemainingSeats = currentRemainingSeats
+    .slice()
+    .sort((left, right) => {
+      const payoutDelta = Number(proposalPayoutByWallet.get(normalizeTrimmedString(right?.walletSubject)) || 0)
+        - Number(proposalPayoutByWallet.get(normalizeTrimmedString(left?.walletSubject)) || 0);
+      if (payoutDelta !== 0) return payoutDelta;
+      const stackDelta = Number(right?.stackOil || 0) - Number(left?.stackOil || 0);
+      if (stackDelta !== 0) return stackDelta;
+      return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+    });
+  const eliminatedSeats = sortSeatsByTournamentElimination(
+    getTournamentAllSeats(entries).filter((seat) => !isTournamentVoidedSeat(seat) && !remainingIdentities.has(getTournamentSeatIdentity(seat)))
+  );
+  const placementDescriptors = [];
+  for (let index = 0; index < orderedRemainingSeats.length; index += 1) {
+    const seat = orderedRemainingSeats[index];
+    placementDescriptors.push({
+      identity: getTournamentSeatIdentity(seat),
+      seat,
+      place: index + 1,
+      payoutOil: Number(proposalPayoutByWallet.get(normalizeTrimmedString(seat?.walletSubject)) || 0),
+      payoutSource: 'deal',
+    });
+  }
+  for (let index = 0; index < eliminatedSeats.length; index += 1) {
+    const seat = eliminatedSeats[index];
+    const place = orderedRemainingSeats.length + index + 1;
+    placementDescriptors.push({
+      identity: getTournamentSeatIdentity(seat),
+      seat,
+      place,
+      payoutOil: Number(payoutByPlace.get(place) || 0),
+      payoutSource: 'ladder',
+    });
+  }
+  const placementMap = new Map(placementDescriptors.map((item) => [item.identity, item]));
+  const settleTreasuryFees = !normalizeIsoString(activeEntry?.table?.state?.completedAt);
+  for (const entry of entries) {
+    const entryTable = entry?.table || null;
+    const entryFeeOil = getTournamentEntryFeeOil(entryTable);
+    for (const seat of Array.isArray(entry?.seats) ? entry.seats : []) {
+      const placement = placementMap.get(getTournamentSeatIdentity(seat));
+      if (!placement) continue;
+      const payoutOil = Math.max(0, Number(placement?.payoutOil || 0));
+      const bountyPayoutOil = Number(seat?.currentBountyOil || 0) > 0 && !seat?.bountySettledAt
+        ? Math.max(0, Number(seat?.currentBountyOil || 0))
+        : 0;
+      if (payoutOil > 0 && !seat?.payoutSettledAt) {
+        deps.createOilLedgerEntry({
+          walletSubject: seat.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          tableId: entryTable.tableId,
+          seriesId: getTournamentSeriesRef(entryTable).seriesId || null,
+          entryKind: 'poker_play_tournament_prize',
+          direction: 'credit',
+          amount: payoutOil,
+          memo: `${entryTable.title} chop payout`,
+          createdAt: requestAt,
+        });
+      }
+      if (bountyPayoutOil > 0) {
+        deps.createOilLedgerEntry({
+          walletSubject: seat.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          tableId: entryTable.tableId,
+          seriesId: getTournamentSeriesRef(entryTable).seriesId || null,
+          entryKind: 'poker_play_tournament_bounty',
+          direction: 'credit',
+          amount: bountyPayoutOil,
+          memo: `${entryTable.title} remaining bounty settlement`,
+          createdAt: requestAt,
+        });
+      }
+      if (settleTreasuryFees && entryFeeOil > 0) {
+        createRoomTreasuryCredit(deps, {
+          table: entryTable,
+          seriesId: getTournamentSeriesRef(entryTable).seriesId || null,
+          amountOil: entryFeeOil,
+          memo: `Tournament fee from ${entryTable.title}`,
+          createdAt: requestAt,
+        });
+      }
+      const updatedSeat = deps.upsertPokerPlaySeat({
+        ...seat,
+        status: payoutOil > 0 ? 'paid' : 'busted',
+        stackOil: 0,
+        eliminatedAt: Number(placement.place || 0) === 1 ? (seat?.eliminatedAt || null) : (seat?.eliminatedAt || requestAt),
+        prizeOil: payoutOil,
+        currentBountyOil: 0,
+        bountyWonOil: Number(seat?.bountyWonOil || 0) + bountyPayoutOil,
+        bountySettledAt: bountyPayoutOil > 0 ? requestAt : (seat?.bountySettledAt || null),
+        payoutSettledAt: payoutOil > 0 ? (seat?.payoutSettledAt || requestAt) : (seat?.payoutSettledAt || null),
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayPlayerStatForSeat(deps, entryTable, updatedSeat, {
+        processAt: requestAt,
+        prizeOil: payoutOil,
+        bountyOilDelta: bountyPayoutOil,
+        entryFeeOilDelta: settleTreasuryFees ? entryFeeOil : 0,
+        finishPosition: Number(placement.place || 0) || null,
+        status: payoutOil > 0 ? 'paid' : 'busted',
+        payoutSettledAt: payoutOil > 0 ? (seat?.payoutSettledAt || requestAt) : null,
+        close: true,
+        stackOil: 0,
+      });
+      const resultHandId = entry?.hand?.handId || entryTable?.state?.lastSettledHandId || entryTable?.state?.activeHandId || null;
+      if ((payoutOil > 0 || bountyPayoutOil > 0) && resultHandId) {
+        deps.createPokerPlayMessage({
+          tableId: entryTable.tableId,
+          handId: resultHandId,
+          seatNumber: null,
+          authorRole: 'system',
+          body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} settles by deal for ${payoutOil} OIL${bountyPayoutOil > 0 ? ` plus ${bountyPayoutOil} OIL bounty` : ''}.`,
+          createdAt: requestAt,
+        });
+      }
+    }
+  }
+  const finalEntries = listTournamentSeriesEntriesBySeriesId(deps, normalizeTrimmedString(proposal?.seriesId), {
+    processAt: requestAt,
+    includeClosed: true,
+  });
+  const finalStandings = buildCompletedTournamentPlacements(finalEntries);
+  const finalSeats = getTournamentAllSeats(finalEntries).filter((seat) => !isTournamentVoidedSeat(seat));
+  const finalPayouts = placementDescriptors
+    .map((item) => ({
+      place: Number(item.place || 0),
+      amountOil: Number(item.payoutOil || 0),
+      percent: snapshot.payablePoolOil > 0 || snapshot.economics.prizePoolOil > 0
+        ? Number((((Number(item.payoutOil || 0)) / Math.max(1, Number(snapshot.economics.prizePoolOil || 0))) * 100).toFixed(2))
+        : 0,
+    }))
+    .sort((left, right) => Number(left.place || 0) - Number(right.place || 0));
+  const winner = finalStandings[0] || null;
+  const paidPlaces = finalPayouts.filter((item) => Number(item.amountOil || 0) > 0).length;
+  const totalBountyAwardedOil = finalSeats.reduce((sum, seat) => sum + Math.max(0, Number(seat?.bountyWonOil || 0)), 0);
+  for (const entry of finalEntries) {
+    const entryTable = entry?.table || null;
+    if (!entryTable) continue;
+    deps.upsertPokerPlayTable({
+      ...entryTable,
+      status: isSeriesClosedTable(entryTable) ? entryTable.status : 'open',
+      state: {
+        ...(entryTable.state && typeof entryTable.state === 'object' ? entryTable.state : {}),
+        completedAt: entryTable?.state?.completedAt || requestAt,
+        winnerSeatNumber: winner && String(winner.tableId || '') === String(entryTable.tableId || '')
+          ? normalizeSeatNumber(winner.seatNumber)
+          : normalizeSeatNumber(entryTable?.state?.winnerSeatNumber),
+        prizeOil: Number(finalPayouts?.[0]?.amountOil || 0),
+        prizePoolOil: Number(snapshot.economics.prizePoolOil || 0),
+        bountyModel: snapshot.economics.bountyModel,
+        bountyPoolOil: Number(snapshot.economics.bountyPoolOil || 0),
+        totalBountyAwardedOil,
+        prizeSettledAt: entryTable?.state?.prizeSettledAt || requestAt,
+        payoutModel: 'deal_custom',
+        paidPlaces,
+        payouts: cloneJson(finalPayouts, []),
+        standings: cloneJson(finalStandings, []),
+        activeHandId: entry?.hand?.handId || entryTable?.state?.activeHandId || null,
+        activeHandNumber: Number(entry?.hand?.handNumber || entryTable?.state?.activeHandNumber || 0),
+        chopSettledAt: requestAt,
+        chopProposalId: normalizeTrimmedString(proposal?.proposalId) || null,
+        pausedAt: null,
+        pausedReason: null,
+        pausedBy: null,
+        pausedActionRemainingMs: 0,
+      },
+      updatedAt: requestAt,
+    });
+  }
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: activeEntry.table.tableId,
+      handId: activeEntry?.hand?.handId || activeEntry?.table?.state?.lastSettledHandId || null,
+      seatNumber: null,
+      actorRole: 'operator',
+      eventKind: 'chop_settled',
+      payload: {
+        proposalId: normalizeTrimmedString(proposal?.proposalId),
+        proposalKind: normalizeTrimmedString(proposal?.proposalKind, 'deal_custom'),
+        seriesId: normalizeTrimmedString(proposal?.seriesId),
+        tableId: activeEntry.table.tableId,
+        agreementCount: (Array.isArray(proposal?.agreements) ? proposal.agreements : []).filter((item) => normalizeIsoString(item?.agreedAt)).length,
+        allAgreed: true,
+        payablePoolOil: Number(snapshot.payablePoolOil || 0),
+      },
+      createdAt: requestAt,
+    });
+  }
+  return {
+    tableId: activeEntry.table.tableId,
+    seriesId: normalizeTrimmedString(proposal?.seriesId),
+    payouts: finalPayouts,
+    standings: finalStandings,
+  };
+}
+
+function createChopProposal(deps, { seriesId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const context = resolveTournamentChopContext(deps, seriesId, requestAt, { requireBetweenHands: true });
+  const { activeEntry, snapshot } = context;
+  const { walletBinding, seat } = requireSeatWriter(deps, { table: activeEntry.table, session, req });
+  touchPokerPlaySeatPresence(deps, activeEntry.table.tableId, walletBinding.walletSubject, requestAt);
+  if (!snapshot.remainingSeats.find((item) => normalizeTrimmedString(item?.walletSubject) === walletBinding.walletSubject)) {
+    throw createRouteError(403, 'FORBIDDEN', 'Only remaining tournament seats can propose a chop.');
+  }
+  const existing = getLatestSeriesChopProposal(deps, normalizeTrimmedString(seriesId), { activeOnly: true });
+  if (existing) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_ALREADY_OPEN', 'An active chop proposal already exists for this tournament series.', {
+      proposalId: existing.proposalId,
+      status: existing.status,
+    });
+  }
+  const proposedPayouts = normalizePokerPlayChopPayouts(body?.payouts, snapshot.remainingSeats, snapshot.payablePoolOil);
+  const proposal = deps.upsertPokerChopProposal({
+    seriesId: normalizeTrimmedString(seriesId),
+    tableId: activeEntry.table.tableId,
+    handId: activeEntry?.hand?.handId || activeEntry?.table?.state?.lastSettledHandId || null,
+    status: snapshot.remainingSeats.length === 1 ? 'pending_approval' : 'open',
+    proposalKind: 'deal_custom',
+    proposerWalletSubject: walletBinding.walletSubject,
+    proposerHouseId: seat.houseId || null,
+    proposerSeatNumber: seat.seatNumber,
+    note: normalizePokerPlayChopNote(body?.note),
+    remainingSeats: snapshot.remainingSeats,
+    defaultPayouts: snapshot.defaultPayouts,
+    fixedPayouts: snapshot.fixedPayouts,
+    proposedPayouts,
+    agreements: snapshot.remainingSeats.map((item) => ({
+      walletSubject: item.walletSubject,
+      seatNumber: item.seatNumber,
+      displayName: item.displayName,
+      agreedAt: normalizeTrimmedString(item.walletSubject) === walletBinding.walletSubject ? requestAt : null,
+    })),
+    settlement: {
+      payablePoolOil: Number(snapshot.payablePoolOil || 0),
+      defaultPayoutModel: snapshot.economics?.payoutModel || '',
+      prizePoolOil: Number(snapshot.economics?.prizePoolOil || 0),
+      fixedPayoutTotalOil: Number(snapshot.fixedPayouts.reduce((sum, item) => sum + Number(item.amountOil || 0), 0)),
+    },
+    createdAt: requestAt,
+    updatedAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: activeEntry.table.tableId,
+      handId: proposal.handId || null,
+      seatNumber: seat.seatNumber,
+      actorRole: 'human',
+      eventKind: 'chop_proposed',
+      payload: {
+        proposalId: proposal.proposalId,
+        proposalKind: proposal.proposalKind,
+        seriesId: proposal.seriesId,
+        tableId: proposal.tableId,
+        agreementCount: 1,
+        allAgreed: false,
+        payablePoolOil: Number(snapshot.payablePoolOil || 0),
+      },
+      createdAt: requestAt,
+    });
+  }
+  const refreshed = syncPokerPlayTable(deps, activeEntry.table.tableId, { processAt: requestAt });
+  return {
+    proposal: buildPokerPlayChopProposalSummary(proposal, { viewerWalletSubject: walletBinding.walletSubject }),
+    table: buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, {
+      session,
+      req,
+      processAt: requestAt,
+    }),
+  };
+}
+
+function agreeToChopProposal(deps, { proposalId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const proposal = typeof deps.getPokerChopProposalById === 'function'
+    ? deps.getPokerChopProposalById(proposalId)
+    : null;
+  if (!proposal) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker chop proposal not found.');
+  }
+  if (!POKER_PLAY_CHOP_ACTIVE_STATUSES.has(normalizePokerPlayChopStatus(proposal?.status, 'open'))) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_CLOSED', 'This poker chop proposal is no longer active.');
+  }
+  const context = resolveTournamentChopContext(deps, proposal.seriesId, requestAt, { requireBetweenHands: true });
+  const { activeEntry, snapshot } = context;
+  const { walletBinding } = requireSeatWriter(deps, { table: activeEntry.table, session, req });
+  touchPokerPlaySeatPresence(deps, activeEntry.table.tableId, walletBinding.walletSubject, requestAt);
+  const seat = snapshot.remainingSeats.find((item) => normalizeTrimmedString(item?.walletSubject) === walletBinding.walletSubject);
+  if (!seat) {
+    throw createRouteError(403, 'FORBIDDEN', 'Only remaining tournament seats can agree to a chop proposal.');
+  }
+  const nextAgreements = (Array.isArray(proposal?.agreements) ? proposal.agreements : []).map((item) => (
+    normalizeTrimmedString(item?.walletSubject) === walletBinding.walletSubject
+      ? {
+        ...cloneJson(item, {}),
+        seatNumber: seat.seatNumber,
+        displayName: seat.displayName,
+        agreedAt: requestAt,
+      }
+      : cloneJson(item, {})
+  ));
+  const allAgreed = nextAgreements.every((item) => normalizeIsoString(item?.agreedAt));
+  const updated = deps.upsertPokerChopProposal({
+    ...proposal,
+    status: allAgreed ? 'pending_approval' : 'open',
+    agreements: nextAgreements,
+    updatedAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: activeEntry.table.tableId,
+      handId: updated.handId || null,
+      seatNumber: seat.seatNumber,
+      actorRole: 'human',
+      eventKind: 'chop_agreed',
+      payload: {
+        proposalId: updated.proposalId,
+        proposalKind: updated.proposalKind,
+        seriesId: updated.seriesId,
+        tableId: updated.tableId,
+        agreementCount: nextAgreements.filter((item) => normalizeIsoString(item?.agreedAt)).length,
+        allAgreed,
+        payablePoolOil: Number(updated?.settlement?.payablePoolOil || 0),
+      },
+      createdAt: requestAt,
+    });
+  }
+  const refreshed = syncPokerPlayTable(deps, activeEntry.table.tableId, { processAt: requestAt });
+  return {
+    proposal: buildPokerPlayChopProposalSummary(updated, { viewerWalletSubject: walletBinding.walletSubject }),
+    table: buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, {
+      session,
+      req,
+      processAt: requestAt,
+    }),
+  };
+}
+
+function reviewChopProposal(deps, { proposalId, body, processAt } = {}) {
+  const requestAt = toProcessIso(deps, processAt || body?.asOf);
+  const proposal = typeof deps.getPokerChopProposalById === 'function'
+    ? deps.getPokerChopProposalById(proposalId)
+    : null;
+  if (!proposal) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker chop proposal not found.');
+  }
+  if (!POKER_PLAY_CHOP_ACTIVE_STATUSES.has(normalizePokerPlayChopStatus(proposal?.status, 'open'))) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_CLOSED', 'This poker chop proposal is already closed.');
+  }
+  const action = normalizeTrimmedString(body?.status, 'approved').toLowerCase();
+  if (action !== 'approved' && action !== 'rejected') {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Chop review status must be approved or rejected.');
+  }
+  const approvedBy = normalizeTrimmedString(body?.approvedBy || body?.resolvedBy, 'operator');
+  if (action === 'rejected') {
+    const rejected = deps.upsertPokerChopProposal({
+      ...proposal,
+      status: 'rejected',
+      rejectedAt: requestAt,
+      rejectedBy: approvedBy,
+      updatedAt: requestAt,
+    });
+    if (typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: rejected.tableId,
+        handId: rejected.handId || null,
+        seatNumber: null,
+        actorRole: 'operator',
+        eventKind: 'chop_rejected',
+        payload: {
+          proposalId: rejected.proposalId,
+          proposalKind: rejected.proposalKind,
+          seriesId: rejected.seriesId,
+          tableId: rejected.tableId,
+          agreementCount: (Array.isArray(rejected?.agreements) ? rejected.agreements : []).filter((item) => normalizeIsoString(item?.agreedAt)).length,
+          allAgreed: false,
+          payablePoolOil: Number(rejected?.settlement?.payablePoolOil || 0),
+        },
+        createdAt: requestAt,
+      });
+    }
+    return {
+      proposal: buildPokerPlayChopProposalSummary(rejected, { publicViewer: false }),
+      review: buildPokerPlayAdminSeriesReviewPayload(deps, {
+        seriesId: rejected.seriesId,
+        processAt: requestAt,
+      }),
+    };
+  }
+  const agreementCount = (Array.isArray(proposal?.agreements) ? proposal.agreements : []).filter((item) => normalizeIsoString(item?.agreedAt)).length;
+  const remainingSeatCount = Array.isArray(proposal?.remainingSeats) ? proposal.remainingSeats.length : 0;
+  if (!remainingSeatCount || agreementCount < remainingSeatCount) {
+    throw createRouteError(409, 'POKER_PLAY_CHOP_AGREEMENTS_INCOMPLETE', 'Every remaining seat must agree before operator approval.', {
+      agreementCount,
+      remainingSeatCount,
+    });
+  }
+  const settled = settleTournamentSeriesByChopProposal(deps, proposal, {
+    approvedBy,
+    atIso: requestAt,
+  });
+  const updated = deps.upsertPokerChopProposal({
+    ...proposal,
+    status: 'settled',
+    approvedAt: requestAt,
+    approvedBy,
+    settledAt: requestAt,
+    settlement: {
+      ...(proposal?.settlement && typeof proposal.settlement === 'object' ? proposal.settlement : {}),
+      settledAt: requestAt,
+      payoutCount: Array.isArray(settled?.payouts) ? settled.payouts.length : 0,
+    },
+    updatedAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: settled.tableId || updated.tableId,
+      handId: updated.handId || null,
+      seatNumber: null,
+      actorRole: 'operator',
+      eventKind: 'chop_approved',
+      payload: {
+        proposalId: updated.proposalId,
+        proposalKind: updated.proposalKind,
+        seriesId: updated.seriesId,
+        tableId: updated.tableId,
+        agreementCount,
+        allAgreed: true,
+        payablePoolOil: Number(updated?.settlement?.payablePoolOil || 0),
+      },
+      createdAt: requestAt,
+    });
+  }
+  return {
+    proposal: buildPokerPlayChopProposalSummary(updated, { publicViewer: false }),
+    review: buildPokerPlayAdminSeriesReviewPayload(deps, {
+      seriesId: updated.seriesId,
+      processAt: requestAt,
+    }),
+  };
 }
 
 function leaveTable(deps, { tableId, session, req, body } = {}) {
@@ -10624,6 +11332,7 @@ module.exports = {
   createTable,
   createRouteError,
   addTournamentAddon,
+  createChopProposal,
   getHandHistory,
   getHandReview,
   buildHandHistoryExport,
@@ -10646,6 +11355,7 @@ module.exports = {
   openHandDispute,
   pauseTable,
   postAction,
+  agreeToChopProposal,
   postMessage,
   postSeatAgentProposal,
   resolveIntegrityFlag,
@@ -10654,6 +11364,7 @@ module.exports = {
   rebuyTournamentSeries,
   reenterTournamentSeries,
   returnTableSeat,
+  reviewChopProposal,
   resolveHandDispute,
   resumeTable,
   seatIntoTable,

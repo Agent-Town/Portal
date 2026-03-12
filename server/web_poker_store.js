@@ -523,6 +523,40 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_rebuy_events_wallet_created_idx
       ON poker_rebuy_events(wallet_subject, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_chop_proposals (
+      proposal_id TEXT PRIMARY KEY,
+      series_id TEXT NOT NULL,
+      table_id TEXT NOT NULL,
+      hand_id TEXT,
+      status TEXT NOT NULL,
+      proposal_kind TEXT NOT NULL,
+      proposer_wallet_subject TEXT NOT NULL,
+      proposer_house_id TEXT,
+      proposer_seat_number INTEGER,
+      note TEXT,
+      remaining_seats_json TEXT NOT NULL,
+      default_payouts_json TEXT NOT NULL,
+      fixed_payouts_json TEXT NOT NULL,
+      proposed_payouts_json TEXT NOT NULL,
+      agreements_json TEXT NOT NULL,
+      settlement_json TEXT NOT NULL,
+      approved_at TEXT,
+      approved_by TEXT,
+      rejected_at TEXT,
+      rejected_by TEXT,
+      settled_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_play_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_chop_proposals_series_updated_idx
+      ON poker_chop_proposals(series_id, updated_at DESC, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_chop_proposals_table_updated_idx
+      ON poker_chop_proposals(table_id, updated_at DESC, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_player_notebook_entries (
       entry_id TEXT PRIMARY KEY,
       wallet_subject TEXT NOT NULL,
@@ -1102,6 +1136,7 @@ function countTableRows(tableName) {
     'poker_tournament_waitlist_entries',
     'poker_satellite_awards',
     'poker_rebuy_events',
+    'poker_chop_proposals',
     'poker_player_notebook_entries',
     'poker_play_hands',
     'poker_play_messages',
@@ -1151,6 +1186,7 @@ function resetExtendedStore() {
     'poker_tournament_waitlist_entries',
     'poker_satellite_awards',
     'poker_rebuy_events',
+    'poker_chop_proposals',
     'poker_player_notebook_entries',
     'poker_play_tables',
     'poker_oil_ledger_entries',
@@ -3854,6 +3890,193 @@ function listPokerRebuyEventsBySeriesId(seriesId, { limit = 200 } = {}) {
   return rows.map(hydratePokerRebuyEvent).filter(Boolean);
 }
 
+function hydratePokerChopProposal(row) {
+  if (!row) return null;
+  return {
+    proposalId: row.proposal_id,
+    seriesId: row.series_id,
+    tableId: row.table_id,
+    handId: row.hand_id || null,
+    status: row.status,
+    proposalKind: row.proposal_kind,
+    proposerWalletSubject: row.proposer_wallet_subject,
+    proposerHouseId: row.proposer_house_id || null,
+    proposerSeatNumber: Number(row.proposer_seat_number || 0) || null,
+    note: row.note || '',
+    remainingSeats: fromJson(row.remaining_seats_json, []),
+    defaultPayouts: fromJson(row.default_payouts_json, []),
+    fixedPayouts: fromJson(row.fixed_payouts_json, []),
+    proposedPayouts: fromJson(row.proposed_payouts_json, []),
+    agreements: fromJson(row.agreements_json, []),
+    settlement: fromJson(row.settlement_json, {}),
+    approvedAt: row.approved_at || null,
+    approvedBy: row.approved_by || null,
+    rejectedAt: row.rejected_at || null,
+    rejectedBy: row.rejected_by || null,
+    settledAt: row.settled_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerChopProposalById(proposalId) {
+  const database = ensureDb();
+  const row = database.prepare('SELECT * FROM poker_chop_proposals WHERE proposal_id = ?').get(proposalId);
+  return hydratePokerChopProposal(row);
+}
+
+function listPokerChopProposalsBySeriesId(seriesId, { status = '', limit = 50 } = {}) {
+  const database = ensureDb();
+  const normalizedSeriesId = String(seriesId || '').trim();
+  if (!normalizedSeriesId) return [];
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 50)));
+  const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+      SELECT * FROM poker_chop_proposals
+      WHERE series_id = ? AND status = ?
+      ORDER BY updated_at DESC, created_at DESC, proposal_id DESC
+      LIMIT ?
+    `).all(normalizedSeriesId, normalizedStatus, safeLimit)
+    : database.prepare(`
+      SELECT * FROM poker_chop_proposals
+      WHERE series_id = ?
+      ORDER BY updated_at DESC, created_at DESC, proposal_id DESC
+      LIMIT ?
+    `).all(normalizedSeriesId, safeLimit);
+  return rows.map(hydratePokerChopProposal).filter(Boolean);
+}
+
+function listPokerChopProposalsByTable(tableId, { status = '', limit = 50 } = {}) {
+  const database = ensureDb();
+  const normalizedTableId = String(tableId || '').trim();
+  if (!normalizedTableId) return [];
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 50)));
+  const normalizedStatus = typeof status === 'string' ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+      SELECT * FROM poker_chop_proposals
+      WHERE table_id = ? AND status = ?
+      ORDER BY updated_at DESC, created_at DESC, proposal_id DESC
+      LIMIT ?
+    `).all(normalizedTableId, normalizedStatus, safeLimit)
+    : database.prepare(`
+      SELECT * FROM poker_chop_proposals
+      WHERE table_id = ?
+      ORDER BY updated_at DESC, created_at DESC, proposal_id DESC
+      LIMIT ?
+    `).all(normalizedTableId, safeLimit);
+  return rows.map(hydratePokerChopProposal).filter(Boolean);
+}
+
+function upsertPokerChopProposal({
+  proposalId,
+  seriesId,
+  tableId,
+  handId = null,
+  status = 'open',
+  proposalKind = 'deal_custom',
+  proposerWalletSubject,
+  proposerHouseId = null,
+  proposerSeatNumber = null,
+  note = '',
+  remainingSeats = [],
+  defaultPayouts = [],
+  fixedPayouts = [],
+  proposedPayouts = [],
+  agreements = [],
+  settlement = {},
+  approvedAt = null,
+  approvedBy = null,
+  rejectedAt = null,
+  rejectedBy = null,
+  settledAt = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = proposalId
+      ? database.prepare('SELECT * FROM poker_chop_proposals WHERE proposal_id = ?').get(proposalId)
+      : null;
+    const nextProposalId = existing?.proposal_id || proposalId || makeId('pkchop');
+    database.prepare(`
+      INSERT INTO poker_chop_proposals (
+        proposal_id,
+        series_id,
+        table_id,
+        hand_id,
+        status,
+        proposal_kind,
+        proposer_wallet_subject,
+        proposer_house_id,
+        proposer_seat_number,
+        note,
+        remaining_seats_json,
+        default_payouts_json,
+        fixed_payouts_json,
+        proposed_payouts_json,
+        agreements_json,
+        settlement_json,
+        approved_at,
+        approved_by,
+        rejected_at,
+        rejected_by,
+        settled_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(proposal_id) DO UPDATE SET
+        series_id = excluded.series_id,
+        table_id = excluded.table_id,
+        hand_id = excluded.hand_id,
+        status = excluded.status,
+        proposal_kind = excluded.proposal_kind,
+        proposer_wallet_subject = excluded.proposer_wallet_subject,
+        proposer_house_id = excluded.proposer_house_id,
+        proposer_seat_number = excluded.proposer_seat_number,
+        note = excluded.note,
+        remaining_seats_json = excluded.remaining_seats_json,
+        default_payouts_json = excluded.default_payouts_json,
+        fixed_payouts_json = excluded.fixed_payouts_json,
+        proposed_payouts_json = excluded.proposed_payouts_json,
+        agreements_json = excluded.agreements_json,
+        settlement_json = excluded.settlement_json,
+        approved_at = excluded.approved_at,
+        approved_by = excluded.approved_by,
+        rejected_at = excluded.rejected_at,
+        rejected_by = excluded.rejected_by,
+        settled_at = excluded.settled_at,
+        updated_at = excluded.updated_at
+    `).run(
+      nextProposalId,
+      seriesId,
+      tableId,
+      handId,
+      status,
+      proposalKind,
+      proposerWalletSubject,
+      proposerHouseId,
+      proposerSeatNumber == null ? null : Number(proposerSeatNumber || 0),
+      note,
+      toJson(remainingSeats, []),
+      toJson(defaultPayouts, []),
+      toJson(fixedPayouts, []),
+      toJson(proposedPayouts, []),
+      toJson(agreements, []),
+      toJson(settlement, {}),
+      approvedAt,
+      approvedBy,
+      rejectedAt,
+      rejectedBy,
+      settledAt,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerChopProposalById(nextProposalId);
+  });
+}
+
 function hydratePokerPlayerNotebookEntry(row) {
   if (!row) return null;
   return {
@@ -5350,6 +5573,7 @@ module.exports = {
   getLatestCheckpointForSession,
   getLatestPokerLeaderboardSnapshot,
   getCurrentPokerPlayHandForTable,
+  getPokerChopProposalById,
   getPokerBatchById,
   getPokerLeaderboardSnapshotById,
   getPokerPlayHandById,
@@ -5391,6 +5615,8 @@ module.exports = {
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
   listPokerBlindObligationsByTable,
+  listPokerChopProposalsBySeriesId,
+  listPokerChopProposalsByTable,
   listPokerPlayActionsByHand,
   listPokerPlayAuditEventsByHand,
   listPokerPlayAuditEventsByTable,
@@ -5427,6 +5653,7 @@ module.exports = {
   upsertCentaurTournament,
   upsertOilSnapshotEvent,
   upsertPokerBatch,
+  upsertPokerChopProposal,
   upsertPokerLeaderboardSnapshot,
   upsertPokerPlayDispute,
   upsertPokerPlayIntegrityFlag,

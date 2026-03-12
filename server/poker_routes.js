@@ -49,9 +49,11 @@ const {
   createTable,
   createRouteError,
   addTournamentAddon,
+  createChopProposal,
   buildHandHistoryExport,
   buildHandHistoryExportNdjson,
   buildHandHistoryExportText,
+  agreeToChopProposal,
   getHandHistory,
   getHandReview,
   getMyQualifiers,
@@ -76,6 +78,7 @@ const {
   rebuyTournamentSeries,
   reenterTournamentSeries,
   returnTableSeat,
+  reviewChopProposal,
   resolveHandDispute,
   resolveIntegrityFlag,
   resumeTable,
@@ -235,6 +238,7 @@ function registerPokerRoutes(app, deps) {
     getCentaurTournamentById,
     getCurrentCentaurHandForEntry,
     getCurrentPokerPlayHandForTable,
+    getPokerChopProposalById,
     getLatestPokerLeaderboardSnapshot,
     getOilSnapshotEventByVerificationAndScheduledFor,
     getPokerOperatorServiceToken,
@@ -272,6 +276,8 @@ function registerPokerRoutes(app, deps) {
     listOilLedgerEntriesByWalletSubject,
     listOilSnapshotEventsByVerificationAndHour,
     listPokerBlindObligationsByTable,
+    listPokerChopProposalsBySeriesId,
+    listPokerChopProposalsByTable,
     listPokerPlayActionsByHand,
     listPokerPlayAuditEventsByHand,
     listPokerPlayAuditEventsByTable,
@@ -315,6 +321,7 @@ function registerPokerRoutes(app, deps) {
     upsertCentaurTournament,
     upsertOilSnapshotEvent,
     upsertPokerBlindObligation,
+    upsertPokerChopProposal,
     upsertPokerPlayHand,
     upsertPokerPlayDispute,
     upsertPokerPlayIntegrityFlag,
@@ -365,6 +372,7 @@ function registerPokerRoutes(app, deps) {
     deletePokerPlaySeat,
     getActivePokerPlaySeatByWalletSubject,
     getCurrentPokerPlayHandForTable,
+    getPokerChopProposalById,
     getPokerPlayHandById,
     getPokerPlayDisputeById,
     getPokerPlayIntegrityFlagById,
@@ -383,6 +391,8 @@ function registerPokerRoutes(app, deps) {
     getStreamflowVerificationByWalletSubject,
     listOilLedgerEntries,
     listPokerBlindObligationsByTable,
+    listPokerChopProposalsBySeriesId,
+    listPokerChopProposalsByTable,
     listPokerPlayActionsByHand,
     listPokerPlayAuditEventsByHand,
     listPokerPlayAuditEventsByTable,
@@ -417,6 +427,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayPlayerStat,
     upsertPokerPlayWalletPolicy,
     upsertPokerBlindObligation,
+    upsertPokerChopProposal,
     upsertPokerPlayTable,
     upsertPokerSatelliteAward,
     upsertPokerTournamentWaitlistEntry,
@@ -929,6 +940,11 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessRebuyA111111111111111111111111', houseId: 'house_harness_rebuy_a', displayName: 'Rebuy Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessRebuyB111111111111111111111111', houseId: 'house_harness_rebuy_b', displayName: 'Rebuy Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessRebuyC111111111111111111111111', houseId: 'house_harness_rebuy_c', displayName: 'Rebuy Charlie' },
+      ],
+      chop_deal_story: [
+        { seatNumber: 1, address: 'So1anaHarnessChopA1111111111111111111111111', houseId: 'house_harness_chop_a', displayName: 'Deal Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessChopB1111111111111111111111111', houseId: 'house_harness_chop_b', displayName: 'Deal Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessChopC1111111111111111111111111', houseId: 'house_harness_chop_c', displayName: 'Deal Charlie' },
       ],
       history_results_story: [
         { seatNumber: 1, address: 'So1anaHarnessHistoryA111111111111111111111', houseId: 'house_harness_history_a', displayName: 'History Alpha' },
@@ -2315,6 +2331,94 @@ function registerPokerRoutes(app, deps) {
         disconnectedAt: null,
         createdAt: requestAt,
         updatedAt: requestAt,
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'chop_deal_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_chop_${randomHex(6)}`;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Chop Final Table',
+        tableType: 'tournament',
+        status: 'paused',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 7,
+          lastSettledHandNumber: 6,
+          lastSettledHandId: null,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          pausedAt: requestAt,
+          pausedReason: 'Harness chop review window.',
+          pausedBy: 'system',
+          pausedActionRemainingMs: 0,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+            '3': 15,
+          },
+        },
+        rules: buildHarnessTournamentRules(seriesId, 'Harness Chop Series', {
+          payoutModel: 'top2_70_30',
+          lateRegistrationHands: 0,
+        }),
+        summary: {
+          headline: 'Harness chop and deal story.',
+          seriesId,
+          seriesTitle: 'Harness Chop Series',
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 900 },
+        { actor: seatTwo, stackOil: 600 },
+        { actor: seatThree, stackOil: 300 },
+      ].forEach(({ actor, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 600,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      createPokerPlayAuditEvent({
+        tableId: nextTableId,
+        handId: null,
+        seatNumber: null,
+        actorRole: 'system',
+        eventKind: 'table_paused',
+        payload: {
+          seriesId,
+          tableId: nextTableId,
+          reason: 'Harness chop review window.',
+        },
+        createdAt: requestAt,
       });
       seededSeriesId = seriesId;
       seededTableIds.push(nextTableId);
@@ -6586,6 +6690,37 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.post('/api/poker/play/admin/chop-proposals/:proposalId/review', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = reviewChopProposal(playRouteDeps, {
+        proposalId: req.params.proposalId,
+        body: req.body,
+        processAt: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.proposal?.tableId || '', 'chop_review', {
+        proposalId: payload?.proposal?.proposalId || req.params.proposalId,
+        status: payload?.proposal?.status || null,
+        seriesId: payload?.proposal?.seriesId || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_CHOP_REVIEW_FAILED',
+        err?.message || 'Unable to review the poker chop proposal.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.post('/api/poker/play/admin/disputes/:disputeId/resolve', express.json({ limit: '128kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     if (!isAdmin(req)) {
@@ -6762,6 +6897,69 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_ADDON_FAILED',
         err?.message || 'Unable to add chips to the poker tournament seat.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/series/:seriesId/chop-proposals', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = createChopProposal(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.table?.tableId || payload?.proposal?.tableId || '', 'chop_proposal', {
+        proposalId: payload?.proposal?.proposalId || null,
+        status: payload?.proposal?.status || null,
+        seriesId: payload?.proposal?.seriesId || req.params.seriesId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_CHOP_CREATE_FAILED',
+        err?.message || 'Unable to create the poker chop proposal.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/chop-proposals/:proposalId/agree', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = agreeToChopProposal(playRouteDeps, {
+        proposalId: req.params.proposalId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.table?.tableId || payload?.proposal?.tableId || '', 'chop_agree', {
+        proposalId: payload?.proposal?.proposalId || req.params.proposalId,
+        status: payload?.proposal?.status || null,
+        seriesId: payload?.proposal?.seriesId || null,
+        agreementCount: payload?.proposal?.agreementCount || 0,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_CHOP_AGREE_FAILED',
+        err?.message || 'Unable to agree to the poker chop proposal.',
         {
           requestId,
           details: err?.details || {},

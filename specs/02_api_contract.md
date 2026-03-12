@@ -1087,6 +1087,7 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.payoutModel`
 - tournaments expose `data.table.summary.payouts[]`
 - tournaments expose `data.table.summary.tournamentEntryFeeOil`
+- tournament table/detail payloads expose `data.chopProposal` when a late-stage deal is active or already settled
 - cash tables expose `data.table.summary.cashRakeBps`
 - cash tables expose `data.table.summary.cashRakeCapOil`
 - live tournament hands expose `data.hand.blindLevel`
@@ -1104,6 +1105,7 @@ Tournament blind progression notes:
 - `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
 - `data.series.formatVariant` exposes the tournament format family
 - `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
+- after operator-approved deal settlement, `data.series.payoutModel = "deal_custom"`
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
 - `data.table.summary.bountyModel` currently resolves as `none`, `pko_50`, `pko_75`, or `full_bounty`
 - `data.table.summary.bountyPerEntryOil` is the starting bounty attached to one accepted tournament entry
@@ -1128,6 +1130,7 @@ Tournament registration notes:
 - tournament series may also allow explicit rebuys within `data.table.summary.rebuyWindowHands`; accepted rebuys increase `data.series.entryCount`, `data.series.acceptedRebuyCount`, and `data.series.prizePoolOil`
 - tournament add-ons increase `data.table.summary.addonCount`, `data.table.summary.addonPrizePoolOil`, and, when bounty play is enabled, `data.table.summary.addonBountyPoolOil`
 - tournament settlement is offchain in the OIL ledger and can pay multiple places from the same prize pool
+- late-stage tournament deals are offchain too: one active `data.chopProposal` can collect unanimous seat agreement, wait for operator approval, and then settle the remaining payable pool exactly
 - once the next hand starts, the registered seat becomes active automatically
 - satellite settlement may create a durable qualifier award and auto-register the winning wallet into the target series without a second OIL debit
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
@@ -1612,6 +1615,95 @@ Failure codes:
 - `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
+### POST `/api/poker/play/series/:seriesId/chop-proposals`
+Lets one remaining seat propose a late-stage tournament deal over the current unpaid payout pool.
+
+Request shape:
+```json
+{
+  "note": "Lock a deterministic final-table deal.",
+  "payouts": [
+    { "seatNumber": 1, "amountOil": 900 },
+    { "seatNumber": 2, "amountOil": 500 },
+    { "seatNumber": 3, "amountOil": 400 }
+  ],
+  "asOf": "2026-03-12T22:00:10.000Z"
+}
+```
+
+Response notes:
+- returns `{ proposal, table }`
+- `data.proposal.defaultPayouts[]` exposes the default remaining ladder by place
+- `data.proposal.fixedPayouts[]` exposes already-fixed lower finishing payouts, if any
+- `data.proposal.settlement.payablePoolOil` is the exact remaining pool that the proposed payouts must sum to
+- `data.table.chopProposal` mirrors the latest proposal summary for the active table
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_CHOP_TOURNAMENT_ONLY`
+- `POKER_PLAY_CHOP_NOT_FINAL_TABLE`
+- `POKER_PLAY_CHOP_HAND_LIVE`
+- `POKER_PLAY_CHOP_NOT_AVAILABLE`
+- `POKER_PLAY_CHOP_ALREADY_OPEN`
+- `POKER_PLAY_CHOP_INVALID_PAYOUTS`
+- `POKER_PLAY_CHOP_TOTAL_MISMATCH`
+
+### POST `/api/poker/play/chop-proposals/:proposalId/agree`
+Lets another remaining seat record agreement on the current late-stage tournament deal.
+
+Request shape:
+```json
+{
+  "asOf": "2026-03-12T22:00:12.000Z"
+}
+```
+
+Response notes:
+- returns `{ proposal, table }`
+- once every remaining seat has agreed, `data.proposal.status = "pending_approval"`
+- `data.proposal.agreementCount` and `data.proposal.allAgreed` expose progress toward unanimity
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_CHOP_CLOSED`
+- `POKER_PLAY_CHOP_NOT_FINAL_TABLE`
+- `POKER_PLAY_CHOP_HAND_LIVE`
+- `POKER_PLAY_CHOP_NOT_AVAILABLE`
+
+### POST `/api/poker/play/admin/chop-proposals/:proposalId/review`
+Lets an operator approve or reject a unanimous tournament deal.
+
+Request shape:
+```json
+{
+  "status": "approved",
+  "approvedBy": "test-admin",
+  "asOf": "2026-03-12T22:00:13.000Z"
+}
+```
+
+Response notes:
+- returns `{ proposal, review }`
+- `data.review.reviewVersion = "poker-play-admin-series-review-v1"`
+- approval settles the remaining payable pool exactly, updates `data.review.series.payoutModel` to `deal_custom`, and leaves one durable `data.review.chopProposals[]` row for export
+- rejection closes the proposal without settling the series
+
+Failure codes:
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_CHOP_CLOSED`
+- `POKER_PLAY_CHOP_AGREEMENTS_INCOMPLETE`
+- `POKER_PLAY_CHOP_NOT_FINAL_TABLE`
+- `POKER_PLAY_CHOP_HAND_LIVE`
+- `POKER_PLAY_CHOP_NOT_AVAILABLE`
+- `POKER_PLAY_CHOP_STALE`
+
 ### GET `/api/poker/play/tables/:tableId/stream`
 Opens a server-sent event stream for one live table. The stream does not expose seat-private cards or thread content; it only notifies the browser that the table changed so the normal detail route can be reloaded immediately.
 
@@ -1906,6 +1998,7 @@ Response fields:
 - `data.processAt`
 - `data.series`
 - `data.summary`
+- `data.chopProposals[]`
 - `data.tables[]`
 - `data.tables[].tableId`
 - `data.tables[].tableStatus`
@@ -1913,7 +2006,7 @@ Response fields:
 
 Series review notes:
 - this route includes closed historical member tables so operators can inspect breaks, converged finals, and cancelled series in one payload
-- `data.summary` totals `openDisputeCount`, `reviewDisputeCount`, `auditEventCount`, `messageCount`, and `actionCount` across the whole series
+- `data.summary` totals `openDisputeCount`, `reviewDisputeCount`, `auditEventCount`, `messageCount`, `actionCount`, and `chopProposalCount` across the whole series
 
 ### GET `/api/poker/play/admin/series/:seriesId/export` (admin)
 Returns an export-ready JSON payload for one tournament-series review.
