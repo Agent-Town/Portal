@@ -1,6 +1,11 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const {
+  openHouseLibraryPublicStackPreview,
+  openHouseLibraryPreviewDetails,
+  saveHouseLibraryReview,
+} = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -131,20 +136,16 @@ test('M36.4: House Library attestation flow stays same-shell from source review 
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
-  await page.getByTestId('house-library-public-stacks-query').fill('Journey Attestation Pack');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
-  await page.getByTestId('house-library-public-stacks-search').click();
-  await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Attestation Pack' }).click();
-  await expect(page.getByTestId('house-library-registry-preview')).toContainText('Journey Attestation Pack');
-
-  await page.getByTestId('house-library-guided-review-tier').selectOption('trusted_here');
-  await page.getByTestId('house-library-guided-review-note').fill('Good for launch use in this House.');
-  await page.getByTestId('house-library-guided-review-save-button').click();
+  await openHouseLibraryPublicStackPreview(page, { title: 'Journey Attestation Pack' });
+  await saveHouseLibraryReview(page, {
+    reviewTier: 'trusted_here',
+    note: 'Good for launch use in this House.',
+  });
   await expect(page.getByTestId('house-library-action-status')).toContainText('Saved local review Trusted here for Journey Attestation Pack.');
 
   await page.getByTestId('house-library-guided-attest-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published attestation for Journey Attestation Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Attestations: Attested by Houses: 1 attestation, 1 trusted here.');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText(sourceHouse.houseId);
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');
@@ -156,19 +157,17 @@ test('M36.4: House Library attestation flow stays same-shell from source review 
   });
   expect(attached.status).toBe(200);
 
-  await page.getByTestId('house-library-public-stacks-query').fill('Journey Attestation Pack');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
-  await page.getByTestId('house-library-public-stacks-search').click();
-  await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-  await expect(page.locator('#houseLibraryPublicStacksResults button').first()).toContainText('1 attestation');
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Attestation Pack' }).click();
+  await openHouseLibraryPublicStackPreview(page, { title: 'Journey Attestation Pack' });
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Attestations: Attested by Houses: 1 attestation, 1 trusted here.');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText(sourceHouse.houseId);
 
-  await page.getByTestId('house-library-guided-review-tier').selectOption('blocked_here');
-  await page.getByTestId('house-library-guided-review-note').fill('Keep this out of this House.');
-  await page.getByTestId('house-library-guided-review-save-button').click();
+  await saveHouseLibraryReview(page, {
+    reviewTier: 'blocked_here',
+    note: 'Keep this out of this House.',
+  });
   await expect(page.getByTestId('house-library-action-status')).toContainText('Saved local review Blocked here for Journey Attestation Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Local review: Blocked here for this House. Note: Keep this out of this House.');
   await expect(page.getByTestId('house-library-guided-import-button')).toBeDisabled();
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');

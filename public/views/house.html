@@ -258,103 +258,138 @@
     <button class="btn" id="houseLibraryPublishPublicStackBtn" type="button" data-testid="house-library-public-stack-publish-button">Publish Satchel Stack</button>
   </div>
   <h3 class="small" style="margin:10px 0 4px;">Public Stacks</h3>
-  <div class="kv" data-testid="house-library-public-stacks-controls" style="margin:8px 0;">
-    <label class="small" for="houseLibraryPublicStacksQueryInput">Search</label>
-    <input
-      id="houseLibraryPublicStacksQueryInput"
-      data-testid="house-library-public-stacks-query"
-      class="pixel-input"
-      type="text"
-      placeholder="atlas"
-      autocomplete="off"
-      style="flex:1; min-width:0;"
-    />
-    <label class="small" for="houseLibraryPublicStacksFamilySelect">Family</label>
-    <select id="houseLibraryPublicStacksFamilySelect" data-testid="house-library-public-stacks-family" class="pixel-input">
-      <option value="">All</option>
-      <option value="house_library_stacks">Satchels</option>
-      <option value="skill">Skills</option>
-      <option value="developer_workflows">Developer Workflows</option>
-      <option value="registry">Registry</option>
-    </select>
-    <label class="small" for="houseLibraryPublicStacksTrustSelect">Trust</label>
-    <select id="houseLibraryPublicStacksTrustSelect" data-testid="house-library-public-stacks-trust" class="pixel-input">
-      <option value="">All</option>
-      <option value="trusted_here">Trusted here</option>
-      <option value="review_later">Review later</option>
-      <option value="blocked_here">Blocked here</option>
-    </select>
-    <button class="btn" id="houseLibraryPublicStacksSearchBtn" type="button" data-testid="house-library-public-stacks-search">Search Public Stacks</button>
-  </div>
-  <div class="small" id="houseLibraryPublicStacksEmpty" data-testid="house-library-public-stacks-empty">Search Public Stacks without leaving this room.</div>
-  <div class="kv stack" id="houseLibraryPublicStacksResults" data-testid="house-library-public-stacks-results" style="margin-bottom:8px;"></div>
-  <div class="small" id="houseLibraryRegistryPreview" data-testid="house-library-registry-preview">Select a Public Stack to preview its provenance.</div>
-  <h3 class="small" style="margin:10px 0 4px;">Exchange Counter</h3>
-  <div class="kv stack" id="houseLibraryExchangeWizard" data-testid="house-library-exchange-wizard" style="margin-bottom:8px;">
-    <div class="small" id="houseLibraryExchangeSummary" data-testid="house-library-exchange-summary">Choose a local Library item or a Public Stack to prepare an exchange.</div>
-    <div class="kv" data-testid="house-library-guided-publish-controls">
-      <label class="small" for="houseLibraryGuidedApprovalInput">Approval ID</label>
+  <div class="house-library-storefront" data-testid="house-library-storefront" style="margin:8px 0 10px;">
+    <div class="kv" data-testid="house-library-public-stacks-controls">
       <input
-        id="houseLibraryGuidedApprovalInput"
-        data-testid="house-library-guided-approval-input"
+        id="houseLibraryPublicStacksQueryInput"
+        data-testid="house-library-public-stacks-query"
         class="pixel-input"
         type="text"
-        placeholder="appr_..."
+        placeholder="atlas"
         autocomplete="off"
         style="flex:1; min-width:0;"
+        aria-label="Search Public Stacks"
       />
-      <button class="btn" id="houseLibraryGuidedPublishBtn" type="button" data-testid="house-library-guided-publish-button">Publish from Guide</button>
+      <button class="btn" id="houseLibraryPublicStacksSearchBtn" type="button" data-testid="house-library-public-stacks-search">Search</button>
     </div>
-    <div class="kv" data-testid="house-library-guided-import-controls">
+    <div class="house-library-chip-rail" id="houseLibraryStorefrontChips" data-testid="house-library-storefront-chips" style="margin-top:8px;">
+      <button class="btn small" id="houseLibraryStorefrontChipAll" type="button" data-testid="house-library-storefront-chip-all" aria-label="Show all Public Stacks">[all]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipSatchels" type="button" data-testid="house-library-storefront-chip-satchels" aria-label="Show Satchels">[bag]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipSkills" type="button" data-testid="house-library-storefront-chip-skills" aria-label="Show Skills">[star]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipFlows" type="button" data-testid="house-library-storefront-chip-flows" aria-label="Show Developer Workflows">[gear]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipRegistry" type="button" data-testid="house-library-storefront-chip-registry" aria-label="Show Registry artifacts">[scroll]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipTrusted" type="button" data-testid="house-library-storefront-chip-trusted" aria-label="Show trusted here">[shield]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipLater" type="button" data-testid="house-library-storefront-chip-later" aria-label="Show review later">[hour]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipBlocked" type="button" data-testid="house-library-storefront-chip-blocked" aria-label="Show blocked here">[bar]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipSealed" type="button" data-testid="house-library-storefront-chip-sealed" aria-label="Show sealed Public Stacks">[seal]</button>
+    </div>
+    <details class="house-library-drawer" id="houseLibraryStorefrontDetails" data-testid="house-library-storefront-details" style="margin-top:8px;">
+      <summary id="houseLibraryStorefrontDetailsToggle" data-testid="house-library-storefront-details-toggle">More filters</summary>
+      <div class="kv stack" data-testid="house-library-storefront-details-body" style="margin-top:8px;">
+        <label class="small" for="houseLibraryPublicStacksFamilySelect">Family</label>
+        <select id="houseLibraryPublicStacksFamilySelect" data-testid="house-library-public-stacks-family" class="pixel-input">
+          <option value="">All</option>
+          <option value="house_library_stacks">Satchels</option>
+          <option value="skill">Skills</option>
+          <option value="developer_workflows">Developer Workflows</option>
+          <option value="registry">Registry</option>
+        </select>
+        <label class="small" for="houseLibraryPublicStacksTrustSelect">Trust</label>
+        <select id="houseLibraryPublicStacksTrustSelect" data-testid="house-library-public-stacks-trust" class="pixel-input">
+          <option value="">All</option>
+          <option value="trusted_here">Trusted here</option>
+          <option value="review_later">Review later</option>
+          <option value="blocked_here">Blocked here</option>
+        </select>
+      </div>
+    </details>
+  </div>
+  <div class="small" id="houseLibraryPublicStacksEmpty" data-testid="house-library-public-stacks-empty">Search Public Stacks without leaving this room.</div>
+  <div class="kv stack house-library-card-grid" id="houseLibraryPublicStacksResults" data-testid="house-library-public-stacks-results" style="margin-bottom:8px;"></div>
+  <h3 class="small" style="margin:10px 0 4px;">Exchange Counter</h3>
+  <div class="kv stack" id="houseLibraryPreviewHero" data-testid="house-library-preview-hero" style="margin-bottom:8px;">
+    <div class="kv" style="justify-content:space-between; align-items:flex-start;">
+      <div class="small" id="houseLibraryPreviewTitle" data-testid="house-library-preview-title">Public Stacks</div>
+      <div class="house-library-sigil-row" id="houseLibraryPreviewSigils" data-testid="house-library-preview-sigils" aria-live="polite"></div>
+    </div>
+    <div class="small" id="houseLibraryPreviewStatus" data-testid="house-library-preview-status">Look, check, trust, import.</div>
+    <div class="kv" id="houseLibraryPreviewReviewStrip" data-testid="house-library-preview-review-strip">
+      <button class="btn small" id="houseLibraryReviewChoiceTrustedBtn" type="button" data-testid="house-library-preview-review-trusted" aria-label="Trust here">[shield]</button>
+      <button class="btn small" id="houseLibraryReviewChoiceLaterBtn" type="button" data-testid="house-library-preview-review-later" aria-label="Review later">[hour]</button>
+      <button class="btn small" id="houseLibraryReviewChoiceBlockedBtn" type="button" data-testid="house-library-preview-review-blocked" aria-label="Block here">[bar]</button>
+    </div>
+    <div class="kv" id="houseLibraryPreviewActionDock" data-testid="house-library-preview-action-dock">
       <button class="btn" id="houseLibraryGuidedVerifyBtn" type="button" data-testid="house-library-guided-verify-button">Verify Public Stack</button>
       <button class="btn" id="houseLibraryGuidedCheckSealBtn" type="button" data-testid="house-library-guided-check-seal-button">Check Seal</button>
       <button class="btn" id="houseLibraryGuidedImportBtn" type="button" data-testid="house-library-guided-import-button">Import from Guide</button>
-    </div>
-    <div class="kv" data-testid="house-library-guided-review-controls">
-      <label class="small" for="houseLibraryGuidedReviewTierSelect">Local Review</label>
-      <select id="houseLibraryGuidedReviewTierSelect" data-testid="house-library-guided-review-tier" class="pixel-input">
-        <option value="review_later">Review later</option>
-        <option value="trusted_here">Trusted here</option>
-        <option value="blocked_here">Blocked here</option>
-      </select>
-      <label class="small" for="houseLibraryGuidedReviewNoteInput">Review Note</label>
-      <input
-        id="houseLibraryGuidedReviewNoteInput"
-        data-testid="house-library-guided-review-note"
-        class="pixel-input"
-        type="text"
-        placeholder="What should this House remember?"
-        autocomplete="off"
-        style="flex:1; min-width:0;"
-      />
-      <button class="btn" id="houseLibraryGuidedReviewSaveBtn" type="button" data-testid="house-library-guided-review-save-button">Save Local Review</button>
       <button class="btn" id="houseLibraryGuidedAttestBtn" type="button" data-testid="house-library-guided-attest-button">Publish Attestation</button>
       <button class="btn" id="houseLibraryGuidedSealBtn" type="button" data-testid="house-library-guided-seal-button">Seal Attestation</button>
     </div>
-    <div class="kv" data-testid="house-library-peer-relay-controls">
-      <label class="small" for="houseLibraryRelayTargetInput">Target House</label>
-      <input
-        id="houseLibraryRelayTargetInput"
-        data-testid="house-library-relay-target-input"
-        class="pixel-input"
-        type="text"
-        placeholder="house_..."
-        autocomplete="off"
-        style="flex:1; min-width:0;"
-      />
-      <label class="small" for="houseLibraryRelayApprovalInput">Relay Approval</label>
-      <input
-        id="houseLibraryRelayApprovalInput"
-        data-testid="house-library-relay-approval-input"
-        class="pixel-input"
-        type="text"
-        placeholder="appr_..."
-        autocomplete="off"
-        style="flex:1; min-width:0;"
-      />
-      <button class="btn" id="houseLibraryRelaySendBtn" type="button" data-testid="house-library-relay-send-button">Relay to House</button>
-      <button class="btn" id="houseLibrarySatchelRelaySendBtn" type="button" data-testid="house-library-satchel-relay-send-button">Relay Satchel</button>
-    </div>
+    <details class="house-library-drawer" id="houseLibraryPreviewDetails" data-testid="house-library-preview-details">
+      <summary id="houseLibraryPreviewDetailsToggle" data-testid="house-library-preview-details-toggle">Details</summary>
+      <div id="houseLibraryPreviewDetailsBody" data-testid="house-library-preview-details-body" style="margin-top:8px;">
+        <div class="small" id="houseLibraryRegistryPreview" data-testid="house-library-registry-preview">Select a Public Stack to preview its provenance.</div>
+        <div class="kv stack" id="houseLibraryExchangeWizard" data-testid="house-library-exchange-wizard" style="margin-top:8px;">
+          <div class="small" id="houseLibraryExchangeSummary" data-testid="house-library-exchange-summary">Choose a local Library item or a Public Stack to prepare an exchange.</div>
+          <div class="kv" data-testid="house-library-guided-publish-controls">
+            <label class="small" for="houseLibraryGuidedApprovalInput">Approval ID</label>
+            <input
+              id="houseLibraryGuidedApprovalInput"
+              data-testid="house-library-guided-approval-input"
+              class="pixel-input"
+              type="text"
+              placeholder="appr_..."
+              autocomplete="off"
+              style="flex:1; min-width:0;"
+            />
+            <button class="btn" id="houseLibraryGuidedPublishBtn" type="button" data-testid="house-library-guided-publish-button">Publish from Guide</button>
+          </div>
+          <div class="kv" data-testid="house-library-guided-review-controls">
+            <label class="small" for="houseLibraryGuidedReviewTierSelect">Local Review</label>
+            <select id="houseLibraryGuidedReviewTierSelect" data-testid="house-library-guided-review-tier" class="pixel-input">
+              <option value="review_later">Review later</option>
+              <option value="trusted_here">Trusted here</option>
+              <option value="blocked_here">Blocked here</option>
+            </select>
+            <label class="small" for="houseLibraryGuidedReviewNoteInput">Review Note</label>
+            <input
+              id="houseLibraryGuidedReviewNoteInput"
+              data-testid="house-library-guided-review-note"
+              class="pixel-input"
+              type="text"
+              placeholder="What should this House remember?"
+              autocomplete="off"
+              style="flex:1; min-width:0;"
+            />
+            <button class="btn" id="houseLibraryGuidedReviewSaveBtn" type="button" data-testid="house-library-guided-review-save-button">Save Local Review</button>
+          </div>
+          <div class="kv" data-testid="house-library-peer-relay-controls">
+            <label class="small" for="houseLibraryRelayTargetInput">Target House</label>
+            <input
+              id="houseLibraryRelayTargetInput"
+              data-testid="house-library-relay-target-input"
+              class="pixel-input"
+              type="text"
+              placeholder="house_..."
+              autocomplete="off"
+              style="flex:1; min-width:0;"
+            />
+            <label class="small" for="houseLibraryRelayApprovalInput">Relay Approval</label>
+            <input
+              id="houseLibraryRelayApprovalInput"
+              data-testid="house-library-relay-approval-input"
+              class="pixel-input"
+              type="text"
+              placeholder="appr_..."
+              autocomplete="off"
+              style="flex:1; min-width:0;"
+            />
+            <button class="btn" id="houseLibraryRelaySendBtn" type="button" data-testid="house-library-relay-send-button">Relay to House</button>
+            <button class="btn" id="houseLibrarySatchelRelaySendBtn" type="button" data-testid="house-library-satchel-relay-send-button">Relay Satchel</button>
+          </div>
+        </div>
+      </div>
+    </details>
   </div>
   <h3 class="small" style="margin:10px 0 4px;">Relay Desk</h3>
   <div class="small" id="houseLibraryIncomingRelaysEmpty" data-testid="house-library-incoming-relays-empty">No relayed publications have arrived for this House yet.</div>

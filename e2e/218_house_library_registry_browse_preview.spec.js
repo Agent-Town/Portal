@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -44,7 +45,7 @@ test('M30.6: House Library browses and previews Public Stacks without leaving /a
   await expect(page.getByTestId('house-library-public-stacks-empty')).toContainText('Search Public Stacks');
 
   await page.getByTestId('house-library-public-stacks-query').fill(String(seededBrowse.query || 'atlas'));
-  await page.getByTestId('house-library-public-stacks-family').selectOption(String(seededBrowse.family || 'skill'));
+  await page.getByTestId('house-library-storefront-chip-skills').click();
   await page.getByTestId('house-library-public-stacks-search').click();
 
   await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(Number(seededBrowse.expectedResultCount || 0));
@@ -59,7 +60,9 @@ test('M30.6: House Library browses and previews Public Stacks without leaving /a
   });
 
   await page.locator(`#houseLibraryPublicStacksResults button[data-registry-id="${String(seededBrowse.expectedFirstRegistryId || 'reg_atlas_skill_01')}"]`).click();
+  await openHouseLibraryPreviewDetails(page);
 
+  await expect(page.getByTestId('house-library-preview-title')).toContainText('Atlas Scout');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText(String(seededBrowse.expectedFirstRegistryId || 'reg_atlas_skill_01'));
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Skills');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Provenance:');

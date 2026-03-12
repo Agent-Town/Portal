@@ -1,6 +1,10 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const {
+  openHouseLibraryPublicStackPreview,
+  openHouseLibraryPreviewDetails,
+} = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -135,18 +139,16 @@ test('M34.4: House Library trust flow stays in the same shell from Public Stack 
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
-  await page.getByTestId('house-library-public-stacks-query').fill('Journey Trust Pack');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
-  await page.getByTestId('house-library-public-stacks-search').click();
-  await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Trust Pack' }).click();
-  await expect(page.getByTestId('house-library-registry-preview')).toContainText('Journey Trust Pack');
+  await openHouseLibraryPublicStackPreview(page, { title: 'Journey Trust Pack' });
+  await openHouseLibraryPreviewDetails(page);
+  await expect(page.getByTestId('house-library-preview-title')).toContainText('Journey Trust Pack');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Verification: Not yet verified in this House.');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Verification pending');
   await expect(page.getByTestId('house-library-guided-verify-button')).toBeEnabled();
 
   await page.getByTestId('house-library-guided-verify-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Verified Public Stack Journey Trust Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Verified here');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Bundle integrity');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Local import status');
@@ -155,6 +157,7 @@ test('M34.4: House Library trust flow stays in the same shell from Public Stack 
 
   await page.getByTestId('house-library-guided-import-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Imported Public Stack Journey Trust Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Already in your Library as Satchel Journey Trust Pack.');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Verified here');
   await expect(page.getByRole('button', { name: /Satchel · Journey Trust Pack/ }).first()).toBeVisible();

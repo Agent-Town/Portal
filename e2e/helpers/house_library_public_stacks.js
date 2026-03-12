@@ -113,19 +113,79 @@ async function seedPublishedHouseLibraryPublicStack(page, {
 async function openHouseLibraryPublicStackPreview(page, {
   title = '',
   query = title,
+  family = 'house_library_stacks',
 } = {}) {
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
   await page.getByTestId('house-library-public-stacks-query').fill(String(query || '').trim());
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
+  if (family === 'house_library_stacks') {
+    await page.getByTestId('house-library-storefront-chip-satchels').click();
+  } else if (family === 'skill') {
+    await page.getByTestId('house-library-storefront-chip-skills').click();
+  } else if (family === 'developer_workflows') {
+    await page.getByTestId('house-library-storefront-chip-flows').click();
+  } else if (family === 'registry') {
+    await page.getByTestId('house-library-storefront-chip-registry').click();
+  } else {
+    await page.getByTestId('house-library-storefront-chip-all').click();
+  }
   await page.getByTestId('house-library-public-stacks-search').click();
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: String(title || query || '').trim() }).first().click();
-  await expect(page.getByTestId('house-library-registry-preview')).toContainText(String(title || query || '').trim());
+  const card = page.getByTestId('house-library-storefront-card').filter({
+    hasText: String(title || query || '').trim(),
+  }).first();
+  await card.getByTestId('house-library-storefront-preview').click();
+  await expect(page.getByTestId('house-library-preview-title')).toContainText(String(title || query || '').trim());
+}
+
+async function openHouseLibraryPreviewDetails(page) {
+  const details = page.getByTestId('house-library-preview-details');
+  const expanded = await details.evaluate((node) => node.open === true).catch(() => false);
+  if (!expanded) {
+    await page.getByTestId('house-library-preview-details-toggle').click();
+  }
+  await expect(details).toHaveAttribute('open', '');
+}
+
+async function saveHouseLibraryReview(page, {
+  reviewTier = 'review_later',
+  note = '',
+} = {}) {
+  if (!note) {
+    if (reviewTier === 'trusted_here') {
+      await page.getByTestId('house-library-preview-review-trusted').click();
+    } else if (reviewTier === 'blocked_here') {
+      await page.getByTestId('house-library-preview-review-blocked').click();
+    } else {
+      await page.getByTestId('house-library-preview-review-later').click();
+    }
+    return;
+  }
+  await openHouseLibraryPreviewDetails(page);
+  await page.getByTestId('house-library-guided-review-tier').selectOption(reviewTier);
+  await page.getByTestId('house-library-guided-review-note').fill(note);
+  await page.getByTestId('house-library-guided-review-save-button').click();
+}
+
+async function setHouseLibraryTrustChip(page, value = '') {
+  if (value === 'trusted_here') {
+    await page.getByTestId('house-library-storefront-chip-trusted').click();
+  } else if (value === 'blocked_here') {
+    await page.getByTestId('house-library-storefront-chip-blocked').click();
+  } else if (value === 'review_later') {
+    await page.getByTestId('house-library-storefront-chip-later').click();
+  } else if (value === 'sealed') {
+    await page.getByTestId('house-library-storefront-chip-sealed').click();
+  } else {
+    await page.getByTestId('house-library-storefront-chip-all').click();
+  }
 }
 
 module.exports = {
   APPROVED_PUBLICATION_ID,
   APPROVED_PUBLIC_STACK_ID,
+  openHouseLibraryPreviewDetails,
   seedPublishedHouseLibraryPublicStack,
   openHouseLibraryPublicStackPreview,
+  saveHouseLibraryReview,
+  setHouseLibraryTrustChip,
 };

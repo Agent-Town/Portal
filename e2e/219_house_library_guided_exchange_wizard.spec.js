@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -100,9 +101,10 @@ test('M30.7: House Library guided exchange keeps trust, approval, sealing, and r
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
 
   await page.getByTestId('house-library-public-stacks-query').fill('atlas');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('skill');
+  await page.getByTestId('house-library-storefront-chip-skills').click();
   await page.getByTestId('house-library-public-stacks-search').click();
   await page.locator(`#houseLibraryPublicStacksResults button[data-registry-id="${registryId}"]`).click();
+  await openHouseLibraryPreviewDetails(page);
 
   await expect(page.getByTestId('house-library-registry-preview')).toContainText(registryId);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Public');
@@ -138,11 +140,13 @@ test('M30.7: House Library guided exchange keeps trust, approval, sealing, and r
   await expect(page.getByTestId('house-library-exchange-summary')).toContainText('Approval is required before publishing.');
 
   const statsBeforeBlockedPublish = await getPlatformStats(request);
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('LIBRARY_PUBLISH_APPROVAL_REQUIRED');
   const statsAfterBlockedPublish = await getPlatformStats(request);
   expect(Number(statsAfterBlockedPublish?.stats?.counts?.library_publications || 0)).toBe(Number(statsBeforeBlockedPublish?.stats?.counts?.library_publications || 0));
 
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-approval-input').fill(APPROVED_PUBLICATION_ID);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published Guide Publish Candidate to Registry as regpub_');
@@ -150,6 +154,7 @@ test('M30.7: House Library guided exchange keeps trust, approval, sealing, and r
   const statsAfterPublish = await getPlatformStats(request);
   expect(Number(statsAfterPublish?.stats?.counts?.library_publications || 0)).toBe(Number(statsBeforeBlockedPublish?.stats?.counts?.library_publications || 0) + 1);
 
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-approval-input').fill(APPROVED_PUBLICATION_ID);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published Guide Publish Candidate to Registry as regpub_');
@@ -158,6 +163,7 @@ test('M30.7: House Library guided exchange keeps trust, approval, sealing, and r
 
   await page.locator(`#houseLibraryList button[data-library-item-id="${sealedLibraryItemId}"]`).click();
   await expect(page.getByTestId('house-library-exchange-summary')).toContainText('seal is active');
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-approval-input').fill(APPROVED_PUBLICATION_ID);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('LIBRARY_SEAL_BLOCKED');

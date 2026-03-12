@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -69,6 +70,7 @@ test('M30.8: House Library keeps pixel-RPG copy plain and exposes a deterministi
   await expect(statusRegion).toHaveAttribute('aria-live', 'polite');
   await expect(statusRegion).toContainText('Saved KeyboardPathNote to your Library.');
 
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(statusRegion).toContainText('LIBRARY_PUBLISH_APPROVAL_REQUIRED');
   await expect(statusRegion).not.toHaveText('');

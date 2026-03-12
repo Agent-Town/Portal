@@ -14,6 +14,8 @@ const {
 } = require('./helpers/unified_platform');
 const {
   openHouseLibraryPublicStackPreview,
+  openHouseLibraryPreviewDetails,
+  saveHouseLibraryReview,
   seedPublishedHouseLibraryPublicStack,
 } = require('./helpers/house_library_public_stacks');
 
@@ -72,9 +74,10 @@ test('M37.5: House Library stays same-shell from source attestation seal through
   await openHouseLibraryPublicStackPreview(page, {
     title: 'Journey Provenance Pack',
   });
-  await page.getByTestId('house-library-guided-review-tier').selectOption('trusted_here');
-  await page.getByTestId('house-library-guided-review-note').fill('Seal this for cross-house reuse.');
-  await page.getByTestId('house-library-guided-review-save-button').click();
+  await saveHouseLibraryReview(page, {
+    reviewTier: 'trusted_here',
+    note: 'Seal this for cross-house reuse.',
+  });
   await expect(page.getByTestId('house-library-action-status')).toContainText('Saved local review Trusted here for Journey Provenance Pack.');
 
   await page.getByTestId('house-library-guided-attest-button').click();
@@ -82,6 +85,7 @@ test('M37.5: House Library stays same-shell from source attestation seal through
 
   await page.getByTestId('house-library-guided-seal-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Sealed attestation for Journey Provenance Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Unchecked seal');
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');
   expect(await readWorkerSessionId(page)).toBe(initialSessionId);
@@ -95,9 +99,11 @@ test('M37.5: House Library stays same-shell from source attestation seal through
   await openHouseLibraryPublicStackPreview(page, {
     title: 'Journey Provenance Pack',
   });
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Unchecked seal');
   await page.getByTestId('house-library-guided-check-seal-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Checked seal for Journey Provenance Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Verified seal');
   await expect(page.getByTestId('house-library-registry-preview')).not.toContainText('Local review:');
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');

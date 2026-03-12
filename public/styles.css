@@ -4840,3 +4840,121 @@ body.atlas-page.atlas-embed .atlas-chip {
   }
 
 }
+
+.house-library-storefront {
+  display: grid;
+  gap: 8px;
+}
+
+.house-library-chip-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.house-library-card-grid {
+  display: grid;
+  gap: 8px;
+  min-height: 28px;
+  align-content: start;
+}
+
+.house-library-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 250, 236, 0.94) 0%, rgba(255, 242, 214, 0.94) 100%);
+  box-shadow: 0 4px 0 rgba(44, 69, 99, 0.18);
+}
+
+.house-library-card-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.house-library-card-content .small {
+  overflow-wrap: anywhere;
+}
+
+.house-library-card-family,
+.house-library-card-trust,
+.house-library-sigil-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.house-library-token {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 2px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255, 250, 236, 0.9);
+  color: var(--text-strong);
+  font-size: 12px;
+  line-height: 1;
+  box-shadow: 0 2px 0 rgba(44, 69, 99, 0.14);
+}
+
+.house-library-token.is-good {
+  background: rgba(107, 179, 107, 0.18);
+}
+
+.house-library-token.is-bad {
+  background: rgba(230, 57, 70, 0.14);
+}
+
+.house-library-token.is-muted {
+  background: rgba(128, 202, 255, 0.2);
+}
+
+.house-library-drawer {
+  border: 2px solid rgba(44, 69, 99, 0.45);
+  border-radius: 12px;
+  background: rgba(255, 250, 236, 0.78);
+  padding: 8px 10px;
+}
+
+.house-library-drawer summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.house-library-drawer[open] {
+  box-shadow: inset 0 0 0 1px rgba(44, 69, 99, 0.08);
+}
+
+@media (max-width: 720px) {
+  .house-library-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .house-library-storefront .kv,
+  #houseLibraryPreviewHero .kv {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .house-library-chip-rail {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .house-library-card,
+  #houseLibraryPreviewHero,
+  #houseLibraryPanel {
+    overflow-x: hidden;
+  }
+}

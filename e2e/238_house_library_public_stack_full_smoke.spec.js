@@ -1,6 +1,7 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const { openHouseLibraryPublicStackPreview } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -147,12 +148,8 @@ test('M33.4: House Library full Public Stack smoke stays in the same shell from 
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
-  await page.getByTestId('house-library-public-stacks-query').fill('Journey Public Pack');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
-  await page.getByTestId('house-library-public-stacks-search').click();
-  await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Public Pack' }).click();
-  await expect(page.getByTestId('house-library-registry-preview')).toContainText('Journey Public Pack');
+  await openHouseLibraryPublicStackPreview(page, { title: 'Journey Public Pack' });
+  await expect(page.getByTestId('house-library-preview-title')).toContainText('Journey Public Pack');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText(sourceHouse.houseId);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('2 items');
   await expect(page.getByTestId('house-library-guided-import-button')).toBeEnabled();

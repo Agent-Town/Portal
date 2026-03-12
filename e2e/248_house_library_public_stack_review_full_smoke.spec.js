@@ -1,6 +1,12 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const {
+  openHouseLibraryPublicStackPreview,
+  openHouseLibraryPreviewDetails,
+  saveHouseLibraryReview,
+  setHouseLibraryTrustChip,
+} = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -137,31 +143,27 @@ test('M35.4: House Library review flow stays same-shell from Public Stack search
 
   await page.getByTestId('house-open-library').click();
   await expect(page.getByTestId('house-library-panel')).toBeVisible();
-  await page.getByTestId('house-library-public-stacks-query').fill('Journey Review Pack');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('house_library_stacks');
-  await page.getByTestId('house-library-public-stacks-search').click();
-  await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Review Pack' }).click();
-  await expect(page.getByTestId('house-library-registry-preview')).toContainText('Journey Review Pack');
-  await expect(page.getByTestId('house-library-guided-review-tier')).toHaveValue('review_later');
-
-  await page.getByTestId('house-library-guided-review-note').fill('Use this later in this House.');
-  await page.getByTestId('house-library-guided-review-save-button').click();
+  await openHouseLibraryPublicStackPreview(page, { title: 'Journey Review Pack' });
+  await saveHouseLibraryReview(page, {
+    reviewTier: 'review_later',
+    note: 'Use this later in this House.',
+  });
   await expect(page.getByTestId('house-library-action-status')).toContainText('Saved local review Review later for Journey Review Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Local review: Saved for later review in this House. Note: Use this later in this House.');
   expect(await page.evaluate(() => window.location.pathname)).toBe('/app');
   expect(await readWorkerSessionId(page)).toBe(initialSessionId);
 
-  await page.getByTestId('house-library-public-stacks-trust').selectOption('review_later');
+  await setHouseLibraryTrustChip(page, 'review_later');
   await page.getByTestId('house-library-public-stacks-search').click();
   await expect(page.locator('#houseLibraryPublicStacksResults button')).toHaveCount(1);
-  await expect(page.locator('#houseLibraryPublicStacksResults button').first()).toContainText('Review later');
+  await expect(page.getByTestId('house-library-storefront-trust-cluster').first()).toContainText('[hour]');
 
-  await page.locator('#houseLibraryPublicStacksResults button', { hasText: 'Journey Review Pack' }).click();
+  await page.getByTestId('house-library-storefront-card').filter({ hasText: 'Journey Review Pack' }).first().getByTestId('house-library-storefront-preview').click();
   await expect(page.getByTestId('house-library-guided-import-button')).toBeEnabled();
   await page.getByTestId('house-library-guided-import-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Imported Public Stack Journey Review Pack.');
+  await openHouseLibraryPreviewDetails(page);
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Already in your Library as Satchel Journey Review Pack.');
   await expect(page.getByTestId('house-library-registry-preview')).toContainText('Review later');
   await expect(page.getByRole('button', { name: /Satchel · Journey Review Pack/ }).first()).toBeVisible();

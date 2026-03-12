@@ -1,5 +1,6 @@
 const { test, expect, request: playwrightRequest } = require('@playwright/test');
 
+const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
@@ -122,6 +123,7 @@ test('M32.4: House Library full Satchel exchange smoke stays in the same shell f
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published Launch Checklist to Registry as regpub_');
 
   await page.getByRole('button', { name: /Journey Relay Pack/ }).first().click();
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-relay-target-input').fill(targetHouse.houseId);
   await page.getByTestId('house-library-relay-approval-input').fill(APPROVED_SATCHEL_RELAY_ID);
   await expect(page.getByTestId('house-library-satchel-relay-send-button')).toBeEnabled();

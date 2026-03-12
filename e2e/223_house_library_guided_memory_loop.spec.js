@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
+const { openHouseLibraryPreviewDetails } = require('./helpers/house_library_public_stacks');
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { waitForLiteApi } = require('./helpers/trainer');
 const {
@@ -96,13 +97,14 @@ test('M30.11: House Library full guided memory loop stays same-shell and benchma
   await expect(page.getByTestId('house-library-action-status')).toContainText('Saved Satchel Journey Pack.');
 
   await page.getByTestId('house-library-public-stacks-query').fill('atlas');
-  await page.getByTestId('house-library-public-stacks-family').selectOption('skill');
+  await page.getByTestId('house-library-storefront-chip-skills').click();
   await page.getByTestId('house-library-public-stacks-search').click();
   await page.locator('#houseLibraryPublicStacksResults button[data-registry-id="reg_atlas_skill_01"]').click();
   await page.getByTestId('house-library-guided-import-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Imported Atlas Scout from Registry.');
 
   await page.locator('#houseLibraryList button', { hasText: 'Journey Note' }).click();
+  await openHouseLibraryPreviewDetails(page);
   await page.getByTestId('house-library-guided-approval-input').fill(APPROVED_PUBLICATION_ID);
   await page.getByTestId('house-library-guided-publish-button').click();
   await expect(page.getByTestId('house-library-action-status')).toContainText('Published Journey Note to Registry as regpub_');
