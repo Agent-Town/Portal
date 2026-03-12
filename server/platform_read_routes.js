@@ -1231,6 +1231,66 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function buildLibraryPublicStackAttestationCounts(attestations = []) {
+    const counts = {
+      total: 0,
+      trustedHere: 0,
+      reviewLater: 0,
+      blockedHere: 0,
+    };
+    const source = Array.isArray(attestations) ? attestations : [];
+    source.forEach((attestation) => {
+      counts.total += 1;
+      const reviewTier = normalizeLibraryPublicStackReviewTier(attestation?.reviewTier);
+      if (reviewTier === 'trusted_here') {
+        counts.trustedHere += 1;
+      } else if (reviewTier === 'blocked_here') {
+        counts.blockedHere += 1;
+      } else {
+        counts.reviewLater += 1;
+      }
+    });
+    return counts;
+  }
+
+  function buildLibraryPublicStackAttestationAggregate(attestations = []) {
+    const counts = buildLibraryPublicStackAttestationCounts(attestations);
+    if (!counts.total) {
+      return {
+        counts,
+        summary: '',
+      };
+    }
+    const parts = [`${counts.total} attestation${counts.total === 1 ? '' : 's'}`];
+    if (counts.trustedHere) {
+      parts.push(`${counts.trustedHere} trusted here`);
+    }
+    if (counts.reviewLater) {
+      parts.push(`${counts.reviewLater} review later`);
+    }
+    if (counts.blockedHere) {
+      parts.push(`${counts.blockedHere} blocked here`);
+    }
+    return {
+      counts,
+      summary: `Attested by Houses: ${parts.join(', ')}.`,
+    };
+  }
+
+  function projectLibraryPublicStackAttestationCards(attestations = []) {
+    return (Array.isArray(attestations) ? attestations : []).map((attestation) => ({
+      libraryPublicStackAttestationId: String(attestation?.libraryPublicStackAttestationId || '').trim(),
+      libraryPublicStackReviewId: String(attestation?.libraryPublicStackReviewId || '').trim(),
+      houseId: String(attestation?.houseId || '').trim(),
+      teamId: String(attestation?.teamId || '').trim(),
+      reviewTier: String(attestation?.reviewTier || '').trim(),
+      summary: String(attestation?.summary || '').trim(),
+      note: String(attestation?.note || '').trim() || null,
+      createdAt: String(attestation?.createdAt || '').trim(),
+      updatedAt: String(attestation?.updatedAt || '').trim(),
+    })).filter((entry) => entry.libraryPublicStackAttestationId && entry.houseId);
+  }
+
   function searchLibraryPublicStackGroups({
     query = '',
     family = '',
@@ -1262,9 +1322,15 @@ function registerPlatformReadRoutes(app, deps) {
           teamId,
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
+        const attestationCards = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
+          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+        }));
+        const attestationSummary = buildLibraryPublicStackAttestationAggregate(attestationCards);
         return {
           entry,
           localReview,
+          attestationCards,
+          attestationSummary,
         };
       })
       .filter(({ localReview }) => {
@@ -1284,7 +1350,7 @@ function registerPlatformReadRoutes(app, deps) {
         summary: familyInfo.description || null,
       },
       memberCount: stacks.length,
-      members: stacks.map(({ entry, localReview }) => {
+      members: stacks.map(({ entry, localReview, attestationCards, attestationSummary }) => {
         const members = listLibraryPublicStackMembers({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
@@ -1297,24 +1363,38 @@ function registerPlatformReadRoutes(app, deps) {
           description: String(entry?.summary || '').trim() || null,
           reviewTier: String(localReview?.reviewTier || '').trim() || null,
           reviewSummary: String(localReview?.review?.summary || '').trim() || null,
+          attestationCounts: attestationSummary.counts,
+          attestationSummary: String(attestationSummary.summary || '').trim() || null,
           projection: {
             bundleHash: String(entry?.bundleHash || '').trim() || null,
             scopeSetId: String(entry?.scopeSetId || '').trim() || null,
             memberCount: members.length,
             sourceHouseId: String(entry?.houseId || '').trim() || null,
           },
-          proofCards: [],
+          proofCards: attestationCards.map((card) => ({
+            title: `${card.houseId} · ${formatReviewTierLabel(card.reviewTier)}`,
+            summary: card.summary,
+          })),
           loadouts: [],
           storefront: {
             title: String(entry?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
             summary: String(entry?.summary || '').trim() || null,
-            proofCount: 0,
+            proofCount: attestationSummary.counts.total,
             loadoutCount: 0,
             memberCount: members.length,
+            attestationCount: attestationSummary.counts.total,
+            attestationSummary: String(attestationSummary.summary || '').trim() || null,
           },
         };
       }).sort((a, b) => String(a?.displayName || '').localeCompare(String(b?.displayName || ''))),
     }];
+  }
+
+  function formatReviewTierLabel(reviewTier = '') {
+    const normalized = normalizeLibraryPublicStackReviewTier(reviewTier);
+    if (normalized === 'trusted_here') return 'Trusted here';
+    if (normalized === 'blocked_here') return 'Blocked here';
+    return 'Review later';
   }
 
   function projectLibraryPublicStackBundleMember(member = null) {
@@ -1539,6 +1619,14 @@ function registerPlatformReadRoutes(app, deps) {
       teamId,
       libraryPublicStackId: normalizedPublicStackId,
     });
+    const publicAttestations = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
+      libraryPublicStackId: normalizedPublicStackId,
+    }));
+    const attestationSummary = buildLibraryPublicStackAttestationAggregate(publicAttestations);
+    const localAttestation = (houseId && teamId)
+      ? publicAttestations.find((entry) => String(entry?.houseId || '').trim() === String(houseId || '').trim()
+          && String(entry?.teamId || '').trim() === String(teamId || '').trim()) || null
+      : null;
     const trustOverlay = buildLibraryPublicStackTrustOverlay({
       publicStack,
       memberPreviews,
@@ -1568,6 +1656,9 @@ function registerPlatformReadRoutes(app, deps) {
         verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
         reviewTier: String(localReview?.reviewTier || '').trim() || null,
         review: localReview?.review || null,
+        localAttestation,
+        attestationCounts: attestationSummary.counts,
+        attestations: publicAttestations,
         verification: trustOverlay?.verification || {
           verificationState: 'unverified',
         },
@@ -1586,11 +1677,13 @@ function registerPlatformReadRoutes(app, deps) {
           : null,
         storefront: {
           memberCount: memberPreviews.length,
+          attestationCount: attestationSummary.counts.total,
         },
         provenance: {
           summary: `Published from ${String(publicStack?.houseId || '').trim() || 'another House'} with ${memberPreviews.length} curated Library artifacts.`,
           bundleHash: String(publicStack?.bundleHash || manifest?.bundleHash || '').trim() || null,
           verificationSummary: String(trustOverlay?.verification?.summary || '').trim() || null,
+          attestationSummary: String(attestationSummary.summary || '').trim() || null,
           orderedPublicationIds: Array.isArray(manifest?.orderedPublicationIds) ? manifest.orderedPublicationIds : memberPreviews.map((member) => member.libraryPublicationId).filter(Boolean),
           orderedRegistryIds: Array.isArray(manifest?.orderedRegistryIds) ? manifest.orderedRegistryIds : memberPreviews.map((member) => member.registryId).filter(Boolean),
         },
@@ -1616,6 +1709,10 @@ function registerPlatformReadRoutes(app, deps) {
         entityKind: String(member?.entityKind || '').trim() || null,
         reviewTier: String(member?.reviewTier || '').trim() || null,
         reviewSummary: String(member?.reviewSummary || '').trim() || null,
+        attestationCounts: member?.attestationCounts && typeof member.attestationCounts === 'object'
+          ? member.attestationCounts
+          : { total: 0, trustedHere: 0, reviewLater: 0, blockedHere: 0 },
+        attestationSummary: String(member?.attestationSummary || member?.storefront?.attestationSummary || '').trim() || null,
         storefront: member?.storefront && typeof member.storefront === 'object'
           ? member.storefront
           : {},
