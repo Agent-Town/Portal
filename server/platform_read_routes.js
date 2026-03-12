@@ -3040,9 +3040,14 @@ function registerPlatformReadRoutes(app, deps) {
         libraryPublicStackId: registryEntityId,
         idempotencyKey,
       });
+      const previewAfterSave = buildLibraryPublicStackPreviewPayload({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+      });
       return sendPortalApiSuccess(res, {
         attestation: persisted.attestation,
-        preview: preview.preview,
+        preview: previewAfterSave.ok ? previewAfterSave.preview : preview.preview,
       }, { requestId, status: persisted.status });
     } catch (err) {
       if (String(err?.code || '').trim() === 'LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED') {
