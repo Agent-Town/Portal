@@ -4,6 +4,9 @@ Status: Proposed
 Branch target: `codex/backend-worker-pool-spec-v0-1`  
 Depends on: [specs/40_house_worker_backend_pool_and_offload_spec.md](./40_house_worker_backend_pool_and_offload_spec.md)  
 Audience: product, runtime, backend, mobile, desktop, UX, QA, security, economics, and AI-agent implementation teams
+Detailed execution docs:
+1. [specs/42_house_worker_executor_abstraction_and_offload_tdd_spec.md](./42_house_worker_executor_abstraction_and_offload_tdd_spec.md)
+2. [specs/43_house_worker_executor_abstraction_and_offload_agent_runbook.md](./43_house_worker_executor_abstraction_and_offload_agent_runbook.md)
 
 ## 1. Purpose
 
