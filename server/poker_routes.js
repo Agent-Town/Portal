@@ -33,10 +33,13 @@ const {
   buildPokerPlayAdminExportPayload,
   buildPokerPlayIntegrityQueuePayload,
   buildPokerPlayLedgerReconciliationPayload,
+  buildPokerPlayAdminTreasuryPayload,
+  buildPokerPlayNativeSeasonLeaderboardPayload,
   buildPokerPlayOpsDashboardPayload,
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
+  POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT,
   breakTournamentSeriesTableByDirector,
   changeCashTableSeat,
   closeTournamentRegistration,
@@ -935,6 +938,11 @@ function registerPokerRoutes(app, deps) {
       ledger_reconciliation_corrupt_story: [
         { seatNumber: 1, address: 'So1anaHarnessReconA11111111111111111111111', houseId: 'house_harness_recon_a', displayName: 'Recon Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessReconB11111111111111111111111', houseId: 'house_harness_recon_b', displayName: 'Recon Bravo' },
+      ],
+      economy_native_season_story: [
+        { seatNumber: 1, address: 'So1anaHarnessEconomyA111111111111111111111', houseId: 'house_harness_economy_a', displayName: 'Economy Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessEconomyB111111111111111111111', houseId: 'house_harness_economy_b', displayName: 'Economy Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessEconomyC111111111111111111111', houseId: 'house_harness_economy_c', displayName: 'Economy Charlie' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -4217,6 +4225,439 @@ function registerPokerRoutes(app, deps) {
           [seatTwo.address]: corrupt ? 25 : 0,
         },
       };
+    } else if (normalizedScenario === 'economy_native_season_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const currentSeasonId = 'native-2026-03';
+      const currentSeasonTitle = 'Native Live Season Mar 2026';
+      const marchCashTableId = nextTableId;
+      const marchTournamentSeriesId = `pkseries_harness_economy_${randomHex(6)}`;
+      const marchTournamentTableId = `${nextTableId}_tournament`;
+      const febCashTableId = `${nextTableId}_feb_cash`;
+      const marchCashOpenedAt = '2026-03-05T18:00:00.000Z';
+      const marchCashClosedAt = '2026-03-05T18:30:00.000Z';
+      const marchTournamentOpenedAt = '2026-03-08T19:00:00.000Z';
+      const marchTournamentClosedAt = '2026-03-08T20:00:00.000Z';
+      const febCashOpenedAt = '2026-02-18T18:00:00.000Z';
+      const febCashClosedAt = '2026-02-18T18:25:00.000Z';
+
+      upsertPokerPlayTable({
+        tableId: marchCashTableId,
+        slug: `${normalizedScenario}-cash-${randomHex(4)}`,
+        title: 'Harness Economy Cash Table',
+        tableType: 'cash',
+        status: 'admin_closed',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 500,
+        minPlayers: 2,
+        state: {
+          closedAt: marchCashClosedAt,
+          closedBy: 'operator',
+          closeReason: 'Harness economy cash settlement complete.',
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+          blindReturnPolicy: 'post_big_blind',
+          cashRakeBps: 500,
+          cashRakeCapOil: 10,
+        },
+        summary: {
+          headline: 'Harness economy cash session with explicit rake.',
+          cashRakeBps: 500,
+          cashRakeCapOil: 10,
+        },
+        createdAt: marchCashOpenedAt,
+        updatedAt: marchCashClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: marchCashTableId,
+        tableType: 'cash',
+        title: 'Harness Economy Cash Table',
+        seatNumber: 1,
+        displayName: seatOne.displayName,
+        buyInOil: 500,
+        reloadOil: 100,
+        cashoutOil: 660,
+        rakeOil: 10,
+        stackOil: 0,
+        status: 'cashed_out',
+        openedAt: marchCashOpenedAt,
+        closedAt: marchCashClosedAt,
+        createdAt: marchCashOpenedAt,
+        updatedAt: marchCashClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: marchCashTableId,
+        tableType: 'cash',
+        title: 'Harness Economy Cash Table',
+        seatNumber: 2,
+        displayName: seatTwo.displayName,
+        buyInOil: 500,
+        cashoutOil: 430,
+        rakeOil: 0,
+        stackOil: 0,
+        status: 'cashed_out',
+        openedAt: marchCashOpenedAt,
+        closedAt: marchCashClosedAt,
+        createdAt: marchCashOpenedAt,
+        updatedAt: marchCashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 500,
+        memo: 'Harness economy cash buy-in A',
+        createdAt: marchCashOpenedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_reload',
+        direction: 'debit',
+        amount: 100,
+        memo: 'Harness economy cash reload A',
+        createdAt: '2026-03-05T18:10:00.000Z',
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_cashout',
+        direction: 'credit',
+        amount: 660,
+        memo: 'Harness economy cash cashout A',
+        createdAt: marchCashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 500,
+        memo: 'Harness economy cash buy-in B',
+        createdAt: marchCashOpenedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_cashout',
+        direction: 'credit',
+        amount: 430,
+        memo: 'Harness economy cash cashout B',
+        createdAt: marchCashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT,
+        tableId: marchCashTableId,
+        entryKind: 'poker_play_room_treasury_credit',
+        direction: 'credit',
+        amount: 10,
+        memo: 'Harness economy cash rake',
+        createdAt: marchCashClosedAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: marchTournamentTableId,
+        slug: `${normalizedScenario}-tournament-${randomHex(4)}`,
+        title: 'Harness Economy Tournament',
+        tableType: 'tournament',
+        status: 'series_closed',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 330,
+        minPlayers: 2,
+        state: {
+          completedAt: marchTournamentClosedAt,
+          winnerSeatNumber: 1,
+          prizeOil: 630,
+          prizePoolOil: 900,
+          prizeSettledAt: marchTournamentClosedAt,
+          payouts: [
+            { place: 1, percent: 70, amountOil: 630 },
+            { place: 2, percent: 30, amountOil: 270 },
+          ],
+          standings: [],
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+        },
+        rules: buildHarnessTournamentRules(marchTournamentSeriesId, 'Harness Economy Series', {
+          tournamentEntryFeeOil: 30,
+          bountyModel: 'none',
+        }),
+        summary: {
+          headline: 'Harness economy tournament with entry fee.',
+          seriesId: marchTournamentSeriesId,
+          seriesTitle: 'Harness Economy Series',
+          tournamentEntryFeeOil: 30,
+        },
+        createdAt: marchTournamentOpenedAt,
+        updatedAt: marchTournamentClosedAt,
+      });
+      [
+        {
+          actor: seatOne,
+          seatNumber: 1,
+          prizeOil: 630,
+          finishPosition: 1,
+          status: 'paid',
+          payoutSettledAt: marchTournamentClosedAt,
+        },
+        {
+          actor: seatTwo,
+          seatNumber: 2,
+          prizeOil: 270,
+          finishPosition: 2,
+          status: 'paid',
+          payoutSettledAt: marchTournamentClosedAt,
+        },
+        {
+          actor: seatThree,
+          seatNumber: 3,
+          prizeOil: 0,
+          finishPosition: 3,
+          status: 'busted',
+          payoutSettledAt: null,
+        },
+      ].forEach(({ actor, seatNumber, prizeOil, finishPosition, status, payoutSettledAt }) => {
+        upsertPokerPlayPlayerStat({
+          walletSubject: actor.address,
+          houseId: actor.houseId,
+          tableId: marchTournamentTableId,
+          seriesId: marchTournamentSeriesId,
+          seriesTitle: 'Harness Economy Series',
+          tableType: 'tournament',
+          title: 'Harness Economy Tournament',
+          seatNumber,
+          displayName: actor.displayName,
+          buyInOil: 330,
+          prizeOil,
+          entryFeeOil: 30,
+          finishPosition,
+          stackOil: 0,
+          status,
+          payoutSettledAt,
+          openedAt: marchTournamentOpenedAt,
+          closedAt: marchTournamentClosedAt,
+          createdAt: marchTournamentOpenedAt,
+          updatedAt: marchTournamentClosedAt,
+        });
+        createOilLedgerEntry({
+          walletSubject: actor.address,
+          houseId: actor.houseId,
+          tableId: marchTournamentTableId,
+          seriesId: marchTournamentSeriesId,
+          entryKind: 'poker_play_buy_in',
+          direction: 'debit',
+          amount: 330,
+          memo: `Harness economy tournament buy-in for ${actor.displayName}`,
+          createdAt: marchTournamentOpenedAt,
+        });
+      });
+      createOilLedgerEntry({
+        walletSubject: seatOne.address,
+        houseId: seatOne.houseId,
+        tableId: marchTournamentTableId,
+        seriesId: marchTournamentSeriesId,
+        entryKind: 'poker_play_tournament_prize',
+        direction: 'credit',
+        amount: 630,
+        memo: 'Harness economy tournament prize A',
+        createdAt: marchTournamentClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: marchTournamentTableId,
+        seriesId: marchTournamentSeriesId,
+        entryKind: 'poker_play_tournament_prize',
+        direction: 'credit',
+        amount: 270,
+        memo: 'Harness economy tournament prize B',
+        createdAt: marchTournamentClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT,
+        tableId: marchTournamentTableId,
+        seriesId: marchTournamentSeriesId,
+        entryKind: 'poker_play_room_treasury_credit',
+        direction: 'credit',
+        amount: 90,
+        memo: 'Harness economy tournament fees',
+        createdAt: marchTournamentClosedAt,
+      });
+
+      upsertPokerPlayTable({
+        tableId: febCashTableId,
+        slug: `${normalizedScenario}-feb-cash-${randomHex(4)}`,
+        title: 'Harness Economy February Cash Table',
+        tableType: 'cash',
+        status: 'admin_closed',
+        maxSeats: 6,
+        smallBlindOil: 10,
+        bigBlindOil: 20,
+        buyInOil: 400,
+        minPlayers: 2,
+        state: {
+          closedAt: febCashClosedAt,
+          closedBy: 'operator',
+          closeReason: 'Harness previous-season cash result.',
+        },
+        rules: {
+          mode: 'no_limit_holdem',
+          format: 'cash',
+          maxSeats: 6,
+          decisionCountdownSeconds: 45,
+          presenceTimeoutSeconds: 30,
+          reconnectGraceSeconds: 90,
+          timeBankSeconds: 15,
+          cashOutEnabled: true,
+          blindReturnPolicy: 'post_big_blind',
+          cashRakeBps: 0,
+          cashRakeCapOil: 0,
+        },
+        summary: {
+          headline: 'Harness previous-season cash result for native ranking filtering.',
+        },
+        createdAt: febCashOpenedAt,
+        updatedAt: febCashClosedAt,
+      });
+      upsertPokerPlayPlayerStat({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: febCashTableId,
+        tableType: 'cash',
+        title: 'Harness Economy February Cash Table',
+        seatNumber: 2,
+        displayName: seatTwo.displayName,
+        buyInOil: 400,
+        cashoutOil: 520,
+        rakeOil: 0,
+        stackOil: 0,
+        status: 'cashed_out',
+        openedAt: febCashOpenedAt,
+        closedAt: febCashClosedAt,
+        createdAt: febCashOpenedAt,
+        updatedAt: febCashClosedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: febCashTableId,
+        entryKind: 'poker_play_buy_in',
+        direction: 'debit',
+        amount: 400,
+        memo: 'Harness previous-season cash buy-in B',
+        createdAt: febCashOpenedAt,
+      });
+      createOilLedgerEntry({
+        walletSubject: seatTwo.address,
+        houseId: seatTwo.houseId,
+        tableId: febCashTableId,
+        entryKind: 'poker_play_cashout',
+        direction: 'credit',
+        amount: 520,
+        memo: 'Harness previous-season cash cashout B',
+        createdAt: febCashClosedAt,
+      });
+
+      seededSeriesId = marchTournamentSeriesId;
+      seededTableIds.push(marchCashTableId, marchTournamentTableId, febCashTableId);
+      reconciliationDebug = {
+        corrupt: false,
+        expectedMismatchCount: 0,
+        expectedWalletBalanceDeltaByWallet: {
+          [seatOne.address]: 0,
+          [seatTwo.address]: 0,
+          [seatThree.address]: 0,
+          [POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT]: 0,
+        },
+      };
+      const nativeSeasonDebug = {
+        seasonId: currentSeasonId,
+        seasonTitle: currentSeasonTitle,
+        playerCount: 3,
+        expectedOrder: [seatOne.address, seatTwo.address, seatThree.address],
+        byWallet: {
+          [seatOne.address]: {
+            netOil: 360,
+            cashNetOil: 60,
+            tournamentNetOil: 300,
+            rakeOil: 10,
+            entryFeeOil: 30,
+            treasuryContributionOil: 40,
+            tournamentWins: 1,
+            tournamentCashes: 1,
+          },
+          [seatTwo.address]: {
+            netOil: -130,
+            cashNetOil: -70,
+            tournamentNetOil: -60,
+            rakeOil: 0,
+            entryFeeOil: 30,
+            treasuryContributionOil: 30,
+            tournamentWins: 0,
+            tournamentCashes: 1,
+          },
+          [seatThree.address]: {
+            netOil: -330,
+            cashNetOil: 0,
+            tournamentNetOil: -330,
+            rakeOil: 0,
+            entryFeeOil: 30,
+            treasuryContributionOil: 30,
+            tournamentWins: 0,
+            tournamentCashes: 0,
+          },
+        },
+      };
+      return {
+        scenario: normalizedScenario,
+        tableId: nextTableId,
+        tableIds: seededTableIds,
+        seriesId: seededSeriesId || null,
+        handId,
+        actionExpiresAt,
+        debug: {
+          reconciliation: reconciliationDebug,
+          treasury: {
+            seasonId: currentSeasonId,
+            expectedCashRakeOil: 10,
+            expectedTournamentFeeOil: 90,
+            expectedTreasuryCreditOil: 100,
+          },
+          nativeSeason: nativeSeasonDebug,
+        },
+        actors: normalizedActors.map((actor) => ({
+          seatNumber: actor.seatNumber,
+          address: actor.address,
+          houseId: actor.houseId,
+          displayName: actor.displayName,
+        })),
+      };
     }
 
     return {
@@ -4943,6 +5384,51 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/seasons/native/current', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = buildPokerPlayNativeSeasonLeaderboardPayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_NATIVE_SEASON_FAILED',
+        err?.message || 'Unable to load the current native poker season.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/seasons/native/:seasonId/leaderboard', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const payload = buildPokerPlayNativeSeasonLeaderboardPayload(playRouteDeps, {
+        seasonId: req.params.seasonId,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_NATIVE_SEASON_LEADERBOARD_FAILED',
+        err?.message || 'Unable to load the native poker season leaderboard.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/rail/tables/:tableId', (req, res) => {
     const requestId = buildPortalRequestId();
     try {
@@ -5528,6 +6014,30 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_RECONCILIATION_FAILED',
         err?.message || 'Unable to reconcile poker ledger state.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/admin/treasury', (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = buildPokerPlayAdminTreasuryPayload(playRouteDeps, {
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TREASURY_FAILED',
+        err?.message || 'Unable to load poker room treasury state.',
         {
           requestId,
           details: err?.details || {},

@@ -823,6 +823,9 @@ Returns the bound wallet's live poker results surface with:
 - `data.items[].stackOil`
 - `data.items[].prizeOil`
 - `data.items[].bountyOil`
+- `data.items[].rakeOil`
+- `data.items[].entryFeeOil`
+- `data.items[].treasuryContributionOil`
 - `data.items[].netOil`
 - `data.items[].finishPosition`
 - `data.items[].payoutSettledAt`
@@ -840,6 +843,10 @@ Returns the bound wallet's live poker results surface with:
 - `data.summary.investedOil`
 - `data.summary.returnedOil`
 - `data.summary.prizeOil`
+- `data.summary.bountyOil`
+- `data.summary.rakeOil`
+- `data.summary.entryFeeOil`
+- `data.summary.treasuryContributionOil`
 - `data.summary.netOil`
 - `data.summary.cashNetOil`
 - `data.summary.tournamentEntries`
@@ -857,6 +864,66 @@ Results notes:
 - `walletSubject` query is optional for same-wallet replay/debug reads, but the route rejects any value that does not match the bound wallet subject with `FORBIDDEN`
 - `data.summary.cashNetOil` is realized cash-session net only and excludes still-open live cash seats
 - `data.summary.netOil` includes open live entries, so unresolved live buy-ins remain negative until they cash out, refund, or prize
+- `data.items[].rakeOil` and `data.items[].entryFeeOil` are treasury-contribution breakdown fields, not extra debits beyond `investedOil`
+
+### GET `/api/poker/play/seasons/native/current`
+Returns the current native live-play season plus its leaderboard, derived from durable poker result rows.
+
+Query fields:
+- `asOf`
+- `limit`; optional leaderboard cap, defaults to `100`
+
+Response fields:
+- `data.processAt`
+- `data.season.seasonId`
+- `data.season.title`
+- `data.season.startAt`
+- `data.season.endAt`
+- `data.season.status`
+- `data.season.metricKey = "net_oil"`
+- `data.season.summary.playerCount`
+- `data.season.summary.tableCount`
+- `data.season.summary.entryCount`
+- `data.season.summary.cashSessionCount`
+- `data.season.summary.tournamentEntryCount`
+- `data.season.summary.investedOil`
+- `data.season.summary.returnedOil`
+- `data.season.summary.prizeOil`
+- `data.season.summary.bountyOil`
+- `data.season.summary.totalNetOil`
+- `data.season.summary.totalCashRakeOil`
+- `data.season.summary.totalTournamentFeeOil`
+- `data.season.summary.totalTreasuryContributionOil`
+- `data.season.summary.actualTreasuryCreditOil`
+- `data.season.summary.roomNetDriftOil`
+- `data.leaderboard.seasonId`
+- `data.leaderboard.sortKey = "net_oil"`
+- `data.leaderboard.items[]`
+
+Leaderboard item fields:
+- `data.leaderboard.items[].rank`
+- `data.leaderboard.items[].walletSubject`
+- `data.leaderboard.items[].displayName`
+- `data.leaderboard.items[].entryCount`
+- `data.leaderboard.items[].cashSessions`
+- `data.leaderboard.items[].tournamentEntries`
+- `data.leaderboard.items[].investedOil`
+- `data.leaderboard.items[].returnedOil`
+- `data.leaderboard.items[].prizeOil`
+- `data.leaderboard.items[].bountyOil`
+- `data.leaderboard.items[].rakeOil`
+- `data.leaderboard.items[].entryFeeOil`
+- `data.leaderboard.items[].treasuryContributionOil`
+- `data.leaderboard.items[].netOil`
+- `data.leaderboard.items[].cashNetOil`
+- `data.leaderboard.items[].tournamentNetOil`
+- `data.leaderboard.items[].tournamentWins`
+- `data.leaderboard.items[].tournamentCashes`
+- `data.leaderboard.items[].roiPercent`
+- `data.leaderboard.items[].scoreNetOil`
+
+### GET `/api/poker/play/seasons/native/:seasonId/leaderboard`
+Returns the same payload shape as `GET /api/poker/play/seasons/native/current`, but for an explicit native season id like `native-2026-03`.
 
 ### GET `/api/poker/play/rail/tables/:tableId`
 Returns the public spectator payload for one live table with:
@@ -906,6 +973,9 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.paidPlaces`
 - tournaments expose `data.table.summary.payoutModel`
 - tournaments expose `data.table.summary.payouts[]`
+- tournaments expose `data.table.summary.tournamentEntryFeeOil`
+- cash tables expose `data.table.summary.cashRakeBps`
+- cash tables expose `data.table.summary.cashRakeCapOil`
 - live tournament hands expose `data.hand.blindLevel`
 - tournament blind values are resolved server-side at hand start from `data.table.rules.handsPerBlindLevel` and `data.table.rules.blindLevels[]`
 - `data.series.targetTableCount` exposes the current tournament-director target table count for the active field
@@ -986,6 +1056,7 @@ Tournament-only request fields:
 - `lateRegistrationHands`
 - `handsPerBlindLevel`
 - `bountyModel`; `none` by default or `pko_50` for progressive knockout split accounting
+- `tournamentEntryFeeOil`; optional offchain room fee retained on completed tournament settlement
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
 
 Optional live-play request fields:
@@ -995,6 +1066,8 @@ Optional live-play request fields:
 - `accessMode`; defaults to `public`
 - `inviteCode`; optional creator-supplied invite code when `accessMode = "invite_only"`; otherwise the server generates one
 - `blindReturnPolicy`; cash only; `post_big_blind` by default, or `wait_for_big_blind`
+- `cashRakeBps`; cash only; optional offchain rake basis points applied to positive realized cashouts
+- `cashRakeCapOil`; cash only; optional per-session rake cap in OIL
 
 Invite-only table notes:
 - invite-only tables are created directly through this route, not through matchmaking
@@ -1841,6 +1914,79 @@ Notes:
 
 Failure codes:
 - `FORBIDDEN`
+
+### GET `/api/poker/play/admin/treasury` (admin)
+Returns the current native-season treasury view over cash rake, tournament fees, and room drift.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Query fields:
+- `asOf`
+
+Response fields:
+- `data.processAt`
+- `data.treasuryWalletSubject`
+- `data.summary.statCount`
+- `data.summary.playerCount`
+- `data.summary.tableCount`
+- `data.summary.seasonCount`
+- `data.summary.seasonId`
+- `data.summary.seasonTitle`
+- `data.summary.cashRakeOil`
+- `data.summary.tournamentFeeOil`
+- `data.summary.expectedTreasuryCreditOil`
+- `data.summary.actualTreasuryCreditOil`
+- `data.summary.treasuryWalletBalanceOil`
+- `data.summary.playerNetOil`
+- `data.summary.roomNetDriftOil`
+- `data.summary.treasuryDeltaOil`
+- `data.summary.treasuryEntryCount`
+- `data.players[]`
+- `data.tables[]`
+- `data.seasons[]`
+
+Per-player fields:
+- `data.players[].rank`
+- `data.players[].walletSubject`
+- `data.players[].displayName`
+- `data.players[].entryCount`
+- `data.players[].cashSessions`
+- `data.players[].tournamentEntries`
+- `data.players[].rakeOil`
+- `data.players[].entryFeeOil`
+- `data.players[].treasuryContributionOil`
+- `data.players[].netOil`
+
+Per-table fields:
+- `data.tables[].tableId`
+- `data.tables[].title`
+- `data.tables[].tableType`
+- `data.tables[].seriesId`
+- `data.tables[].seasonId`
+- `data.tables[].entryCount`
+- `data.tables[].playerNetOil`
+- `data.tables[].cashRakeOil`
+- `data.tables[].tournamentFeeOil`
+- `data.tables[].treasuryContributionOil`
+
+Per-season fields:
+- `data.seasons[].seasonId`
+- `data.seasons[].title`
+- `data.seasons[].startAt`
+- `data.seasons[].endAt`
+- `data.seasons[].playerCount`
+- `data.seasons[].tableCount`
+- `data.seasons[].cashRakeOil`
+- `data.seasons[].tournamentFeeOil`
+- `data.seasons[].expectedTreasuryCreditOil`
+- `data.seasons[].actualTreasuryCreditOil`
+- `data.seasons[].roomNetDriftOil`
+
+Notes:
+- the route summary is scoped to the native season that contains `asOf`
+- treasury rows use a dedicated offchain wallet subject and `entryKind = "poker_play_room_treasury_credit"`
+- `roomNetDriftOil` is exact room drift for the scoped season and should be `0` when player rows and treasury credits reconcile
 
 ### POST `/api/poker/play/admin/integrity/:flagId/resolve` (admin)
 Resolves or dismisses one open automated integrity signal and returns the refreshed integrity queue.
