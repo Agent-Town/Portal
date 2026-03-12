@@ -54,6 +54,9 @@ test.beforeEach(async ({ request }) => {
 });
 
 test('M25.2: shared poker pub/sub fanout reaches multiple logical instances exactly once per subscriber', async ({ browser, request }) => {
+  const expectedAdapterKind = String(process.env.POKER_PLAY_PUBSUB_ADAPTER || 'memory').trim().toLowerCase() === 'sqlite'
+    ? 'sqlite'
+    : 'memory';
   const userA = {
     address: 'So1anaMockPubSubA11111111111111111111111111',
     houseId: 'house_pubsub_a',
@@ -172,7 +175,7 @@ test('M25.2: shared poker pub/sub fanout reaches multiple logical instances exac
     channelKind: 'table',
     channelId: 'pkt_play_cash_01',
   });
-  expect(topic.adapterKind).toBe('memory');
+  expect(topic.adapterKind).toBe(expectedAdapterKind);
   expect(topic.topic).toBe('poker-play:table:pkt_play_cash_01');
   expect(Number(topic.publishCount || 0)).toBeGreaterThanOrEqual(1);
   expect(topic.latestEnvelope?.message?.channelKind).toBe('table');

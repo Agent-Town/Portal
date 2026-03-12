@@ -103,6 +103,12 @@ async function playAggressiveTournamentHand(tableId, seatActors, { asOfPrefix })
   throw new Error('BOUNTY_HAND_DID_NOT_ADVANCE');
 }
 
+function addSecondsToIso(iso, seconds) {
+  const baseMs = Date.parse(String(iso || ''));
+  const safeMs = Number.isFinite(baseMs) ? baseMs : Date.parse('2026-03-12T21:05:00.000Z');
+  return new Date(safeMs + (Number(seconds || 0) * 1000)).toISOString();
+}
+
 for (const scenario of [
   {
     bountyModel: 'pko_75',
@@ -214,11 +220,12 @@ for (const scenario of [
       if (finalDetail?.table?.summary?.completedAt) break;
     }
     expect(finalDetail?.table?.summary?.completedAt).toBeTruthy();
+    const settledAsOf = addSecondsToIso(finalDetail?.table?.summary?.completedAt, 1);
 
     const settledViews = [];
     for (let index = 0; index < users.length; index += 1) {
       settledViews.push(await getTable(pages[index], users[index].address, tableId, {
-        asOf: '2026-03-12T21:05:00.000Z',
+        asOf: settledAsOf,
       }));
     }
     const placements = settledViews

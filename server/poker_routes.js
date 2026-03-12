@@ -26,7 +26,7 @@ const {
   POKER_PLAY_TRANSPORT_VERSION,
 } = require('./poker_transport');
 const {
-  createPokerPubSubMemoryAdapter,
+  createPokerPubSubAdapter,
 } = require('./poker_pubsub');
 const {
   buildPokerPlayAdminReviewPayload,
@@ -438,7 +438,10 @@ function registerPokerRoutes(app, deps) {
   const pokerPlayStreamClientsByTable = new Map();
   const pokerPlayStreamClientsBySeries = new Map();
   const pokerPlayTransport = createPokerTransportMemoryAdapter({ nowIso });
-  const pokerPlayPubSub = createPokerPubSubMemoryAdapter({ nowIso });
+  const pokerPlayPubSub = createPokerPubSubAdapter({
+    kind: process.env.POKER_PLAY_PUBSUB_ADAPTER,
+    nowIso,
+  });
   const pokerPlayTransportWss = WebSocketServer ? new WebSocketServer({ noServer: true }) : null;
   let pokerPlayStreamEventCounter = 0;
 
