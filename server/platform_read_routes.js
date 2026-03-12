@@ -457,6 +457,78 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function resolveHouseWorkerDeploymentSharePackage(deployment = null) {
+    const registryEntityId = String(deployment?.registryEntityId || '').trim();
+    const entityVersionId = String(deployment?.entityVersionId || '').trim();
+    const deploymentLoadoutId = String(deployment?.loadoutId || '').trim();
+    const deploymentBundleHash = String(deployment?.bundleHash || '').trim();
+    if (!registryEntityId || !entityVersionId) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'DEPLOYMENT_PACKAGE_VERSION_INVALID',
+        message: 'This installed helper is missing its exact Registry package version and cannot be shared safely.',
+      };
+    }
+
+    const exactEntity = getRegistryEntityByIdAtVersion(registryEntityId, entityVersionId);
+    const canonicalPackage = resolveHouseWorkerPackage(exactEntity);
+    if (!exactEntity || !canonicalPackage) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'DEPLOYMENT_PACKAGE_VERSION_INVALID',
+        message: 'This installed helper is out of date and can no longer be shared safely. Reinstall it from Registry first.',
+      };
+    }
+
+    const loadouts = Array.isArray(exactEntity?.loadouts) ? exactEntity.loadouts : [];
+    const canonicalLoadoutId = String(canonicalPackage?.loadoutId || canonicalPackage?.runtimeDefaults?.loadoutId || '').trim();
+    const desiredLoadoutId = deploymentLoadoutId || canonicalLoadoutId;
+    const selectedLoadout = desiredLoadoutId
+      ? (loadouts.find((entry) => String(entry?.loadoutId || '').trim() === desiredLoadoutId) || null)
+      : null;
+    if (desiredLoadoutId && !selectedLoadout) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'DEPLOYMENT_PACKAGE_LOADOUT_INVALID',
+        message: 'This installed helper points to a loadout that no longer exists. Reinstall it from Registry before sharing.',
+      };
+    }
+
+    const candidateBundles = selectedLoadout
+      ? (Array.isArray(selectedLoadout?.bundles) ? selectedLoadout.bundles : [])
+      : loadouts.flatMap((entry) => (Array.isArray(entry?.bundles) ? entry.bundles : []));
+    const canonicalBundleHash = String(canonicalPackage?.bundleHash || '').trim();
+    const desiredBundleHash = deploymentBundleHash || canonicalBundleHash;
+    const selectedBundle = desiredBundleHash
+      ? (candidateBundles.find((entry) => String(entry?.contentHash || '').trim() === desiredBundleHash) || null)
+      : (candidateBundles[0] || null);
+    if (desiredBundleHash && !selectedBundle) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'DEPLOYMENT_PACKAGE_BUNDLE_INVALID',
+        message: 'This installed helper points to a portable bundle that no longer exists. Reinstall it from Registry before sharing.',
+      };
+    }
+
+    return {
+      ok: true,
+      packageInfo: {
+        ...canonicalPackage,
+        loadoutId: desiredLoadoutId || null,
+        bundleHash: String(selectedBundle?.contentHash || desiredBundleHash || canonicalPackage?.bundleHash || '').trim() || null,
+        runtimeDefaults: {
+          ...canonicalPackage.runtimeDefaults,
+          loadoutId: desiredLoadoutId || null,
+          delegationAllowed: canonicalPackage?.runtimeDefaults?.delegationAllowed === true,
+        },
+      },
+    };
+  }
+
   function resolveSharedHouseWorkerInstallPackage(share = null) {
     const portablePayload = share?.payload && typeof share.payload === 'object' ? share.payload : {};
     const sharedRegistryEntityId = String(share?.registryEntityId || '').trim();
@@ -473,7 +545,7 @@ function registerPlatformReadRoutes(app, deps) {
         ok: false,
         status: 409,
         code: 'SHARED_WORKER_PAYLOAD_INVALID',
-        message: 'Shared helper payload is missing exact package identity.',
+        message: 'This shared helper link is missing the exact helper package identity.',
       };
     }
 
@@ -489,7 +561,7 @@ function registerPlatformReadRoutes(app, deps) {
           ok: false,
           status: 409,
           code: 'SHARED_WORKER_PAYLOAD_MISMATCH',
-          message: `Shared helper ${field} no longer matches its signed portable payload.`,
+          message: 'This shared helper link no longer matches its signed package details. Ask your friend to send a fresh link.',
           details: {
             field,
           },
@@ -504,7 +576,7 @@ function registerPlatformReadRoutes(app, deps) {
         ok: false,
         status: 409,
         code: 'SHARED_WORKER_VERSION_INVALID',
-        message: 'The shared helper no longer resolves to the exact Registry package version that was shared.',
+        message: 'This shared helper link is out of date. Ask your friend to send a fresh link.',
       };
     }
 
@@ -519,7 +591,7 @@ function registerPlatformReadRoutes(app, deps) {
         ok: false,
         status: 409,
         code: 'SHARED_WORKER_LOADOUT_INVALID',
-        message: 'The shared helper references a loadout that no longer exists for that exact Registry package version.',
+        message: 'This shared helper link points to a setup that is no longer available. Ask your friend to send a fresh link.',
       };
     }
 
@@ -536,7 +608,7 @@ function registerPlatformReadRoutes(app, deps) {
         ok: false,
         status: 409,
         code: 'SHARED_WORKER_BUNDLE_INVALID',
-        message: 'The shared helper references a bundle hash that no longer belongs to the exact shared package.',
+        message: 'This shared helper link points to a portable bundle that is no longer available. Ask your friend to send a fresh link.',
       };
     }
 
@@ -560,7 +632,7 @@ function registerPlatformReadRoutes(app, deps) {
           ok: false,
           status: 409,
           code: 'SHARED_WORKER_RUNTIME_DEFAULT_INVALID',
-          message: `The shared helper contains an invalid ${field} runtime default.`,
+          message: `This shared helper link contains an invalid ${field} runtime default.`,
           details: {
             field,
           },
@@ -3633,8 +3705,20 @@ function registerPlatformReadRoutes(app, deps) {
       if (String(deployment?.houseId || '').trim() !== houseId || String(deployment?.teamId || '').trim() !== teamId) {
         return sendPortalApiError(res, 404, 'DEPLOYMENT_NOT_FOUND', 'House helper deployment not found for the active team.', { requestId });
       }
-      const entity = getRegistryEntityById(String(deployment?.registryEntityId || '').trim());
-      packageInfo = resolveHouseWorkerPackage(entity);
+      const resolvedDeploymentPackage = resolveHouseWorkerDeploymentSharePackage(deployment);
+      if (!resolvedDeploymentPackage?.ok || !resolvedDeploymentPackage?.packageInfo) {
+        return sendPortalApiError(
+          res,
+          Number(resolvedDeploymentPackage?.status || 409),
+          String(resolvedDeploymentPackage?.code || 'DEPLOYMENT_PACKAGE_VERSION_INVALID'),
+          String(resolvedDeploymentPackage?.message || 'This installed helper can no longer be shared safely.'),
+          {
+            requestId,
+            details: resolvedDeploymentPackage?.details || {},
+          }
+        );
+      }
+      packageInfo = resolvedDeploymentPackage.packageInfo;
     } else if (registryEntityId) {
       const entity = getRegistryEntityById(registryEntityId);
       packageInfo = resolveHouseWorkerPackage(entity);
@@ -3678,7 +3762,20 @@ function registerPlatformReadRoutes(app, deps) {
     if (!share) {
       return sendPortalApiError(res, 404, 'NOT_FOUND', 'House worker share not found.', { requestId });
     }
-    return sendPortalApiSuccess(res, buildHouseWorkerShareResponse(share), { requestId });
+    const resolvedSharePackage = resolveSharedHouseWorkerInstallPackage(share);
+    if (!resolvedSharePackage?.ok || !resolvedSharePackage?.canonicalShare) {
+      return sendPortalApiError(
+        res,
+        Number(resolvedSharePackage?.status || 409),
+        String(resolvedSharePackage?.code || 'SHARED_WORKER_PAYLOAD_INVALID'),
+        String(resolvedSharePackage?.message || 'The shared helper could not be resolved safely.'),
+        {
+          requestId,
+          details: resolvedSharePackage?.details || {},
+        }
+      );
+    }
+    return sendPortalApiSuccess(res, resolvedSharePackage.canonicalShare, { requestId });
   });
 
   app.post('/api/platform/house-workers/install-shared', express.json({ limit: '24kb' }), (req, res) => {
