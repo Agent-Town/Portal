@@ -339,6 +339,13 @@ Portal remains authoritative for:
 7. audit events,
 8. sharing and installation.
 
+Current implementation note:
+
+1. `browser_tab` is now routed through the executor adapter boundary,
+2. runtime instances are durable first-class records,
+3. helper message delivery already uses durable ordered transport with inspectable inbox and outbox cursors,
+4. later executor kinds must conform to the same runtime-instance and transport contracts instead of inventing their own session truth.
+
 The executor host becomes authoritative only for:
 
 1. process liveness,

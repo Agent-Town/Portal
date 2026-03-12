@@ -2601,7 +2601,7 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
   }
 
   async function persistReply(message) {
-    await api('/api/platform/house-workers/message', {
+    const response = await api('/api/platform/house-workers/message', {
       method: 'POST',
       body: JSON.stringify({
         houseWorkerSessionId,
@@ -2609,6 +2609,15 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
         message,
       }),
     });
+    const transportMessageId = String(response?.data?.transportMessage?.transportMessageId || '').trim();
+    if (transportMessageId) {
+      await api('/api/platform/house-workers/transport/ack', {
+        method: 'POST',
+        body: JSON.stringify({
+          transportMessageId,
+        }),
+      });
+    }
     await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
     currentStatus = 'idle';
     await persistStatus('idle', { heartbeatOnly: true }).catch(() => null);
@@ -2776,7 +2785,7 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
         throw new Error('HOUSE_WORKER_MESSAGE_REQUIRED');
       }
       await readyPromise;
-      await api('/api/platform/house-workers/message', {
+      const transportResponse = await api('/api/platform/house-workers/message', {
         method: 'POST',
         body: JSON.stringify({
           houseWorkerSessionId,
@@ -2784,6 +2793,7 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
           message: normalizedMessage,
         }),
       });
+      const transportMessageId = String(transportResponse?.data?.transportMessage?.transportMessageId || '').trim();
       await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
       await persistStatus('working').catch(() => null);
       const replyPromise = new Promise((resolve, reject) => {
@@ -2798,6 +2808,14 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
         runtimeContext: buildCurrentRuntimeContext(),
         runtimeState: buildHouseWorkerRuntimeStateForChild(),
       });
+      if (transportMessageId) {
+        await api('/api/platform/house-workers/transport/ack', {
+          method: 'POST',
+          body: JSON.stringify({
+            transportMessageId,
+          }),
+        });
+      }
       return await replyPromise;
     },
     async stop(reason = 'user_stop') {

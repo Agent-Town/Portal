@@ -1402,6 +1402,8 @@ Response fields:
 - `data.runtimeInstances[].leaseStatus`
 - `data.runtimeInstances[].lastHeartbeatAt`
 - `data.runtimeInstances[].leaseExpiresAt`
+- `data.runtimeInstances[].outboxCursor`
+- `data.runtimeInstances[].inboxCursor`
 - `data.runtimeInstances[].startedAt`
 - `data.runtimeInstances[].stoppedAt`
 - `data.sessions[]`
@@ -1515,6 +1517,8 @@ Per-runtime-instance fields:
 - `leaseStatus`
 - `lastHeartbeatAt`
 - `leaseExpiresAt`
+- `outboxCursor`
+- `inboxCursor`
 - `startedAt`
 - `stoppedAt`
 
@@ -1668,6 +1672,60 @@ Stable error codes:
 Response fields:
 - `data.session`
 - `data.event`
+- `data.transportMessage`
+- `data.runtimeInstance`
+
+Notes:
+- `actor=human` and `actor=parent_worker` write `to_runtime` transport rows before the executor processes the task.
+- `actor=helper` writes `from_runtime` transport rows when the executor persists a reply.
+
+### GET `/api/platform/house-workers/transport` (human)
+Returns the durable ordered transport stream for one helper session.
+
+Query params:
+- `houseWorkerSessionId` required when `workerSessionId` is omitted
+- `workerSessionId` accepted as alias for `houseWorkerSessionId`
+- `teamId` optional override; when omitted, resolves to `data.activeTeamId`
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `WORKER_SESSION_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.houseWorkerSessionId`
+- `data.runtimeInstance`
+- `data.transportMessages[]`
+- `data.transportMessages[].transportMessageId`
+- `data.transportMessages[].runtimeInstanceId`
+- `data.transportMessages[].direction`
+- `data.transportMessages[].actor`
+- `data.transportMessages[].message`
+- `data.transportMessages[].deliveryStatus`
+- `data.transportMessages[].transportOrder`
+- `data.transportMessages[].createdAt`
+- `data.transportMessages[].acknowledgedAt`
+
+### POST `/api/platform/house-workers/transport/ack` (human)
+Acknowledges one durable helper transport row and advances the matching runtime cursor.
+
+Request body:
+- `transportMessageId` required
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `INVALID_ARGUMENT`
+- `TRANSPORT_MESSAGE_NOT_FOUND`
+- `WORKER_SESSION_NOT_FOUND`
+
+Response fields:
+- `data.transportMessage`
+- `data.runtimeInstance`
 
 ### POST `/api/platform/house-workers/status` (human)
 Writes one helper status transition for the current House team.

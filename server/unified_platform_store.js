@@ -29,6 +29,7 @@ const PLATFORM_TABLES = Object.freeze([
   'house_worker_share_invites',
   'house_worker_sessions',
   'house_worker_runtime_instances',
+  'house_worker_transport_messages',
   'house_worker_session_events',
   'track_progress_events',
   'sealed_contexts',
@@ -509,6 +510,19 @@ function ensureDb() {
       updated_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS house_worker_transport_messages (
+      transport_message_id TEXT PRIMARY KEY,
+      house_worker_session_id TEXT NOT NULL,
+      runtime_instance_id TEXT,
+      direction TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      message_text TEXT NOT NULL,
+      delivery_status TEXT NOT NULL DEFAULT 'queued',
+      transport_order INTEGER NOT NULL,
+      created_at TEXT NOT NULL,
+      acknowledged_at TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS house_worker_session_events (
       house_worker_session_event_id TEXT PRIMARY KEY,
       house_worker_session_id TEXT NOT NULL,
@@ -608,6 +622,8 @@ function ensureDb() {
   ensureColumn(db, 'trace_events', 'sealed_context_id', 'TEXT');
   ensureColumn(db, 'trace_events', 'canonical_at', `TEXT NOT NULL DEFAULT ''`);
   ensureColumn(db, 'sealed_contexts', 'house_id', 'TEXT');
+  ensureColumn(db, 'house_worker_runtime_instances', 'outbox_cursor', 'TEXT');
+  ensureColumn(db, 'house_worker_runtime_instances', 'inbox_cursor', 'TEXT');
   ensureColumn(db, 'house_worker_deployments', 'lifecycle_state', `TEXT NOT NULL DEFAULT 'active'`);
   ensureColumn(db, 'house_worker_deployments', 'lifecycle_updated_at', 'TEXT');
   ensureColumn(db, 'house_worker_deployments', 'lifecycle_note', 'TEXT');
@@ -2560,6 +2576,8 @@ function mapHouseWorkerRuntimeInstanceRow(row) {
     runtimeBinding: parseJsonColumn(row.runtime_binding_json, {}),
     workspaceSnapshotRef: row.workspace_snapshot_ref ? String(row.workspace_snapshot_ref) : null,
     messageCursor: row.message_cursor ? String(row.message_cursor) : null,
+    outboxCursor: row.outbox_cursor ? String(row.outbox_cursor) : null,
+    inboxCursor: row.inbox_cursor ? String(row.inbox_cursor) : null,
     startedAt: row.started_at ? String(row.started_at) : null,
     stoppedAt: row.stopped_at ? String(row.stopped_at) : null,
     createdAt: String(row.created_at || ''),
@@ -2724,6 +2742,8 @@ function updateHouseWorkerRuntimeInstance({
   runtimeBinding = undefined,
   workspaceSnapshotRef = undefined,
   messageCursor = undefined,
+  outboxCursor = undefined,
+  inboxCursor = undefined,
   startedAt = undefined,
   stoppedAt = undefined,
   updatedAt = new Date().toISOString(),
@@ -2756,6 +2776,8 @@ function updateHouseWorkerRuntimeInstance({
         runtime_binding_json = ?,
         workspace_snapshot_ref = ?,
         message_cursor = ?,
+        outbox_cursor = ?,
+        inbox_cursor = ?,
         started_at = ?,
         stopped_at = ?,
         updated_at = ?
@@ -2773,12 +2795,135 @@ function updateHouseWorkerRuntimeInstance({
     JSON.stringify(nextRuntimeBinding),
     workspaceSnapshotRef === undefined ? existing.workspaceSnapshotRef : (String(workspaceSnapshotRef || '').trim() || null),
     messageCursor === undefined ? existing.messageCursor : (String(messageCursor || '').trim() || null),
+    outboxCursor === undefined ? existing.outboxCursor : (String(outboxCursor || '').trim() || null),
+    inboxCursor === undefined ? existing.inboxCursor : (String(inboxCursor || '').trim() || null),
     startedAt === undefined ? existing.startedAt : (String(startedAt || '').trim() || null),
     stoppedAt === undefined ? existing.stoppedAt : (String(stoppedAt || '').trim() || null),
     String(updatedAt || '').trim() || new Date().toISOString(),
     String(existing.runtimeInstanceId || '').trim(),
   );
   return getHouseWorkerRuntimeInstanceById(String(existing.runtimeInstanceId || '').trim());
+}
+
+function mapHouseWorkerTransportMessageRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    transportMessageId: String(row.transport_message_id || ''),
+    houseWorkerSessionId: String(row.house_worker_session_id || ''),
+    runtimeInstanceId: row.runtime_instance_id ? String(row.runtime_instance_id) : null,
+    direction: String(row.direction || ''),
+    actor: String(row.actor || ''),
+    message: String(row.message_text || ''),
+    deliveryStatus: String(row.delivery_status || ''),
+    transportOrder: Number(row.transport_order || 0) || 0,
+    createdAt: String(row.created_at || ''),
+    acknowledgedAt: row.acknowledged_at ? String(row.acknowledged_at) : null,
+  };
+}
+
+function getHouseWorkerTransportMessageById(transportMessageId = '') {
+  const normalizedTransportMessageId = String(transportMessageId || '').trim();
+  if (!normalizedTransportMessageId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_transport_messages
+    WHERE transport_message_id = ?
+    LIMIT 1
+  `).get(normalizedTransportMessageId);
+  return mapHouseWorkerTransportMessageRow(row);
+}
+
+function listHouseWorkerTransportMessages({
+  houseWorkerSessionId = '',
+} = {}) {
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedSessionId) return [];
+  const database = ensureDb();
+  const rows = database.prepare(`
+    SELECT *
+    FROM house_worker_transport_messages
+    WHERE house_worker_session_id = ?
+    ORDER BY transport_order ASC, transport_message_id ASC
+  `).all(normalizedSessionId);
+  return rows.map(mapHouseWorkerTransportMessageRow).filter(Boolean);
+}
+
+function createHouseWorkerTransportMessage({
+  transportMessageId = '',
+  houseWorkerSessionId = '',
+  runtimeInstanceId = '',
+  direction = '',
+  actor = '',
+  message = '',
+  deliveryStatus = 'queued',
+  transportOrder = 1,
+  createdAt = new Date().toISOString(),
+  acknowledgedAt = '',
+} = {}) {
+  const normalizedTransportMessageId = String(transportMessageId || '').trim();
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  const normalizedDirection = String(direction || '').trim();
+  const normalizedActor = String(actor || '').trim();
+  const normalizedMessage = String(message || '').trim();
+  if (
+    !normalizedTransportMessageId
+    || !normalizedSessionId
+    || !normalizedDirection
+    || !normalizedActor
+    || !normalizedMessage
+  ) {
+    throw new Error('HOUSE_WORKER_TRANSPORT_MESSAGE_INVALID');
+  }
+  const existing = getHouseWorkerTransportMessageById(normalizedTransportMessageId);
+  if (existing) return existing;
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO house_worker_transport_messages (
+      transport_message_id,
+      house_worker_session_id,
+      runtime_instance_id,
+      direction,
+      actor,
+      message_text,
+      delivery_status,
+      transport_order,
+      created_at,
+      acknowledged_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedTransportMessageId,
+    normalizedSessionId,
+    String(runtimeInstanceId || '').trim() || null,
+    normalizedDirection,
+    normalizedActor,
+    normalizedMessage,
+    String(deliveryStatus || 'queued').trim() || 'queued',
+    Math.max(1, Number(transportOrder || 0) || 1),
+    String(createdAt || '').trim() || new Date().toISOString(),
+    String(acknowledgedAt || '').trim() || null,
+  );
+  return getHouseWorkerTransportMessageById(normalizedTransportMessageId);
+}
+
+function acknowledgeHouseWorkerTransportMessage(transportMessageId = '', {
+  deliveryStatus = 'acknowledged',
+  acknowledgedAt = new Date().toISOString(),
+} = {}) {
+  const existing = getHouseWorkerTransportMessageById(transportMessageId);
+  if (!existing) return null;
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE house_worker_transport_messages
+    SET delivery_status = ?,
+        acknowledged_at = ?
+    WHERE transport_message_id = ?
+  `).run(
+    String(deliveryStatus || 'acknowledged').trim() || 'acknowledged',
+    String(acknowledgedAt || '').trim() || new Date().toISOString(),
+    String(transportMessageId || '').trim(),
+  );
+  return getHouseWorkerTransportMessageById(transportMessageId);
 }
 
 function listHouseWorkerSessionEvents({
@@ -3915,6 +4060,7 @@ function getUnifiedPlatformTestStats() {
       houseWorkerSupervisor: true,
       houseWorkerSessions: true,
       houseWorkerRuntimeInstances: true,
+      houseWorkerTransport: true,
       houseWorkerEvents: true,
     },
   };
@@ -3934,6 +4080,7 @@ module.exports = {
   createHouseWorkerShare,
   createHouseWorkerShareInvite,
   createHouseWorkerRuntimeInstance,
+  createHouseWorkerTransportMessage,
   createIntegrationCandidate,
   createIntegrationExecution,
   createIntegrationPackVersion,
@@ -3962,6 +4109,7 @@ module.exports = {
   getHouseWorkerDeploymentById,
   getHouseWorkerRuntimeInstanceById,
   getHouseWorkerRuntimeInstanceBySessionId,
+  getHouseWorkerTransportMessageById,
   getHouseWorkerShareById,
   getHouseWorkerShareInviteById,
   getHouseWorkerSessionById,
@@ -3979,6 +4127,7 @@ module.exports = {
   listHouseStaffAssignments,
   listHouseWorkerDeployments,
   listHouseWorkerRuntimeInstances,
+  listHouseWorkerTransportMessages,
   listHouseWorkerShareInvites,
   listHouseWorkerSessionEvents,
   listHouseWorkerSessions,
@@ -4000,6 +4149,7 @@ module.exports = {
   updateHouseWorkerRuntimeInstance,
   updateHouseWorkerShareInvite,
   updateHouseWorkerSession,
+  acknowledgeHouseWorkerTransportMessage,
   updateSealedContextStatus,
   upsertSealedContext,
   updateTrainerJobStatus,
