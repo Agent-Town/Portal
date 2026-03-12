@@ -159,6 +159,7 @@ const {
   getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
+  getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
@@ -10985,6 +10986,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformScopesInspector();
     } else if (inspector === 'publications') {
       data = getUnifiedPlatformPublicationsInspector();
+    } else if (inspector === 'peer-relay') {
+      data = getUnifiedPlatformPeerRelayInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {

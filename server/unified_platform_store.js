@@ -30,6 +30,8 @@ const PLATFORM_TABLES = Object.freeze([
   'scope_sets',
   'scope_set_items',
   'library_publications',
+  'library_peer_relays',
+  'library_peer_receipts',
   'track_progress_events',
   'sealed_contexts',
   'sealed_context_violations',
@@ -84,6 +86,7 @@ const FIXTURE_FILES = Object.freeze({
   library_skill_contract_v2_seed: 'library_skill_contract_v2_seed.json',
   library_benchmark_seed: 'library_benchmark_seed.json',
   library_guided_flow_seed: 'library_guided_flow_seed.json',
+  library_peer_relay_seed: 'library_peer_relay_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -116,6 +119,7 @@ let unifiedPlatformInspectors = {
   editor: buildDefaultEditorInspector(),
   registryPreview: buildDefaultRegistryPreviewInspector(),
   benchmarks: buildDefaultBenchmarkInspector(),
+  peerRelay: buildDefaultPeerRelayInspector(),
 };
 
 function hasTableColumn(database, tableName, columnName) {
@@ -437,6 +441,34 @@ function ensureDb() {
       UNIQUE (house_id, team_id, idempotency_key)
     );
 
+    CREATE TABLE IF NOT EXISTS library_peer_relays (
+      library_peer_relay_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      library_publication_id TEXT NOT NULL,
+      registry_id TEXT NOT NULL,
+      target_house_id TEXT NOT NULL,
+      transport_kind TEXT NOT NULL,
+      relay_state TEXT NOT NULL,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_peer_receipts (
+      library_peer_receipt_id TEXT PRIMARY KEY,
+      library_peer_relay_id TEXT NOT NULL,
+      target_house_id TEXT NOT NULL,
+      receipt_kind TEXT NOT NULL,
+      receipt_ref TEXT NOT NULL,
+      status TEXT NOT NULL,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_peer_relay_id, receipt_kind, receipt_ref)
+    );
+
     CREATE TABLE IF NOT EXISTS track_progress_events (
       track_progress_event_id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -638,12 +670,25 @@ function buildDefaultBenchmarkInspector() {
   };
 }
 
+function buildDefaultPeerRelayInspector() {
+  return {
+    relays: [],
+    receipts: [],
+    filters: {
+      sourceHouseId: '',
+      targetHouseId: '',
+      transportKind: '',
+    },
+  };
+}
+
 function resetUnifiedPlatformInspectors() {
   unifiedPlatformInspectors = {
     promptPreview: buildDefaultPromptPreviewInspector(),
     editor: buildDefaultEditorInspector(),
     registryPreview: buildDefaultRegistryPreviewInspector(),
     benchmarks: buildDefaultBenchmarkInspector(),
+    peerRelay: buildDefaultPeerRelayInspector(),
   };
 }
 
@@ -1659,6 +1704,38 @@ function mapLibraryPublicationRow(row) {
   };
 }
 
+function mapLibraryPeerRelayRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPeerRelayId: String(row.library_peer_relay_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    libraryPublicationId: String(row.library_publication_id || ''),
+    registryId: String(row.registry_id || ''),
+    targetHouseId: String(row.target_house_id || ''),
+    transportKind: String(row.transport_kind || ''),
+    relayState: String(row.relay_state || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryPeerReceiptRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPeerReceiptId: String(row.library_peer_receipt_id || ''),
+    libraryPeerRelayId: String(row.library_peer_relay_id || ''),
+    targetHouseId: String(row.target_house_id || ''),
+    receiptKind: String(row.receipt_kind || ''),
+    receiptRef: String(row.receipt_ref || ''),
+    status: String(row.status || ''),
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
 function listLibraryPublications({
   houseId = '',
   teamId = '',
@@ -1770,6 +1847,199 @@ function createLibraryPublication({
   );
   return listLibraryPublications({ houseId: normalizedHouseId, teamId: normalizedTeamId })
     .find((entry) => entry.libraryPublicationId === normalizedLibraryPublicationId) || null;
+}
+
+function listLibraryPeerRelays({
+  houseId = '',
+  teamId = '',
+  targetHouseId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_peer_relays
+  `;
+  const args = [];
+  if (normalizedHouseId || normalizedTeamId || normalizedTargetHouseId) {
+    const clauses = [];
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    if (normalizedTargetHouseId) {
+      clauses.push('target_house_id = ?');
+      args.push(normalizedTargetHouseId);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, library_peer_relay_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryPeerRelayRow).filter(Boolean);
+}
+
+function getLibraryPeerRelayByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_peer_relays
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryPeerRelayRow(row);
+}
+
+function createLibraryPeerRelay({
+  libraryPeerRelayId = '',
+  houseId = '',
+  teamId = '',
+  libraryPublicationId = '',
+  registryId = '',
+  targetHouseId = '',
+  transportKind = 'pony.relay.registry.v1',
+  relayState = 'queued',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPeerRelayId = String(libraryPeerRelayId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedLibraryPublicationId = String(libraryPublicationId || '').trim();
+  const normalizedRegistryId = String(registryId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const normalizedTransportKind = String(transportKind || 'pony.relay.registry.v1').trim() || 'pony.relay.registry.v1';
+  const normalizedRelayState = String(relayState || 'queued').trim() || 'queued';
+  if (
+    !normalizedLibraryPeerRelayId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedLibraryPublicationId
+    || !normalizedRegistryId
+    || !normalizedTargetHouseId
+  ) {
+    throw new Error('LIBRARY_PEER_RELAY_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_peer_relays (
+      library_peer_relay_id,
+      house_id,
+      team_id,
+      library_publication_id,
+      registry_id,
+      target_house_id,
+      transport_kind,
+      relay_state,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPeerRelayId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedLibraryPublicationId,
+    normalizedRegistryId,
+    normalizedTargetHouseId,
+    normalizedTransportKind,
+    normalizedRelayState,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return listLibraryPeerRelays({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+    .find((entry) => entry.libraryPeerRelayId === normalizedLibraryPeerRelayId) || null;
+}
+
+function listLibraryPeerReceipts({
+  libraryPeerRelayId = '',
+} = {}) {
+  const normalizedLibraryPeerRelayId = String(libraryPeerRelayId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_peer_receipts
+  `;
+  const args = [];
+  if (normalizedLibraryPeerRelayId) {
+    query += ' WHERE library_peer_relay_id = ?';
+    args.push(normalizedLibraryPeerRelayId);
+  }
+  query += ' ORDER BY created_at DESC, library_peer_receipt_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryPeerReceiptRow).filter(Boolean);
+}
+
+function createLibraryPeerReceipt({
+  libraryPeerReceiptId = '',
+  libraryPeerRelayId = '',
+  targetHouseId = '',
+  receiptKind = 'pony_dispatch_receipt',
+  receiptRef = '',
+  status = 'accepted',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPeerReceiptId = String(libraryPeerReceiptId || '').trim();
+  const normalizedLibraryPeerRelayId = String(libraryPeerRelayId || '').trim();
+  const normalizedTargetHouseId = String(targetHouseId || '').trim();
+  const normalizedReceiptKind = String(receiptKind || 'pony_dispatch_receipt').trim() || 'pony_dispatch_receipt';
+  const normalizedReceiptRef = String(receiptRef || '').trim();
+  const normalizedStatus = String(status || 'accepted').trim() || 'accepted';
+  if (
+    !normalizedLibraryPeerReceiptId
+    || !normalizedLibraryPeerRelayId
+    || !normalizedTargetHouseId
+    || !normalizedReceiptRef
+  ) {
+    throw new Error('LIBRARY_PEER_RECEIPT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_peer_receipts (
+      library_peer_receipt_id,
+      library_peer_relay_id,
+      target_house_id,
+      receipt_kind,
+      receipt_ref,
+      status,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPeerReceiptId,
+    normalizedLibraryPeerRelayId,
+    normalizedTargetHouseId,
+    normalizedReceiptKind,
+    normalizedReceiptRef,
+    normalizedStatus,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+  );
+  return listLibraryPeerReceipts({ libraryPeerRelayId: normalizedLibraryPeerRelayId })
+    .find((entry) => entry.libraryPeerReceiptId === normalizedLibraryPeerReceiptId) || null;
 }
 
 function setUnifiedPlatformPromptPreview(snapshot = null) {
@@ -1885,6 +2155,26 @@ function getUnifiedPlatformPublicationsInspector({
 } = {}) {
   return {
     publications: listLibraryPublications({ houseId, teamId }),
+  };
+}
+
+function getUnifiedPlatformPeerRelayInspector({
+  houseId = '',
+  teamId = '',
+  targetHouseId = '',
+} = {}) {
+  const relays = listLibraryPeerRelays({ houseId, teamId, targetHouseId });
+  const receipts = relays.flatMap((relay) => listLibraryPeerReceipts({
+    libraryPeerRelayId: String(relay?.libraryPeerRelayId || '').trim(),
+  }));
+  return {
+    relays,
+    receipts,
+    filters: {
+      sourceHouseId: String(houseId || '').trim(),
+      targetHouseId: String(targetHouseId || '').trim(),
+      transportKind: '',
+    },
   };
 }
 
@@ -3811,6 +4101,7 @@ function getUnifiedPlatformTestStats() {
       shelves: true,
       scopes: true,
       publications: true,
+      peerRelay: true,
       promptPreview: true,
       editor: true,
       registryPreview: true,
@@ -3826,6 +4117,8 @@ module.exports = {
   createLibraryItem,
   createLibraryItemRevision,
   createLibraryLink,
+  createLibraryPeerReceipt,
+  createLibraryPeerRelay,
   createLibraryShelf,
   createLibraryPublication,
   createScopeSet,
@@ -3852,6 +4145,7 @@ module.exports = {
   getConversationArtifactByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
   getLibraryPublicationByIdempotency,
@@ -3874,6 +4168,7 @@ module.exports = {
   getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
+  getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
@@ -3890,6 +4185,8 @@ module.exports = {
   listLibraryItems,
   listLibraryItemRevisions,
   listLibraryLinks,
+  listLibraryPeerReceipts,
+  listLibraryPeerRelays,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,

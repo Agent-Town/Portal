@@ -1,0 +1,18 @@
+{
+  "family": "library_peer_relay_seed",
+  "publication": {
+    "houseId": "house_library_peer_source",
+    "teamId": "team_main",
+    "libraryPublicationId": "pub_peer_alpha_01",
+    "libraryItemId": "lib_peer_alpha_01",
+    "registryId": "regpub_peer_alpha_01",
+    "visibility": "registry_public"
+  },
+  "peerRelay": {
+    "targetHouseId": "house_library_peer_friend",
+    "transportKind": "pony.relay.registry.v1",
+    "relayState": "queued",
+    "receiptKind": "pony_dispatch_receipt",
+    "expectedReceiptCount": 1
+  }
+}

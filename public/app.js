@@ -1857,10 +1857,24 @@ function syncHouseLibraryPublicStacksControls() {
   const familySelect = el('houseLibraryPublicStacksFamilySelect');
   const searchBtn = el('houseLibraryPublicStacksSearchBtn');
   if (queryInput) {
-    queryInput.value = String(houseSurfaceState.library.publicStacksQuery || '');
+    const storedQuery = String(houseSurfaceState.library.publicStacksQuery || '');
+    const liveQuery = String(queryInput.value || '');
+    const preferLiveQuery = queryInput === document.activeElement || (!storedQuery && liveQuery);
+    if (preferLiveQuery) {
+      houseSurfaceState.library.publicStacksQuery = liveQuery.trim();
+    } else if (liveQuery !== storedQuery) {
+      queryInput.value = storedQuery;
+    }
   }
   if (familySelect) {
-    familySelect.value = String(houseSurfaceState.library.publicStacksFamily || '');
+    const storedFamily = String(houseSurfaceState.library.publicStacksFamily || '');
+    const liveFamily = String(familySelect.value || '');
+    const preferLiveFamily = familySelect === document.activeElement || (!storedFamily && liveFamily);
+    if (preferLiveFamily) {
+      houseSurfaceState.library.publicStacksFamily = liveFamily.trim();
+    } else if (liveFamily !== storedFamily) {
+      familySelect.value = storedFamily;
+    }
   }
   if (searchBtn) {
     searchBtn.disabled = false;
@@ -6646,9 +6660,13 @@ function bindTownDistrictControls() {
     houseLibraryPublicStacksSearchBtn.onclick = async () => {
       houseLibraryPublicStacksSearchBtn.disabled = true;
       try {
+        const nextQuery = String(el('houseLibraryPublicStacksQueryInput')?.value || '').trim();
+        const nextFamily = String(el('houseLibraryPublicStacksFamilySelect')?.value || '').trim();
+        houseSurfaceState.library.publicStacksQuery = nextQuery;
+        houseSurfaceState.library.publicStacksFamily = nextFamily;
         await loadHouseLibraryPublicStacksSearch({
-          query: String(el('houseLibraryPublicStacksQueryInput')?.value || '').trim(),
-          family: String(el('houseLibraryPublicStacksFamilySelect')?.value || '').trim(),
+          query: nextQuery,
+          family: nextFamily,
         });
       } catch (err) {
         const code = String(err?.code || err?.message || 'PUBLIC_STACK_SEARCH_FAILED');
