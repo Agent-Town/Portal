@@ -593,6 +593,17 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_audit_events_hand_created_idx
       ON poker_play_audit_events(hand_id, created_at DESC);
 
+    CREATE TABLE IF NOT EXISTS poker_play_wallet_policies (
+      wallet_subject TEXT PRIMARY KEY,
+      daily_spend_cap_oil INTEGER NOT NULL DEFAULT 0,
+      self_excluded_until TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_play_wallet_policies_self_excluded_idx
+      ON poker_play_wallet_policies(self_excluded_until, updated_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_streamflow_lock_verifications (
       verification_id TEXT PRIMARY KEY,
       portal_session_id TEXT,
@@ -967,6 +978,7 @@ function countTableRows(tableName) {
     'poker_play_disputes',
     'poker_play_integrity_flags',
     'poker_play_player_stats',
+    'poker_play_wallet_policies',
     'poker_play_audit_events',
     'poker_streamflow_lock_verifications',
     'poker_oil_snapshot_events',
@@ -999,6 +1011,7 @@ function resetExtendedStore() {
     'poker_play_disputes',
     'poker_play_integrity_flags',
     'poker_play_player_stats',
+    'poker_play_wallet_policies',
     'poker_play_messages',
     'poker_play_hands',
     'poker_play_seats',
@@ -4362,9 +4375,113 @@ function computeOilBalance(walletSubject) {
   };
 }
 
+function hydratePokerPlayWalletPolicy(row) {
+  if (!row) return null;
+  return {
+    walletSubject: row.wallet_subject,
+    dailySpendCapOil: Number(row.daily_spend_cap_oil || 0),
+    selfExcludedUntil: row.self_excluded_until || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerPlayWalletPolicy(walletSubject) {
+  const normalizedWalletSubject = String(walletSubject || '').trim();
+  if (!normalizedWalletSubject) return null;
+  const database = ensureDb();
+  return hydratePokerPlayWalletPolicy(database.prepare(`
+    SELECT * FROM poker_play_wallet_policies
+    WHERE wallet_subject = ?
+  `).get(normalizedWalletSubject));
+}
+
+function upsertPokerPlayWalletPolicy({
+  walletSubject,
+  dailySpendCapOil = 0,
+  selfExcludedUntil = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const normalizedWalletSubject = String(walletSubject || '').trim();
+    if (!normalizedWalletSubject) return null;
+    const existing = database.prepare(`
+      SELECT * FROM poker_play_wallet_policies
+      WHERE wallet_subject = ?
+    `).get(normalizedWalletSubject);
+    const now = updatedAt || createdAt || sqlNow();
+    database.prepare(`
+      INSERT INTO poker_play_wallet_policies (
+        wallet_subject,
+        daily_spend_cap_oil,
+        self_excluded_until,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(wallet_subject) DO UPDATE SET
+        daily_spend_cap_oil = excluded.daily_spend_cap_oil,
+        self_excluded_until = excluded.self_excluded_until,
+        updated_at = excluded.updated_at
+    `).run(
+      normalizedWalletSubject,
+      Math.max(0, Number(dailySpendCapOil || 0)),
+      selfExcludedUntil || null,
+      existing?.created_at || createdAt || now,
+      now
+    );
+    return hydratePokerPlayWalletPolicy(database.prepare(`
+      SELECT * FROM poker_play_wallet_policies
+      WHERE wallet_subject = ?
+    `).get(normalizedWalletSubject));
+  });
+}
+
+function computeOilLedgerAmountByWalletSubject(walletSubject, {
+  entryKinds = [],
+  direction = '',
+  since = '',
+  until = '',
+} = {}) {
+  const normalizedWalletSubject = String(walletSubject || '').trim();
+  if (!normalizedWalletSubject) return 0;
+  const normalizedDirection = String(direction || '').trim().toLowerCase();
+  const normalizedSince = String(since || '').trim();
+  const normalizedUntil = String(until || '').trim();
+  const normalizedKinds = (Array.isArray(entryKinds) ? entryKinds : [])
+    .map((kind) => String(kind || '').trim())
+    .filter(Boolean);
+  const database = ensureDb();
+  const clauses = ['wallet_subject = ?'];
+  const params = [normalizedWalletSubject];
+  if (normalizedKinds.length) {
+    clauses.push(`entry_kind IN (${normalizedKinds.map(() => '?').join(', ')})`);
+    params.push(...normalizedKinds);
+  }
+  if (normalizedDirection === 'credit' || normalizedDirection === 'debit') {
+    clauses.push('direction = ?');
+    params.push(normalizedDirection);
+  }
+  if (normalizedSince) {
+    clauses.push('created_at >= ?');
+    params.push(normalizedSince);
+  }
+  if (normalizedUntil) {
+    clauses.push('created_at < ?');
+    params.push(normalizedUntil);
+  }
+  const row = database.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM poker_oil_ledger_entries
+    WHERE ${clauses.join(' AND ')}
+  `).get(...params);
+  return Math.max(0, Number(row?.total || 0));
+}
+
 module.exports = {
   activateCredentialGrant,
   countTableRows,
+  computeOilLedgerAmountByWalletSubject,
   computeOilBalance,
   createApprovalRequest,
   createCentaurAction,
@@ -4401,6 +4518,7 @@ module.exports = {
   getPokerPlayDisputeById,
   getPokerPlayIntegrityFlagById,
   getPokerPlayPlayerStatById,
+  getPokerPlayWalletPolicy,
   getOpenPokerPlayPlayerStatByTableAndWalletSubject,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
@@ -4461,6 +4579,7 @@ module.exports = {
   upsertPokerPlayIntegrityFlag,
   upsertPokerPlayHand,
   upsertPokerPlayPlayerStat,
+  upsertPokerPlayWalletPolicy,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
   upsertPokerPlayWaitlistEntry,

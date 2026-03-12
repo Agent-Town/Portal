@@ -38,6 +38,7 @@ const {
   createRouteError,
   getHandHistory,
   getMyResults,
+  getPokerPlayPolicy,
   getSeriesTimeline,
   getSeriesDetail,
   getTableDetail,
@@ -62,6 +63,7 @@ const {
   sitOutTableSeat,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
+  updatePokerPlayPolicy,
   useTimeBank,
 } = require('./poker_play_service');
 
@@ -192,6 +194,7 @@ function registerPokerRoutes(app, deps) {
   const {
     buildPortalRequestId,
     computeOilBalance,
+    computeOilLedgerAmountByWalletSubject,
     computePokerArtifactSha256,
     createCentaurAction,
     createCentaurMessage,
@@ -215,6 +218,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlayDisputeById,
     getPokerPlayIntegrityFlagById,
     getPokerPlayPlayerStatById,
+    getPokerPlayWalletPolicy,
     getOpenPokerPlayPlayerStatByTableAndWalletSubject,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
@@ -276,6 +280,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayIntegrityFlag,
     upsertPokerPlaySeat,
     upsertPokerPlayPlayerStat,
+    upsertPokerPlayWalletPolicy,
     upsertPokerPlayTable,
     upsertPokerPlayWaitlistEntry,
     upsertPokerSeason,
@@ -306,6 +311,7 @@ function registerPokerRoutes(app, deps) {
   };
 
   const playRouteDeps = {
+    computeOilLedgerAmountByWalletSubject,
     computeOilBalance,
     createOilLedgerEntry,
     createPokerPlayAuditEvent,
@@ -318,6 +324,7 @@ function registerPokerRoutes(app, deps) {
     getPokerPlayDisputeById,
     getPokerPlayIntegrityFlagById,
     getPokerPlayPlayerStatById,
+    getPokerPlayWalletPolicy,
     getOpenPokerPlayPlayerStatByTableAndWalletSubject,
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
@@ -348,6 +355,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayIntegrityFlag,
     upsertPokerPlaySeat,
     upsertPokerPlayPlayerStat,
+    upsertPokerPlayWalletPolicy,
     upsertPokerPlayTable,
     upsertPokerPlayWaitlistEntry,
   };
@@ -4134,6 +4142,56 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_LIST_FAILED',
         err?.message || 'Unable to load poker tables.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/policy', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = getPokerPlayPolicy(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_POLICY_READ_FAILED',
+        err?.message || 'Unable to load poker policy.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/policy', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = updatePokerPlayPolicy(playRouteDeps, {
+        session,
+        req,
+        body: req.body,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_POLICY_UPDATE_FAILED',
+        err?.message || 'Unable to update poker policy.',
         {
           requestId,
           details: err?.details || {},

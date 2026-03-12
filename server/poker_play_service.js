@@ -48,6 +48,8 @@ const POKER_PLAY_RECONCILE_RULES = [
 ];
 const POKER_PLAY_REFUND_ENTRY_KINDS = ['poker_play_admin_refund', 'poker_play_tournament_refund', 'poker_play_tournament_unregister'];
 const POKER_PLAY_PAYOUT_ENTRY_KINDS = ['poker_play_tournament_prize'];
+const POKER_PLAY_POLICY_SPEND_ENTRY_KINDS = ['poker_play_buy_in', 'poker_play_waitlist_buy_in', 'poker_play_reload'];
+const DEFAULT_POKER_PLAY_SELF_EXCLUDE_HOURS = 24;
 
 function createRouteError(status, code, message, details = {}) {
   const err = new Error(message);
@@ -162,6 +164,16 @@ function normalizeCashLifecycleSeatStatus(value, fallback = 'active') {
 
 function normalizeReloadAmount(value) {
   return Math.max(0, normalizeOilAmount(value, 0));
+}
+
+function normalizePokerPlayDailySpendCapOil(value, fallback = 0) {
+  if (value == null || value === '') return Math.max(0, Number(fallback || 0));
+  return Math.max(0, normalizeOilAmount(value, fallback));
+}
+
+function normalizePokerPlaySelfExcludeHours(value, fallback = 0) {
+  if (value == null || value === '') return Math.max(0, Number(fallback || 0));
+  return Math.max(0, normalizeOilAmount(value, fallback));
 }
 
 function normalizeSeatCount(value, fallback = POKER_PLAY_MAX_SEATS) {
@@ -651,6 +663,86 @@ function toProcessIso(deps, value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : deps.nowIso();
 }
 
+function addHoursToIso(iso, hours) {
+  const baseMs = Date.parse(String(iso || ''));
+  const safeHours = Math.max(0, Number(hours || 0));
+  const nextMs = (Number.isFinite(baseMs) ? baseMs : Date.now()) + (safeHours * 60 * 60 * 1000);
+  return new Date(nextMs).toISOString();
+}
+
+function buildUtcDayWindow(atIso) {
+  const baseMs = Date.parse(String(atIso || ''));
+  const base = Number.isFinite(baseMs) ? new Date(baseMs) : new Date();
+  const start = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate()));
+  const end = new Date(start.getTime() + (24 * 60 * 60 * 1000));
+  return {
+    startIso: start.toISOString(),
+    endIso: end.toISOString(),
+  };
+}
+
+function isIsoInFuture(iso, refIso) {
+  const targetMs = Date.parse(String(iso || ''));
+  const refMs = Date.parse(String(refIso || ''));
+  return Number.isFinite(targetMs) && Number.isFinite(refMs) && targetMs > refMs;
+}
+
+function buildPokerPlayWalletPolicySummary(deps, walletSubject, { processAt } = {}) {
+  const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
+  if (!normalizedWalletSubject) return null;
+  const requestAt = toProcessIso(deps, processAt);
+  const policy = typeof deps.getPokerPlayWalletPolicy === 'function'
+    ? deps.getPokerPlayWalletPolicy(normalizedWalletSubject)
+    : null;
+  const dailySpendCapOil = Math.max(0, Number(policy?.dailySpendCapOil || 0));
+  const selfExcludedUntil = normalizeIsoString(policy?.selfExcludedUntil) || null;
+  const selfExcluded = !!selfExcludedUntil && isIsoInFuture(selfExcludedUntil, requestAt);
+  const window = buildUtcDayWindow(requestAt);
+  const todaySpendOil = typeof deps.computeOilLedgerAmountByWalletSubject === 'function'
+    ? deps.computeOilLedgerAmountByWalletSubject(normalizedWalletSubject, {
+      entryKinds: POKER_PLAY_POLICY_SPEND_ENTRY_KINDS,
+      direction: 'debit',
+      since: window.startIso,
+      until: window.endIso,
+    })
+    : 0;
+  return {
+    walletSubject: normalizedWalletSubject,
+    dailySpendCapOil,
+    todaySpendOil: Math.max(0, Number(todaySpendOil || 0)),
+    remainingDailySpendOil: dailySpendCapOil > 0
+      ? Math.max(0, dailySpendCapOil - Math.max(0, Number(todaySpendOil || 0)))
+      : null,
+    selfExcluded,
+    selfExcludedUntil,
+    windowStartAt: window.startIso,
+    windowEndAt: window.endIso,
+    updatedAt: policy?.updatedAt || null,
+  };
+}
+
+function assertPokerPlayWalletPolicyAllowsSpend(deps, walletSubject, { amountOil = 0, processAt } = {}) {
+  const policy = buildPokerPlayWalletPolicySummary(deps, walletSubject, { processAt });
+  if (!policy) return null;
+  if (policy.selfExcluded) {
+    throw createRouteError(409, 'POKER_PLAY_SELF_EXCLUDED', 'This wallet is currently self-excluded from live poker spend.', {
+      selfExcludedUntil: policy.selfExcludedUntil,
+    });
+  }
+  const spendAmountOil = Math.max(0, normalizeOilAmount(amountOil, 0));
+  if (policy.dailySpendCapOil > 0 && (policy.todaySpendOil + spendAmountOil) > policy.dailySpendCapOil) {
+    throw createRouteError(409, 'POKER_PLAY_POLICY_LIMIT_EXCEEDED', 'This wallet reached the daily live-poker spend limit.', {
+      dailySpendCapOil: policy.dailySpendCapOil,
+      todaySpendOil: policy.todaySpendOil,
+      projectedSpendOil: policy.todaySpendOil + spendAmountOil,
+      remainingDailySpendOil: Math.max(0, Number(policy.remainingDailySpendOil || 0)),
+      windowStartAt: policy.windowStartAt,
+      windowEndAt: policy.windowEndAt,
+    });
+  }
+  return policy;
+}
+
 function isSeatPendingCashout(seat) {
   return !!seat && seat.status === 'pending_cashout';
 }
@@ -937,6 +1029,14 @@ function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
       continue;
     }
     const buyInOil = computeBuyInOil(table, entry?.buyInOil);
+    try {
+      assertPokerPlayWalletPolicyAllowsSpend(deps, walletSubject, {
+        amountOil: buyInOil,
+        processAt: atIso,
+      });
+    } catch {
+      continue;
+    }
     const oilBalance = deps.computeOilBalance(walletSubject);
     if (Number(oilBalance?.balance || 0) < buyInOil) continue;
     const openSeatNumber = findNextOpenSeatNumber(table, nextSeats);
@@ -4978,6 +5078,9 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
   const messages = hand ? deps.listPokerPlayMessagesByHand(hand.handId) : [];
   const actions = hand ? deps.listPokerPlayActionsByHand(hand.handId) : [];
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
+  const pokerPolicy = walletBinding?.walletSubject
+    ? buildPokerPlayWalletPolicySummary(deps, walletBinding.walletSubject, { processAt })
+    : null;
   const workerSeatAgentMode = normalizeTrimmedString(seatAgentMode).toLowerCase() === 'worker';
   const agentProposal = viewerSeat && hand
     ? getLatestSeatAgentProposal(deps, hand.handId, viewerSeat.seatNumber)
@@ -5057,6 +5160,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
+    pokerPolicy,
     mySeat: viewerSeat
       ? summarizeSeat(viewerSeat)
       : null,
@@ -5077,6 +5181,9 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
   const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
   const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
   const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
+  const pokerPolicy = walletBinding?.walletSubject
+    ? buildPokerPlayWalletPolicySummary(deps, walletBinding.walletSubject, { processAt })
+    : null;
   const entries = deps.listPokerPlayTables()
     .filter((table) => !isSeriesClosedTable(table))
     .map((table) => {
@@ -5161,6 +5268,7 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
     houseId: publicViewer ? null : viewerHouseId,
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
+    pokerPolicy,
     processAt: toProcessIso(deps, processAt),
   };
 }
@@ -5319,6 +5427,59 @@ function resolveMatchmakeTable(deps, config, { processAt } = {}) {
 
 function listTables(deps, { session, req, processAt, publicViewer = false } = {}) {
   return buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewer });
+}
+
+function getPokerPlayPolicy(deps, { session, req, processAt } = {}) {
+  const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding?.walletSubject) {
+    throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before reading poker policy.');
+  }
+  const requestAt = toProcessIso(deps, processAt);
+  return {
+    houseId: getSessionHouseId(session),
+    wallet: walletBinding.submitterWallet || null,
+    oilBalance: deps.computeOilBalance(walletBinding.walletSubject),
+    pokerPolicy: buildPokerPlayWalletPolicySummary(deps, walletBinding.walletSubject, { processAt: requestAt }),
+    processAt: requestAt,
+  };
+}
+
+function updatePokerPlayPolicy(deps, { session, req, body } = {}) {
+  const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
+  if (!walletBinding?.walletSubject) {
+    throw createRouteError(409, 'WALLET_SUBJECT_REQUIRED', 'A bound wallet is required before updating poker policy.');
+  }
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const existing = typeof deps.getPokerPlayWalletPolicy === 'function'
+    ? deps.getPokerPlayWalletPolicy(walletBinding.walletSubject)
+    : null;
+  const hasCapUpdate = Object.prototype.hasOwnProperty.call(body || {}, 'dailySpendCapOil');
+  const requestedSelfExcludeHours = normalizePokerPlaySelfExcludeHours(body?.selfExcludeHours, 0);
+  if (!hasCapUpdate && requestedSelfExcludeHours <= 0) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Provide a daily spend cap and/or self-exclusion window.');
+  }
+  const nextDailySpendCapOil = hasCapUpdate
+    ? normalizePokerPlayDailySpendCapOil(body?.dailySpendCapOil, existing?.dailySpendCapOil || 0)
+    : Math.max(0, Number(existing?.dailySpendCapOil || 0));
+  const currentSelfExcludedUntil = normalizeIsoString(existing?.selfExcludedUntil) || '';
+  const requestedSelfExcludedUntil = requestedSelfExcludeHours > 0
+    ? addHoursToIso(requestAt, requestedSelfExcludeHours)
+    : '';
+  let nextSelfExcludedUntil = currentSelfExcludedUntil || null;
+  if (requestedSelfExcludedUntil) {
+    nextSelfExcludedUntil = currentSelfExcludedUntil && isIsoInFuture(currentSelfExcludedUntil, requestedSelfExcludedUntil)
+      ? currentSelfExcludedUntil
+      : requestedSelfExcludedUntil;
+  }
+  if (typeof deps.upsertPokerPlayWalletPolicy === 'function') {
+    deps.upsertPokerPlayWalletPolicy({
+      walletSubject: walletBinding.walletSubject,
+      dailySpendCapOil: nextDailySpendCapOil,
+      selfExcludedUntil: nextSelfExcludedUntil,
+      updatedAt: requestAt,
+    });
+  }
+  return getPokerPlayPolicy(deps, { session, req, processAt: requestAt });
 }
 
 function getSeriesDetail(deps, { seriesId, session, req, processAt, publicViewer = false } = {}) {
@@ -5567,6 +5728,10 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
     throw createRouteError(409, 'POKER_PLAY_TABLE_FULL', 'No open seat is available at this table.');
   }
   const buyInOil = computeBuyInOil(table, body?.buyInOil);
+  assertPokerPlayWalletPolicyAllowsSpend(deps, walletBinding.walletSubject, {
+    amountOil: buyInOil,
+    processAt: requestAt,
+  });
   const oilBalance = deps.computeOilBalance(walletBinding.walletSubject);
   if (oilBalance.balance < buyInOil) {
     throw createRouteError(409, 'OIL_BALANCE_TOO_LOW', 'Not enough OIL balance to cover the table buy-in.', {
@@ -5937,6 +6102,10 @@ function reloadTableSeat(deps, { tableId, session, req, body } = {}) {
   if (amountOil <= 0) {
     throw createRouteError(400, 'INVALID_ARGUMENT', 'Reload amount must be greater than zero.');
   }
+  assertPokerPlayWalletPolicyAllowsSpend(deps, walletBinding.walletSubject, {
+    amountOil,
+    processAt: requestAt,
+  });
   const oilBalance = deps.computeOilBalance(walletBinding.walletSubject);
   if (Number(oilBalance?.balance || 0) < amountOil) {
     throw createRouteError(409, 'OIL_BALANCE_TOO_LOW', 'Not enough OIL balance to reload this seat.', {
@@ -6134,6 +6303,10 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
     throw createRouteError(409, 'POKER_PLAY_WAITLIST_NOT_NEEDED', 'This table still has an open seat.');
   }
   const buyInOil = computeBuyInOil(table, body?.buyInOil);
+  assertPokerPlayWalletPolicyAllowsSpend(deps, walletBinding.walletSubject, {
+    amountOil: buyInOil,
+    processAt: requestAt,
+  });
   const oilBalance = deps.computeOilBalance(walletBinding.walletSubject);
   if (Number(oilBalance?.balance || 0) < buyInOil) {
     throw createRouteError(409, 'OIL_BALANCE_TOO_LOW', 'Not enough OIL balance to join this waitlist.', {
@@ -6576,6 +6749,7 @@ module.exports = {
   createRouteError,
   getHandHistory,
   getMyResults,
+  getPokerPlayPolicy,
   getSeriesTimeline,
   getSeriesDetail,
   getTableDetail,
@@ -6603,5 +6777,6 @@ module.exports = {
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
+  updatePokerPlayPolicy,
   useTimeBank,
 };

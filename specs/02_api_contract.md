@@ -434,6 +434,59 @@ Returns the live 6-max poker lobby payload with:
 - `data.houseId`
 - `data.wallet`
 - `data.oilBalance`
+- `data.pokerPolicy`
+- `data.pokerPolicy.dailySpendCapOil`
+- `data.pokerPolicy.todaySpendOil`
+- `data.pokerPolicy.remainingDailySpendOil`
+- `data.pokerPolicy.selfExcluded`
+- `data.pokerPolicy.selfExcludedUntil`
+
+Policy notes:
+- `data.pokerPolicy` is only populated for authenticated player views with a bound wallet subject
+- `remainingDailySpendOil = null` means the wallet currently has no daily spend cap configured
+- `todaySpendOil` is computed from the current UTC-day debit window across live-poker buy-ins, waitlist reservations that promote, and reloads
+
+### GET `/api/poker/play/policy`
+Returns the authenticated wallet's current live-poker responsible-gaming policy summary.
+
+Response fields:
+- `data.houseId`
+- `data.wallet`
+- `data.oilBalance`
+- `data.pokerPolicy`
+- `data.pokerPolicy.dailySpendCapOil`
+- `data.pokerPolicy.todaySpendOil`
+- `data.pokerPolicy.remainingDailySpendOil`
+- `data.pokerPolicy.selfExcluded`
+- `data.pokerPolicy.selfExcludedUntil`
+- `data.pokerPolicy.windowStartAt`
+- `data.pokerPolicy.windowEndAt`
+- `data.pokerPolicy.updatedAt`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+
+### POST `/api/poker/play/policy`
+Updates the authenticated wallet's live-poker policy. This route currently supports a UTC-day spend cap and a forward-only self-exclusion lock.
+
+Request shape:
+```json
+{
+  "dailySpendCapOil": 500,
+  "selfExcludeHours": 24
+}
+```
+
+Response notes:
+- returns the same payload shape as `GET /api/poker/play/policy`
+- `dailySpendCapOil = 0` clears the spend cap and restores unlimited daily spend
+- self-exclusion only extends forward; a shorter request does not shorten an already-active exclusion window
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `INVALID_ARGUMENT`
 
 ### GET `/api/poker/play/rail`
 Returns the public spectator lobby for live poker. This route intentionally strips viewer identity and join-state so the browser can render a true rail page.
@@ -474,6 +527,7 @@ Returns one live cash or tournament table payload with:
 - `data.agentProposal`
 - `data.suggestion`
 - `data.oilBalance`
+- `data.pokerPolicy`
 
 Optional query params:
 - `seatAgentMode=worker` suppresses the legacy backend `data.suggestion` field and returns `data.agentProposal` for the acting viewer seat when a worker-backed proposal was already persisted for the live hand
@@ -752,6 +806,15 @@ Invite-only table notes:
 - invite-only tables stay out of public lobby and rail payloads
 - invite-only tables still support direct join and cash waitlist through the normal table routes when the caller supplies the valid invite code
 
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
+- `OIL_BALANCE_TOO_LOW`
+
 ### POST `/api/poker/play/tables/:tableId/sit`
 Debits the table buy-in from offchain OIL and seats the bound wallet in a cash or tournament table.
 
@@ -780,6 +843,8 @@ Failure codes:
 - `POKER_PLAY_TABLE_FULL`
 - `POKER_PLAY_TOURNAMENT_ALREADY_STARTED`
 - `POKER_PLAY_INVITE_REQUIRED`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
 Tournament seat notes:
@@ -812,6 +877,8 @@ Failure codes:
 - `POKER_PLAY_TABLE_CLOSED`
 - `POKER_PLAY_TABLE_PAUSED`
 - `POKER_PLAY_HAND_IN_PROGRESS`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
 ### POST `/api/poker/play/tables/:tableId/sit-out`
@@ -889,6 +956,8 @@ Failure codes:
 - `POKER_PLAY_ALREADY_SEATED`
 - `POKER_PLAY_WAITLIST_NOT_NEEDED`
 - `POKER_PLAY_INVITE_REQUIRED`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
 ### DELETE `/api/poker/play/tables/:tableId/waitlist`
@@ -929,6 +998,15 @@ Response fields:
 - `data.hand`
 - `data.oilBalance`
 
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
+- `OIL_BALANCE_TOO_LOW`
+
 Tournament matchmaking notes:
 - tournament matching includes `lateRegistrationHands` as part of the structure key
 - tournament matching also includes `reentryLimit` as part of the structure key
@@ -963,6 +1041,8 @@ Failure codes:
 - `POKER_PLAY_SEAT_ALREADY_ACTIVE`
 - `POKER_PLAY_REENTRY_UNAVAILABLE`
 - `POKER_PLAY_REENTRY_LIMIT_REACHED`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
 ### GET `/api/poker/play/tables/:tableId/stream`

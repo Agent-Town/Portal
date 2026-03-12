@@ -1051,6 +1051,13 @@
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
     const series = Array.isArray(payload?.data?.series) ? payload.data.series : [];
     const oilBalance = Number(payload?.data?.oilBalance?.balance || 0);
+    const pokerPolicy = payload?.data?.pokerPolicy || null;
+    const dailySpendCapOil = Number(pokerPolicy?.dailySpendCapOil || 0);
+    const todaySpendOil = Number(pokerPolicy?.todaySpendOil || 0);
+    const remainingDailySpendOil = pokerPolicy?.remainingDailySpendOil == null
+      ? null
+      : Number(pokerPolicy?.remainingDailySpendOil || 0);
+    const selfExcluded = !!pokerPolicy?.selfExcluded;
     renderCards([
       `
         <h2>Eligibility</h2>
@@ -1061,6 +1068,24 @@
           ${renderSummaryMetric('Tournament Series', `${series.length}`)}
           ${renderSummaryMetric('Live Tables', `${items.length}`)}
         </div>
+      `,
+      `
+        <h2>Poker Policy</h2>
+        <p>Wallet-level guardrails apply before live poker OIL spend. Daily caps reset at UTC midnight, and self-exclusion blocks new live-poker spend until the lock expires.</p>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('Daily Cap', dailySpendCapOil > 0 ? `${dailySpendCapOil} OIL` : 'unlimited')}
+          ${renderSummaryMetric('Spent Today', `${todaySpendOil} OIL`)}
+          ${renderSummaryMetric('Remaining Today', remainingDailySpendOil == null ? 'unlimited' : `${remainingDailySpendOil} OIL`)}
+          ${renderSummaryMetric('Self-Exclusion', selfExcluded ? `active until ${formatIso(pokerPolicy?.selfExcludedUntil)}` : 'inactive')}
+        </div>
+        <form id="pokerPlayPolicyForm" class="pokerForm">
+          <label>
+            Daily Spend Cap OIL
+            <input id="pokerPlayPolicyDailyCap" type="number" min="0" placeholder="0 = unlimited" value="${dailySpendCapOil > 0 ? escapeHtml(String(dailySpendCapOil)) : ''}">
+          </label>
+          <button class="pokerButton" type="submit">Save Limit</button>
+          <button id="pokerPlayPolicySelfExclude24h" class="pokerButton" type="button"${selfExcluded ? ' disabled' : ''}>Self-Exclude 24h</button>
+        </form>
       `,
       `
         <h2>Quick Seat</h2>
@@ -1118,7 +1143,7 @@
             Table Title
             <input id="pokerPlayMatchmakeTitle" maxlength="96" placeholder="Optional custom title">
           </label>
-          <button class="pokerButton" type="submit">Join Or Create</button>
+          <button class="pokerButton" type="submit"${selfExcluded ? ' disabled' : ''}>Join Or Create</button>
         </form>
       `,
       series.length
@@ -1186,6 +1211,7 @@
         `).join('')
         : '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>',
     ]);
+    bindPlayPolicyForm();
     bindPlayMatchmakeForm();
     setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
   }
@@ -1717,6 +1743,49 @@
         setStatus(`Quick seat failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
+  }
+
+  function bindPlayPolicyForm() {
+    const form = document.getElementById('pokerPlayPolicyForm');
+    if (!form) return;
+    const capEl = document.getElementById('pokerPlayPolicyDailyCap');
+    const selfExcludeButton = document.getElementById('pokerPlayPolicySelfExclude24h');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      setStatus('Saving poker policy...');
+      try {
+        const dailySpendCapOil = capEl && String(capEl.value || '').trim()
+          ? Number(capEl.value)
+          : 0;
+        await api('/api/poker/play/policy', {
+          method: 'POST',
+          body: JSON.stringify({
+            dailySpendCapOil,
+          }),
+        });
+        await loadPlayLobby();
+        setStatus('Poker policy updated.');
+      } catch (err) {
+        setStatus(`Poker policy failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+    if (selfExcludeButton) {
+      selfExcludeButton.addEventListener('click', async () => {
+        setStatus('Activating 24-hour poker self-exclusion...');
+        try {
+          await api('/api/poker/play/policy', {
+            method: 'POST',
+            body: JSON.stringify({
+              selfExcludeHours: 24,
+            }),
+          });
+          await loadPlayLobby();
+          setStatus('Poker self-exclusion is active for 24 hours.');
+        } catch (err) {
+          setStatus(`Poker policy failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
   }
 
   function renderPlayTableCards(data, { rail = false } = {}) {
