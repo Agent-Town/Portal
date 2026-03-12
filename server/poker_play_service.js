@@ -1041,6 +1041,112 @@ function buildWaitlistSummary(entries, viewerWalletSubject = '') {
   };
 }
 
+function isCashSeatMovementAllowed(table, seat, hand) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'cash') return false;
+  if (!seat || !isSeatOccupyingTable(seat)) return false;
+  if (isTableAdminClosed(table)) return false;
+  if (hand && hand.status === 'live') return false;
+  if (isSeatPendingCashout(seat)) return false;
+  return Number(seat?.stackOil || 0) > 0;
+}
+
+function listCashSeatChangeOpenSeatNumbers(table, seats, currentSeatNumber) {
+  const occupied = new Set(
+    (Array.isArray(seats) ? seats : [])
+      .filter(isSeatOccupyingTable)
+      .map((seat) => normalizeSeatNumber(seat?.seatNumber))
+      .filter(Boolean)
+  );
+  return Array.from({ length: Number(table?.maxSeats || POKER_PLAY_MAX_SEATS) }, (_value, index) => index + 1)
+    .filter((seatNumber) => !occupied.has(seatNumber));
+}
+
+function listCompatibleCashTransferOptions(deps, sourceTable, sourceSeat, {
+  walletSubject,
+  houseId,
+  processAt,
+} = {}) {
+  const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
+  if (!sourceTable?.tableId || !sourceSeat || !normalizedWalletSubject) return [];
+  const sourceAccess = getPokerPlayTableAccess(sourceTable);
+  const sourceMatchKey = normalizeTrimmedString(
+    sourceTable?.rules?.matchKey || sourceTable?.summary?.matchKey || buildMatchKeyFromTable(sourceTable)
+  );
+  return deps.listPokerPlayTables()
+    .filter((candidate) => String(candidate?.tableId || '') !== String(sourceTable.tableId || ''))
+    .map((candidate) => ({
+      table: candidate,
+      seats: deps.listPokerPlaySeatsByTable(candidate.tableId),
+      hand: deps.getCurrentPokerPlayHandForTable(candidate.tableId),
+    }))
+    .filter((entry) => normalizePokerPlayTableType(entry?.table?.tableType) === 'cash')
+    .filter((entry) => !isTableAdminClosed(entry?.table))
+    .filter((entry) => !isTablePaused(entry?.table))
+    .filter((entry) => normalizeTrimmedString(entry?.table?.status, 'open') === 'open')
+    .filter((entry) => !entry?.hand || entry.hand.status !== 'live')
+    .filter((entry) => getOpenSeatCount(entry.table, entry.seats) > 0)
+    .filter((entry) => normalizeTrimmedString(entry?.table?.rules?.matchKey || entry?.table?.summary?.matchKey || buildMatchKeyFromTable(entry.table)) === sourceMatchKey)
+    .filter((entry) => normalizePokerPlayAccessMode(getPokerPlayTableAccess(entry.table).mode) === normalizePokerPlayAccessMode(sourceAccess.mode))
+    .filter((entry) => {
+      const targetViewerSeat = deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, normalizedWalletSubject);
+      if (targetViewerSeat && isSeatOccupyingTable(targetViewerSeat)) {
+        return false;
+      }
+      const inviteAuthorization = resolvePokerPlayInviteAuthorization(entry.table, {
+        walletSubject: normalizedWalletSubject,
+        houseId: normalizeTrimmedString(houseId),
+        viewerSeat: targetViewerSeat,
+      });
+      return !!inviteAuthorization?.authorized;
+    })
+    .map((entry) => {
+      const openSeatNumbers = listCashSeatChangeOpenSeatNumbers(entry.table, entry.seats, 0);
+      return {
+        tableId: entry.table.tableId,
+        title: normalizeTrimmedString(entry.table.title, 'Cash Table'),
+        openSeatNumbers,
+        occupancy: Number(entry?.seats?.filter(isSeatOccupyingTable).length || 0),
+        maxSeats: Number(entry?.table?.maxSeats || POKER_PLAY_MAX_SEATS),
+        smallBlindOil: Number(entry?.table?.smallBlindOil || 0),
+        bigBlindOil: Number(entry?.table?.bigBlindOil || 0),
+        buyInOil: Number(entry?.table?.buyInOil || 0),
+        accessMode: normalizePokerPlayAccessMode(getPokerPlayTableAccess(entry.table).mode),
+      };
+    })
+    .filter((entry) => entry.openSeatNumbers.length > 0)
+    .sort((left, right) => {
+      const occupancyDelta = Number(right?.occupancy || 0) - Number(left?.occupancy || 0);
+      if (occupancyDelta !== 0) return occupancyDelta;
+      return String(left?.tableId || '').localeCompare(String(right?.tableId || ''));
+    });
+}
+
+function buildCashMovementSummary(deps, table, seats, hand, viewerSeat, {
+  walletSubject,
+  houseId,
+  processAt,
+  publicViewer = false,
+} = {}) {
+  if (publicViewer || normalizePokerPlayTableType(table?.tableType) !== 'cash' || !viewerSeat) {
+    return null;
+  }
+  const seatChangeOpenSeatNumbers = listCashSeatChangeOpenSeatNumbers(table, seats, viewerSeat.seatNumber);
+  const seatChangeAllowed = isCashSeatMovementAllowed(table, viewerSeat, hand) && seatChangeOpenSeatNumbers.length > 0;
+  const transferOptions = isCashSeatMovementAllowed(table, viewerSeat, hand)
+    ? listCompatibleCashTransferOptions(deps, table, viewerSeat, {
+      walletSubject,
+      houseId,
+      processAt,
+    })
+    : [];
+  return {
+    seatChangeAllowed,
+    seatChangeOpenSeatNumbers,
+    transferAllowed: transferOptions.length > 0,
+    transferOptions,
+  };
+}
+
 function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
   if (normalizePokerPlayTableType(table?.tableType) !== 'cash') {
     return {
@@ -3425,6 +3531,60 @@ function upsertPokerPlayPlayerStatForSeat(deps, table, seat, {
   });
 }
 
+function moveOpenPokerPlayPlayerStatForSeat(deps, {
+  sourceTable,
+  targetTable,
+  seat,
+  targetSeatNumber,
+  processAt,
+} = {}) {
+  if (typeof deps.upsertPokerPlayPlayerStat !== 'function' || typeof deps.getOpenPokerPlayPlayerStatByTableAndWalletSubject !== 'function') {
+    return null;
+  }
+  const walletSubject = normalizeTrimmedString(seat?.walletSubject);
+  if (!walletSubject || !sourceTable?.tableId || !targetTable?.tableId) return null;
+  const requestAt = toProcessIso(deps, processAt);
+  const existing = deps.getOpenPokerPlayPlayerStatByTableAndWalletSubject(sourceTable.tableId, walletSubject);
+  if (!existing) {
+    return upsertPokerPlayPlayerStatForSeat(deps, targetTable, {
+      ...seat,
+      tableId: targetTable.tableId,
+      seatNumber: normalizeSeatNumber(targetSeatNumber),
+    }, {
+      processAt: requestAt,
+      status: 'open',
+      stackOil: Number(seat?.stackOil || 0),
+    });
+  }
+  const targetSeriesRef = getTournamentSeriesRef(targetTable);
+  return deps.upsertPokerPlayPlayerStat({
+    resultId: existing.resultId,
+    walletSubject,
+    houseId: seat?.houseId || existing?.houseId || null,
+    tableId: targetTable.tableId,
+    seriesId: targetSeriesRef.seriesId || null,
+    seriesTitle: targetSeriesRef.seriesTitle || null,
+    tableType: normalizePokerPlayTableType(targetTable?.tableType),
+    title: normalizeTrimmedString(targetTable?.title, existing?.title || 'Live Table'),
+    seatNumber: normalizeSeatNumber(targetSeatNumber),
+    displayName: normalizeTrimmedString(seat?.displayName, existing?.displayName || 'Seat'),
+    buyInOil: Number(existing?.buyInOil || seat?.buyInOil || 0),
+    reloadOil: Number(existing?.reloadOil || 0),
+    cashoutOil: Number(existing?.cashoutOil || 0),
+    refundOil: Number(existing?.refundOil || 0),
+    prizeOil: Number(existing?.prizeOil || seat?.prizeOil || 0),
+    bountyOil: Number(existing?.bountyOil || seat?.bountyWonOil || 0),
+    stackOil: Number(seat?.stackOil || 0),
+    finishPosition: existing?.finishPosition == null ? null : Number(existing.finishPosition || 0),
+    status: normalizeTrimmedString(existing?.status, 'open'),
+    payoutSettledAt: existing?.payoutSettledAt || seat?.payoutSettledAt || null,
+    openedAt: existing?.openedAt || existing?.createdAt || seat?.createdAt || requestAt,
+    closedAt: existing?.closedAt || null,
+    createdAt: existing?.createdAt || seat?.createdAt || requestAt,
+    updatedAt: requestAt,
+  });
+}
+
 function postSeatAgentProposal(deps, { handId, session, req, body } = {}) {
   const requestAt = toProcessIso(deps, body?.asOf);
   const hand = deps.getPokerPlayHandById(handId);
@@ -5518,6 +5678,12 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
       }
       : {}),
   };
+  const cashMovement = buildCashMovementSummary(deps, table, seats, hand, viewerSeat, {
+    walletSubject: walletBinding?.walletSubject || '',
+    houseId: viewerHouseId,
+    processAt,
+    publicViewer,
+  });
 
   return {
     viewerMode: publicViewer ? 'public' : 'player',
@@ -5542,6 +5708,7 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     wallet: walletBinding?.submitterWallet || null,
     oilBalance,
     pokerPolicy,
+    cashMovement,
     mySeat: viewerSeat
       ? summarizeSeat(viewerSeat)
       : null,
@@ -6464,6 +6631,219 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
   return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
 }
 
+function changeCashTableSeat(deps, { tableId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (normalizePokerPlayTableType(synced.table?.tableType) !== 'cash') {
+    throw createRouteError(409, 'POKER_PLAY_SEAT_CHANGE_UNAVAILABLE', 'Seat change is only available at cash tables.');
+  }
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  const { walletBinding, seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  if (synced.hand && synced.hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_HAND_IN_PROGRESS', 'Seat change is only available between hands.');
+  }
+  if (!isCashSeatMovementAllowed(synced.table, seat, synced.hand)) {
+    throw createRouteError(409, 'POKER_PLAY_SEAT_CHANGE_UNAVAILABLE', 'This seat cannot move right now.');
+  }
+  const targetSeatNumber = normalizeSeatNumber(body?.seatNumber);
+  if (!targetSeatNumber || targetSeatNumber === normalizeSeatNumber(seat.seatNumber)) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Choose a different open seat.');
+  }
+  const openSeatNumbers = listCashSeatChangeOpenSeatNumbers(synced.table, synced.seats, seat.seatNumber);
+  if (!openSeatNumbers.includes(targetSeatNumber)) {
+    throw createRouteError(409, 'POKER_PLAY_SEAT_UNAVAILABLE', 'That cash seat is not open.');
+  }
+
+  const carriedTimeBank = getSeatTimeBankRemainingSeconds(synced.table, seat.seatNumber);
+  deps.deletePokerPlaySeat(synced.table.tableId, seat.seatNumber);
+  const nextSeat = deps.upsertPokerPlaySeat({
+    ...seat,
+    seatNumber: targetSeatNumber,
+    lastSeenAt: requestAt,
+    updatedAt: requestAt,
+  });
+  const nextState = setSeatTimeBankRemainingSeconds(
+    {
+      ...synced.table,
+      state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+    },
+    targetSeatNumber,
+    carriedTimeBank
+  );
+  deps.upsertPokerPlayTable({
+    ...synced.table,
+    state: nextState,
+    updatedAt: requestAt,
+  });
+  moveOpenPokerPlayPlayerStatForSeat(deps, {
+    sourceTable: synced.table,
+    targetTable: synced.table,
+    seat: nextSeat,
+    targetSeatNumber,
+    processAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: synced.table.tableId,
+      handId: synced.hand?.handId || null,
+      seatNumber: targetSeatNumber,
+      actorRole: 'human',
+      eventKind: 'seat_changed',
+      payload: {
+        walletSubject: walletBinding.walletSubject,
+        fromSeatNumber: normalizeSeatNumber(seat.seatNumber),
+        toSeatNumber: targetSeatNumber,
+      },
+      createdAt: requestAt,
+    });
+  }
+  const refreshed = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  return buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt });
+}
+
+function transferCashTableSeat(deps, { tableId, session, req, body } = {}) {
+  const requestAt = toProcessIso(deps, body?.asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  if (normalizePokerPlayTableType(synced.table?.tableType) !== 'cash') {
+    throw createRouteError(409, 'POKER_PLAY_TRANSFER_UNAVAILABLE', 'Table transfer is only available at cash tables.');
+  }
+  if (isTableAdminClosed(synced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  const { walletBinding, seat } = requireSeatWriter(deps, { table: synced.table, session, req });
+  if (synced.hand && synced.hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_HAND_IN_PROGRESS', 'Table transfer is only available between hands.');
+  }
+  if (!isCashSeatMovementAllowed(synced.table, seat, synced.hand)) {
+    throw createRouteError(409, 'POKER_PLAY_TRANSFER_UNAVAILABLE', 'This seat cannot transfer right now.');
+  }
+  const targetTableId = normalizeTrimmedString(body?.targetTableId);
+  if (!targetTableId || targetTableId === normalizeTrimmedString(synced.table.tableId)) {
+    throw createRouteError(400, 'INVALID_ARGUMENT', 'Choose a different compatible cash table.');
+  }
+  const targetSynced = syncPokerPlayTable(deps, targetTableId, { processAt: requestAt });
+  if (!targetSynced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Target poker table not found.');
+  }
+  if (normalizePokerPlayTableType(targetSynced.table?.tableType) !== 'cash') {
+    throw createRouteError(409, 'POKER_PLAY_TRANSFER_INCOMPATIBLE', 'Target table must be a compatible cash table.');
+  }
+  if (isTableAdminClosed(targetSynced.table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'Target poker table was closed by an operator.');
+  }
+  if (isTablePaused(targetSynced.table) || normalizeTrimmedString(targetSynced.table?.status, 'open') !== 'open') {
+    throw createRouteError(409, 'POKER_PLAY_TRANSFER_INCOMPATIBLE', 'Target cash table is not open for transfers.');
+  }
+  if (targetSynced.hand && targetSynced.hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_HAND_IN_PROGRESS', 'Target table must also be between hands.');
+  }
+  const houseId = getSessionHouseId(session);
+  requirePokerPlayTableAccess(targetSynced.table, {
+    walletSubject: walletBinding.walletSubject,
+    houseId,
+    viewerSeat: deps.getPokerPlaySeatByWalletSubject(targetSynced.table.tableId, walletBinding.walletSubject),
+    inviteCode: parsePokerPlayInviteCode(req, body),
+    publicViewer: false,
+  });
+  const sourceMatchKey = normalizeTrimmedString(
+    synced.table?.rules?.matchKey || synced.table?.summary?.matchKey || buildMatchKeyFromTable(synced.table)
+  );
+  const targetMatchKey = normalizeTrimmedString(
+    targetSynced.table?.rules?.matchKey || targetSynced.table?.summary?.matchKey || buildMatchKeyFromTable(targetSynced.table)
+  );
+  const sourceAccessMode = normalizePokerPlayAccessMode(getPokerPlayTableAccess(synced.table).mode);
+  const targetAccessMode = normalizePokerPlayAccessMode(getPokerPlayTableAccess(targetSynced.table).mode);
+  if (!sourceMatchKey || sourceMatchKey !== targetMatchKey || sourceAccessMode !== targetAccessMode) {
+    throw createRouteError(409, 'POKER_PLAY_TRANSFER_INCOMPATIBLE', 'Target table is not compatible with this cash seat.');
+  }
+  if (deps.getPokerPlaySeatByWalletSubject(targetSynced.table.tableId, walletBinding.walletSubject)) {
+    throw createRouteError(409, 'POKER_PLAY_ALREADY_SEATED', 'This wallet already has a seat at the target table.');
+  }
+  const requestedTargetSeatNumber = normalizeSeatNumber(body?.targetSeatNumber ?? body?.seatNumber);
+  const openSeatNumbers = listCashSeatChangeOpenSeatNumbers(targetSynced.table, targetSynced.seats, 0);
+  const targetSeatNumber = requestedTargetSeatNumber || openSeatNumbers[0] || 0;
+  if (!targetSeatNumber || !openSeatNumbers.includes(targetSeatNumber)) {
+    throw createRouteError(409, 'POKER_PLAY_SEAT_UNAVAILABLE', 'That target seat is not open.');
+  }
+
+  const carriedTimeBank = getSeatTimeBankRemainingSeconds(synced.table, seat.seatNumber);
+  const movedSeat = deps.upsertPokerPlaySeat({
+    ...seat,
+    tableId: targetSynced.table.tableId,
+    seatNumber: targetSeatNumber,
+    lastSeenAt: requestAt,
+    updatedAt: requestAt,
+  });
+  deps.deletePokerPlaySeat(synced.table.tableId, seat.seatNumber);
+  deps.upsertPokerPlayTable({
+    ...synced.table,
+    state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+    updatedAt: requestAt,
+  });
+  deps.upsertPokerPlayTable({
+    ...targetSynced.table,
+    state: setSeatTimeBankRemainingSeconds(targetSynced.table, targetSeatNumber, carriedTimeBank),
+    updatedAt: requestAt,
+  });
+  moveOpenPokerPlayPlayerStatForSeat(deps, {
+    sourceTable: synced.table,
+    targetTable: targetSynced.table,
+    seat: movedSeat,
+    targetSeatNumber,
+    processAt: requestAt,
+  });
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: synced.table.tableId,
+      handId: synced.hand?.handId || null,
+      seatNumber: normalizeSeatNumber(seat.seatNumber),
+      actorRole: 'human',
+      eventKind: 'seat_transferred_out',
+      payload: {
+        walletSubject: walletBinding.walletSubject,
+        sourceTableId: synced.table.tableId,
+        sourceSeatNumber: normalizeSeatNumber(seat.seatNumber),
+        targetTableId: targetSynced.table.tableId,
+        targetSeatNumber,
+      },
+      createdAt: requestAt,
+    });
+    deps.createPokerPlayAuditEvent({
+      tableId: targetSynced.table.tableId,
+      handId: targetSynced.hand?.handId || null,
+      seatNumber: targetSeatNumber,
+      actorRole: 'human',
+      eventKind: 'seat_transferred_in',
+      payload: {
+        walletSubject: walletBinding.walletSubject,
+        sourceTableId: synced.table.tableId,
+        sourceSeatNumber: normalizeSeatNumber(seat.seatNumber),
+        targetTableId: targetSynced.table.tableId,
+        targetSeatNumber,
+      },
+      createdAt: requestAt,
+    });
+  }
+  const refreshed = syncPokerPlayTable(deps, targetSynced.table.tableId, { processAt: requestAt });
+  return {
+    ...buildPokerPlayTablePayload(deps, refreshed.table, refreshed.seats, refreshed.hand, { session, req, processAt: requestAt }),
+    transfer: {
+      sourceTableId: synced.table.tableId,
+      sourceSeatNumber: normalizeSeatNumber(seat.seatNumber),
+      targetTableId: targetSynced.table.tableId,
+      targetSeatNumber,
+    },
+  };
+}
+
 function reloadTableSeat(deps, { tableId, session, req, body } = {}) {
   const requestAt = toProcessIso(deps, body?.asOf);
   const table = deps.getPokerPlayTableById(tableId);
@@ -7128,6 +7508,7 @@ module.exports = {
   buildPokerPlayLobbyPayload,
   buildPokerPlayTablePayload,
   breakTournamentSeriesTableByDirector,
+  changeCashTableSeat,
   closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
@@ -7163,6 +7544,7 @@ module.exports = {
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
+  transferCashTableSeat,
   updatePokerPlayPolicy,
   useTimeBank,
 };

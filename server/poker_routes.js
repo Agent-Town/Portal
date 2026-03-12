@@ -38,6 +38,7 @@ const {
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
   breakTournamentSeriesTableByDirector,
+  changeCashTableSeat,
   closeTournamentRegistration,
   closeTable,
   closeTournamentSeries,
@@ -70,6 +71,7 @@ const {
   sitOutTableSeat,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
+  transferCashTableSeat,
   updatePokerPlayPolicy,
   useTimeBank,
 } = require('./poker_play_service');
@@ -5539,6 +5541,72 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_RELOAD_FAILED',
         err?.message || 'Unable to reload the poker seat.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/change-seat', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = changeCashTableSeat(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'seat', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SEAT_CHANGE_FAILED',
+        err?.message || 'Unable to change the poker seat.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/transfer', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = transferCashTableSeat(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(req.params.tableId, 'seat_transfer', {
+        handId: null,
+        seatNumber: payload?.transfer?.sourceSeatNumber || null,
+        targetTableId: payload?.transfer?.targetTableId || null,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || payload?.transfer?.targetTableId || '', 'seat_transfer', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || payload?.transfer?.targetSeatNumber || null,
+        sourceTableId: payload?.transfer?.sourceTableId || req.params.tableId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TRANSFER_FAILED',
+        err?.message || 'Unable to transfer the poker seat.',
         {
           requestId,
           details: err?.details || {},

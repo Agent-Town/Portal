@@ -534,6 +534,7 @@ Returns one live cash or tournament table payload with:
 - `data.review.currentHandOpenDisputeCount`
 - `data.review.myDisputes[]`
 - `data.review.latestAuditEvent`
+- `data.cashMovement`
 - `data.agentProposal`
 - `data.suggestion`
 - `data.oilBalance`
@@ -554,6 +555,8 @@ Cash lifecycle and waitlist notes:
 - `data.waitlist.viewerQueued` and `data.waitlist.viewerPosition` describe the bound wallet’s current queue state when it is not yet seated
 - cash-seat statuses may include `active`, `sitting_out`, `sitout_next_hand`, `away`, `away_next_hand`, and `leaving_after_hand`
 - `data.table.summary.occupancy` counts seats that still physically occupy the table, while `data.table.summary.activeSeatCount` excludes cash seats that are sitting out or away between hands
+- `data.cashMovement.seatChangeAllowed` and `data.cashMovement.seatChangeOpenSeatNumbers[]` expose between-hand seat-change availability for the bound cash seat
+- `data.cashMovement.transferAllowed` and `data.cashMovement.transferOptions[]` expose compatible between-hand cash-table transfers without debiting or crediting OIL
 - invite-only tables require a valid `inviteCode` on pre-join reads and seat/waitlist entry unless the wallet is already seated or created the table
 
 ### GET `/api/poker/play/tables/:tableId/history`
@@ -900,6 +903,70 @@ Failure codes:
 - `POKER_PLAY_SELF_EXCLUDED`
 - `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/tables/:tableId/change-seat`
+Moves the bound cash-table seat to a different open seat on the same table between hands.
+
+Request shape:
+```json
+{
+  "seatNumber": 5,
+  "asOf": "2026-03-11T08:00:15.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload
+- `data.mySeat.seatNumber` becomes the requested open seat
+- `data.mySeat.stackOil` is unchanged
+- `data.review.latestAuditEvent.eventKind = "seat_changed"`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_SEAT_CHANGE_UNAVAILABLE`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_HAND_IN_PROGRESS`
+- `POKER_PLAY_SEAT_UNAVAILABLE`
+
+### POST `/api/poker/play/tables/:tableId/transfer`
+Transfers the bound cash-table seat to a compatible open cash table between hands without synthesizing a cashout and rebuy.
+
+Request shape:
+```json
+{
+  "targetTableId": "pkt_play_cash_abcd1234",
+  "targetSeatNumber": 4,
+  "asOf": "2026-03-11T08:00:20.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload for the destination table
+- `data.transfer.sourceTableId`
+- `data.transfer.sourceSeatNumber`
+- `data.transfer.targetTableId`
+- `data.transfer.targetSeatNumber`
+- `data.mySeat.stackOil` is unchanged
+- source-table audit writes `seat_transferred_out`
+- destination-table audit writes `seat_transferred_in`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `POKER_PLAY_TRANSFER_UNAVAILABLE`
+- `POKER_PLAY_TRANSFER_INCOMPATIBLE`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_HAND_IN_PROGRESS`
+- `POKER_PLAY_ALREADY_SEATED`
+- `POKER_PLAY_INVITE_REQUIRED`
+- `POKER_PLAY_SEAT_UNAVAILABLE`
 
 ### POST `/api/poker/play/tables/:tableId/sit-out`
 Marks the bound cash-table seat to sit out or go away, either immediately between hands or defer the state change until the current hand settles.

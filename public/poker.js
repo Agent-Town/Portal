@@ -2065,6 +2065,7 @@
     const seats = Array.isArray(data?.seats) ? data.seats : [];
     const actions = Array.isArray(data?.actions) ? data.actions : [];
     const messages = Array.isArray(data?.messages) ? data.messages : [];
+    const cashMovement = data?.cashMovement && typeof data.cashMovement === 'object' ? data.cashMovement : null;
     const review = data?.review || {};
     const waitlist = data?.waitlist || {};
     const myDisputes = Array.isArray(review?.myDisputes) ? review.myDisputes : [];
@@ -2248,6 +2249,25 @@
       const leaveQueued = String(mySeat.status || '') === 'leaving_after_hand';
       const seatSittingOut = String(mySeat.status || '') === 'sitting_out' || String(mySeat.status || '') === 'sitting_out_next_hand';
       const seatAway = String(mySeat.status || '') === 'away' || String(mySeat.status || '') === 'away_next_hand';
+      const seatChangeOpenSeatNumbers = Array.isArray(cashMovement?.seatChangeOpenSeatNumbers)
+        ? cashMovement.seatChangeOpenSeatNumbers.map((value) => Number(value || 0)).filter((value) => Number.isFinite(value) && value > 0)
+        : [];
+      const transferOptions = Array.isArray(cashMovement?.transferOptions)
+        ? cashMovement.transferOptions.map((entry) => ({
+          tableId: String(entry?.tableId || ''),
+          title: String(entry?.title || 'Cash Table'),
+          openSeatNumbers: Array.isArray(entry?.openSeatNumbers)
+            ? entry.openSeatNumbers.map((value) => Number(value || 0)).filter((value) => Number.isFinite(value) && value > 0)
+            : [],
+          occupancy: Number(entry?.occupancy || 0),
+          maxSeats: Number(entry?.maxSeats || 6),
+          smallBlindOil: Number(entry?.smallBlindOil || 0),
+          bigBlindOil: Number(entry?.bigBlindOil || 0),
+          buyInOil: Number(entry?.buyInOil || 0),
+        })).filter((entry) => entry.tableId && entry.openSeatNumbers.length)
+        : [];
+      const defaultTransferTarget = transferOptions[0] || null;
+      const transferOptionsJson = escapeHtml(JSON.stringify(transferOptions));
       cards.push(`
         <h2>Your Seat</h2>
         <div class="pokerSummary">
@@ -2283,6 +2303,41 @@
               </label>
               <button class="pokerButton" type="submit">Reload Stack</button>
             </form>
+            <div class="pokerLabel">Seat Movement</div>
+            ${cashMovement?.seatChangeAllowed && seatChangeOpenSeatNumbers.length ? `
+              <form id="pokerPlaySeatChangeForm" class="pokerForm">
+                <label>
+                  Open Seat
+                  <select id="pokerPlaySeatChangeNumber">
+                    ${seatChangeOpenSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')}
+                  </select>
+                </label>
+                <button id="pokerPlaySeatChangeButton" class="pokerButton" type="submit">Change Seat</button>
+              </form>
+            ` : '<p>Seat changes open between hands when another cash seat is available.</p>'}
+            ${transferOptions.length ? `
+              <form id="pokerPlayTransferForm" class="pokerForm" data-transfer-options="${transferOptionsJson}">
+                <label>
+                  Compatible Table
+                  <select id="pokerPlayTransferTableId">
+                    ${transferOptions.map((entry) => `
+                      <option value="${escapeHtml(entry.tableId)}">
+                        ${escapeHtml(entry.title)} · ${Number(entry.occupancy || 0)}/${Number(entry.maxSeats || 6)} · ${Number(entry.smallBlindOil || 0)}/${Number(entry.bigBlindOil || 0)}
+                      </option>
+                    `).join('')}
+                  </select>
+                </label>
+                <label>
+                  Target Seat
+                  <select id="pokerPlayTransferSeatNumber">
+                    ${defaultTransferTarget
+                      ? defaultTransferTarget.openSeatNumbers.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('')
+                      : ''}
+                  </select>
+                </label>
+                <button id="pokerPlayTransferButton" class="pokerButton" type="submit">Transfer Table</button>
+              </form>
+            ` : '<p>No compatible cash table is open for transfer right now.</p>'}
           ` : ''}
         `}
       `);
@@ -2632,6 +2687,77 @@
         await loadPlayTable(tableId);
       } catch (err) {
         setStatus(`Reload failed: ${err.code || err.message || 'UNKNOWN'}`);
+      }
+    });
+  }
+
+  function bindCashSeatMovementForms(tableId) {
+    const seatChangeForm = document.getElementById('pokerPlaySeatChangeForm');
+    if (seatChangeForm) {
+      seatChangeForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const seatNumber = Number(document.getElementById('pokerPlaySeatChangeNumber')?.value || 0);
+        if (!seatNumber) {
+          setStatus('Choose an open seat first.');
+          return;
+        }
+        setStatus('Changing seat...');
+        try {
+          await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/change-seat`, {
+            method: 'POST',
+            body: JSON.stringify({ seatNumber }),
+          });
+          await loadPlayTable(tableId);
+          setStatus('Seat changed.');
+        } catch (err) {
+          setStatus(`Seat change failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const transferForm = document.getElementById('pokerPlayTransferForm');
+    if (!transferForm) return;
+    let transferOptions = [];
+    try {
+      transferOptions = JSON.parse(String(transferForm.getAttribute('data-transfer-options') || '[]'));
+    } catch {
+      transferOptions = [];
+    }
+    const targetTableEl = document.getElementById('pokerPlayTransferTableId');
+    const targetSeatEl = document.getElementById('pokerPlayTransferSeatNumber');
+    const syncTransferSeatOptions = () => {
+      if (!targetTableEl || !targetSeatEl) return;
+      const targetTableId = String(targetTableEl.value || '').trim();
+      const selected = transferOptions.find((entry) => String(entry?.tableId || '') === targetTableId) || null;
+      const seatOptions = Array.isArray(selected?.openSeatNumbers)
+        ? selected.openSeatNumbers.map((value) => Number(value || 0)).filter((value) => Number.isFinite(value) && value > 0)
+        : [];
+      targetSeatEl.innerHTML = seatOptions.map((seatNumber) => `<option value="${seatNumber}">Seat ${seatNumber}</option>`).join('');
+      targetSeatEl.disabled = seatOptions.length <= 0;
+    };
+    if (targetTableEl) {
+      targetTableEl.addEventListener('change', syncTransferSeatOptions);
+    }
+    syncTransferSeatOptions();
+    transferForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const targetTableId = String(targetTableEl?.value || '').trim();
+      const targetSeatNumber = Number(targetSeatEl?.value || 0);
+      if (!targetTableId || !targetSeatNumber) {
+        setStatus('Choose a compatible target table and seat.');
+        return;
+      }
+      setStatus('Transferring table...');
+      try {
+        const payload = await api(`/api/poker/play/tables/${encodeURIComponent(tableId)}/transfer`, {
+          method: 'POST',
+          body: JSON.stringify({ targetTableId, targetSeatNumber }),
+        });
+        const nextTableId = String(payload?.data?.table?.tableId || targetTableId);
+        await loadPlayTable(nextTableId);
+        setStatus('Table transferred.');
+      } catch (err) {
+        setStatus(`Table transfer failed: ${err.code || err.message || 'UNKNOWN'}`);
       }
     });
   }
@@ -3187,6 +3313,7 @@
       bindPlayJoinForm(tableId);
       bindWaitlistControls(tableId);
       bindPlayReloadForm(tableId);
+      bindCashSeatMovementForms(tableId);
       bindPlayLifecycleButtons(tableId);
       bindTournamentReentryButton(data?.series?.seriesId || '', tableId);
       bindPlayLeaveButton(tableId);
