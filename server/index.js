@@ -170,6 +170,7 @@ const {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStacksInspector,
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
   getUnifiedPlatformRevisionsInspector,
@@ -11285,6 +11286,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPeerRelayInspector();
     } else if (inspector === 'satchel-exchange') {
       data = getUnifiedPlatformSatchelExchangeInspector();
+    } else if (inspector === 'public-stacks') {
+      data = getUnifiedPlatformPublicStacksInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {

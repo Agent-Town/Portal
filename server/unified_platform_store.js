@@ -30,6 +30,8 @@ const PLATFORM_TABLES = Object.freeze([
   'scope_sets',
   'scope_set_items',
   'library_publications',
+  'library_public_stacks',
+  'library_public_stack_members',
   'library_peer_relays',
   'library_peer_receipts',
   'library_satchel_relays',
@@ -90,6 +92,7 @@ const FIXTURE_FILES = Object.freeze({
   library_guided_flow_seed: 'library_guided_flow_seed.json',
   library_peer_relay_seed: 'library_peer_relay_seed.json',
   library_satchel_exchange_seed: 'library_satchel_exchange_seed.json',
+  library_public_stack_seed: 'library_public_stack_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -124,6 +127,7 @@ let unifiedPlatformInspectors = {
   benchmarks: buildDefaultBenchmarkInspector(),
   peerRelay: buildDefaultPeerRelayInspector(),
   satchelExchange: buildDefaultSatchelExchangeInspector(),
+  publicStacks: buildDefaultPublicStacksInspector(),
 };
 
 function hasTableColumn(database, tableName, columnName) {
@@ -445,6 +449,36 @@ function ensureDb() {
       UNIQUE (house_id, team_id, idempotency_key)
     );
 
+    CREATE TABLE IF NOT EXISTS library_public_stacks (
+      library_public_stack_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      scope_set_id TEXT NOT NULL,
+      family_slug TEXT NOT NULL DEFAULT 'house_library_stacks',
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      bundle_hash TEXT NOT NULL,
+      publication_state TEXT NOT NULL,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_public_stack_members (
+      library_public_stack_member_id TEXT PRIMARY KEY,
+      library_public_stack_id TEXT NOT NULL,
+      library_publication_id TEXT NOT NULL,
+      registry_id TEXT NOT NULL,
+      library_item_id TEXT,
+      sort_index INTEGER NOT NULL DEFAULT 0,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      UNIQUE (library_public_stack_id, sort_index),
+      UNIQUE (library_public_stack_id, library_publication_id)
+    );
+
     CREATE TABLE IF NOT EXISTS library_peer_relays (
       library_peer_relay_id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -725,6 +759,18 @@ function buildDefaultSatchelExchangeInspector() {
   };
 }
 
+function buildDefaultPublicStacksInspector() {
+  return {
+    publicStacks: [],
+    members: [],
+    filters: {
+      sourceHouseId: '',
+      familySlug: '',
+      scopeSetId: '',
+    },
+  };
+}
+
 function resetUnifiedPlatformInspectors() {
   unifiedPlatformInspectors = {
     promptPreview: buildDefaultPromptPreviewInspector(),
@@ -733,6 +779,7 @@ function resetUnifiedPlatformInspectors() {
     benchmarks: buildDefaultBenchmarkInspector(),
     peerRelay: buildDefaultPeerRelayInspector(),
     satchelExchange: buildDefaultSatchelExchangeInspector(),
+    publicStacks: buildDefaultPublicStacksInspector(),
   };
 }
 
@@ -1748,6 +1795,39 @@ function mapLibraryPublicationRow(row) {
   };
 }
 
+function mapLibraryPublicStackRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPublicStackId: String(row.library_public_stack_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    scopeSetId: String(row.scope_set_id || ''),
+    familySlug: String(row.family_slug || 'house_library_stacks'),
+    title: String(row.title || ''),
+    summary: String(row.summary || ''),
+    bundleHash: String(row.bundle_hash || ''),
+    publicationState: String(row.publication_state || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryPublicStackMemberRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPublicStackMemberId: String(row.library_public_stack_member_id || ''),
+    libraryPublicStackId: String(row.library_public_stack_id || ''),
+    libraryPublicationId: String(row.library_publication_id || ''),
+    registryId: String(row.registry_id || ''),
+    libraryItemId: row.library_item_id ? String(row.library_item_id) : null,
+    sortIndex: Number.isFinite(Number(row.sort_index)) ? Number(row.sort_index) : 0,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+  };
+}
+
 function mapLibraryPeerRelayRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -1935,6 +2015,222 @@ function createLibraryPublication({
   );
   return listLibraryPublications({ houseId: normalizedHouseId, teamId: normalizedTeamId })
     .find((entry) => entry.libraryPublicationId === normalizedLibraryPublicationId) || null;
+}
+
+function listLibraryPublicStacks({
+  houseId = '',
+  teamId = '',
+  familySlug = '',
+  scopeSetId = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedFamilySlug = String(familySlug || '').trim();
+  const normalizedScopeSetId = String(scopeSetId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_public_stacks
+  `;
+  const args = [];
+  if (normalizedHouseId || normalizedTeamId || normalizedFamilySlug || normalizedScopeSetId) {
+    const clauses = [];
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    if (normalizedFamilySlug) {
+      clauses.push('family_slug = ?');
+      args.push(normalizedFamilySlug);
+    }
+    if (normalizedScopeSetId) {
+      clauses.push('scope_set_id = ?');
+      args.push(normalizedScopeSetId);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, library_public_stack_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryPublicStackRow).filter(Boolean);
+}
+
+function getLibraryPublicStackById(libraryPublicStackId = '') {
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  if (!normalizedLibraryPublicStackId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stacks
+    WHERE library_public_stack_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryPublicStackId);
+  return mapLibraryPublicStackRow(row);
+}
+
+function getLibraryPublicStackByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stacks
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryPublicStackRow(row);
+}
+
+function createLibraryPublicStack({
+  libraryPublicStackId = '',
+  houseId = '',
+  teamId = '',
+  scopeSetId = '',
+  familySlug = 'house_library_stacks',
+  title = '',
+  summary = '',
+  bundleHash = '',
+  publicationState = 'published',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedScopeSetId = String(scopeSetId || '').trim();
+  const normalizedFamilySlug = String(familySlug || 'house_library_stacks').trim() || 'house_library_stacks';
+  const normalizedTitle = String(title || '').trim();
+  const normalizedSummary = String(summary || '').trim();
+  const normalizedBundleHash = String(bundleHash || '').trim();
+  const normalizedPublicationState = String(publicationState || 'published').trim() || 'published';
+  if (
+    !normalizedLibraryPublicStackId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedScopeSetId
+    || !normalizedTitle
+    || !normalizedBundleHash
+  ) {
+    throw new Error('LIBRARY_PUBLIC_STACK_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_public_stacks (
+      library_public_stack_id,
+      house_id,
+      team_id,
+      scope_set_id,
+      family_slug,
+      title,
+      summary,
+      bundle_hash,
+      publication_state,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPublicStackId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedScopeSetId,
+    normalizedFamilySlug,
+    normalizedTitle,
+    normalizedSummary,
+    normalizedBundleHash,
+    normalizedPublicationState,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return listLibraryPublicStacks({ houseId: normalizedHouseId, teamId: normalizedTeamId })
+    .find((entry) => entry.libraryPublicStackId === normalizedLibraryPublicStackId) || null;
+}
+
+function listLibraryPublicStackMembers({
+  libraryPublicStackId = '',
+} = {}) {
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_public_stack_members
+  `;
+  const args = [];
+  if (normalizedLibraryPublicStackId) {
+    query += ' WHERE library_public_stack_id = ?';
+    args.push(normalizedLibraryPublicStackId);
+  }
+  query += ' ORDER BY sort_index ASC, library_public_stack_member_id ASC';
+  return database.prepare(query).all(...args).map(mapLibraryPublicStackMemberRow).filter(Boolean);
+}
+
+function createLibraryPublicStackMember({
+  libraryPublicStackMemberId = '',
+  libraryPublicStackId = '',
+  libraryPublicationId = '',
+  registryId = '',
+  libraryItemId = '',
+  sortIndex = 0,
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackMemberId = String(libraryPublicStackMemberId || '').trim();
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedLibraryPublicationId = String(libraryPublicationId || '').trim();
+  const normalizedRegistryId = String(registryId || '').trim();
+  const normalizedSortIndex = Number.isFinite(Number(sortIndex)) ? Number(sortIndex) : -1;
+  if (
+    !normalizedLibraryPublicStackMemberId
+    || !normalizedLibraryPublicStackId
+    || !normalizedLibraryPublicationId
+    || !normalizedRegistryId
+    || normalizedSortIndex < 0
+  ) {
+    throw new Error('LIBRARY_PUBLIC_STACK_MEMBER_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_public_stack_members (
+      library_public_stack_member_id,
+      library_public_stack_id,
+      library_publication_id,
+      registry_id,
+      library_item_id,
+      sort_index,
+      metadata_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPublicStackMemberId,
+    normalizedLibraryPublicStackId,
+    normalizedLibraryPublicationId,
+    normalizedRegistryId,
+    String(libraryItemId || '').trim() || null,
+    normalizedSortIndex,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+  );
+  return listLibraryPublicStackMembers({ libraryPublicStackId: normalizedLibraryPublicStackId })
+    .find((entry) => entry.libraryPublicStackMemberId === normalizedLibraryPublicStackMemberId) || null;
 }
 
 function listLibraryPeerRelays({
@@ -2561,6 +2857,27 @@ function getUnifiedPlatformSatchelExchangeInspector({
       sourceHouseId: String(houseId || '').trim(),
       targetHouseId: String(targetHouseId || '').trim(),
       scopeSetId: '',
+    },
+  };
+}
+
+function getUnifiedPlatformPublicStacksInspector({
+  houseId = '',
+  teamId = '',
+  familySlug = '',
+  scopeSetId = '',
+} = {}) {
+  const publicStacks = listLibraryPublicStacks({ houseId, teamId, familySlug, scopeSetId });
+  const members = publicStacks.flatMap((publicStack) => listLibraryPublicStackMembers({
+    libraryPublicStackId: String(publicStack?.libraryPublicStackId || '').trim(),
+  }));
+  return {
+    publicStacks,
+    members,
+    filters: {
+      sourceHouseId: String(houseId || '').trim(),
+      familySlug: String(familySlug || '').trim(),
+      scopeSetId: String(scopeSetId || '').trim(),
     },
   };
 }
@@ -4490,6 +4807,7 @@ function getUnifiedPlatformTestStats() {
       publications: true,
       peerRelay: true,
       satchelExchange: true,
+      publicStacks: true,
       promptPreview: true,
       editor: true,
       registryPreview: true,
@@ -4507,6 +4825,8 @@ module.exports = {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibraryPublicStack,
+  createLibraryPublicStackMember,
   createLibrarySatchelReceipt,
   createLibrarySatchelRelay,
   createLibraryShelf,
@@ -4538,6 +4858,8 @@ module.exports = {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibraryPublicStackById,
+  getLibraryPublicStackByIdempotency,
   getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryShelfById,
@@ -4564,6 +4886,7 @@ module.exports = {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStacksInspector,
   getUnifiedPlatformPublicationsInspector,
   getUnifiedPlatformRegistryPreviewSnapshot,
   getUnifiedPlatformRevisionsInspector,
@@ -4582,6 +4905,8 @@ module.exports = {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryPublicStackMembers,
+  listLibraryPublicStacks,
   listLibrarySatchelReceipts,
   listLibrarySatchelRelays,
   listLibraryPublications,
