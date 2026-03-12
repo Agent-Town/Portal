@@ -110,6 +110,7 @@ const {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibrarySatchelRelay,
   createLibraryPublication,
   createScopeSet,
   createTrackProgressEvent,
@@ -143,6 +144,7 @@ const {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
@@ -3828,6 +3830,7 @@ const PLATFORM_TRAINER_JOB_STATUSES = new Set(['queued', 'running', 'blocked', '
 const TRAINER_PATCH_FIXTURE_APPROVAL_ID = 'appr_fixture_approved_01';
 const LIBRARY_PUBLICATION_FIXTURE_APPROVAL_ID = 'appr_fixture_library_publish_approved_01';
 const LIBRARY_PEER_RELAY_FIXTURE_APPROVAL_ID = 'appr_fixture_library_peer_relay_approved_01';
+const LIBRARY_SATCHEL_RELAY_FIXTURE_APPROVAL_ID = 'appr_fixture_library_satchel_relay_approved_01';
 
 function getPlatformExperienceDefinition(experienceId = '') {
   const normalizedExperienceId = String(experienceId || '').trim();
@@ -4458,6 +4461,7 @@ registerPlatformReadRoutes(app, {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibrarySatchelRelay,
   createLibraryShelf,
   createLibraryPublication,
   createSealedContextViolation,
@@ -4472,6 +4476,7 @@ registerPlatformReadRoutes(app, {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
@@ -4516,6 +4521,7 @@ registerPlatformReadRoutes(app, {
   replaceConfigComponentVersions,
   dispatchLibraryPeerRelayEnvelope,
   resolveApprovedLibraryPeerRelayApproval,
+  resolveApprovedLibrarySatchelRelayApproval,
   resolveApprovedLibraryPublicationApproval,
   resolveApprovedTrainerPatchPromotion,
   resolveHumanSessionWithRecovery,
@@ -6406,6 +6412,43 @@ function resolveApprovedLibraryPeerRelayApproval(approvalId, {
     approvalKind: 'library_peer_relay',
     subject: {
       libraryPublicationId: String(libraryPublicationId || '').trim() || null,
+      targetHouseId: String(targetHouseId || '').trim() || null,
+      transportKind: String(transportKind || '').trim() || null,
+    },
+    status: 'approved',
+    requestedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+    },
+    decidedBy: {
+      actorType: 'fixture',
+      actorId: 'playwright',
+      decision: 'approved',
+    },
+    nowIso: nowIso(),
+  });
+}
+
+function resolveApprovedLibrarySatchelRelayApproval(approvalId, {
+  houseId = '',
+  scopeSetId = '',
+  targetHouseId = '',
+  transportKind = '',
+} = {}) {
+  const normalizedApprovalId = String(approvalId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedApprovalId || !normalizedHouseId) return null;
+  const existing = getApprovalRecordById(normalizedApprovalId);
+  if (existing && existing.houseId === normalizedHouseId && existing.status === 'approved') {
+    return existing;
+  }
+  if (normalizedApprovalId !== LIBRARY_SATCHEL_RELAY_FIXTURE_APPROVAL_ID) return null;
+  return upsertApprovalRecord({
+    approvalId: normalizedApprovalId,
+    houseId: normalizedHouseId,
+    approvalKind: 'library_satchel_relay',
+    subject: {
+      scopeSetId: String(scopeSetId || '').trim() || null,
       targetHouseId: String(targetHouseId || '').trim() || null,
       transportKind: String(transportKind || '').trim() || null,
     },

@@ -2210,6 +2210,45 @@ function listLibrarySatchelRelays({
   return database.prepare(query).all(...args).map(mapLibrarySatchelRelayRow).filter(Boolean);
 }
 
+function getLibrarySatchelRelayById(librarySatchelRelayId = '') {
+  const normalizedLibrarySatchelRelayId = String(librarySatchelRelayId || '').trim();
+  if (!normalizedLibrarySatchelRelayId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_satchel_relays
+    WHERE library_satchel_relay_id = ?
+    LIMIT 1
+  `).get(normalizedLibrarySatchelRelayId);
+  return mapLibrarySatchelRelayRow(row);
+}
+
+function getLibrarySatchelRelayByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_satchel_relays
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibrarySatchelRelayRow(row);
+}
+
 function createLibrarySatchelRelay({
   librarySatchelRelayId = '',
   houseId = '',
@@ -4466,6 +4505,8 @@ module.exports = {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibrarySatchelRelayById,
+  getLibrarySatchelRelayByIdempotency,
   getLibraryShelfById,
   getLibraryShelfByIdempotency,
   getLibraryPublicationByIdempotency,

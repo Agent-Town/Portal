@@ -13,6 +13,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryLink,
     createLibraryPeerReceipt,
     createLibraryPeerRelay,
+    createLibrarySatchelRelay,
     createLibraryShelf,
     createLibraryPublication,
     createSealedContextViolation,
@@ -27,6 +28,7 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPeerRelayById,
     getLibraryPeerRelayByIdempotency,
     getLibraryPublicationById,
+    getLibrarySatchelRelayByIdempotency,
     getLibraryShelfById,
     getLibraryShelfByIdempotency,
     getLibraryPublicationByIdempotency,
@@ -71,6 +73,7 @@ function registerPlatformReadRoutes(app, deps) {
     replaceConfigComponentVersions,
     dispatchLibraryPeerRelayEnvelope,
     resolveApprovedLibraryPeerRelayApproval,
+    resolveApprovedLibrarySatchelRelayApproval,
     resolveApprovedLibraryPublicationApproval,
     resolveApprovedTrainerPatchPromotion,
     resolveHumanSessionWithRecovery,
@@ -1157,6 +1160,101 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function persistLibrarySatchelRelayRecord({
+    houseId = '',
+    teamId = '',
+    scopeSetId = '',
+    targetHouseId = '',
+    bundleManifest = null,
+    relayState = 'queued',
+    metadata = null,
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibrarySatchelRelayByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        relay: existing,
+      };
+    }
+    const relay = createLibrarySatchelRelay({
+      librarySatchelRelayId: `srelay_${randomHex(12)}`,
+      houseId,
+      teamId,
+      scopeSetId,
+      targetHouseId,
+      bundleManifest,
+      relayState,
+      idempotencyKey,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      relay,
+    };
+  }
+
+  function buildLibrarySatchelBundleManifest({
+    scopeSet = null,
+    scopeSetItems = [],
+    itemsById = new Map(),
+    publicationsByItemId = new Map(),
+    targetHouseId = '',
+    transportKind = 'pony.relay.registry.v1',
+  } = {}) {
+    const members = (Array.isArray(scopeSetItems) ? scopeSetItems : [])
+      .map((scopeEntry, index) => {
+        const libraryItemId = String(scopeEntry?.libraryItemId || '').trim();
+        if (!libraryItemId) return null;
+        const item = itemsById instanceof Map ? itemsById.get(libraryItemId) : null;
+        const publication = publicationsByItemId instanceof Map ? publicationsByItemId.get(libraryItemId) : null;
+        if (!item || !publication) return null;
+        return {
+          position: index,
+          libraryItemId,
+          libraryPublicationId: publication.libraryPublicationId,
+          registryId: String(publication.registryId || item.registryId || '').trim(),
+          contentHash: String(publication.contentHash || item.contentHash || '').trim() || null,
+          itemType: String(item.itemType || '').trim() || 'library_note',
+          title: String(item.title || publication.registryId || libraryItemId).trim() || libraryItemId,
+          summary: String(item.summary || '').trim() || null,
+          contentText: String(item.contentText || ''),
+          contentRef: item.contentRef ? String(item.contentRef) : null,
+          sourceKind: String(item.sourceKind || '').trim() || null,
+          sourceRef: String(item.sourceRef || '').trim() || null,
+        };
+      })
+      .filter(Boolean);
+    const scopeMetadata = scopeSet?.metadata && typeof scopeSet.metadata === 'object'
+      ? scopeSet.metadata
+      : {};
+    const manifestCore = {
+      kind: 'library_satchel_bundle.v1',
+      sourceHouseId: String(scopeSet?.houseId || '').trim() || null,
+      sourceTeamId: String(scopeSet?.teamId || '').trim() || null,
+      targetHouseId: String(targetHouseId || '').trim() || null,
+      scopeSetId: String(scopeSet?.scopeSetId || '').trim() || null,
+      title: String(scopeSet?.title || 'Satchel Bundle').trim() || 'Satchel Bundle',
+      scopeKind: String(scopeMetadata.scopeKind || 'reading_table').trim() || 'reading_table',
+      sourceShelfId: String(scopeMetadata.sourceShelfId || '').trim() || null,
+      transportKind: String(transportKind || 'pony.relay.registry.v1').trim() || 'pony.relay.registry.v1',
+      memberCount: members.length,
+      orderedItemIds: members.map((entry) => entry.libraryItemId),
+      orderedPublicationIds: members.map((entry) => entry.libraryPublicationId),
+      orderedRegistryIds: members.map((entry) => entry.registryId).filter(Boolean),
+      members,
+    };
+    return {
+      ...manifestCore,
+      bundleHash: sha256PrefixedHex(stableJsonStringify(manifestCore)),
+    };
+  }
+
   function recordBlockedLibraryPublicationViolation({
     item = null,
     session = null,
@@ -2203,6 +2301,150 @@ function registerPlatformReadRoutes(app, deps) {
         registryId: publication.registryId,
         contentHash: publication.contentHash,
       },
+      target: {
+        houseId: target.houseId,
+      },
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/satchel-relays', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before relaying a Satchel bundle.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before relaying a Satchel bundle.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to relay a Satchel bundle.', { requestId });
+    }
+    const existingRelay = getLibrarySatchelRelayByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingRelay) {
+      return sendPortalApiSuccess(res, {
+        relay: existingRelay,
+      }, { requestId, status: 200 });
+    }
+    const scopeSetId = typeof req.body?.scopeSetId === 'string' ? req.body.scopeSetId.trim() : '';
+    const targetHouseId = typeof req.body?.targetHouseId === 'string' ? req.body.targetHouseId.trim() : '';
+    const transportKind = typeof req.body?.transportKind === 'string' ? req.body.transportKind.trim() : 'pony.relay.registry.v1';
+    const approvalId = typeof req.body?.approvalId === 'string' ? req.body.approvalId.trim() : '';
+    if (!scopeSetId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SCOPE_SET_REQUIRED', 'scopeSetId is required to relay a Satchel bundle.', { requestId });
+    }
+    if (!targetHouseId) {
+      return sendPortalApiError(res, 400, 'TARGET_HOUSE_REQUIRED', 'targetHouseId is required to relay a Satchel bundle.', { requestId });
+    }
+    const scopeSet = getScopeSetById(scopeSetId);
+    if (!scopeSet || scopeSet.houseId !== context.houseId || scopeSet.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_SCOPE_SET_NOT_FOUND', 'The requested Reading Table or Satchel could not be found for this House team.', { requestId });
+    }
+    const scopeSetItems = listScopeSetItems(scopeSet.scopeSetId);
+    if (!scopeSetItems.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_SATCHEL_EMPTY', 'A Satchel bundle requires at least one Library item.', { requestId });
+    }
+    const itemsById = new Map(
+      listLibraryItems({ houseId: context.houseId, teamId: context.activeTeamId })
+        .map((item) => [item.libraryItemId, item])
+    );
+    const missingItemIds = scopeSetItems
+      .map((entry) => String(entry?.libraryItemId || '').trim())
+      .filter((libraryItemId) => libraryItemId && !itemsById.has(libraryItemId));
+    if (missingItemIds.length) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ITEM_NOT_FOUND', 'One or more Satchel members could not be found for this House team.', {
+        requestId,
+        details: {
+          missingItemIds,
+          scopeSetId: scopeSet.scopeSetId,
+        },
+      });
+    }
+    const publications = listLibraryPublications({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+    }).filter((entry) => String(entry?.publicationState || '').trim() === 'published');
+    const publicationsByItemId = new Map();
+    publications.forEach((publication) => {
+      const libraryItemId = String(publication?.libraryItemId || '').trim();
+      if (!libraryItemId || publicationsByItemId.has(libraryItemId)) return;
+      publicationsByItemId.set(libraryItemId, publication);
+    });
+    const missingPublicationItemIds = scopeSetItems
+      .map((entry) => String(entry?.libraryItemId || '').trim())
+      .filter((libraryItemId) => libraryItemId && !publicationsByItemId.has(libraryItemId));
+    if (missingPublicationItemIds.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_SATCHEL_PUBLICATION_REQUIRED', 'Every Satchel member must be published before relay.', {
+        requestId,
+        details: {
+          missingPublicationItemIds,
+          scopeSetId: scopeSet.scopeSetId,
+        },
+      });
+    }
+    const target = resolveKnownHouseTarget(targetHouseId);
+    if (!target) {
+      return sendPortalApiError(res, 404, 'TARGET_HOUSE_NOT_FOUND', 'The requested target house could not be found.', { requestId });
+    }
+    const approval = resolveApprovedLibrarySatchelRelayApproval(approvalId, {
+      houseId: context.houseId,
+      scopeSetId: scopeSet.scopeSetId,
+      targetHouseId: target.houseId,
+      transportKind,
+    });
+    if (!approval) {
+      return sendPortalApiError(res, 409, 'LIBRARY_SATCHEL_RELAY_APPROVAL_REQUIRED', 'Relaying a Satchel bundle requires explicit approval.', {
+        requestId,
+        details: {
+          approvalId: approvalId || null,
+          approvalKind: 'library_satchel_relay',
+          scopeSetId: scopeSet.scopeSetId,
+          targetHouseId: target.houseId,
+          transportKind,
+        },
+      });
+    }
+    const bundleManifest = buildLibrarySatchelBundleManifest({
+      scopeSet,
+      scopeSetItems,
+      itemsById,
+      publicationsByItemId,
+      targetHouseId: target.houseId,
+      transportKind,
+    });
+    const persisted = persistLibrarySatchelRelayRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      scopeSetId: scopeSet.scopeSetId,
+      targetHouseId: target.houseId,
+      bundleManifest,
+      relayState: 'queued',
+      idempotencyKey,
+      metadata: {
+        approvalId: approval.approvalId,
+        approvalKind: approval.approvalKind,
+        memberCount: bundleManifest.memberCount,
+        transportKind: bundleManifest.transportKind,
+        bundleHash: bundleManifest.bundleHash,
+      },
+    });
+    return sendPortalApiSuccess(res, {
+      relay: persisted.relay,
+      scopeSet: {
+        scopeSetId: scopeSet.scopeSetId,
+        title: scopeSet.title,
+        scopeKind: String(scopeSet?.metadata?.scopeKind || 'reading_table').trim() || 'reading_table',
+        orderedItemIds: bundleManifest.orderedItemIds,
+      },
+      bundleManifest,
       target: {
         houseId: target.houseId,
       },
