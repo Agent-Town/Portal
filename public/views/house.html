@@ -309,6 +309,25 @@
       <button class="btn" id="houseLibraryGuidedVerifyBtn" type="button" data-testid="house-library-guided-verify-button">Verify Public Stack</button>
       <button class="btn" id="houseLibraryGuidedImportBtn" type="button" data-testid="house-library-guided-import-button">Import from Guide</button>
     </div>
+    <div class="kv" data-testid="house-library-guided-review-controls">
+      <label class="small" for="houseLibraryGuidedReviewTierSelect">Local Review</label>
+      <select id="houseLibraryGuidedReviewTierSelect" data-testid="house-library-guided-review-tier" class="pixel-input">
+        <option value="review_later">Review later</option>
+        <option value="trusted_here">Trusted here</option>
+        <option value="blocked_here">Blocked here</option>
+      </select>
+      <label class="small" for="houseLibraryGuidedReviewNoteInput">Review Note</label>
+      <input
+        id="houseLibraryGuidedReviewNoteInput"
+        data-testid="house-library-guided-review-note"
+        class="pixel-input"
+        type="text"
+        placeholder="What should this House remember?"
+        autocomplete="off"
+        style="flex:1; min-width:0;"
+      />
+      <button class="btn" id="houseLibraryGuidedReviewSaveBtn" type="button" data-testid="house-library-guided-review-save-button">Save Local Review</button>
+    </div>
     <div class="kv" data-testid="house-library-peer-relay-controls">
       <label class="small" for="houseLibraryRelayTargetInput">Target House</label>
       <input
