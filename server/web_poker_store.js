@@ -1771,11 +1771,58 @@ function getLatestRegistryEntityVersion(registryEntityId) {
   `).get(normalizedRegistryEntityId);
   if (!row) return null;
   return {
+    registryEntityId: normalizedRegistryEntityId,
     entityVersionId: row.entity_version_id,
     versionLabel: row.version_label || null,
     versionProjection: fromJson(row.projection_json, {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function getRegistryEntityVersionById(entityVersionId) {
+  const normalizedEntityVersionId = String(entityVersionId || '').trim();
+  if (!normalizedEntityVersionId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT entity_version_id, registry_entity_id, version_label, projection_json, created_at, updated_at
+    FROM registry_entity_versions
+    WHERE entity_version_id = ?
+    LIMIT 1
+  `).get(normalizedEntityVersionId);
+  if (!row) return null;
+  return {
+    registryEntityId: String(row.registry_entity_id || '').trim(),
+    entityVersionId: row.entity_version_id,
+    versionLabel: row.version_label || null,
+    versionProjection: fromJson(row.projection_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getRegistryEntityByIdAtVersion(registryEntityId, entityVersionId) {
+  const normalizedRegistryEntityId = String(registryEntityId || '').trim();
+  const normalizedEntityVersionId = String(entityVersionId || '').trim();
+  if (!normalizedRegistryEntityId || !normalizedEntityVersionId) return null;
+  const entity = getRegistryEntityById(normalizedRegistryEntityId);
+  const version = getRegistryEntityVersionById(normalizedEntityVersionId);
+  if (!entity || !version) return null;
+  if (String(version.registryEntityId || '').trim() !== normalizedRegistryEntityId) return null;
+  return {
+    ...entity,
+    entityVersionId: version.entityVersionId,
+    versionLabel: version.versionLabel || null,
+    versionProjection: version.versionProjection || {},
+    workerPackage: buildRegistryWorkerPackage({
+      registryEntityId: entity.registryEntityId,
+      entityVersionId: version.entityVersionId,
+      versionLabel: version.versionLabel || null,
+      entityKind: entity.entityKind,
+      displayName: entity.displayName,
+      description: entity.description || null,
+      projection: entity.projection,
+    }, version),
   };
 }
 
@@ -2992,6 +3039,8 @@ module.exports = {
   getRegistryFamilyBySlug,
   getRegistryHealth,
   getRegistryEntityById,
+  getRegistryEntityByIdAtVersion,
+  getRegistryEntityVersionById,
   getRegistryProofByRegistryId,
   getRegistryReviewQueue,
   getPokerRunById,

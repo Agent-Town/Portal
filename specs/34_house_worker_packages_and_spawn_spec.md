@@ -6,10 +6,11 @@ Audience: product, frontend, backend, runtime, UX, QA, security, benchmarking, s
 Implementation branch target: `codex/house-worker-packages-spawn-v0-1`
 Implementation baseline: `679c4ad`
 Latest proof state:
-1. `e2e/215` through `e2e/230` are green.
+1. `e2e/215` through `e2e/231` are green.
 2. Worker-skill contract sync is green in [e2e/55_phase3_skill_contract_line.spec.js](../e2e/55_phase3_skill_contract_line.spec.js).
 3. Post-phase runtime-truth hardening is green in [e2e/229_house_worker_reload_truth.spec.js](../e2e/229_house_worker_reload_truth.spec.js) and [e2e/230_house_worker_local_brain_guard.spec.js](../e2e/230_house_worker_local_brain_guard.spec.js).
-4. Full deterministic suite is green at `349 passed, 4 skipped` via `npm test`.
+4. Shared-install exact-version hardening is green in [e2e/231_house_worker_share_exact_version_guard.spec.js](../e2e/231_house_worker_share_exact_version_guard.spec.js).
+5. Full deterministic suite is green at `352 passed, 4 skipped` via `npm test`.
 Depends on:
 1. [specs/22_option5_integration_unified_completion_spec.md](./22_option5_integration_unified_completion_spec.md)
 2. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)

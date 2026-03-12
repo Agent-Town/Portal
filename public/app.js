@@ -1521,7 +1521,6 @@ async function loadHouseReadiness({ skipContext = false } = {}) {
   try {
     if (!skipContext) {
       await loadHousePlatformContext();
-      return houseSurfaceState.readiness;
     }
     const response = await api('/api/platform/house-readiness');
     const data = response?.data || response || {};
@@ -3865,6 +3864,9 @@ async function loadHouseOfficeSurface({ skipContext = false } = {}) {
       houseSurfaceState.office.selectedOfficeId = String(houseSurfaceState.office.offices[0].officeId);
     }
     await refreshHouseWorkerLocalBrainState({ force: true }).catch(() => null);
+    if (el('houseReadinessSummary')) {
+      await loadHouseReadiness({ skipContext: true }).catch(() => null);
+    }
     renderHouseOfficeSurface();
     setHouseSurfaceStatus('');
   } catch (err) {

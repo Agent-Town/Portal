@@ -19,6 +19,7 @@ function registerPlatformReadRoutes(app, deps) {
     getHouseWorkerShareById,
     getHouseWorkerSessionById,
     getRegistryEntityById,
+    getRegistryEntityByIdAtVersion,
     getUnifiedPlatformTestFixture,
     getTeamConfigBinding,
     listTrackDefinitions,
@@ -453,6 +454,162 @@ function registerPlatformReadRoutes(app, deps) {
         loadoutId: String(sourceDeployment?.runtimeDefaults?.loadoutId || sourcePackage?.runtimeDefaults?.loadoutId || sourceDeployment?.loadoutId || sourcePackage?.loadoutId || '').trim() || null,
         delegationAllowed: sourceDeployment?.runtimeDefaults?.delegationAllowed === true || sourcePackage?.runtimeDefaults?.delegationAllowed === true,
       },
+    };
+  }
+
+  function resolveSharedHouseWorkerInstallPackage(share = null) {
+    const portablePayload = share?.payload && typeof share.payload === 'object' ? share.payload : {};
+    const sharedRegistryEntityId = String(share?.registryEntityId || '').trim();
+    const sharedEntityVersionId = String(share?.entityVersionId || '').trim();
+    const sharedLoadoutId = String(share?.loadoutId || '').trim();
+    const sharedBundleHash = String(share?.bundleHash || '').trim();
+    const payloadRegistryEntityId = String(portablePayload?.registryEntityId || '').trim();
+    const payloadEntityVersionId = String(portablePayload?.entityVersionId || '').trim();
+    const payloadLoadoutId = String(portablePayload?.loadoutId || portablePayload?.runtimeDefaults?.loadoutId || '').trim();
+    const payloadBundleHash = String(portablePayload?.bundleHash || '').trim();
+
+    if (!sharedRegistryEntityId || !sharedEntityVersionId) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'SHARED_WORKER_PAYLOAD_INVALID',
+        message: 'Shared helper payload is missing exact package identity.',
+      };
+    }
+
+    const parityChecks = [
+      ['registryEntityId', sharedRegistryEntityId, payloadRegistryEntityId],
+      ['entityVersionId', sharedEntityVersionId, payloadEntityVersionId],
+      ['loadoutId', sharedLoadoutId, payloadLoadoutId],
+      ['bundleHash', sharedBundleHash, payloadBundleHash],
+    ];
+    for (const [field, rowValue, payloadValue] of parityChecks) {
+      if (rowValue && payloadValue && rowValue !== payloadValue) {
+        return {
+          ok: false,
+          status: 409,
+          code: 'SHARED_WORKER_PAYLOAD_MISMATCH',
+          message: `Shared helper ${field} no longer matches its signed portable payload.`,
+          details: {
+            field,
+          },
+        };
+      }
+    }
+
+    const exactEntity = getRegistryEntityByIdAtVersion(sharedRegistryEntityId, sharedEntityVersionId);
+    const canonicalPackage = resolveHouseWorkerPackage(exactEntity);
+    if (!exactEntity || !canonicalPackage) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'SHARED_WORKER_VERSION_INVALID',
+        message: 'The shared helper no longer resolves to the exact Registry package version that was shared.',
+      };
+    }
+
+    const loadouts = Array.isArray(exactEntity?.loadouts) ? exactEntity.loadouts : [];
+    const canonicalLoadoutId = String(canonicalPackage?.loadoutId || canonicalPackage?.runtimeDefaults?.loadoutId || '').trim();
+    const desiredLoadoutId = sharedLoadoutId || payloadLoadoutId || canonicalLoadoutId;
+    const selectedLoadout = desiredLoadoutId
+      ? (loadouts.find((entry) => String(entry?.loadoutId || '').trim() === desiredLoadoutId) || null)
+      : null;
+    if (desiredLoadoutId && !selectedLoadout) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'SHARED_WORKER_LOADOUT_INVALID',
+        message: 'The shared helper references a loadout that no longer exists for that exact Registry package version.',
+      };
+    }
+
+    const candidateBundles = selectedLoadout
+      ? (Array.isArray(selectedLoadout?.bundles) ? selectedLoadout.bundles : [])
+      : loadouts.flatMap((entry) => (Array.isArray(entry?.bundles) ? entry.bundles : []));
+    const canonicalBundleHash = String(canonicalPackage?.bundleHash || '').trim();
+    const desiredBundleHash = sharedBundleHash || payloadBundleHash || canonicalBundleHash;
+    const selectedBundle = desiredBundleHash
+      ? (candidateBundles.find((entry) => String(entry?.contentHash || '').trim() === desiredBundleHash) || null)
+      : (candidateBundles[0] || null);
+    if (desiredBundleHash && !selectedBundle) {
+      return {
+        ok: false,
+        status: 409,
+        code: 'SHARED_WORKER_BUNDLE_INVALID',
+        message: 'The shared helper references a bundle hash that no longer belongs to the exact shared package.',
+      };
+    }
+
+    const portableRuntimeDefaults = portablePayload?.runtimeDefaults && typeof portablePayload.runtimeDefaults === 'object'
+      ? portablePayload.runtimeDefaults
+      : {};
+    const portableBrainProfileId = String(portableRuntimeDefaults?.brainProfileId || '').trim() || null;
+    const portableWorkspaceSeedRef = String(portableRuntimeDefaults?.workspaceSeedRef || '').trim() || null;
+    const portableConfigVersionId = String(portableRuntimeDefaults?.configVersionId || '').trim() || null;
+    for (const [field, value] of [
+      ['brainProfileId', portableBrainProfileId],
+      ['workspaceSeedRef', portableWorkspaceSeedRef],
+      ['configVersionId', portableConfigVersionId],
+    ]) {
+      if (!value) continue;
+      if (!isSafeHouseWorkerReference(value, {
+        allowEmpty: true,
+        maxLen: field === 'workspaceSeedRef' ? 260 : 180,
+      })) {
+        return {
+          ok: false,
+          status: 409,
+          code: 'SHARED_WORKER_RUNTIME_DEFAULT_INVALID',
+          message: `The shared helper contains an invalid ${field} runtime default.`,
+          details: {
+            field,
+          },
+        };
+      }
+    }
+
+    return {
+      ok: true,
+      packageInfo: {
+        ...canonicalPackage,
+        loadoutId: desiredLoadoutId || null,
+        bundleHash: String(selectedBundle?.contentHash || desiredBundleHash || canonicalPackage?.bundleHash || '').trim() || null,
+        defaultDisplayName: String(portablePayload?.displayName || canonicalPackage?.defaultDisplayName || canonicalPackage?.displayName || '').trim(),
+        runtimeDefaults: {
+          ...canonicalPackage.runtimeDefaults,
+          brainProfileId: portableBrainProfileId || canonicalPackage?.runtimeDefaults?.brainProfileId || null,
+          workspaceSeedRef: portableWorkspaceSeedRef || canonicalPackage?.runtimeDefaults?.workspaceSeedRef || null,
+          configVersionId: portableConfigVersionId || canonicalPackage?.runtimeDefaults?.configVersionId || null,
+          loadoutId: desiredLoadoutId || null,
+          delegationAllowed: canonicalPackage?.runtimeDefaults?.delegationAllowed === true,
+        },
+      },
+      canonicalShare: buildHouseWorkerShareResponse({
+        ...share,
+        payload: {
+          ...portablePayload,
+          registryEntityId: sharedRegistryEntityId,
+          entityVersionId: sharedEntityVersionId,
+          loadoutId: desiredLoadoutId || null,
+          bundleHash: String(selectedBundle?.contentHash || desiredBundleHash || canonicalPackage?.bundleHash || '').trim() || null,
+          oneLineBenefit: String(canonicalPackage?.oneLineBenefit || '').trim(),
+          whatItDoes: String(canonicalPackage?.whatItDoes || '').trim(),
+          bestFor: Array.isArray(canonicalPackage?.bestFor) ? canonicalPackage.bestFor : [],
+          recommendedOfficeId: String(canonicalPackage?.recommendedOfficeId || '').trim() || null,
+          recommendedOfficeLabel: String(canonicalPackage?.recommendedOfficeLabel || '').trim() || null,
+          supportedSurfaces: Array.isArray(canonicalPackage?.supportedSurfaces) ? canonicalPackage.supportedSurfaces : [],
+          requiresLocalBrain: canonicalPackage?.requiresLocalBrain === true,
+          delegationAllowed: canonicalPackage?.delegationAllowed === true,
+          runtimeDefaults: {
+            ...portableRuntimeDefaults,
+            brainProfileId: portableBrainProfileId || canonicalPackage?.runtimeDefaults?.brainProfileId || null,
+            workspaceSeedRef: portableWorkspaceSeedRef || canonicalPackage?.runtimeDefaults?.workspaceSeedRef || null,
+            configVersionId: portableConfigVersionId || canonicalPackage?.runtimeDefaults?.configVersionId || null,
+            loadoutId: desiredLoadoutId || null,
+            delegationAllowed: canonicalPackage?.runtimeDefaults?.delegationAllowed === true,
+          },
+        },
+      }),
     };
   }
 
@@ -3549,46 +3706,26 @@ function registerPlatformReadRoutes(app, deps) {
     if (!share) {
       return sendPortalApiError(res, 404, 'NOT_FOUND', 'House worker share not found.', { requestId });
     }
-    const portablePayload = share?.payload && typeof share.payload === 'object' ? share.payload : {};
-    const entity = getRegistryEntityById(String(portablePayload?.registryEntityId || '').trim());
-    const canonicalPackage = resolveHouseWorkerPackage(entity);
-    if (!entity || !canonicalPackage) {
-      return sendPortalApiError(res, 404, 'WORKER_PACKAGE_NOT_FOUND', 'The shared helper no longer resolves to a Registry worker package.', { requestId });
-    }
     if (requestedOfficeId && !isSafeHouseOfficeIdentifier(requestedOfficeId)) {
       return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'officeId must use safe identifier characters only.', { requestId });
     }
     if (requestedDisplayName && !normalizeHouseWorkerDisplayName(requestedDisplayName)) {
       return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'displayName must stay under 80 characters and cannot include secret-like markers.', { requestId });
     }
-    const packageInfo = {
-      ...canonicalPackage,
-      entityVersionId: String(portablePayload?.entityVersionId || canonicalPackage.entityVersionId || '').trim(),
-      loadoutId: String(portablePayload?.loadoutId || portablePayload?.runtimeDefaults?.loadoutId || canonicalPackage.loadoutId || '').trim(),
-      bundleHash: String(portablePayload?.bundleHash || canonicalPackage.bundleHash || '').trim(),
-      defaultDisplayName: String(portablePayload?.displayName || canonicalPackage.defaultDisplayName || '').trim(),
-      oneLineBenefit: String(portablePayload?.oneLineBenefit || canonicalPackage.oneLineBenefit || '').trim(),
-      whatItDoes: String(portablePayload?.whatItDoes || canonicalPackage.whatItDoes || '').trim(),
-      bestFor: Array.isArray(portablePayload?.bestFor) ? portablePayload.bestFor : canonicalPackage.bestFor,
-      recommendedOfficeId: String(portablePayload?.recommendedOfficeId || canonicalPackage.recommendedOfficeId || '').trim(),
-      recommendedOfficeLabel: String(portablePayload?.recommendedOfficeLabel || canonicalPackage.recommendedOfficeLabel || '').trim(),
-      supportedSurfaces: Array.isArray(portablePayload?.supportedSurfaces) ? portablePayload.supportedSurfaces : canonicalPackage.supportedSurfaces,
-      requiresLocalBrain: portablePayload?.requiresLocalBrain === true || canonicalPackage.requiresLocalBrain === true,
-      delegationAllowed: portablePayload?.delegationAllowed === true || canonicalPackage.delegationAllowed === true,
-      runtimeDefaults: {
-        ...canonicalPackage.runtimeDefaults,
-        ...(portablePayload?.runtimeDefaults && typeof portablePayload.runtimeDefaults === 'object'
-          ? portablePayload.runtimeDefaults
-          : {}),
-        loadoutId: String(
-          portablePayload?.runtimeDefaults?.loadoutId
-          || portablePayload?.loadoutId
-          || canonicalPackage.runtimeDefaults?.loadoutId
-          || canonicalPackage.loadoutId
-          || ''
-        ).trim() || null,
-      },
-    };
+    const resolvedSharePackage = resolveSharedHouseWorkerInstallPackage(share);
+    if (!resolvedSharePackage?.ok || !resolvedSharePackage?.packageInfo) {
+      return sendPortalApiError(
+        res,
+        Number(resolvedSharePackage?.status || 409),
+        String(resolvedSharePackage?.code || 'SHARED_WORKER_PAYLOAD_INVALID'),
+        String(resolvedSharePackage?.message || 'The shared helper could not be resolved safely.'),
+        {
+          requestId,
+          details: resolvedSharePackage?.details || {},
+        }
+      );
+    }
+    const packageInfo = resolvedSharePackage.packageInfo;
     const structure = buildHouseOfficeStructurePayload({
       context,
       houseId,
@@ -3674,7 +3811,7 @@ function registerPlatformReadRoutes(app, deps) {
       .find((entry) => String(entry?.deploymentId || '').trim() === String(deploymentRecord?.deploymentId || '').trim()) || null;
     return sendPortalApiSuccess(res, {
       deployment: deploymentCard,
-      share: buildHouseWorkerShareResponse(share),
+      share: resolvedSharePackage.canonicalShare || buildHouseWorkerShareResponse(share),
       guidance: {
         title: 'Shared helper installed',
         nextStep: buildHouseWorkerStatusExplanation(packageInfo, deploymentStatus),

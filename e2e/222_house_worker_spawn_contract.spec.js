@@ -41,9 +41,19 @@ test('M35.7: spawning a deployed helper creates one real child worker session in
     return Array.isArray(sessions?.json?.data?.sessions) ? sessions.json.data.sessions.length : 0;
   }).toBe(1);
 
-  const sessionsPayload = await readHouseWorkerSessionsFromPage(page, { teamId: 'team_main' });
-  expect(sessionsPayload.status).toBe(200);
-  const session = sessionsPayload.json?.data?.sessions?.[0];
+  let session = null;
+  await expect.poll(async () => {
+    const sessionsPayload = await readHouseWorkerSessionsFromPage(page, { teamId: 'team_main' });
+    if (sessionsPayload.status !== 200) return false;
+    const currentSession = sessionsPayload.json?.data?.sessions?.[0] || null;
+    session = currentSession;
+    const latestReply = String(currentSession?.latestReply || '').trim();
+    const eventCount = Number(currentSession?.eventCount || 0);
+    return Boolean(currentSession && latestReply && eventCount >= 3);
+  }, {
+    message: 'expected spawned helper session to publish its first reply and event log',
+  }).toBe(true);
+
   expect(session).toMatchObject({
     deploymentId,
     status: expect.stringMatching(/^(starting|ready|idle|working)$/),
