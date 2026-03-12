@@ -47,4 +47,5 @@ test('T38.9: House worker live readiness names house, team, browser, and local-b
 
   await expect(page.getByTestId('house-worker-live-readiness-summary')).toContainText('Run the headed operator gate next');
   await expect(page.getByTestId('house-worker-live-readiness-checks')).toContainText('Local brain ready in this browser');
+  await expect(page.getByTestId('house-worker-live-readiness-steps')).toContainText('capture:house-worker-live-state');
 });

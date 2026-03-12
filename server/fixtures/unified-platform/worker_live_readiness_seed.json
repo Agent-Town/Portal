@@ -11,6 +11,7 @@
   "operatorSteps": [
     "Open House in a live browser session.",
     "Confirm the current session already has a house and active team.",
+    "If you need to save this live session for the operator gate, run npm run capture:house-worker-live-state and follow the prompts.",
     "Configure a local brain in this browser.",
     "Run the headed helper smoke and confirm the helper replies once."
   ]

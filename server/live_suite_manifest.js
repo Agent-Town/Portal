@@ -35,6 +35,7 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
   {
     suiteId: 'house-worker-operator',
     command: 'npm run test:house-worker-live',
+    captureCommand: 'npm run capture:house-worker-live-state',
     requiredEnv: [
       'HOUSE_WORKER_LIVE_BASE_URL',
       'HOUSE_WORKER_LIVE_STORAGE_STATE',
@@ -75,6 +76,7 @@ function getLiveSuiteManifest() {
   return LIVE_SUITE_MANIFEST.map((entry) => ({
     ...entry,
     requiredEnv: Array.isArray(entry.requiredEnv) ? [...entry.requiredEnv] : [],
+    captureCommand: typeof entry.captureCommand === 'string' ? entry.captureCommand : undefined,
     providerEnv: entry?.providerEnv && typeof entry.providerEnv === 'object'
       ? Object.fromEntries(Object.entries(entry.providerEnv).map(([key, value]) => [key, Array.isArray(value) ? [...value] : []]))
       : undefined,
@@ -216,6 +218,7 @@ function getLiveSuiteStatuses(env = process.env) {
       command: String(suite?.command || ''),
       description: String(suite?.description || ''),
       defaultMode: String(suite?.defaultMode || ''),
+      captureCommand: typeof suite?.captureCommand === 'string' ? suite.captureCommand : undefined,
       requiredFlag,
       requiredFlagEnabled,
       provider: typeof validation?.provider === 'string' ? validation.provider : '',

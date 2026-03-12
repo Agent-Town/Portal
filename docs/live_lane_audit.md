@@ -151,7 +151,7 @@ Operator setup:
 
 1. run a normal local or staging server and keep its session store intact
 2. create a real session with a house attached and an active team selected
-3. save a Playwright `storageState` file from that real session
+3. run `npm run capture:house-worker-live-state`
 4. export the House worker live env above
 5. run `node scripts/test_live.js --check house-worker-operator`
 6. run `npm run test:house-worker-live`
@@ -204,6 +204,7 @@ node scripts/test_live.js --check privy-guest
 node scripts/test_live.js --check privy-email-otp
 node scripts/test_live.js --check sepolia-wallet
 node scripts/test_live.js --check house-worker-operator
+npm run capture:house-worker-live-state -- --plan
 ```
 
 Only after those checks are ready should the real live suites be treated as release evidence.

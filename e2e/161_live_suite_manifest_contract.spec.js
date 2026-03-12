@@ -60,6 +60,7 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   expect(String(sepoliaSuite?.command || '')).toBe('npm run test:sepolia-live');
   const houseWorkerSuite = listedSuites.find((entry) => String(entry.suiteId || '') === 'house-worker-operator');
   expect(String(houseWorkerSuite?.command || '')).toBe('npm run test:house-worker-live');
+  expect(String(houseWorkerSuite?.captureCommand || '')).toBe('npm run capture:house-worker-live-state');
 
   const statusOutput = execFileSync('node', ['scripts/test_live.js', '--status'], {
     cwd: repoRoot,
@@ -112,6 +113,7 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   const houseWorkerStatus = listedStatuses.find((entry) => String(entry.suiteId || '') === 'house-worker-operator');
   expect(houseWorkerStatus).toMatchObject({
     suiteId: 'house-worker-operator',
+    captureCommand: 'npm run capture:house-worker-live-state',
     ready: false,
     mode: 'skip',
     missing: expect.arrayContaining([

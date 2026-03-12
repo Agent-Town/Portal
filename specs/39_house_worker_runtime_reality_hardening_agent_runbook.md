@@ -18,7 +18,8 @@ Current proof state:
 1. `T35.0` through `T35.13` are implemented.
 2. `T38.0` through `T38.9` and `T38.11` are implemented.
 3. `T38.10` is implemented as an operator-assisted live gate and remains intentionally skipped in the default deterministic suite until live prerequisites are present.
-4. Full deterministic suite is green at `368 passed, 5 skipped`.
+4. Follow-on contract `e2e/248_house_worker_live_state_capture_contract.spec.js` is green.
+5. Full deterministic suite is green at `369 passed, 5 skipped`.
 
 This is not a competing plan.
 It is the execution layer for the follow-on phase that closes the remaining House worker runtime, sharing, lifecycle, and live-confidence gaps.

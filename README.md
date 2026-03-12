@@ -112,6 +112,7 @@ npm run test:sepolia-live
 
 Optional operator-assisted House worker live gate:
 ```bash
+npm run capture:house-worker-live-state
 npm run test:house-worker-live
 ```
 
@@ -123,6 +124,11 @@ What `npm run test:house-worker-live` requires:
 - `HOUSE_WORKER_LIVE_MODEL`
 - `HOUSE_WORKER_LIVE_API_KEY`
 - a saved Playwright `storageState` file captured from a real session with a house attached and an active team selected
+
+What `npm run capture:house-worker-live-state` does:
+- opens a browser on `HOUSE_WORKER_LIVE_BASE_URL` or `BASE_URL`
+- waits for you to sign in and attach a house with an active team
+- saves the session to `HOUSE_WORKER_LIVE_STORAGE_STATE` or `data/house-worker.live.storage-state.json`
 
 What the House worker live gate does:
 - reopens a real saved session against the live server

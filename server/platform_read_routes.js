@@ -3684,6 +3684,7 @@ function registerPlatformReadRoutes(app, deps) {
         : blockingChecks.map((entry) => String(entry?.summary || '').trim()).filter(Boolean).join(' '),
       checks,
       operatorSteps,
+      storageStateCaptureCommand: 'npm run capture:house-worker-live-state',
       liveGateCommand: 'npm run test:house-worker-live',
       liveGateConfig: 'playwright.house-worker.live.config.js',
       counts: {

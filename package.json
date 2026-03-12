@@ -34,6 +34,7 @@
     "pretest:privy-email-live": "npm run build:openclaw-lite",
     "test:privy-email-live": "PRIVY_EMAIL_OTP_REQUIRED=1 playwright test -c playwright.privy.email.config.js",
     "pretest:house-worker-live": "npm run build:openclaw-lite",
+    "capture:house-worker-live-state": "node scripts/capture_house_worker_live_state.js",
     "test:house-worker-live": "HOUSE_WORKER_LIVE_REQUIRED=1 playwright test -c playwright.house-worker.live.config.js",
     "test:sepolia-live": "REAL_SEPOLIA_WALLET_TEST=1 playwright test -c playwright.sepolia.live.config.js",
     "verify:route-modules": "node scripts/verify_route_modules.js",

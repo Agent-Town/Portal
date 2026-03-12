@@ -26,7 +26,8 @@ Implementation baseline:
 5. Current repo proof state is:
    A. `e2e/236` through `e2e/245` and `e2e/247` are green,
    B. `e2e/246_house_worker_operator_live_gate.spec.js` is implemented and intentionally skipped in the default deterministic suite until live prerequisites are present,
-   C. full deterministic suite is green at `368 passed, 5 skipped`.
+   C. follow-on contract `e2e/248_house_worker_live_state_capture_contract.spec.js` is green,
+   D. full deterministic suite is green at `369 passed, 5 skipped`.
 
 Implementation constraints:
 

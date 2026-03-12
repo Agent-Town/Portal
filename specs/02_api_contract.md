@@ -1567,9 +1567,10 @@ Response fields:
 - `data.checks[].browserValidationRequired`
 - `data.checks[].blockedBy[]`
 - `data.operatorSteps[]`
-- `data.operatorSteps[].stepId`
-- `data.operatorSteps[].label`
-- `data.operatorSteps[].successMetric`
+- `data.storageStateCaptureCommand`
+- `data.liveGateCommand`
+- `data.liveGateConfig`
+- `data.browserSnapshot`
 
 Notes:
 - This route is session-bound and honest about missing prerequisites instead of faking seeded success.

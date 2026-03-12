@@ -11,7 +11,8 @@ Current proof state:
 3. [specs/36_house_worker_packages_and_spawn_agent_runbook.md](./36_house_worker_packages_and_spawn_agent_runbook.md) is completed.
 4. `e2e/236` through `e2e/245` and `e2e/247` are green.
 5. `e2e/246_house_worker_operator_live_gate.spec.js` is implemented as an operator-assisted live gate and remains intentionally skipped in the default deterministic suite until live prerequisites are present.
-6. Full deterministic suite is green at `368 passed, 5 skipped`.
+6. Follow-on contract `e2e/248_house_worker_live_state_capture_contract.spec.js` is green and proves the operator capture workflow is machine-readable.
+7. Full deterministic suite is green at `369 passed, 5 skipped`.
 Depends on:
 1. [specs/34_house_worker_packages_and_spawn_spec.md](./34_house_worker_packages_and_spawn_spec.md)
 2. [specs/35_house_worker_packages_and_spawn_tdd_spec.md](./35_house_worker_packages_and_spawn_tdd_spec.md)
