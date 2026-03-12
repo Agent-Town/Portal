@@ -89,6 +89,8 @@ const {
   saveNotebookEntry,
   sitOutTableSeat,
   advanceTournamentBlindLevelByDirector,
+  startScheduledBreakByDirector,
+  endScheduledBreakByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
@@ -1009,6 +1011,11 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 1, address: 'So1anaHarnessSchedBreakA1111111111111111111', houseId: 'house_harness_sched_break_a', displayName: 'Break Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessSchedBreakB1111111111111111111', houseId: 'house_harness_sched_break_b', displayName: 'Break Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessSchedBreakC1111111111111111111', houseId: 'house_harness_sched_break_c', displayName: 'Break Charlie' },
+      ],
+      director_scheduled_break_ready: [
+        { seatNumber: 1, address: 'So1anaHarnessDirBreakA11111111111111111111', houseId: 'house_harness_dir_break_a', displayName: 'Break Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessDirBreakB11111111111111111111', houseId: 'house_harness_dir_break_b', displayName: 'Break Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessDirBreakC11111111111111111111', houseId: 'house_harness_dir_break_c', displayName: 'Break Charlie' },
       ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
@@ -2009,6 +2016,103 @@ function registerPokerRoutes(app, deps) {
           headline: 'Harness scheduled-break scenario.',
           seriesId,
           seriesTitle: 'Harness Break Series',
+          scheduledBreakCount: 2,
+        },
+        createdAt: addHarnessSeconds(requestAt, -1800),
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 640 },
+        { actor: seatTwo, stackOil: 580 },
+        { actor: seatThree, stackOil: 560 },
+      ].forEach(({ actor, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 600,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'director_scheduled_break_ready') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_dir_break_${randomHex(6)}`;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Director Break Control Table',
+        tableType: 'tournament',
+        status: 'paused',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 5,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          lastButtonSeat: seatThree.seatNumber,
+          lastStartedAt: addHarnessSeconds(requestAt, -120),
+          lastSettledAt: requestAt,
+          lastSettledHandId: `${handId}_settled`,
+          lastSettledHandNumber: 5,
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+            [String(seatThree.seatNumber)]: 15,
+          },
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          completedScheduledBreakAfterHands: [3],
+          scheduledBreakId: null,
+          scheduledBreakLabel: null,
+          scheduledBreakAfterHandNumber: 0,
+          scheduledBreakStartedAt: null,
+          scheduledBreakUntilAt: null,
+          scheduledBreakDurationMinutes: 0,
+          pausedAt: requestAt,
+          pausedReason: 'director staging',
+        },
+        rules: buildHarnessTournamentRules(seriesId, 'Harness Director Break Series', {
+          lateRegistrationHands: 0,
+          scheduledBreaks: [
+            {
+              breakId: 'player_break_1',
+              afterHandNumber: 3,
+              label: 'Player Break 1',
+              durationMinutes: 5,
+            },
+            {
+              breakId: 'player_break_2',
+              afterHandNumber: 6,
+              label: 'Player Break 2',
+              durationMinutes: 5,
+            },
+          ],
+        }),
+        summary: {
+          headline: 'Harness director scheduled-break control scenario.',
+          seriesId,
+          seriesTitle: 'Harness Director Break Series',
           scheduledBreakCount: 2,
         },
         createdAt: addHarnessSeconds(requestAt, -1800),
@@ -6717,6 +6821,70 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_TABLE_BLIND_ADVANCE_FAILED',
         err?.message || 'Unable to advance the tournament blinds.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/breaks/start', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = startScheduledBreakByDirector(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'director_break_started', {
+        handId: payload?.hand?.handId || null,
+        scheduledBreakLabel: String(payload?.table?.summary?.scheduledBreakLabel || ''),
+        scheduledBreakUntilAt: payload?.table?.summary?.scheduledBreakUntilAt || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TABLE_BREAK_START_FAILED',
+        err?.message || 'Unable to start the scheduled break.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/admin/tables/:tableId/breaks/end', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    if (!isAdmin(req)) {
+      return sendPortalApiError(res, 403, 'FORBIDDEN', 'Poker admin token required.', { requestId });
+    }
+    try {
+      const payload = endScheduledBreakByDirector(playRouteDeps, {
+        tableId: req.params.tableId,
+        reason: normalizeTrimmedString(req.body?.reason),
+        actorLabel: 'operator',
+        asOf: req.body?.asOf,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'director_break_ended', {
+        handId: payload?.hand?.handId || null,
+        scheduledBreakActive: !!payload?.table?.summary?.scheduledBreakActive,
+        nextScheduledBreakAfterHandNumber: Number(payload?.table?.summary?.nextScheduledBreakAfterHandNumber || 0),
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_TABLE_BREAK_END_FAILED',
+        err?.message || 'Unable to end the scheduled break.',
         {
           requestId,
           details: err?.details || {},

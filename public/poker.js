@@ -2573,6 +2573,19 @@
     const paused = String(table?.status || 'open') === 'paused';
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
     const scheduledBreakActive = !!table?.summary?.scheduledBreakActive;
+    const tournamentDirectorBreakReferenceHandNumber = Math.max(
+      0,
+      Number(table?.summary?.handNumber || 0),
+      Number(table?.state?.lastSettledHandNumber || 0),
+      Number(table?.state?.activeHandNumber || 0)
+    );
+    const tournamentDirectorBreakReady = table?.tableType === 'tournament'
+      && !scheduledBreakActive
+      && !adminClosed
+      && !table?.summary?.scheduledStartPending
+      && !table?.summary?.liveHand
+      && tournamentDirectorBreakReferenceHandNumber > 0
+      && Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0) > 0;
     const tableOpen = String(table?.status || 'open') === 'open';
     const registrationOpen = tableOpen || (table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled');
     const sitAndGoWaiting = table?.tableType === 'tournament'
@@ -2599,10 +2612,10 @@
         <p>${escapeHtml(
           adminClosed
             ? (table?.state?.closeReason || 'Table closed by operator.')
-            : paused
-            ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
             : scheduledBreakActive
             ? `${String(table?.summary?.scheduledBreakLabel || 'Scheduled break')} is active until ${formatIso(table?.summary?.scheduledBreakUntilAt)}.`
+            : paused
+            ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
             : sitAndGoWaiting
             ? `Sit-and-go is waiting for ${Number(table?.summary?.seatsUntilStart || 0)} more seat${Number(table?.summary?.seatsUntilStart || 0) === 1 ? '' : 's'} before hand 1 starts.`
             : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
@@ -3139,6 +3152,8 @@
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.needsRebalance ? `<button class="pokerButton" type="button" data-admin-series-rebalance="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Rebalance Series</button>` : ''}
           ${!adminClosed && series && table?.tableType === 'tournament' && series?.pendingBreakTableId ? `<button class="pokerButton" type="button" data-admin-series-break-table="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}" data-admin-break-table-id="${escapeHtml(series?.pendingBreakTableId || '')}">Break Pending Table</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-table-blinds-advance="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Advance Blinds</button>` : ''}
+          ${tournamentDirectorBreakReady ? `<button class="pokerButton" type="button" data-admin-table-break-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Break Now</button>` : ''}
+          ${!adminClosed && table?.tableType === 'tournament' && scheduledBreakActive ? `<button class="pokerButton" type="button" data-admin-table-break-end="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">End Break Early</button>` : ''}
           ${!adminClosed && table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled' ? `<button class="pokerButton" type="button" data-admin-table-start="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Start Table</button>` : ''}
           ${series && table?.tableType === 'tournament' ? `<button class="pokerButton" type="button" data-admin-series-export="1" data-admin-series-id="${escapeHtml(series?.seriesId || '')}">Export Series Review</button>` : ''}
           <button class="pokerButton" type="button" data-admin-export="1" data-admin-table-id="${escapeHtml(table?.tableId || '')}">Export Review</button>
@@ -4012,6 +4027,50 @@
           );
         } catch (err) {
           setStatus(`Blind advance failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const startBreakButton = document.querySelector('[data-admin-table-break-start="1"][data-admin-table-id]');
+    if (startBreakButton) {
+      startBreakButton.addEventListener('click', async () => {
+        const targetTableId = String(startBreakButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Starting scheduled break...');
+        try {
+          const payload = await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/breaks/start`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director started the next scheduled break.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+          setStatus(`${String(payload?.data?.table?.summary?.scheduledBreakLabel || 'Scheduled break')} is now active.`);
+        } catch (err) {
+          setStatus(`Break start failed: ${err.code || err.message || 'UNKNOWN'}`);
+        }
+      });
+    }
+
+    const endBreakButton = document.querySelector('[data-admin-table-break-end="1"][data-admin-table-id]');
+    if (endBreakButton) {
+      endBreakButton.addEventListener('click', async () => {
+        const targetTableId = String(endBreakButton.getAttribute('data-admin-table-id') || '').trim();
+        if (!targetTableId) return;
+        setStatus('Ending scheduled break...');
+        try {
+          await api(`/api/poker/play/admin/tables/${encodeURIComponent(targetTableId)}/breaks/end`, {
+            method: 'POST',
+            headers: { 'x-admin-token': token },
+            body: JSON.stringify({
+              reason: 'Director ended the scheduled break early.',
+            }),
+          });
+          await loadPlayTable(targetTableId);
+          setStatus('Scheduled break ended.');
+        } catch (err) {
+          setStatus(`Break end failed: ${err.code || err.message || 'UNKNOWN'}`);
         }
       });
     }

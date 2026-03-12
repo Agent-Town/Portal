@@ -2085,6 +2085,47 @@ Response notes:
 - `data.table.summary.upcomingBlindLevel` exposes the next-start level after the queued advance
 - returns `409 POKER_PLAY_DIRECTOR_BLINDS_FINAL` when the table is already at the final configured blind level
 
+### POST `/api/poker/play/admin/tables/:tableId/breaks/start` (admin)
+Starts the next configured scheduled tournament break early. Director break starts only work between hands on already-started tournament tables.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director started the next scheduled break.",
+  "asOf": "2026-03-12T16:01:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal table payload
+- `data.table.summary.scheduledBreakActive = true`
+- `data.table.summary.scheduledBreakLabel` and `data.table.summary.scheduledBreakUntilAt` expose the active break window
+- returns `409 POKER_PLAY_DIRECTOR_BREAK_LIVE_HAND` if a live hand is still in progress
+- returns `409 POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE` when no future scheduled break remains or the table has not started yet
+
+### POST `/api/poker/play/admin/tables/:tableId/breaks/end` (admin)
+Ends one active scheduled tournament break early so the table can resume without waiting for the original resume timestamp.
+
+Headers:
+- `x-admin-token: <ADMIN_TOKEN>`
+
+Request shape:
+```json
+{
+  "reason": "Director ended the scheduled break early.",
+  "asOf": "2026-03-12T16:03:00.000Z"
+}
+```
+
+Response notes:
+- returns the normal table payload
+- clears `data.table.summary.scheduledBreakActive`
+- preserves `data.table.summary.completedScheduledBreakCount`
+- returns `409 POKER_PLAY_DIRECTOR_BREAK_END_UNAVAILABLE` when no scheduled break is active on the table
+
 ### GET `/api/poker/play/admin/tables/:tableId/review` (admin)
 Returns the operator review payload for one table.
 

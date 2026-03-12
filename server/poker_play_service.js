@@ -1076,6 +1076,119 @@ function getNextScheduledBreak(table) {
   }) || null;
 }
 
+function activateTournamentScheduledBreak(deps, table, hand, scheduledBreak, atIso, {
+  actorRole = 'system',
+  eventKind = 'scheduled_break_started',
+  auditPayload = {},
+} = {}) {
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const settledHandId = normalizeTrimmedString(state?.lastSettledHandId);
+  const persistedSettledHandId = settledHandId && typeof deps.getPokerPlayHandById === 'function' && deps.getPokerPlayHandById(settledHandId)
+    ? settledHandId
+    : null;
+  const breakStartHandId = normalizeTrimmedString(hand?.handId) || persistedSettledHandId || null;
+  const untilAt = addMinutesToIso(atIso, scheduledBreak.durationMinutes);
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    state: {
+      ...state,
+      completedScheduledBreakAfterHands: normalizePositiveNumberList([
+        ...getCompletedScheduledBreakAfterHands(table),
+        scheduledBreak.afterHandNumber,
+      ]),
+      scheduledBreakId: scheduledBreak.breakId,
+      scheduledBreakLabel: scheduledBreak.label,
+      scheduledBreakAfterHandNumber: scheduledBreak.afterHandNumber,
+      scheduledBreakStartedAt: atIso,
+      scheduledBreakUntilAt: untilAt,
+      scheduledBreakDurationMinutes: scheduledBreak.durationMinutes,
+    },
+    updatedAt: atIso,
+  });
+  if (breakStartHandId) {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: breakStartHandId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `Scheduled break started: ${scheduledBreak.label}.`,
+      createdAt: atIso,
+    });
+  }
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: breakStartHandId,
+      seatNumber: null,
+      actorRole: normalizePokerPlayAuditActorRole(actorRole, 'system'),
+      eventKind,
+      payload: {
+        breakId: scheduledBreak.breakId,
+        label: scheduledBreak.label,
+        afterHandNumber: scheduledBreak.afterHandNumber,
+        durationMinutes: scheduledBreak.durationMinutes,
+        startedAt: atIso,
+        untilAt,
+        ...cloneJson(auditPayload, {}),
+      },
+      createdAt: atIso,
+    });
+  }
+  return updatedTable;
+}
+
+function clearTournamentScheduledBreak(deps, table, hand, activeBreak, atIso, {
+  actorRole = 'system',
+  eventKind = 'scheduled_break_ended',
+  auditPayload = {},
+} = {}) {
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const resumeHandId = normalizeTrimmedString(hand?.handId);
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    state: {
+      ...state,
+      scheduledBreakId: null,
+      scheduledBreakLabel: null,
+      scheduledBreakAfterHandNumber: 0,
+      scheduledBreakStartedAt: null,
+      scheduledBreakUntilAt: null,
+      scheduledBreakDurationMinutes: 0,
+      lastScheduledBreakResumedAt: atIso,
+    },
+    updatedAt: atIso,
+  });
+  if (resumeHandId) {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: resumeHandId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `Scheduled break ended: ${activeBreak.label}.`,
+      createdAt: atIso,
+    });
+  }
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: null,
+      seatNumber: null,
+      actorRole: normalizePokerPlayAuditActorRole(actorRole, 'system'),
+      eventKind,
+      payload: {
+        breakId: activeBreak.breakId,
+        label: activeBreak.label,
+        afterHandNumber: activeBreak.afterHandNumber,
+        durationMinutes: activeBreak.durationMinutes,
+        resumedAt: atIso,
+        ...cloneJson(auditPayload, {}),
+      },
+      createdAt: atIso,
+    });
+  }
+  return updatedTable;
+}
+
 function isScheduledTournamentPending(table, atIso) {
   if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return false;
   if (normalizeTrimmedString(table?.status, 'open') !== 'scheduled') return false;
@@ -7575,14 +7688,16 @@ function resumeTable(deps, { tableId, actorLabel = 'operator', asOf } = {}) {
     },
     updatedAt: requestAt,
   });
-  deps.createPokerPlayMessage({
-    tableId: table.tableId,
-    handId: hand?.handId || null,
-    seatNumber: null,
-    authorRole: 'system',
-    body: 'Table resumed by operator.',
-    createdAt: requestAt,
-  });
+  if (hand?.handId) {
+    deps.createPokerPlayMessage({
+      tableId: table.tableId,
+      handId: hand.handId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: 'Table resumed by operator.',
+      createdAt: requestAt,
+    });
+  }
   if (typeof deps.createPokerPlayAuditEvent === 'function') {
     deps.createPokerPlayAuditEvent({
       tableId: table.tableId,
@@ -8270,6 +8385,86 @@ function advanceTournamentBlindLevelByDirector(deps, { tableId, reason, actorLab
   });
 }
 
+function startScheduledBreakByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const table = synced.table;
+  const hand = synced.hand;
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE', 'Director break control is only available for tournament tables.');
+  }
+  const status = normalizeTrimmedString(table?.status, 'open').toLowerCase();
+  if (['admin_closed', 'series_closed', 'completed'].includes(status)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE', 'Director break control is only available for active tournament tables.');
+  }
+  if (!hasPokerPlayTableStarted(table, hand) || isScheduledTournamentPending(table, requestAt)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE', 'Director breaks are only available after the tournament has started.');
+  }
+  if (hand && hand.status === 'live') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_LIVE_HAND', 'Director breaks can only start between hands.');
+  }
+  if (getActiveScheduledBreakState(table) && isScheduledBreakActive(table, requestAt)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE', 'A scheduled break is already active.');
+  }
+  const nextScheduledBreak = getNextScheduledBreak(table);
+  if (!nextScheduledBreak) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_START_UNAVAILABLE', 'No remaining scheduled break is available for this table.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director started the next scheduled break.');
+  const updatedTable = activateTournamentScheduledBreak(deps, table, hand, nextScheduledBreak, requestAt, {
+    actorRole: 'operator',
+    eventKind: 'director_scheduled_break_started',
+    auditPayload: {
+      seriesId: getTournamentSeriesRef(table).seriesId || null,
+      actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+      reason: targetReason,
+    },
+  });
+  const detail = syncPokerPlayTable(deps, updatedTable.tableId, { processAt: requestAt });
+  return buildPokerPlayTablePayload(deps, detail.table, detail.seats, detail.hand, {
+    session: null,
+    req: null,
+    processAt: requestAt,
+  });
+}
+
+function endScheduledBreakByDirector(deps, { tableId, reason, actorLabel = 'operator', asOf } = {}) {
+  const requestAt = toProcessIso(deps, asOf);
+  const synced = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+  if (!synced?.table) {
+    throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
+  }
+  const table = synced.table;
+  const hand = synced.hand;
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_END_UNAVAILABLE', 'Director break control is only available for tournament tables.');
+  }
+  const activeBreak = getActiveScheduledBreakState(table);
+  if (!activeBreak || !isScheduledBreakActive(table, requestAt)) {
+    throw createRouteError(409, 'POKER_PLAY_DIRECTOR_BREAK_END_UNAVAILABLE', 'No active scheduled break can be ended on this table.');
+  }
+  const targetReason = normalizeTrimmedString(reason, 'Director ended the scheduled break early.');
+  const updatedTable = clearTournamentScheduledBreak(deps, table, hand, activeBreak, requestAt, {
+    actorRole: 'operator',
+    eventKind: 'director_scheduled_break_ended',
+    auditPayload: {
+      seriesId: getTournamentSeriesRef(table).seriesId || null,
+      actorLabel: normalizeTrimmedString(actorLabel, 'operator'),
+      reason: targetReason,
+      endedEarly: true,
+    },
+  });
+  const detail = syncPokerPlayTable(deps, updatedTable.tableId, { processAt: requestAt });
+  return buildPokerPlayTablePayload(deps, detail.table, detail.seats, detail.hand, {
+    session: null,
+    req: null,
+    processAt: requestAt,
+  });
+}
+
 function maybeActivateScheduledTournament(deps, table, seats, atIso) {
   if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
     return {
@@ -8339,51 +8534,10 @@ function syncScheduledBreakState(deps, table, hand, atIso) {
   const state = table?.state && typeof table.state === 'object' ? table.state : {};
   const activeBreak = getActiveScheduledBreakState(table);
   if (activeBreak) {
-    const resumeHandId = normalizeTrimmedString(hand?.handId);
     if (isScheduledBreakActive(table, atIso)) {
       return { table, hand, changed: false, active: true };
     }
-    const updatedTable = deps.upsertPokerPlayTable({
-      ...table,
-      state: {
-        ...state,
-        scheduledBreakId: null,
-        scheduledBreakLabel: null,
-        scheduledBreakAfterHandNumber: 0,
-        scheduledBreakStartedAt: null,
-        scheduledBreakUntilAt: null,
-        scheduledBreakDurationMinutes: 0,
-        lastScheduledBreakResumedAt: atIso,
-      },
-      updatedAt: atIso,
-    });
-    if (resumeHandId) {
-      deps.createPokerPlayMessage({
-        tableId: updatedTable.tableId,
-        handId: resumeHandId,
-        seatNumber: null,
-        authorRole: 'system',
-        body: `Scheduled break ended: ${activeBreak.label}.`,
-        createdAt: atIso,
-      });
-    }
-    if (typeof deps.createPokerPlayAuditEvent === 'function') {
-      deps.createPokerPlayAuditEvent({
-        tableId: updatedTable.tableId,
-        handId: null,
-        seatNumber: null,
-        actorRole: 'system',
-        eventKind: 'scheduled_break_ended',
-        payload: {
-          breakId: activeBreak.breakId,
-          label: activeBreak.label,
-          afterHandNumber: activeBreak.afterHandNumber,
-          durationMinutes: activeBreak.durationMinutes,
-          resumedAt: atIso,
-        },
-        createdAt: atIso,
-      });
-    }
+    const updatedTable = clearTournamentScheduledBreak(deps, table, hand, activeBreak, atIso);
     return { table: updatedTable, hand, changed: true, active: false };
   }
   if (!hasPokerPlayTableStarted(table, hand)) {
@@ -8402,56 +8556,7 @@ function syncScheduledBreakState(deps, table, hand, atIso) {
   if (!scheduledBreak) {
     return { table, hand, changed: false, active: false };
   }
-  const settledHandId = normalizeTrimmedString(state?.lastSettledHandId);
-  const persistedSettledHandId = settledHandId && typeof deps.getPokerPlayHandById === 'function' && deps.getPokerPlayHandById(settledHandId)
-    ? settledHandId
-    : null;
-  const breakStartHandId = normalizeTrimmedString(hand?.handId) || persistedSettledHandId || null;
-  const updatedTable = deps.upsertPokerPlayTable({
-    ...table,
-    state: {
-      ...state,
-      completedScheduledBreakAfterHands: normalizePositiveNumberList([
-        ...getCompletedScheduledBreakAfterHands(table),
-        scheduledBreak.afterHandNumber,
-      ]),
-      scheduledBreakId: scheduledBreak.breakId,
-      scheduledBreakLabel: scheduledBreak.label,
-      scheduledBreakAfterHandNumber: scheduledBreak.afterHandNumber,
-      scheduledBreakStartedAt: atIso,
-      scheduledBreakUntilAt: addMinutesToIso(atIso, scheduledBreak.durationMinutes),
-      scheduledBreakDurationMinutes: scheduledBreak.durationMinutes,
-    },
-    updatedAt: atIso,
-  });
-  if (breakStartHandId) {
-    deps.createPokerPlayMessage({
-      tableId: updatedTable.tableId,
-      handId: breakStartHandId,
-      seatNumber: null,
-      authorRole: 'system',
-      body: `Scheduled break started: ${scheduledBreak.label}.`,
-      createdAt: atIso,
-    });
-  }
-  if (typeof deps.createPokerPlayAuditEvent === 'function') {
-    deps.createPokerPlayAuditEvent({
-      tableId: updatedTable.tableId,
-      handId: breakStartHandId,
-      seatNumber: null,
-      actorRole: 'system',
-      eventKind: 'scheduled_break_started',
-      payload: {
-        breakId: scheduledBreak.breakId,
-        label: scheduledBreak.label,
-        afterHandNumber: scheduledBreak.afterHandNumber,
-        durationMinutes: scheduledBreak.durationMinutes,
-        startedAt: atIso,
-        untilAt: addMinutesToIso(atIso, scheduledBreak.durationMinutes),
-      },
-      createdAt: atIso,
-    });
-  }
+  const updatedTable = activateTournamentScheduledBreak(deps, table, hand, scheduledBreak, atIso);
   return { table: updatedTable, hand, changed: true, active: true };
 }
 
@@ -12489,6 +12594,8 @@ module.exports = {
   saveNotebookEntry,
   sitOutTableSeat,
   advanceTournamentBlindLevelByDirector,
+  startScheduledBreakByDirector,
+  endScheduledBreakByDirector,
   startTournamentTableByDirector,
   moveTournamentDirectorSeat,
   syncPokerPlayTable,
