@@ -1551,6 +1551,7 @@ Notes:
 - `browser_tab` is the first shipped executor kind.
 - `backend_pool` is the first offloaded executor kind.
 - Browser-backed helpers still use the same House control plane as later executor kinds, so this route is the canonical place to read executor and lease truth.
+- `data.runtimeInstances[].leaseStatus = stale` is authoritative for a backend-pooled helper that stopped heartbeating; House Office must fail closed and show restart language instead of cloud-running language.
 
 ### POST `/api/platform/house-workers/offload` (human)
 Moves one active helper from the current browser executor into the backend pool using a captured workspace snapshot.
@@ -1590,6 +1591,7 @@ Response fields:
 Notes:
 - This phase supports only `targetExecutorKind = backend_pool`.
 - A successful offload preserves one runtime-instance record and updates executor truth from `browser_tab` to `backend_pool` without creating a duplicate active runtime.
+- If the backend-pool runtime later stops heartbeating, the same runtime instance must degrade to `leaseStatus = stale` instead of remaining falsely active.
 
 ### GET `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots` (human)
 Returns captured workspace snapshots for one helper runtime instance.

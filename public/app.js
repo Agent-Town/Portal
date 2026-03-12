@@ -602,6 +602,7 @@ const houseWorkerSupervisorState = {
   localBrainReady: null,
   localBrainStatusLabel: 'Checking local brain readiness...',
   localBrainCheckedAt: 0,
+  lastDetachedSyncAt: 0,
 };
 let pendingTownhallHumanImage = null;
 let pendingTownhallAgentImage = null;
@@ -2100,6 +2101,16 @@ function buildHouseWorkerSessionPresentation(session = null) {
   const currentOwnerId = resolveHouseWorkerSupervisorOwnerId();
   const attached = isHouseWorkerRuntimeAttached(houseWorkerSessionId);
   const active = HOUSE_WORKER_ACTIVE_STATUSES.has(status);
+  if (leaseStatus === 'stale' || status === 'stale') {
+    return {
+      attached: false,
+      handoffRequired: true,
+      statusLabel: 'Needs restart here',
+      actionLabel: 'This helper stopped reporting from its previous tab. Restart it here to continue safely.',
+      startLabel: 'Restart Here',
+      stopLabel: 'Clear Session',
+    };
+  }
   if (active && executorKind === 'backend_pool') {
     return {
       attached: false,
@@ -2109,16 +2120,6 @@ function buildHouseWorkerSessionPresentation(session = null) {
       startLabel: 'Running in cloud',
       stopLabel: 'Stop Cloud Helper',
       cloudOffloaded: true,
-    };
-  }
-  if (leaseStatus === 'stale' || status === 'stale') {
-    return {
-      attached: false,
-      handoffRequired: true,
-      statusLabel: 'Needs restart here',
-      actionLabel: 'This helper stopped reporting from its previous tab. Restart it here to continue safely.',
-      startLabel: 'Restart Here',
-      stopLabel: 'Clear Session',
     };
   }
   if (active && !attached) {
@@ -2289,6 +2290,22 @@ function getHouseWorkerExecutorSnapshot() {
     adapters,
     helpers,
   };
+}
+
+function shouldPollDetachedHouseWorkers(nowMs = Date.now()) {
+  if (houseSurfaceState.activeSurface !== 'office') return false;
+  if ((nowMs - Number(houseWorkerSupervisorState.lastDetachedSyncAt || 0)) < 1000) return false;
+  const sessions = Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [];
+  return sessions.some((entry) => {
+    const houseWorkerSessionId = String(entry?.houseWorkerSessionId || '').trim();
+    const status = String(entry?.status || '').trim();
+    const executorKind = String(entry?.executorKind || '').trim();
+    if (!houseWorkerSessionId) return false;
+    if (status === 'stale') return true;
+    if (!HOUSE_WORKER_ACTIVE_STATUSES.has(status)) return false;
+    if (executorKind === 'backend_pool') return true;
+    return !isHouseWorkerRuntimeAttached(houseWorkerSessionId);
+  });
 }
 
 function applyHouseWorkerCollectionsState(data = {}, { render = true } = {}) {
@@ -13289,6 +13306,13 @@ async function poll() {
     const state = await api('/api/state');
     updateUI(state);
     scheduleAgentInterfaceSetup();
+    if (shouldPollDetachedHouseWorkers()) {
+      houseWorkerSupervisorState.lastDetachedSyncAt = Date.now();
+      await syncHouseWorkerSessions({
+        skipContext: true,
+        render: houseSurfaceState.activeSurface === 'office',
+      }).catch(() => null);
+    }
   } catch (e) {
     console.warn('state poll failed', e);
   } finally {

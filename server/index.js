@@ -95,6 +95,7 @@ const {
 const { getLiveSuiteManifest, getLiveSuiteStatuses } = require('./live_suite_manifest');
 const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = require('./route_manifest');
 const {
+  crashHouseWorkerBackendRuntime,
   getHouseWorkerBackendRuntimeSnapshot,
   startHouseWorkerBackendRuntime,
   stopAllHouseWorkerBackendRuntimes,
@@ -10760,6 +10761,26 @@ if (process.env.NODE_ENV === 'test') {
       ok: true,
       suites: getLiveSuiteManifest(),
       statuses: getLiveSuiteStatuses(),
+    });
+  });
+
+  app.post('/__test__/house-workers/runtime-instances/:runtimeInstanceId/crash', (req, res) => {
+    const token = process.env.TEST_RESET_TOKEN;
+    if (!token) return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    const header = req.header('x-test-reset');
+    if (header !== token) return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    const runtimeInstanceId = String(req.params.runtimeInstanceId || '').trim();
+    if (!runtimeInstanceId) {
+      return res.status(400).json({ ok: false, error: 'RUNTIME_INSTANCE_REQUIRED' });
+    }
+    const crashed = crashHouseWorkerBackendRuntime(runtimeInstanceId);
+    if (!crashed) {
+      return res.status(404).json({ ok: false, error: 'NOT_FOUND' });
+    }
+    return res.json({
+      ok: true,
+      runtimeInstanceId,
+      action: 'crash',
     });
   });
 

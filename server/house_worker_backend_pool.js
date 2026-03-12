@@ -176,6 +176,20 @@ function stopHouseWorkerBackendRuntime(runtimeInstanceId = '', { reason = 'stopp
   return true;
 }
 
+function crashHouseWorkerBackendRuntime(runtimeInstanceId = '') {
+  const normalizedRuntimeInstanceId = String(runtimeInstanceId || '').trim();
+  if (!normalizedRuntimeInstanceId) return false;
+  const entry = poolState.runtimes.get(normalizedRuntimeInstanceId);
+  if (!entry) return false;
+  entry.status = 'crashing';
+  try {
+    entry.child.kill('SIGKILL');
+  } catch {
+    return false;
+  }
+  return true;
+}
+
 function stopAllHouseWorkerBackendRuntimes(reason = 'reset') {
   for (const runtimeInstanceId of Array.from(poolState.runtimes.keys())) {
     stopHouseWorkerBackendRuntime(runtimeInstanceId, { reason });
@@ -193,6 +207,7 @@ process.on('exit', () => {
 });
 
 module.exports = {
+  crashHouseWorkerBackendRuntime,
   startHouseWorkerBackendRuntime,
   stopHouseWorkerBackendRuntime,
   stopAllHouseWorkerBackendRuntimes,

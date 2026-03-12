@@ -51,6 +51,7 @@ Current implementation note:
 3. Runtime-instance records remain the durable source of executor and lease truth for that browser path.
 4. Browser-to-backend offload is now implemented for the first `backend_pool` path through snapshot capture plus runtime-instance transfer.
 5. The backend pool now provides real child-process lease ownership for offloaded helpers, even though full backend message execution parity is still a later milestone.
+6. Backend-pool lease truth now fails closed when the child process disappears, and House Office must switch from cloud-running copy to restart-required copy.
 
 ## 3.1 Worker-first still holds
 

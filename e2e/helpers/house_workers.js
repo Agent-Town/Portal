@@ -7,6 +7,8 @@ async function readJsonResponse(response) {
   }
 }
 
+const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
+
 async function getHouseWorkerDeployments(request, { teamId = '' } = {}) {
   const search = new URLSearchParams();
   if (teamId) search.set('teamId', String(teamId || '').trim());
@@ -172,6 +174,15 @@ async function offloadHouseWorker(request, payload = {}) {
   return readJsonResponse(response);
 }
 
+async function crashHouseWorkerRuntime(request, runtimeInstanceId) {
+  const response = await request.post(`/__test__/house-workers/runtime-instances/${encodeURIComponent(String(runtimeInstanceId || '').trim())}/crash`, {
+    headers: { 'x-test-reset': resetToken },
+    data: {},
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function updateHouseWorkerDeploymentLifecycle(request, deploymentId, action) {
   const response = await request.post(`/api/platform/house-workers/deployments/${encodeURIComponent(String(deploymentId || ''))}/lifecycle`, {
     data: {
@@ -247,6 +258,7 @@ module.exports = {
   getHouseWorkerShare,
   installHouseWorker,
   installSharedHouseWorker,
+  crashHouseWorkerRuntime,
   listHouseWorkerShares,
   listHouseWorkerSessions,
   listHouseWorkerRuntimeInstances,
