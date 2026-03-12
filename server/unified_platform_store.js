@@ -29,6 +29,7 @@ const PLATFORM_TABLES = Object.freeze([
   'house_worker_share_invites',
   'house_worker_sessions',
   'house_worker_runtime_instances',
+  'house_worker_workspace_snapshots',
   'house_worker_transport_messages',
   'house_worker_session_events',
   'track_progress_events',
@@ -506,6 +507,23 @@ function ensureDb() {
       message_cursor TEXT,
       started_at TEXT,
       stopped_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS house_worker_workspace_snapshots (
+      workspace_snapshot_ref TEXT PRIMARY KEY,
+      house_worker_session_id TEXT NOT NULL,
+      runtime_instance_id TEXT NOT NULL,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      deployment_id TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      storage_kind TEXT NOT NULL,
+      created_by_executor_kind TEXT NOT NULL,
+      workspace_manifest_json TEXT NOT NULL DEFAULT '{}',
+      restore_policy_json TEXT NOT NULL DEFAULT '{}',
+      snapshot_payload_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -2821,6 +2839,143 @@ function mapHouseWorkerTransportMessageRow(row) {
   };
 }
 
+function mapHouseWorkerWorkspaceSnapshotRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    workspaceSnapshotRef: String(row.workspace_snapshot_ref || ''),
+    houseWorkerSessionId: String(row.house_worker_session_id || ''),
+    runtimeInstanceId: String(row.runtime_instance_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    deploymentId: String(row.deployment_id || ''),
+    contentHash: String(row.content_hash || ''),
+    storageKind: String(row.storage_kind || ''),
+    createdByExecutorKind: String(row.created_by_executor_kind || ''),
+    workspaceManifest: parseJsonColumn(row.workspace_manifest_json, {}),
+    restorePolicy: parseJsonColumn(row.restore_policy_json, {}),
+    snapshotPayload: parseJsonColumn(row.snapshot_payload_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function getHouseWorkerWorkspaceSnapshotByRef(workspaceSnapshotRef = '') {
+  const normalizedSnapshotRef = String(workspaceSnapshotRef || '').trim();
+  if (!normalizedSnapshotRef) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM house_worker_workspace_snapshots
+    WHERE workspace_snapshot_ref = ?
+    LIMIT 1
+  `).get(normalizedSnapshotRef);
+  return mapHouseWorkerWorkspaceSnapshotRow(row);
+}
+
+function listHouseWorkerWorkspaceSnapshots({
+  runtimeInstanceId = '',
+  houseWorkerSessionId = '',
+} = {}) {
+  const normalizedRuntimeInstanceId = String(runtimeInstanceId || '').trim();
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  if (!normalizedRuntimeInstanceId && !normalizedSessionId) return [];
+  const database = ensureDb();
+  let rows = [];
+  if (normalizedRuntimeInstanceId) {
+    rows = database.prepare(`
+      SELECT *
+      FROM house_worker_workspace_snapshots
+      WHERE runtime_instance_id = ?
+      ORDER BY created_at DESC, workspace_snapshot_ref DESC
+    `).all(normalizedRuntimeInstanceId);
+  } else {
+    rows = database.prepare(`
+      SELECT *
+      FROM house_worker_workspace_snapshots
+      WHERE house_worker_session_id = ?
+      ORDER BY created_at DESC, workspace_snapshot_ref DESC
+    `).all(normalizedSessionId);
+  }
+  return rows.map(mapHouseWorkerWorkspaceSnapshotRow).filter(Boolean);
+}
+
+function createHouseWorkerWorkspaceSnapshot({
+  workspaceSnapshotRef = '',
+  houseWorkerSessionId = '',
+  runtimeInstanceId = '',
+  houseId = '',
+  teamId = '',
+  deploymentId = '',
+  contentHash = '',
+  storageKind = 'platform_db',
+  createdByExecutorKind = '',
+  workspaceManifest = {},
+  restorePolicy = {},
+  snapshotPayload = {},
+  createdAt = new Date().toISOString(),
+  updatedAt = createdAt,
+} = {}) {
+  const normalizedSnapshotRef = String(workspaceSnapshotRef || '').trim();
+  const normalizedSessionId = String(houseWorkerSessionId || '').trim();
+  const normalizedRuntimeInstanceId = String(runtimeInstanceId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedDeploymentId = String(deploymentId || '').trim();
+  const normalizedContentHash = String(contentHash || '').trim();
+  const normalizedStorageKind = String(storageKind || '').trim();
+  const normalizedExecutorKind = String(createdByExecutorKind || '').trim();
+  if (
+    !normalizedSnapshotRef
+    || !normalizedSessionId
+    || !normalizedRuntimeInstanceId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedDeploymentId
+    || !normalizedContentHash
+    || !normalizedStorageKind
+    || !normalizedExecutorKind
+  ) {
+    throw new Error('HOUSE_WORKER_WORKSPACE_SNAPSHOT_INVALID');
+  }
+  const existing = getHouseWorkerWorkspaceSnapshotByRef(normalizedSnapshotRef);
+  if (existing) return existing;
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO house_worker_workspace_snapshots (
+      workspace_snapshot_ref,
+      house_worker_session_id,
+      runtime_instance_id,
+      house_id,
+      team_id,
+      deployment_id,
+      content_hash,
+      storage_kind,
+      created_by_executor_kind,
+      workspace_manifest_json,
+      restore_policy_json,
+      snapshot_payload_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedSnapshotRef,
+    normalizedSessionId,
+    normalizedRuntimeInstanceId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedDeploymentId,
+    normalizedContentHash,
+    normalizedStorageKind,
+    normalizedExecutorKind,
+    JSON.stringify(workspaceManifest && typeof workspaceManifest === 'object' ? workspaceManifest : {}),
+    JSON.stringify(restorePolicy && typeof restorePolicy === 'object' ? restorePolicy : {}),
+    JSON.stringify(snapshotPayload && typeof snapshotPayload === 'object' ? snapshotPayload : {}),
+    String(createdAt || '').trim() || new Date().toISOString(),
+    String(updatedAt || '').trim() || String(createdAt || '').trim() || new Date().toISOString(),
+  );
+  return getHouseWorkerWorkspaceSnapshotByRef(normalizedSnapshotRef);
+}
+
 function getHouseWorkerTransportMessageById(transportMessageId = '') {
   const normalizedTransportMessageId = String(transportMessageId || '').trim();
   if (!normalizedTransportMessageId) return null;
@@ -4060,6 +4215,7 @@ function getUnifiedPlatformTestStats() {
       houseWorkerSupervisor: true,
       houseWorkerSessions: true,
       houseWorkerRuntimeInstances: true,
+      houseWorkerWorkspaceSnapshots: true,
       houseWorkerTransport: true,
       houseWorkerEvents: true,
     },
@@ -4080,6 +4236,7 @@ module.exports = {
   createHouseWorkerShare,
   createHouseWorkerShareInvite,
   createHouseWorkerRuntimeInstance,
+  createHouseWorkerWorkspaceSnapshot,
   createHouseWorkerTransportMessage,
   createIntegrationCandidate,
   createIntegrationExecution,
@@ -4109,6 +4266,7 @@ module.exports = {
   getHouseWorkerDeploymentById,
   getHouseWorkerRuntimeInstanceById,
   getHouseWorkerRuntimeInstanceBySessionId,
+  getHouseWorkerWorkspaceSnapshotByRef,
   getHouseWorkerTransportMessageById,
   getHouseWorkerShareById,
   getHouseWorkerShareInviteById,
@@ -4127,6 +4285,7 @@ module.exports = {
   listHouseStaffAssignments,
   listHouseWorkerDeployments,
   listHouseWorkerRuntimeInstances,
+  listHouseWorkerWorkspaceSnapshots,
   listHouseWorkerTransportMessages,
   listHouseWorkerShareInvites,
   listHouseWorkerSessionEvents,

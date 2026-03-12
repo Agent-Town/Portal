@@ -344,7 +344,8 @@ Current implementation note:
 1. `browser_tab` is now routed through the executor adapter boundary,
 2. runtime instances are durable first-class records,
 3. helper message delivery already uses durable ordered transport with inspectable inbox and outbox cursors,
-4. later executor kinds must conform to the same runtime-instance and transport contracts instead of inventing their own session truth.
+4. browser helpers can already capture and restore sanitized workspace snapshots through the same control plane,
+5. later executor kinds must conform to the same runtime-instance, transport, and snapshot contracts instead of inventing their own session truth.
 
 The executor host becomes authoritative only for:
 

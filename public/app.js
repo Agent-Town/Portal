@@ -584,6 +584,13 @@ const HOUSE_WORKER_LEASE_TTL_MS = 15000;
 const HOUSE_WORKER_TRAINER_NAMESPACE_QUERY_KEYS = ['trainerNamespace', 'trainer_namespace', 'trainer-tools', 'trainerTools'];
 const HOUSE_WORKER_BROWSER_EXECUTOR_KIND = 'browser_tab';
 const HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER = 'portal_browser';
+const HOUSE_WORKER_SNAPSHOT_EXCLUDED_META_KEYS = new Set(['krootB64', 'secretStoreV1', 'secretMarker', 'llmApiKey']);
+const HOUSE_WORKER_SNAPSHOT_SECRET_META_MARKERS = ['token', 'secret', 'credential', 'oauth', 'apikey', 'api_key'];
+const HOUSE_WORKER_SNAPSHOT_SECRET_PATH_MARKERS = ['.env', 'secrets', 'secret', 'credential', 'oauth', 'token', 'auth.json'];
+const HOUSE_WORKER_SNAPSHOT_DEFAULT_RESTORE_WARNINGS = [
+  'Local credentials stay in this browser only and are not copied into the snapshot.',
+  'Restoring here rebinds the helper to the current browser brain before work continues.',
+];
 let houseWorkerSupervisorSeq = 0;
 const houseWorkerSupervisorState = {
   primaryWorkerId: '',
@@ -1801,6 +1808,96 @@ function resolveHouseWorkerWorkspacePath(workspaceSeedRef = '', deploymentId = '
   };
 }
 
+function isHouseWorkerSnapshotSecretLikeMetaKey(key = '') {
+  const normalizedKey = String(key || '').trim();
+  if (!normalizedKey) return false;
+  if (HOUSE_WORKER_SNAPSHOT_EXCLUDED_META_KEYS.has(normalizedKey)) return true;
+  const lowerKey = normalizedKey.toLowerCase();
+  return HOUSE_WORKER_SNAPSHOT_SECRET_META_MARKERS.some((marker) => lowerKey.includes(marker));
+}
+
+function isHouseWorkerSnapshotSecretLikePath(pathValue = '') {
+  const normalizedPath = String(pathValue || '').trim().toLowerCase();
+  if (!normalizedPath) return false;
+  return HOUSE_WORKER_SNAPSHOT_SECRET_PATH_MARKERS.some((marker) => normalizedPath.includes(marker));
+}
+
+function sanitizeHouseWorkerWorkspaceSnapshotPayload(rawPayload = null) {
+  if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+    throw new Error('HOUSE_WORKER_SNAPSHOT_INVALID');
+  }
+  const stores = rawPayload.stores && typeof rawPayload.stores === 'object' && !Array.isArray(rawPayload.stores)
+    ? rawPayload.stores
+    : null;
+  if (!stores) {
+    throw new Error('HOUSE_WORKER_SNAPSHOT_INVALID');
+  }
+  const excludedMetaKeys = [];
+  const excludedVfsPaths = [];
+  const meta = [];
+  const metaSeen = new Set();
+  for (const row of Array.isArray(stores.meta) ? stores.meta : []) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const key = String(row.key || '').trim();
+    if (!key || metaSeen.has(key)) continue;
+    metaSeen.add(key);
+    if (isHouseWorkerSnapshotSecretLikeMetaKey(key)) {
+      excludedMetaKeys.push(key);
+      continue;
+    }
+    meta.push({
+      key,
+      value: row.value === undefined ? null : row.value,
+    });
+  }
+  const vfs = [];
+  const vfsSeen = new Set();
+  for (const row of Array.isArray(stores.vfs) ? stores.vfs : []) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const path = String(row.path || '').trim();
+    const dataB64 = typeof row.dataB64 === 'string' ? row.dataB64.trim() : '';
+    if (!path || !dataB64 || vfsSeen.has(path)) continue;
+    vfsSeen.add(path);
+    if (isHouseWorkerSnapshotSecretLikePath(path)) {
+      excludedVfsPaths.push(path);
+      continue;
+    }
+    const updatedAtMs = Number(row.updatedAtMs);
+    vfs.push({
+      path,
+      updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+      dataB64,
+    });
+  }
+  const checkpoints = [];
+  const checkpointSeen = new Set();
+  for (const row of Array.isArray(stores.checkpoints) ? stores.checkpoints : []) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    const checkpointId = String(row.checkpointId || '').trim();
+    if (!checkpointId || checkpointSeen.has(checkpointId)) continue;
+    checkpointSeen.add(checkpointId);
+    checkpoints.push({
+      ...row,
+      checkpointId,
+    });
+  }
+  return {
+    snapshotPayload: {
+      v: Number(rawPayload.v || 1) || 1,
+      kind: String(rawPayload.kind || '').trim() || 'agent-town-personal-backup',
+      createdAt: String(rawPayload.createdAt || '').trim() || new Date().toISOString(),
+      stores: {
+        meta,
+        vfs,
+        checkpoints,
+      },
+    },
+    excludedMetaKeys,
+    excludedVfsPaths,
+    restoreWarnings: HOUSE_WORKER_SNAPSHOT_DEFAULT_RESTORE_WARNINGS.slice(),
+  };
+}
+
 function buildHouseWorkerRequestedRuntimeProfile(sessionCard = null) {
   const source = sessionCard && typeof sessionCard === 'object' ? sessionCard : {};
   const runtimeProfile = source?.requestedRuntimeProfile && typeof source.requestedRuntimeProfile === 'object'
@@ -2445,6 +2542,24 @@ async function dispatchHouseWorkerRuntimeAction(tool, rawParams = {}, options = 
   }
 }
 
+function resolveAttachedHouseWorkerController({
+  houseWorkerSessionId = '',
+  workerSessionId = '',
+} = {}) {
+  const targetSessionId = String(houseWorkerSessionId || workerSessionId || '').trim();
+  if (!targetSessionId) {
+    throw new Error('HOUSE_WORKER_SESSION_REQUIRED');
+  }
+  const controller = houseWorkerSupervisorState.runtimes.get(targetSessionId);
+  if (!controller) {
+    throw new Error('HOUSE_WORKER_SESSION_NOT_ATTACHED');
+  }
+  return {
+    targetSessionId,
+    controller,
+  };
+}
+
 function maybeExposeHouseWorkerSupervisor() {
   window.AgentTownHouseWorkerRuntime = {
     dispatch: dispatchHouseWorkerRuntimeAction,
@@ -2461,6 +2576,22 @@ function maybeExposeHouseWorkerSupervisor() {
     spawn: async (payload = {}) => await spawnHouseWorkerSession(payload),
     message: async (payload = {}) => await sendHouseWorkerMessage(payload),
     stop: async (payload = {}) => await stopHouseWorkerSession(payload),
+    captureSnapshot: async ({ houseWorkerSessionId = '', workerSessionId = '' } = {}) => {
+      const { controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
+      return await controller.captureWorkspaceSnapshot();
+    },
+    restoreSnapshot: async ({ houseWorkerSessionId = '', workerSessionId = '', workspaceSnapshotRef = '' } = {}) => {
+      const { controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
+      return await controller.restoreWorkspaceSnapshot(workspaceSnapshotRef);
+    },
+    readWorkspaceFile: async ({ houseWorkerSessionId = '', workerSessionId = '', path = '' } = {}) => {
+      const { controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
+      return await controller.readWorkspaceFile(path);
+    },
+    writeWorkspaceFile: async ({ houseWorkerSessionId = '', workerSessionId = '', path = '', content = '' } = {}) => {
+      const { controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
+      return await controller.writeWorkspaceFile(path, content);
+    },
     getCheckpoints: () => houseWorkerSupervisorState.checkpoints.slice(),
   };
   window.__agentTownHouseWorkerExecutors = {
@@ -2554,6 +2685,78 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
     };
   }
 
+  async function bindRuntimeSession({ refreshHeartbeat = true } = {}) {
+    let configResult = null;
+    if (llmPayload && llmPayload.apiKey) {
+      configResult = await sendRequest({
+        requestType: 'gateway.command.setLlmConfig',
+        responseType: 'worker.llm.config.set',
+        payload: llmPayload,
+      });
+    }
+    await sendRequest({
+      requestType: 'gateway.command.workspace.mkdir',
+      responseType: 'worker.workspace.mkdir',
+      payload: {
+        params: {
+          path: workspaceBinding.workspacePath,
+          parents: true,
+        },
+      },
+    });
+    appliedRuntimeProfile = {
+      brainProfileId: requestedRuntimeProfile.brainProfileId === 'local_default'
+        ? 'brain:current-runtime'
+        : requestedRuntimeProfile.brainProfileId,
+      workspaceSeedRef: requestedRuntimeProfile.workspaceSeedRef,
+      configVersionId: requestedRuntimeProfile.configVersionId || null,
+      loadoutId: requestedRuntimeProfile.loadoutId || null,
+    };
+    runtimeBinding = {
+      bindingMode: requestedRuntimeProfile.brainProfileId === 'local_default'
+        ? 'inherit_current_browser_brain'
+        : 'inherit_current_browser_brain',
+      requestedWorkspaceSeedRef: workspaceBinding.requestedWorkspaceSeedRef,
+      workspacePath: workspaceBinding.workspacePath,
+      workspaceBindingMode: workspaceBinding.workspaceBindingMode,
+      appliedAt: new Date().toISOString(),
+      leaseHeartbeatMs: HOUSE_WORKER_HEARTBEAT_INTERVAL_MS,
+      leaseTtlMs: HOUSE_WORKER_LEASE_TTL_MS,
+      llmFingerprint: buildLlmFingerprint(configResult),
+    };
+    const contextResponse = await sendRequest({
+      requestType: 'gateway.command.runtime.sessionContext',
+      responseType: 'worker.runtime.sessionContext',
+      payload: {
+        params: {
+          runtimeContext: buildCurrentRuntimeContext(),
+          runtimeState: buildHouseWorkerRuntimeStateForChild(),
+        },
+      },
+    });
+    const runtimeSessionId = String(contextResponse?.result?.data?.sessionId || contextResponse?.result?.sessionId || '').trim();
+    if (runtimeSessionId) {
+      currentRuntimeSessionId = runtimeSessionId;
+      runtimeBinding = {
+        ...(runtimeBinding && typeof runtimeBinding === 'object' ? runtimeBinding : {}),
+        runtimeSessionId,
+      };
+    }
+    await persistStatus('ready', {
+      runtimeSessionId,
+      appliedRuntimeProfile,
+      runtimeBinding,
+    });
+    if (refreshHeartbeat) {
+      startHeartbeat();
+    }
+    return {
+      runtimeSessionId,
+      appliedRuntimeProfile,
+      runtimeBinding,
+    };
+  }
+
   async function persistStatus(status, extra = {}) {
     const normalizedStatus = String(status || currentStatus || 'ready').trim().toLowerCase() || 'ready';
     currentStatus = normalizedStatus;
@@ -2623,6 +2826,105 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
     await persistStatus('idle', { heartbeatOnly: true }).catch(() => null);
   }
 
+  async function readWorkspaceFile(path) {
+    await readyPromise;
+    const response = await sendRequest({
+      requestType: 'gateway.command.workspace.readFile',
+      responseType: 'worker.workspace.readFile',
+      payload: {
+        params: {
+          path,
+        },
+      },
+    });
+    return response?.result?.data && typeof response.result.data === 'object'
+      ? response.result.data
+      : (response?.result || null);
+  }
+
+  async function writeWorkspaceFile(path, content) {
+    await readyPromise;
+    const response = await sendRequest({
+      requestType: 'gateway.command.workspace.writeFile',
+      responseType: 'worker.workspace.writeFile',
+      payload: {
+        params: {
+          path,
+          content,
+        },
+      },
+    });
+    return response?.result?.data && typeof response.result.data === 'object'
+      ? response.result.data
+      : (response?.result || null);
+  }
+
+  async function captureWorkspaceSnapshot() {
+    await readyPromise;
+    const runtimeInstanceId = String(sessionCard?.runtimeInstanceId || '').trim();
+    if (!runtimeInstanceId) {
+      throw new Error('HOUSE_WORKER_RUNTIME_INSTANCE_REQUIRED');
+    }
+    const exportResponse = await sendRequest({
+      requestType: 'gateway.command.trainer.backup.export',
+      responseType: 'worker.trainer.backup.export',
+      timeoutMs: 30000,
+    });
+    const rawBackup = exportResponse?.result?.data?.backup
+      || exportResponse?.result?.backup
+      || null;
+    const sanitized = sanitizeHouseWorkerWorkspaceSnapshotPayload(rawBackup);
+    const persisted = await api(`/api/platform/house-workers/runtime-instances/${encodeURIComponent(runtimeInstanceId)}/snapshots`, {
+      method: 'POST',
+      body: JSON.stringify({
+        snapshotPayload: sanitized.snapshotPayload,
+        excludedMetaKeys: sanitized.excludedMetaKeys,
+        excludedVfsPaths: sanitized.excludedVfsPaths,
+        restoreWarnings: sanitized.restoreWarnings,
+      }),
+    });
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+    return persisted?.data || persisted || null;
+  }
+
+  async function restoreWorkspaceSnapshot(workspaceSnapshotRef) {
+    await readyPromise;
+    const normalizedSnapshotRef = String(workspaceSnapshotRef || '').trim();
+    const runtimeInstanceId = String(sessionCard?.runtimeInstanceId || '').trim();
+    if (!normalizedSnapshotRef) {
+      throw new Error('HOUSE_WORKER_WORKSPACE_SNAPSHOT_REQUIRED');
+    }
+    if (!runtimeInstanceId) {
+      throw new Error('HOUSE_WORKER_RUNTIME_INSTANCE_REQUIRED');
+    }
+    const snapshotDetail = await api(`/api/platform/house-workers/workspace-snapshots/${encodeURIComponent(normalizedSnapshotRef)}`);
+    const snapshotPayload = snapshotDetail?.data?.snapshot?.snapshotPayload
+      || snapshotDetail?.snapshot?.snapshotPayload
+      || null;
+    if (!snapshotPayload || typeof snapshotPayload !== 'object') {
+      throw new Error('HOUSE_WORKER_WORKSPACE_SNAPSHOT_INVALID');
+    }
+    await sendRequest({
+      requestType: 'gateway.command.trainer.backup.import',
+      responseType: 'worker.trainer.backup.import',
+      payload: {
+        params: {
+          backup: snapshotPayload,
+        },
+      },
+      timeoutMs: 30000,
+    });
+    await bindRuntimeSession({ refreshHeartbeat: true });
+    const restored = await api(`/api/platform/house-workers/runtime-instances/${encodeURIComponent(runtimeInstanceId)}/snapshots/restore`, {
+      method: 'POST',
+      body: JSON.stringify({
+        workspaceSnapshotRef: normalizedSnapshotRef,
+      }),
+    });
+    await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+    return restored?.data || restored || null;
+  }
+
   worker.addEventListener('error', async (event) => {
     const message = String(event?.message || 'HOUSE_WORKER_RUNTIME_ERROR');
     houseWorkerSupervisorState.lastError = message;
@@ -2675,68 +2977,7 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
     }
     if (msg.type === 'worker.runtime.ready') {
       try {
-        let configResult = null;
-        if (llmPayload && llmPayload.apiKey) {
-          configResult = await sendRequest({
-            requestType: 'gateway.command.setLlmConfig',
-            responseType: 'worker.llm.config.set',
-            payload: llmPayload,
-          });
-        }
-        await sendRequest({
-          requestType: 'gateway.command.workspace.mkdir',
-          responseType: 'worker.workspace.mkdir',
-          payload: {
-            params: {
-              path: workspaceBinding.workspacePath,
-              parents: true,
-            },
-          },
-        });
-        appliedRuntimeProfile = {
-          brainProfileId: requestedRuntimeProfile.brainProfileId === 'local_default'
-            ? 'brain:current-runtime'
-            : requestedRuntimeProfile.brainProfileId,
-          workspaceSeedRef: requestedRuntimeProfile.workspaceSeedRef,
-          configVersionId: requestedRuntimeProfile.configVersionId || null,
-          loadoutId: requestedRuntimeProfile.loadoutId || null,
-        };
-        runtimeBinding = {
-          bindingMode: requestedRuntimeProfile.brainProfileId === 'local_default'
-            ? 'inherit_current_browser_brain'
-            : 'inherit_current_browser_brain',
-          requestedWorkspaceSeedRef: workspaceBinding.requestedWorkspaceSeedRef,
-          workspacePath: workspaceBinding.workspacePath,
-          workspaceBindingMode: workspaceBinding.workspaceBindingMode,
-          appliedAt: new Date().toISOString(),
-          leaseHeartbeatMs: HOUSE_WORKER_HEARTBEAT_INTERVAL_MS,
-          leaseTtlMs: HOUSE_WORKER_LEASE_TTL_MS,
-          llmFingerprint: buildLlmFingerprint(configResult),
-        };
-        const contextResponse = await sendRequest({
-          requestType: 'gateway.command.runtime.sessionContext',
-          responseType: 'worker.runtime.sessionContext',
-          payload: {
-            params: {
-              runtimeContext: buildCurrentRuntimeContext(),
-              runtimeState: buildHouseWorkerRuntimeStateForChild(),
-            },
-          },
-        });
-        const runtimeSessionId = String(contextResponse?.result?.data?.sessionId || contextResponse?.result?.sessionId || '').trim();
-        if (runtimeSessionId) {
-          currentRuntimeSessionId = runtimeSessionId;
-          runtimeBinding = {
-            ...(runtimeBinding && typeof runtimeBinding === 'object' ? runtimeBinding : {}),
-            runtimeSessionId,
-          };
-        }
-        await persistStatus('ready', {
-          runtimeSessionId,
-          appliedRuntimeProfile,
-          runtimeBinding,
-        });
-        startHeartbeat();
+        await bindRuntimeSession({ refreshHeartbeat: true });
       } catch (err) {
         clearHeartbeat();
         const message = String(err?.message || 'HOUSE_WORKER_RUNTIME_BINDING_FAILED');
@@ -2778,6 +3019,18 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
       worker.postMessage({ type: 'gateway.boot' });
       await readyPromise;
       return true;
+    },
+    async readWorkspaceFile(path) {
+      return await readWorkspaceFile(path);
+    },
+    async writeWorkspaceFile(path, content) {
+      return await writeWorkspaceFile(path, content);
+    },
+    async captureWorkspaceSnapshot() {
+      return await captureWorkspaceSnapshot();
+    },
+    async restoreWorkspaceSnapshot(workspaceSnapshotRef) {
+      return await restoreWorkspaceSnapshot(workspaceSnapshotRef);
     },
     async sendMessage(message, { actor = 'human', timeoutMs = HOUSE_WORKER_REPLY_TIMEOUT_MS } = {}) {
       const normalizedMessage = String(message || '').trim();

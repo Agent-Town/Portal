@@ -8,6 +8,7 @@ function registerPlatformReadRoutes(app, deps) {
     createHouseStaffAssignment,
     createHouseWorkerDeployment,
     createHouseWorkerRuntimeInstance,
+    createHouseWorkerWorkspaceSnapshot,
     createHouseWorkerTransportMessage,
     createHouseWorkerSession,
     createHouseWorkerSessionEvent,
@@ -21,6 +22,7 @@ function registerPlatformReadRoutes(app, deps) {
     getHouseWorkerDeploymentById,
     getHouseWorkerRuntimeInstanceById,
     getHouseWorkerRuntimeInstanceBySessionId,
+    getHouseWorkerWorkspaceSnapshotByRef,
     getHouseWorkerTransportMessageById,
     getHouseWorkerShareById,
     getHouseWorkerShareInviteById,
@@ -41,6 +43,7 @@ function registerPlatformReadRoutes(app, deps) {
     listHouseStaffAssignments,
     listHouseWorkerDeployments,
     listHouseWorkerRuntimeInstances,
+    listHouseWorkerWorkspaceSnapshots,
     listHouseWorkerTransportMessages,
     listHouseWorkerShareInvites,
     listHouseWorkerSessionEvents,
@@ -100,6 +103,11 @@ function registerPlatformReadRoutes(app, deps) {
   const HOUSE_WORKER_MAX_DELEGATION_DEPTH = 2;
   const HOUSE_WORKER_DELEGATION_BUDGET = 3;
   const HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS = new Set(['brain:current-runtime', 'local_default']);
+  const HOUSE_WORKER_WORKSPACE_SNAPSHOT_MAX_BYTES = 5 * 1024 * 1024;
+  const HOUSE_WORKER_WORKSPACE_SNAPSHOT_STORAGE_KIND = 'platform_db';
+  const HOUSE_WORKER_SNAPSHOT_FORBIDDEN_META_KEYS = new Set(['krootB64', 'secretStoreV1', 'secretMarker', 'llmApiKey']);
+  const HOUSE_WORKER_SNAPSHOT_FORBIDDEN_META_MARKERS = ['token', 'secret', 'credential', 'oauth', 'apikey', 'api_key'];
+  const HOUSE_WORKER_SNAPSHOT_FORBIDDEN_PATH_MARKERS = ['.env', 'secrets', 'secret', 'credential', 'oauth', 'token', 'auth.json'];
   const HOUSE_EXPERIENCE_ENTRIES = [
     {
       experienceId: 'web.agent',
@@ -1764,6 +1772,157 @@ function registerPlatformReadRoutes(app, deps) {
     return `hwtm_${digest.slice(0, 24)}`;
   }
 
+  function buildHouseWorkerWorkspaceSnapshotRef({
+    runtimeInstanceId = '',
+    contentHash = '',
+  } = {}) {
+    const digest = sha256PrefixedHex(stableJsonStringify({
+      runtimeInstanceId: String(runtimeInstanceId || '').trim(),
+      contentHash: String(contentHash || '').trim(),
+    })).replace(/^sha256:/i, '');
+    return `hwsnap_${digest.slice(0, 24)}`;
+  }
+
+  function isHouseWorkerSnapshotSecretLikeMetaKey(key = '') {
+    const normalizedKey = String(key || '').trim();
+    if (!normalizedKey) return false;
+    if (HOUSE_WORKER_SNAPSHOT_FORBIDDEN_META_KEYS.has(normalizedKey)) return true;
+    const lowerKey = normalizedKey.toLowerCase();
+    return HOUSE_WORKER_SNAPSHOT_FORBIDDEN_META_MARKERS.some((marker) => lowerKey.includes(marker));
+  }
+
+  function isHouseWorkerSnapshotSecretLikePath(pathValue = '') {
+    const normalizedPath = String(pathValue || '').trim().toLowerCase();
+    if (!normalizedPath) return false;
+    return HOUSE_WORKER_SNAPSHOT_FORBIDDEN_PATH_MARKERS.some((marker) => normalizedPath.includes(marker));
+  }
+
+  function normalizeHouseWorkerWorkspaceSnapshotStringList(values = [], maxItems = 64) {
+    const out = [];
+    const seen = new Set();
+    for (const value of Array.isArray(values) ? values : []) {
+      const normalized = String(value || '').trim();
+      if (!normalized || normalized.length > 1024 || seen.has(normalized)) continue;
+      seen.add(normalized);
+      out.push(normalized);
+      if (out.length >= maxItems) break;
+    }
+    return out;
+  }
+
+  function normalizeHouseWorkerWorkspaceSnapshotPayload(rawPayload = null) {
+    if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) {
+      throw new Error('INVALID_WORKSPACE_SNAPSHOT');
+    }
+    const stores = rawPayload.stores && typeof rawPayload.stores === 'object' && !Array.isArray(rawPayload.stores)
+      ? rawPayload.stores
+      : null;
+    if (!stores) {
+      throw new Error('INVALID_WORKSPACE_SNAPSHOT');
+    }
+    const meta = [];
+    const metaSeen = new Set();
+    for (const row of Array.isArray(stores.meta) ? stores.meta : []) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+      const key = String(row.key || '').trim();
+      if (!key || key.length > 256 || metaSeen.has(key)) continue;
+      if (isHouseWorkerSnapshotSecretLikeMetaKey(key)) {
+        throw new Error('WORKSPACE_SNAPSHOT_SECRET_LEAK');
+      }
+      metaSeen.add(key);
+      meta.push({
+        key,
+        value: row.value === undefined ? null : row.value,
+      });
+    }
+    const vfs = [];
+    const vfsSeen = new Set();
+    for (const row of Array.isArray(stores.vfs) ? stores.vfs : []) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+      const pathValue = String(row.path || '').trim();
+      const dataB64 = typeof row.dataB64 === 'string' ? row.dataB64.trim() : '';
+      if (!pathValue || pathValue.length > 1024 || !dataB64 || vfsSeen.has(pathValue)) continue;
+      if (isHouseWorkerSnapshotSecretLikePath(pathValue)) {
+        throw new Error('WORKSPACE_SNAPSHOT_SECRET_LEAK');
+      }
+      vfsSeen.add(pathValue);
+      const updatedAtMs = Number(row.updatedAtMs);
+      vfs.push({
+        path: pathValue,
+        updatedAtMs: Number.isFinite(updatedAtMs) ? Math.max(0, Math.floor(updatedAtMs)) : Date.now(),
+        dataB64,
+      });
+    }
+    const checkpoints = [];
+    const checkpointSeen = new Set();
+    for (const row of Array.isArray(stores.checkpoints) ? stores.checkpoints : []) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+      const checkpointId = String(row.checkpointId || '').trim();
+      if (!checkpointId || checkpointId.length > 256 || checkpointSeen.has(checkpointId)) continue;
+      checkpointSeen.add(checkpointId);
+      checkpoints.push({
+        ...row,
+        checkpointId,
+      });
+    }
+    const normalized = {
+      v: Number(rawPayload.v || 1) || 1,
+      kind: String(rawPayload.kind || '').trim() || 'agent-town-personal-backup',
+      createdAt: String(rawPayload.createdAt || '').trim() || nowIso(),
+      stores: {
+        meta,
+        vfs,
+        checkpoints,
+      },
+    };
+    const sizeBytes = Buffer.byteLength(stableJsonStringify(normalized), 'utf8');
+    if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > HOUSE_WORKER_WORKSPACE_SNAPSHOT_MAX_BYTES) {
+      throw new Error('WORKSPACE_SNAPSHOT_TOO_LARGE');
+    }
+    return {
+      snapshotPayload: normalized,
+      sizeBytes,
+    };
+  }
+
+  function buildHouseWorkerWorkspaceSnapshotManifest(snapshotPayload = null, {
+    excludedMetaKeys = [],
+    excludedVfsPaths = [],
+  } = {}) {
+    const stores = snapshotPayload?.stores && typeof snapshotPayload.stores === 'object'
+      ? snapshotPayload.stores
+      : {};
+    const meta = Array.isArray(stores.meta) ? stores.meta : [];
+    const vfs = Array.isArray(stores.vfs) ? stores.vfs : [];
+    const checkpoints = Array.isArray(stores.checkpoints) ? stores.checkpoints : [];
+    return {
+      metaRecordCount: meta.length,
+      vfsFileCount: vfs.length,
+      checkpointCount: checkpoints.length,
+      sampleWorkspacePaths: vfs
+        .slice()
+        .sort((left, right) => String(left?.path || '').localeCompare(String(right?.path || '')))
+        .slice(0, 8)
+        .map((entry) => String(entry?.path || '').trim())
+        .filter(Boolean),
+      excludedMetaKeys: normalizeHouseWorkerWorkspaceSnapshotStringList(excludedMetaKeys, 32),
+      excludedVfsPaths: normalizeHouseWorkerWorkspaceSnapshotStringList(excludedVfsPaths, 32),
+    };
+  }
+
+  function buildHouseWorkerWorkspaceSnapshotRestorePolicy({
+    excludedMetaKeys = [],
+    excludedVfsPaths = [],
+    restoreWarnings = [],
+  } = {}) {
+    return {
+      reapplyCurrentBrowserBrain: true,
+      excludedMetaKeys: normalizeHouseWorkerWorkspaceSnapshotStringList(excludedMetaKeys, 32),
+      excludedVfsPaths: normalizeHouseWorkerWorkspaceSnapshotStringList(excludedVfsPaths, 32),
+      restoreWarnings: normalizeHouseWorkerWorkspaceSnapshotStringList(restoreWarnings, 16),
+    };
+  }
+
   function buildHouseWorkerRuntimeInstanceCards({
     houseId = '',
     teamId = '',
@@ -1844,6 +2003,39 @@ function registerPlatformReadRoutes(app, deps) {
           stoppedAt: String(runtimeInstance?.stoppedAt || '').trim() || null,
           createdAt: String(runtimeInstance?.createdAt || '').trim() || null,
           updatedAt: String(runtimeInstance?.updatedAt || '').trim() || null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function buildHouseWorkerWorkspaceSnapshotCards({
+    runtimeInstanceId = '',
+    houseWorkerSessionId = '',
+  } = {}) {
+    const snapshots = listHouseWorkerWorkspaceSnapshots({
+      runtimeInstanceId,
+      houseWorkerSessionId,
+    });
+    return snapshots
+      .map((snapshot) => {
+        const workspaceSnapshotRef = String(snapshot?.workspaceSnapshotRef || '').trim();
+        if (!workspaceSnapshotRef) return null;
+        return {
+          workspaceSnapshotRef,
+          runtimeInstanceId: String(snapshot?.runtimeInstanceId || '').trim() || null,
+          houseWorkerSessionId: String(snapshot?.houseWorkerSessionId || '').trim() || null,
+          deploymentId: String(snapshot?.deploymentId || '').trim() || null,
+          contentHash: String(snapshot?.contentHash || '').trim() || null,
+          storageKind: String(snapshot?.storageKind || '').trim() || HOUSE_WORKER_WORKSPACE_SNAPSHOT_STORAGE_KIND,
+          createdByExecutorKind: String(snapshot?.createdByExecutorKind || '').trim() || null,
+          workspaceManifest: snapshot?.workspaceManifest && typeof snapshot.workspaceManifest === 'object'
+            ? snapshot.workspaceManifest
+            : {},
+          restorePolicy: snapshot?.restorePolicy && typeof snapshot.restorePolicy === 'object'
+            ? snapshot.restorePolicy
+            : {},
+          createdAt: String(snapshot?.createdAt || '').trim() || null,
+          updatedAt: String(snapshot?.updatedAt || '').trim() || null,
         };
       })
       .filter(Boolean);
@@ -2020,6 +2212,9 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/shares',
           '/api/platform/house-workers/sessions',
           '/api/platform/house-workers/runtime-instances',
+          '/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots',
+          '/api/platform/house-workers/workspace-snapshots/:workspaceSnapshotRef',
+          '/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots/restore',
           '/api/platform/house-workers/transport',
           '/api/platform/house-workers/transport/ack',
           '/api/platform/house-workers/live-readiness',
@@ -4481,6 +4676,259 @@ function registerPlatformReadRoutes(app, deps) {
       concurrencyLimit: payload.concurrencyLimit,
       sourceManifest: payload.sourceManifest,
       emptyStateText: payload.emptyStateText,
+    }, { requestId });
+  });
+
+  app.get('/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const requestedTeamId = typeof req.query?.teamId === 'string' ? req.query.teamId.trim() : '';
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId,
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const runtimeInstanceId = String(req.params?.runtimeInstanceId || '').trim();
+    const runtimeInstance = getHouseWorkerRuntimeInstanceById(runtimeInstanceId);
+    if (
+      !runtimeInstance
+      || String(runtimeInstance?.houseId || '').trim() !== String(houseId || '').trim()
+      || String(runtimeInstance?.teamId || '').trim() !== String(teamResolution?.teamId || '').trim()
+    ) {
+      return sendPortalApiError(res, 404, 'RUNTIME_INSTANCE_NOT_FOUND', 'Helper runtime instance not found for the active team.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      houseId,
+      teamId: String(teamResolution?.teamId || '').trim(),
+      activeTeamId: context.activeTeamId,
+      availableTeamIds: context.availableTeamIds,
+      runtimeInstance: buildHouseWorkerRuntimeInstanceCards({
+        houseId,
+        teamId: String(teamResolution?.teamId || '').trim(),
+      }).find((entry) => String(entry?.runtimeInstanceId || '').trim() === runtimeInstanceId) || null,
+      snapshots: buildHouseWorkerWorkspaceSnapshotCards({
+        runtimeInstanceId,
+      }),
+      sourceManifest: {
+        schema: 'agent-town-house-worker-snapshots/v1',
+        routes: [
+          '/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots',
+          '/api/platform/house-workers/workspace-snapshots/:workspaceSnapshotRef',
+          '/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots/restore',
+        ],
+      },
+    }, { requestId });
+  });
+
+  app.get('/api/platform/house-workers/workspace-snapshots/:workspaceSnapshotRef', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const workspaceSnapshotRef = String(req.params?.workspaceSnapshotRef || '').trim();
+    if (!workspaceSnapshotRef) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'workspaceSnapshotRef is required.', { requestId });
+    }
+    const snapshot = getHouseWorkerWorkspaceSnapshotByRef(workspaceSnapshotRef);
+    if (!snapshot || String(snapshot?.houseId || '').trim() !== String(houseId || '').trim()) {
+      return sendPortalApiError(res, 404, 'WORKSPACE_SNAPSHOT_NOT_FOUND', 'Workspace snapshot not found for the active house.', { requestId });
+    }
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId: String(snapshot?.teamId || '').trim(),
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const snapshotCard = buildHouseWorkerWorkspaceSnapshotCards({
+      runtimeInstanceId: String(snapshot?.runtimeInstanceId || '').trim(),
+    }).find((entry) => String(entry?.workspaceSnapshotRef || '').trim() === workspaceSnapshotRef) || null;
+    return sendPortalApiSuccess(res, {
+      snapshot: {
+        ...(snapshotCard && typeof snapshotCard === 'object' ? snapshotCard : {}),
+        snapshotPayload: snapshot?.snapshotPayload && typeof snapshot.snapshotPayload === 'object'
+          ? snapshot.snapshotPayload
+          : {},
+      },
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots', express.json({ limit: '6mb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const runtimeInstanceId = String(req.params?.runtimeInstanceId || '').trim();
+    const runtimeInstance = getHouseWorkerRuntimeInstanceById(runtimeInstanceId);
+    if (!runtimeInstance || String(runtimeInstance?.houseId || '').trim() !== String(houseId || '').trim()) {
+      return sendPortalApiError(res, 404, 'RUNTIME_INSTANCE_NOT_FOUND', 'Helper runtime instance not found for the active house.', { requestId });
+    }
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId: String(runtimeInstance?.teamId || '').trim(),
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    let normalizedSnapshot;
+    try {
+      normalizedSnapshot = normalizeHouseWorkerWorkspaceSnapshotPayload(req.body?.snapshotPayload);
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        String(err?.message || '').trim() === 'WORKSPACE_SNAPSHOT_SECRET_LEAK' ? 409 : 400,
+        String(err?.message || '').trim() || 'INVALID_WORKSPACE_SNAPSHOT',
+        String(err?.message || '').trim() === 'WORKSPACE_SNAPSHOT_SECRET_LEAK'
+          ? 'Workspace snapshot still includes local-only secret material.'
+          : 'Workspace snapshot payload is invalid.',
+        { requestId }
+      );
+    }
+    const contentHash = sha256PrefixedHex(stableJsonStringify(normalizedSnapshot.snapshotPayload));
+    const workspaceSnapshotRef = buildHouseWorkerWorkspaceSnapshotRef({
+      runtimeInstanceId,
+      contentHash,
+    });
+    const excludedMetaKeys = normalizeHouseWorkerWorkspaceSnapshotStringList(req.body?.excludedMetaKeys, 32);
+    const excludedVfsPaths = normalizeHouseWorkerWorkspaceSnapshotStringList(req.body?.excludedVfsPaths, 32);
+    const restoreWarnings = normalizeHouseWorkerWorkspaceSnapshotStringList(req.body?.restoreWarnings, 16);
+    const snapshotRecord = createHouseWorkerWorkspaceSnapshot({
+      workspaceSnapshotRef,
+      houseWorkerSessionId: String(runtimeInstance?.houseWorkerSessionId || '').trim(),
+      runtimeInstanceId,
+      houseId: String(runtimeInstance?.houseId || '').trim(),
+      teamId: String(runtimeInstance?.teamId || '').trim(),
+      deploymentId: String(runtimeInstance?.deploymentId || '').trim(),
+      contentHash,
+      storageKind: HOUSE_WORKER_WORKSPACE_SNAPSHOT_STORAGE_KIND,
+      createdByExecutorKind: String(runtimeInstance?.executorKind || '').trim() || 'browser_tab',
+      workspaceManifest: buildHouseWorkerWorkspaceSnapshotManifest(normalizedSnapshot.snapshotPayload, {
+        excludedMetaKeys,
+        excludedVfsPaths,
+      }),
+      restorePolicy: buildHouseWorkerWorkspaceSnapshotRestorePolicy({
+        excludedMetaKeys,
+        excludedVfsPaths,
+        restoreWarnings,
+      }),
+      snapshotPayload: normalizedSnapshot.snapshotPayload,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    });
+    const updatedRuntimeInstance = updateHouseWorkerRuntimeInstance({
+      runtimeInstanceId,
+      workspaceSnapshotRef: workspaceSnapshotRef || null,
+      updatedAt: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      snapshot: buildHouseWorkerWorkspaceSnapshotCards({
+        runtimeInstanceId,
+      }).find((entry) => String(entry?.workspaceSnapshotRef || '').trim() === workspaceSnapshotRef) || null,
+      runtimeInstance: buildHouseWorkerRuntimeInstanceCards({
+        houseId: String(runtimeInstance?.houseId || '').trim(),
+        teamId: String(runtimeInstance?.teamId || '').trim(),
+      }).find((entry) => String(entry?.runtimeInstanceId || '').trim() === runtimeInstanceId) || updatedRuntimeInstance,
+      contentHash,
+      sizeBytes: normalizedSnapshot.sizeBytes,
+      captureCount: Number(snapshotRecord?.workspaceManifest?.vfsFileCount || 0),
+    }, { requestId });
+  });
+
+  app.post('/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots/restore', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId : '';
+    const runtimeInstanceId = String(req.params?.runtimeInstanceId || '').trim();
+    const runtimeInstance = getHouseWorkerRuntimeInstanceById(runtimeInstanceId);
+    if (!runtimeInstance || String(runtimeInstance?.houseId || '').trim() !== String(houseId || '').trim()) {
+      return sendPortalApiError(res, 404, 'RUNTIME_INSTANCE_NOT_FOUND', 'Helper runtime instance not found for the active house.', { requestId });
+    }
+    const teamResolution = resolveValidatedHouseReadTeam({
+      context,
+      requestedTeamId: String(runtimeInstance?.teamId || '').trim(),
+    });
+    if (!teamResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        Number(teamResolution?.status || 404),
+        String(teamResolution?.code || 'TEAM_NOT_FOUND'),
+        String(teamResolution?.message || 'The requested team is not available for this house.'),
+        {
+          requestId,
+          details: teamResolution?.details || {},
+        }
+      );
+    }
+    const workspaceSnapshotRef = String(req.body?.workspaceSnapshotRef || '').trim();
+    if (!workspaceSnapshotRef) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'workspaceSnapshotRef is required.', { requestId });
+    }
+    const snapshot = getHouseWorkerWorkspaceSnapshotByRef(workspaceSnapshotRef);
+    if (
+      !snapshot
+      || String(snapshot?.houseId || '').trim() !== String(houseId || '').trim()
+      || String(snapshot?.teamId || '').trim() !== String(teamResolution?.teamId || '').trim()
+    ) {
+      return sendPortalApiError(res, 404, 'WORKSPACE_SNAPSHOT_NOT_FOUND', 'Workspace snapshot not found for the active team.', { requestId });
+    }
+    const updatedRuntimeInstance = updateHouseWorkerRuntimeInstance({
+      runtimeInstanceId,
+      workspaceSnapshotRef,
+      updatedAt: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      snapshot: buildHouseWorkerWorkspaceSnapshotCards({
+        runtimeInstanceId,
+      }).find((entry) => String(entry?.workspaceSnapshotRef || '').trim() === workspaceSnapshotRef) || null,
+      runtimeInstance: buildHouseWorkerRuntimeInstanceCards({
+        houseId: String(runtimeInstance?.houseId || '').trim(),
+        teamId: String(runtimeInstance?.teamId || '').trim(),
+      }).find((entry) => String(entry?.runtimeInstanceId || '').trim() === runtimeInstanceId) || updatedRuntimeInstance,
+      restoreState: 'applied',
     }, { requestId });
   });
 

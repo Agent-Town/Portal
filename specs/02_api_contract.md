@@ -1462,6 +1462,7 @@ Response fields:
 - `data.activeTeamId`
 - `data.availableTeamIds[]`
 - `data.runtimeInstances[]`
+- `data.runtimeInstances[].workspaceSnapshotRef`
 - `data.sessions[]`
 - `data.deployments[]`
 - `data.concurrencyLimit`
@@ -1547,6 +1548,98 @@ Response fields:
 Notes:
 - `browser_tab` is the first shipped executor kind.
 - Browser-backed helpers still use the same House control plane as later executor kinds, so this route is the canonical place to read executor and lease truth.
+
+### GET `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots` (human)
+Returns captured workspace snapshots for one helper runtime instance.
+
+Query params:
+- `teamId` optional override; when omitted, resolves to `data.activeTeamId`
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `RUNTIME_INSTANCE_NOT_FOUND`
+
+Response fields:
+- `data.houseId`
+- `data.teamId`
+- `data.activeTeamId`
+- `data.availableTeamIds[]`
+- `data.runtimeInstance`
+- `data.snapshots[]`
+- `data.snapshots[].workspaceSnapshotRef`
+- `data.snapshots[].contentHash`
+- `data.snapshots[].storageKind`
+- `data.snapshots[].createdByExecutorKind`
+- `data.snapshots[].workspaceManifest`
+- `data.snapshots[].restorePolicy`
+- `data.snapshots[].createdAt`
+- `data.snapshots[].updatedAt`
+- `data.sourceManifest`
+
+### GET `/api/platform/house-workers/workspace-snapshots/:workspaceSnapshotRef` (human)
+Returns one stored helper workspace snapshot, including the sanitized payload used for restore.
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `WORKSPACE_SNAPSHOT_NOT_FOUND`
+
+Response fields:
+- `data.snapshot`
+- `data.snapshot.workspaceSnapshotRef`
+- `data.snapshot.contentHash`
+- `data.snapshot.storageKind`
+- `data.snapshot.createdByExecutorKind`
+- `data.snapshot.workspaceManifest`
+- `data.snapshot.restorePolicy`
+- `data.snapshot.snapshotPayload`
+
+Notes:
+- Snapshot payloads are sanitized before persistence.
+- Secret-bearing browser-only material such as raw local brain credentials and secret stores must not appear in `data.snapshot.snapshotPayload`.
+
+### POST `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots` (human)
+Captures one sanitized browser snapshot for the active helper runtime instance and stores it durably.
+
+Request body:
+- `snapshotPayload` required
+- `excludedMetaKeys[]` optional
+- `excludedVfsPaths[]` optional
+- `restoreWarnings[]` optional
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `RUNTIME_INSTANCE_NOT_FOUND`
+- `INVALID_WORKSPACE_SNAPSHOT`
+- `WORKSPACE_SNAPSHOT_TOO_LARGE`
+- `WORKSPACE_SNAPSHOT_SECRET_LEAK`
+
+Response fields:
+- `data.snapshot`
+- `data.runtimeInstance`
+- `data.contentHash`
+- `data.sizeBytes`
+- `data.captureCount`
+
+### POST `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots/restore` (human)
+Marks one stored helper workspace snapshot as the active restored snapshot for the runtime instance after the executor finishes local import.
+
+Request body:
+- `workspaceSnapshotRef` required
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `TEAM_NOT_FOUND`
+- `RUNTIME_INSTANCE_NOT_FOUND`
+- `INVALID_ARGUMENT`
+- `WORKSPACE_SNAPSHOT_NOT_FOUND`
+
+Response fields:
+- `data.snapshot`
+- `data.runtimeInstance`
+- `data.restoreState`
 
 ### POST `/api/platform/house-workers/spawn` (human)
 Starts one installed House helper as a real child worker session.

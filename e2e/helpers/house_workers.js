@@ -114,6 +114,25 @@ async function listHouseWorkerTransportMessages(request, { houseWorkerSessionId 
   return readJsonResponse(response);
 }
 
+async function listHouseWorkerWorkspaceSnapshots(request, { runtimeInstanceId = '', teamId = '' } = {}) {
+  const search = new URLSearchParams();
+  if (teamId) search.set('teamId', String(teamId || '').trim());
+  const response = await request.get(
+    search.toString()
+      ? `/api/platform/house-workers/runtime-instances/${encodeURIComponent(String(runtimeInstanceId || '').trim())}/snapshots?${search.toString()}`
+      : `/api/platform/house-workers/runtime-instances/${encodeURIComponent(String(runtimeInstanceId || '').trim())}/snapshots`,
+    { failOnStatusCode: false }
+  );
+  return readJsonResponse(response);
+}
+
+async function getHouseWorkerWorkspaceSnapshot(request, workspaceSnapshotRef) {
+  const response = await request.get(`/api/platform/house-workers/workspace-snapshots/${encodeURIComponent(String(workspaceSnapshotRef || '').trim())}`, {
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function getHouseWorkerLiveReadiness(request) {
   const response = await request.get('/api/platform/house-workers/live-readiness', {
     failOnStatusCode: false,
@@ -223,8 +242,10 @@ module.exports = {
   listHouseWorkerShares,
   listHouseWorkerSessions,
   listHouseWorkerRuntimeInstances,
+  listHouseWorkerWorkspaceSnapshots,
   listHouseWorkerTransportMessages,
   messageHouseWorker,
+  getHouseWorkerWorkspaceSnapshot,
   readHouseWorkerExecutorSnapshot,
   readHouseWorkerSessionsFromPage,
   readHouseWorkerLiveReadinessFromPage,
