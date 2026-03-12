@@ -172,6 +172,23 @@ The browser cannot be the only answer for:
 
 ## 5.1 Software options
 
+### Browser target
+
+The browser remains a first-class target.
+
+Pros:
+
+1. zero-install onboarding,
+2. existing distribution path already works,
+3. best first-run funnel,
+4. easiest route for embedded and modal-first Agent Town surfaces.
+
+Cons:
+
+1. no durable persistent local-node execution after browser close,
+2. browser background limits remain strict,
+3. weaker resource guarantees than dedicated native shells.
+
 ### Option A - Tauri 2
 
 Pros:
@@ -232,13 +249,58 @@ Cons:
 
 Recommended product shell strategy:
 
-1. Tauri 2 as the unified native shell target,
-2. same web frontend reused where possible,
-3. desktop-specific local-node sidecar support added under the Tauri shell,
-4. mobile foreground and limited background execution added as a constrained contributor mode,
-5. browser web app remains supported for no-install use.
+1. browser remains a first-class target,
+2. mobile should use a Capacitor shell first,
+3. desktop should use a Tauri 2 shell with local-node sidecar support,
+4. same web frontend is reused across browser, mobile, and desktop wherever possible,
+5. mobile remains shell-first and constrained for background contribution,
+6. desktop becomes the primary local-node host class.
 
-## 5.3 Native app host classes
+Rationale:
+
+1. Capacitor is the most direct and proven web-native mobile wrapper path,
+2. Tauri 2 is the stronger desktop foundation for sidecars and native packaging,
+3. this avoids forcing one shell strategy where platform needs are clearly different,
+4. the browser target remains the easiest distribution funnel.
+
+## 5.3 Practical proof from the Milady repository
+
+The inspected `milady-ai/milady` repository demonstrates a useful split-shell pattern:
+
+1. mobile uses Capacitor,
+2. desktop uses a separate desktop shell,
+3. browser/web remains a normal target.
+
+Repo-grounded evidence:
+
+1. `apps/app/package.json` contains `build:ios`, `build:android`, `ios`, and `android` scripts,
+2. it depends on `@capacitor/ios`, `@capacitor/android`, and `@capacitor/core`,
+3. it includes `apps/app/capacitor.config.ts`,
+4. it includes `apps/app/ios` and `apps/app/android`,
+5. desktop uses a separate `apps/app/electrobun` path.
+
+Implication for Agent Town:
+
+1. we do not need to force one shell technology across all targets,
+2. shared web UI plus split native shells is a credible path,
+3. mobile and desktop can share product contracts while using different host shells.
+
+## 5.4 Target matrix
+
+The target matrix for this program is:
+
+1. Browser web app
+2. iOS native shell
+3. Android native shell
+4. Windows native shell
+5. macOS native shell
+6. Linux native shell
+
+Required product rule:
+
+No target may become the only supported path for Agent Town access.
+
+## 5.5 Native app host classes
 
 The product must distinguish:
 
