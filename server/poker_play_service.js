@@ -155,6 +155,11 @@ function normalizePokerPlayAccessMode(value, fallback = 'public') {
   return mode === 'invite_only' ? 'invite_only' : 'public';
 }
 
+function normalizePokerPlayBlindReturnPolicy(value, fallback = 'post_big_blind') {
+  const policy = normalizeTrimmedString(value, fallback).toLowerCase();
+  return policy === 'wait_for_big_blind' ? 'wait_for_big_blind' : 'post_big_blind';
+}
+
 function normalizePokerPlayInviteCode(value, fallback = '') {
   const code = normalizeTrimmedString(value, fallback)
     .toUpperCase()
@@ -174,6 +179,7 @@ function normalizeCashLifecycleSeatStatus(value, fallback = 'active') {
     'sitting_out',
     'away_next_hand',
     'away',
+    'waiting_big_blind',
     'busted',
     'paid',
     'void_refund',
@@ -308,10 +314,14 @@ function normalizeCreateTableConfig(input = {}) {
   const startTargetSeats = tableType === 'tournament'
     ? normalizeTournamentStartTargetSeats(input?.startTargetSeats, { minPlayers, maxSeats, fillPolicy })
     : minPlayers;
+  const blindReturnPolicy = tableType === 'cash'
+    ? normalizePokerPlayBlindReturnPolicy(input?.blindReturnPolicy)
+    : 'post_big_blind';
   return {
     tableType,
     fillPolicy,
     accessMode,
+    blindReturnPolicy,
     smallBlindOil,
     bigBlindOil,
     buyInOil,
@@ -670,6 +680,10 @@ function isScheduledTournamentPending(table, atIso) {
   return atMs < scheduledMs;
 }
 
+function getCashBlindReturnPolicy(table) {
+  return normalizePokerPlayBlindReturnPolicy(table?.rules?.blindReturnPolicy, 'post_big_blind');
+}
+
 function getTournamentReentryLimit(table) {
   return Math.max(0, normalizeOilAmount(table?.rules?.reentryLimit, 0));
 }
@@ -958,8 +972,13 @@ function resolveTournamentLateRegistration(table, hand) {
 
 function getSeatPresenceStatus(seat) {
   if (isSeatAway(seat) || isSeatAwayPending(seat)) return 'away';
+  if (isSeatWaitingBigBlind(seat)) return 'online';
   if (!isSeatInPlay(seat)) return 'inactive';
   return seat?.disconnectedAt ? 'disconnected' : 'online';
+}
+
+function isSeatWaitingBigBlind(seat) {
+  return normalizeTrimmedString(seat?.status).toLowerCase() === 'waiting_big_blind';
 }
 
 function formatSeatLabel(seatNumber, displayName = '') {
@@ -1028,7 +1047,8 @@ function buildWaitlistSummary(entries, viewerWalletSubject = '') {
     .sort((left, right) => {
       const createdDelta = compareIsoAsc(left?.createdAt || '', right?.createdAt || '');
       if (createdDelta !== 0) return createdDelta;
-      return String(left?.waitlistEntryId || '').localeCompare(String(right?.waitlistEntryId || ''));
+      return String(left?.waitlistEntryId || left?.tournamentWaitlistEntryId || '')
+        .localeCompare(String(right?.waitlistEntryId || right?.tournamentWaitlistEntryId || ''));
     });
   const normalizedViewerWallet = normalizeTrimmedString(viewerWalletSubject);
   const viewerIndex = normalizedViewerWallet
@@ -1038,6 +1058,73 @@ function buildWaitlistSummary(entries, viewerWalletSubject = '') {
     count: waitingEntries.length,
     viewerQueued: viewerIndex >= 0,
     viewerPosition: viewerIndex >= 0 ? viewerIndex + 1 : null,
+  };
+}
+
+function listTableWaitlistEntries(deps, table, { status = 'waiting' } = {}) {
+  if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
+    return typeof deps.listPokerTournamentWaitlistEntriesByTable === 'function'
+      ? deps.listPokerTournamentWaitlistEntriesByTable(table.tableId, { status })
+      : [];
+  }
+  return typeof deps.listPokerPlayWaitlistEntriesByTable === 'function'
+    ? deps.listPokerPlayWaitlistEntriesByTable(table.tableId, { status })
+    : [];
+}
+
+function getTableWaitlistEntryByWalletSubject(deps, table, walletSubject) {
+  const normalizedWalletSubject = normalizeTrimmedString(walletSubject);
+  if (!normalizedWalletSubject) return null;
+  if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
+    return typeof deps.getPokerTournamentWaitlistEntryByTableAndWalletSubject === 'function'
+      ? deps.getPokerTournamentWaitlistEntryByTableAndWalletSubject(table.tableId, normalizedWalletSubject)
+      : null;
+  }
+  return typeof deps.getPokerPlayWaitlistEntryByTableAndWalletSubject === 'function'
+    ? deps.getPokerPlayWaitlistEntryByTableAndWalletSubject(table.tableId, normalizedWalletSubject)
+    : null;
+}
+
+function upsertTableWaitlistEntry(deps, table, entry) {
+  if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
+    return typeof deps.upsertPokerTournamentWaitlistEntry === 'function'
+      ? deps.upsertPokerTournamentWaitlistEntry(entry)
+      : null;
+  }
+  return typeof deps.upsertPokerPlayWaitlistEntry === 'function'
+    ? deps.upsertPokerPlayWaitlistEntry(entry)
+    : null;
+}
+
+function buildBlindObligationSummary(obligation) {
+  if (!obligation) return null;
+  return {
+    blindObligationId: obligation.blindObligationId || null,
+    seatNumber: normalizeSeatNumber(obligation?.seatNumber),
+    policy: normalizePokerPlayBlindReturnPolicy(obligation?.policy, 'post_big_blind'),
+    status: normalizeTrimmedString(obligation?.status, 'pending'),
+    blindAmountOil: Number(obligation?.blindAmountOil || 0),
+    postedAt: obligation?.postedAt || null,
+    clearedAt: obligation?.clearedAt || null,
+    updatedAt: obligation?.updatedAt || null,
+  };
+}
+
+function getSeatBlindObligation(deps, table, seat) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'cash' || !seat?.walletSubject) return null;
+  return typeof deps.getPokerBlindObligationByTableAndWalletSubject === 'function'
+    ? buildBlindObligationSummary(deps.getPokerBlindObligationByTableAndWalletSubject(table.tableId, seat.walletSubject))
+    : null;
+}
+
+function getSeatWaitlistPromotion(deps, table, seat) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament' || !seat?.walletSubject) return null;
+  const entry = getTableWaitlistEntryByWalletSubject(deps, table, seat.walletSubject);
+  if (!entry || normalizeTrimmedString(entry?.status, 'waiting') !== 'promoted') return null;
+  return {
+    source: 'tournament_waitlist',
+    promotedAt: entry?.promotedAt || null,
+    promotedSeatNumber: Number(entry?.promotedSeatNumber || 0) || null,
   };
 }
 
@@ -1147,17 +1234,9 @@ function buildCashMovementSummary(deps, table, seats, hand, viewerSeat, {
   };
 }
 
-function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
-  if (normalizePokerPlayTableType(table?.tableType) !== 'cash') {
-    return {
-      table,
-      seats: Array.isArray(seats) ? seats : [],
-      promoted: [],
-      changed: false,
-    };
-  }
+function promoteCashWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
   let nextSeats = Array.isArray(seats) ? seats.slice() : [];
-  const waitingEntries = deps.listPokerPlayWaitlistEntriesByTable(table.tableId, { status: 'waiting' });
+  const waitingEntries = listTableWaitlistEntries(deps, table, { status: 'waiting' });
   if (!waitingEntries.length || getOpenSeatCount(table, nextSeats) <= 0) {
     return {
       table,
@@ -1173,7 +1252,7 @@ function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
     if (!walletSubject) continue;
     const existingSeat = deps.getPokerPlaySeatByWalletSubject(table.tableId, walletSubject);
     if (existingSeat && isSeatOccupyingTable(existingSeat)) {
-      deps.upsertPokerPlayWaitlistEntry({
+      upsertTableWaitlistEntry(deps, table, {
         ...entry,
         status: 'promoted',
         promotedSeatNumber: normalizeSeatNumber(existingSeat.seatNumber),
@@ -1230,7 +1309,7 @@ function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
       state: setSeatTimeBankRemainingSeconds(table, openSeatNumber, getSeatTimeBankRemainingSeconds(table, openSeatNumber)),
       updatedAt: atIso,
     });
-    deps.upsertPokerPlayWaitlistEntry({
+    upsertTableWaitlistEntry(deps, table, {
       ...entry,
       status: 'promoted',
       promotedSeatNumber: openSeatNumber,
@@ -1275,6 +1354,167 @@ function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
     seats: nextSeats,
     promoted,
     changed: promoted.length > 0,
+  };
+}
+
+function promoteTournamentWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return {
+      table,
+      seats: Array.isArray(seats) ? seats : [],
+      promoted: [],
+      changed: false,
+    };
+  }
+  const lateRegistration = resolveTournamentLateRegistration(table, hand);
+  const scheduledPending = isScheduledTournamentPending(table, atIso);
+  if (!scheduledPending && hand && hand.status === 'live' && !lateRegistration.open) {
+    return {
+      table,
+      seats: Array.isArray(seats) ? seats : [],
+      promoted: [],
+      changed: false,
+    };
+  }
+  let nextSeats = Array.isArray(seats) ? seats.slice() : [];
+  const waitingEntries = listTableWaitlistEntries(deps, table, { status: 'waiting' });
+  if (!waitingEntries.length || getOpenSeatCount(table, nextSeats) <= 0) {
+    return {
+      table,
+      seats: nextSeats,
+      promoted: [],
+      changed: false,
+    };
+  }
+  const promoted = [];
+  for (const entry of waitingEntries) {
+    if (getOpenSeatCount(table, nextSeats) <= 0) break;
+    const walletSubject = normalizeTrimmedString(entry?.walletSubject);
+    if (!walletSubject) continue;
+    const existingSeat = deps.getPokerPlaySeatByWalletSubject(table.tableId, walletSubject);
+    if (existingSeat && isSeatOccupyingTable(existingSeat)) {
+      upsertTableWaitlistEntry(deps, table, {
+        ...entry,
+        status: 'promoted',
+        promotedSeatNumber: normalizeSeatNumber(existingSeat.seatNumber),
+        promotedAt: atIso,
+        updatedAt: atIso,
+      });
+      continue;
+    }
+    const activeElsewhere = deps.getActivePokerPlaySeatByWalletSubject(walletSubject);
+    if (activeElsewhere && String(activeElsewhere.tableId || '') !== String(table.tableId || '') && isSeatInPlay(activeElsewhere)) {
+      continue;
+    }
+    const buyInOil = computeBuyInOil(table, entry?.buyInOil);
+    try {
+      assertPokerPlayWalletPolicyAllowsSpend(deps, walletSubject, {
+        amountOil: buyInOil,
+        processAt: atIso,
+      });
+    } catch {
+      continue;
+    }
+    const oilBalance = deps.computeOilBalance(walletSubject);
+    if (Number(oilBalance?.balance || 0) < buyInOil) continue;
+    const openSeatNumber = findNextOpenSeatNumber(table, nextSeats);
+    if (!openSeatNumber) break;
+    deps.createOilLedgerEntry({
+      walletSubject,
+      houseId: entry?.houseId || null,
+      verificationId: deps.getStreamflowVerificationByWalletSubject(walletSubject)?.verificationId || null,
+      tableId: table.tableId,
+      seriesId: getTournamentSeriesRef(table).seriesId || null,
+      entryKind: 'poker_play_waitlist_buy_in',
+      direction: 'debit',
+      amount: buyInOil,
+      memo: `${table.title} tournament waitlist buy-in`,
+    });
+    const nextTableState = incrementTournamentEntryState(table, walletSubject, { reentry: false });
+    const seatStatus = hand && hand.status === 'live' ? 'registered' : 'active';
+    const seat = deps.upsertPokerPlaySeat({
+      tableId: table.tableId,
+      seatNumber: openSeatNumber,
+      portalSessionId: entry?.portalSessionId || null,
+      houseId: entry?.houseId || null,
+      walletSubject,
+      displayName: normalizePokerPlayDisplayName(entry?.displayName, entry?.houseId || walletSubject.slice(0, 8)),
+      status: seatStatus,
+      buyInOil,
+      stackOil: buyInOil,
+      streamflowVerificationId: deps.getStreamflowVerificationByWalletSubject(walletSubject)?.verificationId || null,
+      lastSeenAt: atIso,
+      disconnectedAt: null,
+      updatedAt: atIso,
+    });
+    upsertPokerPlayPlayerStatForSeat(deps, table, seat, {
+      processAt: atIso,
+      status: seatStatus === 'registered' ? 'registered' : 'open',
+    });
+    table = deps.upsertPokerPlayTable({
+      ...table,
+      state: setSeatTimeBankRemainingSeconds(
+        {
+          ...table,
+          state: nextTableState,
+        },
+        openSeatNumber,
+        getSeatTimeBankRemainingSeconds(table, openSeatNumber)
+      ),
+      updatedAt: atIso,
+    });
+    upsertTableWaitlistEntry(deps, table, {
+      ...entry,
+      seriesId: getTournamentSeriesRef(table).seriesId || entry?.seriesId || null,
+      status: 'promoted',
+      promotedSeatNumber: openSeatNumber,
+      promotedAt: atIso,
+      updatedAt: atIso,
+    });
+    if (typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: table.tableId,
+        handId: hand?.handId || null,
+        seatNumber: openSeatNumber,
+        actorRole: 'system',
+        eventKind: 'tournament_waitlist_promoted',
+        payload: {
+          walletSubject,
+          tournamentWaitlistEntryId: entry?.tournamentWaitlistEntryId || null,
+          buyInOil,
+          seatNumber: openSeatNumber,
+          seatStatus,
+        },
+        createdAt: atIso,
+      });
+    }
+    nextSeats = deps.listPokerPlaySeatsByTable(table.tableId);
+    promoted.push({
+      tournamentWaitlistEntryId: entry?.tournamentWaitlistEntryId || null,
+      walletSubject,
+      seatNumber: openSeatNumber,
+    });
+  }
+  return {
+    table,
+    seats: nextSeats,
+    promoted,
+    changed: promoted.length > 0,
+  };
+}
+
+function promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
+    return promoteTournamentWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso);
+  }
+  if (normalizePokerPlayTableType(table?.tableType) === 'cash') {
+    return promoteCashWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso);
+  }
+  return {
+    table,
+    seats: Array.isArray(seats) ? seats : [],
+    promoted: [],
+    changed: false,
   };
 }
 
@@ -1555,6 +1795,7 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     paidPlaces: Number(localPayoutPlan.paidPlaces || 0),
     payouts: cloneJson(localPayoutPlan.payouts, []),
     registrationClosedByDirectorAt: normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt) || null,
+    blindReturnPolicy: normalizePokerPlayTableType(table?.tableType) === 'cash' ? getCashBlindReturnPolicy(table) : null,
     accessMode: access.mode,
     inviteOnly: access.inviteOnly,
   };
@@ -1584,6 +1825,9 @@ function buildDynamicTableSummary(config, matchKey) {
     accessMode: normalizePokerPlayAccessMode(config?.accessMode),
     inviteOnly: normalizePokerPlayAccessMode(config?.accessMode) === 'invite_only',
   };
+  if (config.tableType === 'cash') {
+    summary.blindReturnPolicy = normalizePokerPlayBlindReturnPolicy(config?.blindReturnPolicy, 'post_big_blind');
+  }
   if (config.tableType === 'tournament') {
     summary.seriesId = normalizeTrimmedString(config?.seriesId);
     summary.seriesTitle = normalizeTrimmedString(config?.seriesTitle, config?.title);
@@ -5437,12 +5681,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   if (isTablePaused(table) || isTableAdminClosed(table)) {
     return { table, seats, hand };
   }
-  if (isScheduledTournamentPending(table, atIso)) {
-    return { table, seats, hand };
-  }
   let waitlistPromotion = promoteWaitlistEntriesIntoOpenSeats(deps, table, seats, hand, atIso);
   table = waitlistPromotion.table;
   seats = waitlistPromotion.seats;
+  if (isScheduledTournamentPending(table, atIso)) {
+    return { table, seats, hand };
+  }
   let safety = 0;
 
   while (safety < 24) {
@@ -5625,12 +5869,8 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     ? derivePokerPlayAgentSuggestion({ table, handState: hand.state, seatNumber: viewerSeat.seatNumber })
     : null;
   const review = buildPokerPlayReviewSummary(deps, table, seats, hand, walletBinding?.walletSubject || '');
-  const waitlist = buildWaitlistSummary(
-    typeof deps.listPokerPlayWaitlistEntriesByTable === 'function'
-      ? deps.listPokerPlayWaitlistEntriesByTable(table.tableId, { status: 'waiting' })
-      : [],
-    walletBinding?.walletSubject || ''
-  );
+  const waitlistEntries = listTableWaitlistEntries(deps, table, { status: 'waiting' });
+  const waitlist = buildWaitlistSummary(waitlistEntries, walletBinding?.walletSubject || '');
   const seriesRef = getTournamentSeriesRef(table);
   const series = seriesRef.seriesId
     ? buildPokerPlaySeriesSummary(
@@ -5710,7 +5950,11 @@ function buildPokerPlayTablePayload(deps, table, seats, hand, { session, req, pr
     pokerPolicy,
     cashMovement,
     mySeat: viewerSeat
-      ? summarizeSeat(viewerSeat)
+      ? {
+        ...summarizeSeat(viewerSeat),
+        blindObligation: getSeatBlindObligation(deps, table, viewerSeat),
+        waitlistPromotion: getSeatWaitlistPromotion(deps, table, viewerSeat),
+      }
       : null,
     seats: (Array.isArray(seats) ? seats : [])
       .map((seat) => summarizeSeat(seat))
@@ -5741,9 +5985,7 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
         : null;
       const summary = computeTableSummary(synced.table, synced.seats, synced.hand, viewerSeat);
       const waitlist = buildWaitlistSummary(
-        typeof deps.listPokerPlayWaitlistEntriesByTable === 'function'
-          ? deps.listPokerPlayWaitlistEntriesByTable(synced.table.tableId, { status: 'waiting' })
-          : [],
+        listTableWaitlistEntries(deps, synced.table, { status: 'waiting' }),
         walletBinding?.walletSubject || ''
       );
       const inviteAuthorization = resolvePokerPlayInviteAuthorization(synced.table, {
@@ -5882,6 +6124,7 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       reconnectGraceSeconds: normalized.reconnectGraceSeconds,
       timeBankSeconds: normalized.timeBankSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
+      blindReturnPolicy: normalized.tableType === 'cash' ? normalized.blindReturnPolicy : 'post_big_blind',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'dynamic_ladder',
       bountyModel: normalized.tableType === 'tournament' ? normalized.bountyModel : 'none',
       fillPolicy: normalized.tableType === 'tournament' ? normalized.fillPolicy : 'open_match',
@@ -5928,10 +6171,8 @@ function isTableMatchCandidate(synced, matchKey, tableType) {
   if (normalizedStatus !== 'open' && !tournamentPrestart) return false;
   if (tableType === 'tournament') {
     if (Number(summary.occupancy || 0) >= Number(table.maxSeats || POKER_PLAY_MAX_SEATS)) return false;
-    if (summary.liveHand) {
-      const lateRegistration = resolveTournamentLateRegistration(table, synced.hand);
-      if (!lateRegistration.open) return false;
-    }
+    const lateRegistration = resolveTournamentLateRegistration(table, synced.hand);
+    if (hasPokerPlayTableStarted(table, synced.hand) && !lateRegistration.open) return false;
   }
   return true;
 }
@@ -6336,17 +6577,15 @@ function seatIntoTable(deps, { tableId, session, req, body } = {}) {
       ? 'registered'
       : 'open',
   });
-  if (typeof deps.getPokerPlayWaitlistEntryByTableAndWalletSubject === 'function' && typeof deps.upsertPokerPlayWaitlistEntry === 'function') {
-    const waitlistEntry = deps.getPokerPlayWaitlistEntryByTableAndWalletSubject(table.tableId, walletBinding.walletSubject);
-    if (waitlistEntry && normalizeTrimmedString(waitlistEntry?.status, 'waiting') === 'waiting') {
-      deps.upsertPokerPlayWaitlistEntry({
-        ...waitlistEntry,
-        status: 'promoted',
-        promotedSeatNumber: openSeatNumber,
-        promotedAt: requestAt,
-        updatedAt: requestAt,
-      });
-    }
+  const waitlistEntry = getTableWaitlistEntryByWalletSubject(deps, table, walletBinding.walletSubject);
+  if (waitlistEntry && normalizeTrimmedString(waitlistEntry?.status, 'waiting') === 'waiting') {
+    upsertTableWaitlistEntry(deps, table, {
+      ...waitlistEntry,
+      status: 'promoted',
+      promotedSeatNumber: openSeatNumber,
+      promotedAt: requestAt,
+      updatedAt: requestAt,
+    });
   }
   table = deps.upsertPokerPlayTable({
     ...table,
@@ -6569,6 +6808,50 @@ function leaveTable(deps, { tableId, session, req, body } = {}) {
       updatedAt: requestAt,
     });
   } else {
+    if (!liveHand && !hasPokerPlayTableStarted(synced.table, synced.hand)) {
+      if (Number(seat.stackOil || 0) > 0) {
+        deps.createOilLedgerEntry({
+          walletSubject: walletBinding.walletSubject,
+          houseId: seat.houseId || null,
+          verificationId: seat.streamflowVerificationId || null,
+          tableId: synced.table.tableId,
+          seriesId: getTournamentSeriesRef(synced.table).seriesId || null,
+          entryKind: 'poker_play_tournament_unregister',
+          direction: 'credit',
+          amount: Number(seat.stackOil || 0),
+          memo: `${synced.table.title} pre-start unregister`,
+        });
+      }
+      upsertPokerPlayPlayerStatForSeat(deps, synced.table, seat, {
+        processAt: requestAt,
+        refundOilDelta: Number(seat.stackOil || 0),
+        status: 'unregistered',
+        close: true,
+        stackOil: 0,
+      });
+      deps.deletePokerPlaySeat(seat.tableId, seat.seatNumber);
+      deps.upsertPokerPlayTable({
+        ...synced.table,
+        state: removeSeatTimeBankState(synced.table, seat.seatNumber),
+        updatedAt: requestAt,
+      });
+      if (typeof deps.createPokerPlayAuditEvent === 'function') {
+        deps.createPokerPlayAuditEvent({
+          tableId: synced.table.tableId,
+          handId: null,
+          seatNumber: seat.seatNumber,
+          actorRole: 'human',
+          eventKind: 'tournament_unregistered',
+          payload: {
+            walletSubject: walletBinding.walletSubject,
+            refundedOil: Number(seat.stackOil || 0),
+          },
+          createdAt: requestAt,
+        });
+      }
+      const refreshedScheduled = syncPokerPlayTable(deps, tableId, { processAt: requestAt });
+      return buildPokerPlayTablePayload(deps, refreshedScheduled.table, refreshedScheduled.seats, refreshedScheduled.hand, { session, req, processAt: requestAt });
+    }
     if (liveHand && normalizeTrimmedString(seat?.status).toLowerCase() === 'registered') {
       if (Number(seat.stackOil || 0) > 0) {
         deps.createOilLedgerEntry({
@@ -6920,6 +7203,61 @@ function reloadTableSeat(deps, { tableId, session, req, body } = {}) {
   return buildPokerPlayTablePayload(deps, refreshedTable, refreshedSeats, refreshedHand, { session, req, processAt: requestAt });
 }
 
+function applyCashBlindReturnPolicy(deps, table, seat, requestAt) {
+  const policy = getCashBlindReturnPolicy(table);
+  const blindAmountOil = Math.min(Math.max(0, Number(seat?.stackOil || 0)), Math.max(0, Number(table?.bigBlindOil || 0)));
+  if (policy === 'wait_for_big_blind') {
+    const obligation = typeof deps.upsertPokerBlindObligation === 'function'
+      ? deps.upsertPokerBlindObligation({
+        tableId: table.tableId,
+        walletSubject: seat.walletSubject,
+        seatNumber: seat.seatNumber,
+        policy,
+        status: 'waiting',
+        blindAmountOil,
+        updatedAt: requestAt,
+      })
+      : null;
+    const updatedSeat = deps.upsertPokerPlaySeat({
+      ...seat,
+      status: 'waiting_big_blind',
+      disconnectedAt: null,
+      lastSeenAt: requestAt,
+      updatedAt: requestAt,
+    });
+    return {
+      seat: updatedSeat,
+      obligation,
+      postedBlindOil: 0,
+    };
+  }
+  const updatedSeat = deps.upsertPokerPlaySeat({
+    ...seat,
+    status: 'active',
+    stackOil: Math.max(0, Number(seat?.stackOil || 0) - blindAmountOil),
+    disconnectedAt: null,
+    lastSeenAt: requestAt,
+    updatedAt: requestAt,
+  });
+  const obligation = typeof deps.upsertPokerBlindObligation === 'function'
+    ? deps.upsertPokerBlindObligation({
+      tableId: table.tableId,
+      walletSubject: seat.walletSubject,
+      seatNumber: seat.seatNumber,
+      policy,
+      status: 'posted',
+      blindAmountOil,
+      postedAt: requestAt,
+      updatedAt: requestAt,
+    })
+    : null;
+  return {
+    seat: updatedSeat,
+    obligation,
+    postedBlindOil: blindAmountOil,
+  };
+}
+
 function sitOutTableSeat(deps, { tableId, session, req, body } = {}) {
   const requestAt = toProcessIso(deps, body?.asOf);
   const table = deps.getPokerPlayTableById(tableId);
@@ -6993,20 +7331,16 @@ function returnTableSeat(deps, { tableId, session, req, body } = {}) {
   }
   const { walletBinding, seat } = requireSeatWriter(deps, { table, session, req });
   const currentHand = deps.getCurrentPokerPlayHandForTable(table.tableId);
-  deps.upsertPokerPlaySeat({
-    ...seat,
-    status: 'active',
-    disconnectedAt: null,
-    lastSeenAt: requestAt,
-    updatedAt: requestAt,
-  });
+  const blindReturn = applyCashBlindReturnPolicy(deps, table, seat, requestAt);
   if (currentHand?.handId) {
     deps.createPokerPlayMessage({
       tableId: table.tableId,
       handId: currentHand.handId,
       seatNumber: null,
       authorRole: 'system',
-      body: `${formatSeatLabel(seat.seatNumber, seat.displayName)} returns to the table for the next hand.`,
+      body: blindReturn.postedBlindOil > 0
+        ? `${formatSeatLabel(seat.seatNumber, seat.displayName)} returns and posts ${blindReturn.postedBlindOil} OIL big blind to rejoin.`
+        : `${formatSeatLabel(seat.seatNumber, seat.displayName)} returns to the table for the next hand.`,
       createdAt: requestAt,
     });
   }
@@ -7019,6 +7353,20 @@ function returnTableSeat(deps, { tableId, session, req, body } = {}) {
       eventKind: 'seat_returned',
       payload: {
         walletSubject: walletBinding.walletSubject,
+      },
+      createdAt: requestAt,
+    });
+    deps.createPokerPlayAuditEvent({
+      tableId: table.tableId,
+      handId: currentHand?.handId || null,
+      seatNumber: seat.seatNumber,
+      actorRole: 'system',
+      eventKind: blindReturn.postedBlindOil > 0 ? 'blind_obligation_posted' : 'blind_obligation_waiting',
+      payload: {
+        walletSubject: walletBinding.walletSubject,
+        policy: getCashBlindReturnPolicy(table),
+        blindAmountOil: blindReturn.obligation?.blindAmountOil || Number(table?.bigBlindOil || 0),
+        blindObligationId: blindReturn.obligation?.blindObligationId || null,
       },
       createdAt: requestAt,
     });
@@ -7048,11 +7396,11 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
     inviteCode: parsePokerPlayInviteCode(req, body),
     publicViewer: false,
   });
-  if (normalizePokerPlayTableType(table?.tableType) !== 'cash') {
-    throw createRouteError(409, 'POKER_PLAY_WAITLIST_UNAVAILABLE', 'Waitlists are only available at cash tables in this phase.');
-  }
   if (isTableAdminClosed(table)) {
     throw createRouteError(409, 'POKER_PLAY_TABLE_CLOSED', 'This poker table was closed by an operator.');
+  }
+  if (isTablePaused(table)) {
+    throw createRouteError(409, 'POKER_PLAY_TABLE_PAUSED', 'This poker table is paused by an operator.');
   }
   const activeSeat = deps.getActivePokerPlaySeatByWalletSubject(walletBinding.walletSubject);
   if (activeSeat && isSeatInPlay(activeSeat)) {
@@ -7064,9 +7412,29 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
   if (deps.getPokerPlaySeatByWalletSubject(table.tableId, walletBinding.walletSubject)) {
     throw createRouteError(409, 'POKER_PLAY_ALREADY_SEATED', 'This wallet already has a seat at the table.');
   }
+  if (getTableWaitlistEntryByWalletSubject(deps, table, walletBinding.walletSubject)
+    && normalizeTrimmedString(getTableWaitlistEntryByWalletSubject(deps, table, walletBinding.walletSubject)?.status, 'waiting') === 'waiting') {
+    throw createRouteError(409, 'POKER_PLAY_WAITLIST_ALREADY_QUEUED', 'This wallet is already on the waitlist for the table.');
+  }
   const seats = deps.listPokerPlaySeatsByTable(table.tableId);
-  if (getOpenSeatCount(table, seats) > 0) {
+  const openSeatCount = getOpenSeatCount(table, seats);
+  const tableType = normalizePokerPlayTableType(table?.tableType);
+  const currentHand = deps.getCurrentPokerPlayHandForTable(table.tableId);
+  const tournamentLateRegistration = resolveTournamentLateRegistration(table, currentHand);
+  if (tableType === 'cash' && openSeatCount > 0) {
     throw createRouteError(409, 'POKER_PLAY_WAITLIST_NOT_NEEDED', 'This table still has an open seat.');
+  }
+  if (tableType === 'tournament') {
+    const scheduledPending = isScheduledTournamentPending(table, requestAt);
+    const tournamentWaitlistAllowed = openSeatCount <= 0 && (
+      scheduledPending
+      || !currentHand
+      || currentHand.status !== 'live'
+      || tournamentLateRegistration.open
+    );
+    if (!tournamentWaitlistAllowed) {
+      throw createRouteError(409, 'POKER_PLAY_WAITLIST_UNAVAILABLE', 'Tournament waitlist is only available for scheduled or late-registration events when the table is full.');
+    }
   }
   const buyInOil = computeBuyInOil(table, body?.buyInOil);
   assertPokerPlayWalletPolicyAllowsSpend(deps, walletBinding.walletSubject, {
@@ -7080,8 +7448,9 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
       balance: Number(oilBalance?.balance || 0),
     });
   }
-  deps.upsertPokerPlayWaitlistEntry({
+  upsertTableWaitlistEntry(deps, table, {
     tableId: table.tableId,
+    seriesId: tableType === 'tournament' ? getTournamentSeriesRef(table).seriesId || null : null,
     portalSessionId: session.sessionId,
     houseId,
     walletSubject: walletBinding.walletSubject,
@@ -7096,7 +7465,7 @@ function joinTableWaitlist(deps, { tableId, session, req, body } = {}) {
       handId: null,
       seatNumber: null,
       actorRole: 'human',
-      eventKind: 'waitlist_joined',
+      eventKind: tableType === 'tournament' ? 'tournament_waitlist_joined' : 'waitlist_joined',
       payload: {
         walletSubject: walletBinding.walletSubject,
         buyInOil,
@@ -7118,11 +7487,11 @@ function leaveTableWaitlist(deps, { tableId, session, req, body } = {}) {
   if (!table) {
     throw createRouteError(404, 'NOT_FOUND', 'Poker table not found.');
   }
-  const waitlistEntry = deps.getPokerPlayWaitlistEntryByTableAndWalletSubject(table.tableId, walletBinding.walletSubject);
+  const waitlistEntry = getTableWaitlistEntryByWalletSubject(deps, table, walletBinding.walletSubject);
   if (!waitlistEntry || normalizeTrimmedString(waitlistEntry?.status, 'waiting') !== 'waiting') {
     throw createRouteError(404, 'NOT_FOUND', 'Poker waitlist entry not found.');
   }
-  deps.upsertPokerPlayWaitlistEntry({
+  upsertTableWaitlistEntry(deps, table, {
     ...waitlistEntry,
     status: 'cancelled',
     updatedAt: requestAt,
@@ -7133,7 +7502,7 @@ function leaveTableWaitlist(deps, { tableId, session, req, body } = {}) {
       handId: null,
       seatNumber: null,
       actorRole: 'human',
-      eventKind: 'waitlist_left',
+      eventKind: normalizePokerPlayTableType(table?.tableType) === 'tournament' ? 'tournament_waitlist_left' : 'waitlist_left',
       payload: {
         walletSubject: walletBinding.walletSubject,
       },

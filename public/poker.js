@@ -2079,13 +2079,24 @@
     const paused = String(table?.status || 'open') === 'paused';
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
     const tableOpen = String(table?.status || 'open') === 'open';
+    const registrationOpen = tableOpen || (table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled');
     const sitAndGoWaiting = table?.tableType === 'tournament'
       && isSitAndGoFillPolicy(table?.summary?.fillPolicy)
       && !table?.summary?.liveHand
       && !table?.summary?.completedAt
       && Number(table?.summary?.seatsUntilStart || 0) > 0;
-    const canJoin = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
-    const canWaitlist = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) <= 0 && table?.tableType === 'cash';
+    const canJoin = !publicRail && registrationOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
+    const canWaitlist = !publicRail
+      && registrationOpen
+      && !mySeat
+      && Number(table?.summary?.openSeatCount || 0) <= 0
+      && (
+        table?.tableType === 'cash'
+        || (
+          table?.tableType === 'tournament'
+          && (table?.summary?.scheduledStartPending || !table?.summary?.liveHand || table?.summary?.lateRegistrationOpen)
+        )
+      );
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
       `
@@ -2105,6 +2116,7 @@
           ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
           ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
+          ${table?.tableType === 'cash' ? renderSummaryMetric('Blind Return', String(table?.summary?.blindReturnPolicy || 'post_big_blind').replace(/_/g, ' ')) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', formatTournamentFillPolicyLabel(table?.summary?.fillPolicy)) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Target', `${Number(table?.summary?.startTargetSeats || table?.minPlayers || 2)}`) : ''}
           ${table?.tableType === 'tournament' && !table?.summary?.liveHand && !table?.summary?.completedAt ? renderSummaryMetric('Seats To Start', `${Number(table?.summary?.seatsUntilStart || 0)}`) : ''}
@@ -2217,7 +2229,14 @@
     if (canWaitlist) {
       cards.push(`
         <h2>Waitlist</h2>
-        <p>${tableAccess?.inviteOnly ? 'This invite-only table is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens.' : 'The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.'}</p>
+        <p>${table?.tableType === 'tournament'
+          ? (tableAccess?.inviteOnly
+            ? 'This invite-only tournament is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens before the schedule locks.'
+            : 'The tournament is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens before the schedule locks.')
+          : (tableAccess?.inviteOnly
+            ? 'This invite-only table is full. Invited wallets can still queue, and the first eligible waiting wallet is promoted when a seat opens.'
+            : 'The table is full. Queue a buy-in and the first eligible waiting wallet is promoted when a seat opens.')}
+        </p>
         ${waitlist?.viewerQueued
           ? `
             <div class="pokerSummary">
@@ -2268,6 +2287,8 @@
         : [];
       const defaultTransferTarget = transferOptions[0] || null;
       const transferOptionsJson = escapeHtml(JSON.stringify(transferOptions));
+      const blindObligation = mySeat?.blindObligation && typeof mySeat.blindObligation === 'object' ? mySeat.blindObligation : null;
+      const waitlistPromotion = mySeat?.waitlistPromotion && typeof mySeat.waitlistPromotion === 'object' ? mySeat.waitlistPromotion : null;
       cards.push(`
         <h2>Your Seat</h2>
         <div class="pokerSummary">
@@ -2285,6 +2306,10 @@
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
         ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
+        ${table?.tableType === 'cash' && (seatSittingOut || seatAway) ? `<p>Return policy: ${String(table?.summary?.blindReturnPolicy || 'post_big_blind') === 'wait_for_big_blind' ? 'wait for big blind.' : `post big blind (${Number(table?.bigBlindOil || 0)} OIL).`}</p>` : ''}
+        ${blindObligation?.status === 'posted' ? `<p>Blind obligation posted: ${Number(blindObligation?.blindAmountOil || 0)} OIL big blind.</p>` : ''}
+        ${blindObligation?.status === 'waiting' ? `<p>Blind obligation pending: wait for big blind before rejoining normal rotation.</p>` : ''}
+        ${waitlistPromotion?.source === 'tournament_waitlist' ? '<p>Promoted from the tournament waitlist.</p>' : ''}
         ${adminClosed ? `<p>This table was closed by an operator.${Number(table?.state?.refundedTotalOil || 0) > 0 ? ` Refunds issued: ${Number(table?.state?.refundedTotalOil || 0)} OIL total.` : ''}</p>` : ''}
         ${mySeat?.finishPosition ? `<p>You currently hold finish position ${Number(mySeat.finishPosition || 0)}.${Number(mySeat?.prizeOil || 0) > 0 ? ` Prize paid: ${Number(mySeat.prizeOil || 0)} OIL.` : ''}${Number(mySeat?.bountyWonOil || 0) > 0 ? ` Bounty won: ${Number(mySeat.bountyWonOil || 0)} OIL.` : ''}</p>` : ''}
         ${adminClosed ? '' : `

@@ -524,6 +524,8 @@ Returns one live cash or tournament table payload with:
 - `data.waitlist`
 - `data.seats[]`
 - `data.mySeat`
+- `data.mySeat.blindObligation` for cash-seat return policy state when present
+- `data.mySeat.waitlistPromotion` for tournament seats promoted from the durable waitlist
 - `data.mySeat.currentBountyOil`
 - `data.mySeat.bountyWonOil`
 - `data.hand`
@@ -551,12 +553,15 @@ Worker seat-agent notes:
 
 Cash lifecycle and waitlist notes:
 - cash tables expose `data.table.summary.activeSeatCount`, `data.table.summary.openSeatCount`, `data.table.summary.waitlistCount`, and `data.table.summary.viewerWaitlistPosition`
+- cash tables expose `data.table.summary.blindReturnPolicy` as `post_big_blind` or `wait_for_big_blind`
 - `data.waitlist.count` is the number of `waiting` entries still queued for that table
 - `data.waitlist.viewerQueued` and `data.waitlist.viewerPosition` describe the bound wallet’s current queue state when it is not yet seated
 - cash-seat statuses may include `active`, `sitting_out`, `sitout_next_hand`, `away`, `away_next_hand`, and `leaving_after_hand`
+- `data.mySeat.blindObligation.status = "posted"` records a big-blind return debit already applied to the seat stack; `status = "waiting"` records a wait-for-big-blind policy state
 - `data.table.summary.occupancy` counts seats that still physically occupy the table, while `data.table.summary.activeSeatCount` excludes cash seats that are sitting out or away between hands
 - `data.cashMovement.seatChangeAllowed` and `data.cashMovement.seatChangeOpenSeatNumbers[]` expose between-hand seat-change availability for the bound cash seat
 - `data.cashMovement.transferAllowed` and `data.cashMovement.transferOptions[]` expose compatible between-hand cash-table transfers without debiting or crediting OIL
+- tournament tables reuse the same `data.waitlist` contract when scheduled or full-event waitlists are enabled
 - invite-only tables require a valid `inviteCode` on pre-join reads and seat/waitlist entry unless the wallet is already seated or created the table
 
 ### GET `/api/poker/play/tables/:tableId/history`
@@ -822,6 +827,7 @@ Optional live-play request fields:
 - `timeBankSeconds`
 - `accessMode`; defaults to `public`
 - `inviteCode`; optional creator-supplied invite code when `accessMode = "invite_only"`; otherwise the server generates one
+- `blindReturnPolicy`; cash only; `post_big_blind` by default, or `wait_for_big_blind`
 
 Invite-only table notes:
 - invite-only tables are created directly through this route, not through matchmaking
@@ -1004,7 +1010,9 @@ Request shape:
 
 Response notes:
 - returns the normal player table payload
-- `data.mySeat.status` is restored to `active`
+- `data.table.summary.blindReturnPolicy` echoes the configured return policy
+- `blindReturnPolicy = "post_big_blind"` immediately debits one big blind from `data.mySeat.stackOil` and returns `data.mySeat.blindObligation.status = "posted"`
+- `blindReturnPolicy = "wait_for_big_blind"` returns `data.mySeat.status = "waiting_big_blind"` and `data.mySeat.blindObligation.status = "waiting"`
 
 Failure codes:
 - `UNAUTHORIZED`
@@ -1015,7 +1023,7 @@ Failure codes:
 - `POKER_PLAY_TABLE_CLOSED`
 
 ### POST `/api/poker/play/tables/:tableId/waitlist`
-Queues the bound wallet for the next open cash-table seat and reserves a future buy-in amount to be debited only if promotion succeeds.
+Queues the bound wallet for the next open seat and reserves a future buy-in amount to be debited only if promotion succeeds.
 
 Request shape:
 ```json
@@ -1031,6 +1039,9 @@ Response notes:
 - returns the normal player table payload
 - `data.waitlist.viewerQueued = true` and `data.waitlist.viewerPosition` reports the caller’s queue position
 - promotion only occurs once a real seat opens; if a cash-table leave happens during a live hand, promotion waits until that hand settles
+- scheduled tournaments accept waitlist registrations while the event is still full and not yet started
+- full tournament tables accept waitlist registrations while late registration remains open
+- tournament waitlist promotions return `data.mySeat.waitlistPromotion.source = "tournament_waitlist"` on the promoted seat
 
 Failure codes:
 - `UNAUTHORIZED`
@@ -1039,8 +1050,10 @@ Failure codes:
 - `NOT_FOUND`
 - `POKER_PLAY_WAITLIST_UNAVAILABLE`
 - `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_TABLE_PAUSED`
 - `POKER_PLAY_SEAT_ALREADY_ACTIVE`
 - `POKER_PLAY_ALREADY_SEATED`
+- `POKER_PLAY_WAITLIST_ALREADY_QUEUED`
 - `POKER_PLAY_WAITLIST_NOT_NEEDED`
 - `POKER_PLAY_INVITE_REQUIRED`
 - `POKER_PLAY_SELF_EXCLUDED`
@@ -1048,7 +1061,7 @@ Failure codes:
 - `OIL_BALANCE_TOO_LOW`
 
 ### DELETE `/api/poker/play/tables/:tableId/waitlist`
-Cancels the bound wallet’s active waitlist entry for a cash table.
+Cancels the bound wallet’s active waitlist entry for a cash or tournament table.
 
 Response notes:
 - returns the normal player table payload
@@ -1080,6 +1093,11 @@ Request shape:
   "displayName": "Bravo House"
 }
 ```
+
+Matchmaking notes:
+- invite-only tables are excluded
+- scheduled tournaments may be selected and preserve their `scheduledStartAt`
+- tournament waitlist state is table-specific; matchmaking does not auto-enqueue the caller
 
 Response fields:
 - `data.table`

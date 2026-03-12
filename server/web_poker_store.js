@@ -433,6 +433,46 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_play_waitlist_entries_table_status_created_idx
       ON poker_play_waitlist_entries(table_id, status, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS poker_blind_obligations (
+      blind_obligation_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      wallet_subject TEXT NOT NULL,
+      seat_number INTEGER NOT NULL,
+      policy TEXT NOT NULL,
+      status TEXT NOT NULL,
+      blind_amount_oil INTEGER NOT NULL DEFAULT 0,
+      posted_at TEXT,
+      cleared_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (table_id, wallet_subject),
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_blind_obligations_table_status_updated_idx
+      ON poker_blind_obligations(table_id, status, updated_at DESC);
+
+    CREATE TABLE IF NOT EXISTS poker_tournament_waitlist_entries (
+      tournament_waitlist_entry_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      series_id TEXT,
+      portal_session_id TEXT,
+      house_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      buy_in_oil INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      promoted_seat_number INTEGER,
+      promoted_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (table_id, wallet_subject),
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_tournament_waitlist_entries_table_status_created_idx
+      ON poker_tournament_waitlist_entries(table_id, status, created_at ASC);
+
     CREATE TABLE IF NOT EXISTS poker_play_hands (
       hand_id TEXT PRIMARY KEY,
       table_id TEXT NOT NULL,
@@ -977,6 +1017,8 @@ function countTableRows(tableName) {
     'poker_play_tables',
     'poker_play_seats',
     'poker_play_waitlist_entries',
+    'poker_blind_obligations',
+    'poker_tournament_waitlist_entries',
     'poker_play_hands',
     'poker_play_messages',
     'poker_play_actions',
@@ -1021,6 +1063,8 @@ function resetExtendedStore() {
     'poker_play_hands',
     'poker_play_seats',
     'poker_play_waitlist_entries',
+    'poker_blind_obligations',
+    'poker_tournament_waitlist_entries',
     'poker_play_tables',
     'poker_oil_ledger_entries',
     'poker_oil_snapshot_events',
@@ -3208,6 +3252,240 @@ function deletePokerPlayWaitlistEntry(tableId, walletSubject) {
   `).run(tableId, walletSubject);
 }
 
+function hydratePokerBlindObligation(row) {
+  if (!row) return null;
+  return {
+    blindObligationId: row.blind_obligation_id,
+    tableId: row.table_id,
+    walletSubject: row.wallet_subject,
+    seatNumber: Number(row.seat_number || 0),
+    policy: row.policy,
+    status: row.status,
+    blindAmountOil: Number(row.blind_amount_oil || 0),
+    postedAt: row.posted_at || null,
+    clearedAt: row.cleared_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerBlindObligationByTableAndWalletSubject(tableId, walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_blind_obligations
+    WHERE table_id = ? AND wallet_subject = ?
+    LIMIT 1
+  `).get(tableId, walletSubject);
+  return hydratePokerBlindObligation(row);
+}
+
+function listPokerBlindObligationsByTable(tableId, { status = '' } = {}) {
+  const database = ensureDb();
+  const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+        SELECT * FROM poker_blind_obligations
+        WHERE table_id = ? AND status = ?
+        ORDER BY updated_at DESC, blind_obligation_id DESC
+      `).all(tableId, normalizedStatus)
+    : database.prepare(`
+        SELECT * FROM poker_blind_obligations
+        WHERE table_id = ?
+        ORDER BY updated_at DESC, blind_obligation_id DESC
+      `).all(tableId);
+  return rows.map(hydratePokerBlindObligation).filter(Boolean);
+}
+
+function upsertPokerBlindObligation({
+  blindObligationId = null,
+  tableId,
+  walletSubject,
+  seatNumber,
+  policy,
+  status,
+  blindAmountOil = 0,
+  postedAt = null,
+  clearedAt = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare(`
+      SELECT * FROM poker_blind_obligations
+      WHERE table_id = ? AND wallet_subject = ?
+      LIMIT 1
+    `).get(tableId, walletSubject);
+    const nextId = existing?.blind_obligation_id || blindObligationId || makeId('pkblind');
+    database.prepare(`
+      INSERT INTO poker_blind_obligations (
+        blind_obligation_id,
+        table_id,
+        wallet_subject,
+        seat_number,
+        policy,
+        status,
+        blind_amount_oil,
+        posted_at,
+        cleared_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(table_id, wallet_subject) DO UPDATE SET
+        seat_number = excluded.seat_number,
+        policy = excluded.policy,
+        status = excluded.status,
+        blind_amount_oil = excluded.blind_amount_oil,
+        posted_at = excluded.posted_at,
+        cleared_at = excluded.cleared_at,
+        updated_at = excluded.updated_at
+    `).run(
+      nextId,
+      tableId,
+      walletSubject,
+      Number(seatNumber || 0),
+      policy,
+      status,
+      Number(blindAmountOil || 0),
+      postedAt,
+      clearedAt,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerBlindObligationByTableAndWalletSubject(tableId, walletSubject);
+  });
+}
+
+function deletePokerBlindObligation(tableId, walletSubject) {
+  const database = ensureDb();
+  database.prepare(`
+    DELETE FROM poker_blind_obligations
+    WHERE table_id = ? AND wallet_subject = ?
+  `).run(tableId, walletSubject);
+}
+
+function hydratePokerTournamentWaitlistEntry(row) {
+  if (!row) return null;
+  return {
+    tournamentWaitlistEntryId: row.tournament_waitlist_entry_id,
+    tableId: row.table_id,
+    seriesId: row.series_id || null,
+    portalSessionId: row.portal_session_id || null,
+    houseId: row.house_id || null,
+    walletSubject: row.wallet_subject,
+    displayName: row.display_name,
+    buyInOil: Number(row.buy_in_oil || 0),
+    status: row.status,
+    promotedSeatNumber: Number(row.promoted_seat_number || 0) || null,
+    promotedAt: row.promoted_at || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function listPokerTournamentWaitlistEntriesByTable(tableId, { status = 'waiting' } = {}) {
+  const database = ensureDb();
+  const normalizedStatus = typeof status === 'string' && status.trim() ? status.trim() : '';
+  const rows = normalizedStatus
+    ? database.prepare(`
+        SELECT * FROM poker_tournament_waitlist_entries
+        WHERE table_id = ? AND status = ?
+        ORDER BY created_at ASC, tournament_waitlist_entry_id ASC
+      `).all(tableId, normalizedStatus)
+    : database.prepare(`
+        SELECT * FROM poker_tournament_waitlist_entries
+        WHERE table_id = ?
+        ORDER BY created_at ASC, tournament_waitlist_entry_id ASC
+      `).all(tableId);
+  return rows.map(hydratePokerTournamentWaitlistEntry).filter(Boolean);
+}
+
+function getPokerTournamentWaitlistEntryByTableAndWalletSubject(tableId, walletSubject) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_tournament_waitlist_entries
+    WHERE table_id = ? AND wallet_subject = ?
+    LIMIT 1
+  `).get(tableId, walletSubject);
+  return hydratePokerTournamentWaitlistEntry(row);
+}
+
+function upsertPokerTournamentWaitlistEntry({
+  tournamentWaitlistEntryId = null,
+  tableId,
+  seriesId = null,
+  portalSessionId = null,
+  houseId = null,
+  walletSubject,
+  displayName,
+  buyInOil = 0,
+  status = 'waiting',
+  promotedSeatNumber = null,
+  promotedAt = null,
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare(`
+      SELECT * FROM poker_tournament_waitlist_entries
+      WHERE table_id = ? AND wallet_subject = ?
+      LIMIT 1
+    `).get(tableId, walletSubject);
+    const nextId = existing?.tournament_waitlist_entry_id || tournamentWaitlistEntryId || makeId('pktwait');
+    database.prepare(`
+      INSERT INTO poker_tournament_waitlist_entries (
+        tournament_waitlist_entry_id,
+        table_id,
+        series_id,
+        portal_session_id,
+        house_id,
+        wallet_subject,
+        display_name,
+        buy_in_oil,
+        status,
+        promoted_seat_number,
+        promoted_at,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(table_id, wallet_subject) DO UPDATE SET
+        series_id = excluded.series_id,
+        portal_session_id = excluded.portal_session_id,
+        house_id = excluded.house_id,
+        display_name = excluded.display_name,
+        buy_in_oil = excluded.buy_in_oil,
+        status = excluded.status,
+        promoted_seat_number = excluded.promoted_seat_number,
+        promoted_at = excluded.promoted_at,
+        updated_at = excluded.updated_at
+    `).run(
+      nextId,
+      tableId,
+      seriesId,
+      portalSessionId,
+      houseId,
+      walletSubject,
+      displayName,
+      Number(buyInOil || 0),
+      status,
+      promotedSeatNumber == null ? null : Number(promotedSeatNumber || 0),
+      promotedAt,
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return getPokerTournamentWaitlistEntryByTableAndWalletSubject(tableId, walletSubject);
+  });
+}
+
+function deletePokerTournamentWaitlistEntry(tableId, walletSubject) {
+  const database = ensureDb();
+  database.prepare(`
+    DELETE FROM poker_tournament_waitlist_entries
+    WHERE table_id = ? AND wallet_subject = ?
+  `).run(tableId, walletSubject);
+}
+
 function hydratePokerPlayHand(row) {
   if (!row) return null;
   return {
@@ -4544,10 +4822,12 @@ module.exports = {
   getPokerPlayIntegrityFlagById,
   getPokerPlayPlayerStatById,
   getPokerPlayWalletPolicy,
+  getPokerBlindObligationByTableAndWalletSubject,
   getOpenPokerPlayPlayerStatByTableAndWalletSubject,
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
+  getPokerTournamentWaitlistEntryByTableAndWalletSubject,
   getPokerPlayWaitlistEntryByTableAndWalletSubject,
   getPokerReplayArtifactByRunId,
   getRegistryEntityById,
@@ -4572,6 +4852,7 @@ module.exports = {
   listOilLedgerEntries,
   listOilLedgerEntriesByWalletSubject,
   listOilSnapshotEventsByVerificationAndHour,
+  listPokerBlindObligationsByTable,
   listPokerPlayActionsByHand,
   listPokerPlayAuditEventsByHand,
   listPokerPlayAuditEventsByTable,
@@ -4586,13 +4867,16 @@ module.exports = {
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
+  listPokerTournamentWaitlistEntriesByTable,
   listPokerPlayWaitlistEntriesByTable,
   listPokerSeasons,
   resetExtendedStore,
   searchRegistryEntities,
   setWebSessionRevisionAndState,
   touchCredentialGrant,
+  deletePokerBlindObligation,
   deletePokerPlaySeat,
+  deletePokerTournamentWaitlistEntry,
   deletePokerPlayWaitlistEntry,
   upsertCentaurEntry,
   upsertCentaurHand,
@@ -4605,8 +4889,10 @@ module.exports = {
   upsertPokerPlayHand,
   upsertPokerPlayPlayerStat,
   upsertPokerPlayWalletPolicy,
+  upsertPokerBlindObligation,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
+  upsertPokerTournamentWaitlistEntry,
   upsertPokerPlayWaitlistEntry,
   upsertPokerReplayArtifact,
   upsertPokerRun,
