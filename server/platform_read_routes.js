@@ -49,6 +49,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryLinks,
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
+    listLibrarySatchelRelays,
     listLibrarySatchelReceipts,
     listLibraryPublications,
     listLibraryShelfItems,
@@ -843,6 +844,222 @@ function registerPlatformReadRoutes(app, deps) {
         houseId: normalizedHouseId,
         teamId: normalizedTeamId,
         libraryPeerRelayId: String(relay?.libraryPeerRelayId || '').trim(),
+      });
+      return previewPayload.ok ? previewPayload.preview : null;
+    }).filter(Boolean);
+  }
+
+  function findLibrarySatchelRelayImportsForTarget({
+    houseId = '',
+    teamId = '',
+    librarySatchelRelayId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRelayId = String(librarySatchelRelayId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedRelayId) {
+      return new Map();
+    }
+    return listLibraryItems({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).reduce((acc, item) => {
+      if (!item || typeof item !== 'object') return acc;
+      if (String(item.importedState || '').trim() !== 'imported_artifact') return acc;
+      if (item.readOnly !== true) return acc;
+      if (String(item.sourceKind || '').trim() !== 'satchel_relay_artifact') return acc;
+      const metadata = item.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+      if (String(metadata.librarySatchelRelayId || '').trim() !== normalizedRelayId) return acc;
+      const libraryPublicationId = String(metadata.libraryPublicationId || '').trim();
+      const registryId = String(item.registryId || metadata.registryId || '').trim();
+      if (libraryPublicationId) {
+        acc.set(libraryPublicationId, item);
+      }
+      if (registryId && !acc.has(registryId)) {
+        acc.set(registryId, item);
+      }
+      return acc;
+    }, new Map());
+  }
+
+  function findImportedSatchelScopeSetForRelay({
+    houseId = '',
+    teamId = '',
+    librarySatchelRelayId = '',
+    bundleHash = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRelayId = String(librarySatchelRelayId || '').trim();
+    const normalizedBundleHash = String(bundleHash || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedRelayId) return null;
+    return listScopeSets({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).find((scopeSet) => {
+      const metadata = scopeSet?.metadata && typeof scopeSet.metadata === 'object'
+        ? scopeSet.metadata
+        : {};
+      if (String(metadata.scopeKind || '').trim() !== 'satchel') return false;
+      if (String(metadata.librarySatchelRelayId || '').trim() !== normalizedRelayId) return false;
+      if (!normalizedBundleHash) return true;
+      return String(metadata.bundleHash || '').trim() === normalizedBundleHash;
+    }) || null;
+  }
+
+  function resolveIncomingLibrarySatchelRelay({
+    houseId = '',
+    teamId = '',
+    librarySatchelRelayId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedRelayId = String(librarySatchelRelayId || '').trim();
+    if (!normalizedHouseId || !normalizedRelayId) {
+      return { ok: false, code: 'LIBRARY_SATCHEL_RELAY_NOT_FOUND', message: 'The requested Satchel relay could not be found.' };
+    }
+    const relay = getLibrarySatchelRelayById(normalizedRelayId);
+    if (!relay || String(relay.targetHouseId || '').trim() !== normalizedHouseId) {
+      return { ok: false, code: 'LIBRARY_SATCHEL_RELAY_NOT_FOUND', message: 'The requested Satchel relay could not be found for this House.' };
+    }
+    const receipt = listLibrarySatchelReceipts({
+      librarySatchelRelayId: normalizedRelayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === normalizedHouseId) || null;
+    if (!receipt) {
+      return { ok: false, code: 'LIBRARY_SATCHEL_RELAY_NOT_DELIVERED', message: 'This Satchel relay has not been delivered to the target House yet.' };
+    }
+    const bundleManifest = relay?.bundleManifest && typeof relay.bundleManifest === 'object'
+      ? relay.bundleManifest
+      : {};
+    const members = Array.isArray(bundleManifest.members)
+      ? bundleManifest.members.map((member, index) => ({
+          position: Number(member?.position ?? index),
+          libraryItemId: String(member?.libraryItemId || '').trim() || null,
+          libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
+          registryId: String(member?.registryId || '').trim() || null,
+          contentHash: String(member?.contentHash || '').trim() || null,
+          itemType: String(member?.itemType || '').trim() || 'imported_artifact',
+          title: String(member?.title || member?.registryId || `Bundle item ${index + 1}`).trim(),
+          summary: String(member?.summary || '').trim() || null,
+          contentText: String(member?.contentText || ''),
+          contentRef: member?.contentRef ? String(member.contentRef) : null,
+          sourceKind: String(member?.sourceKind || '').trim() || null,
+          sourceRef: String(member?.sourceRef || '').trim() || null,
+        }))
+      : [];
+    if (!members.length) {
+      return { ok: false, code: 'LIBRARY_SATCHEL_MANIFEST_REQUIRED', message: 'The Satchel relay manifest could not be resolved.' };
+    }
+    const importedItems = normalizedTeamId
+      ? findLibrarySatchelRelayImportsForTarget({
+          houseId: normalizedHouseId,
+          teamId: normalizedTeamId,
+          librarySatchelRelayId: normalizedRelayId,
+        })
+      : new Map();
+    const localScopeSet = normalizedTeamId
+      ? findImportedSatchelScopeSetForRelay({
+          houseId: normalizedHouseId,
+          teamId: normalizedTeamId,
+          librarySatchelRelayId: normalizedRelayId,
+          bundleHash: String(bundleManifest.bundleHash || '').trim(),
+        })
+      : null;
+    return {
+      ok: true,
+      relay,
+      receipt,
+      bundleManifest,
+      members,
+      importedItems,
+      localScopeSet,
+    };
+  }
+
+  function buildLibrarySatchelRelayPreviewPayload({
+    houseId = '',
+    teamId = '',
+    librarySatchelRelayId = '',
+  } = {}) {
+    const resolved = resolveIncomingLibrarySatchelRelay({
+      houseId,
+      teamId,
+      librarySatchelRelayId,
+    });
+    if (!resolved.ok) {
+      return resolved;
+    }
+    const {
+      relay,
+      receipt,
+      bundleManifest,
+      members,
+      importedItems,
+      localScopeSet,
+    } = resolved;
+    const memberPreviews = members.map((member) => {
+      const importedItem = importedItems instanceof Map
+        ? (importedItems.get(member.libraryPublicationId) || importedItems.get(member.registryId) || null)
+        : null;
+      return {
+        ...member,
+        alreadyImported: !!importedItem,
+        importedItem: importedItem ? projectLibraryItemForRead(importedItem) : null,
+      };
+    });
+    const importedCount = memberPreviews.filter((member) => member.alreadyImported).length;
+    const sourceHouseId = String(relay?.houseId || '').trim() || null;
+    return {
+      ok: true,
+      preview: {
+        librarySatchelRelayId: relay.librarySatchelRelayId,
+        scopeSetId: String(relay?.scopeSetId || bundleManifest.scopeSetId || '').trim() || null,
+        sourceHouseId,
+        targetHouseId: String(relay?.targetHouseId || '').trim() || null,
+        transportKind: String(bundleManifest.transportKind || relay?.metadata?.transportKind || '').trim() || 'pony.relay.registry.v1',
+        relayState: String(relay?.relayState || '').trim() || 'accepted',
+        receiptRef: String(receipt?.receiptRef || '').trim() || null,
+        receiptStatus: String(receipt?.status || '').trim() || 'accepted',
+        bundleHash: String(bundleManifest.bundleHash || '').trim() || null,
+        title: String(bundleManifest.title || relay.librarySatchelRelayId).trim() || relay.librarySatchelRelayId,
+        scopeKind: String(bundleManifest.scopeKind || 'reading_table').trim() || 'reading_table',
+        summary: `Relayed from ${sourceHouseId || 'another House'} with ${memberPreviews.length} curated Library items.`,
+        memberCount: memberPreviews.length,
+        importedCount,
+        alreadyImported: importedCount > 0,
+        alreadyImportedAll: importedCount === memberPreviews.length,
+        members: memberPreviews,
+        localScopeSet: localScopeSet
+          ? {
+              scopeSetId: localScopeSet.scopeSetId,
+              title: localScopeSet.title,
+              orderedItemIds: listScopeSetItems(localScopeSet.scopeSetId).map((entry) => entry.libraryItemId),
+            }
+          : null,
+        provenance: {
+          summary: `Relayed from ${sourceHouseId || 'another House'} via Pony and anchored to ${memberPreviews.length} published Library artifacts.`,
+          bundleHash: String(bundleManifest.bundleHash || '').trim() || null,
+          orderedPublicationIds: Array.isArray(bundleManifest.orderedPublicationIds) ? bundleManifest.orderedPublicationIds : [],
+          orderedRegistryIds: Array.isArray(bundleManifest.orderedRegistryIds) ? bundleManifest.orderedRegistryIds : [],
+        },
+      },
+    };
+  }
+
+  function buildIncomingLibrarySatchelRelayList({
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId) return [];
+    return listLibrarySatchelRelays({
+      targetHouseId: normalizedHouseId,
+    }).map((relay) => {
+      const previewPayload = buildLibrarySatchelRelayPreviewPayload({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+        librarySatchelRelayId: String(relay?.librarySatchelRelayId || '').trim(),
       });
       return previewPayload.ok ? previewPayload.preview : null;
     }).filter(Boolean);
@@ -2588,6 +2805,251 @@ function registerPlatformReadRoutes(app, deps) {
         houseId: target.houseId,
       },
     }, { requestId, status: receiptPersisted.status });
+  });
+
+  app.get('/api/platform/library/satchel-relays/incoming', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before reading incoming Satchel relays.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      incomingRelays: buildIncomingLibrarySatchelRelayList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+      }),
+    }, { requestId });
+  });
+
+  app.get('/api/platform/library/satchel-relays/:librarySatchelRelayId/preview', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before previewing a relayed Satchel bundle.', { requestId });
+    }
+    const librarySatchelRelayId = typeof req.params?.librarySatchelRelayId === 'string' ? req.params.librarySatchelRelayId.trim() : '';
+    if (!librarySatchelRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SATCHEL_RELAY_REQUIRED', 'librarySatchelRelayId is required.', { requestId });
+    }
+    const previewPayload = buildLibrarySatchelRelayPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      librarySatchelRelayId,
+    });
+    if (!previewPayload.ok) {
+      const status = String(previewPayload?.code || '').trim() === 'LIBRARY_SATCHEL_RELAY_NOT_DELIVERED' ? 409 : 404;
+      return sendPortalApiError(res, status, previewPayload.code || 'LIBRARY_SATCHEL_RELAY_NOT_FOUND', previewPayload.message || 'The requested Satchel relay could not be previewed.', {
+        requestId,
+      });
+    }
+    return sendPortalApiSuccess(res, {
+      preview: previewPayload.preview,
+    }, { requestId });
+  });
+
+  app.post('/api/platform/library/satchel-relays/:librarySatchelRelayId/imports', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before importing a relayed Satchel bundle.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before importing a relayed Satchel bundle.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to import a relayed Satchel bundle.', { requestId });
+    }
+    const librarySatchelRelayId = typeof req.params?.librarySatchelRelayId === 'string' ? req.params.librarySatchelRelayId.trim() : '';
+    if (!librarySatchelRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SATCHEL_RELAY_REQUIRED', 'librarySatchelRelayId is required.', { requestId });
+    }
+    const resolved = resolveIncomingLibrarySatchelRelay({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      librarySatchelRelayId,
+    });
+    if (!resolved.ok) {
+      const status = String(resolved?.code || '').trim() === 'LIBRARY_SATCHEL_RELAY_NOT_DELIVERED' ? 409 : 404;
+      return sendPortalApiError(res, status, resolved.code || 'LIBRARY_SATCHEL_RELAY_NOT_FOUND', resolved.message || 'The requested Satchel relay could not be imported.', {
+        requestId,
+      });
+    }
+    const requestedPublicationIds = Array.isArray(req.body?.libraryPublicationIds)
+      ? req.body.libraryPublicationIds.map((entry) => String(entry || '').trim()).filter(Boolean)
+      : [];
+    const requestedPublicationIdSet = new Set(requestedPublicationIds);
+    const selectedMembers = requestedPublicationIds.length
+      ? resolved.members.filter((member) => requestedPublicationIdSet.has(String(member?.libraryPublicationId || '').trim()))
+      : [...resolved.members];
+    const selectedPublicationIds = selectedMembers.map((member) => String(member?.libraryPublicationId || '').trim()).filter(Boolean);
+    if (requestedPublicationIds.length && selectedMembers.length !== requestedPublicationIdSet.size) {
+      const missingPublicationIds = requestedPublicationIds.filter((publicationId) => !selectedPublicationIds.includes(publicationId));
+      return sendPortalApiError(res, 404, 'LIBRARY_SATCHEL_MEMBER_NOT_FOUND', 'One or more requested Satchel members could not be found in this bundle.', {
+        requestId,
+        details: {
+          missingPublicationIds,
+        },
+      });
+    }
+    if (!selectedMembers.length) {
+      return sendPortalApiError(res, 409, 'LIBRARY_SATCHEL_IMPORT_EMPTY', 'Select at least one Satchel member to import.', { requestId });
+    }
+
+    const importedItems = [];
+    const importedLinks = [];
+    let createdSomething = false;
+    selectedMembers.forEach((member) => {
+      const existingImported = resolved.importedItems instanceof Map
+        ? (resolved.importedItems.get(member.libraryPublicationId) || resolved.importedItems.get(member.registryId) || null)
+        : null;
+      if (existingImported) {
+        importedItems.push(existingImported);
+        importedLinks.push(...listLibraryLinks({ libraryItemId: existingImported.libraryItemId }));
+        return;
+      }
+      const registryId = String(member.registryId || '').trim() || `regrelay_${randomHex(8)}`;
+      const persisted = persistLibraryItemRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        idempotencyKey: `${idempotencyKey}:${member.libraryPublicationId}`,
+        itemType: 'imported_artifact',
+        title: String(member.title || registryId).trim() || registryId,
+        summary: `Relayed from ${String(resolved.relay?.houseId || '').trim() || 'another House'} · ${registryId}`,
+        contentText: String(member.contentText || ''),
+        contentRef: member.contentRef ? String(member.contentRef) : (registryId || resolved.relay.librarySatchelRelayId),
+        sourceKind: 'satchel_relay_artifact',
+        sourceRef: `${resolved.relay.librarySatchelRelayId}:${member.libraryPublicationId}`,
+        visibility: 'house_private',
+        importedState: 'imported_artifact',
+        registryId,
+        readOnly: true,
+        metadata: {
+          createdFrom: 'portal.house.library.satchel-relay.import',
+          importKind: 'satchel_relay_artifact',
+          sourceHouseId: String(resolved.relay?.houseId || '').trim() || null,
+          targetHouseId: context.houseId,
+          librarySatchelRelayId: resolved.relay.librarySatchelRelayId,
+          libraryPublicationId: member.libraryPublicationId,
+          receiptId: resolved.receipt.librarySatchelReceiptId,
+          receiptRef: resolved.receipt.receiptRef,
+          contentHash: member.contentHash,
+          bundleHash: String(resolved.bundleManifest?.bundleHash || '').trim() || null,
+          position: member.position,
+          registryId,
+        },
+        links: [
+          {
+            linkKind: 'imported_from_satchel_relay',
+            sourceKind: 'satchel_relay_artifact',
+            sourceRef: resolved.relay.librarySatchelRelayId,
+            metadata: {
+              sourceHouseId: String(resolved.relay?.houseId || '').trim() || null,
+              registryId,
+              libraryPublicationId: member.libraryPublicationId,
+              receiptRef: resolved.receipt.receiptRef,
+              bundleHash: String(resolved.bundleManifest?.bundleHash || '').trim() || null,
+            },
+          },
+          {
+            linkKind: 'relayed_publication',
+            sourceKind: 'library_publication',
+            sourceRef: member.libraryPublicationId,
+            metadata: {
+              registryId,
+              sourceHouseId: String(resolved.relay?.houseId || '').trim() || null,
+              librarySatchelRelayId: resolved.relay.librarySatchelRelayId,
+              bundleHash: String(resolved.bundleManifest?.bundleHash || '').trim() || null,
+            },
+          },
+        ],
+      });
+      importedItems.push(persisted.item);
+      importedLinks.push(...persisted.links);
+      if (persisted.status === 201) {
+        createdSomething = true;
+      }
+      if (resolved.importedItems instanceof Map) {
+        resolved.importedItems.set(member.libraryPublicationId, persisted.item);
+        if (registryId) {
+          resolved.importedItems.set(registryId, persisted.item);
+        }
+      }
+    });
+
+    const isFullImport = selectedMembers.length === resolved.members.length;
+    let scopeSet = null;
+    if (isFullImport) {
+      scopeSet = resolved.localScopeSet || findImportedSatchelScopeSetForRelay({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        librarySatchelRelayId: resolved.relay.librarySatchelRelayId,
+        bundleHash: String(resolved.bundleManifest?.bundleHash || '').trim(),
+      });
+      if (!scopeSet) {
+        scopeSet = createScopeSet({
+          scopeSetId: `scope_${randomHex(12)}`,
+          houseId: context.houseId,
+          teamId: context.activeTeamId,
+          title: String(resolved.bundleManifest?.title || 'Imported Satchel').trim() || 'Imported Satchel',
+          createdBy: 'human',
+          idempotencyKey: `${idempotencyKey}:scope`,
+          metadata: {
+            source: 'portal.house.library.satchel-relay.import',
+            scopeKind: 'satchel',
+            librarySatchelRelayId: resolved.relay.librarySatchelRelayId,
+            sourceScopeSetId: resolved.relay.scopeSetId,
+            bundleHash: String(resolved.bundleManifest?.bundleHash || '').trim() || null,
+            sourceHouseId: String(resolved.relay?.houseId || '').trim() || null,
+          },
+          nowIso: nowIso(),
+        });
+        createdSomething = true;
+      }
+      const orderedImportedItemIds = resolved.members.map((member) => {
+        const importedItem = resolved.importedItems instanceof Map
+          ? (resolved.importedItems.get(member.libraryPublicationId) || resolved.importedItems.get(member.registryId) || null)
+          : null;
+        return importedItem ? importedItem.libraryItemId : null;
+      }).filter(Boolean);
+      replaceScopeSetItems({
+        scopeSetId: scopeSet.scopeSetId,
+        itemIds: orderedImportedItemIds,
+        nowIso: nowIso(),
+      });
+      resolved.localScopeSet = scopeSet;
+    }
+
+    return sendPortalApiSuccess(res, {
+      import: {
+        librarySatchelRelayId,
+        selectionKind: isFullImport ? 'full' : 'subset',
+        importedCount: importedItems.length,
+        memberCount: resolved.members.length,
+      },
+      items: importedItems.map((item) => projectLibraryItemForRead(item)),
+      links: importedLinks,
+      scopeSet: scopeSet
+        ? {
+            scopeSetId: scopeSet.scopeSetId,
+            title: scopeSet.title,
+            scopeKind: 'satchel',
+            orderedItemIds: listScopeSetItems(scopeSet.scopeSetId).map((entry) => entry.libraryItemId),
+          }
+        : null,
+    }, { requestId, status: createdSomething ? 201 : 200 });
   });
 
   app.post('/api/platform/library/peer-relays/:libraryPeerRelayId/deliver', express.json({ limit: '16kb' }), (req, res) => {
