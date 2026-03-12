@@ -2467,16 +2467,42 @@ function sortSeatsByTournamentElimination(seats) {
     });
 }
 
+function getTournamentSeatTotalWonOil(seat) {
+  return Number(seat?.prizeOil || 0) + Number(seat?.bountyWonOil || 0);
+}
+
 function buildCompletedTournamentPlacements(entries) {
   const seats = getTournamentAllSeats(entries).filter((seat) => !isTournamentVoidedSeat(seat));
   if (!seats.length) return [];
   const activeSeats = getActiveSeatRows(seats);
-  let winnerSeat = activeSeats[0] || null;
+  let winnerSeat = activeSeats
+    .slice()
+    .sort((left, right) => {
+      const stackDelta = Number(right?.stackOil || 0) - Number(left?.stackOil || 0);
+      if (stackDelta !== 0) return stackDelta;
+      const wonDelta = getTournamentSeatTotalWonOil(right) - getTournamentSeatTotalWonOil(left);
+      if (wonDelta !== 0) return wonDelta;
+      return normalizeSeatNumber(left?.seatNumber) - normalizeSeatNumber(right?.seatNumber);
+    })[0] || null;
   if (!winnerSeat) {
     winnerSeat = seats
-      .filter((seat) => Number(seat?.prizeOil || 0) > 0)
+      .filter((seat) => Number(seat?.stackOil || 0) > 0)
       .slice()
       .sort((left, right) => {
+        const stackDelta = Number(right?.stackOil || 0) - Number(left?.stackOil || 0);
+        if (stackDelta !== 0) return stackDelta;
+        const wonDelta = getTournamentSeatTotalWonOil(right) - getTournamentSeatTotalWonOil(left);
+        if (wonDelta !== 0) return wonDelta;
+        return compareIsoAsc(left?.updatedAt || '', right?.updatedAt || '');
+      })[0] || null;
+  }
+  if (!winnerSeat) {
+    winnerSeat = seats
+      .filter((seat) => getTournamentSeatTotalWonOil(seat) > 0)
+      .slice()
+      .sort((left, right) => {
+        const wonDelta = getTournamentSeatTotalWonOil(right) - getTournamentSeatTotalWonOil(left);
+        if (wonDelta !== 0) return wonDelta;
         const prizeDelta = Number(right?.prizeOil || 0) - Number(left?.prizeOil || 0);
         if (prizeDelta !== 0) return prizeDelta;
         return compareIsoAsc(left?.payoutSettledAt || left?.updatedAt || '', right?.payoutSettledAt || right?.updatedAt || '');
@@ -2489,9 +2515,11 @@ function buildCompletedTournamentPlacements(entries) {
     seen.add(getTournamentSeatIdentity(winnerSeat));
   }
   const paidSeats = seats
-    .filter((seat) => Number(seat?.prizeOil || 0) > 0 && !seen.has(getTournamentSeatIdentity(seat)))
+    .filter((seat) => getTournamentSeatTotalWonOil(seat) > 0 && !seen.has(getTournamentSeatIdentity(seat)))
     .slice()
     .sort((left, right) => {
+      const wonDelta = getTournamentSeatTotalWonOil(right) - getTournamentSeatTotalWonOil(left);
+      if (wonDelta !== 0) return wonDelta;
       const prizeDelta = Number(right?.prizeOil || 0) - Number(left?.prizeOil || 0);
       if (prizeDelta !== 0) return prizeDelta;
       return compareIsoAsc(left?.payoutSettledAt || left?.updatedAt || '', right?.payoutSettledAt || right?.updatedAt || '');

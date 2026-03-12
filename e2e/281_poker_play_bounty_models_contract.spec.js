@@ -109,6 +109,46 @@ function addSecondsToIso(iso, seconds) {
   return new Date(safeMs + (Number(seconds || 0) * 1000)).toISOString();
 }
 
+async function waitForExpectedSettlement({
+  pages,
+  users,
+  tableId,
+  completedAt,
+  expectedWinnerPrizeOil,
+  expectedWinnerBountyOil,
+  expectedBountyPoolOil,
+  expectedPrizePoolOil,
+}) {
+  for (let offsetSeconds = 1; offsetSeconds <= 6; offsetSeconds += 1) {
+    const settledAsOf = addSecondsToIso(completedAt, offsetSeconds);
+    const settledViews = [];
+    for (let index = 0; index < users.length; index += 1) {
+      settledViews.push(await getTable(pages[index], users[index].address, tableId, {
+        asOf: settledAsOf,
+      }));
+    }
+    const placements = settledViews
+      .map((view) => ({
+        finish: Number(view?.mySeat?.finishPosition || 0),
+        prizeOil: Number(view?.mySeat?.prizeOil || 0),
+        bountyWonOil: Number(view?.mySeat?.bountyWonOil || 0),
+      }))
+      .sort((left, right) => left.finish - right.finish);
+    const winnerView = settledViews.find((view) => Number(view?.mySeat?.finishPosition || 0) === 1) || null;
+    const stable = JSON.stringify(placements.map((item) => item.finish)) === JSON.stringify([1, 2])
+      && placements[0]?.prizeOil === expectedWinnerPrizeOil
+      && placements[0]?.bountyWonOil === expectedWinnerBountyOil
+      && placements[1]?.prizeOil === 0
+      && placements[1]?.bountyWonOil === 0
+      && Number(winnerView?.series?.totalBountyAwardedOil || 0) === expectedBountyPoolOil
+      && Number(winnerView?.series?.prizePoolOil || 0) === expectedPrizePoolOil;
+    if (stable) {
+      return { settledViews, placements, winnerView };
+    }
+  }
+  return null;
+}
+
 for (const scenario of [
   {
     bountyModel: 'pko_75',
@@ -145,106 +185,103 @@ for (const scenario of [
 
     const contexts = [];
     const pages = [];
-    for (const user of users) {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      contexts.push(context);
-      pages.push(page);
-      await page.goto('/');
-      await bindPageSession(page, user);
-      await verifyStreamflowAndFundOil(page, request, {
-        address: user.address,
-        streamId: user.streamId,
+    try {
+      for (const user of users) {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+        contexts.push(context);
+        pages.push(page);
+        await page.goto('/');
+        await bindPageSession(page, user);
+        await verifyStreamflowAndFundOil(page, request, {
+          address: user.address,
+          streamId: user.streamId,
+        });
+      }
+
+      let resp = await browserJson(pages[0], '/api/poker/play/matchmake', {
+        method: 'POST',
+        headers: { 'x-wallet-solana-address': users[0].address },
+        data: {
+          tableType: 'tournament',
+          smallBlindOil: 50,
+          bigBlindOil: 100,
+          buyInOil: 1000,
+          maxSeats: 2,
+          lateRegistrationHands: 0,
+          bountyModel: scenario.bountyModel,
+          displayName: users[0].displayName,
+          asOf: '2026-03-12T21:00:00.000Z',
+        },
       });
+      expect(resp.ok).toBe(true);
+      const tableId = String(resp.body?.data?.table?.tableId || '');
+      expect(tableId).toBeTruthy();
+
+      resp = await browserJson(pages[1], '/api/poker/play/matchmake', {
+        method: 'POST',
+        headers: { 'x-wallet-solana-address': users[1].address },
+        data: {
+          tableType: 'tournament',
+          smallBlindOil: 50,
+          bigBlindOil: 100,
+          buyInOil: 1000,
+          maxSeats: 2,
+          lateRegistrationHands: 0,
+          bountyModel: scenario.bountyModel,
+          displayName: users[1].displayName,
+          asOf: '2026-03-12T21:00:01.000Z',
+        },
+      });
+      expect(resp.ok).toBe(true);
+      expect(String(resp.body?.data?.table?.tableId || '')).toBe(tableId);
+
+      const openingView = await getTable(pages[0], users[0].address, tableId, {
+        asOf: '2026-03-12T21:00:02.000Z',
+      });
+      expect(openingView?.series?.bountyModel).toBe(scenario.bountyModel);
+      expect(Number(openingView?.series?.prizePoolOil || 0)).toBe(scenario.expectedPrizePoolOil);
+      expect(Number(openingView?.series?.bountyPoolOil || 0)).toBe(scenario.expectedBountyPoolOil);
+
+      let finalDetail = null;
+      for (const asOfPrefix of [
+        '2026-03-12T21:01',
+        '2026-03-12T21:02',
+        '2026-03-12T21:03',
+        '2026-03-12T21:04',
+        '2026-03-12T21:05',
+        '2026-03-12T21:06',
+        '2026-03-12T21:07',
+        '2026-03-12T21:08',
+      ]) {
+        finalDetail = await playAggressiveTournamentHand(tableId, {
+          1: { page: pages[0], address: users[0].address },
+          2: { page: pages[1], address: users[1].address },
+        }, { asOfPrefix });
+        if (finalDetail?.table?.summary?.completedAt) break;
+      }
+      expect(finalDetail?.table?.summary?.completedAt).toBeTruthy();
+
+      const settled = await waitForExpectedSettlement({
+        pages,
+        users,
+        tableId,
+        completedAt: finalDetail?.table?.summary?.completedAt,
+        expectedWinnerPrizeOil: scenario.expectedWinnerPrizeOil,
+        expectedWinnerBountyOil: scenario.expectedWinnerBountyOil,
+        expectedBountyPoolOil: scenario.expectedBountyPoolOil,
+        expectedPrizePoolOil: scenario.expectedPrizePoolOil,
+      });
+      expect(settled).toBeTruthy();
+      expect(settled.placements.map((item) => item.finish)).toEqual([1, 2]);
+      expect(settled.placements[0].prizeOil).toBe(scenario.expectedWinnerPrizeOil);
+      expect(settled.placements[0].bountyWonOil).toBe(scenario.expectedWinnerBountyOil);
+      expect(settled.placements[1].prizeOil).toBe(0);
+      expect(settled.placements[1].bountyWonOil).toBe(0);
+      expect(Number(settled.winnerView?.series?.totalBountyAwardedOil || 0)).toBe(scenario.expectedBountyPoolOil);
+      expect(Number(settled.winnerView?.series?.prizePoolOil || 0)).toBe(scenario.expectedPrizePoolOil);
+    } finally {
+      await Promise.all(contexts.map((context) => context.close().catch(() => {})));
     }
-
-    let resp = await browserJson(pages[0], '/api/poker/play/matchmake', {
-      method: 'POST',
-      headers: { 'x-wallet-solana-address': users[0].address },
-      data: {
-        tableType: 'tournament',
-        smallBlindOil: 50,
-        bigBlindOil: 100,
-        buyInOil: 1000,
-        maxSeats: 2,
-        lateRegistrationHands: 0,
-        bountyModel: scenario.bountyModel,
-        displayName: users[0].displayName,
-        asOf: '2026-03-12T21:00:00.000Z',
-      },
-    });
-    expect(resp.ok).toBe(true);
-    const tableId = String(resp.body?.data?.table?.tableId || '');
-    expect(tableId).toBeTruthy();
-
-    resp = await browserJson(pages[1], '/api/poker/play/matchmake', {
-      method: 'POST',
-      headers: { 'x-wallet-solana-address': users[1].address },
-      data: {
-        tableType: 'tournament',
-        smallBlindOil: 50,
-        bigBlindOil: 100,
-        buyInOil: 1000,
-        maxSeats: 2,
-        lateRegistrationHands: 0,
-        bountyModel: scenario.bountyModel,
-        displayName: users[1].displayName,
-        asOf: '2026-03-12T21:00:01.000Z',
-      },
-    });
-    expect(resp.ok).toBe(true);
-    expect(String(resp.body?.data?.table?.tableId || '')).toBe(tableId);
-
-    const openingView = await getTable(pages[0], users[0].address, tableId, {
-      asOf: '2026-03-12T21:00:02.000Z',
-    });
-    expect(openingView?.series?.bountyModel).toBe(scenario.bountyModel);
-    expect(Number(openingView?.series?.prizePoolOil || 0)).toBe(scenario.expectedPrizePoolOil);
-    expect(Number(openingView?.series?.bountyPoolOil || 0)).toBe(scenario.expectedBountyPoolOil);
-
-    let finalDetail = null;
-    for (const asOfPrefix of [
-      '2026-03-12T21:01',
-      '2026-03-12T21:02',
-      '2026-03-12T21:03',
-      '2026-03-12T21:04',
-      '2026-03-12T21:05',
-      '2026-03-12T21:06',
-      '2026-03-12T21:07',
-      '2026-03-12T21:08',
-    ]) {
-      finalDetail = await playAggressiveTournamentHand(tableId, {
-        1: { page: pages[0], address: users[0].address },
-        2: { page: pages[1], address: users[1].address },
-      }, { asOfPrefix });
-      if (finalDetail?.table?.summary?.completedAt) break;
-    }
-    expect(finalDetail?.table?.summary?.completedAt).toBeTruthy();
-    const settledAsOf = addSecondsToIso(finalDetail?.table?.summary?.completedAt, 1);
-
-    const settledViews = [];
-    for (let index = 0; index < users.length; index += 1) {
-      settledViews.push(await getTable(pages[index], users[index].address, tableId, {
-        asOf: settledAsOf,
-      }));
-    }
-    const placements = settledViews
-      .map((view) => ({
-        finish: Number(view?.mySeat?.finishPosition || 0),
-        prizeOil: Number(view?.mySeat?.prizeOil || 0),
-        bountyWonOil: Number(view?.mySeat?.bountyWonOil || 0),
-      }))
-      .sort((left, right) => left.finish - right.finish);
-    expect(placements.map((item) => item.finish)).toEqual([1, 2]);
-    expect(placements[0].prizeOil).toBe(scenario.expectedWinnerPrizeOil);
-    expect(placements[0].bountyWonOil).toBe(scenario.expectedWinnerBountyOil);
-    expect(placements[1].prizeOil).toBe(0);
-    expect(placements[1].bountyWonOil).toBe(0);
-
-    const winnerView = settledViews.find((view) => Number(view?.mySeat?.finishPosition || 0) === 1);
-    expect(Number(winnerView?.series?.totalBountyAwardedOil || 0)).toBe(scenario.expectedBountyPoolOil);
-    expect(Number(winnerView?.series?.prizePoolOil || 0)).toBe(scenario.expectedPrizePoolOil);
-
-    await Promise.all(contexts.map((context) => context.close()));
   });
 }
