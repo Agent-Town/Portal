@@ -1,0 +1,26 @@
+{
+  "sourceHouse": {
+    "houseId": "house_library_attestation_source",
+    "teamId": "team_main"
+  },
+  "targetHouse": {
+    "houseId": "house_library_attestation_target",
+    "teamId": "team_main"
+  },
+  "publicStack": {
+    "scopeSetId": "scope_public_stack_attestation_alpha_01",
+    "familySlug": "house_library_stacks",
+    "title": "Attestation Launch Pack",
+    "expectedMemberCount": 2
+  },
+  "reviewTiers": [
+    "trusted_here",
+    "review_later",
+    "blocked_here"
+  ],
+  "attestationPolicy": {
+    "requiresLocalReview": true,
+    "oneAttestationPerHousePerStack": true,
+    "supportsNote": true
+  }
+}

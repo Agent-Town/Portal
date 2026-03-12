@@ -35,6 +35,7 @@ const PLATFORM_TABLES = Object.freeze([
   'library_public_stack_verifications',
   'library_public_stack_verification_members',
   'library_public_stack_reviews',
+  'library_public_stack_attestations',
   'library_peer_relays',
   'library_peer_receipts',
   'library_satchel_relays',
@@ -98,6 +99,7 @@ const FIXTURE_FILES = Object.freeze({
   library_public_stack_seed: 'library_public_stack_seed.json',
   library_public_stack_trust_seed: 'library_public_stack_trust_seed.json',
   library_public_stack_review_seed: 'library_public_stack_review_seed.json',
+  library_public_stack_attestation_seed: 'library_public_stack_attestation_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -522,6 +524,23 @@ function ensureDb() {
       summary TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       verification_ref TEXT,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key),
+      UNIQUE (library_public_stack_id, house_id, team_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_public_stack_attestations (
+      library_public_stack_attestation_id TEXT PRIMARY KEY,
+      library_public_stack_id TEXT NOT NULL,
+      library_public_stack_review_id TEXT NOT NULL,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      review_tier TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
       idempotency_key TEXT,
       metadata_json TEXT NOT NULL DEFAULT '{}',
       created_at TEXT NOT NULL,
@@ -1929,6 +1948,24 @@ function mapLibraryPublicStackReviewRow(row) {
   };
 }
 
+function mapLibraryPublicStackAttestationRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryPublicStackAttestationId: String(row.library_public_stack_attestation_id || ''),
+    libraryPublicStackId: String(row.library_public_stack_id || ''),
+    libraryPublicStackReviewId: String(row.library_public_stack_review_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    reviewTier: String(row.review_tier || ''),
+    summary: String(row.summary || ''),
+    note: String(row.note || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
 function mapLibraryPeerRelayRow(row) {
   if (!row || typeof row !== 'object') return null;
   return {
@@ -2656,6 +2693,149 @@ function getLibraryPublicStackReview({
   libraryPublicStackId = '',
 } = {}) {
   return listLibraryPublicStackReviews({ houseId, teamId, libraryPublicStackId })[0] || null;
+}
+
+function listLibraryPublicStackAttestations({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+  reviewTier = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedReviewTier = String(reviewTier || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_public_stack_attestations
+  `;
+  const clauses = [];
+  const args = [];
+  if (normalizedHouseId) {
+    clauses.push('house_id = ?');
+    args.push(normalizedHouseId);
+  }
+  if (normalizedTeamId) {
+    clauses.push('team_id = ?');
+    args.push(normalizedTeamId);
+  }
+  if (normalizedLibraryPublicStackId) {
+    clauses.push('library_public_stack_id = ?');
+    args.push(normalizedLibraryPublicStackId);
+  }
+  if (normalizedReviewTier) {
+    clauses.push('review_tier = ?');
+    args.push(normalizedReviewTier);
+  }
+  if (clauses.length) {
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY created_at DESC, library_public_stack_attestation_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryPublicStackAttestationRow).filter(Boolean);
+}
+
+function getLibraryPublicStackAttestationById(libraryPublicStackAttestationId = '') {
+  const normalizedLibraryPublicStackAttestationId = String(libraryPublicStackAttestationId || '').trim();
+  if (!normalizedLibraryPublicStackAttestationId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stack_attestations
+    WHERE library_public_stack_attestation_id = ?
+    LIMIT 1
+  `).get(normalizedLibraryPublicStackAttestationId);
+  return mapLibraryPublicStackAttestationRow(row);
+}
+
+function getLibraryPublicStackAttestationByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_public_stack_attestations
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryPublicStackAttestationRow(row);
+}
+
+function createLibraryPublicStackAttestation({
+  libraryPublicStackAttestationId = '',
+  libraryPublicStackId = '',
+  libraryPublicStackReviewId = '',
+  houseId = '',
+  teamId = '',
+  reviewTier = 'review_later',
+  summary = '',
+  note = '',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPublicStackAttestationId = String(libraryPublicStackAttestationId || '').trim();
+  const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedLibraryPublicStackReviewId = String(libraryPublicStackReviewId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedReviewTier = String(reviewTier || 'review_later').trim() || 'review_later';
+  const normalizedSummary = String(summary || '').trim();
+  if (
+    !normalizedLibraryPublicStackAttestationId
+    || !normalizedLibraryPublicStackId
+    || !normalizedLibraryPublicStackReviewId
+    || !normalizedHouseId
+    || !normalizedTeamId
+    || !normalizedReviewTier
+    || !normalizedSummary
+  ) {
+    throw new Error('LIBRARY_PUBLIC_STACK_ATTESTATION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_public_stack_attestations (
+      library_public_stack_attestation_id,
+      library_public_stack_id,
+      library_public_stack_review_id,
+      house_id,
+      team_id,
+      review_tier,
+      summary,
+      note,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedLibraryPublicStackAttestationId,
+    normalizedLibraryPublicStackId,
+    normalizedLibraryPublicStackReviewId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedReviewTier,
+    normalizedSummary,
+    String(note || ''),
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return getLibraryPublicStackAttestationById(normalizedLibraryPublicStackAttestationId);
 }
 
 function createLibraryPublicStackReview({
@@ -3457,6 +3637,28 @@ function getUnifiedPlatformPublicStackReviewsInspector({
       targetHouseId: String(houseId || '').trim(),
       teamId: String(teamId || '').trim(),
       libraryPublicStackId: String(libraryPublicStackId || '').trim(),
+    },
+  };
+}
+
+function getUnifiedPlatformPublicStackAttestationsInspector({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+  reviewTier = '',
+} = {}) {
+  return {
+    attestations: listLibraryPublicStackAttestations({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+      reviewTier,
+    }),
+    filters: {
+      sourceHouseId: String(houseId || '').trim(),
+      teamId: String(teamId || '').trim(),
+      libraryPublicStackId: String(libraryPublicStackId || '').trim(),
+      reviewTier: String(reviewTier || '').trim(),
     },
   };
 }
@@ -5389,6 +5591,7 @@ function getUnifiedPlatformTestStats() {
       publicStacks: true,
       publicStackTrust: true,
       publicStackReviews: true,
+      publicStackAttestations: true,
       promptPreview: true,
       editor: true,
       registryPreview: true,
@@ -5408,6 +5611,7 @@ module.exports = {
   createLibraryPeerRelay,
   createLibraryPublicStack,
   createLibraryPublicStackMember,
+  createLibraryPublicStackAttestation,
   createLibraryPublicStackVerification,
   createLibraryPublicStackVerificationMember,
   createLibraryPublicStackReview,
@@ -5444,6 +5648,8 @@ module.exports = {
   getLibraryPublicationById,
   getLibraryPublicStackById,
   getLibraryPublicStackByIdempotency,
+  getLibraryPublicStackAttestationById,
+  getLibraryPublicStackAttestationByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewById,
   getLibraryPublicStackReviewByIdempotency,
@@ -5476,6 +5682,7 @@ module.exports = {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStackAttestationsInspector,
   getUnifiedPlatformPublicStackReviewsInspector,
   getUnifiedPlatformPublicStackTrustInspector,
   getUnifiedPlatformPublicStacksInspector,
@@ -5497,6 +5704,7 @@ module.exports = {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryPublicStackAttestations,
   listLibraryPublicStackMembers,
   listLibraryPublicStackReviews,
   listLibraryPublicStacks,

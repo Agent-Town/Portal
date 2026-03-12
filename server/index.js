@@ -183,6 +183,7 @@ const {
   getUnifiedPlatformLibraryInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
+  getUnifiedPlatformPublicStackAttestationsInspector,
   getUnifiedPlatformPublicStackReviewsInspector,
   getUnifiedPlatformPublicStackTrustInspector,
   getUnifiedPlatformPublicStacksInspector,
@@ -11370,6 +11371,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformPublicStackTrustInspector();
     } else if (inspector === 'public-stack-reviews') {
       data = getUnifiedPlatformPublicStackReviewsInspector();
+    } else if (inspector === 'public-stack-attestations') {
+      data = getUnifiedPlatformPublicStackAttestationsInspector();
     } else if (inspector === 'prompt-preview') {
       data = getUnifiedPlatformPromptPreview();
     } else if (inspector === 'editor') {
