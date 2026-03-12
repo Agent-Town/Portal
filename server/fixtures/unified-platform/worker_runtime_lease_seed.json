@@ -2,7 +2,7 @@
   "family": "worker_runtime_lease_seed",
   "schema": "agent-town-worker-runtime-lease-seed/v1",
   "heartbeatIntervalMs": 2500,
-  "leaseTtlMs": 9000,
+  "leaseTtlMs": 15000,
   "expectedStaleStatusLabel": "Needs restart here",
   "expectedStaleActionLabel": "stopped reporting from its previous tab"
 }

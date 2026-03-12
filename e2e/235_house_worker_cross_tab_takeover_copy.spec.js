@@ -24,12 +24,27 @@ test('House helper cross-tab handoff uses plain-language takeover copy for norma
     teamId: 'team_main',
   });
 
-  const installResult = await installHouseWorker(page.request, {
+  const installResult = await page.evaluate(async ({ registryEntityId }) => {
+    const response = await fetch('/api/platform/house-workers/install', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ registryEntityId }),
+    });
+    return {
+      status: response.status,
+      json: await response.json().catch(() => null),
+    };
+  }, {
     registryEntityId: installFixture.fixture.registryEntityId,
   });
   expect(installResult.status).toBe(200);
+  expect(String(installResult.json?.data?.deployment?.deploymentId || '').trim()).toBeTruthy();
 
   await page.getByTestId('house-open-office').click();
+  await expect(page.getByTestId('house-office-deployment-item')).toHaveCount(1);
   await page.getByTestId('house-office-helper-start').first().click();
 
   await expect.poll(async () => {

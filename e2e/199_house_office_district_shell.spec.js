@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
-const { waitForLiteApi } = require('./helpers/trainer');
+const { waitForLiteApi, setDeterministicLlm } = require('./helpers/trainer');
 const {
   attachHouseToPageSession,
   createPlatformRun,
@@ -105,6 +105,7 @@ test('M29.4: House Office district shell keeps section routing and team continui
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
+  await setDeterministicLlm(page);
   const attached = await attachHouseToPageSession(page, {
     houseId: seededHouse.houseId,
     teamId: teamAlpha.teamId,

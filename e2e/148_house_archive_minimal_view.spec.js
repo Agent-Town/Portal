@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 
 const { resetPortalWebState } = require('./helpers/portal_web');
 const { seedRecoverableTokenHouse } = require('./helpers/phase1');
-const { waitForLiteApi } = require('./helpers/trainer');
+const { waitForLiteApi, waitForRuntimeSessionContext } = require('./helpers/trainer');
 const {
   createPlatformRun,
   ingestPlatformTraceRecords,
@@ -33,38 +33,7 @@ async function attachHouseToPageSession(page, houseId) {
 }
 
 async function readRuntimeWorkerSessionId(page) {
-  await page.waitForFunction(async () => {
-    try {
-      if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
-        return false;
-      }
-      const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
-        runtimeContext: {
-          origin: window.location.origin,
-          teamCode: '',
-          houseId: '',
-        },
-        runtimeState: {},
-      });
-      const data = snapshot?.data || snapshot || null;
-      return typeof data?.sessionId === 'string' && data.sessionId.trim().length > 0;
-    } catch {
-      return false;
-    }
-  }, null, { timeout: 10000 });
-
-  return await page.evaluate(async () => {
-    const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
-      runtimeContext: {
-        origin: window.location.origin,
-        teamCode: '',
-        houseId: '',
-      },
-      runtimeState: {},
-    });
-    const data = snapshot?.data || snapshot || null;
-    return String(data?.sessionId || '').trim();
-  });
+  return await waitForRuntimeSessionContext(page);
 }
 
 test.beforeEach(async ({ request }) => {

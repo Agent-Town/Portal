@@ -1,10 +1,53 @@
-const { ensureAppShell } = require('./phase2');
+const { ensureAppShell, configureLiteLlm } = require('./phase2');
 
 const TRAINER_QUEST_ID = 'portal_onboarding_v1';
 const TRAINER_ROOT = `lite/experience-trainer/v1/quests/${TRAINER_QUEST_ID}`;
 
 async function waitForLiteApi(page, timeout = 10000) {
   await page.waitForFunction(() => !!window.__openclawLiteTest, null, { timeout });
+}
+
+async function waitForRuntimeSessionContext(page, timeout = 15000) {
+  await waitForLiteApi(page, timeout);
+  const deadlineAt = Date.now() + Math.max(1000, Number(timeout) || 15000);
+  let lastSessionId = '';
+  while (Date.now() < deadlineAt) {
+    const snapshot = await page.evaluate(async () => {
+      try {
+        if (typeof window.bootstrapVendorRuntime === 'function') {
+          await window.bootstrapVendorRuntime().catch(() => null);
+        }
+        if (typeof window.connectLiteAgent === 'function') {
+          await window.connectLiteAgent().catch(() => null);
+        }
+        if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
+          return { ok: false, sessionId: '' };
+        }
+        const envelope = await window.__openclawLiteTest.runtimeSessionContext({
+          runtimeContext: {
+            origin: window.location.origin,
+            teamCode: '',
+            houseId: '',
+          },
+          runtimeState: {},
+        }).catch(() => null);
+        const data = envelope?.data || envelope || null;
+        const sessionId = String(data?.sessionId || '').trim();
+        return {
+          ok: sessionId.length > 0,
+          sessionId,
+        };
+      } catch {
+        return { ok: false, sessionId: '' };
+      }
+    }).catch(() => ({ ok: false, sessionId: '' }));
+    lastSessionId = String(snapshot?.sessionId || '').trim();
+    if (snapshot?.ok && lastSessionId) {
+      return lastSessionId;
+    }
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`RUNTIME_SESSION_CONTEXT_TIMEOUT:${lastSessionId}`);
 }
 
 async function gotoAppWithLite(page, options = {}) {
@@ -23,52 +66,11 @@ async function gotoAppWithLite(page, options = {}) {
 }
 
 async function setDeterministicLlm(page) {
-  await page.evaluate(async () => {
-    if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.setLlmConfig !== 'function') return;
-    await window.__openclawLiteTest.setLlmConfig({
-      provider: 'test-local',
-      modelId: 'deterministic',
-      modelRef: 'test-local/deterministic',
-      api: 'openai-completions',
-      apiKey: 'trainer-test-key',
-      useProxy: true
-    });
+  await configureLiteLlm(page, {
+    provider: 'test-local',
+    model: 'deterministic',
+    apiKey: 'trainer-test-key',
   });
-  await page.waitForFunction(async (expected) => {
-    const openDb = () => new Promise((resolve, reject) => {
-      const req = indexedDB.open('openclaw-lite', 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains('checkpoints')) {
-          const s = db.createObjectStore('checkpoints', { keyPath: 'checkpointId' });
-          s.createIndex('by_house_createdAtMs', ['houseId', 'createdAtMs'], { unique: false });
-        }
-        if (!db.objectStoreNames.contains('vfs')) db.createObjectStore('vfs', { keyPath: 'path' });
-        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error || new Error('IDB_OPEN_FAILED'));
-    });
-    const txDone = (tx) => new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error || new Error('IDB_TX_FAILED'));
-      tx.onabort = () => reject(tx.error || new Error('IDB_TX_ABORTED'));
-    });
-    const reqToPromise = (req) => new Promise((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => reject(req.error || new Error('IDB_REQUEST_FAILED'));
-    });
-    try {
-      const db = await openDb();
-      const tx = db.transaction(['meta'], 'readonly');
-      const rec = await reqToPromise(tx.objectStore('meta').get('llmApiKey'));
-      await txDone(tx);
-      db.close();
-      return rec && rec.value === expected;
-    } catch {
-      return false;
-    }
-  }, 'trainer-test-key', { timeout: 10000 });
 }
 
 async function visitSkill(page, url = '/skill.md') {
@@ -298,6 +300,7 @@ module.exports = {
   TRAINER_QUEST_ID,
   TRAINER_ROOT,
   waitForLiteApi,
+  waitForRuntimeSessionContext,
   gotoAppWithLite,
   setDeterministicLlm,
   visitSkill,

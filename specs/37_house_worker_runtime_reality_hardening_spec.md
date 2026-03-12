@@ -1,16 +1,17 @@
 # Phase 37 Spec: House Worker Runtime Reality, Managed Sharing, and Live Confidence
 
-Status: Proposed
+Status: Implemented
 Version: 0.1
 Audience: product, frontend, backend, runtime, UX, QA, security, benchmarking, store-and-growth, and AI-agent implementers
 Implementation branch target: `codex/house-worker-packages-spawn-v0-1`
-Implementation baseline: `aaf62d1`
+Implementation baseline: `37da502`
 Current proof state:
 1. [specs/34_house_worker_packages_and_spawn_spec.md](./34_house_worker_packages_and_spawn_spec.md) is implemented.
 2. [specs/35_house_worker_packages_and_spawn_tdd_spec.md](./35_house_worker_packages_and_spawn_tdd_spec.md) is implemented.
 3. [specs/36_house_worker_packages_and_spawn_agent_runbook.md](./36_house_worker_packages_and_spawn_agent_runbook.md) is completed.
-4. `e2e/215` through `e2e/235` are green.
-5. Full deterministic suite is green at `357 passed, 4 skipped`.
+4. `e2e/236` through `e2e/245` and `e2e/247` are green.
+5. `e2e/246_house_worker_operator_live_gate.spec.js` is implemented as an operator-assisted live gate and remains intentionally skipped in the default deterministic suite until live prerequisites are present.
+6. Full deterministic suite is green at `368 passed, 5 skipped`.
 Depends on:
 1. [specs/34_house_worker_packages_and_spawn_spec.md](./34_house_worker_packages_and_spawn_spec.md)
 2. [specs/35_house_worker_packages_and_spawn_tdd_spec.md](./35_house_worker_packages_and_spawn_tdd_spec.md)

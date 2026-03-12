@@ -1,0 +1,11 @@
+{
+  "family": "worker_runtime_reality_smoke_seed",
+  "schema": "agent-town-house-worker-runtime-reality-smoke-seed/v1",
+  "officeIds": [
+    "office_fixture_workshop",
+    "office_fixture_analysis",
+    "office_fixture_archive"
+  ],
+  "shareSummary": "Install 3 helpers in one step.",
+  "recoveryActionLabel": "Take over this helper here if you want it to continue in this tab."
+}

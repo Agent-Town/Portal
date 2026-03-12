@@ -1,5 +1,5 @@
 const { houseAuthHeadersFromKeyB64 } = require('./phase1');
-const { gotoAppWithLite } = require('./trainer');
+const { gotoAppWithLite, waitForRuntimeSessionContext } = require('./trainer');
 
 const resetToken = process.env.TEST_RESET_TOKEN || 'test-reset';
 const DEFAULT_COMPILED_PACK_MANIFEST_PATH = 'workspace/.agent-town/default-pack/manifest.json';
@@ -228,37 +228,7 @@ async function readWorkerSessionId(page) {
   if (!hasRuntimeContext) {
     await gotoAppWithLite(page);
   }
-  await page.waitForFunction(async () => {
-    try {
-      if (!window.__openclawLiteTest || typeof window.__openclawLiteTest.runtimeSessionContext !== 'function') {
-        return false;
-      }
-      const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
-        runtimeContext: {
-          origin: window.location.origin,
-          teamCode: '',
-          houseId: '',
-        },
-        runtimeState: {},
-      });
-      const data = snapshot?.data || snapshot || null;
-      return typeof data?.sessionId === 'string' && data.sessionId.trim().length > 0;
-    } catch {
-      return false;
-    }
-  }, null, { timeout: 10000 });
-  return await page.evaluate(async () => {
-    const snapshot = await window.__openclawLiteTest.runtimeSessionContext({
-      runtimeContext: {
-        origin: window.location.origin,
-        teamCode: '',
-        houseId: '',
-      },
-      runtimeState: {},
-    });
-    const data = snapshot?.data || snapshot || null;
-    return String(data?.sessionId || '').trim();
-  });
+  return await waitForRuntimeSessionContext(page);
 }
 
 async function compileDefaultSkillPack(page, { idempotencyKey = '', force = false } = {}) {

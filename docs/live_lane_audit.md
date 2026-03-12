@@ -93,17 +93,21 @@ This suite is a readiness check for wallet-backed flows, not a complete product 
 
 If `data/local.sepolia.wallet.json` is missing or still contains placeholder values, the lane should be treated as "private wallet not configured yet", not as a product failure.
 
-## House flows are manual-live, not fake-live
+## House flows are partly operator-live, not fake-live
 
-There is intentionally no automated external "house live lane" in this repo yet.
+There is still no fully autonomous external House-wide live lane in this repo.
 Attaching a real house still depends on a real user/session journey, so pretending that a `__test__` helper or seeded session proves live House behavior would be misleading.
 
-Instead, House flows use a session-bound readiness report plus a manual validation checklist:
+Instead, House flows use:
+
+- a session-bound readiness report plus a manual validation checklist for the broader House shell
+- one operator-assisted House worker live gate for the helper install/start/ask/stop path
 
 - `GET /api/platform/house-readiness`
 - the `House readiness` panel in the House Console
 - `GET /api/platform/house-workers/live-readiness`
 - the `House worker live readiness` panel in the House Console
+- `npm run test:house-worker-live`
 
 What that readiness report verifies:
 
@@ -127,6 +131,30 @@ What the helper-specific live-readiness report verifies:
 - whether the operator is using a headed browser session suitable for interactive validation
 - whether at least one installable worker package is available from Registry for the current house flow
 - the exact next operator steps and success metrics for a real helper start/ask/stop walkthrough
+
+What the operator-assisted House worker live gate verifies:
+
+- a real saved session can reopen the House shell against a live server
+- the browser can configure a real local helper brain through the product UI
+- at least one Registry worker package can be installed into the live House
+- one helper can be started, asked for a short status update, and stopped again without `__test__` shortcuts
+
+Required House worker live env:
+
+- `HOUSE_WORKER_LIVE_BASE_URL`
+- `HOUSE_WORKER_LIVE_STORAGE_STATE`
+- `HOUSE_WORKER_LIVE_PROVIDER`
+- `HOUSE_WORKER_LIVE_MODEL`
+- `HOUSE_WORKER_LIVE_API_KEY`
+
+Operator setup:
+
+1. run a normal local or staging server and keep its session store intact
+2. create a real session with a house attached and an active team selected
+3. save a Playwright `storageState` file from that real session
+4. export the House worker live env above
+5. run `node scripts/test_live.js --check house-worker-operator`
+6. run `npm run test:house-worker-live`
 
 Recommended House validation sequence:
 
@@ -162,6 +190,11 @@ The code can now run the live lanes without built-in mocks or stubs, but this wo
   - `gmail-imap`: `PRIVY_EMAIL_OTP_IMAP_PASSWORD`
 - `REAL_SEPOLIA_WALLET_TEST=1`
 - `data/local.sepolia.wallet.json` configured through `npm run setup:sepolia-wallet`
+- `HOUSE_WORKER_LIVE_BASE_URL`
+- `HOUSE_WORKER_LIVE_STORAGE_STATE`
+- `HOUSE_WORKER_LIVE_PROVIDER`
+- `HOUSE_WORKER_LIVE_MODEL`
+- `HOUSE_WORKER_LIVE_API_KEY`
 
 Preflight commands:
 
@@ -170,6 +203,7 @@ npm run test:live:status
 node scripts/test_live.js --check privy-guest
 node scripts/test_live.js --check privy-email-otp
 node scripts/test_live.js --check sepolia-wallet
+node scripts/test_live.js --check house-worker-operator
 ```
 
 Only after those checks are ready should the real live suites be treated as release evidence.

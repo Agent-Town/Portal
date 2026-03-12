@@ -32,6 +32,20 @@ const LIVE_SUITE_MANIFEST = Object.freeze([
     defaultMode: 'skip',
     description: 'Optional real Sepolia wallet reuse and on-chain balance readiness check.',
   },
+  {
+    suiteId: 'house-worker-operator',
+    command: 'npm run test:house-worker-live',
+    requiredEnv: [
+      'HOUSE_WORKER_LIVE_BASE_URL',
+      'HOUSE_WORKER_LIVE_STORAGE_STATE',
+      'HOUSE_WORKER_LIVE_PROVIDER',
+      'HOUSE_WORKER_LIVE_MODEL',
+      'HOUSE_WORKER_LIVE_API_KEY',
+    ],
+    requiredFlag: 'HOUSE_WORKER_LIVE_REQUIRED',
+    defaultMode: 'skip',
+    description: 'Optional operator-assisted House worker install/start/ask/stop gate against a real live session.',
+  },
 ]);
 
 function isTruthy(value) {
@@ -144,12 +158,54 @@ function inspectSepoliaWalletConfig(env = process.env) {
   };
 }
 
+function inspectHouseWorkerLiveConfig(env = process.env) {
+  const configuredPath = typeof env?.HOUSE_WORKER_LIVE_STORAGE_STATE === 'string'
+    ? env.HOUSE_WORKER_LIVE_STORAGE_STATE.trim()
+    : '';
+  if (!configuredPath) {
+    return {
+      ok: false,
+      missing: ['HOUSE_WORKER_LIVE_STORAGE_STATE'],
+      mismatched: [],
+    };
+  }
+  const filePath = path.resolve(configuredPath);
+  if (!fs.existsSync(filePath)) {
+    return {
+      ok: false,
+      missing: ['HOUSE_WORKER_LIVE_STORAGE_STATE_READY'],
+      mismatched: [],
+    };
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const cookies = Array.isArray(parsed?.cookies) ? parsed.cookies : [];
+    const origins = Array.isArray(parsed?.origins) ? parsed.origins : [];
+    const cookieOk = cookies.some((entry) => String(entry?.name || '').trim().length > 0);
+    const originOk = origins.some((entry) => String(entry?.origin || '').trim().length > 0);
+    return {
+      ok: cookieOk || originOk,
+      missing: cookieOk || originOk ? [] : ['HOUSE_WORKER_LIVE_STORAGE_STATE_READY'],
+      mismatched: [],
+    };
+  } catch {
+    return {
+      ok: false,
+      missing: ['HOUSE_WORKER_LIVE_STORAGE_STATE_READY'],
+      mismatched: [],
+    };
+  }
+}
+
 function getLiveSuiteStatuses(env = process.env) {
   return getLiveSuiteManifest().map((suite) => {
     const validation = inspectLiveSuiteEnv(suite, env);
-    const localValidation = String(suite?.suiteId || '') === 'sepolia-wallet'
+    const suiteId = String(suite?.suiteId || '').trim();
+    const localValidation = suiteId === 'sepolia-wallet'
       ? inspectSepoliaWalletConfig(env)
-      : { ok: true, missing: [], mismatched: [] };
+      : suiteId === 'house-worker-operator'
+        ? inspectHouseWorkerLiveConfig(env)
+        : { ok: true, missing: [], mismatched: [] };
     const missing = [...validation.missing, ...localValidation.missing];
     const mismatched = [...validation.mismatched, ...localValidation.mismatched];
     const requiredFlag = String(suite?.requiredFlag || '').trim();
@@ -179,7 +235,9 @@ function getLiveSuiteStatuses(env = process.env) {
 module.exports = {
   getLiveSuiteManifest,
   getLiveSuiteStatuses,
+  inspectHouseWorkerLiveConfig,
   inspectLiveSuiteEnv,
+  inspectSepoliaWalletConfig,
   isTruthy,
   parseRequiredEnvEntry,
 };

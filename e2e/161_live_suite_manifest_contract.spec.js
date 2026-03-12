@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
@@ -19,9 +20,9 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   const suites = Array.isArray(payload.suites) ? payload.suites : [];
   const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
   const suiteIds = suites.map((entry) => String(entry.suiteId || ''));
-  expect(suiteIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet']));
+  expect(suiteIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet', 'house-worker-operator']));
   const statusIds = statuses.map((entry) => String(entry.suiteId || ''));
-  expect(statusIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet']));
+  expect(statusIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet', 'house-worker-operator']));
   for (const suite of suites) {
     expect(String(suite.suiteId || '')).toBeTruthy();
     expect(String(suite.command || '')).toBeTruthy();
@@ -54,9 +55,11 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   });
   const listedSuites = JSON.parse(manifestOutput);
   const listedIds = listedSuites.map((entry) => String(entry.suiteId || ''));
-  expect(listedIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet']));
+  expect(listedIds).toEqual(expect.arrayContaining(['privy-guest', 'privy-email-otp', 'sepolia-wallet', 'house-worker-operator']));
   const sepoliaSuite = listedSuites.find((entry) => String(entry.suiteId || '') === 'sepolia-wallet');
   expect(String(sepoliaSuite?.command || '')).toBe('npm run test:sepolia-live');
+  const houseWorkerSuite = listedSuites.find((entry) => String(entry.suiteId || '') === 'house-worker-operator');
+  expect(String(houseWorkerSuite?.command || '')).toBe('npm run test:house-worker-live');
 
   const statusOutput = execFileSync('node', ['scripts/test_live.js', '--status'], {
     cwd: repoRoot,
@@ -73,6 +76,12 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
       PRIVY_EMAIL_OTP_REQUIRED: '',
       REAL_SEPOLIA_WALLET_TEST: '',
       LOCAL_SEPOLIA_WALLET_FILE: path.join(repoRoot, 'test-results', 'missing.sepolia.wallet.json'),
+      HOUSE_WORKER_LIVE_REQUIRED: '',
+      HOUSE_WORKER_LIVE_BASE_URL: '',
+      HOUSE_WORKER_LIVE_STORAGE_STATE: path.join(repoRoot, 'test-results', 'missing.house-worker.storage-state.json'),
+      HOUSE_WORKER_LIVE_PROVIDER: '',
+      HOUSE_WORKER_LIVE_MODEL: '',
+      HOUSE_WORKER_LIVE_API_KEY: '',
     },
     encoding: 'utf8',
   });
@@ -99,6 +108,19 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
     ready: false,
     mode: 'skip',
     missing: ['PRIVY_APP_ID', 'PRIVY_EMAIL_OTP_PROVIDER', 'PRIVY_EMAIL_OTP_TEST_EMAIL'],
+  });
+  const houseWorkerStatus = listedStatuses.find((entry) => String(entry.suiteId || '') === 'house-worker-operator');
+  expect(houseWorkerStatus).toMatchObject({
+    suiteId: 'house-worker-operator',
+    ready: false,
+    mode: 'skip',
+    missing: expect.arrayContaining([
+      'HOUSE_WORKER_LIVE_BASE_URL',
+      'HOUSE_WORKER_LIVE_PROVIDER',
+      'HOUSE_WORKER_LIVE_MODEL',
+      'HOUSE_WORKER_LIVE_API_KEY',
+      'HOUSE_WORKER_LIVE_STORAGE_STATE_READY',
+    ]),
   });
 
   const emailImapStatusOutput = execFileSync('node', ['scripts/test_live.js', '--status', 'privy-email-otp'], {
@@ -140,6 +162,34 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   expect(emailReadyStatuses[0]).toMatchObject({
     suiteId: 'privy-email-otp',
     provider: 'gmail-imap',
+    ready: true,
+    mode: 'ready',
+    missing: [],
+    mismatched: [],
+  });
+
+  const liveStoragePath = path.join(repoRoot, 'test-results', 'house-worker.live.storage-state.json');
+  fs.writeFileSync(liveStoragePath, JSON.stringify({
+    cookies: [{ name: 'portal.sid', value: 'live-session', domain: 'localhost', path: '/', expires: -1, httpOnly: false, secure: false, sameSite: 'Lax' }],
+    origins: [],
+  }));
+  const houseWorkerReadyOutput = execFileSync('node', ['scripts/test_live.js', '--status', 'house-worker-operator'], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      HOUSE_WORKER_LIVE_BASE_URL: 'http://localhost:3000',
+      HOUSE_WORKER_LIVE_STORAGE_STATE: liveStoragePath,
+      HOUSE_WORKER_LIVE_PROVIDER: 'openai',
+      HOUSE_WORKER_LIVE_MODEL: 'gpt-4.1-mini',
+      HOUSE_WORKER_LIVE_API_KEY: 'live-key',
+      HOUSE_WORKER_LIVE_REQUIRED: '1',
+    },
+    encoding: 'utf8',
+  });
+  const houseWorkerReadyStatuses = JSON.parse(houseWorkerReadyOutput);
+  expect(houseWorkerReadyStatuses).toHaveLength(1);
+  expect(houseWorkerReadyStatuses[0]).toMatchObject({
+    suiteId: 'house-worker-operator',
     ready: true,
     mode: 'ready',
     missing: [],
@@ -189,12 +239,36 @@ test('M20.5: live suite manifest is machine-readable and missing env fails with 
   expect(mismatchError).toBeTruthy();
   expect(String(mismatchError?.stderr || '')).toContain('LIVE_SUITE_SETUP_REQUIRED:privy-guest:PRIVY_APP_ID');
 
+  let houseWorkerSetupError = null;
+  try {
+    execFileSync('node', ['scripts/test_live.js', '--check', 'house-worker-operator'], {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        HOUSE_WORKER_LIVE_BASE_URL: '',
+        HOUSE_WORKER_LIVE_STORAGE_STATE: '',
+        HOUSE_WORKER_LIVE_PROVIDER: '',
+        HOUSE_WORKER_LIVE_MODEL: '',
+        HOUSE_WORKER_LIVE_API_KEY: '',
+      },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    houseWorkerSetupError = err;
+  }
+  expect(houseWorkerSetupError).toBeTruthy();
+  expect(String(houseWorkerSetupError?.stderr || '')).toContain('LIVE_SUITE_SETUP_REQUIRED:house-worker-operator:');
+  expect(String(houseWorkerSetupError?.stderr || '')).toContain('HOUSE_WORKER_LIVE_BASE_URL');
+  expect(String(houseWorkerSetupError?.stderr || '')).toContain('HOUSE_WORKER_LIVE_STORAGE_STATE');
+
   const configAuditOutput = execFileSync(
     'node',
     [
       '-e',
       `const guest = require('./playwright.privy.config.js');
 const email = require('./playwright.privy.email.config.js');
+const houseWorker = require('./playwright.house-worker.live.config.js');
 const sepolia = require('./playwright.sepolia.live.config.js');
 const isTruthy = (value) => /^(1|true|yes|on)$/i.test(String(value || ''));
 const payload = {
@@ -209,6 +283,11 @@ const payload = {
     testResetToken: email?.webServer?.env?.TEST_RESET_TOKEN || null,
     enablePrivyInTest: isTruthy(email?.webServer?.env?.ENABLE_PRIVY_IN_TEST),
     command: email?.webServer?.command || '',
+  },
+  houseWorker: {
+    hasWebServer: !!houseWorker?.webServer,
+    testMatch: Array.isArray(houseWorker?.testMatch) ? houseWorker.testMatch : [],
+    headless: houseWorker?.projects?.[0]?.use?.headless ?? null,
   },
   sepolia: {
     hasWebServer: !!sepolia?.webServer,
@@ -236,6 +315,11 @@ process.stdout.write(JSON.stringify(payload));`,
     enablePrivyInTest: false,
   });
   expect(String(configAudit.email.command || '')).toContain('scripts/start_live_server.js');
+  expect(configAudit.houseWorker).toMatchObject({
+    hasWebServer: false,
+    testMatch: ['246_house_worker_operator_live_gate.spec.js'],
+    headless: false,
+  });
   expect(configAudit.sepolia).toMatchObject({
     hasWebServer: false,
     testMatch: ['10_sepolia_wallet_reuse.spec.js'],

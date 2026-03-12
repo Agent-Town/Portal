@@ -2608,6 +2608,12 @@ function registerPlatformReadRoutes(app, deps) {
         teamId: activeTeamId,
       };
     }
+    if (normalizedRequestedTeamId === activeTeamId) {
+      return {
+        ok: true,
+        teamId: normalizedRequestedTeamId,
+      };
+    }
     if (!availableTeamIds.includes(normalizedRequestedTeamId)) {
       return {
         ok: false,
@@ -5074,10 +5080,14 @@ function registerPlatformReadRoutes(app, deps) {
       houseId,
       teamId,
     });
-    const deploymentCards = (Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [])
-      .filter((entry) => installedDeployments.some((deploymentRecord) =>
-        String(entry?.deploymentId || '').trim() === String(deploymentRecord?.deploymentId || '').trim()
-      ));
+    const deploymentCardMap = new Map(
+      (Array.isArray(deploymentsPayload?.deployments) ? deploymentsPayload.deployments : [])
+        .map((entry) => [String(entry?.deploymentId || '').trim(), entry])
+        .filter(([deploymentId]) => deploymentId)
+    );
+    const deploymentCards = installedDeployments
+      .map((deploymentRecord) => deploymentCardMap.get(String(deploymentRecord?.deploymentId || '').trim()) || null)
+      .filter(Boolean);
     return sendPortalApiSuccess(res, {
       deployment: deploymentCards[0] || null,
       deployments: deploymentCards,

@@ -110,6 +110,27 @@ Optional local integration check (reused Sepolia wallet):
 npm run test:sepolia-live
 ```
 
+Optional operator-assisted House worker live gate:
+```bash
+npm run test:house-worker-live
+```
+
+What `npm run test:house-worker-live` requires:
+- a running local or staging Agent Town server that keeps the real session store intact
+- `HOUSE_WORKER_LIVE_BASE_URL`
+- `HOUSE_WORKER_LIVE_STORAGE_STATE`
+- `HOUSE_WORKER_LIVE_PROVIDER`
+- `HOUSE_WORKER_LIVE_MODEL`
+- `HOUSE_WORKER_LIVE_API_KEY`
+- a saved Playwright `storageState` file captured from a real session with a house attached and an active team selected
+
+What the House worker live gate does:
+- reopens a real saved session against the live server
+- configures a real local helper brain through the product UI if the current browser is not ready yet
+- verifies helper live-readiness before install
+- installs one Registry worker package, starts it, asks for one short reply, then stops it again
+- avoids `__test__` helper shortcuts and seeded fake success
+
 Notes:
 - Setup command:
 ```bash

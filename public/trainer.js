@@ -1558,6 +1558,13 @@
         };
       await refreshToolLab().catch(() => {});
       await refreshTranscriptIntegrity().catch(() => {});
+      try {
+        if (typeof window.__agentTownScheduleDebugRefresh === "function") {
+          window.__agentTownScheduleDebugRefresh("trainer-tool");
+        }
+      } catch {
+        // ignore debug refresh bridge failures
+      }
       await render();
       if (isSkillAction && result?.ok !== true) {
         setStatus(`Skill action ${toolName} failed: ${result?.code || "UNSUPPORTED"}`, true);

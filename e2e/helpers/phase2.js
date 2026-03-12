@@ -664,6 +664,30 @@ async function configureLiteLlm(page, {
   model = 'deterministic',
   apiKey = 'phase2-test-key'
 } = {}) {
+  const finalizeLocalBrain = async () => {
+    await page.evaluate(async () => {
+      if (typeof window.refreshHouseWorkerLocalBrainState === 'function') {
+        await window.refreshHouseWorkerLocalBrainState({ force: true }).catch(() => null);
+      }
+      if (typeof window.bootstrapVendorRuntime === 'function') {
+        await window.bootstrapVendorRuntime().catch(() => null);
+      }
+      if (typeof window.connectLiteAgent === 'function') {
+        await window.connectLiteAgent().catch(() => null);
+      }
+    }).catch(() => {});
+    await page.waitForFunction(async () => {
+      if (typeof window.refreshHouseWorkerLocalBrainState === 'function') {
+        const ready = await window.refreshHouseWorkerLocalBrainState({ force: true }).catch(() => false);
+        if (ready === true) return true;
+      }
+      const snapshot = window.__agentTownHouseWorkerSupervisor
+        && typeof window.__agentTownHouseWorkerSupervisor.getSnapshot === 'function'
+        ? window.__agentTownHouseWorkerSupervisor.getSnapshot()
+        : null;
+      return snapshot?.localBrainReady === true;
+    }, null, { timeout: 10000 });
+  };
   await ensureAppShell(page, { navigate: false });
   await ensureHouseDistrictVisible(page).catch(() => {});
   await ensureBrainPanelVisible(page);
@@ -672,33 +696,44 @@ async function configureLiteLlm(page, {
     if (!liteTestApiReady) {
       throw new Error('LITE_LLM_TEST_API_MISSING');
     }
-    await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
-      const api = window.__openclawLiteTest;
-      if (!api || typeof api.setLlmConfig !== 'function') {
-        throw new Error('LITE_LLM_TEST_API_MISSING');
+    let lastError = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await page.evaluate(async ({ desiredProvider, desiredModel, desiredApiKey }) => {
+          const api = window.__openclawLiteTest;
+          if (!api || typeof api.setLlmConfig !== 'function') {
+            throw new Error('LITE_LLM_TEST_API_MISSING');
+          }
+          await api.setLlmConfig({
+            provider: desiredProvider,
+            modelId: desiredModel,
+            modelRef: `${desiredProvider}/${desiredModel}`,
+            api: 'openai-completions',
+            apiKey: desiredApiKey,
+            useProxy: true
+          });
+        }, {
+          desiredProvider: provider,
+          desiredModel: model,
+          desiredApiKey: apiKey
+        });
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        const message = String(error?.message || '').trim();
+        if (!/WORKER_REQUEST_TIMEOUT|Target page, context or browser has been closed/i.test(message) || attempt >= 2) {
+          throw error;
+        }
+        await page.waitForTimeout(250 * (attempt + 1));
+        if (!(await ensureLiteTestApi(page))) {
+          throw error;
+        }
       }
-      await api.setLlmConfig({
-        provider: desiredProvider,
-        modelId: desiredModel,
-        modelRef: `${desiredProvider}/${desiredModel}`,
-        api: 'openai-completions',
-        apiKey: desiredApiKey,
-        useProxy: true
-      });
-    }, {
-      desiredProvider: provider,
-      desiredModel: model,
-      desiredApiKey: apiKey
-    });
+    }
+    if (lastError) throw lastError;
     await waitForLocalLiteLlmConfig(page, { provider, model });
-    await page.evaluate(async () => {
-      if (typeof window.bootstrapVendorRuntime === 'function') {
-        await window.bootstrapVendorRuntime().catch(() => null);
-      }
-      if (typeof window.connectLiteAgent === 'function') {
-        await window.connectLiteAgent().catch(() => null);
-      }
-    }).catch(() => {});
+    await finalizeLocalBrain();
   };
   const hasDomLlmForm = await page.evaluate(() => {
     return !!(
@@ -749,6 +784,7 @@ async function configureLiteLlm(page, {
     });
     await waitForLocalLiteLlmConfig(page, { provider, model });
     await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|brain/i, { timeout: 5000 });
+    await finalizeLocalBrain();
     return;
   }
 
@@ -782,8 +818,10 @@ async function configureLiteLlm(page, {
     await waitForLocalLiteLlmConfig(page, { provider, model, timeout: 2500 });
   } catch (error) {
     await applyViaTestApi();
+    return;
   }
   await expect(page.getByTestId('lite-llm-status')).toContainText(/configured|saved|ready|connected|brain/i, { timeout: 5000 });
+  await finalizeLocalBrain();
 }
 
 async function ensureLiteConnected(page) {

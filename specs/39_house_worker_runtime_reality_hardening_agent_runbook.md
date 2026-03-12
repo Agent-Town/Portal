@@ -1,6 +1,6 @@
 # Phase 39 Spec: Detailed AI-Agent Runbook for House Worker Runtime Reality Hardening
 
-Status: Proposed
+Status: Implemented
 Version: 0.1
 Depends on:
 1. [specs/37_house_worker_runtime_reality_hardening_spec.md](./37_house_worker_runtime_reality_hardening_spec.md)
@@ -16,8 +16,9 @@ Purpose: convert Phase 38 into AI-agent-sized TDD work packets with explicit mea
 Current proof state:
 
 1. `T35.0` through `T35.13` are implemented.
-2. `e2e/215` through `e2e/235` are green.
-3. Full deterministic suite is green at `357 passed, 4 skipped`.
+2. `T38.0` through `T38.9` and `T38.11` are implemented.
+3. `T38.10` is implemented as an operator-assisted live gate and remains intentionally skipped in the default deterministic suite until live prerequisites are present.
+4. Full deterministic suite is green at `368 passed, 5 skipped`.
 
 This is not a competing plan.
 It is the execution layer for the follow-on phase that closes the remaining House worker runtime, sharing, lifecycle, and live-confidence gaps.

@@ -99,38 +99,78 @@ test('M35.11: helper spawn guardrails reject unsafe or runaway requests without 
     reason: 'guardrail_probe',
     parentWorkerSessionId: firstSessionId,
   });
-  expect(blockedRunaway.status).toBe(409);
-  expect(String(blockedRunaway.json?.error?.code || blockedRunaway.json?.error || '')).toBe('RUNAWAY_SPAWN_BLOCKED');
+  expect(blockedRunaway.status).toBe(200);
+  expect(blockedRunaway.json?.ok).toBe(true);
+  expect(blockedRunaway.json?.data?.reused).toBe(true);
+  expect(String(blockedRunaway.json?.data?.houseWorkerSessionId || '').trim()).toBe(firstSessionId);
 
   const concurrencyLimit = Number(guardrailFixture.fixture.maxActiveSessions || 3);
   const candidateOfficeIds = (Array.isArray(structureFixture.fixture?.offices) ? structureFixture.fixture.offices : [])
     .map((entry) => String(entry?.officeId || '').trim())
     .filter(Boolean)
     .filter((officeId) => officeId !== initialOfficeId);
-  expect(candidateOfficeIds.length).toBeGreaterThanOrEqual(concurrencyLimit);
+  expect(candidateOfficeIds.length).toBeGreaterThanOrEqual(3);
 
-  const overflowOfficeId = candidateOfficeIds[0];
-  const activeOfficeIds = candidateOfficeIds.slice(1, concurrencyLimit);
-  const extraDeploymentIds = [];
-  for (const officeId of [overflowOfficeId, ...activeOfficeIds]) {
-    const extraInstall = await installHouseWorker(page.request, {
-      registryEntityId: installFixture.fixture.registryEntityId,
-      officeId,
-    });
-    expect(extraInstall.status).toBe(200);
-    const extraDeploymentId = String(extraInstall.json?.data?.deployment?.deploymentId || '').trim();
-    expect(extraDeploymentId).toBeTruthy();
-    extraDeploymentIds.push(extraDeploymentId);
-  }
+  const childInstall = await installHouseWorker(page.request, {
+    registryEntityId: installFixture.fixture.registryEntityId,
+    officeId: candidateOfficeIds[0],
+  });
+  expect(childInstall.status).toBe(200);
+  const childDeploymentId = String(childInstall.json?.data?.deployment?.deploymentId || '').trim();
+  expect(childDeploymentId).toBeTruthy();
 
-  for (let index = 0; index < activeOfficeIds.length; index += 1) {
-    const spawned = await spawnHouseWorker(page.request, {
-      deploymentId: String(extraDeploymentIds[index + 1] || '').trim(),
-      task: `Guardrail helper ${index + 2}`,
-      reason: 'guardrail_probe',
-    });
-    expect([200, 201]).toContain(spawned.status);
-  }
+  const nestedChild = await spawnHouseWorker(page.request, {
+    deploymentId: childDeploymentId,
+    task: 'Nested child helper',
+    reason: 'guardrail_probe',
+    parentWorkerSessionId: firstSessionId,
+  });
+  expect([200, 201]).toContain(nestedChild.status);
+  const nestedChildSessionId = String(
+    nestedChild.json?.data?.houseWorkerSessionId
+    || nestedChild.json?.data?.workerSessionId
+    || ''
+  ).trim();
+  expect(nestedChildSessionId).toBeTruthy();
+
+  const grandchildInstall = await installHouseWorker(page.request, {
+    registryEntityId: installFixture.fixture.registryEntityId,
+    officeId: candidateOfficeIds[1],
+  });
+  expect(grandchildInstall.status).toBe(200);
+  const grandchildDeploymentId = String(grandchildInstall.json?.data?.deployment?.deploymentId || '').trim();
+  expect(grandchildDeploymentId).toBeTruthy();
+
+  const grandchildSpawn = await spawnHouseWorker(page.request, {
+    deploymentId: grandchildDeploymentId,
+    task: 'Spawn a third generation',
+    reason: 'guardrail_probe',
+    parentWorkerSessionId: nestedChildSessionId,
+  });
+  expect([200, 201]).toContain(grandchildSpawn.status);
+  const grandchildSessionId = String(
+    grandchildSpawn.json?.data?.houseWorkerSessionId
+    || grandchildSpawn.json?.data?.workerSessionId
+    || ''
+  ).trim();
+  expect(grandchildSessionId).toBeTruthy();
+
+  const greatGrandchildInstall = await installHouseWorker(page.request, {
+    registryEntityId: installFixture.fixture.registryEntityId,
+    officeId: candidateOfficeIds[2],
+  });
+  expect(greatGrandchildInstall.status).toBe(200);
+  const greatGrandchildDeploymentId = String(greatGrandchildInstall.json?.data?.deployment?.deploymentId || '').trim();
+  expect(greatGrandchildDeploymentId).toBeTruthy();
+
+  const blockedNestedRunaway = await spawnHouseWorker(page.request, {
+    deploymentId: greatGrandchildDeploymentId,
+    task: 'Spawn a fourth generation',
+    reason: 'guardrail_probe',
+    parentWorkerSessionId: grandchildSessionId,
+  });
+  expect(blockedNestedRunaway.status).toBe(409);
+  expect(String(blockedNestedRunaway.json?.error?.code || blockedNestedRunaway.json?.error || '')).toBe('RUNAWAY_SPAWN_BLOCKED');
 
   sessionsPayload = await listHouseWorkerSessions(page.request);
   expect(sessionsPayload.status).toBe(200);
@@ -138,7 +178,7 @@ test('M35.11: helper spawn guardrails reject unsafe or runaway requests without 
   expect(activeSessions).toHaveLength(concurrencyLimit);
 
   const overflow = await spawnHouseWorker(page.request, {
-    deploymentId: String(extraDeploymentIds[0] || '').trim(),
+    deploymentId: greatGrandchildDeploymentId,
     task: 'One helper too many',
     reason: 'guardrail_probe',
   });

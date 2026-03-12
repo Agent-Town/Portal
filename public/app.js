@@ -580,7 +580,7 @@ const HOUSE_WORKER_ACTIVE_STATUSES = new Set(['starting', 'ready', 'idle', 'work
 const HOUSE_WORKER_RUNTIME_REQUEST_TIMEOUT_MS = 30000;
 const HOUSE_WORKER_REPLY_TIMEOUT_MS = 20000;
 const HOUSE_WORKER_HEARTBEAT_INTERVAL_MS = 2500;
-const HOUSE_WORKER_LEASE_TTL_MS = 9000;
+const HOUSE_WORKER_LEASE_TTL_MS = 15000;
 const HOUSE_WORKER_TRAINER_NAMESPACE_QUERY_KEYS = ['trainerNamespace', 'trainer_namespace', 'trainer-tools', 'trainerTools'];
 let houseWorkerSupervisorSeq = 0;
 const houseWorkerSupervisorState = {
@@ -3515,6 +3515,7 @@ function renderHouseOfficeSurface() {
       const activeDeploymentSessionCount = activeWorkerSessions.filter((entry) => String(entry?.deploymentId || '').trim() === deploymentId).length;
       const card = document.createElement('article');
       card.setAttribute('data-testid', 'house-office-deployment-item');
+      card.setAttribute('data-deployment-id', deploymentId);
       card.style.border = '1px solid rgba(255,255,255,0.12)';
       card.style.borderRadius = '12px';
       card.style.padding = '10px';

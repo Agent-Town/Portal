@@ -1,6 +1,6 @@
 # Phase 38 Spec: House Worker Runtime Reality Hardening (Contracts First, TDD)
 
-Status: Proposed
+Status: Implemented
 Version: 0.1
 Audience: frontend engineers, backend engineers, runtime engineers, UX engineers, security engineers, QA automation engineers, and AI-agent implementers
 Depends on:
@@ -22,10 +22,11 @@ Implementation baseline:
 1. [specs/34_house_worker_packages_and_spawn_spec.md](./34_house_worker_packages_and_spawn_spec.md) is implemented.
 2. [specs/35_house_worker_packages_and_spawn_tdd_spec.md](./35_house_worker_packages_and_spawn_tdd_spec.md) is implemented.
 3. [specs/36_house_worker_packages_and_spawn_agent_runbook.md](./36_house_worker_packages_and_spawn_agent_runbook.md) is completed.
-4. Current branch baseline is `aaf62d1`.
+4. Current branch baseline is `37da502`.
 5. Current repo proof state is:
-   A. `e2e/215` through `e2e/235` are green,
-   B. full deterministic suite is green at `357 passed, 4 skipped`.
+   A. `e2e/236` through `e2e/245` and `e2e/247` are green,
+   B. `e2e/246_house_worker_operator_live_gate.spec.js` is implemented and intentionally skipped in the default deterministic suite until live prerequisites are present,
+   C. full deterministic suite is green at `368 passed, 5 skipped`.
 
 Implementation constraints:
 
