@@ -561,6 +561,7 @@ let houseSurfaceState = {
     publicStacksResults: [],
     publicStacksResultCount: 0,
     publicStackPreview: null,
+    publicStackApprovalId: '',
     incomingRelays: [],
     selectedIncomingRelayId: '',
     incomingRelayPreview: null,
@@ -1846,6 +1847,7 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.publicStacksResults = [];
   houseSurfaceState.library.publicStacksResultCount = 0;
   houseSurfaceState.library.publicStackPreview = null;
+  houseSurfaceState.library.publicStackApprovalId = '';
   houseSurfaceState.library.incomingRelays = [];
   houseSurfaceState.library.selectedIncomingRelayId = '';
   houseSurfaceState.library.incomingRelayPreview = null;
@@ -1869,6 +1871,14 @@ function findHouseLibraryImportedItemByRegistryId(registryId = '') {
     .find((item) => String(item?.registryId || '').trim() === normalizedRegistryId) || null;
 }
 
+function findHouseLibraryImportedPublicStackScopeSet(libraryPublicStackId = '') {
+  const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+  if (!normalizedPublicStackId) return null;
+  return (Array.isArray(houseSurfaceState.library.scopeSets) ? houseSurfaceState.library.scopeSets : [])
+    .find((scopeSet) => String(scopeSet?.metadata?.importKind || '').trim() === 'public_stack_bundle'
+      && String(scopeSet?.metadata?.libraryPublicStackId || '').trim() === normalizedPublicStackId) || null;
+}
+
 function buildHouseLibraryItemTrustLabels(item = null) {
   if (!item || typeof item !== 'object') return [];
   const labels = [];
@@ -1890,7 +1900,15 @@ function buildHouseLibraryItemTrustLabels(item = null) {
 function buildHouseLibraryPublicStackTrustLabels(preview = null) {
   if (!preview || typeof preview !== 'object') return [];
   const labels = ['Public', 'Provenance shown', 'Read only after import'];
-  if (findHouseLibraryImportedItemByRegistryId(preview.registryId)) {
+  if (String(preview?.bundleKind || '') === 'library_public_stack' || String(preview?.entityKind || '') === 'library_public_stack_bundle') {
+    labels.push('Bundle');
+  }
+  if (
+    preview?.alreadyImportedAll === true
+    || !!preview?.localScopeSet
+    || !!findHouseLibraryImportedPublicStackScopeSet(String(preview?.libraryPublicStackId || preview?.registryId || ''))
+    || findHouseLibraryImportedItemByRegistryId(preview.registryId)
+  ) {
     labels.push('Imported');
   }
   return labels;
@@ -1923,6 +1941,27 @@ function syncHouseLibraryPublicStacksControls() {
   if (searchBtn) {
     searchBtn.disabled = false;
   }
+}
+
+function syncHouseLibraryPublicStackPublishControls() {
+  const approvalInput = el('houseLibraryPublicStackApprovalInput');
+  const publishBtn = el('houseLibraryPublishPublicStackBtn');
+  if (!approvalInput || !publishBtn) return;
+  const activeScopeSet = getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId) || null;
+  const liveApproval = String(approvalInput.value || '').trim();
+  const storedApproval = String(houseSurfaceState.library.publicStackApprovalId || '').trim();
+  if (approvalInput === document.activeElement || (!storedApproval && liveApproval)) {
+    houseSurfaceState.library.publicStackApprovalId = liveApproval;
+  } else if (liveApproval !== storedApproval) {
+    approvalInput.value = storedApproval;
+  }
+  const hasScopeSet = !!String(activeScopeSet?.scopeSetId || '').trim();
+  approvalInput.disabled = !hasScopeSet;
+  publishBtn.disabled = !hasScopeSet;
+  publishBtn.dataset.scopeSetId = hasScopeSet ? String(activeScopeSet.scopeSetId) : '';
+  publishBtn.textContent = String(activeScopeSet?.scopeKind || '') === 'satchel'
+    ? 'Publish Satchel Stack'
+    : 'Publish Reading Table Stack';
 }
 
 async function loadHouseLibraryPublicStacksSearch({
@@ -1981,6 +2020,53 @@ async function previewHouseLibraryPublicStack(registryEntityId = '') {
   const previewTitle = String(data?.preview?.displayName || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId;
   setHouseLibraryActionStatus(`Previewing ${previewTitle} from Public Stacks.`);
   setHouseSurfaceStatus(`Previewing ${previewTitle} from Public Stacks.`);
+  return data;
+}
+
+async function importHouseLibraryPublicStackBundle({
+  libraryPublicStackId: libraryPublicStackIdOverride = '',
+} = {}) {
+  const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
+    ? houseSurfaceState.library.publicStackPreview
+    : null;
+  const libraryPublicStackId = String(libraryPublicStackIdOverride || preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim();
+  if (!libraryPublicStackId) {
+    throw new Error('PUBLIC_STACK_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_import_public_stack', [
+    houseId,
+    teamId,
+    libraryPublicStackId,
+  ]);
+  const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  setHouseSurfaceStatus(`Importing Public Stack ${stackLabel}...`);
+  setHouseLibraryActionStatus(`Importing Public Stack ${stackLabel}...`);
+  const response = await apiWithRetry(`/api/platform/library/public-stacks/${encodeURIComponent(libraryPublicStackId)}/imports`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const importedItemId = String(data?.items?.[0]?.libraryItemId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  await loadHouseLibraryPublicStacksSearch({
+    query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
+    family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
+    preservePreview: true,
+  }).catch(() => null);
+  await previewHouseLibraryPublicStack(libraryPublicStackId).catch(() => null);
+  if (importedItemId) {
+    houseSurfaceState.library.selectedItemId = importedItemId;
+  }
+  renderHouseLibrarySurface();
+  setHouseLibraryActionStatus(`Imported Public Stack ${stackLabel}.`);
+  setHouseSurfaceStatus(`Imported Public Stack ${stackLabel}.`);
   return data;
 }
 
@@ -3022,10 +3108,69 @@ async function publishSelectedHouseLibraryItemToRegistry({
   return data;
 }
 
+async function publishActiveHouseLibraryScopeSetToPublicStacks({
+  approvalId: approvalIdOverride = '',
+} = {}) {
+  const activeScopeSet = getHouseLibraryScopeSetById(houseSurfaceState.library.activeScopeSetId) || null;
+  const scopeSetId = String(activeScopeSet?.scopeSetId || '').trim();
+  if (!scopeSetId) {
+    throw new Error('LIBRARY_SCOPE_SET_REQUIRED');
+  }
+  const approvalInput = el('houseLibraryPublicStackApprovalInput');
+  const approvalId = String(approvalIdOverride || approvalInput?.value || '').trim();
+  const scopeLabel = String(activeScopeSet?.title || scopeSetId).trim() || scopeSetId;
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_publish_public_stack', [
+    houseId,
+    teamId,
+    scopeSetId,
+    'house_library_stacks',
+  ]);
+  setHouseSurfaceStatus(`Publishing ${scopeLabel} to Public Stacks...`);
+  setHouseLibraryActionStatus(`Publishing ${scopeLabel} to Public Stacks...`);
+  const response = await apiWithRetry('/api/platform/library/public-stacks', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      scopeSetId,
+      approvalId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const libraryPublicStackId = String(data?.publicStack?.libraryPublicStackId || '').trim();
+  await loadHouseLibrarySurface({ skipContext: true });
+  await loadHouseLibraryPublicStacksSearch({
+    query: scopeLabel,
+    family: 'house_library_stacks',
+    preservePreview: false,
+  }).catch(() => null);
+  if (libraryPublicStackId) {
+    await previewHouseLibraryPublicStack(libraryPublicStackId).catch(() => null);
+  }
+  if (approvalInput && !approvalIdOverride) {
+    approvalInput.value = '';
+  }
+  houseSurfaceState.library.publicStackApprovalId = '';
+  renderHouseLibrarySurface();
+  setHouseLibraryActionStatus(`Published Satchel ${scopeLabel} to Public Stacks.`);
+  setHouseSurfaceStatus(`Published Satchel ${scopeLabel} to Public Stacks.`);
+  return data;
+}
+
 async function runHouseLibraryGuidedImport() {
   const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
     ? houseSurfaceState.library.publicStackPreview
     : null;
+  if (String(preview?.bundleKind || '') === 'library_public_stack' || String(preview?.entityKind || '') === 'library_public_stack_bundle') {
+    return await importHouseLibraryPublicStackBundle({
+      libraryPublicStackId: String(preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim(),
+    });
+  }
   const registryEntityId = String(preview?.registryEntityId || preview?.registryId || '').trim();
   if (!registryEntityId) {
     throw new Error('REGISTRY_ENTITY_REQUIRED');
@@ -3062,6 +3207,8 @@ function renderHouseLibrarySurface() {
   const facetFilterSelect = el('houseLibraryFacetFilterSelect');
   const satchelTitleInput = el('houseLibrarySatchelTitleInput');
   const saveSatchelBtn = el('houseLibrarySaveSatchelBtn');
+  const publicStackApprovalInput = el('houseLibraryPublicStackApprovalInput');
+  const publicStackPublishBtn = el('houseLibraryPublishPublicStackBtn');
   const publicStacksQueryInput = el('houseLibraryPublicStacksQueryInput');
   const publicStacksFamilySelect = el('houseLibraryPublicStacksFamilySelect');
   const publicStacksSearchBtn = el('houseLibraryPublicStacksSearchBtn');
@@ -3112,6 +3259,8 @@ function renderHouseLibrarySurface() {
     || !facetFilterSelect
     || !satchelTitleInput
     || !saveSatchelBtn
+    || !publicStackApprovalInput
+    || !publicStackPublishBtn
     || !publicStacksQueryInput
     || !publicStacksFamilySelect
     || !publicStacksSearchBtn
@@ -3173,6 +3322,7 @@ function renderHouseLibrarySurface() {
   syncHouseLibraryComposerControls();
   syncHouseLibraryCaptureControls();
   syncHouseLibraryPublicStacksControls();
+  syncHouseLibraryPublicStackPublishControls();
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
   syncHouseLibraryPeerRelayControls(null);
@@ -3281,6 +3431,7 @@ function renderHouseLibrarySurface() {
     button.textContent = [
       String(result?.displayName || result?.registryId || ''),
       String(result?.familyTitle || result?.familySlug || ''),
+      Number(result?.storefront?.memberCount || 0) > 0 ? `${Number(result.storefront.memberCount)} item${Number(result.storefront.memberCount) === 1 ? '' : 's'}` : '',
       Number(result?.storefront?.proofCount || 0) > 0 ? `${Number(result.storefront.proofCount)} proof${Number(result.storefront.proofCount) === 1 ? '' : 's'}` : '',
     ].filter(Boolean).join(' · ');
     button.addEventListener('click', async () => {
@@ -3349,8 +3500,13 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.displayName || publicStackPreview?.registryId || ''),
       String(publicStackPreview?.registryId || ''),
       String(publicStackPreview?.familyTitle || publicStackPreview?.family || ''),
+      Number(publicStackPreview?.memberCount || 0) > 0 ? `${Number(publicStackPreview.memberCount)} item${Number(publicStackPreview.memberCount) === 1 ? '' : 's'}` : '',
+      String(publicStackPreview?.sourceHouseId || '').trim() ? `From: ${String(publicStackPreview.sourceHouseId || '').trim()}` : '',
       String(publicStackPreview?.description || '').trim(),
       `Provenance: ${String(publicStackPreview?.provenance?.summary || '').trim() || 'Visible.'}`,
+      publicStackPreview?.alreadyImportedAll === true
+        ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}.`
+        : '',
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
     ].filter(Boolean).join(' · ');
   }
@@ -3395,7 +3551,9 @@ function renderHouseLibrarySurface() {
         `Import guide: ${String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack')}`,
         String(publicStackPreview?.registryId || ''),
         buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
-        importedPreviewItem
+        (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
+          ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
+          : importedPreviewItem
           ? `Already in your Library as ${String(importedPreviewItem?.title || importedPreviewItem?.libraryItemId || 'an imported item')}. Importing again will reuse it.`
           : 'This Public Stack is ready to bring into your Library.',
       ].filter(Boolean).join(' · ')
@@ -3475,7 +3633,9 @@ function renderHouseLibrarySurface() {
       `Import guide: ${String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack')}`,
       String(publicStackPreview?.registryId || ''),
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
-      importedPreviewItem
+      (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
+        ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
+        : importedPreviewItem
         ? `Already in your Library as ${String(importedPreviewItem?.title || importedPreviewItem?.libraryItemId || 'an imported item')}. Importing again will reuse it.`
         : 'This Public Stack is ready to bring into your Library.',
     ].filter(Boolean).join(' · '));
@@ -3486,7 +3646,7 @@ function renderHouseLibrarySurface() {
       `Satchel guide: ${String(activeScopeSet?.title || activeScopeSet?.scopeSetId || 'Reading Table')}`,
       String(activeScopeSet?.scopeKind || '') === 'satchel' ? 'Satchel' : 'Reading Table',
       `${Array.isArray(activeScopeSet?.orderedItemIds) ? activeScopeSet.orderedItemIds.length : 0} item${Array.isArray(activeScopeSet?.orderedItemIds) && activeScopeSet.orderedItemIds.length === 1 ? '' : 's'}`,
-      'Relay approval and target House are required before sending this curated pack.',
+      'Publish or relay this curated pack with explicit approval.',
     ].filter(Boolean).join(' · '));
   }
   exchangeSummaryNode.textContent = exchangeSummaryParts.length
@@ -7139,6 +7299,38 @@ function bindTownDistrictControls() {
         await saveCurrentHouseLibrarySatchel();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_SATCHEL_SAVE_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryPublicStackApprovalInput = el('houseLibraryPublicStackApprovalInput');
+  if (houseLibraryPublicStackApprovalInput) {
+    houseLibraryPublicStackApprovalInput.oninput = () => {
+      houseSurfaceState.library.publicStackApprovalId = String(houseLibraryPublicStackApprovalInput.value || '').trim();
+      syncHouseLibraryPublicStackPublishControls();
+    };
+    houseLibraryPublicStackApprovalInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryPublishPublicStackBtn = el('houseLibraryPublishPublicStackBtn');
+      if (houseLibraryPublishPublicStackBtn && !houseLibraryPublishPublicStackBtn.disabled) {
+        houseLibraryPublishPublicStackBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryPublishPublicStackBtn = el('houseLibraryPublishPublicStackBtn');
+  if (houseLibraryPublishPublicStackBtn) {
+    houseLibraryPublishPublicStackBtn.onclick = async () => {
+      houseLibraryPublishPublicStackBtn.disabled = true;
+      try {
+        await publishActiveHouseLibraryScopeSetToPublicStacks();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'PUBLIC_STACK_PUBLISH_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {

@@ -244,6 +244,19 @@
     <button class="btn" id="houseLibrarySaveSatchelBtn" type="button" data-testid="house-library-save-satchel">Save Satchel</button>
   </div>
   <div class="kv stack" id="houseLibraryScopeSets" data-testid="house-library-scope-sets" style="margin-bottom:8px;"></div>
+  <div class="kv" data-testid="house-library-public-stack-publish-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibraryPublicStackApprovalInput">Publish Satchel</label>
+    <input
+      id="houseLibraryPublicStackApprovalInput"
+      data-testid="house-library-public-stack-approval-input"
+      class="pixel-input"
+      type="text"
+      placeholder="appr_..."
+      autocomplete="off"
+      style="flex:1; min-width:0;"
+    />
+    <button class="btn" id="houseLibraryPublishPublicStackBtn" type="button" data-testid="house-library-public-stack-publish-button">Publish Satchel Stack</button>
+  </div>
   <h3 class="small" style="margin:10px 0 4px;">Public Stacks</h3>
   <div class="kv" data-testid="house-library-public-stacks-controls" style="margin:8px 0;">
     <label class="small" for="houseLibraryPublicStacksQueryInput">Search</label>
@@ -259,6 +272,7 @@
     <label class="small" for="houseLibraryPublicStacksFamilySelect">Family</label>
     <select id="houseLibraryPublicStacksFamilySelect" data-testid="house-library-public-stacks-family" class="pixel-input">
       <option value="">All</option>
+      <option value="house_library_stacks">Satchels</option>
       <option value="skill">Skills</option>
       <option value="developer_workflows">Developer Workflows</option>
       <option value="registry">Registry</option>
