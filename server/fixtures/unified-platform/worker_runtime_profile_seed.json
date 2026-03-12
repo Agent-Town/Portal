@@ -1,0 +1,10 @@
+{
+  "family": "worker_runtime_profile_seed",
+  "schema": "agent-town-worker-runtime-profile-seed/v1",
+  "brainProfileId": "brain:current-runtime",
+  "workspaceSeedRef": "workspace/house-workers/front-desk-helper",
+  "configVersionId": "cfg_house_fixture_01",
+  "loadoutId": "loadout_house_worker_front_desk_helper_v1",
+  "expectedAppliedBrainProfileId": "brain:current-runtime",
+  "expectedWorkspacePath": "workspace/house-workers/front-desk-helper"
+}

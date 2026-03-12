@@ -1343,6 +1343,26 @@ Response fields:
 - `data.sourceManifest`
 - `data.emptyStateText`
 
+Per-session fields:
+- `houseWorkerSessionId`
+- `deploymentId`
+- `status`
+- `statusLabel`
+- `runtimeProfile`
+- `requestedRuntimeProfile`
+- `appliedRuntimeProfile`
+- `runtimeBinding`
+- `leaseStatus`
+- `ownerKind`
+- `ownerLabel`
+- `ownerId`
+- `lastHeartbeatAt`
+- `leaseExpiresAt`
+- `runtimeSessionId`
+- `latestTask`
+- `latestReply`
+- `eventCount`
+
 ### POST `/api/platform/house-workers/spawn` (human)
 Starts one installed House helper as a real child worker session.
 
@@ -1366,6 +1386,10 @@ Stable error codes:
 - `DEPLOYMENT_NOT_FOUND`
 - `WORKER_SESSION_NOT_FOUND`
 - `UNSUPPORTED_OVERRIDE`
+- `INVALID_BRAIN_PROFILE`
+- `INVALID_WORKSPACE_SEED_REF`
+- `INVALID_CONFIG_VERSION_ID`
+- `INVALID_LOADOUT_ID`
 - `OVER_CONCURRENCY_LIMIT`
 - `RUNAWAY_SPAWN_BLOCKED`
 
@@ -1375,6 +1399,12 @@ Response fields:
 - `data.deploymentId`
 - `data.status`
 - `data.runtimeProfile`
+- `data.session.requestedRuntimeProfile`
+- `data.session.appliedRuntimeProfile`
+- `data.session.runtimeBinding`
+- `data.session.leaseStatus`
+- `data.session.lastHeartbeatAt`
+- `data.session.leaseExpiresAt`
 - `data.spawnedAt`
 - `data.spawnSource`
 - `data.session`
@@ -1385,6 +1415,11 @@ Response fields:
 Notes:
 - `parentWorkerSessionId` is reserved for helper-origin spawn provenance and currently fails closed with `RUNAWAY_SPAWN_BLOCKED` when it resolves to a real helper session.
 - Spawn accepts portable runtime references only; raw secrets are rejected as unsupported overrides.
+- Spawn semantically validates helper runtime references before the helper is marked active:
+  - `brainProfileId` must resolve to the supported local-browser inheritance path,
+  - `workspaceSeedRef` must stay inside the `workspace/house-workers/*` or `seed://house-workers/*` namespace,
+  - `configVersionId` must resolve to a known House config reference,
+  - `loadoutId` must belong to the exact installed helper package.
 - Spawn is idempotent per active deployment within one House team: if the same helper is already active, the route returns the existing session with `data.reused=true` instead of creating a duplicate.
 
 ### POST `/api/platform/house-workers/message` (human)
@@ -1416,17 +1451,31 @@ Request body:
 - `actor` optional (`runtime`, `human`, `parent_worker`, `system`)
 - `reason` optional
 - `runtimeSessionId` optional
+- `ownerKind` optional
+- `ownerLabel` optional
+- `ownerId` optional
+- `lastHeartbeatAt` optional
+- `leaseExpiresAt` optional
+- `requestedRuntimeProfile` optional
+- `appliedRuntimeProfile` optional
+- `runtimeBinding` optional
+- `heartbeatOnly` optional
 
 Stable error codes:
 - `SESSION_REQUIRED`
 - `HOUSE_TEAM_REQUIRED`
 - `INVALID_ARGUMENT`
 - `UNSUPPORTED_OVERRIDE`
+- `INVALID_RUNTIME_PROFILE`
 - `WORKER_SESSION_NOT_FOUND`
 
 Response fields:
 - `data.session`
 - `data.event`
+
+Notes:
+- `heartbeatOnly=true` updates durable lease freshness without creating a new status event row.
+- Runtime status updates may carry applied runtime evidence so the child helper session can prove which runtime profile actually bound.
 
 ### POST `/api/platform/house-workers/stop` (human)
 Stops one helper session for the current House team.

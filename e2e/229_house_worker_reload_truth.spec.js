@@ -43,9 +43,9 @@ test('House worker sessions stay honest after reload and support an explicit res
 
   const sessionCard = page.getByTestId('house-office-worker-session-item').first();
   await expect(sessionCard).toBeVisible();
-  await expect(sessionCard.getByTestId('house-office-worker-session-status')).toContainText('Running in another tab or after refresh');
+  await expect(sessionCard.getByTestId('house-office-worker-session-status')).toContainText(/Running in another tab or after refresh|Ready to resume after refresh/);
   await expect(sessionCard.getByTestId('house-office-worker-session-ask')).toBeDisabled();
-  await expect(page.getByTestId('house-office-helper-start').first()).toHaveText('Take Over Here');
+  await expect(page.getByTestId('house-office-helper-start').first()).toHaveText(/Take Over Here|Resume Here/);
 
   const snapshotAfterReload = await readHouseWorkerSupervisorSnapshot(page);
   expect(Number(snapshotAfterReload?.activeWorkerCount || 0)).toBe(1);

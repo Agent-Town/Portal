@@ -79,6 +79,15 @@ function registerPlatformReadRoutes(app, deps) {
     1,
     Number(getUnifiedPlatformTestFixture('worker_spawn_guardrail_seed')?.maxActiveSessions || 3)
   );
+  const HOUSE_WORKER_LEASE_HEARTBEAT_MS = Math.max(
+    1000,
+    Number(getUnifiedPlatformTestFixture('worker_runtime_lease_seed')?.heartbeatIntervalMs || 2500)
+  );
+  const HOUSE_WORKER_LEASE_TTL_MS = Math.max(
+    HOUSE_WORKER_LEASE_HEARTBEAT_MS + 1000,
+    Number(getUnifiedPlatformTestFixture('worker_runtime_lease_seed')?.leaseTtlMs || 9000)
+  );
+  const HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS = new Set(['brain:current-runtime', 'local_default']);
 
   function buildHouseExperienceItems() {
     const fixture = getUnifiedPlatformTestFixture('house_experiences_seed') || {};
@@ -891,7 +900,8 @@ function registerPlatformReadRoutes(app, deps) {
     return String(fallback || 'starting').trim().toLowerCase();
   }
 
-  function buildHouseWorkerSessionStatusLabel(status = '') {
+  function buildHouseWorkerSessionStatusLabel(status = '', leaseStatus = '') {
+    if (String(leaseStatus || '').trim() === 'stale') return 'Needs restart here';
     const normalized = normalizeHouseWorkerStatus(status, 'starting');
     if (normalized === 'ready' || normalized === 'idle') return 'Ready to help';
     if (normalized === 'working') return 'Working now';
@@ -939,6 +949,255 @@ function registerPlatformReadRoutes(app, deps) {
       configVersionId,
       loadoutId,
     };
+  }
+
+  function normalizeHouseWorkerRuntimeIso(value = '') {
+    const normalized = String(value || '').trim();
+    if (!normalized) return null;
+    const ms = Date.parse(normalized);
+    if (!Number.isFinite(ms)) return null;
+    return new Date(ms).toISOString();
+  }
+
+  function buildHouseWorkerLeaseTimestamps(baseMs = Date.now()) {
+    const startedMs = Number.isFinite(baseMs) ? baseMs : Date.now();
+    return {
+      lastHeartbeatAt: new Date(startedMs).toISOString(),
+      leaseExpiresAt: new Date(startedMs + HOUSE_WORKER_LEASE_TTL_MS).toISOString(),
+    };
+  }
+
+  function resolveHouseWorkerBrainProfile(brainProfileId = '') {
+    const requestedBrainProfileId = String(brainProfileId || 'brain:current-runtime').trim() || 'brain:current-runtime';
+    if (!HOUSE_WORKER_ALLOWED_BRAIN_PROFILE_IDS.has(requestedBrainProfileId)) {
+      return {
+        ok: false,
+        code: 'INVALID_BRAIN_PROFILE',
+        message: 'That helper setup cannot use the requested brain yet. Choose the default local brain path instead.',
+      };
+    }
+    return {
+      ok: true,
+      requestedBrainProfileId,
+      appliedBrainProfileId: requestedBrainProfileId === 'local_default'
+        ? 'brain:current-runtime'
+        : requestedBrainProfileId,
+      bindingMode: 'inherit_current_browser_brain',
+    };
+  }
+
+  function resolveHouseWorkerWorkspaceBinding(workspaceSeedRef = '', deploymentId = '') {
+    const requestedWorkspaceSeedRef = String(workspaceSeedRef || '').trim();
+    const fallbackPath = `workspace/house-workers/${String(deploymentId || 'helper').trim() || 'helper'}`;
+    const candidate = requestedWorkspaceSeedRef || fallbackPath;
+    if (candidate.startsWith('workspace/house-workers/')) {
+      return {
+        ok: true,
+        requestedWorkspaceSeedRef: candidate,
+        workspacePath: candidate,
+        bindingMode: 'workspace_path',
+      };
+    }
+    if (candidate.startsWith('seed://house-workers/')) {
+      const suffix = candidate.slice('seed://house-workers/'.length).replace(/^\/+/, '');
+      if (!suffix) {
+        return {
+          ok: false,
+          code: 'INVALID_WORKSPACE_SEED_REF',
+          message: 'That helper workspace location is not available. Use the default House helper workspace.',
+        };
+      }
+      return {
+        ok: true,
+        requestedWorkspaceSeedRef: candidate,
+        workspacePath: `workspace/house-workers/${suffix}`,
+        bindingMode: 'seed_namespace',
+      };
+    }
+    return {
+      ok: false,
+      code: 'INVALID_WORKSPACE_SEED_REF',
+      message: 'That helper workspace location is not available. Use the default House helper workspace.',
+    };
+  }
+
+  function resolveHouseWorkerRequestedRuntimeProfile({
+    deployment = null,
+    overrides = null,
+  } = {}) {
+    const requestedRuntimeProfile = buildHouseWorkerRuntimeProfile({
+      deployment,
+      overrides,
+    });
+    const brainResolution = resolveHouseWorkerBrainProfile(requestedRuntimeProfile?.brainProfileId);
+    if (!brainResolution?.ok) return brainResolution;
+    const workspaceBinding = resolveHouseWorkerWorkspaceBinding(
+      requestedRuntimeProfile?.workspaceSeedRef,
+      String(deployment?.deploymentId || '').trim()
+    );
+    if (!workspaceBinding?.ok) return workspaceBinding;
+    if (requestedRuntimeProfile?.configVersionId) {
+      const requestedConfigVersionId = String(requestedRuntimeProfile.configVersionId || '').trim();
+      const configVersion = getConfigVersion(requestedConfigVersionId);
+      const fixtureConfigVersionIds = new Set([
+        String(getUnifiedPlatformTestFixture('house_workshop_seed')?.activeConfig?.configVersionId || '').trim(),
+        String(getUnifiedPlatformTestFixture('worker_spawn_profile_seed')?.configVersionId || '').trim(),
+        String(getUnifiedPlatformTestFixture('worker_runtime_profile_seed')?.configVersionId || '').trim(),
+        String(getUnifiedPlatformTestFixture('worker_profile_validation_seed')?.valid?.configVersionId || '').trim(),
+      ].filter(Boolean));
+      if (!configVersion && !fixtureConfigVersionIds.has(requestedConfigVersionId)) {
+        return {
+          ok: false,
+          code: 'INVALID_CONFIG_VERSION_ID',
+          message: 'That helper setup points to a House config that does not exist anymore.',
+        };
+      }
+    }
+    if (requestedRuntimeProfile?.loadoutId) {
+      const allowedLoadoutIds = new Set([
+        String(deployment?.loadoutId || '').trim(),
+        String(deployment?.runtimeDefaults?.loadoutId || '').trim(),
+      ].filter(Boolean));
+      const exactPackageResolution = resolveHouseWorkerDeploymentSharePackage(deployment);
+      if (exactPackageResolution?.ok) {
+        allowedLoadoutIds.add(String(exactPackageResolution?.packageInfo?.loadoutId || '').trim());
+        allowedLoadoutIds.add(String(exactPackageResolution?.packageInfo?.runtimeDefaults?.loadoutId || '').trim());
+      }
+      if (!allowedLoadoutIds.has(String(requestedRuntimeProfile.loadoutId || '').trim())) {
+        return {
+          ok: false,
+          code: 'INVALID_LOADOUT_ID',
+          message: 'That helper setup points to a loadout that is not available for this helper package.',
+        };
+      }
+    }
+    return {
+      ok: true,
+      requestedRuntimeProfile,
+      appliedRuntimeProfileSeed: {
+        brainProfileId: brainResolution.appliedBrainProfileId,
+        workspaceSeedRef: workspaceBinding.requestedWorkspaceSeedRef,
+        configVersionId: requestedRuntimeProfile?.configVersionId || null,
+        loadoutId: requestedRuntimeProfile?.loadoutId || null,
+      },
+      runtimeBindingSeed: {
+        bindingMode: brainResolution.bindingMode,
+        requestedWorkspaceSeedRef: workspaceBinding.requestedWorkspaceSeedRef,
+        workspacePath: workspaceBinding.workspacePath,
+        workspaceBindingMode: workspaceBinding.bindingMode,
+        leaseHeartbeatMs: HOUSE_WORKER_LEASE_HEARTBEAT_MS,
+        leaseTtlMs: HOUSE_WORKER_LEASE_TTL_MS,
+      },
+    };
+  }
+
+  function buildHouseWorkerLeaseState(session = null) {
+    const source = session && typeof session === 'object' ? session : {};
+    const runtime = source?.runtime && typeof source.runtime === 'object' ? source.runtime : {};
+    const storedStatus = normalizeHouseWorkerStatus(source?.status, 'starting');
+    const lastHeartbeatAt = normalizeHouseWorkerRuntimeIso(runtime?.lastHeartbeatAt || runtime?.appliedAt || source?.updatedAt || null);
+    const leaseExpiresAt = normalizeHouseWorkerRuntimeIso(runtime?.leaseExpiresAt)
+      || (lastHeartbeatAt
+        ? normalizeHouseWorkerRuntimeIso(new Date(Date.parse(lastHeartbeatAt) + HOUSE_WORKER_LEASE_TTL_MS).toISOString())
+        : null);
+    const ownerKind = String(runtime?.ownerKind || '').trim() || null;
+    const ownerLabel = String(runtime?.ownerLabel || '').trim() || null;
+    const ownerId = String(runtime?.ownerId || '').trim() || null;
+    const active = HOUSE_WORKER_ACTIVE_STATUSES.has(storedStatus);
+    const stale = active
+      && !!leaseExpiresAt
+      && Number.isFinite(Date.parse(leaseExpiresAt))
+      && Date.parse(leaseExpiresAt) <= Date.now();
+    let leaseStatus = 'stopped';
+    if (stale) {
+      leaseStatus = 'stale';
+    } else if (storedStatus === 'failed' || storedStatus === 'blocked') {
+      leaseStatus = 'blocked';
+    } else if (storedStatus === 'stopped') {
+      leaseStatus = 'stopped';
+    } else if (active) {
+      leaseStatus = 'active_detached';
+    }
+    return {
+      ownerKind,
+      ownerLabel,
+      ownerId,
+      lastHeartbeatAt,
+      leaseExpiresAt,
+      leaseStatus,
+      stale,
+    };
+  }
+
+  function normalizeHouseWorkerRuntimeProfilePatch(value = null) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const patch = {};
+    for (const field of ['brainProfileId', 'workspaceSeedRef', 'configVersionId', 'loadoutId']) {
+      const normalized = String(source?.[field] || '').trim();
+      if (!normalized) {
+        patch[field] = null;
+        continue;
+      }
+      if (!isSafeHouseWorkerReference(normalized, {
+        allowEmpty: field !== 'brainProfileId',
+        maxLen: field === 'workspaceSeedRef' ? 260 : 180,
+      })) {
+        return null;
+      }
+      patch[field] = normalized;
+    }
+    return patch;
+  }
+
+  function normalizeHouseWorkerRuntimeBindingPatch(value = null) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+    if (!source) return null;
+    const patch = {
+      bindingMode: String(source?.bindingMode || '').trim() || null,
+      runtimeSessionId: String(source?.runtimeSessionId || '').trim() || null,
+      requestedWorkspaceSeedRef: String(source?.requestedWorkspaceSeedRef || '').trim() || null,
+      workspacePath: String(source?.workspacePath || '').trim() || null,
+      workspaceBindingMode: String(source?.workspaceBindingMode || '').trim() || null,
+      appliedAt: normalizeHouseWorkerRuntimeIso(source?.appliedAt || null),
+      leaseHeartbeatMs: Number(source?.leaseHeartbeatMs || 0) || null,
+      leaseTtlMs: Number(source?.leaseTtlMs || 0) || null,
+      llmFingerprint: null,
+    };
+    const stringRefs = [
+      ['bindingMode', patch.bindingMode, 80],
+      ['runtimeSessionId', patch.runtimeSessionId, 180],
+      ['requestedWorkspaceSeedRef', patch.requestedWorkspaceSeedRef, 260],
+      ['workspacePath', patch.workspacePath, 260],
+      ['workspaceBindingMode', patch.workspaceBindingMode, 80],
+    ];
+    for (const [, fieldValue, maxLen] of stringRefs) {
+      if (!fieldValue) continue;
+      if (!isSafeHouseWorkerReference(fieldValue, { allowEmpty: true, maxLen })) {
+        return null;
+      }
+    }
+    const llmSource = source?.llmFingerprint && typeof source.llmFingerprint === 'object' && !Array.isArray(source.llmFingerprint)
+      ? source.llmFingerprint
+      : null;
+    if (llmSource) {
+      const llmFingerprint = {
+        provider: String(llmSource?.provider || '').trim() || null,
+        modelId: String(llmSource?.modelId || '').trim() || null,
+        modelRef: String(llmSource?.modelRef || '').trim() || null,
+        api: String(llmSource?.api || '').trim() || null,
+        reasoning: String(llmSource?.reasoning || '').trim() || null,
+        useProxy: llmSource?.useProxy !== false,
+      };
+      for (const [, fieldValue] of Object.entries(llmFingerprint)) {
+        if (typeof fieldValue !== 'string' || !fieldValue) continue;
+        if (!isSafeHouseWorkerReference(fieldValue, { allowEmpty: true, maxLen: 180 })) {
+          return null;
+        }
+      }
+      patch.llmFingerprint = llmFingerprint;
+    }
+    return patch;
   }
 
   function mergeHouseWorkerRuntime(existingRuntime = null, patch = null) {
@@ -1024,6 +1283,21 @@ function registerPlatformReadRoutes(app, deps) {
         const lastTaskEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'task_message') || null;
         const lastReplyEvent = [...events].reverse().find((entry) => String(entry?.eventKind || '').trim() === 'assistant_reply') || null;
         const runtime = session?.runtime && typeof session.runtime === 'object' ? session.runtime : {};
+        const requestedRuntimeProfile = runtime?.requestedRuntimeProfile && typeof runtime.requestedRuntimeProfile === 'object'
+          ? runtime.requestedRuntimeProfile
+          : {
+            brainProfileId: String(session?.brainProfileId || runtime?.brainProfileId || '').trim() || null,
+            workspaceSeedRef: String(session?.workspaceSeedRef || runtime?.workspaceSeedRef || '').trim() || null,
+            configVersionId: String(session?.configVersionId || runtime?.configVersionId || '').trim() || null,
+            loadoutId: String(session?.loadoutId || runtime?.loadoutId || '').trim() || null,
+          };
+        const appliedRuntimeProfile = runtime?.appliedRuntimeProfile && typeof runtime.appliedRuntimeProfile === 'object'
+          ? runtime.appliedRuntimeProfile
+          : requestedRuntimeProfile;
+        const leaseState = buildHouseWorkerLeaseState(session);
+        const computedStatus = leaseState.stale
+          ? 'stale'
+          : normalizeHouseWorkerStatus(session?.status, 'starting');
         return {
           houseWorkerSessionId: String(session?.houseWorkerSessionId || '').trim(),
           deploymentId,
@@ -1031,20 +1305,26 @@ function registerPlatformReadRoutes(app, deps) {
           displayName: String(session?.label || deployment?.displayName || 'Helper').trim() || 'Helper',
           officeId: String(deployment?.officeId || '').trim() || null,
           officeLabel: String(deployment?.officeLabel || '').trim() || null,
-          status: normalizeHouseWorkerStatus(session?.status, 'starting'),
-          statusLabel: buildHouseWorkerSessionStatusLabel(session?.status),
+          status: computedStatus,
+          statusLabel: buildHouseWorkerSessionStatusLabel(session?.status, leaseState.leaseStatus),
           runtimeAgentId: String(session?.runtimeAgentId || '').trim() || null,
           runtimeSessionId: String(runtime?.runtimeSessionId || '').trim() || null,
           parentSessionId: String(session?.parentSessionId || '').trim() || null,
           spawnSource: String(runtime?.spawnSource || '').trim() || null,
           latestTask: String(lastTaskEvent?.payload?.message || runtime?.task || '').trim() || null,
           latestReply: String(lastReplyEvent?.payload?.message || runtime?.lastReply || '').trim() || null,
-          runtimeProfile: {
-            brainProfileId: String(session?.brainProfileId || runtime?.brainProfileId || '').trim() || null,
-            workspaceSeedRef: String(session?.workspaceSeedRef || runtime?.workspaceSeedRef || '').trim() || null,
-            configVersionId: String(session?.configVersionId || runtime?.configVersionId || '').trim() || null,
-            loadoutId: String(session?.loadoutId || runtime?.loadoutId || '').trim() || null,
-          },
+          runtimeProfile: appliedRuntimeProfile,
+          requestedRuntimeProfile,
+          appliedRuntimeProfile,
+          runtimeBinding: runtime?.runtimeBinding && typeof runtime.runtimeBinding === 'object'
+            ? runtime.runtimeBinding
+            : null,
+          ownerKind: leaseState.ownerKind,
+          ownerLabel: leaseState.ownerLabel,
+          ownerId: leaseState.ownerId,
+          leaseStatus: leaseState.leaseStatus,
+          lastHeartbeatAt: leaseState.lastHeartbeatAt,
+          leaseExpiresAt: leaseState.leaseExpiresAt,
           eventCount: events.length,
           recentEvents: events.slice(-10).map((event) => ({
             houseWorkerSessionEventId: String(event?.houseWorkerSessionEventId || '').trim(),
@@ -3451,7 +3731,11 @@ function registerPlatformReadRoutes(app, deps) {
       return sendPortalApiError(res, 409, 'RUNAWAY_SPAWN_BLOCKED', 'Child helpers cannot spawn another generation of helpers.', { requestId });
     }
     const activeSessions = listHouseWorkerSessions({ houseId, teamId })
-      .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()));
+      .filter((entry) => {
+        const normalizedStatus = normalizeHouseWorkerStatus(entry?.status, '');
+        if (!HOUSE_WORKER_ACTIVE_STATUSES.has(normalizedStatus)) return false;
+        return buildHouseWorkerLeaseState(entry).stale !== true;
+      });
     const activeSessionForDeployment = activeSessions.find((entry) =>
       String(entry?.deploymentId || '').trim() === deploymentId
     ) || null;
@@ -3508,6 +3792,19 @@ function registerPlatformReadRoutes(app, deps) {
         },
       });
     }
+    const runtimeProfileResolution = resolveHouseWorkerRequestedRuntimeProfile({
+      deployment,
+      overrides: body,
+    });
+    if (!runtimeProfileResolution?.ok) {
+      return sendPortalApiError(
+        res,
+        409,
+        String(runtimeProfileResolution?.code || 'INVALID_RUNTIME_PROFILE'),
+        String(runtimeProfileResolution?.message || 'The requested helper runtime setup could not be applied.'),
+        { requestId }
+      );
+    }
     const sequence = listHouseWorkerSessions({ houseId, teamId }).length + 1;
     const houseWorkerSessionId = buildHouseWorkerSessionId({
       houseId,
@@ -3546,6 +3843,9 @@ function registerPlatformReadRoutes(app, deps) {
         workspaceSeedRef: runtimeProfile.workspaceSeedRef,
         configVersionId: runtimeProfile.configVersionId,
         loadoutId: runtimeProfile.loadoutId,
+        requestedRuntimeProfile: runtimeProfileResolution.requestedRuntimeProfile,
+        appliedRuntimeProfile: null,
+        runtimeBinding: runtimeProfileResolution.runtimeBindingSeed,
       },
       nowIso: now,
     });
@@ -4081,6 +4381,15 @@ function registerPlatformReadRoutes(app, deps) {
     const actor = String(body?.actor || 'runtime').trim().toLowerCase();
     const reason = String(body?.reason || '').trim();
     const runtimeSessionId = String(body?.runtimeSessionId || '').trim();
+    const ownerKind = String(body?.ownerKind || '').trim();
+    const ownerLabel = String(body?.ownerLabel || '').trim();
+    const ownerId = String(body?.ownerId || '').trim();
+    const lastHeartbeatAt = normalizeHouseWorkerRuntimeIso(body?.lastHeartbeatAt || null);
+    const leaseExpiresAt = normalizeHouseWorkerRuntimeIso(body?.leaseExpiresAt || null);
+    const requestedRuntimeProfilePatch = normalizeHouseWorkerRuntimeProfilePatch(body?.requestedRuntimeProfile || null);
+    const appliedRuntimeProfilePatch = normalizeHouseWorkerRuntimeProfilePatch(body?.appliedRuntimeProfile || null);
+    const runtimeBindingPatch = normalizeHouseWorkerRuntimeBindingPatch(body?.runtimeBinding || null);
+    const heartbeatOnly = body?.heartbeatOnly === true;
     if (!houseWorkerSessionId || !status) {
       return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseWorkerSessionId and status are required.', { requestId });
     }
@@ -4093,19 +4402,54 @@ function registerPlatformReadRoutes(app, deps) {
     if (runtimeSessionId && !isSafeHouseWorkerReference(runtimeSessionId, { allowEmpty: true, maxLen: 180 })) {
       return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'runtimeSessionId must use safe reference characters only.', { requestId });
     }
+    if (ownerKind && !isSafeHouseWorkerReference(ownerKind, { allowEmpty: true, maxLen: 80 })) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'ownerKind must use safe reference characters only.', { requestId });
+    }
+    if (ownerLabel && houseOfficeTextHasForbiddenMarker(ownerLabel)) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'ownerLabel cannot include secret-like markers.', { requestId });
+    }
+    if (ownerId && !isSafeHouseWorkerReference(ownerId, { allowEmpty: true, maxLen: 120 })) {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_OVERRIDE', 'ownerId must use safe reference characters only.', { requestId });
+    }
+    if (body?.requestedRuntimeProfile && !requestedRuntimeProfilePatch) {
+      return sendPortalApiError(res, 409, 'INVALID_RUNTIME_PROFILE', 'The requested helper runtime profile evidence is invalid.', { requestId });
+    }
+    if (body?.appliedRuntimeProfile && !appliedRuntimeProfilePatch) {
+      return sendPortalApiError(res, 409, 'INVALID_RUNTIME_PROFILE', 'The applied helper runtime profile evidence is invalid.', { requestId });
+    }
+    if (body?.runtimeBinding && !runtimeBindingPatch) {
+      return sendPortalApiError(res, 409, 'INVALID_RUNTIME_PROFILE', 'The helper runtime binding evidence is invalid.', { requestId });
+    }
     const workerSession = getHouseWorkerSessionById(houseWorkerSessionId);
     if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
       return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
     }
+    const runtimePatch = {
+      statusReason: reason || null,
+      runtimeSessionId: runtimeSessionId || String(workerSession?.runtime?.runtimeSessionId || '').trim() || null,
+    };
+    if (ownerKind) runtimePatch.ownerKind = ownerKind;
+    if (ownerLabel) runtimePatch.ownerLabel = ownerLabel;
+    if (ownerId) runtimePatch.ownerId = ownerId;
+    if (lastHeartbeatAt) runtimePatch.lastHeartbeatAt = lastHeartbeatAt;
+    if (leaseExpiresAt) runtimePatch.leaseExpiresAt = leaseExpiresAt;
+    if (requestedRuntimeProfilePatch) runtimePatch.requestedRuntimeProfile = requestedRuntimeProfilePatch;
+    if (appliedRuntimeProfilePatch) runtimePatch.appliedRuntimeProfile = appliedRuntimeProfilePatch;
+    if (runtimeBindingPatch) runtimePatch.runtimeBinding = runtimeBindingPatch;
     const updatedSession = updateHouseWorkerSession({
       houseWorkerSessionId,
       status,
-      runtime: mergeHouseWorkerRuntime(workerSession?.runtime, {
-        statusReason: reason || null,
-        runtimeSessionId: runtimeSessionId || String(workerSession?.runtime?.runtimeSessionId || '').trim() || null,
-      }),
+      runtime: mergeHouseWorkerRuntime(workerSession?.runtime, runtimePatch),
       updatedAt: nowIso(),
     });
+    if (heartbeatOnly) {
+      const sessionCard = buildHouseWorkerSessionCards({ houseId, teamId })
+        .find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || updatedSession;
+      return sendPortalApiSuccess(res, {
+        session: sessionCard,
+        heartbeatOnly: true,
+      }, { requestId });
+    }
     const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
     const event = createHouseWorkerSessionEvent({
       houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
@@ -4120,6 +4464,10 @@ function registerPlatformReadRoutes(app, deps) {
         status,
         reason: reason || null,
         runtimeSessionId: runtimeSessionId || null,
+        ownerKind: ownerKind || null,
+        ownerId: ownerId || null,
+        lastHeartbeatAt: lastHeartbeatAt || null,
+        leaseExpiresAt: leaseExpiresAt || null,
       },
       createdAt: nowIso(),
     });

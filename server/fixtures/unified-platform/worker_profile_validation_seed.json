@@ -1,0 +1,16 @@
+{
+  "family": "worker_profile_validation_seed",
+  "schema": "agent-town-worker-profile-validation-seed/v1",
+  "valid": {
+    "brainProfileId": "brain:current-runtime",
+    "workspaceSeedRef": "workspace/house-workers/front-desk-helper",
+    "configVersionId": "cfg_house_fixture_01",
+    "loadoutId": "loadout_house_worker_front_desk_helper_v1"
+  },
+  "invalid": {
+    "brainProfileId": "brain:missing-profile",
+    "workspaceSeedRef": "workspace/private/admin",
+    "configVersionId": "cfg_missing_404",
+    "loadoutId": "loadout_missing_404"
+  }
+}
