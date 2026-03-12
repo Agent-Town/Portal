@@ -14,6 +14,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPeerReceipt,
     createLibraryPeerRelay,
     createLibraryPublicStack,
+    createLibraryPublicStackAttestation,
     createLibraryPublicStackMember,
     createLibraryPublicStackReview,
     createLibraryPublicStackVerification,
@@ -36,6 +37,8 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicationById,
     getLibraryPublicStackById,
     getLibraryPublicStackByIdempotency,
+    getLibraryPublicStackAttestation,
+    getLibraryPublicStackAttestationByIdempotency,
     getLibraryPublicStackReview,
     getLibraryPublicStackReviewByIdempotency,
     getLibraryPublicStackVerificationById,
@@ -61,6 +64,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryLinks,
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
+    listLibraryPublicStackAttestations,
     listLibraryPublicStackMembers,
     listLibraryPublicStackReviews,
     listLibraryPublicStacks,
@@ -1185,6 +1189,23 @@ function registerPlatformReadRoutes(app, deps) {
     return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
   }
 
+  function buildLibraryPublicStackAttestationSummary({
+    reviewTier = '',
+    note = '',
+  } = {}) {
+    const normalizedReviewTier = normalizeLibraryPublicStackReviewTier(reviewTier);
+    const normalizedNote = String(note || '').trim();
+    let prefix = '';
+    if (normalizedReviewTier === 'trusted_here') {
+      prefix = 'This House attests this Public Stack as trusted here.';
+    } else if (normalizedReviewTier === 'blocked_here') {
+      prefix = 'This House attests this Public Stack as blocked here.';
+    } else {
+      prefix = 'This House attests this Public Stack for later review.';
+    }
+    return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
+  }
+
   function projectLibraryPublicStackLocalReview({
     houseId = '',
     teamId = '',
@@ -2065,6 +2086,69 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function persistLibraryPublicStackAttestationRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existingReplay = getLibraryPublicStackAttestationByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return {
+        status: 200,
+        attestation: existingReplay,
+      };
+    }
+    const review = getLibraryPublicStackReview({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (!review) {
+      const err = new Error('LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED');
+      err.code = 'LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED';
+      throw err;
+    }
+    const existing = getLibraryPublicStackAttestation({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        attestation: existing,
+      };
+    }
+    const summary = buildLibraryPublicStackAttestationSummary({
+      reviewTier: review.reviewTier,
+      note: review.note,
+    });
+    return {
+      status: 201,
+      attestation: createLibraryPublicStackAttestation({
+        libraryPublicStackAttestationId: `pstatt_${randomHex(12)}`,
+        libraryPublicStackId,
+        libraryPublicStackReviewId: review.libraryPublicStackReviewId,
+        houseId,
+        teamId,
+        reviewTier: review.reviewTier,
+        summary,
+        note: review.note || '',
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.attestation',
+          localReviewSummary: String(review.summary || '').trim() || null,
+        },
+        nowIso: nowIso(),
+      }),
+    };
+  }
+
   function ensureLibraryPublicStackVerification({
     houseId = '',
     teamId = '',
@@ -2821,6 +2905,60 @@ function registerPlatformReadRoutes(app, deps) {
       review: persisted.review,
       preview: previewAfterSave.ok ? previewAfterSave.preview : preview.preview,
     }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/attestations', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before attesting a Public Stack.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before attesting a Public Stack.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to attest a Public Stack.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to attest a Public Stack.', { requestId });
+    }
+    const preview = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    if (!preview.ok) {
+      return sendPortalApiError(res, 404, preview.code || 'PUBLIC_STACK_NOT_FOUND', preview.message || 'Public Stack not found.', { requestId });
+    }
+    try {
+      const persisted = persistLibraryPublicStackAttestationRecord({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryPublicStackId: registryEntityId,
+        idempotencyKey,
+      });
+      return sendPortalApiSuccess(res, {
+        attestation: persisted.attestation,
+        preview: preview.preview,
+      }, { requestId, status: persisted.status });
+    } catch (err) {
+      if (String(err?.code || '').trim() === 'LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED') {
+        return sendPortalApiError(
+          res,
+          409,
+          'LIBRARY_PUBLIC_STACK_REVIEW_REQUIRED',
+          'Save a local review before publishing a Public Stack attestation.',
+          { requestId },
+        );
+      }
+      throw err;
+    }
   });
 
   app.post('/api/platform/library/public-stacks/:registryEntityId/imports', express.json({ limit: '32kb' }), (req, res) => {

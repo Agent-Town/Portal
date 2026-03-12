@@ -2774,6 +2774,14 @@ function getLibraryPublicStackAttestationByIdempotency({
   return mapLibraryPublicStackAttestationRow(row);
 }
 
+function getLibraryPublicStackAttestation({
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+} = {}) {
+  return listLibraryPublicStackAttestations({ houseId, teamId, libraryPublicStackId })[0] || null;
+}
+
 function createLibraryPublicStackAttestation({
   libraryPublicStackAttestationId = '',
   libraryPublicStackId = '',
@@ -5648,6 +5656,7 @@ module.exports = {
   getLibraryPublicationById,
   getLibraryPublicStackById,
   getLibraryPublicStackByIdempotency,
+  getLibraryPublicStackAttestation,
   getLibraryPublicStackAttestationById,
   getLibraryPublicStackAttestationByIdempotency,
   getLibraryPublicStackReview,
