@@ -9,7 +9,7 @@ function createHttpRelayAdapter() {
     id: 'relay.http.v1',
     canHandle(transport) {
       const kind = typeof transport?.kind === 'string' ? transport.kind.trim() : '';
-      return !kind || kind === 'relay.http.v1';
+      return !kind || kind === 'relay.http.v1' || kind === 'pony.relay.registry.v1';
     },
     deliver({ store, message }) {
       ensureInbox(store).push(message);

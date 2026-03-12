@@ -108,6 +108,7 @@ const {
   countTrackProgressEventsByDedupe,
   createLibraryItem,
   createLibraryLink,
+  createLibraryPeerReceipt,
   createLibraryPeerRelay,
   createLibraryPublication,
   createScopeSet,
@@ -139,6 +140,7 @@ const {
   getLatestTraceEvent,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
   getLibraryPublicationByIdempotency,
@@ -178,6 +180,7 @@ const {
   listLibraryItems,
   listLibraryItemRevisions,
   listLibraryLinks,
+  listLibraryPeerReceipts,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,
@@ -197,6 +200,7 @@ const {
   setUnifiedPlatformBenchmarkSnapshot,
   setUnifiedPlatformRegistryPreviewSnapshot,
   setUnifiedPlatformPromptPreview,
+  updateLibraryPeerRelay,
   updateLibraryItem,
   updateRunMetadata,
   updateSealedContextStatus,
@@ -4450,6 +4454,7 @@ registerPlatformReadRoutes(app, {
   createLibraryItem,
   createLibraryItemRevision,
   createLibraryLink,
+  createLibraryPeerReceipt,
   createLibraryPeerRelay,
   createLibraryShelf,
   createLibraryPublication,
@@ -4462,6 +4467,7 @@ registerPlatformReadRoutes(app, {
   getConversationArtifactByIdempotency,
   getLibraryItemById,
   getLibraryItemByIdempotency,
+  getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
   getLibraryPublicationByIdempotency,
@@ -4482,6 +4488,7 @@ registerPlatformReadRoutes(app, {
   listLibraryItems,
   listLibraryItemRevisions,
   listLibraryLinks,
+  listLibraryPeerReceipts,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,
@@ -4504,6 +4511,7 @@ registerPlatformReadRoutes(app, {
   removeLibraryShelfItem,
   replaceScopeSetItems,
   replaceConfigComponentVersions,
+  dispatchLibraryPeerRelayEnvelope,
   resolveApprovedLibraryPeerRelayApproval,
   resolveApprovedLibraryPublicationApproval,
   resolveApprovedTrainerPatchPromotion,
@@ -4519,6 +4527,7 @@ registerPlatformReadRoutes(app, {
   setUnifiedPlatformPromptPreview,
   sha256PrefixedHex,
   stableJsonStringify,
+  updateLibraryPeerRelay,
   updateLibraryItem,
   updateTrainerJobStatus,
   updateTrainerResultLink,
@@ -6416,6 +6425,86 @@ function resolveKnownHouseTarget(houseAddress = '') {
   if (!normalizedHouseAddress) return null;
   const store = readStore();
   return resolveHouseAddress(store, normalizedHouseAddress);
+}
+
+function dispatchLibraryPeerRelayEnvelope({
+  relay = null,
+  publication = null,
+  item = null,
+  targetHouseId = '',
+} = {}) {
+  const target = resolveKnownHouseTarget(targetHouseId || relay?.targetHouseId || '');
+  if (!target || !target.houseId) {
+    throw new Error('TARGET_HOUSE_NOT_FOUND');
+  }
+  const normalizedRelayId = String(relay?.libraryPeerRelayId || '').trim();
+  const normalizedPublicationId = String(publication?.libraryPublicationId || relay?.libraryPublicationId || '').trim();
+  const normalizedRegistryId = String(relay?.registryId || publication?.registryId || item?.registryId || '').trim();
+  const normalizedTransportKind = String(relay?.transportKind || 'pony.relay.registry.v1').trim() || 'pony.relay.registry.v1';
+  const sourceHouseId = String(relay?.houseId || '').trim() || null;
+  const itemLabel = String(item?.title || publication?.registryId || normalizedPublicationId || 'Library relay').trim();
+  const body = JSON.stringify({
+    kind: 'library_peer_relay_notice',
+    libraryPeerRelayId: normalizedRelayId,
+    libraryPublicationId: normalizedPublicationId,
+    registryId: normalizedRegistryId,
+    title: itemLabel,
+    summary: String(item?.summary || '').trim() || null,
+    sourceRef: String(item?.sourceRef || publication?.sourceRef || '').trim() || null,
+    contentHash: String(publication?.contentHash || item?.contentHash || '').trim() || null,
+  });
+  const message = makeInboxMsg({
+    toHouseId: target.houseId,
+    fromHouseId: sourceHouseId,
+    body,
+    status: 'accepted',
+    kind: 'msg.library_relay.v1',
+  });
+  message.transport = {
+    kind: normalizedTransportKind,
+    relayHints: [
+      `library-peer-relay:${normalizedRelayId}`,
+      normalizedRegistryId ? `registry:${normalizedRegistryId}` : '',
+    ].filter(Boolean),
+  };
+  message.relay = {
+    libraryPeerRelayId: normalizedRelayId,
+    libraryPublicationId: normalizedPublicationId,
+    registryId: normalizedRegistryId || null,
+    sourceHouseId,
+    targetHouseId: target.houseId,
+  };
+  const store = readStore();
+  let dispatchResult;
+  try {
+    dispatchResult = ponyTransportService.dispatch({
+      store,
+      message,
+      transport: message.transport,
+      context: {
+        fromHouseId: sourceHouseId,
+        toHouseId: target.houseId,
+      },
+    });
+  } catch (error) {
+    throw error;
+  }
+  message.dispatch = {
+    receiptId: makeDispatchReceiptId(),
+    ok: dispatchResult?.ok !== false,
+    adapter: typeof dispatchResult?.adapter === 'string' && dispatchResult.adapter.trim()
+      ? dispatchResult.adapter.trim()
+      : 'relay.unknown.v1',
+    transportKind: normalizedTransportKind,
+    relayHints: Array.isArray(message.transport?.relayHints) ? message.transport.relayHints : [],
+    dispatchedAt: nowIso(),
+  };
+  writeStore(store);
+  return {
+    targetHouseId: target.houseId,
+    message,
+    dispatch: message.dispatch,
+  };
 }
 
 function buildSeededSealedContextRecord({

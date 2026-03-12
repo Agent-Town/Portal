@@ -11,6 +11,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryItem,
     createLibraryItemRevision,
     createLibraryLink,
+    createLibraryPeerReceipt,
     createLibraryPeerRelay,
     createLibraryShelf,
     createLibraryPublication,
@@ -23,6 +24,7 @@ function registerPlatformReadRoutes(app, deps) {
     getConversationArtifactByIdempotency,
     getLibraryItemById,
     getLibraryItemByIdempotency,
+    getLibraryPeerRelayById,
     getLibraryPeerRelayByIdempotency,
     getLibraryPublicationById,
     getLibraryShelfById,
@@ -41,6 +43,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryItems,
     listLibraryItemRevisions,
     listLibraryLinks,
+    listLibraryPeerReceipts,
     listLibraryPublications,
     listLibraryShelfItems,
     listLibraryShelves,
@@ -65,6 +68,7 @@ function registerPlatformReadRoutes(app, deps) {
     removeLibraryShelfItem,
     replaceScopeSetItems,
     replaceConfigComponentVersions,
+    dispatchLibraryPeerRelayEnvelope,
     resolveApprovedLibraryPeerRelayApproval,
     resolveApprovedLibraryPublicationApproval,
     resolveApprovedTrainerPatchPromotion,
@@ -80,6 +84,7 @@ function registerPlatformReadRoutes(app, deps) {
     setUnifiedPlatformPromptPreview,
     sha256PrefixedHex,
     stableJsonStringify,
+    updateLibraryPeerRelay,
     updateLibraryItem,
     updateTrainerJobStatus,
     updateTrainerResultLink,
@@ -956,6 +961,42 @@ function registerPlatformReadRoutes(app, deps) {
     return {
       status: 201,
       relay,
+    };
+  }
+
+  function persistLibraryPeerReceiptRecord({
+    relay = null,
+    receiptKind = 'pony_dispatch_receipt',
+    receiptRef = '',
+    status = 'accepted',
+    metadata = null,
+  } = {}) {
+    const relayId = String(relay?.libraryPeerRelayId || '').trim();
+    if (!relayId) {
+      throw new Error('LIBRARY_PEER_RELAY_REQUIRED');
+    }
+    const existingReceipt = listLibraryPeerReceipts({
+      libraryPeerRelayId: relayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === String(relay?.targetHouseId || '').trim()) || null;
+    if (existingReceipt) {
+      return {
+        status: 200,
+        receipt: existingReceipt,
+      };
+    }
+    const receipt = createLibraryPeerReceipt({
+      libraryPeerReceiptId: `preceipt_${randomHex(12)}`,
+      libraryPeerRelayId: relayId,
+      targetHouseId: String(relay?.targetHouseId || '').trim(),
+      receiptKind,
+      receiptRef,
+      status,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      receipt,
     };
   }
 
@@ -2009,6 +2050,113 @@ function registerPlatformReadRoutes(app, deps) {
         houseId: target.houseId,
       },
     }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/peer-relays/:libraryPeerRelayId/deliver', express.json({ limit: '16kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before delivering a Library relay.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before delivering a Library relay.', { requestId });
+    }
+    const libraryPeerRelayId = typeof req.params?.libraryPeerRelayId === 'string' ? req.params.libraryPeerRelayId.trim() : '';
+    if (!libraryPeerRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_PEER_RELAY_REQUIRED', 'libraryPeerRelayId is required.', { requestId });
+    }
+    const relay = getLibraryPeerRelayById(libraryPeerRelayId);
+    if (!relay || relay.houseId !== context.houseId || relay.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_PEER_RELAY_NOT_FOUND', 'The requested Library relay could not be found for this House team.', { requestId });
+    }
+    const existingReceipt = listLibraryPeerReceipts({
+      libraryPeerRelayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === String(relay?.targetHouseId || '').trim()) || null;
+    if (existingReceipt) {
+      const existingRelay = updateLibraryPeerRelay({
+        libraryPeerRelayId,
+        relayState: 'accepted',
+        metadata: {
+          deliveredReceiptId: existingReceipt.libraryPeerReceiptId,
+          deliveredReceiptRef: existingReceipt.receiptRef,
+        },
+        nowIso: nowIso(),
+      }) || relay;
+      return sendPortalApiSuccess(res, {
+        relay: existingRelay,
+        receipt: existingReceipt,
+      }, { requestId, status: 200 });
+    }
+    const publication = relay.libraryPublicationId ? getLibraryPublicationById(relay.libraryPublicationId) : null;
+    if (!publication) {
+      return sendPortalApiError(res, 404, 'LIBRARY_PUBLICATION_NOT_FOUND', 'The source publication for this relay could not be found.', { requestId });
+    }
+    const item = publication.libraryItemId ? getLibraryItemById(publication.libraryItemId) : null;
+    if (!item) {
+      return sendPortalApiError(res, 409, 'LIBRARY_PUBLICATION_ITEM_REQUIRED', 'The published Library item could not be resolved for delivery.', { requestId });
+    }
+    const target = resolveKnownHouseTarget(relay.targetHouseId);
+    if (!target) {
+      return sendPortalApiError(res, 404, 'TARGET_HOUSE_NOT_FOUND', 'The target house for this relay could not be found.', { requestId });
+    }
+    let delivery;
+    try {
+      delivery = dispatchLibraryPeerRelayEnvelope({
+        relay,
+        publication,
+        item,
+        targetHouseId: target.houseId,
+      });
+    } catch (error) {
+      const message = String(error?.message || 'LIBRARY_PEER_RELAY_DELIVERY_FAILED');
+      if (message === 'TARGET_HOUSE_NOT_FOUND') {
+        return sendPortalApiError(res, 404, message, 'The target house for this relay could not be found.', { requestId });
+      }
+      return sendPortalApiError(res, 502, 'LIBRARY_PEER_RELAY_DELIVERY_FAILED', 'The Library relay could not be delivered to Pony inbox.', {
+        requestId,
+        details: {
+          relayId: libraryPeerRelayId,
+          cause: message,
+        },
+      });
+    }
+    const receiptPersisted = persistLibraryPeerReceiptRecord({
+      relay,
+      receiptKind: 'pony_dispatch_receipt',
+      receiptRef: String(delivery?.dispatch?.receiptId || '').trim(),
+      status: 'accepted',
+      metadata: {
+        messageId: String(delivery?.message?.id || '').trim() || null,
+        messageKind: String(delivery?.message?.kind || '').trim() || null,
+        dispatchAdapter: String(delivery?.dispatch?.adapter || '').trim() || null,
+        transportKind: String(delivery?.dispatch?.transportKind || relay?.transportKind || '').trim() || null,
+        registryId: String(relay?.registryId || publication?.registryId || '').trim() || null,
+        libraryPublicationId: publication.libraryPublicationId,
+      },
+    });
+    const updatedRelay = updateLibraryPeerRelay({
+      libraryPeerRelayId,
+      relayState: 'accepted',
+      metadata: {
+        deliveredReceiptId: receiptPersisted.receipt?.libraryPeerReceiptId || null,
+        deliveredReceiptRef: receiptPersisted.receipt?.receiptRef || null,
+        deliveredMessageId: String(delivery?.message?.id || '').trim() || null,
+        targetInboxState: 'accepted',
+      },
+      nowIso: nowIso(),
+    }) || relay;
+    return sendPortalApiSuccess(res, {
+      relay: updatedRelay,
+      receipt: receiptPersisted.receipt,
+      dispatch: delivery?.dispatch || null,
+      target: {
+        houseId: target.houseId,
+      },
+    }, { requestId, status: receiptPersisted.status });
   });
 
   app.post('/api/platform/library/conversation-artifacts', express.json({ limit: '64kb' }), (req, res) => {

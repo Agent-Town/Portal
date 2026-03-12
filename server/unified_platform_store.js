@@ -2000,6 +2000,39 @@ function createLibraryPeerRelay({
     .find((entry) => entry.libraryPeerRelayId === normalizedLibraryPeerRelayId) || null;
 }
 
+function updateLibraryPeerRelay({
+  libraryPeerRelayId = '',
+  relayState = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibraryPeerRelayId = String(libraryPeerRelayId || '').trim();
+  if (!normalizedLibraryPeerRelayId) return null;
+  const existing = getLibraryPeerRelayById(normalizedLibraryPeerRelayId);
+  if (!existing) return null;
+  const nextRelayState = String(relayState || existing.relayState || '').trim() || existing.relayState || 'queued';
+  const nextMetadata = metadata && typeof metadata === 'object'
+    ? {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...metadata,
+      }
+    : (existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_peer_relays
+    SET relay_state = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_peer_relay_id = ?
+  `).run(
+    nextRelayState,
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedLibraryPeerRelayId,
+  );
+  return getLibraryPeerRelayById(normalizedLibraryPeerRelayId);
+}
+
 function listLibraryPeerReceipts({
   libraryPeerRelayId = '',
 } = {}) {
@@ -4238,6 +4271,7 @@ module.exports = {
   setUnifiedPlatformEditorSnapshot,
   setUnifiedPlatformPromptPreview,
   setUnifiedPlatformRegistryPreviewSnapshot,
+  updateLibraryPeerRelay,
   updateRunMetadata,
   updateSealedContextStatus,
   upsertSealedContext,
