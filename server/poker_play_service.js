@@ -124,6 +124,11 @@ function normalizePokerPlayTableType(value, fallback = 'cash') {
   return type === 'tournament' ? 'tournament' : 'cash';
 }
 
+function normalizePokerPlayTournamentFillPolicy(value, fallback = 'open_match') {
+  const policy = normalizeTrimmedString(value, fallback).toLowerCase();
+  return policy === 'fill_to_full' ? 'fill_to_full' : 'open_match';
+}
+
 function normalizePokerPlayAccessMode(value, fallback = 'public') {
   const mode = normalizeTrimmedString(value, fallback).toLowerCase();
   return mode === 'invite_only' ? 'invite_only' : 'public';
@@ -212,6 +217,9 @@ function slugifySegment(value, fallback = 'table') {
 
 function normalizeCreateTableConfig(input = {}) {
   const tableType = normalizePokerPlayTableType(input?.tableType);
+  const fillPolicy = tableType === 'tournament'
+    ? normalizePokerPlayTournamentFillPolicy(input?.fillPolicy)
+    : 'open_match';
   const accessMode = normalizePokerPlayAccessMode(input?.accessMode);
   const smallBlindOil = Math.max(1, normalizeOilAmount(input?.smallBlindOil, tableType === 'cash' ? 10 : 50));
   const bigBlindOil = Math.max(smallBlindOil * 2, normalizeOilAmount(input?.bigBlindOil, tableType === 'cash' ? 20 : 100));
@@ -223,7 +231,7 @@ function normalizeCreateTableConfig(input = {}) {
   const reconnectGraceSeconds = Math.max(10, normalizeOilAmount(input?.reconnectGraceSeconds, DEFAULT_PLAY_RECONNECT_GRACE_SECONDS));
   const timeBankSeconds = Math.max(0, normalizeOilAmount(input?.timeBankSeconds, DEFAULT_PLAY_TIME_BANK_SECONDS));
   const lateRegistrationHands = tableType === 'tournament'
-    ? Math.max(0, normalizeOilAmount(input?.lateRegistrationHands, 2))
+    ? (fillPolicy === 'fill_to_full' ? 0 : Math.max(0, normalizeOilAmount(input?.lateRegistrationHands, 2)))
     : 0;
   const handsPerBlindLevel = tableType === 'tournament'
     ? Math.max(1, normalizeOilAmount(input?.handsPerBlindLevel, 2))
@@ -247,10 +255,11 @@ function normalizeCreateTableConfig(input = {}) {
     ? normalizeIsoString(input?.scheduledStartAt)
     : '';
   const reentryLimit = tableType === 'tournament'
-    ? Math.max(0, normalizeOilAmount(input?.reentryLimit, 0))
+    ? (fillPolicy === 'fill_to_full' ? 0 : Math.max(0, normalizeOilAmount(input?.reentryLimit, 0)))
     : 0;
   return {
     tableType,
+    fillPolicy,
     accessMode,
     smallBlindOil,
     bigBlindOil,
@@ -316,6 +325,7 @@ function buildMatchKey(config) {
   ];
   if (normalizePokerPlayTableType(config?.tableType) === 'tournament') {
     const blindLevels = normalizeTournamentBlindLevels(config?.blindLevels, config?.smallBlindOil, config?.bigBlindOil);
+    base.push(`fp${normalizePokerPlayTournamentFillPolicy(config?.fillPolicy)}`);
     base.push(`hbl${Math.max(1, normalizeOilAmount(config?.handsPerBlindLevel, 2))}`);
     base.push(`bl${blindLevels.map((level) => `${level.smallBlindOil}-${level.bigBlindOil}`).join('_')}`);
     base.push(`lr${Math.max(0, normalizeOilAmount(config?.lateRegistrationHands, 0))}`);
@@ -330,6 +340,7 @@ function buildMatchKey(config) {
 function buildMatchKeyFromTable(table) {
   return buildMatchKey({
     tableType: table?.tableType,
+    fillPolicy: table?.rules?.fillPolicy,
     smallBlindOil: table?.smallBlindOil,
     bigBlindOil: table?.bigBlindOil,
     buyInOil: table?.buyInOil,
@@ -600,6 +611,35 @@ function isScheduledTournamentPending(table, atIso) {
 
 function getTournamentReentryLimit(table) {
   return Math.max(0, normalizeOilAmount(table?.rules?.reentryLimit, 0));
+}
+
+function getTournamentFillPolicy(table) {
+  return normalizePokerPlayTournamentFillPolicy(table?.rules?.fillPolicy, 'open_match');
+}
+
+function getTournamentStartTargetSeats(table) {
+  const minPlayers = Math.max(2, normalizeOilAmount(table?.minPlayers, 2));
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return minPlayers;
+  if (getTournamentFillPolicy(table) !== 'fill_to_full') return minPlayers;
+  return Math.max(minPlayers, normalizeSeatCount(table?.maxSeats, POKER_PLAY_MAX_SEATS));
+}
+
+function hasPokerPlayTableStarted(table, hand) {
+  return !!(
+    hand?.handId
+      || normalizeTrimmedString(table?.state?.lastStartedAt)
+      || normalizeTrimmedString(table?.state?.lastSettledHandId)
+      || Number(table?.state?.activeHandNumber || 0) > 0
+  );
+}
+
+function getPokerPlayAutoStartSeatTarget(table, hand) {
+  const minPlayers = Math.max(2, normalizeOilAmount(table?.minPlayers, 2));
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return minPlayers;
+  if (getTournamentFillPolicy(table) !== 'fill_to_full') return minPlayers;
+  if (normalizeTrimmedString(table?.state?.startedByDirectorAt)) return minPlayers;
+  if (hasPokerPlayTableStarted(table, hand)) return minPlayers;
+  return getTournamentStartTargetSeats(table);
 }
 
 function getSessionHouseId(session) {
@@ -1141,6 +1181,15 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const blindProgress = resolveTournamentBlindProgress(table, handNumber > 0 ? handNumber : Number(table?.state?.activeHandNumber || 1));
   const lateRegistration = resolveTournamentLateRegistration(table, hand);
   const scheduledStartAt = getTournamentScheduledStartAt(table);
+  const scheduledStartPending = !!scheduledStartAt && isScheduledTournamentPending(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || '');
+  const fillPolicy = getTournamentFillPolicy(table);
+  const startTargetSeats = getTournamentStartTargetSeats(table);
+  const started = hasPokerPlayTableStarted(table, hand);
+  const startSeatCount = activeSeats.length;
+  const startReady = !started
+    && !scheduledStartPending
+    && startSeatCount >= getPokerPlayAutoStartSeatTarget(table, hand);
+  const seatsUntilStart = started ? 0 : Math.max(0, startTargetSeats - startSeatCount);
   return {
     occupancy: occupiedSeats.length,
     activeSeatCount: activeSeats.length,
@@ -1158,8 +1207,12 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     lateRegistrationOpen: lateRegistration.open,
     lateRegistrationRemainingHands: lateRegistration.remainingHands,
     scheduledStartAt: scheduledStartAt || null,
-    scheduledStartPending: !!scheduledStartAt && isScheduledTournamentPending(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || ''),
+    scheduledStartPending,
     reentryLimit: getTournamentReentryLimit(table),
+    fillPolicy,
+    startTargetSeats,
+    seatsUntilStart,
+    startReady,
     entryCount: getTournamentTableEntryCount(table, seats),
     acceptedReentryCount: Math.max(0, normalizeOilAmount(table?.state?.reentryCount, 0)),
     registrationClosedByDirectorAt: normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt) || null,
@@ -1169,10 +1222,13 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
 }
 
 function buildDynamicTableSummary(config, matchKey) {
+  const tournamentFillPolicy = normalizePokerPlayTournamentFillPolicy(config?.fillPolicy);
   const summary = {
     headline: config.tableType === 'cash'
       ? 'Open cash table with private human + agent seat threads.'
-      : 'Six-max tournament with a real payout ladder and private human + agent seat threads.',
+      : (tournamentFillPolicy === 'fill_to_full'
+        ? 'Sit-and-go tournament that waits for a full table before the first hand.'
+        : 'Six-max tournament with a real payout ladder and private human + agent seat threads.'),
     matchKey,
     origin: 'dynamic',
     accessMode: normalizePokerPlayAccessMode(config?.accessMode),
@@ -1183,6 +1239,12 @@ function buildDynamicTableSummary(config, matchKey) {
     summary.seriesTitle = normalizeTrimmedString(config?.seriesTitle, config?.title);
     summary.scheduledStartAt = normalizeIsoString(config?.scheduledStartAt) || null;
     summary.reentryLimit = Math.max(0, normalizeOilAmount(config?.reentryLimit, 0));
+    summary.fillPolicy = tournamentFillPolicy;
+    summary.startTargetSeats = summary.fillPolicy === 'fill_to_full'
+      ? Math.max(2, normalizeSeatCount(config?.maxSeats, POKER_PLAY_MAX_SEATS))
+      : Math.max(2, normalizeOilAmount(config?.minPlayers, 2));
+    summary.seatsUntilStart = summary.startTargetSeats;
+    summary.startReady = false;
   }
   return summary;
 }
@@ -4864,7 +4926,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       }
 
       const readySeats = getActiveSeatRows(seats);
-      if (readySeats.length >= Math.max(2, Number(table.minPlayers || 2))) {
+      if (readySeats.length >= getPokerPlayAutoStartSeatTarget(table, hand)) {
         const started = startNewTableHand(deps, table, seats, hand, atIso);
         table = started.table;
         hand = started.hand;
@@ -4886,7 +4948,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
       }
     }
 
-    if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= Math.max(2, Number(table.minPlayers || 2))) {
+    if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= getPokerPlayAutoStartSeatTarget(table, hand)) {
       const started = startNewTableHand(deps, table, seats, hand, atIso);
       table = started.table;
       hand = started.hand;
@@ -5165,6 +5227,7 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       timeBankSeconds: normalized.timeBankSeconds,
       cashOutEnabled: normalized.tableType === 'cash',
       payoutModel: normalized.tableType === 'cash' ? 'cash_stack' : 'dynamic_ladder',
+      fillPolicy: normalized.tableType === 'tournament' ? normalized.fillPolicy : 'open_match',
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
@@ -5233,15 +5296,23 @@ function resolveMatchmakeTable(deps, config, { processAt } = {}) {
   }
   let nextConfig = normalized;
   if (normalized.tableType === 'tournament') {
-    const existingSeries = listExistingTournamentSeriesTables(deps, matchKey, { processAt })
-      .sort((left, right) => String(right?.table?.createdAt || '').localeCompare(String(left?.table?.createdAt || '')));
-    const leadSeriesTable = existingSeries[0]?.table || null;
-    const ref = getTournamentSeriesRef(leadSeriesTable);
-    nextConfig = {
-      ...normalized,
-      seriesId: ref.seriesId || `pkseries_${deps.randomHex(8)}`,
-      seriesTitle: ref.seriesTitle || normalized.title,
-    };
+    if (normalized.fillPolicy === 'fill_to_full') {
+      nextConfig = {
+        ...normalized,
+        seriesId: `pkseries_${deps.randomHex(8)}`,
+        seriesTitle: normalized.title,
+      };
+    } else {
+      const existingSeries = listExistingTournamentSeriesTables(deps, matchKey, { processAt })
+        .sort((left, right) => String(right?.table?.createdAt || '').localeCompare(String(left?.table?.createdAt || '')));
+      const leadSeriesTable = existingSeries[0]?.table || null;
+      const ref = getTournamentSeriesRef(leadSeriesTable);
+      nextConfig = {
+        ...normalized,
+        seriesId: ref.seriesId || `pkseries_${deps.randomHex(8)}`,
+        seriesTitle: ref.seriesTitle || normalized.title,
+      };
+    }
   }
   return createDynamicTable(deps, nextConfig, { createdAt: toProcessIso(deps, processAt) });
 }

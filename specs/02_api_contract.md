@@ -655,6 +655,8 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.scheduledStartPending`
 - tournaments expose `data.table.summary.lateRegistrationOpen`
 - tournaments expose `data.table.summary.lateRegistrationRemainingHands`
+- tournaments expose `data.table.summary.fillPolicy` as `open_match` or `fill_to_full`
+- tournaments expose `data.table.summary.startTargetSeats`, `data.table.summary.seatsUntilStart`, and `data.table.summary.startReady` for first-hand readiness
 - tournaments expose `data.table.summary.entryCount`
 - tournaments expose `data.table.summary.reentryLimit`
 - tournaments expose `data.table.summary.acceptedReentryCount`
@@ -732,6 +734,7 @@ Request shape:
 ```
 
 Tournament-only request fields:
+- `fillPolicy`; `open_match` by default or `fill_to_full` for sit-and-go
 - `lateRegistrationHands`
 - `handsPerBlindLevel`
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
@@ -907,11 +910,13 @@ Request shape:
 ```json
 {
   "tableType": "tournament",
+  "fillPolicy": "fill_to_full",
   "smallBlindOil": 75,
   "bigBlindOil": 150,
   "buyInOil": 600,
-  "lateRegistrationHands": 2,
-  "reentryLimit": 1,
+  "maxSeats": 3,
+  "lateRegistrationHands": 0,
+  "reentryLimit": 0,
   "scheduledStartAt": "2026-03-11T13:25:00.000Z",
   "handsPerBlindLevel": 2,
   "displayName": "Bravo House"
@@ -927,9 +932,11 @@ Response fields:
 Tournament matchmaking notes:
 - tournament matching includes `lateRegistrationHands` as part of the structure key
 - tournament matching also includes `reentryLimit` as part of the structure key
+- tournament matching also includes `fillPolicy`
 - invite-only tables are out of scope for matchmaking and must be created directly with `POST /api/poker/play/tables`
 - if a matching tournament table is already live but still within the late-registration window, matchmaking may seat the caller into that live table as `registered`
 - if a matching tournament table is still `scheduled`, matchmaking may seat the caller before cards are dealt and preserve the scheduled start timestamp in the returned table payload
+- `fillPolicy = "fill_to_full"` creates sit-and-go behavior: the first automatic hand waits until `data.table.summary.startTargetSeats` is reached, late registration is disabled, re-entry is disabled, and once that table is live a later identical matchmake request creates a fresh single-table tournament instead of extending the old series
 
 ### POST `/api/poker/play/series/:seriesId/reenter`
 Lets a wallet with an earlier busted tournament entry buy back into the same series when the configured re-entry policy still allows it.

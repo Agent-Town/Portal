@@ -1064,7 +1064,7 @@
       `,
       `
         <h2>Quick Seat</h2>
-        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, or create an invite-only table that stays out of the public lobby and rail.</p>
+        <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a fill-to-full sit-and-go, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
@@ -1082,6 +1082,20 @@
             <select id="pokerPlayMatchmakeType">
               <option value="cash">Cash</option>
               <option value="tournament">Tournament</option>
+            </select>
+          </label>
+          <label id="pokerPlayMatchmakeFillPolicyRow" hidden>
+            Tournament Start
+            <select id="pokerPlayMatchmakeFillPolicy">
+              <option value="open_match">Open Match</option>
+              <option value="fill_to_full">Sit-And-Go Fill To Full</option>
+            </select>
+          </label>
+          <label id="pokerPlayMatchmakeMaxSeatsRow" hidden>
+            Table Cap
+            <select id="pokerPlayMatchmakeMaxSeats">
+              <option value="6">6 Seats</option>
+              <option value="3">3 Seats</option>
             </select>
           </label>
           <label>
@@ -1144,10 +1158,14 @@
               <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
               ${renderMetaBadges([
                 item.tableType,
+                item?.tableType === 'tournament' && item?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
                 item.accessMode === 'invite_only' ? 'invite-only' : '',
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item.buyInOil || 0)} OIL buy-in`,
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
+                  ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
+                  : '',
                 Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
                 item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
                 item?.tableType === 'tournament'
@@ -1223,8 +1241,12 @@
               <p>${escapeHtml(item?.summary?.headline || 'Public table state only.')}</p>
               ${renderMetaBadges([
                 item.tableType,
+                item?.tableType === 'tournament' && item?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
                 `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                 `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
+                item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
+                  ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
+                  : '',
                 item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
                 Number(item?.summary?.disconnectedSeatCount || 0) > 0 ? `${Number(item.summary.disconnectedSeatCount || 0)} disconnected` : '',
                 item?.tableType === 'tournament' && Number(item?.summary?.prizePoolOil || 0) > 0
@@ -1627,6 +1649,10 @@
     if (!form) return;
     const accessEl = document.getElementById('pokerPlayMatchmakeAccess');
     const typeEl = document.getElementById('pokerPlayMatchmakeType');
+    const fillPolicyRow = document.getElementById('pokerPlayMatchmakeFillPolicyRow');
+    const fillPolicyEl = document.getElementById('pokerPlayMatchmakeFillPolicy');
+    const maxSeatsRow = document.getElementById('pokerPlayMatchmakeMaxSeatsRow');
+    const maxSeatsEl = document.getElementById('pokerPlayMatchmakeMaxSeats');
     const smallBlindEl = document.getElementById('pokerPlayMatchmakeSmallBlind');
     const bigBlindEl = document.getElementById('pokerPlayMatchmakeBigBlind');
     const buyInEl = document.getElementById('pokerPlayMatchmakeBuyIn');
@@ -1643,21 +1669,43 @@
         if (String(buyInEl.value || '') === '300') buyInEl.value = '400';
       }
     };
-    if (typeEl) typeEl.addEventListener('change', applyDefaults);
+    const syncTournamentOptions = () => {
+      const tournament = String(typeEl?.value || 'cash') === 'tournament';
+      if (fillPolicyRow) fillPolicyRow.hidden = !tournament;
+      if (maxSeatsRow) maxSeatsRow.hidden = !tournament;
+      if (fillPolicyEl) fillPolicyEl.disabled = !tournament;
+      if (maxSeatsEl) maxSeatsEl.disabled = !tournament;
+      if (!tournament) {
+        if (fillPolicyEl) fillPolicyEl.value = 'open_match';
+        if (maxSeatsEl) maxSeatsEl.value = '6';
+      }
+    };
+    if (typeEl) {
+      typeEl.addEventListener('change', () => {
+        applyDefaults();
+        syncTournamentOptions();
+      });
+    }
+    syncTournamentOptions();
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       const accessMode = String(accessEl?.value || 'public');
       setStatus(accessMode === 'invite_only' ? 'Creating invite-only table...' : 'Finding a matching live table...');
       try {
+        const tableType = String(typeEl?.value || 'cash');
         const payloadBody = {
           accessMode,
-          tableType: String(typeEl?.value || 'cash'),
+          tableType,
           smallBlindOil: Number(smallBlindEl?.value || 0),
           bigBlindOil: Number(bigBlindEl?.value || 0),
           buyInOil: Number(buyInEl?.value || 0),
           displayName: String(document.getElementById('pokerPlayMatchmakeDisplayName')?.value || '').trim(),
           title: String(document.getElementById('pokerPlayMatchmakeTitle')?.value || '').trim(),
         };
+        if (tableType === 'tournament') {
+          payloadBody.fillPolicy = String(fillPolicyEl?.value || 'open_match');
+          payloadBody.maxSeats = Number(maxSeatsEl?.value || 6);
+        }
         const payload = await api(accessMode === 'invite_only' ? '/api/poker/play/tables' : '/api/poker/play/matchmake', {
           method: 'POST',
           body: JSON.stringify(payloadBody),
@@ -1693,6 +1741,11 @@
     const paused = String(table?.status || 'open') === 'paused';
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
     const tableOpen = String(table?.status || 'open') === 'open';
+    const sitAndGoWaiting = table?.tableType === 'tournament'
+      && table?.summary?.fillPolicy === 'fill_to_full'
+      && !table?.summary?.liveHand
+      && !table?.summary?.completedAt
+      && Number(table?.summary?.seatsUntilStart || 0) > 0;
     const canJoin = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) > 0;
     const canWaitlist = !publicRail && tableOpen && !mySeat && Number(table?.summary?.openSeatCount || 0) <= 0 && table?.tableType === 'cash';
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
@@ -1704,6 +1757,8 @@
             ? (table?.state?.closeReason || 'Table closed by operator.')
             : paused
             ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
+            : sitAndGoWaiting
+            ? `Sit-and-go is waiting for ${Number(table?.summary?.seatsUntilStart || 0)} more seat${Number(table?.summary?.seatsUntilStart || 0) === 1 ? '' : 's'} before hand 1 starts.`
             : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
         )}</p>
         <div class="pokerSummary">
@@ -1712,6 +1767,9 @@
           ${tableAccess?.inviteOnly ? renderSummaryMetric('Access', 'invite-only') : ''}
           ${renderSummaryMetric('Blinds', `${Number(table?.smallBlindOil || 0)} / ${Number(table?.bigBlindOil || 0)}`)}
           ${renderSummaryMetric('Buy-In', `${Number(table?.buyInOil || 0)} OIL`)}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Policy', table?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : 'open match') : ''}
+          ${table?.tableType === 'tournament' ? renderSummaryMetric('Start Target', `${Number(table?.summary?.startTargetSeats || table?.minPlayers || 2)}`) : ''}
+          ${table?.tableType === 'tournament' && !table?.summary?.liveHand && !table?.summary?.completedAt ? renderSummaryMetric('Seats To Start', `${Number(table?.summary?.seatsUntilStart || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Level', `${Number(table?.summary?.blindLevel || hand?.blindLevel || 0) || 1}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Next Level', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.nextBlindLevel || 0)}` : 'final') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Hands To Next', Number(table?.summary?.nextBlindLevel || 0) > 0 ? `${Number(table?.summary?.handsUntilBlindIncrease || 0)}` : '0') : ''}
@@ -1728,8 +1786,12 @@
           ${adminClosed ? renderSummaryMetric('Refunded', `${Number(table?.state?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderMetaBadges([
+          table?.tableType === 'tournament' && table?.summary?.fillPolicy === 'fill_to_full' ? 'sit-and-go' : '',
           tableAccess?.inviteOnly ? 'invite-only' : '',
           `${Number(table?.summary?.occupancy || 0)}/${Number(table?.maxSeats || 6)} seated`,
+          table?.tableType === 'tournament' && !table?.summary?.liveHand && Number(table?.summary?.seatsUntilStart || 0) > 0
+            ? `${Number(table?.summary?.seatsUntilStart || 0)} to start`
+            : '',
           table?.summary?.liveHand ? `hand ${Number(table?.summary?.handNumber || 0)}` : 'waiting',
           table?.summary?.winnerSeatNumber ? `winner seat ${Number(table?.summary?.winnerSeatNumber || 0)}` : '',
         ].filter(Boolean))}
