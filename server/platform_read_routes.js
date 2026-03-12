@@ -21,6 +21,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPublicStackAttestationVerificationReceipt,
     createLibraryPublicStackMember,
     createLibraryPublicStackReview,
+    createLibraryPublicStackSafetyRecord,
     createLibraryPublicStackVerification,
     createLibraryPublicStackVerificationMember,
     createLibrarySatchelReceipt,
@@ -51,6 +52,8 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
     getLibraryPublicStackReview,
     getLibraryPublicStackReviewByIdempotency,
+    getLibraryPublicStackSafetyRecord,
+    getLibraryPublicStackSafetyRecordByIdempotency,
     getLibraryPublicStackVerificationById,
     getLibraryPublicStackVerificationByIdempotency,
     getLatestLibraryPublicStackVerification,
@@ -79,6 +82,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryPublicStackAttestationVerificationReceipts,
     listLibraryPublicStackMembers,
     listLibraryPublicStackReviews,
+    listLibraryPublicStackSafetyRecords,
     listLibraryPublicStacks,
     listLibraryPublicStackVerificationMembers,
     listLibraryPublicStackVerifications,
@@ -128,6 +132,7 @@ function registerPlatformReadRoutes(app, deps) {
     sha256PrefixedHex,
     stableJsonStringify,
     updateLibraryPublicStackReview,
+    updateLibraryPublicStackSafetyRecord,
     updateLibraryPublicStackVerification,
     updateLibraryPeerRelay,
     updateLibrarySatchelRelay,
@@ -389,13 +394,14 @@ function registerPlatformReadRoutes(app, deps) {
         selectedItemIds: [],
         selectedItems: [],
         scopeSets: [],
-        shelves: [],
-        items: [],
-        incomingRelays: [],
-        incomingSatchelRelays: [],
-        emptyStateText: 'No curated Library items yet.',
-      };
-    }
+      shelves: [],
+      items: [],
+      incomingRelays: [],
+      incomingSatchelRelays: [],
+      safetyDesk: [],
+      emptyStateText: 'No curated Library items yet.',
+    };
+  }
     const selection = buildLibrarySelectionPayload({
       houseId: normalizedHouseId,
       teamId: normalizedTeamId,
@@ -417,6 +423,10 @@ function registerPlatformReadRoutes(app, deps) {
         teamId: normalizedTeamId,
       }),
       incomingSatchelRelays: buildIncomingLibrarySatchelRelayList({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }),
+      safetyDesk: buildLibraryPublicStackSafetyDeskList({
         houseId: normalizedHouseId,
         teamId: normalizedTeamId,
       }),
@@ -1184,6 +1194,15 @@ function registerPlatformReadRoutes(app, deps) {
     return '';
   }
 
+  function normalizeLibraryPublicStackSafetyFilter(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'all') return 'all';
+    if (normalized === 'visible_here') return 'visible_here';
+    if (normalized === 'hidden_here') return 'hidden_here';
+    if (normalized === 'reported_here') return 'reported_here';
+    return '';
+  }
+
   function buildLibraryPublicStackReviewSummary({
     reviewTier = '',
     note = '',
@@ -1197,6 +1216,21 @@ function registerPlatformReadRoutes(app, deps) {
       prefix = 'Blocked here for this House.';
     } else {
       prefix = 'Saved for later review in this House.';
+    }
+    return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
+  }
+
+  function buildLibraryPublicStackSafetySummary({
+    safetyState = '',
+    note = '',
+  } = {}) {
+    const normalizedSafetyState = normalizeLibraryPublicStackSafetyFilter(safetyState);
+    const normalizedNote = String(note || '').trim();
+    let prefix = 'Visible in this House.';
+    if (normalizedSafetyState === 'hidden_here') {
+      prefix = 'Hidden in this House.';
+    } else if (normalizedSafetyState === 'reported_here') {
+      prefix = 'Reported for later review in this House.';
     }
     return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
   }
@@ -1482,6 +1516,31 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function projectLibraryPublicStackLocalSafety({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedLibraryPublicStackId = String(libraryPublicStackId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedLibraryPublicStackId) {
+      return {
+        safetyState: '',
+        safety: null,
+      };
+    }
+    const safety = getLibraryPublicStackSafetyRecord({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+      libraryPublicStackId: normalizedLibraryPublicStackId,
+    });
+    return {
+      safetyState: String(safety?.safetyState || '').trim() || '',
+      safety,
+    };
+  }
+
   function buildLibraryPublicStackAttestationCounts(attestations = []) {
     const counts = {
       total: 0,
@@ -1595,6 +1654,7 @@ function registerPlatformReadRoutes(app, deps) {
     teamId = '',
     trust = '',
     seal = '',
+    safety = '',
   } = {}) {
     const normalizedFamily = String(family || '').trim();
     if (normalizedFamily && normalizedFamily !== 'house_library_stacks') {
@@ -1603,6 +1663,7 @@ function registerPlatformReadRoutes(app, deps) {
     const normalizedQuery = String(query || '').trim().toLowerCase();
     const normalizedTrust = normalizeLibraryPublicStackReviewTier(trust);
     const normalizedSeal = normalizeLibraryPublicStackSealFilter(seal);
+    const normalizedSafety = normalizeLibraryPublicStackSafetyFilter(safety);
     const stacks = listLibraryPublicStacks({})
       .filter((entry) => String(entry?.publicationState || '').trim() === 'published')
       .filter((entry) => {
@@ -1621,6 +1682,11 @@ function registerPlatformReadRoutes(app, deps) {
           teamId,
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
+        const localSafety = projectLibraryPublicStackLocalSafety({
+          houseId,
+          teamId,
+          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+        });
         const attestationCards = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         }), {
@@ -1632,12 +1698,13 @@ function registerPlatformReadRoutes(app, deps) {
         return {
           entry,
           localReview,
+          localSafety,
           attestationCards,
           attestationSummary,
           provenanceSummary,
         };
       })
-      .filter(({ localReview, provenanceSummary }) => {
+      .filter(({ localReview, provenanceSummary, localSafety }) => {
         if (!normalizedTrust) return true;
         return String(localReview?.reviewTier || '').trim() === normalizedTrust;
       })
@@ -1650,6 +1717,17 @@ function registerPlatformReadRoutes(app, deps) {
           return Number(provenanceSummary?.counts?.verifiedHere || 0) > 0;
         }
         return true;
+      })
+      .filter(({ localSafety }) => {
+        const safetyState = String(localSafety?.safetyState || '').trim();
+        if (!normalizedSafety) {
+          return safetyState !== 'hidden_here' && safetyState !== 'reported_here';
+        }
+        if (normalizedSafety === 'all') return true;
+        if (normalizedSafety === 'visible_here') {
+          return !safetyState || safetyState === 'visible_here';
+        }
+        return safetyState === normalizedSafety;
       });
     if (!stacks.length) return [];
     const familyInfo = getHouseLibraryPublicStackFamilyInfo('house_library_stacks');
@@ -1664,7 +1742,7 @@ function registerPlatformReadRoutes(app, deps) {
         summary: familyInfo.description || null,
       },
       memberCount: stacks.length,
-      members: stacks.map(({ entry, localReview, attestationCards, attestationSummary, provenanceSummary }) => {
+      members: stacks.map(({ entry, localReview, localSafety, attestationCards, attestationSummary, provenanceSummary }) => {
         const members = listLibraryPublicStackMembers({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
@@ -1677,6 +1755,8 @@ function registerPlatformReadRoutes(app, deps) {
           description: String(entry?.summary || '').trim() || null,
           reviewTier: String(localReview?.reviewTier || '').trim() || null,
           reviewSummary: String(localReview?.review?.summary || '').trim() || null,
+          safetyState: String(localSafety?.safetyState || '').trim() || null,
+          safetySummary: String(localSafety?.safety?.summary || '').trim() || null,
           attestationCounts: attestationSummary.counts,
           attestationSummary: String(attestationSummary.summary || '').trim() || null,
           provenanceCounts: provenanceSummary.counts,
@@ -1713,6 +1793,40 @@ function registerPlatformReadRoutes(app, deps) {
     if (normalized === 'trusted_here') return 'Trusted here';
     if (normalized === 'blocked_here') return 'Blocked here';
     return 'Review later';
+  }
+
+  function formatSafetyStateLabel(safetyState = '') {
+    const normalized = normalizeLibraryPublicStackSafetyFilter(safetyState);
+    if (normalized === 'hidden_here') return 'Hidden here';
+    if (normalized === 'reported_here') return 'Reported here';
+    if (normalized === 'visible_here') return 'Visible here';
+    return '';
+  }
+
+  function buildLibraryPublicStackSafetyDeskList({
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    return listLibraryPublicStackSafetyRecords({ houseId, teamId })
+      .filter((entry) => {
+        const safetyState = String(entry?.safetyState || '').trim();
+        return safetyState === 'hidden_here' || safetyState === 'reported_here';
+      })
+      .map((entry) => {
+        const publicStack = getLibraryPublicStackById(String(entry?.libraryPublicStackId || '').trim());
+        return {
+          libraryPublicStackSafetyRecordId: String(entry?.libraryPublicStackSafetyRecordId || '').trim(),
+          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+          displayName: String(publicStack?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
+          sourceHouseId: String(publicStack?.houseId || '').trim() || null,
+          sourceTeamId: String(publicStack?.teamId || '').trim() || null,
+          safetyState: String(entry?.safetyState || '').trim(),
+          safetyLabel: formatSafetyStateLabel(entry?.safetyState),
+          summary: String(entry?.summary || '').trim() || null,
+          updatedAt: String(entry?.updatedAt || '').trim() || null,
+        };
+      })
+      .sort((a, b) => String(a?.displayName || '').localeCompare(String(b?.displayName || '')));
   }
 
   function projectLibraryPublicStackBundleMember(member = null) {
@@ -1937,6 +2051,11 @@ function registerPlatformReadRoutes(app, deps) {
       teamId,
       libraryPublicStackId: normalizedPublicStackId,
     });
+    const localSafety = projectLibraryPublicStackLocalSafety({
+      houseId,
+      teamId,
+      libraryPublicStackId: normalizedPublicStackId,
+    });
     const publicAttestations = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
       libraryPublicStackId: normalizedPublicStackId,
     }), {
@@ -1982,6 +2101,8 @@ function registerPlatformReadRoutes(app, deps) {
         verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
         reviewTier: String(localReview?.reviewTier || '').trim() || null,
         review: localReview?.review || null,
+        safetyState: String(localSafety?.safetyState || '').trim() || null,
+        safety: localSafety?.safety || null,
         localAttestation: localAttestation
           ? {
               ...localAttestation,
@@ -2043,6 +2164,8 @@ function registerPlatformReadRoutes(app, deps) {
         entityKind: String(member?.entityKind || '').trim() || null,
         reviewTier: String(member?.reviewTier || '').trim() || null,
         reviewSummary: String(member?.reviewSummary || '').trim() || null,
+        safetyState: String(member?.safetyState || '').trim() || null,
+        safetySummary: String(member?.safetySummary || '').trim() || null,
         attestationCounts: member?.attestationCounts && typeof member.attestationCounts === 'object'
           ? member.attestationCounts
           : { total: 0, trustedHere: 0, reviewLater: 0, blockedHere: 0 },
@@ -2515,6 +2638,69 @@ function registerPlatformReadRoutes(app, deps) {
         idempotencyKey,
         metadata: {
           createdFrom: 'portal.house.library.public-stack.review',
+        },
+        nowIso: nowIso(),
+      }),
+    };
+  }
+
+  function persistLibraryPublicStackSafetyRecord({
+    houseId = '',
+    teamId = '',
+    libraryPublicStackId = '',
+    safetyState = '',
+    note = '',
+    idempotencyKey = '',
+  } = {}) {
+    const existingReplay = getLibraryPublicStackSafetyRecordByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existingReplay) {
+      return {
+        status: 200,
+        safety: existingReplay,
+      };
+    }
+    const summary = buildLibraryPublicStackSafetySummary({
+      safetyState,
+      note,
+    });
+    const existing = getLibraryPublicStackSafetyRecord({
+      houseId,
+      teamId,
+      libraryPublicStackId,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        safety: updateLibraryPublicStackSafetyRecord({
+          libraryPublicStackSafetyRecordId: existing.libraryPublicStackSafetyRecordId,
+          safetyState,
+          summary,
+          note,
+          idempotencyKey,
+          metadata: {
+            updatedFrom: 'portal.house.library.public-stack.safety',
+          },
+          nowIso: nowIso(),
+        }),
+      };
+    }
+    return {
+      status: 201,
+      safety: createLibraryPublicStackSafetyRecord({
+        libraryPublicStackSafetyRecordId: `pstsafe_${randomHex(12)}`,
+        libraryPublicStackId,
+        houseId,
+        teamId,
+        safetyState,
+        summary,
+        note,
+        idempotencyKey,
+        metadata: {
+          createdFrom: 'portal.house.library.public-stack.safety',
         },
         nowIso: nowIso(),
       }),
@@ -3349,8 +3535,9 @@ function registerPlatformReadRoutes(app, deps) {
     const family = typeof req.query?.family === 'string' ? req.query.family.trim() : '';
     const trust = normalizeLibraryPublicStackReviewTier(req.query?.trust);
     const seal = normalizeLibraryPublicStackSealFilter(req.query?.seal);
+    const safety = normalizeLibraryPublicStackSafetyFilter(req.query?.safety);
     const groups = [
-      ...(trust || seal ? [] : searchRegistryFamilyGroups({ query, family })),
+      ...(trust || seal || safety ? [] : searchRegistryFamilyGroups({ query, family })),
       ...searchLibraryPublicStackGroups({
         query,
         family,
@@ -3358,6 +3545,7 @@ function registerPlatformReadRoutes(app, deps) {
         teamId: context.activeTeamId,
         trust,
         seal,
+        safety,
       }),
     ];
     const results = flattenPublicStackSearchGroups(groups);
@@ -3373,6 +3561,7 @@ function registerPlatformReadRoutes(app, deps) {
       family,
       trust,
       seal,
+      safety,
       resultCount: results.length,
       groups,
       results,
@@ -3511,6 +3700,63 @@ function registerPlatformReadRoutes(app, deps) {
     return sendPortalApiSuccess(res, {
       review: persisted.review,
       preview: previewAfterSave.ok ? previewAfterSave.preview : preview.preview,
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/public-stacks/:registryEntityId/safety', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before saving Public Stack safety.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before saving Public Stack safety.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to save Public Stack safety.', { requestId });
+    }
+    const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    if (!registryEntityId) {
+      return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to save Public Stack safety.', { requestId });
+    }
+    const safetyState = normalizeLibraryPublicStackSafetyFilter(req.body?.safetyState);
+    if (!safetyState || safetyState === 'all') {
+      return sendPortalApiError(res, 400, 'LIBRARY_PUBLIC_STACK_SAFETY_REQUIRED', 'Choose one local safety state for this Public Stack.', { requestId });
+    }
+    const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
+    const preview = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    if (!preview.ok) {
+      return sendPortalApiError(res, 404, preview.code || 'PUBLIC_STACK_NOT_FOUND', preview.message || 'Public Stack not found.', { requestId });
+    }
+    const persisted = persistLibraryPublicStackSafetyRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+      safetyState,
+      note,
+      idempotencyKey,
+    });
+    const previewAfterSave = buildLibraryPublicStackPreviewPayload({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryPublicStackId: registryEntityId,
+    });
+    return sendPortalApiSuccess(res, {
+      safety: persisted.safety,
+      preview: previewAfterSave.ok ? previewAfterSave.preview : preview.preview,
+      safetyDesk: buildLibraryPublicStackSafetyDeskList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+      }),
     }, { requestId, status: persisted.status });
   });
 
@@ -3757,6 +4003,18 @@ function registerPlatformReadRoutes(app, deps) {
         })
       : null;
     const importReplayDetected = !!(replayScopeSet || replayImportedItem);
+    const safetyState = String(resolved.preview?.safetyState || resolved.preview?.safety?.safetyState || '').trim();
+    if ((safetyState === 'hidden_here' || safetyState === 'reported_here') && !importReplayDetected) {
+      return sendPortalApiError(
+        res,
+        409,
+        'LIBRARY_PUBLIC_STACK_SAFETY_BLOCKED',
+        safetyState === 'hidden_here'
+          ? 'This Public Stack is hidden here for this House. Restore it before importing.'
+          : 'This Public Stack is reported here for this House. Restore it before importing.',
+        { requestId },
+      );
+    }
     if (String(resolved.preview.reviewTier || '').trim() === 'blocked_here' && !importReplayDetected) {
       return sendPortalApiError(
         res,

@@ -146,6 +146,15 @@ async function openHouseLibraryPreviewDetails(page) {
   await expect(details).toHaveAttribute('open', '');
 }
 
+async function openHouseLibraryStorefrontDetails(page) {
+  const details = page.getByTestId('house-library-storefront-details');
+  const expanded = await details.evaluate((node) => node.open === true).catch(() => false);
+  if (!expanded) {
+    await page.getByTestId('house-library-storefront-details-toggle').click();
+  }
+  await expect(details).toHaveAttribute('open', '');
+}
+
 async function saveHouseLibraryReview(page, {
   reviewTier = 'review_later',
   note = '',
@@ -166,6 +175,19 @@ async function saveHouseLibraryReview(page, {
   await page.getByTestId('house-library-guided-review-save-button').click();
 }
 
+async function saveHouseLibrarySafety(page, {
+  safetyState = 'hidden_here',
+} = {}) {
+  await openHouseLibraryPreviewDetails(page);
+  if (safetyState === 'reported_here') {
+    await page.getByTestId('house-library-guided-report-button').click();
+  } else if (safetyState === 'visible_here') {
+    await page.getByTestId('house-library-guided-restore-button').click();
+  } else {
+    await page.getByTestId('house-library-guided-hide-button').click();
+  }
+}
+
 async function setHouseLibraryTrustChip(page, value = '') {
   if (value === 'trusted_here') {
     await page.getByTestId('house-library-storefront-chip-trusted').click();
@@ -180,12 +202,20 @@ async function setHouseLibraryTrustChip(page, value = '') {
   }
 }
 
+async function setHouseLibrarySafetyFilter(page, value = '') {
+  await openHouseLibraryStorefrontDetails(page);
+  await page.getByTestId('house-library-public-stacks-safety').selectOption(value);
+}
+
 module.exports = {
   APPROVED_PUBLICATION_ID,
   APPROVED_PUBLIC_STACK_ID,
   openHouseLibraryPreviewDetails,
+  openHouseLibraryStorefrontDetails,
   seedPublishedHouseLibraryPublicStack,
   openHouseLibraryPublicStackPreview,
   saveHouseLibraryReview,
+  saveHouseLibrarySafety,
+  setHouseLibrarySafetyFilter,
   setHouseLibraryTrustChip,
 };

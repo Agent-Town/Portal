@@ -282,6 +282,8 @@
       <button class="btn small" id="houseLibraryStorefrontChipLater" type="button" data-testid="house-library-storefront-chip-later" aria-label="Show review later">[hour]</button>
       <button class="btn small" id="houseLibraryStorefrontChipBlocked" type="button" data-testid="house-library-storefront-chip-blocked" aria-label="Show blocked here">[bar]</button>
       <button class="btn small" id="houseLibraryStorefrontChipSealed" type="button" data-testid="house-library-storefront-chip-sealed" aria-label="Show sealed Public Stacks">[seal]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipHidden" type="button" data-testid="house-library-storefront-chip-hidden" aria-label="Show hidden here">[veil]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipReported" type="button" data-testid="house-library-storefront-chip-reported" aria-label="Show reported here">[flag]</button>
     </div>
     <details class="house-library-drawer" id="houseLibraryStorefrontDetails" data-testid="house-library-storefront-details" style="margin-top:8px;">
       <summary id="houseLibraryStorefrontDetailsToggle" data-testid="house-library-storefront-details-toggle">More filters</summary>
@@ -300,6 +302,14 @@
           <option value="trusted_here">Trusted here</option>
           <option value="review_later">Review later</option>
           <option value="blocked_here">Blocked here</option>
+        </select>
+        <label class="small" for="houseLibraryPublicStacksSafetySelect">Safety</label>
+        <select id="houseLibraryPublicStacksSafetySelect" data-testid="house-library-public-stacks-safety" class="pixel-input">
+          <option value="">Default visible set</option>
+          <option value="all">All including hidden and reported</option>
+          <option value="visible_here">Visible here</option>
+          <option value="hidden_here">Hidden here</option>
+          <option value="reported_here">Reported here</option>
         </select>
       </div>
     </details>
@@ -363,6 +373,11 @@
             />
             <button class="btn" id="houseLibraryGuidedReviewSaveBtn" type="button" data-testid="house-library-guided-review-save-button">Save Local Review</button>
           </div>
+          <div class="kv" data-testid="house-library-guided-safety-controls">
+            <button class="btn small" id="houseLibraryGuidedHideBtn" type="button" data-testid="house-library-guided-hide-button">Hide here</button>
+            <button class="btn small" id="houseLibraryGuidedReportBtn" type="button" data-testid="house-library-guided-report-button">Report here</button>
+            <button class="btn small" id="houseLibraryGuidedRestoreBtn" type="button" data-testid="house-library-guided-restore-button">Restore here</button>
+          </div>
           <div class="kv" data-testid="house-library-peer-relay-controls">
             <label class="small" for="houseLibraryRelayTargetInput">Target House</label>
             <input
@@ -391,6 +406,9 @@
       </div>
     </details>
   </div>
+  <h3 class="small" style="margin:10px 0 4px;">Safety Desk</h3>
+  <div class="small" id="houseLibrarySafetyDeskEmpty" data-testid="house-library-safety-desk-empty">No hidden or reported Public Stacks in this House.</div>
+  <div class="kv stack" id="houseLibrarySafetyDesk" data-testid="house-library-safety-desk" style="margin-bottom:8px;"></div>
   <h3 class="small" style="margin:10px 0 4px;">Relay Desk</h3>
   <div class="small" id="houseLibraryIncomingRelaysEmpty" data-testid="house-library-incoming-relays-empty">No relayed publications have arrived for this House yet.</div>
   <div class="kv stack" id="houseLibraryIncomingRelays" data-testid="house-library-incoming-relays" style="margin-bottom:8px;"></div>

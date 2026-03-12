@@ -1,0 +1,34 @@
+{
+  "sourceHouse": {
+    "houseId": "house_library_safety_source",
+    "teamId": "team_main"
+  },
+  "targetHouse": {
+    "houseId": "house_library_safety_target",
+    "teamId": "team_main"
+  },
+  "publicStack": {
+    "scopeSetId": "scope_public_stack_safety_alpha_01",
+    "familySlug": "house_library_stacks",
+    "title": "Safety Launch Pack",
+    "expectedMemberCount": 2
+  },
+  "safetyStates": [
+    "visible_here",
+    "hidden_here",
+    "reported_here"
+  ],
+  "filters": {
+    "defaultSafetyFilter": "",
+    "supportedSafetyFilters": [
+      "all",
+      "visible_here",
+      "hidden_here",
+      "reported_here"
+    ],
+    "importBlockingStates": [
+      "hidden_here",
+      "reported_here"
+    ]
+  }
+}
