@@ -1903,6 +1903,14 @@ function buildHouseLibraryPublicStackTrustLabels(preview = null) {
   if (String(preview?.bundleKind || '') === 'library_public_stack' || String(preview?.entityKind || '') === 'library_public_stack_bundle') {
     labels.push('Bundle');
   }
+  const verificationState = String(preview?.verificationState || preview?.verification?.verificationState || '').trim();
+  if (verificationState === 'verified') {
+    labels.push('Verified here');
+  } else if (verificationState) {
+    labels.push('Verification pending');
+  } else {
+    labels.push('Verification available');
+  }
   if (
     preview?.alreadyImportedAll === true
     || !!preview?.localScopeSet
@@ -2000,13 +2008,17 @@ async function loadHouseLibraryPublicStacksSearch({
   return data;
 }
 
-async function previewHouseLibraryPublicStack(registryEntityId = '') {
+async function previewHouseLibraryPublicStack(registryEntityId = '', {
+  announce = true,
+} = {}) {
   const normalizedRegistryEntityId = String(registryEntityId || '').trim();
   if (!normalizedRegistryEntityId) {
     throw new Error('REGISTRY_ENTITY_REQUIRED');
   }
-  setHouseLibraryActionStatus(`Opening ${normalizedRegistryEntityId}...`);
-  setHouseSurfaceStatus(`Opening ${normalizedRegistryEntityId}...`);
+  if (announce) {
+    setHouseLibraryActionStatus(`Opening ${normalizedRegistryEntityId}...`);
+    setHouseSurfaceStatus(`Opening ${normalizedRegistryEntityId}...`);
+  }
   const response = await apiWithRetry(`/api/platform/library/public-stacks/preview/${encodeURIComponent(normalizedRegistryEntityId)}`, {
     method: 'GET',
   }, {
@@ -2018,9 +2030,54 @@ async function previewHouseLibraryPublicStack(registryEntityId = '') {
     : null;
   renderHouseLibrarySurface();
   const previewTitle = String(data?.preview?.displayName || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId;
-  setHouseLibraryActionStatus(`Previewing ${previewTitle} from Public Stacks.`);
-  setHouseSurfaceStatus(`Previewing ${previewTitle} from Public Stacks.`);
+  if (announce) {
+    setHouseLibraryActionStatus(`Previewing ${previewTitle} from Public Stacks.`);
+    setHouseSurfaceStatus(`Previewing ${previewTitle} from Public Stacks.`);
+  }
   return data;
+}
+
+async function verifyHouseLibraryPublicStackBundle({
+  libraryPublicStackId: libraryPublicStackIdOverride = '',
+  silent = false,
+} = {}) {
+  const preview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
+    ? houseSurfaceState.library.publicStackPreview
+    : null;
+  const libraryPublicStackId = String(libraryPublicStackIdOverride || preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim();
+  if (!libraryPublicStackId) {
+    throw new Error('PUBLIC_STACK_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const bundleHash = String(preview?.bundleHash || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_verify_public_stack', [
+    houseId,
+    teamId,
+    libraryPublicStackId,
+    bundleHash,
+  ]);
+  const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  if (!silent) {
+    setHouseSurfaceStatus(`Verifying Public Stack ${stackLabel}...`);
+    setHouseLibraryActionStatus(`Verifying Public Stack ${stackLabel}...`);
+  }
+  const response = await apiWithRetry(`/api/platform/library/public-stacks/${encodeURIComponent(libraryPublicStackId)}/verifications`, {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
+  renderHouseLibrarySurface();
+  if (!silent) {
+    setHouseLibraryActionStatus(`Verified Public Stack ${stackLabel}.`);
+    setHouseSurfaceStatus(`Verified Public Stack ${stackLabel}.`);
+  }
+  return response?.data || response || {};
 }
 
 async function importHouseLibraryPublicStackBundle({
@@ -2041,6 +2098,12 @@ async function importHouseLibraryPublicStackBundle({
     libraryPublicStackId,
   ]);
   const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  if (String(preview?.verificationState || preview?.verification?.verificationState || '').trim() !== 'verified') {
+    await verifyHouseLibraryPublicStackBundle({
+      libraryPublicStackId,
+      silent: true,
+    }).catch(() => null);
+  }
   setHouseSurfaceStatus(`Importing Public Stack ${stackLabel}...`);
   setHouseLibraryActionStatus(`Importing Public Stack ${stackLabel}...`);
   const response = await apiWithRetry(`/api/platform/library/public-stacks/${encodeURIComponent(libraryPublicStackId)}/imports`, {
@@ -3219,6 +3282,7 @@ function renderHouseLibrarySurface() {
   const exchangeSummaryNode = el('houseLibraryExchangeSummary');
   const guidedApprovalInput = el('houseLibraryGuidedApprovalInput');
   const guidedPublishBtn = el('houseLibraryGuidedPublishBtn');
+  const guidedVerifyBtn = el('houseLibraryGuidedVerifyBtn');
   const guidedImportBtn = el('houseLibraryGuidedImportBtn');
   const relayTargetInput = el('houseLibraryRelayTargetInput');
   const relayApprovalInput = el('houseLibraryRelayApprovalInput');
@@ -3496,6 +3560,9 @@ function renderHouseLibrarySurface() {
   if (!publicStackPreview) {
     registryPreviewNode.textContent = 'Select a Public Stack to preview its provenance.';
   } else {
+    const proofTitles = Array.isArray(publicStackPreview?.proofCards)
+      ? publicStackPreview.proofCards.map((card) => String(card?.title || '').trim()).filter(Boolean)
+      : [];
     registryPreviewNode.textContent = [
       String(publicStackPreview?.displayName || publicStackPreview?.registryId || ''),
       String(publicStackPreview?.registryId || ''),
@@ -3504,9 +3571,11 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.sourceHouseId || '').trim() ? `From: ${String(publicStackPreview.sourceHouseId || '').trim()}` : '',
       String(publicStackPreview?.description || '').trim(),
       `Provenance: ${String(publicStackPreview?.provenance?.summary || '').trim() || 'Visible.'}`,
+      `Verification: ${String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.'}`,
       publicStackPreview?.alreadyImportedAll === true
         ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}.`
         : '',
+      proofTitles.length ? `Proofs: ${proofTitles.join(', ')}` : '',
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
     ].filter(Boolean).join(' · ');
   }
@@ -3551,6 +3620,7 @@ function renderHouseLibrarySurface() {
         `Import guide: ${String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack')}`,
         String(publicStackPreview?.registryId || ''),
         buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
+        String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
         (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
           ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
           : importedPreviewItem
@@ -3558,6 +3628,10 @@ function renderHouseLibrarySurface() {
           : 'This Public Stack is ready to bring into your Library.',
       ].filter(Boolean).join(' · ')
     : 'Choose a local Library item or a Public Stack to prepare an exchange.';
+  if (guidedVerifyBtn) {
+    guidedVerifyBtn.disabled = !publicStackPreview
+      || !(String(publicStackPreview?.bundleKind || '') === 'library_public_stack' || String(publicStackPreview?.entityKind || '') === 'library_public_stack_bundle');
+  }
   guidedImportBtn.disabled = !publicStackPreview;
   guidedApprovalInput.disabled = true;
   guidedPublishBtn.disabled = true;
@@ -3633,6 +3707,7 @@ function renderHouseLibrarySurface() {
       `Import guide: ${String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack')}`,
       String(publicStackPreview?.registryId || ''),
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
+      String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
       (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
         ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
         : importedPreviewItem
@@ -7410,6 +7485,22 @@ function bindTownDistrictControls() {
         await runHouseLibraryGuidedImport();
       } catch (err) {
         const code = String(err?.code || err?.message || 'LIBRARY_IMPORT_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryGuidedVerifyBtn = el('houseLibraryGuidedVerifyBtn');
+  if (houseLibraryGuidedVerifyBtn) {
+    houseLibraryGuidedVerifyBtn.onclick = async () => {
+      houseLibraryGuidedVerifyBtn.disabled = true;
+      try {
+        await verifyHouseLibraryPublicStackBundle();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_VERIFY_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {
