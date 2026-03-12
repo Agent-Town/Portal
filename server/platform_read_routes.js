@@ -20,6 +20,7 @@ function registerPlatformReadRoutes(app, deps) {
     getConfigVersion,
     getConfigVersionByIdempotency,
     getHouseWorkerDeploymentById,
+    getHouseWorkerBackendRuntimeSnapshot,
     getHouseWorkerRuntimeInstanceById,
     getHouseWorkerRuntimeInstanceBySessionId,
     getHouseWorkerWorkspaceSnapshotByRef,
@@ -66,7 +67,9 @@ function registerPlatformReadRoutes(app, deps) {
     sendPortalApiError,
     sendPortalApiSuccess,
     sha256PrefixedHex,
+    startHouseWorkerBackendRuntime,
     stableJsonStringify,
+    stopHouseWorkerBackendRuntime,
     updateHouseWorkerDeployment,
     updateHouseWorkerRuntimeInstance,
     updateHouseWorkerShareInvite,
@@ -2225,6 +2228,7 @@ function registerPlatformReadRoutes(app, deps) {
           '/api/platform/house-workers/install-shared',
           '/api/platform/house-workers/deployments/:deploymentId/lifecycle',
           '/api/platform/house-workers/spawn',
+          '/api/platform/house-workers/offload',
           '/api/platform/house-workers/message',
           '/api/platform/house-workers/status',
           '/api/platform/house-workers/stop',
@@ -5285,6 +5289,164 @@ function registerPlatformReadRoutes(app, deps) {
     });
   });
 
+  app.post('/api/platform/house-workers/offload', express.json({ limit: '24kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    const houseId = typeof context.houseId === 'string' ? context.houseId.trim() : '';
+    const teamId = typeof context.activeTeamId === 'string' ? context.activeTeamId.trim() : '';
+    if (!houseId || !teamId) {
+      return sendPortalApiError(res, 409, 'HOUSE_TEAM_REQUIRED', 'Attach a house and select an active team before offloading a helper.', { requestId });
+    }
+    const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+    const houseWorkerSessionId = typeof body?.houseWorkerSessionId === 'string' ? body.houseWorkerSessionId.trim() : '';
+    const runtimeInstanceId = typeof body?.runtimeInstanceId === 'string' ? body.runtimeInstanceId.trim() : '';
+    const workspaceSnapshotRef = typeof body?.workspaceSnapshotRef === 'string' ? body.workspaceSnapshotRef.trim() : '';
+    const targetExecutorKind = typeof body?.targetExecutorKind === 'string' ? body.targetExecutorKind.trim() : 'backend_pool';
+    if (!houseWorkerSessionId || !runtimeInstanceId || !workspaceSnapshotRef) {
+      return sendPortalApiError(res, 400, 'INVALID_ARGUMENT', 'houseWorkerSessionId, runtimeInstanceId, and workspaceSnapshotRef are required.', { requestId });
+    }
+    if (targetExecutorKind !== 'backend_pool') {
+      return sendPortalApiError(res, 409, 'UNSUPPORTED_EXECUTOR_KIND', 'Only backend pool offload is supported in this phase.', { requestId });
+    }
+    const workerSession = getHouseWorkerSessionById(houseWorkerSessionId);
+    if (!workerSession || String(workerSession?.houseId || '').trim() !== houseId || String(workerSession?.teamId || '').trim() !== teamId) {
+      return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
+    }
+    const runtimeInstance = getHouseWorkerRuntimeInstanceById(runtimeInstanceId);
+    if (
+      !runtimeInstance
+      || String(runtimeInstance?.houseWorkerSessionId || '').trim() !== houseWorkerSessionId
+      || String(runtimeInstance?.houseId || '').trim() !== houseId
+      || String(runtimeInstance?.teamId || '').trim() !== teamId
+    ) {
+      return sendPortalApiError(res, 404, 'RUNTIME_INSTANCE_NOT_FOUND', 'Helper runtime instance not found for the active team.', { requestId });
+    }
+    if (String(runtimeInstance?.executorKind || '').trim() !== 'browser_tab') {
+      return sendPortalApiError(res, 409, 'OFFLOAD_ALREADY_ACTIVE', 'This helper is already running outside the current browser tab.', { requestId });
+    }
+    const snapshot = getHouseWorkerWorkspaceSnapshotByRef(workspaceSnapshotRef);
+    if (
+      !snapshot
+      || String(snapshot?.runtimeInstanceId || '').trim() !== runtimeInstanceId
+      || String(snapshot?.houseId || '').trim() !== houseId
+      || String(snapshot?.teamId || '').trim() !== teamId
+    ) {
+      return sendPortalApiError(res, 404, 'WORKSPACE_SNAPSHOT_NOT_FOUND', 'Workspace snapshot not found for the active helper.', { requestId });
+    }
+    const offloadedAt = nowIso();
+    const previousRuntimePatch = {
+      executorKind: String(runtimeInstance?.executorKind || '').trim() || 'browser_tab',
+      executorProvider: String(runtimeInstance?.executorProvider || '').trim() || 'portal_browser',
+      leaseStatus: String(runtimeInstance?.leaseStatus || '').trim() || 'active',
+      leaseOwnerKind: String(runtimeInstance?.leaseOwnerKind || '').trim() || 'browser_tab',
+      leaseOwnerLabel: String(runtimeInstance?.leaseOwnerLabel || '').trim() || 'This browser tab',
+      leaseOwnerId: String(runtimeInstance?.leaseOwnerId || '').trim() || null,
+      workspaceSnapshotRef: String(runtimeInstance?.workspaceSnapshotRef || '').trim() || null,
+      stoppedAt: String(runtimeInstance?.stoppedAt || '').trim() || null,
+    };
+    const previousSessionRuntime = workerSession?.runtime && typeof workerSession.runtime === 'object'
+      ? workerSession.runtime
+      : {};
+    const previousSessionStatus = HOUSE_WORKER_ACTIVE_STATUSES.has(String(workerSession?.status || '').trim())
+      ? String(workerSession?.status || 'idle').trim()
+      : 'idle';
+    let backendRuntime = null;
+    try {
+      updateHouseWorkerRuntimeInstance({
+        runtimeInstanceId,
+        executorKind: 'backend_pool',
+        executorProvider: 'portal_backend_pool',
+        leaseStatus: 'starting',
+        leaseOwnerKind: 'backend_process',
+        leaseOwnerLabel: 'Portal backend pool',
+        leaseOwnerId: null,
+        workspaceSnapshotRef,
+        stoppedAt: null,
+        updatedAt: offloadedAt,
+      });
+      updateHouseWorkerSession({
+        houseWorkerSessionId,
+        status: previousSessionStatus,
+        runtime: mergeHouseWorkerRuntime(previousSessionRuntime, {
+          supervisorSource: 'backend_pool',
+          offloadedAt,
+          workspaceSnapshotRef,
+        }),
+        updatedAt: offloadedAt,
+      });
+      backendRuntime = startHouseWorkerBackendRuntime({
+        runtimeInstanceId,
+        houseWorkerSessionId,
+        workspaceSnapshotRef,
+      });
+    } catch (err) {
+      updateHouseWorkerRuntimeInstance({
+        runtimeInstanceId,
+        executorKind: previousRuntimePatch.executorKind,
+        executorProvider: previousRuntimePatch.executorProvider,
+        leaseStatus: previousRuntimePatch.leaseStatus,
+        leaseOwnerKind: previousRuntimePatch.leaseOwnerKind,
+        leaseOwnerLabel: previousRuntimePatch.leaseOwnerLabel,
+        leaseOwnerId: previousRuntimePatch.leaseOwnerId,
+        workspaceSnapshotRef: previousRuntimePatch.workspaceSnapshotRef,
+        stoppedAt: previousRuntimePatch.stoppedAt,
+        updatedAt: nowIso(),
+      });
+      updateHouseWorkerSession({
+        houseWorkerSessionId,
+        status: previousSessionStatus,
+        runtime: previousSessionRuntime,
+        updatedAt: nowIso(),
+      });
+      return sendPortalApiError(
+        res,
+        503,
+        'BACKEND_POOL_OFFLOAD_FAILED',
+        'Cloud handoff is unavailable right now. Keep this helper running in your browser and try again.',
+        { requestId }
+      );
+    }
+    const eventSequence = listHouseWorkerSessionEvents({ houseWorkerSessionId }).length + 1;
+    createHouseWorkerSessionEvent({
+      houseWorkerSessionEventId: buildHouseWorkerSessionEventId({
+        houseWorkerSessionId,
+        eventKind: 'offloaded',
+        sequence: eventSequence,
+      }),
+      houseWorkerSessionId,
+      eventKind: 'offloaded',
+      actor: 'human',
+      payload: {
+        targetExecutorKind: 'backend_pool',
+        workspaceSnapshotRef,
+      },
+      createdAt: offloadedAt,
+    });
+    const payload = buildHouseWorkerCollectionsPayload({
+      context,
+      houseId,
+      teamId,
+      sourceKind: 'durable_house_worker_offload',
+    });
+    const nextSession = Array.isArray(payload?.sessions)
+      ? payload.sessions.find((entry) => String(entry?.houseWorkerSessionId || '').trim() === houseWorkerSessionId) || null
+      : null;
+    const nextRuntimeInstance = Array.isArray(payload?.runtimeInstances)
+      ? payload.runtimeInstances.find((entry) => String(entry?.runtimeInstanceId || '').trim() === runtimeInstanceId) || null
+      : null;
+    return sendPortalApiSuccess(res, {
+      offloadState: 'backend_pool_running',
+      cloudLabel: 'Running in cloud',
+      backendRuntime: backendRuntime || getHouseWorkerBackendRuntimeSnapshot(runtimeInstanceId),
+      session: nextSession,
+      runtimeInstance: nextRuntimeInstance,
+    }, { requestId });
+  });
+
   app.post('/api/platform/house-workers/install', express.json({ limit: '24kb' }), (req, res) => {
     const requestId = buildPortalRequestId();
     const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
@@ -6361,6 +6523,11 @@ function registerPlatformReadRoutes(app, deps) {
       return sendPortalApiError(res, 404, 'WORKER_SESSION_NOT_FOUND', 'Helper session not found for the active team.', { requestId });
     }
     const runtimeInstance = getHouseWorkerRuntimeInstanceBySessionId(houseWorkerSessionId);
+    if (String(runtimeInstance?.executorKind || '').trim() === 'backend_pool') {
+      stopHouseWorkerBackendRuntime(String(runtimeInstance?.runtimeInstanceId || '').trim(), {
+        reason: reason || 'user_stop',
+      });
+    }
     const updatedSession = updateHouseWorkerSession({
       houseWorkerSessionId,
       status: 'stopped',

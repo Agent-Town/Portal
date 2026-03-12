@@ -1,6 +1,6 @@
 # 40. House Worker Backend Pool And Offload Spec
 
-Status: Proposed  
+Status: In progress  
 Branch target: `codex/backend-worker-pool-spec-v0-1`  
 Audience: product, runtime, backend, frontend, UX, QA, security, benchmarking, platform-partnership, and AI-agent implementation teams
 Detailed execution docs:
@@ -49,6 +49,8 @@ Current implementation note:
 1. `browser_tab` is now implemented as the first concrete executor kind.
 2. Browser helper startup is required to pass through the executor adapter boundary, not direct helper-specific boot wiring.
 3. Runtime-instance records remain the durable source of executor and lease truth for that browser path.
+4. Browser-to-backend offload is now implemented for the first `backend_pool` path through snapshot capture plus runtime-instance transfer.
+5. The backend pool now provides real child-process lease ownership for offloaded helpers, even though full backend message execution parity is still a later milestone.
 
 ## 3.1 Worker-first still holds
 

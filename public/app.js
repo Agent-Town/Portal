@@ -2095,10 +2095,22 @@ function buildHouseWorkerSessionPresentation(session = null) {
   const houseWorkerSessionId = String(source?.houseWorkerSessionId || '').trim();
   const status = String(source?.status || '').trim();
   const leaseStatus = String(source?.leaseStatus || '').trim();
+  const executorKind = String(source?.executorKind || '').trim();
   const ownerId = String(source?.ownerId || '').trim();
   const currentOwnerId = resolveHouseWorkerSupervisorOwnerId();
   const attached = isHouseWorkerRuntimeAttached(houseWorkerSessionId);
   const active = HOUSE_WORKER_ACTIVE_STATUSES.has(status);
+  if (active && executorKind === 'backend_pool') {
+    return {
+      attached: false,
+      handoffRequired: false,
+      statusLabel: 'Running in cloud',
+      actionLabel: 'This helper keeps running in the backend pool even after you close this tab.',
+      startLabel: 'Running in cloud',
+      stopLabel: 'Stop Cloud Helper',
+      cloudOffloaded: true,
+    };
+  }
   if (leaseStatus === 'stale' || status === 'stale') {
     return {
       attached: false,
@@ -2575,6 +2587,7 @@ function maybeExposeHouseWorkerSupervisor() {
     sync: async ({ teamId = '' } = {}) => await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office', teamId }),
     spawn: async (payload = {}) => await spawnHouseWorkerSession(payload),
     message: async (payload = {}) => await sendHouseWorkerMessage(payload),
+    offload: async (payload = {}) => await offloadHouseWorkerSession(payload),
     stop: async (payload = {}) => await stopHouseWorkerSession(payload),
     captureSnapshot: async ({ houseWorkerSessionId = '', workerSessionId = '' } = {}) => {
       const { controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
@@ -3032,6 +3045,16 @@ function createHouseWorkerRuntimeController(sessionCard, llmPayload) {
     async restoreWorkspaceSnapshot(workspaceSnapshotRef) {
       return await restoreWorkspaceSnapshot(workspaceSnapshotRef);
     },
+    async detachLocal(reason = 'detached') {
+      clearHeartbeat();
+      currentStatus = reason === 'offloaded_to_backend' ? 'waiting' : currentStatus;
+      try {
+        worker.terminate();
+      } catch {
+        // ignore terminate errors
+      }
+      return true;
+    },
     async sendMessage(message, { actor = 'human', timeoutMs = HOUSE_WORKER_REPLY_TIMEOUT_MS } = {}) {
       const normalizedMessage = String(message || '').trim();
       if (!normalizedMessage) {
@@ -3169,6 +3192,43 @@ async function sendHouseWorkerMessage({
     ok: true,
     houseWorkerSessionId: targetSessionId,
     reply,
+  };
+}
+
+async function offloadHouseWorkerSession({
+  houseWorkerSessionId = '',
+  workerSessionId = '',
+} = {}) {
+  const { targetSessionId, controller } = resolveAttachedHouseWorkerController({ houseWorkerSessionId, workerSessionId });
+  const snapshotResult = await controller.captureWorkspaceSnapshot();
+  const runtimeInstanceId = String(
+    snapshotResult?.runtimeInstance?.runtimeInstanceId
+    || snapshotResult?.snapshot?.runtimeInstanceId
+    || ''
+  ).trim();
+  const workspaceSnapshotRef = String(snapshotResult?.snapshot?.workspaceSnapshotRef || '').trim();
+  if (!runtimeInstanceId || !workspaceSnapshotRef) {
+    throw new Error('HOUSE_WORKER_OFFLOAD_PRECONDITION_FAILED');
+  }
+  const response = await api('/api/platform/house-workers/offload', {
+    method: 'POST',
+    body: JSON.stringify({
+      houseWorkerSessionId: targetSessionId,
+      runtimeInstanceId,
+      workspaceSnapshotRef,
+      targetExecutorKind: 'backend_pool',
+    }),
+  });
+  await controller.detachLocal('offloaded_to_backend');
+  houseWorkerSupervisorState.runtimes.delete(targetSessionId);
+  houseWorkerSupervisorState.checkpoints.push(`offload:${targetSessionId}`);
+  await syncHouseWorkerSessions({ skipContext: true, render: houseSurfaceState.activeSurface === 'office' }).catch(() => null);
+  return {
+    ok: true,
+    houseWorkerSessionId: targetSessionId,
+    snapshot: snapshotResult?.snapshot || null,
+    runtimeInstance: response?.data?.runtimeInstance || null,
+    session: response?.data?.session || null,
   };
 }
 
@@ -3924,6 +3984,7 @@ function renderHouseOfficeSurface() {
       const recoveryPresentation = buildHouseWorkerRecoveryPresentation(deploymentSession, sessionPresentation);
       const activeAttachedSession = !!deploymentSession && sessionPresentation.attached === true;
       const detachedActiveSession = !!deploymentSession && sessionPresentation.handoffRequired === true;
+      const cloudOffloadedSession = !!deploymentSession && sessionPresentation.cloudOffloaded === true;
       const actionStatus = document.createElement('div');
       actionStatus.className = 'small';
       actionStatus.style.marginTop = '8px';
@@ -3992,13 +4053,13 @@ function renderHouseOfficeSurface() {
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
       startBtn.className = 'btn';
-      startBtn.textContent = activeAttachedSession || detachedActiveSession
+      startBtn.textContent = activeAttachedSession || detachedActiveSession || cloudOffloadedSession
         ? sessionPresentation.startLabel
         : deploymentSession && !sessionPresentation.attached
           ? 'Take Over Here'
           : 'Start Helper';
       startBtn.setAttribute('data-testid', 'house-office-helper-start');
-      startBtn.disabled = !localBrainReady || activeAttachedSession;
+      startBtn.disabled = !localBrainReady || activeAttachedSession || !!sessionPresentation.cloudOffloaded;
       actions.appendChild(startBtn);
 
       const askBtn = document.createElement('button');
@@ -4012,7 +4073,7 @@ function renderHouseOfficeSurface() {
       const stopBtn = document.createElement('button');
       stopBtn.type = 'button';
       stopBtn.className = 'btn';
-      stopBtn.textContent = detachedActiveSession ? sessionPresentation.stopLabel : 'Stop Helper';
+      stopBtn.textContent = detachedActiveSession || cloudOffloadedSession ? sessionPresentation.stopLabel : 'Stop Helper';
       stopBtn.setAttribute('data-testid', 'house-office-helper-stop');
       stopBtn.disabled = !deploymentSession;
       actions.appendChild(stopBtn);
@@ -4028,6 +4089,14 @@ function renderHouseOfficeSurface() {
       shareBtn.textContent = 'Copy Friend Link';
       shareBtn.setAttribute('data-testid', 'house-office-helper-share');
       manageActions.appendChild(shareBtn);
+
+      const offloadBtn = document.createElement('button');
+      offloadBtn.type = 'button';
+      offloadBtn.className = 'btn';
+      offloadBtn.textContent = sessionPresentation.cloudOffloaded ? 'Running in cloud' : 'Keep Running In Cloud';
+      offloadBtn.setAttribute('data-testid', 'house-office-helper-offload');
+      offloadBtn.disabled = !deploymentSession || !sessionPresentation.attached || !!sessionPresentation.cloudOffloaded;
+      manageActions.appendChild(offloadBtn);
 
       const pauseBtn = document.createElement('button');
       pauseBtn.type = 'button';
@@ -4227,6 +4296,29 @@ function renderHouseOfficeSurface() {
           actionStatus.textContent = String(err?.detail || err?.message || 'Friend link unavailable.');
         } finally {
           shareBtn.disabled = false;
+        }
+      });
+
+      offloadBtn.addEventListener('click', async () => {
+        const activeSession = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+          .filter((entry) => HOUSE_WORKER_ACTIVE_STATUSES.has(String(entry?.status || '').trim()))
+          .find((entry) => String(entry?.deploymentId || '').trim() === deploymentId) || null;
+        if (!activeSession?.houseWorkerSessionId) return;
+        offloadBtn.disabled = true;
+        actionStatus.textContent = 'Moving helper to cloud...';
+        try {
+          await offloadHouseWorkerSession({
+            houseWorkerSessionId: String(activeSession.houseWorkerSessionId || '').trim(),
+          });
+          await loadHouseOfficeSurface({ skipContext: true });
+          actionStatus.textContent = 'Helper is now running in cloud.';
+          askBtn.disabled = true;
+          stopBtn.disabled = false;
+        } catch (err) {
+          actionStatus.textContent = String(err?.detail || err?.message || 'Cloud handoff failed.');
+          houseWorkerSupervisorState.lastError = String(err?.detail || err?.message || 'HOUSE_WORKER_OFFLOAD_FAILED');
+        } finally {
+          offloadBtn.disabled = false;
         }
       });
 

@@ -94,6 +94,12 @@ const {
 } = require('./web_poker_store');
 const { getLiveSuiteManifest, getLiveSuiteStatuses } = require('./live_suite_manifest');
 const { getRouteOwnerManifest, registerRouteOwner, resetRouteOwnerManifest } = require('./route_manifest');
+const {
+  getHouseWorkerBackendRuntimeSnapshot,
+  startHouseWorkerBackendRuntime,
+  stopAllHouseWorkerBackendRuntimes,
+  stopHouseWorkerBackendRuntime,
+} = require('./house_worker_backend_pool');
 const { registerPlatformReadRoutes } = require('./platform_read_routes');
 const { registerWebRoutes } = require('./web_routes');
 const { registerRegistryRoutes } = require('./registry_routes');
@@ -4261,6 +4267,7 @@ registerPlatformReadRoutes(app, {
   getRegistryFamilyBySlug,
   getRegistryEntityById,
   getRegistryEntityByIdAtVersion,
+  getHouseWorkerBackendRuntimeSnapshot,
   getUnifiedPlatformTestFixture,
   getTeamConfigBinding,
   listTrackDefinitions,
@@ -4298,7 +4305,9 @@ registerPlatformReadRoutes(app, {
   sendPortalApiError,
   sendPortalApiSuccess,
   sha256PrefixedHex,
+  startHouseWorkerBackendRuntime,
   stableJsonStringify,
+  stopHouseWorkerBackendRuntime,
   updateHouseWorkerDeployment,
   updateHouseWorkerRuntimeInstance,
   updateHouseWorkerShareInvite,
@@ -10681,6 +10690,7 @@ if (process.env.NODE_ENV === 'test') {
     resetUnifiedPlatformStore();
     resetPokerOperatorState();
     resetEmailOtpAdapter();
+    stopAllHouseWorkerBackendRuntimes('test_reset');
     invalidateAtlasStoreCaches();
     resetAllSessions();
     rateBuckets.clear();

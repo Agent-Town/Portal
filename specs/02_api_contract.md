@@ -1445,6 +1445,8 @@ Response fields:
 Notes:
 - `data.runtimeInstances[].executorKind = browser_tab` means the helper is currently running through the browser executor adapter boundary.
 - `data.sessions[].executorKind = browser_tab` means the current helper runtime is attached to the local browser executor path, even though runtime truth is stored durably in `data.runtimeInstances[]`.
+- `data.runtimeInstances[].executorKind = backend_pool` means the helper moved out of the browser and is now supervised by the backend pool.
+- `data.sessions[].executorKind = backend_pool` means House Office should report cloud-running truth instead of browser-attachment truth.
 
 ### GET `/api/platform/house-workers/sessions` (human)
 Returns active and recent helper sessions for the current House team.
@@ -1547,7 +1549,47 @@ Response fields:
 
 Notes:
 - `browser_tab` is the first shipped executor kind.
+- `backend_pool` is the first offloaded executor kind.
 - Browser-backed helpers still use the same House control plane as later executor kinds, so this route is the canonical place to read executor and lease truth.
+
+### POST `/api/platform/house-workers/offload` (human)
+Moves one active helper from the current browser executor into the backend pool using a captured workspace snapshot.
+
+Request body:
+- `houseWorkerSessionId` required
+- `runtimeInstanceId` required
+- `workspaceSnapshotRef` required
+- `targetExecutorKind` required in this phase and must equal `backend_pool`
+
+Stable error codes:
+- `SESSION_REQUIRED`
+- `HOUSE_TEAM_REQUIRED`
+- `INVALID_ARGUMENT`
+- `UNSUPPORTED_EXECUTOR_KIND`
+- `WORKER_SESSION_NOT_FOUND`
+- `RUNTIME_INSTANCE_NOT_FOUND`
+- `OFFLOAD_ALREADY_ACTIVE`
+- `WORKSPACE_SNAPSHOT_NOT_FOUND`
+- `BACKEND_POOL_OFFLOAD_FAILED`
+
+Response fields:
+- `data.offloadState`
+- `data.cloudLabel`
+- `data.backendRuntime`
+- `data.backendRuntime.runtimeInstanceId`
+- `data.backendRuntime.houseWorkerSessionId`
+- `data.backendRuntime.pid`
+- `data.backendRuntime.status`
+- `data.backendRuntime.startedAt`
+- `data.backendRuntime.workspaceSnapshotRef`
+- `data.backendRuntime.executorKind`
+- `data.backendRuntime.executorProvider`
+- `data.session`
+- `data.runtimeInstance`
+
+Notes:
+- This phase supports only `targetExecutorKind = backend_pool`.
+- A successful offload preserves one runtime-instance record and updates executor truth from `browser_tab` to `backend_pool` without creating a duplicate active runtime.
 
 ### GET `/api/platform/house-workers/runtime-instances/:runtimeInstanceId/snapshots` (human)
 Returns captured workspace snapshots for one helper runtime instance.

@@ -164,6 +164,14 @@ async function stopHouseWorker(request, payload = {}) {
   return readJsonResponse(response);
 }
 
+async function offloadHouseWorker(request, payload = {}) {
+  const response = await request.post('/api/platform/house-workers/offload', {
+    data: payload,
+    failOnStatusCode: false,
+  });
+  return readJsonResponse(response);
+}
+
 async function updateHouseWorkerDeploymentLifecycle(request, deploymentId, action) {
   const response = await request.post(`/api/platform/house-workers/deployments/${encodeURIComponent(String(deploymentId || ''))}/lifecycle`, {
     data: {
@@ -245,6 +253,7 @@ module.exports = {
   listHouseWorkerWorkspaceSnapshots,
   listHouseWorkerTransportMessages,
   messageHouseWorker,
+  offloadHouseWorker,
   getHouseWorkerWorkspaceSnapshot,
   readHouseWorkerExecutorSnapshot,
   readHouseWorkerSessionsFromPage,

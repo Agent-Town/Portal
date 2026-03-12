@@ -2748,6 +2748,8 @@ function createHouseWorkerRuntimeInstance({
 function updateHouseWorkerRuntimeInstance({
   runtimeInstanceId = '',
   houseWorkerSessionId = '',
+  executorKind = undefined,
+  executorProvider = undefined,
   executorRef = undefined,
   leaseStatus = undefined,
   leaseOwnerKind = undefined,
@@ -2782,7 +2784,9 @@ function updateHouseWorkerRuntimeInstance({
   const database = ensureDb();
   database.prepare(`
     UPDATE house_worker_runtime_instances
-    SET executor_ref = ?,
+    SET executor_kind = ?,
+        executor_provider = ?,
+        executor_ref = ?,
         lease_status = ?,
         lease_owner_kind = ?,
         lease_owner_label = ?,
@@ -2801,6 +2805,8 @@ function updateHouseWorkerRuntimeInstance({
         updated_at = ?
     WHERE runtime_instance_id = ?
   `).run(
+    executorKind === undefined ? existing.executorKind : (String(executorKind || '').trim() || existing.executorKind),
+    executorProvider === undefined ? existing.executorProvider : (String(executorProvider || '').trim() || null),
     executorRef === undefined ? existing.executorRef : (String(executorRef || '').trim() || null),
     leaseStatus === undefined ? existing.leaseStatus : (String(leaseStatus || '').trim() || null),
     leaseOwnerKind === undefined ? existing.leaseOwnerKind : (String(leaseOwnerKind || '').trim() || null),
