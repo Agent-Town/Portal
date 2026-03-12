@@ -2852,6 +2852,32 @@ function registerPlatformReadRoutes(app, deps) {
     if (!resolved.ok) {
       return sendPortalApiError(res, 404, resolved.code || 'PUBLIC_STACK_NOT_FOUND', resolved.message || 'Public Stack not found.', { requestId });
     }
+    const replayScopeSet = getScopeSetByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey: `${idempotencyKey}:scope`,
+    });
+    const replayImportedItem = Array.isArray(resolved.preview.members)
+      ? resolved.preview.members.find((member) => {
+          const publicationId = String(member?.libraryPublicationId || '').trim();
+          if (!publicationId) return false;
+          return !!getLibraryItemByIdempotency({
+            houseId: context.houseId,
+            teamId: context.activeTeamId,
+            idempotencyKey: `${idempotencyKey}:${publicationId}`,
+          });
+        })
+      : null;
+    const importReplayDetected = !!(replayScopeSet || replayImportedItem);
+    if (String(resolved.preview.reviewTier || '').trim() === 'blocked_here' && !importReplayDetected) {
+      return sendPortalApiError(
+        res,
+        409,
+        'LIBRARY_PUBLIC_STACK_BLOCKED_HERE',
+        'This Public Stack is blocked here for this House. Change the local review before importing.',
+        { requestId },
+      );
+    }
     const verificationPersisted = ensureLibraryPublicStackVerification({
       houseId: context.houseId,
       teamId: context.activeTeamId,

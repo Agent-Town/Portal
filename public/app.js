@@ -1940,6 +1940,14 @@ function formatHouseLibraryPublicStackReviewTier(reviewTier = '') {
   return '';
 }
 
+function getHouseLibraryPublicStackImportPolicyMessage(preview = null) {
+  if (String(preview?.reviewTier || preview?.review?.reviewTier || '').trim() !== 'blocked_here') {
+    return '';
+  }
+  return String(preview?.review?.summary || '').trim()
+    || 'This Public Stack is blocked here for this House. Change the local review before importing.';
+}
+
 function syncHouseLibraryPublicStacksControls() {
   const queryInput = el('houseLibraryPublicStacksQueryInput');
   const familySelect = el('houseLibraryPublicStacksFamilySelect');
@@ -2121,6 +2129,12 @@ async function importHouseLibraryPublicStackBundle({
   const libraryPublicStackId = String(libraryPublicStackIdOverride || preview?.libraryPublicStackId || preview?.registryEntityId || preview?.registryId || '').trim();
   if (!libraryPublicStackId) {
     throw new Error('PUBLIC_STACK_REQUIRED');
+  }
+  const blockedMessage = getHouseLibraryPublicStackImportPolicyMessage(preview);
+  if (blockedMessage) {
+    const err = new Error(blockedMessage);
+    err.code = 'LIBRARY_PUBLIC_STACK_BLOCKED_HERE';
+    throw err;
   }
   const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
@@ -3659,6 +3673,7 @@ function renderHouseLibrarySurface() {
         String(publicStackPreview?.registryId || ''),
         buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
         String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
+        getHouseLibraryPublicStackImportPolicyMessage(publicStackPreview),
         (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
           ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
           : importedPreviewItem
@@ -3670,7 +3685,7 @@ function renderHouseLibrarySurface() {
     guidedVerifyBtn.disabled = !publicStackPreview
       || !(String(publicStackPreview?.bundleKind || '') === 'library_public_stack' || String(publicStackPreview?.entityKind || '') === 'library_public_stack_bundle');
   }
-  guidedImportBtn.disabled = !publicStackPreview;
+  guidedImportBtn.disabled = !publicStackPreview || !!getHouseLibraryPublicStackImportPolicyMessage(publicStackPreview);
   guidedApprovalInput.disabled = true;
   guidedPublishBtn.disabled = true;
 
@@ -3746,6 +3761,7 @@ function renderHouseLibrarySurface() {
       String(publicStackPreview?.registryId || ''),
       buildHouseLibraryPublicStackTrustLabels(publicStackPreview).join(' · '),
       String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.',
+      getHouseLibraryPublicStackImportPolicyMessage(publicStackPreview),
       (publicStackPreview?.alreadyImportedAll === true || publicStackPreview?.localScopeSet)
         ? `Already in your Library as Satchel ${String(publicStackPreview?.localScopeSet?.title || publicStackPreview?.displayName || 'Imported Public Stack')}. Importing again will reuse it.`
         : importedPreviewItem
@@ -7537,7 +7553,7 @@ function bindTownDistrictControls() {
       try {
         await runHouseLibraryGuidedImport();
       } catch (err) {
-        const code = String(err?.code || err?.message || 'LIBRARY_IMPORT_FAILED');
+        const code = String(err?.message || err?.code || 'LIBRARY_IMPORT_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {
