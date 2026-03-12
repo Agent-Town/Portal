@@ -582,6 +582,8 @@ const HOUSE_WORKER_REPLY_TIMEOUT_MS = 20000;
 const HOUSE_WORKER_HEARTBEAT_INTERVAL_MS = 2500;
 const HOUSE_WORKER_LEASE_TTL_MS = 15000;
 const HOUSE_WORKER_TRAINER_NAMESPACE_QUERY_KEYS = ['trainerNamespace', 'trainer_namespace', 'trainer-tools', 'trainerTools'];
+const HOUSE_WORKER_BROWSER_EXECUTOR_KIND = 'browser_tab';
+const HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER = 'portal_browser';
 let houseWorkerSupervisorSeq = 0;
 const houseWorkerSupervisorState = {
   primaryWorkerId: '',
@@ -2096,6 +2098,9 @@ function getHouseWorkerSupervisorSnapshot() {
         status: String(entry?.status || '').trim(),
         statusLabel: presentation.statusLabel,
         attached: presentation.attached,
+        runtimeInstanceId: String(entry?.runtimeInstanceId || '').trim() || null,
+        executorKind: String(entry?.executorKind || HOUSE_WORKER_BROWSER_EXECUTOR_KIND).trim() || HOUSE_WORKER_BROWSER_EXECUTOR_KIND,
+        executorProvider: String(entry?.executorProvider || HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER).trim() || HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER,
         runtimeAgentId: String(entry?.runtimeAgentId || '').trim() || null,
         runtimeSessionId: String(entry?.runtimeSessionId || '').trim() || null,
         parentWorkerSessionId: String(entry?.parentSessionId || '').trim() || null,
@@ -2123,6 +2128,57 @@ function getHouseWorkerSupervisorSnapshot() {
     lastError: String(houseWorkerSupervisorState.lastError || '').trim() || null,
     localBrainReady: houseWorkerSupervisorState.localBrainReady === true,
     localBrainStatusLabel: String(houseWorkerSupervisorState.localBrainStatusLabel || '').trim() || null,
+  };
+}
+
+function buildHouseWorkerBrowserExecutorAdapter() {
+  return {
+    executorKind: HOUSE_WORKER_BROWSER_EXECUTOR_KIND,
+    executorProvider: HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER,
+    label: 'This browser tab',
+    parityMode: 'exact',
+    availability: 'ready',
+    runtimeAuthority: 'house_worker_runtime_instances',
+    createController: createHouseWorkerRuntimeController,
+  };
+}
+
+function listHouseWorkerExecutorAdapters() {
+  return [buildHouseWorkerBrowserExecutorAdapter()];
+}
+
+function resolveHouseWorkerExecutorAdapter(sessionCard = null) {
+  const requestedExecutorKind = String(sessionCard?.executorKind || HOUSE_WORKER_BROWSER_EXECUTOR_KIND).trim() || HOUSE_WORKER_BROWSER_EXECUTOR_KIND;
+  const adapter = listHouseWorkerExecutorAdapters()
+    .find((entry) => String(entry?.executorKind || '').trim() === requestedExecutorKind)
+    || null;
+  if (adapter) return adapter;
+  throw new Error(`HOUSE_WORKER_EXECUTOR_UNSUPPORTED:${requestedExecutorKind}`);
+}
+
+function getHouseWorkerExecutorSnapshot() {
+  const adapters = listHouseWorkerExecutorAdapters().map((entry) => ({
+    executorKind: String(entry?.executorKind || '').trim(),
+    executorProvider: String(entry?.executorProvider || '').trim(),
+    label: String(entry?.label || '').trim() || null,
+    parityMode: String(entry?.parityMode || '').trim() || null,
+    availability: String(entry?.availability || '').trim() || null,
+    runtimeAuthority: String(entry?.runtimeAuthority || '').trim() || null,
+  }));
+  const helpers = (Array.isArray(houseSurfaceState.office.workerSessions) ? houseSurfaceState.office.workerSessions : [])
+    .map((entry) => ({
+      houseWorkerSessionId: String(entry?.houseWorkerSessionId || '').trim() || null,
+      runtimeInstanceId: String(entry?.runtimeInstanceId || '').trim() || null,
+      executorKind: String(entry?.executorKind || HOUSE_WORKER_BROWSER_EXECUTOR_KIND).trim() || HOUSE_WORKER_BROWSER_EXECUTOR_KIND,
+      executorProvider: String(entry?.executorProvider || HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER).trim() || HOUSE_WORKER_BROWSER_EXECUTOR_PROVIDER,
+      attached: isHouseWorkerRuntimeAttached(String(entry?.houseWorkerSessionId || '').trim()),
+      leaseStatus: String(entry?.leaseStatus || '').trim() || null,
+      status: String(entry?.status || '').trim() || null,
+    }))
+    .filter((entry) => entry.houseWorkerSessionId);
+  return {
+    adapters,
+    helpers,
   };
 }
 
@@ -2406,6 +2462,9 @@ function maybeExposeHouseWorkerSupervisor() {
     message: async (payload = {}) => await sendHouseWorkerMessage(payload),
     stop: async (payload = {}) => await stopHouseWorkerSession(payload),
     getCheckpoints: () => houseWorkerSupervisorState.checkpoints.slice(),
+  };
+  window.__agentTownHouseWorkerExecutors = {
+    getSnapshot: () => getHouseWorkerExecutorSnapshot(),
   };
 }
 
@@ -2793,7 +2852,8 @@ async function spawnHouseWorkerSession(payload = {}) {
   if (existing && typeof existing.stop === 'function') {
     await existing.stop('respawn').catch(() => null);
   }
-  const controller = createHouseWorkerRuntimeController(sessionCard, llmPayload);
+  const executorAdapter = resolveHouseWorkerExecutorAdapter(sessionCard);
+  const controller = executorAdapter.createController(sessionCard, llmPayload);
   houseWorkerSupervisorState.runtimes.set(houseWorkerSessionId, controller);
   houseWorkerSupervisorState.checkpoints.push(`spawn:${houseWorkerSessionId}`);
   try {

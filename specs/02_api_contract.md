@@ -1440,6 +1440,10 @@ Response fields:
 - `data.sourceManifest`
 - `data.emptyStateText`
 
+Notes:
+- `data.runtimeInstances[].executorKind = browser_tab` means the helper is currently running through the browser executor adapter boundary.
+- `data.sessions[].executorKind = browser_tab` means the current helper runtime is attached to the local browser executor path, even though runtime truth is stored durably in `data.runtimeInstances[]`.
+
 ### GET `/api/platform/house-workers/sessions` (human)
 Returns active and recent helper sessions for the current House team.
 
@@ -1535,6 +1539,10 @@ Response fields:
 - `data.concurrencyLimit`
 - `data.sourceManifest`
 - `data.emptyStateText`
+
+Notes:
+- `browser_tab` is the first shipped executor kind.
+- Browser-backed helpers still use the same House control plane as later executor kinds, so this route is the canonical place to read executor and lease truth.
 
 ### POST `/api/platform/house-workers/spawn` (human)
 Starts one installed House helper as a real child worker session.

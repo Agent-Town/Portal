@@ -44,6 +44,12 @@ The original platform direction already pointed toward durable runners and optio
 
 ## 3. Non-Negotiable Decisions
 
+Current implementation note:
+
+1. `browser_tab` is now implemented as the first concrete executor kind.
+2. Browser helper startup is required to pass through the executor adapter boundary, not direct helper-specific boot wiring.
+3. Runtime-instance records remain the durable source of executor and lease truth for that browser path.
+
 ## 3.1 Worker-first still holds
 
 The backend pool must run real worker runtimes, not fake completions.

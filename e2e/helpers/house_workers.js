@@ -150,6 +150,14 @@ async function readHouseWorkerSupervisorSnapshot(page) {
   });
 }
 
+async function readHouseWorkerExecutorSnapshot(page) {
+  return await page.evaluate(() => {
+    const api = window.__agentTownHouseWorkerExecutors;
+    if (!api || typeof api.getSnapshot !== 'function') return null;
+    return api.getSnapshot();
+  });
+}
+
 async function readHouseWorkerSessionsFromPage(page, { teamId = '' } = {}) {
   return await page.evaluate(async ({ teamId }) => {
     const api = window.__agentTownHouseWorkerSupervisor;
@@ -203,6 +211,7 @@ module.exports = {
   listHouseWorkerSessions,
   listHouseWorkerRuntimeInstances,
   messageHouseWorker,
+  readHouseWorkerExecutorSnapshot,
   readHouseWorkerSessionsFromPage,
   readHouseWorkerLiveReadinessFromPage,
   readHouseWorkerSupervisorSnapshot,
