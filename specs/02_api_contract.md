@@ -1200,6 +1200,8 @@ Stable error codes:
 
 Response fields:
 - `data.deployment`
+- `data.deployment.versionLabel`
+- `data.deployment.compatibilityLabel`
 - `data.guidance.title`
 - `data.guidance.nextStep`
 - `data.guidance.plainLanguageSummary`
@@ -1231,6 +1233,8 @@ Response fields:
 - `data.shareId`
 - `data.sharePath`
 - `data.portable`
+- `data.portable.versionLabel`
+- `data.portable.compatibilityLabel`
 - `data.installActionLabel`
 - `data.summary`
 - `data.secretBoundarySummary`
@@ -1251,6 +1255,8 @@ Response fields:
 - `data.shareId`
 - `data.sharePath`
 - `data.portable`
+- `data.portable.versionLabel`
+- `data.portable.compatibilityLabel`
 - `data.installActionLabel`
 - `data.summary`
 - `data.secretBoundarySummary`
@@ -1278,6 +1284,8 @@ Stable error codes:
 
 Response fields:
 - `data.deployment`
+- `data.deployment.versionLabel`
+- `data.deployment.compatibilityLabel`
 - `data.share`
 - `data.guidance`
 - `data.deploymentsPath`

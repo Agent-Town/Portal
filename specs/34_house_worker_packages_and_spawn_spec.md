@@ -4,14 +4,15 @@ Status: Implemented
 Version: 0.1
 Audience: product, frontend, backend, runtime, UX, QA, security, benchmarking, store-and-growth, and AI-agent implementers
 Implementation branch target: `codex/house-worker-packages-spawn-v0-1`
-Implementation baseline: `679c4ad`
+Implementation baseline: `9eb0842`
 Latest proof state:
-1. `e2e/215` through `e2e/232` are green.
+1. `e2e/215` through `e2e/233` are green.
 2. Worker-skill contract sync is green in [e2e/55_phase3_skill_contract_line.spec.js](../e2e/55_phase3_skill_contract_line.spec.js).
 3. Post-phase runtime-truth hardening is green in [e2e/229_house_worker_reload_truth.spec.js](../e2e/229_house_worker_reload_truth.spec.js) and [e2e/230_house_worker_local_brain_guard.spec.js](../e2e/230_house_worker_local_brain_guard.spec.js).
 4. Shared-install exact-version hardening is green in [e2e/231_house_worker_share_exact_version_guard.spec.js](../e2e/231_house_worker_share_exact_version_guard.spec.js).
 5. Share-create and share-preview truth hardening is green in [e2e/232_house_worker_share_preview_truth.spec.js](../e2e/232_house_worker_share_preview_truth.spec.js).
-6. Full deterministic suite is green at `354 passed, 4 skipped` via `npm test`.
+6. Release and compatibility visibility hardening is green in [e2e/233_house_worker_release_visibility.spec.js](../e2e/233_house_worker_release_visibility.spec.js).
+7. Full deterministic suite is green at `355 passed, 4 skipped` via `npm test`.
 Depends on:
 1. [specs/22_option5_integration_unified_completion_spec.md](./22_option5_integration_unified_completion_spec.md)
 2. [specs/28_house_office_star_office_inspired_extension_spec.md](./28_house_office_star_office_inspired_extension_spec.md)

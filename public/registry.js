@@ -116,6 +116,13 @@
     const bestFor = Array.isArray(workerPackage?.bestFor) ? workerPackage.bestFor : [];
     const supportedSurfaces = Array.isArray(workerPackage?.supportedSurfaces) ? workerPackage.supportedSurfaces : [];
     const recommendedOfficeLabel = String(workerPackage?.recommendedOfficeLabel || workerPackage?.recommendedOfficeId || '').trim();
+    const versionLabel = String(workerPackage?.versionLabel || workerPackage?.entityVersionId || '').trim();
+    const compatibilityLabel = String(
+      workerPackage?.compatibilityLabel
+      || (bannerMode
+        ? (shareEnvelope?.portable?.compatibilityLabel || '')
+        : '')
+    ).trim();
     const requiresLocalBrain = workerPackage?.requiresLocalBrain === true;
     const statusNode = createWorkerStatusNode(
       bannerMode
@@ -146,6 +153,20 @@
       office.className = 'registryHint';
       office.textContent = `Recommended office: ${recommendedOfficeLabel}`;
       copySection.appendChild(office);
+    }
+    if (versionLabel) {
+      const releaseNode = document.createElement('div');
+      releaseNode.className = 'registryHint';
+      releaseNode.setAttribute('data-testid', 'registry-worker-package-release');
+      releaseNode.textContent = `Release: ${versionLabel}`;
+      copySection.appendChild(releaseNode);
+    }
+    if (compatibilityLabel) {
+      const compatibilityNode = document.createElement('div');
+      compatibilityNode.className = 'registryHint';
+      compatibilityNode.setAttribute('data-testid', 'registry-worker-package-compatibility');
+      compatibilityNode.textContent = compatibilityLabel;
+      copySection.appendChild(compatibilityNode);
     }
     if (bestFor.length) {
       const bestForNode = document.createElement('div');
@@ -268,8 +289,10 @@
     advancedBody.textContent = JSON.stringify({
       registryEntityId: String(workerPackage?.registryEntityId || item?.registryEntityId || '').trim() || null,
       entityVersionId: String(workerPackage?.entityVersionId || item?.entityVersionId || '').trim() || null,
+      versionLabel: versionLabel || null,
       loadoutId: String(workerPackage?.portableArtifacts?.loadoutId || workerPackage?.runtimeDefaults?.loadoutId || '').trim() || null,
       bundleHash: String(workerPackage?.portableArtifacts?.bundleHash || '').trim() || null,
+      compatibilityLabel: compatibilityLabel || null,
       runtimeDefaults: workerPackage?.runtimeDefaults || null,
     }, null, 2);
     details.appendChild(advancedBody);
@@ -432,7 +455,9 @@
         ...portable,
         registryEntityId: String(portable?.registryEntityId || '').trim() || null,
         entityVersionId: String(portable?.entityVersionId || '').trim() || null,
+        versionLabel: String(portable?.versionLabel || '').trim() || null,
         displayName: String(portable?.displayName || 'Shared Helper').trim(),
+        compatibilityLabel: String(portable?.compatibilityLabel || '').trim() || null,
         portableArtifacts: {
           loadoutId: String(portable?.loadoutId || portable?.runtimeDefaults?.loadoutId || '').trim() || null,
           bundleHash: String(portable?.bundleHash || '').trim() || null,

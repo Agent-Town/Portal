@@ -24,7 +24,7 @@ Goal: convert Option B and Option C into one deterministic implementation path:
 Implementation baseline:
 
 1. House Office phases `28` through `33` are implemented.
-2. Current branch baseline is `679c4ad`.
+2. Current branch baseline is `9eb0842`.
 3. Current repo already has:
    A. Registry entities, versions, bundles, and loadouts,
    B. House offices, staff agents, and assignments,
@@ -41,12 +41,13 @@ Implementation constraints:
 
 Current proof state:
 
-1. `215` through `232` are green.
+1. `215` through `233` are green.
 2. Skill/API sync is green in `e2e/55` and `e2e/135`.
 3. Runtime-truth hardening is green in `e2e/229` and `e2e/230`.
 4. Shared-install exact-version hardening is green in `e2e/231`.
 5. Share-create and share-preview truth hardening is green in `e2e/232`.
-6. Full deterministic suite is green at `354 passed, 4 skipped`.
+6. Release and compatibility visibility hardening is green in `e2e/233`.
+7. Full deterministic suite is green at `355 passed, 4 skipped`.
 7. Default tests remain deterministic and offline-safe.
 8. Runtime changes under `vendors/openclaw-lite-main/src/openclaw-lite/*` must rebuild browser artifacts.
 9. New worker-tool behavior must sync:

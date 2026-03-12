@@ -28,6 +28,8 @@ test('M35.0: Registry exposes a worker package family with plain-language storef
     registryEntityId: fixture.registryEntityId,
     entityVersionId: fixture.entityVersionId,
     workerPackage: expect.objectContaining({
+      versionLabel: fixture.versionLabel,
+      compatibilityLabel: expect.any(String),
       oneLineBenefit: expect.any(String),
       whatItDoes: expect.any(String),
       bestFor: expect.any(Array),
@@ -51,6 +53,8 @@ test('M35.0: Registry exposes a worker package family with plain-language storef
     registryEntityId: fixture.registryEntityId,
     entityVersionId: fixture.entityVersionId,
     workerPackage: expect.objectContaining({
+      versionLabel: fixture.versionLabel,
+      compatibilityLabel: expect.any(String),
       portableArtifacts: expect.objectContaining({
         loadoutId: fixture.loadoutId,
         bundleHash: fixture.bundleHash,

@@ -5,6 +5,7 @@
   "familyTitle": "Workers",
   "registryEntityId": "reg_house_worker_front_desk_helper",
   "entityVersionId": "rev_house_worker_front_desk_helper_v1",
+  "versionLabel": "v1",
   "loadoutId": "loadout_house_worker_front_desk_helper_v1",
   "bundleHash": "sha256:bundle_house_worker_front_desk_helper_v1",
   "displayName": "Front Desk Helper",

@@ -1860,11 +1860,15 @@ function buildRegistryWorkerPackage(storefrontEntity = {}, version = null) {
   const defaultDisplayName = String(workerPackage?.defaultDisplayName || storefrontEntity?.displayName || '').trim();
   const requiresLocalBrain = workerPackage?.requiresLocalBrain === true;
   const delegationAllowed = workerPackage?.delegationAllowed === true;
+  const versionLabel = String(version?.versionLabel || storefrontEntity?.versionLabel || '').trim() || null;
+  const compatibilityLabel = versionLabel
+    ? `Install uses exactly release ${versionLabel} from Registry.${requiresLocalBrain ? ' Local brain setup stays local to the receiving House.' : ''}`
+    : null;
   return {
     packageKind: 'worker_package',
     registryEntityId,
     entityVersionId: String(version?.entityVersionId || storefrontEntity?.entityVersionId || '').trim() || null,
-    versionLabel: String(version?.versionLabel || storefrontEntity?.versionLabel || '').trim() || null,
+    versionLabel,
     displayName: String(storefrontEntity?.displayName || '').trim(),
     oneLineBenefit: String(workerPackage?.oneLineBenefit || storefrontEntity?.description || '').trim(),
     whatItDoes: String(workerPackage?.whatItDoes || storefrontEntity?.description || '').trim(),
@@ -1875,6 +1879,7 @@ function buildRegistryWorkerPackage(storefrontEntity = {}, version = null) {
     defaultDisplayName,
     requiresLocalBrain,
     brainBindingLabel: requiresLocalBrain ? 'Needs local brain setup' : 'Ready after install',
+    compatibilityLabel,
     delegationAllowed,
     runtimeDefaults: {
       brainProfileId: String(runtimeDefaults?.brainProfileId || '').trim() || null,

@@ -3015,6 +3015,26 @@ function renderHouseOfficeSurface() {
         card.appendChild(bestForLine);
       }
 
+      const versionLabel = String(deployment?.versionLabel || deployment?.entityVersionId || '').trim();
+      if (versionLabel) {
+        const releaseLine = document.createElement('div');
+        releaseLine.className = 'small';
+        releaseLine.style.marginTop = '4px';
+        releaseLine.setAttribute('data-testid', 'house-office-deployment-release');
+        releaseLine.textContent = `Release: ${versionLabel}`;
+        card.appendChild(releaseLine);
+      }
+
+      const compatibilityLabel = String(deployment?.compatibilityLabel || '').trim();
+      if (compatibilityLabel) {
+        const compatibilityLine = document.createElement('div');
+        compatibilityLine.className = 'small';
+        compatibilityLine.style.marginTop = '4px';
+        compatibilityLine.setAttribute('data-testid', 'house-office-deployment-compatibility');
+        compatibilityLine.textContent = compatibilityLabel;
+        card.appendChild(compatibilityLine);
+      }
+
       const actionStatus = document.createElement('div');
       actionStatus.className = 'small';
       actionStatus.style.marginTop = '8px';

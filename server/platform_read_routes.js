@@ -328,9 +328,10 @@ function registerPlatformReadRoutes(app, deps) {
     const runtimeDefaults = workerPackage?.runtimeDefaults && typeof workerPackage.runtimeDefaults === 'object'
       ? workerPackage.runtimeDefaults
       : {};
-    return {
+    const resolvedPackage = {
       registryEntityId: String(source?.registryEntityId || source?.registryId || '').trim(),
       entityVersionId: String(source?.entityVersionId || '').trim(),
+      versionLabel: String(workerPackage?.versionLabel || source?.versionLabel || '').trim() || null,
       displayName: String(workerPackage?.displayName || source?.displayName || '').trim() || String(source?.registryEntityId || '').trim(),
       oneLineBenefit: String(workerPackage?.oneLineBenefit || source?.description || '').trim(),
       whatItDoes: String(workerPackage?.whatItDoes || source?.description || '').trim(),
@@ -356,6 +357,27 @@ function registerPlatformReadRoutes(app, deps) {
         delegationAllowed: runtimeDefaults?.delegationAllowed === true || workerPackage?.delegationAllowed === true,
       },
     };
+    resolvedPackage.compatibilityLabel = buildHouseWorkerCompatibilityLabel(resolvedPackage);
+    return resolvedPackage;
+  }
+
+  function buildHouseWorkerReleaseLabel(packageInfo = null) {
+    const source = packageInfo && typeof packageInfo === 'object' ? packageInfo : {};
+    const versionLabel = String(source?.versionLabel || '').trim();
+    if (versionLabel) return `Release ${versionLabel}`;
+    const entityVersionId = String(source?.entityVersionId || '').trim();
+    return entityVersionId ? `Release ${entityVersionId}` : 'Release unavailable';
+  }
+
+  function buildHouseWorkerCompatibilityLabel(packageInfo = null, {
+    shared = false,
+  } = {}) {
+    const releaseLabel = buildHouseWorkerReleaseLabel(packageInfo).toLowerCase();
+    const prefix = shared ? 'This link installs' : 'Install uses';
+    const setupTail = packageInfo?.requiresLocalBrain === true
+      ? ' Local brain setup stays local to the receiving House.'
+      : '';
+    return `${prefix} exactly ${releaseLabel} from Registry.${setupTail}`.trim();
   }
 
   function buildHouseWorkerStatusExplanation(packageInfo = null, status = '') {
@@ -446,6 +468,13 @@ function registerPlatformReadRoutes(app, deps) {
         ? sourceDeployment.summary.supportedSurfaces
         : (Array.isArray(sourcePackage?.supportedSurfaces) ? sourcePackage.supportedSurfaces : []),
       requiresLocalBrain: sourceDeployment?.summary?.requiresLocalBrain === true || sourcePackage?.requiresLocalBrain === true,
+      versionLabel: String(sourceDeployment?.summary?.versionLabel || sourcePackage?.versionLabel || '').trim() || null,
+      compatibilityLabel: String(
+        sourceDeployment?.summary?.compatibilityLabel
+        || sourcePackage?.compatibilityLabel
+        || buildHouseWorkerCompatibilityLabel(sourcePackage, { shared: true })
+        || ''
+      ).trim() || null,
       delegationAllowed: sourceDeployment?.runtimeDefaults?.delegationAllowed === true || sourcePackage?.delegationAllowed === true,
       runtimeDefaults: {
         brainProfileId: String(sourceDeployment?.runtimeDefaults?.brainProfileId || sourcePackage?.runtimeDefaults?.brainProfileId || '').trim() || null,
@@ -646,6 +675,7 @@ function registerPlatformReadRoutes(app, deps) {
         ...canonicalPackage,
         loadoutId: desiredLoadoutId || null,
         bundleHash: String(selectedBundle?.contentHash || desiredBundleHash || canonicalPackage?.bundleHash || '').trim() || null,
+        compatibilityLabel: buildHouseWorkerCompatibilityLabel(canonicalPackage, { shared: true }),
         defaultDisplayName: String(portablePayload?.displayName || canonicalPackage?.defaultDisplayName || canonicalPackage?.displayName || '').trim(),
         runtimeDefaults: {
           ...canonicalPackage.runtimeDefaults,
@@ -664,6 +694,8 @@ function registerPlatformReadRoutes(app, deps) {
           entityVersionId: sharedEntityVersionId,
           loadoutId: desiredLoadoutId || null,
           bundleHash: String(selectedBundle?.contentHash || desiredBundleHash || canonicalPackage?.bundleHash || '').trim() || null,
+          versionLabel: String(canonicalPackage?.versionLabel || '').trim() || null,
+          compatibilityLabel: buildHouseWorkerCompatibilityLabel(canonicalPackage, { shared: true }),
           oneLineBenefit: String(canonicalPackage?.oneLineBenefit || '').trim(),
           whatItDoes: String(canonicalPackage?.whatItDoes || '').trim(),
           bestFor: Array.isArray(canonicalPackage?.bestFor) ? canonicalPackage.bestFor : [],
@@ -721,6 +753,7 @@ function registerPlatformReadRoutes(app, deps) {
           staffAgentLabel: String(staffAgent?.displayName || deployment?.staffAgentId || '').trim(),
           registryEntityId: String(deployment?.registryEntityId || '').trim(),
           entityVersionId: String(deployment?.entityVersionId || '').trim(),
+          versionLabel: String(summary?.versionLabel || '').trim() || null,
           loadoutId: String(deployment?.loadoutId || '').trim() || null,
           bundleHash: String(deployment?.bundleHash || '').trim() || null,
           displayName: String(deployment?.displayName || '').trim(),
@@ -731,6 +764,7 @@ function registerPlatformReadRoutes(app, deps) {
           bestFor: Array.isArray(summary?.bestFor) ? summary.bestFor : [],
           supportedSurfaces: Array.isArray(summary?.supportedSurfaces) ? summary.supportedSurfaces : [],
           requiresLocalBrain: summary?.requiresLocalBrain === true,
+          compatibilityLabel: String(summary?.compatibilityLabel || '').trim() || null,
           delegationAllowed: runtimeDefaults?.delegationAllowed === true,
           runtimeDefaults: {
             brainProfileId: String(runtimeDefaults?.brainProfileId || '').trim() || null,
@@ -3625,6 +3659,8 @@ function registerPlatformReadRoutes(app, deps) {
         supportedSurfaces: packageInfo.supportedSurfaces,
         requiresLocalBrain: packageInfo.requiresLocalBrain === true,
         brainBindingLabel: packageInfo.brainBindingLabel,
+        versionLabel: String(packageInfo?.versionLabel || '').trim() || null,
+        compatibilityLabel: buildHouseWorkerCompatibilityLabel(packageInfo),
       },
       runtimeDefaults: packageInfo.runtimeDefaults,
       installSource: {
@@ -3654,6 +3690,7 @@ function registerPlatformReadRoutes(app, deps) {
         staffAgentLabel: String(staffAgent?.displayName || '').trim(),
         registryEntityId: String(deploymentRecord?.registryEntityId || '').trim(),
         entityVersionId: String(deploymentRecord?.entityVersionId || '').trim(),
+        versionLabel: String(packageInfo?.versionLabel || '').trim() || null,
         loadoutId: String(deploymentRecord?.loadoutId || '').trim() || null,
         bundleHash: String(deploymentRecord?.bundleHash || '').trim() || null,
         displayName: String(deploymentRecord?.displayName || '').trim(),
@@ -3664,6 +3701,7 @@ function registerPlatformReadRoutes(app, deps) {
         bestFor: packageInfo.bestFor,
         supportedSurfaces: packageInfo.supportedSurfaces,
         requiresLocalBrain: packageInfo.requiresLocalBrain === true,
+        compatibilityLabel: buildHouseWorkerCompatibilityLabel(packageInfo),
         delegationAllowed: packageInfo.runtimeDefaults?.delegationAllowed === true,
         runtimeDefaults: packageInfo.runtimeDefaults,
         shareable: true,
@@ -3887,6 +3925,8 @@ function registerPlatformReadRoutes(app, deps) {
         supportedSurfaces: packageInfo.supportedSurfaces,
         requiresLocalBrain: packageInfo.requiresLocalBrain === true,
         brainBindingLabel: packageInfo.brainBindingLabel,
+        versionLabel: String(packageInfo?.versionLabel || '').trim() || null,
+        compatibilityLabel: buildHouseWorkerCompatibilityLabel(packageInfo, { shared: true }),
       },
       runtimeDefaults: packageInfo.runtimeDefaults,
       installSource: {

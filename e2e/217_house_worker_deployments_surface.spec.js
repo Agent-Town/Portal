@@ -42,6 +42,8 @@ test('M35.2: installed helpers appear in House Office with plain-language setup 
     officeLabel: 'Operations',
     status: 'brain_binding_required',
     statusLabel: 'Connect a local brain before this helper can start working.',
+    versionLabel: registryFixture.fixture.versionLabel,
+    compatibilityLabel: expect.any(String),
   });
 
   await page.getByTestId('house-open-office').click();
@@ -50,5 +52,7 @@ test('M35.2: installed helpers appear in House Office with plain-language setup 
   await expect(page.getByTestId('house-office-deployments')).toContainText('Front Desk Helper');
   await expect(page.getByTestId('house-office-deployment-item')).toContainText('Operations');
   await expect(page.getByTestId('house-office-deployment-item')).toContainText('Connect a local brain before this helper can start working.');
+  await expect(page.getByTestId('house-office-deployment-release')).toHaveText(`Release: ${registryFixture.fixture.versionLabel}`);
+  await expect(page.getByTestId('house-office-deployment-compatibility')).toContainText('Install uses exactly release v1 from Registry.');
   await expect(page.getByTestId('house-office-deployment-advanced-body')).not.toBeVisible();
 });
