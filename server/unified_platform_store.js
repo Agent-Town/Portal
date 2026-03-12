@@ -39,6 +39,8 @@ const PLATFORM_TABLES = Object.freeze([
   'library_public_stack_attestations',
   'library_public_stack_attestation_provenance',
   'library_public_stack_attestation_verification_receipts',
+  'library_route_subscriptions',
+  'library_route_sync_receipts',
   'library_peer_relays',
   'library_peer_receipts',
   'library_satchel_relays',
@@ -106,6 +108,7 @@ const FIXTURE_FILES = Object.freeze({
   library_public_stack_attestation_provenance_seed: 'library_public_stack_attestation_provenance_seed.json',
   library_public_stack_safety_seed: 'library_public_stack_safety_seed.json',
   library_public_stack_discovery_seed: 'library_public_stack_discovery_seed.json',
+  library_route_sync_seed: 'library_route_sync_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([
@@ -138,6 +141,7 @@ let unifiedPlatformInspectors = {
   editor: buildDefaultEditorInspector(),
   registryPreview: buildDefaultRegistryPreviewInspector(),
   benchmarks: buildDefaultBenchmarkInspector(),
+  routeSync: buildDefaultRouteSyncInspector(),
   peerRelay: buildDefaultPeerRelayInspector(),
   satchelExchange: buildDefaultSatchelExchangeInspector(),
   publicStacks: buildDefaultPublicStacksInspector(),
@@ -612,6 +616,39 @@ function ensureDb() {
       UNIQUE (library_public_stack_attestation_provenance_id, house_id, team_id)
     );
 
+    CREATE TABLE IF NOT EXISTS library_route_subscriptions (
+      library_route_subscription_id TEXT PRIMARY KEY,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      source_house_id TEXT NOT NULL,
+      source_team_id TEXT NOT NULL,
+      route_state TEXT NOT NULL,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key),
+      UNIQUE (house_id, team_id, source_house_id, source_team_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS library_route_sync_receipts (
+      library_route_sync_receipt_id TEXT PRIMARY KEY,
+      library_route_subscription_id TEXT NOT NULL,
+      house_id TEXT NOT NULL,
+      team_id TEXT NOT NULL,
+      library_public_stack_id TEXT NOT NULL,
+      source_house_id TEXT NOT NULL,
+      source_team_id TEXT NOT NULL,
+      synced_at TEXT NOT NULL,
+      imported_at TEXT,
+      idempotency_key TEXT,
+      metadata_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (house_id, team_id, idempotency_key),
+      UNIQUE (library_route_subscription_id, library_public_stack_id)
+    );
+
     CREATE TABLE IF NOT EXISTS library_peer_relays (
       library_peer_relay_id TEXT PRIMARY KEY,
       house_id TEXT NOT NULL,
@@ -868,6 +905,18 @@ function buildDefaultBenchmarkInspector() {
   };
 }
 
+function buildDefaultRouteSyncInspector() {
+  return {
+    subscriptions: [],
+    receipts: [],
+    filters: {
+      sourceHouseId: '',
+      targetHouseId: '',
+      routeState: '',
+    },
+  };
+}
+
 function buildDefaultPeerRelayInspector() {
   return {
     relays: [],
@@ -910,6 +959,7 @@ function resetUnifiedPlatformInspectors() {
     editor: buildDefaultEditorInspector(),
     registryPreview: buildDefaultRegistryPreviewInspector(),
     benchmarks: buildDefaultBenchmarkInspector(),
+    routeSync: buildDefaultRouteSyncInspector(),
     peerRelay: buildDefaultPeerRelayInspector(),
     satchelExchange: buildDefaultSatchelExchangeInspector(),
     publicStacks: buildDefaultPublicStacksInspector(),
@@ -2100,6 +2150,41 @@ function mapLibraryPeerRelayRow(row) {
     targetHouseId: String(row.target_house_id || ''),
     transportKind: String(row.transport_kind || ''),
     relayState: String(row.relay_state || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryRouteSubscriptionRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryRouteSubscriptionId: String(row.library_route_subscription_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    sourceHouseId: String(row.source_house_id || ''),
+    sourceTeamId: String(row.source_team_id || ''),
+    routeState: String(row.route_state || ''),
+    idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
+    metadata: parseJsonColumn(row.metadata_json, {}),
+    createdAt: String(row.created_at || ''),
+    updatedAt: String(row.updated_at || ''),
+  };
+}
+
+function mapLibraryRouteSyncReceiptRow(row) {
+  if (!row || typeof row !== 'object') return null;
+  return {
+    libraryRouteSyncReceiptId: String(row.library_route_sync_receipt_id || ''),
+    libraryRouteSubscriptionId: String(row.library_route_subscription_id || ''),
+    houseId: String(row.house_id || ''),
+    teamId: String(row.team_id || ''),
+    libraryPublicStackId: String(row.library_public_stack_id || ''),
+    sourceHouseId: String(row.source_house_id || ''),
+    sourceTeamId: String(row.source_team_id || ''),
+    syncedAt: String(row.synced_at || ''),
+    importedAt: row.imported_at ? String(row.imported_at) : null,
     idempotencyKey: row.idempotency_key ? String(row.idempotency_key) : null,
     metadata: parseJsonColumn(row.metadata_json, {}),
     createdAt: String(row.created_at || ''),
@@ -3625,6 +3710,339 @@ function updateLibraryPublicStackSafetyRecord({
   return getLibraryPublicStackSafetyRecordById(normalizedId);
 }
 
+function listLibraryRouteSubscriptions({
+  houseId = '',
+  teamId = '',
+  sourceHouseId = '',
+  routeState = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedSourceHouseId = String(sourceHouseId || '').trim();
+  const normalizedRouteState = String(routeState || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_route_subscriptions
+  `;
+  const args = [];
+  if (normalizedHouseId || normalizedTeamId || normalizedSourceHouseId || normalizedRouteState) {
+    const clauses = [];
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    if (normalizedSourceHouseId) {
+      clauses.push('source_house_id = ?');
+      args.push(normalizedSourceHouseId);
+    }
+    if (normalizedRouteState) {
+      clauses.push('route_state = ?');
+      args.push(normalizedRouteState);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY updated_at DESC, library_route_subscription_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryRouteSubscriptionRow).filter(Boolean);
+}
+
+function getLibraryRouteSubscriptionByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_route_subscriptions
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryRouteSubscriptionRow(row);
+}
+
+function getLibraryRouteSubscriptionById(libraryRouteSubscriptionId = '') {
+  const normalizedId = String(libraryRouteSubscriptionId || '').trim();
+  if (!normalizedId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_route_subscriptions
+    WHERE library_route_subscription_id = ?
+    LIMIT 1
+  `).get(normalizedId);
+  return mapLibraryRouteSubscriptionRow(row);
+}
+
+function createLibraryRouteSubscription({
+  libraryRouteSubscriptionId = '',
+  houseId = '',
+  teamId = '',
+  sourceHouseId = '',
+  sourceTeamId = '',
+  routeState = 'active',
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedId = String(libraryRouteSubscriptionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedSourceHouseId = String(sourceHouseId || '').trim();
+  const normalizedSourceTeamId = String(sourceTeamId || '').trim();
+  const normalizedRouteState = String(routeState || 'active').trim() || 'active';
+  if (!normalizedId || !normalizedHouseId || !normalizedTeamId || !normalizedSourceHouseId || !normalizedSourceTeamId) {
+    throw new Error('LIBRARY_ROUTE_SUBSCRIPTION_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_route_subscriptions (
+      library_route_subscription_id,
+      house_id,
+      team_id,
+      source_house_id,
+      source_team_id,
+      route_state,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedSourceHouseId,
+    normalizedSourceTeamId,
+    normalizedRouteState,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return getLibraryRouteSubscriptionById(normalizedId);
+}
+
+function updateLibraryRouteSubscription({
+  libraryRouteSubscriptionId = '',
+  routeState = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedId = String(libraryRouteSubscriptionId || '').trim();
+  if (!normalizedId) return null;
+  const existing = getLibraryRouteSubscriptionById(normalizedId);
+  if (!existing) return null;
+  const nextRouteState = String(routeState || existing.routeState || '').trim() || existing.routeState || 'active';
+  const nextMetadata = metadata && typeof metadata === 'object'
+    ? {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...metadata,
+      }
+    : (existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_route_subscriptions
+    SET route_state = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_route_subscription_id = ?
+  `).run(
+    nextRouteState,
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedId,
+  );
+  return getLibraryRouteSubscriptionById(normalizedId);
+}
+
+function listLibraryRouteSyncReceipts({
+  libraryRouteSubscriptionId = '',
+  houseId = '',
+  teamId = '',
+} = {}) {
+  const normalizedSubscriptionId = String(libraryRouteSubscriptionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const database = ensureDb();
+  let query = `
+    SELECT *
+    FROM library_route_sync_receipts
+  `;
+  const args = [];
+  if (normalizedSubscriptionId || normalizedHouseId || normalizedTeamId) {
+    const clauses = [];
+    if (normalizedSubscriptionId) {
+      clauses.push('library_route_subscription_id = ?');
+      args.push(normalizedSubscriptionId);
+    }
+    if (normalizedHouseId) {
+      clauses.push('house_id = ?');
+      args.push(normalizedHouseId);
+    }
+    if (normalizedTeamId) {
+      clauses.push('team_id = ?');
+      args.push(normalizedTeamId);
+    }
+    query += ` WHERE ${clauses.join(' AND ')}`;
+  }
+  query += ' ORDER BY synced_at DESC, library_route_sync_receipt_id DESC';
+  return database.prepare(query).all(...args).map(mapLibraryRouteSyncReceiptRow).filter(Boolean);
+}
+
+function getLibraryRouteSyncReceiptByIdempotency({
+  houseId = '',
+  teamId = '',
+  idempotencyKey = '',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedIdempotencyKey = String(idempotencyKey || '').trim();
+  if (!normalizedHouseId || !normalizedTeamId || !normalizedIdempotencyKey) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_route_sync_receipts
+    WHERE house_id = ?
+      AND team_id = ?
+      AND idempotency_key = ?
+    ORDER BY created_at ASC
+    LIMIT 1
+  `).get(
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedIdempotencyKey,
+  );
+  return mapLibraryRouteSyncReceiptRow(row);
+}
+
+function getLibraryRouteSyncReceiptById(libraryRouteSyncReceiptId = '') {
+  const normalizedId = String(libraryRouteSyncReceiptId || '').trim();
+  if (!normalizedId) return null;
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT *
+    FROM library_route_sync_receipts
+    WHERE library_route_sync_receipt_id = ?
+    LIMIT 1
+  `).get(normalizedId);
+  return mapLibraryRouteSyncReceiptRow(row);
+}
+
+function createLibraryRouteSyncReceipt({
+  libraryRouteSyncReceiptId = '',
+  libraryRouteSubscriptionId = '',
+  houseId = '',
+  teamId = '',
+  libraryPublicStackId = '',
+  sourceHouseId = '',
+  sourceTeamId = '',
+  syncedAt = new Date().toISOString(),
+  importedAt = null,
+  idempotencyKey = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedId = String(libraryRouteSyncReceiptId || '').trim();
+  const normalizedSubscriptionId = String(libraryRouteSubscriptionId || '').trim();
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedTeamId = String(teamId || '').trim();
+  const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+  const normalizedSourceHouseId = String(sourceHouseId || '').trim();
+  const normalizedSourceTeamId = String(sourceTeamId || '').trim();
+  const normalizedSyncedAt = String(syncedAt || nowIso).trim() || nowIso;
+  if (!normalizedId || !normalizedSubscriptionId || !normalizedHouseId || !normalizedTeamId || !normalizedPublicStackId || !normalizedSourceHouseId || !normalizedSourceTeamId) {
+    throw new Error('LIBRARY_ROUTE_SYNC_RECEIPT_INVALID');
+  }
+  const database = ensureDb();
+  database.prepare(`
+    INSERT INTO library_route_sync_receipts (
+      library_route_sync_receipt_id,
+      library_route_subscription_id,
+      house_id,
+      team_id,
+      library_public_stack_id,
+      source_house_id,
+      source_team_id,
+      synced_at,
+      imported_at,
+      idempotency_key,
+      metadata_json,
+      created_at,
+      updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    normalizedId,
+    normalizedSubscriptionId,
+    normalizedHouseId,
+    normalizedTeamId,
+    normalizedPublicStackId,
+    normalizedSourceHouseId,
+    normalizedSourceTeamId,
+    normalizedSyncedAt,
+    importedAt ? String(importedAt).trim() || null : null,
+    String(idempotencyKey || '').trim() || null,
+    JSON.stringify(metadata && typeof metadata === 'object' ? metadata : {}),
+    nowIso,
+    nowIso,
+  );
+  return getLibraryRouteSyncReceiptById(normalizedId);
+}
+
+function updateLibraryRouteSyncReceipt({
+  libraryRouteSyncReceiptId = '',
+  syncedAt = '',
+  importedAt = undefined,
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedId = String(libraryRouteSyncReceiptId || '').trim();
+  if (!normalizedId) return null;
+  const existing = getLibraryRouteSyncReceiptById(normalizedId);
+  if (!existing) return null;
+  const nextSyncedAt = String(syncedAt || existing.syncedAt || '').trim() || existing.syncedAt || nowIso;
+  const nextImportedAt = importedAt === undefined
+    ? existing.importedAt
+    : (importedAt ? String(importedAt).trim() || null : null);
+  const nextMetadata = metadata && typeof metadata === 'object'
+    ? {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...metadata,
+      }
+    : (existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_route_sync_receipts
+    SET synced_at = ?,
+        imported_at = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_route_sync_receipt_id = ?
+  `).run(
+    nextSyncedAt,
+    nextImportedAt,
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedId,
+  );
+  return getLibraryRouteSyncReceiptById(normalizedId);
+}
+
 function listLibraryPeerRelays({
   houseId = '',
   teamId = '',
@@ -4210,6 +4628,26 @@ function getUnifiedPlatformPublicationsInspector({
 } = {}) {
   return {
     publications: listLibraryPublications({ houseId, teamId }),
+  };
+}
+
+function getUnifiedPlatformRouteSyncInspector({
+  houseId = '',
+  teamId = '',
+  sourceHouseId = '',
+} = {}) {
+  const subscriptions = listLibraryRouteSubscriptions({ houseId, teamId, sourceHouseId });
+  const receipts = subscriptions.flatMap((subscription) => listLibraryRouteSyncReceipts({
+    libraryRouteSubscriptionId: String(subscription?.libraryRouteSubscriptionId || '').trim(),
+  }));
+  return {
+    subscriptions,
+    receipts,
+    filters: {
+      sourceHouseId: String(sourceHouseId || '').trim(),
+      targetHouseId: String(houseId || '').trim(),
+      routeState: '',
+    },
   };
 }
 
@@ -6350,6 +6788,7 @@ function getUnifiedPlatformTestStats() {
       editor: true,
       registryPreview: true,
       benchmarks: true,
+      routeSync: true,
     },
   };
 }
@@ -6368,6 +6807,8 @@ module.exports = {
   createLibraryPublicStackAttestation,
   createLibraryPublicStackAttestationProvenance,
   createLibraryPublicStackAttestationVerificationReceipt,
+  createLibraryRouteSubscription,
+  createLibraryRouteSyncReceipt,
   createLibraryPublicStackVerification,
   createLibraryPublicStackVerificationMember,
   createLibraryPublicStackReview,
@@ -6414,6 +6855,10 @@ module.exports = {
   getLibraryPublicStackAttestationVerificationReceipt,
   getLibraryPublicStackAttestationVerificationReceiptById,
   getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
+  getLibraryRouteSubscriptionById,
+  getLibraryRouteSubscriptionByIdempotency,
+  getLibraryRouteSyncReceiptById,
+  getLibraryRouteSyncReceiptByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewById,
   getLibraryPublicStackReviewByIdempotency,
@@ -6447,6 +6892,7 @@ module.exports = {
   getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
+  getUnifiedPlatformRouteSyncInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicStackAttestationsInspector,
@@ -6474,6 +6920,8 @@ module.exports = {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryRouteSubscriptions,
+  listLibraryRouteSyncReceipts,
   listLibraryPublicStackAttestations,
   listLibraryPublicStackAttestationProvenance,
   listLibraryPublicStackAttestationVerificationReceipts,
@@ -6511,6 +6959,8 @@ module.exports = {
   updateLibraryPublicStackReview,
   updateLibraryPublicStackSafetyRecord,
   updateLibraryPublicStackVerification,
+  updateLibraryRouteSubscription,
+  updateLibraryRouteSyncReceipt,
   updateLibraryPeerRelay,
   updateLibrarySatchelRelay,
   updateRunMetadata,

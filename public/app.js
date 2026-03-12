@@ -574,6 +574,11 @@ let houseSurfaceState = {
     publicStacksResultCount: 0,
     publicStackPreview: null,
     publicStackApprovalId: '',
+    routeSourceHouseId: '',
+    routeSubscriptions: [],
+    selectedRouteSubscriptionId: '',
+    routeFeed: [],
+    selectedRouteSyncReceiptId: '',
     safetyDesk: [],
     incomingRelays: [],
     selectedIncomingRelayId: '',
@@ -1782,6 +1787,7 @@ function renderHouseExperiencesSurface() {
 function syncHouseLibraryStateFromPayload(payload = {}) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   const selectedItems = Array.isArray(payload?.selectedItems) ? payload.selectedItems : [];
+  const routeSubscriptions = Array.isArray(payload?.routeSubscriptions) ? payload.routeSubscriptions : [];
   const incomingRelays = Array.isArray(payload?.incomingRelays) ? payload.incomingRelays : [];
   const incomingSatchelRelays = Array.isArray(payload?.incomingSatchelRelays) ? payload.incomingSatchelRelays : [];
   houseSurfaceState.library.loaded = true;
@@ -1796,6 +1802,7 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
     ? payload.selectedItemIds.map((itemId) => String(itemId || '').trim()).filter(Boolean)
     : [];
   houseSurfaceState.library.selectedItems = selectedItems;
+  houseSurfaceState.library.routeSubscriptions = routeSubscriptions;
   houseSurfaceState.library.safetyDesk = Array.isArray(payload?.safetyDesk) ? payload.safetyDesk : [];
   houseSurfaceState.library.incomingRelays = incomingRelays;
   houseSurfaceState.library.incomingSatchelRelays = incomingSatchelRelays;
@@ -1805,6 +1812,14 @@ function syncHouseLibraryStateFromPayload(payload = {}) {
   }
   if (!houseSurfaceState.library.selectedItemId && items[0]?.libraryItemId) {
     houseSurfaceState.library.selectedItemId = String(items[0].libraryItemId);
+  }
+  if (!routeSubscriptions.some((entry) => String(entry?.libraryRouteSubscriptionId || '') === String(houseSurfaceState.library.selectedRouteSubscriptionId || ''))) {
+    houseSurfaceState.library.selectedRouteSubscriptionId = '';
+    houseSurfaceState.library.routeFeed = [];
+    houseSurfaceState.library.selectedRouteSyncReceiptId = '';
+  }
+  if (!houseSurfaceState.library.selectedRouteSubscriptionId && routeSubscriptions[0]?.libraryRouteSubscriptionId) {
+    houseSurfaceState.library.selectedRouteSubscriptionId = String(routeSubscriptions[0].libraryRouteSubscriptionId);
   }
   if (!incomingRelays.some((entry) => String(entry?.libraryPeerRelayId || '') === String(houseSurfaceState.library.selectedIncomingRelayId || ''))) {
     houseSurfaceState.library.selectedIncomingRelayId = '';
@@ -1874,6 +1889,11 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.publicStacksResultCount = 0;
   houseSurfaceState.library.publicStackPreview = null;
   houseSurfaceState.library.publicStackApprovalId = '';
+  houseSurfaceState.library.routeSourceHouseId = '';
+  houseSurfaceState.library.routeSubscriptions = [];
+  houseSurfaceState.library.selectedRouteSubscriptionId = '';
+  houseSurfaceState.library.routeFeed = [];
+  houseSurfaceState.library.selectedRouteSyncReceiptId = '';
   houseSurfaceState.library.safetyDesk = [];
   houseSurfaceState.library.incomingRelays = [];
   houseSurfaceState.library.selectedIncomingRelayId = '';
@@ -2648,6 +2668,11 @@ async function importHouseLibraryPublicStackBundle({
     libraryPublicStackId,
   ]);
   const stackLabel = String(preview?.displayName || libraryPublicStackId).trim() || libraryPublicStackId;
+  const selectedRouteFeedEntry = getSelectedHouseLibraryRouteFeedEntry();
+  const sourceRouteSyncReceiptId = selectedRouteFeedEntry
+    && String(selectedRouteFeedEntry?.libraryPublicStackId || '').trim() === libraryPublicStackId
+    ? String(selectedRouteFeedEntry?.libraryRouteSyncReceiptId || '').trim()
+    : '';
   if (String(preview?.verificationState || preview?.verification?.verificationState || '').trim() !== 'verified') {
     await verifyHouseLibraryPublicStackBundle({
       libraryPublicStackId,
@@ -2661,13 +2686,19 @@ async function importHouseLibraryPublicStackBundle({
     headers: {
       'Idempotency-Key': idempotencyKey,
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({
+      ...(sourceRouteSyncReceiptId ? { sourceRouteSyncReceiptId } : {}),
+    }),
   }, {
     retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
   });
   const data = response?.data || response || {};
   const importedItemId = String(data?.items?.[0]?.libraryItemId || '').trim();
   await loadHouseLibrarySurface({ skipContext: true });
+  await loadHouseLibraryRoutes().catch(() => null);
+  if (String(houseSurfaceState.library.selectedRouteSubscriptionId || '').trim()) {
+    await loadHouseLibraryRouteFeed(String(houseSurfaceState.library.selectedRouteSubscriptionId || '').trim(), { announce: false }).catch(() => null);
+  }
   await loadHouseLibraryPublicStacksSearch({
     query: String(houseSurfaceState.library.publicStacksQuery || '').trim(),
     family: String(houseSurfaceState.library.publicStacksFamily || '').trim(),
@@ -2690,11 +2721,166 @@ function getSelectedHouseLibraryIncomingRelay() {
   return relays.find((entry) => String(entry?.libraryPeerRelayId || '').trim() === selectedRelayId) || relays[0] || null;
 }
 
+function getSelectedHouseLibraryRouteSubscription() {
+  const routes = Array.isArray(houseSurfaceState.library.routeSubscriptions) ? houseSurfaceState.library.routeSubscriptions : [];
+  if (!routes.length) return null;
+  const selectedRouteId = String(houseSurfaceState.library.selectedRouteSubscriptionId || routes[0]?.libraryRouteSubscriptionId || '').trim();
+  return routes.find((entry) => String(entry?.libraryRouteSubscriptionId || '').trim() === selectedRouteId) || routes[0] || null;
+}
+
+function getSelectedHouseLibraryRouteFeedEntry() {
+  const feed = Array.isArray(houseSurfaceState.library.routeFeed) ? houseSurfaceState.library.routeFeed : [];
+  if (!feed.length) return null;
+  const selectedReceiptId = String(houseSurfaceState.library.selectedRouteSyncReceiptId || feed[0]?.libraryRouteSyncReceiptId || '').trim();
+  return feed.find((entry) => String(entry?.libraryRouteSyncReceiptId || '').trim() === selectedReceiptId) || feed[0] || null;
+}
+
 function getSelectedHouseLibraryIncomingSatchelRelay() {
   const relays = Array.isArray(houseSurfaceState.library.incomingSatchelRelays) ? houseSurfaceState.library.incomingSatchelRelays : [];
   if (!relays.length) return null;
   const selectedRelayId = String(houseSurfaceState.library.selectedIncomingSatchelRelayId || relays[0]?.librarySatchelRelayId || '').trim();
   return relays.find((entry) => String(entry?.librarySatchelRelayId || '').trim() === selectedRelayId) || relays[0] || null;
+}
+
+function syncHouseLibraryRouteControls() {
+  const sourceInput = el('houseLibraryRouteSourceInput');
+  const followBtn = el('houseLibraryRouteFollowBtn');
+  const syncBtn = el('houseLibraryRouteSyncBtn');
+  if (sourceInput) {
+    const storedSourceHouseId = String(houseSurfaceState.library.routeSourceHouseId || '');
+    const liveSourceHouseId = String(sourceInput.value || '');
+    if (sourceInput === document.activeElement || (!storedSourceHouseId && liveSourceHouseId)) {
+      houseSurfaceState.library.routeSourceHouseId = liveSourceHouseId.trim();
+    } else if (liveSourceHouseId !== storedSourceHouseId) {
+      sourceInput.value = storedSourceHouseId;
+    }
+  }
+  if (followBtn) {
+    followBtn.disabled = !String(houseSurfaceState.library.routeSourceHouseId || '').trim();
+  }
+  if (syncBtn) {
+    const selectedRoute = getSelectedHouseLibraryRouteSubscription();
+    syncBtn.disabled = !selectedRoute || String(selectedRoute?.routeState || '').trim() !== 'active';
+    syncBtn.dataset.libraryRouteSubscriptionId = String(selectedRoute?.libraryRouteSubscriptionId || '');
+  }
+}
+
+async function loadHouseLibraryRoutes({
+  announce = false,
+} = {}) {
+  const response = await apiWithRetry('/api/platform/library/routes', {
+    method: 'GET',
+  }, {
+    retryCodes: ['SESSION_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const routes = Array.isArray(data?.routes) ? data.routes : [];
+  houseSurfaceState.library.routeSubscriptions = routes;
+  if (!routes.some((entry) => String(entry?.libraryRouteSubscriptionId || '').trim() === String(houseSurfaceState.library.selectedRouteSubscriptionId || '').trim())) {
+    houseSurfaceState.library.selectedRouteSubscriptionId = String(routes[0]?.libraryRouteSubscriptionId || '').trim();
+    houseSurfaceState.library.routeFeed = [];
+    houseSurfaceState.library.selectedRouteSyncReceiptId = '';
+  }
+  if (announce) {
+    setHouseLibraryActionStatus(routes.length ? `Loaded ${routes.length} followed House route${routes.length === 1 ? '' : 's'}.` : 'No followed House routes yet.');
+    setHouseSurfaceStatus(routes.length ? `Loaded ${routes.length} followed House route${routes.length === 1 ? '' : 's'}.` : 'No followed House routes yet.');
+  }
+  return data;
+}
+
+async function loadHouseLibraryRouteFeed(libraryRouteSubscriptionId = '', {
+  announce = true,
+} = {}) {
+  const normalizedRouteId = String(libraryRouteSubscriptionId || '').trim();
+  if (!normalizedRouteId) {
+    houseSurfaceState.library.routeFeed = [];
+    houseSurfaceState.library.selectedRouteSyncReceiptId = '';
+    renderHouseLibrarySurface();
+    return { route: null, results: [] };
+  }
+  if (announce) {
+    setHouseLibraryActionStatus(`Opening route ${normalizedRouteId}...`);
+    setHouseSurfaceStatus(`Opening route ${normalizedRouteId}...`);
+  }
+  const response = await apiWithRetry(`/api/platform/library/routes/${encodeURIComponent(normalizedRouteId)}/feed`, {
+    method: 'GET',
+  }, {
+    retryCodes: ['SESSION_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  houseSurfaceState.library.selectedRouteSubscriptionId = normalizedRouteId;
+  houseSurfaceState.library.routeFeed = Array.isArray(data?.results) ? data.results : [];
+  if (!houseSurfaceState.library.routeFeed.some((entry) => String(entry?.libraryRouteSyncReceiptId || '').trim() === String(houseSurfaceState.library.selectedRouteSyncReceiptId || '').trim())) {
+    houseSurfaceState.library.selectedRouteSyncReceiptId = String(houseSurfaceState.library.routeFeed[0]?.libraryRouteSyncReceiptId || '').trim();
+  }
+  renderHouseLibrarySurface();
+  if (announce) {
+    const sourceHouseId = String(data?.route?.sourceHouseId || '').trim() || 'that House';
+    const count = Array.isArray(data?.results) ? data.results.length : 0;
+    setHouseLibraryActionStatus(`Loaded route from ${sourceHouseId}: ${count} Public Stack${count === 1 ? '' : 's'}.`);
+    setHouseSurfaceStatus(`Loaded route from ${sourceHouseId}: ${count} Public Stack${count === 1 ? '' : 's'}.`);
+  }
+  return data;
+}
+
+async function createHouseLibraryRouteSubscription() {
+  const sourceHouseId = String(houseSurfaceState.library.routeSourceHouseId || '').trim();
+  if (!sourceHouseId) {
+    throw new Error('SOURCE_HOUSE_REQUIRED');
+  }
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const teamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const idempotencyKey = makeStableHouseIdempotencyKey('house_library_route_follow', [
+    houseId,
+    teamId,
+    sourceHouseId,
+  ]);
+  setHouseLibraryActionStatus(`Following ${sourceHouseId}...`);
+  setHouseSurfaceStatus(`Following ${sourceHouseId}...`);
+  const response = await apiWithRetry('/api/platform/library/routes', {
+    method: 'POST',
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify({
+      sourceHouseId,
+    }),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  const data = response?.data || response || {};
+  const routeId = String(data?.route?.libraryRouteSubscriptionId || '').trim();
+  await loadHouseLibraryRoutes();
+  if (routeId) {
+    houseSurfaceState.library.selectedRouteSubscriptionId = routeId;
+    await loadHouseLibraryRouteFeed(routeId, { announce: false }).catch(() => null);
+  }
+  renderHouseLibrarySurface();
+  setHouseLibraryActionStatus(`Following ${sourceHouseId}.`);
+  setHouseSurfaceStatus(`Following ${sourceHouseId}.`);
+  return data;
+}
+
+async function syncSelectedHouseLibraryRouteSubscription() {
+  const selectedRoute = getSelectedHouseLibraryRouteSubscription();
+  const routeId = String(selectedRoute?.libraryRouteSubscriptionId || '').trim();
+  if (!routeId) {
+    throw new Error('LIBRARY_ROUTE_SUBSCRIPTION_REQUIRED');
+  }
+  const sourceHouseId = String(selectedRoute?.sourceHouseId || '').trim() || routeId;
+  setHouseLibraryActionStatus(`Syncing ${sourceHouseId}...`);
+  setHouseSurfaceStatus(`Syncing ${sourceHouseId}...`);
+  await apiWithRetry(`/api/platform/library/routes/${encodeURIComponent(routeId)}/sync`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }, {
+    retryCodes: ['SESSION_REQUIRED', 'HOUSE_REQUIRED', 'TEAM_REQUIRED'],
+  });
+  await loadHouseLibraryRoutes();
+  await loadHouseLibraryRouteFeed(routeId, { announce: false });
+  renderHouseLibrarySurface();
+  setHouseLibraryActionStatus(`Synced ${sourceHouseId}.`);
+  setHouseSurfaceStatus(`Synced ${sourceHouseId}.`);
 }
 
 function syncHouseLibraryPeerRelayControls(selectedItem = null) {
@@ -4148,6 +4334,13 @@ function renderHouseLibrarySurface() {
   const saveSatchelBtn = el('houseLibrarySaveSatchelBtn');
   const publicStackApprovalInput = el('houseLibraryPublicStackApprovalInput');
   const publicStackPublishBtn = el('houseLibraryPublishPublicStackBtn');
+  const routeSourceInput = el('houseLibraryRouteSourceInput');
+  const routeFollowBtn = el('houseLibraryRouteFollowBtn');
+  const routeSyncBtn = el('houseLibraryRouteSyncBtn');
+  const routesEmptyNode = el('houseLibraryRoutesEmpty');
+  const routesNode = el('houseLibraryRoutes');
+  const routeFeedEmptyNode = el('houseLibraryRouteFeedEmpty');
+  const routeFeedNode = el('houseLibraryRouteFeed');
   const publicStacksQueryInput = el('houseLibraryPublicStacksQueryInput');
   const publicStacksFamilySelect = el('houseLibraryPublicStacksFamilySelect');
   const publicStacksTrustSelect = el('houseLibraryPublicStacksTrustSelect');
@@ -4227,6 +4420,13 @@ function renderHouseLibrarySurface() {
     || !saveSatchelBtn
     || !publicStackApprovalInput
     || !publicStackPublishBtn
+    || !routeSourceInput
+    || !routeFollowBtn
+    || !routeSyncBtn
+    || !routesEmptyNode
+    || !routesNode
+    || !routeFeedEmptyNode
+    || !routeFeedNode
     || !publicStacksQueryInput
     || !publicStacksFamilySelect
     || !publicStacksTrustSelect
@@ -4292,6 +4492,8 @@ function renderHouseLibrarySurface() {
   const filteredItemsById = new Map(filteredItems.map((item) => [String(item?.libraryItemId || '').trim(), item]));
   const shelves = Array.isArray(houseSurfaceState.library.shelves) ? houseSurfaceState.library.shelves : [];
   const scopeSets = Array.isArray(houseSurfaceState.library.scopeSets) ? houseSurfaceState.library.scopeSets : [];
+  const routeSubscriptions = Array.isArray(houseSurfaceState.library.routeSubscriptions) ? houseSurfaceState.library.routeSubscriptions : [];
+  const routeFeed = Array.isArray(houseSurfaceState.library.routeFeed) ? houseSurfaceState.library.routeFeed : [];
   const selectedItemIds = Array.isArray(houseSurfaceState.library.selectedItemIds) ? houseSurfaceState.library.selectedItemIds : [];
   const selectedItems = Array.isArray(houseSurfaceState.library.selectedItems) ? houseSurfaceState.library.selectedItems : [];
   const safetyDesk = Array.isArray(houseSurfaceState.library.safetyDesk) ? houseSurfaceState.library.safetyDesk : [];
@@ -4299,6 +4501,8 @@ function renderHouseLibrarySurface() {
   const incomingSatchelRelays = Array.isArray(houseSurfaceState.library.incomingSatchelRelays) ? houseSurfaceState.library.incomingSatchelRelays : [];
   listNode.innerHTML = '';
   shelvesNode.innerHTML = '';
+  routesNode.innerHTML = '';
+  routeFeedNode.innerHTML = '';
   publicStacksResultsNode.innerHTML = '';
   safetyDeskNode.innerHTML = '';
   incomingRelaysNode.innerHTML = '';
@@ -4319,6 +4523,7 @@ function renderHouseLibrarySurface() {
   syncHouseLibraryPublicStacksControls();
   syncHouseLibraryPublicStackReviewControls();
   syncHouseLibraryPublicStackPublishControls();
+  syncHouseLibraryRouteControls();
   syncHouseLibraryImportControls();
   syncHouseLibraryPublishControls(null);
   syncHouseLibraryPeerRelayControls(null);
@@ -4337,6 +4542,8 @@ function renderHouseLibrarySurface() {
   const publicStackPreview = houseSurfaceState.library.publicStackPreview && typeof houseSurfaceState.library.publicStackPreview === 'object'
     ? houseSurfaceState.library.publicStackPreview
     : null;
+  const selectedRoute = getSelectedHouseLibraryRouteSubscription();
+  const selectedRouteFeedEntry = getSelectedHouseLibraryRouteFeedEntry();
   const selectedIncomingRelay = getSelectedHouseLibraryIncomingRelay();
   const incomingRelayPreview = houseSurfaceState.library.incomingRelayPreview && typeof houseSurfaceState.library.incomingRelayPreview === 'object'
     ? houseSurfaceState.library.incomingRelayPreview
@@ -4374,6 +4581,14 @@ function renderHouseLibrarySurface() {
   incomingRelaysEmptyNode.textContent = incomingRelays.length
     ? ''
     : 'No relayed publications have arrived for this House yet.';
+  routesEmptyNode.classList.toggle('is-hidden', routeSubscriptions.length > 0);
+  routesEmptyNode.textContent = routeSubscriptions.length
+    ? ''
+    : 'No followed Houses yet.';
+  routeFeedEmptyNode.classList.toggle('is-hidden', routeFeed.length > 0);
+  routeFeedEmptyNode.textContent = routeFeed.length
+    ? ''
+    : 'Sync one followed House to see its Route feed.';
   incomingSatchelsEmptyNode.classList.toggle('is-hidden', incomingSatchelRelays.length > 0);
   incomingSatchelsEmptyNode.textContent = incomingSatchelRelays.length
     ? ''
@@ -4442,6 +4657,57 @@ function renderHouseLibrarySurface() {
       }
     });
     scopeSetsNode.appendChild(button);
+  });
+
+  routeSubscriptions.forEach((route) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(selectedRoute?.libraryRouteSubscriptionId || '') === String(route?.libraryRouteSubscriptionId || '') ? ' primary' : ''}`;
+    button.dataset.libraryRouteSubscriptionId = String(route?.libraryRouteSubscriptionId || '');
+    button.setAttribute('data-testid', 'house-library-route-card');
+    button.textContent = [
+      String(route?.sourceHouseId || '').trim() || 'Unknown House',
+      `${Number(route?.syncedCount || 0)} synced`,
+      Number(route?.importedCount || 0) > 0 ? `${Number(route.importedCount)} imported` : '',
+      String(route?.routeState || '').trim() === 'active' ? 'Active' : String(route?.routeState || '').trim(),
+    ].filter(Boolean).join(' · ');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await loadHouseLibraryRouteFeed(String(route?.libraryRouteSubscriptionId || '').trim(), { announce: false });
+      } catch (err) {
+        button.disabled = false;
+        setHouseLibraryActionStatus(String(err?.message || 'LIBRARY_ROUTE_FEED_FAILED'), true);
+        setHouseSurfaceStatus(String(err?.message || 'LIBRARY_ROUTE_FEED_FAILED'), true);
+      }
+    });
+    routesNode.appendChild(button);
+  });
+
+  routeFeed.forEach((entry) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn${String(selectedRouteFeedEntry?.libraryRouteSyncReceiptId || '') === String(entry?.libraryRouteSyncReceiptId || '') ? ' primary' : ''}`;
+    button.dataset.libraryRouteSyncReceiptId = String(entry?.libraryRouteSyncReceiptId || '');
+    button.setAttribute('data-testid', 'house-library-route-feed-card');
+    button.textContent = [
+      String(entry?.displayName || entry?.libraryPublicStackId || '').trim(),
+      String(entry?.sourceHouseId || '').trim() ? `From ${String(entry?.sourceHouseId || '').trim()}` : '',
+      formatHouseLibraryDiscoveryLaneLabel(entry?.discoveryLane),
+      entry?.importedHere === true ? 'Imported' : 'Ready to preview',
+    ].filter(Boolean).join(' · ');
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        houseSurfaceState.library.selectedRouteSyncReceiptId = String(entry?.libraryRouteSyncReceiptId || '').trim();
+        await previewHouseLibraryPublicStack(String(entry?.libraryPublicStackId || '').trim());
+      } catch (err) {
+        button.disabled = false;
+        setHouseLibraryActionStatus(String(err?.message || 'PUBLIC_STACK_PREVIEW_FAILED'), true);
+        setHouseSurfaceStatus(String(err?.message || 'PUBLIC_STACK_PREVIEW_FAILED'), true);
+      }
+    });
+    routeFeedNode.appendChild(button);
   });
 
   publicStackResults.forEach((result) => {
@@ -5551,6 +5817,10 @@ async function loadHouseLibrarySurface({ skipContext = false } = {}) {
     const selectedItemId = String(houseSurfaceState.library.selectedItemId || '').trim();
     if (selectedItemId) {
       await loadHouseLibraryRevisions(selectedItemId).catch(() => []);
+    }
+    const selectedRouteSubscriptionId = String(houseSurfaceState.library.selectedRouteSubscriptionId || '').trim();
+    if (selectedRouteSubscriptionId) {
+      await loadHouseLibraryRouteFeed(selectedRouteSubscriptionId, { announce: false }).catch(() => null);
     }
     renderHouseLibrarySurface();
     setHouseSurfaceStatus(houseSurfaceState.library.items.length ? '' : houseSurfaceState.library.emptyStateText);
@@ -8449,6 +8719,54 @@ function bindTownDistrictControls() {
         await publishActiveHouseLibraryScopeSetToPublicStacks();
       } catch (err) {
         const code = String(err?.code || err?.message || 'PUBLIC_STACK_PUBLISH_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryRouteSourceInput = el('houseLibraryRouteSourceInput');
+  if (houseLibraryRouteSourceInput) {
+    houseLibraryRouteSourceInput.oninput = () => {
+      houseSurfaceState.library.routeSourceHouseId = String(houseLibraryRouteSourceInput.value || '').trim();
+      syncHouseLibraryRouteControls();
+    };
+    houseLibraryRouteSourceInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const houseLibraryRouteFollowBtn = el('houseLibraryRouteFollowBtn');
+      if (houseLibraryRouteFollowBtn && !houseLibraryRouteFollowBtn.disabled) {
+        houseLibraryRouteFollowBtn.click();
+      }
+    };
+  }
+
+  const houseLibraryRouteFollowBtn = el('houseLibraryRouteFollowBtn');
+  if (houseLibraryRouteFollowBtn) {
+    houseLibraryRouteFollowBtn.onclick = async () => {
+      houseLibraryRouteFollowBtn.disabled = true;
+      try {
+        await createHouseLibraryRouteSubscription();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_ROUTE_CREATE_FAILED');
+        setHouseLibraryActionStatus(code, true);
+        setHouseSurfaceStatus(code, true);
+      } finally {
+        renderHouseLibrarySurface();
+      }
+    };
+  }
+
+  const houseLibraryRouteSyncBtn = el('houseLibraryRouteSyncBtn');
+  if (houseLibraryRouteSyncBtn) {
+    houseLibraryRouteSyncBtn.onclick = async () => {
+      houseLibraryRouteSyncBtn.disabled = true;
+      try {
+        await syncSelectedHouseLibraryRouteSubscription();
+      } catch (err) {
+        const code = String(err?.code || err?.message || 'LIBRARY_ROUTE_SYNC_FAILED');
         setHouseLibraryActionStatus(code, true);
         setHouseSurfaceStatus(code, true);
       } finally {

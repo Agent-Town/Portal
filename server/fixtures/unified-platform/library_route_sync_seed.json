@@ -1,0 +1,13 @@
+{
+  "sourceHouse": {
+    "houseId": "house_library_route_source",
+    "teamId": "team_main"
+  },
+  "targetHouse": {
+    "houseId": "house_library_route_target",
+    "teamId": "team_main"
+  },
+  "routeState": "active",
+  "bundleKind": "library_public_stack",
+  "transport": "explicit_sync"
+}

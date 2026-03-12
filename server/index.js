@@ -129,6 +129,8 @@ const {
   createLibraryPublicStackAttestation,
   createLibraryPublicStackAttestationProvenance,
   createLibraryPublicStackAttestationVerificationReceipt,
+  createLibraryRouteSubscription,
+  createLibraryRouteSyncReceipt,
   createLibraryPublicStackMember,
   createLibraryPublicStackReview,
   createLibraryPublicStackSafetyRecord,
@@ -165,6 +167,10 @@ const {
   getLibraryPublicStackAttestationVerificationReceipt,
   getLibraryPublicStackAttestationVerificationReceiptById,
   getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
+  getLibraryRouteSubscriptionById,
+  getLibraryRouteSubscriptionByIdempotency,
+  getLibraryRouteSyncReceiptById,
+  getLibraryRouteSyncReceiptByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewById,
   getLibraryPublicStackReviewByIdempotency,
@@ -197,6 +203,7 @@ const {
   getUnifiedPlatformConversationArtifactsInspector,
   getUnifiedPlatformEditorSnapshot,
   getUnifiedPlatformLibraryInspector,
+  getUnifiedPlatformRouteSyncInspector,
   getUnifiedPlatformPeerRelayInspector,
   getUnifiedPlatformPromptPreview,
   getUnifiedPlatformPublicStackAttestationsInspector,
@@ -223,6 +230,8 @@ const {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryRouteSubscriptions,
+  listLibraryRouteSyncReceipts,
   listLibraryPublicStackAttestations,
   listLibraryPublicStackAttestationProvenance,
   listLibraryPublicStackAttestationVerificationReceipts,
@@ -256,6 +265,8 @@ const {
   updateLibraryPublicStackReview,
   updateLibraryPublicStackSafetyRecord,
   updateLibraryPublicStackVerification,
+  updateLibraryRouteSubscription,
+  updateLibraryRouteSyncReceipt,
   updateLibraryPeerRelay,
   updateLibrarySatchelRelay,
   updateLibraryItem,
@@ -4519,6 +4530,8 @@ registerPlatformReadRoutes(app, {
   createLibraryPublicStackAttestation,
   createLibraryPublicStackAttestationProvenance,
   createLibraryPublicStackAttestationVerificationReceipt,
+  createLibraryRouteSubscription,
+  createLibraryRouteSyncReceipt,
   createLibraryPublicStackMember,
   createLibraryPublicStackReview,
   createLibraryPublicStackSafetyRecord,
@@ -4551,6 +4564,10 @@ registerPlatformReadRoutes(app, {
   getLibraryPublicStackAttestationVerificationReceipt,
   getLibraryPublicStackAttestationVerificationReceiptById,
   getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
+  getLibraryRouteSubscriptionById,
+  getLibraryRouteSubscriptionByIdempotency,
+  getLibraryRouteSyncReceiptById,
+  getLibraryRouteSyncReceiptByIdempotency,
   getLibraryPublicStackReview,
   getLibraryPublicStackReviewByIdempotency,
   getLibraryPublicStackSafetyRecord,
@@ -4580,6 +4597,8 @@ registerPlatformReadRoutes(app, {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibraryRouteSubscriptions,
+  listLibraryRouteSyncReceipts,
   listLibraryPublicStackAttestations,
   listLibraryPublicStackAttestationProvenance,
   listLibraryPublicStackAttestationVerificationReceipts,
@@ -4633,6 +4652,8 @@ registerPlatformReadRoutes(app, {
   updateLibraryPublicStackReview,
   updateLibraryPublicStackSafetyRecord,
   updateLibraryPublicStackVerification,
+  updateLibraryRouteSubscription,
+  updateLibraryRouteSyncReceipt,
   sha256PrefixedHex,
   stableJsonStringify,
   updateLibraryPeerRelay,
@@ -11405,6 +11426,8 @@ if (process.env.NODE_ENV === 'test') {
       data = getUnifiedPlatformScopesInspector();
     } else if (inspector === 'publications') {
       data = getUnifiedPlatformPublicationsInspector();
+    } else if (inspector === 'route-sync') {
+      data = getUnifiedPlatformRouteSyncInspector();
     } else if (inspector === 'peer-relay') {
       data = getUnifiedPlatformPeerRelayInspector();
     } else if (inspector === 'satchel-exchange') {

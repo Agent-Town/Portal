@@ -19,6 +19,8 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryPublicStackAttestation,
     createLibraryPublicStackAttestationProvenance,
     createLibraryPublicStackAttestationVerificationReceipt,
+    createLibraryRouteSubscription,
+    createLibraryRouteSyncReceipt,
     createLibraryPublicStackMember,
     createLibraryPublicStackReview,
     createLibraryPublicStackSafetyRecord,
@@ -50,6 +52,10 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPublicStackAttestationProvenanceByIdempotency,
     getLibraryPublicStackAttestationVerificationReceipt,
     getLibraryPublicStackAttestationVerificationReceiptByIdempotency,
+    getLibraryRouteSubscriptionById,
+    getLibraryRouteSubscriptionByIdempotency,
+    getLibraryRouteSyncReceiptById,
+    getLibraryRouteSyncReceiptByIdempotency,
     getLibraryPublicStackReview,
     getLibraryPublicStackReviewByIdempotency,
     getLibraryPublicStackSafetyRecord,
@@ -77,6 +83,8 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryLinks,
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
+    listLibraryRouteSubscriptions,
+    listLibraryRouteSyncReceipts,
     listLibraryPublicStackAttestations,
     listLibraryPublicStackAttestationProvenance,
     listLibraryPublicStackAttestationVerificationReceipts,
@@ -134,6 +142,8 @@ function registerPlatformReadRoutes(app, deps) {
     updateLibraryPublicStackReview,
     updateLibraryPublicStackSafetyRecord,
     updateLibraryPublicStackVerification,
+    updateLibraryRouteSubscription,
+    updateLibraryRouteSyncReceipt,
     updateLibraryPeerRelay,
     updateLibrarySatchelRelay,
     updateLibraryItem,
@@ -396,6 +406,7 @@ function registerPlatformReadRoutes(app, deps) {
         scopeSets: [],
       shelves: [],
       items: [],
+      routeSubscriptions: [],
       incomingRelays: [],
       incomingSatchelRelays: [],
       safetyDesk: [],
@@ -418,6 +429,10 @@ function registerPlatformReadRoutes(app, deps) {
       scopeSets: selection.scopeSets,
       shelves: selection.shelves,
       items: selection.items,
+      routeSubscriptions: buildLibraryRouteSubscriptionList({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+      }),
       incomingRelays: buildIncomingLibraryPeerRelayList({
         houseId: normalizedHouseId,
         teamId: normalizedTeamId,
@@ -1114,6 +1129,100 @@ function registerPlatformReadRoutes(app, deps) {
       });
       return previewPayload.ok ? previewPayload.preview : null;
     }).filter(Boolean);
+  }
+
+  function buildLibraryRouteSubscriptionList({
+    houseId = '',
+    teamId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId) return [];
+    return listLibraryRouteSubscriptions({
+      houseId: normalizedHouseId,
+      teamId: normalizedTeamId,
+    }).map((subscription) => {
+      const receipts = listLibraryRouteSyncReceipts({
+        libraryRouteSubscriptionId: String(subscription?.libraryRouteSubscriptionId || '').trim(),
+      });
+      const importedCount = receipts.filter((entry) => String(entry?.importedAt || '').trim()).length;
+      const latestSyncedAt = receipts.reduce((latest, entry) => {
+        const candidate = String(entry?.syncedAt || '').trim();
+        if (!candidate) return latest;
+        if (!latest || candidate > latest) return candidate;
+        return latest;
+      }, '');
+      return {
+        libraryRouteSubscriptionId: String(subscription?.libraryRouteSubscriptionId || '').trim(),
+        sourceHouseId: String(subscription?.sourceHouseId || '').trim() || null,
+        sourceTeamId: String(subscription?.sourceTeamId || '').trim() || null,
+        routeState: String(subscription?.routeState || '').trim() || 'active',
+        syncedCount: receipts.length,
+        importedCount,
+        latestSyncedAt: latestSyncedAt || null,
+        metadata: subscription?.metadata && typeof subscription.metadata === 'object' ? subscription.metadata : {},
+      };
+    });
+  }
+
+  function buildLibraryRouteSyncFeedList({
+    houseId = '',
+    teamId = '',
+    libraryRouteSubscriptionId = '',
+  } = {}) {
+    const normalizedHouseId = String(houseId || '').trim();
+    const normalizedTeamId = String(teamId || '').trim();
+    const normalizedSubscriptionId = String(libraryRouteSubscriptionId || '').trim();
+    if (!normalizedHouseId || !normalizedTeamId || !normalizedSubscriptionId) {
+      return {
+        subscription: null,
+        members: [],
+      };
+    }
+    const subscription = getLibraryRouteSubscriptionById(normalizedSubscriptionId);
+    if (!subscription || subscription.houseId !== normalizedHouseId || subscription.teamId !== normalizedTeamId) {
+      return {
+        subscription: null,
+        members: [],
+      };
+    }
+    const members = listLibraryRouteSyncReceipts({
+      libraryRouteSubscriptionId: normalizedSubscriptionId,
+    }).map((receipt) => {
+      const previewPayload = buildLibraryPublicStackPreviewPayload({
+        houseId: normalizedHouseId,
+        teamId: normalizedTeamId,
+        libraryPublicStackId: String(receipt?.libraryPublicStackId || '').trim(),
+      });
+      if (!previewPayload.ok) return null;
+      const preview = previewPayload.preview && typeof previewPayload.preview === 'object'
+        ? previewPayload.preview
+        : null;
+      if (!preview) return null;
+      return {
+        libraryRouteSyncReceiptId: String(receipt?.libraryRouteSyncReceiptId || '').trim(),
+        libraryRouteSubscriptionId: normalizedSubscriptionId,
+        libraryPublicStackId: String(receipt?.libraryPublicStackId || '').trim(),
+        sourceHouseId: String(receipt?.sourceHouseId || subscription?.sourceHouseId || '').trim() || null,
+        sourceTeamId: String(receipt?.sourceTeamId || subscription?.sourceTeamId || '').trim() || null,
+        syncedAt: String(receipt?.syncedAt || '').trim() || null,
+        importedAt: receipt?.importedAt ? String(receipt.importedAt).trim() || null : null,
+        importedHere: !!receipt?.importedAt || preview?.alreadyImportedAll === true,
+        displayName: String(preview?.displayName || receipt?.libraryPublicStackId || '').trim() || String(receipt?.libraryPublicStackId || '').trim(),
+        summary: String(preview?.discoveryReason || preview?.description || '').trim() || null,
+        discoveryLane: String(preview?.discoveryLane || '').trim() || 'check_here',
+        discoveryReason: String(preview?.discoveryReason || '').trim() || 'Needs a local check in this House.',
+      };
+    }).filter(Boolean).sort((a, b) => String(a?.displayName || '').localeCompare(String(b?.displayName || '')));
+    return {
+      subscription: {
+        libraryRouteSubscriptionId: String(subscription?.libraryRouteSubscriptionId || '').trim(),
+        sourceHouseId: String(subscription?.sourceHouseId || '').trim() || null,
+        sourceTeamId: String(subscription?.sourceTeamId || '').trim() || null,
+        routeState: String(subscription?.routeState || '').trim() || 'active',
+      },
+      members,
+    };
   }
 
   function findLibraryPublicStackImportsForTarget({
@@ -3191,6 +3300,86 @@ function registerPlatformReadRoutes(app, deps) {
     };
   }
 
+  function persistLibraryRouteSubscriptionRecord({
+    houseId = '',
+    teamId = '',
+    sourceHouseId = '',
+    sourceTeamId = '',
+    routeState = 'active',
+    metadata = null,
+    idempotencyKey = '',
+  } = {}) {
+    const existing = getLibraryRouteSubscriptionByIdempotency({
+      houseId,
+      teamId,
+      idempotencyKey,
+    });
+    if (existing) {
+      return {
+        status: 200,
+        subscription: existing,
+      };
+    }
+    const subscription = createLibraryRouteSubscription({
+      libraryRouteSubscriptionId: `route_${randomHex(12)}`,
+      houseId,
+      teamId,
+      sourceHouseId,
+      sourceTeamId,
+      routeState,
+      idempotencyKey,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      subscription,
+    };
+  }
+
+  function persistLibraryRouteSyncReceiptRecord({
+    subscription = null,
+    libraryPublicStackId = '',
+    syncedAt = '',
+    metadata = null,
+  } = {}) {
+    const subscriptionId = String(subscription?.libraryRouteSubscriptionId || '').trim();
+    const normalizedPublicStackId = String(libraryPublicStackId || '').trim();
+    if (!subscriptionId || !normalizedPublicStackId) {
+      throw new Error('LIBRARY_ROUTE_SYNC_RECEIPT_INVALID');
+    }
+    const existing = listLibraryRouteSyncReceipts({
+      libraryRouteSubscriptionId: subscriptionId,
+    }).find((entry) => String(entry?.libraryPublicStackId || '').trim() === normalizedPublicStackId) || null;
+    if (existing) {
+      return {
+        status: 200,
+        receipt: updateLibraryRouteSyncReceipt({
+          libraryRouteSyncReceiptId: existing.libraryRouteSyncReceiptId,
+          syncedAt: syncedAt || nowIso(),
+          metadata: metadata && typeof metadata === 'object' ? metadata : {},
+          nowIso: nowIso(),
+        }),
+      };
+    }
+    const receipt = createLibraryRouteSyncReceipt({
+      libraryRouteSyncReceiptId: `routesync_${randomHex(12)}`,
+      libraryRouteSubscriptionId: subscriptionId,
+      houseId: String(subscription?.houseId || '').trim(),
+      teamId: String(subscription?.teamId || '').trim(),
+      libraryPublicStackId: normalizedPublicStackId,
+      sourceHouseId: String(subscription?.sourceHouseId || '').trim(),
+      sourceTeamId: String(subscription?.sourceTeamId || '').trim(),
+      syncedAt: syncedAt || nowIso(),
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      receipt,
+    };
+  }
+
   function persistLibraryPeerReceiptRecord({
     relay = null,
     receiptKind = 'pony_dispatch_receipt',
@@ -4148,6 +4337,9 @@ function registerPlatformReadRoutes(app, deps) {
       return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to import a Public Stack.', { requestId });
     }
     const registryEntityId = typeof req.params?.registryEntityId === 'string' ? req.params.registryEntityId.trim() : '';
+    const sourceRouteSyncReceiptId = typeof req.body?.sourceRouteSyncReceiptId === 'string'
+      ? req.body.sourceRouteSyncReceiptId.trim()
+      : '';
     if (!registryEntityId) {
       return sendPortalApiError(res, 400, 'REGISTRY_ENTITY_REQUIRED', 'registryEntityId is required to import a Public Stack.', { requestId });
     }
@@ -4338,6 +4530,25 @@ function registerPlatformReadRoutes(app, deps) {
       },
       nowIso: nowIso(),
     });
+    let routeSyncReceipt = null;
+    if (sourceRouteSyncReceiptId) {
+      const existingRouteSyncReceipt = getLibraryRouteSyncReceiptById(sourceRouteSyncReceiptId);
+      if (
+        existingRouteSyncReceipt
+        && existingRouteSyncReceipt.houseId === context.houseId
+        && existingRouteSyncReceipt.teamId === context.activeTeamId
+        && String(existingRouteSyncReceipt?.libraryPublicStackId || '').trim() === String(resolved.preview.libraryPublicStackId || '').trim()
+      ) {
+        routeSyncReceipt = updateLibraryRouteSyncReceipt({
+          libraryRouteSyncReceiptId: sourceRouteSyncReceiptId,
+          importedAt: nowIso(),
+          metadata: {
+            localScopeSetId: scopeSet.scopeSetId,
+          },
+          nowIso: nowIso(),
+        });
+      }
+    }
 
     const previewAfterImport = buildLibraryPublicStackPreviewPayload({
       houseId: context.houseId,
@@ -4354,6 +4565,7 @@ function registerPlatformReadRoutes(app, deps) {
       verification: previewAfterImport.ok ? previewAfterImport.preview.verification : verificationPersisted.verification,
       items: importedItems.map((item) => projectLibraryItemForRead(item)),
       links: importedLinks,
+      routeSyncReceipt,
       scopeSet: previewAfterImport.ok ? previewAfterImport.preview.localScopeSet : {
         scopeSetId: scopeSet.scopeSetId,
         title: scopeSet.title,
@@ -5116,6 +5328,189 @@ function registerPlatformReadRoutes(app, deps) {
         orderedItemIds: manifest.orderedItemIds,
       },
     }, { requestId, status: persisted.status });
+  });
+
+  app.get('/api/platform/library/routes', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before opening Route Desk.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before opening Route Desk.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      routes: buildLibraryRouteSubscriptionList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+      }),
+    }, { requestId });
+  });
+
+  app.post('/api/platform/library/routes', express.json({ limit: '32kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before following another House route.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before following another House route.', { requestId });
+    }
+    const idempotencyKey = normalizePortalIdempotencyKey(req);
+    if (!idempotencyKey) {
+      return sendPortalApiError(res, 400, 'LIBRARY_IDEMPOTENCY_REQUIRED', 'Idempotency-Key is required to follow a House route.', { requestId });
+    }
+    const sourceHouseId = typeof req.body?.sourceHouseId === 'string' ? req.body.sourceHouseId.trim() : '';
+    const sourceTeamId = typeof req.body?.sourceTeamId === 'string' ? req.body.sourceTeamId.trim() : 'team_main';
+    if (!sourceHouseId) {
+      return sendPortalApiError(res, 400, 'SOURCE_HOUSE_REQUIRED', 'sourceHouseId is required to follow a House route.', { requestId });
+    }
+    if (sourceHouseId === context.houseId) {
+      return sendPortalApiError(res, 409, 'LIBRARY_ROUTE_SELF_NOT_ALLOWED', 'This House cannot follow itself as a Route.', { requestId });
+    }
+    const existingByIdempotency = getLibraryRouteSubscriptionByIdempotency({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      idempotencyKey,
+    });
+    if (existingByIdempotency) {
+      return sendPortalApiSuccess(res, {
+        route: existingByIdempotency,
+      }, { requestId, status: 200 });
+    }
+    const existingRoute = listLibraryRouteSubscriptions({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      sourceHouseId,
+    }).find((entry) => String(entry?.sourceTeamId || '').trim() === sourceTeamId) || null;
+    if (existingRoute) {
+      return sendPortalApiSuccess(res, {
+        route: existingRoute,
+      }, { requestId, status: 200 });
+    }
+    const sourceTarget = resolveKnownHouseTarget(sourceHouseId);
+    if (!sourceTarget) {
+      return sendPortalApiError(res, 404, 'SOURCE_HOUSE_NOT_FOUND', 'The requested source House could not be found.', { requestId });
+    }
+    const persisted = persistLibraryRouteSubscriptionRecord({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      sourceHouseId: sourceTarget.houseId,
+      sourceTeamId,
+      routeState: 'active',
+      idempotencyKey,
+      metadata: {
+        createdFrom: 'portal.house.library.route-desk',
+      },
+    });
+    return sendPortalApiSuccess(res, {
+      route: persisted.subscription,
+      feed: buildLibraryRouteSyncFeedList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryRouteSubscriptionId: String(persisted.subscription?.libraryRouteSubscriptionId || '').trim(),
+      }),
+    }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/routes/:libraryRouteSubscriptionId/sync', express.json({ limit: '16kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before syncing a Route.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before syncing a Route.', { requestId });
+    }
+    const libraryRouteSubscriptionId = typeof req.params?.libraryRouteSubscriptionId === 'string'
+      ? req.params.libraryRouteSubscriptionId.trim()
+      : '';
+    if (!libraryRouteSubscriptionId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ROUTE_SUBSCRIPTION_REQUIRED', 'Select one Route before syncing it.', { requestId });
+    }
+    const subscription = getLibraryRouteSubscriptionById(libraryRouteSubscriptionId);
+    if (!subscription || subscription.houseId !== context.houseId || subscription.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ROUTE_SUBSCRIPTION_NOT_FOUND', 'The requested Route could not be found for this House team.', { requestId });
+    }
+    if (String(subscription?.routeState || '').trim() !== 'active') {
+      return sendPortalApiError(res, 409, 'LIBRARY_ROUTE_SYNC_PAUSED', 'This Route is paused. Resume it before syncing.', { requestId });
+    }
+    const sourceStacks = listLibraryPublicStacks({
+      houseId: String(subscription?.sourceHouseId || '').trim(),
+      teamId: String(subscription?.sourceTeamId || '').trim(),
+    }).filter((entry) => String(entry?.publicationState || '').trim() === 'published');
+    const synced = sourceStacks.map((publicStack) => persistLibraryRouteSyncReceiptRecord({
+      subscription,
+      libraryPublicStackId: String(publicStack?.libraryPublicStackId || '').trim(),
+      syncedAt: nowIso(),
+      metadata: {
+        syncedFrom: 'portal.house.library.route-desk',
+        bundleHash: String(publicStack?.bundleHash || '').trim() || null,
+      },
+    }).receipt);
+    updateLibraryRouteSubscription({
+      libraryRouteSubscriptionId,
+      metadata: {
+        lastSyncedAt: nowIso(),
+        syncedCount: synced.length,
+      },
+      nowIso: nowIso(),
+    });
+    return sendPortalApiSuccess(res, {
+      route: getLibraryRouteSubscriptionById(libraryRouteSubscriptionId),
+      syncedCount: synced.length,
+      feed: buildLibraryRouteSyncFeedList({
+        houseId: context.houseId,
+        teamId: context.activeTeamId,
+        libraryRouteSubscriptionId,
+      }),
+    }, { requestId, status: 200 });
+  });
+
+  app.get('/api/platform/library/routes/:libraryRouteSubscriptionId/feed', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before opening a Route feed.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before opening a Route feed.', { requestId });
+    }
+    const libraryRouteSubscriptionId = typeof req.params?.libraryRouteSubscriptionId === 'string'
+      ? req.params.libraryRouteSubscriptionId.trim()
+      : '';
+    if (!libraryRouteSubscriptionId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_ROUTE_SUBSCRIPTION_REQUIRED', 'Select one Route before opening its feed.', { requestId });
+    }
+    const feed = buildLibraryRouteSyncFeedList({
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      libraryRouteSubscriptionId,
+    });
+    if (!feed.subscription) {
+      return sendPortalApiError(res, 404, 'LIBRARY_ROUTE_SUBSCRIPTION_NOT_FOUND', 'The requested Route could not be found for this House team.', { requestId });
+    }
+    return sendPortalApiSuccess(res, {
+      route: feed.subscription,
+      results: feed.members,
+      resultCount: feed.members.length,
+    }, { requestId });
   });
 
   app.post('/api/platform/library/peer-relays', express.json({ limit: '32kb' }), (req, res) => {

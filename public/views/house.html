@@ -257,6 +257,25 @@
     />
     <button class="btn" id="houseLibraryPublishPublicStackBtn" type="button" data-testid="house-library-public-stack-publish-button">Publish Satchel Stack</button>
   </div>
+  <h3 class="small" style="margin:10px 0 4px;">Route Desk</h3>
+  <div class="kv" data-testid="house-library-route-controls" style="margin:8px 0;">
+    <label class="small" for="houseLibraryRouteSourceInput">Follow House</label>
+    <input
+      id="houseLibraryRouteSourceInput"
+      data-testid="house-library-route-source-input"
+      class="pixel-input"
+      type="text"
+      placeholder="house_..."
+      autocomplete="off"
+      style="flex:1; min-width:0;"
+    />
+    <button class="btn" id="houseLibraryRouteFollowBtn" type="button" data-testid="house-library-route-follow-button">Follow</button>
+    <button class="btn" id="houseLibraryRouteSyncBtn" type="button" data-testid="house-library-route-sync-button">Sync Route</button>
+  </div>
+  <div class="small" id="houseLibraryRoutesEmpty" data-testid="house-library-routes-empty">No followed Houses yet.</div>
+  <div class="kv stack" id="houseLibraryRoutes" data-testid="house-library-routes" style="margin-bottom:8px;"></div>
+  <div class="small" id="houseLibraryRouteFeedEmpty" data-testid="house-library-route-feed-empty">Sync one followed House to see its Route feed.</div>
+  <div class="kv stack" id="houseLibraryRouteFeed" data-testid="house-library-route-feed" style="margin-bottom:8px;"></div>
   <h3 class="small" style="margin:10px 0 4px;">Public Stacks</h3>
   <div class="house-library-storefront" data-testid="house-library-storefront" style="margin:8px 0 10px;">
     <div class="kv" data-testid="house-library-public-stacks-controls">
