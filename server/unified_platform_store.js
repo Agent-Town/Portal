@@ -2308,6 +2308,39 @@ function createLibrarySatchelRelay({
     .find((entry) => entry.librarySatchelRelayId === normalizedLibrarySatchelRelayId) || null;
 }
 
+function updateLibrarySatchelRelay({
+  librarySatchelRelayId = '',
+  relayState = '',
+  metadata = null,
+  nowIso = new Date().toISOString(),
+} = {}) {
+  const normalizedLibrarySatchelRelayId = String(librarySatchelRelayId || '').trim();
+  if (!normalizedLibrarySatchelRelayId) return null;
+  const existing = getLibrarySatchelRelayById(normalizedLibrarySatchelRelayId);
+  if (!existing) return null;
+  const nextRelayState = String(relayState || existing.relayState || '').trim() || existing.relayState || 'queued';
+  const nextMetadata = metadata && typeof metadata === 'object'
+    ? {
+        ...(existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
+        ...metadata,
+      }
+    : (existing.metadata && typeof existing.metadata === 'object' ? existing.metadata : {});
+  const database = ensureDb();
+  database.prepare(`
+    UPDATE library_satchel_relays
+    SET relay_state = ?,
+        metadata_json = ?,
+        updated_at = ?
+    WHERE library_satchel_relay_id = ?
+  `).run(
+    nextRelayState,
+    JSON.stringify(nextMetadata),
+    nowIso,
+    normalizedLibrarySatchelRelayId,
+  );
+  return getLibrarySatchelRelayById(normalizedLibrarySatchelRelayId);
+}
+
 function listLibrarySatchelReceipts({
   librarySatchelRelayId = '',
 } = {}) {
@@ -4575,6 +4608,7 @@ module.exports = {
   setUnifiedPlatformPromptPreview,
   setUnifiedPlatformRegistryPreviewSnapshot,
   updateLibraryPeerRelay,
+  updateLibrarySatchelRelay,
   updateRunMetadata,
   updateSealedContextStatus,
   upsertSealedContext,

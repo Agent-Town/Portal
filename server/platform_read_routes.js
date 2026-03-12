@@ -13,6 +13,7 @@ function registerPlatformReadRoutes(app, deps) {
     createLibraryLink,
     createLibraryPeerReceipt,
     createLibraryPeerRelay,
+    createLibrarySatchelReceipt,
     createLibrarySatchelRelay,
     createLibraryShelf,
     createLibraryPublication,
@@ -28,6 +29,7 @@ function registerPlatformReadRoutes(app, deps) {
     getLibraryPeerRelayById,
     getLibraryPeerRelayByIdempotency,
     getLibraryPublicationById,
+    getLibrarySatchelRelayById,
     getLibrarySatchelRelayByIdempotency,
     getLibraryShelfById,
     getLibraryShelfByIdempotency,
@@ -47,6 +49,7 @@ function registerPlatformReadRoutes(app, deps) {
     listLibraryLinks,
     listLibraryPeerReceipts,
     listLibraryPeerRelays,
+    listLibrarySatchelReceipts,
     listLibraryPublications,
     listLibraryShelfItems,
     listLibraryShelves,
@@ -72,6 +75,7 @@ function registerPlatformReadRoutes(app, deps) {
     replaceScopeSetItems,
     replaceConfigComponentVersions,
     dispatchLibraryPeerRelayEnvelope,
+    dispatchLibrarySatchelRelayEnvelope,
     resolveApprovedLibraryPeerRelayApproval,
     resolveApprovedLibrarySatchelRelayApproval,
     resolveApprovedLibraryPublicationApproval,
@@ -89,6 +93,7 @@ function registerPlatformReadRoutes(app, deps) {
     sha256PrefixedHex,
     stableJsonStringify,
     updateLibraryPeerRelay,
+    updateLibrarySatchelRelay,
     updateLibraryItem,
     updateTrainerJobStatus,
     updateTrainerResultLink,
@@ -1196,6 +1201,42 @@ function registerPlatformReadRoutes(app, deps) {
     return {
       status: 201,
       relay,
+    };
+  }
+
+  function persistLibrarySatchelReceiptRecord({
+    relay = null,
+    receiptKind = 'pony_dispatch_receipt',
+    receiptRef = '',
+    status = 'accepted',
+    metadata = null,
+  } = {}) {
+    const relayId = String(relay?.librarySatchelRelayId || '').trim();
+    if (!relayId) {
+      throw new Error('LIBRARY_SATCHEL_RELAY_REQUIRED');
+    }
+    const existingReceipt = listLibrarySatchelReceipts({
+      librarySatchelRelayId: relayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === String(relay?.targetHouseId || '').trim()) || null;
+    if (existingReceipt) {
+      return {
+        status: 200,
+        receipt: existingReceipt,
+      };
+    }
+    const receipt = createLibrarySatchelReceipt({
+      librarySatchelReceiptId: `sreceipt_${randomHex(12)}`,
+      librarySatchelRelayId: relayId,
+      targetHouseId: String(relay?.targetHouseId || '').trim(),
+      receiptKind,
+      receiptRef,
+      status,
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      nowIso: nowIso(),
+    });
+    return {
+      status: 201,
+      receipt,
     };
   }
 
@@ -2449,6 +2490,104 @@ function registerPlatformReadRoutes(app, deps) {
         houseId: target.houseId,
       },
     }, { requestId, status: persisted.status });
+  });
+
+  app.post('/api/platform/library/satchel-relays/:librarySatchelRelayId/deliver', express.json({ limit: '16kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = resolveHumanSessionWithRecovery(req, res, { allowCreate: false });
+    if (!session) {
+      return sendPortalApiError(res, 401, 'SESSION_REQUIRED', 'A live Portal session is required for this route.', { requestId });
+    }
+    const context = resolveSessionPlatformContext(session);
+    if (!context.houseId) {
+      return sendPortalApiError(res, 409, 'HOUSE_REQUIRED', 'Attach a house before delivering a Satchel relay.', { requestId });
+    }
+    if (!context.activeTeamId) {
+      return sendPortalApiError(res, 409, 'TEAM_REQUIRED', 'Select an active team before delivering a Satchel relay.', { requestId });
+    }
+    const librarySatchelRelayId = typeof req.params?.librarySatchelRelayId === 'string' ? req.params.librarySatchelRelayId.trim() : '';
+    if (!librarySatchelRelayId) {
+      return sendPortalApiError(res, 400, 'LIBRARY_SATCHEL_RELAY_REQUIRED', 'librarySatchelRelayId is required.', { requestId });
+    }
+    const relay = getLibrarySatchelRelayById(librarySatchelRelayId);
+    if (!relay || relay.houseId !== context.houseId || relay.teamId !== context.activeTeamId) {
+      return sendPortalApiError(res, 404, 'LIBRARY_SATCHEL_RELAY_NOT_FOUND', 'The requested Satchel relay could not be found for this House team.', { requestId });
+    }
+    const existingReceipt = listLibrarySatchelReceipts({
+      librarySatchelRelayId,
+    }).find((entry) => String(entry?.targetHouseId || '').trim() === String(relay?.targetHouseId || '').trim()) || null;
+    if (existingReceipt) {
+      const existingRelay = updateLibrarySatchelRelay({
+        librarySatchelRelayId,
+        relayState: 'accepted',
+        metadata: {
+          deliveredReceiptId: existingReceipt.librarySatchelReceiptId,
+          deliveredReceiptRef: existingReceipt.receiptRef,
+        },
+        nowIso: nowIso(),
+      }) || relay;
+      return sendPortalApiSuccess(res, {
+        relay: existingRelay,
+        receipt: existingReceipt,
+      }, { requestId, status: 200 });
+    }
+    const target = resolveKnownHouseTarget(relay.targetHouseId);
+    if (!target) {
+      return sendPortalApiError(res, 404, 'TARGET_HOUSE_NOT_FOUND', 'The target house for this Satchel relay could not be found.', { requestId });
+    }
+    let delivery;
+    try {
+      delivery = dispatchLibrarySatchelRelayEnvelope({
+        relay,
+        targetHouseId: target.houseId,
+      });
+    } catch (error) {
+      const message = String(error?.message || 'LIBRARY_SATCHEL_RELAY_DELIVERY_FAILED');
+      if (message === 'TARGET_HOUSE_NOT_FOUND') {
+        return sendPortalApiError(res, 404, message, 'The target house for this Satchel relay could not be found.', { requestId });
+      }
+      return sendPortalApiError(res, 502, 'LIBRARY_SATCHEL_RELAY_DELIVERY_FAILED', 'The Satchel relay could not be delivered to Pony inbox.', {
+        requestId,
+        details: {
+          relayId: librarySatchelRelayId,
+          cause: message,
+        },
+      });
+    }
+    const receiptPersisted = persistLibrarySatchelReceiptRecord({
+      relay,
+      receiptKind: 'pony_dispatch_receipt',
+      receiptRef: String(delivery?.dispatch?.receiptId || '').trim(),
+      status: 'accepted',
+      metadata: {
+        messageId: String(delivery?.message?.id || '').trim() || null,
+        messageKind: String(delivery?.message?.kind || '').trim() || null,
+        dispatchAdapter: String(delivery?.dispatch?.adapter || '').trim() || null,
+        transportKind: String(delivery?.dispatch?.transportKind || relay?.bundleManifest?.transportKind || relay?.metadata?.transportKind || '').trim() || null,
+        scopeSetId: relay.scopeSetId,
+        bundleHash: String(relay?.bundleManifest?.bundleHash || '').trim() || null,
+        memberCount: Math.max(0, Number(relay?.bundleManifest?.memberCount || 0)),
+      },
+    });
+    const updatedRelay = updateLibrarySatchelRelay({
+      librarySatchelRelayId,
+      relayState: 'accepted',
+      metadata: {
+        deliveredReceiptId: receiptPersisted.receipt?.librarySatchelReceiptId || null,
+        deliveredReceiptRef: receiptPersisted.receipt?.receiptRef || null,
+        deliveredMessageId: String(delivery?.message?.id || '').trim() || null,
+        targetInboxState: 'accepted',
+      },
+      nowIso: nowIso(),
+    }) || relay;
+    return sendPortalApiSuccess(res, {
+      relay: updatedRelay,
+      receipt: receiptPersisted.receipt,
+      dispatch: delivery?.dispatch || null,
+      target: {
+        houseId: target.houseId,
+      },
+    }, { requestId, status: receiptPersisted.status });
   });
 
   app.post('/api/platform/library/peer-relays/:libraryPeerRelayId/deliver', express.json({ limit: '16kb' }), (req, res) => {

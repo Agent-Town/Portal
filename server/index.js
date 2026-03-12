@@ -110,6 +110,7 @@ const {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibrarySatchelReceipt,
   createLibrarySatchelRelay,
   createLibraryPublication,
   createScopeSet,
@@ -144,6 +145,7 @@ const {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
   getLibraryShelfById,
@@ -185,6 +187,7 @@ const {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibrarySatchelReceipts,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,
@@ -205,6 +208,7 @@ const {
   setUnifiedPlatformRegistryPreviewSnapshot,
   setUnifiedPlatformPromptPreview,
   updateLibraryPeerRelay,
+  updateLibrarySatchelRelay,
   updateLibraryItem,
   updateRunMetadata,
   updateSealedContextStatus,
@@ -4461,6 +4465,7 @@ registerPlatformReadRoutes(app, {
   createLibraryLink,
   createLibraryPeerReceipt,
   createLibraryPeerRelay,
+  createLibrarySatchelReceipt,
   createLibrarySatchelRelay,
   createLibraryShelf,
   createLibraryPublication,
@@ -4476,6 +4481,7 @@ registerPlatformReadRoutes(app, {
   getLibraryPeerRelayById,
   getLibraryPeerRelayByIdempotency,
   getLibraryPublicationById,
+  getLibrarySatchelRelayById,
   getLibrarySatchelRelayByIdempotency,
   getLibraryPublicationByIdempotency,
   getLibraryShelfById,
@@ -4497,6 +4503,7 @@ registerPlatformReadRoutes(app, {
   listLibraryLinks,
   listLibraryPeerReceipts,
   listLibraryPeerRelays,
+  listLibrarySatchelReceipts,
   listLibraryPublications,
   listLibraryShelfItems,
   listLibraryShelves,
@@ -4520,6 +4527,7 @@ registerPlatformReadRoutes(app, {
   replaceScopeSetItems,
   replaceConfigComponentVersions,
   dispatchLibraryPeerRelayEnvelope,
+  dispatchLibrarySatchelRelayEnvelope,
   resolveApprovedLibraryPeerRelayApproval,
   resolveApprovedLibrarySatchelRelayApproval,
   resolveApprovedLibraryPublicationApproval,
@@ -4537,6 +4545,7 @@ registerPlatformReadRoutes(app, {
   sha256PrefixedHex,
   stableJsonStringify,
   updateLibraryPeerRelay,
+  updateLibrarySatchelRelay,
   updateLibraryItem,
   updateTrainerJobStatus,
   updateTrainerResultLink,
@@ -6535,6 +6544,102 @@ function dispatchLibraryPeerRelayEnvelope({
   } catch (error) {
     throw error;
   }
+  message.dispatch = {
+    receiptId: makeDispatchReceiptId(),
+    ok: dispatchResult?.ok !== false,
+    adapter: typeof dispatchResult?.adapter === 'string' && dispatchResult.adapter.trim()
+      ? dispatchResult.adapter.trim()
+      : 'relay.unknown.v1',
+    transportKind: normalizedTransportKind,
+    relayHints: Array.isArray(message.transport?.relayHints) ? message.transport.relayHints : [],
+    dispatchedAt: nowIso(),
+  };
+  writeStore(store);
+  return {
+    targetHouseId: target.houseId,
+    message,
+    dispatch: message.dispatch,
+  };
+}
+
+function dispatchLibrarySatchelRelayEnvelope({
+  relay = null,
+  targetHouseId = '',
+} = {}) {
+  const target = resolveKnownHouseTarget(targetHouseId || relay?.targetHouseId || '');
+  if (!target || !target.houseId) {
+    throw new Error('TARGET_HOUSE_NOT_FOUND');
+  }
+  const normalizedRelayId = String(relay?.librarySatchelRelayId || '').trim();
+  const bundleManifest = relay?.bundleManifest && typeof relay.bundleManifest === 'object'
+    ? relay.bundleManifest
+    : {};
+  const normalizedTransportKind = String(
+    bundleManifest.transportKind
+    || relay?.metadata?.transportKind
+    || 'pony.relay.registry.v1'
+  ).trim() || 'pony.relay.registry.v1';
+  const sourceHouseId = String(relay?.houseId || '').trim() || null;
+  const bundleTitle = String(bundleManifest.title || normalizedRelayId || 'Satchel bundle').trim() || 'Satchel bundle';
+  const bundleMembers = Array.isArray(bundleManifest.members) ? bundleManifest.members : [];
+  const bundlePreview = bundleMembers.map((member, index) => ({
+    position: Number(member?.position ?? index),
+    libraryItemId: String(member?.libraryItemId || '').trim() || null,
+    libraryPublicationId: String(member?.libraryPublicationId || '').trim() || null,
+    registryId: String(member?.registryId || '').trim() || null,
+    title: String(member?.title || member?.registryId || `Bundle item ${index + 1}`).trim(),
+    contentHash: String(member?.contentHash || '').trim() || null,
+  }));
+  const body = JSON.stringify({
+    kind: 'library_satchel_bundle_notice',
+    librarySatchelRelayId: normalizedRelayId,
+    scopeSetId: String(relay?.scopeSetId || bundleManifest.scopeSetId || '').trim() || null,
+    bundleHash: String(bundleManifest.bundleHash || '').trim() || null,
+    title: bundleTitle,
+    memberCount: Math.max(0, Number(bundleManifest.memberCount || bundlePreview.length || 0)),
+    orderedPublicationIds: Array.isArray(bundleManifest.orderedPublicationIds) ? bundleManifest.orderedPublicationIds : [],
+    orderedRegistryIds: Array.isArray(bundleManifest.orderedRegistryIds) ? bundleManifest.orderedRegistryIds : [],
+  });
+  const message = makeInboxMsg({
+    toHouseId: target.houseId,
+    fromHouseId: sourceHouseId,
+    body,
+    status: 'accepted',
+    kind: 'msg.library_satchel_bundle.v1',
+  });
+  message.transport = {
+    kind: normalizedTransportKind,
+    relayHints: [
+      `library-satchel-relay:${normalizedRelayId}`,
+      bundleManifest.bundleHash ? `bundle:${bundleManifest.bundleHash}` : '',
+    ].filter(Boolean),
+  };
+  message.satchelRelay = {
+    librarySatchelRelayId: normalizedRelayId,
+    scopeSetId: String(relay?.scopeSetId || bundleManifest.scopeSetId || '').trim() || null,
+    bundleHash: String(bundleManifest.bundleHash || '').trim() || null,
+    sourceHouseId,
+    targetHouseId: target.houseId,
+    title: bundleTitle,
+    memberCount: Math.max(0, Number(bundleManifest.memberCount || bundlePreview.length || 0)),
+  };
+  message.bundle = {
+    scopeKind: String(bundleManifest.scopeKind || 'reading_table').trim() || 'reading_table',
+    orderedItemIds: Array.isArray(bundleManifest.orderedItemIds) ? bundleManifest.orderedItemIds : [],
+    orderedPublicationIds: Array.isArray(bundleManifest.orderedPublicationIds) ? bundleManifest.orderedPublicationIds : [],
+    orderedRegistryIds: Array.isArray(bundleManifest.orderedRegistryIds) ? bundleManifest.orderedRegistryIds : [],
+    members: bundlePreview,
+  };
+  const store = readStore();
+  const dispatchResult = ponyTransportService.dispatch({
+    store,
+    message,
+    transport: message.transport,
+    context: {
+      fromHouseId: sourceHouseId,
+      toHouseId: target.houseId,
+    },
+  });
   message.dispatch = {
     receiptId: makeDispatchReceiptId(),
     ok: dispatchResult?.ok !== false,
