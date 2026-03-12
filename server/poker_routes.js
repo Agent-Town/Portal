@@ -39,6 +39,7 @@ const {
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayTablePayload,
+  buildPokerPlaySchedulePayload,
   POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT,
   breakTournamentSeriesTableByDirector,
   changeCashTableSeat,
@@ -944,6 +945,14 @@ function registerPokerRoutes(app, deps) {
         { seatNumber: 2, address: 'So1anaHarnessEconomyB111111111111111111111', houseId: 'house_harness_economy_b', displayName: 'Economy Bravo' },
         { seatNumber: 3, address: 'So1anaHarnessEconomyC111111111111111111111', houseId: 'house_harness_economy_c', displayName: 'Economy Charlie' },
       ],
+      schedule_calendar_story: [
+        { seatNumber: 1, address: 'So1anaHarnessScheduleUIA11111111111111111111', houseId: 'house_harness_schedule_ui_a', displayName: 'Schedule Viewer' },
+      ],
+      scheduled_break_story: [
+        { seatNumber: 1, address: 'So1anaHarnessSchedBreakA1111111111111111111', houseId: 'house_harness_sched_break_a', displayName: 'Break Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessSchedBreakB1111111111111111111', houseId: 'house_harness_sched_break_b', displayName: 'Break Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessSchedBreakC1111111111111111111', houseId: 'house_harness_sched_break_c', displayName: 'Break Charlie' },
+      ],
     };
     const defaults = defaultsByScenario[normalizedScenario];
     if (!defaults) {
@@ -1721,6 +1730,256 @@ function registerPokerRoutes(app, deps) {
       });
       seededSeriesId = seriesId;
       seededTableIds.push(tableAId, tableBId);
+    } else if (normalizedScenario === 'schedule_calendar_story') {
+      const [seatOne] = normalizedActors;
+      const dailyTemplateId = 'daily_river_sprint';
+      const dailyTemplateTitle = 'Daily River Sprint';
+      const dailyRecurrenceLabel = 'Daily 12:00 UTC';
+      const majorTemplateId = 'friday_deepstack_major';
+      const majorTemplateTitle = 'Friday Deepstack Major';
+      const majorRecurrenceLabel = 'Weekly Fri 18:00 UTC';
+      const dailySeriesId = `pkseries_harness_schedule_daily_${randomHex(6)}`;
+      const majorSeriesId = `pkseries_harness_schedule_major_${randomHex(6)}`;
+      const tableAId = nextTableId;
+      const tableBId = `${nextTableId}_b`;
+      const tableCId = `${nextTableId}_c`;
+      const scheduleA = addHarnessSeconds(requestAt, 4 * 60 * 60);
+      const scheduleB = addHarnessSeconds(requestAt, 28 * 60 * 60);
+      const scheduleC = addHarnessSeconds(requestAt, 34 * 60 * 60);
+      const buildScheduledState = (scheduledStartAt, entryCountsByWallet = {}) => ({
+        activeHandId: null,
+        activeHandNumber: 0,
+        completedAt: null,
+        winnerSeatNumber: 0,
+        prizeOil: 0,
+        prizeSettledAt: null,
+        scheduledStartAt,
+        timeBankRemainingBySeat: {},
+        entryCount: Object.values(entryCountsByWallet).reduce((sum, count) => sum + Number(count || 0), 0),
+        reentryCount: 0,
+        entryCountsByWallet,
+        completedScheduledBreakAfterHands: [],
+        scheduledBreakId: null,
+        scheduledBreakLabel: null,
+        scheduledBreakAfterHandNumber: 0,
+        scheduledBreakStartedAt: null,
+        scheduledBreakUntilAt: null,
+        scheduledBreakDurationMinutes: 0,
+      });
+      upsertPokerPlayTable({
+        tableId: tableAId,
+        slug: `${normalizedScenario}-a-${randomHex(4)}`,
+        title: dailyTemplateTitle,
+        tableType: 'tournament',
+        status: 'scheduled',
+        maxSeats: 6,
+        smallBlindOil: 25,
+        bigBlindOil: 50,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: buildScheduledState(scheduleA, {
+          [seatOne.address]: 1,
+        }),
+        rules: buildHarnessTournamentRules(dailySeriesId, dailyTemplateTitle, {
+          scheduledStartAt: scheduleA,
+          lateRegistrationHands: 2,
+          scheduleTemplateId: dailyTemplateId,
+          scheduleTemplateTitle: dailyTemplateTitle,
+          scheduleRecurrenceLabel: dailyRecurrenceLabel,
+        }),
+        summary: {
+          headline: 'Harness schedule calendar scenario.',
+          seriesId: dailySeriesId,
+          seriesTitle: dailyTemplateTitle,
+          scheduledStartAt: scheduleA,
+          scheduleTemplateId: dailyTemplateId,
+          scheduleTemplateTitle: dailyTemplateTitle,
+          scheduleRecurrenceLabel: dailyRecurrenceLabel,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: tableAId,
+        seatNumber: seatOne.seatNumber,
+        portalSessionId: `harness_${seatOne.address}`,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        displayName: seatOne.displayName,
+        status: 'active',
+        buyInOil: 300,
+        stackOil: 300,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayTable({
+        tableId: tableBId,
+        slug: `${normalizedScenario}-b-${randomHex(4)}`,
+        title: dailyTemplateTitle,
+        tableType: 'tournament',
+        status: 'scheduled',
+        maxSeats: 6,
+        smallBlindOil: 25,
+        bigBlindOil: 50,
+        buyInOil: 300,
+        minPlayers: 2,
+        state: buildScheduledState(scheduleB),
+        rules: buildHarnessTournamentRules(dailySeriesId, dailyTemplateTitle, {
+          scheduledStartAt: scheduleB,
+          lateRegistrationHands: 2,
+          scheduleTemplateId: dailyTemplateId,
+          scheduleTemplateTitle: dailyTemplateTitle,
+          scheduleRecurrenceLabel: dailyRecurrenceLabel,
+        }),
+        summary: {
+          headline: 'Harness schedule calendar scenario.',
+          seriesId: dailySeriesId,
+          seriesTitle: dailyTemplateTitle,
+          scheduledStartAt: scheduleB,
+          scheduleTemplateId: dailyTemplateId,
+          scheduleTemplateTitle: dailyTemplateTitle,
+          scheduleRecurrenceLabel: dailyRecurrenceLabel,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlayTable({
+        tableId: tableCId,
+        slug: `${normalizedScenario}-c-${randomHex(4)}`,
+        title: majorTemplateTitle,
+        tableType: 'tournament',
+        status: 'scheduled',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: buildScheduledState(scheduleC),
+        rules: buildHarnessTournamentRules(majorSeriesId, majorTemplateTitle, {
+          scheduledStartAt: scheduleC,
+          lateRegistrationHands: 2,
+          scheduleTemplateId: majorTemplateId,
+          scheduleTemplateTitle: majorTemplateTitle,
+          scheduleRecurrenceLabel: majorRecurrenceLabel,
+          scheduledBreaks: [
+            {
+              afterHandNumber: 4,
+              label: 'Player Break 1',
+              durationMinutes: 5,
+            },
+          ],
+        }),
+        summary: {
+          headline: 'Harness schedule calendar scenario.',
+          seriesId: majorSeriesId,
+          seriesTitle: majorTemplateTitle,
+          scheduledStartAt: scheduleC,
+          scheduleTemplateId: majorTemplateId,
+          scheduleTemplateTitle: majorTemplateTitle,
+          scheduleRecurrenceLabel: majorRecurrenceLabel,
+          scheduledBreakCount: 1,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      seededSeriesId = dailySeriesId;
+      seededTableIds.push(tableAId, tableBId, tableCId);
+    } else if (normalizedScenario === 'scheduled_break_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_sched_break_${randomHex(6)}`;
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Scheduled Break Table',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 3,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          lastButtonSeat: seatThree.seatNumber,
+          lastSettledAt: requestAt,
+          lastSettledHandId: `${handId}_settled`,
+          lastSettledHandNumber: 3,
+          timeBankRemainingBySeat: {
+            [String(seatOne.seatNumber)]: 15,
+            [String(seatTwo.seatNumber)]: 15,
+            [String(seatThree.seatNumber)]: 15,
+          },
+          entryCount: 3,
+          reentryCount: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          completedScheduledBreakAfterHands: [],
+          scheduledBreakId: null,
+          scheduledBreakLabel: null,
+          scheduledBreakAfterHandNumber: 0,
+          scheduledBreakStartedAt: null,
+          scheduledBreakUntilAt: null,
+          scheduledBreakDurationMinutes: 0,
+        },
+        rules: buildHarnessTournamentRules(seriesId, 'Harness Break Series', {
+          lateRegistrationHands: 0,
+          scheduledBreaks: [
+            {
+              breakId: 'player_break_1',
+              afterHandNumber: 3,
+              label: 'Player Break 1',
+              durationMinutes: 5,
+            },
+            {
+              breakId: 'player_break_2',
+              afterHandNumber: 6,
+              label: 'Player Break 2',
+              durationMinutes: 5,
+            },
+          ],
+        }),
+        summary: {
+          headline: 'Harness scheduled-break scenario.',
+          seriesId,
+          seriesTitle: 'Harness Break Series',
+          scheduledBreakCount: 2,
+        },
+        createdAt: addHarnessSeconds(requestAt, -1800),
+        updatedAt: requestAt,
+      });
+      [
+        { actor: seatOne, stackOil: 640 },
+        { actor: seatTwo, stackOil: 580 },
+        { actor: seatThree, stackOil: 560 },
+      ].forEach(({ actor, stackOil }) => {
+        upsertPokerPlaySeat({
+          tableId: nextTableId,
+          seatNumber: actor.seatNumber,
+          portalSessionId: `harness_${actor.address}`,
+          houseId: actor.houseId,
+          walletSubject: actor.address,
+          displayName: actor.displayName,
+          status: 'active',
+          buyInOil: 600,
+          stackOil,
+          lastSeenAt: requestAt,
+          disconnectedAt: null,
+          createdAt: requestAt,
+          updatedAt: requestAt,
+        });
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
     } else if (normalizedScenario === 'tournament_schedule_waiting') {
       const [seatOne, seatTwo] = normalizedActors;
       const seriesId = `pkseries_harness_schedule_${randomHex(6)}`;
@@ -4925,6 +5184,31 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_LIST_FAILED',
         err?.message || 'Unable to load poker tables.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.get('/api/poker/play/schedule', (req, res) => {
+    const requestId = buildPortalRequestId();
+    try {
+      const session = parseOptionalSession({ resolveHumanSessionWithRecovery }, req, res);
+      const payload = buildPokerPlaySchedulePayload(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+        days: req.query?.days,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_SCHEDULE_FAILED',
+        err?.message || 'Unable to load the poker tournament schedule.',
         {
           requestId,
           details: err?.details || {},

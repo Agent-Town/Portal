@@ -150,6 +150,44 @@ function normalizePokerPlayTournamentEntryFeeOil(value, buyInOil, fallback = 0) 
   return Math.max(0, Math.min(maxFeeOil, normalizeOilAmount(value, fallback)));
 }
 
+function normalizePokerPlayScheduleTemplateId(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 64);
+}
+
+function normalizePokerPlayScheduleTemplateTitle(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 96);
+}
+
+function normalizePokerPlayScheduleRecurrenceLabel(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 96);
+}
+
+function normalizePokerPlayScheduledBreakLabel(value, fallback = '') {
+  return normalizeTrimmedString(value, fallback).slice(0, 80);
+}
+
+function normalizePokerPlayScheduledBreaks(value, { handsPerBlindLevel = 0 } = {}) {
+  const items = Array.isArray(value) ? value : [];
+  const fallbackAfterHandNumber = Math.max(2, normalizeOilAmount(handsPerBlindLevel, 2));
+  const normalized = [];
+  const seenAfterHandNumbers = new Set();
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const afterHandNumber = Math.max(1, normalizeOilAmount(item?.afterHandNumber, fallbackAfterHandNumber));
+    if (seenAfterHandNumbers.has(afterHandNumber)) continue;
+    seenAfterHandNumbers.add(afterHandNumber);
+    normalized.push({
+      breakId: normalizeTrimmedString(item?.breakId, `break_after_${afterHandNumber}`).slice(0, 64),
+      label: normalizePokerPlayScheduledBreakLabel(item?.label, `Break ${index + 1}`),
+      afterHandNumber,
+      durationMinutes: Math.max(1, Math.min(60, normalizeOilAmount(item?.durationMinutes, 5))),
+    });
+  }
+  return normalized
+    .sort((left, right) => left.afterHandNumber - right.afterHandNumber)
+    .slice(0, 12);
+}
+
 function normalizePokerPlayTournamentFillPolicy(value, fallback = 'open_match') {
   const policy = normalizeTrimmedString(value, fallback).toLowerCase();
   if (policy === 'fill_to_full') return 'fill_to_full';
@@ -381,6 +419,18 @@ function normalizeCreateTableConfig(input = {}) {
   const tournamentEntryFeeOil = tableType === 'tournament'
     ? normalizePokerPlayTournamentEntryFeeOil(input?.tournamentEntryFeeOil, buyInOil, 0)
     : 0;
+  const scheduleTemplateId = tableType === 'tournament'
+    ? normalizePokerPlayScheduleTemplateId(input?.scheduleTemplateId)
+    : '';
+  const scheduleTemplateTitle = tableType === 'tournament'
+    ? normalizePokerPlayScheduleTemplateTitle(input?.scheduleTemplateTitle, title)
+    : '';
+  const scheduleRecurrenceLabel = tableType === 'tournament'
+    ? normalizePokerPlayScheduleRecurrenceLabel(input?.scheduleRecurrenceLabel)
+    : '';
+  const scheduledBreaks = tableType === 'tournament'
+    ? normalizePokerPlayScheduledBreaks(input?.scheduledBreaks, { handsPerBlindLevel })
+    : [];
   return {
     tableType,
     fillPolicy,
@@ -408,6 +458,10 @@ function normalizeCreateTableConfig(input = {}) {
     scheduledStartAt,
     reentryLimit,
     startTargetSeats,
+    scheduleTemplateId,
+    scheduleTemplateTitle,
+    scheduleRecurrenceLabel,
+    scheduledBreaks,
     inviteCode: accessMode === 'invite_only' ? normalizePokerPlayInviteCode(input?.inviteCode) : '',
     creatorWalletSubject: normalizeTrimmedString(input?.creatorWalletSubject),
     creatorHouseId: normalizeTrimmedString(input?.creatorHouseId),
@@ -743,6 +797,70 @@ function getTournamentScheduledStartAt(table) {
   return normalizeIsoString(table?.rules?.scheduledStartAt || table?.state?.scheduledStartAt);
 }
 
+function getTournamentScheduleTemplate(table) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return null;
+  const templateId = normalizePokerPlayScheduleTemplateId(
+    table?.rules?.scheduleTemplateId || table?.summary?.scheduleTemplateId || ''
+  );
+  if (!templateId) return null;
+  return {
+    templateId,
+    title: normalizePokerPlayScheduleTemplateTitle(
+      table?.rules?.scheduleTemplateTitle || table?.summary?.scheduleTemplateTitle || table?.title || 'Tournament Template',
+      table?.title || 'Tournament Template'
+    ),
+    recurrenceLabel: normalizePokerPlayScheduleRecurrenceLabel(
+      table?.rules?.scheduleRecurrenceLabel || table?.summary?.scheduleRecurrenceLabel || ''
+    ),
+  };
+}
+
+function getTournamentScheduledBreaks(table) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return [];
+  return normalizePokerPlayScheduledBreaks(table?.rules?.scheduledBreaks, {
+    handsPerBlindLevel: table?.rules?.handsPerBlindLevel,
+  });
+}
+
+function getCompletedScheduledBreakAfterHands(table) {
+  return normalizePositiveNumberList(table?.state?.completedScheduledBreakAfterHands);
+}
+
+function getActiveScheduledBreakState(table) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return null;
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const afterHandNumber = Math.max(0, normalizeOilAmount(state?.scheduledBreakAfterHandNumber, 0));
+  const untilAt = normalizeIsoString(state?.scheduledBreakUntilAt);
+  if (!afterHandNumber || !untilAt) return null;
+  return {
+    breakId: normalizeTrimmedString(state?.scheduledBreakId, `break_after_${afterHandNumber}`),
+    label: normalizePokerPlayScheduledBreakLabel(state?.scheduledBreakLabel, `Break after hand ${afterHandNumber}`),
+    afterHandNumber,
+    startedAt: normalizeIsoString(state?.scheduledBreakStartedAt) || null,
+    untilAt,
+    durationMinutes: Math.max(1, normalizeOilAmount(state?.scheduledBreakDurationMinutes, 5)),
+  };
+}
+
+function isScheduledBreakActive(table, atIso) {
+  const scheduledBreak = getActiveScheduledBreakState(table);
+  if (!scheduledBreak) return false;
+  const breakUntilMs = Date.parse(String(scheduledBreak.untilAt || ''));
+  const atMs = Date.parse(String(atIso || ''));
+  if (!Number.isFinite(breakUntilMs) || !Number.isFinite(atMs)) return true;
+  return atMs < breakUntilMs;
+}
+
+function getNextScheduledBreak(table) {
+  const completed = new Set(getCompletedScheduledBreakAfterHands(table));
+  const activeBreak = getActiveScheduledBreakState(table);
+  return getTournamentScheduledBreaks(table).find((item) => {
+    if (completed.has(item.afterHandNumber)) return false;
+    if (activeBreak && item.afterHandNumber === activeBreak.afterHandNumber) return false;
+    return true;
+  }) || null;
+}
+
 function isScheduledTournamentPending(table, atIso) {
   if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') return false;
   if (normalizeTrimmedString(table?.status, 'open') !== 'scheduled') return false;
@@ -808,6 +926,13 @@ function addHoursToIso(iso, hours) {
   const baseMs = Date.parse(String(iso || ''));
   const safeHours = Math.max(0, Number(hours || 0));
   const nextMs = (Number.isFinite(baseMs) ? baseMs : Date.now()) + (safeHours * 60 * 60 * 1000);
+  return new Date(nextMs).toISOString();
+}
+
+function addMinutesToIso(iso, minutes) {
+  const baseMs = Date.parse(String(iso || ''));
+  const safeMinutes = Math.max(0, Number(minutes || 0));
+  const nextMs = (Number.isFinite(baseMs) ? baseMs : Date.now()) + (safeMinutes * 60 * 1000);
   return new Date(nextMs).toISOString();
 }
 
@@ -1714,6 +1839,13 @@ function normalizeSeatNumberList(values) {
     .sort((left, right) => left - right);
 }
 
+function normalizePositiveNumberList(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => Math.max(0, normalizeOilAmount(value, 0)))
+    .filter((value) => value > 0)))
+    .sort((left, right) => left - right);
+}
+
 function clockwiseSeatOrderFromButton(seatNumbers, buttonSeat) {
   const normalized = normalizeSeatNumberList(seatNumbers);
   const button = normalizeSeatNumber(buttonSeat);
@@ -2015,6 +2147,10 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
   const lateRegistration = resolveTournamentLateRegistration(table, hand);
   const scheduledStartAt = getTournamentScheduledStartAt(table);
   const scheduledStartPending = !!scheduledStartAt && isScheduledTournamentPending(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || '');
+  const activeScheduledBreak = getActiveScheduledBreakState(table);
+  const scheduledBreakActive = !!activeScheduledBreak && isScheduledBreakActive(table, hand?.updatedAt || table?.updatedAt || table?.createdAt || '');
+  const nextScheduledBreak = getNextScheduledBreak(table);
+  const scheduleTemplate = getTournamentScheduleTemplate(table);
   const fillPolicy = getTournamentFillPolicy(table);
   const bountyModel = getTournamentBountyModel(table);
   const tournamentEntryFeeOil = getTournamentEntryFeeOil(table);
@@ -2049,6 +2185,9 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     lateRegistrationRemainingHands: lateRegistration.remainingHands,
     scheduledStartAt: scheduledStartAt || null,
     scheduledStartPending,
+    scheduleTemplateId: scheduleTemplate?.templateId || null,
+    scheduleTemplateTitle: scheduleTemplate?.title || null,
+    scheduleRecurrenceLabel: scheduleTemplate?.recurrenceLabel || null,
     reentryLimit: getTournamentReentryLimit(table),
     fillPolicy,
     startTargetSeats,
@@ -2065,6 +2204,16 @@ function computeTableSummary(table, seats, hand, viewerSeat) {
     payoutModel: localPayoutPlan.payoutModel,
     paidPlaces: Number(localPayoutPlan.paidPlaces || 0),
     payouts: cloneJson(localPayoutPlan.payouts, []),
+    scheduledBreakCount: getTournamentScheduledBreaks(table).length,
+    scheduledBreakActive,
+    scheduledBreakLabel: activeScheduledBreak?.label || null,
+    scheduledBreakAfterHandNumber: activeScheduledBreak?.afterHandNumber || 0,
+    scheduledBreakStartedAt: activeScheduledBreak?.startedAt || null,
+    scheduledBreakUntilAt: scheduledBreakActive ? activeScheduledBreak?.untilAt || null : null,
+    scheduledBreakDurationMinutes: activeScheduledBreak?.durationMinutes || 0,
+    completedScheduledBreakCount: getCompletedScheduledBreakAfterHands(table).length,
+    nextScheduledBreakAfterHandNumber: nextScheduledBreak?.afterHandNumber || 0,
+    nextScheduledBreakLabel: nextScheduledBreak?.label || null,
     registrationClosedByDirectorAt: normalizeTrimmedString(table?.state?.registrationClosedByDirectorAt) || null,
     blindReturnPolicy: normalizePokerPlayTableType(table?.tableType) === 'cash' ? getCashBlindReturnPolicy(table) : null,
     cashRakeBps: normalizePokerPlayTableType(table?.tableType) === 'cash' ? getCashRakeBps(table) : 0,
@@ -2107,6 +2256,9 @@ function buildDynamicTableSummary(config, matchKey) {
     summary.seriesId = normalizeTrimmedString(config?.seriesId);
     summary.seriesTitle = normalizeTrimmedString(config?.seriesTitle, config?.title);
     summary.scheduledStartAt = normalizeIsoString(config?.scheduledStartAt) || null;
+    summary.scheduleTemplateId = normalizePokerPlayScheduleTemplateId(config?.scheduleTemplateId) || null;
+    summary.scheduleTemplateTitle = normalizePokerPlayScheduleTemplateTitle(config?.scheduleTemplateTitle, config?.title) || null;
+    summary.scheduleRecurrenceLabel = normalizePokerPlayScheduleRecurrenceLabel(config?.scheduleRecurrenceLabel) || null;
     summary.reentryLimit = Math.max(0, normalizeOilAmount(config?.reentryLimit, 0));
     summary.fillPolicy = tournamentFillPolicy;
     summary.bountyModel = tournamentBountyModel;
@@ -2115,6 +2267,21 @@ function buildDynamicTableSummary(config, matchKey) {
     summary.startTargetSeats = tournamentStartTargetSeats;
     summary.seatsUntilStart = summary.startTargetSeats;
     summary.startReady = false;
+    summary.scheduledBreakCount = normalizePokerPlayScheduledBreaks(config?.scheduledBreaks, {
+      handsPerBlindLevel: config?.handsPerBlindLevel,
+    }).length;
+    summary.scheduledBreakActive = false;
+    summary.scheduledBreakLabel = null;
+    summary.scheduledBreakAfterHandNumber = 0;
+    summary.scheduledBreakStartedAt = null;
+    summary.scheduledBreakUntilAt = null;
+    summary.scheduledBreakDurationMinutes = 0;
+    summary.completedScheduledBreakCount = 0;
+    const nextScheduledBreak = normalizePokerPlayScheduledBreaks(config?.scheduledBreaks, {
+      handsPerBlindLevel: config?.handsPerBlindLevel,
+    })[0] || null;
+    summary.nextScheduledBreakAfterHandNumber = nextScheduledBreak?.afterHandNumber || 0;
+    summary.nextScheduledBreakLabel = nextScheduledBreak?.label || null;
   }
   return summary;
 }
@@ -2243,6 +2410,11 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
   let lateRegistrationOpen = false;
   let earliestScheduledStartAt = '';
   let anyScheduledPending = false;
+  let anyScheduledBreakActive = false;
+  let scheduledBreakTableCount = 0;
+  let earliestScheduledBreakUntilAt = '';
+  let nextScheduledBreakAfterHandNumber = 0;
+  let nextScheduledBreakLabel = '';
   let currentUserTableId = '';
   const tableIds = [];
   const navigableEntries = items.filter((entry) => !isSeriesClosedTable(entry?.table));
@@ -2266,6 +2438,19 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     if (summary?.scheduledStartPending) {
       anyScheduledPending = true;
     }
+    if (summary?.scheduledBreakActive) {
+      anyScheduledBreakActive = true;
+      scheduledBreakTableCount += 1;
+      if (summary?.scheduledBreakUntilAt && (!earliestScheduledBreakUntilAt || compareIsoAsc(summary.scheduledBreakUntilAt, earliestScheduledBreakUntilAt) < 0)) {
+        earliestScheduledBreakUntilAt = summary.scheduledBreakUntilAt;
+      }
+    }
+    if (Number(summary?.nextScheduledBreakAfterHandNumber || 0) > 0) {
+      if (!nextScheduledBreakAfterHandNumber || Number(summary.nextScheduledBreakAfterHandNumber) < nextScheduledBreakAfterHandNumber) {
+        nextScheduledBreakAfterHandNumber = Number(summary.nextScheduledBreakAfterHandNumber);
+        nextScheduledBreakLabel = normalizeTrimmedString(summary?.nextScheduledBreakLabel);
+      }
+    }
     if (summary?.lateRegistrationOpen && Number(summary?.openSeatCount || 0) > 0) {
       lateRegistrationOpen = true;
     }
@@ -2284,6 +2469,8 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     stage = 'cancelled';
   } else if (anyScheduledPending && liveTableCount === 0) {
     stage = 'scheduled';
+  } else if (anyScheduledBreakActive && liveTableCount === 0) {
+    stage = 'break';
   } else if (completedTableCount === tableCount && liveTableCount === 0 && !lateRegistrationOpen) {
     stage = 'completed';
   } else if (directorPolicy.needsRebalance && !lateRegistrationOpen) {
@@ -2320,6 +2507,11 @@ function buildPokerPlaySeriesSummary(entries, viewerWalletSubject = '') {
     lateRegistrationOpen,
     scheduledStartAt: earliestScheduledStartAt || null,
     scheduledStartPending: anyScheduledPending,
+    scheduledBreakActive: anyScheduledBreakActive,
+    scheduledBreakTableCount,
+    scheduledBreakUntilAt: earliestScheduledBreakUntilAt || null,
+    nextScheduledBreakAfterHandNumber,
+    nextScheduledBreakLabel: nextScheduledBreakLabel || null,
     stage,
     targetTableCount: directorPolicy.targetTableCount,
     needsRebalance: directorPolicy.needsRebalance,
@@ -4994,7 +5186,14 @@ function startNewTableHand(deps, table, seats, previousHand, atIso) {
   }
   nextSeats = deps.listPokerPlaySeatsByTable(table.tableId);
   nextSeats = applyDeferredCashLifecycleSeats(deps, table, nextSeats, atIso);
-  const nextHandNumber = previousHand ? Number(previousHand.handNumber || 0) + 1 : 1;
+  const previousHandNumber = previousHand
+    ? Number(previousHand.handNumber || 0)
+    : Math.max(
+      0,
+      Number(table?.state?.activeHandNumber || 0),
+      Number(table?.state?.lastSettledHandNumber || 0)
+    );
+  const nextHandNumber = Math.max(1, previousHandNumber + 1);
   let nextTable = table;
   if (normalizePokerPlayTableType(table?.tableType) === 'tournament') {
     const blindProgress = resolveTournamentBlindProgress(table, nextHandNumber);
@@ -5388,6 +5587,13 @@ function maybeClearReusableTournamentSeats(deps, table) {
       prizePoolOil: 0,
       payouts: [],
       standings: [],
+      completedScheduledBreakAfterHands: [],
+      scheduledBreakId: null,
+      scheduledBreakLabel: null,
+      scheduledBreakAfterHandNumber: 0,
+      scheduledBreakStartedAt: null,
+      scheduledBreakUntilAt: null,
+      scheduledBreakDurationMinutes: 0,
     },
   });
 }
@@ -6461,6 +6667,129 @@ function maybeActivateScheduledTournament(deps, table, seats, atIso) {
   };
 }
 
+function syncScheduledBreakState(deps, table, hand, atIso) {
+  if (normalizePokerPlayTableType(table?.tableType) !== 'tournament') {
+    return { table, hand, changed: false, active: false };
+  }
+  const state = table?.state && typeof table.state === 'object' ? table.state : {};
+  const activeBreak = getActiveScheduledBreakState(table);
+  if (activeBreak) {
+    const resumeHandId = normalizeTrimmedString(hand?.handId);
+    if (isScheduledBreakActive(table, atIso)) {
+      return { table, hand, changed: false, active: true };
+    }
+    const updatedTable = deps.upsertPokerPlayTable({
+      ...table,
+      state: {
+        ...state,
+        scheduledBreakId: null,
+        scheduledBreakLabel: null,
+        scheduledBreakAfterHandNumber: 0,
+        scheduledBreakStartedAt: null,
+        scheduledBreakUntilAt: null,
+        scheduledBreakDurationMinutes: 0,
+        lastScheduledBreakResumedAt: atIso,
+      },
+      updatedAt: atIso,
+    });
+    if (resumeHandId) {
+      deps.createPokerPlayMessage({
+        tableId: updatedTable.tableId,
+        handId: resumeHandId,
+        seatNumber: null,
+        authorRole: 'system',
+        body: `Scheduled break ended: ${activeBreak.label}.`,
+        createdAt: atIso,
+      });
+    }
+    if (typeof deps.createPokerPlayAuditEvent === 'function') {
+      deps.createPokerPlayAuditEvent({
+        tableId: updatedTable.tableId,
+        handId: null,
+        seatNumber: null,
+        actorRole: 'system',
+        eventKind: 'scheduled_break_ended',
+        payload: {
+          breakId: activeBreak.breakId,
+          label: activeBreak.label,
+          afterHandNumber: activeBreak.afterHandNumber,
+          durationMinutes: activeBreak.durationMinutes,
+          resumedAt: atIso,
+        },
+        createdAt: atIso,
+      });
+    }
+    return { table: updatedTable, hand, changed: true, active: false };
+  }
+  if (!hasPokerPlayTableStarted(table, hand)) {
+    return { table, hand, changed: false, active: false };
+  }
+  if (hand && hand.status === 'live') {
+    return { table, hand, changed: false, active: false };
+  }
+  if (isScheduledTournamentPending(table, atIso)) {
+    return { table, hand, changed: false, active: false };
+  }
+  const scheduledBreak = getTournamentScheduledBreaks(table).find((item) => (
+    !getCompletedScheduledBreakAfterHands(table).includes(item.afterHandNumber)
+      && item.afterHandNumber <= Math.max(0, normalizeOilAmount(table?.state?.lastSettledHandNumber, hand?.status === 'settled' ? hand.handNumber : 0))
+  )) || null;
+  if (!scheduledBreak) {
+    return { table, hand, changed: false, active: false };
+  }
+  const settledHandId = normalizeTrimmedString(state?.lastSettledHandId);
+  const persistedSettledHandId = settledHandId && typeof deps.getPokerPlayHandById === 'function' && deps.getPokerPlayHandById(settledHandId)
+    ? settledHandId
+    : null;
+  const breakStartHandId = normalizeTrimmedString(hand?.handId) || persistedSettledHandId || null;
+  const updatedTable = deps.upsertPokerPlayTable({
+    ...table,
+    state: {
+      ...state,
+      completedScheduledBreakAfterHands: normalizePositiveNumberList([
+        ...getCompletedScheduledBreakAfterHands(table),
+        scheduledBreak.afterHandNumber,
+      ]),
+      scheduledBreakId: scheduledBreak.breakId,
+      scheduledBreakLabel: scheduledBreak.label,
+      scheduledBreakAfterHandNumber: scheduledBreak.afterHandNumber,
+      scheduledBreakStartedAt: atIso,
+      scheduledBreakUntilAt: addMinutesToIso(atIso, scheduledBreak.durationMinutes),
+      scheduledBreakDurationMinutes: scheduledBreak.durationMinutes,
+    },
+    updatedAt: atIso,
+  });
+  if (breakStartHandId) {
+    deps.createPokerPlayMessage({
+      tableId: updatedTable.tableId,
+      handId: breakStartHandId,
+      seatNumber: null,
+      authorRole: 'system',
+      body: `Scheduled break started: ${scheduledBreak.label}.`,
+      createdAt: atIso,
+    });
+  }
+  if (typeof deps.createPokerPlayAuditEvent === 'function') {
+    deps.createPokerPlayAuditEvent({
+      tableId: updatedTable.tableId,
+      handId: breakStartHandId,
+      seatNumber: null,
+      actorRole: 'system',
+      eventKind: 'scheduled_break_started',
+      payload: {
+        breakId: scheduledBreak.breakId,
+        label: scheduledBreak.label,
+        afterHandNumber: scheduledBreak.afterHandNumber,
+        durationMinutes: scheduledBreak.durationMinutes,
+        startedAt: atIso,
+        untilAt: addMinutesToIso(atIso, scheduledBreak.durationMinutes),
+      },
+      createdAt: atIso,
+    });
+  }
+  return { table: updatedTable, hand, changed: true, active: true };
+}
+
 function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   let table = deps.getPokerPlayTableById(tableId);
   if (!table) return null;
@@ -6483,6 +6812,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
   table = waitlistPromotion.table;
   seats = waitlistPromotion.seats;
   if (isScheduledTournamentPending(table, atIso)) {
+    return { table, seats, hand };
+  }
+  let scheduledBreakState = syncScheduledBreakState(deps, table, hand, atIso);
+  table = scheduledBreakState.table;
+  hand = scheduledBreakState.hand;
+  if (scheduledBreakState.active) {
     return { table, seats, hand };
   }
   let safety = 0;
@@ -6664,6 +6999,7 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
         lastButtonSeat: normalizeSeatNumber(hand?.state?.buttonSeat) || normalizeSeatNumber(table?.state?.lastButtonSeat),
         lastSettledAt: atIso,
         lastSettledHandId: hand.handId,
+        lastSettledHandNumber: Number(hand?.handNumber || 0),
       };
       table = deps.upsertPokerPlayTable({
         ...table,
@@ -6683,6 +7019,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
         hand = seriesRebalance.hand;
         if (seriesRebalance.closed) break;
       }
+
+      scheduledBreakState = syncScheduledBreakState(deps, table, hand, atIso);
+      table = scheduledBreakState.table;
+      hand = scheduledBreakState.hand;
+      if (scheduledBreakState.active) break;
+      if (scheduledBreakState.changed) continue;
 
       const readySeats = getActiveSeatRows(seats);
       if (readySeats.length >= getPokerPlayAutoStartSeatTarget(table, hand)) {
@@ -6706,6 +7048,12 @@ function syncPokerPlayTable(deps, tableId, { processAt } = {}) {
         if (seriesRebalance.closed) break;
       }
     }
+
+    scheduledBreakState = syncScheduledBreakState(deps, table, hand, atIso);
+    table = scheduledBreakState.table;
+    hand = scheduledBreakState.hand;
+    if (scheduledBreakState.active) break;
+    if (scheduledBreakState.changed) continue;
 
     if ((!hand || hand.status !== 'live') && getActiveSeatRows(seats).length >= getPokerPlayAutoStartSeatTarget(table, hand)) {
       const started = startNewTableHand(deps, table, seats, hand, atIso);
@@ -6955,6 +7303,162 @@ function buildPokerPlayLobbyPayload(deps, { session, req, processAt, publicViewe
   };
 }
 
+function buildPokerPlaySchedulePayload(deps, { session, req, processAt, publicViewer = false, days = 7 } = {}) {
+  const requestAt = toProcessIso(deps, processAt);
+  const walletBinding = (!publicViewer && session) ? deps.resolvePrimaryWalletSubject(session, req) : null;
+  const viewerHouseId = (!publicViewer && session) ? getSessionHouseId(session) : '';
+  const oilBalance = walletBinding?.walletSubject ? deps.computeOilBalance(walletBinding.walletSubject) : null;
+  const windowEndAt = addHoursToIso(requestAt, Math.max(1, normalizeOilAmount(days, 7)) * 24);
+  const items = deps.listPokerPlayTables()
+    .map((table) => syncPokerPlayTable(deps, table.tableId, { processAt: requestAt }))
+    .filter((entry) => normalizePokerPlayTableType(entry?.table?.tableType) === 'tournament')
+    .filter((entry) => !!getTournamentScheduledStartAt(entry?.table))
+    .map((entry) => {
+      const viewerSeat = walletBinding?.walletSubject
+        ? deps.getPokerPlaySeatByWalletSubject(entry.table.tableId, walletBinding.walletSubject)
+        : null;
+      const inviteAuthorization = resolvePokerPlayInviteAuthorization(entry.table, {
+        walletSubject: walletBinding?.walletSubject || '',
+        houseId: viewerHouseId,
+        viewerSeat,
+        inviteCode: parsePokerPlayInviteCode(req),
+      });
+      const summary = computeTableSummary(entry.table, entry.seats, entry.hand, viewerSeat);
+      const waitlistEntries = listTableWaitlistEntries(deps, entry.table, { status: 'waiting' });
+      const waitlist = buildWaitlistSummary(waitlistEntries, walletBinding?.walletSubject || '');
+      const scheduleTemplate = getTournamentScheduleTemplate(entry.table);
+      return {
+        ...entry,
+        viewerSeat,
+        inviteAuthorization,
+        summary: {
+          ...summary,
+          waitlistCount: Number(waitlist?.count || 0),
+          viewerWaitlistPosition: waitlist?.viewerPosition ?? null,
+        },
+        waitlist,
+        scheduleTemplate,
+      };
+    })
+    .filter((entry) => !entry?.inviteAuthorization?.access?.inviteOnly || !!entry?.inviteAuthorization?.bySeat || !!entry?.inviteAuthorization?.byCreator)
+    .filter((entry) => {
+      const scheduledStartAt = getTournamentScheduledStartAt(entry?.table);
+      return !!scheduledStartAt
+        && compareIsoAsc(scheduledStartAt, windowEndAt) <= 0
+        && (
+          compareIsoAsc(scheduledStartAt, requestAt) >= 0
+            || !!entry?.summary?.lateRegistrationOpen
+            || !!entry?.summary?.scheduledBreakActive
+            || !!entry?.summary?.liveHand
+        );
+    })
+    .sort((left, right) => {
+      const startDelta = compareIsoAsc(getTournamentScheduledStartAt(left?.table), getTournamentScheduledStartAt(right?.table));
+      if (startDelta !== 0) return startDelta;
+      return String(left?.table?.title || '').localeCompare(String(right?.table?.title || ''));
+    })
+    .map((entry) => {
+      const scheduledStartAt = getTournamentScheduledStartAt(entry.table);
+      const seriesRef = getTournamentSeriesRef(entry.table);
+      const viewerRegistered = !!entry.viewerSeat;
+      const viewerWaitlisted = !!entry.waitlist?.viewerQueued;
+      const registrationOpen = !!entry.summary?.scheduledStartPending || !entry.summary?.liveHand || !!entry.summary?.lateRegistrationOpen;
+      let registrationStatus = 'closed';
+      if (viewerRegistered) registrationStatus = 'registered';
+      else if (viewerWaitlisted) registrationStatus = 'waitlisted';
+      else if (registrationOpen && Number(entry.summary?.openSeatCount || 0) > 0) registrationStatus = 'open';
+      else if (registrationOpen) registrationStatus = 'waitlist';
+      const nextBreakAfterHandNumber = Number(entry.summary?.nextScheduledBreakAfterHandNumber || 0);
+      return {
+        tableId: String(entry.table.tableId || ''),
+        title: String(entry.table.title || 'Tournament'),
+        tableStatus: String(entry.table.status || 'open'),
+        seriesId: seriesRef.seriesId || null,
+        seriesTitle: seriesRef.seriesTitle || null,
+        scheduledStartAt,
+        day: scheduledStartAt.slice(0, 10),
+        openSeatCount: Number(entry.summary?.openSeatCount || 0),
+        waitlistCount: Number(entry.summary?.waitlistCount || 0),
+        entryCount: Number(entry.summary?.entryCount || 0),
+        registrationStatus,
+        registrationOpen,
+        viewerRegistered,
+        viewerWaitlisted,
+        lateRegistrationOpen: !!entry.summary?.lateRegistrationOpen,
+        scheduleTemplateId: entry.scheduleTemplate?.templateId || null,
+        scheduleTemplateTitle: entry.scheduleTemplate?.title || null,
+        scheduleRecurrenceLabel: entry.scheduleTemplate?.recurrenceLabel || null,
+        scheduledBreakCount: Number(entry.summary?.scheduledBreakCount || 0),
+        scheduledBreakActive: !!entry.summary?.scheduledBreakActive,
+        scheduledBreakUntilAt: entry.summary?.scheduledBreakUntilAt || null,
+        nextScheduledBreakAfterHandNumber: nextBreakAfterHandNumber,
+        nextScheduledBreakLabel: entry.summary?.nextScheduledBreakLabel || null,
+        links: {
+          table: `/poker/play/tables/${encodeURIComponent(entry.table.tableId)}`,
+          timeline: seriesRef.seriesId ? `/poker/play/series/${encodeURIComponent(seriesRef.seriesId)}/timeline` : null,
+        },
+      };
+    });
+
+  const templates = Array.from(items.reduce((map, item) => {
+    const templateId = normalizePokerPlayScheduleTemplateId(item?.scheduleTemplateId);
+    if (!templateId) return map;
+    const existing = map.get(templateId) || {
+      templateId,
+      title: normalizePokerPlayScheduleTemplateTitle(item?.scheduleTemplateTitle, item?.title),
+      recurrenceLabel: normalizePokerPlayScheduleRecurrenceLabel(item?.scheduleRecurrenceLabel),
+      upcomingCount: 0,
+      nextStartAt: null,
+      eventTableIds: [],
+    };
+    existing.upcomingCount += 1;
+    existing.eventTableIds.push(String(item?.tableId || ''));
+    if (!existing.nextStartAt || compareIsoAsc(item?.scheduledStartAt, existing.nextStartAt) < 0) {
+      existing.nextStartAt = item?.scheduledStartAt || null;
+    }
+    map.set(templateId, existing);
+    return map;
+  }, new Map()).values())
+    .sort((left, right) => {
+      const nextDelta = compareIsoAsc(left?.nextStartAt, right?.nextStartAt);
+      if (nextDelta !== 0) return nextDelta;
+      return String(left?.title || '').localeCompare(String(right?.title || ''));
+    });
+
+  const dayMap = new Map();
+  for (const item of items) {
+    if (!dayMap.has(item.day)) {
+      dayMap.set(item.day, []);
+    }
+    dayMap.get(item.day).push(item);
+  }
+  const scheduleDays = Array.from(dayMap.entries())
+    .sort((left, right) => compareIsoAsc(left[0], right[0]))
+    .map(([day, dayItems]) => ({
+      day,
+      eventCount: dayItems.length,
+      items: dayItems,
+    }));
+
+  return {
+    viewerMode: publicViewer ? 'public' : 'player',
+    houseId: publicViewer ? null : viewerHouseId,
+    wallet: walletBinding?.submitterWallet || null,
+    oilBalance,
+    summary: {
+      dayCount: scheduleDays.length,
+      templateCount: templates.length,
+      eventCount: items.length,
+      registeredCount: items.filter((item) => item.viewerRegistered).length,
+      waitlistedCount: items.filter((item) => item.viewerWaitlisted).length,
+      nextStartAt: items[0]?.scheduledStartAt || null,
+    },
+    templates,
+    days: scheduleDays,
+    processAt: requestAt,
+  };
+}
+
 function requireSeatWriter(deps, { table, session, req }) {
   const walletBinding = deps.resolvePrimaryWalletSubject(session, req);
   if (!walletBinding?.walletSubject) {
@@ -7003,6 +7507,13 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       entryCount: 0,
       reentryCount: 0,
       entryCountsByWallet: {},
+      completedScheduledBreakAfterHands: [],
+      scheduledBreakId: null,
+      scheduledBreakLabel: null,
+      scheduledBreakAfterHandNumber: 0,
+      scheduledBreakStartedAt: null,
+      scheduledBreakUntilAt: null,
+      scheduledBreakDurationMinutes: 0,
       registrationClosedByDirectorAt: null,
       timeBankRemainingBySeat: {},
       accessMode,
@@ -7026,9 +7537,13 @@ function createDynamicTable(deps, config, { createdAt } = {}) {
       lateRegistrationHands: normalized.tableType === 'tournament' ? normalized.lateRegistrationHands : 0,
       handsPerBlindLevel: normalized.tableType === 'tournament' ? normalized.handsPerBlindLevel : 0,
       blindLevels: normalized.tableType === 'tournament' ? normalized.blindLevels : [],
+      scheduledBreaks: normalized.tableType === 'tournament' ? normalized.scheduledBreaks : [],
       scheduledStartAt: normalized.tableType === 'tournament' ? (scheduledStartAt || null) : null,
       reentryLimit: normalized.tableType === 'tournament' ? normalized.reentryLimit : 0,
       startTargetSeats: normalized.tableType === 'tournament' ? normalized.startTargetSeats : normalized.minPlayers,
+      scheduleTemplateId: normalized.tableType === 'tournament' ? (normalized.scheduleTemplateId || null) : null,
+      scheduleTemplateTitle: normalized.tableType === 'tournament' ? (normalized.scheduleTemplateTitle || null) : null,
+      scheduleRecurrenceLabel: normalized.tableType === 'tournament' ? (normalized.scheduleRecurrenceLabel || null) : null,
       seriesId: normalized.tableType === 'tournament'
         ? normalizeTrimmedString(normalized.seriesId, `pkseries_${deps.randomHex(8)}`)
         : '',
@@ -9168,6 +9683,7 @@ module.exports = {
   buildPokerPlayAdminSeriesExportPayload,
   buildPokerPlayAdminSeriesReviewPayload,
   buildPokerPlayLobbyPayload,
+  buildPokerPlaySchedulePayload,
   buildPokerPlayTablePayload,
   POKER_PLAY_ROOM_TREASURY_WALLET_SUBJECT,
   breakTournamentSeriesTableByDirector,

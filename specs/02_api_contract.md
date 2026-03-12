@@ -454,6 +454,56 @@ Policy notes:
 - `remainingDailySpendOil = null` means the wallet currently has no daily spend cap configured
 - `todaySpendOil` is computed from the current UTC-day debit window across live-poker buy-ins, waitlist reservations that promote, and reloads
 
+### GET `/api/poker/play/schedule`
+Returns the scheduled tournament calendar and recurring template lobby with:
+- `data.viewerMode = "player"`
+- `data.houseId`
+- `data.wallet`
+- `data.oilBalance`
+- `data.summary.dayCount`
+- `data.summary.templateCount`
+- `data.summary.eventCount`
+- `data.summary.registeredCount`
+- `data.summary.waitlistedCount`
+- `data.summary.nextStartAt`
+- `data.templates[]`
+- `data.templates[].templateId`
+- `data.templates[].title`
+- `data.templates[].recurrenceLabel`
+- `data.templates[].upcomingCount`
+- `data.templates[].nextStartAt`
+- `data.days[]`
+- `data.days[].day` as `YYYY-MM-DD`
+- `data.days[].eventCount`
+- `data.days[].items[]`
+- `data.days[].items[].tableId`
+- `data.days[].items[].title`
+- `data.days[].items[].tableStatus`
+- `data.days[].items[].seriesId`
+- `data.days[].items[].seriesTitle`
+- `data.days[].items[].scheduledStartAt`
+- `data.days[].items[].registrationStatus`
+- `data.days[].items[].openSeatCount`
+- `data.days[].items[].waitlistCount`
+- `data.days[].items[].entryCount`
+- `data.days[].items[].scheduleTemplateId`
+- `data.days[].items[].scheduleTemplateTitle`
+- `data.days[].items[].scheduleRecurrenceLabel`
+- `data.days[].items[].scheduledBreakCount`
+- `data.days[].items[].scheduledBreakActive`
+- `data.days[].items[].scheduledBreakUntilAt`
+- `data.days[].items[].nextScheduledBreakAfterHandNumber`
+- `data.days[].items[].nextScheduledBreakLabel`
+- `data.days[].items[].links.table`
+- `data.days[].items[].links.timeline`
+
+Schedule notes:
+- only tournament tables with a durable `scheduledStartAt` appear in this feed
+- invite-only scheduled tournaments are only visible to their creator or an already-authorized seat
+- `registrationStatus` is `registered`, `waitlisted`, `open`, `waitlist`, or `closed`
+- scheduled-break metadata is surfaced here so the calendar can preview break cadence before an event starts
+- query param `days=<n>` narrows or widens the forward calendar window; `asOf=<iso>` remains deterministic for test-mode reads
+
 ### GET `/api/poker/play/policy`
 Returns the authenticated wallet's current live-poker responsible-gaming policy summary.
 
@@ -968,6 +1018,13 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.entryCount`
 - tournaments expose `data.table.summary.reentryLimit`
 - tournaments expose `data.table.summary.acceptedReentryCount`
+- tournaments expose `data.table.summary.scheduledBreakCount`
+- tournaments expose `data.table.summary.scheduledBreakActive`
+- tournaments expose `data.table.summary.scheduledBreakLabel`
+- tournaments expose `data.table.summary.scheduledBreakUntilAt`
+- tournaments expose `data.table.summary.completedScheduledBreakCount`
+- tournaments expose `data.table.summary.nextScheduledBreakAfterHandNumber`
+- tournaments expose `data.table.summary.nextScheduledBreakLabel`
 - tournaments expose `data.table.summary.registrationClosedByDirectorAt`
 - tournaments expose `data.table.summary.prizePoolOil`
 - tournaments expose `data.table.summary.paidPlaces`
@@ -982,6 +1039,8 @@ Tournament blind progression notes:
 - `data.series.needsRebalance` flips on when the active series still needs table-break or seat-balancing work
 - `data.series.pendingBreakTableId` is populated when one specific overflow table is the next break candidate
 - `data.series.scheduledStartAt` exposes the earliest durable start timestamp in a scheduled series
+- `data.series.scheduledBreakActive`, `data.series.scheduledBreakTableCount`, and `data.series.scheduledBreakUntilAt` expose currently active scheduled-break state across the series
+- `data.series.nextScheduledBreakAfterHandNumber` and `data.series.nextScheduledBreakLabel` expose the next configured scheduled break across the active field
 - `data.series.entryCount` exposes the total counted tournament entries, including accepted re-entries
 - `data.series.uniquePlayerCount` exposes the distinct wallet count across those entries
 - `data.series.acceptedReentryCount` exposes the counted re-entry total
@@ -1003,6 +1062,8 @@ Tournament registration notes:
 - a seat that joins during a live hand returns `data.mySeat.status = "registered"` and does not receive current-hand cards or action controls until the next hand begins
 - tournaments may remain in `data.table.status = "scheduled"` until `data.table.summary.scheduledStartAt`
 - once the scheduled start time arrives, the table becomes `open` and can start a live hand immediately if enough seats are ready
+- scheduled breaks only begin between hands and only after the configured `afterHandNumber` threshold settles
+- while a scheduled break is active, `data.table.summary.scheduledBreakActive = true` and the next automatic hand waits until `data.table.summary.scheduledBreakUntilAt`
 - tournament series may allow one or more explicit re-entries; accepted re-entries increase `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
 - tournament settlement is offchain in the OIL ledger and can pay multiple places from the same prize pool
 - once the next hand starts, the registered seat becomes active automatically

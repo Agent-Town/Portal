@@ -185,6 +185,10 @@
     return buildPokerApiPath('/api/poker/play/admin/ops');
   }
 
+  function buildPlayScheduleApiPath() {
+    return buildPokerApiPath('/api/poker/play/schedule');
+  }
+
   function readWalletRecoveryKey() {
     try {
       return String(window.localStorage.getItem('agentTown:walletRecoveryKey') || '').trim();
@@ -1401,6 +1405,7 @@
         <h2>Quick Seat</h2>
         <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a sit-and-go that waits for either a full table or a configured start target, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play/schedule'))}">Tournament Schedule</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Open Public Rail</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
@@ -1544,6 +1549,85 @@
     bindPlayPolicyForm();
     bindPlayMatchmakeForm();
     setStatus(items.length ? `${items.length} live poker table${items.length === 1 ? '' : 's'} loaded.` : 'No live poker table available.');
+  }
+
+  async function loadPlaySchedule() {
+    clearLiveTableStream();
+    setTitle('Tournament Schedule', 'Recurring events, registration windows, and scheduled player breaks.');
+    setStatus('Loading tournament schedule...');
+    const payload = await api(buildPlayScheduleApiPath());
+    const data = payload?.data || {};
+    const summary = data?.summary || {};
+    const templates = Array.isArray(data?.templates) ? data.templates : [];
+    const days = Array.isArray(data?.days) ? data.days : [];
+    const cards = [
+      `
+        <h2>Schedule Snapshot</h2>
+        <div class="pokerSummary">
+          ${renderSummaryMetric('House', data?.houseId || 'Pending')}
+          ${renderSummaryMetric('Wallet', data?.wallet?.address || 'Bind wallet')}
+          ${renderSummaryMetric('Templates', `${Number(summary?.templateCount || 0)}`)}
+          ${renderSummaryMetric('Upcoming Events', `${Number(summary?.eventCount || 0)}`)}
+          ${renderSummaryMetric('Registered', `${Number(summary?.registeredCount || 0)}`)}
+          ${renderSummaryMetric('Waitlisted', `${Number(summary?.waitlistedCount || 0)}`)}
+        </div>
+        <div class="pokerLinks">
+          <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
+          <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+        </div>
+      `,
+      templates.length
+        ? `
+          <h2>Recurring Templates</h2>
+          <div class="pokerStack">
+            ${templates.map((item) => `
+              <div class="pokerMessage">
+                <div class="pokerLabel">${escapeHtml(item?.title || 'Tournament Template')}</div>
+                <div>${escapeHtml(item?.recurrenceLabel || 'Ad hoc schedule')}</div>
+                <div>${Number(item?.upcomingCount || 0)} upcoming event${Number(item?.upcomingCount || 0) === 1 ? '' : 's'}</div>
+                <div class="pokerLabel">${item?.nextStartAt ? `Next start ${escapeHtml(formatIso(item.nextStartAt))}` : 'No next start yet.'}</div>
+              </div>
+            `).join('')}
+          </div>
+        `
+        : '<h2>Recurring Templates</h2><p>No recurring tournament templates are scheduled yet.</p>',
+    ];
+    for (const day of days) {
+      const items = Array.isArray(day?.items) ? day.items : [];
+      cards.push(`
+        <h2>${escapeHtml(day?.day || 'Upcoming')}</h2>
+        <div class="pokerStack">
+          ${items.map((item) => `
+            <div class="pokerMessage">
+              <div class="pokerLabel">${escapeHtml(item?.title || 'Tournament')}</div>
+              <div>${escapeHtml(formatIso(item?.scheduledStartAt))}</div>
+              ${renderMetaBadges([
+                String(item?.registrationStatus || 'closed'),
+                item?.scheduleRecurrenceLabel || '',
+                Number(item?.scheduledBreakCount || 0) > 0 ? `${Number(item?.scheduledBreakCount || 0)} break${Number(item?.scheduledBreakCount || 0) === 1 ? '' : 's'}` : '',
+              ].filter(Boolean))}
+              <div class="pokerSummary">
+                ${renderSummaryMetric('Entries', `${Number(item?.entryCount || 0)}`)}
+                ${renderSummaryMetric('Open Seats', `${Number(item?.openSeatCount || 0)}`)}
+                ${renderSummaryMetric('Waitlist', `${Number(item?.waitlistCount || 0)}`)}
+                ${Number(item?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(item?.nextScheduledBreakLabel || 'Break')} after hand ${Number(item?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref(item?.links?.table || '/poker/play'))}">Open Lobby Table</a>
+                ${item?.links?.timeline ? `<a href="${escapeHtml(buildPokerHref(item.links.timeline))}">Series Timeline</a>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `);
+    }
+    if (!days.length) {
+      cards.push('<h2>No Scheduled Events</h2><p>No tournament events are scheduled in the current calendar window.</p>');
+    }
+    renderCards(cards);
+    setStatus(Number(summary?.eventCount || 0) > 0
+      ? `${Number(summary?.eventCount || 0)} scheduled tournament event${Number(summary?.eventCount || 0) === 1 ? '' : 's'} loaded.`
+      : 'No tournament events are scheduled right now.');
   }
 
   async function loadPlayRailLobby() {
@@ -2378,6 +2462,7 @@
     const publicRail = viewerMode === 'public';
     const paused = String(table?.status || 'open') === 'paused';
     const adminClosed = String(table?.status || '').toLowerCase() === 'admin_closed';
+    const scheduledBreakActive = !!table?.summary?.scheduledBreakActive;
     const tableOpen = String(table?.status || 'open') === 'open';
     const registrationOpen = tableOpen || (table?.tableType === 'tournament' && String(table?.status || '') === 'scheduled');
     const sitAndGoWaiting = table?.tableType === 'tournament'
@@ -2406,6 +2491,8 @@
             ? (table?.state?.closeReason || 'Table closed by operator.')
             : paused
             ? (table?.state?.pausedReason ? `Table paused: ${table.state.pausedReason}` : 'Table paused by operator.')
+            : scheduledBreakActive
+            ? `${String(table?.summary?.scheduledBreakLabel || 'Scheduled break')} is active until ${formatIso(table?.summary?.scheduledBreakUntilAt)}.`
             : sitAndGoWaiting
             ? `Sit-and-go is waiting for ${Number(table?.summary?.seatsUntilStart || 0)} more seat${Number(table?.summary?.seatsUntilStart || 0) === 1 ? '' : 's'} before hand 1 starts.`
             : (table?.summary?.completedAt ? 'Previous cycle complete. Seats can rotate back in for the next match.' : (table?.summary?.liveHand ? 'A live hand is in progress.' : 'Waiting for enough players to post blinds.'))
@@ -2427,6 +2514,9 @@
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg', table?.summary?.lateRegistrationOpen ? 'open' : 'closed') : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Late Reg Hands', `${Number(table?.summary?.lateRegistrationRemainingHands || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Entries', `${Number(table?.summary?.entryCount || 0)}`) : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.scheduledBreakCount || 0) > 0 ? renderSummaryMetric('Breaks', `${Number(table?.summary?.completedScheduledBreakCount || 0)}/${Number(table?.summary?.scheduledBreakCount || 0)}`) : ''}
+          ${table?.tableType === 'tournament' && scheduledBreakActive ? renderSummaryMetric('Break Until', formatIso(table?.summary?.scheduledBreakUntilAt)) : ''}
+          ${table?.tableType === 'tournament' && Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(table?.summary?.nextScheduledBreakLabel || 'Break')} after hand ${Number(table?.summary?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
           ${table?.tableType === 'tournament' ? renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(table?.summary?.bountyModel)) : ''}
           ${table?.tableType === 'tournament' && Number(table?.summary?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(table?.summary?.bountyPerEntryOil || 0)} OIL`) : ''}
           ${table?.tableType === 'tournament' && Number(table?.summary?.reentryLimit || 0) > 0 ? renderSummaryMetric('Re-Entry', `${Number(table?.summary?.acceptedReentryCount || 0)}/${Number(table?.summary?.reentryLimit || 0)}`) : ''}
@@ -2445,6 +2535,7 @@
           table?.tableType === 'tournament' && !table?.summary?.liveHand && Number(table?.summary?.seatsUntilStart || 0) > 0
             ? `${Number(table?.summary?.seatsUntilStart || 0)} to start`
             : '',
+          table?.tableType === 'tournament' && scheduledBreakActive ? 'scheduled break active' : '',
           table?.tableType === 'tournament' && String(table?.summary?.bountyModel || '') === 'pko_50'
             ? formatTournamentBountyModelLabel(table?.summary?.bountyModel)
             : '',
@@ -2605,6 +2696,7 @@
         </div>
         ${String(mySeat.status || '').toLowerCase() === 'registered' ? '<p>Your buy-in is posted. You are registered for the next hand and can use the seat thread before cards are dealt to you.</p>' : ''}
         ${table?.tableType === 'tournament' && String(mySeat.status || '').toLowerCase() === 'busted' && Number(table?.summary?.reentryLimit || 0) > 0 ? '<p>Your last tournament entry busted. Re-entry stays available until late registration closes or the table schedule locks.</p>' : ''}
+        ${table?.tableType === 'tournament' && scheduledBreakActive ? `<p>Scheduled break: ${escapeHtml(String(table?.summary?.scheduledBreakLabel || 'Break'))} until ${escapeHtml(formatIso(table?.summary?.scheduledBreakUntilAt))}.</p>` : ''}
         ${leaveQueued ? '<p>Your cash-out is queued. You stay in this hand, then your remaining stack returns to OIL automatically.</p>' : ''}
         ${seatSittingOut ? '<p>Your seat is marked to sit out. You keep the same wallet-bound seat and can return without rebuying.</p>' : ''}
         ${seatAway ? '<p>Your seat is marked away. The wallet-bound seat stays yours until you return or cash out.</p>' : ''}
@@ -2734,6 +2826,9 @@
           ${renderSummaryMetric('Stage', series?.stage || 'seating')}
           ${renderSummaryMetric('Break Pending', series?.needsRebalance ? 'yes' : 'no')}
           ${series?.scheduledStartAt ? renderSummaryMetric('Scheduled Start', formatIso(series?.scheduledStartAt)) : ''}
+          ${series?.scheduledBreakActive ? renderSummaryMetric('Break Until', formatIso(series?.scheduledBreakUntilAt)) : ''}
+          ${Number(series?.scheduledBreakTableCount || 0) > 0 ? renderSummaryMetric('Break Tables', `${Number(series?.scheduledBreakTableCount || 0)}`) : ''}
+          ${Number(series?.nextScheduledBreakAfterHandNumber || 0) > 0 ? renderSummaryMetric('Next Break', `${String(series?.nextScheduledBreakLabel || 'Break')} after hand ${Number(series?.nextScheduledBreakAfterHandNumber || 0)}`) : ''}
           ${renderSummaryMetric('Entries', `${Number(series?.entryCount || 0)}`)}
           ${renderSummaryMetric('Bounty Mode', formatTournamentBountyModelLabel(series?.bountyModel))}
           ${Number(series?.bountyPerEntryOil || 0) > 0 ? renderSummaryMetric('Starting Bounty', `${Number(series?.bountyPerEntryOil || 0)} OIL`) : ''}
@@ -2745,6 +2840,7 @@
           ${Number(series?.refundedTotalOil || 0) > 0 ? renderSummaryMetric('Refunded', `${Number(series?.refundedTotalOil || 0)} OIL`) : ''}
         </div>
         ${renderSeriesClosureNotice(series)}
+        ${series?.scheduledBreakActive ? `<p>Scheduled break is active across ${Number(series?.scheduledBreakTableCount || 0)} table${Number(series?.scheduledBreakTableCount || 0) === 1 ? '' : 's'} until ${escapeHtml(formatIso(series?.scheduledBreakUntilAt))}.</p>` : ''}
         ${String(series?.stage || '') === 'cancelled'
           ? '<p>No active tables remain in this series. Operator review and export stay available on the closed table records.</p>'
           : series?.pendingBreakTableId
@@ -4288,6 +4384,7 @@
       }
       if (path === '/poker') return await loadIndex();
       if (path === '/poker/play') return await loadPlayLobby();
+      if (path === '/poker/play/schedule') return await loadPlaySchedule();
       if (path === '/poker/play/admin/ops') return await loadPlayOpsDashboard();
       if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
       if (path === '/poker/play/results') return await loadPlayResults();
