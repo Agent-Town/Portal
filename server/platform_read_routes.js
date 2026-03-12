@@ -1203,6 +1203,15 @@ function registerPlatformReadRoutes(app, deps) {
     return '';
   }
 
+  function normalizeLibraryPublicStackDiscoveryLane(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'ready_here') return 'ready_here';
+    if (normalized === 'check_here') return 'check_here';
+    if (normalized === 'attested_elsewhere') return 'attested_elsewhere';
+    if (normalized === 'imported_here') return 'imported_here';
+    return '';
+  }
+
   function buildLibraryPublicStackReviewSummary({
     reviewTier = '',
     note = '',
@@ -1233,6 +1242,100 @@ function registerPlatformReadRoutes(app, deps) {
       prefix = 'Reported for later review in this House.';
     }
     return normalizedNote ? `${prefix} Note: ${normalizedNote}` : prefix;
+  }
+
+  function buildLibraryPublicStackDiscoveryProjection({
+    preview = null,
+    targetHouseId = '',
+  } = {}) {
+    const normalizedTargetHouseId = String(targetHouseId || '').trim();
+    if (!preview || typeof preview !== 'object') {
+      return {
+        discoveryLane: 'check_here',
+        discoveryReason: 'Needs a local check in this House.',
+      };
+    }
+    const reviewTier = String(preview?.reviewTier || preview?.review?.reviewTier || '').trim();
+    const safetyState = String(preview?.safetyState || preview?.safety?.safetyState || '').trim();
+    const verificationState = String(preview?.verificationState || preview?.verification?.verificationState || '').trim();
+    const importedHere = preview?.alreadyImportedAll === true || !!preview?.localScopeSet;
+    const otherHouseAttestations = Array.isArray(preview?.attestations)
+      ? preview.attestations.filter((entry) => String(entry?.houseId || '').trim() && String(entry?.houseId || '').trim() !== normalizedTargetHouseId)
+      : [];
+    if (importedHere) {
+      return {
+        discoveryLane: 'imported_here',
+        discoveryReason: `Already in your Library as Satchel ${String(preview?.localScopeSet?.title || preview?.displayName || 'Imported Public Stack').trim() || 'Imported Public Stack'}.`,
+      };
+    }
+    if (verificationState === 'verified') {
+      return {
+        discoveryLane: 'ready_here',
+        discoveryReason: 'Verified here in this House.',
+      };
+    }
+    if (reviewTier === 'trusted_here') {
+      return {
+        discoveryLane: 'ready_here',
+        discoveryReason: 'Trusted here in this House.',
+      };
+    }
+    if (otherHouseAttestations.length > 0) {
+      return {
+        discoveryLane: 'attested_elsewhere',
+        discoveryReason: 'Attested by other Houses.',
+      };
+    }
+    if (safetyState === 'hidden_here') {
+      return {
+        discoveryLane: 'check_here',
+        discoveryReason: 'Hidden in this House.',
+      };
+    }
+    if (safetyState === 'reported_here') {
+      return {
+        discoveryLane: 'check_here',
+        discoveryReason: 'Reported for later review in this House.',
+      };
+    }
+    if (reviewTier === 'blocked_here') {
+      return {
+        discoveryLane: 'check_here',
+        discoveryReason: 'Blocked here in this House.',
+      };
+    }
+    if (reviewTier === 'review_later') {
+      return {
+        discoveryLane: 'check_here',
+        discoveryReason: 'Saved for later review in this House.',
+      };
+    }
+    return {
+      discoveryLane: 'check_here',
+      discoveryReason: 'Needs a local check in this House.',
+    };
+  }
+
+  function buildLibraryPublicStackDiscoveryCounts(rows = []) {
+    const counts = {
+      readyHere: 0,
+      checkHere: 0,
+      attestedElsewhere: 0,
+      importedHere: 0,
+    };
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      const lane = normalizeLibraryPublicStackDiscoveryLane(row?.discovery?.discoveryLane || row?.discoveryLane);
+      if (lane === 'ready_here') {
+        counts.readyHere += 1;
+      } else if (lane === 'attested_elsewhere') {
+        counts.attestedElsewhere += 1;
+      } else if (lane === 'imported_here') {
+        counts.importedHere += 1;
+      } else {
+        counts.checkHere += 1;
+      }
+    });
+    return counts;
   }
 
   function buildLibraryPublicStackAttestationSummary({
@@ -1655,6 +1758,7 @@ function registerPlatformReadRoutes(app, deps) {
     trust = '',
     seal = '',
     safety = '',
+    discovery = '',
   } = {}) {
     const normalizedFamily = String(family || '').trim();
     if (normalizedFamily && normalizedFamily !== 'house_library_stacks') {
@@ -1664,6 +1768,7 @@ function registerPlatformReadRoutes(app, deps) {
     const normalizedTrust = normalizeLibraryPublicStackReviewTier(trust);
     const normalizedSeal = normalizeLibraryPublicStackSealFilter(seal);
     const normalizedSafety = normalizeLibraryPublicStackSafetyFilter(safety);
+    const normalizedDiscovery = normalizeLibraryPublicStackDiscoveryLane(discovery);
     const stacks = listLibraryPublicStacks({})
       .filter((entry) => String(entry?.publicationState || '').trim() === 'published')
       .filter((entry) => {
@@ -1677,31 +1782,65 @@ function registerPlatformReadRoutes(app, deps) {
         return haystack.includes(normalizedQuery);
       })
       .map((entry) => {
-        const localReview = projectLibraryPublicStackLocalReview({
+        const previewPayload = buildLibraryPublicStackPreviewPayload({
           houseId,
           teamId,
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
-        const localSafety = projectLibraryPublicStackLocalSafety({
-          houseId,
-          teamId,
-          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
-        });
-        const attestationCards = projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
-          libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
-        }), {
+        const preview = previewPayload?.ok ? previewPayload.preview : null;
+        const localReview = preview
+          ? {
+              reviewTier: String(preview?.reviewTier || '').trim(),
+              review: preview?.review || null,
+            }
+          : projectLibraryPublicStackLocalReview({
+              houseId,
+              teamId,
+              libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+            });
+        const localSafety = preview
+          ? {
+              safetyState: String(preview?.safetyState || '').trim(),
+              safety: preview?.safety || null,
+            }
+          : projectLibraryPublicStackLocalSafety({
+              houseId,
+              teamId,
+              libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+            });
+        const attestationCards = preview && Array.isArray(preview?.attestations)
+          ? preview.attestations
+          : projectLibraryPublicStackAttestationCards(listLibraryPublicStackAttestations({
+              libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
+            }), {
+              targetHouseId: houseId,
+              targetTeamId: teamId,
+            });
+        const attestationSummary = preview?.attestationCounts && typeof preview.attestationCounts === 'object'
+          ? {
+              counts: preview.attestationCounts,
+              summary: String(preview?.provenance?.attestationSummary || '').trim() || null,
+            }
+          : buildLibraryPublicStackAttestationAggregate(attestationCards);
+        const provenanceSummary = preview?.attestationProvenanceCounts && typeof preview.attestationProvenanceCounts === 'object'
+          ? {
+              counts: preview.attestationProvenanceCounts,
+              summary: String(preview?.provenance?.sealSummary || '').trim() || null,
+            }
+          : buildLibraryPublicStackAttestationProvenanceAggregate(attestationCards);
+        const discoveryProjection = buildLibraryPublicStackDiscoveryProjection({
+          preview,
           targetHouseId: houseId,
-          targetTeamId: teamId,
         });
-        const attestationSummary = buildLibraryPublicStackAttestationAggregate(attestationCards);
-        const provenanceSummary = buildLibraryPublicStackAttestationProvenanceAggregate(attestationCards);
         return {
           entry,
+          preview,
           localReview,
           localSafety,
           attestationCards,
           attestationSummary,
           provenanceSummary,
+          discovery: discoveryProjection,
         };
       })
       .filter(({ localReview, provenanceSummary, localSafety }) => {
@@ -1728,9 +1867,14 @@ function registerPlatformReadRoutes(app, deps) {
           return !safetyState || safetyState === 'visible_here';
         }
         return safetyState === normalizedSafety;
+      })
+      .filter(({ discovery: discoveryProjection }) => {
+        if (!normalizedDiscovery) return true;
+        return String(discoveryProjection?.discoveryLane || '').trim() === normalizedDiscovery;
       });
     if (!stacks.length) return [];
     const familyInfo = getHouseLibraryPublicStackFamilyInfo('house_library_stacks');
+    const discoveryCounts = buildLibraryPublicStackDiscoveryCounts(stacks);
     return [{
       family: familyInfo.familySlug,
       familySlug: familyInfo.familySlug,
@@ -1742,7 +1886,8 @@ function registerPlatformReadRoutes(app, deps) {
         summary: familyInfo.description || null,
       },
       memberCount: stacks.length,
-      members: stacks.map(({ entry, localReview, localSafety, attestationCards, attestationSummary, provenanceSummary }) => {
+      discoveryCounts,
+      members: stacks.map(({ entry, preview, localReview, localSafety, attestationCards, attestationSummary, provenanceSummary, discovery: discoveryProjection }) => {
         const members = listLibraryPublicStackMembers({
           libraryPublicStackId: String(entry?.libraryPublicStackId || '').trim(),
         });
@@ -1757,6 +1902,8 @@ function registerPlatformReadRoutes(app, deps) {
           reviewSummary: String(localReview?.review?.summary || '').trim() || null,
           safetyState: String(localSafety?.safetyState || '').trim() || null,
           safetySummary: String(localSafety?.safety?.summary || '').trim() || null,
+          discoveryLane: String(discoveryProjection?.discoveryLane || '').trim() || 'check_here',
+          discoveryReason: String(discoveryProjection?.discoveryReason || '').trim() || 'Needs a local check in this House.',
           attestationCounts: attestationSummary.counts,
           attestationSummary: String(attestationSummary.summary || '').trim() || null,
           provenanceCounts: provenanceSummary.counts,
@@ -1766,6 +1913,8 @@ function registerPlatformReadRoutes(app, deps) {
             scopeSetId: String(entry?.scopeSetId || '').trim() || null,
             memberCount: members.length,
             sourceHouseId: String(entry?.houseId || '').trim() || null,
+            importedCount: Number(preview?.importedCount || 0),
+            verificationState: String(preview?.verificationState || '').trim() || null,
           },
           proofCards: attestationCards.map((card) => ({
             title: `${card.houseId} · ${formatReviewTierLabel(card.reviewTier)}`,
@@ -1774,7 +1923,7 @@ function registerPlatformReadRoutes(app, deps) {
           loadouts: [],
           storefront: {
             title: String(entry?.title || entry?.libraryPublicStackId || '').trim() || String(entry?.libraryPublicStackId || '').trim(),
-            summary: String(entry?.summary || '').trim() || null,
+            summary: String(discoveryProjection?.discoveryReason || entry?.summary || '').trim() || null,
             proofCount: attestationSummary.counts.total,
             loadoutCount: 0,
             memberCount: members.length,
@@ -2080,6 +2229,20 @@ function registerPlatformReadRoutes(app, deps) {
       verificationMembers: latestVerificationMembers,
     });
     const familyInfo = getHouseLibraryPublicStackFamilyInfo(String(publicStack?.familySlug || '').trim() || 'house_library_stacks');
+    const discoveryProjection = buildLibraryPublicStackDiscoveryProjection({
+      preview: {
+        reviewTier: String(localReview?.reviewTier || '').trim() || null,
+        review: localReview?.review || null,
+        safetyState: String(localSafety?.safetyState || '').trim() || null,
+        safety: localSafety?.safety || null,
+        verificationState: String(trustOverlay?.verificationState || 'unverified').trim() || 'unverified',
+        alreadyImportedAll: importedCount === memberPreviews.length && memberPreviews.length > 0,
+        localScopeSet,
+        displayName: String(publicStack?.title || normalizedPublicStackId).trim() || normalizedPublicStackId,
+        attestations: publicAttestations,
+      },
+      targetHouseId: houseId,
+    });
     return {
       ok: true,
       preview: {
@@ -2119,6 +2282,8 @@ function registerPlatformReadRoutes(app, deps) {
         importedCount,
         alreadyImported: importedCount > 0,
         alreadyImportedAll: importedCount === memberPreviews.length && memberPreviews.length > 0,
+        discoveryLane: String(discoveryProjection?.discoveryLane || '').trim() || 'check_here',
+        discoveryReason: String(discoveryProjection?.discoveryReason || '').trim() || 'Needs a local check in this House.',
         members: memberPreviews,
         proofCards: Array.isArray(trustOverlay?.proofCards) ? trustOverlay.proofCards : [],
         localScopeSet: localScopeSet
@@ -2166,6 +2331,8 @@ function registerPlatformReadRoutes(app, deps) {
         reviewSummary: String(member?.reviewSummary || '').trim() || null,
         safetyState: String(member?.safetyState || '').trim() || null,
         safetySummary: String(member?.safetySummary || '').trim() || null,
+        discoveryLane: String(member?.discoveryLane || '').trim() || null,
+        discoveryReason: String(member?.discoveryReason || '').trim() || null,
         attestationCounts: member?.attestationCounts && typeof member.attestationCounts === 'object'
           ? member.attestationCounts
           : { total: 0, trustedHere: 0, reviewLater: 0, blockedHere: 0 },
@@ -3536,19 +3703,23 @@ function registerPlatformReadRoutes(app, deps) {
     const trust = normalizeLibraryPublicStackReviewTier(req.query?.trust);
     const seal = normalizeLibraryPublicStackSealFilter(req.query?.seal);
     const safety = normalizeLibraryPublicStackSafetyFilter(req.query?.safety);
+    const discovery = normalizeLibraryPublicStackDiscoveryLane(req.query?.discovery);
+    const libraryGroups = searchLibraryPublicStackGroups({
+      query,
+      family,
+      houseId: context.houseId,
+      teamId: context.activeTeamId,
+      trust,
+      seal,
+      safety,
+      discovery,
+    });
     const groups = [
-      ...(trust || seal || safety ? [] : searchRegistryFamilyGroups({ query, family })),
-      ...searchLibraryPublicStackGroups({
-        query,
-        family,
-        houseId: context.houseId,
-        teamId: context.activeTeamId,
-        trust,
-        seal,
-        safety,
-      }),
+      ...(trust || seal || safety || discovery ? [] : searchRegistryFamilyGroups({ query, family })),
+      ...libraryGroups,
     ];
     const results = flattenPublicStackSearchGroups(groups);
+    const discoveryCounts = buildLibraryPublicStackDiscoveryCounts(flattenPublicStackSearchGroups(libraryGroups));
     setUnifiedPlatformRegistryPreviewSnapshot({
       query,
       family,
@@ -3562,6 +3733,8 @@ function registerPlatformReadRoutes(app, deps) {
       trust,
       seal,
       safety,
+      discovery,
+      discoveryCounts,
       resultCount: results.length,
       groups,
       results,

@@ -105,6 +105,7 @@ const FIXTURE_FILES = Object.freeze({
   library_public_stack_attestation_seed: 'library_public_stack_attestation_seed.json',
   library_public_stack_attestation_provenance_seed: 'library_public_stack_attestation_provenance_seed.json',
   library_public_stack_safety_seed: 'library_public_stack_safety_seed.json',
+  library_public_stack_discovery_seed: 'library_public_stack_discovery_seed.json',
 });
 
 const TRACK_DEFINITIONS = Object.freeze([

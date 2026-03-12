@@ -284,6 +284,10 @@
       <button class="btn small" id="houseLibraryStorefrontChipSealed" type="button" data-testid="house-library-storefront-chip-sealed" aria-label="Show sealed Public Stacks">[seal]</button>
       <button class="btn small" id="houseLibraryStorefrontChipHidden" type="button" data-testid="house-library-storefront-chip-hidden" aria-label="Show hidden here">[veil]</button>
       <button class="btn small" id="houseLibraryStorefrontChipReported" type="button" data-testid="house-library-storefront-chip-reported" aria-label="Show reported here">[flag]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipReady" type="button" data-testid="house-library-storefront-chip-ready" aria-label="Show ready here">[go]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipCheck" type="button" data-testid="house-library-storefront-chip-check" aria-label="Show needs check">[look]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipAttested" type="button" data-testid="house-library-storefront-chip-attested" aria-label="Show attested elsewhere">[echo]</button>
+      <button class="btn small" id="houseLibraryStorefrontChipImported" type="button" data-testid="house-library-storefront-chip-imported" aria-label="Show imported here">[home]</button>
     </div>
     <details class="house-library-drawer" id="houseLibraryStorefrontDetails" data-testid="house-library-storefront-details" style="margin-top:8px;">
       <summary id="houseLibraryStorefrontDetailsToggle" data-testid="house-library-storefront-details-toggle">More filters</summary>
@@ -310,6 +314,14 @@
           <option value="visible_here">Visible here</option>
           <option value="hidden_here">Hidden here</option>
           <option value="reported_here">Reported here</option>
+        </select>
+        <label class="small" for="houseLibraryPublicStacksDiscoverySelect">Discovery</label>
+        <select id="houseLibraryPublicStacksDiscoverySelect" data-testid="house-library-public-stacks-discovery" class="pixel-input">
+          <option value="">All lanes</option>
+          <option value="ready_here">Ready here</option>
+          <option value="check_here">Needs check</option>
+          <option value="attested_elsewhere">Attested elsewhere</option>
+          <option value="imported_here">Imported here</option>
         </select>
       </div>
     </details>

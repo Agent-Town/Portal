@@ -184,8 +184,49 @@ async function saveHouseLibrarySafety(page, {
   } else if (safetyState === 'visible_here') {
     await page.getByTestId('house-library-guided-restore-button').click();
   } else {
-    await page.getByTestId('house-library-guided-hide-button').click();
+  await page.getByTestId('house-library-guided-hide-button').click();
   }
+}
+
+async function saveHouseLibraryReviewApi(page, {
+  libraryPublicStackId = '',
+  reviewTier = 'review_later',
+  note = '',
+  idempotencyKey = '',
+} = {}) {
+  const response = await callPageJson(page, `/api/platform/library/public-stacks/${encodeURIComponent(String(libraryPublicStackId || '').trim())}/reviews`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': String(idempotencyKey || 'house-library-review-api-001').trim() },
+    data: {
+      reviewTier,
+      note,
+    },
+  });
+  return response;
+}
+
+async function publishHouseLibraryAttestationApi(page, {
+  libraryPublicStackId = '',
+  idempotencyKey = '',
+} = {}) {
+  const response = await callPageJson(page, `/api/platform/library/public-stacks/${encodeURIComponent(String(libraryPublicStackId || '').trim())}/attestations`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': String(idempotencyKey || 'house-library-attestation-api-001').trim() },
+    data: {},
+  });
+  return response;
+}
+
+async function importHouseLibraryPublicStackApi(page, {
+  libraryPublicStackId = '',
+  idempotencyKey = '',
+} = {}) {
+  const response = await callPageJson(page, `/api/platform/library/public-stacks/${encodeURIComponent(String(libraryPublicStackId || '').trim())}/imports`, {
+    method: 'POST',
+    headers: { 'Idempotency-Key': String(idempotencyKey || 'house-library-import-api-001').trim() },
+    data: {},
+  });
+  return response;
 }
 
 async function setHouseLibraryTrustChip(page, value = '') {
@@ -207,6 +248,11 @@ async function setHouseLibrarySafetyFilter(page, value = '') {
   await page.getByTestId('house-library-public-stacks-safety').selectOption(value);
 }
 
+async function setHouseLibraryDiscoveryFilter(page, value = '') {
+  await openHouseLibraryStorefrontDetails(page);
+  await page.getByTestId('house-library-public-stacks-discovery').selectOption(value);
+}
+
 module.exports = {
   APPROVED_PUBLICATION_ID,
   APPROVED_PUBLIC_STACK_ID,
@@ -214,8 +260,12 @@ module.exports = {
   openHouseLibraryStorefrontDetails,
   seedPublishedHouseLibraryPublicStack,
   openHouseLibraryPublicStackPreview,
+  importHouseLibraryPublicStackApi,
+  publishHouseLibraryAttestationApi,
+  saveHouseLibraryReviewApi,
   saveHouseLibraryReview,
   saveHouseLibrarySafety,
+  setHouseLibraryDiscoveryFilter,
   setHouseLibrarySafetyFilter,
   setHouseLibraryTrustChip,
 };

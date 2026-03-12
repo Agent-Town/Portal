@@ -561,6 +561,13 @@ let houseSurfaceState = {
     publicStacksTrust: '',
     publicStacksSeal: '',
     publicStacksSafety: '',
+    publicStacksDiscovery: '',
+    publicStacksDiscoveryCounts: {
+      readyHere: 0,
+      checkHere: 0,
+      attestedElsewhere: 0,
+      importedHere: 0,
+    },
     publicStackReviewTierDraft: '',
     publicStackReviewNoteDraft: '',
     publicStacksResults: [],
@@ -1854,6 +1861,13 @@ function resetHouseLibraryOrganizationState() {
   houseSurfaceState.library.publicStacksTrust = '';
   houseSurfaceState.library.publicStacksSeal = '';
   houseSurfaceState.library.publicStacksSafety = '';
+  houseSurfaceState.library.publicStacksDiscovery = '';
+  houseSurfaceState.library.publicStacksDiscoveryCounts = {
+    readyHere: 0,
+    checkHere: 0,
+    attestedElsewhere: 0,
+    importedHere: 0,
+  };
   houseSurfaceState.library.publicStackReviewTierDraft = '';
   houseSurfaceState.library.publicStackReviewNoteDraft = '';
   houseSurfaceState.library.publicStacksResults = [];
@@ -1956,6 +1970,13 @@ function buildHouseLibraryPublicStackTrustLabels(preview = null) {
   } else if (Number(preview?.attestationProvenanceCounts?.sealed || 0) > 0) {
     labels.push('Sealed');
   }
+  const discoveryLabel = formatHouseLibraryDiscoveryLaneLabel(preview?.discoveryLane);
+  if (discoveryLabel) {
+    labels.push(discoveryLabel);
+  }
+  if (String(preview?.discoveryReason || '').trim()) {
+    labels.push(String(preview.discoveryReason).trim());
+  }
   return labels;
 }
 
@@ -1972,6 +1993,15 @@ function formatHouseLibrarySafetyStateLabel(safetyState = '') {
   if (normalized === 'hidden_here') return 'Hidden here';
   if (normalized === 'reported_here') return 'Reported here';
   if (normalized === 'visible_here') return 'Visible here';
+  return '';
+}
+
+function formatHouseLibraryDiscoveryLaneLabel(discoveryLane = '') {
+  const normalized = String(discoveryLane || '').trim();
+  if (normalized === 'ready_here') return 'Ready here';
+  if (normalized === 'check_here') return 'Needs check';
+  if (normalized === 'attested_elsewhere') return 'Attested elsewhere';
+  if (normalized === 'imported_here') return 'Imported here';
   return '';
 }
 
@@ -2006,13 +2036,35 @@ function getHouseLibraryFamilyToken(value = '') {
   return { shortLabel: '[stack]', label: 'Public Stack' };
 }
 
+function getHouseLibraryDiscoveryToken(discoveryLane = '') {
+  const normalized = String(discoveryLane || '').trim();
+  if (normalized === 'ready_here') {
+    return { shortLabel: '[go]', label: 'Ready here', tone: 'good' };
+  }
+  if (normalized === 'check_here') {
+    return { shortLabel: '[look]', label: 'Needs check', tone: 'muted' };
+  }
+  if (normalized === 'attested_elsewhere') {
+    return { shortLabel: '[echo]', label: 'Attested elsewhere', tone: 'muted' };
+  }
+  if (normalized === 'imported_here') {
+    return { shortLabel: '[home]', label: 'Imported here', tone: 'good' };
+  }
+  return null;
+}
+
 function buildHouseLibraryTrustTokens({
   reviewTier = '',
   sealState = '',
   verificationState = '',
   safetyState = '',
+  discoveryLane = '',
 } = {}) {
   const tokens = [];
+  const discoveryToken = getHouseLibraryDiscoveryToken(discoveryLane);
+  if (discoveryToken) {
+    tokens.push(discoveryToken);
+  }
   const normalizedSafetyState = String(safetyState || '').trim();
   if (normalizedSafetyState === 'hidden_here') {
     tokens.push({ shortLabel: '[veil]', label: 'Hidden here', tone: 'bad' });
@@ -2193,6 +2245,7 @@ function syncHouseLibraryPublicStacksControls() {
   const familySelect = el('houseLibraryPublicStacksFamilySelect');
   const trustSelect = el('houseLibraryPublicStacksTrustSelect');
   const safetySelect = el('houseLibraryPublicStacksSafetySelect');
+  const discoverySelect = el('houseLibraryPublicStacksDiscoverySelect');
   const searchBtn = el('houseLibraryPublicStacksSearchBtn');
   if (queryInput) {
     const storedQuery = String(houseSurfaceState.library.publicStacksQuery || '');
@@ -2234,11 +2287,21 @@ function syncHouseLibraryPublicStacksControls() {
       safetySelect.value = storedSafety;
     }
   }
+  if (discoverySelect) {
+    const storedDiscovery = String(houseSurfaceState.library.publicStacksDiscovery || '');
+    const liveDiscovery = String(discoverySelect.value || '');
+    const preferLiveDiscovery = discoverySelect === document.activeElement;
+    if (preferLiveDiscovery) {
+      houseSurfaceState.library.publicStacksDiscovery = liveDiscovery.trim();
+    } else if (liveDiscovery !== storedDiscovery) {
+      discoverySelect.value = storedDiscovery;
+    }
+  }
   if (searchBtn) {
     searchBtn.disabled = false;
   }
   const chipStates = [
-    ['houseLibraryStorefrontChipAll', !String(houseSurfaceState.library.publicStacksFamily || '').trim() && !String(houseSurfaceState.library.publicStacksTrust || '').trim() && !String(houseSurfaceState.library.publicStacksSeal || '').trim() && !String(houseSurfaceState.library.publicStacksSafety || '').trim()],
+    ['houseLibraryStorefrontChipAll', !String(houseSurfaceState.library.publicStacksFamily || '').trim() && !String(houseSurfaceState.library.publicStacksTrust || '').trim() && !String(houseSurfaceState.library.publicStacksSeal || '').trim() && !String(houseSurfaceState.library.publicStacksSafety || '').trim() && !String(houseSurfaceState.library.publicStacksDiscovery || '').trim()],
     ['houseLibraryStorefrontChipSatchels', String(houseSurfaceState.library.publicStacksFamily || '').trim() === 'house_library_stacks'],
     ['houseLibraryStorefrontChipSkills', String(houseSurfaceState.library.publicStacksFamily || '').trim() === 'skill'],
     ['houseLibraryStorefrontChipFlows', String(houseSurfaceState.library.publicStacksFamily || '').trim() === 'developer_workflows'],
@@ -2249,11 +2312,30 @@ function syncHouseLibraryPublicStacksControls() {
     ['houseLibraryStorefrontChipSealed', String(houseSurfaceState.library.publicStacksSeal || '').trim() === 'sealed'],
     ['houseLibraryStorefrontChipHidden', String(houseSurfaceState.library.publicStacksSafety || '').trim() === 'hidden_here'],
     ['houseLibraryStorefrontChipReported', String(houseSurfaceState.library.publicStacksSafety || '').trim() === 'reported_here'],
+    ['houseLibraryStorefrontChipReady', String(houseSurfaceState.library.publicStacksDiscovery || '').trim() === 'ready_here'],
+    ['houseLibraryStorefrontChipCheck', String(houseSurfaceState.library.publicStacksDiscovery || '').trim() === 'check_here'],
+    ['houseLibraryStorefrontChipAttested', String(houseSurfaceState.library.publicStacksDiscovery || '').trim() === 'attested_elsewhere'],
+    ['houseLibraryStorefrontChipImported', String(houseSurfaceState.library.publicStacksDiscovery || '').trim() === 'imported_here'],
   ];
   chipStates.forEach(([id, active]) => {
     const button = el(id);
     if (!button) return;
     button.classList.toggle('primary', active === true);
+  });
+  const discoveryCounts = houseSurfaceState.library.publicStacksDiscoveryCounts && typeof houseSurfaceState.library.publicStacksDiscoveryCounts === 'object'
+    ? houseSurfaceState.library.publicStacksDiscoveryCounts
+    : {};
+  [
+    ['houseLibraryStorefrontChipReady', '[go]', Number(discoveryCounts.readyHere || 0), 'Show ready here'],
+    ['houseLibraryStorefrontChipCheck', '[look]', Number(discoveryCounts.checkHere || 0), 'Show needs check'],
+    ['houseLibraryStorefrontChipAttested', '[echo]', Number(discoveryCounts.attestedElsewhere || 0), 'Show attested elsewhere'],
+    ['houseLibraryStorefrontChipImported', '[home]', Number(discoveryCounts.importedHere || 0), 'Show imported here'],
+  ].forEach(([id, token, count, label]) => {
+    const button = el(id);
+    if (!button) return;
+    button.textContent = `${token}${count > 0 ? ` ${count}` : ''}`;
+    button.setAttribute('aria-label', `${label} (${count})`);
+    button.title = `${label} (${count})`;
   });
 }
 
@@ -2417,6 +2499,7 @@ async function loadHouseLibraryPublicStacksSearch({
   trust = String(houseSurfaceState.library.publicStacksTrust || '').trim(),
   seal = String(houseSurfaceState.library.publicStacksSeal || '').trim(),
   safety = String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+  discovery = String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
   preservePreview = false,
 } = {}) {
   const params = new URLSearchParams();
@@ -2425,6 +2508,7 @@ async function loadHouseLibraryPublicStacksSearch({
   if (trust) params.set('trust', trust);
   if (seal) params.set('seal', seal);
   if (safety) params.set('safety', safety);
+  if (discovery) params.set('discovery', discovery);
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const response = await apiWithRetry(`/api/platform/library/public-stacks/search${suffix}`, {
     method: 'GET',
@@ -2437,6 +2521,15 @@ async function loadHouseLibraryPublicStacksSearch({
   houseSurfaceState.library.publicStacksTrust = String(data?.trust || trust || '').trim();
   houseSurfaceState.library.publicStacksSeal = String(data?.seal || seal || '').trim();
   houseSurfaceState.library.publicStacksSafety = String(data?.safety || safety || '').trim();
+  houseSurfaceState.library.publicStacksDiscovery = String(data?.discovery || discovery || '').trim();
+  houseSurfaceState.library.publicStacksDiscoveryCounts = data?.discoveryCounts && typeof data.discoveryCounts === 'object'
+    ? data.discoveryCounts
+    : {
+        readyHere: 0,
+        checkHere: 0,
+        attestedElsewhere: 0,
+        importedHere: 0,
+      };
   houseSurfaceState.library.publicStacksResults = Array.isArray(data?.results) ? data.results : [];
   houseSurfaceState.library.publicStacksResultCount = Math.max(0, Number(data?.resultCount || 0));
   if (!preservePreview) {
@@ -3749,6 +3842,7 @@ async function saveHouseLibraryPublicStackReview({
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
     seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+    discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -3812,6 +3906,7 @@ async function saveHouseLibraryPublicStackSafety({
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
     seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+    discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -3867,6 +3962,7 @@ async function publishHouseLibraryPublicStackAttestation({
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
     seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+    discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -3946,6 +4042,7 @@ async function sealHouseLibraryPublicStackAttestation({
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
     seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+    discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -4004,6 +4101,7 @@ async function checkHouseLibraryPublicStackSeal({
     trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
     seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
     safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+    discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
     preservePreview: true,
   }).catch(() => null);
   await previewHouseLibraryPublicStack(libraryPublicStackId, { announce: false }).catch(() => null);
@@ -4054,6 +4152,7 @@ function renderHouseLibrarySurface() {
   const publicStacksFamilySelect = el('houseLibraryPublicStacksFamilySelect');
   const publicStacksTrustSelect = el('houseLibraryPublicStacksTrustSelect');
   const publicStacksSafetySelect = el('houseLibraryPublicStacksSafetySelect');
+  const publicStacksDiscoverySelect = el('houseLibraryPublicStacksDiscoverySelect');
   const publicStacksSearchBtn = el('houseLibraryPublicStacksSearchBtn');
   const storefrontChipsNode = el('houseLibraryStorefrontChips');
   const storefrontDetailsNode = el('houseLibraryStorefrontDetails');
@@ -4132,6 +4231,7 @@ function renderHouseLibrarySurface() {
     || !publicStacksFamilySelect
     || !publicStacksTrustSelect
     || !publicStacksSafetySelect
+    || !publicStacksDiscoverySelect
     || !publicStacksSearchBtn
     || !storefrontChipsNode
     || !storefrontDetailsNode
@@ -4264,6 +4364,7 @@ function renderHouseLibrarySurface() {
       sealState: getHouseLibraryPreviewSealState(publicStackPreview),
       verificationState: getHouseLibraryPreviewVerificationState(publicStackPreview),
       safetyState: publicStackPreview?.safetyState || publicStackPreview?.safety?.safetyState,
+      discoveryLane: publicStackPreview?.discoveryLane,
     });
     previewTitleNode.textContent = String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack');
     previewStatusNode.textContent = buildHouseLibraryPreviewHeroStatus(publicStackPreview);
@@ -4362,6 +4463,8 @@ function renderHouseLibrarySurface() {
     const attestationCount = Math.max(0, Number(result?.storefront?.attestationCount || result?.attestationCounts?.total || 0));
     metaNode.textContent = [
       Number(result?.storefront?.memberCount || 0) > 0 ? `${Number(result.storefront.memberCount)} item${Number(result.storefront.memberCount) === 1 ? '' : 's'}` : '',
+      formatHouseLibraryDiscoveryLaneLabel(result?.discoveryLane),
+      String(result?.discoveryReason || '').trim(),
       attestationCount > 0 ? formatHouseLibraryAttestationCountLabel(attestationCount) : '',
       String(result?.safetySummary || '').trim(),
       String(result?.provenanceSummary || '').trim(),
@@ -4380,6 +4483,7 @@ function renderHouseLibrarySurface() {
           : '',
       safetyState: result?.safetyState,
       verificationState: '',
+      discoveryLane: result?.discoveryLane,
     }));
     const button = document.createElement('button');
     button.type = 'button';
@@ -4489,6 +4593,9 @@ function renderHouseLibrarySurface() {
       Number(publicStackPreview?.memberCount || 0) > 0 ? `${Number(publicStackPreview.memberCount)} item${Number(publicStackPreview.memberCount) === 1 ? '' : 's'}` : '',
       String(publicStackPreview?.sourceHouseId || '').trim() ? `From: ${String(publicStackPreview.sourceHouseId || '').trim()}` : '',
       String(publicStackPreview?.description || '').trim(),
+      String(publicStackPreview?.discoveryReason || '').trim()
+        ? `Discovery: ${String(publicStackPreview.discoveryReason).trim()}`
+        : '',
       `Provenance: ${String(publicStackPreview?.provenance?.summary || '').trim() || 'Visible.'}`,
       `Verification: ${String(publicStackPreview?.verification?.summary || publicStackPreview?.provenance?.verificationSummary || '').trim() || 'Not yet verified in this House.'}`,
       `Seal: ${String(publicStackPreview?.provenance?.sealSummary || '').trim() || formatHouseLibrarySealStateLabel(publicStackPreview?.provenance?.sealState) || 'No seal yet.'}`,
@@ -8403,6 +8510,18 @@ function bindTownDistrictControls() {
     };
   }
 
+  const houseLibraryPublicStacksDiscoverySelect = el('houseLibraryPublicStacksDiscoverySelect');
+  if (houseLibraryPublicStacksDiscoverySelect) {
+    houseLibraryPublicStacksDiscoverySelect.onchange = () => {
+      const queryInput = el('houseLibraryPublicStacksQueryInput');
+      if (queryInput) {
+        houseSurfaceState.library.publicStacksQuery = String(queryInput.value || '').trim();
+      }
+      houseSurfaceState.library.publicStacksDiscovery = String(houseLibraryPublicStacksDiscoverySelect.value || '').trim();
+      syncHouseLibraryPublicStacksControls();
+    };
+  }
+
   const storefrontChipConfigs = [
     ['houseLibraryStorefrontChipAll', { reset: true }],
     ['houseLibraryStorefrontChipSatchels', { family: 'house_library_stacks' }],
@@ -8415,6 +8534,10 @@ function bindTownDistrictControls() {
     ['houseLibraryStorefrontChipSealed', { seal: 'sealed' }],
     ['houseLibraryStorefrontChipHidden', { safety: 'hidden_here' }],
     ['houseLibraryStorefrontChipReported', { safety: 'reported_here' }],
+    ['houseLibraryStorefrontChipReady', { discovery: 'ready_here' }],
+    ['houseLibraryStorefrontChipCheck', { discovery: 'check_here' }],
+    ['houseLibraryStorefrontChipAttested', { discovery: 'attested_elsewhere' }],
+    ['houseLibraryStorefrontChipImported', { discovery: 'imported_here' }],
   ];
   storefrontChipConfigs.forEach(([id, config]) => {
     const button = el(id);
@@ -8427,6 +8550,7 @@ function bindTownDistrictControls() {
         houseSurfaceState.library.publicStacksTrust = '';
         houseSurfaceState.library.publicStacksSeal = '';
         houseSurfaceState.library.publicStacksSafety = '';
+        houseSurfaceState.library.publicStacksDiscovery = '';
       } else if (config.family) {
         houseSurfaceState.library.publicStacksFamily = String(houseSurfaceState.library.publicStacksFamily || '').trim() === config.family ? '' : config.family;
       } else if (config.trust) {
@@ -8437,6 +8561,8 @@ function bindTownDistrictControls() {
         houseSurfaceState.library.publicStacksTrust = '';
       } else if (config.safety) {
         houseSurfaceState.library.publicStacksSafety = String(houseSurfaceState.library.publicStacksSafety || '').trim() === config.safety ? '' : config.safety;
+      } else if (config.discovery) {
+        houseSurfaceState.library.publicStacksDiscovery = String(houseSurfaceState.library.publicStacksDiscovery || '').trim() === config.discovery ? '' : config.discovery;
       }
       syncHouseLibraryPublicStacksControls();
       try {
@@ -8446,6 +8572,7 @@ function bindTownDistrictControls() {
           trust: String(houseSurfaceState.library.publicStacksTrust || '').trim(),
           seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
           safety: String(houseSurfaceState.library.publicStacksSafety || '').trim(),
+          discovery: String(houseSurfaceState.library.publicStacksDiscovery || '').trim(),
         });
       } catch (err) {
         const code = String(err?.code || err?.message || 'PUBLIC_STACK_SEARCH_FAILED');
@@ -8465,10 +8592,12 @@ function bindTownDistrictControls() {
         const nextFamily = String(el('houseLibraryPublicStacksFamilySelect')?.value || '').trim();
         const nextTrust = String(el('houseLibraryPublicStacksTrustSelect')?.value || '').trim();
         const nextSafety = String(el('houseLibraryPublicStacksSafetySelect')?.value || '').trim();
+        const nextDiscovery = String(el('houseLibraryPublicStacksDiscoverySelect')?.value || '').trim();
         houseSurfaceState.library.publicStacksQuery = nextQuery;
         houseSurfaceState.library.publicStacksFamily = nextFamily;
         houseSurfaceState.library.publicStacksTrust = nextTrust;
         houseSurfaceState.library.publicStacksSafety = nextSafety;
+        houseSurfaceState.library.publicStacksDiscovery = nextDiscovery;
         if (nextTrust) {
           houseSurfaceState.library.publicStacksSeal = '';
         }
@@ -8478,6 +8607,7 @@ function bindTownDistrictControls() {
           trust: nextTrust,
           seal: String(houseSurfaceState.library.publicStacksSeal || '').trim(),
           safety: nextSafety,
+          discovery: nextDiscovery,
         });
       } catch (err) {
         const code = String(err?.code || err?.message || 'PUBLIC_STACK_SEARCH_FAILED');
