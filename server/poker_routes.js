@@ -48,11 +48,13 @@ const {
   closeTournamentSeries,
   createTable,
   createRouteError,
+  addTournamentAddon,
   buildHandHistoryExport,
   buildHandHistoryExportNdjson,
   buildHandHistoryExportText,
   getHandHistory,
   getHandReview,
+  getMyQualifiers,
   getMyResults,
   getPokerPlayPolicy,
   getSeriesTimeline,
@@ -71,6 +73,7 @@ const {
   postSeatAgentProposal,
   rebalanceTournamentSeriesByDirector,
   reloadTableSeat,
+  rebuyTournamentSeries,
   reenterTournamentSeries,
   returnTableSeat,
   resolveHandDispute,
@@ -222,6 +225,7 @@ function registerPokerRoutes(app, deps) {
     createPokerPlayAuditEvent,
     createPokerPlayAction,
     createPokerPlayMessage,
+    createPokerRebuyEvent,
     createPortalPokerOperatorClient,
     express,
     getActivePokerPlaySeatByWalletSubject,
@@ -245,6 +249,8 @@ function registerPokerRoutes(app, deps) {
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
+    getPokerSatelliteAwardById,
+    getPokerSatelliteAwardBySourceAndWallet,
     getPokerTournamentWaitlistEntryByTableAndWalletSubject,
     getPokerPlayWaitlistEntryByTableAndWalletSubject,
     getPokerReplayArtifactByRunId,
@@ -281,6 +287,10 @@ function registerPokerRoutes(app, deps) {
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
+    listPokerRebuyEventsBySeriesId,
+    listPokerRebuyEventsByTable,
+    listPokerSatelliteAwardsByTargetSeriesId,
+    listPokerSatelliteAwardsByWalletSubject,
     listPokerTournamentWaitlistEntriesByTable,
     listPokerPlayWaitlistEntriesByTable,
     listPokerSeasons,
@@ -313,6 +323,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayPlayerStat,
     upsertPokerPlayWalletPolicy,
     upsertPokerPlayTable,
+    upsertPokerSatelliteAward,
     upsertPokerTournamentWaitlistEntry,
     upsertPokerPlayWaitlistEntry,
     upsertPokerSeason,
@@ -350,6 +361,7 @@ function registerPokerRoutes(app, deps) {
     createPokerPlayAuditEvent,
     createPokerPlayAction,
     createPokerPlayMessage,
+    createPokerRebuyEvent,
     deletePokerPlaySeat,
     getActivePokerPlaySeatByWalletSubject,
     getCurrentPokerPlayHandForTable,
@@ -364,6 +376,8 @@ function registerPokerRoutes(app, deps) {
     getPokerPlaySeatByTableAndNumber,
     getPokerPlaySeatByWalletSubject,
     getPokerPlayTableById,
+    getPokerSatelliteAwardById,
+    getPokerSatelliteAwardBySourceAndWallet,
     getPokerTournamentWaitlistEntryByTableAndWalletSubject,
     getPokerPlayWaitlistEntryByTableAndWalletSubject,
     getStreamflowVerificationByWalletSubject,
@@ -384,6 +398,10 @@ function registerPokerRoutes(app, deps) {
     listPokerPlaySeatsByWalletSubject,
     listPokerPlaySeatsByTable,
     listPokerPlayTables,
+    listPokerRebuyEventsBySeriesId,
+    listPokerRebuyEventsByTable,
+    listPokerSatelliteAwardsByTargetSeriesId,
+    listPokerSatelliteAwardsByWalletSubject,
     listPokerTournamentWaitlistEntriesByTable,
     listPokerPlayWaitlistEntriesByTable,
     nowIso,
@@ -400,6 +418,7 @@ function registerPokerRoutes(app, deps) {
     upsertPokerPlayWalletPolicy,
     upsertPokerBlindObligation,
     upsertPokerPlayTable,
+    upsertPokerSatelliteAward,
     upsertPokerTournamentWaitlistEntry,
     upsertPokerPlayWaitlistEntry,
   };
@@ -905,6 +924,11 @@ function registerPokerRoutes(app, deps) {
       tournament_reentry_waiting: [
         { seatNumber: 1, address: 'So1anaHarnessReentryA11111111111111111111111', houseId: 'house_harness_reentry_a', displayName: 'Reentry Alpha' },
         { seatNumber: 2, address: 'So1anaHarnessReentryB11111111111111111111111', houseId: 'house_harness_reentry_b', displayName: 'Reentry Bravo' },
+      ],
+      rebuy_addon_story: [
+        { seatNumber: 1, address: 'So1anaHarnessRebuyA111111111111111111111111', houseId: 'house_harness_rebuy_a', displayName: 'Rebuy Alpha' },
+        { seatNumber: 2, address: 'So1anaHarnessRebuyB111111111111111111111111', houseId: 'house_harness_rebuy_b', displayName: 'Rebuy Bravo' },
+        { seatNumber: 3, address: 'So1anaHarnessRebuyC111111111111111111111111', houseId: 'house_harness_rebuy_c', displayName: 'Rebuy Charlie' },
       ],
       history_results_story: [
         { seatNumber: 1, address: 'So1anaHarnessHistoryA111111111111111111111', houseId: 'house_harness_history_a', displayName: 'History Alpha' },
@@ -2157,6 +2181,136 @@ function registerPokerRoutes(app, deps) {
         status: 'active',
         buyInOil: 600,
         stackOil: 600,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      seededSeriesId = seriesId;
+      seededTableIds.push(nextTableId);
+    } else if (normalizedScenario === 'rebuy_addon_story') {
+      const [seatOne, seatTwo, seatThree] = normalizedActors;
+      const seriesId = `pkseries_harness_rebuy_addon_${randomHex(6)}`;
+      const breakStartedAt = requestAt;
+      const breakUntilAt = addHarnessSeconds(requestAt, 300);
+      upsertPokerPlayTable({
+        tableId: nextTableId,
+        slug: `${normalizedScenario}-${randomHex(4)}`,
+        title: 'Harness Rebuy Add-On Table',
+        tableType: 'tournament',
+        status: 'open',
+        maxSeats: 6,
+        smallBlindOil: 50,
+        bigBlindOil: 100,
+        buyInOil: 600,
+        minPlayers: 2,
+        state: {
+          activeHandId: null,
+          activeHandNumber: 1,
+          lastSettledHandNumber: 1,
+          lastSettledHandId: null,
+          completedAt: null,
+          winnerSeatNumber: 0,
+          prizeOil: 0,
+          prizeSettledAt: null,
+          entryCount: 3,
+          reentryCount: 0,
+          rebuyCount: 0,
+          addonCount: 0,
+          addonPrizePoolOil: 0,
+          addonBountyPoolOil: 0,
+          entryCountsByWallet: {
+            [seatOne.address]: 1,
+            [seatTwo.address]: 1,
+            [seatThree.address]: 1,
+          },
+          rebuyCountsByWallet: {},
+          addonCountsByWallet: {},
+          completedScheduledBreakAfterHands: [],
+          scheduledBreakId: 'rebuy_break_1',
+          scheduledBreakLabel: 'Break 1',
+          scheduledBreakAfterHandNumber: 1,
+          scheduledBreakStartedAt: breakStartedAt,
+          scheduledBreakUntilAt: breakUntilAt,
+          scheduledBreakDurationMinutes: 5,
+          timeBankRemainingBySeat: {
+            '1': 15,
+            '2': 15,
+            '3': 15,
+          },
+        },
+        rules: buildHarnessTournamentRules(seriesId, 'Harness Rebuy Add-On Series', {
+          reentryLimit: 0,
+          rebuyLimit: 1,
+          rebuyWindowHands: 1,
+          addonWindowAfterHandNumbers: [1],
+          addonCostOil: 200,
+          addonChipsOil: 300,
+          maxAddonsPerSeat: 1,
+          scheduledBreaks: [
+            {
+              breakId: 'rebuy_break_1',
+              label: 'Break 1',
+              afterHandNumber: 1,
+              durationMinutes: 5,
+            },
+          ],
+        }),
+        summary: {
+          headline: 'Harness rebuy and add-on policy story.',
+          seriesId,
+          seriesTitle: 'Harness Rebuy Add-On Series',
+          rebuyLimit: 1,
+          rebuyWindowHands: 1,
+          addonWindowAfterHandNumbers: [1],
+          addonCostOil: 200,
+          addonChipsOil: 300,
+          maxAddonsPerSeat: 1,
+        },
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: nextTableId,
+        seatNumber: seatOne.seatNumber,
+        portalSessionId: `harness_${seatOne.address}`,
+        houseId: seatOne.houseId,
+        walletSubject: seatOne.address,
+        displayName: seatOne.displayName,
+        status: 'busted',
+        buyInOil: 600,
+        stackOil: 0,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        eliminatedAt: requestAt,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: nextTableId,
+        seatNumber: seatTwo.seatNumber,
+        portalSessionId: `harness_${seatTwo.address}`,
+        houseId: seatTwo.houseId,
+        walletSubject: seatTwo.address,
+        displayName: seatTwo.displayName,
+        status: 'active',
+        buyInOil: 600,
+        stackOil: 500,
+        lastSeenAt: requestAt,
+        disconnectedAt: null,
+        createdAt: requestAt,
+        updatedAt: requestAt,
+      });
+      upsertPokerPlaySeat({
+        tableId: nextTableId,
+        seatNumber: seatThree.seatNumber,
+        portalSessionId: `harness_${seatThree.address}`,
+        houseId: seatThree.houseId,
+        walletSubject: seatThree.address,
+        displayName: seatThree.displayName,
+        status: 'active',
+        buyInOil: 600,
+        stackOil: 900,
         lastSeenAt: requestAt,
         disconnectedAt: null,
         createdAt: requestAt,
@@ -5668,6 +5822,32 @@ function registerPokerRoutes(app, deps) {
     }
   });
 
+  app.get('/api/poker/play/qualifiers/me', (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = getMyQualifiers(playRouteDeps, {
+        session,
+        req,
+        processAt: req.query?.asOf,
+        limit: req.query?.limit,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_QUALIFIERS_FAILED',
+        err?.message || 'Unable to load poker qualifier awards.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
   app.get('/api/poker/play/seasons/native/current', (req, res) => {
     const requestId = buildPortalRequestId();
     try {
@@ -6521,6 +6701,67 @@ function registerPokerRoutes(app, deps) {
         Number(err?.status || 500),
         err?.code || 'POKER_PLAY_REENTRY_FAILED',
         err?.message || 'Unable to re-enter the poker tournament.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/series/:seriesId/rebuy', express.json({ limit: '128kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = rebuyTournamentSeries(playRouteDeps, {
+        seriesId: req.params.seriesId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || '', 'rebuy', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+        seriesId: payload?.series?.seriesId || req.params.seriesId,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_REBUY_FAILED',
+        err?.message || 'Unable to rebuy into the poker tournament.',
+        {
+          requestId,
+          details: err?.details || {},
+        }
+      );
+    }
+  });
+
+  app.post('/api/poker/play/tables/:tableId/addon', express.json({ limit: '64kb' }), (req, res) => {
+    const requestId = buildPortalRequestId();
+    const session = requireBoundHumanSession(req, res, { requestId });
+    if (!session) return;
+    try {
+      const payload = addTournamentAddon(playRouteDeps, {
+        tableId: req.params.tableId,
+        session,
+        req,
+        body: req.body,
+      });
+      publishPokerPlayTableEvent(payload?.table?.tableId || req.params.tableId, 'addon', {
+        handId: payload?.hand?.handId || null,
+        seatNumber: payload?.mySeat?.seatNumber || null,
+      });
+      return sendPortalApiSuccess(res, payload, { requestId });
+    } catch (err) {
+      return sendPortalApiError(
+        res,
+        Number(err?.status || 500),
+        err?.code || 'POKER_PLAY_ADDON_FAILED',
+        err?.message || 'Unable to add chips to the poker tournament seat.',
         {
           requestId,
           details: err?.details || {},

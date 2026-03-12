@@ -473,6 +473,56 @@ function ensureDb() {
     CREATE INDEX IF NOT EXISTS poker_tournament_waitlist_entries_table_status_created_idx
       ON poker_tournament_waitlist_entries(table_id, status, created_at ASC);
 
+    CREATE TABLE IF NOT EXISTS poker_satellite_awards (
+      satellite_award_id TEXT PRIMARY KEY,
+      source_table_id TEXT NOT NULL,
+      source_series_id TEXT,
+      target_table_id TEXT,
+      target_series_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      award_kind TEXT NOT NULL,
+      registration_state TEXT NOT NULL,
+      status TEXT NOT NULL,
+      award_count INTEGER NOT NULL DEFAULT 1,
+      award_value_oil INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (source_table_id, wallet_subject, target_series_id, award_kind),
+      FOREIGN KEY (source_table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (target_table_id) REFERENCES poker_play_tables(table_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_satellite_awards_wallet_created_idx
+      ON poker_satellite_awards(wallet_subject, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_satellite_awards_target_status_idx
+      ON poker_satellite_awards(target_series_id, registration_state, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS poker_rebuy_events (
+      rebuy_event_id TEXT PRIMARY KEY,
+      table_id TEXT NOT NULL,
+      series_id TEXT,
+      hand_id TEXT,
+      wallet_subject TEXT NOT NULL,
+      house_id TEXT,
+      seat_number INTEGER,
+      event_kind TEXT NOT NULL,
+      amount_oil INTEGER NOT NULL DEFAULT 0,
+      chips_oil INTEGER NOT NULL DEFAULT 0,
+      payload_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (table_id) REFERENCES poker_play_tables(table_id),
+      FOREIGN KEY (hand_id) REFERENCES poker_play_hands(hand_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS poker_rebuy_events_table_created_idx
+      ON poker_rebuy_events(table_id, created_at DESC);
+
+    CREATE INDEX IF NOT EXISTS poker_rebuy_events_wallet_created_idx
+      ON poker_rebuy_events(wallet_subject, created_at DESC);
+
     CREATE TABLE IF NOT EXISTS poker_player_notebook_entries (
       entry_id TEXT PRIMARY KEY,
       wallet_subject TEXT NOT NULL,
@@ -1050,6 +1100,8 @@ function countTableRows(tableName) {
     'poker_play_waitlist_entries',
     'poker_blind_obligations',
     'poker_tournament_waitlist_entries',
+    'poker_satellite_awards',
+    'poker_rebuy_events',
     'poker_player_notebook_entries',
     'poker_play_hands',
     'poker_play_messages',
@@ -1097,6 +1149,8 @@ function resetExtendedStore() {
     'poker_play_waitlist_entries',
     'poker_blind_obligations',
     'poker_tournament_waitlist_entries',
+    'poker_satellite_awards',
+    'poker_rebuy_events',
     'poker_player_notebook_entries',
     'poker_play_tables',
     'poker_oil_ledger_entries',
@@ -3519,6 +3573,287 @@ function deletePokerTournamentWaitlistEntry(tableId, walletSubject) {
   `).run(tableId, walletSubject);
 }
 
+function hydratePokerSatelliteAward(row) {
+  if (!row) return null;
+  return {
+    satelliteAwardId: row.satellite_award_id,
+    sourceTableId: row.source_table_id,
+    sourceSeriesId: row.source_series_id || null,
+    targetTableId: row.target_table_id || null,
+    targetSeriesId: row.target_series_id || null,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    awardKind: row.award_kind,
+    registrationState: row.registration_state,
+    status: row.status,
+    awardCount: Number(row.award_count || 0),
+    awardValueOil: Number(row.award_value_oil || 0),
+    payload: fromJson(row.payload_json, {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getPokerSatelliteAwardById(satelliteAwardId) {
+  const database = ensureDb();
+  const row = database.prepare(`
+    SELECT * FROM poker_satellite_awards
+    WHERE satellite_award_id = ?
+    LIMIT 1
+  `).get(satelliteAwardId);
+  return hydratePokerSatelliteAward(row);
+}
+
+function listPokerSatelliteAwardsByWalletSubject(walletSubject, {
+  status = '',
+  registrationState = '',
+  limit = 100,
+} = {}) {
+  const database = ensureDb();
+  const normalizedWalletSubject = String(walletSubject || '').trim();
+  if (!normalizedWalletSubject) return [];
+  const normalizedStatus = String(status || '').trim();
+  const normalizedRegistrationState = String(registrationState || '').trim();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const clauses = ['wallet_subject = ?'];
+  const params = [normalizedWalletSubject];
+  if (normalizedStatus) {
+    clauses.push('status = ?');
+    params.push(normalizedStatus);
+  }
+  if (normalizedRegistrationState) {
+    clauses.push('registration_state = ?');
+    params.push(normalizedRegistrationState);
+  }
+  params.push(safeLimit);
+  const rows = database.prepare(`
+    SELECT * FROM poker_satellite_awards
+    WHERE ${clauses.join(' AND ')}
+    ORDER BY created_at DESC, satellite_award_id DESC
+    LIMIT ?
+  `).all(...params);
+  return rows.map(hydratePokerSatelliteAward).filter(Boolean);
+}
+
+function listPokerSatelliteAwardsByTargetSeriesId(targetSeriesId, {
+  registrationState = '',
+  limit = 500,
+} = {}) {
+  const database = ensureDb();
+  const normalizedTargetSeriesId = String(targetSeriesId || '').trim();
+  if (!normalizedTargetSeriesId) return [];
+  const normalizedRegistrationState = String(registrationState || '').trim();
+  const safeLimit = Math.max(1, Math.min(1000, Number(limit || 500)));
+  const rows = normalizedRegistrationState
+    ? database.prepare(`
+        SELECT * FROM poker_satellite_awards
+        WHERE target_series_id = ? AND registration_state = ?
+        ORDER BY created_at ASC, satellite_award_id ASC
+        LIMIT ?
+      `).all(normalizedTargetSeriesId, normalizedRegistrationState, safeLimit)
+    : database.prepare(`
+        SELECT * FROM poker_satellite_awards
+        WHERE target_series_id = ?
+        ORDER BY created_at ASC, satellite_award_id ASC
+        LIMIT ?
+      `).all(normalizedTargetSeriesId, safeLimit);
+  return rows.map(hydratePokerSatelliteAward).filter(Boolean);
+}
+
+function getPokerSatelliteAwardBySourceAndWallet(sourceTableId, walletSubject, targetSeriesId = '', awardKind = '') {
+  const database = ensureDb();
+  const normalizedTargetSeriesId = String(targetSeriesId || '').trim();
+  const normalizedAwardKind = String(awardKind || '').trim();
+  const row = normalizedTargetSeriesId || normalizedAwardKind
+    ? database.prepare(`
+        SELECT * FROM poker_satellite_awards
+        WHERE source_table_id = ?
+          AND wallet_subject = ?
+          AND (? = '' OR target_series_id = ?)
+          AND (? = '' OR award_kind = ?)
+        LIMIT 1
+      `).get(sourceTableId, walletSubject, normalizedTargetSeriesId, normalizedTargetSeriesId, normalizedAwardKind, normalizedAwardKind)
+    : database.prepare(`
+        SELECT * FROM poker_satellite_awards
+        WHERE source_table_id = ? AND wallet_subject = ?
+        LIMIT 1
+      `).get(sourceTableId, walletSubject);
+  return hydratePokerSatelliteAward(row);
+}
+
+function upsertPokerSatelliteAward({
+  satelliteAwardId = null,
+  sourceTableId,
+  sourceSeriesId = null,
+  targetTableId = null,
+  targetSeriesId = null,
+  walletSubject,
+  houseId = null,
+  awardKind = 'ticket',
+  registrationState = 'awarded',
+  status = 'active',
+  awardCount = 1,
+  awardValueOil = 0,
+  payload = {},
+  createdAt = null,
+  updatedAt = null,
+}) {
+  return withTransaction((database) => {
+    const now = sqlNow();
+    const existing = database.prepare(`
+      SELECT * FROM poker_satellite_awards
+      WHERE source_table_id = ? AND wallet_subject = ? AND COALESCE(target_series_id, '') = COALESCE(?, '') AND award_kind = ?
+      LIMIT 1
+    `).get(sourceTableId, walletSubject, targetSeriesId, awardKind);
+    const nextId = existing?.satellite_award_id || satelliteAwardId || makeId('pksat');
+    database.prepare(`
+      INSERT INTO poker_satellite_awards (
+        satellite_award_id,
+        source_table_id,
+        source_series_id,
+        target_table_id,
+        target_series_id,
+        wallet_subject,
+        house_id,
+        award_kind,
+        registration_state,
+        status,
+        award_count,
+        award_value_oil,
+        payload_json,
+        created_at,
+        updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(source_table_id, wallet_subject, target_series_id, award_kind) DO UPDATE SET
+        source_series_id = excluded.source_series_id,
+        target_table_id = excluded.target_table_id,
+        house_id = excluded.house_id,
+        registration_state = excluded.registration_state,
+        status = excluded.status,
+        award_count = excluded.award_count,
+        award_value_oil = excluded.award_value_oil,
+        payload_json = excluded.payload_json,
+        updated_at = excluded.updated_at
+    `).run(
+      nextId,
+      sourceTableId,
+      sourceSeriesId,
+      targetTableId,
+      targetSeriesId,
+      walletSubject,
+      houseId,
+      awardKind,
+      registrationState,
+      status,
+      Math.max(1, Number(awardCount || 1)),
+      Math.max(0, Number(awardValueOil || 0)),
+      toJson(payload, {}),
+      existing?.created_at || createdAt || now,
+      updatedAt || now
+    );
+    return hydratePokerSatelliteAward(database.prepare(`
+      SELECT * FROM poker_satellite_awards
+      WHERE satellite_award_id = ?
+    `).get(nextId));
+  });
+}
+
+function hydratePokerRebuyEvent(row) {
+  if (!row) return null;
+  return {
+    rebuyEventId: row.rebuy_event_id,
+    tableId: row.table_id,
+    seriesId: row.series_id || null,
+    handId: row.hand_id || null,
+    walletSubject: row.wallet_subject,
+    houseId: row.house_id || null,
+    seatNumber: Number(row.seat_number || 0) || null,
+    eventKind: row.event_kind,
+    amountOil: Number(row.amount_oil || 0),
+    chipsOil: Number(row.chips_oil || 0),
+    payload: fromJson(row.payload_json, {}),
+    createdAt: row.created_at,
+  };
+}
+
+function createPokerRebuyEvent({
+  rebuyEventId = null,
+  tableId,
+  seriesId = null,
+  handId = null,
+  walletSubject,
+  houseId = null,
+  seatNumber = null,
+  eventKind,
+  amountOil = 0,
+  chipsOil = 0,
+  payload = {},
+  createdAt = null,
+}) {
+  const database = ensureDb();
+  const nextEventId = rebuyEventId || makeId('pkrebuy');
+  const now = createdAt || sqlNow();
+  database.prepare(`
+    INSERT INTO poker_rebuy_events (
+      rebuy_event_id,
+      table_id,
+      series_id,
+      hand_id,
+      wallet_subject,
+      house_id,
+      seat_number,
+      event_kind,
+      amount_oil,
+      chips_oil,
+      payload_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    nextEventId,
+    tableId,
+    seriesId,
+    handId,
+    walletSubject,
+    houseId,
+    seatNumber == null ? null : Number(seatNumber || 0),
+    eventKind,
+    Math.max(0, Number(amountOil || 0)),
+    Math.max(0, Number(chipsOil || 0)),
+    toJson(payload, {}),
+    now
+  );
+  return hydratePokerRebuyEvent(database.prepare(`
+    SELECT * FROM poker_rebuy_events
+    WHERE rebuy_event_id = ?
+  `).get(nextEventId));
+}
+
+function listPokerRebuyEventsByTable(tableId, { limit = 100 } = {}) {
+  const database = ensureDb();
+  const safeLimit = Math.max(1, Math.min(500, Number(limit || 100)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_rebuy_events
+    WHERE table_id = ?
+    ORDER BY created_at DESC, rebuy_event_id DESC
+    LIMIT ?
+  `).all(tableId, safeLimit);
+  return rows.map(hydratePokerRebuyEvent).filter(Boolean);
+}
+
+function listPokerRebuyEventsBySeriesId(seriesId, { limit = 200 } = {}) {
+  const database = ensureDb();
+  const normalizedSeriesId = String(seriesId || '').trim();
+  if (!normalizedSeriesId) return [];
+  const safeLimit = Math.max(1, Math.min(1000, Number(limit || 200)));
+  const rows = database.prepare(`
+    SELECT * FROM poker_rebuy_events
+    WHERE series_id = ?
+    ORDER BY created_at DESC, rebuy_event_id DESC
+    LIMIT ?
+  `).all(normalizedSeriesId, safeLimit);
+  return rows.map(hydratePokerRebuyEvent).filter(Boolean);
+}
+
 function hydratePokerPlayerNotebookEntry(row) {
   if (!row) return null;
   return {
@@ -4996,6 +5331,7 @@ module.exports = {
   createPokerPlayAuditEvent,
   createPokerPlayAction,
   createPokerPlayMessage,
+  createPokerRebuyEvent,
   createWebSession,
   decideApproval,
   getActiveCredentialGrant,
@@ -5027,6 +5363,8 @@ module.exports = {
   getPokerPlaySeatByTableAndNumber,
   getPokerPlaySeatByWalletSubject,
   getPokerPlayTableById,
+  getPokerSatelliteAwardById,
+  getPokerSatelliteAwardBySourceAndWallet,
   getPokerTournamentWaitlistEntryByTableAndWalletSubject,
   getPokerPlayWaitlistEntryByTableAndWalletSubject,
   getPokerReplayArtifactByRunId,
@@ -5068,6 +5406,10 @@ module.exports = {
   listPokerPlaySeatsByWalletSubject,
   listPokerPlaySeatsByTable,
   listPokerPlayTables,
+  listPokerRebuyEventsBySeriesId,
+  listPokerRebuyEventsByTable,
+  listPokerSatelliteAwardsByTargetSeriesId,
+  listPokerSatelliteAwardsByWalletSubject,
   listPokerTournamentWaitlistEntriesByTable,
   listPokerPlayWaitlistEntriesByTable,
   listPokerSeasons,
@@ -5095,6 +5437,7 @@ module.exports = {
   upsertPokerBlindObligation,
   upsertPokerPlaySeat,
   upsertPokerPlayTable,
+  upsertPokerSatelliteAward,
   upsertPokerTournamentWaitlistEntry,
   upsertPokerPlayWaitlistEntry,
   upsertPokerReplayArtifact,

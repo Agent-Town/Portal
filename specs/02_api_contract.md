@@ -916,6 +916,46 @@ Results notes:
 - `data.summary.netOil` includes open live entries, so unresolved live buy-ins remain negative until they cash out, refund, or prize
 - `data.items[].rakeOil` and `data.items[].entryFeeOil` are treasury-contribution breakdown fields, not extra debits beyond `investedOil`
 
+### GET `/api/poker/play/qualifiers/me`
+Returns the bound wallet's satellite qualifier awards and target-series registration state.
+
+Query fields:
+- `asOf`
+- `limit`; optional cap, defaults to `50`
+
+Response fields:
+- `data.walletSubject`
+- `data.items[]`
+- `data.items[].awardId`
+- `data.items[].sourceSeriesId`
+- `data.items[].sourceSeriesTitle`
+- `data.items[].targetSeriesId`
+- `data.items[].targetSeriesTitle`
+- `data.items[].awardKind`
+- `data.items[].awardValueOil`
+- `data.items[].finishPosition`
+- `data.items[].registrationState`
+- `data.items[].registeredTableId`
+- `data.items[].registeredSeatNumber`
+- `data.items[].awardedAt`
+- `data.items[].registeredAt`
+- `data.items[].targetSeries`
+- `data.items[].targetSeries.seriesId`
+- `data.items[].targetSeries.seriesTitle`
+- `data.items[].targetSeries.stage`
+- `data.items[].targetSeries.tableCount`
+- `data.items[].targetSeries.scheduledStartAt`
+- `data.items[].targetSeries.currentUserTableId`
+- `data.summary.awardCount`
+- `data.summary.registeredCount`
+- `data.summary.pendingCount`
+- `data.processAt`
+
+Qualifier notes:
+- `awardKind` currently resolves as `ticket`, `qualifier_seat`, or `credit`
+- a satellite winner that auto-registers into a target series returns `registrationState = "registered"` with the target table details populated
+- satellite auto-registration does not create a second OIL debit when the award kind is `ticket` or `qualifier_seat`
+
 ### GET `/api/poker/play/seasons/native/current`
 Returns the current native live-play season plus its leaderboard, derived from durable poker result rows.
 
@@ -1016,8 +1056,24 @@ Tournament blind progression notes:
 - tournaments expose `data.table.summary.fillPolicy` as `open_match`, `fill_to_full`, or `fill_to_target`
 - tournaments expose `data.table.summary.startTargetSeats`, `data.table.summary.seatsUntilStart`, and `data.table.summary.startReady` for first-hand readiness
 - tournaments expose `data.table.summary.entryCount`
+- tournaments expose `data.table.summary.formatVariant` as `standard` or `satellite`
 - tournaments expose `data.table.summary.reentryLimit`
 - tournaments expose `data.table.summary.acceptedReentryCount`
+- tournaments expose `data.table.summary.rebuyLimit`
+- tournaments expose `data.table.summary.rebuyWindowHands`
+- tournaments expose `data.table.summary.rebuyWindowOpen`
+- tournaments expose `data.table.summary.rebuyWindowRemainingHands`
+- tournaments expose `data.table.summary.acceptedRebuyCount`
+- tournaments expose `data.table.summary.addonWindowAfterHandNumbers[]`
+- tournaments expose `data.table.summary.addonWindowOpen`
+- tournaments expose `data.table.summary.activeAddonWindowAfterHandNumber`
+- tournaments expose `data.table.summary.nextAddonAfterHandNumber`
+- tournaments expose `data.table.summary.addonCostOil`
+- tournaments expose `data.table.summary.addonChipsOil`
+- tournaments expose `data.table.summary.maxAddonsPerSeat`
+- tournaments expose `data.table.summary.addonCount`
+- tournaments expose `data.table.summary.addonPrizePoolOil`
+- tournaments expose `data.table.summary.addonBountyPoolOil`
 - tournaments expose `data.table.summary.scheduledBreakCount`
 - tournaments expose `data.table.summary.scheduledBreakActive`
 - tournaments expose `data.table.summary.scheduledBreakLabel`
@@ -1044,14 +1100,18 @@ Tournament blind progression notes:
 - `data.series.entryCount` exposes the total counted tournament entries, including accepted re-entries
 - `data.series.uniquePlayerCount` exposes the distinct wallet count across those entries
 - `data.series.acceptedReentryCount` exposes the counted re-entry total
+- `data.series.acceptedRebuyCount` exposes the counted rebuy total
 - `data.series.prizePoolOil` is the summed buy-in pool for the full tournament field
+- `data.series.formatVariant` exposes the tournament format family
 - `data.series.payoutModel` currently resolves as `winner_take_all`, `top2_70_30`, `top3_50_30_20`, `top4_40_27_18_15`, or `top5_35_25_18_12_10` from entrant count
 - `data.series.payouts[]` exposes the paid ladder with `place`, `percent`, and `amountOil`
-- `data.table.summary.bountyModel` currently resolves as `none` or `pko_50`
+- `data.table.summary.bountyModel` currently resolves as `none`, `pko_50`, `pko_75`, or `full_bounty`
 - `data.table.summary.bountyPerEntryOil` is the starting bounty attached to one accepted tournament entry
 - `data.table.summary.bountyPoolOil` is the total committed bounty pool across accepted tournament entries
 - `data.series.bountyModel` mirrors the series-wide tournament bounty policy
 - `data.series.bountyPerEntryOil`, `data.series.bountyPoolOil`, `data.series.totalBountyAwardedOil`, and `data.series.activeBountyPoolOil` expose the durable progressive bounty economy
+- satellite tournaments expose `data.table.summary.satelliteTargetSeriesId`, `data.table.summary.satelliteTargetSeriesTitle`, `data.table.summary.satelliteAwardKind`, `data.table.summary.satelliteAwardCount`, and `data.table.summary.satelliteAwardValueOil`
+- satellite series expose `data.series.satelliteTargetSeriesId`, `data.series.satelliteTargetSeriesTitle`, `data.series.satelliteAwardKind`, `data.series.satelliteAwardCount`, and `data.series.satelliteAwardValueOil`
 - once a tournament finishes, `data.series.standings[]` exposes final placements with `place`, `displayName`, `walletSubject`, `prizeOil`, `bountyWonOil`, and `totalWonOil`
 - player tournament seats expose `data.mySeat.currentBountyOil` while still alive and `data.mySeat.bountyWonOil` for settled knockout credits
 - when an operator cancels the series, `data.series.stage = "cancelled"` and the series exposes `adminClosedTableCount`, `refundedSeatCount`, `refundedTotalOil`, `closeReason`, `refundMode`, and `closedAt`
@@ -1065,8 +1125,11 @@ Tournament registration notes:
 - scheduled breaks only begin between hands and only after the configured `afterHandNumber` threshold settles
 - while a scheduled break is active, `data.table.summary.scheduledBreakActive = true` and the next automatic hand waits until `data.table.summary.scheduledBreakUntilAt`
 - tournament series may allow one or more explicit re-entries; accepted re-entries increase `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
+- tournament series may also allow explicit rebuys within `data.table.summary.rebuyWindowHands`; accepted rebuys increase `data.series.entryCount`, `data.series.acceptedRebuyCount`, and `data.series.prizePoolOil`
+- tournament add-ons increase `data.table.summary.addonCount`, `data.table.summary.addonPrizePoolOil`, and, when bounty play is enabled, `data.table.summary.addonBountyPoolOil`
 - tournament settlement is offchain in the OIL ledger and can pay multiple places from the same prize pool
 - once the next hand starts, the registered seat becomes active automatically
+- satellite settlement may create a durable qualifier award and auto-register the winning wallet into the target series without a second OIL debit
 - tournament tables may share one `data.series.seriesId` across multiple live tables when a tournament grows beyond one table
 - when a series can fit back onto one table, active seats may converge to a single final table between hands; overflow tables then fall out of the lobby payload
 - when a series still needs multiple tables, non-live overflow seats may rebalance onto shorter tables between hands; if the destination table is already live, the moved seat arrives as `registered` and activates on that table's next hand
@@ -1114,10 +1177,14 @@ Request shape:
 Tournament-only request fields:
 - `fillPolicy`; `open_match` by default, `fill_to_full` for full-table sit-and-go, or `fill_to_target` for target-start sit-and-go
 - `startTargetSeats`; required for `fill_to_target`, ignored otherwise, and clamped between `minPlayers` and `maxSeats`
+- `formatVariant`; `standard` by default, or `satellite`
 - `lateRegistrationHands`
 - `handsPerBlindLevel`
-- `bountyModel`; `none` by default or `pko_50` for progressive knockout split accounting
+- `bountyModel`; `none` by default, or `pko_50`, `pko_75`, or `full_bounty`
 - `tournamentEntryFeeOil`; optional offchain room fee retained on completed tournament settlement
+- `satelliteTargetSeriesId`, `satelliteTargetSeriesTitle`, `satelliteAwardKind`, `satelliteAwardCount`, and `satelliteAwardValueOil` when `formatVariant = "satellite"`
+- `rebuyLimit` and `rebuyWindowHands` for explicit rebuy policy
+- `addonWindowAfterHandNumbers[]`, `addonCostOil`, `addonChipsOil`, and `maxAddonsPerSeat` for explicit add-on policy
 - `blindLevels[]` with `{ "smallBlindOil": 50, "bigBlindOil": 100 }`
 
 Optional live-play request fields:
@@ -1470,7 +1537,7 @@ Request shape:
 Response notes:
 - returns the normal player table payload for the chosen re-entry table
 - increments `data.series.entryCount`, `data.series.acceptedReentryCount`, and `data.series.prizePoolOil`
-- if `data.series.bountyModel = "pko_50"`, re-entry also increments `data.series.bountyPoolOil` and resets the re-entered seat's `data.mySeat.currentBountyOil`
+- if `data.series.bountyModel = "pko_50"`, `pko_75`, or `full_bounty`, re-entry also increments `data.series.bountyPoolOil` and resets the re-entered seat's `data.mySeat.currentBountyOil`
 - may reuse the same table seat record or choose another live table in the same series, depending on seat availability
 
 Failure codes:
@@ -1482,6 +1549,66 @@ Failure codes:
 - `POKER_PLAY_REENTRY_UNAVAILABLE`
 - `POKER_PLAY_REENTRY_LIMIT_REACHED`
 - `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
+- `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/series/:seriesId/rebuy`
+Lets a wallet with an earlier busted tournament entry buy back into the same series during the configured rebuy window.
+
+Request shape:
+```json
+{
+  "displayName": "Bravo House",
+  "buyInOil": 600,
+  "asOf": "2026-03-11T13:10:10.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload for the chosen rebuy table
+- increments `data.series.entryCount`, `data.series.acceptedRebuyCount`, and `data.series.prizePoolOil`
+- if `data.series.bountyModel = "pko_50"`, `pko_75`, or `full_bounty`, rebuy also increments `data.series.bountyPoolOil` and resets the rebought seat's `data.mySeat.currentBountyOil`
+- may reuse the same table seat record or choose another live table in the same series, depending on seat availability
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `HOUSE_REQUIRED`
+- `NOT_FOUND`
+- `POKER_PLAY_SEAT_ALREADY_ACTIVE`
+- `POKER_PLAY_REBUY_UNAVAILABLE`
+- `POKER_PLAY_REBUY_WINDOW_CLOSED`
+- `POKER_PLAY_REBUY_LIMIT_REACHED`
+- `POKER_PLAY_SELF_EXCLUDED`
+- `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
+- `OIL_BALANCE_TOO_LOW`
+
+### POST `/api/poker/play/tables/:tableId/addon`
+Lets the bound live tournament seat purchase an add-on during an open add-on window.
+
+Request shape:
+```json
+{
+  "asOf": "2026-03-11T13:15:10.000Z"
+}
+```
+
+Response notes:
+- returns the normal player table payload for the same tournament seat
+- increments `data.table.summary.addonCount`, `data.table.summary.addonPrizePoolOil`, and when applicable `data.table.summary.addonBountyPoolOil`
+- increases `data.mySeat.stackOil` by the configured `addonChipsOil`
+- if `data.table.summary.bountyModel = "pko_50"`, `pko_75`, or `full_bounty`, add-on also increments `data.mySeat.currentBountyOil`
+
+Failure codes:
+- `UNAUTHORIZED`
+- `WALLET_SUBJECT_REQUIRED`
+- `FORBIDDEN`
+- `NOT_FOUND`
+- `POKER_PLAY_TABLE_CLOSED`
+- `POKER_PLAY_TABLE_PAUSED`
+- `POKER_PLAY_ADDON_UNAVAILABLE`
+- `POKER_PLAY_ADDON_WINDOW_CLOSED`
+- `POKER_PLAY_ADDON_LIMIT_REACHED`
 - `POKER_PLAY_POLICY_LIMIT_EXCEEDED`
 - `OIL_BALANCE_TOO_LOW`
 
