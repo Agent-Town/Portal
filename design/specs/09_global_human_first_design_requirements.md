@@ -23,6 +23,7 @@ The design must therefore be:
 3. game-like without becoming childish,
 4. provider-agnostic,
 5. voice-ready for future phases.
+6. LLM-assisted rather than detail-heavy.
 
 ## 1. Primary audience contract
 
@@ -60,6 +61,12 @@ It should not feel like:
 3. a prompt engineering product,
 4. a settings labyrinth,
 5. a Western-only metaphor puzzle.
+
+It should also not feel like:
+
+1. a database browser,
+2. a control room that expects the human to inspect every layer manually,
+3. an AI ops interface wearing game art.
 
 Game-like means:
 
@@ -108,6 +115,33 @@ Primary UI should avoid leading with terms like:
 
 These may exist in advanced or debug surfaces.
 They must not dominate primary user flows.
+
+## 3.1 LLM-first information architecture
+
+The user is not alone with the interface.
+The product already includes an LLM companion.
+
+Design implication:
+
+1. rich data should stay available in the product,
+2. rich data should stay accessible to advanced or detailed views,
+3. the default human UI should expose only the minimum needed to act, orient, and trust,
+4. the user should be able to ask the LLM about details instead of parsing dense UI by default,
+5. the primary interface should be summary-first and action-first, not exhaustive by default.
+
+This means future design agents should prefer:
+
+1. clear summaries over raw records,
+2. one obvious next step over many simultaneous diagnostics,
+3. optional drawers, detail panels, and advanced views for human deep dives,
+4. preserving rich system state for LLM interpretation without forcing it into the main layout.
+
+This does not mean deleting information.
+It means separating:
+
+1. what a human must see immediately,
+2. what a human may inspect optionally,
+3. what the LLM can interpret and explain on demand.
 
 ## 4. Internationalization rules
 
@@ -175,6 +209,7 @@ Design implication:
 3. do not make provider setup the center of the product story,
 4. present providers as interchangeable backroom infrastructure unless the user is explicitly in an advanced configuration surface,
 5. keep primary user flows outcome-based, not provider-based.
+6. let the LLM carry explanatory burden before the UI does.
 
 The user should think:
 
@@ -225,6 +260,11 @@ Every major surface should answer these questions visually:
 
 If the user must infer these from dense labels or technical copy, the design is not ready.
 
+The same rule applies to detail:
+
+1. if the user must read a long operational screen to understand their own data, the design is not ready,
+2. if the LLM could answer the question but the UI still forces manual parsing, the design is not ready.
+
 ## 9. Required cross-cutting acceptance criteria
 
 Every approved design phase must now also prove:
@@ -236,6 +276,7 @@ Every approved design phase must now also prove:
 5. the UI still feels game-like and friendly rather than enterprise-technical,
 6. future voice control would have a stable target vocabulary,
 7. the design does not privilege one provider or model brand in primary flows.
+8. the default interface is simpler than the underlying information model while still preserving access to deeper detail.
 
 ## 10. Required design review questions
 
@@ -247,6 +288,7 @@ Future design agents must ask of every changed surface:
 4. Are the actions named in human verbs rather than system nouns?
 5. Could this screen later support voice commands without renaming everything?
 6. Is the playful world helping comprehension or distracting from it?
+7. Is the UI showing only what the human needs right now, with deeper detail left to the LLM or advanced disclosure?
 
 ## 11. Phase implications
 
@@ -257,6 +299,17 @@ These requirements apply to every design phase, with special emphasis on:
 3. D4 for House Library human task framing,
 4. D5 for guided onboarding and sidebar restraint,
 5. D6 for accessibility, empty states, motion, and final cross-device clarity.
+
+## 12. Summary-versus-detail rule
+
+For all future phases, the preferred hierarchy is:
+
+1. simple action surface first,
+2. contextual summary second,
+3. optional human detail third,
+4. raw system richness available to the LLM throughout.
+
+If a screen leads with structured detail instead of a clear task, simplify it.
 
 ## 12. Definition of success
 

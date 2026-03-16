@@ -32,6 +32,23 @@ The `specs/` subfolder mirrors the repo's engineering TDD style, but for design 
 4. each spec defines evidence requirements for mobile, tablet, and desktop,
 5. no design implementation should begin without explicit approval of the phase.
 
+## LLM-first information architecture rule
+
+The user is assumed to have an always-available LLM companion inside the product.
+
+That changes the design goal:
+
+1. rich information should remain available to the system,
+2. rich information should remain available to advanced or detailed views,
+3. the default human UI should show only the minimum needed to act confidently,
+4. the user should be able to learn about complexity by asking the LLM instead of decoding crowded screens.
+
+This means future design agents must treat:
+
+1. default UI as summary, action, and orientation,
+2. advanced drawers and detail views as optional human deep dives,
+3. data-rich system state as something the LLM can interpret on demand without forcing the user to browse raw structure first.
+
 ## Required reading order for future design agents
 
 Read in this order before proposing changes:
@@ -75,6 +92,12 @@ Not allowed without a separate product or engineering decision:
 4. changed data models,
 5. changed navigation architecture that breaks the modal-first worker continuity rule,
 6. design changes that silently require backend logic changes.
+
+Also required:
+
+1. preserve the existence of information even when removing it from the default visual layer,
+2. prefer moving detail behind disclosure over deleting it,
+3. keep the human-facing path dead simple while preserving system richness for the LLM.
 
 ## Verification rule
 

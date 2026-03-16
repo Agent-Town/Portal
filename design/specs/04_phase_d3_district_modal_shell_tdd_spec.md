@@ -38,6 +38,7 @@ Primary files:
 Cross-cutting requirement:
 
 1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+2. room shells must lead with the task, not with exhaustive room detail that the LLM could explain if needed.
 
 ## 4. Measurable acceptance criteria
 
@@ -47,7 +48,8 @@ Cross-cutting requirement:
 4. each district surface can establish one clear primary region in the first screenful,
 5. modal content remains usable at mobile, tablet, and desktop,
 6. no modal content clips behind the agent sidebar or safe area,
-7. the active room identity remains obvious enough for future voice and multilingual use.
+7. the active room identity remains obvious enough for future voice and multilingual use,
+8. default room views stay summary-first even when the underlying room has rich operational detail.
 
 ## 5. Evidence requirements
 

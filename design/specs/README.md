@@ -9,6 +9,12 @@ Each spec should be treated as:
 3. approval-gated,
 4. implementation-ready for a future AI design agent.
 
+Cross-cutting rule:
+
+1. the default UI should stay simple enough for non-technical users,
+2. rich detail should remain available through advanced views and LLM-readable product state,
+3. future design work should not confuse "less visible by default" with "deleted from the product."
+
 ## Reading order
 
 1. `00_design_tdd_protocol.md`
@@ -30,6 +36,12 @@ Every design spec should include:
 7. evidence requirements,
 8. exact file targets,
 9. exit criteria.
+
+Whenever relevant, specs should also state:
+
+1. what detail stays in the product for LLM use,
+2. what detail is hidden from the default human path,
+3. which advanced views preserve optional human deep inspection.
 
 ## Verification model
 

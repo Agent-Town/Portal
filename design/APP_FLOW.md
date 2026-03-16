@@ -10,7 +10,8 @@ Cross-cutting rule:
 1. every major flow must remain understandable to non-technical users,
 2. every major flow must survive localization,
 3. every major flow should be describable in plain verbs,
-4. future voice interaction should be able to refer to the current room and main action clearly.
+4. future voice interaction should be able to refer to the current room and main action clearly,
+5. the user should be able to rely on the LLM for explanation instead of browsing dense detail by default.
 
 ## 1. Route inventory
 
@@ -140,7 +141,8 @@ Design consequence:
 2. it can easily become visually administrative,
 3. hierarchy and progressive disclosure are essential,
 4. primary actions must be human verbs, not AI vocabulary,
-5. the default state must still make sense across languages.
+5. the default state must still make sense across languages,
+6. detailed trust, provenance, revision, and route data should stay available without dominating the main path.
 
 ## 6. Town Hall flow
 
@@ -189,7 +191,8 @@ Design consequence:
 Design consequence:
 
 1. all of these inherit the same shell,
-2. they should not all inherit the same visual density.
+2. they should not all inherit the same visual density,
+3. advanced infrastructure detail should remain secondary because the LLM can help explain it.
 
 ## 8. Device audit order
 
@@ -227,4 +230,5 @@ This is mandatory because the current product reveals its biggest hierarchy and 
 2. task-first hierarchy not yet strong enough,
 3. advanced/manual controls still accumulate visual weight,
 4. human goals are less obvious than system structure,
-5. language still risks sounding more technical than necessary for mainstream users.
+5. language still risks sounding more technical than necessary for mainstream users,
+6. the screen still asks the human to inspect more structure than necessary when the LLM could explain it.

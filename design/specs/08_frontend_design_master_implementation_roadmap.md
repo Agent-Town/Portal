@@ -13,7 +13,8 @@ It tells the next agent:
 3. what must change,
 4. in what order it should change,
 5. which files and screenshots matter,
-6. which constraints must never be broken.
+6. which constraints must never be broken,
+7. how to keep the UI simple while preserving rich detail for the LLM and advanced users.
 
 Use this document after reading:
 
@@ -60,7 +61,8 @@ Every future design phase must preserve:
 9. usability for low-AI-literacy users,
 10. international flexibility, especially English and Chinese,
 11. provider-agnostic primary flows,
-12. future voice-ready interaction grammar.
+12. future voice-ready interaction grammar,
+13. default human surfaces that remain simpler than the underlying information model because the LLM can explain deeper detail on demand.
 
 Do not:
 
@@ -76,7 +78,8 @@ The correct design move is:
 2. make the interface quieter,
 3. make the user's next action obvious,
 4. name actions in human language,
-5. avoid letting infrastructure vocabulary become the product face.
+5. avoid letting infrastructure vocabulary become the product face,
+6. preserve detail for LLM interpretation and advanced disclosure instead of surfacing it all by default.
 
 ## 3. Surface inventory
 
@@ -96,6 +99,7 @@ The current frontend surfaces that must be considered together are:
 The work is not complete until all of these surfaces feel like one authored product family.
 
 They must also feel understandable to users who do not think in AI systems language.
+They must not force users to browse rich system detail manually when the LLM can mediate it.
 
 ## 4. Master findings matrix
 
@@ -121,7 +125,8 @@ Required outcome:
 6. one icon language for action and one for state, both visually consistent,
 7. a design system future agents can extend without inventing one-off fixes,
 8. token and typography rules that remain stable under English and Chinese UI,
-9. primary action naming that stays compatible with future voice control.
+9. primary action naming that stays compatible with future voice control,
+10. a summary-first visual language that does not force humans to parse system detail screens.
 
 Primary files:
 
@@ -157,7 +162,8 @@ Required outcome:
 3. the media frame supports rather than dominates,
 4. fallback presentation looks intentional if media is absent,
 5. the bottom of the screen remains calm on mobile,
-6. the first action is understandable without knowing what an AI agent is.
+6. the first action is understandable without knowing what an AI agent is,
+7. deeper technical detail stays secondary because the LLM can explain it if needed.
 
 Primary files:
 
@@ -190,7 +196,8 @@ Required outcome:
 3. the world remains expressive without forcing interpretation,
 4. the sidebar becomes a supporting presence unless engaged,
 5. touch behavior feels intentional on mobile,
-6. the map reads like places and actions, not a technical dashboard.
+6. the map reads like places and actions, not a technical dashboard,
+7. the hub does not front-load technical state that the LLM can explain if asked.
 
 Primary files:
 
@@ -223,7 +230,8 @@ Required outcome:
 3. secondary panels step back visually,
 4. all district modals share one composition grammar,
 5. information density feels deliberate rather than stacked,
-6. room identity remains obvious enough for future voice reference.
+6. room identity remains obvious enough for future voice reference,
+7. default modal views emphasize the task rather than exhaustive room detail.
 
 Primary files:
 
@@ -253,7 +261,8 @@ Current problems:
 2. user goals are weaker than system sections,
 3. advanced and manual controls remain too visible too early,
 4. the top-level screen is not yet organized around meaningful human tasks,
-5. card language is improved but not yet calm enough across all Library desks.
+5. card language is improved but not yet calm enough across all Library desks,
+6. too much information still appears as if the human must inspect it directly instead of asking the LLM.
 
 Required outcome:
 
@@ -262,7 +271,8 @@ Required outcome:
 3. discovery remains nearby but not noisy,
 4. supporting desks feel related and secondary,
 5. technical provenance stays available without dominating the first screenful,
-6. Library actions read as human verbs rather than AI concepts.
+6. Library actions read as human verbs rather than AI concepts,
+7. rich artifact detail remains available while the main path stays summary-first.
 
 Primary files:
 
@@ -297,7 +307,8 @@ Required outcome:
 3. customization is clearly secondary,
 4. processing reads as confident progress,
 5. identity completion feels meaningful rather than clerical,
-6. the ceremony remains understandable without agent-setup literacy.
+6. the ceremony remains understandable without agent-setup literacy,
+7. onboarding asks for decisions, not for manual interpretation of system detail.
 
 Primary files:
 
@@ -443,7 +454,8 @@ Future agent must verify:
 2. loading never looks like a broken surface,
 3. error language is calm and readable,
 4. these states follow the same visual system as full states,
-5. fallback states remain understandable across languages and low technical literacy.
+5. fallback states remain understandable across languages and low technical literacy,
+6. fallback states summarize what matters instead of exposing raw system internals first.
 
 ### 5.8 Responsiveness and accessibility
 
@@ -524,7 +536,8 @@ Every future implementation step must include:
 5. confirmation that behavior did not change,
 6. passing targeted Playwright runs,
 7. passing `npm test`,
-8. explicit confirmation that the phase still satisfies `design/specs/09_global_human_first_design_requirements.md`.
+8. explicit confirmation that the phase still satisfies `design/specs/09_global_human_first_design_requirements.md`,
+9. explicit confirmation that the phase keeps the default human path simpler than the full underlying information model.
 
 ## 8. File-target map for next agent
 
@@ -554,4 +567,5 @@ The frontend findings from the earlier audit are considered implemented only whe
 4. the interface becomes calmer and more inevitable,
 5. the Library feels human-friendly rather than administrative,
 6. the debug and worker surfaces remain available but no longer compete visually,
-7. existing functionality and tests still pass.
+7. existing functionality and tests still pass,
+8. the UI lets the LLM and advanced views carry detail while the default path stays dead simple.

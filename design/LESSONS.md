@@ -255,3 +255,15 @@ Rule:
 1. prefer viewport captures that match what the user actually sees,
 2. if a modal is scaled or transformed, scroll the relevant surface into view before capturing it,
 3. design evidence should communicate hierarchy clearly, not just prove that a node exists.
+
+## 27. When the LLM is always present, the UI does not need to explain everything
+
+Agent Town is not a standalone form app.
+The user has an LLM companion inside the product.
+
+Rule:
+
+1. keep rich information in the system,
+2. let advanced views and drawers preserve optional human deep inspection,
+3. keep the default screen focused on action, confidence, and orientation,
+4. if the LLM can explain complexity on demand, the main UI should usually summarize rather than enumerate it.

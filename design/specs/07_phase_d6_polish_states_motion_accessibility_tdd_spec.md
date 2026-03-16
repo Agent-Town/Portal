@@ -31,6 +31,7 @@ Only presentation-related JS changes are allowed.
 Cross-cutting requirement:
 
 1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+2. polish work must reinforce a summary-first UI instead of reintroducing visible detail clutter.
 
 ## 4. Measurable acceptance criteria
 
@@ -44,13 +45,15 @@ Cross-cutting requirement:
 
 1. empty surfaces feel authored rather than unfinished,
 2. each empty state points toward one next action,
-3. empty states are visually consistent across districts.
+3. empty states are visually consistent across districts,
+4. empty states summarize what matters instead of dumping system detail into the blank state.
 
 ### 4.3 Error states
 
 1. error styling is consistent,
 2. error text is clear and not hostile,
-3. the user can recover without deciphering technical jargon.
+3. the user can recover without deciphering technical jargon,
+4. default error states explain just enough for the user while deeper diagnosis remains available elsewhere.
 
 ### 4.4 Motion
 
@@ -87,7 +90,8 @@ This phase is complete only when:
 
 1. the interface feels finished in motion and state transitions,
 2. the app remains calm when empty, loading, or failing,
-3. accessibility is visibly stronger than the baseline.
+3. accessibility is visibly stronger than the baseline,
+4. the final UI stays dead simple on the main path even though the product retains richer detail for the LLM and advanced views.
 
 ## 8. Implementation evidence
 

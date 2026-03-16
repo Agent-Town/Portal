@@ -29,6 +29,7 @@ Optional JS presentation support only if needed:
 Cross-cutting requirement:
 
 1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+2. onboarding and support chrome must stay simple enough that deeper explanation can come from the LLM instead of from dense UI.
 
 ## 4. Measurable acceptance criteria
 
@@ -39,14 +40,16 @@ Cross-cutting requirement:
 3. processing and mint states feel guided, not clerical,
 4. the continue action is obvious once available,
 5. mobile onboarding remains usable without feeling cramped,
-6. onboarding remains understandable to users unfamiliar with agent setup concepts.
+6. onboarding remains understandable to users unfamiliar with agent setup concepts,
+7. onboarding focuses on user decisions instead of exposing system detail the LLM can explain later.
 
 ### 4.2 Agent sidebar
 
 1. by default, the sidebar no longer competes with the current main task,
 2. debug information remains available and readable,
 3. bottom safe area and content spacing remain intentional on mobile,
-4. expanded and collapsed states remain clear and accessible.
+4. expanded and collapsed states remain clear and accessible,
+5. support and debug detail remains available without dominating the human path.
 
 ## 5. Evidence requirements
 

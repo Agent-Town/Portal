@@ -95,7 +95,8 @@ When changing markup:
 1. preserve existing `data-testid` attributes unless a spec explicitly changes them,
 2. preserve accessible names for buttons and controls,
 3. preserve the current action wiring unless the change is explicitly approved as a functional change,
-4. update Playwright coverage if the visual contract is intentionally changed.
+4. update Playwright coverage if the visual contract is intentionally changed,
+5. prefer simplifying the default visible layer before removing any underlying information the LLM or advanced users may still need.
 
 ## 6. Responsive implementation rules
 
@@ -136,7 +137,19 @@ The Library has become a large same-shell system. Design agents must preserve:
 Visual simplification is allowed.
 Behavioral simplification is not automatically allowed.
 
-## 7.1 Human-first wording rule
+## 7.1 LLM-first information presentation rule
+
+The interface should assume the user can ask the in-product LLM for explanation and retrieval help.
+
+Implementation implication:
+
+1. do not surface every field or diagnostic just because it exists,
+2. keep default panels action-first and summary-first,
+3. keep richer detail accessible through drawers, detail panes, or advanced surfaces,
+4. preserve ids, hooks, and readable structure so the LLM can still interpret the richer state model,
+5. treat "simple for the human" and "rich for the system" as compatible goals, not opposing ones.
+
+## 7.2 Human-first wording rule
 
 For primary user-facing surfaces:
 
@@ -145,7 +158,7 @@ For primary user-facing surfaces:
 3. keep provider and model names secondary unless the user is explicitly configuring them,
 4. ensure the main task would still make sense to someone new to AI.
 
-## 7.2 Voice-ready structure rule
+## 7.3 Voice-ready structure rule
 
 Future design work should preserve:
 
@@ -172,3 +185,4 @@ For every approved design phase:
 2. If JS is needed, keep it limited to presentation state, not product logic.
 3. Prefer reusing existing semantic wrappers rather than inventing redundant container divs.
 4. Reduce visual complexity before introducing new decorative elements.
+5. When choosing between visible detail and optional detail, default to the simpler visible layer if the LLM can safely carry the explanatory burden.

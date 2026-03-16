@@ -78,6 +78,8 @@ For every changed surface, verify:
 11. the main action is understandable without AI jargon,
 12. the screen remains plausible for English and Chinese UI,
 13. the action vocabulary remains compatible with future voice control.
+14. the default human view is simpler than the full underlying information model,
+15. detailed data remains accessible through disclosure or LLM-facing product state instead of crowding the main screen.
 
 ## 6. Functional safety contract
 
@@ -91,6 +93,18 @@ Design work must preserve:
 6. current backend/API behavior.
 
 If a proposed design improvement requires a functional change, the future agent must say so explicitly and stop.
+
+## 6.1 LLM-first simplification rule
+
+The product assumes the user can ask the in-product LLM for explanation and retrieval help.
+
+Design implication:
+
+1. do not surface every available detail by default just because the system has it,
+2. keep task-critical context visible,
+3. move dense or technical detail behind advanced views when possible,
+4. preserve enough structure that the LLM can still retrieve, explain, and act on the richer data model,
+5. optimize the human UI for action and confidence, not for exhaustive browsing.
 
 ## 7. Verification commands
 

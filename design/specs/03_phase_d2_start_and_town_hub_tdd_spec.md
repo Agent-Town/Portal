@@ -36,6 +36,7 @@ Any JS changes in this phase must remain presentation-only.
 Cross-cutting requirement:
 
 1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+2. entry and hub surfaces must stay simple enough that deeper explanation can come from the LLM instead of extra screen detail.
 
 ## 4. Measurable acceptance criteria
 
@@ -45,7 +46,8 @@ Cross-cutting requirement:
 2. the primary CTA is the most visually dominant interactive element,
 3. the page still feels intentional if the hero media does not render,
 4. the warning footer no longer competes visually with the main action,
-5. the first action remains understandable to users with no AI vocabulary.
+5. the first action remains understandable to users with no AI vocabulary,
+6. the front door does not expose setup complexity that the LLM can explain later.
 
 ### 4.2 Town hub
 
@@ -53,7 +55,8 @@ Cross-cutting requirement:
 2. the selected district is visually unambiguous,
 3. the existing status or supporting copy clearly reinforces what opens next,
 4. mobile tap targets feel thumb-safe and do not require pixel hunting,
-5. the town metaphor remains understandable across languages.
+5. the town metaphor remains understandable across languages,
+6. the hub remains place-first and action-first rather than surfacing system detail prematurely.
 
 ### 4.3 Responsive composition
 

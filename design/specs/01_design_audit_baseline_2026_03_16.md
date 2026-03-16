@@ -41,6 +41,12 @@ It does not yet have a quiet or inevitable interface hierarchy.
 The biggest current issue is not lack of visual identity.
 It is too much visual competition at once.
 
+There is also a structural product opportunity:
+
+1. too much raw or system-facing detail is surfaced for people by default,
+2. the app already has an always-available LLM companion,
+3. the UI should rely more on that companion to explain complexity and less on screens filled with layered detail.
+
 ## 3. Primary findings by surface
 
 ### 3.1 Start page
@@ -77,6 +83,7 @@ Problems:
 2. human goals are less obvious than system structure,
 3. technical/manual controls still carry too much default visual weight,
 4. cards and drawers improved things, but the top-level task architecture is still not simple enough.
+5. too much information is still presented as if the human must inspect it manually instead of asking the LLM.
 
 ### 3.5 Town Hall
 
@@ -93,6 +100,14 @@ Problems:
 1. it reads like a second product attached to the app,
 2. it is too visually prominent by default,
 3. mobile and short-height layouts feel compressed once the sidebar is present.
+
+### 3.7 Information architecture
+
+Problems:
+
+1. the product often presents complexity directly to the human even when the LLM could mediate it,
+2. advanced and detailed information is not always separated clearly from the primary path,
+3. the UI still occasionally behaves like a system browser instead of a guided game surface.
 
 ## 4. System-level findings
 
@@ -164,7 +179,8 @@ Needed direction:
 1. task-first architecture,
 2. calmer top-level grouping,
 3. advanced control quieting,
-4. human-readable task framing.
+4. human-readable task framing,
+5. clear separation between simple user view and deeper LLM/advanced detail.
 
 ### D5 - Town Hall and agent sidebar
 
@@ -179,6 +195,7 @@ Needed direction:
 3. motion,
 4. accessibility tightening,
 5. final cross-device rhythm cleanup.
+6. consistent summary-versus-detail treatment across loading, empty, and error surfaces.
 
 ## 6. Non-negotiable guardrails from the audit
 
@@ -188,4 +205,4 @@ Needed direction:
 4. no destruction of current test coverage assumptions,
 5. no color-only status patterns,
 6. no default screen where every control screams equally.
-
+7. no default screen that assumes the human must browse all available system detail manually.

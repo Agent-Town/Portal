@@ -19,6 +19,7 @@ not like one long administrative form.
 Cross-cutting requirement:
 
 1. all changes must satisfy `design/specs/09_global_human_first_design_requirements.md`
+2. the Library must keep rich memory and provenance available without forcing the default human path to browse it manually.
 
 ## 2. Scope
 
@@ -49,7 +50,8 @@ Supporting specs to preserve:
 2. discovery must remain legible,
 3. advanced/manual tools must remain available but quiet,
 4. route, safety, relay, satchel, and local item surfaces must look like one family,
-5. trust and safety must remain visible without long reading.
+5. trust and safety must remain visible without long reading,
+6. the user should be able to ask the LLM for detail instead of being confronted by default with every detail layer.
 
 ## 5. Measurable acceptance criteria
 
@@ -58,13 +60,15 @@ Supporting specs to preserve:
 1. at mobile and desktop, the first screenful reveals one clear primary Library purpose,
 2. the user can identify where to save, discover, or open without reading the entire panel,
 3. no more than one visually dominant action cluster appears at once,
-4. the main Library verbs remain understandable without AI terminology.
+4. the main Library verbs remain understandable without AI terminology,
+5. the first screenful prefers action and summary over provenance or system structure.
 
 ### 5.2 Progressive disclosure
 
 1. manual and advanced controls remain hidden by default where already possible,
 2. drawers read as supporting tools, not primary content,
-3. technical inputs do not dominate the first screenful.
+3. technical inputs do not dominate the first screenful,
+4. deeper Library detail remains available through drawers and advanced areas rather than being removed.
 
 ### 5.3 Card consistency
 
@@ -107,7 +111,8 @@ This phase is complete only when:
 
 1. the Library feels task-first,
 2. the underlying power remains intact,
-3. a non-technical user can infer what the Library is for without reading every section heading.
+3. a non-technical user can infer what the Library is for without reading every section heading,
+4. the default Library path is simpler than the full underlying memory model.
 
 ## 9. Implementation evidence
 

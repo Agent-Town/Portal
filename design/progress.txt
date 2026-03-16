@@ -15,6 +15,10 @@ Current state:
 - Added phased design specs in `design/specs/`
 - Added master implementation roadmap for all currently known frontend audit findings
 - Added cross-cutting global human-first design requirements for low-AI-literacy, international, Chinese, provider-flexible, and future voice-ready design
+- Added cross-cutting LLM-first information architecture rule:
+  - the default UI should stay dead simple for humans
+  - detailed information should remain available to the LLM and advanced disclosure
+  - future design phases must not force users to browse rich system detail by default
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start

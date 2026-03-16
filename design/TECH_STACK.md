@@ -86,6 +86,7 @@ Design implication:
 1. third-party embeds can fail or load slowly,
 2. the design must degrade gracefully,
 3. empty or loading states must feel intentional.
+4. because the app already has an in-product LLM, the UI does not need to expose every available detail directly.
 
 ## 7.1 Internationalization and provider flexibility implications
 
@@ -101,7 +102,8 @@ Design implication:
 1. core layout should not depend on one provider brand,
 2. primary flows should not be built around provider-specific wording,
 3. text containers must tolerate localization,
-4. design choices should assume English and Chinese are both important.
+4. design choices should assume English and Chinese are both important,
+5. detailed system information can remain available to the LLM and advanced views while the default human UI stays simpler.
 
 ## 7.2 Future voice implications
 
@@ -113,7 +115,8 @@ Design implication:
 1. controls need stable names,
 2. rooms and panels need obvious identities,
 3. ambiguous icon-only action clusters should be avoided,
-4. visual confirmation states matter because voice flows will need them later.
+4. visual confirmation states matter because voice flows will need them later,
+5. summary-first UI helps voice and LLM explanation scale better than detail-heavy screens.
 
 ## 8. Test and verification environment
 

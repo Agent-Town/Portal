@@ -33,6 +33,7 @@ It must also feel:
 3. game-like without becoming childish,
 4. adaptable across languages and provider stacks,
 5. ready for future voice interaction patterns.
+6. simpler for humans because the LLM carries explanatory complexity.
 
 ## 2.1 Audience contract
 
@@ -51,6 +52,7 @@ Design implication:
 2. the primary UI cannot depend on English-only jargon,
 3. the design should teach through place, hierarchy, verbs, and feedback,
 4. advanced technical language must stay secondary.
+5. the human should not have to browse every layer of detail when the LLM can explain it on demand.
 
 ## 3. Core design requirements
 
@@ -64,6 +66,7 @@ Design implication:
 8. Core surfaces must remain visually robust under localization, especially English and Chinese.
 9. Provider and model choice must not dominate primary user journeys.
 10. The interaction grammar must remain compatible with future voice control.
+11. Detailed information should remain available, but primarily through advanced views and the LLM rather than default screen clutter.
 
 ## 4. Screen-level requirements
 
@@ -100,7 +103,8 @@ Required outcome:
 3. advanced controls visible only when needed,
 4. consistent card/drawer language,
 5. trust and safety visible without long reading,
-6. same-shell continuity always preserved.
+6. same-shell continuity always preserved,
+7. rich artifact detail remains available without making the default Library path feel like an archive browser.
 
 ### 4.5 Town Hall
 
@@ -131,7 +135,8 @@ These are the primary measurable outcomes for future phases:
 7. full Playwright suite remains green,
 8. key actions remain understandable without AI jargon,
 9. primary screens remain legible under English and Chinese label conditions,
-10. the UI still reads as one calm game-like world rather than a technical control plane.
+10. the UI still reads as one calm game-like world rather than a technical control plane,
+11. the main path stays summary-first even when the underlying system contains much richer information.
 
 ## 6. Non-goals
 
@@ -156,7 +161,8 @@ It is:
 2. stronger human task framing,
 3. calmer defaults,
 4. better trust readability,
-5. simpler cross-device use.
+5. simpler cross-device use,
+6. fewer reasons for the human to manually inspect structured detail that the LLM can explain instead.
 
 ## 8. Cross-cutting audience requirement
 

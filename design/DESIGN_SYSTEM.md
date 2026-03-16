@@ -33,6 +33,7 @@ The interface must stay disciplined.
 8. Primary controls must be nameable with simple human verbs.
 9. The system must tolerate localization, especially English and Chinese.
 10. The visual grammar must remain compatible with future voice control.
+11. Default surfaces should present summary and action first, while richer detail remains available through advanced views and LLM-readable state.
 
 ## 3. Current token baseline from `public/styles.css`
 
@@ -185,6 +186,7 @@ Every design change must preserve or improve:
 4. screen-reader naming on icon-first controls,
 5. no color-only status encoding,
 6. predictable reading order in modal and drawer flows.
+7. no default requirement that the human scan dense structured detail to understand their next move.
 
 ## 6.1 Localization and global readability contract
 
@@ -195,6 +197,7 @@ Every design change must also preserve or improve:
 3. layouts that do not depend on English-only word length,
 4. text presentation that remains readable for Latin and Chinese scripts,
 5. primary actions that remain obvious without technical vocabulary.
+6. primary screens that stay comprehensible even when richer detail is deferred to the LLM or advanced disclosure.
 
 ## 6.2 Voice-readiness contract
 
@@ -205,6 +208,7 @@ Every design change must also preserve or improve:
 3. visible state changes not communicated by color alone,
 4. controls that can later be referenced clearly in speech,
 5. room and panel structures that make current context visually obvious.
+6. stable summary surfaces that can be explained by voice or the LLM without exposing every underlying record.
 
 ## 7. Design system rules for future changes
 
@@ -221,6 +225,7 @@ Every design change must also preserve or improve:
 5. If a user must read long text to understand the next step, the hierarchy is wrong.
 6. If a user must understand AI jargon to act, the design is wrong.
 7. If a control label only works in English, it is not ready.
+8. If the LLM could explain a detail more cleanly than the screen, the screen should usually summarize instead of enumerate.
 
 ## 8. Approved direction, not yet implemented
 
@@ -231,7 +236,8 @@ These are approved as design direction for future phase planning, but not yet im
 3. move advanced controls behind progressive disclosure by default,
 4. use simple human verbs in primary flows,
 5. build layouts that remain composed for English and Chinese,
-6. maintain a control vocabulary that can later support voice interaction.
+6. maintain a control vocabulary that can later support voice interaction,
+7. keep default surfaces simple even as the underlying system remains rich for LLM and advanced use.
 
 ## 9. Pending additions required before major implementation
 
