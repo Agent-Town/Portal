@@ -1,0 +1,37 @@
+Design workspace status
+Last updated: 2026-03-16
+
+Current state:
+- Created canonical design documentation folder at `design/`
+- Created dedicated frontend design branch `codex/frontend-design`
+- Added baseline source-of-truth docs:
+  - DESIGN_SYSTEM.md
+  - FRONTEND_GUIDELINES.md
+  - APP_FLOW.md
+  - PRD.md
+  - TECH_STACK.md
+  - LESSONS.md
+  - progress.txt
+- Added phased design specs in `design/specs/`
+- Added master implementation roadmap for all currently known frontend audit findings
+- Recorded March 2026 baseline audit findings for:
+  - /start
+  - /app town hub
+  - district modal shell
+  - House Library
+  - Town Hall
+  - agent sidebar
+
+Completed:
+- Design audit completed at mobile, tablet, and desktop
+- Current visual system documented from `public/styles.css`
+- Future design agent workflow documented
+- Frontend execution order documented from system foundation through polish
+
+Not yet done:
+- No design implementation phase has been approved
+- No design token refactor has been implemented
+- No screenshots or before/after evidence pack has been committed as canonical artifacts
+
+Recommended next step:
+- Approve Phase D1 before any frontend design implementation begins
