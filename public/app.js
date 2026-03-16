@@ -1903,11 +1903,29 @@ function getHouseReconnectIntroText({
     : 'Your house is ready. Continue in this town session.';
 }
 
+function getHouseReconnectSnippetText({
+  houseId = houseSurfaceState.context.houseId,
+  teamCode = lastState?.teamCode || lastState?.pairCode || '…',
+} = {}) {
+  const normalizedTeamCode = String(teamCode || '').trim() || '…';
+  const savedName = getSavedHouseHqName(houseId);
+  return savedName
+    ? `Reconnect worker session ${normalizedTeamCode} to ${savedName} HQ.`
+    : `Reconnect worker session ${normalizedTeamCode} to your house.`;
+}
+
 function renderHouseReconnectIntro({
   houseId = houseSurfaceState.context.houseId,
   recovered = walletRecovered,
 } = {}) {
   safeSetText('reconnectIntro', getHouseReconnectIntroText({ houseId, recovered }));
+}
+
+function renderHouseReconnectSnippet({
+  houseId = houseSurfaceState.context.houseId,
+  teamCode = lastState?.teamCode || lastState?.pairCode || '…',
+} = {}) {
+  safeSetText('houseSnippet', getHouseReconnectSnippetText({ houseId, teamCode }));
 }
 
 function renderHouseShareCardCta({ houseId = houseSurfaceState.context.houseId, sharePath = '' } = {}) {
@@ -2102,6 +2120,7 @@ function renderHouseHqEntrySurface() {
   if (startMissionBtn) startMissionBtn.disabled = !ready;
   renderHouseDistrictHeader();
   renderHouseReconnectIntro({ houseId });
+  renderHouseReconnectSnippet({ houseId });
   renderHouseShareCardCta({ houseId, sharePath: resolveSharePathFromState(lastState) });
   if (!panel || !ready) return;
 
@@ -12826,7 +12845,7 @@ async function updateUI(state) {
       safeSetText('reconnectTitle', 'Reconnect to House');
     }
     renderHouseReconnectIntro({ houseId, recovered: walletRecovered });
-    safeSetText('houseSnippet', `Reconnect worker session ${teamCode} to your house.`);
+    renderHouseReconnectSnippet({ houseId, teamCode });
     const openHouseLink = el('openHouseLink');
     if (openHouseLink) openHouseLink.href = `/house?house=${encodeURIComponent(houseId)}`;
   }
