@@ -10590,6 +10590,11 @@ function applyLlmProviderModelSelection(provider, model) {
   return { provider: selectedProvider, model: selectedModel };
 }
 
+function setVisibilityClass(node, visible) {
+  if (!node) return;
+  node.classList.toggle('is-hidden', !visible);
+}
+
 function updateLlmOauthLaunchUi() {
   const launchBtn = el('llmOauthLaunchBtn');
   const completeBtn = el('llmOauthCompleteBtn');
@@ -10597,13 +10602,13 @@ function updateLlmOauthLaunchUi() {
   const provider = String(el('llmProviderSelect')?.value || 'openai').trim() || 'openai';
   const mode = readLlmAuthMode();
   const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
-  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  setVisibilityClass(launchBtn, mode === 'oauth-json');
   launchBtn.disabled = !supported;
   launchBtn.title = supported
     ? 'Start OpenAI PKCE OAuth in a new tab.'
     : 'OAuth launch is available for OpenAI providers only.';
   if (completeBtn) {
-    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    setVisibilityClass(completeBtn, mode === 'oauth-json');
     completeBtn.disabled = !supported;
     completeBtn.title = supported
       ? 'Complete OAuth using pasted callback URL/code.'
@@ -10844,7 +10849,7 @@ function setLlmAuthModeUI(mode) {
   const keyInput = el('llmKeyInput');
 
   if (authModeSelect) authModeSelect.value = authMode;
-  if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
+  setVisibilityClass(oauthInput, authMode === 'oauth-json');
   if (keyInput) {
     keyInput.placeholder = authMode === 'oauth-json'
       ? 'Optional override token (usually auto-derived from OAuth input)'
@@ -11923,13 +11928,13 @@ function updateAgentLlmOauthLaunchUi() {
   const provider = String(el('agentLlmProviderSelect')?.value || 'openai').trim() || 'openai';
   const mode = readAgentLlmAuthMode();
   const supported = OPENAI_CODEX_OAUTH_PROVIDERS.has(provider.toLowerCase());
-  launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+  setVisibilityClass(launchBtn, mode === 'oauth-json');
   launchBtn.disabled = !supported;
   launchBtn.title = supported
     ? 'Start OpenAI PKCE OAuth in a new tab.'
     : 'OAuth launch is available for OpenAI providers only.';
   if (completeBtn) {
-    completeBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none';
+    setVisibilityClass(completeBtn, mode === 'oauth-json');
     completeBtn.disabled = !supported;
     completeBtn.title = supported
       ? 'Complete OAuth using pasted callback URL/code.'
@@ -11943,7 +11948,7 @@ function setAgentLlmAuthModeUI(mode) {
   const oauthInput = el('agentLlmOauthProfileInput');
   const keyInput = el('agentLlmKeyInput');
   if (authModeSelect) authModeSelect.value = authMode;
-  if (oauthInput) oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none';
+  setVisibilityClass(oauthInput, authMode === 'oauth-json');
   if (keyInput) {
     keyInput.placeholder = authMode === 'oauth-json'
       ? 'Optional override token (usually auto-derived from OAuth input)'

@@ -119,3 +119,23 @@ test('create markup uses structured hero and canvas classes instead of inline la
   expect(createHtml).not.toContain('style=');
   expect(createScript).not.toContain("el('shareStatus').style.display");
 });
+
+test('trainer and brain markup use structured classes instead of inline layout styling', async () => {
+  const indexPath = path.join(process.cwd(), 'public/index.html');
+  const indexHtml = fs.readFileSync(indexPath, 'utf8');
+  const appPath = path.join(process.cwd(), 'public/app.js');
+  const appScript = fs.readFileSync(appPath, 'utf8');
+
+  expect(indexHtml).toContain('class="trainerHero"');
+  expect(indexHtml).toContain('data-testid="trainer-action-row"');
+  expect(indexHtml).toContain('class="panel trainerSectionCard"');
+  expect(indexHtml).toContain('class="agent-mind-header"');
+  expect(indexHtml).toContain('data-testid="lite-llm-advanced-body"');
+  expect(indexHtml).not.toContain('style="display: none;"');
+  expect(indexHtml).not.toContain('style="display:none; justify-self:start;"');
+  expect(indexHtml).not.toContain('<details style=');
+  expect(indexHtml).not.toContain('style="display:flex; align-items:center; gap:8px; margin-top:4px;"');
+  expect(indexHtml).not.toContain('style="margin-top: 12px;"');
+  expect(appScript).not.toContain("oauthInput.style.display = authMode === 'oauth-json' ? 'block' : 'none'");
+  expect(appScript).not.toContain("launchBtn.style.display = mode === 'oauth-json' ? 'inline-flex' : 'none'");
+});

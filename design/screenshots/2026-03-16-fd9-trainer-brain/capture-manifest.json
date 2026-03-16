@@ -1,0 +1,32 @@
+{
+  "capturedAt": "2026-03-16T09:34:46.766Z",
+  "baseUrl": "http://127.0.0.1:4294",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd9-trainer-brain",
+  "scenario": "trainer-brain",
+  "shots": [
+    {
+      "name": "01_trainer_mobile.png",
+      "route": "/app?liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "trainer-mobile"
+    },
+    {
+      "name": "02_brain_mobile.png",
+      "route": "/app?liteDriver=phase1",
+      "viewport": "390x844",
+      "state": "brain-mobile"
+    },
+    {
+      "name": "03_trainer_desktop.png",
+      "route": "/app?liteDriver=phase1",
+      "viewport": "1440x1200",
+      "state": "trainer-desktop"
+    },
+    {
+      "name": "04_brain_desktop.png",
+      "route": "/app?liteDriver=phase1",
+      "viewport": "1440x1200",
+      "state": "brain-desktop"
+    }
+  ]
+}

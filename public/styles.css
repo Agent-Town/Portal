@@ -1064,10 +1064,44 @@ body.registry-page .wrap {
 .trainerPanel {
   margin: 0;
   min-height: 100%;
+  display: grid;
+  gap: var(--space-12);
+  padding: var(--space-16);
 }
 
 .trainerQuestTitle {
-  margin-top: 0;
+  margin: 0;
+}
+
+.trainerHero {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.trainerHeroLead {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainerEyebrow {
+  margin: 0;
+  font-size: var(--type-meta);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.trainerStatusLine {
+  margin: 0;
+}
+
+.trainerToolbar {
+  padding: var(--space-10);
+  border: var(--stroke-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-subtle);
+  box-shadow: var(--shadow-card);
 }
 
 .trainerActionRow {
@@ -1075,11 +1109,12 @@ body.registry-page .wrap {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-8);
-  margin-bottom: var(--space-10);
+  margin: 0;
 }
 
 .trainerInlineLabel {
   margin: 0;
+  color: var(--text-muted);
 }
 
 .trainerCompactInput {
@@ -1090,10 +1125,35 @@ body.registry-page .wrap {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
+  padding-inline: var(--space-6);
+  min-height: 36px;
+  border: var(--stroke-faint);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .trainerStack {
-  margin-top: 8px;
+  margin-top: 0;
+  gap: var(--space-12);
+}
+
+.trainerSectionCard {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.trainerSectionHeader {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.trainerSectionEyebrow {
+  margin: 0;
+  font-size: var(--type-meta);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
 }
 
 .trainerSectionTitle {
@@ -1106,6 +1166,11 @@ body.registry-page .wrap {
 
 .trainerSectionTitleInset {
   margin-top: var(--space-8);
+}
+
+.trainerTabPanel {
+  display: grid;
+  gap: var(--space-8);
 }
 
 .trainerAttemptRow {
@@ -1150,12 +1215,14 @@ body.registry-page .wrap {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  padding-bottom: var(--space-8);
+  border-bottom: var(--stroke-faint);
 }
 
 .trainerTab.is-active {
-  background: #7ac9b4;
-  border-color: #1d5e4f;
-  color: #173a32;
+  background: rgba(43, 110, 86, 0.16);
+  border-color: rgba(43, 110, 86, 0.42);
+  color: #184636;
 }
 
 .trainerToolLabRow {
@@ -3171,21 +3238,48 @@ footer::before {
 }
 
 .agent-mind-panel {
-  border: 2px solid #3d2d1f;
-  background: #fff;
-  border-radius: 4px;
-  padding: 8px;
+  border: var(--stroke-subtle);
+  background: var(--surface-base);
+  border-radius: var(--radius-card);
+  padding: var(--space-10);
   display: grid;
-  gap: 6px;
+  gap: var(--space-8);
   flex-shrink: 0;
+  box-shadow: var(--shadow-card);
 }
 
 .agent-mind-title {
-  font-size: 11px;
-  letter-spacing: 0.3px;
+  font-size: var(--type-meta);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #3d2d1f;
+  color: var(--text-accent);
   font-weight: 700;
+}
+
+.agent-mind-shell {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.agent-mind-header {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.agent-mind-copy {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.agent-mind-heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--type-title-3);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-strong);
 }
 
 .agent-mind-grid {
@@ -3193,6 +3287,10 @@ footer::before {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 6px;
   align-items: center;
+}
+
+.agent-mind-config-grid {
+  gap: var(--space-8);
 }
 
 .agent-mind-grid .small-label {
@@ -3211,11 +3309,53 @@ footer::before {
   grid-column: 1 / -1;
 }
 
+.agent-mind-oauth-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.agent-mind-oauth-action {
+  justify-self: start;
+}
+
+.agent-mind-advanced {
+  margin-top: var(--space-6);
+  border: var(--stroke-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--space-6) var(--space-8);
+  background: var(--surface-subtle);
+}
+
+.agent-mind-advanced-summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.agent-mind-advanced-body {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: var(--stroke-faint);
+}
+
+.agent-mind-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  margin-top: var(--space-4);
+}
+
 .agent-mind-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+
+.agent-mind-actions-row {
+  margin-top: var(--space-10);
+  align-items: center;
 }
 
 #agentLlmLine {
@@ -3226,6 +3366,10 @@ footer::before {
 @media (max-width: 980px) {
   .agent-mind-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trainerPanel {
+    padding: var(--space-12);
   }
 }
 

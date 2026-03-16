@@ -219,6 +219,76 @@ async function captureCreateScenario({ browser, api, metadata }) {
   await context.close();
 }
 
+async function captureTrainerBrainScenario({ browser, metadata }) {
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    localStorage.setItem('agentTown:panel:minimized', '0');
+    localStorage.setItem('agentTown:panel:debugVisible', '1');
+  });
+
+  await page.goto(`${baseUrl}/app?liteDriver=phase1`);
+  await waitForLiteApi(page);
+  await page.getByTestId('agent-open-trainer').click();
+  await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '01_trainer_mobile.png');
+  metadata.shots.push({
+    name: '01_trainer_mobile.png',
+    route: '/app?liteDriver=phase1',
+    viewport: '390x844',
+    state: 'trainer-mobile',
+  });
+
+  await page.locator('#trainerModalClose').click();
+  if (!(await page.getByTestId('agent-debug-pane').isVisible())) {
+    await page.getByTestId('agent-debug-toggle').click();
+  }
+  await page.getByTestId('agent-debug-tab-brain').click();
+  await expectPanelVisible(page.getByTestId('agent-debug-panel-brain'));
+  await captureViewportShot(page, '02_brain_mobile.png');
+  metadata.shots.push({
+    name: '02_brain_mobile.png',
+    route: '/app?liteDriver=phase1',
+    viewport: '390x844',
+    state: 'brain-mobile',
+  });
+
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.waitForTimeout(250);
+  await page.getByTestId('agent-open-trainer').click();
+  await page.getByTestId('trainer-root').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '03_trainer_desktop.png');
+  metadata.shots.push({
+    name: '03_trainer_desktop.png',
+    route: '/app?liteDriver=phase1',
+    viewport: '1440x1200',
+    state: 'trainer-desktop',
+  });
+
+  await page.locator('#trainerModalClose').click();
+  await page.getByTestId('agent-debug-tab-brain').click();
+  await expectPanelVisible(page.getByTestId('agent-debug-panel-brain'));
+  await captureViewportShot(page, '04_brain_desktop.png');
+  metadata.shots.push({
+    name: '04_brain_desktop.png',
+    route: '/app?liteDriver=phase1',
+    viewport: '1440x1200',
+    state: 'brain-desktop',
+  });
+
+  await context.close();
+}
+
+async function expectPanelVisible(locator) {
+  await locator.waitFor({ state: 'visible', timeout: 10000 });
+}
+
 async function main() {
   ensureDir(outputDir);
   const metadata = {
@@ -245,6 +315,8 @@ async function main() {
     await captureRegistryWorkersScenario({ browser, metadata });
   } else if (scenario === 'create') {
     await captureCreateScenario({ browser, api, metadata });
+  } else if (scenario === 'trainer-brain') {
+    await captureTrainerBrainScenario({ browser, metadata });
   } else {
     await captureHouseOfficeScenario({ browser, api, metadata });
   }

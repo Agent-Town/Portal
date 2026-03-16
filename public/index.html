@@ -51,42 +51,52 @@
         </header>
         <div class="districtModalBody trainerModalBody">
           <section class="panel trainerPanel" data-testid="trainer-root">
-            <h2 class="trainerQuestTitle">Quest: Portal Onboarding</h2>
-            <p class="muted" id="trainerStatusLine">Trainer ready.</p>
-            <div class="trainerActionRow">
-              <button class="btn small" id="trainerRunOnceBtn" type="button">Run 1</button>
-              <button class="btn small" id="trainerRun3Btn" type="button">Run 3</button>
-              <button class="btn small" id="trainerRun10Btn" type="button">Run 10</button>
-              <button class="btn small" id="trainerClearAttemptsBtn" type="button" data-testid="trainer-clear-all">Clear local cache</button>
-              <label class="small trainerInlineLabel" for="trainerCoachingMode">Coaching</label>
-              <select id="trainerCoachingMode" class="input trainerCompactInput">
-                <option value="approve">Off</option>
-                <option value="reject">Reject tools</option>
-                <option value="manual">Manual</option>
-              </select>
-              <label class="small trainerToggleLabel">
-                <input id="trainerAdvancedToggle" type="checkbox" />
-                Advanced
-              </label>
+            <div class="trainerHero">
+              <div class="trainerHeroLead">
+                <p class="trainerEyebrow">Practice Surface</p>
+                <h2 class="trainerQuestTitle">Quest: Portal Onboarding</h2>
+              </div>
+              <p class="muted trainerStatusLine" id="trainerStatusLine">Trainer ready.</p>
+            </div>
+            <div class="trainerToolbar">
+              <div class="trainerActionRow" data-testid="trainer-action-row">
+                <button class="btn small" id="trainerRunOnceBtn" type="button">Run 1</button>
+                <button class="btn small" id="trainerRun3Btn" type="button">Run 3</button>
+                <button class="btn small" id="trainerRun10Btn" type="button">Run 10</button>
+                <button class="btn small" id="trainerClearAttemptsBtn" type="button" data-testid="trainer-clear-all">Clear local cache</button>
+                <label class="small trainerInlineLabel" for="trainerCoachingMode">Coaching</label>
+                <select id="trainerCoachingMode" class="input trainerCompactInput">
+                  <option value="approve">Off</option>
+                  <option value="reject">Reject tools</option>
+                  <option value="manual">Manual</option>
+                </select>
+                <label class="small trainerToggleLabel">
+                  <input id="trainerAdvancedToggle" type="checkbox" />
+                  Advanced
+                </label>
+              </div>
             </div>
 
             <div class="stack trainerStack">
-              <div class="panel">
-                <h3 class="trainerSectionTitle trainerSectionTitleTop">Attempts</h3>
+              <div class="panel trainerSectionCard">
+                <div class="trainerSectionHeader">
+                  <p class="trainerSectionEyebrow">Runs</p>
+                  <h3 class="trainerSectionTitle trainerSectionTitleTop">Attempts</h3>
+                </div>
                 <div id="trainerAttempts" data-testid="trainer-attempts"></div>
               </div>
-              <div class="panel">
+              <div class="panel trainerSectionCard">
                 <div class="trainerTabs" role="tablist" aria-label="Trainer views">
                   <button class="btn small trainerTab is-active" id="trainerTabTraceBtn" type="button" data-trainer-tab="trace" data-testid="trainer-tab-trace" role="tab" aria-selected="true">Trace</button>
                   <button class="btn small trainerTab" id="trainerTabToolsBtn" type="button" data-trainer-tab="tools" data-testid="trainer-tab-tools" role="tab" aria-selected="false">Tool Lab</button>
                 </div>
-                <div id="trainerTabPanelTrace" data-trainer-panel="trace" role="tabpanel" aria-labelledby="trainerTabTraceBtn">
+                <div id="trainerTabPanelTrace" class="trainerTabPanel" data-trainer-panel="trace" role="tabpanel" aria-labelledby="trainerTabTraceBtn">
                   <h3 class="trainerSectionTitle trainerSectionTitleInset">Timeline</h3>
                   <div id="trainerTimeline" data-testid="trainer-timeline"></div>
                   <h3>Inspector</h3>
                   <pre id="trainerInspector" data-testid="trainer-inspector"></pre>
                 </div>
-                <div id="trainerTabPanelTools" data-trainer-panel="tools" class="is-hidden" role="tabpanel" aria-labelledby="trainerTabToolsBtn">
+                <div id="trainerTabPanelTools" class="trainerTabPanel is-hidden" data-trainer-panel="tools" role="tabpanel" aria-labelledby="trainerTabToolsBtn">
                   <h3 class="trainerSectionTitle trainerSectionTitleInset">Skills Extracted From Prompt</h3>
                   <pre id="trainerSkillCatalog" data-testid="trainer-skill-catalog"></pre>
                   <h3>Tool Trigger</h3>
@@ -100,20 +110,32 @@
                   <pre id="trainerToolResult" data-testid="trainer-tool-result"></pre>
                 </div>
               </div>
-              <div class="panel">
-                <h3 class="trainerSectionTitle trainerSectionTitleTop">Transcript Integrity</h3>
+              <div class="panel trainerSectionCard">
+                <div class="trainerSectionHeader">
+                  <p class="trainerSectionEyebrow">Signal</p>
+                  <h3 class="trainerSectionTitle trainerSectionTitleTop">Transcript Integrity</h3>
+                </div>
                 <pre id="trainerIntegrity" data-testid="trainer-integrity"></pre>
               </div>
-              <div class="panel">
-                <h3 class="trainerSectionTitle trainerSectionTitleTop">Compare</h3>
+              <div class="panel trainerSectionCard">
+                <div class="trainerSectionHeader">
+                  <p class="trainerSectionEyebrow">Review</p>
+                  <h3 class="trainerSectionTitle trainerSectionTitleTop">Compare</h3>
+                </div>
                 <div id="trainerCompare" data-testid="trainer-compare"></div>
               </div>
-              <div class="panel">
-                <h3 class="trainerSectionTitle trainerSectionTitleTop">Loadouts</h3>
+              <div class="panel trainerSectionCard">
+                <div class="trainerSectionHeader">
+                  <p class="trainerSectionEyebrow">Profiles</p>
+                  <h3 class="trainerSectionTitle trainerSectionTitleTop">Loadouts</h3>
+                </div>
                 <div id="trainerLoadouts" data-testid="trainer-loadouts"></div>
               </div>
-              <div class="panel">
-                <h3 class="trainerSectionTitle trainerSectionTitleTop">Personal Backup</h3>
+              <div class="panel trainerSectionCard">
+                <div class="trainerSectionHeader">
+                  <p class="trainerSectionEyebrow">Recovery</p>
+                  <h3 class="trainerSectionTitle trainerSectionTitleTop">Personal Backup</h3>
+                </div>
                 <div class="trainerBackupActions">
                   <button class="btn small" id="trainerBackupDownloadBtn" type="button" data-testid="trainer-backup-download">Download backup</button>
                   <input id="trainerBackupUploadInput" data-testid="trainer-backup-upload" type="file" accept="application/json,.json" />
@@ -213,10 +235,14 @@
               </div>
               <div class="agent-debug-panel agent-debug-panel-brain is-hidden" id="agentDebugPanelBrain" data-debug-panel="brain" data-testid="agent-debug-panel-brain">
                 <div class="agent-mind-panel" id="agentMindPanel" data-testid="agent-mind-panel">
-                  <div data-testid="lite-llm-panel">
-                    <div class="agent-mind-title">Brain</div>
-                  <div class="brain-config">
-                    <div class="kv dense">
+                  <div class="agent-mind-shell" data-testid="lite-llm-panel">
+                    <div class="agent-mind-header">
+                      <div class="agent-mind-title">Brain</div>
+                      <h3 class="agent-mind-heading">Connect Brain</h3>
+                      <p class="agent-mind-copy">Choose how your helper thinks. Basic controls come first; advanced provider details stay tucked away.</p>
+                    </div>
+                    <div class="brain-config">
+                    <div class="kv dense agent-mind-grid agent-mind-config-grid">
                       <label class="small-label">Provider</label>
                       <select class="input" id="llmProviderSelect" data-testid="lite-llm-provider">
                         <option value="openai">openai</option>
@@ -262,18 +288,18 @@
                       </select>
 
                       <label class="small-label">OAuth profile JSON / token</label>
-                      <textarea class="input" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)." style="display: none;"></textarea>
+                      <textarea class="input agent-mind-oauth-input is-hidden" id="llmOauthProfileInput" rows="3" placeholder="Paste OAuth profile JSON or raw access token (id_token callback URLs are not supported)."></textarea>
                       <div class="small" id="llmOauthProfileHint"></div>
-                      <button class="btn small" id="llmOauthLaunchBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
-                      <button class="btn small" id="llmOauthCompleteBtn" type="button" style="display:none; justify-self:start;" data-testid="lite-llm-oauth-complete">Complete OAuth</button>
+                      <button class="btn small agent-mind-oauth-action is-hidden" id="llmOauthLaunchBtn" type="button" data-testid="lite-llm-oauth-launch">Start OAuth in new tab</button>
+                      <button class="btn small agent-mind-oauth-action is-hidden" id="llmOauthCompleteBtn" type="button" data-testid="lite-llm-oauth-complete">Complete OAuth</button>
 
                       <label class="small-label">API Key</label>
                       <input class="input" id="llmKeyInput" type="password" placeholder="sk-..." data-testid="lite-llm-api-key" />
                     </div>
 
-                    <details style="margin-top: 8px; border: 1px solid #444; border-radius: 4px; padding: 4px;">
-                      <summary class="small" style="cursor: pointer; padding: 4px;">Advanced Settings</summary>
-                      <div class="kv dense" style="margin-top: 8px; padding: 4px;">
+                    <details class="agent-mind-advanced" data-testid="lite-llm-advanced">
+                      <summary class="small agent-mind-advanced-summary">Advanced Settings</summary>
+                      <div class="kv dense agent-mind-advanced-body" data-testid="lite-llm-advanced-body">
                         <label class="small-label">Base URL (Optional)</label>
                         <input class="input" id="llmBaseUrlInput" placeholder="https://api.openai.com/v1" />
 
@@ -285,7 +311,7 @@
                           <option value="xhigh">XHigh</option>
                         </select>
 
-                        <label class="small" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                        <label class="small agent-mind-toggle">
                           <input id="llmUseProxyInput" type="checkbox" checked />
                           Use Proxy (Recommended)
                         </label>
@@ -295,7 +321,7 @@
                     <input id="llmModelRefInput" type="hidden" />
                     <input id="llmApiInput" type="hidden" />
 
-                    <div class="kv" style="margin-top: 12px;">
+                    <div class="kv agent-mind-actions-row" data-testid="lite-llm-actions">
                       <button class="btn primary small" id="llmSaveBtn" data-testid="lite-llm-save">Connect Brain</button>
                       <button class="btn small" id="llmClearBtn" data-testid="lite-llm-clear">Clear Brain</button>
                       <div class="small status-text" id="llmLine" data-testid="lite-llm-status"></div>
