@@ -21,6 +21,8 @@ if (EMBED_MODE) {
   document.body.classList.add('share-embed');
 }
 const HOUSE_AUTH_CACHE_PREFIX = 'agentTownHouseAuth:';
+const SHARE_CARD_PREVIEW_STORAGE_KEY = 'agentTown:share:preview';
+const SHARE_CARD_PREVIEW_MAX_AGE_MS = 30 * 60 * 1000;
 const houseAuthRecoveryInFlight = new Map();
 let cachedCurrentHouseId = null;
 let currentHouseLookup = null;
@@ -392,6 +394,80 @@ async function initHouseNavLink() {
 
 const shareId = window.location.pathname.split('/').filter(Boolean).pop();
 
+function normalizeHouseHqName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 64);
+}
+
+function isPlaceholderShareId(value = shareId) {
+  return String(value || '').trim() === 'sh_missing';
+}
+
+function clearShareCardPreview() {
+  try {
+    sessionStorage.removeItem(SHARE_CARD_PREVIEW_STORAGE_KEY);
+  } catch {
+    // ignore storage errors in restricted contexts
+  }
+}
+
+function readShareCardPreview() {
+  try {
+    const raw = sessionStorage.getItem(SHARE_CARD_PREVIEW_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      clearShareCardPreview();
+      return null;
+    }
+    const savedAt = Date.parse(parsed.savedAt || '');
+    if (!Number.isFinite(savedAt) || (Date.now() - savedAt) > SHARE_CARD_PREVIEW_MAX_AGE_MS) {
+      clearShareCardPreview();
+      return null;
+    }
+    return {
+      houseId: typeof parsed.houseId === 'string' ? parsed.houseId.trim() : '',
+      hqName: normalizeHouseHqName(parsed.hqName),
+      sharePath: typeof parsed.sharePath === 'string' ? parsed.sharePath.trim() : '',
+    };
+  } catch {
+    clearShareCardPreview();
+    return null;
+  }
+}
+
+function getSharePlaceholderCopy(preview = null) {
+  const hqName = normalizeHouseHqName(preview?.hqName);
+  if (!hqName) {
+    return {
+      badge: 'preview',
+      title: 'Share Card',
+      lead: 'Placeholder shell for a house whose public share card is still offline.',
+      hero: 'Generated house hero will appear here once the public share card is minted.',
+    };
+  }
+  return {
+    badge: 'preview',
+    title: `${hqName} HQ share card`,
+    lead: `Placeholder shell for ${hqName} HQ while the public share card is still offline.`,
+    hero: `${hqName} HQ hero will appear here once the public share card is minted.`,
+  };
+}
+
+function applySharePlaceholderState(preview = null) {
+  const copy = getSharePlaceholderCopy(preview);
+  const title = el('shareCardTitle');
+  const lead = el('shareLead');
+  const badge = el('shareIdBadge');
+  const heroPlaceholder = el('shareHeroPlaceholder');
+  if (title) title.textContent = copy.title;
+  if (lead) lead.textContent = copy.lead;
+  if (badge) badge.textContent = copy.badge;
+  if (heroPlaceholder) heroPlaceholder.textContent = copy.hero;
+  document.title = `${copy.title} — Agent Town`;
+  const err = el('err');
+  if (err) err.textContent = '';
+}
+
 function handleFromUrl(url) {
   if (!url) return null;
   try {
@@ -495,7 +571,13 @@ async function addShareAsFriend(targetShareId) {
 }
 
 async function init() {
-  el('shareIdBadge').textContent = shareId;
+  const placeholderPreview = isPlaceholderShareId() ? readShareCardPreview() : null;
+  if (isPlaceholderShareId()) {
+    applySharePlaceholderState(placeholderPreview);
+  } else {
+    el('shareIdBadge').textContent = shareId;
+  }
+
   await initHouseNavLink();
   const signup = el('signupBtn');
   if (signup) {
@@ -517,10 +599,19 @@ async function init() {
       }
     };
   }
-  const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
-  setTeamLine(r.share);
-  setLinks(r.share);
-  setPublicMedia(resolveShareHero(r.share));
+
+  try {
+    const r = await api(`/api/share/${encodeURIComponent(shareId)}`);
+    setTeamLine(r.share);
+    setLinks(r.share);
+    setPublicMedia(resolveShareHero(r.share));
+  } catch (error) {
+    if (isPlaceholderShareId() && Number(error?.status || 0) === 404) {
+      applySharePlaceholderState(placeholderPreview);
+      return;
+    }
+    throw error;
+  }
 }
 
 init().catch((e) => {

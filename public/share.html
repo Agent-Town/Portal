@@ -16,7 +16,7 @@
       <header class="shareModalHeader">
         <div class="shareModalTitle">
           <span class="shareTitleIcon" aria-hidden="true">📜</span>
-          <h1 id="shareCardTitle">Share Card</h1>
+          <h1 id="shareCardTitle" data-testid="share-card-title">Share Card</h1>
           <span class="badge shareIdBadge" id="shareIdBadge">…</span>
         </div>
         <div class="kv shareModalNav">
@@ -29,7 +29,7 @@
       </header>
 
       <div class="shareModalBody">
-        <p class="small shareLead">High-distribution card for social sharing with generated house hero.</p>
+        <p class="small shareLead" id="shareLead" data-testid="share-lead">High-distribution card for social sharing with generated house hero.</p>
 
         <div class="shareGrid">
           <section class="panel shareHeroPanel">
@@ -38,7 +38,7 @@
               <img id="shareMediaImg" data-testid="share-hero-image" alt="Public house image" />
               <div class="small" id="shareMediaPrompt"></div>
             </div>
-            <div class="shareHeroPlaceholder">🏠 Generated Wild-West house image</div>
+            <div class="shareHeroPlaceholder" id="shareHeroPlaceholder" data-testid="share-hero-placeholder">🏠 Generated Wild-West house image</div>
           </section>
 
           <section class="panel shareTeamPanel">
@@ -68,7 +68,7 @@
     </section>
   </div>
 
-  <script src="/share_public.js?v=20260204"></script>
+  <script src="/share_public.js?v=20260317"></script>
   <script src="/agent_panel.js?v=20260213"></script>
 </body>
 </html>

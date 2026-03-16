@@ -13,6 +13,7 @@ const ONBOARDING_STEP_CEREMONY = 'ceremony';
 const ONBOARDING_STEP_DONE = 'done';
 const CEREMONY_COMPLETE_MESSAGE_TYPE = 'agent-town:ceremony-complete';
 const HOUSE_HQ_NAME_STORAGE_PREFIX = 'agentTown:house:hqName:';
+const SHARE_CARD_PREVIEW_STORAGE_KEY = 'agentTown:share:preview';
 const HOUSE_HQ_HUMAN_WORDS = Object.freeze(['North', 'Still', 'Bright', 'River', 'Cedar', 'High', 'Kind', 'Clear', 'Stone', 'Wild']);
 const HOUSE_HQ_AGENT_WORDS = Object.freeze(['Signal', 'Compass', 'Relay', 'Beacon', 'Arc', 'Thread', 'Orbit', 'Bridge', 'Vector', 'Anchor']);
 
@@ -1836,6 +1837,37 @@ function persistHouseHqNamingRecord(houseId, record) {
   if (key === HOUSE_HQ_NAME_STORAGE_PREFIX) return;
   try {
     localStorage.setItem(key, JSON.stringify(record && typeof record === 'object' ? record : {}));
+  } catch {
+    // ignore storage errors in restricted contexts
+  }
+}
+
+function clearShareCardPreviewRecord() {
+  try {
+    sessionStorage.removeItem(SHARE_CARD_PREVIEW_STORAGE_KEY);
+  } catch {
+    // ignore storage errors in restricted contexts
+  }
+}
+
+function persistShareCardPreviewRecord({
+  houseId = houseSurfaceState.context.houseId,
+  sharePath = '/s/sh_missing',
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  const normalizedSharePath = String(sharePath || '').trim();
+  const savedName = getSavedHouseHqName(normalizedHouseId);
+  if (!normalizedHouseId || !savedName || !normalizedSharePath.startsWith('/s/')) {
+    clearShareCardPreviewRecord();
+    return;
+  }
+  try {
+    sessionStorage.setItem(SHARE_CARD_PREVIEW_STORAGE_KEY, JSON.stringify({
+      houseId: normalizedHouseId,
+      hqName: savedName,
+      sharePath: normalizedSharePath,
+      savedAt: new Date().toISOString(),
+    }));
   } catch {
     // ignore storage errors in restricted contexts
   }
@@ -9139,11 +9171,15 @@ function bindTownDistrictControls() {
         }
         if (!sharePath) {
           sharePath = '/s/sh_missing';
+          persistShareCardPreviewRecord({ houseId, sharePath });
           if (shareCardStatus) {
             shareCardStatus.textContent = getHouseShareCardMissingStatusText(houseId);
           }
-        } else if (shareCardStatus) {
-          shareCardStatus.textContent = '';
+        } else {
+          clearShareCardPreviewRecord();
+          if (shareCardStatus) {
+            shareCardStatus.textContent = '';
+          }
         }
         routeToShareCard(sharePath);
       } catch (err) {
