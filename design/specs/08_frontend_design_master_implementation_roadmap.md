@@ -63,6 +63,7 @@ Every future design phase must preserve:
 11. provider-agnostic primary flows,
 12. future voice-ready interaction grammar,
 13. default human surfaces that remain simpler than the underlying information model because the LLM can explain deeper detail on demand.
+14. no drift between the simple UI, advanced UI, and LLM explanation layer.
 
 Do not:
 
@@ -80,6 +81,7 @@ The correct design move is:
 4. name actions in human language,
 5. avoid letting infrastructure vocabulary become the product face,
 6. preserve detail for LLM interpretation and advanced disclosure instead of surfacing it all by default.
+7. keep all layers as different projections of the same truth rather than separate narratives.
 
 ## 3. Surface inventory
 
@@ -538,6 +540,7 @@ Every future implementation step must include:
 7. passing `npm test`,
 8. explicit confirmation that the phase still satisfies `design/specs/09_global_human_first_design_requirements.md`,
 9. explicit confirmation that the phase keeps the default human path simpler than the full underlying information model.
+10. explicit confirmation that the simple UI, advanced UI, and LLM-facing meaning still align.
 
 ## 8. File-target map for next agent
 

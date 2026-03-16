@@ -149,7 +149,25 @@ Implementation implication:
 4. preserve ids, hooks, and readable structure so the LLM can still interpret the richer state model,
 5. treat "simple for the human" and "rich for the system" as compatible goals, not opposing ones.
 
-## 7.2 Human-first wording rule
+## 7.2 No-drift layering rule
+
+The frontend should treat:
+
+1. default visible UI,
+2. advanced drawers and detail panels,
+3. LLM-readable state,
+4. future voice labels,
+
+as different projections of the same canonical meaning.
+
+Implementation implication:
+
+1. do not invent alternate terminology per layer without reason,
+2. do not let advanced views contradict the simplified view,
+3. do not simplify by hiding the only truthful representation of state,
+4. when a concept appears in multiple layers, make the summary layer shorter, not different.
+
+## 7.3 Human-first wording rule
 
 For primary user-facing surfaces:
 
@@ -158,7 +176,7 @@ For primary user-facing surfaces:
 3. keep provider and model names secondary unless the user is explicitly configuring them,
 4. ensure the main task would still make sense to someone new to AI.
 
-## 7.3 Voice-ready structure rule
+## 7.4 Voice-ready structure rule
 
 Future design work should preserve:
 

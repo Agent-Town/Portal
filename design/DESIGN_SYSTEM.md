@@ -34,6 +34,7 @@ The interface must stay disciplined.
 9. The system must tolerate localization, especially English and Chinese.
 10. The visual grammar must remain compatible with future voice control.
 11. Default surfaces should present summary and action first, while richer detail remains available through advanced views and LLM-readable state.
+12. Summary UI, advanced UI, LLM explanations, and future voice labels must all derive from the same canonical product meaning.
 
 ## 3. Current token baseline from `public/styles.css`
 
@@ -226,6 +227,7 @@ Every design change must also preserve or improve:
 6. If a user must understand AI jargon to act, the design is wrong.
 7. If a control label only works in English, it is not ready.
 8. If the LLM could explain a detail more cleanly than the screen, the screen should usually summarize instead of enumerate.
+9. If the simple surface, advanced surface, and LLM would describe the same thing differently, the design has drifted and must be corrected.
 
 ## 8. Approved direction, not yet implemented
 

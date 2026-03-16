@@ -12,6 +12,7 @@ Cross-cutting rule:
 3. every major flow should be describable in plain verbs,
 4. future voice interaction should be able to refer to the current room and main action clearly,
 5. the user should be able to rely on the LLM for explanation instead of browsing dense detail by default.
+6. the simple flow, advanced flow, and LLM explanation of the same task should never drift apart.
 
 ## 1. Route inventory
 

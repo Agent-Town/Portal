@@ -99,6 +99,26 @@ Also required:
 2. prefer moving detail behind disclosure over deleting it,
 3. keep the human-facing path dead simple while preserving system richness for the LLM.
 
+## No-drift design rule
+
+Design should follow a one-source-of-truth principle similar to the core idea behind `tla-precheck`:
+
+1. one canonical underlying task and state model,
+2. one simple human surface derived from it,
+3. one advanced/detail surface derived from it,
+4. one LLM explanation/action surface derived from it,
+5. later one voice surface derived from it.
+
+Future design agents must not let these layers drift into conflicting stories.
+
+If:
+
+1. the default UI says one thing,
+2. the advanced view says another,
+3. the LLM would explain a third,
+
+then the design is wrong even if each individual screen looks good.
+
 ## Verification rule
 
 Every approved design phase must produce all of the following:

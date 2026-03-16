@@ -80,6 +80,7 @@ For every changed surface, verify:
 13. the action vocabulary remains compatible with future voice control.
 14. the default human view is simpler than the full underlying information model,
 15. detailed data remains accessible through disclosure or LLM-facing product state instead of crowding the main screen.
+16. the summary surface, advanced surface, and LLM-facing meaning do not contradict one another.
 
 ## 6. Functional safety contract
 
@@ -105,6 +106,16 @@ Design implication:
 3. move dense or technical detail behind advanced views when possible,
 4. preserve enough structure that the LLM can still retrieve, explain, and act on the richer data model,
 5. optimize the human UI for action and confidence, not for exhaustive browsing.
+
+## 6.2 No-drift verification rule
+
+For any concept that appears in multiple layers, the future design agent must check:
+
+1. the default UI summary,
+2. the advanced/detail view,
+3. the phrasing and structure the LLM would use to explain it.
+
+If those three do not align, the phase is not complete.
 
 ## 7. Verification commands
 

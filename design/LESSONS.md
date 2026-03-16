@@ -267,3 +267,15 @@ Rule:
 2. let advanced views and drawers preserve optional human deep inspection,
 3. keep the default screen focused on action, confidence, and orientation,
 4. if the LLM can explain complexity on demand, the main UI should usually summarize rather than enumerate it.
+
+## 28. Simplification must not create semantic drift
+
+The useful idea in `tla-precheck` is not the exact tooling. It is the discipline:
+one truth, many projections, no drift.
+
+Rule:
+
+1. the simple UI can be shorter than the advanced UI,
+2. the LLM can explain more than the default UI,
+3. but all three must still describe the same underlying reality,
+4. summarize by compression, not by inventing a different product model.

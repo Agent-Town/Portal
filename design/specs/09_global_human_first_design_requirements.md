@@ -136,6 +136,26 @@ This means future design agents should prefer:
 3. optional drawers, detail panels, and advanced views for human deep dives,
 4. preserving rich system state for LLM interpretation without forcing it into the main layout.
 
+## 3.2 One truth, many surfaces
+
+This product should adopt a no-drift principle similar to the core idea behind [`tla-precheck`](https://github.com/kingbootoshi/tla-precheck):
+
+1. one canonical underlying product meaning,
+2. one simplified human-facing projection,
+3. one advanced/detail projection,
+4. one LLM-usable projection,
+5. later one voice-usable projection.
+
+These layers can differ in density.
+They should not differ in truth.
+
+Design implication:
+
+1. do not let the simple UI invent a different story from the detailed UI,
+2. do not let advanced screens expose a meaning the main screen hides incorrectly,
+3. do not let the LLM explain concepts using a contradictory mental model,
+4. simplify by summarizing, not by distorting.
+
 This does not mean deleting information.
 It means separating:
 
@@ -277,6 +297,7 @@ Every approved design phase must now also prove:
 6. future voice control would have a stable target vocabulary,
 7. the design does not privilege one provider or model brand in primary flows.
 8. the default interface is simpler than the underlying information model while still preserving access to deeper detail.
+9. simplified human views and detailed/LLM views remain semantically aligned.
 
 ## 10. Required design review questions
 

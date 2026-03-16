@@ -19,6 +19,12 @@ Current state:
   - the default UI should stay dead simple for humans
   - detailed information should remain available to the LLM and advanced disclosure
   - future design phases must not force users to browse rich system detail by default
+- Added no-drift multi-surface rule inspired by `tla-precheck`:
+  - one canonical product meaning
+  - one simplified human projection
+  - one advanced/detail projection
+  - one LLM explanation/action projection
+  - all layers must stay semantically aligned
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start

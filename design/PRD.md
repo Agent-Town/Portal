@@ -67,6 +67,7 @@ Design implication:
 9. Provider and model choice must not dominate primary user journeys.
 10. The interaction grammar must remain compatible with future voice control.
 11. Detailed information should remain available, but primarily through advanced views and the LLM rather than default screen clutter.
+12. The simple UI, advanced UI, and LLM explanation layer must stay semantically aligned and derive from one canonical product meaning.
 
 ## 4. Screen-level requirements
 
