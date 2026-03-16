@@ -62,6 +62,8 @@ TLA+ here is for semantic UI logic, not for aesthetic judgment.
 2. `DesignProjectionNoDrift.cfg`
 3. `ModalFirstWorkerContinuity.tla`
 4. `ModalFirstWorkerContinuity.cfg`
+5. `HouseLibraryTaskDisclosure.tla`
+6. `HouseLibraryTaskDisclosure.cfg`
 
 ## Current model
 
@@ -134,6 +136,45 @@ It encodes the semantic pattern that future design work must preserve.
 9. `ModalOpenClosePreserveWorkerEpoch`
 10. `RedirectOpensAtlasInApp`
 
+## Third model
+
+`HouseLibraryTaskDisclosure.tla` formalizes the House Library design rule from Phase D4 and later Library phases:
+
+1. the default House Library surface stays task-first,
+2. the human layer shows one active task, one focus section, and one primary action,
+3. technical and provenance detail stay out of the default human path,
+4. advanced disclosure reveals detail without changing meaning,
+5. the LLM still sees the full canonical Library state.
+
+### State modeled
+
+1. active Library task (`save`, `openLocal`, `reviewTrust`, `receiveDelivery`, `reviewHidden`, `followRoute`)
+2. focused section (`MemoryTable`, `KeepBox`, `TrustedFinds`, `RouteDesk`, `HiddenShelf`, `Deliveries`)
+3. current selection (`none`, `localItem`, `publicStack`, `delivery`, `hiddenStack`, `routeStack`)
+4. trust state
+5. disclosure mode (`closed`, `itemDetail`, `provenance`, `advancedDesk`)
+
+### Invariants modeled
+
+1. `TypeOK`
+2. `TaskFocusFits`
+3. `TaskSelectionTrustFits`
+4. `DisclosureFitsSelection`
+5. `SummaryNotInvented`
+6. `HumanSummaryBound`
+7. `HumanShowsSingleGoal`
+8. `HumanShowsSingleFocusSection`
+9. `HumanShowsSinglePrimaryAction`
+10. `HumanAvoidsTechnicalFacts`
+11. `HumanAvoidsDetailFacts`
+12. `AdvancedSuperset`
+13. `AdvancedOnlyShowsCanonical`
+14. `AdvancedHidesLLMOnly`
+15. `ClosedDisclosureMatchesHuman`
+16. `OpenDisclosureAddsFacts`
+17. `LLMCompleteness`
+18. `NoDrift`
+
 ## Running TLC
 
 If `tla2tools.jar` is available:
@@ -142,6 +183,7 @@ If `tla2tools.jar` is available:
 cd design/formal
 java -XX:+UseParallelGC -jar /path/to/tla2tools.jar DesignProjectionNoDrift.tla -config DesignProjectionNoDrift.cfg
 java -XX:+UseParallelGC -jar /path/to/tla2tools.jar ModalFirstWorkerContinuity.tla -config ModalFirstWorkerContinuity.cfg
+java -XX:+UseParallelGC -jar /path/to/tla2tools.jar HouseLibraryTaskDisclosure.tla -config HouseLibraryTaskDisclosure.cfg
 ```
 
 If TLC is not installed locally, the model should still be kept up to date and checked later in a verification-capable environment.
@@ -168,6 +210,15 @@ Observed result:
 4. no invariant violations,
 5. no deadlock check requested by config.
 
+`HouseLibraryTaskDisclosure.tla` verified locally on 2026-03-16 with TLC 2.19.
+
+Observed result:
+
+1. `292` states generated,
+2. `37` distinct reachable states,
+3. complete search depth `4`,
+4. no invariant violations.
+
 ## How future agents should use this
 
 Use the model when a design change affects:
@@ -187,3 +238,11 @@ Use the modal-first continuity model when a design change affects:
 3. whether worker continuity is preserved by the proposed UX,
 4. how standalone Atlas entry points behave,
 5. whether a new shell would accidentally become a second first-class navigation path.
+
+Use the House Library disclosure model when a design change affects:
+
+1. what the House Library shows by default,
+2. which Library desks are primary versus secondary,
+3. when provenance or trust detail becomes visible,
+4. how much of Library state stays for the LLM instead of the default human path,
+5. whether a proposed simplification would hide truth or merely defer it behind disclosure.

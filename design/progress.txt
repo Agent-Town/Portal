@@ -39,6 +39,12 @@ Current state:
   - modal open/close preserves worker epoch
   - redirect returns Atlas into `/app`
   - verified locally with TLC 2.19
+- Added third formal TLA+ model for House Library task-first disclosure:
+  - one active Library task at a time
+  - one focus section and one primary action in the human layer
+  - technical and provenance detail deferred behind disclosure
+  - LLM retains the full canonical Library state
+  - verified locally with TLC 2.19
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start

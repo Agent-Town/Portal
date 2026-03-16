@@ -303,3 +303,14 @@ Rule:
 2. standalone district pages should be redirect entry points when the product contract says the room is modal-first,
 3. opening or closing a modal-first room must not count as a new product surface,
 4. if a design proposal breaks worker continuity, it is not just risky engineering, it is the wrong design.
+
+## 31. The House Library must express one job at a time
+
+The Library can do many things, but the user should not have to parse them all at once.
+
+Rule:
+
+1. the human layer should expose one active task, one focus section, and one primary action,
+2. other Library power can remain available through disclosure and the LLM,
+3. provenance and technical detail should be deferred rather than removed,
+4. if the default Library view starts feeling like an admin console again, the design has regressed.
