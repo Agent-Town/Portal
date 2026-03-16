@@ -8,7 +8,7 @@
     <button class="btn" id="hatchWalletCheckBtn" type="button" data-testid="hatch-wallet-check">Check wallet</button>
     <span class="pill">Wallet: <strong id="walletAddr">—</strong></span>
   </div>
-  <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
+  <div class="small status-note" id="walletStatus" data-tone="muted" style="min-height:1.4em;"></div>
   <div class="kv" id="pathChoices">
     <button class="btn" id="pathHumanBtn" data-testid="path-human">Human</button>
     <button class="btn primary" id="pathCoopBtn" data-testid="path-coop">Human &amp; Agent</button>
@@ -30,7 +30,7 @@
     <span class="pill status is-hidden" id="tokenStatus" data-testid="token-status"><span class="dot" id="tokenDot"></span><span id="tokenStatusText">Waiting</span></span>
     <a class="btn" id="tokenCreateLink" href="/create?mode=token" style="display:none">Create house</a>
   </div>
-  <div class="small" id="tokenError" style="color: var(--bad);"></div>
+  <div class="small status-note" id="tokenError" data-tone="muted"></div>
 </div>
 
 <div class="panel is-hidden" id="reconnectPanel" data-testid="reconnect-panel">
@@ -50,7 +50,7 @@
     <a class="btn" id="openHouseLink" href="/house">Open house</a>
     <button class="btn" id="openShareCardBtn" type="button" data-testid="open-share-card">Open share card</button>
   </div>
-  <div class="small" id="shareCardStatus" style="min-height:1.4em;"></div>
+  <div class="small status-note" id="shareCardStatus" data-tone="muted" style="min-height:1.4em;"></div>
 </div>
 
 <div class="panel" id="step1Panel">
@@ -82,7 +82,7 @@
     <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
     <span class="pill" id="openReady" style="display:none">Open → <a href="/create">Create</a> · <a href="/house">House</a></span>
   </div>
-  <div class="small" id="openError" style="color: var(--bad);"></div>
+  <div class="small status-note" id="openError" data-tone="muted"></div>
 </div>
 
 <div class="divider"></div>
@@ -107,7 +107,7 @@
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>
   </div>
-  <div class="small" id="houseSurfaceStatus" style="min-height:1.4em;"></div>
+  <div class="small status-note" id="houseSurfaceStatus" data-tone="muted" style="min-height:1.4em;"></div>
 </div>
 
 <div class="panel is-hidden" id="houseExperiencesPanel" data-testid="house-experiences-panel">
@@ -115,7 +115,7 @@
   <p class="small" style="margin-top:0">
     Minimal House-linked entry points stay inside the same shell and reuse the current Registry, Web, and Poker surfaces.
   </p>
-  <div class="small" id="houseExperiencesEmpty" data-testid="house-experiences-empty">No House experiences available yet.</div>
+  <div class="small" id="houseExperiencesEmpty" data-testid="house-experiences-empty" data-next-action="Open another House room or wait for a new experience to appear here.">No House experiences available yet.</div>
   <div class="kv stack" id="houseExperiencesList" data-testid="house-experiences-list"></div>
   <div class="small" id="houseExperiencesDetail" data-testid="house-experiences-detail">Select an experience to inspect available entry points.</div>
   <div class="kv" id="houseExperienceActions" data-testid="house-experience-actions" style="margin-top:8px;"></div>
@@ -126,13 +126,13 @@
   <p class="small" style="margin-top:0">
     Active config lineage stays visible in House and Inbox remains reachable from the same shell.
   </p>
-  <div class="small" id="houseWorkshopEmpty" data-testid="house-workshop-empty">No active config is bound to this team yet.</div>
+  <div class="small" id="houseWorkshopEmpty" data-testid="house-workshop-empty" data-next-action="Select another team or bind an active config to continue in Workshop.">No active config is bound to this team yet.</div>
   <div class="small" id="houseWorkshopDetail" data-testid="house-workshop-detail">Select a team with an active config binding to inspect Workshop lineage.</div>
   <div class="kv" style="margin-top:8px;">
     <button class="btn" id="houseWorkshopOpenInboxBtn" type="button" data-testid="house-workshop-open-inbox" data-entry-path="" disabled>Open Inbox</button>
   </div>
   <div class="small" style="margin:10px 0 4px;">Files</div>
-  <div class="small" id="houseWorkshopFilesEmpty" data-testid="house-workshop-files-empty">No Workshop files available yet.</div>
+  <div class="small" id="houseWorkshopFilesEmpty" data-testid="house-workshop-files-empty" data-next-action="Choose a team with Workshop files to read or edit them here.">No Workshop files available yet.</div>
   <div class="kv stack" id="houseWorkshopFiles" data-testid="house-workshop-files"></div>
   <div class="small" id="houseWorkshopFilePath" data-testid="house-workshop-file-path" style="margin-top:8px;">Select a file to read.</div>
   <pre id="houseWorkshopFileContent" data-testid="house-workshop-file-content" class="small" style="margin:8px 0 0; white-space:pre-wrap; overflow:auto; max-height:280px;"></pre>
@@ -144,7 +144,7 @@
     <button class="btn primary" id="houseWorkshopApplyDraftBtn" type="button" data-testid="house-workshop-apply-draft" disabled>Apply Draft</button>
     <button class="btn" id="houseWorkshopSaveSnapshotBtn" type="button" data-testid="house-workshop-save-snapshot" disabled>Save Snapshot to Library</button>
   </div>
-  <div class="small" id="houseWorkshopActionStatus" data-testid="house-workshop-action-status" style="margin-top:8px; min-height:1.4em;"></div>
+  <div class="small status-note" id="houseWorkshopActionStatus" data-testid="house-workshop-action-status" data-tone="muted" style="margin-top:8px; min-height:1.4em;"></div>
 </div>
 
 <div class="panel is-hidden house-library-shell" id="houseLibraryPanel" data-testid="house-library-panel">
@@ -178,7 +178,7 @@
           <h3 class="small">Reading Table</h3>
           <p class="small">Save and reopen the set you want on the table.</p>
         </div>
-        <div class="small" id="houseLibraryScopeEmpty" data-testid="house-library-scope-empty">No saved Reading Tables yet.</div>
+        <div class="small" id="houseLibraryScopeEmpty" data-testid="house-library-scope-empty" data-next-action="Save the current selection as a Reading Table to reopen it later.">No saved Reading Tables yet.</div>
         <div class="kv" data-testid="house-library-satchel-controls" style="margin:8px 0;">
           <label class="small" for="houseLibrarySatchelTitleInput">Save Satchel</label>
           <input
@@ -199,7 +199,7 @@
           <h4 class="small">Library Items</h4>
           <p class="small">Open a note, file, or import already in this room.</p>
         </div>
-        <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty">No curated Library items yet.</div>
+        <div class="small" id="houseLibraryEmpty" data-testid="house-library-empty" data-next-action="Write a note, save chat, or import a stack to place something on this shelf.">No curated Library items yet.</div>
         <div class="kv stack house-library-card-grid" id="houseLibraryList" data-testid="house-library-list"></div>
         <details class="house-library-drawer" id="houseLibraryDetailDrawer" data-testid="house-library-detail-drawer" style="margin:8px 0;">
           <summary id="houseLibraryDetailToggle" data-testid="house-library-detail-toggle">Library detail</summary>
@@ -210,7 +210,7 @@
           <div class="kv stack" id="houseLibraryRevisions" data-testid="house-library-revisions" style="margin-top:8px;"></div>
         </details>
         <div class="kv" id="houseLibraryActions" data-testid="house-library-actions" style="margin-top:8px;"></div>
-        <div class="small" id="houseLibraryActionStatus" data-testid="house-library-action-status" role="status" aria-live="polite" style="margin-top:8px; min-height:1.4em;"></div>
+        <div class="small status-note" id="houseLibraryActionStatus" data-testid="house-library-action-status" data-tone="muted" role="status" aria-live="polite" style="margin-top:8px; min-height:1.4em;"></div>
       </div>
     </section>
 
@@ -248,7 +248,7 @@
               <button class="btn primary" id="houseLibrarySaveNoteBtn" type="button" data-testid="house-library-save-note">Save Note to Library</button>
               <button class="btn" id="houseLibraryCancelEditBtn" type="button" data-testid="house-library-cancel-edit">Start a New Note</button>
             </div>
-            <div class="small" id="houseLibraryComposerStatus" data-testid="house-library-composer-status">Writing a new local note.</div>
+            <div class="small status-note" id="houseLibraryComposerStatus" data-testid="house-library-composer-status" data-tone="muted">Writing a new local note.</div>
           </div>
         </div>
 
@@ -278,7 +278,7 @@
               Bring to chat now after saving
             </label>
             <button class="btn" id="houseLibraryCaptureSaveBtn" type="button" data-testid="house-library-capture-save">Save Selected Chat to Library</button>
-            <div class="small" id="houseLibraryCaptureStatus" data-testid="house-library-capture-status">No chat turns selected yet.</div>
+            <div class="small status-note" id="houseLibraryCaptureStatus" data-testid="house-library-capture-status" data-tone="muted">No chat turns selected yet.</div>
           </div>
         </div>
       </section>
@@ -392,7 +392,7 @@
       </details>
     </div>
 
-    <div class="small" id="houseLibraryPublicStacksEmpty" data-testid="house-library-public-stacks-empty">Search Public Stacks without leaving this room.</div>
+    <div class="small" id="houseLibraryPublicStacksEmpty" data-testid="house-library-public-stacks-empty" data-next-action="Run a search or tap a chip to find a stack to review.">Search Public Stacks without leaving this room.</div>
     <div class="house-library-find-grid">
       <div class="house-library-find-results">
         <div class="kv stack house-library-card-grid" id="houseLibraryPublicStacksResults" data-testid="house-library-public-stacks-results"></div>
@@ -408,7 +408,7 @@
             <div class="small" id="houseLibraryPreviewTitle" data-testid="house-library-preview-title">Public Stacks</div>
             <div class="house-library-sigil-row" id="houseLibraryPreviewSigils" data-testid="house-library-preview-sigils" aria-live="polite"></div>
           </div>
-          <div class="small" id="houseLibraryPreviewStatus" data-testid="house-library-preview-status">Look, check, trust, import.</div>
+          <div class="small status-note" id="houseLibraryPreviewStatus" data-testid="house-library-preview-status" data-tone="muted">Look, check, trust, import.</div>
           <div class="kv" id="houseLibraryPreviewReviewStrip" data-testid="house-library-preview-review-strip">
             <button class="btn small" id="houseLibraryReviewChoiceTrustedBtn" type="button" data-testid="house-library-preview-review-trusted" aria-label="Trust here">[shield]</button>
             <button class="btn small" id="houseLibraryReviewChoiceLaterBtn" type="button" data-testid="house-library-preview-review-later" aria-label="Review later">[hour]</button>
@@ -519,9 +519,9 @@
           <button class="btn" id="houseLibraryRouteSyncBtn" type="button" data-testid="house-library-route-sync-button">Sync Route</button>
         </div>
       </details>
-      <div class="small" id="houseLibraryRoutesEmpty" data-testid="house-library-routes-empty">No followed Houses yet.</div>
+      <div class="small" id="houseLibraryRoutesEmpty" data-testid="house-library-routes-empty" data-next-action="Follow a House first, then sync its route into this room.">No followed Houses yet.</div>
       <div class="kv stack house-library-card-grid" id="houseLibraryRoutes" data-testid="house-library-routes"></div>
-      <div class="small" id="houseLibraryRouteFeedEmpty" data-testid="house-library-route-feed-empty">Sync one followed House to see its Route feed.</div>
+      <div class="small" id="houseLibraryRouteFeedEmpty" data-testid="house-library-route-feed-empty" data-next-action="Choose a followed House and press Sync Route to fill this feed.">Sync one followed House to see its Route feed.</div>
       <div class="kv stack house-library-card-grid" id="houseLibraryRouteFeed" data-testid="house-library-route-feed"></div>
     </section>
 
@@ -530,7 +530,7 @@
         <h3 class="small">Hidden Shelf</h3>
         <p class="small">Stacks that this House hid or reported stay here for later review.</p>
       </div>
-      <div class="small" id="houseLibrarySafetyDeskEmpty" data-testid="house-library-safety-desk-empty">No hidden or reported Public Stacks in this House.</div>
+      <div class="small" id="houseLibrarySafetyDeskEmpty" data-testid="house-library-safety-desk-empty" data-next-action="Hidden or reported stacks will return here if this House needs to review them later.">No hidden or reported Public Stacks in this House.</div>
       <div class="kv stack house-library-card-grid" id="houseLibrarySafetyDesk" data-testid="house-library-safety-desk"></div>
     </section>
 
@@ -545,7 +545,7 @@
           <h4 class="small">Single Items</h4>
           <p class="small">One relayed publication at a time.</p>
         </div>
-        <div class="small" id="houseLibraryIncomingRelaysEmpty" data-testid="house-library-incoming-relays-empty">No relayed publications have arrived for this House yet.</div>
+        <div class="small" id="houseLibraryIncomingRelaysEmpty" data-testid="house-library-incoming-relays-empty" data-next-action="Incoming single-item deliveries will appear here before you import them.">No relayed publications have arrived for this House yet.</div>
         <div class="kv stack house-library-card-grid" id="houseLibraryIncomingRelays" data-testid="house-library-incoming-relays"></div>
         <details class="house-library-drawer" id="houseLibraryIncomingRelayDrawer" data-testid="house-library-incoming-relay-drawer" style="margin:8px 0;">
           <summary id="houseLibraryIncomingRelayToggle" data-testid="house-library-incoming-relay-toggle">Relay detail</summary>
@@ -561,7 +561,7 @@
           <h4 class="small">Satchels</h4>
           <p class="small">Whole bundles arrive here together.</p>
         </div>
-        <div class="small" id="houseLibraryIncomingSatchelsEmpty" data-testid="house-library-incoming-satchels-empty">No relayed Satchels have arrived for this House yet.</div>
+        <div class="small" id="houseLibraryIncomingSatchelsEmpty" data-testid="house-library-incoming-satchels-empty" data-next-action="Incoming Satchels will gather here until you open or import them.">No relayed Satchels have arrived for this House yet.</div>
         <div class="kv stack house-library-card-grid" id="houseLibraryIncomingSatchels" data-testid="house-library-incoming-satchels"></div>
         <details class="house-library-drawer" id="houseLibraryIncomingSatchelDrawer" data-testid="house-library-incoming-satchel-drawer" style="margin:8px 0;">
           <summary id="houseLibraryIncomingSatchelToggle" data-testid="house-library-incoming-satchel-toggle">Satchel detail</summary>
@@ -634,7 +634,7 @@
   <p class="small" style="margin-top:0">
     Track progress stays readable in the same shell without introducing points, badges, or extra navigation.
   </p>
-  <div class="small" id="houseTracksEmpty" data-testid="house-tracks-empty">No track progress recorded yet.</div>
+  <div class="small" id="houseTracksEmpty" data-testid="house-tracks-empty" data-next-action="Track progress will appear here once this House starts recording its milestones.">No track progress recorded yet.</div>
   <div class="kv stack" id="houseTracksList" data-testid="house-tracks-list"></div>
   <div class="small" id="houseTracksDetail" data-testid="house-tracks-detail">Select a track to inspect deterministic progress.</div>
 </div>
@@ -647,9 +647,9 @@
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseArchiveSaveLibraryBtn" type="button" data-testid="house-archive-save-library" disabled>Save to Library</button>
   </div>
-  <div class="small" id="houseArchiveEmpty" data-testid="house-archive-empty">No canonical traces archived yet.</div>
+  <div class="small" id="houseArchiveEmpty" data-testid="house-archive-empty" data-next-action="Archive entries will appear here when this House saves canonical traces.">No canonical traces archived yet.</div>
   <div class="kv stack" id="houseArchiveList" data-testid="house-archive-list"></div>
-  <div class="small" id="houseArchiveActionStatus" data-testid="house-archive-action-status" style="min-height:1.4em;"></div>
+  <div class="small status-note" id="houseArchiveActionStatus" data-testid="house-archive-action-status" data-tone="muted" style="min-height:1.4em;"></div>
   <div class="small" id="houseArchiveDetail" data-testid="house-archive-detail">Select a trace to inspect archive counters.</div>
 </div>
 
@@ -667,11 +667,11 @@
     <label class="small" for="houseTrainerApprovalIdInput">Approval ID</label>
     <input id="houseTrainerApprovalIdInput" data-testid="house-trainer-approval-input" type="text" placeholder="appr_..." />
   </div>
-  <div class="small" id="houseTrainerEmpty" data-testid="house-trainer-empty">No durable trainer jobs yet.</div>
+  <div class="small" id="houseTrainerEmpty" data-testid="house-trainer-empty" data-next-action="Create a compare job or save a result to start the Trainer history.">No durable trainer jobs yet.</div>
   <div class="small" style="margin:10px 0 4px;">Jobs</div>
   <div class="kv stack" id="houseTrainerJobs" data-testid="house-trainer-jobs"></div>
   <div class="small" style="margin:10px 0 4px;">Results</div>
   <div class="kv stack" id="houseTrainerResults" data-testid="house-trainer-results"></div>
-  <div class="small" id="houseTrainerActionStatus" data-testid="house-trainer-action-status" style="min-height:1.4em;"></div>
+  <div class="small status-note" id="houseTrainerActionStatus" data-testid="house-trainer-action-status" data-tone="muted" style="min-height:1.4em;"></div>
   <div class="small" id="houseTrainerDetail" data-testid="house-trainer-detail">Select a trainer result to inspect linked config refs.</div>
 </div>

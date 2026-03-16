@@ -124,8 +124,8 @@
             <button class="btn primary" id="townhallContinueBtn" data-testid="townhall-continue-btn" disabled>Continue to sigil test</button>
             <span class="pill" id="townhallRegisterState">Not registered</span>
           </div>
-          <div class="small townhallRegisterMeta" id="townhallRegisterStatus"></div>
-          <div class="small townhallRegisterError" id="townhallRegisterError"></div>
+          <div class="small townhallRegisterMeta status-note" id="townhallRegisterStatus" data-tone="muted"></div>
+          <div class="small townhallRegisterError status-note" id="townhallRegisterError" data-tone="muted"></div>
         </div>
       </div>
     </div>
@@ -172,7 +172,7 @@
       <a class="btn primary" href="/skill.md" target="_blank" data-testid="skill-link">View worker playbook</a>
       <span class="pill status" data-testid="agent-status"><span class="dot" id="agentDot"></span><span id="agentStatusText">Agent not connected</span></span>
     </div>
-    <div class="small" id="walletStatus" style="min-height:1.4em;"></div>
+    <div class="small status-note" id="walletStatus" data-tone="muted" style="min-height:1.4em;"></div>
   </div>
 
   <div class="divider" id="stepDivider"></div>
@@ -192,6 +192,6 @@
       <span class="pill" data-testid="open-waiting" id="openWaiting" style="display:none">Waiting for agent…</span>
       <span class="pill" id="openReady" style="display:none">Continue → <a href="/create">Ceremony</a> · <a href="/house">House</a></span>
     </div>
-    <div class="small" id="openError" style="color: var(--bad);"></div>
+    <div class="small status-note" id="openError" data-tone="muted"></div>
   </div>
 </div>

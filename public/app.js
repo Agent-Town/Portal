@@ -305,6 +305,62 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function normalizeStatusTone(tone = '') {
+  switch (String(tone || '').trim().toLowerCase()) {
+    case 'info':
+    case 'success':
+    case 'warning':
+    case 'error':
+      return String(tone || '').trim().toLowerCase();
+    default:
+      return 'muted';
+  }
+}
+
+function inferStatusTone(text = '', { isError = false, tone = '' } = {}) {
+  const value = String(text || '').trim();
+  if (!value) return 'muted';
+  if (tone) return normalizeStatusTone(tone);
+  if (isError) return 'error';
+  const lower = value.toLowerCase();
+  if (/(failed|error|unavailable|denied|cancelled|timed out|invalid|missing|could not)/.test(lower)) {
+    return 'error';
+  }
+  if (/(checking|loading|resolving|registering|opening|syncing|saving|importing|publishing|verifying|creating|connecting|preparing|starting|waiting)/.test(lower)) {
+    return 'info';
+  }
+  if (/(done|saved|connected|verified|ready|welcome back|found|opened|imported|published|created|restored|sealed|copied|complete)/.test(lower)) {
+    return 'success';
+  }
+  if (/^(no |select |choose |pick )/.test(lower)) {
+    return 'warning';
+  }
+  return 'muted';
+}
+
+function setStatusNote(nodeOrId, text = '', { isError = false, tone = '' } = {}) {
+  const node = typeof nodeOrId === 'string' ? el(nodeOrId) : nodeOrId;
+  if (!node) return;
+  const value = String(text || '');
+  node.textContent = value;
+  if (node.classList && !node.classList.contains('status-note')) {
+    node.classList.add('status-note');
+  }
+  if (node.dataset) {
+    node.dataset.tone = inferStatusTone(value, { isError, tone });
+  }
+  node.style.color = '';
+}
+
+function setPillTone(nodeOrId, tone = 'muted') {
+  const node = typeof nodeOrId === 'string' ? el(nodeOrId) : nodeOrId;
+  if (!node) return;
+  if (node.dataset) {
+    node.dataset.tone = normalizeStatusTone(tone);
+  }
+  node.style.color = '';
+}
+
 const HATCH_VISIBILITY_KEY = 'openclawLite:hatchVisible';
 const AGENT_PANEL_MINIMIZED_KEY = 'agentTown:panel:minimized';
 const AGENT_PANEL_DEBUG_VISIBLE_KEY = 'agentTown:panel:debugVisible';
@@ -768,17 +824,11 @@ function buildWalletLookupMessage({ address, nonce, houseId }) {
   return parts.join('\n');
 }
 
-function setWalletStatus(msg, isError = false) {
+function setWalletStatus(msg, isError = false, tone = '') {
   const elStatus = el('walletStatus');
   if (!elStatus) return;
-  if (!msg || !isError) {
-    elStatus.textContent = '';
-    elStatus.style.display = 'none';
-    return;
-  }
-  elStatus.style.display = 'block';
-  elStatus.textContent = msg;
-  elStatus.style.color = 'var(--bad)';
+  setStatusNote(elStatus, msg, { isError, tone });
+  elStatus.style.display = '';
 }
 
 function loadHatchVisible() {
@@ -802,7 +852,7 @@ function setHatchVisible(value) {
 function setHatchStatus(text) {
   const status = el('hatchStatus');
   if (!status) return;
-  status.textContent = text || '';
+  setStatusNote(status, text, { tone: inferStatusTone(text) });
 }
 
 function updateWalletUI() {
@@ -931,7 +981,7 @@ function loadTokenError() {
 
 function setTokenError(msg) {
   const tokenError = el('tokenError');
-  if (tokenError) tokenError.textContent = msg || '';
+  if (tokenError) setStatusNote(tokenError, msg, { isError: !!String(msg || '').trim() });
 }
 
 function updatePathButtons() {
@@ -1337,17 +1387,15 @@ async function loadDistrictView(district) {
 function setHouseSurfaceStatus(text, isError = false) {
   const node = el('houseSurfaceStatus');
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  setStatusNote(node, text, { isError });
 }
 
 function setHouseTrainerActionStatus(text, isError = false) {
   const node = el('houseTrainerActionStatus');
-  if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
   houseSurfaceState.trainer.actionStatusText = String(text || '');
   houseSurfaceState.trainer.actionStatusError = !!isError;
+  if (!node) return;
+  setStatusNote(node, text, { isError });
 }
 
 function setHouseLibraryActionStatus(text, isError = false) {
@@ -1355,8 +1403,7 @@ function setHouseLibraryActionStatus(text, isError = false) {
   houseSurfaceState.library.actionStatusText = String(text || '');
   houseSurfaceState.library.actionStatusError = !!isError;
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  setStatusNote(node, text, { isError });
 }
 
 function setHouseWorkshopActionStatus(text, isError = false) {
@@ -1364,8 +1411,7 @@ function setHouseWorkshopActionStatus(text, isError = false) {
   houseSurfaceState.workshop.actionStatusText = String(text || '');
   houseSurfaceState.workshop.actionStatusError = !!isError;
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  setStatusNote(node, text, { isError });
 }
 
 function setHouseArchiveActionStatus(text, isError = false) {
@@ -1373,8 +1419,7 @@ function setHouseArchiveActionStatus(text, isError = false) {
   houseSurfaceState.archive.actionStatusText = String(text || '');
   houseSurfaceState.archive.actionStatusError = !!isError;
   if (!node) return;
-  node.textContent = String(text || '');
-  node.style.color = isError ? 'var(--bad)' : 'var(--muted)';
+  setStatusNote(node, text, { isError });
 }
 
 function houseWorkshopFileLabel(filePath = '') {
@@ -3335,9 +3380,13 @@ function syncHouseLibraryComposerControls() {
   saveBtn.textContent = isEditing ? 'Update Note' : 'Save Note to Library';
   saveBtn.disabled = !hasDraft;
   cancelBtn.disabled = !isEditing && !effectiveTitle && !effectiveBody.trim();
-  statusNode.textContent = isEditing
-    ? 'Editing a local Library note.'
-    : 'Writing a new local note.';
+  setStatusNote(
+    statusNode,
+    isEditing
+      ? 'Editing a local Library note.'
+      : 'Writing a new local note.',
+    { tone: isEditing ? 'info' : 'muted' },
+  );
 }
 
 function readHouseLibraryComposerDraft() {
@@ -3450,9 +3499,13 @@ function syncHouseLibraryCaptureControls() {
     });
   }
   saveBtn.disabled = !messages.length || !selectedIds.length;
-  statusNode.textContent = selectedIds.length
-    ? `${selectedIds.length} chat turn${selectedIds.length === 1 ? '' : 's'} selected.`
-    : 'No chat turns selected yet.';
+  setStatusNote(
+    statusNode,
+    selectedIds.length
+      ? `${selectedIds.length} chat turn${selectedIds.length === 1 ? '' : 's'} selected.`
+      : 'No chat turns selected yet.',
+    { tone: selectedIds.length ? 'info' : 'warning' },
+  );
 }
 
 function getHouseLibraryScopeSetById(scopeSetId = '') {
@@ -4668,7 +4721,7 @@ function renderHouseLibrarySurface() {
   previewActionDockNode.classList.toggle('is-hidden', !publicStackPreview);
   if (!publicStackPreview) {
     previewTitleNode.textContent = 'Public Stacks';
-    previewStatusNode.textContent = 'Look, check, trust, import.';
+    setStatusNote(previewStatusNode, 'Look, check, trust, import.', { tone: 'muted' });
     renderHouseLibraryTokenCluster(previewSigilsNode, []);
   } else {
     const familyToken = getHouseLibraryFamilyToken(String(publicStackPreview?.family || publicStackPreview?.familySlug || '').trim());
@@ -4680,7 +4733,7 @@ function renderHouseLibrarySurface() {
       discoveryLane: publicStackPreview?.discoveryLane,
     });
     previewTitleNode.textContent = String(publicStackPreview?.displayName || publicStackPreview?.registryId || 'Public Stack');
-    previewStatusNode.textContent = buildHouseLibraryPreviewHeroStatus(publicStackPreview);
+    setStatusNote(previewStatusNode, buildHouseLibraryPreviewHeroStatus(publicStackPreview), { tone: 'info' });
     renderHouseLibraryTokenCluster(previewSigilsNode, [familyToken, ...visualTokens]);
   }
   incomingRelaysEmptyNode.classList.toggle('is-hidden', incomingRelays.length > 0);
@@ -6265,21 +6318,21 @@ function setTownhallMintStepStatus(step, kind) {
   if (!node) return;
   if (kind === 'running') {
     node.textContent = 'Registering...';
-    node.style.color = 'var(--accent)';
+    setPillTone(node, 'info');
     return;
   }
   if (kind === 'done') {
     node.textContent = 'Done ✓';
-    node.style.color = 'var(--good)';
+    setPillTone(node, 'success');
     return;
   }
   if (kind === 'error') {
     node.textContent = 'Failed';
-    node.style.color = 'var(--bad)';
+    setPillTone(node, 'error');
     return;
   }
   node.textContent = 'Pending';
-  node.style.color = 'var(--muted)';
+  setPillTone(node, 'muted');
 }
 
 function syncTownhallMintChecklist(draft, { activeStep = null, errorStep = null } = {}) {
@@ -7720,8 +7773,8 @@ function combineRejectedTownhallMintErrors(results) {
 function setTownhallRegisterFeedback(message = '', isError = false) {
   const status = el('townhallRegisterStatus');
   const error = el('townhallRegisterError');
-  if (status) status.textContent = isError ? '' : message;
-  if (error) error.textContent = isError ? message : '';
+  if (status) setStatusNote(status, isError ? '' : message, { tone: message ? 'info' : 'muted' });
+  if (error) setStatusNote(error, isError ? message : '', { isError });
 }
 
 function setTownhallAvatarPreview(kind, imageUrl) {
@@ -8429,7 +8482,7 @@ function bindTownDistrictControls() {
   if (openShareCardBtn) {
     openShareCardBtn.onclick = async () => {
       openShareCardBtn.disabled = true;
-      if (shareCardStatus) shareCardStatus.textContent = 'Resolving share card...';
+      if (shareCardStatus) setStatusNote(shareCardStatus, 'Resolving share card...', { tone: 'info' });
       try {
         let sharePath = resolveSharePathFromState(lastState);
         const houseId = String(lastState?.houseId || walletHouseId || '').trim();
@@ -8439,15 +8492,15 @@ function bindTownDistrictControls() {
         if (!sharePath) {
           sharePath = '/s/sh_missing';
           if (shareCardStatus) {
-            shareCardStatus.textContent = 'No share yet for this house. Opening placeholder card.';
+            setStatusNote(shareCardStatus, 'No share yet for this house. Opening placeholder card.', { tone: 'warning' });
           }
         } else if (shareCardStatus) {
-          shareCardStatus.textContent = '';
+          setStatusNote(shareCardStatus, '', { tone: 'muted' });
         }
         routeToShareCard(sharePath);
       } catch (err) {
         if (shareCardStatus) {
-          shareCardStatus.textContent = `Share card unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`;
+          setStatusNote(shareCardStatus, `Share card unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`, { isError: true });
         }
       } finally {
         openShareCardBtn.disabled = false;
@@ -8458,9 +8511,8 @@ function bindTownDistrictControls() {
   const openBtn = el('openBtn');
   if (openBtn) {
     openBtn.onclick = async () => {
-      const openError = safeSetText('openError');
       const openWaiting = el('openWaiting');
-      if (openError) openError.textContent = '';
+      setOpenError('');
       try {
         const result = await api('/api/human/open/press', {
           method: 'POST',
@@ -8483,7 +8535,7 @@ function bindTownDistrictControls() {
         if (openWaiting) openWaiting.style.display = 'inline-flex';
         requestHomeSkillStep('human-action');
       } catch (e) {
-        if (openError) openError.textContent = `Error: ${e.message}`;
+        setOpenError(`Error: ${e.message}`);
       }
     };
   }
@@ -9663,8 +9715,7 @@ async function openTrainerModal() {
 
   const statusLine = document.getElementById('trainerStatusLine');
   if (statusLine && statusLine.textContent.includes('failed')) {
-    statusLine.textContent = 'Trainer loading...';
-    statusLine.style.color = 'var(--muted)';
+    setStatusNote(statusLine, 'Trainer loading...', { tone: 'info' });
   }
 
   try {
@@ -9672,8 +9723,7 @@ async function openTrainerModal() {
     await ensureTrainerScriptLoaded();
   } catch (err) {
     if (statusLine) {
-      statusLine.textContent = `Trainer failed to initialize: ${err?.message || 'UNKNOWN'}`;
-      statusLine.style.color = 'var(--bad)';
+      setStatusNote(statusLine, `Trainer failed to initialize: ${err?.message || 'UNKNOWN'}`, { isError: true });
     }
   }
 }
@@ -9866,15 +9916,15 @@ function bindAgentPanelLayout(panel) {
 function setOpenError(text) {
   const node = el('openError');
   if (!node) return;
-  node.textContent = text || '';
+  setStatusNote(node, text, { isError: !!String(text || '').trim() });
 }
 
 function setLiteLlmStatus(text) {
   const value = text || '';
   const legacy = el('liteLlmStatus');
-  if (legacy) legacy.textContent = value;
+  if (legacy) setStatusNote(legacy, value, { tone: inferStatusTone(value) });
   const agent = el('agentLlmLine');
-  if (agent) agent.textContent = value;
+  if (agent) setStatusNote(agent, value, { tone: inferStatusTone(value) });
 }
 
 function safeJsonParse(raw, fallback = null) {
@@ -11146,17 +11196,17 @@ async function lookupWalletHouse(houseIdOverride = null) {
 
 async function connectWalletAndLookup({ silent = false } = {}) {
   await connectWallet({ silent });
-  setWalletStatus('Wallet connected. Checking for houses…');
+  setWalletStatus('Wallet connected. Checking for houses…', false, 'info');
   const lookup = await lookupWalletHouse();
   if (lookup.houseId) {
     walletHouseId = lookup.houseId;
     walletRecovered = true;
-    setWalletStatus('Welcome back. House found.');
+    setWalletStatus('Welcome back. House found.', false, 'success');
     if (lastState) updateUI({ ...lastState, houseId: lookup.houseId });
   } else {
     walletHouseId = null;
     walletRecovered = false;
-    setWalletStatus('No houses found for this wallet yet.');
+    setWalletStatus('No houses found for this wallet yet.', false, 'warning');
     if (lastState) updateUI({ ...lastState, houseId: null });
   }
 }
@@ -11205,7 +11255,7 @@ async function restoreWalletConnection() {
     walletRecovered = true;
     if (lastState) updateUI({ ...lastState, houseId: cached.houseId });
   }
-  setWalletStatus('Wallet connected.');
+  setWalletStatus('Wallet connected.', false, 'success');
   saveWalletCache();
 }
 
@@ -12085,7 +12135,7 @@ async function updateUI(state) {
     openShareCardBtn.disabled = !houseId;
   }
   if (shareCardStatus && !houseId) {
-    shareCardStatus.textContent = '';
+    setStatusNote(shareCardStatus, '', { tone: 'muted' });
   }
   const matched = !!state.match?.matched;
   const matchState = el('matchState');
@@ -13411,7 +13461,7 @@ async function checkWalletStep() {
 
   pendingWalletCheck = true;
   if (walletBtn) walletBtn.disabled = true;
-  if (walletStatus) walletStatus.textContent = 'Checking wallet...';
+  setWalletStatus('Checking wallet...', false, 'info');
 
   const unlockStep2 = () => {
     if (step1) step1.classList.add('done');
@@ -13438,16 +13488,13 @@ async function checkWalletStep() {
     }
     if (lookup?.houseId) {
       statusOverride = 'House found! Redirecting...';
-      if (walletStatus) walletStatus.textContent = statusOverride;
+      setWalletStatus(statusOverride, false, 'success');
       window.location.href = `/house?house=${encodeURIComponent(lookup.houseId)}`;
       return;
     }
 
     // No house found - Proceed to Step 2 (LLM Config)
-    if (walletStatus) {
-      walletStatus.textContent = 'Wallet verified. Configure brain.';
-      walletStatus.style.color = 'var(--good)';
-    }
+    setWalletStatus('Wallet verified. Configure brain.', false, 'success');
     unlockStep2();
 
     statusOverride = 'No existing house found. Continue setting up your OpenClaw Lite agent.';
@@ -13467,10 +13514,7 @@ async function checkWalletStep() {
             : hasConnectedWallet
               ? 'Wallet connected. Lookup skipped. Configure brain to continue.'
               : 'Wallet check failed.';
-    if (walletStatus) {
-      walletStatus.textContent = msg;
-      walletStatus.style.color = hasConnectedWallet ? 'var(--muted)' : 'var(--bad)';
-    }
+    setWalletStatus(msg, !hasConnectedWallet, hasConnectedWallet ? 'warning' : 'error');
     if (hasConnectedWallet) {
       unlockStep2();
     }
@@ -13672,7 +13716,7 @@ function copySelectOptions(fromSelect, toSelect) {
 function setAgentLlmStatus(text) {
   const node = el('agentLlmLine');
   if (!node) return;
-  node.textContent = text || '';
+  setStatusNote(node, text, { tone: inferStatusTone(text) });
 }
 
 function readAgentLlmAuthMode() {

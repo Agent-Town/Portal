@@ -225,3 +225,33 @@ Rule:
 1. minimized support surfaces should take less width than expanded ones,
 2. support headers should be calmer and shorter than primary room headers,
 3. debug power can stay available without using the same visual intensity as the main task.
+
+## 24. Empty-state contracts can evolve visually without breaking deterministic copy
+
+The House surfaces proved that many empty-state strings are part of the test contract.
+
+Rule:
+
+1. preserve canonical empty-state text when tests or benchmark fixtures depend on it,
+2. add guidance through secondary affordances such as helper lines, drawers, or `data-*` driven visual hints,
+3. treat copy replacement as a contract change, not as harmless polish.
+
+## 25. A shared tone system is more reliable than inline status colors
+
+The final polish pass exposed how many surfaces were still setting `style.color` directly.
+
+Rule:
+
+1. status, warning, success, and error states should flow through one visual helper,
+2. avoid one-off color writes in JS for presentational feedback,
+3. if a state needs emphasis, use shared tone tokens so screenshots, accessibility, and future localization stay aligned.
+
+## 26. Modal evidence should document the surface the user actually reads
+
+The first D6 screenshot pass showed that raw element captures can misrepresent transformed modal layouts.
+
+Rule:
+
+1. prefer viewport captures that match what the user actually sees,
+2. if a modal is scaled or transformed, scroll the relevant surface into view before capturing it,
+3. design evidence should communicate hierarchy clearly, not just prove that a node exists.

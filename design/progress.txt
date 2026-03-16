@@ -71,6 +71,12 @@ Completed:
   - onboarding copy is shorter and easier to follow without AI setup knowledge
   - the agent sidebar is smaller and quieter by default, with a reduced minimized footprint and calmer expanded chrome
   - the agent sidebar still preserves the same chat, Brain, Worker Tools, Skill Context, Worker Traffic, and Session Context behavior
+- Phase D6 implemented:
+  - loading states now use a calmer shared visual treatment instead of blank waiting surfaces
+  - empty states keep deterministic contract text while adding one clear next action
+  - status and error messaging now share one tone system instead of scattered inline colors
+  - focus visibility is stronger across buttons, links, summaries, and form fields
+  - drawer reveal motion is more coherent and still respects reduced-motion users
 - Verification completed for D4:
   - targeted House Library regressions passed
   - screenshot evidence captured and committed in `design/evidence/phase-d4/`
@@ -79,10 +85,14 @@ Completed:
   - targeted Town Hall and agent-panel regressions passed
   - screenshot evidence captured and committed in `design/evidence/phase-d5/`
   - full `npm test` passed
+- Verification completed for D6:
+  - targeted D6 regressions passed
+  - screenshot evidence captured and committed in `design/evidence/phase-d6/`
+  - full `npm test` passed with `410 passed, 4 skipped`
 
 Not yet done:
-- D6 is not implemented
+- no approved design phases remain after D6
 
 Recommended next step:
-- Implement Phase D6 after reviewing D5 screenshots
+- review the full D1 through D6 evidence set before proposing any new design phase
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

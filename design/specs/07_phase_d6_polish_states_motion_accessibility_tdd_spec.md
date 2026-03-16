@@ -1,6 +1,6 @@
 # Phase D6 - Polish, States, Motion, And Accessibility TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 
@@ -88,3 +88,26 @@ This phase is complete only when:
 1. the interface feels finished in motion and state transitions,
 2. the app remains calm when empty, loading, or failing,
 3. accessibility is visibly stronger than the baseline.
+
+## 8. Implementation evidence
+
+Implemented in:
+
+1. `public/styles.css`
+2. `public/start.html`
+3. `public/index.html`
+4. `public/trainer.html`
+5. `public/views/house.html`
+6. `public/views/townhall.html`
+7. `public/app.js`
+8. `public/start.js`
+
+Evidence:
+
+1. `design/evidence/phase-d6/before/`
+2. `design/evidence/phase-d6/after/`
+
+Verification completed:
+
+1. targeted D6 regressions passed
+2. full `npm test` passed with `410 passed, 4 skipped`

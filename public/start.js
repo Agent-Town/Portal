@@ -1,8 +1,18 @@
+function inferStartStatusTone(message = '', isError = false) {
+  const value = String(message || '').trim().toLowerCase();
+  if (!value) return 'muted';
+  if (isError) return 'error';
+  if (/(connecting|finalizing|checking|sending|preparing|waiting)/.test(value)) return 'info';
+  if (/(success|entering|ready)/.test(value)) return 'success';
+  return 'muted';
+}
+
 function setStatus(msg, isError = false) {
   const statusNode = document.getElementById('startStatus');
   if (!statusNode) return;
   statusNode.textContent = msg || '';
-  statusNode.style.color = isError ? 'var(--bad-strong)' : 'var(--muted)';
+  statusNode.dataset.tone = inferStartStatusTone(msg, isError);
+  statusNode.style.color = '';
 }
 
 let cachedPrivyConfig = null;
