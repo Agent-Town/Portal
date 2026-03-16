@@ -1850,6 +1850,26 @@ function normalizeHouseHqName(value) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 64);
 }
 
+function getSavedHouseHqName() {
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  if (!houseId) return '';
+  const naming = ensureHouseHqNamingState();
+  return normalizeHouseHqName(naming.savedName);
+}
+
+function getHouseDistrictTitle() {
+  const defaultTitle = String(districtViews?.house?.title || 'Plan Wagons');
+  const savedName = getSavedHouseHqName();
+  return savedName ? `${savedName} HQ` : defaultTitle;
+}
+
+function renderHouseDistrictHeader() {
+  if (currentDistrict !== 'house') return;
+  const titleNode = el('districtModalTitle');
+  if (!titleNode) return;
+  titleNode.textContent = getHouseDistrictTitle();
+}
+
 function hashHouseHqSeed(value) {
   const input = String(value || '');
   let hash = 2166136261;
@@ -1976,11 +1996,11 @@ function renderHouseHqEntrySurface() {
   const agentWordNode = el('houseHqAgentWord');
   const previewNode = el('houseHqNamePreview');
   const inputNode = el('houseHqNameInput');
-  if (!panel) return;
   const ready = isHouseHqFirstEntryReady();
-  panel.classList.toggle('is-hidden', !ready);
+  if (panel) panel.classList.toggle('is-hidden', !ready);
   if (startMissionBtn) startMissionBtn.disabled = !ready;
-  if (!ready) return;
+  renderHouseDistrictHeader();
+  if (!panel || !ready) return;
 
   const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();

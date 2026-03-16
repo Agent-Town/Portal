@@ -1,7 +1,7 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green  
-Last updated: 2026-03-16 22:11 Asia/Bangkok  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green, M44.7 saved HQ name now projects into the House shell header and is green  
+Last updated: 2026-03-16 22:36 Asia/Bangkok  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
@@ -25,121 +25,94 @@ Robin clarified the constraints that currently govern the founders-loop passes:
 
 ## What landed this pass
 
-### M44.6 — shared HQ naming now sits inside the existing House modal handoff
-The next smallest coherent slice is now live inside the existing HQ-first-entry surface.
+### M44.7 — saved HQ name now brands the House modal header
+The smallest coherent follow-on to M44.6 is now landed: once the pair saves the HQ name, the surrounding House shell starts using it.
 
 What changed:
-- the House modal now opens with a concise paired naming move before Mission
-- the surface shows one word from the human side and one word from the agent side
-- the pair gets one editable shared HQ name field plus one obvious primary action
-- the primary action saves the shared name and opens Mission in the same move
-- after the name is saved, the same surface simplifies back down to `Open mission`
+- the House modal header now stays generic (`Plan Wagons`) until the HQ name is actually saved
+- once saved, the modal header switches to `<saved HQ name> HQ`
+- after reload, the saved HQ name still appears in the header immediately when the House modal comes back
+- unsaved typing does **not** rename the shell early; the naming payoff still happens through the existing single primary action
 
 Implementation details:
-- `public/views/house.html`
-  - added a minimal paired proposal row inside the HQ panel
-  - added live HQ-name preview + editable input
-  - kept the entire interaction inside the existing `/app` modal shell
 - `public/app.js`
-  - derives concise deterministic human/agent word proposals from founder names + house id
-  - persists the chosen HQ name in local storage keyed by house id
-  - preserves one primary action by making the mission button also commit the shared name
-  - changes the CTA label by state:
-    - fresh house: `Name HQ and open mission`
-    - after save: `Open mission`
-  - Enter on the input also triggers the same single primary action
-- `public/styles.css`
-  - adds minimal styling for the paired proposal strip and live HQ-name preview
+  - added a tiny header renderer for the House district modal title
+  - derives the shell title from the already-saved local HQ name only
+  - keeps the fallback title as `Plan Wagons` when no saved HQ name exists yet
+  - re-renders the title through the existing HQ-entry render path so save/reload both stay in sync
 
 ### Why this matches the direction better
-This is the first early post-crest / early-HQ interaction that feels like a shared win rather than a dead handoff panel:
+This gives the naming move visible payoff in the shell itself without broadening scope:
 - still modal-only on `/app`
-- still sparse and functional
-- still one obvious primary action
-- explicitly framed as the human and agent contributing together
-- not a fake chat app and not a wall of copy
+- still minimal and functional
+- still one obvious primary action in the HQ entry state
+- the saved shared name now feels like it actually changes the headquarters, not just one input field
+- no fake chat, no extra ceremony layer, no persistence broadening
 
 ## New / updated contract coverage
-- added: `e2e/421_zhc0_house_shared_naming.spec.js`
-  - verifies the paired human+agent naming surface appears on first House entry
-  - verifies the user can edit the shared HQ name
-  - verifies the saved name persists after reload for the same house
-  - verifies the primary action remains singular and then simplifies to `Open mission`
-- updated: `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
-  - ceremony completion still re-homes into the House modal
-  - assertion now expects the naming-first HQ state rather than the pre-M44.6 plain `Open mission` state
+- added: `e2e/429_zhc0_house_header_uses_saved_hq_name.spec.js`
+  - verifies the House modal title starts as `Plan Wagons`
+  - verifies saving the HQ name promotes it into the modal header as `<name> HQ`
+  - verifies the same header title persists after reload for the same attached house
 
 ## Files changed in this slice
 
 - `public/app.js`
-- `public/views/house.html`
-- `public/styles.css`
-- `e2e/421_zhc0_house_shared_naming.spec.js`
-- `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
+- `e2e/429_zhc0_house_header_uses_saved_hq_name.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused founders-loop HQ naming sweep
+### Focused founders-loop House naming/header sweep
 ```bash
-npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/421_zhc0_house_shared_naming.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
+node --check public/app.js && npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/421_zhc0_house_shared_naming.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js e2e/429_zhc0_house_header_uses_saved_hq_name.spec.js
 ```
 
 Result:
-- `3 passed`
-
-### Syntax sanity on touched browser files
-```bash
-node --check public/app.js && node --check public/create.js
-```
-
-Result:
-- passed
+- `4 passed`
 
 ## What I verified
 
 - the first House HQ entry still lives inside the `/app` modal shell
-- the first HQ state now presents a concise co-authored naming move instead of only a static mission handoff
-- the human and agent names from onboarding are surfaced directly in the paired naming UI
-- the shared HQ name can be edited before Mission opens
-- the chosen HQ name persists across reload for the same attached house
-- after save, the primary action simplifies back down to `Open mission`
-- ceremony handoff still lands correctly in the House modal and now lands on the naming-first surface
+- the shared HQ naming move still saves through the same single primary action
+- the shell does **not** rename itself while the input is still just a draft
+- after save, the House modal header switches to the saved HQ name
+- after reload for the same house, the saved HQ name still appears in the House modal header immediately
+- existing M44.5 / M44.6 / M44.4 focused coverage still passes alongside the new header projection test
 
 ## Honest gaps / remaining debt
 
-- HQ naming currently persists in browser local storage only
-  - it is coherent for the UI slice, but it is **not** yet written into server/session/platform state
-- the saved shared name is not yet reused broadly across the rest of the product
-  - it does not yet flow into share cards, deeper House surfaces, or longer-lived metadata
-- this pass intentionally stops at the smallest coherent shared-win interaction
-  - it does **not** introduce a broader Step 7 paired mission mechanic yet
+- HQ naming still persists in browser local storage only
+  - coherent for this UI slice, but still not written into server/session/platform state
+- the saved HQ name now appears in the House shell header, but it is still not reused across broader product surfaces
+  - for example: deeper mission copy, share cards, and longer-lived metadata still do not use it
 - no screenshot evidence was captured in this pass
 
 ## What I did **not** do
 
 - no push
 - did **not** touch the unrelated dirty `package-lock.json`
-- did **not** broaden the slice into a fake conversation UI or chat surface
+- did **not** broaden persistence scope beyond existing local storage
+- did **not** add extra actions or expand the flow beyond the current modal shell
 - did **not** update deeper machine/spec artifacts (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`)
 
 ## Blockers
 
 - none for this slice
-- main conscious limitation is persistence scope: local-only for now, by design, to keep the change minimal and green
+- conscious limitation remains persistence scope: local-only, by design, to keep the slice small and green
 
 ## Next exact pickup
 
 Best next small follow-on:
-1. use the saved HQ name in one more place where it pays off immediately
-   - strongest candidate: reflect it in the Mission/House header or another early post-entry shell surface
-2. decide whether the HQ name should graduate from local UI state into server/platform state
+1. project the saved HQ name into the Mission lane itself
+   - strongest candidate now: the Mission panel heading/lead inside the same House modal shell
+2. keep persistence local-only unless there is an exceptionally small safe path to broader state
 3. keep the next move just as narrow
    - modal-only on `/app`
-   - one obvious primary action
-   - no broad ceremony / mission rewrite
+   - one obvious primary action per state
+   - no broad mission rewrite or fake dialogue layer
 
 ## Repo state notes
 
-- this M44.6 naming slice is local in this worktree only
+- this M44.7 shell-header projection is local in this worktree only
 - unrelated dirty file remains: `package-lock.json` (leave it alone unless explicitly intended)
