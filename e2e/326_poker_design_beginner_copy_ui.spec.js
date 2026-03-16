@@ -16,8 +16,8 @@ test('D5 copy: lobby and live table use beginner-friendly teammate language', as
 
     await page.goto('/poker/play?embed=1');
     const quickSeat = page.locator('[data-poker-section="quick-seat"]');
-    await expect(quickSeat).toContainText('Find Or Create Table');
-    await expect(quickSeat).toContainText('Watch Public Tables');
+    await expect(quickSeat).toContainText('Join Or Create');
+    await expect(quickSeat).toContainText('Live Season');
     await expect(quickSeat).not.toContainText('Native Season');
 
     await page.goto('/poker/play/tables/pkt_play_cash_01?embed=1');

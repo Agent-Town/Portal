@@ -262,6 +262,30 @@ When a future design phase lands, append:
 1. Quick Seat should default to one decision and one action; everything else must justify why it belongs outside the advanced drawer.
 2. Lobby rows should look like poker-room listings, not like generic product cards.
 3. If a detail is useful mostly after the user sits or for the LLM, it does not belong in the first lobby read.
+
+## 2026-03-16 D6 Live Table Support Drawers
+
+### What changed
+
+1. Team notes, AI teammate detail, auto-play settings, player review forms, and study note bodies now stay behind explicit drawers on the live table.
+2. The default live-table rail now leads with short summaries and counts instead of full logs and full forms.
+3. The simplified live table was validated again in Simplified Chinese so the default action lane stays clear under localized copy.
+
+### What worked
+
+1. Keeping the forms in the DOM but behind `details` preserved behavior and made the regression fixes straightforward.
+2. The action lane already had the right hierarchy from D2, so reducing support density created a meaningful calm without moving the core poker flow.
+3. Updating the affected functional tests immediately was necessary; hidden-by-default controls are still real controls and the suite has to treat them that way.
+
+### What regressed and had to be corrected
+
+1. The dispute-review UI test originally assumed review fields and audit detail were always visible; it had to be rewritten to open the right drawers at the right time.
+
+### What should become a permanent rule
+
+1. Live-table support should summarize by default and explain in drawers.
+2. If a player can still act correctly without reading a support panel, that panel should not ship expanded by default.
+3. Localization checks for simple-default poker routes must include hidden-support layouts, not just visible-button overflow.
 2. The design workflow now explicitly treats TLA+ as the precheck for visibility, gating, and projection invariants.
 3. The docs now distinguish formalizable design logic from non-formalizable visual taste.
 

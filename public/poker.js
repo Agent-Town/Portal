@@ -1382,22 +1382,25 @@
     const opponentNotes = Array.isArray(data.opponentNotes) ? data.opponentNotes : [];
     return sectionCard('study-preview', `
       <h2>Study</h2>
-      <div class="pokerSummary">
-        ${renderSummaryMetric('Notebook', `${Number(data.notebookCount || 0)}`)}
-        ${renderSummaryMetric('Opponent Notes', `${Number(data.opponentNoteCount || 0)}`)}
-      </div>
+      <p>Keep review tools nearby without making them part of the live decision lane.</p>
+      ${renderFactStrip([
+        { label: 'Notebook', value: `${Number(data.notebookCount || 0)}` },
+        { label: 'Opponent Notes', value: `${Number(data.opponentNoteCount || 0)}` },
+      ])}
       <div class="pokerLinks">
         ${data.handReviewPath ? `<a href="${escapeHtml(buildPokerHref(data.handReviewPath))}">Open Current Hand Review</a>` : ''}
         <a href="${escapeHtml(buildPokerHref(window.location.pathname.replace(/\/$/, '') + '/history', { status: 'completed' }))}">Open Hand History</a>
       </div>
-      ${recentEntries.length ? `
-        <div class="pokerLabel">Recent Notebook</div>
-        ${renderNotebookEntryRows(recentEntries, { emptyText: 'No notebook entries yet.' })}
-      ` : '<p>No notebook entries saved yet.</p>'}
-      ${opponentNotes.length ? `
-        <div class="pokerLabel">Recent Opponent Notes</div>
-        ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes yet.' })}
-      ` : '<p>No opponent notes saved yet.</p>'}
+      ${renderAdvancedPanel('Open study notes', 'Notebook and opponent notes for later review.', `
+        ${recentEntries.length ? `
+          <div class="pokerLabel">Recent Notebook</div>
+          ${renderNotebookEntryRows(recentEntries, { emptyText: 'No notebook entries yet.' })}
+        ` : '<p>No notebook entries saved yet.</p>'}
+        ${opponentNotes.length ? `
+          <div class="pokerLabel">Recent Opponent Notes</div>
+          ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes yet.' })}
+        ` : '<p>No opponent notes saved yet.</p>'}
+      `)}
     `, { plane: 'reference' });
   }
 
@@ -3786,44 +3789,47 @@
       const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
       cards.push(sectionCard('auto-act', `
         <h2>Auto Play Help</h2>
-        <p>Automation is always optional. Turn it on only if you want your seat to keep acting by the rules you choose.</p>
-        <div class="pokerSummary">
-          ${renderSummaryMetric('Mode', formatAutoActLabel(autoAct?.mode))}
-          ${renderSummaryMetric('Allow Disconnect', autoAct?.allowWhileDisconnected ? 'yes' : 'no')}
-          ${renderSummaryMetric('Last Action', autoAct?.lastExecutedActionKind ? formatPokerActionLabel(autoAct.lastExecutedActionKind) : 'none')}
-        </div>
-        <form id="pokerPlayAutoActForm" class="pokerForm">
-          <label>
-            Mode
-            <select id="pokerPlayAutoActMode">
-              <option value="off"${String(autoAct?.mode || 'off') === 'off' ? ' selected' : ''}>Off</option>
-              <option value="propose_only"${String(autoAct?.mode || '') === 'propose_only' ? ' selected' : ''}>Suggestions Only</option>
-              <option value="check_fold"${String(autoAct?.mode || '') === 'check_fold' ? ' selected' : ''}>Check/Fold</option>
-              <option value="seat_agent_auto"${String(autoAct?.mode || '') === 'seat_agent_auto' ? ' selected' : ''}>AI Teammate Auto</option>
-            </select>
-          </label>
-          <label>
-            <input id="pokerPlayAutoActAllowDisconnect" type="checkbox"${autoAct?.allowWhileDisconnected ? ' checked' : ''}>
-            Allow while disconnected
-          </label>
-          <button id="pokerPlayAutoActSaveButton" class="pokerButton" type="submit">Save Auto Play</button>
-        </form>
-        <div class="pokerLinks">
-          <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto Play</button>
-        </div>
+        <p>Leave automation closed unless you want the seat to keep acting by a rule.</p>
+        ${renderFactStrip([
+          { label: 'Mode', value: formatAutoActLabel(autoAct?.mode) },
+          { label: 'Allow Disconnect', value: autoAct?.allowWhileDisconnected ? 'yes' : 'no' },
+          { label: 'Last Action', value: autoAct?.lastExecutedActionKind ? formatPokerActionLabel(autoAct.lastExecutedActionKind) : 'none' },
+        ])}
+        ${renderAdvancedPanel('Open auto-play settings', 'Mode, disconnect behavior, and reset controls.', `
+          <form id="pokerPlayAutoActForm" class="pokerForm">
+            <label>
+              Mode
+              <select id="pokerPlayAutoActMode">
+                <option value="off"${String(autoAct?.mode || 'off') === 'off' ? ' selected' : ''}>Off</option>
+                <option value="propose_only"${String(autoAct?.mode || '') === 'propose_only' ? ' selected' : ''}>Suggestions Only</option>
+                <option value="check_fold"${String(autoAct?.mode || '') === 'check_fold' ? ' selected' : ''}>Check/Fold</option>
+                <option value="seat_agent_auto"${String(autoAct?.mode || '') === 'seat_agent_auto' ? ' selected' : ''}>AI Teammate Auto</option>
+              </select>
+            </label>
+            <label>
+              <input id="pokerPlayAutoActAllowDisconnect" type="checkbox"${autoAct?.allowWhileDisconnected ? ' checked' : ''}>
+              Allow while disconnected
+            </label>
+            <button id="pokerPlayAutoActSaveButton" class="pokerButton" type="submit">Save Auto Play</button>
+          </form>
+          <div class="pokerLinks">
+            <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto Play</button>
+          </div>
+        `)}
       `, { plane: 'reference' }));
     }
 
     if (Number(review?.openDisputeCount || 0) > 0 || myDisputes.length) {
       cards.push(sectionCard('table-review', `
         <h2>Table Review</h2>
-        <div class="pokerSummary">
-          ${renderSummaryMetric('Status', review?.status || 'clear')}
-          ${renderSummaryMetric('Open Disputes', `${Number(review?.openDisputeCount || 0)}`)}
-          ${renderSummaryMetric('Current Hand', `${Number(review?.currentHandOpenDisputeCount || 0)}`)}
-        </div>
-        ${review?.latestAuditEvent ? `<p>Latest audit event: <strong>${escapeHtml(review.latestAuditEvent.eventKind || 'review')}</strong> at ${escapeHtml(review.latestAuditEvent.createdAt || '')}</p>` : ''}
-        ${myDisputes.length ? `
+        <p>Keep review detail folded away unless something is already open.</p>
+        ${renderFactStrip([
+          { label: 'Status', value: review?.status || 'clear' },
+          { label: 'Open Disputes', value: `${Number(review?.openDisputeCount || 0)}` },
+          { label: 'Current Hand', value: `${Number(review?.currentHandOpenDisputeCount || 0)}` },
+        ])}
+        ${review?.latestAuditEvent ? `<p>Latest audit event: <strong>${escapeHtml(review.latestAuditEvent.eventKind || 'review')}</strong>.</p>` : ''}
+        ${renderAdvancedPanel('Open review detail', 'Your dispute history and the latest resolution notes.', myDisputes.length ? `
           <div class="pokerStack">
             ${myDisputes.map((dispute) => `
               <div class="pokerMessage">
@@ -3833,7 +3839,7 @@
               </div>
             `).join('')}
           </div>
-        ` : '<p>No seat dispute from you on this table.</p>'}
+        ` : '<p>No seat dispute from you on this table.</p>')}
       `, { plane: 'reference' }));
     }
 
@@ -3918,22 +3924,22 @@
       const proposal = data?.agentProposal && typeof data.agentProposal === 'object' ? data.agentProposal : null;
       cards.push(sectionCard('worker-seat-agent', `
         <h2>AI Teammate Suggestion</h2>
-        <p>Ask your AI teammate for a plain-language suggested move, then decide whether to use it.</p>
+        <p>Ask for a quick line when you want it. The full rationale stays hidden until you open it.</p>
         ${proposal
-          ? `
-            <div class="pokerSummary">
-              ${renderSummaryMetric('Action', proposal.actionKind || 'hold')}
-              ${renderSummaryMetric('Amount', `${Number(proposal.amountOil || 0)} OIL`)}
-              ${renderSummaryMetric('Confidence', proposal.confidence || 'medium')}
-            </div>
-            <p>${escapeHtml(proposal.body || 'No AI teammate suggestion is recorded for this hand.')}</p>
-          `
-          : '<p>No AI teammate suggestion is saved for this hand yet. Ask for one when you want a quick line before you act.</p>'}
+          ? renderFactStrip([
+            { label: 'Action', value: proposal.actionKind || 'hold' },
+            { label: 'Amount', value: `${Number(proposal.amountOil || 0)} OIL` },
+            { label: 'Confidence', value: proposal.confidence || 'medium' },
+          ])
+          : '<p>No AI teammate suggestion is saved for this hand yet.</p>'}
         <div class="pokerSupportMeta" data-poker-support-kind="provider-meta" hidden aria-hidden="true"></div>
         <div class="pokerLinks">
           <button id="pokerSeatAgentProposeButton" class="pokerButton" type="button">Ask AI Teammate</button>
           ${proposal ? '<button id="pokerSeatAgentCommitButton" class="pokerButton" type="button">Use Suggested Action</button>' : ''}
         </div>
+        ${renderAdvancedPanel('Open AI detail', 'Plain-language rationale, sizing, and teammate note.', proposal
+          ? `<p>${escapeHtml(proposal.body || 'No AI teammate suggestion is recorded for this hand.')}</p>`
+          : '<p>No AI teammate suggestion is recorded for this hand.</p>')}
       `, { plane: 'supporting' }));
     }
 
@@ -3948,49 +3954,58 @@
     if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(sectionCard('flag-review', `
         <h2>Flag Hand For Review</h2>
-        <p>Use this for rule, turn-order, disconnect, or settlement issues. Filing a review pauses the table for operator inspection.</p>
-        ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : ''}
-        <form id="pokerPlayDisputeForm" class="pokerForm">
-          <label>
-            Category
-            <select id="pokerPlayDisputeCategory">
-              <option value="general">General</option>
-              <option value="rule_misread">Rule Misread</option>
-              <option value="bet_size">Bet Size</option>
-              <option value="turn_order">Turn Order</option>
-              <option value="disconnect">Disconnect</option>
-              <option value="settlement">Settlement</option>
-              <option value="conduct">Conduct</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label>
-            Review note
-            <textarea id="pokerPlayDisputeNote" placeholder="Describe the issue and the seat/action involved."></textarea>
-          </label>
-          <button id="pokerPlayDisputeSubmit" class="pokerButton" type="submit"${hasOpenMyHandDispute ? ' disabled' : ''}>Flag Hand For Review</button>
-        </form>
+        <p>Only open this if there is a real rule, turn-order, disconnect, or settlement issue.</p>
+        ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : '<p>No open review from your seat.</p>'}
+        ${renderAdvancedPanel('Open review form', 'Category and note for the operator queue.', `
+          <form id="pokerPlayDisputeForm" class="pokerForm">
+            <label>
+              Category
+              <select id="pokerPlayDisputeCategory">
+                <option value="general">General</option>
+                <option value="rule_misread">Rule Misread</option>
+                <option value="bet_size">Bet Size</option>
+                <option value="turn_order">Turn Order</option>
+                <option value="disconnect">Disconnect</option>
+                <option value="settlement">Settlement</option>
+                <option value="conduct">Conduct</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>
+              Review note
+              <textarea id="pokerPlayDisputeNote" placeholder="Describe the issue and the seat/action involved."></textarea>
+            </label>
+            <button id="pokerPlayDisputeSubmit" class="pokerButton" type="submit"${hasOpenMyHandDispute ? ' disabled' : ''}>Flag Hand For Review</button>
+          </form>
+        `)}
       `, { plane: 'reference' }));
     }
 
     if (!publicRail && !adminClosed && mySeat && hand) {
       cards.push(sectionCard('seat-thread', `
         <h2>Team Notes</h2>
-        <div class="pokerStack">
-          ${messages.length ? messages.map((message) => `
-            <div class="pokerMessage ${message.authorRole === 'agent' ? 'is-agent' : ''}">
-              <div class="pokerLabel">${escapeHtml(message.authorRole)}</div>
-              <div>${escapeHtml(message.body)}</div>
-            </div>
-          `).join('') : '<p>No private team notes yet.</p>'}
-        </div>
-        <form id="pokerPlayMessageForm" class="pokerForm">
-          <label>
-            Discuss the next move
-            <textarea id="pokerPlayMessageBody" placeholder="What line are we taking into this spot?"></textarea>
-          </label>
-          <button class="pokerButton" type="submit">Send To Team Notes</button>
-        </form>
+        <p>Open the team note thread when you want the full back-and-forth. The table stays cleaner when it is closed.</p>
+        ${renderFactStrip([
+          { label: 'Messages', value: `${messages.length}` },
+          { label: 'Latest', value: messages.length ? String(messages[messages.length - 1]?.authorRole || 'team') : 'none' },
+        ])}
+        ${renderAdvancedPanel('Open team notes', 'Private note history and the draft box for this hand.', `
+          <div class="pokerStack">
+            ${messages.length ? messages.map((message) => `
+              <div class="pokerMessage ${message.authorRole === 'agent' ? 'is-agent' : ''}">
+                <div class="pokerLabel">${escapeHtml(message.authorRole)}</div>
+                <div>${escapeHtml(message.body)}</div>
+              </div>
+            `).join('') : '<p>No private team notes yet.</p>'}
+          </div>
+          <form id="pokerPlayMessageForm" class="pokerForm">
+            <label>
+              Discuss the next move
+              <textarea id="pokerPlayMessageBody" placeholder="What line are we taking into this spot?"></textarea>
+            </label>
+            <button class="pokerButton" type="submit">Send To Team Notes</button>
+          </form>
+        `)}
         <div class="pokerVoiceReadySlot" data-poker-voice-slot="seat-thread" hidden aria-hidden="true"></div>
       `, { plane: 'supporting' }));
     }

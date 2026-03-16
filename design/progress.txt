@@ -65,6 +65,10 @@ Current next-step status:
 - live tables and tournament series in the lobby now render as compact poker-room rows instead of tall stacked cards, with history and director context remaining in explicit drawers
 - deterministic D6 compactness tests added: e2e/336_poker_design_quick_seat_compact_default_ui.spec.js and e2e/337_poker_design_live_table_compact_list_ui.spec.js
 - visual documentation captured for the lobby simplification continuation under artifacts/design-progress-20260316-d8-lobby-minimal
+- D6 simplification continued on the live table: team notes, AI teammate detail, auto-play settings, study note bodies, and player review forms now stay behind explicit drawers while current hand, submit action, and seat state remain visible by default
+- deterministic live-table simplification tests added: e2e/338_poker_design_live_table_dead_simple_default_ui.spec.js, e2e/339_poker_design_live_table_support_detail_gate_ui.spec.js, and e2e/340_poker_design_chinese_live_table_simple_default_ui.spec.js
+- related functional regression coverage updated for drawer-based lobby and live-table controls in e2e/179, e2e/196, e2e/245, e2e/247, e2e/249, e2e/251, and e2e/253
+- visual documentation captured for the live-table simplification continuation under artifacts/design-progress-20260316-d9-live-table-minimal
 - TLA+ formal design layer added under design/tla for route projection, admin gating, default-hidden advanced detail, locale invariance, voice-mode invariance, and no-drift human vs LLM projection rules
 - formal methods companion added: design/08_poker_play_design_v1_formal_methods.md
 - TLC validation run completed successfully for design/tla/PokerDesignProjection.tla on 2026-03-16

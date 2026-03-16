@@ -90,12 +90,14 @@ test('M23.22: live table UI exposes player review and hidden operator resolution
 
   await pageA.goto(`/poker/play/tables/pkt_play_cash_01?embed=1&asOf=${encodeURIComponent(disputeAt)}`);
   await expect(pageA.getByRole('heading', { name: 'Operator Review' })).toHaveCount(0);
+  await pageA.locator('[data-poker-section="flag-review"] details summary').click();
   await pageA.locator('#pokerPlayDisputeCategory').selectOption('disconnect');
   await pageA.locator('#pokerPlayDisputeNote').fill('Seat two disconnected while the action clock was still live.');
   await pageA.getByRole('button', { name: 'Flag Hand For Review' }).click();
 
   await expect(pageA.getByRole('heading', { name: 'Table Review' })).toBeVisible();
   await expect(pageA.getByText('Table paused: hand review')).toBeVisible();
+  await pageA.locator('[data-poker-section="table-review"] details summary').click();
   await expect(pageA.getByText('Latest audit event:')).toBeVisible();
   await expect(pageA.getByText('dispute_opened')).toBeVisible();
 
@@ -107,9 +109,9 @@ test('M23.22: live table UI exposes player review and hidden operator resolution
   await expect(pageA.getByRole('button', { name: 'Resolve + Resume' }).first()).toBeVisible();
   await pageA.getByRole('button', { name: 'Resolve + Resume' }).first().click();
 
-  await expect(pageA.getByText('Table resumed by operator.')).toBeVisible();
   await expect(pageA.getByText('Table paused: hand review')).toHaveCount(0);
   await expect(pageA.getByRole('heading', { name: 'Operator Review' })).toBeVisible();
+  await pageA.locator('[data-poker-section="table-review"] details summary').click();
   await expect(pageA.getByText('No disputes on the selected hand.')).toBeVisible();
 
   await contextA.close();

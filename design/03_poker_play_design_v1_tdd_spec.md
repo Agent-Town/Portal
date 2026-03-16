@@ -284,9 +284,9 @@ Primary tests:
 4. `e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js`
 5. `e2e/336_poker_design_quick_seat_compact_default_ui.spec.js`
 6. `e2e/337_poker_design_live_table_compact_list_ui.spec.js`
-7. `e2e/338_poker_design_season_compact_default_ui.spec.js`
-8. `e2e/339_poker_design_centaur_dead_simple_default_ui.spec.js`
-9. `e2e/340_poker_design_chinese_simple_default_ui.spec.js`
+7. `e2e/338_poker_design_live_table_dead_simple_default_ui.spec.js`
+8. `e2e/339_poker_design_live_table_support_detail_gate_ui.spec.js`
+9. `e2e/340_poker_design_chinese_live_table_simple_default_ui.spec.js`
 
 Evaluation target:
 
