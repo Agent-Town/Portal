@@ -2691,6 +2691,14 @@ async function previewHouseLibraryPublicStack(registryEntityId = '', {
     : null;
   setHouseLibraryPublicStackReviewDraftFromPreview(houseSurfaceState.library.publicStackPreview);
   renderHouseLibrarySurface();
+  if (typeof window !== 'undefined' && Number(window.innerWidth || 0) <= 720) {
+    const previewHero = el('houseLibraryPreviewHero');
+    if (previewHero && typeof previewHero.scrollIntoView === 'function') {
+      window.requestAnimationFrame(() => {
+        previewHero.scrollIntoView({ block: 'start', inline: 'nearest' });
+      });
+    }
+  }
   const previewTitle = String(data?.preview?.displayName || normalizedRegistryEntityId).trim() || normalizedRegistryEntityId;
   if (announce) {
     setHouseLibraryActionStatus(`Previewing ${previewTitle} from Public Stacks.`);

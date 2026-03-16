@@ -59,10 +59,20 @@ Completed:
 - Verification completed for D3:
   - targeted D3 modal block passed
   - screenshot evidence captured and committed in `design/evidence/phase-d3/`
+- Phase D4 implemented:
+  - House Library now opens with a clearer human-task hierarchy instead of one long administrative stack
+  - the lead shell is split into a Memory Table area, a Keep Box, a calmer Public Stacks discovery band, and secondary desks
+  - Reading Table, local Library items, Public Stacks, Route Desk, Hidden Shelf, and Deliveries now read as one calmer family
+  - benchmark-required novice headings remain intact while the new human-friendly cues appear as secondary labels
+  - mobile Public Stack preview now auto-reveals the action dock when a card is opened
+- Verification completed for D4:
+  - targeted House Library regressions passed
+  - screenshot evidence captured and committed in `design/evidence/phase-d4/`
+  - full `npm test` passed
 
 Not yet done:
-- D4 through D6 are not implemented
+- D5 and D6 are not implemented
 
 Recommended next step:
-- Implement Phase D4 after reviewing D3 screenshots
+- Implement Phase D5 after reviewing D4 screenshots
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

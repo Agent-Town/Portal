@@ -181,3 +181,23 @@ Rule:
 1. large workflows can keep large envelopes,
 2. simple rooms should collapse into tighter modal widths and heights,
 3. visual weight should match task weight.
+
+## 20. Human-friendly relabeling still has to respect deterministic product contracts
+
+The House Library redesign improved clarity by introducing friendlier labels like `Memory Table` and `Trusted Finds`, but Phase 30 benchmark contracts still required specific canonical headings.
+
+Rule:
+
+1. keep user-friendly cues,
+2. preserve any heading or copy strings that are used by benchmark fixtures and design-contract tests,
+3. when evolving language, layer new cues as secondary labels before removing canonical labels.
+
+## 21. On mobile, opening a result should reveal the action surface automatically
+
+Reordered sections are not enough on their own when the user opens a card deep inside a stacked layout.
+
+Rule:
+
+1. if a mobile action produces a preview or action dock, reveal it automatically,
+2. do not rely on the user to scroll upward to find the next step,
+3. treat preview reveal as part of the visual interaction design, not as optional polish.

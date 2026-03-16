@@ -1,6 +1,6 @@
 # Phase D4 - House Library Human Task UI TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 
@@ -108,3 +108,21 @@ This phase is complete only when:
 1. the Library feels task-first,
 2. the underlying power remains intact,
 3. a non-technical user can infer what the Library is for without reading every section heading.
+
+## 9. Implementation evidence
+
+Implemented in:
+
+1. `public/views/house.html`
+2. `public/styles.css`
+3. `public/app.js`
+
+Evidence:
+
+1. `design/evidence/phase-d4/before/`
+2. `design/evidence/phase-d4/after/`
+
+Verification completed:
+
+1. targeted House Library regressions passed
+2. full `npm test` passed
