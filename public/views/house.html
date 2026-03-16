@@ -104,8 +104,23 @@
   </div>
   <h2 style="margin:0 0 6px">Headquarters online</h2>
   <p class="small" id="houseHqLead" style="margin-top:0">
-    Operate as a pair from this House modal. Start with Mission. Library, Workshop, and Mailroom stay within reach.
+    Start with one shared name. Then carry it into Mission.
   </p>
+  <div class="house-hq-coauthor" data-testid="house-hq-coauthored-name">
+    <div class="house-hq-pair" aria-label="Shared house name proposals">
+      <div class="house-hq-proposal" data-testid="house-hq-human-proposal">
+        <span class="small" id="houseHqHumanLabel">Human</span>
+        <strong id="houseHqHumanWord">North</strong>
+      </div>
+      <div class="house-hq-proposal" data-testid="house-hq-agent-proposal">
+        <span class="small" id="houseHqAgentLabel">Agent</span>
+        <strong id="houseHqAgentWord">Signal</strong>
+      </div>
+    </div>
+    <div class="house-hq-name-preview" id="houseHqNamePreview" data-testid="house-hq-name-preview">North Signal</div>
+    <label class="small" for="houseHqNameInput">Trim together</label>
+    <input id="houseHqNameInput" data-testid="house-hq-name-input" type="text" maxlength="64" placeholder="House name" autocomplete="off" />
+  </div>
   <div class="house-hq-grid" style="margin-top:8px;">
     <section class="house-hq-card" data-testid="zhc-house-room-mission">
       <span class="pill">Next move</span>
@@ -129,7 +144,7 @@
     </section>
   </div>
   <div class="kv" style="margin-top:12px;">
-    <button class="btn primary" id="houseHqStartMissionBtn" type="button" data-testid="house-hq-start-mission" data-zhc-primary-action="true">Open mission</button>
+    <button class="btn primary" id="houseHqStartMissionBtn" type="button" data-testid="house-hq-start-mission" data-zhc-primary-action="true">Name HQ and open mission</button>
   </div>
   <div class="small" id="houseHqStatus" style="min-height:1.4em; color: var(--muted);"></div>
 </div>
@@ -137,7 +152,7 @@
 <div class="panel" id="houseConsolePanel" data-testid="house-console-panel">
   <h2 style="margin:0 0 6px">HQ systems</h2>
   <p class="small" style="margin-top:0">
-    Start with Mission above. Deeper rooms stay here when needed.
+    Name the HQ above. Deeper rooms stay here when needed.
   </p>
   <div class="kv" style="margin-bottom:8px;">
     <label class="small" for="houseTeamSelect">Team</label>

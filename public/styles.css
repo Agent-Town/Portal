@@ -995,6 +995,39 @@ body.trainer-modal-open {
   width: max-content;
 }
 
+.house-hq-coauthor {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.house-hq-pair {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.house-hq-proposal {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(44, 69, 99, 0.18);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.house-hq-proposal strong {
+  font-size: 18px;
+  color: var(--text-strong);
+}
+
+.house-hq-name-preview {
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
 .row {
   display: grid;
   grid-template-columns: 1fr;

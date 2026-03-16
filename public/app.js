@@ -12,6 +12,9 @@ const ONBOARDING_STEP_SIGIL = 'sigil';
 const ONBOARDING_STEP_CEREMONY = 'ceremony';
 const ONBOARDING_STEP_DONE = 'done';
 const CEREMONY_COMPLETE_MESSAGE_TYPE = 'agent-town:ceremony-complete';
+const HOUSE_HQ_NAME_STORAGE_PREFIX = 'agentTown:house:hqName:';
+const HOUSE_HQ_HUMAN_WORDS = Object.freeze(['North', 'Still', 'Bright', 'River', 'Cedar', 'High', 'Kind', 'Clear', 'Stone', 'Wild']);
+const HOUSE_HQ_AGENT_WORDS = Object.freeze(['Signal', 'Compass', 'Relay', 'Beacon', 'Arc', 'Thread', 'Orbit', 'Bridge', 'Vector', 'Anchor']);
 
 function normalizeOnboardingStep(value) {
   switch (String(value || '').trim()) {
@@ -521,6 +524,18 @@ let houseSurfaceState = {
     houseId: '',
     activeTeamId: '',
     availableTeamIds: [],
+  },
+  naming: {
+    houseId: '',
+    founderKey: '',
+    humanLabel: '',
+    agentLabel: '',
+    humanWord: '',
+    agentWord: '',
+    suggestedName: '',
+    draftName: '',
+    savedName: '',
+    dirty: false,
   },
   archive: {
     loaded: false,
@@ -1719,6 +1734,9 @@ function syncHouseSurfaceContextFromPayload(payload = {}) {
   houseSurfaceState.context.houseId = nextHouseId;
   houseSurfaceState.context.activeTeamId = nextActiveTeamId;
   houseSurfaceState.context.availableTeamIds = nextTeamIds;
+  if (previousHouseId !== nextHouseId) {
+    resetHouseHqNamingState();
+  }
   if (previousActiveTeamId !== nextActiveTeamId) {
     houseSurfaceState.archive.selectedTraceId = '';
     houseSurfaceState.archive.actionStatusText = '';
@@ -1780,24 +1798,221 @@ function syncHouseSurfaceContextFromState(state) {
   });
 }
 
+function resetHouseHqNamingState() {
+  houseSurfaceState.naming = {
+    houseId: '',
+    founderKey: '',
+    humanLabel: '',
+    agentLabel: '',
+    humanWord: '',
+    agentWord: '',
+    suggestedName: '',
+    draftName: '',
+    savedName: '',
+    dirty: false,
+  };
+}
+
+function getHouseHqNamingStorageKey(houseId) {
+  const normalizedHouseId = String(houseId || '').trim();
+  return normalizedHouseId ? `${HOUSE_HQ_NAME_STORAGE_PREFIX}${normalizedHouseId}` : HOUSE_HQ_NAME_STORAGE_PREFIX;
+}
+
+function readHouseHqNamingRecord(houseId) {
+  const key = getHouseHqNamingStorageKey(houseId);
+  if (key === HOUSE_HQ_NAME_STORAGE_PREFIX) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistHouseHqNamingRecord(houseId, record) {
+  const key = getHouseHqNamingStorageKey(houseId);
+  if (key === HOUSE_HQ_NAME_STORAGE_PREFIX) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(record && typeof record === 'object' ? record : {}));
+  } catch {
+    // ignore storage errors in restricted contexts
+  }
+}
+
+function normalizeHouseFounderLabel(value, fallback = 'Founder') {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 48);
+  return normalized || fallback;
+}
+
+function normalizeHouseHqName(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, 64);
+}
+
+function hashHouseHqSeed(value) {
+  const input = String(value || '');
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function pickHouseHqWord(seed, words, fallback = '') {
+  const bank = Array.isArray(words) ? words.filter(Boolean) : [];
+  if (!bank.length) return fallback;
+  return bank[hashHouseHqSeed(seed) % bank.length] || fallback;
+}
+
+function getHouseFounderPair(state = lastState) {
+  const source = state && typeof state === 'object' ? state : {};
+  const onboarding = source.onboarding && typeof source.onboarding === 'object' ? source.onboarding : {};
+  const profile = onboarding.profile && typeof onboarding.profile === 'object' ? onboarding.profile : {};
+  return {
+    humanLabel: normalizeHouseFounderLabel(profile.humanName, 'Human'),
+    agentLabel: normalizeHouseFounderLabel(profile.agentName || source?.agent?.name, 'Agent'),
+  };
+}
+
+function buildHouseHqNamingSuggestion({ houseId = '', humanLabel = 'Human', agentLabel = 'Agent' } = {}) {
+  const baseKey = `${String(houseId || '').trim()}:${humanLabel}:${agentLabel}`;
+  const humanWord = pickHouseHqWord(`${baseKey}:human`, HOUSE_HQ_HUMAN_WORDS, 'North');
+  let agentWord = pickHouseHqWord(`${baseKey}:agent`, HOUSE_HQ_AGENT_WORDS, 'Signal');
+  if (agentWord.toLowerCase() === humanWord.toLowerCase()) {
+    const bank = HOUSE_HQ_AGENT_WORDS;
+    const currentIndex = Math.max(0, bank.indexOf(agentWord));
+    agentWord = bank[(currentIndex + 1) % bank.length] || 'Signal';
+  }
+  return {
+    humanWord,
+    agentWord,
+    suggestedName: normalizeHouseHqName(`${humanWord} ${agentWord}`),
+  };
+}
+
+function ensureHouseHqNamingState({ force = false } = {}) {
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  if (!houseId) {
+    resetHouseHqNamingState();
+    return houseSurfaceState.naming;
+  }
+
+  const naming = houseSurfaceState.naming && typeof houseSurfaceState.naming === 'object'
+    ? houseSurfaceState.naming
+    : {};
+  const founders = getHouseFounderPair(lastState);
+  const founderKey = `${houseId}::${founders.humanLabel}::${founders.agentLabel}`;
+  if (!force && naming.houseId === houseId && naming.founderKey === founderKey) {
+    return naming;
+  }
+
+  const stored = readHouseHqNamingRecord(houseId);
+  const suggestion = buildHouseHqNamingSuggestion({
+    houseId,
+    humanLabel: founders.humanLabel,
+    agentLabel: founders.agentLabel,
+  });
+  const savedName = normalizeHouseHqName(stored?.name);
+
+  houseSurfaceState.naming = {
+    houseId,
+    founderKey,
+    humanLabel: founders.humanLabel,
+    agentLabel: founders.agentLabel,
+    humanWord: suggestion.humanWord,
+    agentWord: suggestion.agentWord,
+    suggestedName: suggestion.suggestedName,
+    draftName: savedName || suggestion.suggestedName,
+    savedName,
+    dirty: false,
+  };
+
+  return houseSurfaceState.naming;
+}
+
+function syncHouseHqNameInputValue(inputEl, nextValue) {
+  if (!inputEl) return;
+  const isFocused = document.activeElement === inputEl;
+  const isDirty = inputEl.dataset.houseHqDirty === '1';
+  if (!isFocused && !isDirty) {
+    const normalized = String(nextValue || '');
+    if (inputEl.value !== normalized) inputEl.value = normalized;
+    inputEl.dataset.houseHqDirty = '0';
+  }
+}
+
+function saveHouseHqNameDraft() {
+  const naming = ensureHouseHqNamingState();
+  const inputEl = el('houseHqNameInput');
+  const nextName = normalizeHouseHqName(inputEl?.value || naming.draftName || naming.suggestedName) || naming.suggestedName;
+  houseSurfaceState.naming.savedName = nextName;
+  houseSurfaceState.naming.draftName = nextName;
+  houseSurfaceState.naming.dirty = false;
+  if (inputEl) {
+    inputEl.value = nextName;
+    inputEl.dataset.houseHqDirty = '0';
+  }
+  persistHouseHqNamingRecord(naming.houseId, {
+    name: nextName,
+    savedAt: new Date().toISOString(),
+  });
+  return nextName;
+}
+
 function isHouseHqFirstEntryReady() {
   return !!String(houseSurfaceState.context.houseId || '').trim();
 }
 
 function renderHouseHqEntrySurface() {
   const panel = el('houseHqEntryPanel');
+  const leadNode = el('houseHqLead');
   const statusNode = el('houseHqStatus');
   const startMissionBtn = el('houseHqStartMissionBtn');
+  const humanLabelNode = el('houseHqHumanLabel');
+  const agentLabelNode = el('houseHqAgentLabel');
+  const humanWordNode = el('houseHqHumanWord');
+  const agentWordNode = el('houseHqAgentWord');
+  const previewNode = el('houseHqNamePreview');
+  const inputNode = el('houseHqNameInput');
   if (!panel) return;
   const ready = isHouseHqFirstEntryReady();
   panel.classList.toggle('is-hidden', !ready);
   if (startMissionBtn) startMissionBtn.disabled = !ready;
   if (!ready) return;
+
   const houseId = String(houseSurfaceState.context.houseId || '').trim();
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  const naming = ensureHouseHqNamingState();
+  const draftName = normalizeHouseHqName(naming.draftName || naming.savedName || naming.suggestedName) || naming.suggestedName;
+  const hasSavedName = !!normalizeHouseHqName(naming.savedName);
+  const savedMatchesDraft = hasSavedName && normalizeHouseHqName(naming.savedName) === draftName;
+
+  if (leadNode) {
+    leadNode.textContent = savedMatchesDraft
+      ? `${draftName} is live. Mission, Memory, Workshop, and Mailroom stay within reach.`
+      : `${naming.humanLabel} and ${naming.agentLabel} each bring one word. Trim it, then carry it into Mission.`;
+  }
+  if (humanLabelNode) humanLabelNode.textContent = naming.humanLabel;
+  if (agentLabelNode) agentLabelNode.textContent = naming.agentLabel;
+  if (humanWordNode) humanWordNode.textContent = naming.humanWord;
+  if (agentWordNode) agentWordNode.textContent = naming.agentWord;
+  if (previewNode) previewNode.textContent = draftName;
+  if (inputNode) {
+    syncHouseHqNameInputValue(inputNode, naming.draftName || naming.savedName || naming.suggestedName);
+    inputNode.setAttribute('aria-label', `House name for ${naming.humanLabel} and ${naming.agentLabel}`);
+  }
+  if (startMissionBtn) {
+    startMissionBtn.textContent = savedMatchesDraft
+      ? 'Open mission'
+      : hasSavedName
+        ? 'Rename HQ and open mission'
+        : 'Name HQ and open mission';
+  }
   if (statusNode) {
     statusNode.textContent = houseId
-      ? `House ${houseId}${activeTeamId ? ` · team ${activeTeamId}` : ''}. Start with Mission.`
+      ? `${draftName} · House ${houseId}${activeTeamId ? ` · team ${activeTeamId}` : ''}`
       : 'Attach a house to bring HQ online.';
   }
 }
@@ -8829,12 +9044,40 @@ function bindTownDistrictControls() {
     if (missionBtn) missionBtn.disabled = true;
     if (consoleBtn) consoleBtn.disabled = true;
     try {
+      saveHouseHqNameDraft();
+      renderHouseHqEntrySurface();
       await loadHouseExperiencesSurface();
     } finally {
       if (missionBtn) missionBtn.disabled = false;
       if (consoleBtn) consoleBtn.disabled = false;
     }
   };
+
+  const houseHqNameInput = el('houseHqNameInput');
+  if (houseHqNameInput) {
+    houseHqNameInput.oninput = (event) => {
+      const naming = ensureHouseHqNamingState();
+      naming.draftName = String(event?.target?.value || '').slice(0, 64);
+      naming.dirty = true;
+      houseHqNameInput.dataset.houseHqDirty = '1';
+      renderHouseHqEntrySurface();
+    };
+    houseHqNameInput.onblur = () => {
+      const naming = ensureHouseHqNamingState();
+      const normalized = normalizeHouseHqName(houseHqNameInput.value) || naming.savedName || naming.suggestedName;
+      naming.draftName = normalized;
+      naming.dirty = false;
+      houseHqNameInput.value = normalized;
+      houseHqNameInput.dataset.houseHqDirty = '0';
+      renderHouseHqEntrySurface();
+    };
+    houseHqNameInput.onkeydown = (event) => {
+      if (event.key !== 'Enter' || event.shiftKey) return;
+      event.preventDefault();
+      const missionBtn = el('houseHqStartMissionBtn');
+      if (missionBtn && !missionBtn.disabled) missionBtn.click();
+    };
+  }
 
   const houseHqStartMissionBtn = el('houseHqStartMissionBtn');
   if (houseHqStartMissionBtn) {

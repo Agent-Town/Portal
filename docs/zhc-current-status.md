@@ -1,13 +1,13 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green  
-Last updated: 2026-03-16 21:31 Asia/Bangkok  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green, M44.6 shared HQ naming slice green  
+Last updated: 2026-03-16 22:11 Asia/Bangkok  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
 ## Active product direction (authoritative)
 
-Robin clarified two constraints that now govern the founders-loop passes:
+Robin clarified the constraints that currently govern the founders-loop passes:
 
 ### 1) Architecture
 - the founder journey must stay in modals on top of `/app`
@@ -21,112 +21,125 @@ Robin clarified two constraints that now govern the founders-loop passes:
 - keep one obvious primary action per state
 - the journey should feel explicitly like **the human and the agent succeeding together**
 - early shared wins matter; prefer concise co-authored moments over dead explanatory panels where coherent
-- if naming / mission handoff / first-step surfaces are touched, bias toward paired interaction language and shared-action framing
+- Robin explicitly suggested house naming as a promising shared mechanic
 
 ## What landed this pass
 
-### M44.4 — `/create` completion now hands back into the House modal flow
-The remaining route-shaped founders-loop debt was the `/create` completion handoff: even when Town Hall opened `/create` inside the modal frame, completion still fell forward to raw `/house`.
+### M44.6 — shared HQ naming now sits inside the existing House modal handoff
+The next smallest coherent slice is now live inside the existing HQ-first-entry surface.
 
-That is now corrected inside the modal-only flow:
-- `public/create.js`
-  - embedded ceremony completion now posts a same-origin `agent-town:ceremony-complete` message to the parent shell
-  - embedded fallback now prefers `/app?district=house` instead of continuing deeper into raw route flow
+What changed:
+- the House modal now opens with a concise paired naming move before Mission
+- the surface shows one word from the human side and one word from the agent side
+- the pair gets one editable shared HQ name field plus one obvious primary action
+- the primary action saves the shared name and opens Mission in the same move
+- after the name is saved, the same surface simplifies back down to `Open mission`
+
+Implementation details:
+- `public/views/house.html`
+  - added a minimal paired proposal row inside the HQ panel
+  - added live HQ-name preview + editable input
+  - kept the entire interaction inside the existing `/app` modal shell
 - `public/app.js`
-  - the `/app` shell now listens for `agent-town:ceremony-complete` from the active district frame
-  - on receipt, it refreshes `/api/state` and swaps the modal from the ceremony iframe back into the House district surface
-- practical result:
-  - Town Hall → crest ceremony still opens inside the district modal frame
-  - ceremony completion now re-homes into the House modal instead of continuing as a raw `/house` iframe/route continuation
+  - derives concise deterministic human/agent word proposals from founder names + house id
+  - persists the chosen HQ name in local storage keyed by house id
+  - preserves one primary action by making the mission button also commit the shared name
+  - changes the CTA label by state:
+    - fresh house: `Name HQ and open mission`
+    - after save: `Open mission`
+  - Enter on the input also triggers the same single primary action
+- `public/styles.css`
+  - adds minimal styling for the paired proposal strip and live HQ-name preview
 
-### UI trim + pair framing on affected founders-loop surfaces
-This pass also trimmed the most explanatory copy on the touched founder surfaces without changing ZHC markers.
+### Why this matches the direction better
+This is the first early post-crest / early-HQ interaction that feels like a shared win rather than a dead handoff panel:
+- still modal-only on `/app`
+- still sparse and functional
+- still one obvious primary action
+- explicitly framed as the human and agent contributing together
+- not a fake chat app and not a wall of copy
 
-#### Town Hall
-- founder naming copy is shorter and more pair-framed
-  - `Name the human` / `What should your agent call you?`
-  - `Name the agent` / `What should you call your agent?`
-- the registration-processing surface is now terser
-- first-worker / sigil / alignment surfaces were reduced to shorter instrument-panel language
-- alignment handoff now points to `Open crest studio` instead of narrated prose
-
-#### House / HQ
-- HQ copy now frames the house as a paired operating surface inside the modal shell
-- room cards were shortened to functional labels and concise affordances
-- primary action is now `Open mission`
-- mission handoff copy is shorter and shared-task oriented
-
-### New / updated contract coverage
-- added: `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
-  - verifies ceremony completion re-homes from the `/create` iframe into the House modal shell
-- updated: `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
-  - relaxed a stale `mission lane` text expectation to the now-trimmed `mission` surface wording
+## New / updated contract coverage
+- added: `e2e/421_zhc0_house_shared_naming.spec.js`
+  - verifies the paired human+agent naming surface appears on first House entry
+  - verifies the user can edit the shared HQ name
+  - verifies the saved name persists after reload for the same house
+  - verifies the primary action remains singular and then simplifies to `Open mission`
+- updated: `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
+  - ceremony completion still re-homes into the House modal
+  - assertion now expects the naming-first HQ state rather than the pre-M44.6 plain `Open mission` state
 
 ## Files changed in this slice
 
 - `public/app.js`
-- `public/create.js`
-- `public/views/townhall.html`
 - `public/views/house.html`
-- `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
+- `public/styles.css`
+- `e2e/421_zhc0_house_shared_naming.spec.js`
 - `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### First focused founders-loop/modal sweep
+### Focused founders-loop HQ naming sweep
 ```bash
-npx playwright test e2e/59_townhall_worker_single_path_modal.spec.js e2e/417_zhc0_townhall_founder_progress.spec.js e2e/418_zhc0_alignment_gate.spec.js e2e/419_zhc0_create_crest_contract.spec.js e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/425_zhc0_founders_loop_resume_contract.spec.js e2e/426_zhc0_founders_loop_machine_projection.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
+npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/421_zhc0_house_shared_naming.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
 ```
 
 Result:
-- `11 passed`
-- `1 failed`
-- failure was expected text drift in `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
-  - old assertion expected `/mission lane/i`
-  - trimmed UI now presents `Mission`
+- `3 passed`
 
-### Green rerun after updating the stale expectation
+### Syntax sanity on touched browser files
 ```bash
-npx playwright test e2e/59_townhall_worker_single_path_modal.spec.js e2e/417_zhc0_townhall_founder_progress.spec.js e2e/418_zhc0_alignment_gate.spec.js e2e/419_zhc0_create_crest_contract.spec.js e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/425_zhc0_founders_loop_resume_contract.spec.js e2e/426_zhc0_founders_loop_machine_projection.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
+node --check public/app.js && node --check public/create.js
 ```
 
 Result:
-- `12 passed`
+- passed
 
 ## What I verified
 
-- Town Hall still opens the ceremony in the district modal frame on `/app`
-- completing the embedded ceremony can now hand back into the House district modal instead of continuing the route-based `/house` path
-- the House HQ-first-entry surface still exposes exactly one primary action in the ready state
-- the affected founders-loop surfaces are materially less narrated and more functional
-- the touched naming / alignment / mission surfaces now lean more toward human+agent shared-action framing
+- the first House HQ entry still lives inside the `/app` modal shell
+- the first HQ state now presents a concise co-authored naming move instead of only a static mission handoff
+- the human and agent names from onboarding are surfaced directly in the paired naming UI
+- the shared HQ name can be edited before Mission opens
+- the chosen HQ name persists across reload for the same attached house
+- after save, the primary action simplifies back down to `Open mission`
+- ceremony handoff still lands correctly in the House modal and now lands on the naming-first surface
 
 ## Honest gaps / remaining debt
 
-- the primary flow is now modal-correct, but standalone `/create` still exists as a support route; this pass did **not** delete that page
-- the new Robin direction about co-authored wins is only partially expressed so far through copy/handoff framing
-  - no bespoke paired interaction mechanic landed yet
-  - the example Robin gave (`house naming as a conversation`) is still future work
-- `Mission` is still the conservative handoff into the existing Experiences surface, not a bespoke Step 7 paired interaction yet
+- HQ naming currently persists in browser local storage only
+  - it is coherent for the UI slice, but it is **not** yet written into server/session/platform state
+- the saved shared name is not yet reused broadly across the rest of the product
+  - it does not yet flow into share cards, deeper House surfaces, or longer-lived metadata
+- this pass intentionally stops at the smallest coherent shared-win interaction
+  - it does **not** introduce a broader Step 7 paired mission mechanic yet
 - no screenshot evidence was captured in this pass
 
 ## What I did **not** do
 
 - no push
-- did **not** remove the standalone `/create` page itself
-- did **not** start a bespoke naming conversation or Step 7 mission mechanic yet
-- did **not** modify the deeper founders-loop artifacts (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`) in this pass
+- did **not** touch the unrelated dirty `package-lock.json`
+- did **not** broaden the slice into a fake conversation UI or chat surface
+- did **not** update deeper machine/spec artifacts (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`)
+
+## Blockers
+
+- none for this slice
+- main conscious limitation is persistence scope: local-only for now, by design, to keep the change minimal and green
 
 ## Next exact pickup
 
-Smallest coherent next slice:
-1. turn one early post-crest / early-HQ action into a **real co-authored moment** instead of just trimmed copy
-2. best candidate right now: make the first House naming / mission-selection move feel like a concise human+agent exchange inside the existing `/app` modal shell
-3. preserve the modal-only rule and keep one obvious primary action per state
-4. add a focused contract around that paired interaction rather than broadening the journey all at once
+Best next small follow-on:
+1. use the saved HQ name in one more place where it pays off immediately
+   - strongest candidate: reflect it in the Mission/House header or another early post-entry shell surface
+2. decide whether the HQ name should graduate from local UI state into server/platform state
+3. keep the next move just as narrow
+   - modal-only on `/app`
+   - one obvious primary action
+   - no broad ceremony / mission rewrite
 
 ## Repo state notes
 
-- this modal handoff correction is local in this worktree
-- there is still a pre-existing unrelated `package-lock.json` modification outside this founders-loop slice; avoid sweeping it into the next commit unless explicitly intended
+- this M44.6 naming slice is local in this worktree only
+- unrelated dirty file remains: `package-lock.json` (leave it alone unless explicitly intended)

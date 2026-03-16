@@ -166,12 +166,13 @@ test('M44.4 ceremony completion re-homes the iframe flow into the House modal sh
     await expect(root).toHaveAttribute('data-zhc-progress-total', '9');
     await expect(root).toHaveAttribute('data-zhc-overlay-state', 'ready');
     await expect(root).toContainText(/headquarters/i);
-    await expect(root).toContainText(/pair/i);
+    await expect(page.getByTestId('house-hq-human-proposal')).toContainText('Robin');
+    await expect(page.getByTestId('house-hq-agent-proposal')).toContainText('OpenClaw');
 
     const primary = page.getByTestId('house-hq-start-mission');
     await expect(primary).toBeVisible();
     await expect(primary).toHaveAttribute('data-zhc-primary-action', 'true');
-    await expect(primary).toHaveText('Open mission');
+    await expect(primary).toHaveText('Name HQ and open mission');
     expect(await visiblePrimaryActionCount(page)).toBe(1);
   } finally {
     await stopServer(launched.child);
