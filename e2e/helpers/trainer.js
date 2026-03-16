@@ -66,6 +66,7 @@ async function gotoAppWithLite(page, options = {}) {
 }
 
 async function setDeterministicLlm(page) {
+  await waitForRuntimeSessionContext(page, 4000).catch(() => null);
   await configureLiteLlm(page, {
     provider: 'test-local',
     model: 'deterministic',

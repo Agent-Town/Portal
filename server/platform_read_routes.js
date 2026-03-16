@@ -2,6 +2,7 @@ function registerPlatformReadRoutes(app, deps) {
   const {
     express,
     buildDefaultCompiledSkillPack,
+    buildDefaultHouseOfficeStructureSeed,
     buildPlatformContextResponse,
     buildPlatformTrainerResultPayload,
     buildPortalRequestId,
@@ -376,12 +377,16 @@ function registerPlatformReadRoutes(app, deps) {
     const normalizedHouseId = String(houseId || '').trim();
     const normalizedTeamId = String(teamId || '').trim();
     if (!normalizedHouseId) {
+      const previewSeed = buildDefaultHouseOfficeStructureSeed && typeof buildDefaultHouseOfficeStructureSeed === 'function'
+        ? buildDefaultHouseOfficeStructureSeed()
+        : null;
+      const previewOffices = Array.isArray(previewSeed?.offices) ? previewSeed.offices : [];
       return {
         houseId: null,
         teamId: null,
         activeTeamId: context.activeTeamId,
         availableTeamIds: context.availableTeamIds,
-        offices: [],
+        offices: previewOffices,
         staffAgents: [],
         modelVersion: 'house_canonical_structure_v1',
         structureSourceKind: 'unattached_preview',

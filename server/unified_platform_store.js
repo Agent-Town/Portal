@@ -4413,6 +4413,7 @@ function getUnifiedPlatformTestStats() {
 }
 
 module.exports = {
+  buildDefaultHouseOfficeStructureSeed,
   ensureHouseOfficeStructure,
   countTrackProgressEventsByDedupe,
   createTrackProgressEvent,

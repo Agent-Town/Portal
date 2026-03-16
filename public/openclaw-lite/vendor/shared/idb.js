@@ -12,6 +12,7 @@ function resolveDbName() {
 
 const DB_NAME = resolveDbName();
 const DB_VERSION = 1;
+const REQUIRED_STORES = ["checkpoints", "vfs", "meta"];
 
 export const OPENCLAW_LITE_DB_NAME = DB_NAME;
 
@@ -32,9 +33,21 @@ function txDone(tx) {
 
 let dbPromise = null;
 
-export function openDb() {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+function hasRequiredStores(db) {
+  return REQUIRED_STORES.every((storeName) => db.objectStoreNames.contains(storeName));
+}
+
+function deleteDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = () => resolve();
+    req.onblocked = () => resolve();
+    req.onerror = () => reject(req.error || new Error("IDB_DELETE_FAILED"));
+  });
+}
+
+function openDbAttempt({ allowRepair = true } = {}) {
+  return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -52,9 +65,30 @@ export function openDb() {
         db.createObjectStore("meta", { keyPath: "key" });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      if (hasRequiredStores(db)) {
+        resolve(db);
+        return;
+      }
+      db.close();
+      if (!allowRepair) {
+        reject(new Error("IDB_SCHEMA_MISSING_STORES"));
+        return;
+      }
+      dbPromise = null;
+      deleteDb()
+        .then(() => openDbAttempt({ allowRepair: false }))
+        .then(resolve)
+        .catch(reject);
+    };
     req.onerror = () => reject(req.error || new Error("IDB_OPEN_FAILED"));
   });
+}
+
+export function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = openDbAttempt();
   return dbPromise;
 }
 
