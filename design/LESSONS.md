@@ -291,3 +291,15 @@ Rule:
 2. semantic projection rules can be encoded,
 3. when simple UI, advanced UI, LLM explanation, and future voice labels must stay aligned, write the invariant down,
 4. if a future design phase changes that contract, update the formal model instead of relying on memory.
+
+## 30. Modal-first continuity is a design rule, not just an implementation quirk
+
+The worker runtime is page-scoped, but the consequence is a UX rule:
+if the product can preserve continuity in `/app`, it should.
+
+Rule:
+
+1. modal-first district work belongs to the town shell,
+2. standalone district pages should be redirect entry points when the product contract says the room is modal-first,
+3. opening or closing a modal-first room must not count as a new product surface,
+4. if a design proposal breaks worker continuity, it is not just risky engineering, it is the wrong design.

@@ -33,6 +33,12 @@ Current state:
   - voice-aligned projection
   - checked by invariant rather than taste alone
   - verified locally with TLC 2.19
+- Added second formal TLA+ model for modal-first routing and worker continuity:
+  - modal-first district work stays inside `/app`
+  - standalone Atlas routes are redirect entry points only
+  - modal open/close preserves worker epoch
+  - redirect returns Atlas into `/app`
+  - verified locally with TLC 2.19
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start

@@ -60,6 +60,8 @@ TLA+ here is for semantic UI logic, not for aesthetic judgment.
 
 1. `DesignProjectionNoDrift.tla`
 2. `DesignProjectionNoDrift.cfg`
+3. `ModalFirstWorkerContinuity.tla`
+4. `ModalFirstWorkerContinuity.cfg`
 
 ## Current model
 
@@ -100,6 +102,38 @@ It encodes the semantic pattern that future design work must preserve.
 11. `VoiceMatchesHuman`
 12. `NoDrift`
 
+## Second model
+
+`ModalFirstWorkerContinuity.tla` formalizes the modal-first routing and page-scoped worker rule for Agent Town:
+
+1. district work that is designed to be modal-first stays inside `/app`,
+2. opening and closing modal-first surfaces does not tear down the worker runtime,
+3. non-`/app` paths do not own modal-first district UI,
+4. standalone Atlas routes may exist only as redirect entry points,
+5. Atlas redirect returns to `/app` and reopens Atlas in modal form.
+
+### State modeled
+
+1. current path (`/start`, `/app`, `/atlas`, `/atlas.html`)
+2. current modal surface (`none`, `Atlas`, `House`, `TownHall`, `Registry`, `Pony`, `Trainer`)
+3. whether the page-scoped worker is alive
+4. worker epoch
+5. redirect pending or not
+6. standalone target (`none`, `Atlas`)
+
+### Invariants and temporal properties modeled
+
+1. `TypeOK`
+2. `AppPathHasWorker`
+3. `ModalRequiresApp`
+4. `ModalRequiresWorker`
+5. `NonAppPathHasNoModal`
+6. `SteadyStandaloneAtlasForbidden`
+7. `RedirectStateWellFormed`
+8. `SteadyAppClearsStandaloneTarget`
+9. `ModalOpenClosePreserveWorkerEpoch`
+10. `RedirectOpensAtlasInApp`
+
 ## Running TLC
 
 If `tla2tools.jar` is available:
@@ -107,6 +141,7 @@ If `tla2tools.jar` is available:
 ```bash
 cd design/formal
 java -XX:+UseParallelGC -jar /path/to/tla2tools.jar DesignProjectionNoDrift.tla -config DesignProjectionNoDrift.cfg
+java -XX:+UseParallelGC -jar /path/to/tla2tools.jar ModalFirstWorkerContinuity.tla -config ModalFirstWorkerContinuity.cfg
 ```
 
 If TLC is not installed locally, the model should still be kept up to date and checked later in a verification-capable environment.
@@ -123,6 +158,16 @@ Observed result:
 4. no invariant violations,
 5. no deadlock check requested by config.
 
+`ModalFirstWorkerContinuity.tla` verified locally on 2026-03-16 with TLC 2.19.
+
+Observed result:
+
+1. `196` states generated,
+2. `29` distinct reachable states,
+3. complete search depth `6`,
+4. no invariant violations,
+5. no deadlock check requested by config.
+
 ## How future agents should use this
 
 Use the model when a design change affects:
@@ -134,3 +179,11 @@ Use the model when a design change affects:
 5. whether a proposed simplification hides truth or merely compresses it.
 
 If a future phase changes those semantics, update this model and rerun TLC.
+
+Use the modal-first continuity model when a design change affects:
+
+1. route ownership between `/app` and district experiences,
+2. whether a room opens as a modal or as a page,
+3. whether worker continuity is preserved by the proposed UX,
+4. how standalone Atlas entry points behave,
+5. whether a new shell would accidentally become a second first-class navigation path.

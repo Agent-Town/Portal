@@ -38,7 +38,9 @@ The `formal/` subfolder holds machine-checkable semantic models for design rules
 2. simple human summary,
 3. advanced/detail disclosure,
 4. LLM explanation/action surface,
-5. future voice alignment.
+5. future voice alignment,
+6. modal-first route ownership,
+7. worker continuity across district navigation.
 
 ## LLM-first information architecture rule
 
