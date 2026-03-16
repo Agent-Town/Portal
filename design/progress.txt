@@ -33,3 +33,6 @@ Current next-step status:
 - implementation sequencing documented
 - audit findings mapped to deterministic future tests
 - beginner-first AI framing, English and Simplified Chinese resilience, provider-neutral hierarchy, and future voice-ready constraints documented
+- D0 foundation implementation started in public/poker.html and public/poker.js
+- route-level design hooks and section metadata now exist on lobby, table, review, season, schedule, and centaur surfaces
+- deterministic design tests added: e2e/300_poker_design_harness.spec.js and e2e/301_poker_design_token_contract.spec.js

@@ -40,3 +40,21 @@ When a future design phase lands, append:
 2. what worked,
 3. what regressed,
 4. what should become a permanent rule.
+
+## 2026-03-16 D0 Foundation
+
+### What changed
+
+1. Poker now exposes route-level `data-poker-view` hooks and section-level `data-poker-section` metadata on the key design surfaces.
+2. Poker action controls now receive deterministic role markers and role classes after render.
+3. The poker shell now uses the v1 token set as the visual base, including Chinese-capable font fallbacks.
+
+### What worked
+
+1. Post-render action-role decoration was lower risk than rewriting every button template by hand.
+2. Section-card descriptors let the design system add structure without changing route behavior.
+
+### What should become a permanent rule
+
+1. New poker surfaces should be added with explicit view and section metadata from the start.
+2. Button roles must stay machine-detectable so design tests can verify hierarchy deterministically.

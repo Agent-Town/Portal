@@ -1,10 +1,18 @@
 (function () {
+  const bodyEl = document.body;
+  const frameEl = document.getElementById('pokerFrameRoot');
   const titleEl = document.getElementById('pokerTitle');
   const subtitleEl = document.getElementById('pokerSubtitle');
   const statusEl = document.getElementById('pokerStatus');
   const contentEl = document.getElementById('pokerContent');
   const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1';
   const POKER_ADMIN_TOKEN_KEY = 'poker.adminToken';
+  const POKER_BUTTON_ROLE_CLASS = {
+    primary: 'pokerButtonPrimary',
+    secondary: 'pokerButtonSecondary',
+    navigation: 'pokerButtonNav',
+    destructive: 'pokerButtonDanger',
+  };
   let countdownTimer = null;
   let liveRefreshTimer = null;
   let liveTableStream = null;
@@ -16,6 +24,13 @@
   function setTitle(title, subtitle) {
     if (titleEl) titleEl.textContent = title;
     if (subtitleEl) subtitleEl.textContent = subtitle;
+  }
+
+  function setPokerView(view) {
+    const normalizedView = String(view || 'unknown').trim() || 'unknown';
+    if (bodyEl) bodyEl.dataset.pokerView = normalizedView;
+    if (frameEl) frameEl.dataset.pokerView = normalizedView;
+    if (contentEl) contentEl.dataset.pokerView = normalizedView;
   }
 
   function setStatus(text) {
@@ -347,12 +362,26 @@
     clearLiveRefreshTimer();
     if (!contentEl) return;
     contentEl.innerHTML = '';
-    for (const item of items) {
+    const list = Array.isArray(items) ? items : [];
+    let cardIndex = 0;
+    for (const item of list) {
+      if (!item) continue;
+      const descriptor = typeof item === 'string' ? { html: item } : item;
+      const html = String(descriptor?.html || '').trim();
+      if (!html) continue;
       const card = document.createElement('article');
-      card.className = 'pokerCard';
-      card.innerHTML = item;
+      const classNames = ['pokerCard'];
+      if (descriptor?.className) classNames.push(String(descriptor.className));
+      card.className = classNames.join(' ');
+      card.dataset.pokerCardIndex = String(cardIndex);
+      if (descriptor?.section) card.dataset.pokerSection = String(descriptor.section);
+      if (descriptor?.plane) card.dataset.pokerPlane = String(descriptor.plane);
+      if (descriptor?.state) card.dataset.pokerState = String(descriptor.state);
+      card.innerHTML = html;
       contentEl.appendChild(card);
+      cardIndex += 1;
     }
+    decoratePokerScreen(contentEl);
   }
 
   function formatIso(value) {
@@ -367,11 +396,55 @@
 
   function renderSummaryMetric(label, value) {
     return `
-      <div class="pokerCard pokerInset">
+      <div class="pokerMetric">
         <div class="pokerLabel">${escapeHtml(label)}</div>
         <div class="pokerSummaryValue">${escapeHtml(value)}</div>
       </div>
     `;
+  }
+
+  function sectionCard(section, html, { plane = '', className = '', state = '' } = {}) {
+    return {
+      section,
+      html,
+      plane,
+      className,
+      state,
+    };
+  }
+
+  function normalizePokerLabel(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function inferPokerActionRole(control) {
+    const explicitRole = String(control?.dataset?.actionRole || '').trim().toLowerCase();
+    if (explicitRole) return explicitRole;
+    if (control?.tagName === 'A') return 'navigation';
+    const label = normalizePokerLabel(control?.textContent || '');
+    if (!label) return 'secondary';
+    if (
+      label.includes('close + refund')
+      || label.includes('cancel series + refund')
+      || label.includes('self-exclude')
+    ) {
+      return 'destructive';
+    }
+    if (String(control?.type || '').toLowerCase() === 'submit') return 'primary';
+    return 'secondary';
+  }
+
+  function decoratePokerScreen(root) {
+    if (!root) return;
+    const controls = root.querySelectorAll('a[href], button');
+    controls.forEach((control) => {
+      const role = inferPokerActionRole(control);
+      control.dataset.actionRole = role;
+      Object.values(POKER_BUTTON_ROLE_CLASS).forEach((className) => control.classList.remove(className));
+      if (POKER_BUTTON_ROLE_CLASS[role]) {
+        control.classList.add(POKER_BUTTON_ROLE_CLASS[role]);
+      }
+    });
   }
 
   function renderPokerCards(cards) {
@@ -1447,7 +1520,7 @@
       : Number(pokerPolicy?.remainingDailySpendOil || 0);
     const selfExcluded = !!pokerPolicy?.selfExcluded;
     renderCards([
-      `
+      sectionCard('eligibility', `
         <h2>Eligibility</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
@@ -1456,8 +1529,8 @@
           ${renderSummaryMetric('Tournament Series', `${series.length}`)}
           ${renderSummaryMetric('Live Tables', `${items.length}`)}
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('poker-policy', `
         <h2>Poker Policy</h2>
         <p>Wallet-level guardrails apply before live poker OIL spend. Daily caps reset at UTC midnight, and self-exclusion blocks new live-poker spend until the lock expires.</p>
         <div class="pokerSummary">
@@ -1474,8 +1547,8 @@
           <button class="pokerButton" type="submit">Save Limit</button>
           <button id="pokerPlayPolicySelfExclude24h" class="pokerButton" type="button"${selfExcluded ? ' disabled' : ''}>Self-Exclude 24h</button>
         </form>
-      `,
-      `
+      `, { plane: 'reference' }),
+      sectionCard('quick-seat', `
         <h2>Quick Seat</h2>
         <p>Matchmake into an existing live table with the same structure, create a new public one instantly if no match exists, create a sit-and-go that waits for either a full table or a configured start target, or create an invite-only table that stays out of the public lobby and rail.</p>
         <div class="pokerLinks">
@@ -1547,9 +1620,10 @@
           </label>
           <button class="pokerButton" type="submit"${selfExcluded ? ' disabled' : ''}>Join Or Create</button>
         </form>
-      `,
+      `, { plane: 'primary' }),
       series.length
-        ? series.map((item) => `
+        ? sectionCard('tournament-series', `
+          ${series.map((item) => `
           <div class="pokerSplit">
             <div>
               <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
@@ -1577,10 +1651,12 @@
               <a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(item.seriesId || '')}/timeline`))}">Timeline</a>
             </div>
           </div>
-        `).join('')
+          `).join('')}
+        `, { plane: 'supporting' })
         : '',
       items.length
-        ? items.map((item) => `
+        ? sectionCard('live-tables', `
+          ${items.map((item) => `
           <div class="pokerSplit">
             <div>
               <h2>${escapeHtml(item.title)}</h2>
@@ -1618,8 +1694,9 @@
               <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}/history`, { status: 'completed' }))}">History</a>
             </div>
           </div>
-        `).join('')
-        : '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>',
+          `).join('')}
+        `, { plane: 'supporting' })
+        : sectionCard('live-tables', '<h2>No live tables yet.</h2><p>Use Quick Seat to create the first matching cash or tournament table.</p>', { plane: 'supporting' }),
     ]);
     bindPlayPolicyForm();
     bindPlayMatchmakeForm();
@@ -1651,7 +1728,7 @@
     const templates = Array.isArray(data?.templates) ? data.templates : [];
     const days = Array.isArray(data?.days) ? data.days : [];
     const cards = [
-      `
+      sectionCard('schedule-snapshot', `
         <h2>Schedule Snapshot</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('House', data?.houseId || 'Pending')}
@@ -1665,9 +1742,9 @@
           <a href="${escapeHtml(buildPokerHref('/poker/play'))}">Back To Lobby</a>
           <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
         </div>
-      `,
+      `, { plane: 'supporting' }),
       adminToken
-        ? `
+        ? sectionCard('schedule-admin', `
           <h2>Schedule Admin</h2>
           <p>Durable recurring templates materialize real scheduled tournament tables. Create the template here; the public calendar stays on the same minimal route.</p>
           ${adminError
@@ -1731,10 +1808,10 @@
               </div>
             `
             : '<p>No durable schedule templates yet.</p>'}
-        `
+        `, { plane: 'reference' })
         : '',
       templates.length
-        ? `
+        ? sectionCard('recurring-templates', `
           <h2>Recurring Templates</h2>
           <div class="pokerStack">
             ${templates.map((item) => `
@@ -1746,12 +1823,12 @@
               </div>
             `).join('')}
           </div>
-        `
-        : '<h2>Recurring Templates</h2><p>No recurring tournament templates are scheduled yet.</p>',
+        `, { plane: 'supporting' })
+        : sectionCard('recurring-templates', '<h2>Recurring Templates</h2><p>No recurring tournament templates are scheduled yet.</p>', { plane: 'supporting' }),
     ];
     for (const day of days) {
       const items = Array.isArray(day?.items) ? day.items : [];
-      cards.push(`
+      cards.push(sectionCard('schedule-day', `
         <h2>${escapeHtml(day?.day || 'Upcoming')}</h2>
         <div class="pokerStack">
           ${items.map((item) => `
@@ -1776,12 +1853,12 @@
                 ${item?.links?.timeline ? `<a href="${escapeHtml(buildPokerHref(item.links.timeline))}">Series Timeline</a>` : ''}
               </div>
             </div>
-          `).join('')}
+            `).join('')}
         </div>
-      `);
+      `, { plane: 'primary' }));
     }
     if (!days.length) {
-      cards.push('<h2>No Scheduled Events</h2><p>No tournament events are scheduled in the current calendar window.</p>');
+      cards.push(sectionCard('schedule-empty', '<h2>No Scheduled Events</h2><p>No tournament events are scheduled in the current calendar window.</p>', { plane: 'primary' }));
     }
     renderCards(cards);
     setStatus(Number(summary?.eventCount || 0) > 0
@@ -2060,7 +2137,7 @@
       ? buildPokerHref(`/poker/play/seasons/native/${encodeURIComponent(season.seasonId)}`)
       : buildPokerHref('/poker/play/seasons/native');
     renderCards([
-      `
+      sectionCard('season-summary', `
         <h2>${escapeHtml(season?.title || season?.seasonId || 'Native Live Season')}</h2>
         <p>Native season standings come from durable live-play rows only. No mirrored operator ladder is mixed into this page.</p>
         <div class="pokerSummary" data-native-season-summary="1">
@@ -2079,8 +2156,8 @@
           <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Current Season</a>
           <a href="${escapeHtml(explicitSeasonPath)}">Open Explicit Season</a>
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('season-economy', `
         <h2>Season Economy</h2>
         <p>These totals expose exactly how native offchain OIL moved through live cash sessions and tournaments in the selected season window.</p>
         <div class="pokerSummary">
@@ -2094,12 +2171,12 @@
           ${renderSummaryMetric('Tournament Fees', `${Number(summary?.totalTournamentFeeOil || 0)} OIL`)}
           ${renderSummaryMetric('Treasury Credits', `${Number(summary?.actualTreasuryCreditOil || 0)} OIL`)}
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('season-leaderboard', `
         <h2>Leaderboard</h2>
         <p>Rank order is deterministic by net OIL, then tournament wins, then cash net. Wallet display stays minimal while the full wallet subject remains available in the exportable API payload.</p>
         ${renderNativeSeasonLeaderboardRows(items)}
-      `,
+      `, { plane: 'primary' }),
     ]);
     setStatus(items.length
       ? `${items.length} native season row${items.length === 1 ? '' : 's'} loaded.`
@@ -2245,7 +2322,7 @@
     const notebookItems = Array.isArray(notebook?.items) ? notebook.items : [];
     const lessonTags = Array.isArray(data?.lessonTags) ? data.lessonTags : [];
     renderCards([
-      `
+      sectionCard('review-summary-shell', `
         <h2>${escapeHtml(table?.title || 'Poker Hand Review')}</h2>
         <p>Private post-hand review for the seated wallet. Hole cards stay excluded from this export-safe study surface.</p>
         <div class="pokerSummary">
@@ -2261,8 +2338,8 @@
           <button id="pokerPlayHistoryExportNdjson" class="pokerButton" type="button">Export NDJSON</button>
           <button id="pokerPlayHistoryExportText" class="pokerButton" type="button">Export Text</button>
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('review-result-summary', `
         <h2>Result Summary</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Viewer Seat', resultSummary?.viewerSeatNumber ? `Seat ${Number(resultSummary.viewerSeatNumber || 0)}` : 'n/a')}
@@ -2271,12 +2348,12 @@
           ${renderSummaryMetric('Completed', hand?.completedAt ? formatIso(hand.completedAt) : 'n/a')}
         </div>
         <p>${escapeHtml(resultSummary?.note || 'No result note recorded for this hand.')}</p>
-      `,
-      `
+      `, { plane: 'primary' }),
+      sectionCard('review-action-line', `
         <h2>Action Line</h2>
         ${Array.isArray(data?.actionLine) && data.actionLine.length ? renderPublicActionLog(data.actionLine, 'No public actions logged.') : '<p>No public actions logged.</p>'}
-      `,
-      `
+      `, { plane: 'primary' }),
+      sectionCard('review-board-pot', `
         <h2>Board & Pot</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Pot', `${Number(boardPot?.potOil || 0)} OIL`)}
@@ -2286,20 +2363,20 @@
         ${renderPokerCards(boardPot?.communityCards || [])}
         ${renderMatchedPots(boardPot)}
         ${boardPot?.note ? `<p>${escapeHtml(boardPot.note)}</p>` : ''}
-      `,
-      `
+      `, { plane: 'primary' }),
+      sectionCard('review-human-note', `
         <h2>Human Note</h2>
         ${data?.humanNote?.body ? `<p>${escapeHtml(data.humanNote.body)}</p>` : '<p>No human study note saved for this hand yet.</p>'}
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('review-agent-note', `
         <h2>Agent Note</h2>
         ${data?.agentNote?.body ? `<p>${escapeHtml(data.agentNote.body)}</p>` : '<p>No worker proposal was saved for this hand.</p>'}
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('review-lesson-tags', `
         <h2>Lesson Tags</h2>
         ${renderTagBadges(lessonTags, 'No lesson tags saved yet.')}
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('review-notebook', `
         <h2>Notebook</h2>
         <form id="pokerStudyForm" class="pokerForm">
           <label>
@@ -2317,11 +2394,11 @@
           <button id="pokerStudySaveButton" class="pokerButton" type="submit">Save Notebook</button>
         </form>
         ${renderNotebookEntryRows(notebookItems, { emptyText: 'No notebook entries saved for this hand yet.', showBody: false })}
-      `,
-      `
+      `, { plane: 'reference' }),
+      sectionCard('review-opponent-notes', `
         <h2>Opponent Notes</h2>
         ${renderNotebookEntryRows(opponentNotes, { emptyText: 'No opponent notes saved for this hand yet.' })}
-      `,
+      `, { plane: 'reference' }),
     ]);
     bindPlayHandReviewForms(data);
     setStatus('Hand review ready.');
@@ -2750,7 +2827,7 @@
       );
     const hasOpenMyHandDispute = !!(hand && myDisputes.some((dispute) => String(dispute?.handId || '') === String(hand.handId || '') && String(dispute?.status || '') === 'open'));
     const cards = [
-      `
+      sectionCard('table-summary', `
         <h2>${escapeHtml(table?.title || 'Live Table')}</h2>
         <p>${escapeHtml(
           adminClosed
@@ -2822,15 +2899,15 @@
             ${series && table?.tableType === 'tournament' ? `<a href="${escapeHtml(buildPokerHref(`/poker/play/series/${encodeURIComponent(series?.seriesId || '')}/timeline`))}">Series Timeline</a>` : ''}
           </div>
         `}
-      `,
-      publicRail ? `
+      `, { plane: 'supporting' }),
+      publicRail ? sectionCard('rail-view', `
         <h2>Rail View</h2>
         <p>Watching public table state only. Private seat-thread discussion and seat-only actions stay hidden here, even while the hand is live.</p>
-      ` : '',
-      `
+      `, { plane: 'reference' }) : '',
+      sectionCard('seats', `
         <h2>Seats</h2>
         ${renderSeatMarkers(seats)}
-      `,
+      `, { plane: 'supporting' }),
     ].filter(Boolean);
 
     if (!publicRail && tableAccess?.inviteOnly) {
@@ -2863,7 +2940,7 @@
         .filter((seat) => !nextOpenSeat.includes(seat))
         .map((seat) => `<option value="${seat}">Seat ${seat}</option>`)
         .join('');
-      cards.push(`
+      cards.push(sectionCard('take-seat', `
         <h2>Take A Seat</h2>
         <p>${tableAccess?.inviteOnly ? 'This invite-only table still gives your seat the same private human + agent thread. Other players only see your public actions.' : 'Buying in starts a private human + agent thread for your seat. Other players only see your public actions, not your private discussion.'}</p>
         <form id="pokerPlayJoinForm" class="pokerForm">
@@ -2881,11 +2958,11 @@
           </label>
           <button class="pokerButton" type="submit">Join Table</button>
         </form>
-      `);
+      `, { plane: 'primary' }));
     }
 
     if (canWaitlist) {
-      cards.push(`
+      cards.push(sectionCard('waitlist', `
         <h2>Waitlist</h2>
         <p>${table?.tableType === 'tournament'
           ? (tableAccess?.inviteOnly
@@ -2918,7 +2995,7 @@
               <button class="pokerButton" type="submit">Join Waitlist</button>
             </form>
           `}
-      `);
+      `, { plane: 'primary' }));
     }
 
     if (mySeat) {
@@ -2948,7 +3025,7 @@
       const blindObligation = mySeat?.blindObligation && typeof mySeat.blindObligation === 'object' ? mySeat.blindObligation : null;
       const waitlistPromotion = mySeat?.waitlistPromotion && typeof mySeat.waitlistPromotion === 'object' ? mySeat.waitlistPromotion : null;
       const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
-      cards.push(`
+      cards.push(sectionCard('your-seat', `
         <h2>Your Seat</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Seat', `${Number(mySeat.seatNumber || 0)}`)}
@@ -3025,14 +3102,14 @@
                 <button id="pokerPlayTransferButton" class="pokerButton" type="submit">Transfer Table</button>
               </form>
             ` : '<p>No compatible cash table is open for transfer right now.</p>'}
-          ` : ''}
+            ` : ''}
         `}
-      `);
+      `, { plane: 'supporting' }));
     }
 
     if (!publicRail && !adminClosed && mySeat) {
       const autoAct = mySeat?.autoAct && typeof mySeat.autoAct === 'object' ? mySeat.autoAct : { mode: 'off', enabled: false };
-      cards.push(`
+      cards.push(sectionCard('auto-act', `
         <h2>Auto-Act</h2>
         <p>Automation is opt-in per seat and stays visible in the live table state.</p>
         <div class="pokerSummary">
@@ -3059,7 +3136,7 @@
         <div class="pokerLinks">
           <button id="pokerPlayAutoActOffButton" class="pokerButton" type="button">Turn Off Auto-Act</button>
         </div>
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (Number(review?.openDisputeCount || 0) > 0 || myDisputes.length) {
@@ -3134,7 +3211,7 @@
     }
 
     if (hand) {
-      cards.push(`
+      cards.push(sectionCard('current-hand', `
         <h2>Current Hand</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Hand', `${Number(hand.handNumber || 0)}`)}
@@ -3159,12 +3236,12 @@
         </div>
         ${renderMatchedPots(hand?.result)}
         ${seats.some((seat) => seat.isActing && seat.presenceStatus === 'disconnected') ? '<p>The acting seat is disconnected. The reconnect grace window is holding the clock before timeout action takes over.</p>' : ''}
-      `);
+      `, { plane: 'primary' }));
     }
 
     if (!publicRail && !adminClosed && mySeat && hand) {
       const proposal = data?.agentProposal && typeof data.agentProposal === 'object' ? data.agentProposal : null;
-      cards.push(`
+      cards.push(sectionCard('worker-seat-agent', `
         <h2>Worker Seat Agent</h2>
         ${proposal
           ? `
@@ -3180,7 +3257,7 @@
           <button id="pokerSeatAgentProposeButton" class="pokerButton" type="button">Request Worker Line</button>
           ${proposal ? '<button id="pokerSeatAgentCommitButton" class="pokerButton" type="button">Commit Worker Action</button>' : ''}
         </div>
-      `);
+      `, { plane: 'supporting' }));
     }
 
     if (data?.suggestion && mySeat && !data?.agentProposal) {
@@ -3191,7 +3268,7 @@
     }
 
     if (!publicRail && !adminClosed && mySeat && hand) {
-      cards.push(`
+      cards.push(sectionCard('flag-review', `
         <h2>Flag Hand For Review</h2>
         <p>Use this for rule, turn-order, disconnect, or settlement issues. Filing a review pauses the table for operator inspection.</p>
         ${hasOpenMyHandDispute ? '<p>You already flagged this hand for review.</p>' : ''}
@@ -3215,11 +3292,11 @@
           </label>
           <button id="pokerPlayDisputeSubmit" class="pokerButton" type="submit"${hasOpenMyHandDispute ? ' disabled' : ''}>Flag Hand For Review</button>
         </form>
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (!publicRail && !adminClosed && mySeat && hand) {
-      cards.push(`
+      cards.push(sectionCard('seat-thread', `
         <h2>Seat Thread</h2>
         <div class="pokerStack">
           ${messages.length ? messages.map((message) => `
@@ -3236,17 +3313,17 @@
           </label>
           <button class="pokerButton" type="submit">Send To Agent Thread</button>
         </form>
-      `);
+      `, { plane: 'supporting' }));
     }
 
     if (!publicRail && !adminClosed && mySeat && hand && paused) {
-      cards.push(`
+      cards.push(sectionCard('submit-action', `
         <h2>Submit Action</h2>
         <p>Table play is paused by an operator. Your seat thread remains visible, but no new poker action can be submitted until the table resumes.</p>
-      `);
+      `, { plane: 'primary', state: 'paused' }));
     } else if (!publicRail && !adminClosed && mySeat && hand && Array.isArray(hand.viewerAllowedActions) && hand.viewerAllowedActions.length) {
       const shoveToOil = Number(mySeat.committedStreetOil || 0) + Number(mySeat.stackOil || 0);
-      cards.push(`
+      cards.push(sectionCard('submit-action', `
         <h2>Submit Action</h2>
         <div class="pokerStack">
           ${actions.length ? actions.slice(-8).map((action) => `
@@ -3270,16 +3347,16 @@
           ${hand.canUseTimeBank ? `<button id="pokerPlayTimeBankButton" class="pokerButton" type="button">Use Time Bank (+${Number(hand.timeBankRemainingSeconds || 0)}s)</button>` : ''}
           <button class="pokerButton" type="submit">Submit Action</button>
         </form>
-      `);
+      `, { plane: 'primary', state: 'live' }));
     } else if (publicRail || actions.length) {
-      cards.push(`
+      cards.push(sectionCard('public-action-log', `
         <h2>Public Action Log</h2>
         ${renderPublicActionLog(actions)}
-      `);
+      `, { plane: 'reference' }));
     }
 
     if (adminReview) {
-      cards.push(`
+      cards.push(sectionCard('operator-review', `
         <h2>Operator Review</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('Review Hand', adminReview?.reviewHand?.handId || adminReview?.activeHand?.handId || 'none')}
@@ -3355,7 +3432,7 @@
             </div>
           `).join('') : '<p>No audit events yet.</p>'}
         </div>
-      `);
+      `, { plane: 'reference' }));
     }
 
     return cards;
@@ -4400,7 +4477,7 @@
     const items = Array.isArray(payload?.data?.items) ? payload.data.items : [];
     const oilBalance = Number(payload?.data?.oilBalance?.balance || 0);
     renderCards([
-      `
+      sectionCard('centaur-eligibility', `
         <h2>Eligibility</h2>
         <div class="pokerSummary">
           ${renderSummaryMetric('House', payload?.data?.houseId || 'Pending')}
@@ -4408,14 +4485,15 @@
           ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
           ${renderSummaryMetric('Verification', payload?.data?.verification?.status || 'unverified')}
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('centaur-snapshots', `
         <h2>Current Hour Snapshots</h2>
         <p>15 randomized checks per hour. Each eligible snapshot credits 100 OIL offchain.</p>
         ${renderSnapshotSlots(payload?.data?.currentHourSnapshots)}
-      `,
+      `, { plane: 'supporting' }),
       items.length
-        ? items.map((item) => `
+        ? sectionCard('centaur-lobby-list', `
+          ${items.map((item) => `
           <div class="pokerSplit">
             <div>
               <h2>${escapeHtml(item.title)}</h2>
@@ -4430,8 +4508,9 @@
               <a href="${escapeHtml(buildPokerHref(`/poker/centaur/tournaments/${encodeURIComponent(item.tournamentId)}`))}">Open Table</a>
             </div>
           </div>
-        `).join('')
-        : '<h2>No centaur tournaments available.</h2><p>The lobby is live, but no tournament is open yet.</p>',
+          `).join('')}
+        `, { plane: 'primary' })
+        : sectionCard('centaur-lobby-empty', '<h2>No centaur tournaments available.</h2><p>The lobby is live, but no tournament is open yet.</p>', { plane: 'primary' }),
     ]);
     setStatus(items.length ? `${items.length} centaur tournament${items.length === 1 ? '' : 's'} loaded.` : 'No centaur tournaments available.');
   }
@@ -4660,7 +4739,7 @@
     const tableState = hand?.tableState || {};
     const streamId = readStoredStreamId();
     const cards = [
-      `
+      sectionCard('centaur-summary', `
         <h2>${escapeHtml(tournament?.title || 'Centaur Tournament')}</h2>
         <p>${escapeHtml(tournament?.summary?.headline || 'Human and AI act from the same seat against a live countdown.')}</p>
         <div class="pokerSummary">
@@ -4669,16 +4748,16 @@
           ${renderSummaryMetric('OIL Balance', `${oilBalance}`)}
           ${renderSummaryMetric('Lock Status', verification?.status || 'unverified')}
         </div>
-      `,
-      `
+      `, { plane: 'supporting' }),
+      sectionCard('centaur-snapshot-hour', `
         <h2>Snapshot Hour</h2>
         <p>Randomized 15x/hour verification of the same wallet lock. Each successful check credits 100 OIL offchain.</p>
         ${renderSnapshotSlots(data?.currentHourSnapshots)}
-      `,
+      `, { plane: 'supporting' }),
     ];
 
     if (!verification) {
-      cards.push(`
+      cards.push(sectionCard('centaur-verify', `
         <h2>Verify Streamflow Lock</h2>
         <p>Use the same wallet bound to your House. The signed message proves control of the wallet that holds the Streamflow lock.</p>
         <form id="centaurVerifyForm" class="pokerForm">
@@ -4692,9 +4771,9 @@
           </label>
           <button class="pokerButton" type="submit">Sign & Verify</button>
         </form>
-      `);
+      `, { plane: 'primary' }));
     } else if (!entry) {
-      cards.push(`
+      cards.push(sectionCard('centaur-join', `
         <h2>Join The Table</h2>
         <p>Your verified lock is active. Join the shared centaur seat and start the first hand.</p>
         <form id="centaurJoinForm" class="pokerForm">
@@ -4704,11 +4783,11 @@
           </label>
           <button class="pokerButton" type="submit">Join For ${Number(tournament?.buyInOil || 0)} OIL</button>
         </form>
-      `);
+      `, { plane: 'primary' }));
     }
 
     if (entry && hand) {
-      cards.push(`
+      cards.push(sectionCard('centaur-live-hand', `
         <h2>Live Hand</h2>
         ${renderMetaBadges([
           `entry ${entry.displayName || entry.entryId}`,
@@ -4735,8 +4814,8 @@
             <div id="centaurCountdownValue" class="pokerCountdown">--</div>
           </div>
         </div>
-      `);
-      cards.push(`
+      `, { plane: 'primary' }));
+      cards.push(sectionCard('centaur-discussion', `
         <h2>Centaur Discussion</h2>
         <div id="centaurMessages" class="pokerStack">
           ${messages.length ? messages.map((message) => `
@@ -4753,8 +4832,8 @@
           </label>
           <button class="pokerButton" type="submit">Send Discussion Note</button>
         </form>
-      `);
-      cards.push(`
+      `, { plane: 'supporting' }));
+      cards.push(sectionCard('centaur-submit-action', `
         <h2>Submit Shared Action</h2>
         <div class="pokerStack">
           ${(Array.isArray(actions) && actions.length) ? actions.map((action) => `
@@ -4778,7 +4857,7 @@
           </label>
           <button class="pokerButton" type="submit">Lock Action</button>
         </form>
-      `);
+      `, { plane: 'primary' }));
     }
     return cards;
   }
@@ -4911,45 +4990,113 @@
       if (!path.match(/^\/poker\/play\/tables\/([^/]+)$/) && !path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/)) {
         clearLiveTableStream();
       }
-      if (path === '/poker') return await loadIndex();
-      if (path === '/poker/play') return await loadPlayLobby();
-      if (path === '/poker/play/schedule') return await loadPlaySchedule();
-      if (path === '/poker/play/seasons/native') return await loadPlayNativeSeason();
-      if (path === '/poker/play/admin/ops') return await loadPlayOpsDashboard();
-      if (path === '/poker/play/admin/integrity') return await loadPlayIntegrityQueue();
-      if (path === '/poker/play/results') return await loadPlayResults();
+      if (path === '/poker') {
+        setPokerView('index');
+        return await loadIndex();
+      }
+      if (path === '/poker/play') {
+        setPokerView('play-lobby');
+        return await loadPlayLobby();
+      }
+      if (path === '/poker/play/schedule') {
+        setPokerView('play-schedule');
+        return await loadPlaySchedule();
+      }
+      if (path === '/poker/play/seasons/native') {
+        setPokerView('play-native-season');
+        return await loadPlayNativeSeason();
+      }
+      if (path === '/poker/play/admin/ops') {
+        setPokerView('play-admin-ops');
+        return await loadPlayOpsDashboard();
+      }
+      if (path === '/poker/play/admin/integrity') {
+        setPokerView('play-admin-integrity');
+        return await loadPlayIntegrityQueue();
+      }
+      if (path === '/poker/play/results') {
+        setPokerView('play-results');
+        return await loadPlayResults();
+      }
       const nativeSeasonMatch = path.match(/^\/poker\/play\/seasons\/native\/([^/]+)$/);
-      if (nativeSeasonMatch) return await loadPlayNativeSeason(nativeSeasonMatch[1]);
+      if (nativeSeasonMatch) {
+        setPokerView('play-native-season');
+        return await loadPlayNativeSeason(nativeSeasonMatch[1]);
+      }
       const handReviewMatch = path.match(/^\/poker\/play\/hands\/([^/]+)\/review$/);
-      if (handReviewMatch) return await loadPlayHandReview(handReviewMatch[1]);
+      if (handReviewMatch) {
+        setPokerView('play-hand-review');
+        return await loadPlayHandReview(handReviewMatch[1]);
+      }
       const tableHistoryMatch = path.match(/^\/poker\/play\/tables\/([^/]+)\/history$/);
-      if (tableHistoryMatch) return await loadPlayTableHistory(tableHistoryMatch[1]);
+      if (tableHistoryMatch) {
+        setPokerView('play-table-history');
+        return await loadPlayTableHistory(tableHistoryMatch[1]);
+      }
       const seriesTimelineMatch = path.match(/^\/poker\/play\/series\/([^/]+)\/timeline$/);
-      if (seriesTimelineMatch) return await loadPlaySeriesTimeline(seriesTimelineMatch[1]);
-      if (path === '/poker/play/rail') return await loadPlayRailLobby();
+      if (seriesTimelineMatch) {
+        setPokerView('play-series-timeline');
+        return await loadPlaySeriesTimeline(seriesTimelineMatch[1]);
+      }
+      if (path === '/poker/play/rail') {
+        setPokerView('play-rail-lobby');
+        return await loadPlayRailLobby();
+      }
       const railSeriesTimelineMatch = path.match(/^\/poker\/play\/rail\/series\/([^/]+)\/timeline$/);
-      if (railSeriesTimelineMatch) return await loadPlaySeriesTimeline(railSeriesTimelineMatch[1], { rail: true });
+      if (railSeriesTimelineMatch) {
+        setPokerView('play-rail-series-timeline');
+        return await loadPlaySeriesTimeline(railSeriesTimelineMatch[1], { rail: true });
+      }
       const seriesRailMatch = path.match(/^\/poker\/play\/rail\/series\/([^/]+)$/);
-      if (seriesRailMatch) return await loadPlayRailSeries(seriesRailMatch[1]);
+      if (seriesRailMatch) {
+        setPokerView('play-rail-series');
+        return await loadPlayRailSeries(seriesRailMatch[1]);
+      }
       const railMatch = path.match(/^\/poker\/play\/rail\/tables\/([^/]+)$/);
-      if (railMatch) return await loadPlayRailTable(railMatch[1]);
+      if (railMatch) {
+        setPokerView('play-rail-table');
+        return await loadPlayRailTable(railMatch[1]);
+      }
       const playMatch = path.match(/^\/poker\/play\/tables\/([^/]+)$/);
-      if (playMatch) return await loadPlayTable(playMatch[1]);
-      if (path === '/poker/centaur') return await loadCentaurLobby();
+      if (playMatch) {
+        setPokerView('play-table');
+        return await loadPlayTable(playMatch[1]);
+      }
+      if (path === '/poker/centaur') {
+        setPokerView('centaur-lobby');
+        return await loadCentaurLobby();
+      }
       const centaurMatch = path.match(/^\/poker\/centaur\/tournaments\/([^/]+)$/);
-      if (centaurMatch) return await loadCentaurTournament(centaurMatch[1]);
+      if (centaurMatch) {
+        setPokerView('centaur-table');
+        return await loadCentaurTournament(centaurMatch[1]);
+      }
       const seasonMatch = path.match(/^\/poker\/seasons\/([^/]+)$/);
-      if (seasonMatch) return await loadSeason(seasonMatch[1]);
+      if (seasonMatch) {
+        setPokerView('season-detail');
+        return await loadSeason(seasonMatch[1]);
+      }
       const leaderboardMatch = path.match(/^\/poker\/leaderboards\/([^/]+)$/);
-      if (leaderboardMatch) return await loadLeaderboard(leaderboardMatch[1]);
+      if (leaderboardMatch) {
+        setPokerView('season-leaderboard');
+        return await loadLeaderboard(leaderboardMatch[1]);
+      }
       const replayMatch = path.match(/^\/poker\/replays\/([^/]+)$/);
-      if (replayMatch) return await loadReplay(replayMatch[1]);
+      if (replayMatch) {
+        setPokerView('replay-detail');
+        return await loadReplay(replayMatch[1]);
+      }
       const submissionMatch = path.match(/^\/poker\/submissions\/([^/]+)$/);
-      if (submissionMatch) return await loadSubmission(submissionMatch[1]);
+      if (submissionMatch) {
+        setPokerView('submission-detail');
+        return await loadSubmission(submissionMatch[1]);
+      }
+      setPokerView('unknown');
       setTitle('Portal Poker', 'Unknown route');
       setStatus('Unknown poker route.');
       renderCards(['<h2>Unknown poker route.</h2>']);
     } catch (err) {
+      setPokerView('error');
       setStatus(err.code ? `${err.code}: ${err.message}` : (err.message || 'Unexpected error'));
       renderCards([`<h2>Unable to load poker page.</h2><p>${escapeHtml(err.code || err.message || 'Unexpected error')}</p>`]);
     }

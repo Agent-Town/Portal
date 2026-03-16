@@ -7,31 +7,53 @@
   <link rel="stylesheet" href="/styles.css">
   <style>
     :root {
-      --poker-bg: #101418;
-      --poker-ink: #f7efd8;
-      --poker-card: rgba(27, 38, 33, 0.88);
-      --poker-accent: #d2a24c;
-      --poker-muted: #cbbd9f;
-      --poker-line: rgba(247, 239, 216, 0.12);
+      --poker-surface-0: #0b1014;
+      --poker-surface-1: #11181d;
+      --poker-surface-2: #182126;
+      --poker-surface-3: #202b31;
+      --poker-overlay: rgba(8, 12, 16, 0.72);
+      --poker-text-primary: #f4ecdc;
+      --poker-text-secondary: #b8ae99;
+      --poker-text-tertiary: #8e8678;
+      --poker-text-inverse: #081014;
+      --poker-accent-gold: #d6aa63;
+      --poker-accent-gold-strong: #e4bd79;
+      --poker-accent-gold-soft: rgba(214, 170, 99, 0.14);
+      --poker-success: #90b88f;
+      --poker-warning: #d1aa5c;
+      --poker-danger: #c98778;
+      --poker-info: #81a7be;
+      --poker-line-subtle: #26313a;
+      --poker-line-strong: #31404a;
+      --poker-focus-ring: #f0d49c;
+      --poker-font-display: "Wellfleet", "Iowan Old Style", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Serif SC", Georgia, serif;
+      --poker-font-ui: "Iowan Old Style", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Serif SC", "Palatino Linotype", Georgia, serif;
+      --poker-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      --poker-bg: var(--poker-surface-0);
+      --poker-ink: var(--poker-text-primary);
+      --poker-card: var(--poker-surface-1);
+      --poker-accent: var(--poker-accent-gold);
+      --poker-muted: var(--poker-text-secondary);
+      --poker-line: var(--poker-line-subtle);
     }
     body.pokerShell {
       margin: 0;
       min-height: 100vh;
       color: var(--poker-ink);
-      font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+      font-family: var(--poker-font-ui);
       background:
-        radial-gradient(circle at top, rgba(210, 162, 76, 0.2), transparent 36%),
-        linear-gradient(180deg, #12191d 0%, #0d1216 100%);
+        radial-gradient(circle at top, rgba(214, 170, 99, 0.16), transparent 36%),
+        linear-gradient(180deg, #12191d 0%, var(--poker-bg) 100%);
     }
     .pokerFrame {
-      max-width: 1040px;
+      max-width: 1160px;
       margin: 0 auto;
-      padding: 28px 20px 40px;
+      padding: 32px 20px 48px;
     }
     .pokerHero {
       display: flex;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 24px;
       justify-content: space-between;
       align-items: end;
       margin-bottom: 24px;
@@ -39,8 +61,11 @@
     .pokerHero h1 {
       margin: 0;
       font-size: clamp(30px, 4vw, 52px);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
+      line-height: 1.08;
+      letter-spacing: 0.01em;
+      text-transform: none;
+      color: var(--poker-text-primary);
+      font-family: var(--poker-font-display);
     }
     .pokerHero p {
       max-width: 42rem;
@@ -49,25 +74,42 @@
       line-height: 1.5;
     }
     .pokerStatus {
-      min-height: 20px;
+      min-height: 24px;
       margin-bottom: 16px;
-      color: var(--poker-muted);
+      color: var(--poker-text-secondary);
+      font-size: 14px;
+      line-height: 1.5;
     }
     .pokerGrid {
       display: grid;
-      gap: 16px;
+      gap: 24px;
     }
     .pokerCard {
-      border-radius: 22px;
+      border-radius: 16px;
       border: 1px solid var(--poker-line);
-      background: var(--poker-card);
-      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
-      padding: 20px;
+      background: linear-gradient(180deg, rgba(32, 43, 49, 0.24) 0%, rgba(17, 24, 29, 0.96) 100%);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+      padding: 24px;
       backdrop-filter: blur(6px);
+    }
+    .pokerCard[data-poker-plane="primary"] {
+      border-color: var(--poker-line-strong);
+      background: linear-gradient(180deg, rgba(228, 189, 121, 0.08) 0%, rgba(17, 24, 29, 0.98) 100%);
+    }
+    .pokerCard[data-poker-plane="reference"] {
+      background: linear-gradient(180deg, rgba(24, 33, 38, 0.82) 0%, rgba(17, 24, 29, 0.92) 100%);
     }
     .pokerCard h2,
     .pokerCard h3 {
-      margin: 0 0 8px;
+      margin: 0 0 10px;
+      color: var(--poker-text-primary);
+      line-height: 1.2;
+      text-transform: none;
+    }
+    .pokerCard p {
+      margin: 0;
+      color: var(--poker-text-secondary);
+      line-height: 1.6;
     }
     .pokerMeta {
       display: flex;
@@ -77,7 +119,7 @@
     }
     .pokerBadge {
       border-radius: 999px;
-      border: 1px solid rgba(210, 162, 76, 0.28);
+      border: 1px solid rgba(214, 170, 99, 0.28);
       color: var(--poker-accent);
       padding: 5px 10px;
       font-size: 12px;
@@ -92,16 +134,92 @@
     }
     .pokerLinks a,
     .pokerButton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
       border-radius: 999px;
-      border: 1px solid rgba(247, 239, 216, 0.18);
+      border: 1px solid rgba(244, 236, 220, 0.16);
       color: var(--poker-ink);
       text-decoration: none;
-      padding: 10px 14px;
-      background: rgba(247, 239, 216, 0.04);
+      padding: 10px 16px;
+      background: rgba(244, 236, 220, 0.04);
+      transition:
+        background-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        border-color 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        color 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        transform 120ms cubic-bezier(0.2, 0.8, 0.2, 1),
+        box-shadow 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
     }
     .pokerButton {
       cursor: pointer;
       font: inherit;
+    }
+    .pokerButtonPrimary,
+    .pokerLinks a.pokerButtonPrimary,
+    .pokerButton[data-action-role="primary"] {
+      background: var(--poker-accent-gold);
+      border-color: rgba(228, 189, 121, 0.72);
+      color: var(--poker-text-inverse);
+      box-shadow: 0 10px 24px rgba(214, 170, 99, 0.18);
+    }
+    .pokerButtonSecondary,
+    .pokerButton[data-action-role="secondary"] {
+      background: rgba(244, 236, 220, 0.06);
+      border-color: rgba(244, 236, 220, 0.16);
+      color: var(--poker-text-primary);
+    }
+    .pokerButtonNav,
+    .pokerLinks a,
+    .pokerLinks a[data-action-role="navigation"],
+    .pokerLinks a.pokerButtonNav {
+      background: transparent;
+      border-color: rgba(184, 174, 153, 0.24);
+      color: var(--poker-text-secondary);
+    }
+    .pokerButtonDanger,
+    .pokerButton[data-action-role="destructive"] {
+      background: rgba(201, 135, 120, 0.12);
+      border-color: rgba(201, 135, 120, 0.42);
+      color: #f5d7d0;
+    }
+    .pokerLinks a:hover,
+    .pokerButton:hover:not(:disabled) {
+      border-color: rgba(228, 189, 121, 0.5);
+      background: rgba(228, 189, 121, 0.12);
+      color: var(--poker-text-primary);
+    }
+    .pokerButtonPrimary:hover:not(:disabled),
+    .pokerLinks a.pokerButtonPrimary:hover {
+      background: var(--poker-accent-gold-strong);
+      color: var(--poker-text-inverse);
+      transform: translateY(-1px);
+    }
+    .pokerButtonDanger:hover:not(:disabled) {
+      background: rgba(201, 135, 120, 0.18);
+      border-color: rgba(201, 135, 120, 0.52);
+      color: #fff0ec;
+    }
+    .pokerLinks a:focus-visible,
+    .pokerButton:focus-visible,
+    .pokerForm input:focus-visible,
+    .pokerForm textarea:focus-visible,
+    .pokerForm select:focus-visible {
+      outline: 2px solid var(--poker-focus-ring);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 3px rgba(240, 212, 156, 0.18);
+    }
+    .pokerButton:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+    .pokerButton:disabled,
+    .pokerLinks a[aria-disabled="true"] {
+      opacity: 0.58;
+      cursor: not-allowed;
+      border-color: rgba(142, 134, 120, 0.2);
+      color: var(--poker-text-tertiary);
+      background: rgba(255, 255, 255, 0.03);
+      box-shadow: none;
     }
     .pokerTable {
       width: 100%;
@@ -135,9 +253,9 @@
       width: 100%;
       min-height: 44px;
       box-sizing: border-box;
-      border-radius: 14px;
+      border-radius: 12px;
       border: 1px solid var(--poker-line);
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--poker-ink);
       padding: 12px 14px;
       font: inherit;
@@ -146,15 +264,16 @@
       min-height: 96px;
       resize: vertical;
     }
-    .pokerInset {
+    .pokerMetric {
       padding: 16px;
-      border-radius: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--poker-line);
       background: rgba(255, 255, 255, 0.03);
-      box-shadow: none;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
     .pokerLabel {
       margin-bottom: 8px;
-      color: var(--poker-muted);
+      color: var(--poker-text-secondary);
       font-size: 12px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -187,6 +306,7 @@
     .pokerSummaryValue {
       font-size: 28px;
       color: var(--poker-accent);
+      line-height: 1.15;
     }
     .pokerCardStrip {
       display: flex;
@@ -256,16 +376,41 @@
       color: var(--poker-muted);
       padding: 8px 0;
     }
+    @media (min-width: 900px) {
+      .pokerFrame {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+      .pokerGrid[data-poker-view="play-table"],
+      .pokerGrid[data-poker-view="play-hand-review"],
+      .pokerGrid[data-poker-view="centaur-table"] {
+        gap: 28px;
+      }
+    }
     @media (max-width: 720px) {
       .pokerFrame {
+        padding-top: 24px;
         padding-left: 16px;
         padding-right: 16px;
+        padding-bottom: 40px;
+      }
+      .pokerCard {
+        padding: 16px;
+      }
+      .pokerGrid {
+        gap: 16px;
+      }
+      .pokerHero {
+        gap: 16px;
+      }
+      .pokerHero h1 {
+        font-size: clamp(28px, 8vw, 40px);
       }
     }
   </style>
 </head>
-<body class="pokerShell">
-  <main class="pokerFrame">
+<body class="pokerShell" data-poker-view="boot">
+  <main id="pokerFrameRoot" class="pokerFrame" data-poker-view="boot">
     <header class="pokerHero">
       <div>
         <h1 id="pokerTitle">Portal Poker</h1>
@@ -273,7 +418,7 @@
       </div>
     </header>
     <div id="pokerStatus" class="pokerStatus" aria-live="polite"></div>
-    <section id="pokerContent" class="pokerGrid" aria-live="polite"></section>
+    <section id="pokerContent" class="pokerGrid" data-poker-view="boot" aria-live="polite"></section>
   </main>
   <script src="/wallet_client.js"></script>
   <script src="/poker.js?v=20260310-centaur"></script>
