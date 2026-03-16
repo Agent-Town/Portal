@@ -41,6 +41,7 @@ test('M23.5: live poker lobby quick-seat form creates or joins a matching table 
   await page.goto('/poker/play?embed=1');
   await expect(page.getByRole('heading', { name: 'Quick Seat' })).toBeVisible();
   await page.locator('#pokerPlayMatchmakeType').selectOption('tournament');
+  await page.locator('[data-poker-section="quick-seat"] details summary').click();
   await page.locator('#pokerPlayMatchmakeSmallBlind').fill('60');
   await page.locator('#pokerPlayMatchmakeBigBlind').fill('120');
   await page.locator('#pokerPlayMatchmakeBuyIn').fill('1200');

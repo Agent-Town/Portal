@@ -61,6 +61,10 @@ Current next-step status:
 - tournament schedule now keeps recurring-template detail, admin template authoring, and event-level break or waitlist detail in explicit drawers instead of ambient full-weight cards
 - deterministic D6 tests added: e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js, e2e/333_poker_design_lobby_advanced_detail_gate_ui.spec.js, e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js, and e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js
 - visual documentation captured for the D6 simplification pass under artifacts/design-progress-20260316-d7-simple
+- D6 simplification continued on the lobby: Quick Seat now exposes only the game choice and primary join action by default, while access, stakes, display name, and extra destinations sit behind the advanced drawer
+- live tables and tournament series in the lobby now render as compact poker-room rows instead of tall stacked cards, with history and director context remaining in explicit drawers
+- deterministic D6 compactness tests added: e2e/336_poker_design_quick_seat_compact_default_ui.spec.js and e2e/337_poker_design_live_table_compact_list_ui.spec.js
+- visual documentation captured for the lobby simplification continuation under artifacts/design-progress-20260316-d8-lobby-minimal
 - TLA+ formal design layer added under design/tla for route projection, admin gating, default-hidden advanced detail, locale invariance, voice-mode invariance, and no-drift human vs LLM projection rules
 - formal methods companion added: design/08_poker_play_design_v1_formal_methods.md
 - TLC validation run completed successfully for design/tla/PokerDesignProjection.tla on 2026-03-16

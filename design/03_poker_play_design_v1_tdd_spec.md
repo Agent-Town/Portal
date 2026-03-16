@@ -279,11 +279,11 @@ Purpose:
 Primary tests:
 
 1. `e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js`
-2. `e2e/333_poker_design_live_table_dead_simple_default_ui.spec.js`
+2. `e2e/333_poker_design_lobby_advanced_detail_gate_ui.spec.js`
 3. `e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js`
-4. `e2e/335_poker_design_advanced_detail_gate_contract.spec.js`
-5. `e2e/336_poker_design_llm_support_metadata_contract.spec.js`
-6. `e2e/337_poker_design_player_route_admin_separation_ui.spec.js`
+4. `e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js`
+5. `e2e/336_poker_design_quick_seat_compact_default_ui.spec.js`
+6. `e2e/337_poker_design_live_table_compact_list_ui.spec.js`
 7. `e2e/338_poker_design_season_compact_default_ui.spec.js`
 8. `e2e/339_poker_design_centaur_dead_simple_default_ui.spec.js`
 9. `e2e/340_poker_design_chinese_simple_default_ui.spec.js`

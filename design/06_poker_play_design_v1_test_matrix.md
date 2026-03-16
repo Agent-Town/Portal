@@ -227,7 +227,8 @@ Every design phase must capture and assert:
   - lobby, live table, schedule, season, centaur
 - Tests:
   - `e2e/332_poker_design_lobby_dead_simple_default_ui.spec.js`
-  - `e2e/333_poker_design_live_table_dead_simple_default_ui.spec.js`
+  - `e2e/336_poker_design_quick_seat_compact_default_ui.spec.js`
+  - `e2e/337_poker_design_live_table_compact_list_ui.spec.js`
   - `e2e/334_poker_design_schedule_dead_simple_default_ui.spec.js`
   - `e2e/338_poker_design_season_compact_default_ui.spec.js`
   - `e2e/339_poker_design_centaur_dead_simple_default_ui.spec.js`
@@ -242,7 +243,8 @@ Every design phase must capture and assert:
 - Seed:
   - live table, schedule, season
 - Tests:
-  - `e2e/335_poker_design_advanced_detail_gate_contract.spec.js`
+  - `e2e/333_poker_design_lobby_advanced_detail_gate_ui.spec.js`
+  - `e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js`
 - Assertions:
   - advanced detail is collapsed, hidden, or moved to explicit secondary surfaces
   - the player can act without reading dense support sections
@@ -252,9 +254,10 @@ Every design phase must capture and assert:
 - Problem:
   - simplification must not mean removing useful structured context entirely.
 - Seed:
-  - live table, centaur, study-enabled table
+  - lobby, live table, centaur, study-enabled table
 - Tests:
-  - `e2e/336_poker_design_llm_support_metadata_contract.spec.js`
+  - `e2e/333_poker_design_lobby_advanced_detail_gate_ui.spec.js`
+  - `e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js`
 - Assertions:
   - rich support metadata still exists in machine-readable or explicit advanced form
   - the default visible layout stays cleaner than the machine or context layer
@@ -267,7 +270,7 @@ Every design phase must capture and assert:
 - Seed:
   - live table, schedule
 - Tests:
-  - `e2e/337_poker_design_player_route_admin_separation_ui.spec.js`
+  - `e2e/335_poker_design_schedule_advanced_detail_gate_ui.spec.js`
 - Assertions:
   - player default routes do not foreground admin or operator surfaces
   - admin controls remain clearly secondary or absent outside explicit operator states

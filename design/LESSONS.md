@@ -238,6 +238,30 @@ When a future design phase lands, append:
 ### What changed
 
 1. The poker design pack now has a TLA+ model for route projection logic under `design/tla/`.
+
+## 2026-03-16 D6 Lobby Minimal Follow-Through
+
+### What changed
+
+1. Quick Seat now defaults to one game picker, one primary join action, and one compact defaults summary.
+2. Stakes, invite-only setup, naming, and secondary poker destinations moved behind the Quick Seat advanced drawer instead of staying full-weight.
+3. Lobby live tables and tournament series now render as compact poker-room rows with one obvious action and lighter supporting facts.
+
+### What worked
+
+1. Hiding configuration behind the existing advanced drawer preserved all functionality without inventing a separate “simple mode” backend truth.
+2. Compact rows feel much closer to a real poker client than tall multi-card stacks, especially on mobile.
+3. The canonical-state rule held: the LLM and advanced surfaces still have the same detail even though the default player projection is much quieter.
+
+### What regressed and had to be corrected
+
+1. The first lobby rewrite broke at runtime because the simplified summary reused variables outside the right scope; the fix was to keep the summary fully inside the same canonical sync path as the tournament-option gating.
+
+### What should become a permanent rule
+
+1. Quick Seat should default to one decision and one action; everything else must justify why it belongs outside the advanced drawer.
+2. Lobby rows should look like poker-room listings, not like generic product cards.
+3. If a detail is useful mostly after the user sits or for the LLM, it does not belong in the first lobby read.
 2. The design workflow now explicitly treats TLA+ as the precheck for visibility, gating, and projection invariants.
 3. The docs now distinguish formalizable design logic from non-formalizable visual taste.
 

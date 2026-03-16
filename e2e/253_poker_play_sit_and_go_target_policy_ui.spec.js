@@ -58,6 +58,7 @@ test('M23.31: quick-seat target sit-and-go starts at the configured target inste
   await page.goto('/poker/play?embed=1');
   await expect(page.getByRole('heading', { name: 'Quick Seat' })).toBeVisible();
   await page.locator('#pokerPlayMatchmakeType').selectOption('tournament');
+  await page.locator('[data-poker-section="quick-seat"] details summary').click();
   await page.locator('#pokerPlayMatchmakeFillPolicy').selectOption('fill_to_target');
   await expect(page.locator('#pokerPlayMatchmakeStartTargetRow')).toBeVisible();
   await page.locator('#pokerPlayMatchmakeMaxSeats').selectOption('6');

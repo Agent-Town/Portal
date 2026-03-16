@@ -39,22 +39,26 @@ test('M23.27: live poker lobby exposes policy controls and blocks quick-seat whe
   });
 
   await page.goto('/poker/play?embed=1');
+  await page.locator('[data-poker-section="poker-policy"] details summary').click();
   const policyCard = page.locator('.pokerCard').filter({
-    has: page.getByRole('heading', { name: 'Poker Policy' }),
+    has: page.getByRole('heading', { name: 'Limits' }),
   });
-  await expect(page.getByRole('heading', { name: 'Poker Policy' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Limits' })).toBeVisible();
   await page.locator('#pokerPlayPolicyDailyCap').fill('300');
   await page.getByRole('button', { name: 'Save Limit' }).click();
   await expect(page.getByText('Poker policy updated.')).toBeVisible();
   await expect(policyCard).toContainText('Daily Cap');
   await expect(policyCard).toContainText('300 OIL');
 
+  await page.locator('[data-poker-section="quick-seat"] details summary').click();
   await page.locator('#pokerPlayMatchmakeDisplayName').fill('Policy UI Cash');
   await page.getByRole('button', { name: 'Join Or Create' }).click();
   await expect(page.getByText('Quick seat failed: POKER_PLAY_POLICY_LIMIT_EXCEEDED')).toBeVisible();
 
+  await page.locator('[data-poker-section="poker-policy"] details summary').click();
   await page.getByRole('button', { name: 'Self-Exclude 24h' }).click();
   await expect(page.getByText('Poker self-exclusion is active for 24 hours.')).toBeVisible();
+  await page.locator('[data-poker-section="poker-policy"] details summary').click();
   await expect(page.getByText(/active until/i)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Join Or Create' })).toBeDisabled();
 });

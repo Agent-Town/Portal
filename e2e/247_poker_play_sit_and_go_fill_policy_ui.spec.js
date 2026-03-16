@@ -58,6 +58,7 @@ test('M23.25: quick-seat sit-and-go shows seats-to-start and flips live once the
   await page.goto('/poker/play?embed=1');
   await expect(page.getByRole('heading', { name: 'Quick Seat' })).toBeVisible();
   await page.locator('#pokerPlayMatchmakeType').selectOption('tournament');
+  await page.locator('[data-poker-section="quick-seat"] details summary').click();
   await page.locator('#pokerPlayMatchmakeFillPolicy').selectOption('fill_to_full');
   await page.locator('#pokerPlayMatchmakeMaxSeats').selectOption('3');
   await page.locator('#pokerPlayMatchmakeSmallBlind').fill('60');

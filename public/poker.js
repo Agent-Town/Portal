@@ -33,6 +33,18 @@
       quickSeatSeason: '实时赛季',
       quickSeatRail: '公开观战',
       quickSeatResults: '我的结果',
+      quickSeatTypeCash: '现金桌',
+      quickSeatTypeTournament: '锦标赛',
+      quickSeatAccessPublic: '公开桌',
+      quickSeatAccessInvite: '邀请制',
+      quickSeatSummaryPrefix: '默认',
+      quickSeatSummaryBlinds: '盲注',
+      quickSeatSummaryBuyIn: '买入',
+      quickSeatSummaryStartTarget: '开桌目标',
+      quickSeatPrimaryHint: '先选现金桌或锦标赛。更多桌面细节只在需要时展开。',
+      quickSeatAdvancedTitle: '展开桌面设置',
+      quickSeatAdvancedSummary: '邀请制、盲注、买入、显示名称与更多入口。',
+      quickSeatMoreRoutes: '更多入口',
       eligibilityTitle: '准备开局',
       pokerPolicyTitle: '限额',
       scheduleSnapshotTitle: '今日赛事',
@@ -853,6 +865,41 @@
     if (value === 'fill_to_full') return 'sit-and-go';
     if (value === 'fill_to_target') return 'sit-and-go target';
     return 'open match';
+  }
+
+  function formatQuickSeatTableTypeLabel(tableType) {
+    return String(tableType || '').trim().toLowerCase() === 'tournament'
+      ? getPokerLocaleText('quickSeatTypeTournament', 'Tournament')
+      : getPokerLocaleText('quickSeatTypeCash', 'Cash');
+  }
+
+  function formatQuickSeatAccessLabel(accessMode) {
+    return String(accessMode || '').trim().toLowerCase() === 'invite_only'
+      ? getPokerLocaleText('quickSeatAccessInvite', 'Invite-only')
+      : getPokerLocaleText('quickSeatAccessPublic', 'Public');
+  }
+
+  function buildQuickSeatSummary({
+    tableType = 'cash',
+    accessMode = 'public',
+    smallBlindOil = 0,
+    bigBlindOil = 0,
+    buyInOil = 0,
+    fillPolicy = 'open_match',
+    startTargetSeats = 0,
+  } = {}) {
+    const parts = [
+      `${formatQuickSeatAccessLabel(accessMode)} ${formatQuickSeatTableTypeLabel(tableType)}`,
+      `${Number(smallBlindOil || 0)} / ${Number(bigBlindOil || 0)} ${getPokerLocaleText('quickSeatSummaryBlinds', 'blinds')}`,
+      `${Number(buyInOil || 0)} OIL ${getPokerLocaleText('quickSeatSummaryBuyIn', 'buy-in')}`,
+    ];
+    if (String(tableType || '').trim().toLowerCase() === 'tournament') {
+      parts.push(formatTournamentFillPolicyLabel(fillPolicy));
+      if (String(fillPolicy || '').trim().toLowerCase() === 'fill_to_target' && Number(startTargetSeats || 0) > 0) {
+        parts.push(`${Number(startTargetSeats || 0)} ${getPokerLocaleText('quickSeatSummaryStartTarget', 'to start')}`);
+      }
+    }
+    return `${getPokerLocaleText('quickSeatSummaryPrefix', 'Default')}: ${parts.join(' · ')}`;
   }
 
   function renderSeriesStandings(standings) {
@@ -2044,95 +2091,115 @@
       `, { plane: 'reference' }),
       sectionCard('quick-seat', `
         <h2>Quick Seat</h2>
-        <p>Pick a game, set the table basics, and go. The room detail can wait until after you sit down.</p>
-        <div class="pokerLinks">
-          <a href="${escapeHtml(buildPokerHref('/poker/play/schedule'))}">Tournament Schedule</a>
-          <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Live Season</a>
-          <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Watch Public Tables</a>
-          <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
-        </div>
-        <form id="pokerPlayMatchmakeForm" class="pokerForm">
-          <label>
-            Access
-            <select id="pokerPlayMatchmakeAccess">
-              <option value="public">Public</option>
-              <option value="invite_only">Invite Only</option>
-            </select>
-          </label>
-          <label>
-            Table Type
-            <select id="pokerPlayMatchmakeType">
-              <option value="cash">Cash</option>
-              <option value="tournament">Tournament</option>
-            </select>
-          </label>
-          <label id="pokerPlayMatchmakeFillPolicyRow" hidden>
-            Tournament Start
-            <select id="pokerPlayMatchmakeFillPolicy">
-              <option value="open_match">Open Match</option>
-              <option value="fill_to_full">Sit-And-Go Fill To Full</option>
-              <option value="fill_to_target">Sit-And-Go Fill To Target</option>
-            </select>
-          </label>
-          <label id="pokerPlayMatchmakeMaxSeatsRow" hidden>
-            Table Cap
-            <select id="pokerPlayMatchmakeMaxSeats">
-              <option value="6">6 Seats</option>
-              <option value="3">3 Seats</option>
-            </select>
-          </label>
-          <label id="pokerPlayMatchmakeStartTargetRow" hidden>
-            Start Target
-            <select id="pokerPlayMatchmakeStartTargetSeats"></select>
-          </label>
-          <label id="pokerPlayMatchmakeBountyRow" hidden>
-            Tournament Bounty
-            <select id="pokerPlayMatchmakeBountyModel">
-              <option value="none">Standard</option>
-              <option value="pko_50">PKO 50/50</option>
-            </select>
-          </label>
-          <label>
-            Small Blind OIL
-            <input id="pokerPlayMatchmakeSmallBlind" type="number" min="1" value="10">
-          </label>
-          <label>
-            Big Blind OIL
-            <input id="pokerPlayMatchmakeBigBlind" type="number" min="2" value="20">
-          </label>
-          <label>
-            Buy-In OIL
-            <input id="pokerPlayMatchmakeBuyIn" type="number" min="20" value="400">
-          </label>
-          <label>
-            Display Name
-            <input id="pokerPlayMatchmakeDisplayName" maxlength="80" value="${escapeHtml(payload?.data?.houseId || 'House Seat')}">
-          </label>
-          <label>
-            Table Title
-            <input id="pokerPlayMatchmakeTitle" maxlength="96" placeholder="Optional custom title">
-          </label>
-          <button class="pokerButton" type="submit"${selfExcluded ? ' disabled' : ''}>Find Or Create Table</button>
+        <p>${escapeHtml(getPokerLocaleText('quickSeatPrimaryHint', 'Choose cash or tournament first. The room can carry the defaults until you want more control.'))}</p>
+        <form id="pokerPlayMatchmakeForm" class="pokerForm pokerQuickSeatForm" data-poker-form-variant="compact">
+          <div class="pokerQuickSeatPrimaryRow">
+            <label class="pokerQuickSeatField">
+              <span class="sr-only">Table Type</span>
+              <select id="pokerPlayMatchmakeType" aria-label="Table Type">
+                <option value="cash">Cash</option>
+                <option value="tournament">Tournament</option>
+              </select>
+            </label>
+            <button class="pokerButton pokerButtonPrimary" type="submit"${selfExcluded ? ' disabled' : ''}>Join Or Create</button>
+          </div>
+          <p id="pokerPlayMatchmakeSimpleSummary" class="pokerQuickSeatSummaryLine">Default: public cash · 10 / 20 blinds · 400 OIL buy-in</p>
+          <div class="pokerLinks pokerQuickSeatDestinations">
+            <a href="${escapeHtml(buildPokerHref('/poker/play/schedule'))}">Tournament Schedule</a>
+            <a href="${escapeHtml(buildPokerHref('/poker/play/seasons/native'))}">Live Season</a>
+          </div>
+          ${renderAdvancedPanel(
+            getPokerLocaleText('quickSeatAdvancedTitle', 'Open table setup'),
+            getPokerLocaleText('quickSeatAdvancedSummary', 'Invite-only tables, stakes, names, and the rest of the room.'),
+            `
+              <div class="pokerQuickSeatAdvancedFields">
+                <label>
+                  Access
+                  <select id="pokerPlayMatchmakeAccess">
+                    <option value="public">Public</option>
+                    <option value="invite_only">Invite Only</option>
+                  </select>
+                </label>
+                <label id="pokerPlayMatchmakeFillPolicyRow" hidden>
+                  Tournament Start
+                  <select id="pokerPlayMatchmakeFillPolicy">
+                    <option value="open_match">Open Match</option>
+                    <option value="fill_to_full">Sit-And-Go Fill To Full</option>
+                    <option value="fill_to_target">Sit-And-Go Fill To Target</option>
+                  </select>
+                </label>
+                <label id="pokerPlayMatchmakeMaxSeatsRow" hidden>
+                  Table Cap
+                  <select id="pokerPlayMatchmakeMaxSeats">
+                    <option value="6">6 Seats</option>
+                    <option value="3">3 Seats</option>
+                  </select>
+                </label>
+                <label id="pokerPlayMatchmakeStartTargetRow" hidden>
+                  Start Target
+                  <select id="pokerPlayMatchmakeStartTargetSeats"></select>
+                </label>
+                <label id="pokerPlayMatchmakeBountyRow" hidden>
+                  Tournament Bounty
+                  <select id="pokerPlayMatchmakeBountyModel">
+                    <option value="none">Standard</option>
+                    <option value="pko_50">PKO 50/50</option>
+                  </select>
+                </label>
+                <label>
+                  Small Blind OIL
+                  <input id="pokerPlayMatchmakeSmallBlind" type="number" min="1" value="10">
+                </label>
+                <label>
+                  Big Blind OIL
+                  <input id="pokerPlayMatchmakeBigBlind" type="number" min="2" value="20">
+                </label>
+                <label>
+                  Buy-In OIL
+                  <input id="pokerPlayMatchmakeBuyIn" type="number" min="20" value="400">
+                </label>
+                <label>
+                  Display Name
+                  <input id="pokerPlayMatchmakeDisplayName" maxlength="80" value="${escapeHtml(payload?.data?.houseId || 'House Seat')}">
+                </label>
+                <label class="pokerQuickSeatAdvancedFieldsFull">
+                  Table Title
+                  <input id="pokerPlayMatchmakeTitle" maxlength="96" placeholder="Optional custom title">
+                </label>
+              </div>
+              <div class="pokerLinks">
+                <a href="${escapeHtml(buildPokerHref('/poker/play/rail'))}">Watch Public Tables</a>
+                <a href="${escapeHtml(buildPokerHref('/poker/play/results'))}">My Results</a>
+              </div>
+            `,
+          )}
         </form>
       `, { plane: 'primary' }),
       series.length
         ? sectionCard('tournament-series', `
+          <h2>Tournament Series</h2>
+          <p>Series stay compact by default. Open detail only when you need the director plan or payout shape.</p>
+          <div class="pokerCompactList">
           ${series.map((item) => `
-          <div class="pokerStack">
-            <div class="pokerSplit">
+          <div class="pokerCompactEntry" data-poker-compact-kind="series">
+            <div class="pokerCompactEntryPrimary">
               <div>
-                <h2>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h2>
-                <p>One tournament running across linked tables. Open your seat first; use details when you need the director view.</p>
+                <h3>${escapeHtml(item.seriesTitle || 'Tournament Series')}</h3>
+                <p class="pokerCompactEntrySummary">One tournament across linked tables. Open your seat first; leave the director view hidden until you need it.</p>
                 ${renderMetaBadges([
                   item.stage || 'seating',
                   `${Number(item.entrantCount || 0)} entrants`,
                   Number(item.prizePoolOil || 0) > 0 ? `${Number(item.prizePoolOil || 0)} OIL pool` : '',
-                  item.lateRegistrationOpen ? 'late reg open' : 'late reg closed',
                 ].filter(Boolean))}
               </div>
-              <div class="pokerLinks">
+              <div class="pokerCompactEntryAction pokerLinks">
                 <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.currentUserTableId || item.activeTableId || '')}`))}">${item.currentUserTableId ? 'Return To Series Table' : 'Open Series Table'}</a>
               </div>
+            </div>
+            <div class="pokerCompactFacts">
+              <span class="pokerCompactFactItem">${Number(item.tableCount || 0)} table${Number(item.tableCount || 0) === 1 ? '' : 's'}</span>
+              <span class="pokerCompactFactItem">${item.lateRegistrationOpen ? 'late reg open' : 'late reg closed'}</span>
+              ${Number(item.paidPlaces || 0) > 0 ? `<span class="pokerCompactFactItem">${Number(item.paidPlaces || 0)} paid</span>` : ''}
             </div>
             ${renderAdvancedPanel('Open series detail', 'Payout ladder, table-break plan, and public timeline.', `
               ${renderFactStrip([
@@ -2152,30 +2219,37 @@
             `)}
           </div>
           `).join('')}
+          </div>
         `, { plane: 'supporting' })
         : '',
       items.length
         ? sectionCard('live-tables', `
+          <h2>Live Tables</h2>
+          <p>See the room fast. Extra table detail stays behind an explicit drawer.</p>
+          <div class="pokerCompactList">
           ${items.map((item) => `
-          <div class="pokerStack">
-            <div class="pokerSplit">
+          <div class="pokerCompactEntry" data-poker-compact-kind="live-table">
+            <div class="pokerCompactEntryPrimary">
               <div>
-                <h2>${escapeHtml(item.title)}</h2>
-                <p>${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
+                <h3>${escapeHtml(item.title)}</h3>
+                <p class="pokerCompactEntrySummary">${escapeHtml(item?.summary?.headline || 'Human + agent co-op on a shared live table.')}</p>
                 ${renderMetaBadges([
                   item.tableType,
-                  item.accessMode === 'invite_only' ? 'invite-only' : '',
                   `${Number(item.smallBlindOil || 0)} / ${Number(item.bigBlindOil || 0)}`,
                   `${Number(item?.summary?.occupancy || 0)}/${Number(item.maxSeats || 6)} seated`,
-                  item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
-                    ? `${Number(item?.summary?.seatsUntilStart || 0)} to start`
-                    : '',
                   item?.summary?.liveHand ? `hand ${Number(item?.summary?.handNumber || 0)}` : 'waiting',
                 ].filter(Boolean))}
               </div>
-              <div class="pokerLinks">
+              <div class="pokerCompactEntryAction pokerLinks">
                 <a href="${escapeHtml(buildPokerHref(`/poker/play/tables/${encodeURIComponent(item.tableId)}`))}">${item?.currentUser?.seated ? 'Return To Seat' : 'Open Table'}</a>
               </div>
+            </div>
+            <div class="pokerCompactFacts">
+              <span class="pokerCompactFactItem">${Number(item.buyInOil || 0)} OIL buy-in</span>
+              ${item.accessMode === 'invite_only' ? '<span class="pokerCompactFactItem">invite-only</span>' : ''}
+              ${item?.tableType === 'tournament' && !item?.summary?.liveHand && Number(item?.summary?.seatsUntilStart || 0) > 0
+                ? `<span class="pokerCompactFactItem">${Number(item?.summary?.seatsUntilStart || 0)} to start</span>`
+                : ''}
             </div>
             ${renderAdvancedPanel('Open table detail', 'History, buy-in detail, and extra live state.', `
               ${renderFactStrip([
@@ -2200,6 +2274,7 @@
             `)}
           </div>
           `).join('')}
+          </div>
         `, { plane: 'supporting' })
         : renderStateCard('live-tables', 'empty', 'No live tables yet.', 'Use Quick Seat to create the first matching cash or tournament table.', { plane: 'supporting' }),
     ]);
@@ -3197,6 +3272,7 @@
     const smallBlindEl = document.getElementById('pokerPlayMatchmakeSmallBlind');
     const bigBlindEl = document.getElementById('pokerPlayMatchmakeBigBlind');
     const buyInEl = document.getElementById('pokerPlayMatchmakeBuyIn');
+    const simpleSummaryEl = document.getElementById('pokerPlayMatchmakeSimpleSummary');
     const applyDefaults = () => {
       const tableType = String(typeEl?.value || 'cash');
       if (!smallBlindEl || !bigBlindEl || !buyInEl) return;
@@ -3221,8 +3297,9 @@
       startTargetEl.value = String(currentValue);
     };
     const syncTournamentOptions = () => {
-      const tournament = String(typeEl?.value || 'cash') === 'tournament';
+      const tableType = String(typeEl?.value || 'cash');
       const fillPolicy = String(fillPolicyEl?.value || 'open_match');
+      const tournament = String(typeEl?.value || 'cash') === 'tournament';
       const targetStart = fillPolicy === 'fill_to_target';
       if (fillPolicyRow) fillPolicyRow.hidden = !tournament;
       if (maxSeatsRow) maxSeatsRow.hidden = !tournament;
@@ -3239,6 +3316,17 @@
         if (bountyEl) bountyEl.value = 'none';
       }
       syncStartTargetOptions();
+      if (simpleSummaryEl) {
+        simpleSummaryEl.textContent = buildQuickSeatSummary({
+          tableType,
+          accessMode: String(accessEl?.value || 'public'),
+          smallBlindOil: Number(smallBlindEl?.value || 0),
+          bigBlindOil: Number(bigBlindEl?.value || 0),
+          buyInOil: Number(buyInEl?.value || 0),
+          fillPolicy,
+          startTargetSeats: Number(startTargetEl?.value || 0),
+        });
+      }
     };
     if (typeEl) {
       typeEl.addEventListener('change', () => {
@@ -3257,6 +3345,15 @@
         syncTournamentOptions();
       });
     }
+    [accessEl, smallBlindEl, bigBlindEl, buyInEl, startTargetEl, fillPolicyEl].forEach((element) => {
+      if (!element) return;
+      element.addEventListener('change', () => {
+        syncTournamentOptions();
+      });
+      element.addEventListener('input', () => {
+        syncTournamentOptions();
+      });
+    });
     syncTournamentOptions();
     form.addEventListener('submit', async (event) => {
       event.preventDefault();

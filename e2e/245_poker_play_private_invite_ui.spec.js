@@ -63,6 +63,7 @@ test('M23.16 UI: creators can make an invite-only table and invited wallets can 
 
   await pageA.goto('/poker/play?embed=1');
   await expect(pageA.getByRole('heading', { name: 'Live Poker Lobby' })).toBeVisible();
+  await pageA.locator('[data-poker-section="quick-seat"] details summary').click();
   await pageA.locator('#pokerPlayMatchmakeAccess').selectOption('invite_only');
   await pageA.locator('#pokerPlayMatchmakeTitle').fill('Invite UI Table');
   await pageA.locator('#pokerPlayMatchmakeDisplayName').fill('Invite UI Alpha');

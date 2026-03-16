@@ -40,6 +40,7 @@ test('M23.29: quick-seat lobby can create a PKO tournament and the table UI rend
 
   await page.goto('/poker/play?embed=1');
   await page.locator('#pokerPlayMatchmakeType').selectOption('tournament');
+  await page.locator('[data-poker-section="quick-seat"] details summary').click();
   await expect(page.locator('#pokerPlayMatchmakeBountyRow')).toBeVisible();
   await page.locator('#pokerPlayMatchmakeBountyModel').selectOption('pko_50');
   await page.locator('#pokerPlayMatchmakeBuyIn').fill('1000');
