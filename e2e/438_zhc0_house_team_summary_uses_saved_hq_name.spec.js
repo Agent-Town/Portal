@@ -21,48 +21,27 @@ async function bootstrapFoundersReady(request) {
   expect(response.ok()).toBeTruthy();
 }
 
-async function forceMissionEmptyState(page) {
-  await page.route('**/api/platform/experiences*', async (route) => {
-    const response = await route.fetch();
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch {
-      payload = null;
-    }
-    const nextPayload = payload && typeof payload === 'object' ? payload : {};
-    const nextData = nextPayload?.data && typeof nextPayload.data === 'object'
-      ? { ...nextPayload.data }
-      : {};
-    nextData.items = [];
-    nextData.emptyStateText = 'No House experiences available yet.';
-    await route.fulfill({
-      status: response.status(),
-      headers: {
-        ...response.headers(),
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...nextPayload,
-        data: nextData,
-      }),
-    });
-  });
+async function readActiveTeamIdFromSummary(summary) {
+  const text = String((await summary.textContent()) || '').trim();
+  expect(text.startsWith('Active team: ')).toBe(true);
+  const activeTeamId = text.slice('Active team: '.length).trim();
+  expect(activeTeamId.length).toBeGreaterThan(0);
+  return activeTeamId;
 }
 
 test.beforeEach(async ({ request }) => {
   await resetPortalWebState(request);
 });
 
-test('M44.10 Mission empty-state uses the saved HQ name after save and reload', async ({ page, request }) => {
+test('M44.16 saved HQ name brands the House systems team summary after save and reload', async ({ page, request }) => {
   await bootstrapFoundersReady(page.request);
   const seededHouse = await seedRecoverableTokenHouse(request);
-  await forceMissionEmptyState(page);
 
   await page.goto('/app?district=house&liteDriver=phase1');
   await waitForLiteApi(page);
   const attached = await attachHouseToPageSession(page, {
     houseId: seededHouse.houseId,
+    teamId: 'team_main',
   });
   expect(attached.status).toBe(200);
 
@@ -73,23 +52,23 @@ test('M44.10 Mission empty-state uses the saved HQ name after save and reload', 
   const input = page.getByTestId('house-hq-name-input');
   const preview = page.getByTestId('house-hq-name-preview');
   const primary = page.getByTestId('house-hq-start-mission');
-  const missionEmpty = page.getByTestId('house-experiences-empty');
+  const summary = page.getByTestId('house-team-summary');
   const customName = 'Shared Orbit';
 
   await expect(root).toBeVisible();
+  const activeTeamId = await readActiveTeamIdFromSummary(summary);
+  await expect(summary).not.toContainText('HQ');
+
   await input.fill(customName);
   await primary.click();
 
   await expect(page.getByTestId('house-experiences-panel')).toBeVisible();
-  await expect(missionEmpty).toHaveText(`No experiences routed to ${customName} HQ yet.`);
+  await expect(summary).toHaveText(`${customName} HQ · active team ${activeTeamId}`);
 
   await page.reload();
   await waitForLiteApi(page);
 
   await expect(root).toBeVisible();
   await expect(preview).toHaveText(customName);
-  await primary.click();
-
-  await expect(page.getByTestId('house-experiences-panel')).toBeVisible();
-  await expect(missionEmpty).toHaveText(`No experiences routed to ${customName} HQ yet.`);
+  await expect(summary).toHaveText(`${customName} HQ · active team ${activeTeamId}`);
 });

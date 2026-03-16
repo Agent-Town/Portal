@@ -2158,6 +2158,26 @@ function renderHouseHqEntrySurface() {
   }
 }
 
+function getHouseTeamSummaryText({
+  houseId = houseSurfaceState.context.houseId,
+  activeTeamId = houseSurfaceState.context.activeTeamId,
+} = {}) {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (!normalizedHouseId) {
+    return 'Attach a house to inspect team-specific archive and trainer records.';
+  }
+  const normalizedTeamId = String(activeTeamId || '').trim();
+  const savedName = getSavedHouseHqName(normalizedHouseId);
+  if (!normalizedTeamId) {
+    return savedName
+      ? `${savedName} HQ · no seeded team context yet.`
+      : 'No seeded team context is available for this house yet.';
+  }
+  return savedName
+    ? `${savedName} HQ · active team ${normalizedTeamId}`
+    : `Active team: ${normalizedTeamId}`;
+}
+
 function renderHouseSurfaceContext() {
   const selectNode = el('houseTeamSelect');
   const summaryNode = el('houseTeamSummary');
@@ -2184,15 +2204,10 @@ function renderHouseSurfaceContext() {
   }
   renderHouseHqEntrySurface();
   if (!summaryNode) return;
-  if (!houseSurfaceState.context.houseId) {
-    summaryNode.textContent = 'Attach a house to inspect team-specific archive and trainer records.';
-    return;
-  }
-  if (!activeTeamId) {
-    summaryNode.textContent = 'No seeded team context is available for this house yet.';
-    return;
-  }
-  summaryNode.textContent = `Active team: ${activeTeamId}`;
+  summaryNode.textContent = getHouseTeamSummaryText({
+    houseId: houseSurfaceState.context.houseId,
+    activeTeamId,
+  });
 }
 
 async function loadHousePlatformContext({ requireHouse = false } = {}) {
