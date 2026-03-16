@@ -188,6 +188,12 @@ function el(id) {
   return document.getElementById(id);
 }
 
+function setShareStatusVisible(visible) {
+  const node = el('shareStatus');
+  if (!node) return;
+  node.classList.toggle('is-hidden', !visible);
+}
+
 function setHouseNavLink(houseId) {
   const link = el('houseNavLink');
   if (!link) return;
@@ -903,7 +909,7 @@ async function init() {
 
   el('shareBtn').addEventListener('click', async () => {
     el('err').textContent = '';
-    el('shareStatus').style.display = 'inline-flex';
+    setShareStatusVisible(true);
     try {
       const { address } = await connectWalletOrThrow();
       if (tokenMode && tokenAddress && address !== tokenAddress) {
@@ -1024,7 +1030,7 @@ async function init() {
         : e.message === 'WAITING_AGENT_REVEAL'
           ? 'Waiting for OpenClaw Lite runtime to finish the house ceremony.'
           : e.message;
-      el('shareStatus').style.display = 'none';
+      setShareStatusVisible(false);
     }
   });
 

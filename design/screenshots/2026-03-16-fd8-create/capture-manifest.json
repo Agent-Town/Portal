@@ -1,0 +1,20 @@
+{
+  "capturedAt": "2026-03-16T09:20:20.865Z",
+  "baseUrl": "http://127.0.0.1:4293",
+  "outputDir": "/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd8-create",
+  "scenario": "create",
+  "shots": [
+    {
+      "name": "01_create_mobile.png",
+      "route": "/create",
+      "viewport": "390x844",
+      "state": "create-mobile"
+    },
+    {
+      "name": "02_create_desktop.png",
+      "route": "/create",
+      "viewport": "1440x1200",
+      "state": "create-desktop"
+    }
+  ]
+}

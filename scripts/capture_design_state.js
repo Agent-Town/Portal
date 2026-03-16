@@ -5,6 +5,8 @@ const path = require('path');
 const { chromium, request: playwrightRequest } = require('playwright');
 
 const { resetPortalWebState } = require('../e2e/helpers/portal_web');
+const { installMockSolanaWallet } = require('../e2e/helpers/phase1');
+const { reachCreateViaLite } = require('../e2e/helpers/phase2');
 const { seedRecoverableTokenHouse } = require('../e2e/helpers/phase1');
 const { waitForLiteApi } = require('../e2e/helpers/trainer');
 const { attachHouseToPageSession } = require('../e2e/helpers/unified_platform');
@@ -183,6 +185,40 @@ async function captureRegistryWorkersScenario({ browser, metadata }) {
   await context.close();
 }
 
+async function captureCreateScenario({ browser, api, metadata }) {
+  const context = await browser.newContext({
+    baseURL: baseUrl,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await context.newPage();
+
+  await installMockSolanaWallet(page);
+  await reachCreateViaLite(page);
+  await page.getByTestId('create-panel').waitFor({ state: 'visible', timeout: 10000 });
+  await captureViewportShot(page, '01_create_mobile.png');
+  metadata.shots.push({
+    name: '01_create_mobile.png',
+    route: '/create',
+    viewport: '390x844',
+    state: 'create-mobile',
+  });
+
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.waitForTimeout(250);
+  await captureViewportShot(page, '02_create_desktop.png');
+  metadata.shots.push({
+    name: '02_create_desktop.png',
+    route: '/create',
+    viewport: '1440x1200',
+    state: 'create-desktop',
+  });
+
+  await context.close();
+}
+
 async function main() {
   ensureDir(outputDir);
   const metadata = {
@@ -207,6 +243,8 @@ async function main() {
     await captureLeaderboardEmptyScenario({ browser, metadata });
   } else if (scenario === 'registry-workers') {
     await captureRegistryWorkersScenario({ browser, metadata });
+  } else if (scenario === 'create') {
+    await captureCreateScenario({ browser, api, metadata });
   } else {
     await captureHouseOfficeScenario({ browser, api, metadata });
   }

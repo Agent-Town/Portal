@@ -24,29 +24,41 @@
         <a class="btn" href="/">Home</a>
         <a class="btn is-hidden" id="houseNavLink" href="/house">House</a>
         <a class="btn" href="/leaderboard">Leaderboard</a>
-        <a class="btn" id="inboxLink" href="#" style="display:none;">Inbox</a>
+        <a class="btn is-hidden" id="inboxLink" href="#">Inbox</a>
         <a class="btn coin" href="https://dexscreener.com/solana/3mnazsjrmgiz7jvvwe6icw4uscg4zjfefw2gmaexzxvi" target="_blank" rel="noreferrer" aria-label="Coin">$</a>
       </div>
     </div>
 
-    <div class="panel">
-      <h1 style="margin:0 0 8px">Create entropy for house key.</h1>
-      <p class="small" style="margin-top:0" id="createIntro">
-        Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
-      </p>
-
-      <div class="canvasWrap">
-        <div class="palette" id="palette" data-testid="palette"></div>
-        <div class="canvasGrid" id="canvas" data-testid="canvas"></div>
-        <div class="kv">
-          <button class="btn primary" id="shareBtn" data-testid="share-btn" disabled>Generate house key</button>
-          <span class="pill" id="shareStatus" style="display:none">Working…</span>
-        </div>
-        <div class="small" style="margin-top:6px; color: var(--muted)" id="createNextNote">
-          Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.
+    <div class="panel createPanel" data-testid="create-panel">
+      <div class="createHero">
+        <div class="createHeroLead">
+          <div class="small createEyebrow">House Key</div>
+          <h1 class="createTitle">Create entropy for house key.</h1>
+          <p class="small createIntro" id="createIntro">
+            Human: click pixels. Agent: paint via the skill API. When it feels done, lock it in.
+          </p>
         </div>
       </div>
-      <div class="small" id="err" style="color: var(--bad)"></div>
+
+      <div class="createCanvasShell">
+        <section class="createPaletteCard">
+          <div class="small createSectionEyebrow">Palette</div>
+          <div class="palette" id="palette" data-testid="palette"></div>
+        </section>
+
+        <section class="createBoardCard">
+          <div class="small createSectionEyebrow">Canvas</div>
+          <div class="canvasGrid" id="canvas" data-testid="canvas"></div>
+          <div class="kv createActionRow" data-testid="create-action-row">
+            <button class="btn primary" id="shareBtn" data-testid="share-btn" disabled>Generate house key</button>
+            <span class="pill is-hidden" id="shareStatus">Working…</span>
+          </div>
+          <p class="small createNextNote" id="createNextNote">
+            Next: unlock the house with a wallet signature. Then you and the agent can read/write encrypted entries.
+          </p>
+          <p class="small createError" id="err" data-testid="create-error"></p>
+        </section>
+      </div>
     </div>
 
     <footer>

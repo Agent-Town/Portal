@@ -103,3 +103,19 @@ test('registry markup uses shared classes instead of a page-local visual system'
   expect(registryScript).not.toContain('.style.color');
   expect(registryScript).not.toContain('.style.marginTop');
 });
+
+test('create markup uses structured hero and canvas classes instead of inline layout styling', async () => {
+  const createPath = path.join(process.cwd(), 'public/create.html');
+  const createHtml = fs.readFileSync(createPath, 'utf8');
+  const createScriptPath = path.join(process.cwd(), 'public/create.js');
+  const createScript = fs.readFileSync(createScriptPath, 'utf8');
+
+  expect(createHtml).toContain('data-testid="create-panel"');
+  expect(createHtml).toContain('class="createHero"');
+  expect(createHtml).toContain('class="createCanvasShell"');
+  expect(createHtml).toContain('class="createPaletteCard"');
+  expect(createHtml).toContain('class="createBoardCard"');
+  expect(createHtml).toContain('data-testid="create-action-row"');
+  expect(createHtml).not.toContain('style=');
+  expect(createScript).not.toContain("el('shareStatus').style.display");
+});
