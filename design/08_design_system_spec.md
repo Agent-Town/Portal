@@ -25,6 +25,8 @@ The system keeps the Agent Town world. It removes unnecessary visual noise.
 - Dense runtime, provider, provenance, and operational detail should stay in structured advanced surfaces rather than the first viewport
 - The assistant should be able to help users reach deeper detail without the visible UI becoming a dashboard
 - Designers should prefer progressive disclosure over persistent clutter
+- Designers should not solve clutter by flattening everything into text blocks; summary-first surfaces still need visual anchors
+- Favor cards, maps, scene framing, grouped actions, icon-supported labels, and progress signals before adding explanatory copy
 
 ## 1.2 No-Drift Rule
 
@@ -180,6 +182,8 @@ Formal companion:
 - Primary content blocks should rarely exceed `960px` unless the content is inherently data-dense
 - First viewport must expose the primary action without requiring interpretation
 - Critical labels and actions must survive at least `35%` expansion for localization
+- Core modal surfaces should present one readable scene, not a stacked document of labels and paragraphs
+- If a surface feels like a text desert, add visual structure before adding more words
 
 ### Mobile
 
@@ -203,6 +207,7 @@ Formal companion:
 - Textured imagery must not be the primary source of contrast
 - Wood/parchment motifs are supporting materials, not default backgrounds for every nested container
 - No essential instruction may be baked into imagery because the product must remain localizable
+- Core operational surfaces should retain at least one non-text orientation anchor such as a map, grouped summary card, action cluster, illustrated state marker, or icon-guided section lead
 
 ## 10. Inline Styling Rule
 
@@ -218,4 +223,10 @@ Exceptions must be justified in the build spec and kept temporary.
 - First-view user-facing content must be task-first, not AI-first
 - Terms like `provider`, `model`, `LLM`, and `OAuth` belong in advanced or clearly secondary contexts unless functionally required
 - Primary controls should use short, speakable labels such as `Open House`, `Send`, `Connect Brain`, `Open Office`
+
+## 12. Modal-First Shell Rule
+
+- Core agent work surfaces must be designed for the modal-on-town-shell context first
+- Future design work must not assume a page-first flow for the main user journey
+- Separate pages may exist technically, but the design source of truth is the modal-first in-shell experience
 - Status copy should be short enough to understand when read aloud

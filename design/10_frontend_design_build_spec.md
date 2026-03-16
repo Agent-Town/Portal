@@ -29,9 +29,11 @@ Cross-cutting rules:
 - redesigned labels and controls must survive Chinese/CJK rendering and localization expansion
 - primary controls should use short speakable labels suitable for future voice workflows
 - default surfaces should show summary and next action first, while dense detail remains available through advanced or assistant-guided access
+- default surfaces must not become text deserts; use visual anchors before adding explanatory prose
 - do not promote raw runtime, provider, or provenance detail into the first viewport unless the task requires immediate action on it
 - when simplifying a surface, reduce visible volume without creating semantic drift from the richer detailed view or assistant-readable structured data
 - if a phase changes summary/detail/assistant logic or modal continuity, update the relevant model under [design/formal/](/Users/robin/.codex/worktrees/3e47/Portal/design/formal) as part of the same phase
+- core experience surfaces must be implemented for the modal-on-town-shell context, not a separate page-first flow
 
 ## 2. Phase A: Token And Component Base
 
@@ -338,6 +340,22 @@ Before the final phase is considered complete, verify:
 - house console and house office with translated/expanded labels
 - dock controls remain short and pronounceable
 - no essential first-view screen depends on AI/provider jargon
+
+## 16. Visual Anchor Validation
+
+Before a design phase is considered truly complete, verify:
+
+- the first viewport contains at least one strong non-text orientation anchor on core surfaces
+- summary cards, maps, action clusters, chips, progress markers, or icon-guided headings carry part of the comprehension load
+- users are not forced to read multiple stacked paragraphs or label rows just to understand what screen they are on
+
+## 17. Modal-Only Validation
+
+Before a design phase is considered complete, verify:
+
+- the improved surface still works inside the town-shell modal context
+- the design does not depend on standalone-page spacing, navigation, or route assumptions
+- no change weakens modal-first worker continuity
 
 ## 14. Documentation And Verification
 

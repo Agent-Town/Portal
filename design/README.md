@@ -38,6 +38,12 @@ That means:
 - users should be able to learn depth by asking the assistant, not by manually parsing cluttered panels
 - design agents should simplify the visible UI before removing access to underlying detail
 
+That does not justify replacing visual structure with walls of copy.
+
+- the default UI must avoid "text desert" layouts
+- summary surfaces should use visual anchors such as maps, cards, chips, progress markers, icon-supported labels, and grouped actions before adding more prose
+- text should explain, not carry the whole interface alone
+
 ## No-Drift Principle
 
 Borrow the useful architectural idea from `tla-precheck`: one source of truth, no drift.
@@ -51,6 +57,15 @@ For design, that means:
 must describe the same underlying product truth.
 
 Future design agents should not let those layers diverge into three separate stories.
+
+## Modal Continuity Rule
+
+Core user work must remain inside the Agent Town shell.
+
+- primary experiences should be designed as modal or in-shell surfaces on top of the town app
+- future design work must not depend on sending the user to a separate page-first flow for core agent interaction
+- if a route exists for technical or legacy reasons, the design target is still the modal-first shell experience
+- preserving worker continuity is more important than page-level visual freedom
 
 ## Read Order
 
@@ -108,7 +123,7 @@ Implemented proof currently includes:
 
 Next unlocked design packet:
 
-- `FD11`: international, Chinese, and voice-ready validation
+- `FD11`: visual anchor and scene-composition pass
 
 ## Design Acceptance Block
 

@@ -10,6 +10,7 @@ Agent Town already has a memorable world and a distinctive atmosphere. The desig
 
 The target product should feel more like an inviting game world and less like an insider console, while remaining timeless, operationally clear, and usable across languages and provider choices.
 The visible UI should show the minimum needed to act. Deeper operational detail should remain available through advanced views and assistant-guided explanation, not pushed into every first-view screen.
+The visible UI should not collapse into a text desert. It should use visual anchors, hierarchy, and game-like structure so users can orient instantly without reading everything.
 
 ## Phase 1: Critical Structural Fixes
 
@@ -110,6 +111,25 @@ Why this matters:
 
 - Mobile is the hardest truth test for hierarchy
 - It is also the most unforgiving environment for translated and spoken-first interaction
+
+### 6. Text-desert regression
+
+Current problem:
+
+- several redesigned surfaces now rely too heavily on stacked headings, labels, and status copy
+- the simplification work reduced noise, but in places it also removed too many visual anchors
+- users are still asked to scan too much text to understand the scene
+
+Target state:
+
+- key surfaces use visual anchors before explanation
+- summary cards, office maps, action clusters, progress markers, and icon-supported section labels do more of the orientation work
+- text becomes shorter and more supportive because the layout already communicates structure
+
+Why this matters:
+
+- a simple UI should feel clear, not empty
+- game-like products need readable scene composition, not just reduced copy volume
 
 ## Phase 2: Refinement And System Unification
 
@@ -249,6 +269,8 @@ These decisions are already made for future agents:
 - Chinese and international audiences must be first-class layout and typography targets
 - Future voice control should be anticipated in labels, structure, and state feedback
 - Default UI should be summary-first, while structured detail remains available for assistant-guided exploration and advanced views
+- summary-first does not mean text-only; visual anchors are required on core surfaces
+- core agent experiences must remain modal-first on top of the town shell to preserve worker continuity
 
 ## Explicit Rejections
 

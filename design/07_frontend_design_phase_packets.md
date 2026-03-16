@@ -343,7 +343,40 @@ Implementation proof:
 - acceptance contract: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
 - screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
-## P12. Global Audience Packet
+## P12. Visual Anchor Packet
+
+Objective:
+
+- remove text-desert regressions without reintroducing clutter
+
+Files:
+
+- [public/views/house.html](/Users/robin/.codex/worktrees/3e47/Portal/public/views/house.html)
+- [public/index.html](/Users/robin/.codex/worktrees/3e47/Portal/public/index.html)
+- [public/styles.css](/Users/robin/.codex/worktrees/3e47/Portal/public/styles.css)
+- other touched modal-first core surfaces
+
+Focus:
+
+- visual anchors
+- scene composition
+- grouped summary cards
+- map and action-cluster prominence
+- icon-guided section leads
+
+Do not change:
+
+- feature behavior
+- modal-first continuity
+- worker/runtime logic
+
+Success checks:
+
+- core modal surfaces no longer rely on stacked text as the main comprehension layer
+- first viewport includes at least one strong non-text orientation anchor
+- improvements still fit the modal-on-town-shell context
+
+## P13. Global Audience Packet
 
 Objective:
 
@@ -368,6 +401,58 @@ Do not change:
 Success checks:
 
 - key screens tolerate Chinese or expanded labels without breakage
+
+## P14. Final Responsive And Accessibility Packet
+
+Objective:
+
+- validate final layout resilience and input clarity
+
+Files:
+
+- all touched design files
+
+Focus:
+
+- responsive cleanup
+- focus visibility
+- touch targets
+- contrast
+
+Do not change:
+
+- behavior
+- content model
+
+Success checks:
+
+- no horizontal overflow on target screens
+- focus and touch-target rules hold on redesigned surfaces
+
+## P15. Final Visual Smoke Packet
+
+Objective:
+
+- prove the full redesigned system works as one product
+
+Files:
+
+- all touched design files
+
+Focus:
+
+- coherence
+- final screenshots
+- final design acceptance sweep
+
+Do not change:
+
+- behavior
+- route model
+
+Success checks:
+
+- final visual smoke is coherent across start, town, house, office, registry, create, trainer, and dock
 - first-view critical screens avoid unexplained AI/provider jargon
 - core action labels are short and speakable
 

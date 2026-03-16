@@ -26,9 +26,10 @@ The design work should not be executed as one big redesign. It should be deliver
 2. fix the highest-friction hierarchy problems
 3. unify the remaining major surfaces
 4. keep default UI summary-first while preserving dense detail for assistant-guided exploration
-5. harden for international, Chinese, and non-technical comprehension
-6. polish motion, states, and accessibility
-7. prove coherence across the product
+5. avoid text-desert regressions by restoring visual anchors where simplification went too far
+6. harden for international, Chinese, and non-technical comprehension
+7. polish motion, states, and accessibility
+8. prove coherence across the product
 
 This order matters because the current design problems are mostly architectural, not cosmetic.
 
@@ -47,9 +48,10 @@ The backlog is organized as a numbered delivery sequence:
 - `FD8`: create surface alignment
 - `FD9`: trainer / brain / advanced surface cleanup
 - `FD10`: states and motion library
-- `FD11`: international, Chinese, and voice-ready validation
-- `FD12`: final responsive and accessibility pass
-- `FD13`: final visual smoke
+- `FD11`: visual anchor and scene-composition pass
+- `FD12`: international, Chinese, and voice-ready validation
+- `FD13`: final responsive and accessibility pass
+- `FD14`: final visual smoke
 
 ## 3. Workstreams
 
@@ -373,7 +375,37 @@ Implementation proof:
 - acceptance contract: [e2e/277_design_states_motion_consistency_contract.spec.js](/Users/robin/.codex/worktrees/3e47/Portal/e2e/277_design_states_motion_consistency_contract.spec.js)
 - screenshot pack: [design/screenshots/2026-03-16-fd10-states-motion/README.md](/Users/robin/.codex/worktrees/3e47/Portal/design/screenshots/2026-03-16-fd10-states-motion/README.md)
 
-### FD11. International, Chinese, And Voice-Ready Validation
+### FD11. Visual Anchor And Scene-Composition Pass
+
+Goal:
+
+- remove text-desert regressions while keeping the UI simple
+
+Primary files:
+
+- [public/views/house.html](/Users/robin/.codex/worktrees/3e47/Portal/public/views/house.html)
+- [public/index.html](/Users/robin/.codex/worktrees/3e47/Portal/public/index.html)
+- [public/styles.css](/Users/robin/.codex/worktrees/3e47/Portal/public/styles.css)
+- other touched core modal surfaces
+
+Tasks:
+
+- add stronger visual anchors to summary-first modal surfaces
+- use maps, grouped action clusters, chips, icon-supported headings, and compact scene framing instead of extra explanatory copy
+- keep advanced detail available without promoting it into the first viewport
+- validate all changes in the modal-on-town-shell context, not a standalone page-first composition
+
+Dependencies:
+
+- `FD0` through `FD10`
+
+Acceptance metrics:
+
+- core modal surfaces no longer read as text deserts
+- first viewport comprehension improves through layout and visual anchors, not extra prose
+- no design change depends on leaving the town-shell modal context
+
+### FD12. International, Chinese, And Voice-Ready Validation
 
 Goal:
 
@@ -400,7 +432,7 @@ Acceptance metrics:
 - first-view critical screens avoid unexplained AI/provider jargon
 - major controls use concise speakable labels
 
-### FD12. Final Responsive And Accessibility Pass
+### FD13. Final Responsive And Accessibility Pass
 
 Goal:
 
@@ -428,7 +460,7 @@ Acceptance metrics:
 - focus states visible and coherent
 - touch targets meet `44x44` in redesigned zones
 
-### FD13. Final Visual Smoke
+### FD14. Final Visual Smoke
 
 Goal:
 
@@ -471,6 +503,7 @@ The recommended sequence for actual work is:
 12. `FD11`
 13. `FD12`
 14. `FD13`
+15. `FD14`
 
 ## 5. Work Not To Mix In
 
