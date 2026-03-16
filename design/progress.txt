@@ -65,14 +65,24 @@ Completed:
   - Reading Table, local Library items, Public Stacks, Route Desk, Hidden Shelf, and Deliveries now read as one calmer family
   - benchmark-required novice headings remain intact while the new human-friendly cues appear as secondary labels
   - mobile Public Stack preview now auto-reveals the action dock when a card is opened
+- Phase D5 implemented:
+  - Town Hall now leads with a clearer identity-first structure, while avatar customization is visually secondary
+  - Town Hall processing now separates progress from next-step actions and reads as guided rather than clerical
+  - onboarding copy is shorter and easier to follow without AI setup knowledge
+  - the agent sidebar is smaller and quieter by default, with a reduced minimized footprint and calmer expanded chrome
+  - the agent sidebar still preserves the same chat, Brain, Worker Tools, Skill Context, Worker Traffic, and Session Context behavior
 - Verification completed for D4:
   - targeted House Library regressions passed
   - screenshot evidence captured and committed in `design/evidence/phase-d4/`
   - full `npm test` passed
+- Verification completed for D5:
+  - targeted Town Hall and agent-panel regressions passed
+  - screenshot evidence captured and committed in `design/evidence/phase-d5/`
+  - full `npm test` passed
 
 Not yet done:
-- D5 and D6 are not implemented
+- D6 is not implemented
 
 Recommended next step:
-- Implement Phase D5 after reviewing D4 screenshots
+- Implement Phase D6 after reviewing D5 screenshots
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

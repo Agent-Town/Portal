@@ -1,6 +1,6 @@
 # Phase D5 - Town Hall And Agent Sidebar TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 
@@ -69,3 +69,22 @@ This phase is complete only when:
 1. onboarding feels guided rather than procedural,
 2. the sidebar feels like support infrastructure rather than a competing product surface,
 3. no onboarding or debug behavior changed functionally.
+
+## 8. Implementation evidence
+
+Implemented in:
+
+1. `public/views/townhall.html`
+2. `public/index.html`
+3. `public/styles.css`
+4. `public/app.js`
+
+Evidence:
+
+1. `design/evidence/phase-d5/before/`
+2. `design/evidence/phase-d5/after/`
+
+Verification completed:
+
+1. targeted Town Hall and agent-panel regressions passed
+2. full `npm test` passed

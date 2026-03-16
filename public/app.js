@@ -8004,7 +8004,7 @@ async function mintAllTownhallIdentitiesAndRegister() {
     setTownhallRegisterFeedback('Saving Town Hall registration...');
     await submitTownhallRegistration();
     townhallMintLastErrorStep = null;
-    setTownhallRegisterFeedback('Registration complete. Open Brain on the right, connect it, then continue to the sigil test.');
+    setTownhallRegisterFeedback('Registration complete. Open Brain on the right, connect it, then continue.');
     openTownhallBrainSetupPanel();
   } catch (err) {
     townhallSigilUnlockedByContinue = false;
@@ -8104,7 +8104,7 @@ function bindTownhallRegistrationControls() {
     openBrainBtn.dataset.bound = '1';
     openBrainBtn.addEventListener('click', () => {
       openTownhallBrainSetupPanel();
-      setTownhallRegisterFeedback('Brain panel opened on the right. Connect it there, then continue here.');
+      setTownhallRegisterFeedback('Brain opened on the right. Connect it there, then continue here.');
     });
   }
 
@@ -8239,15 +8239,15 @@ function syncTownhallRegistrationUI(state) {
   const gateHint = el('townHallGateHint');
   if (gateHint) {
     if (onboardingStep === ONBOARDING_STEP_BRAIN && !isBrainConfigured) {
-      gateHint.textContent = 'Registration complete. Use Open Brain to configure the agent in the right-side panel, then continue here.';
+      gateHint.textContent = 'Registration complete. Use Open Brain on the right, then continue here.';
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN && isBrainConfigured && !isWorkerConnected) {
-      gateHint.textContent = 'Brain configured. Waiting for your worker agent to connect.';
+      gateHint.textContent = 'Brain is ready. Waiting for your agent to connect.';
     } else if (onboardingStep === ONBOARDING_STEP_BRAIN) {
-      gateHint.textContent = 'Registration complete. Open the sigil screen to continue.';
+      gateHint.textContent = 'Registration complete. Continue when you are ready for the sigil test.';
     } else if (registrationComplete) {
       gateHint.textContent = 'Registration complete.';
     } else if (required) {
-      gateHint.textContent = 'Complete Town Hall onboarding to continue.';
+      gateHint.textContent = 'Finish Town Hall to continue.';
     } else {
       gateHint.textContent = 'Town Hall onboarding is optional here.';
     }

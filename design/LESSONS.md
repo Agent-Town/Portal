@@ -201,3 +201,27 @@ Rule:
 1. if a mobile action produces a preview or action dock, reveal it automatically,
 2. do not rely on the user to scroll upward to find the next step,
 3. treat preview reveal as part of the visual interaction design, not as optional polish.
+
+## 22. Optional customization must follow the primary identity action
+
+Town Hall worked better once the flow made one thing obvious:
+
+1. name yourself,
+2. continue,
+3. customize only if you want to.
+
+Rule:
+
+1. optional personalization cannot sit in front of the identity decision,
+2. on mobile, the primary continue action should appear before secondary customization content whenever possible,
+3. support surfaces can still be attractive, but they must not become the first thing the user has to parse.
+
+## 23. Support infrastructure should feel docked, not attached
+
+The agent sidebar is important, but the app feels cleaner when the sidebar behaves like a calm support dock instead of a second main canvas.
+
+Rule:
+
+1. minimized support surfaces should take less width than expanded ones,
+2. support headers should be calmer and shorter than primary room headers,
+3. debug power can stay available without using the same visual intensity as the main task.

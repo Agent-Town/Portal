@@ -1268,18 +1268,101 @@ body.trainer-modal-open {
 
 .townhallStoryStep {
   display: grid;
-  gap: 10px;
+  gap: var(--space-4);
   width: min(680px, 100%);
 }
 
 .townhallStoryShell {
-  justify-content: center;
-  align-items: center;
-  width: fit-content;
+  display: grid;
+  gap: var(--space-5);
+  width: min(760px, 100%);
   max-width: 100%;
   margin: 0 auto;
+}
+
+.townhallGateHint {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(88, 59, 34, 0.14);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 251, 244, 0.76);
+  color: var(--muted);
+}
+
+.townhallStepHeader {
   display: grid;
-  gap: 12px;
+  gap: var(--space-2);
+  max-width: 34rem;
+}
+
+.townhallStepEyebrow {
+  color: var(--muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.townhallStepTitle {
+  margin: 0;
+  max-width: 15ch;
+}
+
+.townhallStepLead {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--muted);
+}
+
+.townhallStepFrame {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1.1fr) minmax(250px, 0.9fr);
+  align-items: start;
+}
+
+.townhallStepFrame--processing {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.townhallPrimaryBlock,
+.townhallSupportBlock,
+.townhallProgressCard {
+  display: grid;
+  gap: var(--space-3);
+  padding: clamp(16px, 2vw, 22px);
+  border: 1px solid rgba(88, 59, 34, 0.14);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(248, 239, 220, 0.94));
+  box-shadow: var(--shadow-sm);
+}
+
+.townhallPrimaryBlock--processing {
+  gap: var(--space-3);
+}
+
+.townhallSupportBlock {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.86), rgba(248, 239, 220, 0.8));
+}
+
+.townhallSupportIntro {
+  display: grid;
+  gap: 4px;
+}
+
+.townhallSupportTitle {
+  color: var(--text);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.townhallSupportHint {
+  margin: 0;
+  color: var(--muted);
+}
+
+.townhallAvatarLabel {
+  color: var(--muted);
 }
 
 .townhallStoryStep textarea,
@@ -1293,53 +1376,102 @@ body.trainer-modal-open {
 
 .townhallAvatarBlock {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 2px solid rgba(44, 69, 99, 0.22);
-  border-radius: 10px;
-  background: rgba(255, 248, 230, 0.72);
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 160px) minmax(0, 1fr);
+  align-items: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .townhallAvatarBlock .public-media-preview {
   margin-top: 0;
+  grid-column: 1;
+  grid-row: 2 / span 2;
 }
 
 .townhallAvatarBlock .public-media-preview img {
-  max-width: 220px;
-  max-height: 320px;
-  border: 2px solid var(--border);
-  border-radius: 10px;
+  width: 100%;
+  max-width: 180px;
+  max-height: 220px;
+  object-fit: cover;
+  border: 1px solid rgba(88, 59, 34, 0.2);
+  border-radius: var(--radius-lg);
   background: #fff8e8;
+}
+
+.townhallAvatarBlock .btn {
+  justify-self: start;
+  align-self: start;
+}
+
+.townhallAvatarBlock .small {
+  grid-column: 1 / -1;
 }
 
 .townhallCustomizeModal {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 2px solid rgba(44, 69, 99, 0.2);
-  border-radius: 10px;
-  background: rgba(255, 242, 214, 0.85);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed rgba(88, 59, 34, 0.24);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 248, 235, 0.88);
 }
 
 .townhallMintChecklist {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .townhallMintChecklistRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 10px;
-  border: 2px solid rgba(44, 69, 99, 0.22);
-  border-radius: 10px;
-  background: rgba(255, 248, 230, 0.72);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(88, 59, 34, 0.14);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 251, 244, 0.78);
 }
 
 .townhallMintChecklistRow .pill {
   min-width: 128px;
   text-align: center;
+}
+
+.townhallStepActions {
+  margin-top: 0;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.townhallStepActions .btn.primary {
+  min-width: 156px;
+}
+
+.townhallStepActions--processing .btn.primary {
+  min-width: 188px;
+}
+
+.townhallRegisterMeta {
+  min-height: 1.4em;
+  color: var(--muted);
+}
+
+.townhallRegisterError {
+  min-height: 1.4em;
+  color: var(--bad);
+}
+
+.townhallFlowNote {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(247, 239, 221, 0.94));
+}
+
+.townhallFlowPanel {
+  border-color: rgba(88, 59, 34, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(246, 237, 217, 0.94));
 }
 
 .card {
@@ -4234,8 +4366,6 @@ body.town-hub-page .districtModalBody #townhallRegisterPanel {
 }
 
 body.town-hub-page .districtModalBody .townhallStoryShell {
-  justify-content: stretch;
-  justify-items: start;
   width: 100%;
 }
 
@@ -4243,12 +4373,23 @@ body.town-hub-page .districtModalBody .townhallStoryStep {
   width: 100%;
 }
 
+body.town-hub-page .districtModalBody .townhallGateHint,
+body.town-hub-page .districtModalBody .townhallPrimaryBlock,
+body.town-hub-page .districtModalBody .townhallSupportBlock,
+body.town-hub-page .districtModalBody .townhallProgressCard,
 body.town-hub-page .districtModalBody .townhallAvatarBlock,
 body.town-hub-page .districtModalBody .townhallCustomizeModal,
 body.town-hub-page .districtModalBody .townhallMintChecklistRow {
   border-color: rgba(88, 59, 34, 0.16);
   background: rgba(255, 251, 242, 0.78);
   box-shadow: none;
+}
+
+body.town-hub-page .districtModalBody .townhallProgressCard,
+body.town-hub-page .districtModalBody .townhallPrimaryBlock,
+body.town-hub-page .districtModalBody .townhallSupportBlock {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(248, 239, 220, 0.92));
 }
 
 body.town-hub-page .districtModalBody #townBoardList:empty::before {
@@ -4288,6 +4429,46 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
   body.town-hub-page .districtModalBody .panel {
     padding: 14px;
     border-radius: 14px;
+  }
+
+  .townhallStoryShell {
+    gap: var(--space-4);
+  }
+
+  .townhallStepFrame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .townhallStepTitle {
+    max-width: 10ch;
+  }
+
+  .townhallAvatarBlock {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .townhallAvatarBlock .public-media-preview {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .townhallAvatarBlock .public-media-preview img {
+    max-width: 100%;
+    max-height: 180px;
+  }
+
+  .townhallAvatarBlock .btn,
+  .townhallStepActions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .townhallStepActions {
+    display: grid;
+  }
+
+  .townhallMintChecklistRow {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   body.town-hub-page .districtModalClose {
@@ -4417,18 +4598,17 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
   bottom: 0;
   z-index: 80;
   transform: translateX(-50%);
-  width: min(calc(860px * var(--agent-panel-zoom)), calc(100vw - 16px));
-  height: min(calc(34vh * var(--agent-panel-zoom)), calc(318px * var(--agent-panel-zoom)));
-  min-height: calc(200px * var(--agent-panel-zoom));
-  border: 3px solid #6d8eb0;
-  border-radius: 18px;
+  width: min(calc(760px * var(--agent-panel-zoom)), calc(100vw - 16px));
+  height: min(calc(31vh * var(--agent-panel-zoom)), calc(286px * var(--agent-panel-zoom)));
+  min-height: calc(184px * var(--agent-panel-zoom));
+  border: 1px solid rgba(74, 90, 108, 0.24);
+  border-radius: 16px;
   background:
-    linear-gradient(160deg, rgba(255, 248, 232, 0.96), rgba(240, 223, 192, 0.95)),
-    url("/images/parchment-bg.jpg") center/cover no-repeat;
+    linear-gradient(180deg, rgba(255, 249, 238, 0.96), rgba(243, 231, 206, 0.95));
   box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.28),
-    0 0 0 1px rgba(196, 136, 58, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+    0 10px 22px rgba(51, 38, 24, 0.22),
+    0 0 0 1px rgba(196, 136, 58, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
   overflow: hidden;
   position: fixed;
   transition: none;
@@ -4444,20 +4624,19 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar.agent-sidebar:not(.debug-collapsed) {
-  width: min(calc(1100px * var(--agent-panel-zoom)), calc(100vw - 16px));
-  height: min(calc(42vh * var(--agent-panel-zoom)), calc(404px * var(--agent-panel-zoom)));
-  min-height: calc(255px * var(--agent-panel-zoom));
+  width: min(calc(980px * var(--agent-panel-zoom)), calc(100vw - 16px));
+  height: min(calc(39vh * var(--agent-panel-zoom)), calc(380px * var(--agent-panel-zoom)));
+  min-height: calc(238px * var(--agent-panel-zoom));
 }
 
 #agentSidebar .sidebar-header {
   position: relative;
   z-index: 3;
-  padding: 5px 10px;
-  border-bottom: 3px solid var(--v0-wood);
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(88, 59, 34, 0.18);
   border-radius: 15px 15px 0 0;
   background:
-    linear-gradient(180deg, rgba(46, 27, 14, 0.4), rgba(46, 27, 14, 0.2)),
-    url("/images/wood-header.jpg") center/cover no-repeat;
+    linear-gradient(180deg, rgba(108, 79, 52, 0.94), rgba(91, 65, 42, 0.92));
 }
 
 #agentSidebar .sidebar-header::after {
@@ -4467,7 +4646,18 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 #agentSidebar .sidebar-header-main {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+#agentSidebar .agent-panel-heading {
+  display: grid;
+  gap: 1px;
+}
+
+#agentSidebar .agent-panel-kicker {
+  color: rgba(250, 236, 201, 0.82);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 #agentSidebar .sidebar-header-actions {
@@ -4477,21 +4667,21 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar .sidebar-header h3 {
-  color: var(--v0-sun);
-  font-family: "Rye", "Rock Salt", serif;
-  font-size: calc(18px * var(--agent-panel-text-scale));
-  letter-spacing: 0.35px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.56);
+  color: #fff0cb;
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--agent-panel-text-scale));
+  letter-spacing: 0.18px;
+  text-shadow: none;
 }
 
 #agentSidebar .status-indicator {
   font-size: calc(10px * var(--agent-panel-text-scale));
   font-weight: 700;
-  color: #4a3522;
-  border: 1px solid #8d7842;
+  color: #5b4931;
+  border: 1px solid rgba(255, 241, 213, 0.18);
   border-radius: 999px;
-  background: linear-gradient(180deg, #f0e5c0 0%, #e7d8aa 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  background: rgba(255, 243, 218, 0.94);
+  box-shadow: none;
   padding: calc(3px * var(--agent-panel-text-scale)) calc(8px * var(--agent-panel-text-scale));
 }
 
@@ -4500,7 +4690,7 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
   z-index: 2;
   padding: 0;
   gap: 7px;
-  background: linear-gradient(180deg, rgba(255, 248, 232, 0.92), rgba(240, 223, 192, 0.92));
+  background: linear-gradient(180deg, rgba(255, 250, 242, 0.96), rgba(243, 231, 206, 0.94));
 }
 
 #agentSidebar .sidebar-content::before,
@@ -4526,10 +4716,10 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
   padding: calc(3px * var(--agent-panel-text-scale)) calc(8px * var(--agent-panel-text-scale));
   min-height: calc(28px * var(--agent-panel-text-scale));
   line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 240, 212, 0.18);
   border-radius: 8px;
-  background: rgba(46, 27, 14, 0.46);
-  color: var(--v0-sun);
+  background: rgba(255, 248, 232, 0.1);
+  color: #fff0cb;
   box-shadow: none;
 }
 
@@ -4549,9 +4739,9 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar .agent-debug-toggle[aria-expanded="true"] {
-  background: rgba(160, 82, 45, 0.84);
-  border-color: #6c2f21;
-  color: var(--v0-cream);
+  background: rgba(255, 245, 220, 0.22);
+  border-color: rgba(255, 243, 213, 0.4);
+  color: #fff7ea;
 }
 
 #agentSidebar .agent-minimize-toggle {
@@ -4562,34 +4752,28 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 #agentSidebar .agent-minimize-toggle:hover,
 #agentSidebar .agent-panel-zoom-toggle:hover,
 #agentSidebar .agent-debug-toggle:hover {
-  background: rgba(160, 82, 45, 0.82);
-  border-color: var(--v0-rust);
-  color: var(--v0-cream);
+  background: rgba(255, 245, 220, 0.22);
+  border-color: rgba(255, 243, 213, 0.4);
+  color: #fff7ea;
 }
 
 #agentSidebar .agent-pane-right,
 #agentSidebar .chat-box.sidebar-chat,
 #agentSidebar .agent-approvals,
 #agentSidebar .agent-mind-panel {
-  border: 2px solid rgba(58, 40, 27, 0.82);
-  border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(255, 249, 235, 0.96), rgba(240, 223, 192, 0.95)),
-    url("/images/parchment-bg.jpg") center/cover no-repeat;
-  box-shadow:
-    0 2px 0 rgba(67, 45, 28, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(88, 59, 34, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96), rgba(246, 236, 216, 0.94));
+  box-shadow: none;
 }
 
 #agentSidebar .chat-box.sidebar-chat {
-  background:
-    linear-gradient(180deg, rgba(255, 248, 232, 0.96), rgba(240, 223, 192, 0.8)),
-    url("/images/parchment-bg.jpg") center/cover no-repeat;
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(247, 237, 216, 0.94));
 }
 
 #agentSidebar .chat-message {
-  border: 2px solid rgba(58, 40, 27, 0.24);
-  border-radius: 8px;
+  border: 1px solid rgba(88, 59, 34, 0.16);
+  border-radius: 10px;
   font-size: calc(12px * var(--agent-panel-text-scale));
   line-height: 1.45;
 }
@@ -4616,13 +4800,11 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar .btn:not(.agent-debug-toggle):not(.agent-panel-zoom-toggle):not(.agent-minimize-toggle) {
-  border: 2px solid #3a281b;
+  border: 1px solid rgba(88, 59, 34, 0.18);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(246, 232, 198, 0.98) 0%, rgba(233, 212, 165, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(250, 240, 216, 0.98) 0%, rgba(240, 225, 188, 0.98) 100%);
   color: #4a3522;
-  box-shadow:
-    0 2px 0 rgba(58, 40, 27, 0.28),
-    inset 0 1px 0 rgba(255, 240, 204, 0.42);
+  box-shadow: none;
   font-size: calc(12px * var(--agent-panel-text-scale));
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -4639,9 +4821,9 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 
 #agentSidebar .pixel-input,
 #agentSidebar #chatInput {
-  border: 2px solid var(--v0-brass);
-  border-radius: 8px;
-  background: var(--v0-cream);
+  border: 1px solid rgba(88, 59, 34, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 251, 244, 0.98);
   color: var(--v0-wood);
   padding: calc(8px * var(--agent-panel-text-scale)) calc(11px * var(--agent-panel-text-scale));
   font-size: calc(12px * var(--agent-panel-text-scale));
@@ -4663,8 +4845,8 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 
 #agentSidebar .agent-debug-tab.is-active,
 #agentSidebar .agent-traffic-filter.is-active {
-  background: linear-gradient(180deg, #f0e5c0 0%, #e7d8aa 100%);
-  border-color: #8d7842;
+  background: rgba(240, 229, 192, 0.9);
+  border-color: rgba(141, 120, 66, 0.58);
   color: #4a3522;
 }
 
@@ -4675,8 +4857,8 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar .agent-debug-content {
-  border-color: var(--v0-wood);
-  border-radius: 8px;
+  border-color: rgba(58, 40, 27, 0.92);
+  border-radius: 10px;
   background: #1f170f;
   color: #ccf0d4;
   font-size: calc(11px * var(--agent-panel-text-scale));
@@ -4695,7 +4877,8 @@ body.town-hub-page .districtModal[data-theme="atlas"].is-district .districtModal
 }
 
 #agentSidebar.agent-sidebar.minimized {
-  height: calc(50px * var(--agent-panel-zoom)) !important;
+  width: min(calc(520px * var(--agent-panel-zoom)), calc(100vw - 16px));
+  height: calc(46px * var(--agent-panel-zoom)) !important;
   min-height: 0 !important;
 }
 
