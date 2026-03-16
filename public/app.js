@@ -11,6 +11,7 @@ const ONBOARDING_STEP_BRAIN = 'brain';
 const ONBOARDING_STEP_SIGIL = 'sigil';
 const ONBOARDING_STEP_CEREMONY = 'ceremony';
 const ONBOARDING_STEP_DONE = 'done';
+const CEREMONY_COMPLETE_MESSAGE_TYPE = 'agent-town:ceremony-complete';
 
 function normalizeOnboardingStep(value) {
   switch (String(value || '').trim()) {
@@ -1184,7 +1185,7 @@ function syncAlignmentPassedProjection(state) {
   const status = el('townhallAlignmentStatus');
   if (status) {
     status.textContent = projection
-      ? 'You and the worker cleared the co-op gate. Create the founding crest before House opens.'
+      ? 'You two matched. Open the crest studio.'
       : '';
   }
 
@@ -1796,8 +1797,8 @@ function renderHouseHqEntrySurface() {
   const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
   if (statusNode) {
     statusNode.textContent = houseId
-      ? `House ${houseId}${activeTeamId ? ` · team ${activeTeamId}` : ''}. Start with the mission lane above; later-loop archive and trainer tools stay below.`
-      : 'Attach a house to bring the HQ surface online.';
+      ? `House ${houseId}${activeTeamId ? ` · team ${activeTeamId}` : ''}. Start with Mission.`
+      : 'Attach a house to bring HQ online.';
   }
 }
 
@@ -8382,7 +8383,7 @@ function bindTownhallRegistrationControls() {
       townhallSigilUnlockedByContinue = false;
       persistTownhallFounderDraft({ step: 'agent' });
       setTownhallStoryStep('processing');
-      setTownhallRegisterFeedback('Welcome to Agent Town, processing your registration.');
+      setTownhallRegisterFeedback('Registering the pair.');
       if (lastState) syncTownhallRegistrationUI(lastState);
       mintAllTownhallIdentitiesAndRegister();
     });
@@ -8395,7 +8396,7 @@ function bindTownhallRegistrationControls() {
       if (continueBtn.disabled) return;
       townhallAwaitingContinue = false;
       townhallSigilUnlockedByContinue = true;
-      setTownhallRegisterFeedback('Continue with the sigil test.');
+      setTownhallRegisterFeedback('Move to the sigil test.');
       if (lastState) syncTownhallRegistrationUI(lastState);
       const sigilFlow = el('townhallSigilFlow');
       if (sigilFlow && !sigilFlow.classList.contains('is-hidden')) {
@@ -10424,6 +10425,49 @@ function onDistrictModalLinkClick(ev) {
   }
 }
 
+function isDistrictFrameMessageSource(sourceWindow) {
+  if (!sourceWindow) return false;
+  const frame = document.querySelector('#districtModalBody iframe.districtFrame');
+  if (!frame) return false;
+  try {
+    return frame.contentWindow === sourceWindow;
+  } catch {
+    return false;
+  }
+}
+
+async function refreshTownHubStateFromServer() {
+  const state = await api('/api/state');
+  elements = Array.isArray(state?.elements) ? state.elements : elements;
+  updateUI(state);
+  return state;
+}
+
+function bindDistrictFrameMessageListener() {
+  if (window.__agentTownDistrictFrameMessageBound === true) return;
+  window.__agentTownDistrictFrameMessageBound = true;
+  window.addEventListener('message', async (event) => {
+    if (!isTownHub) return;
+    if (event.origin !== window.location.origin) return;
+    if (!isDistrictFrameMessageSource(event.source)) return;
+    const payload = event?.data;
+    if (!payload || typeof payload !== 'object') return;
+    if (String(payload.type || '').trim() !== CEREMONY_COMPLETE_MESSAGE_TYPE) return;
+
+    try {
+      await refreshTownHubStateFromServer();
+    } catch {
+      // best-effort state refresh; modal handoff still proceeds below
+    }
+
+    try {
+      await showDistrict('house');
+    } catch {
+      // ignore modal handoff failures and let polling catch up
+    }
+  });
+}
+
 function setDistrictModalMode(mode) {
   const modal = document.querySelector('#districtModalBackdrop .districtModal');
   if (!modal) return;
@@ -12434,8 +12478,8 @@ async function updateUI(state) {
   }
 
   safeSetText('matchDetail', matched
-    ? `Matched on “${state.match?.elementId || ''}”. Now press Open together.`
-    : 'Pick the same sigil to unlock.'
+    ? `Matched on “${state.match?.elementId || ''}”. Open together.`
+    : 'Match the same sigil.'
   );
 
   const openBtn = el('openBtn');
@@ -14641,8 +14685,8 @@ function updateMatchUi(state) {
   }
   if (matchDetail) {
     matchDetail.textContent = matched
-      ? `Matched on "${state.match.elementId}". Press Open.`
-      : 'Pick the same sigil to unlock.';
+      ? `Matched on "${state.match.elementId}". Open together.`
+      : 'Match the same sigil.';
   }
   if (openBtn) {
     openBtn.disabled = !matched || complete;
@@ -15421,6 +15465,7 @@ async function bootstrapInitialRouteState() {
   if (isTownHub) {
     bindDistrictMapInteractions();
     bindTrainerModalInteractions();
+    bindDistrictFrameMessageListener();
 
     const closeBtn = el('districtModalClose');
     if (closeBtn) {

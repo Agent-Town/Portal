@@ -6,6 +6,7 @@ const WALLET_IDENTITY_EVM_HEADER = 'x-wallet-evm-address';
 const WALLET_IDENTITY_SOLANA_HEADER = 'x-wallet-solana-address';
 const WALLET_RECOVERY_INTENT_HEADER = 'x-wallet-recovery-intent';
 const CREATE_EMBED_QUERY_KEY = 'embed';
+const CEREMONY_COMPLETE_MESSAGE_TYPE = 'agent-town:ceremony-complete';
 
 const isCeremonyEmbedMode = (() => {
   try {
@@ -207,6 +208,36 @@ function syncCreateProjection({ crestReady = false } = {}) {
   setCreateDataAttr(root, 'data-zhc-progress-total', '9');
   setCreateDataAttr(root, 'data-zhc-blocker-key', crestReady ? '' : 'needs_crest');
   setCreateDataAttr(root, 'data-zhc-next-unlock', 'house');
+}
+
+function notifyCeremonyComplete(houseId) {
+  if (!isCeremonyEmbedMode) return false;
+  const normalizedHouseId = String(houseId || '').trim();
+  try {
+    window.parent.postMessage({
+      type: CEREMONY_COMPLETE_MESSAGE_TYPE,
+      houseId: normalizedHouseId || null
+    }, window.location.origin);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function handoffToHouseModal(houseId) {
+  const normalizedHouseId = String(houseId || '').trim();
+  if (notifyCeremonyComplete(normalizedHouseId)) return;
+  if (isCeremonyEmbedMode) {
+    try {
+      window.top.location.assign('/app?district=house');
+      return;
+    } catch {
+      // fall through to the standalone route below
+    }
+  }
+  window.location.href = normalizedHouseId
+    ? `/house?house=${encodeURIComponent(normalizedHouseId)}`
+    : '/house';
 }
 
 function setHouseNavLink(houseId) {
@@ -1036,7 +1067,9 @@ async function init() {
         })
       });
 
-      window.location.href = `/house?house=${encodeURIComponent(housePubKey)}`;
+      const shareStatus = el('shareStatus');
+      if (shareStatus) shareStatus.textContent = 'Opening HQ…';
+      await handoffToHouseModal(housePubKey);
     } catch (e) {
       el('err').textContent = e.message === 'EMPTY_CANVAS'
         ? 'Add at least one pixel before locking in.'

@@ -1,7 +1,7 @@
 <div class="panel" id="townhallRegisterPanel">
   <div class="townhallStoryShell">
     <div class="small" id="townHallGateHint" style="margin-bottom:8px;">
-      Complete onboarding and configure your brain to unlock the sigil flow.
+      Set up the pair.
     </div>
 
     <div
@@ -15,8 +15,8 @@
       data-zhc-blocker-key="needs_founders"
       data-zhc-next-unlock="alignment"
     >
-      <h2 style="margin:0 0 6px">Hello hero! Welcome to Agent Town.</h2>
-      <p class="small" style="margin-top:0">How should we call you?</p>
+      <h2 style="margin:0 0 6px">Name the human</h2>
+      <p class="small" style="margin-top:0">What should your agent call you?</p>
 
       <label class="small" for="townhallHumanName">Your name</label>
       <input id="townhallHumanName" type="text" maxlength="48" placeholder="Promptmancer" />
@@ -53,8 +53,8 @@
       data-zhc-blocker-key="needs_founders"
       data-zhc-next-unlock="alignment"
     >
-      <h2 style="margin:0 0 6px">This is your agent - you rescued it!</h2>
-      <p class="small" style="margin-top:0">What should we call it?</p>
+      <h2 style="margin:0 0 6px">Name the agent</h2>
+      <p class="small" style="margin-top:0">What should you call your agent?</p>
 
       <label class="small" for="townhallAgentName">Agent name</label>
       <input id="townhallAgentName" type="text" maxlength="48" placeholder="OpenClaw" />
@@ -92,23 +92,23 @@
       data-zhc-blocker-key="needs_brain"
       data-zhc-next-unlock="alignment"
     >
-      <h2 style="margin:0 0 6px">Welcome to Agent Town, processing your registration.</h2>
+      <h2 style="margin:0 0 6px">Registering the pair</h2>
 
       <div class="townhallMintChecklist" id="townhallMintChecklist">
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Ethereum</span>
+          <span>Human · Ethereum</span>
           <span class="pill" id="townhallMintUserEvmStatus" data-testid="townhall-mint-user-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>User is registering on Solana</span>
+          <span>Human · Solana</span>
           <span class="pill" id="townhallMintUserSolanaStatus" data-testid="townhall-mint-user-solana-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Ethereum</span>
+          <span>Agent · Ethereum</span>
           <span class="pill" id="townhallMintAgentEvmStatus" data-testid="townhall-mint-agent-evm-status">Pending</span>
         </div>
         <div class="townhallMintChecklistRow">
-          <span>Agent is registering on Solana</span>
+          <span>Agent · Solana</span>
           <span class="pill" id="townhallMintAgentSolanaStatus" data-testid="townhall-mint-agent-solana-status">Pending</span>
         </div>
       </div>
@@ -129,9 +129,9 @@
   <div class="divider"></div>
 
   <div class="panel spaced" data-testid="townhall-single-path-note">
-    <h2 style="margin:0 0 6px">Single Worker Path</h2>
+    <h2 style="margin:0 0 6px">One live pair</h2>
     <p class="small" style="margin-top:0">
-      Every session now uses the in-browser worker agent. Keep this tab open and complete onboarding here.
+      You and the worker stay in this tab.
     </p>
   </div>
 
@@ -154,9 +154,9 @@
   </div>
 
   <div class="panel" id="step1Panel">
-    <h2 style="margin:0 0 6px">Step 1 — Worker Agent</h2>
+    <h2 style="margin:0 0 6px">Link the worker</h2>
     <p class="small" style="margin-top:0" id="step1Intro">
-      Configure Brain in the right panel, then keep the worker connected while you run the sigil test.
+      Open Brain. Connect the worker. Stay here.
     </p>
     <div class="kv">
       <button class="btn" id="connectWalletBtn" type="button">Connect wallet</button>
@@ -171,14 +171,14 @@
   <div class="divider" id="stepDivider"></div>
 
   <div class="panel" id="step2Panel">
-    <h2 style="margin:0 0 6px">Step 2 — Sigil Test</h2>
-    <p class="small" style="margin-top:0">You pick a sigil. The worker mirrors it. If both match, the lock opens.</p>
+    <h2 style="margin:0 0 6px">Match the sigil</h2>
+    <p class="small" style="margin-top:0">You pick. Agent mirrors. Match, then open.</p>
 
     <div class="grid6" id="sigilGrid" data-testid="sigil-grid"></div>
 
     <div style="margin-top:12px" class="lock" data-testid="match-status">
       <span class="state bad" id="matchState">LOCKED</span>
-      <span class="small" id="matchDetail">Pick the same sigil to unlock.</span>
+      <span class="small" id="matchDetail">Match the same sigil.</span>
     </div>
     <div class="kv" style="margin-top:10px">
       <button class="btn primary" id="openBtn" data-testid="open-btn">Open</button>
@@ -188,13 +188,13 @@
   </div>
 
   <div class="panel is-hidden" id="townhallAlignmentPanel" data-testid="zhc-alignment-handoff">
-    <h2 style="margin:0 0 6px">Alignment passed</h2>
+    <h2 style="margin:0 0 6px">Aligned</h2>
     <p class="small" id="townhallAlignmentStatus" style="margin-top:0">
-      You and the worker cleared the co-op gate. Create the founding crest before House opens.
+      You two matched. Open the crest studio.
     </p>
     <div class="kv" id="openReady" style="display:none">
       <span class="pill">Next unlock: House</span>
-      <a class="btn" id="townhallCreateCrestLink" data-testid="townhall-create-crest-link" href="/create">Create crest</a>
+      <a class="btn" id="townhallCreateCrestLink" data-testid="townhall-create-crest-link" href="/create">Open crest studio</a>
     </div>
   </div>
 </div>

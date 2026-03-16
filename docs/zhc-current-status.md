@@ -1,112 +1,132 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 logic/gating coverage still green but now has a route-architecture conflict, M44.5 HQ-first-entry has been re-homed into the `/app` modal flow and is green  
-Last updated: 2026-03-16 20:58 Asia/Bangkok  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 modal handoff corrected and green, M44.5 HQ-first-entry modal surface green  
+Last updated: 2026-03-16 21:31 Asia/Bangkok  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
-## Architecture correction (authoritative)
+## Active product direction (authoritative)
 
-Robin clarified a hard product constraint during this pass:
-- the whole founder journey must stay in modals on top of `/app`
-- do **not** continue building the journey as standalone pages
-- treat this as higher priority than prior route-based assumptions
+Robin clarified two constraints that now govern the founders-loop passes:
 
-What that means right now:
-- the earlier standalone-route M44.5 HQ-first-entry prototype on raw `/house` is **not** the target architecture and was not kept as the current slice
-- the useful M44.5 learnings were re-homed into the House modal surface under `/app`
-- the existing M44.4 `/create`-based presentation is now a known architecture conflict/debt; keep its gating learnings, but do **not** extend that standalone route as the long-term journey shape
+### 1) Architecture
+- the founder journey must stay in modals on top of `/app`
+- do **not** continue the primary journey as standalone pages
+- route-based pages can still exist as support surfaces, but the intended founder flow must hand back into the `/app` modal shell
+
+### 2) Interaction / UI tone
+- current UI is too text-heavy / explanatory
+- explanatory/tutorial prose should move into docs
+- in-product UI should be more functional, minimal, and timeless
+- keep one obvious primary action per state
+- the journey should feel explicitly like **the human and the agent succeeding together**
+- early shared wins matter; prefer concise co-authored moments over dead explanatory panels where coherent
+- if naming / mission handoff / first-step surfaces are touched, bias toward paired interaction language and shared-action framing
 
 ## What landed this pass
 
-### M44.5 — House / HQ first-entry surface, re-homed into the `/app` modal shell
-Completed conservatively inside the House district modal instead of on a standalone route.
+### M44.4 — `/create` completion now hands back into the House modal flow
+The remaining route-shaped founders-loop debt was the `/create` completion handoff: even when Town Hall opened `/create` inside the modal frame, completion still fell forward to raw `/house`.
 
-Key changes:
-- added a dedicated HQ-first-entry surface inside `public/views/house.html`
-  - root: `#houseHqEntryPanel`
-  - machine markers: `data-zhc-phase="house_ready"`, `data-zhc-progress-step="6"`, `data-zhc-progress-total="9"`, `data-zhc-overlay-state="ready"`, `data-zhc-next-unlock="first_mission"`
-  - this surface stays inside the existing `/app` modal flow
-- re-framed House as HQ within the modal shell
-  - first visible rooms now call out: mission lane, memory, workshop, and mailroom
-  - copy explicitly says the operating shell stays inside `/app`
-- made one obvious primary move for the HQ-ready state
-  - new button: `#houseHqStartMissionBtn`
-  - it opens the existing Experiences surface as the conservative “mission lane” handoff inside the same modal shell
-- kept deeper systems present but de-emphasized
-  - `houseConsolePanel` now separates `Day-one rooms` from `Later-loop / deep ops`
-  - Tracks / Archive / Trainer remain reachable, but they are no longer framed as the first thing the player should do
-- preserved existing House modal entry-point behavior
-  - trainer entry still works
-  - workshop entry still works
-  - library entry still works
-- added the modal-correct M44.5 Playwright contract
-  - `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
-- reusable HQ card styling lives in `public/styles.css`
-
-Relevant files:
+That is now corrected inside the modal-only flow:
+- `public/create.js`
+  - embedded ceremony completion now posts a same-origin `agent-town:ceremony-complete` message to the parent shell
+  - embedded fallback now prefers `/app?district=house` instead of continuing deeper into raw route flow
 - `public/app.js`
+  - the `/app` shell now listens for `agent-town:ceremony-complete` from the active district frame
+  - on receipt, it refreshes `/api/state` and swaps the modal from the ceremony iframe back into the House district surface
+- practical result:
+  - Town Hall → crest ceremony still opens inside the district modal frame
+  - ceremony completion now re-homes into the House modal instead of continuing as a raw `/house` iframe/route continuation
+
+### UI trim + pair framing on affected founders-loop surfaces
+This pass also trimmed the most explanatory copy on the touched founder surfaces without changing ZHC markers.
+
+#### Town Hall
+- founder naming copy is shorter and more pair-framed
+  - `Name the human` / `What should your agent call you?`
+  - `Name the agent` / `What should you call your agent?`
+- the registration-processing surface is now terser
+- first-worker / sigil / alignment surfaces were reduced to shorter instrument-panel language
+- alignment handoff now points to `Open crest studio` instead of narrated prose
+
+#### House / HQ
+- HQ copy now frames the house as a paired operating surface inside the modal shell
+- room cards were shortened to functional labels and concise affordances
+- primary action is now `Open mission`
+- mission handoff copy is shorter and shared-task oriented
+
+### New / updated contract coverage
+- added: `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
+  - verifies ceremony completion re-homes from the `/create` iframe into the House modal shell
+- updated: `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
+  - relaxed a stale `mission lane` text expectation to the now-trimmed `mission` surface wording
+
+## Files changed in this slice
+
+- `public/app.js`
+- `public/create.js`
+- `public/views/townhall.html`
 - `public/views/house.html`
-- `public/styles.css`
 - `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
+- `e2e/428_zhc0_ceremony_modal_handoff.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused M44.5 modal contract
-
+### First focused founders-loop/modal sweep
 ```bash
-npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js
+npx playwright test e2e/59_townhall_worker_single_path_modal.spec.js e2e/417_zhc0_townhall_founder_progress.spec.js e2e/418_zhc0_alignment_gate.spec.js e2e/419_zhc0_create_crest_contract.spec.js e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/425_zhc0_founders_loop_resume_contract.spec.js e2e/426_zhc0_founders_loop_machine_projection.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
 ```
 
 Result:
-- `1 passed`
+- `11 passed`
+- `1 failed`
+- failure was expected text drift in `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
+  - old assertion expected `/mission lane/i`
+  - trimmed UI now presents `Mission`
 
-### Focused House-modal regression sweep after re-homing M44.5 into `/app`
-
+### Green rerun after updating the stale expectation
 ```bash
-npx playwright test \
-  e2e/420_zhc0_house_first_entry_hq_surface.spec.js \
-  e2e/149_house_trainer_minimal_view.spec.js \
-  e2e/200_workshop_editor_surface.spec.js \
-  e2e/261_house_library_icon_first_storefront.spec.js
+npx playwright test e2e/59_townhall_worker_single_path_modal.spec.js e2e/417_zhc0_townhall_founder_progress.spec.js e2e/418_zhc0_alignment_gate.spec.js e2e/419_zhc0_create_crest_contract.spec.js e2e/420_zhc0_house_first_entry_hq_surface.spec.js e2e/425_zhc0_founders_loop_resume_contract.spec.js e2e/426_zhc0_founders_loop_machine_projection.spec.js e2e/428_zhc0_ceremony_modal_handoff.spec.js
 ```
 
 Result:
-- `5 passed`
+- `12 passed`
 
 ## What I verified
 
-- the HQ-first-entry surface now lives inside the House modal on `/app`, not on a standalone `/house` page
-- once a House is attached to the current session, the modal exposes a clear HQ surface with mission / memory / workshop / mailroom framing
-- there is exactly one visible founders-loop primary action on that surface
-- the primary action opens the existing Experiences surface inside the same modal shell
-- pre-existing House modal regressions for trainer, workshop, and library entry points stayed green after the re-home
+- Town Hall still opens the ceremony in the district modal frame on `/app`
+- completing the embedded ceremony can now hand back into the House district modal instead of continuing the route-based `/house` path
+- the House HQ-first-entry surface still exposes exactly one primary action in the ready state
+- the affected founders-loop surfaces are materially less narrated and more functional
+- the touched naming / alignment / mission surfaces now lean more toward human+agent shared-action framing
 
-## Conflicts / honest gaps
+## Honest gaps / remaining debt
 
-- **Known architecture conflict:** M44.4 still presents part of the founder journey through standalone `/create` (and the older raw `/house` path still exists). Per Robin’s correction, that is now technical/product debt, not target architecture.
-- this pass did **not** yet re-home the M44.4 crest/house handoff out of standalone route flow
-- the “mission lane” is still the conservative Experiences handoff, not a bespoke Step 7 mission implementation yet
-- no modal screenshot evidence has been captured yet after the architecture correction
+- the primary flow is now modal-correct, but standalone `/create` still exists as a support route; this pass did **not** delete that page
+- the new Robin direction about co-authored wins is only partially expressed so far through copy/handoff framing
+  - no bespoke paired interaction mechanic landed yet
+  - the example Robin gave (`house naming as a conversation`) is still future work
+- `Mission` is still the conservative handoff into the existing Experiences surface, not a bespoke Step 7 paired interaction yet
+- no screenshot evidence was captured in this pass
 
 ## What I did **not** do
 
 - no push
-- did **not** extend standalone `/create` or raw `/house` as the journey target
-- did **not** modify the artifact chain (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`) in this pass
-- did **not** start a bespoke Step 7 mission implementation yet
+- did **not** remove the standalone `/create` page itself
+- did **not** start a bespoke naming conversation or Step 7 mission mechanic yet
+- did **not** modify the deeper founders-loop artifacts (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`) in this pass
 
 ## Next exact pickup
 
-Most conservative next move:
-1. re-home the remaining route-based founder journey handoff (`/create` → raw `/house`) into Town Hall / House modal flow on `/app`
-2. keep `e2e/420_zhc0_house_first_entry_hq_surface.spec.js` as the contract anchor while adding the next modal-correct founders-loop test
-3. decide the smallest viable Step 7 mission contract that still stays inside the same `/app` modal shell
-4. capture modal screenshot evidence once the corrected flow stabilizes a bit more
+Smallest coherent next slice:
+1. turn one early post-crest / early-HQ action into a **real co-authored moment** instead of just trimmed copy
+2. best candidate right now: make the first House naming / mission-selection move feel like a concise human+agent exchange inside the existing `/app` modal shell
+3. preserve the modal-only rule and keep one obvious primary action per state
+4. add a focused contract around that paired interaction rather than broadening the journey all at once
 
 ## Repo state notes
 
-The modal-correct M44.5 slice is local in this worktree.
-
-There is still a pre-existing unrelated `package-lock.json` modification outside this founders-loop slice. Treat the worktree as dirty when resuming, and avoid sweeping that file into the next pass unless explicitly intended.
+- this modal handoff correction is local in this worktree
+- there is still a pre-existing unrelated `package-lock.json` modification outside this founders-loop slice; avoid sweeping it into the next commit unless explicitly intended

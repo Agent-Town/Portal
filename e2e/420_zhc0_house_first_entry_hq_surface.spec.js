@@ -59,7 +59,7 @@ test('M44.5 house first entry stays in the /app modal shell and frames House as 
   await expect(root).toContainText(/headquarters/i);
   await expect(root).toContainText(/modal/i);
 
-  await expect(page.getByTestId('zhc-house-room-mission')).toContainText(/mission lane/i);
+  await expect(page.getByTestId('zhc-house-room-mission')).toContainText(/mission/i);
   await expect(page.getByTestId('zhc-house-room-memory')).toContainText(/memory/i);
   await expect(page.getByTestId('zhc-house-room-workshop')).toContainText(/workshop/i);
   await expect(page.getByTestId('zhc-house-room-mailroom')).toContainText(/mailroom/i);
