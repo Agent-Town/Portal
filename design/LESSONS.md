@@ -127,3 +127,23 @@ Voice-ready UI starts now by making:
 5. the full test suite remains green,
 6. the main action is understandable without AI jargon,
 7. English and Chinese remain plausible first-class targets.
+
+## 15. Use a display face for world identity and a system UI face for comprehension
+
+The product needs a memorable world voice and a calm reading voice at the same time.
+
+Rule:
+
+1. decorative display typography should lead headings and world identity,
+2. buttons, labels, forms, metadata, and body copy should use the calmer UI stack,
+3. international and Chinese fallback support matters more than a perfectly themed Latin-only UI font.
+
+## 16. Secondary controls need their own compact size
+
+When the global button system becomes more touch-friendly, compact secondary controls must not inherit full primary size by accident.
+
+Rule:
+
+1. primary actions can be large,
+2. chip rows, toolbar controls, and review toggles need a smaller button variant,
+3. always verify dense mobile clusters after increasing global control size.

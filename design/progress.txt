@@ -15,6 +15,7 @@ Current state:
 - Added phased design specs in `design/specs/`
 - Added master implementation roadmap for all currently known frontend audit findings
 - Added cross-cutting global human-first design requirements for low-AI-literacy, international, Chinese, provider-flexible, and future voice-ready design
+- Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start
   - /app town hub
@@ -29,12 +30,21 @@ Completed:
 - Future design agent workflow documented
 - Frontend execution order documented from system foundation through polish
 - Cross-cutting audience and localization constraints documented for future design implementation
+- Phase D1 implemented:
+  - display and UI typography separated
+  - spacing ladder added
+  - radius and depth tokens added
+  - button, pill, panel, and token hierarchy calmed
+  - town modal inner framing reduced
+  - agent dock visual weight reduced without behavior change
+- Verification completed for D1:
+  - targeted Playwright block passed
+  - full `npm test` passed
 
 Not yet done:
-- No design implementation phase has been approved
-- No design token refactor has been implemented
+- D2 through D6 are not implemented
 - No screenshots or before/after evidence pack has been committed as canonical artifacts
 
 Recommended next step:
-- Approve Phase D1 before any frontend design implementation begins
+- Approve Phase D2 before the next frontend design implementation begins
 - Require every future design phase to satisfy `design/specs/09_global_human_first_design_requirements.md`

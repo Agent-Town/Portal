@@ -1,6 +1,6 @@
 # Phase D1 - Foundation And Tokens TDD Spec
 
-Status: Draft
+Status: Implemented on `codex/frontend-design`
 
 ## 1. Goal
 

@@ -1,6 +1,6 @@
 # DESIGN_SYSTEM
 
-Status: baseline source-of-truth for design work
+Status: current source-of-truth after Phase D1 foundation
 Last updated: 2026-03-16
 
 This file documents the current visual system, the non-negotiable design principles, and the allowed token vocabulary for future design agents.
@@ -42,14 +42,18 @@ These are the current implemented token families.
 
 Current baseline:
 
-1. `--font-display: "Wellfleet", serif`
-2. `--font-ui: "Wellfleet", serif`
-3. `--font-accent: "Wellfleet", serif`
+1. `--font-display: "Wellfleet", "Songti SC", "STSong", serif`
+2. `--font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif`
+3. `--font-accent: "Wellfleet", "Songti SC", "STSong", serif`
+4. `--font-body: var(--font-ui)`
+5. `--font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace`
 
-Current design debt:
+Current design note:
 
-1. display and UI text use the same font voice,
-2. metadata, labels, buttons, and body copy do not separate clearly from world-building headings.
+1. D1 separated display from UI text,
+2. world-facing headings keep the display voice,
+3. body, labels, buttons, and metadata now use the calmer UI stack,
+4. the UI stack is intentionally system-based for international and Chinese fallback safety.
 
 ### 3.2 Core colors
 
@@ -89,50 +93,58 @@ Current design debt:
 
 ### 3.3 Borders and radii
 
-Current implemented values appear repeatedly:
+Current baseline:
 
-1. border widths: `2px`, `3px`
-2. radii: `8px`, `10px`, `12px`, `14px`, `18px`, `999px`
+1. border widths still appear as `1px`, `2px`, and `3px` depending on shell strength
+2. standard radius tokens are:
+   - `--radius-sm: 8px`
+   - `--radius-md: 12px`
+   - `--radius-lg: 16px`
+   - `--radius-xl: 20px`
+   - `--radius-pill: 999px`
 
 Current design debt:
 
-1. the system uses too many nearby radius values,
-2. panel, button, pill, and card curves feel related but not deliberate enough.
+1. some legacy route-specific surfaces still use older one-off radius values,
+2. later phases should continue migrating remaining `10px`, `14px`, and `18px` one-offs to the standard scale where safe.
 
 ### 3.4 Spacing
 
-Current spacing values appear repeatedly:
+Current baseline:
 
-1. `4px`
-2. `6px`
-3. `8px`
-4. `10px`
-5. `12px`
-6. `14px`
-7. `16px`
-8. `18px`
-9. `20px`
+1. `--space-1: 4px`
+2. `--space-2: 8px`
+3. `--space-3: 12px`
+4. `--space-4: 16px`
+5. `--space-5: 24px`
+6. `--space-6: 32px`
+7. `--space-7: 48px`
 
 Current design debt:
 
-1. spacing is not yet operating from a clearly enforced ladder,
-2. dense screens feel assembled rather than rhythmically composed.
+1. some older screen-specific rules still use legacy values like `6px`, `10px`, `14px`, `18px`, and `20px`,
+2. later phases should continue replacing those with the formal ladder as individual surfaces are redesigned.
 
 ### 3.5 Shadows and depth
 
-Current style relies heavily on:
+Current baseline:
 
-1. outer shadow,
-2. inset highlight,
-3. thick border,
-4. background gradient,
-5. occasional inner frame line.
+1. `--depth-control`
+2. `--depth-surface`
+3. `--depth-modal`
+4. `--focus-ring`
+5. softer `--border-soft` surface separation
+
+Current design note:
+
+1. D1 introduced an explicit control versus surface versus modal depth model,
+2. panels, buttons, pills, and tokens are calmer than the pre-D1 baseline,
+3. nested town-shell and agent-dock surfaces were reduced in emphasis without changing their behavior.
 
 Current design debt:
 
-1. too many layers are visually "raised",
-2. modal shell and inner panel hierarchy are insufficiently separated,
-3. components compete for emphasis.
+1. some ornate route-specific shells still carry stronger framing than ideal,
+2. D3 and D5 still need to complete the hierarchy cleanup in modal interiors and the agent sidebar.
 
 ## 4. Current component families
 
@@ -214,24 +226,18 @@ Every design change must also preserve or improve:
 
 These are approved as design direction for future phase planning, but not yet implemented globally:
 
-1. separate display typography from UI typography,
-2. define a smaller set of standard radii,
-3. define a formal spacing ladder,
-4. define a formal depth hierarchy,
-5. keep the world expressive while making interface surfaces quieter,
-6. move advanced controls behind progressive disclosure by default,
-7. use simple human verbs in primary flows,
-8. build layouts that remain composed for English and Chinese,
-9. maintain a control vocabulary that can later support voice interaction.
+1. complete the migration of legacy one-off spacing and radius values,
+2. keep the world expressive while making interface surfaces quieter,
+3. move advanced controls behind progressive disclosure by default,
+4. use simple human verbs in primary flows,
+5. build layouts that remain composed for English and Chinese,
+6. maintain a control vocabulary that can later support voice interaction.
 
 ## 9. Pending additions required before major implementation
 
-Future approved implementation phases should add explicit tokens for:
+Future approved implementation phases should add or finish:
 
-1. spacing scale,
-2. radius scale,
-3. depth scale,
-4. control heights,
-5. focus ring,
-6. motion durations and easing curves,
-7. text roles beyond the current font assignment.
+1. motion durations and easing curves,
+2. route-specific shell tokens for the town modal family,
+3. remaining legacy value cleanup across older surfaces,
+4. any additional text-role tokens needed after D2 through D5.
