@@ -87,10 +87,58 @@
 
 <div class="divider"></div>
 
+<div
+  class="panel hero is-hidden"
+  id="houseHqEntryPanel"
+  data-testid="zhc-house-hq-surface"
+  data-zhc-phase="house_ready"
+  data-zhc-progress-step="6"
+  data-zhc-progress-total="9"
+  data-zhc-overlay-state="ready"
+  data-zhc-next-unlock="first_mission"
+>
+  <div class="kv">
+    <span class="pill"><strong>Step 6</strong> of 9</span>
+    <span class="pill">Founder HQ</span>
+    <span class="pill">Modal on /app</span>
+  </div>
+  <h2 style="margin:0 0 6px">Your headquarters is live.</h2>
+  <p class="small" id="houseHqLead" style="margin-top:0">
+    House now acts as the company HQ inside the `/app` modal shell: start with the mission lane, keep memory close,
+    keep the workshop nearby, and leave the later-loop archive/trainer tools below until you need them.
+  </p>
+  <div class="house-hq-grid" style="margin-top:8px;">
+    <section class="house-hq-card" data-testid="zhc-house-room-mission">
+      <span class="pill">Next move</span>
+      <h2>Mission lane</h2>
+      <p>Open the first working lane from inside House instead of bouncing to a separate route.</p>
+    </section>
+    <section class="house-hq-card" data-testid="zhc-house-room-memory">
+      <span class="pill">Room</span>
+      <h2>Memory</h2>
+      <p>Library stays legible as the pair’s shared memory room, not buried inside later-loop tooling.</p>
+    </section>
+    <section class="house-hq-card" data-testid="zhc-house-room-workshop">
+      <span class="pill">Room</span>
+      <h2>Workshop</h2>
+      <p>Config lineage, inbox handoff, and active working files stay reachable from the same modal HQ.</p>
+    </section>
+    <section class="house-hq-card" data-testid="zhc-house-room-mailroom">
+      <span class="pill">Room</span>
+      <h2>Mailroom</h2>
+      <p>The inbox remains part of the House operating shell instead of becoming a separate journey step.</p>
+    </section>
+  </div>
+  <div class="kv" style="margin-top:12px;">
+    <button class="btn primary" id="houseHqStartMissionBtn" type="button" data-testid="house-hq-start-mission" data-zhc-primary-action="true">Open mission lane</button>
+  </div>
+  <div class="small" id="houseHqStatus" style="min-height:1.4em; color: var(--muted);"></div>
+</div>
+
 <div class="panel" id="houseConsolePanel" data-testid="house-console-panel">
-  <h2 style="margin:0 0 6px">House Console</h2>
+  <h2 style="margin:0 0 6px">HQ systems</h2>
   <p class="small" style="margin-top:0">
-    Read-only access to the canonical archive and durable trainer outputs for this house.
+    Start with the HQ surface above. The canonical archive, trainer outputs, and deeper operating rooms stay here when you actually need them.
   </p>
   <div class="kv" style="margin-bottom:8px;">
     <label class="small" for="houseTeamSelect">Team</label>
@@ -99,10 +147,14 @@
   <div class="small" id="houseTeamSummary" data-testid="house-team-summary" style="margin-bottom:8px;">
     Attach a house to inspect team-specific archive and trainer records.
   </div>
+  <div class="small" style="margin:10px 0 4px;">Day-one rooms</div>
   <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseExperiencesBtn" type="button" data-testid="house-open-experiences">Open Experiences</button>
     <button class="btn" id="houseWorkshopBtn" type="button" data-testid="house-open-workshop">Open Workshop</button>
     <button class="btn" id="houseLibraryBtn" type="button" data-testid="house-open-library">Open Library</button>
+  </div>
+  <div class="small" style="margin:10px 0 4px;">Later-loop / deep ops</div>
+  <div class="kv" style="margin-bottom:8px;">
     <button class="btn" id="houseTracksBtn" type="button" data-testid="house-open-tracks">Open Tracks</button>
     <button class="btn" id="houseArchiveBtn" type="button" data-testid="house-open-archive">Open Archive</button>
     <button class="btn" id="houseTrainerBtn" type="button" data-testid="house-open-house-trainer">Open Trainer</button>

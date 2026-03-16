@@ -1779,6 +1779,28 @@ function syncHouseSurfaceContextFromState(state) {
   });
 }
 
+function isHouseHqFirstEntryReady() {
+  return !!String(houseSurfaceState.context.houseId || '').trim();
+}
+
+function renderHouseHqEntrySurface() {
+  const panel = el('houseHqEntryPanel');
+  const statusNode = el('houseHqStatus');
+  const startMissionBtn = el('houseHqStartMissionBtn');
+  if (!panel) return;
+  const ready = isHouseHqFirstEntryReady();
+  panel.classList.toggle('is-hidden', !ready);
+  if (startMissionBtn) startMissionBtn.disabled = !ready;
+  if (!ready) return;
+  const houseId = String(houseSurfaceState.context.houseId || '').trim();
+  const activeTeamId = String(houseSurfaceState.context.activeTeamId || '').trim();
+  if (statusNode) {
+    statusNode.textContent = houseId
+      ? `House ${houseId}${activeTeamId ? ` · team ${activeTeamId}` : ''}. Start with the mission lane above; later-loop archive and trainer tools stay below.`
+      : 'Attach a house to bring the HQ surface online.';
+  }
+}
+
 function renderHouseSurfaceContext() {
   const selectNode = el('houseTeamSelect');
   const summaryNode = el('houseTeamSummary');
@@ -1803,6 +1825,7 @@ function renderHouseSurfaceContext() {
       selectNode.value = activeTeamId;
     }
   }
+  renderHouseHqEntrySurface();
   if (!summaryNode) return;
   if (!houseSurfaceState.context.houseId) {
     summaryNode.textContent = 'Attach a house to inspect team-specific archive and trainer records.';
@@ -8799,15 +8822,30 @@ function bindTownDistrictControls() {
     };
   }
 
+  const openHouseMissionLane = async () => {
+    const missionBtn = el('houseHqStartMissionBtn');
+    const consoleBtn = el('houseExperiencesBtn');
+    if (missionBtn) missionBtn.disabled = true;
+    if (consoleBtn) consoleBtn.disabled = true;
+    try {
+      await loadHouseExperiencesSurface();
+    } finally {
+      if (missionBtn) missionBtn.disabled = false;
+      if (consoleBtn) consoleBtn.disabled = false;
+    }
+  };
+
+  const houseHqStartMissionBtn = el('houseHqStartMissionBtn');
+  if (houseHqStartMissionBtn) {
+    houseHqStartMissionBtn.onclick = async () => {
+      await openHouseMissionLane();
+    };
+  }
+
   const houseExperiencesBtn = el('houseExperiencesBtn');
   if (houseExperiencesBtn) {
     houseExperiencesBtn.onclick = async () => {
-      houseExperiencesBtn.disabled = true;
-      try {
-        await loadHouseExperiencesSurface();
-      } finally {
-        houseExperiencesBtn.disabled = false;
-      }
+      await openHouseMissionLane();
     };
   }
 

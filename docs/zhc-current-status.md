@@ -1,111 +1,112 @@
 # ZHC Current Status Snapshot
 
-Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 conservative alignment/crest gating slice complete and green  
-Last updated: 2026-03-16 20:09 Asia/Bangkok  
+Status: M44.1 complete, M44.2 contract/mechanics complete, M44.3 Town Hall founder-progression slice complete, M44.4 logic/gating coverage still green but now has a route-architecture conflict, M44.5 HQ-first-entry has been re-homed into the `/app` modal flow and is green  
+Last updated: 2026-03-16 20:58 Asia/Bangkok  
 Branch: `zhc0-founders-loop`  
 Worktree: `/Users/robin/.openclaw/workspace/Portal-zhc0`
 
+## Architecture correction (authoritative)
+
+Robin clarified a hard product constraint during this pass:
+- the whole founder journey must stay in modals on top of `/app`
+- do **not** continue building the journey as standalone pages
+- treat this as higher priority than prior route-based assumptions
+
+What that means right now:
+- the earlier standalone-route M44.5 HQ-first-entry prototype on raw `/house` is **not** the target architecture and was not kept as the current slice
+- the useful M44.5 learnings were re-homed into the House modal surface under `/app`
+- the existing M44.4 `/create`-based presentation is now a known architecture conflict/debt; keep its gating learnings, but do **not** extend that standalone route as the long-term journey shape
+
 ## What landed this pass
 
-### M44.4 — alignment / crest gating (conservative slice)
-Completed for the alignment-passed handoff plus `/create` gating contract.
+### M44.5 — House / HQ first-entry surface, re-homed into the `/app` modal shell
+Completed conservatively inside the House district modal instead of on a standalone route.
 
 Key changes:
-- added an explicit Town Hall alignment-passed handoff panel
-  - root: `#townhallAlignmentPanel`
-  - machine markers: `data-zhc-phase="alignment_passed"`, `data-zhc-overlay-state="success_feedback"`, `data-zhc-progress-step="4"`, `data-zhc-progress-total="9"`, `data-zhc-next-unlock="create"`
-  - primary move is now explicit: `Create crest`
-- removed the premature Town Hall House CTA leak from the alignment handoff
-  - `#openReady` now exposes `/create`
-  - no `/house` link is shown in the alignment-passed state
-- added machine-visible crest gating markers to `/create`
-  - root: `#zhcCreateRoot`
-  - blocked state: `data-zhc-blocker-key="needs_crest"`
-  - ready state flips once the player paints ink onto the crest canvas
-  - `Generate house key` remains the single visible primary action on the page
-- kept scope tight to measurable gating only
-  - `/create` is still blocked before the co-op sigil pass exists
-  - House/HQ CTA remains hidden before crest creation
-  - no artifact-chain changes; this slice stayed UI-contract/local-state only
-- fixed one regression while landing the slice
-  - initial alignment override accidentally stripped `data-zhc-primary-action` from the earlier `Open Brain` gate
-  - corrected by only overriding primary-action ownership while the alignment-passed handoff is actually active
+- added a dedicated HQ-first-entry surface inside `public/views/house.html`
+  - root: `#houseHqEntryPanel`
+  - machine markers: `data-zhc-phase="house_ready"`, `data-zhc-progress-step="6"`, `data-zhc-progress-total="9"`, `data-zhc-overlay-state="ready"`, `data-zhc-next-unlock="first_mission"`
+  - this surface stays inside the existing `/app` modal flow
+- re-framed House as HQ within the modal shell
+  - first visible rooms now call out: mission lane, memory, workshop, and mailroom
+  - copy explicitly says the operating shell stays inside `/app`
+- made one obvious primary move for the HQ-ready state
+  - new button: `#houseHqStartMissionBtn`
+  - it opens the existing Experiences surface as the conservative “mission lane” handoff inside the same modal shell
+- kept deeper systems present but de-emphasized
+  - `houseConsolePanel` now separates `Day-one rooms` from `Later-loop / deep ops`
+  - Tracks / Archive / Trainer remain reachable, but they are no longer framed as the first thing the player should do
+- preserved existing House modal entry-point behavior
+  - trainer entry still works
+  - workshop entry still works
+  - library entry still works
+- added the modal-correct M44.5 Playwright contract
+  - `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
+- reusable HQ card styling lives in `public/styles.css`
 
 Relevant files:
 - `public/app.js`
-- `public/views/townhall.html`
-- `public/create.html`
-- `public/create.js`
-- `e2e/418_zhc0_alignment_gate.spec.js`
-- `e2e/419_zhc0_create_crest_contract.spec.js`
+- `public/views/house.html`
+- `public/styles.css`
+- `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
 - `docs/zhc-current-status.md`
 
 ## Evidence runs
 
-### Focused M44.4 command
+### Focused M44.5 modal contract
 
 ```bash
-npx playwright test \
-  e2e/418_zhc0_alignment_gate.spec.js \
-  e2e/419_zhc0_create_crest_contract.spec.js
+npx playwright test e2e/420_zhc0_house_first_entry_hq_surface.spec.js
 ```
 
 Result:
-- `3 passed`
+- `1 passed`
 
-### Focused founders-loop regression sweep after the M44.4 changes
+### Focused House-modal regression sweep after re-homing M44.5 into `/app`
 
 ```bash
 npx playwright test \
-  e2e/37_phase1_lite_agent_open_press.spec.js \
-  e2e/38_phase1_create_ceremony_regression.spec.js \
-  e2e/44_phase2_vendor_open_press.spec.js \
-  e2e/59_townhall_worker_single_path_modal.spec.js \
-  e2e/415_zhc0_start_entry_contract.spec.js \
-  e2e/416_zhc0_first_worker_ready_gate.spec.js \
-  e2e/417_zhc0_townhall_founder_progress.spec.js \
-  e2e/418_zhc0_alignment_gate.spec.js \
-  e2e/419_zhc0_create_crest_contract.spec.js \
-  e2e/425_zhc0_founders_loop_resume_contract.spec.js \
-  e2e/426_zhc0_founders_loop_machine_projection.spec.js \
-  e2e/427_zhc0_founders_loop_mobile_primary_action.spec.js
+  e2e/420_zhc0_house_first_entry_hq_surface.spec.js \
+  e2e/149_house_trainer_minimal_view.spec.js \
+  e2e/200_workshop_editor_surface.spec.js \
+  e2e/261_house_library_icon_first_storefront.spec.js
 ```
 
 Result:
-- `17 passed`
+- `5 passed`
 
 ## What I verified
 
-- `/create` redirects away on a fresh session, so crest completion stays blocked before alignment passes
-- alignment-passed Town Hall state exposes a dedicated `alignment_passed` handoff with `Create crest` as the only visible primary move
-- Town Hall no longer leaks a House CTA before crest creation
-- `/create` exposes a blocked crest contract until the player adds ink
-- `/create` flips to ready once ink exists, while House still stays hidden until actual crest completion
-- prior M44.1/M44.2/M44.3 coverage remained green in the focused regression sweep
+- the HQ-first-entry surface now lives inside the House modal on `/app`, not on a standalone `/house` page
+- once a House is attached to the current session, the modal exposes a clear HQ surface with mission / memory / workshop / mailroom framing
+- there is exactly one visible founders-loop primary action on that surface
+- the primary action opens the existing Experiences surface inside the same modal shell
+- pre-existing House modal regressions for trainer, workshop, and library entry points stayed green after the re-home
 
-## Blockers / honest gaps
+## Conflicts / honest gaps
 
-- screenshot evidence still has not been generated
-- this slice does **not** yet add a dedicated on-screen `crest_created` success handoff before HQ; `/create` still follows the existing house-generation flow once completed
-- M44.5 House/HQ first-entry surface is still the next real milestone
+- **Known architecture conflict:** M44.4 still presents part of the founder journey through standalone `/create` (and the older raw `/house` path still exists). Per Robin’s correction, that is now technical/product debt, not target architecture.
+- this pass did **not** yet re-home the M44.4 crest/house handoff out of standalone route flow
+- the “mission lane” is still the conservative Experiences handoff, not a bespoke Step 7 mission implementation yet
+- no modal screenshot evidence has been captured yet after the architecture correction
 
 ## What I did **not** do
 
 - no push
-- no screenshot artifacts generated yet
-- did **not** modify the artifact chain (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`) because the transition semantics did not move
+- did **not** extend standalone `/create` or raw `/house` as the journey target
+- did **not** modify the artifact chain (`docs/founders-loop-state-model.md`, `design/specs/10_founders_loop_ui_state_projection.md`, `design/specs/11_zhc0_ui_evidence_contract.md`, `specs/43_zhc0_founders_loop_state_contract.md`, `machines/FoundersLoop.machine.ts`) in this pass
+- did **not** start a bespoke Step 7 mission implementation yet
 
 ## Next exact pickup
 
 Most conservative next move:
-1. start M44.5 House / HQ first-entry contract work
-2. add / turn green:
-   - `e2e/420_zhc0_house_first_entry_hq_surface.spec.js`
-3. decide whether the branch still wants an explicit in-UI `crest_created` success handoff on `/create`, or whether that should wait until the House/HQ first-entry slice lands
-4. keep M44.4 gating invariant coverage intact while expanding toward HQ-ready
+1. re-home the remaining route-based founder journey handoff (`/create` → raw `/house`) into Town Hall / House modal flow on `/app`
+2. keep `e2e/420_zhc0_house_first_entry_hq_surface.spec.js` as the contract anchor while adding the next modal-correct founders-loop test
+3. decide the smallest viable Step 7 mission contract that still stays inside the same `/app` modal shell
+4. capture modal screenshot evidence once the corrected flow stabilizes a bit more
 
 ## Repo state notes
 
-Relevant M44.1–M44.4 changes are still local in this worktree.
+The modal-correct M44.5 slice is local in this worktree.
 
-There are also pre-existing dirty items outside the founders-loop slice (notably `package-lock.json`). Treat the worktree as dirty when resuming, and avoid sweeping unrelated files into the next pass.
+There is still a pre-existing unrelated `package-lock.json` modification outside this founders-loop slice. Treat the worktree as dirty when resuming, and avoid sweeping that file into the next pass unless explicitly intended.
