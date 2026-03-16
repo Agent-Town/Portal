@@ -1890,6 +1890,13 @@ function getHouseMissionExperienceEmptyStateCopy(emptyStateText = '') {
   return savedName ? `No experiences routed to ${savedName} HQ yet.` : fallback;
 }
 
+function getHouseMissionExperienceDetailEmptyCopy() {
+  const savedName = getSavedHouseHqName();
+  return savedName
+    ? `Entry points for ${savedName} HQ appear here once an experience is routed in.`
+    : 'Entry points appear here once an experience is routed in.';
+}
+
 function getHouseMissionExperienceDetailCopy(selectedItem = null) {
   const savedName = getSavedHouseHqName();
   if (!selectedItem) {
@@ -2254,7 +2261,7 @@ function renderHouseExperiencesSurface() {
   emptyNode.textContent = emptyStateCopy;
   emptyNode.classList.toggle('is-hidden', items.length > 0);
   if (!items.length) {
-    detailNode.textContent = getHouseMissionExperienceDetailCopy();
+    detailNode.textContent = getHouseMissionExperienceDetailEmptyCopy();
     return;
   }
 
