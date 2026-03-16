@@ -1410,12 +1410,15 @@ async function lookupSharePathByHouse(houseId) {
   }
 }
 
-function routeToShareCard(sharePath) {
+function routeToShareCard(sharePath, { houseId = houseSurfaceState.context.houseId } = {}) {
   const normalized = String(sharePath || '').trim();
   if (!normalized) return;
   const resolved = routeToPopupMode(normalized);
   if (resolved?.mode === 'frame') {
-    openRouteInModalFrame(resolved.url, resolved.title || 'Share Card');
+    const frameTitle = normalized.startsWith('/s/')
+      ? getHouseShareCardModalTitle({ houseId, sharePath: normalized })
+      : (resolved.title || 'Share Card');
+    openRouteInModalFrame(resolved.url, frameTitle);
     return;
   }
   if (resolved?.mode === 'district') {
@@ -1911,6 +1914,13 @@ function getHouseShareCardCtaLabel({ houseId = houseSurfaceState.context.houseId
   const hasSharePath = String(sharePath || '').trim().startsWith('/s/');
   if (!savedName) return hasSharePath ? 'Open share card' : 'Open share card (preview)';
   return hasSharePath ? `Open ${savedName} HQ share card` : `Preview ${savedName} HQ share card`;
+}
+
+function getHouseShareCardModalTitle({ houseId = houseSurfaceState.context.houseId, sharePath = '' } = {}) {
+  const normalizedSharePath = String(sharePath || '').trim();
+  if (!normalizedSharePath.startsWith('/s/')) return 'Share Card';
+  const savedName = getSavedHouseHqName(houseId);
+  return savedName ? `${savedName} HQ share card` : 'Share Card';
 }
 
 function getHouseShareCardMissingStatusText(houseId = houseSurfaceState.context.houseId) {
@@ -9181,7 +9191,7 @@ function bindTownDistrictControls() {
             shareCardStatus.textContent = '';
           }
         }
-        routeToShareCard(sharePath);
+        routeToShareCard(sharePath, { houseId });
       } catch (err) {
         if (shareCardStatus) {
           shareCardStatus.textContent = `Share card unavailable: ${String(err?.message || 'UNKNOWN_ERROR')}`;
