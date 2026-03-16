@@ -25,6 +25,14 @@ Current state:
   - one advanced/detail projection
   - one LLM explanation/action projection
   - all layers must stay semantically aligned
+- Added formal TLA+ model for the no-drift projection rule in `design/formal/`:
+  - canonical meaning
+  - simple human summary projection
+  - advanced/detail projection
+  - LLM-complete projection
+  - voice-aligned projection
+  - checked by invariant rather than taste alone
+  - verified locally with TLC 2.19
 - Implemented Phase D1 foundation in `public/styles.css`
 - Recorded March 2026 baseline audit findings for:
   - /start

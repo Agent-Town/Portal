@@ -32,6 +32,14 @@ The `specs/` subfolder mirrors the repo's engineering TDD style, but for design 
 4. each spec defines evidence requirements for mobile, tablet, and desktop,
 5. no design implementation should begin without explicit approval of the phase.
 
+The `formal/` subfolder holds machine-checkable semantic models for design rules that cross UI layers:
+
+1. canonical product meaning,
+2. simple human summary,
+3. advanced/detail disclosure,
+4. LLM explanation/action surface,
+5. future voice alignment.
+
 ## LLM-first information architecture rule
 
 The user is assumed to have an always-available LLM companion inside the product.
@@ -66,6 +74,18 @@ Read in this order before proposing changes:
 11. `specs/09_global_human_first_design_requirements.md`
 
 Then read only the approved phase spec(s) you need to execute.
+
+If the task changes how meaning is projected between:
+
+1. the simple human UI,
+2. advanced/detail drawers,
+3. LLM explanations or actions,
+4. future voice-first naming,
+
+also read:
+
+1. `formal/README.md`
+2. `formal/DesignProjectionNoDrift.tla`
 
 ## Design scope guardrail
 

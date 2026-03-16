@@ -27,7 +27,11 @@ Before touching any UI file:
 8. inspect the live app in this order:
    - mobile,
    - tablet,
-   - desktop.
+   - desktop,
+9. if the phase changes semantic projection across simple UI, advanced detail, LLM explanation, or future voice labels:
+   - read `design/formal/README.md`,
+   - read `design/formal/DesignProjectionNoDrift.tla`,
+   - update the formal model if the semantic contract changes.
 
 ## 3. Required audit viewports
 
@@ -116,6 +120,8 @@ For any concept that appears in multiple layers, the future design agent must ch
 3. the phrasing and structure the LLM would use to explain it.
 
 If those three do not align, the phase is not complete.
+
+If the phase changes the underlying semantic contract, rerun TLC for `design/formal/DesignProjectionNoDrift.tla` when a verification-capable environment is available.
 
 ## 7. Verification commands
 

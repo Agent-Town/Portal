@@ -23,6 +23,11 @@ Cross-cutting rule:
 4. `09_global_human_first_design_requirements.md`
 5. approved phase spec(s) only
 
+If a phase changes what the default UI summarizes versus what advanced views, the LLM, or future voice affordances may express, also read:
+
+1. `../formal/README.md`
+2. `../formal/DesignProjectionNoDrift.tla`
+
 ## Spec structure
 
 Every design spec should include:

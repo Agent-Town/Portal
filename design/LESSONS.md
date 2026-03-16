@@ -279,3 +279,15 @@ Rule:
 2. the LLM can explain more than the default UI,
 3. but all three must still describe the same underlying reality,
 4. summarize by compression, not by inventing a different product model.
+
+## 29. Formalize semantic design rules when they cross surfaces
+
+Not every design rule belongs in a formal model.
+This one does.
+
+Rule:
+
+1. aesthetics stay in design review,
+2. semantic projection rules can be encoded,
+3. when simple UI, advanced UI, LLM explanation, and future voice labels must stay aligned, write the invariant down,
+4. if a future design phase changes that contract, update the formal model instead of relying on memory.
