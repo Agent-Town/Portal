@@ -1884,6 +1884,12 @@ function getHouseMissionPanelCopy() {
   };
 }
 
+function getHouseMissionExperienceEmptyStateCopy(emptyStateText = '') {
+  const fallback = String(emptyStateText || '').trim() || 'No House experiences available yet.';
+  const savedName = getSavedHouseHqName();
+  return savedName ? `No experiences routed to ${savedName} HQ yet.` : fallback;
+}
+
 function getHouseMissionExperienceDetailCopy(selectedItem = null) {
   const savedName = getSavedHouseHqName();
   if (!selectedItem) {
@@ -2242,9 +2248,10 @@ function renderHouseExperiencesSurface() {
   if (titleNode) titleNode.textContent = missionCopy.title;
   if (leadNode) leadNode.textContent = missionCopy.lead;
   const items = Array.isArray(houseSurfaceState.experiences.items) ? houseSurfaceState.experiences.items : [];
+  const emptyStateCopy = getHouseMissionExperienceEmptyStateCopy(houseSurfaceState.experiences.emptyStateText);
   listNode.innerHTML = '';
   actionsNode.innerHTML = '';
-  emptyNode.textContent = houseSurfaceState.experiences.emptyStateText || 'No House experiences available yet.';
+  emptyNode.textContent = emptyStateCopy;
   emptyNode.classList.toggle('is-hidden', items.length > 0);
   if (!items.length) {
     detailNode.textContent = getHouseMissionExperienceDetailCopy();
@@ -6474,7 +6481,8 @@ async function loadHouseExperiencesSurface({ skipContext = false } = {}) {
       houseSurfaceState.experiences.selectedExperienceId = String(houseSurfaceState.experiences.items[0].experienceId);
     }
     renderHouseExperiencesSurface();
-    setHouseSurfaceStatus(houseSurfaceState.experiences.items.length ? '' : houseSurfaceState.experiences.emptyStateText);
+    const emptyStateCopy = getHouseMissionExperienceEmptyStateCopy(houseSurfaceState.experiences.emptyStateText);
+    setHouseSurfaceStatus(houseSurfaceState.experiences.items.length ? '' : emptyStateCopy);
   } catch (err) {
     houseSurfaceState.experiences.loaded = true;
     houseSurfaceState.experiences.items = [];
